@@ -720,14 +720,7 @@
       </div>
 
       <!-- Formulário Netlify -->
-      <form class="modal-body" id="cadastro-form"
-        name="cadastro-loja" method="POST"
-        data-netlify="true"
-        data-netlify-honeypot="bot-field">
-
-        <!-- Campo anti-spam invisível -->
-        <input type="hidden" name="form-name" value="cadastro-loja" />
-        <input type="hidden" name="bot-field" style="display:none" />
+      <form class="modal-body" id="cadastro-form" novalidate>
 
         <div class="field-group">
           <label class="field-label" for="f-nome">Nome da loja / empresa <span>*</span></label>
@@ -1546,25 +1539,35 @@
     if (e.target === this) closeModal();
   });
 
-  // Submissão via fetch (AJAX) — sem redirecionar a página
+  // Submissão via Google Apps Script — funciona no GitHub Pages
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwmJMmvb5H6KkMWdXJV441SQ2h18SEfLrb_4-kvUYM0IiVL6Co-EKGGay7f_qvUEi0_cg/exec'; // ← você vai substituir após criar o script
+
   document.getElementById('cadastro-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const btn = this.querySelector('.modal-submit');
-    btn.textContent = 'Enviando...';
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Enviando...';
     btn.style.opacity = '0.7';
     btn.disabled = true;
 
     try {
-      const data = new FormData(this);
-      await fetch('/', { method: 'POST', body: data });
-      // Sucesso: esconde form, mostra tela de confirmação
+      const formData = new FormData(this);
+      const payload  = Object.fromEntries(formData.entries());
+
+      await fetch(APPS_SCRIPT_URL, {
+        method:  'POST',
+        mode:    'no-cors', // Apps Script exige no-cors
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload),
+      });
+
+      // no-cors não retorna status — assume sucesso se não lançou exceção
       this.style.display = 'none';
       document.getElementById('cadastro-success').classList.add('show');
     } catch {
       btn.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Cadastro';
       btn.style.opacity = '';
       btn.disabled = false;
-      alert('Erro ao enviar. Tente novamente.');
+      alert('Erro ao enviar. Verifique sua conexão e tente novamente.');
     }
   });
 

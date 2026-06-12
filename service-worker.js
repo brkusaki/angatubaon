@@ -1,12 +1,21 @@
-const CACHE = 'angatubaon-v1';
-const FILES = ['/', '/index.html', '/manifest.json'];
-
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
-});
-
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  
+  // Não intercepta chamadas externas (Apps Script, etc.)
+  if (!e.request.url.startsWith(self.location.origin)) return;
+  
+  const isHTML = e.request.destination === 'document';
+  
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
+    isHTML
+      ? fetch(e.request)
+          .then(r => {
+            const clone = r.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
+            return r;
+          })
+          .catch(() => caches.match(e.request))
+      : caches.match(e.request)
+          .then(r => r || fetch(e.request))
   );
 });

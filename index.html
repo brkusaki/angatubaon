@@ -831,9 +831,13 @@
   const CAT_BG = Object.fromEntries(CATEGORIAS.map(c => [c.id, c.bg]));
 
   /* ══════════════════════════════════════════════════════════════
-     LOJAS
+     LOJAS — carregadas dinamicamente do Google Sheets via Apps Script
+     Lojas hardcoded abaixo são o fallback caso a API falhe
   ══════════════════════════════════════════════════════════════ */
-  const LOJAS = [
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwmJMmvb5H6KkMWdXJV441SQ2h18SEfLrb_4-kvUYM0IiVL6Co-EKGGay7f_qvUEi0_cg/exec';
+
+  // Lojas fixas (fallback offline / enquanto carrega)
+  const LOJAS_FIXAS = [
     {
       nome:        'Pizzaria Ferreira',
       categoria:   'pizzaria',
@@ -1136,6 +1140,9 @@
       horario:     { dias:[1,2,3,4,5], abre:'08:00', fecha:'19:00' },
     },
   ];
+
+  // Array ativo — começa com as fixas, substituído pelas da API quando carregar
+  let LOJAS = [...LOJAS_FIXAS];
 
   /* ══════════════════════════════════════════════════════════════
      ENGINE
@@ -1540,8 +1547,6 @@
   });
 
   // Submissão via Google Apps Script — funciona no GitHub Pages
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwmJMmvb5H6KkMWdXJV441SQ2h18SEfLrb_4-kvUYM0IiVL6Co-EKGGay7f_qvUEi0_cg/exec'; // ← você vai substituir após criar o script
-
   document.getElementById('cadastro-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const btn = this.querySelector('.modal-submit');
@@ -1640,10 +1645,43 @@
     });
   }
 
+  /* ── Carrega lojas da API (Apps Script → Google Sheets) ─────── */
+  // O Apps Script não envia CORS headers nativamente.
+  // Solução: usamos allorigins.win como proxy CORS gratuito.
+  // Se o proxy falhar, o site continua funcionando com LOJAS_FIXAS.
+  async function carregarLojas() {
+    const PROXY = 'https://api.allorigins.win/get?url=';
+    const url   = encodeURIComponent(APPS_SCRIPT_URL);
+
+    try {
+      const resp = await fetch(PROXY + url, { signal: AbortSignal.timeout(8000) });
+      if (!resp.ok) throw new Error('Proxy HTTP ' + resp.status);
+
+      const outer = await resp.json();
+      if (!outer.contents) throw new Error('Proxy sem conteúdo');
+
+      const json = JSON.parse(outer.contents);
+      if (json.status === 'ok' && Array.isArray(json.data) && json.data.length > 0) {
+        LOJAS = json.data;
+        renderLojas();
+        renderCategorias();
+        console.log('[AngatubaON] ' + json.data.length + ' lojas carregadas da API ✅');
+      } else {
+        console.warn('[AngatubaON] API retornou dados vazios — usando fallback');
+      }
+    } catch(err) {
+      console.warn('[AngatubaON] API indisponível, usando lojas fixas:', err.message);
+      // LOJAS_FIXAS já estão ativas — não precisa fazer nada
+    }
+  }
+
   /* ── INIT ────────────────────────────────────────────────── */
   // renderLojas primeiro: popula _statusSnapshot antes de renderCategorias usá-lo
   renderLojas();
   renderCategorias();
+
+  // Carrega lojas dinâmicas em background — substitui LOJAS_FIXAS quando chegar
+  carregarLojas();
   </script>
 </body>
 </html>

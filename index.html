@@ -1558,11 +1558,13 @@
       const formData = new FormData(this);
       const payload  = Object.fromEntries(formData.entries());
 
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify(payload));
+
       await fetch(APPS_SCRIPT_URL, {
-        method:  'POST',
-        mode:    'no-cors', // Apps Script exige no-cors
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(payload),
+        method: 'POST',
+        mode:   'no-cors',
+        body:   params,
       });
 
       // no-cors não retorna status — assume sucesso se não lançou exceção

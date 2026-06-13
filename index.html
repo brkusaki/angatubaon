@@ -1654,10 +1654,13 @@
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const json = await resp.json();
       if (json.status === 'ok' && Array.isArray(json.data) && json.data.length > 0) {
-        LOJAS = json.data;
+        // Junta lojas da API com as fixas, evitando duplicatas pelo nome
+        const nomesApi = new Set(json.data.map(l => l.nome.trim().toLowerCase()));
+        const fixasSemDuplicata = LOJAS_FIXAS.filter(l => !nomesApi.has(l.nome.trim().toLowerCase()));
+        LOJAS = [...json.data, ...fixasSemDuplicata];
         renderLojas();
         renderCategorias();
-        console.log('[AngatubaON] ' + json.data.length + ' lojas carregadas da API ✅');
+        console.log('[AngatubaON] ' + json.data.length + ' da API + ' + fixasSemDuplicata.length + ' fixas ✅');
       } else {
         console.warn('[AngatubaON] API retornou dados vazios — usando fallback');
       }

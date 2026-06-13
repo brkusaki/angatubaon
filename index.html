@@ -1648,21 +1648,11 @@
   }
 
   /* ── Carrega lojas da API (Apps Script → Google Sheets) ─────── */
-  // O Apps Script não envia CORS headers nativamente.
-  // Solução: usamos allorigins.win como proxy CORS gratuito.
-  // Se o proxy falhar, o site continua funcionando com LOJAS_FIXAS.
   async function carregarLojas() {
-    const PROXY = 'https://api.allorigins.win/get?url=';
-    const url   = encodeURIComponent(APPS_SCRIPT_URL);
-
     try {
-      const resp = await fetch(PROXY + url, { signal: AbortSignal.timeout(8000) });
-      if (!resp.ok) throw new Error('Proxy HTTP ' + resp.status);
-
-      const outer = await resp.json();
-      if (!outer.contents) throw new Error('Proxy sem conteúdo');
-
-      const json = JSON.parse(outer.contents);
+      const resp = await fetch(APPS_SCRIPT_URL, { signal: AbortSignal.timeout(10000) });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const json = await resp.json();
       if (json.status === 'ok' && Array.isArray(json.data) && json.data.length > 0) {
         LOJAS = json.data;
         renderLojas();
@@ -1673,7 +1663,6 @@
       }
     } catch(err) {
       console.warn('[AngatubaON] API indisponível, usando lojas fixas:', err.message);
-      // LOJAS_FIXAS já estão ativas — não precisa fazer nada
     }
   }
 

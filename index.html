@@ -603,6 +603,65 @@
       -webkit-tap-highlight-color: transparent;
     }
     .modal-submit:active { transform: scale(0.97); opacity: 0.9; }
+    /* ── Schedule Builder ───────────────────────────────────── */
+    .schedule-builder { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+    .schedule-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      position: relative;
+    }
+    .schedule-card-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 10px;
+    }
+    .schedule-days {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;
+    }
+    .schedule-day-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      font-size: 11px; font-weight: 700;
+      background: var(--surface); color: var(--muted);
+      border: 1.5px solid var(--border);
+      cursor: pointer; transition: all .15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .schedule-day-btn.active {
+      background: var(--accent, #f59e0b);
+      color: #000; border-color: transparent;
+    }
+    .schedule-times {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .schedule-times input[type="time"] {
+      flex: 1; background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px 10px; font-size: 14px; font-family: inherit;
+    }
+    .schedule-times span { color: var(--muted); font-size: 13px; }
+    .schedule-remove {
+      position: absolute; top: 10px; right: 10px;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(255,68,68,.15); color: #ff4444;
+      font-size: 12px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; border: none;
+    }
+    .schedule-add-btn {
+      width: 100%; padding: 10px;
+      background: rgba(245,158,11,.08); color: var(--accent, #f59e0b);
+      border: 1.5px dashed rgba(245,158,11,.3); border-radius: 10px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      transition: background .15s;
+    }
+    .schedule-add-btn:hover { background: rgba(245,158,11,.15); }
+
+
 
     /* Tela de sucesso */
     .modal-success {
@@ -767,9 +826,15 @@
         </div>
 
         <div class="field-group">
-          <label class="field-label" for="f-horario">Horário de funcionamento <span>*</span></label>
-          <input class="field-input" id="f-horario" name="horario" type="text"
-            placeholder="Ex: Seg–Sex 08:00–18:00, Sáb 08:00–12:00" required />
+          <label class="field-label">Horário de funcionamento <span>*</span></label>
+          <div class="schedule-builder" id="schedule-builder"></div>
+          <button type="button" class="schedule-add-btn" id="schedule-add-btn">
+            <i class="fa fa-plus"></i> Adicionar turno diferente
+          </button>
+          <input type="hidden" id="f-horario" name="horario" />
+          <input type="hidden" id="f-dias" name="dias" />
+          <input type="hidden" id="f-hora-abre" name="horaAbre" />
+          <input type="hidden" id="f-hora-fecha" name="horaFecha" />
         </div>
 
         <div class="field-group">
@@ -1546,7 +1611,119 @@
     if (e.target === this) closeModal();
   });
 
+  /* ── Schedule Builder ───────────────────────────────────── */
+  const DIAS_LABEL = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const scheduleBuilder = document.getElementById('schedule-builder');
+  const scheduleAddBtn  = document.getElementById('schedule-add-btn');
+  let scheduleTurnos = []; // [{dias:[1,2,3,4,5], abre:'08:00', fecha:'18:00'}]
+
+  function criarCardTurno(idx) {
+    const turno = scheduleTurnos[idx];
+    const card = document.createElement('div');
+    card.className = 'schedule-card';
+    card.dataset.idx = idx;
+
+    const title = document.createElement('div');
+    title.className = 'schedule-card-title';
+    title.textContent = idx === 0 ? 'Dias e horário principal' : 'Turno adicional';
+    card.appendChild(title);
+
+    // Dias
+    const daysRow = document.createElement('div');
+    daysRow.className = 'schedule-days';
+    DIAS_LABEL.forEach((label, d) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'schedule-day-btn' + (turno.dias.includes(d) ? ' active' : '');
+      btn.textContent = label;
+      btn.dataset.day = d;
+      btn.addEventListener('click', () => {
+        const di = turno.dias.indexOf(d);
+        if (di >= 0) turno.dias.splice(di, 1);
+        else turno.dias.push(d);
+        btn.classList.toggle('active');
+        syncHiddenFields();
+      });
+      daysRow.appendChild(btn);
+    });
+    card.appendChild(daysRow);
+
+    // Horários
+    const timesRow = document.createElement('div');
+    timesRow.className = 'schedule-times';
+
+    const inAbre = document.createElement('input');
+    inAbre.type = 'time'; inAbre.value = turno.abre;
+    inAbre.addEventListener('change', () => { turno.abre = inAbre.value; syncHiddenFields(); });
+
+    const sep = document.createElement('span');
+    sep.textContent = 'até';
+
+    const inFecha = document.createElement('input');
+    inFecha.type = 'time'; inFecha.value = turno.fecha;
+    inFecha.addEventListener('change', () => { turno.fecha = inFecha.value; syncHiddenFields(); });
+
+    timesRow.appendChild(inAbre);
+    timesRow.appendChild(sep);
+    timesRow.appendChild(inFecha);
+    card.appendChild(timesRow);
+
+    // Botão remover (só em cards extras)
+    if (idx > 0) {
+      const rmBtn = document.createElement('button');
+      rmBtn.type = 'button';
+      rmBtn.className = 'schedule-remove';
+      rmBtn.innerHTML = '<i class="fa fa-times"></i>';
+      rmBtn.addEventListener('click', () => {
+        scheduleTurnos.splice(idx, 1);
+        renderScheduleCards();
+        syncHiddenFields();
+      });
+      card.appendChild(rmBtn);
+    }
+
+    return card;
+  }
+
+  function renderScheduleCards() {
+    scheduleBuilder.innerHTML = '';
+    scheduleTurnos.forEach((_, idx) => {
+      scheduleBuilder.appendChild(criarCardTurno(idx));
+    });
+  }
+
+  function syncHiddenFields() {
+    // Monta texto legível: "Seg-Sex 08:00-18:00 | Sáb 08:00-12:00"
+    const texto = scheduleTurnos.map(t => {
+      if (!t.dias.length) return null;
+      const diasNomes = t.dias.sort((a,b)=>a-b).map(d => DIAS_LABEL[d]).join(', ');
+      return diasNomes + ' ' + t.abre + '-' + t.fecha;
+    }).filter(Boolean).join(' | ');
+
+    // Usa o primeiro turno como principal para os campos estruturados
+    const principal = scheduleTurnos[0];
+    const diasStr = scheduleTurnos.flatMap(t => t.dias).filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>a-b).join(',');
+
+    document.getElementById('f-horario').value   = texto;
+    document.getElementById('f-dias').value      = diasStr;
+    document.getElementById('f-hora-abre').value  = principal ? principal.abre  : '';
+    document.getElementById('f-hora-fecha').value = principal ? principal.fecha : '';
+  }
+
+  // Inicializa com um card padrão Seg-Sex
+  scheduleTurnos = [{ dias: [1,2,3,4,5], abre: '08:00', fecha: '18:00' }];
+  renderScheduleCards();
+  syncHiddenFields();
+
+  scheduleAddBtn.addEventListener('click', () => {
+    if (scheduleTurnos.length >= 3) return; // máximo 3 turnos
+    scheduleTurnos.push({ dias: [], abre: '08:00', fecha: '12:00' });
+    renderScheduleCards();
+    syncHiddenFields();
+  });
+
   // Submissão via Google Apps Script — funciona no GitHub Pages
+
   document.getElementById('cadastro-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const btn = this.querySelector('.modal-submit');
@@ -1555,6 +1732,15 @@
     btn.disabled = true;
 
     try {
+      // Valida horário
+      if (!document.getElementById('f-horario').value) {
+        alert('Selecione pelo menos um dia e horário de funcionamento.');
+        btn.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Cadastro';
+        btn.style.opacity = '';
+        btn.disabled = false;
+        return;
+      }
+
       const formData = new FormData(this);
       const payload  = Object.fromEntries(formData.entries());
 

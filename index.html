@@ -856,7 +856,7 @@
           <div class="field-group">
             <label class="field-label" for="f-tel">Telefone fixo</label>
             <input class="field-input" id="f-tel" name="telefone" type="tel"
-              placeholder="(15) 3255-0000" autocomplete="tel"
+              placeholder="(15) 3255-0000" autocomplete="off"
               inputmode="numeric" />
           </div>
         </div>
@@ -1639,6 +1639,10 @@
       document.getElementById('cadastro-form').style.display = 'flex';
       document.getElementById('cadastro-success').classList.remove('show');
       document.getElementById('cadastro-form').reset();
+      // Reinicia o schedule builder visualmente
+      scheduleTurnos = [{ dias: [1,2,3,4,5], abre: '08:00', fecha: '18:00' }];
+      renderScheduleCards();
+      syncHiddenFields();
     }, 300);
   }
 

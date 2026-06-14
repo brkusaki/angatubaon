@@ -591,6 +591,26 @@
 
     .field-hint { font-size: 11px; color: var(--muted); line-height: 1.5; }
 
+    /* Address autocomplete */
+    .addr-item {
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--text);
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      line-height: 1.4;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      transition: background 0.1s;
+    }
+    .addr-item:last-child { border-bottom: none; }
+    .addr-item:hover, .addr-item:focus { background: rgba(255,255,255,0.07); outline: none; }
+    .addr-item i { color: var(--blue); font-size: 12px; margin-top: 2px; flex-shrink: 0; }
+    .addr-item-main { font-weight: 600; }
+    .addr-item-sub  { font-size: 11px; color: var(--muted); }
+    .addr-loading { padding: 12px 14px; font-size: 12px; color: var(--muted); text-align: center; }
+
     .modal-submit {
       margin: 20px 20px 0;
       width: calc(100% - 40px);
@@ -804,10 +824,26 @@
           </select>
         </div>
 
-        <div class="field-group">
-          <label class="field-label" for="f-endereco">Endereço <span>*</span></label>
+        <div class="field-group" style="position:relative;">
+          <label class="field-label" for="f-endereco">
+            Endereço <span>*</span>
+            <span id="maps-status" style="font-size:10px;font-weight:600;margin-left:6px;"></span>
+          </label>
           <input class="field-input" id="f-endereco" name="endereco" type="text"
-            placeholder="Ex: R. Filomena Basile Santi, 39" required autocomplete="street-address" />
+            placeholder="Digite a rua ou nome do estabelecimento..."
+            required autocomplete="off" autocorrect="off" />
+          <!-- Dropdown de sugestões -->
+          <div id="addr-suggestions" style="
+            display:none; position:absolute; left:0; right:0; top:100%;
+            background:#222; border:1px solid rgba(255,255,255,0.12);
+            border-radius:0 0 12px 12px; z-index:3000;
+            max-height:220px; overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,0.5);
+          "></div>
+          <!-- Link do Maps gerado automaticamente -->
+          <input type="hidden" id="f-maps-url" name="mapsUrl" />
+          <p class="field-hint" style="margin-top:6px;" id="maps-hint">
+            📍 Digite pelo menos 4 letras para buscar o endereço
+          </p>
         </div>
 
         <div class="field-row">
@@ -1854,6 +1890,153 @@
       console.warn('[AngatubaON] API indisponível, usando lojas fixas:', err.message);
     }
   }
+
+  /* ── Address Autocomplete (Nominatim / OpenStreetMap) ──────── */
+  // Gratuito, sem chave de API, limitado a 1 req/s (respeitamos com debounce de 500ms)
+  (function initAddressAutocomplete() {
+    const input      = document.getElementById('f-endereco');
+    const dropdown   = document.getElementById('addr-suggestions');
+    const hiddenMaps = document.getElementById('f-maps-url');
+    const statusEl   = document.getElementById('maps-status');
+    const hintEl     = document.getElementById('maps-hint');
+
+    if (!input) return;
+
+    let debounceTimer = null;
+    let currentQuery  = '';
+
+    function setStatus(icon, text, color) {
+      statusEl.textContent = icon + ' ' + text;
+      statusEl.style.color = color || 'var(--muted)';
+    }
+
+    function clearMaps() {
+      hiddenMaps.value = '';
+      setStatus('', '', '');
+    }
+
+    function setMapsConfirmed(displayName, lat, lon) {
+      // Gera link do Google Maps com coordenadas precisas
+      const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+      hiddenMaps.value = mapsUrl;
+      setStatus('✅', 'Localização confirmada', 'var(--green)');
+      if (hintEl) hintEl.style.display = 'none';
+    }
+
+    function buildSuggestionHTML(item) {
+      const parts    = item.display_name.split(', ');
+      const mainPart = parts.slice(0, 2).join(', ');
+      const subPart  = parts.slice(2, 5).join(', ');
+      return `
+        <div class="addr-item" tabindex="0"
+          data-display="${escAttr(item.display_name)}"
+          data-lat="${item.lat}"
+          data-lon="${item.lon}">
+          <i class="fa fa-map-marker-alt"></i>
+          <div>
+            <div class="addr-item-main">${mainPart}</div>
+            ${subPart ? `<div class="addr-item-sub">${subPart}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    function showDropdown(items) {
+      if (!items.length) {
+        dropdown.innerHTML = '<div class="addr-loading">Nenhum endereço encontrado. Tente ser mais específico.</div>';
+      } else {
+        dropdown.innerHTML = items.map(buildSuggestionHTML).join('');
+        // Eventos de clique em cada item
+        dropdown.querySelectorAll('.addr-item').forEach(el => {
+          const select = () => {
+            input.value      = el.dataset.display;
+            setMapsConfirmed(el.dataset.display, el.dataset.lat, el.dataset.lon);
+            dropdown.style.display = 'none';
+          };
+          el.addEventListener('click',   select);
+          el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') select(); });
+        });
+      }
+      dropdown.style.display = 'block';
+    }
+
+    async function buscarEnderecos(query) {
+      if (query !== currentQuery) return; // descarta resposta obsoleta
+      try {
+        // Restringe à cidade de Angatuba para resultados mais precisos
+        const url = `https://nominatim.openstreetmap.org/search?` +
+          `q=${encodeURIComponent(query + ', Angatuba, SP, Brasil')}` +
+          `&format=json&limit=5&countrycodes=br&addressdetails=1` +
+          `&accept-language=pt-BR`;
+
+        const resp = await fetch(url, {
+          headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'AngatubaON/1.0' }
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+
+        if (query !== currentQuery) return; // descarta se query mudou durante o fetch
+
+        if (data.length === 0) {
+          // Segunda tentativa sem restrição de cidade
+          const url2 = `https://nominatim.openstreetmap.org/search?` +
+            `q=${encodeURIComponent(query + ', São Paulo, Brasil')}` +
+            `&format=json&limit=5&countrycodes=br` +
+            `&accept-language=pt-BR`;
+          const resp2 = await fetch(url2, {
+            headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'AngatubaON/1.0' }
+          });
+          const data2 = await resp2.json();
+          showDropdown(data2);
+        } else {
+          showDropdown(data);
+        }
+      } catch (err) {
+        dropdown.innerHTML = `<div class="addr-loading">Erro na busca. Verifique sua conexão.</div>`;
+        dropdown.style.display = 'block';
+        console.warn('[AngatubaON] Nominatim error:', err.message);
+      }
+    }
+
+    input.addEventListener('input', function() {
+      const q = this.value.trim();
+      clearMaps();
+      clearTimeout(debounceTimer);
+
+      if (q.length < 4) {
+        dropdown.style.display = 'none';
+        if (hintEl) hintEl.style.display = '';
+        return;
+      }
+
+      currentQuery = q;
+      dropdown.innerHTML = '<div class="addr-loading"><i class="fa fa-spinner fa-spin"></i> Buscando...</div>';
+      dropdown.style.display = 'block';
+      if (hintEl) hintEl.style.display = 'none';
+
+      // Debounce 500ms para respeitar o rate limit do Nominatim (1 req/s)
+      debounceTimer = setTimeout(() => buscarEnderecos(q), 500);
+    });
+
+    // Fecha dropdown ao clicar fora
+    document.addEventListener('click', function(e) {
+      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    });
+
+    // Navega entre itens com teclado
+    input.addEventListener('keydown', function(e) {
+      if (!['ArrowDown','ArrowUp','Escape'].includes(e.key)) return;
+      if (e.key === 'Escape') { dropdown.style.display = 'none'; return; }
+      const items = [...dropdown.querySelectorAll('.addr-item')];
+      if (!items.length) return;
+      e.preventDefault();
+      const focused = document.activeElement;
+      const idx     = items.indexOf(focused);
+      if (e.key === 'ArrowDown') (items[idx + 1] || items[0]).focus();
+      if (e.key === 'ArrowUp')   (items[idx - 1] || items[items.length - 1]).focus();
+    });
+  })();
 
   /* ── INIT ────────────────────────────────────────────────── */
   // renderLojas primeiro: popula _statusSnapshot antes de renderCategorias usá-lo

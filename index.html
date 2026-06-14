@@ -153,6 +153,23 @@
       transition: opacity 0.2s, transform 0.2s;
     }
     .cat-badge.visible { opacity: 1; transform: scale(1); }
+    /* ── Skeleton Categorias ────────────────────────────────── */
+    .skeleton-cat {
+      display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 68px;
+    }
+    .skeleton-cat-icon {
+      width: 54px; height: 54px; border-radius: 16px;
+      background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+      background-size: 400px 100%;
+      animation: shimmer 1.2s infinite linear;
+    }
+    .skeleton-cat-label {
+      width: 44px; height: 9px; border-radius: 5px;
+      background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+      background-size: 400px 100%;
+      animation: shimmer 1.2s infinite linear;
+    }
+
 
     /* ════════════════════════════════════════════
        SEÇÃO RECOMENDADOS (lojas destaque/pagas)
@@ -1185,6 +1202,15 @@
     // renderLojas já substitui o conteúdo — não precisa fazer nada
   }
 
+  function showSkeletonCat() {
+    const bar = document.getElementById('cat-bar');
+    bar.innerHTML = Array(9).fill(0).map(() => `
+      <div class="skeleton-cat">
+        <div class="skeleton-cat-icon"></div>
+        <div class="skeleton-cat-label"></div>
+      </div>`).join('');
+  }
+
   /* ── Cache global de status — compartilhado entre renderLojas e renderCategorias ── */
   let _statusSnapshot = new Map(); // populado por renderLojas a cada ciclo
 
@@ -1795,8 +1821,9 @@
   })();
 
   /* ── INIT ────────────────────────────────────────────────── */
-  // Mostra skeleton enquanto API carrega
+  // Mostra skeletons enquanto API carrega
   showSkeleton();
+  showSkeletonCat();
 
   // Carrega lojas dinâmicas em background
   carregarLojas();

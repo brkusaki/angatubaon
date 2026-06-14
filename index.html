@@ -623,6 +623,38 @@
       -webkit-tap-highlight-color: transparent;
     }
     .modal-submit:active { transform: scale(0.97); opacity: 0.9; }
+    /* ── Skeleton Loading ───────────────────────────────────── */
+    @keyframes shimmer {
+      0%   { background-position: -400px 0; }
+      100% { background-position:  400px 0; }
+    }
+    .skeleton-card {
+      background: var(--surface2, #1e1e1e);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 10px;
+    }
+    .skeleton-thumb {
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      flex-shrink: 0;
+      background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+      background-size: 400px 100%;
+      animation: shimmer 1.2s infinite linear;
+    }
+    .skeleton-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+    .skeleton-line {
+      height: 12px; border-radius: 6px;
+      background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+      background-size: 400px 100%;
+      animation: shimmer 1.2s infinite linear;
+    }
+    .skeleton-line.short { width: 55%; }
+    .skeleton-line.xshort { width: 35%; }
+
     /* ── Schedule Builder ───────────────────────────────────── */
     .schedule-builder { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
     .schedule-card {
@@ -1129,6 +1161,28 @@
     });
     list.innerHTML = '';
     list.appendChild(frag);
+  }
+
+
+  /* ── Skeleton Loading ───────────────────────────────────── */
+  function showSkeleton() {
+    const listEl = document.getElementById('store-list');
+    listEl.innerHTML = '';
+    for (let i = 0; i < 5; i++) {
+      listEl.innerHTML += `
+        <div class="skeleton-card">
+          <div class="skeleton-thumb"></div>
+          <div class="skeleton-lines">
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line xshort"></div>
+          </div>
+        </div>`;
+    }
+  }
+
+  function hideSkeleton() {
+    // renderLojas já substitui o conteúdo — não precisa fazer nada
   }
 
   /* ── Cache global de status — compartilhado entre renderLojas e renderCategorias ── */
@@ -1741,11 +1795,10 @@
   })();
 
   /* ── INIT ────────────────────────────────────────────────── */
-  // renderLojas primeiro: popula _statusSnapshot antes de renderCategorias usá-lo
-  renderLojas();
-  renderCategorias();
+  // Mostra skeleton enquanto API carrega
+  showSkeleton();
 
-  // Carrega lojas dinâmicas em background — substitui LOJAS_FIXAS quando chegar
+  // Carrega lojas dinâmicas em background
   carregarLojas();
   </script>
 </body>

@@ -939,6 +939,196 @@
           0 6px 32px rgba(245,158,11,0.32);
       }
     }
+
+    /* ════════════════════════════════════════════
+       MODAL DETALHES — Exclusivo Planos Pagos
+    ════════════════════════════════════════════ */
+    .detail-overlay {
+      position: fixed; inset: 0; z-index: 3000;
+      background: rgba(0,0,0,0.88);
+      display: flex; align-items: flex-end; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.28s ease;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    .detail-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .detail-sheet {
+      width: 100%; max-width: 520px;
+      background: var(--surface);
+      border-radius: 24px 24px 0 0;
+      border: 1px solid var(--border); border-bottom: none;
+      padding: 0 0 calc(28px + env(safe-area-inset-bottom));
+      max-height: 90vh; overflow-y: auto; scrollbar-width: none;
+      transform: translateY(48px);
+      transition: transform 0.32s cubic-bezier(0.32,0.72,0,1);
+    }
+    .detail-sheet::-webkit-scrollbar { display: none; }
+    .detail-overlay.open .detail-sheet { transform: translateY(0); }
+
+    /* Capa do modal */
+    .detail-cover {
+      width: 100%; height: 200px;
+      object-fit: cover; display: block;
+      border-radius: 24px 24px 0 0;
+      background: var(--surface2);
+    }
+    .detail-cover-placeholder {
+      width: 100%; height: 160px;
+      border-radius: 24px 24px 0 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 4rem;
+    }
+    /* Gradiente sobre a capa para o handle ficar legível */
+    .detail-cover-wrap {
+      position: relative; border-radius: 24px 24px 0 0; overflow: hidden;
+    }
+    .detail-cover-wrap::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* Handle e botão fechar flutuantes */
+    .detail-top-bar {
+      position: absolute; top: 0; left: 0; right: 0;
+      display: flex; align-items: flex-start; justify-content: space-between;
+      padding: 12px 14px 0;
+      z-index: 1;
+    }
+    .detail-handle {
+      width: 36px; height: 4px; border-radius: 2px;
+      background: rgba(255,255,255,0.45);
+      margin: 0 auto;
+      /* centralizado via flex abaixo */
+      position: absolute; left: 50%; transform: translateX(-50%);
+      top: 10px;
+    }
+    .detail-close {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(0,0,0,0.5); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; cursor: pointer; border: none;
+      backdrop-filter: blur(4px);
+      margin-left: auto;
+    }
+
+    /* Conteúdo textual */
+    .detail-body { padding: 18px 20px 0; }
+
+    .detail-name-row {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+    }
+    .detail-name {
+      font-family: var(--font-h); font-size: 1.25rem; font-weight: 800;
+      letter-spacing: -0.02em; flex: 1 1 0; min-width: 0;
+    }
+
+    .detail-sub {
+      font-size: 12px; color: var(--muted); margin-bottom: 16px;
+    }
+
+    /* Linha de info (endereço, horário etc.) */
+    .detail-info { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+
+    .detail-info-row {
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .detail-info-icon {
+      width: 32px; height: 32px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0;
+    }
+    .detail-info-icon.addr  { background: rgba(66,133,244,0.12); color: var(--blue); }
+    .detail-info-icon.clock { background: rgba(0,208,132,0.12);  color: var(--green); }
+    .detail-info-icon.phone { background: rgba(37,211,102,0.12); color: #25d366; }
+    .detail-info-icon.obs   { background: rgba(245,158,11,0.12); color: var(--zap); }
+
+    .detail-info-text { flex: 1; font-size: 13px; line-height: 1.5; }
+    .detail-info-label {
+      font-size: 10px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      display: block; margin-bottom: 1px;
+    }
+
+    /* Grade de dias da semana */
+    .detail-schedule { display: flex; flex-direction: column; gap: 6px; }
+    .detail-schedule-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 10px; border-radius: 8px;
+      font-size: 12px;
+    }
+    .detail-schedule-row.today {
+      background: rgba(0,208,132,0.1); border: 1px solid rgba(0,208,132,0.2);
+    }
+    .detail-schedule-day { font-weight: 600; color: var(--text); }
+    .detail-schedule-row.today .detail-schedule-day { color: var(--green); }
+    .detail-schedule-time { color: var(--muted); font-size: 11px; }
+    .detail-schedule-row.today .detail-schedule-time { color: var(--green); font-weight: 600; }
+    .detail-schedule-closed { color: #555; font-size: 11px; }
+
+    /* Status badge no modal */
+    .detail-status-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    /* Botões de ação do modal */
+    .detail-actions {
+      display: flex; gap: 10px; padding: 0 20px 0;
+    }
+    .detail-btn-wpp {
+      flex: 1; padding: 14px;
+      background: linear-gradient(135deg,#25d366,#128c7e);
+      color: #fff; border-radius: 14px;
+      font-family: var(--font-h); font-size: 1rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: opacity 0.2s, transform 0.12s;
+      border: none; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .detail-btn-wpp.closed-wpp {
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .detail-btn-wpp:active { transform: scale(0.97); opacity: 0.9; }
+
+    .detail-btn-tel {
+      flex: 1; padding: 14px;
+      background: linear-gradient(135deg,#3b82f6,#1d4ed8);
+      color: #fff; border-radius: 14px;
+      font-family: var(--font-h); font-size: 1rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: opacity 0.2s, transform 0.12s;
+      border: none; cursor: pointer; text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .detail-btn-tel:active { transform: scale(0.97); opacity: 0.9; }
+
+    .detail-btn-maps {
+      width: 52px; height: 52px; border-radius: 14px;
+      background: rgba(66,133,244,0.12); color: var(--blue);
+      border: 1px solid rgba(66,133,244,0.22);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; flex-shrink: 0; cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s, transform 0.12s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .detail-btn-maps:active { transform: scale(0.93); background: rgba(66,133,244,0.22); }
+
+    /* Faixa "Aberto agora" no topo da capa */
+    .detail-cover-badge {
+      position: absolute; bottom: 12px; left: 16px;
+      z-index: 2;
+    }
+
+    /* Divisor */
+    .detail-divider {
+      height: 1px; background: var(--border);
+      margin: 16px 20px;
+    }
   </style>
 </head>
 <body>
@@ -1017,6 +1207,13 @@
       </a>
     </div>
   </main>
+
+  <!-- ══════════════════════════ MODAL DETALHES (Planos Pagos) ══ -->
+  <div class="detail-overlay" id="modal-detalhes" role="dialog" aria-modal="true" aria-labelledby="detail-name-text">
+    <div class="detail-sheet" id="detail-sheet">
+      <!-- Conteúdo preenchido dinamicamente pelo JS -->
+    </div>
+  </div>
 
   <!-- ══════════════════════════ MODAL CADASTRO ══ -->
   <div class="modal-overlay" id="modal-cadastro" role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
@@ -1402,6 +1599,7 @@
     const plano  = (loja.plano || 'GRATIS').toUpperCase();
     const isPro  = plano === 'PRO';
     const isPlus = plano === 'PLUS';
+    const isPago = isPro || isPlus;
 
     // Foto de capa apenas no PRO
     const hasCover = isPro && loja.foto && loja.foto.trim();
@@ -1427,18 +1625,32 @@
 
     const bgStyle = hasCover ? `background-image:url('${loja.foto}');` : '';
 
+    // Cards pagos: área de info clicável abre o modal de detalhes
+    // Cards gratuitos: área de info não tem ação (só os botões de contato)
+    const infoClick = isPago
+      ? `onclick="abrirDetalhes(${JSON.stringify(JSON.stringify(loja))})" style="cursor:pointer;" role="button" tabindex="0"`
+      : '';
+
+    // Dica visual discreta para planos pagos
+    const expandHint = isPago
+      ? `<span style="font-size:9px;color:var(--muted);display:flex;align-items:center;gap:3px;margin-top:2px;">
+           <i class="fa fa-expand-alt" style="font-size:8px;"></i> Ver detalhes
+         </span>`
+      : '';
+
     return `
       <div class="${cardClass}"
         data-status="${status}" data-category="${loja.categoria}" data-plano="${plano}"
         style="animation-delay:${delay}s;${bgStyle}">
         ${thumbHTML(loja)}
-        <div class="store-info">
+        <div class="store-info" ${infoClick}>
           <div class="store-name-row">
             <div class="store-name">${loja.nome}</div>
             ${planBadge}
           </div>
           <div class="store-sub">${loja.sub}</div>
           <div class="store-row">${badgeHTML(status)}${mapBtn}${ctTag}</div>
+          ${expandHint}
         </div>
         ${contatoHTML(loja, status)}
       </div>`;
@@ -2178,6 +2390,215 @@
       if (e.key === 'ArrowUp')   (items[idx - 1] || items[items.length - 1]).focus();
     });
   })();
+
+  /* ══════════════════════════════════════════════════════════════
+     MODAL DE DETALHES — Planos Pagos (Plus / Pro)
+  ══════════════════════════════════════════════════════════════ */
+
+  const DIAS_NOMES_FULL = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+
+  // Abre o modal preenchendo dinamicamente o conteúdo
+  // `lojaJson` é a loja serializada como string (passa via onclick inline)
+  function abrirDetalhes(lojaJson) {
+    let loja;
+    try { loja = JSON.parse(lojaJson); } catch { return; }
+
+    const overlay = document.getElementById('modal-detalhes');
+    const sheet   = document.getElementById('detail-sheet');
+
+    const plano  = (loja.plano || 'GRATIS').toUpperCase();
+    const isPro  = plano === 'PRO';
+    const status = calcStatus(loja);
+
+    // ── CAPA ──────────────────────────────────────────────────
+    const hasFoto = loja.foto && loja.foto.trim();
+    const coverHTML = hasFoto
+      ? `<div class="detail-cover-wrap">
+           <img class="detail-cover" src="${loja.foto}" alt="Foto ${escAttr(loja.nome)}"
+             onerror="this.parentElement.innerHTML = placeholderCover('${escAttr(loja.emoji || '🏪')}', '${escAttr(loja.categoria || '')}');" />
+           <div class="detail-top-bar">
+             <div class="detail-handle"></div>
+             <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
+           </div>
+           <div class="detail-cover-badge">${badgeHTML(status)}</div>
+         </div>`
+      : `<div class="detail-cover-wrap">
+           <div class="detail-cover-placeholder" style="background:${CAT_BG[loja.categoria] || 'rgba(255,255,255,0.06)'};">
+             ${loja.emoji || '🏪'}
+           </div>
+           <div class="detail-top-bar">
+             <div class="detail-handle"></div>
+             <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
+           </div>
+           <div class="detail-cover-badge">${badgeHTML(status)}</div>
+         </div>`;
+
+    // ── BADGE DE PLANO ────────────────────────────────────────
+    let planBadge = '';
+    if (isPro)         planBadge = `<span class="plan-badge badge-pro">⭐ PRO</span>`;
+    else if (plano === 'PLUS') planBadge = `<span class="plan-badge badge-plus">✦ PLUS</span>`;
+
+    // ── ENDEREÇO ─────────────────────────────────────────────
+    const enderecoHTML = loja.endereco
+      ? `<div class="detail-info-row">
+           <div class="detail-info-icon addr"><i class="fa fa-map-marker-alt"></i></div>
+           <div class="detail-info-text">
+             <span class="detail-info-label">Endereço</span>
+             ${escHTML(loja.endereco)}
+           </div>
+         </div>`
+      : '';
+
+    // ── HORÁRIO ESTRUTURADO ───────────────────────────────────
+    const horarioHTML = buildHorarioHTML(loja);
+
+    // ── OBS ──────────────────────────────────────────────────
+    const obsHTML = loja.obs && loja.obs.trim()
+      ? `<div class="detail-info-row">
+           <div class="detail-info-icon obs"><i class="fa fa-note-sticky"></i></div>
+           <div class="detail-info-text">
+             <span class="detail-info-label">Observações</span>
+             ${escHTML(loja.obs)}
+           </div>
+         </div>`
+      : '';
+
+    // ── BOTÕES DE AÇÃO ────────────────────────────────────────
+    const actionsHTML = buildActionsHTML(loja, status);
+
+    // ── MONTA SHEET ──────────────────────────────────────────
+    sheet.innerHTML = `
+      ${coverHTML}
+      <div class="detail-body">
+        <div class="detail-name-row">
+          <div class="detail-name" id="detail-name-text">${escHTML(loja.nome)}</div>
+          ${planBadge}
+        </div>
+        <div class="detail-sub">${escHTML(loja.sub || loja.categoria || '')}</div>
+        <div class="detail-info">
+          ${enderecoHTML}
+          ${horarioHTML}
+          ${obsHTML}
+        </div>
+      </div>
+      <div class="detail-actions">${actionsHTML}</div>
+    `;
+
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function fecharDetalhes() {
+    const overlay = document.getElementById('modal-detalhes');
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  // Fecha ao clicar no overlay fora do sheet
+  document.getElementById('modal-detalhes').addEventListener('click', function(e) {
+    if (e.target === this) fecharDetalhes();
+  });
+
+  // Fecha com tecla Escape
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') fecharDetalhes();
+  });
+
+  // Placeholder quando foto falha
+  function placeholderCover(emoji, categoria) {
+    const bg = CAT_BG[categoria] || 'rgba(255,255,255,0.06)';
+    return `<div class="detail-cover-placeholder" style="background:${bg};">${emoji}</div>`;
+  }
+
+  // Helper: escapa HTML para evitar XSS
+  function escHTML(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Constrói a seção de horários legível (grade de dias)
+  function buildHorarioHTML(loja) {
+    if (!loja.horario) {
+      // Tenta usar o texto livre se disponível
+      const txt = loja.horarioTexto || loja.horario_texto || '';
+      if (!txt) return '';
+      return `<div class="detail-info-row">
+        <div class="detail-info-icon clock"><i class="fa fa-clock"></i></div>
+        <div class="detail-info-text">
+          <span class="detail-info-label">Horário</span>
+          ${escHTML(txt)}
+        </div>
+      </div>`;
+    }
+
+    const { dias, abre, fecha } = loja.horario;
+    const hoje = new Date().getDay();
+
+    // Monta grade: linha por cada dia da semana (0-6)
+    const linhas = DIAS_NOMES_FULL.map((nome, d) => {
+      const aberto = dias.includes(d);
+      const isHoje = d === hoje;
+      return `<div class="detail-schedule-row${isHoje ? ' today' : ''}">
+        <span class="detail-schedule-day">${nome}${isHoje ? ' (hoje)' : ''}</span>
+        ${aberto
+          ? `<span class="detail-schedule-time">${abre} – ${fecha}</span>`
+          : `<span class="detail-schedule-closed">Fechado</span>`}
+      </div>`;
+    }).join('');
+
+    return `<div class="detail-info-row">
+      <div class="detail-info-icon clock"><i class="fa fa-clock"></i></div>
+      <div class="detail-info-text" style="flex:1;">
+        <span class="detail-info-label">Horário de Funcionamento</span>
+        <div class="detail-schedule">${linhas}</div>
+      </div>
+    </div>`;
+  }
+
+  // Constrói os botões de ação do modal
+  function buildActionsHTML(loja, status) {
+    const mNome = escAttr(loja.nome);
+    const mPlan = escAttr(loja.plano || 'GRATIS');
+    const mCat  = escAttr(loja.categoria || '');
+    const abre  = loja.horario ? loja.horario.abre : '';
+
+    let html = '';
+
+    // Botão WhatsApp
+    if (loja.wpp) {
+      const msg = encodeURIComponent('Olá, vi no AngatubaON! Está aberto agora?');
+      const url = `https://wa.me/${loja.wpp}?text=${msg}`;
+      if (status === 'open' || status === 'zap') {
+        html += `<a href="${url}" target="_blank" rel="noopener"
+          class="detail-btn-wpp"
+          onclick="registrarClique('${mNome}','wpp','${mPlan}','${mCat}')">
+          <i class="fab fa-whatsapp"></i> WhatsApp
+        </a>`;
+      } else {
+        html += `<button class="detail-btn-wpp closed-wpp"
+          onclick="fecharDetalhes(); showToast('${mNome}','${abre}');">
+          <i class="fab fa-whatsapp"></i> Fechado agora
+        </button>`;
+      }
+    }
+
+    // Botão Telefone (se existir)
+    if (loja.tel) {
+      html += `<a href="tel:${loja.tel}" class="detail-btn-tel"
+        onclick="registrarClique('${mNome}','tel','${mPlan}','${mCat}')">
+        <i class="fa fa-phone"></i> Ligar
+      </a>`;
+    }
+
+    // Botão Mapa
+    if (loja.maps) {
+      html += `<a href="${loja.maps}" target="_blank" rel="noopener"
+        class="detail-btn-maps" aria-label="Ver no mapa">
+        <i class="fa fa-map-marker-alt"></i>
+      </a>`;
+    }
+
+    return html;
+  }
 
   /* ── INIT ────────────────────────────────────────────────── */
   // Mostra skeletons enquanto API carrega

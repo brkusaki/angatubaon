@@ -1,8 +1,9 @@
-const CACHE = 'angatubaon-v3';
+const CACHE = 'angatubaon-v4';
 
 const STATIC = [
   '/',
   '/index.html',
+  '/offline.html',
 ];
 
 // Instala e cacheia arquivos estáticos
@@ -23,7 +24,7 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Fetch: HTML sempre da rede, resto do cache
+// Fetch: HTML sempre da rede, resto do cache; fallback offline.html
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
 
@@ -40,7 +41,7 @@ self.addEventListener('fetch', e => {
             caches.open(CACHE).then(c => c.put(e.request, clone));
             return r;
           })
-          .catch(() => caches.match(e.request))
+          .catch(() => caches.match(e.request).then(r => r || caches.match('/offline.html')))
       : caches.match(e.request)
           .then(r => r || fetch(e.request))
   );

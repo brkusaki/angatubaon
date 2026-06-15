@@ -751,59 +751,63 @@
       font-size: 14px; font-weight: 600; cursor: pointer;
     }
 
-    /* ════════════════════════════════════════════
-       PLANOS — PRO / PLUS / GRATIS
-    ════════════════════════════════════════════ */
+/* ════════════════════════════════════════════
+   PLANOS — PRO / PLUS / GRATIS (CORRIGIDO)
+════════════════════════════════════════════ */
 
-    /* ── Plano PRO ───────────────────────────────────────────── */
-    .store-card.plano-pro {
-      border-color: rgba(245,158,11,0.55);
-      background: linear-gradient(135deg,#1c1a14,#25210f);
-      box-shadow:
-        0 0 0 1px rgba(245,158,11,0.3) inset,
-        0 4px 28px rgba(245,158,11,0.15),
-        0 1px 0 rgba(245,158,11,0.4);
-    }
+/* Força o fundo dourado sutil no plano PRO ou Recomendado */
+.store-card.plano-pro, 
+.store-card.is-recommended {
+  border-color: rgba(245,158,11,0.55) !important;
+  background: linear-gradient(135deg, #1c1a14, #25210f) !important;
+  box-shadow:
+    0 0 0 1px rgba(245,158,11,0.3) inset,
+    0 4px 28px rgba(245,158,11,0.15),
+    0 1px 0 rgba(245,158,11,0.4) !important;
+}
 
-    /* PRO com foto de capa */
-    .store-card.plano-pro.has-cover {
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      border-color: rgba(245,158,11,0.65);
-      animation: pro-pulse 3s ease-in-out infinite;
-    }
+/* PRO / Recomendado com foto de capa */
+.store-card.plano-pro.has-cover,
+.store-card.is-recommended.has-foto {
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  border-color: rgba(245,158,11,0.65) !important;
+  animation: pro-pulse 3s ease-in-out infinite;
+}
 
-    /* Overlay escuro direcional para legibilidade */
-    .store-card.plano-pro.has-cover::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        105deg,
-        rgba(0,0,0,0.88) 0%,
-        rgba(0,0,0,0.65) 50%,
-        rgba(0,0,0,0.80) 100%
-      );
-      border-radius: inherit;
-      z-index: 0;
-      pointer-events: none;
-    }
+/* Overlay escuro direcional para legibilidade da foto */
+.store-card.plano-pro.has-cover::after,
+.store-card.is-recommended.has-foto::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    rgba(0,0,0,0.88) 0%,
+    rgba(0,0,0,0.65) 50%,
+    rgba(0,0,0,0.80) 100%
+  );
+  border-radius: inherit;
+  z-index: 1 !important;
+  pointer-events: none;
+}
 
-    /* Garante que o conteúdo fique acima do overlay */
-    .store-card.plano-pro.has-cover > * {
-      position: relative;
-      z-index: 1;
-    }
+/* Garante que absolutamente todo o conteúdo interno fique ACIMA do overlay */
+.store-card.plano-pro > *, 
+.store-card.is-recommended > * {
+  position: relative;
+  z-index: 2 !important;
+}
 
-    /* ── Plano PLUS ──────────────────────────────────────────── */
-    .store-card.plano-plus {
-      border-color: rgba(99,102,241,0.35);
-      background: linear-gradient(135deg,#141420,#1a1a2e);
-      box-shadow:
-        0 0 0 1px rgba(99,102,241,0.15) inset,
-        0 2px 16px rgba(99,102,241,0.1);
-    }
+/* ── Plano PLUS ──────────────────────────────────────────── */
+.store-card.plano-plus {
+  border-color: rgba(99,102,241,0.35) !important;
+  background: linear-gradient(135deg,#141420,#1a1a2e) !important;
+  box-shadow:
+    0 0 0 1px rgba(99,102,241,0.15) inset,
+    0 2px 16px rgba(99,102,241,0.1) !important;
+}
 
     /* ── Selos de plano ──────────────────────────────────────── */
     .plan-badge {

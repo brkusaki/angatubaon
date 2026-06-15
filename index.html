@@ -1334,6 +1334,10 @@
   function contatoHTML(loja, status) {
     const abre     = loja.horario ? loja.horario.abre : '';
     const nomeAttr = escAttr(loja.nome); // Fix 4: escapa aspas para data-attr seguro
+    // Campos para métricas — escapados para uso seguro em onclick inline
+    const mNome = escAttr(loja.nome);
+    const mPlan = escAttr(loja.plano || 'GRATIS');
+    const mCat  = escAttr(loja.categoria || '');
 
     if ((!loja.wpp || loja.wpp === 'PREENCHER') && !loja.tel) {
       return `<button class="btn-wpp disabled" disabled aria-label="Sem contato"><i class="fab fa-whatsapp"></i></button>`;
@@ -1346,7 +1350,9 @@
           onclick="showToast(this.dataset.nome,this.dataset.abre,this.dataset.tel)"
           aria-label="Loja fechada"><i class="fa fa-phone"></i></button>`;
       }
-      return `<a href="tel:${loja.tel}" class="btn-tel open" aria-label="Ligar"><i class="fa fa-phone"></i></a>`;
+      return `<a href="tel:${loja.tel}" class="btn-tel open" aria-label="Ligar"
+        onclick="registrarClique('${mNome}','tel','${mPlan}','${mCat}')">
+        <i class="fa fa-phone"></i></a>`;
     }
 
     const msg = encodeURIComponent('Olá, vi no AngatubaON! Está aberto agora?');
@@ -1354,7 +1360,9 @@
 
     if (status === 'open' || status === 'zap') {
       const cls = status === 'zap' ? 'zap' : 'open';
-      return `<a href="${url}" target="_blank" rel="noopener" class="btn-wpp ${cls}" aria-label="WhatsApp"><i class="fab fa-whatsapp"></i></a>`;
+      return `<a href="${url}" target="_blank" rel="noopener" class="btn-wpp ${cls}" aria-label="WhatsApp"
+        onclick="registrarClique('${mNome}','wpp','${mPlan}','${mCat}')">
+        <i class="fab fa-whatsapp"></i></a>`;
     }
 
     return `<button class="btn-wpp closed"
@@ -1652,6 +1660,22 @@
   function hideToast() {
     document.getElementById('toast').classList.remove('show');
     clearTimeout(toastTimer);
+  }
+
+  /* ── Métricas de clique ──────────────────────────────────────── */
+  // Fire-and-forget: registra na planilha sem bloquear a ação do usuário.
+  // Chamado apenas em botões de lojas ABERTAS (wpp/tel ativos).
+  function registrarClique(nome, tipo, plano, categoria) {
+    const params = new URLSearchParams();
+    params.append('payload', JSON.stringify({
+      action:    'registrarClique',
+      loja:      nome,
+      tipo:      tipo,       // 'wpp' ou 'tel'
+      plano:     plano,
+      categoria: categoria,
+    }));
+    fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: params })
+      .catch(() => {}); // falha silenciosa — nunca interrompe o usuário
   }
 
   /* ── Debounce ────────────────────────────────────────────── */

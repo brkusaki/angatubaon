@@ -230,6 +230,56 @@
     }
     #admin-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     #admin-toast.err  { border-left-color: var(--red); }
+    /* ── MÉTRICAS ────────────────────────────────────────────── */
+    .metric-summary {
+      display: grid; grid-template-columns: repeat(3,1fr); gap: 10px;
+      margin-bottom: 20px;
+    }
+    .metric-kpi {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 14px; text-align: center;
+    }
+    .metric-kpi-val {
+      font-family: var(--font-h); font-size: 1.6rem; font-weight: 800;
+      line-height: 1;
+    }
+    .metric-kpi-label { font-size: 10px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .05em; }
+
+    .metric-table { display: flex; flex-direction: column; gap: 8px; }
+    .metric-row {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 12px 14px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .metric-rank {
+      font-family: var(--font-h); font-size: 1rem; font-weight: 800;
+      color: var(--muted); min-width: 24px; text-align: center;
+    }
+    .metric-rank.gold   { color: #f59e0b; }
+    .metric-rank.silver { color: #94a3b8; }
+    .metric-rank.bronze { color: #b45309; }
+    .metric-info { flex: 1; min-width: 0; }
+    .metric-nome { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .metric-plano { font-size: 10px; color: var(--muted); }
+    .metric-bars { display: flex; flex-direction: column; gap: 4px; min-width: 100px; }
+    .metric-bar-wrap { display: flex; align-items: center; gap: 6px; }
+    .metric-bar-label { font-size: 10px; color: var(--muted); width: 24px; text-align: right; flex-shrink: 0; }
+    .metric-bar-track { flex: 1; height: 6px; border-radius: 3px; background: var(--s2); overflow: hidden; }
+    .metric-bar-fill  { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+    .metric-bar-fill.wpp { background: #25d366; }
+    .metric-bar-fill.tel { background: var(--blue); }
+    .metric-total { font-family: var(--font-h); font-size: 1rem; font-weight: 800; min-width: 28px; text-align: right; color: var(--text); }
+
+    .metric-refresh {
+      font-size: 11px; color: var(--muted); padding: 6px 12px;
+      border-radius: 8px; border: 1px solid var(--border);
+      background: var(--s2); display: flex; align-items: center; gap: 5px;
+      cursor: pointer; transition: color .2s;
+    }
+    .metric-refresh:hover { color: var(--green); }
+    .metric-period {
+      font-size: 11px; color: var(--muted);
+    }
   </style>
 </head>
 <body>
@@ -266,6 +316,9 @@
     </button>
     <button class="tab-btn" onclick="switchTab('planos', this)">
       <i class="fa fa-star"></i> Planos
+    </button>
+    <button class="tab-btn" onclick="switchTab('metricas', this)">
+      <i class="fa fa-chart-bar"></i> Métricas
     </button>
   </div>
 
@@ -304,6 +357,26 @@
       </div>
       <div class="store-cards" id="list-planos">
         <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
+      </div>
+    </div>
+
+    <!-- TAB: Métricas -->
+    <div class="tab-content" id="tab-metricas">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <span class="metric-period" id="metric-period">Carregando...</span>
+        <button class="metric-refresh" onclick="loadMetricas()">
+          <i class="fa fa-rotate-right"></i> Atualizar
+        </button>
+      </div>
+      <!-- KPIs resumo -->
+      <div class="metric-summary" id="metric-summary">
+        <div class="metric-kpi"><div class="metric-kpi-val" id="kpi-total">—</div><div class="metric-kpi-label">Cliques Totais</div></div>
+        <div class="metric-kpi"><div class="metric-kpi-val" style="color:var(--green);" id="kpi-wpp">—</div><div class="metric-kpi-label">WhatsApp</div></div>
+        <div class="metric-kpi"><div class="metric-kpi-val" style="color:var(--blue);" id="kpi-tel">—</div><div class="metric-kpi-label">Telefone</div></div>
+      </div>
+      <!-- Ranking de lojas -->
+      <div class="metric-table" id="metric-table">
+        <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando métricas...</div>
       </div>
     </div>
 
@@ -563,6 +636,83 @@ function toast(msg, isErr = false) {
   el.className   = 'show' + (isErr ? ' err' : '');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.className = '', 3500);
+}
+
+/* ══ MÉTRICAS ═════════════════════════════════════════════════ */
+const PLAN_COLOR = { PRO: '#f59e0b', PLUS: '#6366f1', GRATIS: '#7a7a7a' };
+
+async function loadMetricas() {
+  const tableEl = document.getElementById('metric-table');
+  const periodEl = document.getElementById('metric-period');
+  tableEl.innerHTML = '<div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>';
+
+  try {
+    const resp = await fetch(APPS_SCRIPT_URL + '?action=metricas', { signal: AbortSignal.timeout(12000) });
+    const json = await resp.json();
+    if (json.status !== 'ok' || !Array.isArray(json.data)) throw new Error('Resposta inválida');
+
+    const data = json.data; // já vem ordenado por total desc
+
+    // KPIs
+    const totCliques = data.reduce((s, r) => s + r.total, 0);
+    const totWpp     = data.reduce((s, r) => s + r.wpp,   0);
+    const totTel     = data.reduce((s, r) => s + r.tel,   0);
+    document.getElementById('kpi-total').textContent = totCliques;
+    document.getElementById('kpi-wpp').textContent   = totWpp;
+    document.getElementById('kpi-tel').textContent   = totTel;
+
+    periodEl.textContent = `${data.length} lojas com cliques registrados`;
+
+    if (!data.length) {
+      tableEl.innerHTML = '<div class="admin-empty"><i class="fa fa-chart-bar"></i>Nenhum clique registrado ainda.</div>';
+      return;
+    }
+
+    const maxTotal = data[0].total || 1;
+    const rankIcon = ['🥇','🥈','🥉'];
+    const rankCls  = ['gold','silver','bronze'];
+
+    tableEl.innerHTML = data.map((r, i) => {
+      const pct    = w => Math.round((w / maxTotal) * 100);
+      const cor    = PLAN_COLOR[r.plano] || '#7a7a7a';
+      const rIcon  = rankIcon[i] ?? (i + 1);
+      const rCls   = rankCls[i] ?? '';
+      return `
+        <div class="metric-row">
+          <div class="metric-rank ${rCls}">${rIcon}</div>
+          <div class="metric-info">
+            <div class="metric-nome">${r.loja}</div>
+            <div class="metric-plano" style="color:${cor};">${r.plano}</div>
+          </div>
+          <div class="metric-bars">
+            <div class="metric-bar-wrap">
+              <span class="metric-bar-label" style="color:#25d366;">WPP</span>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill wpp" style="width:${pct(r.wpp)}%;"></div>
+              </div>
+            </div>
+            <div class="metric-bar-wrap">
+              <span class="metric-bar-label" style="color:var(--blue);">TEL</span>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill tel" style="width:${pct(r.tel)}%;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="metric-total">${r.total}</div>
+        </div>`;
+    }).join('');
+
+  } catch(e) {
+    tableEl.innerHTML = '<div class="admin-empty"><i class="fa fa-triangle-exclamation"></i>Erro ao carregar métricas.</div>';
+    periodEl.textContent = '';
+  }
+}
+
+// Carrega métricas quando a aba é ativada
+const _origSwitchTab = switchTab;
+function switchTab(name, btn) {
+  _origSwitchTab(name, btn);
+  if (name === 'metricas') loadMetricas();
 }
 
 /* ══ INIT ═════════════════════════════════════════════════════ */

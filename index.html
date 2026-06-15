@@ -1625,10 +1625,11 @@
 
     const bgStyle = hasCover ? `background-image:url('${loja.foto}');` : '';
 
-    // Cards pagos: área de info clicável abre o modal de detalhes
-    // Cards gratuitos: área de info não tem ação (só os botões de contato)
+    // Cards pagos: área de info clicável abre o modal de detalhes.
+    // Usamos _lojaIdx (índice em LOJAS) para evitar serialização inline perigosa.
+    const lojaIdx = LOJAS.indexOf(loja);
     const infoClick = isPago
-      ? `onclick="abrirDetalhes(${JSON.stringify(JSON.stringify(loja))})" style="cursor:pointer;" role="button" tabindex="0"`
+      ? `onclick="abrirDetalhes(${lojaIdx})" style="cursor:pointer;" role="button" tabindex="0"`
       : '';
 
     // Dica visual discreta para planos pagos
@@ -2397,11 +2398,11 @@
 
   const DIAS_NOMES_FULL = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 
-  // Abre o modal preenchendo dinamicamente o conteúdo
-  // `lojaJson` é a loja serializada como string (passa via onclick inline)
-  function abrirDetalhes(lojaJson) {
-    let loja;
-    try { loja = JSON.parse(lojaJson); } catch { return; }
+  // Abre o modal preenchendo dinamicamente o conteúdo.
+  // `idx` é o índice da loja no array LOJAS — evita serialização de objetos em onclick inline.
+  function abrirDetalhes(idx) {
+    const loja = LOJAS[idx];
+    if (!loja) return;
 
     const overlay = document.getElementById('modal-detalhes');
     const sheet   = document.getElementById('detail-sheet');

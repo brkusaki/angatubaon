@@ -1661,7 +1661,7 @@
 
   /* ── HTML de um card ─────────────────────────────────────── */
   // statusInfo pode ser string (compat) ou objeto { status, fechaStr }
-  function cardHTML(loja, delay, statusInfo) {
+  function cardHTML(loja, delay, statusInfo, idx) {
     // normaliza entrada: aceita string legada ou objeto novo
     let status, fechaStr;
     if (statusInfo && typeof statusInfo === 'object') {
@@ -1702,7 +1702,7 @@
     const bgStyle = hasCover ? `background-image:url('${loja.foto}');` : '';
 
     // Todos os cards abrem o modal — pagos com visual completo, grátis simplificado
-    const infoClick = `onclick="abrirDetalhes(${lojaIdx})" style="cursor:pointer;" role="button" tabindex="0"`;
+    const infoClick = `onclick="abrirDetalhes(${idx})" style="cursor:pointer;" role="button" tabindex="0"`;
 
     // Dica visual: "Ver detalhes" em todos, ícone diferente para grátis
     const expandHint = `<span style="font-size:9px;color:var(--muted);display:flex;align-items:center;gap:3px;margin-top:2px;">
@@ -1827,7 +1827,7 @@
     const frag = document.createDocumentFragment();
     filtradas.forEach((loja, i) => {
       const wrap = document.createElement('div');
-      wrap.innerHTML = cardHTML(loja, i * 0.055, getStatusInfo(loja));
+      wrap.innerHTML = cardHTML(loja, i * 0.055, getStatusInfo(loja), LOJAS.indexOf(loja));
       frag.appendChild(wrap.firstElementChild);
     });
 
@@ -2500,6 +2500,8 @@
 
     const plano  = (loja.plano || 'GRATIS').toUpperCase();
     const isPro  = plano === 'PRO';
+    const isPlus = plano === 'PLUS';
+    const isPago = isPro || isPlus;
     const { status, fechaStr } = calcStatusInfo(loja);
 
     // ── CAPA ──────────────────────────────────────────────────

@@ -750,6 +750,105 @@
       color: var(--text); font-family: var(--font-b);
       font-size: 14px; font-weight: 600; cursor: pointer;
     }
+
+    /* ════════════════════════════════════════════
+       PLANOS — PRO / PLUS / GRATIS
+    ════════════════════════════════════════════ */
+
+    /* ── Plano PRO ───────────────────────────────────────────── */
+    .store-card.plano-pro {
+      border-color: rgba(245,158,11,0.55);
+      background: linear-gradient(135deg,#1c1a14,#25210f);
+      box-shadow:
+        0 0 0 1px rgba(245,158,11,0.3) inset,
+        0 4px 28px rgba(245,158,11,0.15),
+        0 1px 0 rgba(245,158,11,0.4);
+    }
+
+    /* PRO com foto de capa */
+    .store-card.plano-pro.has-cover {
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      border-color: rgba(245,158,11,0.65);
+      animation: pro-pulse 3s ease-in-out infinite;
+    }
+
+    /* Overlay escuro direcional para legibilidade */
+    .store-card.plano-pro.has-cover::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        105deg,
+        rgba(0,0,0,0.88) 0%,
+        rgba(0,0,0,0.65) 50%,
+        rgba(0,0,0,0.80) 100%
+      );
+      border-radius: inherit;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Garante que o conteúdo fique acima do overlay */
+    .store-card.plano-pro.has-cover > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Plano PLUS ──────────────────────────────────────────── */
+    .store-card.plano-plus {
+      border-color: rgba(99,102,241,0.35);
+      background: linear-gradient(135deg,#141420,#1a1a2e);
+      box-shadow:
+        0 0 0 1px rgba(99,102,241,0.15) inset,
+        0 2px 16px rgba(99,102,241,0.1);
+    }
+
+    /* ── Selos de plano ──────────────────────────────────────── */
+    .plan-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 9px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 5px;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      line-height: 1.4;
+      align-self: center;
+      text-transform: uppercase;
+    }
+
+    .plan-badge.badge-pro {
+      background: linear-gradient(135deg,#f59e0b,#d97706);
+      color: #000;
+      box-shadow: 0 1px 6px rgba(245,158,11,0.4);
+    }
+
+    .plan-badge.badge-plus {
+      background: linear-gradient(135deg,#6366f1,#4f46e5);
+      color: #fff;
+      box-shadow: 0 1px 6px rgba(99,102,241,0.35);
+    }
+
+    /* Pulso dourado sutil no PRO com foto */
+    @keyframes pro-pulse {
+      0%,100% {
+        box-shadow:
+          0 0 0 1.5px rgba(245,158,11,0.5) inset,
+          0 0 0 3px rgba(245,158,11,0.12),
+          0 6px 32px rgba(245,158,11,0.22);
+      }
+      50% {
+        box-shadow:
+          0 0 0 1.5px rgba(245,158,11,0.8) inset,
+          0 0 0 3px rgba(245,158,11,0.20),
+          0 6px 32px rgba(245,158,11,0.32);
+      }
+    }
   </style>
 </head>
 <body>
@@ -1121,8 +1220,13 @@
   /* ── HTML de um card ─────────────────────────────────────── */
   function cardHTML(loja, delay, status) {
     if (status === undefined) status = calcStatus(loja);
-    const isRec  = loja.recomendado === true;
-    const hasFoto = isRec && loja.foto && loja.foto.trim();
+
+    const plano  = (loja.plano || 'GRATIS').toUpperCase();
+    const isPro  = plano === 'PRO';
+    const isPlus = plano === 'PLUS';
+
+    // Foto de capa apenas no PRO
+    const hasCover = isPro && loja.foto && loja.foto.trim();
 
     const mapBtn = loja.maps
       ? `<a href="${loja.maps}" target="_blank" rel="noopener" class="btn-map" aria-label="Ver ${loja.nome} no mapa"><i class="fa fa-map-marker-alt"></i></a>`
@@ -1132,21 +1236,28 @@
       ? `<span class="contact-tag tel">📞 TEL</span>`
       : `<span class="contact-tag wpp">💬 WPP</span>`;
 
-    const recStar = isRec ? `<span class="rec-star">⭐&nbsp;DESTAQUE</span>` : '';
+    // Selo visual por plano
+    let planBadge = '';
+    if (isPro)  planBadge = `<span class="plan-badge badge-pro">⭐ PRO</span>`;
+    if (isPlus) planBadge = `<span class="plan-badge badge-plus">✦ PLUS</span>`;
 
-    // Classe e estilo extras só para recomendados com foto
-    const recClass = hasFoto ? ' is-recommended has-foto' : isRec ? ' is-recommended' : '';
-    const bgStyle  = hasFoto ? `background-image:url('${loja.foto}');` : '';
+    // Classes do card
+    let cardClass = 'store-card fade-in';
+    if (isPro)    cardClass += ' plano-pro';
+    if (isPlus)   cardClass += ' plano-plus';
+    if (hasCover) cardClass += ' has-cover';
+
+    const bgStyle = hasCover ? `background-image:url('${loja.foto}');` : '';
 
     return `
-      <div class="store-card${recClass} fade-in"
-        data-status="${status}" data-category="${loja.categoria}"
+      <div class="${cardClass}"
+        data-status="${status}" data-category="${loja.categoria}" data-plano="${plano}"
         style="animation-delay:${delay}s;${bgStyle}">
         ${thumbHTML(loja)}
         <div class="store-info">
           <div class="store-name-row">
             <div class="store-name">${loja.nome}</div>
-            ${recStar}
+            ${planBadge}
           </div>
           <div class="store-sub">${loja.sub}</div>
           <div class="store-row">${badgeHTML(status)}${mapBtn}${ctTag}</div>
@@ -1250,8 +1361,30 @@
       filtradas = filtradas.filter(l => l.recomendado === true);
     }
 
-    const ord = { open:0, zap:1, closed:2 };
-    filtradas.sort((a,b) => (ord[getStatus(a)]??2) - (ord[getStatus(b)]??2));
+    // Peso por plano: PRO=0, PLUS=1, GRATIS=2
+    const planOrd   = { PRO:0, PLUS:1, GRATIS:2 };
+    // Peso por status: open=0, zap=1, closed=2
+    const statusOrd = { open:0, zap:1, closed:2 };
+
+    filtradas.sort((a, b) => {
+      const planoA = (a.plano || 'GRATIS').toUpperCase();
+      const planoB = (b.plano || 'GRATIS').toUpperCase();
+
+      // 1º critério: plano
+      const diffPlano = (planOrd[planoA] ?? 2) - (planOrd[planoB] ?? 2);
+      if (diffPlano !== 0) return diffPlano;
+
+      // 2º critério: recomendado (true sobe)
+      const diffRec = (b.recomendado ? 1 : 0) - (a.recomendado ? 1 : 0);
+      if (diffRec !== 0) return diffRec;
+
+      // 3º critério: status (aberto sobe)
+      const diffStatus = (statusOrd[getStatus(a)] ?? 2) - (statusOrd[getStatus(b)] ?? 2);
+      if (diffStatus !== 0) return diffStatus;
+
+      // 4º critério: ordem alfabética
+      return a.nome.localeCompare(b.nome, 'pt-BR');
+    });
 
     const abertas = filtradas.filter(l => getStatus(l) === 'open').length;
 

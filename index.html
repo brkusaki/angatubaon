@@ -562,6 +562,99 @@
     .addr-item-sub  { font-size: 11px; color: var(--muted); }
     .addr-loading { padding: 12px 14px; font-size: 12px; color: var(--muted); text-align: center; }
 
+    /* ── Ramo Autocomplete ──────────────────────────────────────────── */
+    .ramo-wrap { position: relative; }
+
+    .ramo-combobox {
+      display: flex; align-items: center;
+      background: var(--surface2);
+      border: 1px solid var(--border); border-radius: var(--r-md);
+      transition: border-color .2s, box-shadow .2s;
+      overflow: hidden;               /* mantém o radius no input filho */
+    }
+    .ramo-combobox:focus-within {
+      border-color: rgba(255,255,255,.25);
+      box-shadow: 0 0 0 3px rgba(255,68,68,.08);
+    }
+    .ramo-selected-emoji {
+      padding: 0 0 0 14px; font-size: 1.05rem;
+      flex-shrink: 0; pointer-events: none;
+      transition: opacity .15s, width .15s;
+      line-height: 1;
+    }
+    .ramo-selected-emoji:empty { width: 0; padding: 0; }
+
+    #f-ramo-text {
+      flex: 1; min-width: 0;
+      background: transparent; border: none; outline: none;
+      padding: 11px 12px 11px 10px;
+      color: var(--text); font-family: var(--font-b); font-size: 16px;
+    }
+    #f-ramo-text::placeholder { color: var(--muted); font-size: 14px; }
+
+    .ramo-clear-btn {
+      width: 30px; height: 30px; margin-right: 6px; flex-shrink: 0;
+      border-radius: 50%; border: none;
+      background: rgba(255,255,255,.06); color: var(--muted);
+      font-size: 11px; cursor: pointer; display: none;
+      align-items: center; justify-content: center;
+      transition: background .15s, color .15s;
+    }
+    .ramo-clear-btn:hover { background: rgba(255,68,68,.15); color: var(--red); }
+    .ramo-clear-btn.show  { display: flex; }
+
+    .ramo-ok-mark {
+      font-size: 11px; color: var(--green); padding-right: 10px;
+      flex-shrink: 0; pointer-events: none;
+      opacity: 0; transition: opacity .2s;
+    }
+    .ramo-ok-mark.show { opacity: 1; }
+
+    /* dropdown */
+    .ramo-dropdown {
+      display: none;
+      position: absolute; left: 0; right: 0; top: calc(100% + 5px);
+      background: #1c1c1c;
+      border: 1px solid rgba(255,255,255,.11);
+      border-radius: 14px; z-index: 3500;
+      max-height: 264px; overflow-y: auto; scrollbar-width: none;
+      box-shadow: 0 14px 44px rgba(0,0,0,.7);
+      padding: 6px 0;
+    }
+    .ramo-dropdown::-webkit-scrollbar { display: none; }
+    .ramo-dropdown.open { display: block; }
+
+    .ramo-group-label {
+      padding: 8px 14px 3px;
+      font-size: 9px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: .08em;
+      color: #444; pointer-events: none;
+    }
+    .ramo-opt {
+      padding: 9px 14px;
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px; color: var(--text);
+      border-bottom: 1px solid rgba(255,255,255,.04);
+      cursor: pointer; transition: background .1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ramo-opt:last-child  { border-bottom: none; }
+    .ramo-opt:hover,
+    .ramo-opt.kb-focus    { background: rgba(255,255,255,.07); outline: none; }
+    .ramo-opt-emoji       { font-size: .95rem; flex-shrink: 0; width: 22px; text-align: center; }
+    .ramo-opt-label       { flex: 1; font-weight: 500; line-height: 1.35; }
+    .ramo-opt-label mark  {
+      background: rgba(255,68,68,.2); color: var(--red);
+      border-radius: 3px; padding: 0 1px; font-weight: 700;
+      font-style: normal;
+    }
+    .ramo-opt.is-outro {
+      color: var(--zap);
+      border-top: 1px solid rgba(255,255,255,.07);
+      margin-top: 2px;
+    }
+    /* ─────────────────────────────────────────────────────────────── */
+
     .modal-submit {
       margin: 20px 20px 0;
       width: calc(100% - 40px);
@@ -1243,20 +1336,30 @@
         </div>
 
         <div class="field-group">
-          <label class="field-label" for="f-ramo">Ramo / categoria <span>*</span></label>
-          <select class="field-select" id="f-ramo" name="ramo" required>
-            <option value="" disabled selected>Selecione o ramo</option>
-            <option value="pizzaria">🍕 Pizzaria</option>
-            <option value="lanches">🍔 Lanches / Hamburgueria</option>
-            <option value="adega">🍺 Adega / Bebidas</option>
-            <option value="farmacia">💊 Farmácia</option>
-            <option value="mercado">🛒 Mercado / Supermercado</option>
-            <option value="posto">⛽ Posto de Combustível</option>
-            <option value="gas">🛢️ Gás / Água</option>
-            <option value="pet">🐾 Pet Shop / Veterinário</option>
-            <option value="servicos">🔧 Serviços / Mecânica</option>
-            <option value="outro">➕ Outro ramo</option>
-          </select>
+          <label class="field-label" for="f-ramo-text">Ramo / categoria <span>*</span></label>
+          <div class="ramo-wrap">
+
+            <!-- Combobox visível -->
+            <div class="ramo-combobox" id="ramo-combobox">
+              <span class="ramo-selected-emoji" id="ramo-emoji" aria-hidden="true"></span>
+              <input type="text" id="f-ramo-text"
+                placeholder="Digite ou escolha o ramo…"
+                autocomplete="off" autocorrect="off" spellcheck="false"
+                role="combobox" aria-autocomplete="list"
+                aria-controls="ramo-dropdown" aria-haspopup="listbox"
+                aria-expanded="false" />
+              <span class="ramo-ok-mark" id="ramo-ok">✓</span>
+              <button type="button" class="ramo-clear-btn" id="ramo-clear"
+                aria-label="Limpar ramo" tabindex="-1">✕</button>
+            </div>
+
+            <!-- Dropdown de sugestões -->
+            <div class="ramo-dropdown" id="ramo-dropdown" role="listbox"
+              aria-label="Sugestões de ramo"></div>
+
+            <!-- Campo oculto — valor real enviado ao Apps Script -->
+            <input type="hidden" id="f-ramo" name="ramo" />
+          </div>
         </div>
 
         <div class="field-group" style="position:relative;">
@@ -2028,6 +2131,8 @@
       document.getElementById('foto-group').style.display = 'none';
       document.getElementById('logo-group').style.display = 'none';
       selectedPlan = 'GRATIS';
+      // Reseta campo de ramo autocomplete
+      if (typeof ramoReset === 'function') ramoReset();
     }, 300);
   }
 
@@ -2777,6 +2882,337 @@
   // Inicializa os dois campos de upload
   initImageUpload('f-foto-file', 'f-foto-url', 'foto-preview-img', 'foto-preview-wrap', 'foto-upload-status');
   initImageUpload('f-logo-file', 'f-logo-url', 'logo-preview-img', 'logo-preview-wrap', 'logo-upload-status');
+
+  /* ══════════════════════════════════════════════════════════════
+     RAMO AUTOCOMPLETE
+     Substitui o <select> estático por um combobox com busca em tempo real.
+     O campo oculto #f-ramo recebe o slug/valor real enviado ao servidor.
+  ══════════════════════════════════════════════════════════════ */
+  (function initRamoAutocomplete() {
+
+    /* ── Catálogo completo ──────────────────────────────────── */
+    const RAMOS = [
+      // ── Alimentação e Bebidas ──────────────────────────────
+      { emoji:'🍕', label:'Pizzaria',                        slug:'pizzaria',     grupo:'Alimentação e Bebidas',
+        busca:['pizza','pizzaria','pizzaiolo'] },
+      { emoji:'🍔', label:'Lanches / Hamburgueria',          slug:'lanches',      grupo:'Alimentação e Bebidas',
+        busca:['lanche','hamburger','hamburguer','lanchonete','pastelaria','hot dog','hotdog','sanduiche'] },
+      { emoji:'🍺', label:'Adega / Bebidas',                 slug:'adega',        grupo:'Alimentação e Bebidas',
+        busca:['adega','bebida','bar','distribuidora','cerveja','drinks','bebidas'] },
+      { emoji:'🥩', label:'Steakhouse / Casa de Carnes',     slug:'carnes',       grupo:'Alimentação e Bebidas',
+        busca:['churrascaria','steakhouse','carnes','churrasco','açougue','acougue','grill'] },
+
+      // ── Saúde, Beleza e Bem-Estar ─────────────────────────
+      { emoji:'💊', label:'Farmácia / Drogaria',             slug:'farmacia',     grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['farmacia','farmácia','drogaria','remedio','medicamento','plantao','droga','drogal'] },
+      { emoji:'🩺', label:'Clínica Médica / Odontológica',   slug:'clinica',      grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['clinica','clínica','medica','médica','odonto','dentista','consulta','saude','médico','medico'] },
+      { emoji:'🧪', label:'Laboratório de Análises',         slug:'laboratorio',  grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['laboratorio','laboratório','exame','analise','análise','coleta'] },
+      { emoji:'👓', label:'Ótica',                           slug:'otica',        grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['otica','ótica','oculista','oculos','óculos','lente','visao'] },
+      { emoji:'💈', label:'Barbearia',                       slug:'barbearia',    grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['barbearia','barber','barbeiro','corte','barba','cabelo masculino'] },
+      { emoji:'💅', label:'Salão de Beleza / Estética',      slug:'salao',        grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['salao','salão','beleza','estetica','estética','cabeleireiro','cabelereiro','manicure','sobrancelha','depilacao','depilação','spa'] },
+      { emoji:'💪', label:'Academia / Pilates / Yoga',       slug:'academia',     grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['academia','pilates','yoga','ginasio','ginásio','musculacao','musculação','crossfit','funcional','fitness'] },
+      { emoji:'🩸', label:'Estúdio de Tatuagem / Piercing',  slug:'tattoo',       grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['tattoo','tatuagem','piercing','estudio','estúdio','body art'] },
+
+      // ── Automotivo ─────────────────────────────────────────
+      { emoji:'⛽', label:'Posto de Combustível',            slug:'posto',        grupo:'Automotivo',
+        busca:['posto','gasolina','diesel','combustivel','combustível','etanol','alvim'] },
+      { emoji:'🛢️', label:'Gás / Água',                      slug:'gas',          grupo:'Automotivo',
+        busca:['gas','gás','agua','água','botijao','botijão','liquigas','ultragaz','glp'] },
+      { emoji:'⚙️', label:'Autopeças / Motopeças',           slug:'autopecas',    grupo:'Automotivo',
+        busca:['autopecas','autopeças','motopecas','motopeças','peças','pecas','acessorio auto'] },
+      { emoji:'🔧', label:'Oficina Mecânica / Auto Elétrica',slug:'mecanica',     grupo:'Automotivo',
+        busca:['mecanica','mecânica','oficina','eletrica','elétrica','motor','freio','suspensao','retifica','funilaria','auto center'] },
+      { emoji:'🎨', label:'Funilaria e Pintura',             slug:'funilaria',    grupo:'Automotivo',
+        busca:['funilaria','funileiro','pintura','lanternagem','lataria'] },
+      { emoji:'🛞', label:'Borracharia',                     slug:'borracharia',  grupo:'Automotivo',
+        busca:['borracharia','pneu','pneus','borracha','remendo'] },
+      { emoji:'🧼', label:'Lava-Rápido',                     slug:'lava-rapido',  grupo:'Automotivo',
+        busca:['lava','lavagem','lavajato','autolavagem','limpeza veicular','car wash'] },
+      { emoji:'🚲', label:'Bicicletaria',                    slug:'bicicletaria', grupo:'Automotivo',
+        busca:['bicicletaria','bicicleta','ciclo','bike','bikes'] },
+
+      // ── Casa e Construção ──────────────────────────────────
+      { emoji:'🧱', label:'Material de Construção',          slug:'construcao',   grupo:'Casa e Construção',
+        busca:['construção','construcao','material','cimento','ferragem','tijolo','telhado','obra'] },
+      { emoji:'🛋️', label:'Móveis e Eletrodomésticos',       slug:'moveis',       grupo:'Casa e Construção',
+        busca:['moveis','móveis','eletrodomestico','eletrodoméstico','armario','sofa','cama','geladeira'] },
+      { emoji:'🛍️', label:'Loja de Variedades / Utilidades', slug:'variedades',   grupo:'Casa e Construção',
+        busca:['variedades','utilidades','bazar','utilidade','descartavel','plastico'] },
+      { emoji:'🪟', label:'Vidraçaria / Esquadrias',         slug:'vidracaria',   grupo:'Casa e Construção',
+        busca:['vidraçaria','vidracaria','vidro','esquadria','janela','porta','espelho'] },
+      { emoji:'🪵', label:'Madeireira',                      slug:'madeireira',   grupo:'Casa e Construção',
+        busca:['madeira','madeireira','tabua','tábua','mdf','compensado'] },
+      { emoji:'🎨', label:'Loja de Tintas',                  slug:'tintas',       grupo:'Casa e Construção',
+        busca:['tinta','tintas','pintura','verniz','tinteiro','imobiliaria tintas'] },
+      { emoji:'👨‍🏭', label:'Serralheria',                    slug:'serralheria',  grupo:'Casa e Construção',
+        busca:['serralheria','serralheiro','grade','portao','portão','ferro','estrutura metalica'] },
+      { emoji:'❄️', label:'Refrigeração e Ar-Condicionado',  slug:'refrigeracao', grupo:'Casa e Construção',
+        busca:['refrigeração','refrigeracao','ar-condicionado','ar condicionado','freezer','climatizador'] },
+      { emoji:'🛠️', label:'Conserto de Eletrodomésticos',    slug:'consertos',    grupo:'Casa e Construção',
+        busca:['conserto','eletrodomestico','eletrodoméstico','reparo','assistencia','assistência','manutencao'] },
+
+      // ── Comércio e Variedades ──────────────────────────────
+      { emoji:'🛒', label:'Mercado / Supermercado',          slug:'mercado',      grupo:'Comércio e Variedades',
+        busca:['mercado','supermercado','minimercado','mercearia','hortifruti','acougue'] },
+      { emoji:'👗', label:'Loja de Roupas / Vestuário',      slug:'roupas',       grupo:'Comércio e Variedades',
+        busca:['roupa','roupas','vestuario','vestuário','moda','confeccao','confecção','boutique','moda feminina','moda masculina'] },
+      { emoji:'👟', label:'Loja de Calçados',                slug:'calcados',     grupo:'Comércio e Variedades',
+        busca:['calcado','calçado','sapato','tenis','tênis','sandalia','bota','sapataria','calcados'] },
+      { emoji:'💍', label:'Joalheria e Relojoaria',          slug:'joalheria',    grupo:'Comércio e Variedades',
+        busca:['joalheria','joalheiro','joias','relogio','relógio','relojoaria','ouro','prata','alianca'] },
+      { emoji:'🧸', label:'Artigos para Festas e Embalagens',slug:'festas',       grupo:'Comércio e Variedades',
+        busca:['festa','festas','balao','balão','embalagem','decoracao','decoração','aniversario','brinquedo'] },
+      { emoji:'🧵', label:'Armarinho / Aviamentos / Artesanato',slug:'armarinho', grupo:'Comércio e Variedades',
+        busca:['armarinho','aviamento','artesanato','la','lã','fios','linhas','tecido','costura','croche'] },
+      { emoji:'💐', label:'Floricultura e Paisagismo',       slug:'floricultura', grupo:'Comércio e Variedades',
+        busca:['flor','flores','floricultura','paisagismo','plantas','buque','buquê','jardim','orquidea'] },
+
+      // ── Pet e Agropecuária ─────────────────────────────────
+      { emoji:'🐾', label:'Pet Shop / Veterinário',          slug:'pet',          grupo:'Pet e Agropecuária',
+        busca:['pet','petshop','veterinario','veterinário','animal','racao','ração','banho','tosa','caes','gatos'] },
+      { emoji:'🌾', label:'Agropecuária / Casa de Rações',   slug:'agropecuaria', grupo:'Pet e Agropecuária',
+        busca:['agropecuaria','agropecuária','racoes','rações','agro','rural','casa rural','semente'] },
+      { emoji:'🚜', label:'Insumos Agrícolas e Ferramentas', slug:'insumos',      grupo:'Pet e Agropecuária',
+        busca:['insumo','agricola','agrícola','ferramenta','adubo','fertilizante','defensivo','trator','irrigacao'] },
+
+      // ── Tecnologia e Serviços ──────────────────────────────
+      { emoji:'📚', label:'Papelaria e Bazar',               slug:'papelaria',    grupo:'Tecnologia e Serviços',
+        busca:['papelaria','bazar','livraria','caderno','caneta','escolar','material escolar'] },
+      { emoji:'💻', label:'Informática e Assistência Técnica',slug:'informatica', grupo:'Tecnologia e Serviços',
+        busca:['informatica','informática','computador','notebook','assistencia','suporte','hardware','software','ti','impressora'] },
+      { emoji:'📱', label:'Loja de Celular e Acessórios',    slug:'celular',      grupo:'Tecnologia e Serviços',
+        busca:['celular','smartphone','acessorio','acessório','capinha','carregador','mobile'] },
+      { emoji:'🖨️', label:'Gráfica / Comunicação Visual',    slug:'grafica',      grupo:'Tecnologia e Serviços',
+        busca:['grafica','gráfica','comunicação visual','banner','adesivo','impressao','impressão','plotagem','serigrafia'] },
+      { emoji:'🏢', label:'Imobiliária',                     slug:'imobiliaria',  grupo:'Tecnologia e Serviços',
+        busca:['imobiliaria','imobiliária','aluguel','venda','imoveis','imóveis','corretor','corretora'] },
+      { emoji:'⚖️', label:'Escritório de Advocacia',         slug:'advocacia',    grupo:'Tecnologia e Serviços',
+        busca:['advocacia','advogado','juridico','jurídico','direito','escritorio juridico'] },
+      { emoji:'📊', label:'Escritório de Contabilidade',     slug:'contabilidade',grupo:'Tecnologia e Serviços',
+        busca:['contabilidade','contador','contabil','contábil','fiscal','tributario','imposto','irpf'] },
+      { emoji:'📸', label:'Estúdio de Fotografia / Filmagem',slug:'fotografia',   grupo:'Tecnologia e Serviços',
+        busca:['fotografia','filmagem','estudio','estúdio','fotografo','fotógrafo','video','vídeo','foto','drone'] },
+      { emoji:'✈️', label:'Agência de Viagens e Turismo',    slug:'viagens',      grupo:'Tecnologia e Serviços',
+        busca:['viagem','viagens','turismo','agencia','agência','passagem','hotel','pacote','turista'] },
+
+      // ── Educação e Finanças ────────────────────────────────
+      { emoji:'🏦', label:'Agência Bancária / Lotérica',     slug:'bancario',     grupo:'Educação e Finanças',
+        busca:['banco','bancaria','bancária','loterica','lotérica','loteria','financeiro','atm','caixa economica'] },
+      { emoji:'🛡️', label:'Escritório de Seguros',           slug:'seguros',      grupo:'Educação e Finanças',
+        busca:['seguro','seguros','corretora','apolice','apólice','plano de saude','previdencia'] },
+      { emoji:'🗣️', label:'Escola de Idiomas / Cursos',      slug:'idiomas',      grupo:'Educação e Finanças',
+        busca:['idioma','idiomas','ingles','inglês','curso','escola','ensino','educacao','educação','capacitacao'] },
+      { emoji:'🚗', label:'Autoescola (CFC)',                 slug:'autoescola',   grupo:'Educação e Finanças',
+        busca:['autoescola','cfc','habilitacao','habilitação','cnh','motorista','primeira habilitacao'] },
+    ];
+
+    /* ── Helpers ──────────────────────────────────────────── */
+    // Remove acentos e converte para minúsculas para busca insensível
+    function norm(s) {
+      return String(s).toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9 ]/g, ' ').trim();
+    }
+    // Envolve o trecho coincidente em <mark> para highlight
+    function hl(label, raw) {
+      if (!raw) return label;
+      const re = new RegExp(`(${raw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi');
+      return label.replace(re, '<mark>$1</mark>');
+    }
+
+    /* ── DOM refs ─────────────────────────────────────────── */
+    const inputEl    = document.getElementById('f-ramo-text');
+    const hiddenEl   = document.getElementById('f-ramo');
+    const dropEl     = document.getElementById('ramo-dropdown');
+    const emojiEl    = document.getElementById('ramo-emoji');
+    const clearEl    = document.getElementById('ramo-clear');
+    const okEl       = document.getElementById('ramo-ok');
+    if (!inputEl) return;
+
+    /* ── Estado interno ───────────────────────────────────── */
+    let chosen  = null;   // objeto RAMOS escolhido
+    let kbIdx   = -1;     // índice com foco via teclado
+    let visible = [];     // itens renderizados no momento
+
+    /* ── Renderiza o dropdown ─────────────────────────────── */
+    function renderDrop(q) {
+      const qn  = norm(q);
+      const qRaw = q.trim();
+
+      const matched = qn
+        ? RAMOS.filter(r =>
+            norm(r.label).includes(qn) ||
+            r.busca.some(b => norm(b).includes(qn))
+          )
+        : RAMOS;   // vazio = mostra todos
+
+      // Agrupa por grupo
+      const map = new Map();
+      matched.forEach(r => {
+        if (!map.has(r.grupo)) map.set(r.grupo, []);
+        map.get(r.grupo).push(r);
+      });
+
+      visible = [];
+      let html = '';
+
+      if (!matched.length && qRaw) {
+        // Sem resultado: opção de usar o texto livre
+        visible = [{ emoji:'➕', label:`"${qRaw}"`, slug: qRaw, grupo:'', busca:[], _custom: true }];
+        html = `<div class="ramo-opt is-outro" role="option" data-idx="0">
+          <span class="ramo-opt-emoji">➕</span>
+          <span class="ramo-opt-label">Usar <mark>${qRaw}</mark> como ramo</span>
+        </div>`;
+      } else {
+        map.forEach((items, grupo) => {
+          html += `<div class="ramo-group-label">${grupo}</div>`;
+          items.forEach(r => {
+            const i = visible.length;
+            visible.push(r);
+            html += `<div class="ramo-opt" role="option" data-idx="${i}">
+              <span class="ramo-opt-emoji">${r.emoji}</span>
+              <span class="ramo-opt-label">${hl(r.label, qRaw)}</span>
+            </div>`;
+          });
+        });
+        // "Outro ramo" sempre disponível no final
+        const oi = visible.length;
+        visible.push({ emoji:'➕', label:'Outro ramo (não listado)', slug:'outro', grupo:'', busca:[] });
+        html += `<div class="ramo-opt is-outro" role="option" data-idx="${oi}">
+          <span class="ramo-opt-emoji">➕</span>
+          <span class="ramo-opt-label">Outro ramo (não listado)</span>
+        </div>`;
+      }
+
+      dropEl.innerHTML = html;
+      kbIdx = -1;
+
+      // Clicks nas opções
+      dropEl.querySelectorAll('.ramo-opt').forEach(el => {
+        el.addEventListener('mousedown', ev => {
+          ev.preventDefault();               // impede blur antes do click
+          escolher(visible[+el.dataset.idx]);
+        });
+      });
+    }
+
+    /* ── Aplica a escolha ─────────────────────────────────── */
+    function escolher(ramo) {
+      if (!ramo) return;
+      chosen = ramo;
+      const displayLabel = ramo._custom ? ramo.slug : ramo.label;   // texto real
+      inputEl.value    = ramo._custom ? ramo.slug : `${ramo.emoji}  ${ramo.label}`;
+      hiddenEl.value   = ramo._custom ? ramo.slug : ramo.slug;
+      emojiEl.textContent = ramo._custom ? '' : ramo.emoji;
+      okEl.classList.add('show');
+      clearEl.classList.add('show');
+      fecharDrop();
+      inputEl.setAttribute('aria-expanded', 'false');
+    }
+
+    /* ── Abre / fecha ─────────────────────────────────────── */
+    function abrirDrop() {
+      renderDrop(inputEl.value);
+      dropEl.classList.add('open');
+      inputEl.setAttribute('aria-expanded', 'true');
+    }
+    function fecharDrop() {
+      dropEl.classList.remove('open');
+      inputEl.setAttribute('aria-expanded', 'false');
+      kbIdx = -1;
+    }
+
+    /* ── Foco via teclado ─────────────────────────────────── */
+    function moverKb(dir) {
+      const opts = dropEl.querySelectorAll('.ramo-opt');
+      if (!opts.length) return;
+      opts[kbIdx]?.classList.remove('kb-focus');
+      kbIdx = (kbIdx + dir + opts.length) % opts.length;
+      opts[kbIdx]?.classList.add('kb-focus');
+      opts[kbIdx]?.scrollIntoView({ block: 'nearest' });
+    }
+
+    /* ── Eventos ──────────────────────────────────────────── */
+    inputEl.addEventListener('focus', () => {
+      if (chosen) inputEl.select();
+      abrirDrop();
+    });
+
+    inputEl.addEventListener('input', () => {
+      chosen = null;
+      hiddenEl.value = '';
+      okEl.classList.remove('show');
+      emojiEl.textContent = '';
+      clearEl.classList.toggle('show', inputEl.value.length > 0);
+      renderDrop(inputEl.value);
+      dropEl.classList.add('open');
+      inputEl.setAttribute('aria-expanded', 'true');
+    });
+
+    inputEl.addEventListener('keydown', e => {
+      if (!dropEl.classList.contains('open')) {
+        if (e.key === 'ArrowDown' || e.key === 'Enter') abrirDrop();
+        return;
+      }
+      switch (e.key) {
+        case 'ArrowDown':  e.preventDefault(); moverKb(+1); break;
+        case 'ArrowUp':    e.preventDefault(); moverKb(-1); break;
+        case 'Escape':     fecharDrop(); break;
+        case 'Tab':
+        case 'Enter':
+          if (kbIdx >= 0 && visible[kbIdx]) { e.preventDefault(); escolher(visible[kbIdx]); }
+          else if (e.key === 'Enter') fecharDrop();
+          break;
+      }
+    });
+
+    inputEl.addEventListener('blur', () => {
+      // Delay pequeno para o mousedown dos itens disparar antes
+      setTimeout(() => {
+        fecharDrop();
+        // Se digitou algo sem confirmar: tenta autocomplete pelo melhor match
+        if (!chosen && inputEl.value.trim()) {
+          const qn = norm(inputEl.value);
+          const hit = RAMOS.find(r =>
+            norm(r.label).includes(qn) || r.busca.some(b => norm(b).includes(qn))
+          );
+          if (hit) {
+            escolher(hit);
+          } else {
+            // Mantém como texto livre (ramo customizado)
+            hiddenEl.value = inputEl.value.trim();
+            okEl.classList.add('show');
+          }
+        }
+      }, 200);
+    });
+
+    clearEl.addEventListener('click', () => ramoReset());
+
+    // Fecha ao clicar fora
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.ramo-wrap')) fecharDrop();
+    });
+
+    /* ── API pública — usada no closeModal ────────────────── */
+    window.ramoReset = function () {
+      chosen = null;
+      inputEl.value       = '';
+      hiddenEl.value      = '';
+      emojiEl.textContent = '';
+      okEl.classList.remove('show');
+      clearEl.classList.remove('show');
+      fecharDrop();
+    };
+
+  })(); // ── fim initRamoAutocomplete ──────────────────────────
 
   /* ── INIT ────────────────────────────────────────────────── */
   // Mostra skeletons enquanto API carrega

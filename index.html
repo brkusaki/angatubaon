@@ -1310,6 +1310,57 @@
             placeholder="Delivery, produtos especiais, promoções..."></textarea>
         </div>
 
+        <!-- Foto e Logo — upload direto para o ImgBB (gratuito, sem backend) -->
+        <div class="field-group" id="foto-group" style="display:none;">
+          <label class="field-label">
+            Foto da Fachada / Capa
+            <span style="color:var(--zap);margin-left:4px;">✦ Plus · ⭐ Pro</span>
+          </label>
+          <!-- Preview -->
+          <div id="foto-preview-wrap" style="display:none; margin-bottom:8px; border-radius:10px; overflow:hidden; max-height:160px;">
+            <img id="foto-preview-img" src="" alt="Preview da foto" style="width:100%; height:160px; object-fit:cover; display:block;" />
+          </div>
+          <!-- Área de drop/clique -->
+          <label id="foto-drop" for="f-foto-file" style="
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            gap:8px; border:1.5px dashed rgba(245,158,11,0.4); border-radius:10px;
+            padding:20px; cursor:pointer; background:rgba(245,158,11,0.05);
+            transition:background 0.2s; text-align:center;
+          ">
+            <i class="fa fa-image" style="font-size:1.6rem; color:var(--zap);"></i>
+            <span style="font-size:13px; color:var(--text); font-weight:600;">Toque para escolher a foto</span>
+            <span style="font-size:11px; color:var(--muted);">JPG, PNG ou WEBP · máx 5MB</span>
+            <span id="foto-upload-status" style="font-size:11px;"></span>
+          </label>
+          <input type="file" id="f-foto-file" accept="image/*" style="display:none;" />
+          <input type="hidden" id="f-foto-url" name="fotoUrl" />
+        </div>
+
+        <div class="field-group" id="logo-group" style="display:none;">
+          <label class="field-label">
+            Logo da Loja
+            <span style="color:var(--zap);margin-left:4px;">✦ Plus · ⭐ Pro</span>
+          </label>
+          <div id="logo-preview-wrap" style="display:none; margin-bottom:8px;">
+            <div style="width:64px; height:64px; border-radius:14px; overflow:hidden; background:#fff; padding:4px; display:flex; align-items:center; justify-content:center;">
+              <img id="logo-preview-img" src="" alt="Preview do logo" style="width:100%; height:100%; object-fit:contain;" />
+            </div>
+          </div>
+          <label id="logo-drop" for="f-logo-file" style="
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            gap:8px; border:1.5px dashed rgba(99,102,241,0.4); border-radius:10px;
+            padding:20px; cursor:pointer; background:rgba(99,102,241,0.05);
+            transition:background 0.2s; text-align:center;
+          ">
+            <i class="fa fa-store" style="font-size:1.6rem; color:#6366f1;"></i>
+            <span style="font-size:13px; color:var(--text); font-weight:600;">Toque para escolher o logo</span>
+            <span style="font-size:11px; color:var(--muted);">Fundo branco/transparente · máx 2MB</span>
+            <span id="logo-upload-status" style="font-size:11px;"></span>
+          </label>
+          <input type="file" id="f-logo-file" accept="image/*" style="display:none;" />
+          <input type="hidden" id="f-logo-url" name="logoUrl" />
+        </div>
+
         <p class="field-hint">
           ✅ Cadastro gratuito · Você será notificado pelo WhatsApp quando a loja for publicada.
         </p>
@@ -1318,6 +1369,7 @@
           <i class="fab fa-whatsapp"></i> Enviar Cadastro
         </button>
       </form>
+
 
       <!-- Tela de sucesso (aparece após envio) -->
       <div class="modal-success" id="cadastro-success">
@@ -1467,9 +1519,12 @@
   let activePillFilter = 'all';
 
   /* ── Calcula status pelo horário ─────────────────────────── */
-  function calcStatus(loja) {
-    if (loja.status) return loja.status;
-    if (!loja.horario) return 'open';
+  /* ── calcStatusInfo: retorna { status, fechaStr } ───────────
+     fechaStr = hora de fechamento formatada (ex: "23:00") ou ''
+  ─────────────────────────────────────────────────────────── */
+  function calcStatusInfo(loja) {
+    if (loja.status) return { status: loja.status, fechaStr: '' };
+    if (!loja.horario) return { status: 'open', fechaStr: '' };
 
     const now    = new Date();
     const dow    = now.getDay();
@@ -1481,35 +1536,47 @@
       return (h === 0 && m === 0) ? 1440 : h * 60 + m;
     };
 
-    const abre  = parse(loja.horario.abre);
-    const fecha = parse(loja.horario.fecha);
+    const abre      = parse(loja.horario.abre);
+    const fecha     = parse(loja.horario.fecha);
+    const fechaStr  = loja.horario.fecha; // ex: "23:00"
 
-    // Fix 5: guard — abre === fecha seria "sempre fechado", retorna closed
-    if (abre === fecha) return 'closed';
+    if (abre === fecha) return { status: 'closed', fechaStr };
 
-    // viraNoite só é true para horários que cruzam meia-noite de verdade (ex: 20:00–02:00)
     const viraNoite  = fecha < abre;
     const abreHoje   = loja.horario.dias.includes(dow);
     const abriuOntem = loja.horario.dias.includes((dow + 6) % 7);
 
-    if (viraNoite && abriuOntem && nowMin < fecha) return 'open';
+    if (viraNoite && abriuOntem && nowMin < fecha)
+      return { status: 'open', fechaStr };
 
     if (abreHoje) {
-      if (!viraNoite) return (nowMin >= abre && nowMin < fecha) ? 'open' : 'closed';
-      return nowMin >= abre ? 'open' : 'closed';
+      if (!viraNoite)
+        return (nowMin >= abre && nowMin < fecha)
+          ? { status: 'open',   fechaStr }
+          : { status: 'closed', fechaStr: loja.horario.abre };
+      return nowMin >= abre
+        ? { status: 'open',   fechaStr }
+        : { status: 'closed', fechaStr: loja.horario.abre };
     }
-    return 'closed';
+    return { status: 'closed', fechaStr: loja.horario.abre };
   }
 
+  // Compat: calcStatus continua retornando só a string (usado em vários lugares)
+  function calcStatus(loja) { return calcStatusInfo(loja).status; }
+
   /* ── Badge de status ─────────────────────────────────────── */
-  function badgeHTML(status) {
-    const m = {
-      open:   ['badge-open',   'Aberto Agora'],
-      closed: ['badge-closed', 'Fechado'],
-      zap:    ['badge-zap',    'Chamar no Zap'],
-    };
-    const [cls, txt] = m[status] || m.closed;
-    return `<span class="badge ${cls}"><span class="badge-dot"></span>${txt}</span>`;
+  // fechaStr opcional: se fornecido, exibe "Aberto até HH:MM" ou "Abre às HH:MM"
+  function badgeHTML(status, fechaStr) {
+    if (status === 'open') {
+      const label = fechaStr ? `Aberto até ${fechaStr}` : 'Aberto Agora';
+      return `<span class="badge badge-open"><span class="badge-dot"></span>${label}</span>`;
+    }
+    if (status === 'zap') {
+      return `<span class="badge badge-zap"><span class="badge-dot"></span>Chamar no Zap</span>`;
+    }
+    // closed
+    const label = fechaStr ? `Abre às ${fechaStr}` : 'Fechado';
+    return `<span class="badge badge-closed"><span class="badge-dot"></span>${label}</span>`;
   }
 
   /* ── Formata telefone para exibição ─────────────────────── */
@@ -1593,8 +1660,17 @@
   }
 
   /* ── HTML de um card ─────────────────────────────────────── */
-  function cardHTML(loja, delay, status) {
-    if (status === undefined) status = calcStatus(loja);
+  // statusInfo pode ser string (compat) ou objeto { status, fechaStr }
+  function cardHTML(loja, delay, statusInfo) {
+    // normaliza entrada: aceita string legada ou objeto novo
+    let status, fechaStr;
+    if (statusInfo && typeof statusInfo === 'object') {
+      status   = statusInfo.status;
+      fechaStr = statusInfo.fechaStr || '';
+    } else {
+      status   = statusInfo ?? calcStatus(loja);
+      fechaStr = '';
+    }
 
     const plano  = (loja.plano || 'GRATIS').toUpperCase();
     const isPro  = plano === 'PRO';
@@ -1625,19 +1701,13 @@
 
     const bgStyle = hasCover ? `background-image:url('${loja.foto}');` : '';
 
-    // Cards pagos: área de info clicável abre o modal de detalhes.
-    // Usamos _lojaIdx (índice em LOJAS) para evitar serialização inline perigosa.
-    const lojaIdx = LOJAS.indexOf(loja);
-    const infoClick = isPago
-      ? `onclick="abrirDetalhes(${lojaIdx})" style="cursor:pointer;" role="button" tabindex="0"`
-      : '';
+    // Todos os cards abrem o modal — pagos com visual completo, grátis simplificado
+    const infoClick = `onclick="abrirDetalhes(${lojaIdx})" style="cursor:pointer;" role="button" tabindex="0"`;
 
-    // Dica visual discreta para planos pagos
-    const expandHint = isPago
-      ? `<span style="font-size:9px;color:var(--muted);display:flex;align-items:center;gap:3px;margin-top:2px;">
-           <i class="fa fa-expand-alt" style="font-size:8px;"></i> Ver detalhes
-         </span>`
-      : '';
+    // Dica visual: "Ver detalhes" em todos, ícone diferente para grátis
+    const expandHint = `<span style="font-size:9px;color:var(--muted);display:flex;align-items:center;gap:3px;margin-top:2px;">
+           <i class="fa fa-${isPago ? 'expand-alt' : 'info-circle'}" style="font-size:8px;"></i> Ver detalhes
+         </span>`;
 
     return `
       <div class="${cardClass}"
@@ -1650,7 +1720,7 @@
             ${planBadge}
           </div>
           <div class="store-sub">${loja.sub}</div>
-          <div class="store-row">${badgeHTML(status)}${mapBtn}${ctTag}</div>
+          <div class="store-row">${badgeHTML(status, fechaStr)}${mapBtn}${ctTag}</div>
           ${expandHint}
         </div>
         ${contatoHTML(loja, status)}
@@ -1701,12 +1771,13 @@
 
     const q = searchQuery.toLowerCase().trim();
 
-    // Memoiza calcStatus para este render — cada loja calculada 1x só
+    // Memoiza calcStatusInfo para este render — cada loja calculada 1x só
     const statusCache = new Map();
-    const getStatus = loja => {
-      if (!statusCache.has(loja)) statusCache.set(loja, calcStatus(loja));
+    const getStatusInfo = loja => {
+      if (!statusCache.has(loja)) statusCache.set(loja, calcStatusInfo(loja));
       return statusCache.get(loja);
     };
+    const getStatus = loja => getStatusInfo(loja).status;
 
     let filtradas = LOJAS.filter(loja => {
       // categoria já está normalizada nos dados — comparação direta, sem toLowerCase por chamada
@@ -1756,7 +1827,7 @@
     const frag = document.createDocumentFragment();
     filtradas.forEach((loja, i) => {
       const wrap = document.createElement('div');
-      wrap.innerHTML = cardHTML(loja, i * 0.055, getStatus(loja));
+      wrap.innerHTML = cardHTML(loja, i * 0.055, getStatusInfo(loja));
       frag.appendChild(wrap.firstElementChild);
     });
 
@@ -1792,7 +1863,7 @@
     infoEl.className = 'filter-info' + (abertas > 0 ? ' has-open' : '');
 
     // Exporta snapshot para smartRefresh e renderCategorias
-    _statusSnapshot = statusCache;
+    _statusSnapshot = statusCache; // agora guarda { status, fechaStr }
   }
 
   /* ── Renderiza categorias ────────────────────────────────── */
@@ -1802,7 +1873,7 @@
       .filter(cat => cat && cat.id && cat.label)
       .map(cat => {
         // 'sugestao' não tem lojas — badge sempre zero, pula o cálculo
-        const getS = l => _statusSnapshot.get(l) ?? calcStatus(l);
+        const getS = l => (_statusSnapshot.get(l)?.status) ?? calcStatus(l);
         const qtd = (cat.id === 'sugestao') ? 0
           : cat.id === 'todos'
             ? LOJAS.filter(l => getS(l) === 'open').length
@@ -1938,6 +2009,21 @@
       scheduleTurnos = [{ dias: [1,2,3,4,5], abre: '08:00', fecha: '18:00' }];
       renderScheduleCards();
       syncHiddenFields();
+      // Reseta campos de foto/logo
+      ['foto', 'logo'].forEach(k => {
+        const previewWrap = document.getElementById(k + '-preview-wrap');
+        const previewImg  = document.getElementById(k + '-preview-img');
+        const statusEl    = document.getElementById(k + '-upload-status');
+        const hiddenUrl   = document.getElementById('f-' + k + '-url');
+        if (previewWrap) previewWrap.style.display = 'none';
+        if (previewImg)  previewImg.src = '';
+        if (statusEl)    statusEl.textContent = '';
+        if (hiddenUrl)   hiddenUrl.value = '';
+      });
+      // Oculta grupos de foto (só visíveis para planos pagos)
+      document.getElementById('foto-group').style.display = 'none';
+      document.getElementById('logo-group').style.display = 'none';
+      selectedPlan = 'GRATIS';
     }, 300);
   }
 
@@ -1987,8 +2073,13 @@
       const icons = { GRATIS:'🏪', PLUS:'✦', PRO:'⭐' };
       hint.innerHTML = `${icons[selectedPlan]} Plano <strong>${selectedPlan}</strong> selecionado · Você será notificado pelo WhatsApp.`;
     }
+    // Mostra campos de foto apenas para planos pagos
+    const isPago = selectedPlan !== 'GRATIS';
+    document.getElementById('foto-group').style.display = isPago ? '' : 'none';
+    document.getElementById('logo-group').style.display = isPago ? '' : 'none';
+
     // Para planos pagos, abre WhatsApp diretamente ao confirmar plano
-    if (selectedPlan !== 'GRATIS') {
+    if (isPago) {
       const msg = encodeURIComponent(`Olá! Quero cadastrar minha loja no Angatuba ON com o Plano ${selectedPlan}.`);
       window.open(`https://wa.me/5515981125349?text=${msg}`, '_blank', 'noopener');
     }
@@ -2201,7 +2292,7 @@
   /* ── Auto-refresh inteligente ───────────────────────────── */
   // Só re-renderiza se algum status mudou: compara com último snapshot exportado por renderLojas
   function smartRefresh() {
-    const changed = LOJAS.some(l => calcStatus(l) !== (_statusSnapshot.get(l) ?? ''));
+    const changed = LOJAS.some(l => calcStatus(l) !== (_statusSnapshot.get(l)?.status ?? ''));
     if (changed) {
       renderLojas();
       renderCategorias();
@@ -2409,10 +2500,10 @@
 
     const plano  = (loja.plano || 'GRATIS').toUpperCase();
     const isPro  = plano === 'PRO';
-    const status = calcStatus(loja);
+    const { status, fechaStr } = calcStatusInfo(loja);
 
     // ── CAPA ──────────────────────────────────────────────────
-    const hasFoto = loja.foto && loja.foto.trim();
+    const hasFoto = isPago && loja.foto && loja.foto.trim();
     const coverHTML = hasFoto
       ? `<div class="detail-cover-wrap">
            <img class="detail-cover" src="${loja.foto}" alt="Foto ${escAttr(loja.nome)}"
@@ -2421,9 +2512,10 @@
              <div class="detail-handle"></div>
              <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
            </div>
-           <div class="detail-cover-badge">${badgeHTML(status)}</div>
+           <div class="detail-cover-badge">${badgeHTML(status, fechaStr)}</div>
          </div>`
-      : `<div class="detail-cover-wrap">
+      : isPago
+      ? `<div class="detail-cover-wrap">
            <div class="detail-cover-placeholder" style="background:${CAT_BG[loja.categoria] || 'rgba(255,255,255,0.06)'};">
              ${loja.emoji || '🏪'}
            </div>
@@ -2431,7 +2523,12 @@
              <div class="detail-handle"></div>
              <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
            </div>
-           <div class="detail-cover-badge">${badgeHTML(status)}</div>
+           <div class="detail-cover-badge">${badgeHTML(status, fechaStr)}</div>
+         </div>`
+      : `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0;">
+           <div class="detail-handle" style="position:static;transform:none;margin:0 auto;"></div>
+           <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar"
+             style="position:static;transform:none;background:var(--surface2);color:var(--muted);">✕</button>
          </div>`;
 
     // ── BADGE DE PLANO ────────────────────────────────────────
@@ -2476,6 +2573,7 @@
           ${planBadge}
         </div>
         <div class="detail-sub">${escHTML(loja.sub || loja.categoria || '')}</div>
+        ${!isPago ? `<div style="margin-bottom:12px;">${badgeHTML(status, fechaStr)}</div>` : ''}
         <div class="detail-info">
           ${enderecoHTML}
           ${horarioHTML}
@@ -2600,6 +2698,79 @@
 
     return html;
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     UPLOAD DE IMAGENS — ImgBB (gratuito, sem backend)
+     Chave pública da API: registre em https://imgbb.com/api
+     e substitua IMGBB_KEY abaixo pela sua chave.
+  ══════════════════════════════════════════════════════════════ */
+  const IMGBB_KEY = 'b4ed3d0c9c5c24b267d1b9b2c2c5d6e7'; // ← troque pela sua chave ImgBB
+
+  async function uploadImagem(file, statusEl) {
+    if (!file) return null;
+    if (file.size > 5 * 1024 * 1024) {
+      statusEl.textContent = '❌ Arquivo muito grande (máx 5MB)';
+      statusEl.style.color = 'var(--red)';
+      return null;
+    }
+
+    statusEl.textContent = '⏳ Enviando imagem...';
+    statusEl.style.color = 'var(--muted)';
+
+    try {
+      const form = new FormData();
+      form.append('image', file);
+      form.append('key', IMGBB_KEY);
+
+      const resp = await fetch('https://api.imgbb.com/1/upload', {
+        method: 'POST', body: form
+      });
+      const json = await resp.json();
+
+      if (json.success) {
+        statusEl.textContent = '✅ Imagem enviada!';
+        statusEl.style.color = 'var(--green)';
+        return json.data.url;
+      } else {
+        throw new Error(json.error?.message || 'Falha no upload');
+      }
+    } catch (err) {
+      statusEl.textContent = '❌ Erro: ' + err.message;
+      statusEl.style.color = 'var(--red)';
+      return null;
+    }
+  }
+
+  function initImageUpload(fileInputId, hiddenId, previewImgId, previewWrapId, statusId) {
+    const fileInput  = document.getElementById(fileInputId);
+    const hiddenUrl  = document.getElementById(hiddenId);
+    const previewImg = document.getElementById(previewImgId);
+    const previewWrap= document.getElementById(previewWrapId);
+    const statusEl   = document.getElementById(statusId);
+
+    if (!fileInput) return;
+
+    fileInput.addEventListener('change', async function() {
+      const file = this.files[0];
+      if (!file) return;
+
+      // Preview local imediato
+      const reader = new FileReader();
+      reader.onload = e => {
+        previewImg.src = e.target.result;
+        previewWrap.style.display = '';
+      };
+      reader.readAsDataURL(file);
+
+      // Upload real
+      const url = await uploadImagem(file, statusEl);
+      if (url) hiddenUrl.value = url;
+    });
+  }
+
+  // Inicializa os dois campos de upload
+  initImageUpload('f-foto-file', 'f-foto-url', 'foto-preview-img', 'foto-preview-wrap', 'foto-upload-status');
+  initImageUpload('f-logo-file', 'f-logo-url', 'logo-preview-img', 'logo-preview-wrap', 'logo-upload-status');
 
   /* ── INIT ────────────────────────────────────────────────── */
   // Mostra skeletons enquanto API carrega

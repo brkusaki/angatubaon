@@ -425,6 +425,7 @@ function switchTab(name, btn) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'metricas') loadMetricas();
 }
 
 /* ══ DATA ═════════════════════════════════════════════════════ */
@@ -708,12 +709,7 @@ async function loadMetricas() {
   }
 }
 
-// Carrega métricas quando a aba é ativada
-const _origSwitchTab = switchTab;
-function switchTab(name, btn) {
-  _origSwitchTab(name, btn);
-  if (name === 'metricas') loadMetricas();
-}
+// Carrega métricas quando a aba é ativada — integrado ao switchTab original acima
 
 /* ══ INIT ═════════════════════════════════════════════════════ */
 if (sessionStorage.getItem('angatuba_admin')) loadData();

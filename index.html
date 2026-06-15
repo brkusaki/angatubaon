@@ -682,6 +682,166 @@
     }
 
     /* ════════════════════════════════════════════
+       MODAL PLANOS
+    ════════════════════════════════════════════ */
+    .plan-overlay {
+      position: fixed; inset: 0; z-index: 2100;
+      background: rgba(0,0,0,0.9);
+      display: flex; align-items: flex-end; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s ease;
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    }
+    .plan-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .plan-sheet {
+      width: 100%; max-width: 520px;
+      background: var(--surface);
+      border-radius: 24px 24px 0 0;
+      border: 1px solid var(--border); border-bottom: none;
+      padding: 0 0 calc(28px + env(safe-area-inset-bottom));
+      max-height: 94vh; overflow-y: auto; scrollbar-width: none;
+      transform: translateY(40px);
+      transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
+    }
+    .plan-sheet::-webkit-scrollbar { display: none; }
+    .plan-overlay.open .plan-sheet { transform: translateY(0); }
+
+    .plan-handle {
+      width: 36px; height: 4px; border-radius: 2px;
+      background: var(--border); margin: 12px auto 0;
+    }
+
+    .plan-header {
+      padding: 20px 20px 4px;
+      text-align: center;
+    }
+    .plan-header-title {
+      font-family: var(--font-h); font-size: 1.2rem; font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .plan-header-title span { color: var(--red); }
+    .plan-header-sub {
+      font-size: 12px; color: var(--muted); margin-top: 4px;
+    }
+
+    .plan-cards {
+      display: flex; flex-direction: column;
+      gap: 10px; padding: 16px 16px 0;
+    }
+
+    .plan-card {
+      border-radius: 16px; border: 1.5px solid var(--border);
+      padding: 16px; cursor: pointer; position: relative;
+      transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .plan-card:active { transform: scale(0.98); }
+    .plan-card.selected { border-color: currentColor; }
+
+    .plan-card.card-gratis {
+      background: var(--surface2);
+      color: var(--muted);
+    }
+    .plan-card.card-gratis.selected {
+      border-color: rgba(255,255,255,0.3);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.1) inset;
+    }
+
+    .plan-card.card-plus {
+      background: linear-gradient(135deg,#141420,#1a1a2e);
+      color: #818cf8;
+    }
+    .plan-card.card-plus.selected {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 1px rgba(99,102,241,0.2) inset,
+                  0 4px 20px rgba(99,102,241,0.15);
+    }
+
+    .plan-card.card-pro {
+      background: linear-gradient(135deg,#1c1a14,#25210f);
+      color: #f59e0b;
+    }
+    .plan-card.card-pro.selected {
+      border-color: #f59e0b;
+      box-shadow: 0 0 0 1px rgba(245,158,11,0.2) inset,
+                  0 4px 20px rgba(245,158,11,0.18);
+    }
+
+    .plan-card-top {
+      display: flex; align-items: center;
+      justify-content: space-between; margin-bottom: 10px;
+    }
+    .plan-card-name {
+      font-family: var(--font-h); font-size: 1rem; font-weight: 800;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .plan-card-price {
+      text-align: right;
+    }
+    .plan-card-price .price-val {
+      font-family: var(--font-h); font-size: 1.2rem; font-weight: 800;
+      color: var(--text);
+    }
+    .plan-card-price .price-per {
+      font-size: 10px; color: var(--muted); display: block;
+    }
+
+    .plan-card-features {
+      list-style: none; display: flex; flex-direction: column; gap: 5px;
+    }
+    .plan-card-features li {
+      font-size: 11px; display: flex; align-items: center; gap: 6px;
+      color: var(--text); opacity: 0.85;
+    }
+    .plan-card-features li .feat-icon {
+      font-size: 10px; flex-shrink: 0;
+    }
+    .feat-off { opacity: 0.35 !important; text-decoration: line-through; }
+
+    .plan-radio {
+      position: absolute; top: 14px; right: 14px;
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid currentColor; display: flex;
+      align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .plan-card.selected .plan-radio::after {
+      content: ''; width: 8px; height: 8px;
+      border-radius: 50%; background: currentColor;
+    }
+
+    .plan-popular {
+      position: absolute; top: -10px; left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg,#6366f1,#4f46e5);
+      color: #fff; font-size: 9px; font-weight: 800;
+      padding: 3px 10px; border-radius: 20px;
+      letter-spacing: 0.5px; white-space: nowrap;
+    }
+
+    .plan-cta {
+      margin: 16px 16px 0;
+      width: calc(100% - 32px);
+      padding: 14px; border-radius: 14px;
+      font-family: var(--font-h); font-size: 1rem; font-weight: 700;
+      color: #000; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: opacity 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+      border: none;
+    }
+    .plan-cta:active { transform: scale(0.97); opacity: 0.9; }
+    .plan-cta.cta-gratis { background: rgba(255,255,255,0.12); color: var(--text); }
+    .plan-cta.cta-plus   { background: linear-gradient(135deg,#6366f1,#4f46e5); color: #fff; }
+    .plan-cta.cta-pro    { background: linear-gradient(135deg,#f59e0b,#d97706); color: #000; }
+
+    .plan-note {
+      text-align: center; font-size: 11px; color: var(--muted);
+      margin: 10px 16px 0; line-height: 1.5;
+    }
+
+    /* ════════════════════════════════════════════
        PLANOS — PRO / PLUS / GRATIS
     ════════════════════════════════════════════ */
 
@@ -972,6 +1132,90 @@
         </p>
         <button class="success-close" onclick="closeModal()">Fechar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ MODAL PLANOS ══ -->
+  <div class="plan-overlay" id="modal-planos" role="dialog" aria-modal="true">
+    <div class="plan-sheet">
+      <div class="plan-handle"></div>
+
+      <div class="plan-header">
+        <div class="plan-header-title">Escolha seu Plano<span> ✦</span></div>
+        <div class="plan-header-sub">Selecione antes de continuar o cadastro</div>
+      </div>
+
+      <div class="plan-cards">
+
+        <!-- GRÁTIS -->
+        <div class="plan-card card-gratis selected" data-plan="GRATIS" onclick="selectPlan(this)">
+          <div class="plan-radio"></div>
+          <div class="plan-card-top">
+            <div class="plan-card-name">🏪 Grátis</div>
+            <div class="plan-card-price">
+              <span class="price-val">R$ 0</span>
+              <span class="price-per">para sempre</span>
+            </div>
+          </div>
+          <ul class="plan-card-features">
+            <li><span class="feat-icon">✅</span> Loja listada no app</li>
+            <li><span class="feat-icon">✅</span> Status aberto/fechado em tempo real</li>
+            <li><span class="feat-icon">✅</span> Botão WhatsApp / Telefone</li>
+            <li class="feat-off"><span class="feat-icon">✦</span> Posição de destaque</li>
+            <li class="feat-off"><span class="feat-icon">✦</span> Selo e visual diferenciado</li>
+            <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa no card</li>
+          </ul>
+        </div>
+
+        <!-- PLUS -->
+        <div class="plan-card card-plus" data-plan="PLUS" onclick="selectPlan(this)" style="position:relative;">
+          <span class="plan-popular">⭐ MAIS POPULAR</span>
+          <div class="plan-radio"></div>
+          <div class="plan-card-top">
+            <div class="plan-card-name">✦ Plus</div>
+            <div class="plan-card-price">
+              <span class="price-val">A definir</span>
+              <span class="price-per">por mês</span>
+            </div>
+          </div>
+          <ul class="plan-card-features">
+            <li><span class="feat-icon">✅</span> Tudo do Grátis</li>
+            <li><span class="feat-icon">✅</span> Posição acima das lojas Grátis</li>
+            <li><span class="feat-icon">✅</span> Selo ✦ PLUS no card</li>
+            <li><span class="feat-icon">✅</span> Visual destacado (fundo índigo)</li>
+            <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa no card</li>
+            <li class="feat-off"><span class="feat-icon">✦</span> Topo absoluto da lista</li>
+          </ul>
+        </div>
+
+        <!-- PRO -->
+        <div class="plan-card card-pro" data-plan="PRO" onclick="selectPlan(this)">
+          <div class="plan-radio"></div>
+          <div class="plan-card-top">
+            <div class="plan-card-name">⭐ Pro</div>
+            <div class="plan-card-price">
+              <span class="price-val">A definir</span>
+              <span class="price-per">por mês</span>
+            </div>
+          </div>
+          <ul class="plan-card-features">
+            <li><span class="feat-icon">✅</span> Tudo do Plus</li>
+            <li><span class="feat-icon">✅</span> Topo absoluto da lista</li>
+            <li><span class="feat-icon">✅</span> Foto de capa no card com overlay</li>
+            <li><span class="feat-icon">✅</span> Borda dourada animada</li>
+            <li><span class="feat-icon">✅</span> Selo ⭐ PRO em destaque</li>
+            <li><span class="feat-icon">✅</span> Máxima visibilidade</li>
+          </ul>
+        </div>
+
+      </div>
+
+      <button class="plan-cta cta-gratis" id="plan-cta-btn" onclick="confirmPlan()">
+        Continuar com Grátis →
+      </button>
+      <p class="plan-note" id="plan-note">
+        Planos pagos são ativados após análise e pagamento via WhatsApp.
+      </p>
     </div>
   </div>
 
@@ -1434,9 +1678,14 @@
 
   /* ── Modal Cadastro ──────────────────────────────────────── */
   function openModal() {
+    // Mostra seletor de planos primeiro
+    openPlanModal();
+  }
+
+  function openCadastroModal() {
     const overlay = document.getElementById('modal-cadastro');
     overlay.classList.add('open');
-    document.body.style.overflow = 'hidden'; // trava scroll do fundo
+    document.body.style.overflow = 'hidden';
   }
 
   function closeModal() {
@@ -1458,6 +1707,60 @@
   // Fecha ao clicar no overlay (fora do sheet)
   document.getElementById('modal-cadastro').addEventListener('click', function(e) {
     if (e.target === this) closeModal();
+  });
+
+  /* ── Modal de Planos ─────────────────────────────────────── */
+  let selectedPlan = 'GRATIS';
+
+  const PLAN_LABELS = {
+    GRATIS: { btn: 'Continuar com Grátis →',  cls: 'cta-gratis', note: 'Cadastro gratuito, sem compromisso.' },
+    PLUS:   { btn: '✦ Quero o Plano Plus →',  cls: 'cta-plus',   note: 'Você será contactado via WhatsApp para ativar o plano.' },
+    PRO:    { btn: '⭐ Quero o Plano Pro →',   cls: 'cta-pro',    note: 'Você será contactado via WhatsApp para ativar o plano.' },
+  };
+
+  function openPlanModal() {
+    document.getElementById('modal-planos').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closePlanModal() {
+    document.getElementById('modal-planos').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function selectPlan(card) {
+    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedPlan = card.dataset.plan;
+
+    const cfg = PLAN_LABELS[selectedPlan];
+    const btn  = document.getElementById('plan-cta-btn');
+    const note = document.getElementById('plan-note');
+
+    btn.textContent = cfg.btn;
+    btn.className   = 'plan-cta ' + cfg.cls;
+    note.textContent = cfg.note;
+  }
+
+  function confirmPlan() {
+    closePlanModal();
+    // Injeta o plano escolhido no hint do formulário
+    const hint = document.querySelector('#cadastro-form .field-hint');
+    if (hint) {
+      const icons = { GRATIS:'🏪', PLUS:'✦', PRO:'⭐' };
+      hint.innerHTML = `${icons[selectedPlan]} Plano <strong>${selectedPlan}</strong> selecionado · Você será notificado pelo WhatsApp.`;
+    }
+    // Para planos pagos, abre WhatsApp diretamente ao confirmar plano
+    if (selectedPlan !== 'GRATIS') {
+      const msg = encodeURIComponent(`Olá! Quero cadastrar minha loja no Angatuba ON com o Plano ${selectedPlan}.`);
+      window.open(`https://wa.me/5515981125349?text=${msg}`, '_blank', 'noopener');
+    }
+    openCadastroModal();
+  }
+
+  // Fecha plan modal ao clicar fora
+  document.getElementById('modal-planos').addEventListener('click', function(e) {
+    if (e.target === this) closePlanModal();
   });
 
   /* ── Schedule Builder ───────────────────────────────────── */
@@ -1592,6 +1895,7 @@
 
       const formData = new FormData(this);
       const payload  = Object.fromEntries(formData.entries());
+      payload.planoSolicitado = selectedPlan; // envia o plano escolhido
 
       const params = new URLSearchParams();
       params.append('payload', JSON.stringify(payload));

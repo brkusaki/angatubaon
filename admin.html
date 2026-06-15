@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin · AngatubaON</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    a { text-decoration: none; color: inherit; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; }
+
+    :root {
+      --bg:      #0d0d0d;
+      --surface: #181818;
+      --s2:      #222;
+      --border:  rgba(255,255,255,0.08);
+      --text:    #f0f0f0;
+      --muted:   #7a7a7a;
+      --green:   #00d084;
+      --red:     #ff4444;
+      --zap:     #f59e0b;
+      --blue:    #4285f4;
+      --indigo:  #6366f1;
+      --font-h:  'Syne', sans-serif;
+      --font-b:  'DM Sans', sans-serif;
+      --r:       14px;
+    }
+
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: var(--font-b); font-size: 14px;
+      line-height: 1.5; min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── LOGIN ─────────────────────────────────────────── */
+    #login-screen {
+      min-height: 100vh; display: flex;
+      align-items: center; justify-content: center; padding: 24px;
+    }
+    .login-box {
+      width: 100%; max-width: 360px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 32px 24px; text-align: center;
+    }
+    .login-logo {
+      font-family: var(--font-h); font-size: 1.6rem; font-weight: 800;
+      margin-bottom: 4px;
+    }
+    .login-logo span { color: var(--red); }
+    .login-sub { font-size: 12px; color: var(--muted); margin-bottom: 28px; }
+    .login-field {
+      width: 100%; background: var(--s2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px; color: var(--text);
+      font-family: var(--font-b); font-size: 15px; outline: none;
+      margin-bottom: 12px; transition: border-color 0.2s;
+    }
+    .login-field:focus { border-color: rgba(255,255,255,0.25); }
+    .login-btn {
+      width: 100%; padding: 13px; border-radius: 12px;
+      background: var(--red); color: #fff;
+      font-family: var(--font-h); font-size: 1rem; font-weight: 700;
+      transition: opacity 0.2s;
+    }
+    .login-btn:hover { opacity: 0.88; }
+    .login-err {
+      font-size: 12px; color: var(--red); margin-top: 10px;
+      display: none;
+    }
+
+    /* ── PAINEL ─────────────────────────────────────────── */
+    #admin-panel { display: none; }
+
+    .admin-header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 14px 20px; display: flex; align-items: center;
+      justify-content: space-between; position: sticky; top: 0; z-index: 100;
+    }
+    .admin-logo { font-family: var(--font-h); font-size: 1.1rem; font-weight: 800; }
+    .admin-logo span { color: var(--red); }
+    .admin-badge {
+      font-size: 11px; background: var(--s2); border: 1px solid var(--border);
+      color: var(--muted); padding: 4px 10px; border-radius: 20px;
+    }
+    .logout-btn {
+      font-size: 12px; color: var(--muted); padding: 6px 12px;
+      border-radius: 8px; border: 1px solid var(--border);
+      background: var(--s2); transition: color 0.2s;
+    }
+    .logout-btn:hover { color: var(--red); }
+
+    /* ── TABS ────────────────────────────────────────────── */
+    .tabs {
+      display: flex; border-bottom: 1px solid var(--border);
+      padding: 0 20px; background: var(--surface);
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      padding: 12px 16px; font-size: 13px; font-weight: 600;
+      color: var(--muted); border-bottom: 2px solid transparent;
+      white-space: nowrap; transition: color 0.2s, border-color 0.2s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .tab-btn.active { color: var(--text); border-bottom-color: var(--red); }
+    .tab-count {
+      background: var(--red); color: #fff;
+      font-size: 9px; font-weight: 800;
+      padding: 2px 6px; border-radius: 10px; min-width: 18px;
+      text-align: center; display: none;
+    }
+    .tab-count.visible { display: inline-block; }
+
+    /* ── CONTEÚDO PRINCIPAL ─────────────────────────────── */
+    .admin-body { padding: 20px; max-width: 720px; margin: 0 auto; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── CARDS DE CADASTRO ──────────────────────────────── */
+    .store-cards { display: flex; flex-direction: column; gap: 12px; }
+
+    .admin-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 16px; position: relative;
+    }
+    .admin-card.pendente { border-left: 3px solid var(--zap); }
+    .admin-card.aprovado { border-left: 3px solid var(--green); }
+    .admin-card.reprovado { border-left: 3px solid var(--red); opacity: 0.55; }
+
+    .card-top {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 10px; margin-bottom: 10px;
+    }
+    .card-name {
+      font-family: var(--font-h); font-size: 0.95rem; font-weight: 700;
+    }
+    .card-ramo {
+      font-size: 11px; color: var(--muted); margin-top: 2px;
+    }
+    .status-pill {
+      font-size: 9px; font-weight: 800; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 20px; white-space: nowrap; flex-shrink: 0;
+    }
+    .pill-pendente { background: rgba(245,158,11,0.15); color: var(--zap); }
+    .pill-aprovado { background: rgba(0,208,132,0.12); color: var(--green); }
+    .pill-reprovado { background: rgba(255,68,68,0.12); color: var(--red); }
+
+    .card-info { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+    .card-info-row {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 12px; color: var(--muted);
+    }
+    .card-info-row i { width: 14px; text-align: center; font-size: 11px; flex-shrink: 0; }
+    .card-info-row a { color: var(--blue); }
+
+    .card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .act-btn {
+      padding: 7px 14px; border-radius: 8px; font-size: 12px;
+      font-weight: 600; display: flex; align-items: center; gap: 5px;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .act-btn:active { transform: scale(0.96); }
+    .btn-approve { background: rgba(0,208,132,0.12); color: var(--green); border: 1px solid rgba(0,208,132,0.25); }
+    .btn-reject  { background: rgba(255,68,68,0.1);  color: var(--red);   border: 1px solid rgba(255,68,68,0.2); }
+    .btn-wpp     { background: rgba(37,211,102,0.12); color: #25d366;      border: 1px solid rgba(37,211,102,0.2); }
+    .btn-plan    { background: rgba(99,102,241,0.12); color: var(--indigo);border: 1px solid rgba(99,102,241,0.25); }
+
+    /* ── PLAN MANAGER ────────────────────────────────────── */
+    .plan-manager-row {
+      display: flex; gap: 8px; align-items: center;
+      flex-wrap: wrap; margin-top: 10px; padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .plan-select, .plan-date-input {
+      background: var(--s2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 7px 10px; color: var(--text);
+      font-family: var(--font-b); font-size: 12px; outline: none;
+    }
+    .plan-select { cursor: pointer; }
+    .plan-date-input { color-scheme: dark; }
+    .btn-save-plan {
+      background: linear-gradient(135deg,#f59e0b,#d97706);
+      color: #000; font-weight: 700; font-size: 12px;
+      padding: 7px 14px; border-radius: 8px; display: flex;
+      align-items: center; gap: 5px;
+    }
+
+    /* ── EMPTY / LOADING ─────────────────────────────────── */
+    .admin-empty {
+      text-align: center; padding: 48px 20px;
+      color: var(--muted); font-size: 13px;
+    }
+    .admin-empty i { font-size: 2rem; display: block; margin-bottom: 12px; opacity: 0.3; }
+
+    .loading-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 20px; color: var(--muted); font-size: 13px;
+      justify-content: center;
+    }
+
+    /* ── SEARCH ──────────────────────────────────────────── */
+    .admin-search-wrap { position: relative; margin-bottom: 16px; }
+    .admin-search {
+      width: 100%; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 14px 10px 38px; color: var(--text);
+      font-family: var(--font-b); font-size: 14px; outline: none;
+    }
+    .admin-search:focus { border-color: rgba(255,255,255,0.2); }
+    .admin-search-icon {
+      position: absolute; left: 13px; top: 50%;
+      transform: translateY(-50%); color: var(--muted); font-size: 12px;
+      pointer-events: none;
+    }
+
+    /* ── TOAST ───────────────────────────────────────────── */
+    #admin-toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface); border: 1px solid var(--border);
+      border-left: 3px solid var(--green);
+      border-radius: 12px; padding: 12px 18px;
+      font-size: 13px; color: var(--text);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      opacity: 0; pointer-events: none; z-index: 9999;
+      transition: opacity 0.25s, transform 0.25s;
+      white-space: nowrap;
+    }
+    #admin-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #admin-toast.err  { border-left-color: var(--red); }
+  </style>
+</head>
+<body>
+
+<!-- ══ LOGIN ══ -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">Angatuba<span>ON</span></div>
+    <div class="login-sub">Painel Administrativo</div>
+    <input class="login-field" id="login-pass" type="password"
+      placeholder="Senha de acesso" autocomplete="current-password"
+      onkeydown="if(event.key==='Enter') doLogin()" />
+    <button class="login-btn" onclick="doLogin()">Entrar</button>
+    <div class="login-err" id="login-err">Senha incorreta.</div>
+  </div>
+</div>
+
+<!-- ══ PAINEL ══ -->
+<div id="admin-panel">
+
+  <header class="admin-header">
+    <div class="admin-logo">Angatuba<span>ON</span> <span style="font-size:11px;color:var(--muted);font-family:var(--font-b);font-weight:400;">· Admin</span></div>
+    <button class="logout-btn" onclick="doLogout()"><i class="fa fa-right-from-bracket"></i> Sair</button>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('pendentes', this)">
+      <i class="fa fa-clock"></i> Pendentes
+      <span class="tab-count" id="count-pendentes"></span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('aprovados', this)">
+      <i class="fa fa-check-circle"></i> Aprovados
+      <span class="tab-count" id="count-aprovados"></span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('planos', this)">
+      <i class="fa fa-star"></i> Planos
+    </button>
+  </div>
+
+  <div class="admin-body">
+
+    <!-- TAB: Pendentes -->
+    <div class="tab-content active" id="tab-pendentes">
+      <div class="admin-search-wrap">
+        <i class="fa fa-search admin-search-icon"></i>
+        <input class="admin-search" id="search-pendentes"
+          placeholder="Filtrar pelo nome..." oninput="filterCards('pendentes')" />
+      </div>
+      <div class="store-cards" id="list-pendentes">
+        <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
+      </div>
+    </div>
+
+    <!-- TAB: Aprovados -->
+    <div class="tab-content" id="tab-aprovados">
+      <div class="admin-search-wrap">
+        <i class="fa fa-search admin-search-icon"></i>
+        <input class="admin-search" id="search-aprovados"
+          placeholder="Filtrar pelo nome..." oninput="filterCards('aprovados')" />
+      </div>
+      <div class="store-cards" id="list-aprovados">
+        <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
+      </div>
+    </div>
+
+    <!-- TAB: Planos -->
+    <div class="tab-content" id="tab-planos">
+      <div class="admin-search-wrap">
+        <i class="fa fa-search admin-search-icon"></i>
+        <input class="admin-search" id="search-planos"
+          placeholder="Filtrar pelo nome..." oninput="filterCards('planos')" />
+      </div>
+      <div class="store-cards" id="list-planos">
+        <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="admin-toast"></div>
+
+<script>
+'use strict';
+
+/* ══ CONFIG ══════════════════════════════════════════════════ */
+const ADMIN_PASS      = 'angatuba2025';   // ← MUDE AQUI
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwmJMmvb5H6KkMWdXJV441SQ2h18SEfLrb_4-kvUYM0IiVL6Co-EKGGay7f_qvUEi0_cg/exec';
+const ADMIN_WPP       = '5515981125349';
+
+/* ══ LOGIN ════════════════════════════════════════════════════ */
+function doLogin() {
+  const val = document.getElementById('login-pass').value.trim();
+  if (val === ADMIN_PASS) {
+    sessionStorage.setItem('angatuba_admin', '1');
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('admin-panel').style.display  = 'block';
+    loadData();
+  } else {
+    document.getElementById('login-err').style.display = 'block';
+    document.getElementById('login-pass').value = '';
+  }
+}
+
+function doLogout() {
+  sessionStorage.removeItem('angatuba_admin');
+  location.reload();
+}
+
+// Auto-login se sessão ativa
+if (sessionStorage.getItem('angatuba_admin')) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-panel').style.display  = 'block';
+}
+
+/* ══ TABS ═════════════════════════════════════════════════════ */
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+/* ══ DATA ═════════════════════════════════════════════════════ */
+let allRows = [];
+
+async function loadData() {
+  try {
+    const resp = await fetch(APPS_SCRIPT_URL + '?action=admin', { signal: AbortSignal.timeout(12000) });
+    const json = await resp.json();
+    if (json.status === 'ok' && Array.isArray(json.data)) {
+      allRows = json.data;
+      renderAll();
+    } else {
+      showFallbackError();
+    }
+  } catch(e) {
+    showFallbackError();
+  }
+}
+
+function showFallbackError() {
+  ['pendentes','aprovados','planos'].forEach(k => {
+    document.getElementById('list-' + k).innerHTML =
+      `<div class="admin-empty"><i class="fa fa-triangle-exclamation"></i>Erro ao carregar dados.<br>Verifique a URL do Apps Script.</div>`;
+  });
+}
+
+function renderAll() {
+  const pendentes = allRows.filter(r => r.status === 'PENDENTE');
+  const aprovados = allRows.filter(r => r.status === 'APROVADO');
+
+  setCount('pendentes', pendentes.length);
+  setCount('aprovados', aprovados.length);
+
+  renderList('pendentes', pendentes);
+  renderList('aprovados', aprovados);
+  renderPlanos(aprovados);
+}
+
+function setCount(key, n) {
+  const el = document.getElementById('count-' + key);
+  el.textContent = n;
+  el.classList.toggle('visible', n > 0);
+}
+
+/* ══ RENDER LISTS ═════════════════════════════════════════════ */
+function renderList(type, rows) {
+  const el = document.getElementById('list-' + type);
+  if (!rows.length) {
+    el.innerHTML = `<div class="admin-empty"><i class="fa fa-inbox"></i>Nenhum cadastro aqui.</div>`;
+    return;
+  }
+  el.innerHTML = rows.map(r => cardHTML(r, type)).join('');
+}
+
+function renderPlanos(rows) {
+  const el = document.getElementById('list-planos');
+  if (!rows.length) {
+    el.innerHTML = `<div class="admin-empty"><i class="fa fa-star"></i>Nenhuma loja aprovada ainda.</div>`;
+    return;
+  }
+  el.innerHTML = rows.map(r => planCardHTML(r)).join('');
+}
+
+/* ── Card de cadastro ─────────────────────────────────────── */
+function cardHTML(r, type) {
+  const statusCls = { PENDENTE:'pendente', APROVADO:'aprovado', REPROVADO:'reprovado' };
+  const pillCls   = { PENDENTE:'pill-pendente', APROVADO:'pill-aprovado', REPROVADO:'pill-reprovado' };
+  const cls  = statusCls[r.status] || 'pendente';
+  const pill = pillCls[r.status]   || 'pill-pendente';
+
+  const wppMsg = encodeURIComponent(`Olá ${r.nome}! Recebemos seu cadastro no AngatubaON. `);
+  const wppLink = r.wpp ? `https://wa.me/${r.wpp.replace(/\D/g,'')}?text=${wppMsg}` : '';
+
+  const isPendente = r.status === 'PENDENTE';
+
+  return `
+    <div class="admin-card ${cls}" id="card-${r.row}" data-nome="${escAttr(r.nome)}">
+      <div class="card-top">
+        <div>
+          <div class="card-name">${r.nome || '—'}</div>
+          <div class="card-ramo">${r.ramo || '—'} · linha ${r.row}</div>
+        </div>
+        <span class="status-pill ${pill}">${r.status}</span>
+      </div>
+      <div class="card-info">
+        ${r.endereco ? `<div class="card-info-row"><i class="fa fa-map-marker-alt"></i>${r.endereco}</div>` : ''}
+        ${r.wpp      ? `<div class="card-info-row"><i class="fab fa-whatsapp"></i>${r.wpp}</div>` : ''}
+        ${r.tel      ? `<div class="card-info-row"><i class="fa fa-phone"></i>${r.tel}</div>` : ''}
+        ${r.horario  ? `<div class="card-info-row"><i class="fa fa-clock"></i>${r.horario}</div>` : ''}
+        ${r.planoSolicitado ? `<div class="card-info-row"><i class="fa fa-star"></i>Plano solicitado: <strong style="color:var(--zap);margin-left:4px;">${r.planoSolicitado}</strong></div>` : ''}
+        ${r.obs      ? `<div class="card-info-row"><i class="fa fa-note-sticky"></i>${r.obs}</div>` : ''}
+      </div>
+      <div class="card-actions">
+        ${isPendente ? `
+          <button class="act-btn btn-approve" onclick="updateStatus(${r.row},'APROVADO',this)">
+            <i class="fa fa-check"></i> Aprovar
+          </button>
+          <button class="act-btn btn-reject" onclick="updateStatus(${r.row},'REPROVADO',this)">
+            <i class="fa fa-times"></i> Reprovar
+          </button>` : ''}
+        ${wppLink ? `
+          <a href="${wppLink}" target="_blank" class="act-btn btn-wpp">
+            <i class="fab fa-whatsapp"></i> WhatsApp
+          </a>` : ''}
+      </div>
+    </div>`;
+}
+
+/* ── Card de gestão de plano ─────────────────────────────── */
+function planCardHTML(r) {
+  const plano    = r.plano || 'GRATIS';
+  const validade = r.planoValidade || '';
+
+  const planColor = { PRO:'var(--zap)', PLUS:'var(--indigo)', GRATIS:'var(--muted)' };
+  const cor = planColor[plano] || 'var(--muted)';
+
+  return `
+    <div class="admin-card aprovado" id="plan-card-${r.row}" data-nome="${escAttr(r.nome)}">
+      <div class="card-top">
+        <div>
+          <div class="card-name">${r.nome}</div>
+          <div class="card-ramo">${r.ramo} · linha ${r.row}</div>
+        </div>
+        <span style="font-family:var(--font-h);font-size:11px;font-weight:800;color:${cor};">${plano}</span>
+      </div>
+      <div class="plan-manager-row">
+        <select class="plan-select" id="ps-${r.row}">
+          <option value="GRATIS" ${plano==='GRATIS'?'selected':''}>🏪 Grátis</option>
+          <option value="PLUS"   ${plano==='PLUS'  ?'selected':''}>✦ Plus</option>
+          <option value="PRO"    ${plano==='PRO'   ?'selected':''}>⭐ Pro</option>
+        </select>
+        <input class="plan-date-input" type="date" id="pd-${r.row}"
+          value="${isoDate(validade)}" title="Validade do plano (vazio = vitalício)" />
+        <button class="act-btn btn-save-plan" onclick="savePlan(${r.row})">
+          <i class="fa fa-save"></i> Salvar
+        </button>
+      </div>
+    </div>`;
+}
+
+/* ══ AÇÕES ════════════════════════════════════════════════════ */
+async function updateStatus(row, newStatus, btn) {
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+  try {
+    const params = new URLSearchParams();
+    params.append('payload', JSON.stringify({ action: 'updateStatus', row, status: newStatus }));
+    await fetch(APPS_SCRIPT_URL, { method:'POST', mode:'no-cors', body: params });
+    toast('✅ Status atualizado para ' + newStatus);
+    // Atualiza localmente sem recarregar tudo
+    const r = allRows.find(x => x.row === row);
+    if (r) r.status = newStatus;
+    renderAll();
+  } catch(e) {
+    toast('❌ Erro ao atualizar. Tente novamente.', true);
+    btn.disabled = false;
+  }
+}
+
+async function savePlan(row) {
+  const plano    = document.getElementById('ps-' + row).value;
+  const validade = document.getElementById('pd-' + row).value;
+
+  // Converte ISO (YYYY-MM-DD) para BR (DD/MM/AAAA)
+  const validadeBR = validade ? validade.split('-').reverse().join('/') : '';
+
+  try {
+    const params = new URLSearchParams();
+    params.append('payload', JSON.stringify({
+      action: 'updatePlan', row, plano,
+      planoValidade: validadeBR,
+      planoPago: plano !== 'GRATIS' ? 'SIM' : 'NÃO',
+    }));
+    await fetch(APPS_SCRIPT_URL, { method:'POST', mode:'no-cors', body: params });
+    toast(`✅ Plano ${plano} salvo${validadeBR ? ' até ' + validadeBR : ' (vitalício)'}`);
+    const r = allRows.find(x => x.row === row);
+    if (r) { r.plano = plano; r.planoValidade = validadeBR; }
+  } catch(e) {
+    toast('❌ Erro ao salvar plano.', true);
+  }
+}
+
+/* ══ FILTRO ═══════════════════════════════════════════════════ */
+function filterCards(type) {
+  const q   = document.getElementById('search-' + type).value.toLowerCase();
+  const cards = document.querySelectorAll(`#list-${type} .admin-card`);
+  cards.forEach(c => {
+    c.style.display = c.dataset.nome.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+/* ══ HELPERS ══════════════════════════════════════════════════ */
+function escAttr(s) {
+  return String(s || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function isoDate(br) {
+  if (!br) return '';
+  const p = br.split('/');
+  if (p.length !== 3) return '';
+  return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+}
+
+let toastTimer;
+function toast(msg, isErr = false) {
+  const el = document.getElementById('admin-toast');
+  el.textContent = msg;
+  el.className   = 'show' + (isErr ? ' err' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = '', 3500);
+}
+
+/* ══ INIT ═════════════════════════════════════════════════════ */
+if (sessionStorage.getItem('angatuba_admin')) loadData();
+</script>
+</body>
+</html>

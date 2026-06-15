@@ -174,76 +174,6 @@
     /* ════════════════════════════════════════════
        SEÇÃO RECOMENDADOS (lojas destaque/pagas)
     ════════════════════════════════════════════ */
-    .rec-section {
-      margin: 16px 16px 8px;
-      background: linear-gradient(135deg, #1c1a14, #25210f);
-      border: 1px solid rgba(245,158,11,0.35);
-      border-radius: var(--r-lg);
-      padding: 16px 14px 12px;
-      display: none;
-    }
-    .rec-header {
-      display: flex; align-items: center; gap: 8px;
-      font-family: var(--font-h); font-size: 0.95rem; font-weight: 700;
-      color: var(--zap); margin-bottom: 12px; letter-spacing: -0.01em;
-    }
-    .rec-header i { font-size: 0.85rem; }
-
-    .store-card.is-recommended {
-      border-color: #f59e0b;
-      background: rgba(245,158,11,0.06);
-      box-shadow:
-        0 0 0 1px rgba(245,158,11,0.25) inset,
-        0 0 12px rgba(245,158,11,0.08);
-    }
-    /* Card recomendado COM foto: bg-image + overlay escuro para manter legibilidade */
-    .store-card.is-recommended.has-foto {
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      border-color: #f59e0b;
-      box-shadow:
-        0 0 0 1px rgba(245,158,11,0.5) inset,
-        0 0 0 3px rgba(245,158,11,0.12),
-        0 4px 24px rgba(245,158,11,0.18);
-    }
-    /* Overlay: gradiente direcional — mais escuro embaixo para texto, mais leve no centro */
-    .store-card.is-recommended.has-foto::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        105deg,
-        rgba(0,0,0,0.82) 0%,
-        rgba(0,0,0,0.60) 55%,
-        rgba(0,0,0,0.75) 100%
-      );
-      border-radius: inherit;
-      z-index: 0;
-      pointer-events: none;
-    }
-    /* Garante que thumb, info e botão fiquem acima do overlay */
-    .store-card.is-recommended.has-foto > * {
-      position: relative;
-      z-index: 1;
-    }
-    /* Badge DESTAQUE — inline no flexbox, sem ::after frágil */
-    .rec-star {
-      display: inline-flex;
-      align-items: center;
-      font-size: 9px;
-      font-weight: 800;
-      color: #000;
-      background: #f59e0b;
-      padding: 2px 6px;
-      border-radius: 5px;
-      letter-spacing: 0.4px;
-      white-space: nowrap;
-      flex-shrink: 0;
-      max-width: 72px;
-      line-height: 1.4;
-      align-self: center;
-    }
 
     /* ════════════════════════════════════════════
        MAIN
@@ -895,11 +825,7 @@
     </button>
   </div>
 
-  <!-- ══════════════════════════ RECOMENDADOS -->
-  <div class="rec-section" id="rec-section">
-    <div class="rec-header"><i class="fa fa-star"></i> Em Destaque</div>
-    <div class="store-list" id="rec-list"></div>
-  </div>
+
 
   <!-- ════════════════════════════════ MAIN -->
   <main class="main">
@@ -1266,32 +1192,6 @@
       </div>`;
   }
 
-  /* ── Renderiza seção Recomendados ────────────────────────── */
-  function renderRecomendados() {
-    const section = document.getElementById('rec-section');
-    const list    = document.getElementById('rec-list');
-
-    const recs = LOJAS.filter(l => l.recomendado === true);
-
-    if (recs.length === 0 || activeCat !== 'todos' || searchQuery !== '') {
-      section.style.display = 'none';
-      return;
-    }
-
-    section.style.display = 'block';
-    const frag = document.createDocumentFragment();
-    recs.forEach((loja, i) => {
-      const wrap = document.createElement('div');
-      // Usa _statusSnapshot (já populado antes desta chamada) — zero recálculo
-      const st = _statusSnapshot.get(loja) ?? calcStatus(loja);
-      wrap.innerHTML = cardHTML(loja, i * 0.06, st);
-      frag.appendChild(wrap.firstElementChild);
-    });
-    list.innerHTML = '';
-    list.appendChild(frag);
-  }
-
-
   /* ── Skeleton Loading ───────────────────────────────────── */
   function showSkeleton() {
     const listEl = document.getElementById('store-list');
@@ -1426,10 +1326,8 @@
       : '';
     infoEl.className = 'filter-info' + (abertas > 0 ? ' has-open' : '');
 
-    // Exporta snapshot ANTES de renderRecomendados para que ela também use o cache
+    // Exporta snapshot para smartRefresh e renderCategorias
     _statusSnapshot = statusCache;
-
-    renderRecomendados();
   }
 
   /* ── Renderiza categorias ────────────────────────────────── */

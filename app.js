@@ -1,0 +1,2136 @@
+'use strict';
+
+  /* ══════════════════════════════════════════════════════════════
+     CATEGORIAS
+  ══════════════════════════════════════════════════════════════ */
+  const CATEGORIAS = [
+    { id:'todos',        label:'Tudo',          icon:'fa-bolt',               cor:'#ff4444', bg:'rgba(255,68,68,0.12)'    },
+    // ── Alimentação e Bebidas ──────────────────────────────────────────────
+    { id:'pizzaria',     label:'Pizzarias',     icon:'fa-pizza-slice',         cor:'#f59e0b', bg:'rgba(245,158,11,0.12)'   },
+    { id:'lanches',      label:'Lanches',       icon:'fa-burger',              cor:'#00d084', bg:'rgba(0,208,132,0.12)'    },
+    { id:'adega',        label:'Adegas',        icon:'fa-wine-bottle',         cor:'#a78bfa', bg:'rgba(167,139,250,0.12)'  },
+    { id:'carnes',       label:'Carnes/Grill',  icon:'fa-drumstick-bite',      cor:'#ef4444', bg:'rgba(239,68,68,0.12)'    },
+    // ── Saúde, Beleza e Bem-Estar ──────────────────────────────────────────
+    { id:'farmacia',     label:'Farmácias',     icon:'fa-pills',               cor:'#38bdf8', bg:'rgba(56,189,248,0.12)'   },
+    { id:'clinica',      label:'Clínicas',      icon:'fa-stethoscope',         cor:'#34d399', bg:'rgba(52,211,153,0.12)'   },
+    { id:'laboratorio',  label:'Laboratórios',  icon:'fa-flask',               cor:'#a3e635', bg:'rgba(163,230,53,0.12)'   },
+    { id:'otica',        label:'Óticas',        icon:'fa-glasses',             cor:'#67e8f9', bg:'rgba(103,232,249,0.12)'  },
+    { id:'barbearia',    label:'Barbearias',    icon:'fa-scissors',            cor:'#fbbf24', bg:'rgba(251,191,36,0.12)'   },
+    { id:'salao',        label:'Salões',        icon:'fa-spa',                 cor:'#f9a8d4', bg:'rgba(249,168,212,0.12)'  },
+    { id:'academia',     label:'Academias',     icon:'fa-dumbbell',            cor:'#fb923c', bg:'rgba(251,146,60,0.12)'   },
+    { id:'tattoo',       label:'Tatuagem',      icon:'fa-paintbrush',          cor:'#c084fc', bg:'rgba(192,132,252,0.12)'  },
+    // ── Comércio e Variedades ──────────────────────────────────────────────
+    { id:'mercado',      label:'Mercados',      icon:'fa-store',               cor:'#2dd4bf', bg:'rgba(45,212,191,0.12)'   },
+    { id:'roupas',       label:'Roupas',        icon:'fa-shirt',               cor:'#f472b6', bg:'rgba(244,114,182,0.12)'  },
+    { id:'calcados',     label:'Calçados',      icon:'fa-shoe-prints',         cor:'#a78bfa', bg:'rgba(167,139,250,0.12)'  },
+    { id:'joalheria',    label:'Joalherias',    icon:'fa-gem',                 cor:'#facc15', bg:'rgba(250,204,21,0.12)'   },
+    { id:'festas',       label:'Festas',        icon:'fa-cake-candles',        cor:'#fb7185', bg:'rgba(251,113,133,0.12)'  },
+    { id:'armarinho',    label:'Armarinho',     icon:'fa-scissors',            cor:'#d946ef', bg:'rgba(217,70,239,0.12)'   },
+    { id:'floricultura', label:'Flores',        icon:'fa-seedling',            cor:'#4ade80', bg:'rgba(74,222,128,0.12)'   },
+    { id:'papelaria',    label:'Papelaria',     icon:'fa-book',                cor:'#60a5fa', bg:'rgba(96,165,250,0.12)'   },
+    { id:'variedades',   label:'Variedades',    icon:'fa-bag-shopping',        cor:'#94a3b8', bg:'rgba(148,163,184,0.12)'  },
+    // ── Automotivo ────────────────────────────────────────────────────────
+    { id:'posto',        label:'Postos',        icon:'fa-gas-pump',            cor:'#facc15', bg:'rgba(250,204,21,0.12)'   },
+    { id:'gas',          label:'Gás/Água',      icon:'fa-fire-flame-curved',   cor:'#fb923c', bg:'rgba(251,146,60,0.12)'   },
+    { id:'mecanica',     label:'Mecânicas',     icon:'fa-wrench',              cor:'#94a3b8', bg:'rgba(148,163,184,0.12)'  },
+    { id:'autopecas',    label:'Autopeças',     icon:'fa-gear',                cor:'#78716c', bg:'rgba(120,113,108,0.12)'  },
+    { id:'borracharia',  label:'Borracharia',   icon:'fa-circle-dot',          cor:'#a8a29e', bg:'rgba(168,162,158,0.12)'  },
+    { id:'funilaria',    label:'Funilaria',     icon:'fa-car-burst',           cor:'#f87171', bg:'rgba(248,113,113,0.12)'  },
+    { id:'lava-rapido',  label:'Lava-Rápido',   icon:'fa-droplet',             cor:'#38bdf8', bg:'rgba(56,189,248,0.12)'   },
+    { id:'bicicletaria', label:'Bicicletaria',  icon:'fa-bicycle',             cor:'#4ade80', bg:'rgba(74,222,128,0.12)'   },
+    // ── Casa e Construção ─────────────────────────────────────────────────
+    { id:'construcao',   label:'Construção',    icon:'fa-helmet-safety',       cor:'#f59e0b', bg:'rgba(245,158,11,0.12)'   },
+    { id:'moveis',       label:'Móveis',        icon:'fa-couch',               cor:'#a78bfa', bg:'rgba(167,139,250,0.12)'  },
+    { id:'madeireira',   label:'Madeireira',    icon:'fa-tree',                cor:'#86efac', bg:'rgba(134,239,172,0.12)'  },
+    { id:'tintas',       label:'Tintas',        icon:'fa-fill-drip',           cor:'#f472b6', bg:'rgba(244,114,182,0.12)'  },
+    { id:'vidracaria',   label:'Vidraçaria',    icon:'fa-window-restore',      cor:'#67e8f9', bg:'rgba(103,232,249,0.12)'  },
+    { id:'serralheria',  label:'Serralheria',   icon:'fa-industry',            cor:'#94a3b8', bg:'rgba(148,163,184,0.12)'  },
+    { id:'refrigeracao', label:'Refrigeração',  icon:'fa-snowflake',           cor:'#7dd3fc', bg:'rgba(125,211,252,0.12)'  },
+    { id:'consertos',    label:'Consertos',     icon:'fa-screwdriver-wrench',  cor:'#fbbf24', bg:'rgba(251,191,36,0.12)'   },
+    // ── Pet e Agropecuária ────────────────────────────────────────────────
+    { id:'pet',          label:'Pet Shop',      icon:'fa-paw',                 cor:'#f472b6', bg:'rgba(244,114,182,0.12)'  },
+    { id:'agropecuaria', label:'Agropecuária',  icon:'fa-tractor',             cor:'#86efac', bg:'rgba(134,239,172,0.12)'  },
+    { id:'insumos',      label:'Insumos Agric.',icon:'fa-leaf',                cor:'#4ade80', bg:'rgba(74,222,128,0.12)'   },
+    // ── Tecnologia e Serviços ─────────────────────────────────────────────
+    { id:'informatica',  label:'Informática',   icon:'fa-laptop',              cor:'#60a5fa', bg:'rgba(96,165,250,0.12)'   },
+    { id:'celular',      label:'Celulares',     icon:'fa-mobile-screen',       cor:'#34d399', bg:'rgba(52,211,153,0.12)'   },
+    { id:'grafica',      label:'Gráfica',       icon:'fa-print',               cor:'#a78bfa', bg:'rgba(167,139,250,0.12)'  },
+    { id:'imobiliaria',  label:'Imobiliária',   icon:'fa-house',               cor:'#38bdf8', bg:'rgba(56,189,248,0.12)'   },
+    { id:'advocacia',    label:'Advocacia',     icon:'fa-scale-balanced',      cor:'#f59e0b', bg:'rgba(245,158,11,0.12)'   },
+    { id:'contabilidade',label:'Contabilidade', icon:'fa-calculator',          cor:'#34d399', bg:'rgba(52,211,153,0.12)'   },
+    { id:'fotografia',   label:'Fotografia',    icon:'fa-camera',              cor:'#f472b6', bg:'rgba(244,114,182,0.12)'  },
+    { id:'viagens',      label:'Viagens',       icon:'fa-plane',               cor:'#38bdf8', bg:'rgba(56,189,248,0.12)'   },
+    // ── Educação e Finanças ───────────────────────────────────────────────
+    { id:'bancario',     label:'Bancos/Lotérica',icon:'fa-landmark',           cor:'#facc15', bg:'rgba(250,204,21,0.12)'   },
+    { id:'seguros',      label:'Seguros',       icon:'fa-shield-halved',       cor:'#60a5fa', bg:'rgba(96,165,250,0.12)'   },
+    { id:'idiomas',      label:'Cursos/Idiomas',icon:'fa-graduation-cap',      cor:'#a3e635', bg:'rgba(163,230,53,0.12)'   },
+    { id:'autoescola',   label:'Autoescola',    icon:'fa-car',                 cor:'#fb923c', bg:'rgba(251,146,60,0.12)'   },
+    // ── Genérico ──────────────────────────────────────────────────────────
+    { id:'servicos',     label:'Serviços',      icon:'fa-toolbox',             cor:'#94a3b8', bg:'rgba(148,163,184,0.12)'  },
+  ];
+
+  const CAT_BG = Object.fromEntries(CATEGORIAS.map(c => [c.id, c.bg]));
+
+  /* ══════════════════════════════════════════════════════════════
+     LOJAS — carregadas dinamicamente do Google Sheets via Apps Script
+     Lojas hardcoded abaixo são o fallback caso a API falhe
+  ══════════════════════════════════════════════════════════════ */
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwmJMmvb5H6KkMWdXJV441SQ2h18SEfLrb_4-kvUYM0IiVL6Co-EKGGay7f_qvUEi0_cg/exec';
+
+  // Lojas fixas (fallback offline / enquanto carrega)
+  const LOJAS_FIXAS = []; // migradas para a planilha
+
+  // Array ativo — começa com as fixas, substituído pelas da API quando carregar
+  let LOJAS = [...LOJAS_FIXAS];
+
+  // Mapa nome→índice global — atualizado sempre que LOJAS muda.
+  // Garante que abrirDetalhes(idx) sempre encontre a loja certa,
+  // independente de filtros ativos na lista renderizada.
+  let _lojaIdxMap = new Map();
+  function _rebuildIdxMap() {
+    _lojaIdxMap.clear();
+    LOJAS.forEach((l, i) => _lojaIdxMap.set(l, i));
+  }
+  _rebuildIdxMap();
+
+  /* ══════════════════════════════════════════════════════════════
+     ENGINE
+  ══════════════════════════════════════════════════════════════ */
+
+  // Helper: escapa HTML para evitar XSS — definido cedo pois é usado em cardHTML
+  function escHTML(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  let activeCat        = 'todos';
+  let searchQuery      = '';
+  let activePillFilter = 'all';
+
+  /* ── Calcula status pelo horário ─────────────────────────── */
+  /* ── calcStatusInfo: retorna { status, fechaStr } ───────────
+     fechaStr = hora de fechamento formatada (ex: "23:00") ou ''
+  ─────────────────────────────────────────────────────────── */
+  function calcStatusInfo(loja) {
+    // Override manual do dono da loja (ABERTO / VOLTAMOS / FECHADO)
+    if (loja.statusLoja === 'ABERTO')   return { status: 'open',   fechaStr: '' };
+    if (loja.statusLoja === 'VOLTAMOS') return { status: 'zap',    fechaStr: '' };
+    if (loja.statusLoja === 'FECHADO')  return { status: 'closed', fechaStr: '' };
+
+    if (loja.status) return { status: loja.status, fechaStr: '' };
+    if (!loja.horario) return { status: 'open', fechaStr: '' };
+
+    // Convenção 24h: abre 00:00 e fecha 23:59 (ou abre === fecha em 00:00)
+    const is24h = (loja.horario.abre === '00:00' && loja.horario.fecha === '23:59')
+               || (loja.horario.abre === '00:00' && loja.horario.fecha === '00:00');
+    if (is24h) {
+      const hoje = new Date().getDay();
+      if (loja.horario.dias.includes(hoje)) return { status: 'open', fechaStr: '24h' };
+      return { status: 'closed', fechaStr: '' };
+    }
+
+    const now    = new Date();
+    const dow    = now.getDay();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+
+    // 00:00 como fechamento = meia-noite (1440 min)
+    const parse = s => {
+      const [h, m] = s.split(':').map(Number);
+      return (h === 0 && m === 0) ? 1440 : h * 60 + m;
+    };
+
+    const abre     = parse(loja.horario.abre);
+    const fecha    = parse(loja.horario.fecha);
+    const fechaStr = loja.horario.fecha;
+
+    if (abre === fecha) return { status: 'closed', fechaStr };
+
+    const viraNoite  = fecha < abre;
+    const abreHoje   = loja.horario.dias.includes(dow);
+    const abriuOntem = loja.horario.dias.includes((dow + 6) % 7);
+
+    if (viraNoite && abriuOntem && nowMin < fecha)
+      return { status: 'open', fechaStr };
+
+    if (abreHoje) {
+      if (!viraNoite)
+        return (nowMin >= abre && nowMin < fecha)
+          ? { status: 'open',   fechaStr }
+          : { status: 'closed', fechaStr: loja.horario.abre };
+      return nowMin >= abre
+        ? { status: 'open',   fechaStr }
+        : { status: 'closed', fechaStr: loja.horario.abre };
+    }
+    return { status: 'closed', fechaStr: loja.horario.abre };
+  }
+
+  // Compat: calcStatus continua retornando só a string (usado em vários lugares)
+  function calcStatus(loja) { return calcStatusInfo(loja).status; }
+
+  /* ── Badge de status ─────────────────────────────────────── */
+  // fechaStr opcional: se fornecido, exibe "Aberto até HH:MM" ou "Abre às HH:MM"
+  function badgeHTML(status, fechaStr) {
+    if (status === 'open') {
+      const label = fechaStr ? `Aberto até ${fechaStr}` : 'Aberto Agora';
+      return `<span class="badge badge-open"><span class="badge-dot"></span>${label}</span>`;
+    }
+    if (status === 'zap') {
+      return `<span class="badge badge-zap"><span class="badge-dot"></span>Chamar no Zap</span>`;
+    }
+    // closed
+    const label = fechaStr ? `Abre às ${fechaStr}` : 'Fechado';
+    return `<span class="badge badge-closed"><span class="badge-dot"></span>${label}</span>`;
+  }
+
+  /* ── Formata telefone para exibição ─────────────────────── */
+  function formatTel(num) {
+    const d = num.replace(/\D/g,'');
+    // Fix 8: 0800 com 11 dígitos (ex: 08007257333 → 0800 725 7333)
+    if (d.length === 11 && d.startsWith('0800')) return `${d.slice(0,4)} ${d.slice(4,7)} ${d.slice(7)}`;
+    if (d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+    if (d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+    return num;
+  }
+
+  /* ── Escapa aspas em strings usadas em atributos HTML ───────── */
+  function escAttr(s) {
+    return String(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* ── Botão de contato ────────────────────────────────────── */
+  function contatoHTML(loja, status) {
+    const abre     = loja.horario ? loja.horario.abre : '';
+    const nomeAttr = escAttr(loja.nome); // Fix 4: escapa aspas para data-attr seguro
+    // Campos para métricas — escapados para uso seguro em onclick inline
+    const mNome = escAttr(loja.nome);
+    const mPlan = escAttr(loja.plano || 'GRATIS');
+    const mCat  = escAttr(loja.categoria || '');
+
+    if ((!loja.wpp || loja.wpp === 'PREENCHER') && !loja.tel) {
+      return `<button class="btn-wpp disabled" disabled aria-label="Sem contato"><i class="fab fa-whatsapp"></i></button>`;
+    }
+
+    if (loja.tel && !loja.wpp) {
+      if (status === 'closed') {
+        return `<button class="btn-tel closed"
+          data-nome="${nomeAttr}" data-abre="${abre}" data-tel="${loja.tel}"
+          onclick="showToast(this.dataset.nome,this.dataset.abre,this.dataset.tel)"
+          aria-label="Loja fechada"><i class="fa fa-phone"></i></button>`;
+      }
+      return `<a href="tel:${loja.tel}" class="btn-tel open" aria-label="Ligar"
+        onclick="registrarClique('${mNome}','tel','${mPlan}','${mCat}')">
+        <i class="fa fa-phone"></i></a>`;
+    }
+
+    const msg = encodeURIComponent('Olá, vi no AngatubaON! Está aberto agora?');
+    const url = `https://wa.me/${loja.wpp}?text=${msg}`;
+
+    if (status === 'open' || status === 'zap') {
+      const cls = status === 'zap' ? 'zap' : 'open';
+      return `<a href="${url}" target="_blank" rel="noopener" class="btn-wpp ${cls}" aria-label="WhatsApp"
+        onclick="registrarClique('${mNome}','wpp','${mPlan}','${mCat}')">
+        <i class="fab fa-whatsapp"></i></a>`;
+    }
+
+    return `<button class="btn-wpp closed"
+      data-nome="${nomeAttr}" data-abre="${abre}"
+      onclick="showToast(this.dataset.nome,this.dataset.abre)"
+      aria-label="Loja fechada"><i class="fab fa-whatsapp"></i></button>`;
+  }
+
+  /* ── Thumb ───────────────────────────────────────────────── */
+  function thumbHTML(loja) {
+    const bg = CAT_BG[loja.categoria] || 'rgba(255,255,255,0.06)';
+
+    if (loja.logo && loja.logo.trim()) {
+      // Fallback de extensão: tenta loja.logo; se falhar, troca .png↔.jpg (ou vice-versa)
+      const alt = loja.logo.replace(/\.(png)$/i, '.jpg').replace(/\.(jpg|jpeg)$/i, '.png');
+      return `<div class="store-thumb" style="background:#ffffff; padding:4px; display:flex; align-items:center; justify-content:center; position:relative;">
+        <span style="position:absolute; font-size:1.5rem; z-index:1;">${loja.emoji}</span>
+        <img src="${loja.logo}" alt="Logo ${loja.nome}" class="store-logo-img" loading="lazy"
+          style="position:relative; z-index:2; background:#ffffff;"
+          onerror="if(this.src !== '${alt}'){ this.src='${alt}'; } else { this.style.display='none'; }" />
+      </div>`;
+    }
+
+    if (!loja.recomendado && loja.foto && loja.foto.trim()) {
+      return `<div class="store-thumb" style="background:${bg};">
+        <img src="${loja.foto}" alt="${loja.nome}" loading="lazy" />
+      </div>`;
+    }
+
+    return `<div class="store-thumb" style="background:${bg};">${loja.emoji}</div>`;
+  }
+
+  /* ── HTML de um card ─────────────────────────────────────── */
+  // statusInfo pode ser string (compat) ou objeto { status, fechaStr }
+  function cardHTML(loja, delay, statusInfo, idx) {
+    // normaliza entrada: aceita string legada ou objeto novo
+    let status, fechaStr;
+    if (statusInfo && typeof statusInfo === 'object') {
+      status   = statusInfo.status;
+      fechaStr = statusInfo.fechaStr || '';
+    } else {
+      status   = statusInfo ?? calcStatus(loja);
+      fechaStr = '';
+    }
+
+    const plano  = (loja.plano || 'GRATIS').toUpperCase();
+    const isPro  = plano === 'PRO';
+    const isPlus = plano === 'PLUS';
+    const isPago = isPro || isPlus;
+
+    // Foto de capa apenas no PRO
+    const hasCover = isPro && loja.foto && loja.foto.trim();
+
+    const mapBtn = loja.maps
+      ? `<a href="${loja.maps}" target="_blank" rel="noopener" class="btn-map" aria-label="Ver ${loja.nome} no mapa"><i class="fa fa-map-marker-alt"></i></a>`
+      : '';
+
+    const ctTag = loja.tel && !loja.wpp
+      ? `<span class="contact-tag tel">📞 TEL</span>`
+      : `<span class="contact-tag wpp">💬 WPP</span>`;
+
+    // Selo visual por plano
+    let planBadge = '';
+    if (isPro)  planBadge = `<span class="plan-badge badge-pro">⭐ PRO</span>`;
+    if (isPlus) planBadge = `<span class="plan-badge badge-plus">✦ PLUS</span>`;
+
+    // Classes do card
+    let cardClass = 'store-card fade-in';
+    if (isPro)    cardClass += ' plano-pro';
+    if (isPlus)   cardClass += ' plano-plus';
+    if (hasCover) cardClass += ' has-cover';
+
+    const bgStyle = hasCover ? `background-image:url('${loja.foto}');` : '';
+
+    // Todos os cards abrem o modal — pagos com visual completo, grátis simplificado
+    const infoClick = `onclick="abrirDetalhes(${idx})" style="cursor:pointer;" role="button" tabindex="0"`;
+
+    // Dica visual: "Ver detalhes" em todos, ícone diferente para grátis
+    const expandHint = `<span style="font-size:9px;color:var(--muted);display:flex;align-items:center;gap:3px;margin-top:2px;">
+           <i class="fa fa-${isPago ? 'expand-alt' : 'info-circle'}" style="font-size:8px;"></i> Ver detalhes
+         </span>`;
+
+    return `
+      <div class="${cardClass}"
+        data-status="${status}" data-category="${loja.categoria}" data-plano="${plano}"
+        style="animation-delay:${delay}s;${bgStyle}">
+        ${thumbHTML(loja)}
+        <div class="store-info" ${infoClick}>
+          <div class="store-name-row">
+            <div class="store-name">${escHTML(loja.nome)}</div>
+            ${planBadge}
+          </div>
+          <div class="store-sub">${escHTML(loja.sub)}</div>
+          <div class="store-row">${badgeHTML(status, fechaStr)}${mapBtn}${ctTag}</div>
+          ${expandHint}
+        </div>
+        ${contatoHTML(loja, status)}
+      </div>`;
+  }
+
+  /* ── Skeleton Loading ───────────────────────────────────── */
+  function showSkeleton() {
+    const listEl = document.getElementById('store-list');
+    listEl.style.display = 'flex';
+    listEl.innerHTML = Array(6).fill(0).map(() => `
+      <div class="skeleton-card">
+        <div class="skeleton-thumb"></div>
+        <div class="skeleton-lines">
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line short"></div>
+          <div class="skeleton-line xshort"></div>
+        </div>
+      </div>`).join('');
+  }
+
+  function showSkeletonCat() {
+    const bar = document.getElementById('cat-bar');
+    bar.innerHTML = Array(9).fill(0).map(() => `
+      <div class="skeleton-cat">
+        <div class="skeleton-cat-icon"></div>
+        <div class="skeleton-cat-label"></div>
+      </div>`).join('');
+  }
+
+  /* ── Cache global de status — compartilhado entre renderLojas e renderCategorias ── */
+  // Inicializado como Map vazio; populado por renderLojas a cada ciclo.
+  // renderCategorias usa _statusSnapshot.get(l)?.status com fallback para calcStatus,
+  // então é seguro mesmo antes do primeiro render.
+  let _statusSnapshot = new Map();
+
+  /* ── Renderiza lista principal ───────────────────────────── */
+  function renderLojas() {
+    const listEl   = document.getElementById('store-list');
+    const emptyEl  = document.getElementById('empty-state');
+    const titleEl  = document.getElementById('list-title');
+    const infoEl   = document.getElementById('filter-info');
+    const emptyMsg = document.getElementById('empty-msg');
+    const emptySub = document.getElementById('empty-sub');
+
+    const q = searchQuery.toLowerCase().trim();
+
+    // Memoiza calcStatusInfo para este render — cada loja calculada 1x só
+    const statusCache = new Map();
+    const getStatusInfo = loja => {
+      if (!statusCache.has(loja)) statusCache.set(loja, calcStatusInfo(loja));
+      return statusCache.get(loja);
+    };
+    const getStatus = loja => getStatusInfo(loja).status;
+
+    let filtradas = LOJAS.filter(loja => {
+      const catOk = activeCat === 'todos' || loja.categoria === activeCat;
+      if (!catOk) return false;
+      if (!q) return true;
+      // Guard: garante que campos string existam antes de chamar .toLowerCase()
+      const nome = (loja.nome  || '').toLowerCase();
+      const tags = (loja.tags  || '').toLowerCase();
+      const sub  = (loja.sub   || '').toLowerCase();
+      return nome.includes(q) || tags.includes(q) || sub.includes(q);
+    });
+
+    if (activePillFilter === 'open') {
+      filtradas = filtradas.filter(l => getStatus(l) === 'open');
+    } else if (activePillFilter === 'featured') {
+      filtradas = filtradas.filter(l => l.recomendado === true);
+    }
+
+    // Peso por plano: PRO=0, PLUS=1, GRATIS=2
+    const planOrd   = { PRO:0, PLUS:1, GRATIS:2 };
+    // Peso por status: open=0, zap=1, closed=2
+    const statusOrd = { open:0, zap:1, closed:2 };
+
+    filtradas.sort((a, b) => {
+      const planoA = (a.plano || 'GRATIS').toUpperCase();
+      const planoB = (b.plano || 'GRATIS').toUpperCase();
+
+      // 1º critério: plano
+      const diffPlano = (planOrd[planoA] ?? 2) - (planOrd[planoB] ?? 2);
+      if (diffPlano !== 0) return diffPlano;
+
+      // 2º critério: recomendado (true sobe)
+      const diffRec = (b.recomendado ? 1 : 0) - (a.recomendado ? 1 : 0);
+      if (diffRec !== 0) return diffRec;
+
+      // 3º critério: status (aberto sobe)
+      const diffStatus = (statusOrd[getStatus(a)] ?? 2) - (statusOrd[getStatus(b)] ?? 2);
+      if (diffStatus !== 0) return diffStatus;
+
+      // 4º critério: ordem alfabética
+      return a.nome.localeCompare(b.nome, 'pt-BR');
+    });
+
+    const abertas = filtradas.filter(l => getStatus(l) === 'open').length;
+
+    const frag = document.createDocumentFragment();
+    filtradas.forEach((loja, i) => {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = cardHTML(loja, i * 0.055, getStatusInfo(loja), _lojaIdxMap.get(loja) ?? 0);
+      frag.appendChild(wrap.firstElementChild);
+    });
+
+    listEl.innerHTML = '';
+    listEl.appendChild(frag);
+
+    const temResultado = filtradas.length > 0;
+    listEl.style.display = temResultado ? 'flex' : 'none';
+
+    if (!temResultado) {
+      emptyEl.style.display = 'block';
+      if (LOJAS.length === 0) {
+        document.getElementById('empty-icon').textContent = '🏗️';
+        emptyMsg.textContent = 'Nenhuma loja cadastrada ainda.';
+        emptySub.textContent = 'Adicione lojas no array LOJAS do código.';
+      } else {
+        document.getElementById('empty-icon').textContent = '🔍';
+        emptyMsg.textContent = 'Nenhuma loja encontrada.';
+        emptySub.textContent = 'Tente outro termo ou selecione outra categoria.';
+      }
+    } else {
+      emptyEl.style.display = 'none';
+    }
+
+    const catLabel = CATEGORIAS.find(c => c.id === activeCat)?.label ?? 'Todas';
+    titleEl.textContent = q
+      ? `🔍 "${q}"`
+      : activeCat === 'todos' ? '📍 Todas as Lojas' : `📍 ${catLabel}`;
+
+    infoEl.textContent = temResultado
+      ? (abertas > 0 ? `${abertas} aberta${abertas>1?'s':''} agora` : 'Nenhuma aberta')
+      : '';
+    infoEl.className = 'filter-info' + (abertas > 0 ? ' has-open' : '');
+
+    // Exporta snapshot para smartRefresh e renderCategorias
+    _statusSnapshot = statusCache; // agora guarda { status, fechaStr }
+  }
+
+  /* ── Renderiza categorias ────────────────────────────────── */
+  function renderCategorias() {
+    const bar = document.getElementById('cat-bar');
+    const getS = l => (_statusSnapshot.get(l)?.status) ?? calcStatus(l);
+
+    bar.innerHTML = CATEGORIAS
+      .filter(cat => {
+        if (!cat || !cat.id || !cat.label) return false;
+        // "Tudo" sempre aparece
+        if (cat.id === 'todos') return true;
+        // Só exibe se houver pelo menos 1 loja nessa categoria
+        return LOJAS.some(l => l.categoria === cat.id);
+      })
+      .map(cat => {
+        const qtd = cat.id === 'todos'
+          ? LOJAS.filter(l => getS(l) === 'open').length
+          : LOJAS.filter(l => l.categoria === cat.id && getS(l) === 'open').length;
+
+        const badge    = qtd > 0 ? `<span class="cat-badge visible">${qtd}</span>` : '';
+        const isActive = cat.id === activeCat;
+
+        return `
+          <button class="cat-item" data-cat="${cat.id}" onclick="setCat('${cat.id}',this)">
+            <div class="cat-icon ${isActive?'active':''}" style="background:${cat.bg};">
+              <i class="fa ${cat.icon}" style="color:${cat.cor};"></i>
+              ${badge}
+            </div>
+            <span class="cat-label">${cat.label}</span>
+          </button>`;
+      }).join('');
+  }
+
+  /* ── Troca categoria ─────────────────────────────────────── */
+  function setCat(cat, btn) {
+    activeCat    = cat;
+    searchQuery  = '';  // limpa busca ao trocar categoria
+    const searchEl = document.getElementById('main-search');
+    if (searchEl) searchEl.value = '';
+
+    // Remove active de todos os ícones, marca só o clicado — sem re-renderizar o cat-bar inteiro
+    document.querySelectorAll('.cat-icon').forEach(i => i.classList.remove('active'));
+    btn.querySelector('.cat-icon').classList.add('active');
+
+    activePillFilter = 'all';
+    document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.pill-btn[data-filter="all"]')?.classList.add('active');
+    renderLojas();
+  }
+
+  /* ── Toast ───────────────────────────────────────────────── */
+  let toastTimer = null;
+
+  function showToast(nomeLoja, horarioAbre, tel) {
+    const el    = document.getElementById('toast');
+    const title = document.getElementById('toast-title');
+    const msg   = document.getElementById('toast-msg');
+
+    title.textContent = `${nomeLoja} — fechado agora`;
+
+    if (tel) {
+      msg.innerHTML = horarioAbre
+        ? `Abre às ${horarioAbre} · <a href="tel:${tel}" style="color:var(--zap);font-weight:600;">${formatTel(tel)}</a>`
+        : `<a href="tel:${tel}" style="color:var(--zap);font-weight:600;">${formatTel(tel)}</a>`;
+    } else {
+      msg.textContent = horarioAbre
+        ? `Atendimento começa às ${horarioAbre}`
+        : 'Consulte o horário de funcionamento';
+    }
+
+    clearTimeout(toastTimer);
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    toastTimer = setTimeout(hideToast, 4000);
+  }
+
+  function hideToast() {
+    document.getElementById('toast').classList.remove('show');
+    clearTimeout(toastTimer);
+  }
+
+  /* ── Métricas de clique ──────────────────────────────────────── */
+  // Fire-and-forget: registra na planilha sem bloquear a ação do usuário.
+  // Chamado apenas em botões de lojas ABERTAS (wpp/tel ativos).
+  function registrarClique(nome, tipo, plano, categoria) {
+    const params = new URLSearchParams();
+    params.append('payload', JSON.stringify({
+      action:    'registrarClique',
+      loja:      nome,
+      tipo:      tipo,       // 'wpp' ou 'tel'
+      plano:     plano,
+      categoria: categoria,
+    }));
+    fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: params })
+      .catch(() => {}); // falha silenciosa — nunca interrompe o usuário
+  }
+
+  /* ── Debounce ────────────────────────────────────────────── */
+  function debounce(fn, delay) {
+    let t;
+    return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this,args), delay); };
+  }
+
+  const searchEl = document.getElementById('main-search');
+
+  const handleSearch = debounce(function(e) {
+    searchQuery = e.target.value.trim();
+    activeCat = 'todos';
+    activePillFilter = 'all';
+    document.querySelectorAll('.cat-icon').forEach(i => i.classList.remove('active'));
+    document.querySelector('[data-cat="todos"] .cat-icon')?.classList.add('active');
+    document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.pill-btn[data-filter="all"]')?.classList.add('active');
+    renderLojas();
+  }, 300);
+
+  searchEl.addEventListener('input', handleSearch);
+  searchEl.addEventListener('search', handleSearch);
+
+  /* ── Modal Cadastro ──────────────────────────────────────── */
+  function openModal() {
+    // Mostra seletor de planos primeiro
+    openPlanModal();
+  }
+
+  function openCadastroModal() {
+    const overlay = document.getElementById('modal-cadastro');
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    const overlay = document.getElementById('modal-cadastro');
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    // Reseta tela de sucesso após fechar (com delay para não piscar)
+    setTimeout(() => {
+      document.getElementById('cadastro-form').style.display = 'flex';
+      document.getElementById('cadastro-success').classList.remove('show');
+      document.getElementById('cadastro-success').querySelector('.success-wpp-btn')?.remove();
+      document.getElementById('cadastro-form').reset();
+      // Reinicia o schedule builder visualmente
+      scheduleTurnos = [{ dias: [1,2,3,4,5], abre: '08:00', fecha: '18:00' }];
+      renderScheduleCards();
+      syncHiddenFields();
+      // Reseta campos de foto/logo
+      ['foto', 'logo'].forEach(k => {
+        const previewWrap = document.getElementById(k + '-preview-wrap');
+        const previewImg  = document.getElementById(k + '-preview-img');
+        const statusEl    = document.getElementById(k + '-upload-status');
+        const hiddenUrl   = document.getElementById('f-' + k + '-url');
+        if (previewWrap) previewWrap.style.display = 'none';
+        if (previewImg)  previewImg.src = '';
+        if (statusEl)    statusEl.textContent = '';
+        if (hiddenUrl)   hiddenUrl.value = '';
+      });
+      // Oculta grupos de foto (só visíveis para planos pagos)
+      document.getElementById('foto-group').style.display = 'none';
+      document.getElementById('logo-group').style.display = 'none';
+      selectedPlan = 'GRATIS';
+      // Reseta campo de ramo autocomplete
+      if (typeof ramoReset === 'function') ramoReset();
+    }, 300);
+  }
+
+  // Fecha ao clicar no overlay (fora do sheet)
+  document.getElementById('modal-cadastro').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  /* ── Modal de Planos ─────────────────────────────────────── */
+  let selectedPlan = 'GRATIS';
+
+  const PLAN_LABELS = {
+    GRATIS: { btn: 'Continuar com Grátis →',  cls: 'cta-gratis', note: 'Cadastro gratuito, sem compromisso.' },
+    PLUS:   { btn: '✦ Quero o Plano Plus →',  cls: 'cta-plus',   note: 'Você será contactado via WhatsApp para ativar o plano.' },
+    PRO:    { btn: '⭐ Quero o Plano Pro →',   cls: 'cta-pro',    note: 'Você será contactado via WhatsApp para ativar o plano.' },
+  };
+
+  function openPlanModal() {
+    document.getElementById('modal-planos').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closePlanModal() {
+    document.getElementById('modal-planos').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function selectPlan(card) {
+    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedPlan = card.dataset.plan;
+
+    const cfg = PLAN_LABELS[selectedPlan];
+    const btn  = document.getElementById('plan-cta-btn');
+    const note = document.getElementById('plan-note');
+
+    btn.textContent = cfg.btn;
+    btn.className   = 'plan-cta ' + cfg.cls;
+    note.textContent = cfg.note;
+  }
+
+  function confirmPlan() {
+    closePlanModal();
+    // Injeta o plano escolhido no hint do formulário
+    const hint = document.querySelector('#cadastro-form .field-hint');
+    if (hint) {
+      const icons = { GRATIS:'🏪', PLUS:'✦', PRO:'⭐' };
+      hint.innerHTML = `${icons[selectedPlan]} Plano <strong>${selectedPlan}</strong> selecionado · Você será notificado pelo WhatsApp.`;
+    }
+    // Mostra campos de foto apenas para planos pagos
+    const isPago = selectedPlan !== 'GRATIS';
+    document.getElementById('foto-group').style.display = isPago ? '' : 'none';
+    document.getElementById('logo-group').style.display = isPago ? '' : 'none';
+    openCadastroModal();
+  }
+
+  // Fecha plan modal ao clicar fora
+  document.getElementById('modal-planos').addEventListener('click', function(e) {
+    if (e.target === this) closePlanModal();
+  });
+
+  /* ── Schedule Builder ───────────────────────────────────── */
+  const DIAS_LABEL = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const scheduleBuilder = document.getElementById('schedule-builder');
+  const scheduleAddBtn  = document.getElementById('schedule-add-btn');
+  let scheduleTurnos = []; // [{dias:[1,2,3,4,5], abre:'08:00', fecha:'18:00'}]
+
+  function criarCardTurno(idx) {
+    const turno = scheduleTurnos[idx];
+    const card = document.createElement('div');
+    card.className = 'schedule-card';
+    card.dataset.idx = idx;
+
+    const title = document.createElement('div');
+    title.className = 'schedule-card-title';
+    title.textContent = idx === 0 ? 'Dias e horário principal' : 'Turno adicional';
+    card.appendChild(title);
+
+    // Dias
+    const daysRow = document.createElement('div');
+    daysRow.className = 'schedule-days';
+    DIAS_LABEL.forEach((label, d) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'schedule-day-btn' + (turno.dias.includes(d) ? ' active' : '');
+      btn.textContent = label;
+      btn.dataset.day = d;
+      btn.addEventListener('click', () => {
+        const di = turno.dias.indexOf(d);
+        if (di >= 0) turno.dias.splice(di, 1);
+        else turno.dias.push(d);
+        btn.classList.toggle('active');
+        syncHiddenFields();
+      });
+      daysRow.appendChild(btn);
+    });
+    card.appendChild(daysRow);
+
+    // Horários
+    const timesRow = document.createElement('div');
+    timesRow.className = 'schedule-times';
+
+    const inAbre = document.createElement('input');
+    inAbre.type = 'time'; inAbre.value = turno.abre;
+    inAbre.addEventListener('change', () => { turno.abre = inAbre.value; syncHiddenFields(); });
+
+    const sep = document.createElement('span');
+    sep.textContent = 'até';
+
+    const inFecha = document.createElement('input');
+    inFecha.type = 'time'; inFecha.value = turno.fecha;
+    inFecha.addEventListener('change', () => { turno.fecha = inFecha.value; syncHiddenFields(); });
+
+    timesRow.appendChild(inAbre);
+    timesRow.appendChild(sep);
+    timesRow.appendChild(inFecha);
+    card.appendChild(timesRow);
+
+    // Botão remover (só em cards extras)
+    if (idx > 0) {
+      const rmBtn = document.createElement('button');
+      rmBtn.type = 'button';
+      rmBtn.className = 'schedule-remove';
+      rmBtn.innerHTML = '<i class="fa fa-times"></i>';
+      rmBtn.addEventListener('click', () => {
+        scheduleTurnos.splice(idx, 1);
+        renderScheduleCards();
+        syncHiddenFields();
+      });
+      card.appendChild(rmBtn);
+    }
+
+    return card;
+  }
+
+  function renderScheduleCards() {
+    scheduleBuilder.innerHTML = '';
+    scheduleTurnos.forEach((_, idx) => {
+      scheduleBuilder.appendChild(criarCardTurno(idx));
+    });
+  }
+
+  function syncHiddenFields() {
+    // Monta texto legível: "Seg-Sex 08:00-18:00 | Sáb 08:00-12:00"
+    const texto = scheduleTurnos.map(t => {
+      if (!t.dias.length) return null;
+      const diasNomes = t.dias.sort((a,b)=>a-b).map(d => DIAS_LABEL[d]).join(', ');
+      return diasNomes + ' ' + t.abre + '-' + t.fecha;
+    }).filter(Boolean).join(' | ');
+
+    // Usa o primeiro turno como principal para os campos estruturados
+    const principal = scheduleTurnos[0];
+    const diasStr = scheduleTurnos.flatMap(t => t.dias).filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>a-b).join(',');
+
+    document.getElementById('f-horario').value   = texto;
+    document.getElementById('f-dias').value      = diasStr;
+    document.getElementById('f-hora-abre').value  = principal ? principal.abre  : '';
+    document.getElementById('f-hora-fecha').value = principal ? principal.fecha : '';
+  }
+
+  // Inicializa com um card padrão Seg-Sex
+  scheduleTurnos = [{ dias: [1,2,3,4,5], abre: '08:00', fecha: '18:00' }];
+  renderScheduleCards();
+  syncHiddenFields();
+
+  scheduleAddBtn.addEventListener('click', () => {
+    if (scheduleTurnos.length >= 3) return; // máximo 3 turnos
+    scheduleTurnos.push({ dias: [], abre: '08:00', fecha: '12:00' });
+    renderScheduleCards();
+    syncHiddenFields();
+  });
+
+  // Submissão via Google Apps Script — funciona no GitHub Pages
+
+  /* ── Máscara e validação de WhatsApp ─────────────────────── */
+  (function initWppField() {
+    const input = document.getElementById('f-wpp');
+    const errEl = document.getElementById('f-wpp-err');
+    if (!input) return;
+
+    function mask(v) {
+      const d = v.replace(/\D/g, '').slice(0, 11);
+      if (d.length <= 2)  return d;
+      if (d.length <= 6)  return `(${d.slice(0,2)}) ${d.slice(2)}`;
+      if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+      return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+    }
+
+    function validate(showErr) {
+      const digits = input.value.replace(/\D/g,'');
+      const ok = digits.length === 10 || digits.length === 11;
+      input.classList.toggle('invalid', showErr && !ok);
+      errEl.classList.toggle('show', showErr && !ok);
+      return ok;
+    }
+
+    input.addEventListener('input', function() {
+      const pos  = this.selectionStart;
+      const prev = this.value.length;
+      this.value = mask(this.value);
+      const diff = this.value.length - prev;
+      try { this.setSelectionRange(pos + diff, pos + diff); } catch(e) {}
+      if (this.value.replace(/\D/g,'').length >= 10) validate(true);
+      else { input.classList.remove('invalid'); errEl.classList.remove('show'); }
+    });
+
+    input.addEventListener('blur', () => {
+      if (input.value.trim()) validate(true);
+    });
+
+    // Limpa erro ao focar de novo
+    input.addEventListener('focus', () => {
+      input.classList.remove('invalid');
+      errEl.classList.remove('show');
+    });
+
+    window._validateWpp = () => validate(true);
+  })();
+
+  document.getElementById('cadastro-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = this.querySelector('.modal-submit');
+
+    // Valida WPP antes de qualquer coisa
+    if (window._validateWpp && !window._validateWpp()) {
+      document.getElementById('f-wpp').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      document.getElementById('f-wpp').focus();
+      return;
+    }
+
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Enviando...';
+    btn.style.opacity = '0.7';
+    btn.disabled = true;
+
+    try {
+      // Valida horário
+      if (!document.getElementById('f-horario').value) {
+        alert('Selecione pelo menos um dia e horário de funcionamento.');
+        btn.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Cadastro';
+        btn.style.opacity = '';
+        btn.disabled = false;
+        return;
+      }
+
+      const formData = new FormData(this);
+      const payload  = Object.fromEntries(formData.entries());
+      payload.planoSolicitado = selectedPlan; // envia o plano escolhido
+
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify(payload));
+
+      await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode:   'no-cors',
+        body:   params,
+      });
+
+      // no-cors não retorna status — assume sucesso se não lançou exceção
+      this.style.display = 'none';
+
+      // Monta tela de sucesso com botão de WPP para planos pagos
+      const successEl = document.getElementById('cadastro-success');
+      const nomeLoja  = payload.nome || payload.storeName || 'sua loja';
+      const plano     = selectedPlan;
+      const isPago    = plano !== 'GRATIS';
+
+      if (isPago) {
+        const wppMsg = encodeURIComponent(
+          `Olá! Acabei de cadastrar *${nomeLoja}* no AngatubaON e escolhi o Plano ${plano}. Gostaria de ativá-lo!`
+        );
+        const wppUrl = `https://wa.me/5515981125349?text=${wppMsg}`;
+        successEl.querySelector('.success-sub').innerHTML =
+          `Recebemos os dados da sua loja.<br>` +
+          `Agora fale com a gente pelo WhatsApp para ativar o <strong>Plano ${plano}</strong>:`;
+        // Adiciona/atualiza botão de WPP dinâmico
+        let wppBtn = successEl.querySelector('.success-wpp-btn');
+        if (!wppBtn) {
+          wppBtn = document.createElement('a');
+          wppBtn.className = 'success-wpp-btn';
+          wppBtn.target    = '_blank';
+          wppBtn.rel       = 'noopener';
+          successEl.querySelector('.success-close').before(wppBtn);
+        }
+        wppBtn.href      = wppUrl;
+        wppBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Ativar Plano ' + plano + ' →';
+      } else {
+        successEl.querySelector('.success-sub').innerHTML =
+          `Recebemos os dados da sua loja.<br>Vamos analisar e entrar em contato pelo WhatsApp em breve.`;
+        // Remove botão de WPP se existia de cadastro anterior na mesma sessão
+        successEl.querySelector('.success-wpp-btn')?.remove();
+      }
+
+      successEl.classList.add('show');
+    } catch {
+      btn.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Cadastro';
+      btn.style.opacity = '';
+      btn.disabled = false;
+      alert('Erro ao enviar. Verifique sua conexão e tente novamente.');
+    }
+  });
+
+  /* ══════════════════════════════════════════════════════════════
+     SESSÃO DE LOJA — login via WhatsApp + código
+  ══════════════════════════════════════════════════════════════ */
+  let _lojaToken = sessionStorage.getItem('angatuba_loja_token') || null;
+  let _lojaNome  = sessionStorage.getItem('angatuba_loja_nome')  || '';
+  let _lojaWpp   = ''; // capturado no passo 1 do login
+
+  /* ── Atualiza a bottom nav conforme sessão ───────────────── */
+  function atualizarNav() {
+    const navLojaBtn = document.getElementById('nav-loja');
+    if (!navLojaBtn) return;
+    if (_lojaToken) {
+      navLojaBtn.innerHTML = `<i class="fa fa-shop-slash" style="color:var(--green);"></i><span style="color:var(--green);">Minha Loja</span>`;
+    } else {
+      navLojaBtn.innerHTML = `<i class="fa fa-store"></i><span>Cadastrar</span>`;
+    }
+  }
+
+  /* ── Bottom nav events ───────────────────────────────────── */
+  document.getElementById('nav-inicio').addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.getElementById('nav-inicio').classList.add('active');
+    searchEl.value   = '';
+    searchQuery      = '';
+    activeCat        = 'todos';
+    activePillFilter = 'all';
+    document.querySelectorAll('.cat-icon').forEach(i => i.classList.remove('active'));
+    document.querySelector('[data-cat="todos"] .cat-icon')?.classList.add('active');
+    document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.pill-btn[data-filter="all"]')?.classList.add('active');
+    renderLojas();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  document.getElementById('nav-buscar').addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.getElementById('nav-buscar').classList.add('active');
+    searchEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => searchEl.focus(), 320);
+  });
+
+  document.getElementById('nav-loja').addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.getElementById('nav-loja').classList.add('active');
+    if (_lojaToken) {
+      abrirMinhaLoja();
+    } else {
+      openModal(); // abre o seletor de planos → cadastro
+    }
+  });
+
+  /* ── Modais de login ─────────────────────────────────────── */
+  function openLoginLoja() {
+    loginStep(1);
+    document.getElementById('ll-wpp').value    = '';
+    document.getElementById('ll-codigo').value = '';
+    document.getElementById('login-loja-title').innerHTML = 'Acessar <span>Minha Loja</span>';
+    document.getElementById('login-loja-sub').textContent = 'Digite o WhatsApp cadastrado para receber seu código';
+    document.getElementById('modal-login-loja').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => document.getElementById('ll-wpp').focus(), 300);
+  }
+
+  function closeLoginLoja() {
+    document.getElementById('modal-login-loja').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  document.getElementById('modal-login-loja').addEventListener('click', function(e) {
+    if (e.target === this) closeLoginLoja();
+  });
+
+  function loginStep(step) {
+    document.getElementById('login-step1').style.display = step === 1 ? 'flex' : 'none';
+    document.getElementById('login-step2').style.display = step === 2 ? 'flex' : 'none';
+  }
+
+  /* ── Passo 1: solicita código ──────────────────────────────── */
+  async function lojaRequestCodigo() {
+    const wppRaw = document.getElementById('ll-wpp').value.replace(/\D/g,'');
+    const wpp = wppRaw.startsWith('55') ? wppRaw : '55' + wppRaw;
+    if (wpp.length < 12) {
+      alert('Digite o número de WhatsApp completo com DDD.');
+      return;
+    }
+    _lojaWpp = wpp;
+
+    const btn = document.querySelector('#login-step1 .modal-submit');
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Solicitando...';
+    btn.disabled = true;
+
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action: 'lojaRequestCodigo', wpp }));
+      const resp = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST', body: params,
+        signal: AbortSignal.timeout(15000),
+      });
+      const json = await resp.json();
+
+      if (json.status === 'ok') {
+        loginStep(2);
+        document.getElementById('login-loja-sub').textContent = 'Código enviado! Confira seu WhatsApp.';
+        setTimeout(() => document.getElementById('ll-codigo').focus(), 100);
+      } else if (json.msg === 'WPP_NAO_ENCONTRADO') {
+        alert('Número não encontrado. Verifique se o WhatsApp cadastrado está correto.\n\nSe ainda não tem cadastro, use "Cadastrar" para se registrar.');
+      } else if (json.msg === 'LOJA_NAO_APROVADA') {
+        alert('Sua loja ainda está pendente de aprovação. Aguarde o contato pelo WhatsApp.');
+      } else {
+        alert('Erro: ' + (json.msg || 'Tente novamente.'));
+      }
+    } catch(e) {
+      alert('Erro de conexão. Verifique sua internet e tente novamente.');
+    } finally {
+      btn.innerHTML = '<i class="fab fa-whatsapp"></i> Receber código';
+      btn.disabled = false;
+    }
+  }
+
+  /* ── Passo 2: verifica código ─────────────────────────────── */
+  async function lojaVerificarCodigo() {
+    const codigo = document.getElementById('ll-codigo').value.trim();
+    if (codigo.length !== 6) {
+      document.getElementById('login-codigo-hint').textContent = 'O código tem 6 dígitos.';
+      return;
+    }
+
+    const btn = document.querySelector('#login-step2 .modal-submit');
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Verificando...';
+    btn.disabled = true;
+
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action: 'lojaVerificarCodigo', wpp: _lojaWpp, codigo }));
+      const resp = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST', body: params,
+        signal: AbortSignal.timeout(15000),
+      });
+      const json = await resp.json();
+
+      if (json.status === 'ok' && json.data.token) {
+        _lojaToken = json.data.token;
+        _lojaNome  = json.data.nome || '';
+        sessionStorage.setItem('angatuba_loja_token', _lojaToken);
+        sessionStorage.setItem('angatuba_loja_nome',  _lojaNome);
+        closeLoginLoja();
+        atualizarNav();
+        abrirMinhaLoja();
+      } else if (json.msg === 'CODIGO_INVALIDO') {
+        document.getElementById('login-codigo-hint').textContent = '❌ Código inválido ou expirado. Solicite um novo.';
+        document.getElementById('ll-codigo').value = '';
+      } else {
+        alert('Erro: ' + (json.msg || 'Tente novamente.'));
+      }
+    } catch(e) {
+      alert('Erro de conexão. Verifique sua internet.');
+    } finally {
+      btn.innerHTML = '<i class="fa fa-check"></i> Confirmar código';
+      btn.disabled = false;
+    }
+  }
+
+  /* ── Painel Minha Loja ─────────────────────────────────────── */
+  async function abrirMinhaLoja() {
+    if (!_lojaToken) { openLoginLoja(); return; }
+
+    const overlay = document.getElementById('modal-minha-loja');
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    // Preenche com dados básicos enquanto carrega
+    document.getElementById('ml-nome').textContent = _lojaNome || 'Carregando...';
+    document.getElementById('ml-ramo').textContent = '—';
+    document.getElementById('ml-m-7d').textContent  = '—';
+    document.getElementById('ml-m-30d').textContent = '—';
+    document.getElementById('ml-m-total').textContent = '—';
+    document.getElementById('ml-m-wpp').textContent = '—';
+    document.getElementById('ml-m-tel').textContent = '—';
+
+    try {
+      // Carrega dados da loja e métricas em paralelo
+      const [dadosResp, metResp] = await Promise.all([
+        fetch(`${APPS_SCRIPT_URL}?action=lojaDados&token=${encodeURIComponent(_lojaToken)}`, { signal: AbortSignal.timeout(10000) }),
+        fetch(`${APPS_SCRIPT_URL}?action=lojaMetricas&token=${encodeURIComponent(_lojaToken)}`, { signal: AbortSignal.timeout(10000) }),
+      ]);
+
+      const dadosJson = await dadosResp.json();
+      const metJson   = await metResp.json();
+
+      // Sessão expirada
+      if (dadosJson.msg === 'UNAUTHORIZED') {
+        lojaLogout(true); return;
+      }
+
+      if (dadosJson.status === 'ok') {
+        const d = dadosJson.data;
+        _lojaNome = d.nome;
+        sessionStorage.setItem('angatuba_loja_nome', _lojaNome);
+
+        document.getElementById('ml-nome').textContent = d.nome;
+        document.getElementById('ml-ramo').textContent = d.ramo || '—';
+
+        // Emoji da loja (se existir na lista carregada)
+        const lojaLocal = LOJAS.find(l => l.nome === d.nome);
+        document.getElementById('ml-emoji').textContent = lojaLocal?.emoji || '🏪';
+
+        // Status do cadastro
+        const statusMap = { APROVADO: '✅ Loja publicada', PENDENTE: '⏳ Aguardando aprovação', REPROVADO: '❌ Reprovada' };
+        document.getElementById('ml-status-cadastro').textContent = statusMap[d.statusCadastro] || d.statusCadastro;
+        document.getElementById('ml-status-icon').style.color = d.statusCadastro === 'APROVADO' ? 'var(--green)' : 'var(--zap)';
+
+        // Badge de plano
+        const planBadge = document.getElementById('ml-plan-badge');
+        const plano = d.plano || 'GRATIS';
+        if (plano === 'PRO') {
+          planBadge.textContent = '⭐ PRO';
+          planBadge.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
+          planBadge.style.color = '#000';
+        } else if (plano === 'PLUS') {
+          planBadge.textContent = '✦ PLUS';
+          planBadge.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
+          planBadge.style.color = '#fff';
+        } else {
+          planBadge.textContent = 'GRÁTIS';
+          planBadge.style.background = 'rgba(122,122,122,0.15)';
+          planBadge.style.color = 'var(--muted)';
+        }
+
+        // Toggle — marca o status atual
+        marcarToggle(d.statusLoja || '');
+
+        // CTA upgrade
+        const upgradeCta = document.getElementById('ml-upgrade-cta');
+        upgradeCta.style.display = (plano === 'GRATIS') ? '' : 'none';
+        if (plano === 'GRATIS') {
+          const upgradeMsg = encodeURIComponent(`Olá! Sou dono da loja *${d.nome}* no AngatubaON e quero saber mais sobre os planos pagos!`);
+          document.getElementById('ml-upgrade-link').href = `https://wa.me/5515981125349?text=${upgradeMsg}`;
+        }
+
+        // Métricas
+        if (metJson.status === 'ok') {
+          const isPago = plano !== 'GRATIS';
+          const m = metJson.data.metricas || { total:0, wpp:0, tel:0, d7:0, d30:0 };
+          document.getElementById('ml-metricas-lock').style.display = isPago ? 'none' : '';
+          if (isPago) {
+            document.getElementById('ml-m-7d').textContent    = m.d7   ?? 0;
+            document.getElementById('ml-m-30d').textContent   = m.d30  ?? 0;
+            document.getElementById('ml-m-total').textContent = m.total ?? 0;
+            document.getElementById('ml-m-wpp').textContent   = m.wpp  ?? 0;
+            document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
+          } else {
+            // Grátis: mostra total mas bloqueia detalhes
+            document.getElementById('ml-m-7d').textContent    = '🔒';
+            document.getElementById('ml-m-30d').textContent   = '🔒';
+            document.getElementById('ml-m-total').textContent = m.total ?? 0;
+            document.getElementById('ml-m-wpp').textContent   = '🔒';
+            document.getElementById('ml-m-tel').textContent   = '🔒';
+            document.getElementById('ml-lock-total').textContent = m.total ?? 0;
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('[MinhaLoja] Erro ao carregar dados:', e.message);
+    }
+  }
+
+  function fecharMinhaLoja() {
+    document.getElementById('modal-minha-loja').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  document.getElementById('modal-minha-loja').addEventListener('click', function(e) {
+    if (e.target === this) fecharMinhaLoja();
+  });
+
+  /* ── Toggle de status manual ─────────────────────────────── */
+  function marcarToggle(status) {
+    document.querySelectorAll('.toggle-status-btn').forEach(btn => {
+      const isActive = btn.dataset.status === status;
+      btn.style.opacity    = isActive ? '1' : '0.45';
+      btn.style.fontWeight = isActive ? '800' : '600';
+      btn.style.boxShadow  = isActive ? '0 0 0 2px currentColor inset' : '';
+    });
+  }
+
+  async function lojaToggle(novoStatus) {
+    if (!_lojaToken) return;
+    marcarToggle(novoStatus); // feedback imediato
+
+    try {
+      const url = `${APPS_SCRIPT_URL}?action=lojaToggle&token=${encodeURIComponent(_lojaToken)}&statusLoja=${encodeURIComponent(novoStatus)}`;
+      const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      const json = await resp.json();
+      if (json.msg === 'UNAUTHORIZED') { lojaLogout(true); return; }
+      // Sucesso — já foi marcado no feedback imediato
+    } catch(e) {
+      console.warn('[lojaToggle] Erro:', e.message);
+    }
+  }
+
+  /* ── Logout de loja ──────────────────────────────────────── */
+  function lojaLogout(silencioso) {
+    if (_lojaToken) {
+      const url = `${APPS_SCRIPT_URL}?action=lojaLogout&token=${encodeURIComponent(_lojaToken)}`;
+      fetch(url).catch(() => {});
+    }
+    _lojaToken = null;
+    _lojaNome  = '';
+    sessionStorage.removeItem('angatuba_loja_token');
+    sessionStorage.removeItem('angatuba_loja_nome');
+    fecharMinhaLoja();
+    atualizarNav();
+    if (!silencioso) {
+      // Reseta nav para Início
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+      document.getElementById('nav-inicio').classList.add('active');
+    }
+  }
+
+  // Número do admin para CTAs de WhatsApp
+  const ADMIN_WPP = '5515981125349';
+
+  /* ── Inicializa nav ──────────────────────────────────────── */
+  atualizarNav();
+  // Se tem token de loja na session, valida silenciosamente ao carregar
+  if (_lojaToken) {
+    fetch(`${APPS_SCRIPT_URL}?action=lojaDados&token=${encodeURIComponent(_lojaToken)}`, { signal: AbortSignal.timeout(8000) })
+      .then(r => r.json())
+      .then(j => { if (j.msg === 'UNAUTHORIZED') { _lojaToken = null; sessionStorage.removeItem('angatuba_loja_token'); atualizarNav(); } })
+      .catch(() => {});
+  }
+
+  /* ── Pill filter events ──────────────────────────────────── */
+  document.querySelectorAll('.pill-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activePillFilter = btn.dataset.filter;
+      renderLojas();
+    });
+  });
+
+  /* ── Auto-refresh inteligente ───────────────────────────── */
+  // Só re-renderiza se algum status mudou, evitando repaints desnecessários
+  function smartRefresh() {
+    const changed = LOJAS.some(l => calcStatus(l) !== (_statusSnapshot.get(l)?.status ?? ''));
+    if (changed) {
+      renderLojas();
+      renderCategorias();
+    }
+  }
+
+  // Intervalo de 60s — não precisa ser mais rápido pois horários mudam em minuto cheio
+  setInterval(smartRefresh, 60_000);
+
+  /* ── Limpa will-change após animação ─────────────────────── */
+  document.addEventListener('animationend', e => {
+    if (e.target.classList.contains('fade-in')) e.target.style.willChange = 'auto';
+  }, { passive: true });
+
+  /* ── Service Worker ──────────────────────────────────────── */
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+        .catch(err => console.warn('[SW] Falha no registro:', err));
+    });
+  }
+
+  /* ── Carrega lojas da API (Apps Script → Google Sheets) ─────── */
+  const _retryDelays = [8000, 20000, 45000]; // backoff progressivo: 8s, 20s, 45s
+  let   _retryCount  = 0;
+
+  async function carregarLojas() {
+    try {
+      const resp = await fetch(APPS_SCRIPT_URL, { signal: AbortSignal.timeout(10000) });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const json = await resp.json();
+      if (json.status === 'ok' && Array.isArray(json.data) && json.data.length > 0) {
+        // Junta lojas da API com as fixas, evitando duplicatas pelo nome
+        const nomesApi = new Set(json.data.map(l => l.nome.trim().toLowerCase()));
+        const fixasSemDuplicata = LOJAS_FIXAS.filter(l => !nomesApi.has(l.nome.trim().toLowerCase()));
+        LOJAS = [...json.data, ...fixasSemDuplicata].map(l => ({
+          ...l,
+          nome:      l.nome      || '',
+          tags:      l.tags      || '',
+          sub:       l.sub       || '',
+          categoria: l.categoria || 'servicos',
+          plano:     (l.plano    || 'GRATIS').toUpperCase(),
+          emoji:     l.emoji     || '🏪',
+        }));
+        _retryCount = 0; // reseta contador em caso de sucesso
+        _rebuildIdxMap();
+        renderLojas();
+        renderCategorias();
+        console.log('[AngatubaON] ' + json.data.length + ' da API + ' + fixasSemDuplicata.length + ' fixas ✅');
+      } else {
+        console.warn('[AngatubaON] API retornou dados vazios — usando fallback');
+        _mostrarErroCarregamento(false);
+      }
+    } catch(err) {
+      console.warn('[AngatubaON] API indisponível, usando lojas fixas:', err.message);
+      _mostrarErroCarregamento(_retryCount < _retryDelays.length);
+      // Retry com backoff progressivo (máx 3 tentativas)
+      if (_retryCount < _retryDelays.length) {
+        const delay = _retryDelays[_retryCount++];
+        console.log(`[AngatubaON] Retry ${_retryCount}/${_retryDelays.length} em ${delay/1000}s...`);
+        setTimeout(() => carregarLojas(), delay);
+      }
+    }
+  }
+
+  function _mostrarErroCarregamento(vaiRetry) {
+    if (LOJAS.length > 0) return; // tem fallback, não precisa mostrar erro
+    const listEl  = document.getElementById('store-list');
+    listEl.innerHTML = '';
+    listEl.style.display = 'none';
+    const emptyEl = document.getElementById('empty-state');
+    emptyEl.style.display = 'block';
+    document.getElementById('empty-icon').textContent = '📡';
+    document.getElementById('empty-msg').textContent = 'Sem conexão com o servidor.';
+    document.getElementById('empty-sub').textContent = vaiRetry
+      ? 'Tentando novamente em alguns segundos...'
+      : 'Verifique sua conexão e recarregue a página.';
+  }
+
+  /* ── Address Autocomplete (Nominatim / OpenStreetMap) ──────── */
+  // Gratuito, sem chave de API, limitado a 1 req/s (respeitamos com debounce de 500ms)
+  (function initAddressAutocomplete() {
+    const input      = document.getElementById('f-endereco');
+    const dropdown   = document.getElementById('addr-suggestions');
+    const hiddenMaps = document.getElementById('f-maps-url');
+    const statusEl   = document.getElementById('maps-status');
+    const hintEl     = document.getElementById('maps-hint');
+
+    if (!input) return;
+
+    let debounceTimer = null;
+    let currentQuery  = '';
+
+    function setStatus(icon, text, color) {
+      statusEl.textContent = icon + ' ' + text;
+      statusEl.style.color = color || 'var(--muted)';
+    }
+
+    function clearMaps() {
+      hiddenMaps.value = '';
+      statusEl.textContent = '';
+      statusEl.style.color = 'var(--muted)';
+    }
+
+    function setMapsConfirmed(displayName, lat, lon) {
+      // Gera link do Google Maps com coordenadas precisas
+      const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+      hiddenMaps.value = mapsUrl;
+      setStatus('✅', 'Localização confirmada', 'var(--green)');
+      if (hintEl) hintEl.style.display = 'none';
+    }
+
+    function buildSuggestionHTML(item) {
+      const parts    = item.display_name.split(', ');
+      const mainPart = parts.slice(0, 2).join(', ');
+      const subPart  = parts.slice(2, 5).join(', ');
+      return `
+        <div class="addr-item" tabindex="0"
+          data-display="${escAttr(item.display_name)}"
+          data-lat="${item.lat}"
+          data-lon="${item.lon}">
+          <i class="fa fa-map-marker-alt"></i>
+          <div>
+            <div class="addr-item-main">${mainPart}</div>
+            ${subPart ? `<div class="addr-item-sub">${subPart}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    function showDropdown(items) {
+      if (!items.length) {
+        dropdown.innerHTML = '<div class="addr-loading">Nenhum endereço encontrado. Tente ser mais específico.</div>';
+      } else {
+        dropdown.innerHTML = items.map(buildSuggestionHTML).join('');
+        // Eventos de clique em cada item
+        dropdown.querySelectorAll('.addr-item').forEach(el => {
+          const select = () => {
+            input.value      = el.dataset.display;
+            setMapsConfirmed(el.dataset.display, el.dataset.lat, el.dataset.lon);
+            dropdown.style.display = 'none';
+          };
+          el.addEventListener('click',   select);
+          el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') select(); });
+        });
+      }
+      dropdown.style.display = 'block';
+    }
+
+    async function buscarEnderecos(query) {
+      if (query !== currentQuery) return; // descarta resposta obsoleta
+      try {
+        // Restringe à cidade de Angatuba para resultados mais precisos
+        const url = `https://nominatim.openstreetmap.org/search?` +
+          `q=${encodeURIComponent(query + ', Angatuba, SP, Brasil')}` +
+          `&format=json&limit=5&countrycodes=br&addressdetails=1` +
+          `&accept-language=pt-BR`;
+
+        const resp = await fetch(url, {
+          headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'AngatubaON/1.0' }
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+
+        if (query !== currentQuery) return; // descarta se query mudou durante o fetch
+
+        if (data.length === 0) {
+          // Segunda tentativa sem restrição de cidade
+          const url2 = `https://nominatim.openstreetmap.org/search?` +
+            `q=${encodeURIComponent(query + ', São Paulo, Brasil')}` +
+            `&format=json&limit=5&countrycodes=br` +
+            `&accept-language=pt-BR`;
+          const resp2 = await fetch(url2, {
+            headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'AngatubaON/1.0' }
+          });
+          const data2 = await resp2.json();
+          showDropdown(data2);
+        } else {
+          showDropdown(data);
+        }
+      } catch (err) {
+        dropdown.innerHTML = `<div class="addr-loading">Erro na busca. Verifique sua conexão.</div>`;
+        dropdown.style.display = 'block';
+        console.warn('[AngatubaON] Nominatim error:', err.message);
+      }
+    }
+
+    input.addEventListener('input', function() {
+      const q = this.value.trim();
+      clearMaps();
+      clearTimeout(debounceTimer);
+
+      if (q.length < 4) {
+        dropdown.style.display = 'none';
+        if (hintEl) hintEl.style.display = '';
+        return;
+      }
+
+      currentQuery = q;
+      dropdown.innerHTML = '<div class="addr-loading"><i class="fa fa-spinner fa-spin"></i> Buscando...</div>';
+      dropdown.style.display = 'block';
+      if (hintEl) hintEl.style.display = 'none';
+
+      // Debounce 500ms para respeitar o rate limit do Nominatim (1 req/s)
+      debounceTimer = setTimeout(() => buscarEnderecos(q), 500);
+    });
+
+    // Fecha dropdown ao clicar fora
+    document.addEventListener('click', function(e) {
+      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    });
+
+    // Navega entre itens com teclado
+    input.addEventListener('keydown', function(e) {
+      if (!['ArrowDown','ArrowUp','Escape'].includes(e.key)) return;
+      if (e.key === 'Escape') { dropdown.style.display = 'none'; return; }
+      const items = [...dropdown.querySelectorAll('.addr-item')];
+      if (!items.length) return;
+      e.preventDefault();
+      const focused = document.activeElement;
+      const idx     = items.indexOf(focused);
+      if (e.key === 'ArrowDown') (items[idx + 1] || items[0]).focus();
+      if (e.key === 'ArrowUp')   (items[idx - 1] || items[items.length - 1]).focus();
+    });
+  })();
+
+  /* ══════════════════════════════════════════════════════════════
+     MODAL DE DETALHES — Planos Pagos (Plus / Pro)
+  ══════════════════════════════════════════════════════════════ */
+
+  const DIAS_NOMES_FULL = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+
+  // Abre o modal preenchendo dinamicamente o conteúdo.
+  // `idx` é o índice da loja no array LOJAS — evita serialização de objetos em onclick inline.
+  function abrirDetalhes(idx) {
+    const loja = LOJAS[idx];
+    if (!loja) return;
+
+    const overlay = document.getElementById('modal-detalhes');
+    const sheet   = document.getElementById('detail-sheet');
+
+    const plano  = (loja.plano || 'GRATIS').toUpperCase();
+    const isPro  = plano === 'PRO';
+    const isPlus = plano === 'PLUS';
+    const isPago = isPro || isPlus;
+    const { status, fechaStr } = calcStatusInfo(loja);
+
+    // ── CAPA ──────────────────────────────────────────────────
+    const hasFoto = isPago && loja.foto && loja.foto.trim();
+    const coverHTML = hasFoto
+      ? `<div class="detail-cover-wrap">
+           <img class="detail-cover" src="${loja.foto}" alt="Foto ${escAttr(loja.nome)}"
+             onerror="this.parentElement.innerHTML = placeholderCover('${escAttr(loja.emoji || '🏪')}', '${escAttr(loja.categoria || '')}');" />
+           <div class="detail-top-bar">
+             <div class="detail-handle"></div>
+             <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
+           </div>
+           <div class="detail-cover-badge">${badgeHTML(status, fechaStr)}</div>
+         </div>`
+      : isPago
+      ? `<div class="detail-cover-wrap">
+           <div class="detail-cover-placeholder" style="background:${CAT_BG[loja.categoria] || 'rgba(255,255,255,0.06)'};">
+             ${loja.emoji || '🏪'}
+           </div>
+           <div class="detail-top-bar">
+             <div class="detail-handle"></div>
+             <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
+           </div>
+           <div class="detail-cover-badge">${badgeHTML(status, fechaStr)}</div>
+         </div>`
+      : `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0;">
+           <div class="detail-handle" style="position:static;transform:none;margin:0 auto;"></div>
+           <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar"
+             style="position:static;transform:none;background:var(--surface2);color:var(--muted);">✕</button>
+         </div>`;
+
+    // ── BADGE DE PLANO ────────────────────────────────────────
+    let planBadge = '';
+    if (isPro)         planBadge = `<span class="plan-badge badge-pro">⭐ PRO</span>`;
+    else if (plano === 'PLUS') planBadge = `<span class="plan-badge badge-plus">✦ PLUS</span>`;
+
+    // ── ENDEREÇO ─────────────────────────────────────────────
+    const enderecoHTML = loja.endereco
+      ? `<div class="detail-info-row">
+           <div class="detail-info-icon addr"><i class="fa fa-map-marker-alt"></i></div>
+           <div class="detail-info-text">
+             <span class="detail-info-label">Endereço</span>
+             ${escHTML(loja.endereco)}
+           </div>
+         </div>`
+      : '';
+
+    // ── HORÁRIO ESTRUTURADO ───────────────────────────────────
+    const horarioHTML = buildHorarioHTML(loja);
+
+    // ── OBS ──────────────────────────────────────────────────
+    const obsHTML = loja.obs && loja.obs.trim()
+      ? `<div class="detail-info-row">
+           <div class="detail-info-icon obs"><i class="fa fa-note-sticky"></i></div>
+           <div class="detail-info-text">
+             <span class="detail-info-label">Observações</span>
+             ${escHTML(loja.obs)}
+           </div>
+         </div>`
+      : '';
+
+    // ── BOTÕES DE AÇÃO ────────────────────────────────────────
+    const actionsHTML = buildActionsHTML(loja, status);
+
+    // ── MONTA SHEET ──────────────────────────────────────────
+    sheet.innerHTML = `
+      ${coverHTML}
+      <div class="detail-body">
+        <div class="detail-name-row">
+          <div class="detail-name" id="detail-name-text">${escHTML(loja.nome)}</div>
+          ${planBadge}
+        </div>
+        <div class="detail-sub">${escHTML(loja.sub || loja.categoria || '')}</div>
+        ${!isPago ? `<div style="margin-bottom:12px;">${badgeHTML(status, fechaStr)}</div>` : ''}
+        <div class="detail-info">
+          ${enderecoHTML}
+          ${horarioHTML}
+          ${obsHTML}
+        </div>
+      </div>
+      <div class="detail-actions">${actionsHTML}</div>
+    `;
+
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function fecharDetalhes() {
+    const overlay = document.getElementById('modal-detalhes');
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  // Fecha ao clicar no overlay fora do sheet
+  document.getElementById('modal-detalhes').addEventListener('click', function(e) {
+    if (e.target === this) fecharDetalhes();
+  });
+
+  // Fecha com tecla Escape — respeita hierarquia de modais abertos
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('modal-detalhes').classList.contains('open')) {
+      fecharDetalhes(); return;
+    }
+    if (document.getElementById('modal-cadastro').classList.contains('open')) {
+      closeModal(); return;
+    }
+    if (document.getElementById('modal-planos').classList.contains('open')) {
+      closePlanModal();
+    }
+  });
+
+  // Placeholder quando foto falha
+  function placeholderCover(emoji, categoria) {
+    const bg = CAT_BG[categoria] || 'rgba(255,255,255,0.06)';
+    return `<div class="detail-cover-placeholder" style="background:${bg};">${emoji}</div>`;
+  }
+
+  // Constrói a seção de horários legível (grade de dias)
+  function buildHorarioHTML(loja) {
+    if (!loja.horario) {
+      // Tenta usar o texto livre se disponível
+      const txt = loja.horarioTexto || loja.horario_texto || '';
+      if (!txt) return '';
+      return `<div class="detail-info-row">
+        <div class="detail-info-icon clock"><i class="fa fa-clock"></i></div>
+        <div class="detail-info-text">
+          <span class="detail-info-label">Horário</span>
+          ${escHTML(txt)}
+        </div>
+      </div>`;
+    }
+
+    const { dias, abre, fecha } = loja.horario;
+    const hoje = new Date().getDay();
+    const is24h = abre === '00:00' && fecha === '23:59';
+
+    // Monta grade: linha por cada dia da semana (0-6)
+    const linhas = DIAS_NOMES_FULL.map((nome, d) => {
+      const aberto = dias.includes(d);
+      const isHoje = d === hoje;
+      const horaStr = is24h ? '24 horas' : `${abre} – ${fecha}`;
+      return `<div class="detail-schedule-row${isHoje ? ' today' : ''}">
+        <span class="detail-schedule-day">${nome}${isHoje ? ' (hoje)' : ''}</span>
+        ${aberto
+          ? `<span class="detail-schedule-time">${horaStr}</span>`
+          : `<span class="detail-schedule-closed">Fechado</span>`}
+      </div>`;
+    }).join('');
+
+    return `<div class="detail-info-row">
+      <div class="detail-info-icon clock"><i class="fa fa-clock"></i></div>
+      <div class="detail-info-text" style="flex:1;">
+        <span class="detail-info-label">Horário de Funcionamento</span>
+        <div class="detail-schedule">${linhas}</div>
+      </div>
+    </div>`;
+  }
+
+  // Constrói os botões de ação do modal
+  function buildActionsHTML(loja, status) {
+    const mNome = escAttr(loja.nome);
+    const mPlan = escAttr(loja.plano || 'GRATIS');
+    const mCat  = escAttr(loja.categoria || '');
+    const abre  = loja.horario ? loja.horario.abre : '';
+
+    let html = '';
+
+    // Botão WhatsApp
+    if (loja.wpp) {
+      const msg = encodeURIComponent('Olá, vi no AngatubaON! Está aberto agora?');
+      const url = `https://wa.me/${loja.wpp}?text=${msg}`;
+      if (status === 'open' || status === 'zap') {
+        html += `<a href="${url}" target="_blank" rel="noopener"
+          class="detail-btn-wpp"
+          onclick="registrarClique('${mNome}','wpp','${mPlan}','${mCat}')">
+          <i class="fab fa-whatsapp"></i> WhatsApp
+        </a>`;
+      } else {
+        html += `<button class="detail-btn-wpp closed-wpp"
+          onclick="fecharDetalhes(); showToast('${mNome}','${abre}');">
+          <i class="fab fa-whatsapp"></i> Fechado agora
+        </button>`;
+      }
+    }
+
+    // Botão Telefone (se existir)
+    if (loja.tel) {
+      html += `<a href="tel:${loja.tel}" class="detail-btn-tel"
+        onclick="registrarClique('${mNome}','tel','${mPlan}','${mCat}')">
+        <i class="fa fa-phone"></i> Ligar
+      </a>`;
+    }
+
+    // Botão Mapa
+    if (loja.maps) {
+      html += `<a href="${loja.maps}" target="_blank" rel="noopener"
+        class="detail-btn-maps" aria-label="Ver no mapa">
+        <i class="fa fa-map-marker-alt"></i>
+      </a>`;
+    }
+
+    return html;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     UPLOAD DE IMAGENS — ImgBB (gratuito, sem backend)
+     Chave pública da API: registre em https://imgbb.com/api
+     e substitua IMGBB_KEY abaixo pela sua chave.
+  ══════════════════════════════════════════════════════════════ */
+  const IMGBB_KEY = '0eed15a2dd1ee18da2d05c394639b2aa';
+
+  async function uploadImagem(file, statusEl) {
+    if (!file) return null;
+    if (file.size > 5 * 1024 * 1024) {
+      statusEl.textContent = '❌ Arquivo muito grande (máx 5MB)';
+      statusEl.style.color = 'var(--red)';
+      return null;
+    }
+
+    statusEl.textContent = '⏳ Enviando imagem...';
+    statusEl.style.color = 'var(--muted)';
+
+    try {
+      const form = new FormData();
+      form.append('image', file);
+      form.append('key', IMGBB_KEY);
+
+      const resp = await fetch('https://api.imgbb.com/1/upload', {
+        method: 'POST', body: form
+      });
+      const json = await resp.json();
+
+      if (json.success) {
+        statusEl.textContent = '✅ Imagem enviada!';
+        statusEl.style.color = 'var(--green)';
+        return json.data.url;
+      } else {
+        throw new Error(json.error?.message || 'Falha no upload');
+      }
+    } catch (err) {
+      statusEl.textContent = '❌ Erro: ' + err.message;
+      statusEl.style.color = 'var(--red)';
+      return null;
+    }
+  }
+
+  function initImageUpload(fileInputId, hiddenId, previewImgId, previewWrapId, statusId) {
+    const fileInput  = document.getElementById(fileInputId);
+    const hiddenUrl  = document.getElementById(hiddenId);
+    const previewImg = document.getElementById(previewImgId);
+    const previewWrap= document.getElementById(previewWrapId);
+    const statusEl   = document.getElementById(statusId);
+
+    if (!fileInput) return;
+
+    fileInput.addEventListener('change', async function() {
+      const file = this.files[0];
+      if (!file) return;
+
+      // Preview local imediato
+      const reader = new FileReader();
+      reader.onload = e => {
+        previewImg.src = e.target.result;
+        previewWrap.style.display = '';
+      };
+      reader.readAsDataURL(file);
+
+      // Upload real
+      const url = await uploadImagem(file, statusEl);
+      if (url) hiddenUrl.value = url;
+    });
+  }
+
+  // Inicializa os dois campos de upload
+  initImageUpload('f-foto-file', 'f-foto-url', 'foto-preview-img', 'foto-preview-wrap', 'foto-upload-status');
+  initImageUpload('f-logo-file', 'f-logo-url', 'logo-preview-img', 'logo-preview-wrap', 'logo-upload-status');
+
+  /* ══════════════════════════════════════════════════════════════
+     RAMO AUTOCOMPLETE
+     Substitui o <select> estático por um combobox com busca em tempo real.
+     O campo oculto #f-ramo recebe o slug/valor real enviado ao servidor.
+  ══════════════════════════════════════════════════════════════ */
+  (function initRamoAutocomplete() {
+
+    /* ── Catálogo completo ──────────────────────────────────── */
+    const RAMOS = [
+      // ── Alimentação e Bebidas ──────────────────────────────
+      { emoji:'🍕', label:'Pizzaria',                        slug:'pizzaria',     grupo:'Alimentação e Bebidas',
+        busca:['pizza','pizzaria','pizzaiolo'] },
+      { emoji:'🍔', label:'Lanches / Hamburgueria',          slug:'lanches',      grupo:'Alimentação e Bebidas',
+        busca:['lanche','hamburger','hamburguer','lanchonete','pastelaria','hot dog','hotdog','sanduiche'] },
+      { emoji:'🍺', label:'Adega / Bebidas',                 slug:'adega',        grupo:'Alimentação e Bebidas',
+        busca:['adega','bebida','bar','distribuidora','cerveja','drinks','bebidas'] },
+      { emoji:'🥩', label:'Steakhouse / Casa de Carnes',     slug:'carnes',       grupo:'Alimentação e Bebidas',
+        busca:['churrascaria','steakhouse','carnes','churrasco','açougue','acougue','grill'] },
+
+      // ── Saúde, Beleza e Bem-Estar ─────────────────────────
+      { emoji:'💊', label:'Farmácia / Drogaria',             slug:'farmacia',     grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['farmacia','farmácia','drogaria','remedio','medicamento','plantao','droga','drogal'] },
+      { emoji:'🩺', label:'Clínica Médica / Odontológica',   slug:'clinica',      grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['clinica','clínica','medica','médica','odonto','dentista','consulta','saude','médico','medico'] },
+      { emoji:'🧪', label:'Laboratório de Análises',         slug:'laboratorio',  grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['laboratorio','laboratório','exame','analise','análise','coleta'] },
+      { emoji:'👓', label:'Ótica',                           slug:'otica',        grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['otica','ótica','oculista','oculos','óculos','lente','visao'] },
+      { emoji:'💈', label:'Barbearia',                       slug:'barbearia',    grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['barbearia','barber','barbeiro','corte','barba','cabelo masculino'] },
+      { emoji:'💅', label:'Salão de Beleza / Estética',      slug:'salao',        grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['salao','salão','beleza','estetica','estética','cabeleireiro','cabelereiro','manicure','sobrancelha','depilacao','depilação','spa'] },
+      { emoji:'💪', label:'Academia / Pilates / Yoga',       slug:'academia',     grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['academia','pilates','yoga','ginasio','ginásio','musculacao','musculação','crossfit','funcional','fitness'] },
+      { emoji:'🩸', label:'Estúdio de Tatuagem / Piercing',  slug:'tattoo',       grupo:'Saúde, Beleza e Bem-Estar',
+        busca:['tattoo','tatuagem','piercing','estudio','estúdio','body art'] },
+
+      // ── Automotivo ─────────────────────────────────────────
+      { emoji:'⛽', label:'Posto de Combustível',            slug:'posto',        grupo:'Automotivo',
+        busca:['posto','gasolina','diesel','combustivel','combustível','etanol','alvim'] },
+      { emoji:'🛢️', label:'Gás / Água',                      slug:'gas',          grupo:'Automotivo',
+        busca:['gas','gás','agua','água','botijao','botijão','liquigas','ultragaz','glp'] },
+      { emoji:'⚙️', label:'Autopeças / Motopeças',           slug:'autopecas',    grupo:'Automotivo',
+        busca:['autopecas','autopeças','motopecas','motopeças','peças','pecas','acessorio auto'] },
+      { emoji:'🔧', label:'Oficina Mecânica / Auto Elétrica',slug:'mecanica',     grupo:'Automotivo',
+        busca:['mecanica','mecânica','oficina','eletrica','elétrica','motor','freio','suspensao','retifica','funilaria','auto center'] },
+      { emoji:'🎨', label:'Funilaria e Pintura',             slug:'funilaria',    grupo:'Automotivo',
+        busca:['funilaria','funileiro','pintura','lanternagem','lataria'] },
+      { emoji:'🛞', label:'Borracharia',                     slug:'borracharia',  grupo:'Automotivo',
+        busca:['borracharia','pneu','pneus','borracha','remendo'] },
+      { emoji:'🧼', label:'Lava-Rápido',                     slug:'lava-rapido',  grupo:'Automotivo',
+        busca:['lava','lavagem','lavajato','autolavagem','limpeza veicular','car wash'] },
+      { emoji:'🚲', label:'Bicicletaria',                    slug:'bicicletaria', grupo:'Automotivo',
+        busca:['bicicletaria','bicicleta','ciclo','bike','bikes'] },
+
+      // ── Casa e Construção ──────────────────────────────────
+      { emoji:'🧱', label:'Material de Construção',          slug:'construcao',   grupo:'Casa e Construção',
+        busca:['construção','construcao','material','cimento','ferragem','tijolo','telhado','obra'] },
+      { emoji:'🛋️', label:'Móveis e Eletrodomésticos',       slug:'moveis',       grupo:'Casa e Construção',
+        busca:['moveis','móveis','eletrodomestico','eletrodoméstico','armario','sofa','cama','geladeira'] },
+      { emoji:'🛍️', label:'Loja de Variedades / Utilidades', slug:'variedades',   grupo:'Casa e Construção',
+        busca:['variedades','utilidades','bazar','utilidade','descartavel','plastico'] },
+      { emoji:'🪟', label:'Vidraçaria / Esquadrias',         slug:'vidracaria',   grupo:'Casa e Construção',
+        busca:['vidraçaria','vidracaria','vidro','esquadria','janela','porta','espelho'] },
+      { emoji:'🪵', label:'Madeireira',                      slug:'madeireira',   grupo:'Casa e Construção',
+        busca:['madeira','madeireira','tabua','tábua','mdf','compensado'] },
+      { emoji:'🎨', label:'Loja de Tintas',                  slug:'tintas',       grupo:'Casa e Construção',
+        busca:['tinta','tintas','pintura','verniz','tinteiro','imobiliaria tintas'] },
+      { emoji:'👨‍🏭', label:'Serralheria',                    slug:'serralheria',  grupo:'Casa e Construção',
+        busca:['serralheria','serralheiro','grade','portao','portão','ferro','estrutura metalica'] },
+      { emoji:'❄️', label:'Refrigeração e Ar-Condicionado',  slug:'refrigeracao', grupo:'Casa e Construção',
+        busca:['refrigeração','refrigeracao','ar-condicionado','ar condicionado','freezer','climatizador'] },
+      { emoji:'🛠️', label:'Conserto de Eletrodomésticos',    slug:'consertos',    grupo:'Casa e Construção',
+        busca:['conserto','eletrodomestico','eletrodoméstico','reparo','assistencia','assistência','manutencao'] },
+
+      // ── Comércio e Variedades ──────────────────────────────
+      { emoji:'🛒', label:'Mercado / Supermercado',          slug:'mercado',      grupo:'Comércio e Variedades',
+        busca:['mercado','supermercado','minimercado','mercearia','hortifruti','acougue'] },
+      { emoji:'👗', label:'Loja de Roupas / Vestuário',      slug:'roupas',       grupo:'Comércio e Variedades',
+        busca:['roupa','roupas','vestuario','vestuário','moda','confeccao','confecção','boutique','moda feminina','moda masculina'] },
+      { emoji:'👟', label:'Loja de Calçados',                slug:'calcados',     grupo:'Comércio e Variedades',
+        busca:['calcado','calçado','sapato','tenis','tênis','sandalia','bota','sapataria','calcados'] },
+      { emoji:'💍', label:'Joalheria e Relojoaria',          slug:'joalheria',    grupo:'Comércio e Variedades',
+        busca:['joalheria','joalheiro','joias','relogio','relógio','relojoaria','ouro','prata','alianca'] },
+      { emoji:'🧸', label:'Artigos para Festas e Embalagens',slug:'festas',       grupo:'Comércio e Variedades',
+        busca:['festa','festas','balao','balão','embalagem','decoracao','decoração','aniversario','brinquedo'] },
+      { emoji:'🧵', label:'Armarinho / Aviamentos / Artesanato',slug:'armarinho', grupo:'Comércio e Variedades',
+        busca:['armarinho','aviamento','artesanato','la','lã','fios','linhas','tecido','costura','croche'] },
+      { emoji:'💐', label:'Floricultura e Paisagismo',       slug:'floricultura', grupo:'Comércio e Variedades',
+        busca:['flor','flores','floricultura','paisagismo','plantas','buque','buquê','jardim','orquidea'] },
+
+      // ── Pet e Agropecuária ─────────────────────────────────
+      { emoji:'🐾', label:'Pet Shop / Veterinário',          slug:'pet',          grupo:'Pet e Agropecuária',
+        busca:['pet','petshop','veterinario','veterinário','animal','racao','ração','banho','tosa','caes','gatos'] },
+      { emoji:'🌾', label:'Agropecuária / Casa de Rações',   slug:'agropecuaria', grupo:'Pet e Agropecuária',
+        busca:['agropecuaria','agropecuária','racoes','rações','agro','rural','casa rural','semente'] },
+      { emoji:'🚜', label:'Insumos Agrícolas e Ferramentas', slug:'insumos',      grupo:'Pet e Agropecuária',
+        busca:['insumo','agricola','agrícola','ferramenta','adubo','fertilizante','defensivo','trator','irrigacao'] },
+
+      // ── Tecnologia e Serviços ──────────────────────────────
+      { emoji:'📚', label:'Papelaria e Bazar',               slug:'papelaria',    grupo:'Tecnologia e Serviços',
+        busca:['papelaria','bazar','livraria','caderno','caneta','escolar','material escolar'] },
+      { emoji:'💻', label:'Informática e Assistência Técnica',slug:'informatica', grupo:'Tecnologia e Serviços',
+        busca:['informatica','informática','computador','notebook','assistencia','suporte','hardware','software','ti','impressora'] },
+      { emoji:'📱', label:'Loja de Celular e Acessórios',    slug:'celular',      grupo:'Tecnologia e Serviços',
+        busca:['celular','smartphone','acessorio','acessório','capinha','carregador','mobile'] },
+      { emoji:'🖨️', label:'Gráfica / Comunicação Visual',    slug:'grafica',      grupo:'Tecnologia e Serviços',
+        busca:['grafica','gráfica','comunicação visual','banner','adesivo','impressao','impressão','plotagem','serigrafia'] },
+      { emoji:'🏢', label:'Imobiliária',                     slug:'imobiliaria',  grupo:'Tecnologia e Serviços',
+        busca:['imobiliaria','imobiliária','aluguel','venda','imoveis','imóveis','corretor','corretora'] },
+      { emoji:'⚖️', label:'Escritório de Advocacia',         slug:'advocacia',    grupo:'Tecnologia e Serviços',
+        busca:['advocacia','advogado','juridico','jurídico','direito','escritorio juridico'] },
+      { emoji:'📊', label:'Escritório de Contabilidade',     slug:'contabilidade',grupo:'Tecnologia e Serviços',
+        busca:['contabilidade','contador','contabil','contábil','fiscal','tributario','imposto','irpf'] },
+      { emoji:'📸', label:'Estúdio de Fotografia / Filmagem',slug:'fotografia',   grupo:'Tecnologia e Serviços',
+        busca:['fotografia','filmagem','estudio','estúdio','fotografo','fotógrafo','video','vídeo','foto','drone'] },
+      { emoji:'✈️', label:'Agência de Viagens e Turismo',    slug:'viagens',      grupo:'Tecnologia e Serviços',
+        busca:['viagem','viagens','turismo','agencia','agência','passagem','hotel','pacote','turista'] },
+
+      // ── Educação e Finanças ────────────────────────────────
+      { emoji:'🏦', label:'Agência Bancária / Lotérica',     slug:'bancario',     grupo:'Educação e Finanças',
+        busca:['banco','bancaria','bancária','loterica','lotérica','loteria','financeiro','atm','caixa economica'] },
+      { emoji:'🛡️', label:'Escritório de Seguros',           slug:'seguros',      grupo:'Educação e Finanças',
+        busca:['seguro','seguros','corretora','apolice','apólice','plano de saude','previdencia'] },
+      { emoji:'🗣️', label:'Escola de Idiomas / Cursos',      slug:'idiomas',      grupo:'Educação e Finanças',
+        busca:['idioma','idiomas','ingles','inglês','curso','escola','ensino','educacao','educação','capacitacao'] },
+      { emoji:'🚗', label:'Autoescola (CFC)',                 slug:'autoescola',   grupo:'Educação e Finanças',
+        busca:['autoescola','cfc','habilitacao','habilitação','cnh','motorista','primeira habilitacao'] },
+    ];
+
+    /* ── Helpers ──────────────────────────────────────────── */
+    // Remove acentos e converte para minúsculas para busca insensível
+    function norm(s) {
+      return String(s).toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9 ]/g, ' ').trim();
+    }
+    // Envolve o trecho coincidente em <mark> para highlight
+    function hl(label, raw) {
+      if (!raw) return label;
+      const re = new RegExp(`(${raw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi');
+      return label.replace(re, '<mark>$1</mark>');
+    }
+
+    /* ── DOM refs ─────────────────────────────────────────── */
+    const inputEl    = document.getElementById('f-ramo-text');
+    const hiddenEl   = document.getElementById('f-ramo');
+    const dropEl     = document.getElementById('ramo-dropdown');
+    const emojiEl    = document.getElementById('ramo-emoji');
+    const clearEl    = document.getElementById('ramo-clear');
+    const okEl       = document.getElementById('ramo-ok');
+    if (!inputEl) return;
+
+    /* ── Estado interno ───────────────────────────────────── */
+    let chosen  = null;   // objeto RAMOS escolhido
+    let kbIdx   = -1;     // índice com foco via teclado
+    let visible = [];     // itens renderizados no momento
+
+    /* ── Renderiza o dropdown ─────────────────────────────── */
+    function renderDrop(q) {
+      const qn  = norm(q);
+      const qRaw = q.trim();
+
+      const matched = qn
+        ? RAMOS.filter(r =>
+            norm(r.label).includes(qn) ||
+            r.busca.some(b => norm(b).includes(qn))
+          )
+        : RAMOS;   // vazio = mostra todos
+
+      // Agrupa por grupo
+      const map = new Map();
+      matched.forEach(r => {
+        if (!map.has(r.grupo)) map.set(r.grupo, []);
+        map.get(r.grupo).push(r);
+      });
+
+      visible = [];
+      let html = '';
+
+      if (!matched.length && qRaw) {
+        // Sem resultado: opção de usar o texto livre
+        visible = [{ emoji:'➕', label:`"${qRaw}"`, slug: qRaw, grupo:'', busca:[], _custom: true }];
+        html = `<div class="ramo-opt is-outro" role="option" data-idx="0">
+          <span class="ramo-opt-emoji">➕</span>
+          <span class="ramo-opt-label">Usar <mark>${qRaw}</mark> como ramo</span>
+        </div>`;
+      } else {
+        map.forEach((items, grupo) => {
+          html += `<div class="ramo-group-label">${grupo}</div>`;
+          items.forEach(r => {
+            const i = visible.length;
+            visible.push(r);
+            html += `<div class="ramo-opt" role="option" data-idx="${i}">
+              <span class="ramo-opt-emoji">${r.emoji}</span>
+              <span class="ramo-opt-label">${hl(r.label, qRaw)}</span>
+            </div>`;
+          });
+        });
+        // "Outro ramo" sempre disponível no final
+        const oi = visible.length;
+        visible.push({ emoji:'➕', label:'Outro ramo (não listado)', slug:'outro', grupo:'', busca:[] });
+        html += `<div class="ramo-opt is-outro" role="option" data-idx="${oi}">
+          <span class="ramo-opt-emoji">➕</span>
+          <span class="ramo-opt-label">Outro ramo (não listado)</span>
+        </div>`;
+      }
+
+      dropEl.innerHTML = html;
+      kbIdx = -1;
+
+      // Clicks nas opções
+      dropEl.querySelectorAll('.ramo-opt').forEach(el => {
+        el.addEventListener('mousedown', ev => {
+          ev.preventDefault();               // impede blur antes do click
+          escolher(visible[+el.dataset.idx]);
+        });
+      });
+    }
+
+    /* ── Aplica a escolha ─────────────────────────────────── */
+    function escolher(ramo) {
+      if (!ramo) return;
+      chosen = ramo;
+      inputEl.value    = ramo._custom ? ramo.slug : `${ramo.emoji}  ${ramo.label}`;
+      hiddenEl.value   = ramo._custom ? ramo.slug : ramo.slug;
+      emojiEl.textContent = ramo._custom ? '' : ramo.emoji;
+      okEl.classList.add('show');
+      clearEl.classList.add('show');
+      fecharDrop();
+      inputEl.setAttribute('aria-expanded', 'false');
+    }
+
+    /* ── Abre / fecha ─────────────────────────────────────── */
+    function abrirDrop() {
+      renderDrop(inputEl.value);
+      dropEl.classList.add('open');
+      inputEl.setAttribute('aria-expanded', 'true');
+    }
+    function fecharDrop() {
+      dropEl.classList.remove('open');
+      inputEl.setAttribute('aria-expanded', 'false');
+      kbIdx = -1;
+    }
+
+    /* ── Foco via teclado ─────────────────────────────────── */
+    function moverKb(dir) {
+      const opts = dropEl.querySelectorAll('.ramo-opt');
+      if (!opts.length) return;
+      opts[kbIdx]?.classList.remove('kb-focus');
+      kbIdx = (kbIdx + dir + opts.length) % opts.length;
+      opts[kbIdx]?.classList.add('kb-focus');
+      opts[kbIdx]?.scrollIntoView({ block: 'nearest' });
+    }
+
+    /* ── Eventos ──────────────────────────────────────────── */
+    inputEl.addEventListener('focus', () => {
+      if (chosen) inputEl.select();
+      abrirDrop();
+    });
+
+    inputEl.addEventListener('input', () => {
+      chosen = null;
+      hiddenEl.value = '';
+      okEl.classList.remove('show');
+      emojiEl.textContent = '';
+      clearEl.classList.toggle('show', inputEl.value.length > 0);
+      renderDrop(inputEl.value);
+      dropEl.classList.add('open');
+      inputEl.setAttribute('aria-expanded', 'true');
+    });
+
+    inputEl.addEventListener('keydown', e => {
+      if (!dropEl.classList.contains('open')) {
+        if (e.key === 'ArrowDown' || e.key === 'Enter') abrirDrop();
+        return;
+      }
+      switch (e.key) {
+        case 'ArrowDown':  e.preventDefault(); moverKb(+1); break;
+        case 'ArrowUp':    e.preventDefault(); moverKb(-1); break;
+        case 'Escape':     fecharDrop(); break;
+        case 'Tab':
+        case 'Enter':
+          if (kbIdx >= 0 && visible[kbIdx]) { e.preventDefault(); escolher(visible[kbIdx]); }
+          else if (e.key === 'Enter') fecharDrop();
+          break;
+      }
+    });
+
+    inputEl.addEventListener('blur', () => {
+      // Delay pequeno para o mousedown dos itens disparar antes
+      setTimeout(() => {
+        fecharDrop();
+        // Se digitou algo sem confirmar: tenta autocomplete pelo melhor match
+        if (!chosen && inputEl.value.trim()) {
+          const qn = norm(inputEl.value);
+          const hit = RAMOS.find(r =>
+            norm(r.label).includes(qn) || r.busca.some(b => norm(b).includes(qn))
+          );
+          if (hit) {
+            escolher(hit);
+          } else {
+            // Mantém como texto livre (ramo customizado)
+            hiddenEl.value = inputEl.value.trim();
+            okEl.classList.add('show');
+          }
+        }
+      }, 200);
+    });
+
+    clearEl.addEventListener('click', () => ramoReset());
+
+    // Fecha ao clicar fora
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.ramo-wrap')) fecharDrop();
+    });
+
+    /* ── API pública — usada no closeModal ────────────────── */
+    window.ramoReset = function () {
+      chosen = null;
+      inputEl.value       = '';
+      hiddenEl.value      = '';
+      emojiEl.textContent = '';
+      okEl.classList.remove('show');
+      clearEl.classList.remove('show');
+      fecharDrop();
+    };
+
+  })(); // ── fim initRamoAutocomplete ──────────────────────────
+
+  /* ── INIT ────────────────────────────────────────────────── */
+  // Mostra skeletons enquanto API carrega
+  showSkeleton();
+  showSkeletonCat();
+
+  // Carrega lojas dinâmicas em background
+  carregarLojas();

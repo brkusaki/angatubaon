@@ -1896,20 +1896,28 @@
     if (loja.status) return { status: loja.status, fechaStr: '' };
     if (!loja.horario) return { status: 'open', fechaStr: '' };
 
+    // Convenção 24h: abre 00:00 e fecha 23:59 (ou abre === fecha em 00:00)
+    const is24h = (loja.horario.abre === '00:00' && loja.horario.fecha === '23:59')
+               || (loja.horario.abre === '00:00' && loja.horario.fecha === '00:00');
+    if (is24h) {
+      const hoje = new Date().getDay();
+      if (loja.horario.dias.includes(hoje)) return { status: 'open', fechaStr: '24h' };
+      return { status: 'closed', fechaStr: '' };
+    }
+
     const now    = new Date();
     const dow    = now.getDay();
     const nowMin = now.getHours() * 60 + now.getMinutes();
 
-    // 00:00 como fechamento = meia-noite (1440 min), não zero
+    // 00:00 como fechamento = meia-noite (1440 min)
     const parse = s => {
       const [h, m] = s.split(':').map(Number);
       return (h === 0 && m === 0) ? 1440 : h * 60 + m;
     };
 
-    const abre      = parse(loja.horario.abre);
-    const fecha     = parse(loja.horario.fecha);
-    // 23:59 é convenção para "funciona 24h" — exibe "24h" no badge
-    const fechaStr  = loja.horario.fecha === '23:59' ? '24h' : loja.horario.fecha;
+    const abre     = parse(loja.horario.abre);
+    const fecha    = parse(loja.horario.fecha);
+    const fechaStr = loja.horario.fecha;
 
     if (abre === fecha) return { status: 'closed', fechaStr };
 
@@ -2123,7 +2131,10 @@
   }
 
   /* ── Cache global de status — compartilhado entre renderLojas e renderCategorias ── */
-  let _statusSnapshot = new Map(); // populado por renderLojas a cada ciclo
+  // Inicializado como Map vazio; populado por renderLojas a cada ciclo.
+  // renderCategorias usa _statusSnapshot.get(l)?.status com fallback para calcStatus,
+  // então é seguro mesmo antes do primeiro render.
+  let _statusSnapshot = new Map();
 
   /* ── Renderiza lista principal ───────────────────────────── */
   function renderLojas() {
@@ -2876,7 +2887,7 @@
         upgradeCta.style.display = (plano === 'GRATIS') ? '' : 'none';
         if (plano === 'GRATIS') {
           const upgradeMsg = encodeURIComponent(`Olá! Sou dono da loja *${d.nome}* no AngatubaON e quero saber mais sobre os planos pagos!`);
-          document.getElementById('ml-upgrade-link').href = `https://wa.me/${ADMIN_WPP}?text=${upgradeMsg}`;
+          document.getElementById('ml-upgrade-link').href = `https://wa.me/5515981125349?text=${upgradeMsg}`;
         }
 
         // Métricas
@@ -3009,6 +3020,9 @@
   }
 
   /* ── Carrega lojas da API (Apps Script → Google Sheets) ─────── */
+  const _retryDelays = [8000, 20000, 45000]; // backoff progressivo: 8s, 20s, 45s
+  let   _retryCount  = 0;
+
   async function carregarLojas() {
     try {
       const resp = await fetch(APPS_SCRIPT_URL, { signal: AbortSignal.timeout(10000) });
@@ -3027,6 +3041,7 @@
           plano:     (l.plano    || 'GRATIS').toUpperCase(),
           emoji:     l.emoji     || '🏪',
         }));
+        _retryCount = 0; // reseta contador em caso de sucesso
         _rebuildIdxMap();
         renderLojas();
         renderCategorias();
@@ -3037,11 +3052,12 @@
       }
     } catch(err) {
       console.warn('[AngatubaON] API indisponível, usando lojas fixas:', err.message);
-      _mostrarErroCarregamento(true);
-      // Retry automático após 8s (máx 1 retry)
-      if (!carregarLojas._retried) {
-        carregarLojas._retried = true;
-        setTimeout(() => carregarLojas(), 8000);
+      _mostrarErroCarregamento(_retryCount < _retryDelays.length);
+      // Retry com backoff progressivo (máx 3 tentativas)
+      if (_retryCount < _retryDelays.length) {
+        const delay = _retryDelays[_retryCount++];
+        console.log(`[AngatubaON] Retry ${_retryCount}/${_retryDelays.length} em ${delay/1000}s...`);
+        setTimeout(() => carregarLojas(), delay);
       }
     }
   }

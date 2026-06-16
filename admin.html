@@ -673,36 +673,68 @@ async function updateStatus(row, newStatus, btn) {
 }
 
 async function savePlan(row) {
-  const plano    = document.getElementById('ps-' + row).value;
-  const validade = document.getElementById('pd-' + row).value;
+  const plano      = document.getElementById('ps-' + row).value;
+  const validade   = document.getElementById('pd-' + row).value;
   const validadeBR = validade ? validade.split('-').reverse().join('/') : '';
 
   const saveBtn = document.querySelector(`#plan-card-${row} .btn-save-plan`);
-  if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>'; }
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...'; }
+
+  const params = new URLSearchParams();
+  params.append('payload', JSON.stringify({
+    action: 'updatePlan', row, plano,
+    planoValidade: validadeBR,
+    planoPago: plano !== 'GRATIS' ? 'SIM' : 'NÃO',
+    token: _sessionToken,
+  }));
 
   try {
-    const params = new URLSearchParams();
-    params.append('payload', JSON.stringify({
-      action: 'updatePlan', row, plano,
-      planoValidade: validadeBR,
-      planoPago: plano !== 'GRATIS' ? 'SIM' : 'NÃO',
-      token: _sessionToken,
-    }));
-    const resp = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST', body: params, signal: AbortSignal.timeout(15000)
+    // Envia com no-cors (Apps Script às vezes bloqueia CORS no POST mas executa mesmo assim)
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: params,
+      signal: AbortSignal.timeout(15000),
     });
+  } catch(e) {
+    // Ignora erro de rede/CORS — vai confirmar pelo GET abaixo
+  }
+
+  // Aguarda 1.5s e confirma pelo GET se o plano foi realmente salvo
+  await new Promise(r => setTimeout(r, 1500));
+
+  try {
+    const resp = await fetch(
+      `${APPS_SCRIPT_URL}?action=admin&token=${encodeURIComponent(_sessionToken || '')}`,
+      { signal: AbortSignal.timeout(12000) }
+    );
     const json = await resp.json();
 
     if (json.status === 'erro' && json.msg === 'UNAUTHORIZED') {
       handleUnauthorized(); return;
     }
-    if (json.status !== 'ok') throw new Error(json.msg || 'Erro desconhecido');
 
-    toast(`✅ Plano ${plano} salvo${validadeBR ? ' até ' + validadeBR : ' (vitalício)'}`);
-    const r = allRows.find(x => x.row === row);
-    if (r) { r.plano = plano; r.planoValidade = validadeBR; }
+    if (json.status === 'ok' && Array.isArray(json.data)) {
+      const salvo = json.data.find(x => x.row === row);
+      const planoSalvo = salvo ? salvo.plano : null;
+
+      if (planoSalvo && planoSalvo.toUpperCase() === plano.toUpperCase()) {
+        // ✅ Confirmado: atualiza memória e re-renderiza
+        toast(`✅ Plano ${plano} salvo${validadeBR ? ' até ' + validadeBR : ' (vitalício)'}`);
+        allRows = json.data;
+        renderAll();
+      } else {
+        // Plano no servidor ainda não bate — pode ter demorado mais
+        toast('⚠️ Salvo, mas aguarde alguns segundos e recarregue para confirmar.', true);
+        const r = allRows.find(x => x.row === row);
+        if (r) { r.plano = plano; r.planoValidade = validadeBR; }
+        renderAll();
+      }
+    } else {
+      toast('⚠️ Enviado — recarregue para confirmar.', true);
+    }
   } catch(e) {
-    toast('❌ Erro ao salvar plano: ' + e.message, true);
+    toast('⚠️ Enviado — recarregue para confirmar.', true);
   } finally {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa fa-save"></i> Salvar'; }
   }

@@ -1781,17 +1781,69 @@
      CATEGORIAS
   ══════════════════════════════════════════════════════════════ */
   const CATEGORIAS = [
-    { id:'todos',    label:'Tudo',      icon:'fa-bolt',              cor:'#ff4444', bg:'rgba(255,68,68,0.12)'    },
-    { id:'pizzaria', label:'Pizzarias', icon:'fa-pizza-slice',        cor:'#f59e0b', bg:'rgba(245,158,11,0.12)'   },
-    { id:'lanches',  label:'Lanches',   icon:'fa-burger',             cor:'#00d084', bg:'rgba(0,208,132,0.12)'    },
-    { id:'adega',    label:'Adegas',    icon:'fa-wine-bottle',        cor:'#a78bfa', bg:'rgba(167,139,250,0.12)'  },
-    { id:'farmacia', label:'Farmácias', icon:'fa-pills',              cor:'#38bdf8', bg:'rgba(56,189,248,0.12)'   },
-    { id:'mercado',  label:'Mercados',  icon:'fa-store',              cor:'#2dd4bf', bg:'rgba(45,212,191,0.12)'   },
-    { id:'posto',    label:'Postos',    icon:'fa-gas-pump',           cor:'#facc15', bg:'rgba(250,204,21,0.12)'   },
-    { id:'gas',      label:'Gás/Água',  icon:'fa-fire-flame-curved',  cor:'#fb923c', bg:'rgba(251,146,60,0.12)'   },
-    { id:'pet',      label:'Pet Shop',  icon:'fa-paw',                cor:'#f472b6', bg:'rgba(244,114,182,0.12)'  },
-    { id:'servicos', label:'Serviços',  icon:'fa-wrench',             cor:'#94a3b8', bg:'rgba(148,163,184,0.12)'  },
-    { id:'sugestao', label:'Sugerir Ramo', icon:'fa-plus', cor:'#f59e0b', bg:'rgba(245,158,11,0.12)' },
+    { id:'todos',        label:'Tudo',          icon:'fa-bolt',               cor:'#ff4444', bg:'rgba(255,68,68,0.12)'    },
+    // ── Alimentação e Bebidas ──────────────────────────────────────────────
+    { id:'pizzaria',     label:'Pizzarias',     icon:'fa-pizza-slice',         cor:'#f59e0b', bg:'rgba(245,158,11,0.12)'   },
+    { id:'lanches',      label:'Lanches',       icon:'fa-burger',              cor:'#00d084', bg:'rgba(0,208,132,0.12)'    },
+    { id:'adega',        label:'Adegas',        icon:'fa-wine-bottle',         cor:'#a78bfa', bg:'rgba(167,139,250,0.12)'  },
+    { id:'carnes',       label:'Carnes/Grill',  icon:'fa-drumstick-bite',      cor:'#ef4444', bg:'rgba(239,68,68,0.12)'    },
+    // ── Saúde, Beleza e Bem-Estar ──────────────────────────────────────────
+    { id:'farmacia',     label:'Farmácias',     icon:'fa-pills',               cor:'#38bdf8', bg:'rgba(56,189,248,0.12)'   },
+    { id:'clinica',      label:'Clínicas',      icon:'fa-stethoscope',         cor:'#34d399', bg:'rgba(52,211,153,0.12)'   },
+    { id:'laboratorio',  label:'Laboratórios',  icon:'fa-flask',               cor:'#a3e635', bg:'rgba(163,230,53,0.12)'   },
+    { id:'otica',        label:'Óticas',        icon:'fa-glasses',             cor:'#67e8f9', bg:'rgba(103,232,249,0.12)'  },
+    { id:'barbearia',    label:'Barbearias',    icon:'fa-scissors',            cor:'#fbbf24', bg:'rgba(251,191,36,0.12)'   },
+    { id:'salao',        label:'Salões',        icon:'fa-spa',                 cor:'#f9a8d4', bg:'rgba(249,168,212,0.12)'  },
+    { id:'academia',     label:'Academias',     icon:'fa-dumbbell',            cor:'#fb923c', bg:'rgba(251,146,60,0.12)'   },
+    { id:'tattoo',       label:'Tatuagem',      icon:'fa-paintbrush',          cor:'#c084fc', bg:'rgba(192,132,252,0.12)'  },
+    // ── Comércio e Variedades ──────────────────────────────────────────────
+    { id:'mercado',      label:'Mercados',      icon:'fa-store',               cor:'#2dd4bf', bg:'rgba(45,212,191,0.12)'   },
+    { id:'roupas',       label:'Roupas',        icon:'fa-shirt',               cor:'#f472b6', bg:'rgba(244,114,182,0.12)'  },
+    { id:'calcados',     label:'Calçados',      icon:'fa-shoe-prints',         cor:'#a78bfa', bg:'rgba(167,139,250,0.12)'  },
+    { id:'joalheria',    label:'Joalherias',    icon:'fa-gem',                 cor:'#facc15', bg:'rgba(250,204,21,0.12)'   },
+    { id:'festas',       label:'Festas',        icon:'fa-cake-candles',        cor:'#fb7185', bg:'rgba(251,113,133,0.12)'  },
+    { id:'armarinho',    label:'Armarinho',     icon:'fa-scissors',            cor:'#d946ef', bg:'rgba(217,70,239,0.12)'   },
+    { id:'floricultura', label:'Flores',        icon:'fa-seedling',            cor:'#4ade80', bg:'rgba(74,222,128,0.12)'   },
+    { id:'papelaria',    label:'Papelaria',     icon:'fa-book',                cor:'#60a5fa', bg:'rgba(96,165,250,0.12)'   },
+    { id:'variedades',   label:'Variedades',    icon:'fa-bag-shopping',        cor:'#94a3b8', bg:'rgba(148,163,184,0.12)'  },
+    // ── Automotivo ────────────────────────────────────────────────────────
+    { id:'posto',        label:'Postos',        icon:'fa-gas-pump',            cor:'#facc15', bg:'rgba(250,204,21,0.12)'   },
+    { id:'gas',          label:'Gás/Água',      icon:'fa-fire-flame-curved',   cor:'#fb923c', bg:'rgba(251,146,60,0.12)'   },
+    { id:'mecanica',     label:'Mecânicas',     icon:'fa-wrench',              cor:'#94a3b8', bg:'rgba(148,163,184,0.12)'  },
+    { id:'autopecas',    label:'Autopeças',     icon:'fa-gear',                cor:'#78716c', bg:'rgba(120,113,108,0.12)'  },
+    { id:'borracharia',  label:'Borracharia',   icon:'fa-circle-dot',          cor:'#a8a29e', bg:'rgba(168,162,158,0.12)'  },
+    { id:'funilaria',    label:'Funilaria',     icon:'fa-car-burst',           cor:'#f87171', bg:'rgba(248,113,113,0.12)'  },
+    { id:'lava-rapido',  label:'Lava-Rápido',   icon:'fa-droplet',             cor:'#38bdf8', bg:'rgba(56,189,248,0.12)'   },
+    { id:'bicicletaria', label:'Bicicletaria',  icon:'fa-bicycle',             cor:'#4ade80', bg:'rgba(74,222,128,0.12)'   },
+    // ── Casa e Construção ─────────────────────────────────────────────────
+    { id:'construcao',   label:'Construção',    icon:'fa-helmet-safety',       cor:'#f59e0b', bg:'rgba(245,158,11,0.12)'   },
+    { id:'moveis',       label:'Móveis',        icon:'fa-couch',               cor:'#a78bfa', bg:'rgba(167,139,250,0.12)'  },
+    { id:'madeireira',   label:'Madeireira',    icon:'fa-tree',                cor:'#86efac', bg:'rgba(134,239,172,0.12)'  },
+    { id:'tintas',       label:'Tintas',        icon:'fa-fill-drip',           cor:'#f472b6', bg:'rgba(244,114,182,0.12)'  },
+    { id:'vidracaria',   label:'Vidraçaria',    icon:'fa-window-restore',      cor:'#67e8f9', bg:'rgba(103,232,249,0.12)'  },
+    { id:'serralheria',  label:'Serralheria',   icon:'fa-industry',            cor:'#94a3b8', bg:'rgba(148,163,184,0.12)'  },
+    { id:'refrigeracao', label:'Refrigeração',  icon:'fa-snowflake',           cor:'#7dd3fc', bg:'rgba(125,211,252,0.12)'  },
+    { id:'consertos',    label:'Consertos',     icon:'fa-screwdriver-wrench',  cor:'#fbbf24', bg:'rgba(251,191,36,0.12)'   },
+    // ── Pet e Agropecuária ────────────────────────────────────────────────
+    { id:'pet',          label:'Pet Shop',      icon:'fa-paw',                 cor:'#f472b6', bg:'rgba(244,114,182,0.12)'  },
+    { id:'agropecuaria', label:'Agropecuária',  icon:'fa-tractor',             cor:'#86efac', bg:'rgba(134,239,172,0.12)'  },
+    { id:'insumos',      label:'Insumos Agric.',icon:'fa-leaf',                cor:'#4ade80', bg:'rgba(74,222,128,0.12)'   },
+    // ── Tecnologia e Serviços ─────────────────────────────────────────────
+    { id:'informatica',  label:'Informática',   icon:'fa-laptop',              cor:'#60a5fa', bg:'rgba(96,165,250,0.12)'   },
+    { id:'celular',      label:'Celulares',     icon:'fa-mobile-screen',       cor:'#34d399', bg:'rgba(52,211,153,0.12)'   },
+    { id:'grafica',      label:'Gráfica',       icon:'fa-print',               cor:'#a78bfa', bg:'rgba(167,139,250,0.12)'  },
+    { id:'imobiliaria',  label:'Imobiliária',   icon:'fa-house',               cor:'#38bdf8', bg:'rgba(56,189,248,0.12)'   },
+    { id:'advocacia',    label:'Advocacia',     icon:'fa-scale-balanced',      cor:'#f59e0b', bg:'rgba(245,158,11,0.12)'   },
+    { id:'contabilidade',label:'Contabilidade', icon:'fa-calculator',          cor:'#34d399', bg:'rgba(52,211,153,0.12)'   },
+    { id:'fotografia',   label:'Fotografia',    icon:'fa-camera',              cor:'#f472b6', bg:'rgba(244,114,182,0.12)'  },
+    { id:'viagens',      label:'Viagens',       icon:'fa-plane',               cor:'#38bdf8', bg:'rgba(56,189,248,0.12)'   },
+    // ── Educação e Finanças ───────────────────────────────────────────────
+    { id:'bancario',     label:'Bancos/Lotérica',icon:'fa-landmark',           cor:'#facc15', bg:'rgba(250,204,21,0.12)'   },
+    { id:'seguros',      label:'Seguros',       icon:'fa-shield-halved',       cor:'#60a5fa', bg:'rgba(96,165,250,0.12)'   },
+    { id:'idiomas',      label:'Cursos/Idiomas',icon:'fa-graduation-cap',      cor:'#a3e635', bg:'rgba(163,230,53,0.12)'   },
+    { id:'autoescola',   label:'Autoescola',    icon:'fa-car',                 cor:'#fb923c', bg:'rgba(251,146,60,0.12)'   },
+    // ── Genérico ──────────────────────────────────────────────────────────
+    { id:'servicos',     label:'Serviços',      icon:'fa-toolbox',             cor:'#94a3b8', bg:'rgba(148,163,184,0.12)'  },
   ];
 
   const CAT_BG = Object.fromEntries(CATEGORIAS.map(c => [c.id, c.bg]));
@@ -2184,10 +2236,8 @@
     bar.innerHTML = CATEGORIAS
       .filter(cat => cat && cat.id && cat.label)
       .map(cat => {
-        // 'sugestao' não tem lojas — badge sempre zero, pula o cálculo
         const getS = l => (_statusSnapshot.get(l)?.status) ?? calcStatus(l);
-        const qtd = (cat.id === 'sugestao') ? 0
-          : cat.id === 'todos'
+        const qtd = cat.id === 'todos'
             ? LOJAS.filter(l => getS(l) === 'open').length
             : LOJAS.filter(l => l.categoria === cat.id && getS(l) === 'open').length;
 
@@ -2207,14 +2257,10 @@
 
   /* ── Troca categoria ─────────────────────────────────────── */
   function setCat(cat, btn) {
-    // Intercepta "Sugerir Ramo" — abre WhatsApp e não altera o filtro ativo
-    if (cat === 'sugestao') {
-      const msg = encodeURIComponent('Olá! Senti falta de uma categoria no Angatuba ON e gostaria de sugerir o ramo de: ');
-      window.open(`https://wa.me/5515981125349?text=${msg}`, '_blank', 'noopener');
-      return;
-    }
-
-    activeCat = cat;
+    activeCat    = cat;
+    searchQuery  = '';  // limpa busca ao trocar categoria
+    const searchEl = document.getElementById('main-search');
+    if (searchEl) searchEl.value = '';
 
     // Remove active de todos os ícones, marca só o clicado — sem re-renderizar o cat-bar inteiro
     document.querySelectorAll('.cat-icon').forEach(i => i.classList.remove('active'));

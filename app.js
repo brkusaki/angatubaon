@@ -1260,6 +1260,21 @@
     document.getElementById('ml-m-wpp').textContent = '—';
     document.getElementById('ml-m-tel').textContent = '—';
 
+    // Restaura anúncio do sessionStorage enquanto API carrega
+    try {
+      const anuncioCache = sessionStorage.getItem('angatuba_anuncio');
+      if (anuncioCache) {
+        const obj = JSON.parse(anuncioCache);
+        if (obj.expira && new Date(obj.expira) > new Date()) {
+          const anuncioSection = document.getElementById('ml-anuncio-section');
+          if (anuncioSection) anuncioSection.style.display = '';
+          mlExibirAnuncioAtivo(obj);
+        } else {
+          sessionStorage.removeItem('angatuba_anuncio');
+        }
+      }
+    } catch(e) {}
+
     try {
       // Carrega dados da loja e métricas em paralelo
       const [dadosResp, metResp] = await Promise.all([
@@ -2588,6 +2603,16 @@
     if (!anuncio || !anuncio.texto) return;
     const ativoEl = document.getElementById('ml-anuncio-ativo');
     if (!ativoEl) return;
+
+    // Verifica se ainda não expirou
+    if (anuncio.expira && new Date(anuncio.expira) <= new Date()) {
+      sessionStorage.removeItem('angatuba_anuncio');
+      return;
+    }
+
+    // Persiste no sessionStorage para sobreviver ao recarregar
+    sessionStorage.setItem('angatuba_anuncio', JSON.stringify(anuncio));
+
     ativoEl.style.display = '';
     document.getElementById('ml-anuncio-emoji-preview').textContent = anuncio.emoji || '🎯';
     document.getElementById('ml-anuncio-texto-preview').textContent = anuncio.texto;
@@ -2603,6 +2628,8 @@
       } else {
         timerEl.textContent = 'Expirado';
         ativoEl.style.display = 'none';
+        sessionStorage.removeItem('angatuba_anuncio');
+        return;
       }
     }
 
@@ -2662,6 +2689,7 @@
       const textarea = document.getElementById('ml-anuncio-texto');
       if (textarea) { textarea.value = ''; }
       document.getElementById('ml-anuncio-chars').textContent = '0/80';
+      sessionStorage.removeItem('angatuba_anuncio');
     } catch(e) {
       console.warn('[Anuncio] Erro ao remover:', e.message);
     }

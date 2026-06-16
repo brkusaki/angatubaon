@@ -1617,9 +1617,24 @@
   // Array ativo — começa com as fixas, substituído pelas da API quando carregar
   let LOJAS = [...LOJAS_FIXAS];
 
+  // Mapa nome→índice global — atualizado sempre que LOJAS muda.
+  // Garante que abrirDetalhes(idx) sempre encontre a loja certa,
+  // independente de filtros ativos na lista renderizada.
+  let _lojaIdxMap = new Map();
+  function _rebuildIdxMap() {
+    _lojaIdxMap.clear();
+    LOJAS.forEach((l, i) => _lojaIdxMap.set(l, i));
+  }
+  _rebuildIdxMap();
+
   /* ══════════════════════════════════════════════════════════════
      ENGINE
   ══════════════════════════════════════════════════════════════ */
+
+  // Helper: escapa HTML para evitar XSS — definido cedo pois é usado em cardHTML
+  function escHTML(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
 
   let activeCat        = 'todos';
   let searchQuery      = '';
@@ -1645,7 +1660,8 @@
 
     const abre      = parse(loja.horario.abre);
     const fecha     = parse(loja.horario.fecha);
-    const fechaStr  = loja.horario.fecha; // ex: "23:00"
+    // 23:59 é convenção para "funciona 24h" — exibe "24h" no badge
+    const fechaStr  = loja.horario.fecha === '23:59' ? '24h' : loja.horario.fecha;
 
     if (abre === fecha) return { status: 'closed', fechaStr };
 
@@ -1823,10 +1839,10 @@
         ${thumbHTML(loja)}
         <div class="store-info" ${infoClick}>
           <div class="store-name-row">
-            <div class="store-name">${loja.nome}</div>
+            <div class="store-name">${escHTML(loja.nome)}</div>
             ${planBadge}
           </div>
-          <div class="store-sub">${loja.sub}</div>
+          <div class="store-sub">${escHTML(loja.sub)}</div>
           <div class="store-row">${badgeHTML(status, fechaStr)}${mapBtn}${ctTag}</div>
           ${expandHint}
         </div>
@@ -1837,22 +1853,16 @@
   /* ── Skeleton Loading ───────────────────────────────────── */
   function showSkeleton() {
     const listEl = document.getElementById('store-list');
-    listEl.innerHTML = '';
-    for (let i = 0; i < 5; i++) {
-      listEl.innerHTML += `
-        <div class="skeleton-card">
-          <div class="skeleton-thumb"></div>
-          <div class="skeleton-lines">
-            <div class="skeleton-line"></div>
-            <div class="skeleton-line short"></div>
-            <div class="skeleton-line xshort"></div>
-          </div>
-        </div>`;
-    }
-  }
-
-  function hideSkeleton() {
-    // renderLojas já substitui o conteúdo — não precisa fazer nada
+    listEl.style.display = 'flex';
+    listEl.innerHTML = Array(6).fill(0).map(() => `
+      <div class="skeleton-card">
+        <div class="skeleton-thumb"></div>
+        <div class="skeleton-lines">
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line short"></div>
+          <div class="skeleton-line xshort"></div>
+        </div>
+      </div>`).join('');
   }
 
   function showSkeletonCat() {
@@ -1887,15 +1897,14 @@
     const getStatus = loja => getStatusInfo(loja).status;
 
     let filtradas = LOJAS.filter(loja => {
-      // categoria já está normalizada nos dados — comparação direta, sem toLowerCase por chamada
       const catOk = activeCat === 'todos' || loja.categoria === activeCat;
       if (!catOk) return false;
       if (!q) return true;
-      return (
-        loja.nome.toLowerCase().includes(q) ||
-        loja.tags.toLowerCase().includes(q) ||
-        loja.sub.toLowerCase().includes(q)
-      );
+      // Guard: garante que campos string existam antes de chamar .toLowerCase()
+      const nome = (loja.nome  || '').toLowerCase();
+      const tags = (loja.tags  || '').toLowerCase();
+      const sub  = (loja.sub   || '').toLowerCase();
+      return nome.includes(q) || tags.includes(q) || sub.includes(q);
     });
 
     if (activePillFilter === 'open') {
@@ -1934,7 +1943,7 @@
     const frag = document.createDocumentFragment();
     filtradas.forEach((loja, i) => {
       const wrap = document.createElement('div');
-      wrap.innerHTML = cardHTML(loja, i * 0.055, getStatusInfo(loja), LOJAS.indexOf(loja));
+      wrap.innerHTML = cardHTML(loja, i * 0.055, getStatusInfo(loja), _lojaIdxMap.get(loja) ?? 0);
       frag.appendChild(wrap.firstElementChild);
     });
 
@@ -2399,7 +2408,7 @@
   });
 
   /* ── Auto-refresh inteligente ───────────────────────────── */
-  // Só re-renderiza se algum status mudou: compara com último snapshot exportado por renderLojas
+  // Só re-renderiza se algum status mudou, evitando repaints desnecessários
   function smartRefresh() {
     const changed = LOJAS.some(l => calcStatus(l) !== (_statusSnapshot.get(l)?.status ?? ''));
     if (changed) {
@@ -2408,6 +2417,7 @@
     }
   }
 
+  // Intervalo de 60s — não precisa ser mais rápido pois horários mudam em minuto cheio
   setInterval(smartRefresh, 60_000);
 
   /* ── Limpa will-change após animação ─────────────────────── */
@@ -2433,16 +2443,46 @@
         // Junta lojas da API com as fixas, evitando duplicatas pelo nome
         const nomesApi = new Set(json.data.map(l => l.nome.trim().toLowerCase()));
         const fixasSemDuplicata = LOJAS_FIXAS.filter(l => !nomesApi.has(l.nome.trim().toLowerCase()));
-        LOJAS = [...json.data, ...fixasSemDuplicata];
+        LOJAS = [...json.data, ...fixasSemDuplicata].map(l => ({
+          ...l,
+          nome:      l.nome      || '',
+          tags:      l.tags      || '',
+          sub:       l.sub       || '',
+          categoria: l.categoria || 'servicos',
+          plano:     (l.plano    || 'GRATIS').toUpperCase(),
+          emoji:     l.emoji     || '🏪',
+        }));
+        _rebuildIdxMap();
         renderLojas();
         renderCategorias();
         console.log('[AngatubaON] ' + json.data.length + ' da API + ' + fixasSemDuplicata.length + ' fixas ✅');
       } else {
         console.warn('[AngatubaON] API retornou dados vazios — usando fallback');
+        _mostrarErroCarregamento(false);
       }
     } catch(err) {
       console.warn('[AngatubaON] API indisponível, usando lojas fixas:', err.message);
+      _mostrarErroCarregamento(true);
+      // Retry automático após 8s (máx 1 retry)
+      if (!carregarLojas._retried) {
+        carregarLojas._retried = true;
+        setTimeout(() => carregarLojas(), 8000);
+      }
     }
+  }
+
+  function _mostrarErroCarregamento(vaiRetry) {
+    if (LOJAS.length > 0) return; // tem fallback, não precisa mostrar erro
+    const listEl  = document.getElementById('store-list');
+    listEl.innerHTML = '';
+    listEl.style.display = 'none';
+    const emptyEl = document.getElementById('empty-state');
+    emptyEl.style.display = 'block';
+    document.getElementById('empty-icon').textContent = '📡';
+    document.getElementById('empty-msg').textContent = 'Sem conexão com o servidor.';
+    document.getElementById('empty-sub').textContent = vaiRetry
+      ? 'Tentando novamente em alguns segundos...'
+      : 'Verifique sua conexão e recarregue a página.';
   }
 
   /* ── Address Autocomplete (Nominatim / OpenStreetMap) ──────── */
@@ -2466,7 +2506,8 @@
 
     function clearMaps() {
       hiddenMaps.value = '';
-      setStatus('', '', '');
+      statusEl.textContent = '';
+      statusEl.style.color = 'var(--muted)';
     }
 
     function setMapsConfirmed(displayName, lat, lon) {
@@ -2709,20 +2750,24 @@
     if (e.target === this) fecharDetalhes();
   });
 
-  // Fecha com tecla Escape
+  // Fecha com tecla Escape — respeita hierarquia de modais abertos
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') fecharDetalhes();
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('modal-detalhes').classList.contains('open')) {
+      fecharDetalhes(); return;
+    }
+    if (document.getElementById('modal-cadastro').classList.contains('open')) {
+      closeModal(); return;
+    }
+    if (document.getElementById('modal-planos').classList.contains('open')) {
+      closePlanModal();
+    }
   });
 
   // Placeholder quando foto falha
   function placeholderCover(emoji, categoria) {
     const bg = CAT_BG[categoria] || 'rgba(255,255,255,0.06)';
     return `<div class="detail-cover-placeholder" style="background:${bg};">${emoji}</div>`;
-  }
-
-  // Helper: escapa HTML para evitar XSS
-  function escHTML(s) {
-    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   // Constrói a seção de horários legível (grade de dias)
@@ -2742,15 +2787,17 @@
 
     const { dias, abre, fecha } = loja.horario;
     const hoje = new Date().getDay();
+    const is24h = abre === '00:00' && fecha === '23:59';
 
     // Monta grade: linha por cada dia da semana (0-6)
     const linhas = DIAS_NOMES_FULL.map((nome, d) => {
       const aberto = dias.includes(d);
       const isHoje = d === hoje;
+      const horaStr = is24h ? '24 horas' : `${abre} – ${fecha}`;
       return `<div class="detail-schedule-row${isHoje ? ' today' : ''}">
         <span class="detail-schedule-day">${nome}${isHoje ? ' (hoje)' : ''}</span>
         ${aberto
-          ? `<span class="detail-schedule-time">${abre} – ${fecha}</span>`
+          ? `<span class="detail-schedule-time">${horaStr}</span>`
           : `<span class="detail-schedule-closed">Fechado</span>`}
       </div>`;
     }).join('');
@@ -3107,7 +3154,6 @@
     function escolher(ramo) {
       if (!ramo) return;
       chosen = ramo;
-      const displayLabel = ramo._custom ? ramo.slug : ramo.label;   // texto real
       inputEl.value    = ramo._custom ? ramo.slug : `${ramo.emoji}  ${ramo.label}`;
       hiddenEl.value   = ramo._custom ? ramo.slug : ramo.slug;
       emojiEl.textContent = ramo._custom ? '' : ramo.emoji;

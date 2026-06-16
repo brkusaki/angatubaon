@@ -777,6 +777,17 @@
       color: var(--text); font-family: var(--font-b);
       font-size: 14px; font-weight: 600; cursor: pointer;
     }
+    .success-wpp-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: linear-gradient(135deg,#25d366,#128c7e);
+      color: #fff; font-family: var(--font-h);
+      font-size: 1rem; font-weight: 700;
+      padding: 13px 24px; border-radius: 14px;
+      text-decoration: none;
+      transition: opacity 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .success-wpp-btn:active { transform: scale(0.97); opacity: 0.9; }
 
     /* ════════════════════════════════════════════
        MODAL PLANOS
@@ -2120,6 +2131,7 @@
     setTimeout(() => {
       document.getElementById('cadastro-form').style.display = 'flex';
       document.getElementById('cadastro-success').classList.remove('show');
+      document.getElementById('cadastro-success').querySelector('.success-wpp-btn')?.remove();
       document.getElementById('cadastro-form').reset();
       // Reinicia o schedule builder visualmente
       scheduleTurnos = [{ dias: [1,2,3,4,5], abre: '08:00', fecha: '18:00' }];
@@ -2195,12 +2207,6 @@
     const isPago = selectedPlan !== 'GRATIS';
     document.getElementById('foto-group').style.display = isPago ? '' : 'none';
     document.getElementById('logo-group').style.display = isPago ? '' : 'none';
-
-    // Para planos pagos, abre WhatsApp diretamente ao confirmar plano
-    if (isPago) {
-      const msg = encodeURIComponent(`Olá! Quero cadastrar minha loja no Angatuba ON com o Plano ${selectedPlan}.`);
-      window.open(`https://wa.me/5515981125349?text=${msg}`, '_blank', 'noopener');
-    }
     openCadastroModal();
   }
 
@@ -2354,7 +2360,40 @@
 
       // no-cors não retorna status — assume sucesso se não lançou exceção
       this.style.display = 'none';
-      document.getElementById('cadastro-success').classList.add('show');
+
+      // Monta tela de sucesso com botão de WPP para planos pagos
+      const successEl = document.getElementById('cadastro-success');
+      const nomeLoja  = payload.nome || payload.storeName || 'sua loja';
+      const plano     = selectedPlan;
+      const isPago    = plano !== 'GRATIS';
+
+      if (isPago) {
+        const wppMsg = encodeURIComponent(
+          `Olá! Acabei de cadastrar *${nomeLoja}* no AngatubaON e escolhi o Plano ${plano}. Gostaria de ativá-lo!`
+        );
+        const wppUrl = `https://wa.me/5515981125349?text=${wppMsg}`;
+        successEl.querySelector('.success-sub').innerHTML =
+          `Recebemos os dados da sua loja.<br>` +
+          `Agora fale com a gente pelo WhatsApp para ativar o <strong>Plano ${plano}</strong>:`;
+        // Adiciona/atualiza botão de WPP dinâmico
+        let wppBtn = successEl.querySelector('.success-wpp-btn');
+        if (!wppBtn) {
+          wppBtn = document.createElement('a');
+          wppBtn.className = 'success-wpp-btn';
+          wppBtn.target    = '_blank';
+          wppBtn.rel       = 'noopener';
+          successEl.querySelector('.success-close').before(wppBtn);
+        }
+        wppBtn.href      = wppUrl;
+        wppBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Ativar Plano ' + plano + ' →';
+      } else {
+        successEl.querySelector('.success-sub').innerHTML =
+          `Recebemos os dados da sua loja.<br>Vamos analisar e entrar em contato pelo WhatsApp em breve.`;
+        // Remove botão de WPP se existia de cadastro anterior na mesma sessão
+        successEl.querySelector('.success-wpp-btn')?.remove();
+      }
+
+      successEl.classList.add('show');
     } catch {
       btn.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Cadastro';
       btn.style.opacity = '';

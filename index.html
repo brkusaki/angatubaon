@@ -2233,13 +2233,20 @@
   /* ── Renderiza categorias ────────────────────────────────── */
   function renderCategorias() {
     const bar = document.getElementById('cat-bar');
+    const getS = l => (_statusSnapshot.get(l)?.status) ?? calcStatus(l);
+
     bar.innerHTML = CATEGORIAS
-      .filter(cat => cat && cat.id && cat.label)
+      .filter(cat => {
+        if (!cat || !cat.id || !cat.label) return false;
+        // "Tudo" sempre aparece
+        if (cat.id === 'todos') return true;
+        // Só exibe se houver pelo menos 1 loja nessa categoria
+        return LOJAS.some(l => l.categoria === cat.id);
+      })
       .map(cat => {
-        const getS = l => (_statusSnapshot.get(l)?.status) ?? calcStatus(l);
         const qtd = cat.id === 'todos'
-            ? LOJAS.filter(l => getS(l) === 'open').length
-            : LOJAS.filter(l => l.categoria === cat.id && getS(l) === 'open').length;
+          ? LOJAS.filter(l => getS(l) === 'open').length
+          : LOJAS.filter(l => l.categoria === cat.id && getS(l) === 'open').length;
 
         const badge    = qtd > 0 ? `<span class="cat-badge visible">${qtd}</span>` : '';
         const isActive = cat.id === activeCat;

@@ -305,72 +305,94 @@
 
       <div class="plan-header">
         <div class="plan-header-title">Escolha seu Plano<span> ✦</span></div>
-        <div class="plan-header-sub">Selecione antes de continuar o cadastro</div>
+        <div class="plan-header-sub">Deslize para comparar os planos</div>
       </div>
 
-      <div class="plan-cards">
+      <!-- Indicadores de dots -->
+      <div class="plan-dots" id="plan-dots">
+        <span class="plan-dot active" data-idx="0"></span>
+        <span class="plan-dot" data-idx="1"></span>
+        <span class="plan-dot" data-idx="2"></span>
+      </div>
 
-        <!-- GRÁTIS -->
-        <div class="plan-card card-gratis selected" data-plan="GRATIS" onclick="selectPlan(this)">
-          <div class="plan-radio"></div>
-          <div class="plan-card-top">
-            <div class="plan-card-name">🏪 Grátis</div>
-            <div class="plan-card-price">
-              <span class="price-val">R$ 0</span>
-              <span class="price-per">para sempre</span>
+      <!-- Carrossel -->
+      <div class="plan-carousel-wrap">
+        <div class="plan-carousel" id="plan-carousel">
+
+          <!-- GRÁTIS -->
+          <div class="plan-slide" data-plan="GRATIS">
+            <div class="plan-card card-gratis selected">
+              <div class="plan-card-top">
+                <div class="plan-card-name">🏪 Grátis</div>
+                <div class="plan-card-price">
+                  <span class="price-val">R$ 0</span>
+                  <span class="price-per">para sempre</span>
+                </div>
+              </div>
+              <ul class="plan-card-features">
+                <li><span class="feat-icon">✅</span> Loja listada no app</li>
+                <li><span class="feat-icon">✅</span> Status aberto/fechado em tempo real</li>
+                <li><span class="feat-icon">✅</span> Botão WhatsApp / Telefone</li>
+                <li><span class="feat-icon">✅</span> Painel "Minha Loja"</li>
+                <li><span class="feat-icon">✅</span> Total de cliques (contador simples)</li>
+                <li class="feat-off"><span class="feat-icon">✦</span> Posição de destaque na lista</li>
+                <li class="feat-off"><span class="feat-icon">✦</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
+                <li class="feat-off"><span class="feat-icon">✦</span> Link de compartilhamento</li>
+                <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa e logo no card</li>
+              </ul>
             </div>
           </div>
-          <ul class="plan-card-features">
-            <li><span class="feat-icon">✅</span> Loja listada no app</li>
-            <li><span class="feat-icon">✅</span> Status aberto/fechado em tempo real</li>
-            <li><span class="feat-icon">✅</span> Botão WhatsApp / Telefone</li>
-            <li class="feat-off"><span class="feat-icon">✦</span> Posição de destaque</li>
-            <li class="feat-off"><span class="feat-icon">✦</span> Selo e visual diferenciado</li>
-            <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa no card</li>
-          </ul>
-        </div>
 
-        <!-- PLUS -->
-        <div class="plan-card card-plus" data-plan="PLUS" onclick="selectPlan(this)" style="position:relative;">
-          <span class="plan-popular">⭐ MAIS POPULAR</span>
-          <div class="plan-radio"></div>
-          <div class="plan-card-top">
-            <div class="plan-card-name">✦ Plus</div>
-            <div class="plan-card-price">
-              <span class="price-val">R$ 29,90</span>
-              <span class="price-per">por mês</span>
+          <!-- PLUS -->
+          <div class="plan-slide" data-plan="PLUS">
+            <div class="plan-card card-plus" style="position:relative;">
+              <span class="plan-popular">⭐ MAIS POPULAR</span>
+              <div class="plan-card-top">
+                <div class="plan-card-name">✦ Plus</div>
+                <div class="plan-card-price">
+                  <span class="price-val">R$ 29,90</span>
+                  <span class="price-per">por mês</span>
+                </div>
+              </div>
+              <ul class="plan-card-features">
+                <li><span class="feat-icon">✅</span> Tudo do Grátis</li>
+                <li><span class="feat-icon">✅</span> Posição acima das lojas Grátis</li>
+                <li><span class="feat-icon">✅</span> Selo ✦ PLUS no card</li>
+                <li><span class="feat-icon">✅</span> Visual destacado (fundo índigo)</li>
+                <li><span class="feat-icon">✅</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
+                <li><span class="feat-icon">✅</span> Link de compartilhamento da loja</li>
+                <li><span class="feat-icon">✅</span> Hero com logo no painel</li>
+                <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa no card com overlay</li>
+                <li class="feat-off"><span class="feat-icon">✦</span> Topo absoluto da lista</li>
+                <li class="feat-off"><span class="feat-icon">✦</span> Horário de pico dos cliques</li>
+              </ul>
             </div>
           </div>
-          <ul class="plan-card-features">
-            <li><span class="feat-icon">✅</span> Tudo do Grátis</li>
-            <li><span class="feat-icon">✅</span> Posição acima das lojas Grátis</li>
-            <li><span class="feat-icon">✅</span> Selo ✦ PLUS no card</li>
-            <li><span class="feat-icon">✅</span> Visual destacado (fundo índigo)</li>
-            <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa no card</li>
-            <li class="feat-off"><span class="feat-icon">✦</span> Topo absoluto da lista</li>
-          </ul>
-        </div>
 
-        <!-- PRO -->
-        <div class="plan-card card-pro" data-plan="PRO" onclick="selectPlan(this)">
-          <div class="plan-radio"></div>
-          <div class="plan-card-top">
-            <div class="plan-card-name">⭐ Pro</div>
-            <div class="plan-card-price">
-              <span class="price-val">R$ 49,90</span>
-              <span class="price-per">por mês</span>
+          <!-- PRO -->
+          <div class="plan-slide" data-plan="PRO">
+            <div class="plan-card card-pro">
+              <div class="plan-card-top">
+                <div class="plan-card-name">⭐ Pro</div>
+                <div class="plan-card-price">
+                  <span class="price-val">R$ 49,90</span>
+                  <span class="price-per">por mês</span>
+                </div>
+              </div>
+              <ul class="plan-card-features">
+                <li><span class="feat-icon">✅</span> Tudo do Plus</li>
+                <li><span class="feat-icon">✅</span> Topo absoluto da lista</li>
+                <li><span class="feat-icon">✅</span> Foto de capa no card com overlay</li>
+                <li><span class="feat-icon">✅</span> Borda dourada animada</li>
+                <li><span class="feat-icon">✅</span> Selo ⭐ PRO em destaque</li>
+                <li><span class="feat-icon">✅</span> Horário de pico dos cliques</li>
+                <li><span class="feat-icon">✅</span> Hero com foto de capa no painel</li>
+                <li><span class="feat-icon">✅</span> Máxima visibilidade</li>
+              </ul>
             </div>
           </div>
-          <ul class="plan-card-features">
-            <li><span class="feat-icon">✅</span> Tudo do Plus</li>
-            <li><span class="feat-icon">✅</span> Topo absoluto da lista</li>
-            <li><span class="feat-icon">✅</span> Foto de capa no card com overlay</li>
-            <li><span class="feat-icon">✅</span> Borda dourada animada</li>
-            <li><span class="feat-icon">✅</span> Selo ⭐ PRO em destaque</li>
-            <li><span class="feat-icon">✅</span> Máxima visibilidade</li>
-          </ul>
-        </div>
 
+        </div>
       </div>
 
       <button class="plan-cta cta-gratis" id="plan-cta-btn" onclick="confirmPlan()">

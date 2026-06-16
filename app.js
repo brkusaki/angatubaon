@@ -644,6 +644,8 @@
 
   /* ── Modal de Planos ─────────────────────────────────────── */
   let selectedPlan = 'GRATIS';
+  let _carouselIdx = 0;
+  const PLANS_ORDER = ['GRATIS', 'PLUS', 'PRO'];
 
   const PLAN_LABELS = {
     GRATIS: { btn: 'Continuar com Grátis →',  cls: 'cta-gratis', note: 'Cadastro gratuito, sem compromisso.' },
@@ -654,6 +656,8 @@
   function openPlanModal() {
     document.getElementById('modal-planos').classList.add('open');
     document.body.style.overflow = 'hidden';
+    // Começa sempre no Plus (índice 1) para aumentar conversão
+    _irParaSlide(1, false);
   }
 
   function closePlanModal() {
@@ -661,29 +665,96 @@
     document.body.style.overflow = '';
   }
 
-  function selectPlan(card) {
-    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
-    card.classList.add('selected');
-    selectedPlan = card.dataset.plan;
+  function _irParaSlide(idx, animado = true) {
+    const carousel = document.getElementById('plan-carousel');
+    if (!carousel) return;
+    _carouselIdx = Math.max(0, Math.min(idx, PLANS_ORDER.length - 1));
+    carousel.style.transition = animado ? 'transform 0.35s cubic-bezier(0.32,0.72,0,1)' : 'none';
+    carousel.style.transform  = `translateX(-${_carouselIdx * 100}%)`;
 
-    const cfg = PLAN_LABELS[selectedPlan];
+    // Dots
+    document.querySelectorAll('.plan-dot').forEach((d, i) => {
+      d.classList.toggle('active', i === _carouselIdx);
+    });
+
+    // Card selecionado
+    selectedPlan = PLANS_ORDER[_carouselIdx];
+    document.querySelectorAll('.plan-slide .plan-card').forEach((c, i) => {
+      c.classList.toggle('selected', i === _carouselIdx);
+    });
+
+    // Botão e nota
+    const cfg  = PLAN_LABELS[selectedPlan];
     const btn  = document.getElementById('plan-cta-btn');
     const note = document.getElementById('plan-note');
+    if (btn)  { btn.textContent = cfg.btn; btn.className = 'plan-cta ' + cfg.cls; }
+    if (note) note.textContent = cfg.note;
+  }
 
-    btn.textContent = cfg.btn;
-    btn.className   = 'plan-cta ' + cfg.cls;
-    note.textContent = cfg.note;
+  // Dots clicáveis
+  document.querySelectorAll('.plan-dot').forEach(dot => {
+    dot.addEventListener('click', () => _irParaSlide(+dot.dataset.idx));
+  });
+
+  // Swipe touch no carrossel
+  (function initCarouselSwipe() {
+    const wrap = document.querySelector('.plan-carousel-wrap');
+    if (!wrap) return;
+    let startX = 0, startY = 0, isDragging = false, isHoriz = null;
+
+    wrap.addEventListener('touchstart', e => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      isDragging = true; isHoriz = null;
+    }, { passive: true });
+
+    wrap.addEventListener('touchmove', e => {
+      if (!isDragging) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (isHoriz === null) isHoriz = Math.abs(dx) > Math.abs(dy);
+      if (isHoriz) e.preventDefault();
+    }, { passive: false });
+
+    wrap.addEventListener('touchend', e => {
+      if (!isDragging || !isHoriz) { isDragging = false; return; }
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 40) {
+        if (dx < 0) _irParaSlide(_carouselIdx + 1);
+        else        _irParaSlide(_carouselIdx - 1);
+      }
+      isDragging = false;
+    });
+
+    // Mouse drag para desktop
+    let mouseStartX = 0, mouseDragging = false;
+    wrap.addEventListener('mousedown', e => { mouseStartX = e.clientX; mouseDragging = true; });
+    wrap.addEventListener('mousemove', e => { if (mouseDragging) e.preventDefault(); });
+    wrap.addEventListener('mouseup', e => {
+      if (!mouseDragging) return;
+      const dx = e.clientX - mouseStartX;
+      if (Math.abs(dx) > 40) {
+        if (dx < 0) _irParaSlide(_carouselIdx + 1);
+        else        _irParaSlide(_carouselIdx - 1);
+      }
+      mouseDragging = false;
+    });
+    wrap.addEventListener('mouseleave', () => { mouseDragging = false; });
+  })();
+
+  function selectPlan(card) {
+    // Mantido por compatibilidade, mas o carrossel gerencia tudo
+    const idx = PLANS_ORDER.indexOf(card.dataset.plan);
+    if (idx >= 0) _irParaSlide(idx);
   }
 
   function confirmPlan() {
     closePlanModal();
-    // Injeta o plano escolhido no hint do formulário
     const hint = document.querySelector('#cadastro-form .field-hint');
     if (hint) {
       const icons = { GRATIS:'🏪', PLUS:'✦', PRO:'⭐' };
       hint.innerHTML = `${icons[selectedPlan]} Plano <strong>${selectedPlan}</strong> selecionado · Você será notificado pelo WhatsApp.`;
     }
-    // Mostra campos de foto apenas para planos pagos
     const isPago = selectedPlan !== 'GRATIS';
     document.getElementById('foto-group').style.display = isPago ? '' : 'none';
     document.getElementById('logo-group').style.display = isPago ? '' : 'none';

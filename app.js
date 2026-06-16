@@ -102,6 +102,14 @@
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  // Gera slug de URL a partir do nome da loja
+  function toSlug(nome) {
+    return String(nome || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^a-z0-9]+/g,'-')
+      .replace(/^-+|-+$/g,'');
+  }
+
   let activeCat        = 'todos';
   let searchQuery      = '';
   let activePillFilter = 'all';
@@ -1271,6 +1279,13 @@
           if (lockLink) lockLink.href = upgradeUrl;
         }
 
+        // ── Link de compartilhamento (Plus e Pro) ────────────
+        const shareSection = document.getElementById('ml-share-section');
+        if (shareSection) {
+          shareSection.style.display = isPago ? '' : 'none';
+          if (isPago) mlMontarCompartilhamento(d.nome);
+        }
+
         // ── Métricas ─────────────────────────────────────────
         if (metJson.status === 'ok') {
           const m = metJson.data.metricas || { total:0, wpp:0, tel:0, d7:0, d30:0 };
@@ -1285,7 +1300,7 @@
             document.getElementById('ml-m-wpp').textContent   = m.wpp  ?? 0;
             document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
           } else {
-            // Grátis: coloca números falsos para o blur cobrir, ativa overlay lock
+            // Grátis: coloca números para o blur cobrir, ativa overlay lock
             document.getElementById('ml-m-7d').textContent    = m.d7   ?? 0;
             document.getElementById('ml-m-30d').textContent   = m.d30  ?? 0;
             document.getElementById('ml-m-total').textContent = m.total ?? 0;
@@ -1293,6 +1308,17 @@
             document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
             document.getElementById('ml-lock-total').textContent = m.total ?? 0;
             if (lockEl) lockEl.style.display = '';
+          }
+
+          // ── Horário de pico (só Pro) ──────────────────────
+          const picoSection = document.getElementById('ml-pico-section');
+          const isPro = plano === 'PRO';
+          if (picoSection) {
+            picoSection.style.display = isPro ? '' : 'none';
+            if (isPro && metJson.data.pico) {
+              // Aguarda um frame para o canvas ter dimensão real
+              requestAnimationFrame(() => mlRenderizarPico(metJson.data.pico));
+            }
           }
         }
       }
@@ -2241,4 +2267,123 @@
   showSkeletonCat();
 
   // Carrega lojas dinâmicas em background
-  carregarLojas();
+  carregarLojas().then(() => {
+    // Deep link: abre detalhes de loja pelo hash da URL (ex: /#mr-centro-automotivo)
+    _resolverDeepLink();
+  });
+
+  /* ══════════════════════════════════════════════════════════════
+     DEEP LINK — /#slug-da-loja
+  ══════════════════════════════════════════════════════════════ */
+  function _resolverDeepLink() {
+    const hash = (location.hash || '').replace('#','').trim();
+    if (!hash) return;
+    const loja = LOJAS.find(l => toSlug(l.nome) === hash);
+    if (!loja) return;
+    const idx = _lojaIdxMap.get(loja);
+    if (idx != null) {
+      // Pequeno delay para garantir que o DOM está pronto
+      setTimeout(() => abrirDetalhes(idx), 200);
+    }
+  }
+
+  // Também resolve ao navegar pelo histórico (botão voltar/avançar)
+  window.addEventListener('hashchange', _resolverDeepLink);
+
+  /* ══════════════════════════════════════════════════════════════
+     COMPARTILHAMENTO — painel Minha Loja
+  ══════════════════════════════════════════════════════════════ */
+  window.mlCopiarLink = function() {
+    const urlEl = document.getElementById('ml-share-url');
+    const btn   = document.getElementById('ml-copy-btn');
+    if (!urlEl) return;
+    navigator.clipboard.writeText(urlEl.textContent.trim()).then(() => {
+      btn.innerHTML = '<i class="fa fa-check"></i> Copiado!';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => {
+        btn.innerHTML = '<i class="fa fa-copy"></i> Copiar';
+        btn.style.color = '';
+      }, 2000);
+    }).catch(() => {
+      // Fallback para browsers sem clipboard API
+      const tmp = document.createElement('input');
+      tmp.value = urlEl.textContent.trim();
+      document.body.appendChild(tmp);
+      tmp.select();
+      document.execCommand('copy');
+      document.body.removeChild(tmp);
+      btn.innerHTML = '<i class="fa fa-check"></i> Copiado!';
+      setTimeout(() => { btn.innerHTML = '<i class="fa fa-copy"></i> Copiar'; }, 2000);
+    });
+  };
+
+  function mlMontarCompartilhamento(nome) {
+    const slug    = toSlug(nome);
+    const baseUrl = location.origin + location.pathname.replace(/\/[^/]*$/, '/');
+    const url     = `${location.origin}/#${slug}`;
+    const urlEl   = document.getElementById('ml-share-url');
+    const wppEl   = document.getElementById('ml-share-wpp');
+    const igEl    = document.getElementById('ml-share-ig');
+    if (urlEl) urlEl.textContent = url;
+    if (wppEl) wppEl.href = `https://wa.me/?text=${encodeURIComponent(`Confira ${nome} no AngatubaON! 📍\n${url}`)}`;
+    if (igEl)  igEl.href  = `https://www.instagram.com/`; // Instagram não permite deep link de share, abre o app
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     GRÁFICO DE PICO — canvas simples, sem lib externa
+  ══════════════════════════════════════════════════════════════ */
+  function mlRenderizarPico(pico) {
+    const canvas = document.getElementById('ml-pico-chart');
+    if (!canvas) return;
+    const ctx    = canvas.getContext('2d');
+    const W      = canvas.offsetWidth || 300;
+    const H      = 80;
+    canvas.width  = W * window.devicePixelRatio;
+    canvas.height = H * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+    const max  = Math.max(...pico, 1);
+    const barW = W / 24;
+    const pad  = 2;
+
+    // Cor do horário atual
+    const horaAtual = new Date().getHours();
+
+    pico.forEach((val, h) => {
+      const barH   = Math.max(2, (val / max) * (H - 10));
+      const x      = h * barW + pad / 2;
+      const y      = H - barH;
+      const isPico = val === max && val > 0;
+      const isNow  = h === horaAtual;
+
+      // Gradiente da barra
+      const grad = ctx.createLinearGradient(0, y, 0, H);
+      if (isPico) {
+        grad.addColorStop(0, '#f59e0b');
+        grad.addColorStop(1, 'rgba(245,158,11,0.3)');
+      } else if (isNow) {
+        grad.addColorStop(0, '#6366f1');
+        grad.addColorStop(1, 'rgba(99,102,241,0.3)');
+      } else {
+        grad.addColorStop(0, 'rgba(255,255,255,0.25)');
+        grad.addColorStop(1, 'rgba(255,255,255,0.05)');
+      }
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.roundRect(x, y, barW - pad, barH, [2, 2, 0, 0]);
+      ctx.fill();
+    });
+
+    // Destaque textual
+    const idxPico = pico.indexOf(Math.max(...pico));
+    const destaqueEl = document.getElementById('ml-pico-destaque');
+    if (destaqueEl) {
+      if (Math.max(...pico) === 0) {
+        destaqueEl.textContent = 'Nenhum clique registrado nos últimos 30 dias.';
+      } else {
+        const fmt = h => `${String(h).padStart(2,'0')}h`;
+        destaqueEl.innerHTML = `🔥 Pico às <strong style="color:#f59e0b;">${fmt(idxPico)}–${fmt(idxPico+1)}</strong> · ${pico[idxPico]} clique${pico[idxPico]>1?'s':''}`;
+      }
+    }
+  }

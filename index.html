@@ -644,6 +644,45 @@
             <i class="fab fa-whatsapp"></i> Quero o Plano Pro
           </a>
         </div>
+
+        <!-- Link de compartilhamento — Plus e Pro -->
+        <div id="ml-share-section" style="display:none;margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">
+            Compartilhar minha loja
+          </div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" id="ml-share-url">—</div>
+              <button onclick="mlCopiarLink()" style="flex-shrink:0;padding:8px 12px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;" id="ml-copy-btn">
+                <i class="fa fa-copy"></i> Copiar
+              </button>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <a id="ml-share-wpp" href="#" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:8px;background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.2);color:#25d366;font-size:12px;font-weight:700;text-decoration:none;">
+                <i class="fab fa-whatsapp"></i> WhatsApp
+              </a>
+              <a id="ml-share-ig" href="#" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:8px;background:rgba(225,48,108,0.08);border:1px solid rgba(225,48,108,0.2);color:#e1306c;font-size:12px;font-weight:700;text-decoration:none;">
+                <i class="fab fa-instagram"></i> Instagram
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Horário de pico — só Pro -->
+        <div id="ml-pico-section" style="display:none;margin-bottom:20px;">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">
+            Horário de pico <span style="font-size:9px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PRO</span>
+          </div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">Cliques por hora do dia · últimos 30 dias</div>
+            <canvas id="ml-pico-chart" height="80" style="width:100%;display:block;"></canvas>
+            <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;color:var(--muted);">
+              <span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span>
+            </div>
+            <div id="ml-pico-destaque" style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center;"></div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>

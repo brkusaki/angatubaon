@@ -1204,26 +1204,29 @@
         const plano     = d.plano || 'GRATIS';
         const isPago    = plano !== 'GRATIS';
 
-        if (isPago && d.foto) {
+        // Usa foto/logo do lojaDados; fallback na lista LOJAS já carregada
+        const lojaLocal = LOJAS.find(l => l.nome === d.nome);
+        const fotoUrl   = d.foto  || lojaLocal?.foto  || '';
+        const logoUrl   = d.logo  || lojaLocal?.logo  || '';
+
+        if (isPago && fotoUrl) {
           // Plano pago com foto: exibe a capa
-          if (heroImgEl) { heroImgEl.src = d.foto; heroImgEl.style.display = ''; }
+          if (heroImgEl) { heroImgEl.src = fotoUrl; heroImgEl.style.display = ''; }
           if (heroEl) heroEl.style.background = '#0d0d0d';
         } else {
           // Sem foto: usa gradiente por categoria
           if (heroImgEl) heroImgEl.style.display = 'none';
-          const lojaLocal = LOJAS.find(l => l.nome === d.nome);
-          const cat = lojaLocal?.categoria || '';
+          const cat   = lojaLocal?.categoria || '';
           const catBg = CAT_BG[cat] || 'rgba(99,102,241,0.12)';
           if (heroEl) heroEl.style.background = `linear-gradient(135deg, ${catBg} 0%, #0d0d0d 100%)`;
         }
 
         // ── Logo / emoji ──────────────────────────────────────
-        const logoImgEl   = document.getElementById('ml-logo-img');
-        const emojiEl     = document.getElementById('ml-emoji');
-        const lojaLocal   = LOJAS.find(l => l.nome === d.nome);
+        const logoImgEl = document.getElementById('ml-logo-img');
+        const emojiEl   = document.getElementById('ml-emoji');
 
-        if (isPago && d.logo) {
-          if (logoImgEl) { logoImgEl.src = d.logo; logoImgEl.style.display = ''; }
+        if (isPago && logoUrl) {
+          if (logoImgEl) { logoImgEl.src = logoUrl; logoImgEl.style.display = ''; }
           if (emojiEl)   emojiEl.style.display = 'none';
         } else {
           if (logoImgEl) logoImgEl.style.display = 'none';

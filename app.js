@@ -1394,8 +1394,25 @@
         const anuncioSection = document.getElementById('ml-anuncio-section');
         if (anuncioSection) {
           anuncioSection.style.display = isPro ? '' : 'none';
-          if (isPro && metJson.status === 'ok' && metJson.data.anuncio) {
-            mlExibirAnuncioAtivo(metJson.data.anuncio);
+          if (isPro && metJson.status === 'ok') {
+            if (metJson.data.anuncio) {
+              // API retornou anúncio — usa ele (fonte da verdade)
+              mlExibirAnuncioAtivo(metJson.data.anuncio);
+            } else {
+              // API não retornou anúncio — tenta usar o cache local
+              try {
+                const cache = sessionStorage.getItem('angatuba_anuncio');
+                if (cache) {
+                  const obj = JSON.parse(cache);
+                  if (obj.expira && new Date(obj.expira) > new Date()) {
+                    mlExibirAnuncioAtivo(obj);
+                  } else {
+                    sessionStorage.removeItem('angatuba_anuncio');
+                    document.getElementById('ml-anuncio-ativo').style.display = 'none';
+                  }
+                }
+              } catch(e) {}
+            }
           }
         }
 

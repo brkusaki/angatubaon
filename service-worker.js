@@ -1,4 +1,4 @@
-const CACHE = 'angatubaon-v5';
+const CACHE = 'angatubaon-v6';
 const STATIC = [
   '/',
   '/index.html',
@@ -6,6 +6,7 @@ const STATIC = [
   '/styles.css',
   '/app.js',
 ];
+
 // Instala e cacheia arquivos estáticos
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -13,6 +14,7 @@ self.addEventListener('install', e => {
   );
   self.skipWaiting();
 });
+
 // Remove caches antigos
 self.addEventListener('activate', e => {
   e.waitUntil(
@@ -22,22 +24,36 @@ self.addEventListener('activate', e => {
   );
   self.clients.claim();
 });
-// Fetch: HTML sempre da rede, resto do cache; fallback offline.html
+
+// Fetch: HTML sempre da rede (garante versão nova),
+// JS/CSS: rede primeiro, fallback cache (stale-while-revalidate)
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  // Não intercepta chamadas externas (Apps Script, etc.)
   if (!e.request.url.startsWith(self.location.origin)) return;
+
+  const url = new URL(e.request.url);
   const isHTML = e.request.destination === 'document';
-  e.respondWith(
-    isHTML
-      ? fetch(e.request)
-          .then(r => {
+  const isAsset = /\.(js|css)$/.test(url.pathname);
+
+  if (isHTML || isAsset) {
+    // Sempre tenta a rede primeiro; atualiza o cache em background
+    e.respondWith(
+      fetch(e.request)
+        .then(r => {
+          if (r && r.status === 200) {
             const clone = r.clone();
             caches.open(CACHE).then(c => c.put(e.request, clone));
-            return r;
-          })
-          .catch(() => caches.match(e.request).then(r => r || caches.match('/offline.html')))
-      : caches.match(e.request)
-          .then(r => r || fetch(e.request))
-  );
+          }
+          return r;
+        })
+        .catch(() =>
+          caches.match(e.request).then(r => r || caches.match('/offline.html'))
+        )
+    );
+  } else {
+    // Outros recursos: cache primeiro, fallback rede
+    e.respondWith(
+      caches.match(e.request).then(r => r || fetch(e.request))
+    );
+  }
 });

@@ -1030,6 +1030,75 @@
       if (json.status === 'ok') {
         loginStep(2);
         document.getElementById('login-loja-sub').textContent = 'Código enviado! Confira seu WhatsApp.';
+
+        // ── Preenche card de identidade da loja ─────────────────
+        const infoLoja = json.data || {};
+        const cardEl = document.getElementById('login-loja-card');
+        if (cardEl) {
+          cardEl.style.display = '';
+
+          // Nome e ramo
+          const nomeEl = document.getElementById('login-loja-nome');
+          const ramoEl = document.getElementById('login-loja-ramo');
+          if (nomeEl) nomeEl.textContent = infoLoja.nome || '—';
+          if (ramoEl) ramoEl.textContent = infoLoja.ramo || '';
+
+          // Badge de plano
+          const badgeEl = document.getElementById('login-loja-badge');
+          if (badgeEl) {
+            const plano = (infoLoja.plano || 'GRATIS').toUpperCase();
+            if (plano === 'PRO') {
+              badgeEl.textContent = '⭐ PRO';
+              badgeEl.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
+              badgeEl.style.color = '#000';
+            } else if (plano === 'PLUS') {
+              badgeEl.textContent = '✦ PLUS';
+              badgeEl.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
+              badgeEl.style.color = '#fff';
+            } else {
+              badgeEl.textContent = 'GRÁTIS';
+              badgeEl.style.background = 'rgba(122,122,122,0.3)';
+              badgeEl.style.color = 'rgba(255,255,255,0.6)';
+            }
+          }
+
+          // Logo da loja
+          const logoImg   = document.getElementById('login-loja-logo-img');
+          const logoEmoji = document.getElementById('login-loja-logo-emoji');
+          if (logoImg && logoEmoji) {
+            if (infoLoja.logo) {
+              logoImg.src = infoLoja.logo;
+              logoImg.style.display = '';
+              logoEmoji.style.display = 'none';
+            } else {
+              logoImg.style.display = 'none';
+              logoEmoji.style.display = '';
+              // Tenta achar emoji na lista já carregada
+              const lojaLocal = LOJAS.find(l => l.nome === infoLoja.nome);
+              logoEmoji.textContent = lojaLocal?.emoji || '🏪';
+            }
+          }
+
+          // BG foto de capa (borrada)
+          const bgEl = document.getElementById('login-loja-bg');
+          if (bgEl) {
+            if (infoLoja.foto) {
+              bgEl.style.backgroundImage = `url('${infoLoja.foto}')`;
+              bgEl.style.display = '';
+            } else {
+              bgEl.style.display = 'none';
+            }
+          }
+
+          // Cor de fundo baseada em categoria quando não tem foto
+          const bgColorEl = document.getElementById('login-loja-bg-color');
+          if (bgColorEl) {
+            const cat = infoLoja.categoria || infoLoja.ramo || '';
+            const catBg = CAT_BG[cat] || 'rgba(99,102,241,0.15)';
+            bgColorEl.style.background = `linear-gradient(135deg,${catBg},rgba(13,13,13,0.9))`;
+          }
+        }
+
         setTimeout(() => document.getElementById('ll-codigo').focus(), 100);
       } else if (json.msg === 'WPP_NAO_ENCONTRADO') {
         alert('Número não encontrado. Verifique se o WhatsApp cadastrado está correto.\n\nSe ainda não tem cadastro, use "Cadastrar" para se registrar.');
@@ -1129,9 +1198,40 @@
         document.getElementById('ml-nome').textContent = d.nome;
         document.getElementById('ml-ramo').textContent = d.ramo || '—';
 
-        // Emoji da loja (se existir na lista carregada)
-        const lojaLocal = LOJAS.find(l => l.nome === d.nome);
-        document.getElementById('ml-emoji').textContent = lojaLocal?.emoji || '🏪';
+        // ── Hero: foto de capa ────────────────────────────────
+        const heroEl    = document.getElementById('ml-hero');
+        const heroImgEl = document.getElementById('ml-hero-img');
+        const plano     = d.plano || 'GRATIS';
+        const isPago    = plano !== 'GRATIS';
+
+        if (isPago && d.foto) {
+          // Plano pago com foto: exibe a capa
+          if (heroImgEl) { heroImgEl.src = d.foto; heroImgEl.style.display = ''; }
+          if (heroEl) heroEl.style.background = '#0d0d0d';
+        } else {
+          // Sem foto: usa gradiente por categoria
+          if (heroImgEl) heroImgEl.style.display = 'none';
+          const lojaLocal = LOJAS.find(l => l.nome === d.nome);
+          const cat = lojaLocal?.categoria || '';
+          const catBg = CAT_BG[cat] || 'rgba(99,102,241,0.12)';
+          if (heroEl) heroEl.style.background = `linear-gradient(135deg, ${catBg} 0%, #0d0d0d 100%)`;
+        }
+
+        // ── Logo / emoji ──────────────────────────────────────
+        const logoImgEl   = document.getElementById('ml-logo-img');
+        const emojiEl     = document.getElementById('ml-emoji');
+        const lojaLocal   = LOJAS.find(l => l.nome === d.nome);
+
+        if (isPago && d.logo) {
+          if (logoImgEl) { logoImgEl.src = d.logo; logoImgEl.style.display = ''; }
+          if (emojiEl)   emojiEl.style.display = 'none';
+        } else {
+          if (logoImgEl) logoImgEl.style.display = 'none';
+          if (emojiEl) {
+            emojiEl.style.display = '';
+            emojiEl.textContent = lojaLocal?.emoji || '🏪';
+          }
+        }
 
         // Status do cadastro
         const statusMap = { APROVADO: '✅ Loja publicada', PENDENTE: '⏳ Aguardando aprovação', REPROVADO: '❌ Reprovada' };
@@ -1140,7 +1240,6 @@
 
         // Badge de plano
         const planBadge = document.getElementById('ml-plan-badge');
-        const plano = d.plano || 'GRATIS';
         if (plano === 'PRO') {
           planBadge.textContent = '⭐ PRO';
           planBadge.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
@@ -1151,8 +1250,8 @@
           planBadge.style.color = '#fff';
         } else {
           planBadge.textContent = 'GRÁTIS';
-          planBadge.style.background = 'rgba(122,122,122,0.15)';
-          planBadge.style.color = 'var(--muted)';
+          planBadge.style.background = 'rgba(122,122,122,0.4)';
+          planBadge.style.color = 'rgba(255,255,255,0.7)';
         }
 
         // Toggle — marca o status atual
@@ -1163,28 +1262,34 @@
         upgradeCta.style.display = (plano === 'GRATIS') ? '' : 'none';
         if (plano === 'GRATIS') {
           const upgradeMsg = encodeURIComponent(`Olá! Sou dono da loja *${d.nome}* no AngatubaON e quero saber mais sobre os planos pagos!`);
-          document.getElementById('ml-upgrade-link').href = `https://wa.me/5515981125349?text=${upgradeMsg}`;
+          const upgradeUrl = `https://wa.me/5515981125349?text=${upgradeMsg}`;
+          document.getElementById('ml-upgrade-link').href = upgradeUrl;
+          const lockLink = document.getElementById('ml-lock-upgrade-link');
+          if (lockLink) lockLink.href = upgradeUrl;
         }
 
-        // Métricas
+        // ── Métricas ─────────────────────────────────────────
         if (metJson.status === 'ok') {
-          const isPago = plano !== 'GRATIS';
           const m = metJson.data.metricas || { total:0, wpp:0, tel:0, d7:0, d30:0 };
-          document.getElementById('ml-metricas-lock').style.display = isPago ? 'none' : '';
+          const lockEl = document.getElementById('ml-metricas-lock');
+
           if (isPago) {
+            // Plano pago: mostra tudo, esconde lock
+            if (lockEl) lockEl.style.display = 'none';
             document.getElementById('ml-m-7d').textContent    = m.d7   ?? 0;
             document.getElementById('ml-m-30d').textContent   = m.d30  ?? 0;
             document.getElementById('ml-m-total').textContent = m.total ?? 0;
             document.getElementById('ml-m-wpp').textContent   = m.wpp  ?? 0;
             document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
           } else {
-            // Grátis: mostra total mas bloqueia detalhes
-            document.getElementById('ml-m-7d').textContent    = '🔒';
-            document.getElementById('ml-m-30d').textContent   = '🔒';
+            // Grátis: coloca números falsos para o blur cobrir, ativa overlay lock
+            document.getElementById('ml-m-7d').textContent    = m.d7   ?? 0;
+            document.getElementById('ml-m-30d').textContent   = m.d30  ?? 0;
             document.getElementById('ml-m-total').textContent = m.total ?? 0;
-            document.getElementById('ml-m-wpp').textContent   = '🔒';
-            document.getElementById('ml-m-tel').textContent   = '🔒';
+            document.getElementById('ml-m-wpp').textContent   = m.wpp  ?? 0;
+            document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
             document.getElementById('ml-lock-total').textContent = m.total ?? 0;
+            if (lockEl) lockEl.style.display = '';
           }
         }
       }

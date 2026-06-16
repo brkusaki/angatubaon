@@ -667,6 +667,93 @@
           </a>
         </div>
 
+        <!-- ── Anúncio do Dia — só Pro ── -->
+        <div id="ml-anuncio-section" style="display:none;margin-bottom:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">
+              Anúncio do dia
+              <span style="font-size:9px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PRO</span>
+            </div>
+            <span id="ml-anuncio-timer" style="font-size:10px;color:var(--muted);"></span>
+          </div>
+          <!-- Preview do anúncio ativo -->
+          <div id="ml-anuncio-ativo" style="display:none;background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(245,158,11,0.03));border:1px solid rgba(245,158,11,0.25);border-radius:12px;padding:12px;margin-bottom:10px;">
+            <div style="display:flex;align-items:flex-start;gap:10px;">
+              <div style="font-size:1.4rem;" id="ml-anuncio-emoji-preview">🎯</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:12px;font-weight:700;color:var(--text);" id="ml-anuncio-texto-preview">—</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:3px;" id="ml-anuncio-validade-preview"></div>
+              </div>
+              <button onclick="mlRemoverAnuncio()" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:6px;border:1px solid rgba(255,68,68,0.3);">
+                Remover
+              </button>
+            </div>
+          </div>
+          <!-- Form para criar/editar anúncio -->
+          <div id="ml-anuncio-form" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Publique uma oferta ou aviso que aparece no card da sua loja por 24h</div>
+            <!-- Seletor de emoji -->
+            <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;" id="ml-anuncio-emojis">
+              <button class="anuncio-emoji-btn active" data-emoji="🎯" onclick="mlSelectEmoji(this)">🎯</button>
+              <button class="anuncio-emoji-btn" data-emoji="🔥" onclick="mlSelectEmoji(this)">🔥</button>
+              <button class="anuncio-emoji-btn" data-emoji="💥" onclick="mlSelectEmoji(this)">💥</button>
+              <button class="anuncio-emoji-btn" data-emoji="🏷️" onclick="mlSelectEmoji(this)">🏷️</button>
+              <button class="anuncio-emoji-btn" data-emoji="⚡" onclick="mlSelectEmoji(this)">⚡</button>
+              <button class="anuncio-emoji-btn" data-emoji="🎁" onclick="mlSelectEmoji(this)">🎁</button>
+              <button class="anuncio-emoji-btn" data-emoji="✂️" onclick="mlSelectEmoji(this)">✂️</button>
+              <button class="anuncio-emoji-btn" data-emoji="🚗" onclick="mlSelectEmoji(this)">🚗</button>
+            </div>
+            <textarea id="ml-anuncio-texto" maxlength="80" rows="2"
+              placeholder="Ex: Hoje 10% off em troca de óleo! Venha nos visitar."
+              style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+                     padding:10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;
+                     font-family:var(--font-b);line-height:1.5;"></textarea>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+              <span id="ml-anuncio-chars" style="font-size:10px;color:var(--muted);">0/80</span>
+              <button onclick="mlPublicarAnuncio()" id="ml-anuncio-btn"
+                style="padding:8px 16px;border-radius:8px;background:linear-gradient(135deg,#f59e0b,#d97706);
+                       color:#000;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;
+                       display:flex;align-items:center;gap:5px;">
+                <i class="fa fa-bullhorn"></i> Publicar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Upload de imagens — Plus e Pro ── -->
+        <div id="ml-upload-section" style="display:none;margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">
+            Imagens da loja
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <!-- Logo -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Logo / Avatar</div>
+              <div id="ml-up-logo-preview" style="width:52px;height:52px;border-radius:10px;background:var(--surface);border:1px dashed var(--border);margin:0 auto 8px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                <i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>
+              </div>
+              <label style="display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);font-size:10px;font-weight:700;cursor:pointer;color:var(--text);">
+                <i class="fa fa-upload" style="font-size:9px;"></i> Trocar
+                <input type="file" accept="image/*" id="ml-up-logo-file" style="display:none;" onchange="mlUploadImagem('logo',this)">
+              </label>
+              <div id="ml-up-logo-status" style="font-size:9px;color:var(--muted);margin-top:4px;min-height:14px;"></div>
+            </div>
+            <!-- Foto de capa -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Foto de Capa</div>
+              <div id="ml-up-foto-preview" style="width:52px;height:52px;border-radius:10px;background:var(--surface);border:1px dashed var(--border);margin:0 auto 8px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                <i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>
+              </div>
+              <label style="display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);font-size:10px;font-weight:700;cursor:pointer;color:var(--text);">
+                <i class="fa fa-upload" style="font-size:9px;"></i> Trocar
+                <input type="file" accept="image/*" id="ml-up-foto-file" style="display:none;" onchange="mlUploadImagem('foto',this)">
+              </label>
+              <div id="ml-up-foto-status" style="font-size:9px;color:var(--muted);margin-top:4px;min-height:14px;"></div>
+            </div>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:6px;text-align:center;">Máx 5MB por imagem · JPG, PNG ou WebP</div>
+        </div>
+
         <!-- Link de compartilhamento — Plus e Pro -->
         <div id="ml-share-section" style="display:none;margin-bottom:14px;">
           <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">

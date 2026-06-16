@@ -319,6 +319,11 @@
            <i class="fa fa-${isPago ? 'expand-alt' : 'info-circle'}" style="font-size:8px;"></i> Ver detalhes
          </span>`;
 
+    // Badge de anúncio do dia (só Pro com anúncio ativo)
+    const anuncioBadge = (isPro && loja.anuncio && loja.anuncio.texto)
+      ? `<div class="store-anuncio-badge"><span>${loja.anuncio.emoji || '🎯'}</span> ${escHTML(loja.anuncio.texto)}</div>`
+      : '';
+
     return `
       <div class="${cardClass}"
         data-status="${status}" data-category="${loja.categoria}" data-plano="${plano}"
@@ -331,6 +336,7 @@
           </div>
           <div class="store-sub">${escHTML(loja.sub)}</div>
           <div class="store-row">${badgeHTML(status, fechaStr)}${mapBtn}${ctTag}</div>
+          ${anuncioBadge}
           ${expandHint}
         </div>
         ${contatoHTML(loja, status)}
@@ -1357,13 +1363,47 @@
           if (isPago) mlMontarCompartilhamento(d.nome);
         }
 
+        // ── Upload de imagens (Plus e Pro) ───────────────────
+        const uploadSection = document.getElementById('ml-upload-section');
+        if (uploadSection) {
+          uploadSection.style.display = isPago ? '' : 'none';
+          if (isPago) {
+            // Pré-visualiza imagens já existentes
+            if (fotoUrl) mlSetPreviewUpload('foto', fotoUrl);
+            if (logoUrl) mlSetPreviewUpload('logo', logoUrl);
+          }
+        }
+
+        // ── Anúncio do dia (só Pro) ──────────────────────────
+        const isPro = plano === 'PRO';
+        const anuncioSection = document.getElementById('ml-anuncio-section');
+        if (anuncioSection) {
+          anuncioSection.style.display = isPro ? '' : 'none';
+          if (isPro && metJson.status === 'ok' && metJson.data.anuncio) {
+            mlExibirAnuncioAtivo(metJson.data.anuncio);
+          }
+        }
+
         // ── Métricas ─────────────────────────────────────────
         if (metJson.status === 'ok') {
           const m = metJson.data.metricas || { total:0, wpp:0, tel:0, d7:0, d30:0 };
           const lockEl = document.getElementById('ml-metricas-lock');
 
+          // Badge de novos cliques desde última visita
+          const ultimaVisita = parseInt(localStorage.getItem(`angatuba_ultima_visita_${_lojaToken?.slice(-8)}`) || '0');
+          const novos = metJson.data.novosCliques ?? 0;
+          const tituloMetricas = document.querySelector('#ml-metricas-wrap')?.previousElementSibling;
+          if (tituloMetricas && novos > 0) {
+            const existeBadge = tituloMetricas.querySelector('.ml-badge-novo');
+            if (!existeBadge) {
+              tituloMetricas.insertAdjacentHTML('beforeend',
+                `<span class="ml-badge-novo">+${novos} hoje</span>`);
+            }
+          }
+          // Salva timestamp da visita atual
+          localStorage.setItem(`angatuba_ultima_visita_${_lojaToken?.slice(-8)}`, Date.now().toString());
+
           if (isPago) {
-            // Plano pago: mostra tudo, esconde lock
             if (lockEl) lockEl.style.display = 'none';
             document.getElementById('ml-m-7d').textContent    = m.d7   ?? 0;
             document.getElementById('ml-m-30d').textContent   = m.d30  ?? 0;
@@ -1371,7 +1411,6 @@
             document.getElementById('ml-m-wpp').textContent   = m.wpp  ?? 0;
             document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
           } else {
-            // Grátis: coloca números para o blur cobrir, ativa overlay lock
             document.getElementById('ml-m-7d').textContent    = m.d7   ?? 0;
             document.getElementById('ml-m-30d').textContent   = m.d30  ?? 0;
             document.getElementById('ml-m-total').textContent = m.total ?? 0;
@@ -1383,11 +1422,9 @@
 
           // ── Horário de pico (só Pro) ──────────────────────
           const picoSection = document.getElementById('ml-pico-section');
-          const isPro = plano === 'PRO';
           if (picoSection) {
             picoSection.style.display = isPro ? '' : 'none';
             if (isPro && metJson.data.pico) {
-              // Aguarda um frame para o canvas ter dimensão real
               requestAnimationFrame(() => mlRenderizarPico(metJson.data.pico));
             }
           }
@@ -2456,5 +2493,176 @@
         const fmt = h => `${String(h).padStart(2,'0')}h`;
         destaqueEl.innerHTML = `🔥 Pico às <strong style="color:#f59e0b;">${fmt(idxPico)}–${fmt(idxPico+1)}</strong> · ${pico[idxPico]} clique${pico[idxPico]>1?'s':''}`;
       }
+    }
+  }
+  /* ══════════════════════════════════════════════════════════════
+     UPLOAD DE IMAGENS — painel Minha Loja
+  ══════════════════════════════════════════════════════════════ */
+  function mlSetPreviewUpload(tipo, url) {
+    const previewEl = document.getElementById(`ml-up-${tipo}-preview`);
+    if (!previewEl || !url) return;
+    previewEl.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;" onerror="this.parentElement.innerHTML='<i class=\\'fa fa-image\\' style=\\'color:var(--muted);font-size:1.2rem;\\'></i>'" />`;
+  }
+
+  async function mlUploadImagem(tipo, input) {
+    const file = input.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById(`ml-up-${tipo}-status`);
+    const previewEl = document.getElementById(`ml-up-${tipo}-preview`);
+
+    // Preview local imediato
+    const reader = new FileReader();
+    reader.onload = e => {
+      previewEl.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;" />`;
+    };
+    reader.readAsDataURL(file);
+
+    if (file.size > 5 * 1024 * 1024) {
+      statusEl.textContent = '❌ Máx 5MB';
+      statusEl.style.color = 'var(--red)';
+      return;
+    }
+
+    statusEl.textContent = '⏳ Enviando...';
+    statusEl.style.color = 'var(--muted)';
+
+    try {
+      const form = new FormData();
+      form.append('image', file);
+      form.append('key', IMGBB_KEY);
+      const resp = await fetch('https://api.imgbb.com/1/upload', { method:'POST', body:form });
+      const json = await resp.json();
+      if (!json.success) throw new Error(json.error?.message || 'Falha');
+
+      const url = json.data.url;
+      statusEl.textContent = '✅ Salvo!';
+      statusEl.style.color = 'var(--green)';
+
+      // Envia URL para o servidor salvar na planilha
+      const campo = tipo === 'logo' ? 'logoUrl' : 'fotoUrl';
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({
+        action: 'lojaAtualizarImagem',
+        token:  _lojaToken,
+        campo,
+        url,
+      }));
+      await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
+
+      // Atualiza hero/logo no painel imediatamente
+      if (tipo === 'foto') {
+        const heroImg = document.getElementById('ml-hero-img');
+        if (heroImg) { heroImg.src = url; heroImg.style.display = ''; }
+      } else {
+        const logoImg = document.getElementById('ml-logo-img');
+        const emojiEl = document.getElementById('ml-emoji');
+        if (logoImg) { logoImg.src = url; logoImg.style.display = ''; }
+        if (emojiEl) emojiEl.style.display = 'none';
+      }
+
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    } catch(e) {
+      statusEl.textContent = '❌ Erro: ' + e.message;
+      statusEl.style.color = 'var(--red)';
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     ANÚNCIO DO DIA — painel Minha Loja
+  ══════════════════════════════════════════════════════════════ */
+  let _anuncioEmojiSelecionado = '🎯';
+
+  function mlSelectEmoji(btn) {
+    document.querySelectorAll('.anuncio-emoji-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _anuncioEmojiSelecionado = btn.dataset.emoji;
+  }
+
+  // Contador de caracteres
+  document.getElementById('ml-anuncio-texto')?.addEventListener('input', function() {
+    const charEl = document.getElementById('ml-anuncio-chars');
+    if (charEl) charEl.textContent = `${this.value.length}/80`;
+  });
+
+  function mlExibirAnuncioAtivo(anuncio) {
+    if (!anuncio || !anuncio.texto) return;
+    const ativoEl = document.getElementById('ml-anuncio-ativo');
+    if (!ativoEl) return;
+    ativoEl.style.display = '';
+    document.getElementById('ml-anuncio-emoji-preview').textContent = anuncio.emoji || '🎯';
+    document.getElementById('ml-anuncio-texto-preview').textContent = anuncio.texto;
+
+    // Timer de expiração
+    const timerEl = document.getElementById('ml-anuncio-timer');
+    if (timerEl && anuncio.expira) {
+      const restante = new Date(anuncio.expira) - new Date();
+      if (restante > 0) {
+        const h = Math.floor(restante / 3600000);
+        const m = Math.floor((restante % 3600000) / 60000);
+        timerEl.textContent = `Expira em ${h}h ${m}m`;
+      } else {
+        timerEl.textContent = 'Expirado';
+        ativoEl.style.display = 'none';
+      }
+    }
+
+    // Preenche o texto no campo para edição
+    const textarea = document.getElementById('ml-anuncio-texto');
+    if (textarea) {
+      textarea.value = anuncio.texto;
+      document.getElementById('ml-anuncio-chars').textContent = `${anuncio.texto.length}/80`;
+    }
+    const emojiBtn = document.querySelector(`.anuncio-emoji-btn[data-emoji="${anuncio.emoji}"]`);
+    if (emojiBtn) mlSelectEmoji(emojiBtn);
+  }
+
+  async function mlPublicarAnuncio() {
+    const texto = document.getElementById('ml-anuncio-texto')?.value.trim();
+    if (!texto) { alert('Escreva o texto do anúncio.'); return; }
+
+    const btn = document.getElementById('ml-anuncio-btn');
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Publicando...';
+    btn.disabled = true;
+
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({
+        action: 'lojaPublicarAnuncio',
+        token:  _lojaToken,
+        emoji:  _anuncioEmojiSelecionado,
+        texto,
+      }));
+      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      const json = await resp.json();
+
+      if (json.status === 'ok') {
+        mlExibirAnuncioAtivo({ emoji: _anuncioEmojiSelecionado, texto, expira: json.data?.expira });
+        btn.innerHTML = '<i class="fa fa-check"></i> Publicado!';
+        setTimeout(() => {
+          btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
+          btn.disabled = false;
+        }, 2000);
+      } else {
+        throw new Error(json.msg || 'Erro');
+      }
+    } catch(e) {
+      alert('Erro ao publicar: ' + e.message);
+      btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
+      btn.disabled = false;
+    }
+  }
+
+  async function mlRemoverAnuncio() {
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action:'lojaRemoverAnuncio', token:_lojaToken }));
+      await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
+      document.getElementById('ml-anuncio-ativo').style.display = 'none';
+      document.getElementById('ml-anuncio-timer').textContent = '';
+      const textarea = document.getElementById('ml-anuncio-texto');
+      if (textarea) { textarea.value = ''; }
+      document.getElementById('ml-anuncio-chars').textContent = '0/80';
+    } catch(e) {
+      console.warn('[Anuncio] Erro ao remover:', e.message);
     }
   }

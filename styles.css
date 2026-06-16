@@ -1232,3 +1232,40 @@
       height: 1px; background: var(--border);
       margin: 16px 20px;
     }
+    /* ════════════════════════════════════════════
+       PAINEL MINHA LOJA — NOVOS COMPONENTES
+    ════════════════════════════════════════════ */
+
+    /* Badge de novos cliques */
+    .ml-badge-novo {
+      display:inline-flex;align-items:center;gap:4px;
+      background:rgba(0,208,132,0.12);border:1px solid rgba(0,208,132,0.25);
+      color:var(--green);font-size:10px;font-weight:700;
+      padding:3px 8px;border-radius:20px;margin-left:6px;
+      animation: pulse-badge 2s ease infinite;
+    }
+    @keyframes pulse-badge {
+      0%,100% { opacity:1; } 50% { opacity:0.65; }
+    }
+
+    /* Botões de emoji do anúncio */
+    .anuncio-emoji-btn {
+      width:32px;height:32px;border-radius:8px;font-size:1rem;
+      background:var(--surface);border:1.5px solid var(--border);
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+      transition:border-color 0.15s,background 0.15s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .anuncio-emoji-btn.active {
+      border-color:var(--zap);background:rgba(245,158,11,0.1);
+    }
+    .anuncio-emoji-btn:active { transform:scale(0.9); }
+
+    /* Badge anúncio no card da loja (lista principal) */
+    .store-anuncio-badge {
+      display:flex;align-items:center;gap:5px;
+      font-size:10px;font-weight:600;color:var(--zap);
+      background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);
+      border-radius:6px;padding:3px 7px;margin-top:4px;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;
+    }

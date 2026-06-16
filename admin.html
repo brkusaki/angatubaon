@@ -390,33 +390,102 @@
 'use strict';
 
 /* ══ CONFIG ══════════════════════════════════════════════════ */
-const ADMIN_PASS      = 'angatuba2025';   // ← MUDE AQUI
+// Sem senha aqui — autenticação é feita no servidor (Apps Script).
+// O HTML só envia o SHA-256 da senha; o servidor valida e devolve um token.
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwmJMmvb5H6KkMWdXJV441SQ2h18SEfLrb_4-kvUYM0IiVL6Co-EKGGay7f_qvUEi0_cg/exec';
 const ADMIN_WPP       = '5515981125349';
 
+// Token de sessão — salvo na memória da página (não no localStorage)
+let _sessionToken = null;
+
+/* ══ CRYPTO: SHA-256 via Web Crypto API ═══════════════════════ */
+async function sha256(text) {
+  const encoder = new TextEncoder();
+  const data    = encoder.encode(text);
+  const hashBuf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuf))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 /* ══ LOGIN ════════════════════════════════════════════════════ */
-function doLogin() {
-  const val = document.getElementById('login-pass').value.trim();
-  if (val === ADMIN_PASS) {
-    sessionStorage.setItem('angatuba_admin', '1');
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('admin-panel').style.display  = 'block';
-    loadData();
-  } else {
-    document.getElementById('login-err').style.display = 'block';
-    document.getElementById('login-pass').value = '';
+async function doLogin() {
+  const passInput = document.getElementById('login-pass');
+  const errEl     = document.getElementById('login-err');
+  const loginBtn  = document.querySelector('.login-btn');
+  const val = passInput.value.trim();
+  if (!val) return;
+
+  loginBtn.textContent = 'Verificando...';
+  loginBtn.disabled    = true;
+  errEl.style.display  = 'none';
+
+  try {
+    const passHash = await sha256(val);
+    const params   = new URLSearchParams();
+    params.append('payload', JSON.stringify({ action: 'login', passHash }));
+
+    const resp = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body:   params,
+      signal: AbortSignal.timeout(15000),
+    });
+    const json = await resp.json();
+
+    if (json.status === 'ok' && json.data && json.data.token) {
+      _sessionToken = json.data.token;
+      sessionStorage.setItem('angatuba_token', _sessionToken);
+      mostrarPainel();
+    } else {
+      errEl.textContent   = 'Senha incorreta.';
+      errEl.style.display = 'block';
+      passInput.value     = '';
+    }
+  } catch(e) {
+    errEl.textContent   = 'Erro de conexão. Tente novamente.';
+    errEl.style.display = 'block';
+  } finally {
+    loginBtn.textContent = 'Entrar';
+    loginBtn.disabled    = false;
+    passInput.focus();
   }
 }
 
-function doLogout() {
-  sessionStorage.removeItem('angatuba_admin');
+function mostrarPainel() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-panel').style.display  = 'block';
+  loadData();
+}
+
+async function doLogout() {
+  // Invalida o token no servidor (fire-and-forget)
+  if (_sessionToken) {
+    const params = new URLSearchParams();
+    params.append('payload', JSON.stringify({ action: 'logout', token: _sessionToken }));
+    fetch(APPS_SCRIPT_URL, { method: 'POST', body: params }).catch(() => {});
+  }
+  _sessionToken = null;
+  sessionStorage.removeItem('angatuba_token');
   location.reload();
 }
 
-// Auto-login se sessão ativa
-if (sessionStorage.getItem('angatuba_admin')) {
+// Restaura sessão se token ainda existe na sessionStorage
+const _storedToken = sessionStorage.getItem('angatuba_token');
+if (_storedToken) {
+  _sessionToken = _storedToken;
+  // Mostra painel imediatamente; se o token expirou, loadData() vai detectar e forçar logout
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('admin-panel').style.display  = 'block';
+}
+
+// Intercepta respostas UNAUTHORIZED e força logout automático
+function handleUnauthorized() {
+  toast('⚠️ Sessão expirada. Faça login novamente.', true);
+  setTimeout(() => {
+    _sessionToken = null;
+    sessionStorage.removeItem('angatuba_token');
+    location.reload();
+  }, 2000);
 }
 
 /* ══ TABS ═════════════════════════════════════════════════════ */
@@ -433,8 +502,14 @@ let allRows = [];
 
 async function loadData() {
   try {
-    const resp = await fetch(APPS_SCRIPT_URL + '?action=admin', { signal: AbortSignal.timeout(12000) });
+    const resp = await fetch(
+      `${APPS_SCRIPT_URL}?action=admin&token=${encodeURIComponent(_sessionToken || '')}`,
+      { signal: AbortSignal.timeout(12000) }
+    );
     const json = await resp.json();
+    if (json.status === 'erro' && json.msg === 'UNAUTHORIZED') {
+      handleUnauthorized(); return;
+    }
     if (json.status === 'ok' && Array.isArray(json.data)) {
       allRows = json.data;
       renderAll();
@@ -573,25 +648,37 @@ async function updateStatus(row, newStatus, btn) {
   btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
   try {
     const params = new URLSearchParams();
-    params.append('payload', JSON.stringify({ action: 'updateStatus', row, status: newStatus }));
-    await fetch(APPS_SCRIPT_URL, { method:'POST', mode:'no-cors', body: params });
+    params.append('payload', JSON.stringify({
+      action: 'updateStatus', row, status: newStatus, token: _sessionToken
+    }));
+    const resp = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST', body: params, signal: AbortSignal.timeout(15000)
+    });
+    const json = await resp.json();
+
+    if (json.status === 'erro' && json.msg === 'UNAUTHORIZED') {
+      handleUnauthorized(); return;
+    }
+    if (json.status !== 'ok') throw new Error(json.msg || 'Erro desconhecido');
+
     toast('✅ Status atualizado para ' + newStatus);
-    // Atualiza localmente sem recarregar tudo
     const r = allRows.find(x => x.row === row);
     if (r) r.status = newStatus;
     renderAll();
   } catch(e) {
-    toast('❌ Erro ao atualizar. Tente novamente.', true);
+    toast('❌ Erro ao atualizar: ' + e.message, true);
     btn.disabled = false;
+    btn.innerHTML = '<i class="fa fa-check"></i> Aprovar';
   }
 }
 
 async function savePlan(row) {
   const plano    = document.getElementById('ps-' + row).value;
   const validade = document.getElementById('pd-' + row).value;
-
-  // Converte ISO (YYYY-MM-DD) para BR (DD/MM/AAAA)
   const validadeBR = validade ? validade.split('-').reverse().join('/') : '';
+
+  const saveBtn = document.querySelector(`#plan-card-${row} .btn-save-plan`);
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>'; }
 
   try {
     const params = new URLSearchParams();
@@ -599,13 +686,25 @@ async function savePlan(row) {
       action: 'updatePlan', row, plano,
       planoValidade: validadeBR,
       planoPago: plano !== 'GRATIS' ? 'SIM' : 'NÃO',
+      token: _sessionToken,
     }));
-    await fetch(APPS_SCRIPT_URL, { method:'POST', mode:'no-cors', body: params });
+    const resp = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST', body: params, signal: AbortSignal.timeout(15000)
+    });
+    const json = await resp.json();
+
+    if (json.status === 'erro' && json.msg === 'UNAUTHORIZED') {
+      handleUnauthorized(); return;
+    }
+    if (json.status !== 'ok') throw new Error(json.msg || 'Erro desconhecido');
+
     toast(`✅ Plano ${plano} salvo${validadeBR ? ' até ' + validadeBR : ' (vitalício)'}`);
     const r = allRows.find(x => x.row === row);
     if (r) { r.plano = plano; r.planoValidade = validadeBR; }
   } catch(e) {
-    toast('❌ Erro ao salvar plano.', true);
+    toast('❌ Erro ao salvar plano: ' + e.message, true);
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa fa-save"></i> Salvar'; }
   }
 }
 
@@ -643,13 +742,19 @@ function toast(msg, isErr = false) {
 const PLAN_COLOR = { PRO: '#f59e0b', PLUS: '#6366f1', GRATIS: '#7a7a7a' };
 
 async function loadMetricas() {
-  const tableEl = document.getElementById('metric-table');
+  const tableEl  = document.getElementById('metric-table');
   const periodEl = document.getElementById('metric-period');
   tableEl.innerHTML = '<div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>';
 
   try {
-    const resp = await fetch(APPS_SCRIPT_URL + '?action=metricas', { signal: AbortSignal.timeout(12000) });
+    const resp = await fetch(
+      `${APPS_SCRIPT_URL}?action=metricas&token=${encodeURIComponent(_sessionToken || '')}`,
+      { signal: AbortSignal.timeout(12000) }
+    );
     const json = await resp.json();
+    if (json.status === 'erro' && json.msg === 'UNAUTHORIZED') {
+      handleUnauthorized(); return;
+    }
     if (json.status !== 'ok' || !Array.isArray(json.data)) throw new Error('Resposta inválida');
 
     const data = json.data; // já vem ordenado por total desc
@@ -712,7 +817,7 @@ async function loadMetricas() {
 // Carrega métricas quando a aba é ativada — integrado ao switchTab original acima
 
 /* ══ INIT ═════════════════════════════════════════════════════ */
-if (sessionStorage.getItem('angatuba_admin')) loadData();
+if (_storedToken) loadData();
 </script>
 </body>
 </html>

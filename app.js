@@ -1255,6 +1255,172 @@
   }
 
   /* ── Painel Minha Loja ─────────────────────────────────────── */
+  // Aplica dados de lojaDados no painel (usado tanto pelo cache quanto pela API)
+  function _aplicarDadosLoja(d, metJson) {
+    _lojaNome = d.nome;
+    localStorage.setItem('angatuba_loja_nome', _lojaNome);
+
+    document.getElementById('ml-nome').textContent = d.nome;
+    document.getElementById('ml-ramo').textContent = d.ramo || '—';
+
+    // ── Hero: foto de capa ────────────────────────────────
+    const heroEl    = document.getElementById('ml-hero');
+    const heroImgEl = document.getElementById('ml-hero-img');
+    const plano     = d.plano || 'GRATIS';
+    const isPago    = plano !== 'GRATIS';
+
+    // Usa foto/logo do lojaDados; fallback na lista LOJAS já carregada
+    const lojaLocal = LOJAS.find(l => l.nome === d.nome);
+    const fotoUrl   = d.foto  || lojaLocal?.foto  || '';
+    const logoUrl   = d.logo  || lojaLocal?.logo  || '';
+
+    if (isPago && fotoUrl) {
+      if (heroImgEl) { heroImgEl.src = fotoUrl; heroImgEl.style.display = ''; }
+      if (heroEl) heroEl.style.background = '#0d0d0d';
+    } else {
+      if (heroImgEl) heroImgEl.style.display = 'none';
+      const cat   = lojaLocal?.categoria || '';
+      const catBg = CAT_BG[cat] || 'rgba(99,102,241,0.12)';
+      if (heroEl) heroEl.style.background = `linear-gradient(135deg, ${catBg} 0%, #0d0d0d 100%)`;
+    }
+
+    // ── Logo / emoji ──────────────────────────────────────
+    const logoImgEl = document.getElementById('ml-logo-img');
+    const emojiEl   = document.getElementById('ml-emoji');
+
+    if (isPago && logoUrl) {
+      if (logoImgEl) { logoImgEl.src = logoUrl; logoImgEl.style.display = ''; }
+      if (emojiEl)   emojiEl.style.display = 'none';
+    } else {
+      if (logoImgEl) logoImgEl.style.display = 'none';
+      if (emojiEl) {
+        emojiEl.style.display = '';
+        emojiEl.textContent = lojaLocal?.emoji || '🏪';
+      }
+    }
+
+    // Status do cadastro
+    const statusMap = { APROVADO: '✅ Loja publicada', PENDENTE: '⏳ Aguardando aprovação', REPROVADO: '❌ Reprovada' };
+    document.getElementById('ml-status-cadastro').textContent = statusMap[d.statusCadastro] || d.statusCadastro;
+    document.getElementById('ml-status-icon').style.color = d.statusCadastro === 'APROVADO' ? 'var(--green)' : 'var(--zap)';
+
+    // Badge de plano
+    const planBadge = document.getElementById('ml-plan-badge');
+    if (plano === 'PRO') {
+      planBadge.textContent = '⭐ PRO';
+      planBadge.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
+      planBadge.style.color = '#000';
+    } else if (plano === 'PLUS') {
+      planBadge.textContent = '✦ PLUS';
+      planBadge.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
+      planBadge.style.color = '#fff';
+    } else {
+      planBadge.textContent = 'GRÁTIS';
+      planBadge.style.background = 'rgba(122,122,122,0.4)';
+      planBadge.style.color = 'rgba(255,255,255,0.7)';
+    }
+
+    // Toggle — marca o status atual
+    marcarToggle(d.statusLoja || '');
+
+    // CTA upgrade
+    const upgradeCta = document.getElementById('ml-upgrade-cta');
+    upgradeCta.style.display = (plano === 'GRATIS') ? '' : 'none';
+    if (plano === 'GRATIS') {
+      const upgradeMsg = encodeURIComponent(`Olá! Sou dono da loja *${d.nome}* no AngatubaON e quero saber mais sobre os planos pagos!`);
+      const upgradeUrl = `https://wa.me/5515981125349?text=${upgradeMsg}`;
+      document.getElementById('ml-upgrade-link').href = upgradeUrl;
+      const lockLink = document.getElementById('ml-lock-upgrade-link');
+      if (lockLink) lockLink.href = upgradeUrl;
+    }
+
+    // ── Link de compartilhamento (Plus e Pro) ────────────
+    const shareSection = document.getElementById('ml-share-section');
+    if (shareSection) {
+      shareSection.style.display = isPago ? '' : 'none';
+      if (isPago) mlMontarCompartilhamento(d.nome);
+    }
+
+    // ── Upload de imagens (Plus e Pro) ───────────────────
+    const uploadSection = document.getElementById('ml-upload-section');
+    if (uploadSection) {
+      uploadSection.style.display = isPago ? '' : 'none';
+      if (isPago) {
+        if (fotoUrl) mlSetPreviewUpload('foto', fotoUrl);
+        if (logoUrl) mlSetPreviewUpload('logo', logoUrl);
+      }
+    }
+
+    // ── Anúncio do dia (só Pro) ──────────────────────────
+    const isPro = plano === 'PRO';
+    const anuncioSection = document.getElementById('ml-anuncio-section');
+    if (anuncioSection) {
+      anuncioSection.style.display = isPro ? '' : 'none';
+      if (isPro && metJson && metJson.status === 'ok') {
+        if (metJson.data.anuncio) {
+          mlExibirAnuncioAtivo(metJson.data.anuncio);
+        } else {
+          try {
+            const cache = localStorage.getItem('angatuba_anuncio');
+            if (cache) {
+              const obj = JSON.parse(cache);
+              if (obj.expira && new Date(obj.expira) > new Date()) {
+                mlExibirAnuncioAtivo(obj);
+              } else {
+                localStorage.removeItem('angatuba_anuncio');
+                document.getElementById('ml-anuncio-ativo').style.display = 'none';
+              }
+            }
+          } catch(e) {}
+        }
+      }
+    }
+
+    // ── Métricas ─────────────────────────────────────────
+    if (metJson && metJson.status === 'ok') {
+      const m = metJson.data.metricas || { total:0, wpp:0, tel:0, d7:0, d30:0 };
+      const lockEl = document.getElementById('ml-metricas-lock');
+
+      // Badge de novos cliques desde última visita
+      const novos = metJson.data.novosCliques ?? 0;
+      const tituloMetricas = document.querySelector('#ml-metricas-wrap')?.previousElementSibling;
+      if (tituloMetricas && novos > 0) {
+        const existeBadge = tituloMetricas.querySelector('.ml-badge-novo');
+        if (!existeBadge) {
+          tituloMetricas.insertAdjacentHTML('beforeend',
+            `<span class="ml-badge-novo">+${novos} hoje</span>`);
+        }
+      }
+      localStorage.setItem(`angatuba_ultima_visita_${_lojaToken?.slice(-8)}`, Date.now().toString());
+
+      if (isPago) {
+        if (lockEl) lockEl.style.display = 'none';
+        document.getElementById('ml-m-7d').textContent    = m.d7   ?? 0;
+        document.getElementById('ml-m-30d').textContent   = m.d30  ?? 0;
+        document.getElementById('ml-m-total').textContent = m.total ?? 0;
+        document.getElementById('ml-m-wpp').textContent   = m.wpp  ?? 0;
+        document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
+      } else {
+        document.getElementById('ml-m-7d').textContent    = m.d7   ?? 0;
+        document.getElementById('ml-m-30d').textContent   = m.d30  ?? 0;
+        document.getElementById('ml-m-total').textContent = m.total ?? 0;
+        document.getElementById('ml-m-wpp').textContent   = m.wpp  ?? 0;
+        document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
+        document.getElementById('ml-lock-total').textContent = m.total ?? 0;
+        if (lockEl) lockEl.style.display = '';
+      }
+
+      // ── Horário de pico (só Pro) ──────────────────────
+      const picoSection = document.getElementById('ml-pico-section');
+      if (picoSection) {
+        picoSection.style.display = isPro ? '' : 'none';
+        if (isPro && metJson.data.pico) {
+          requestAnimationFrame(() => mlRenderizarPico(metJson.data.pico));
+        }
+      }
+    }
+  }
+
   async function abrirMinhaLoja() {
     if (!_lojaToken) { openLoginLoja(); return; }
 
@@ -1262,32 +1428,41 @@
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
 
-    // Preenche com dados básicos enquanto carrega
-    document.getElementById('ml-nome').textContent = _lojaNome || 'Carregando...';
-    document.getElementById('ml-ramo').textContent = '—';
-    document.getElementById('ml-m-7d').textContent  = '—';
-    document.getElementById('ml-m-30d').textContent = '—';
-    document.getElementById('ml-m-total').textContent = '—';
-    document.getElementById('ml-m-wpp').textContent = '—';
-    document.getElementById('ml-m-tel').textContent = '—';
+    // ── Abre instantaneamente com cache do localStorage ───────
+    const dadosCache = (() => {
+      try { return JSON.parse(localStorage.getItem('angatuba_loja_dados') || 'null'); } catch(e) { return null; }
+    })();
 
-    // Restaura anúncio do sessionStorage enquanto API carrega
-    try {
-      const anuncioCache = localStorage.getItem('angatuba_anuncio');
-      if (anuncioCache) {
-        const obj = JSON.parse(anuncioCache);
-        if (obj.expira && new Date(obj.expira) > new Date()) {
-          const anuncioSection = document.getElementById('ml-anuncio-section');
-          if (anuncioSection) anuncioSection.style.display = '';
-          mlExibirAnuncioAtivo(obj);
-        } else {
-          localStorage.removeItem('angatuba_anuncio');
+    if (dadosCache) {
+      // Painel visível imediatamente com dados do cache
+      _aplicarDadosLoja(dadosCache, null);
+      // Restaura anúncio do cache local
+      try {
+        const anuncioCache = localStorage.getItem('angatuba_anuncio');
+        if (anuncioCache) {
+          const obj = JSON.parse(anuncioCache);
+          if (obj.expira && new Date(obj.expira) > new Date()) {
+            const anuncioSection = document.getElementById('ml-anuncio-section');
+            if (anuncioSection) anuncioSection.style.display = '';
+            mlExibirAnuncioAtivo(obj);
+          } else {
+            localStorage.removeItem('angatuba_anuncio');
+          }
         }
-      }
-    } catch(e) {}
+      } catch(e) {}
+    } else {
+      // Sem cache: placeholders mínimos
+      document.getElementById('ml-nome').textContent = _lojaNome || '...';
+      document.getElementById('ml-ramo').textContent = '—';
+      document.getElementById('ml-m-7d').textContent  = '—';
+      document.getElementById('ml-m-30d').textContent = '—';
+      document.getElementById('ml-m-total').textContent = '—';
+      document.getElementById('ml-m-wpp').textContent = '—';
+      document.getElementById('ml-m-tel').textContent = '—';
+    }
 
+    // ── Busca dados frescos em background ─────────────────────
     try {
-      // Carrega dados da loja e métricas em paralelo
       const [dadosResp, metResp] = await Promise.all([
         fetch(`${APPS_SCRIPT_URL}?action=lojaDados&token=${encodeURIComponent(_lojaToken)}`, { signal: AbortSignal.timeout(10000) }),
         fetch(`${APPS_SCRIPT_URL}?action=lojaMetricas&token=${encodeURIComponent(_lojaToken)}`, { signal: AbortSignal.timeout(10000) }),
@@ -1302,179 +1477,13 @@
       }
 
       if (dadosJson.status === 'ok') {
-        const d = dadosJson.data;
-        _lojaNome = d.nome;
-        localStorage.setItem('angatuba_loja_nome', _lojaNome);
+        // Salva cache para próxima abertura ser instantânea
+        try { localStorage.setItem('angatuba_loja_dados', JSON.stringify(dadosJson.data)); } catch(e) {}
 
-        document.getElementById('ml-nome').textContent = d.nome;
-        document.getElementById('ml-ramo').textContent = d.ramo || '—';
-
-        // ── Hero: foto de capa ────────────────────────────────
-        const heroEl    = document.getElementById('ml-hero');
-        const heroImgEl = document.getElementById('ml-hero-img');
-        const plano     = d.plano || 'GRATIS';
-        const isPago    = plano !== 'GRATIS';
-
-        // Usa foto/logo do lojaDados; fallback na lista LOJAS já carregada
-        const lojaLocal = LOJAS.find(l => l.nome === d.nome);
-        const fotoUrl   = d.foto  || lojaLocal?.foto  || '';
-        const logoUrl   = d.logo  || lojaLocal?.logo  || '';
-
-        if (isPago && fotoUrl) {
-          // Plano pago com foto: exibe a capa
-          if (heroImgEl) { heroImgEl.src = fotoUrl; heroImgEl.style.display = ''; }
-          if (heroEl) heroEl.style.background = '#0d0d0d';
-        } else {
-          // Sem foto: usa gradiente por categoria
-          if (heroImgEl) heroImgEl.style.display = 'none';
-          const cat   = lojaLocal?.categoria || '';
-          const catBg = CAT_BG[cat] || 'rgba(99,102,241,0.12)';
-          if (heroEl) heroEl.style.background = `linear-gradient(135deg, ${catBg} 0%, #0d0d0d 100%)`;
-        }
-
-        // ── Logo / emoji ──────────────────────────────────────
-        const logoImgEl = document.getElementById('ml-logo-img');
-        const emojiEl   = document.getElementById('ml-emoji');
-
-        if (isPago && logoUrl) {
-          if (logoImgEl) { logoImgEl.src = logoUrl; logoImgEl.style.display = ''; }
-          if (emojiEl)   emojiEl.style.display = 'none';
-        } else {
-          if (logoImgEl) logoImgEl.style.display = 'none';
-          if (emojiEl) {
-            emojiEl.style.display = '';
-            emojiEl.textContent = lojaLocal?.emoji || '🏪';
-          }
-        }
-
-        // Status do cadastro
-        const statusMap = { APROVADO: '✅ Loja publicada', PENDENTE: '⏳ Aguardando aprovação', REPROVADO: '❌ Reprovada' };
-        document.getElementById('ml-status-cadastro').textContent = statusMap[d.statusCadastro] || d.statusCadastro;
-        document.getElementById('ml-status-icon').style.color = d.statusCadastro === 'APROVADO' ? 'var(--green)' : 'var(--zap)';
-
-        // Badge de plano
-        const planBadge = document.getElementById('ml-plan-badge');
-        if (plano === 'PRO') {
-          planBadge.textContent = '⭐ PRO';
-          planBadge.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
-          planBadge.style.color = '#000';
-        } else if (plano === 'PLUS') {
-          planBadge.textContent = '✦ PLUS';
-          planBadge.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
-          planBadge.style.color = '#fff';
-        } else {
-          planBadge.textContent = 'GRÁTIS';
-          planBadge.style.background = 'rgba(122,122,122,0.4)';
-          planBadge.style.color = 'rgba(255,255,255,0.7)';
-        }
-
-        // Toggle — marca o status atual
-        marcarToggle(d.statusLoja || '');
-
-        // CTA upgrade
-        const upgradeCta = document.getElementById('ml-upgrade-cta');
-        upgradeCta.style.display = (plano === 'GRATIS') ? '' : 'none';
-        if (plano === 'GRATIS') {
-          const upgradeMsg = encodeURIComponent(`Olá! Sou dono da loja *${d.nome}* no AngatubaON e quero saber mais sobre os planos pagos!`);
-          const upgradeUrl = `https://wa.me/5515981125349?text=${upgradeMsg}`;
-          document.getElementById('ml-upgrade-link').href = upgradeUrl;
-          const lockLink = document.getElementById('ml-lock-upgrade-link');
-          if (lockLink) lockLink.href = upgradeUrl;
-        }
-
-        // ── Link de compartilhamento (Plus e Pro) ────────────
-        const shareSection = document.getElementById('ml-share-section');
-        if (shareSection) {
-          shareSection.style.display = isPago ? '' : 'none';
-          if (isPago) mlMontarCompartilhamento(d.nome);
-        }
-
-        // ── Upload de imagens (Plus e Pro) ───────────────────
-        const uploadSection = document.getElementById('ml-upload-section');
-        if (uploadSection) {
-          uploadSection.style.display = isPago ? '' : 'none';
-          if (isPago) {
-            // Pré-visualiza imagens já existentes
-            if (fotoUrl) mlSetPreviewUpload('foto', fotoUrl);
-            if (logoUrl) mlSetPreviewUpload('logo', logoUrl);
-          }
-        }
-
-        // ── Anúncio do dia (só Pro) ──────────────────────────
-        const isPro = plano === 'PRO';
-        const anuncioSection = document.getElementById('ml-anuncio-section');
-        if (anuncioSection) {
-          anuncioSection.style.display = isPro ? '' : 'none';
-          if (isPro && metJson.status === 'ok') {
-            if (metJson.data.anuncio) {
-              // API retornou anúncio — usa ele (fonte da verdade)
-              mlExibirAnuncioAtivo(metJson.data.anuncio);
-            } else {
-              // API não retornou anúncio — tenta usar o cache local
-              try {
-                const cache = localStorage.getItem('angatuba_anuncio');
-                if (cache) {
-                  const obj = JSON.parse(cache);
-                  if (obj.expira && new Date(obj.expira) > new Date()) {
-                    mlExibirAnuncioAtivo(obj);
-                  } else {
-                    localStorage.removeItem('angatuba_anuncio');
-                    document.getElementById('ml-anuncio-ativo').style.display = 'none';
-                  }
-                }
-              } catch(e) {}
-            }
-          }
-        }
-
-        // ── Métricas ─────────────────────────────────────────
-        if (metJson.status === 'ok') {
-          const m = metJson.data.metricas || { total:0, wpp:0, tel:0, d7:0, d30:0 };
-          const lockEl = document.getElementById('ml-metricas-lock');
-
-          // Badge de novos cliques desde última visita
-          const ultimaVisita = parseInt(localStorage.getItem(`angatuba_ultima_visita_${_lojaToken?.slice(-8)}`) || '0');
-          const novos = metJson.data.novosCliques ?? 0;
-          const tituloMetricas = document.querySelector('#ml-metricas-wrap')?.previousElementSibling;
-          if (tituloMetricas && novos > 0) {
-            const existeBadge = tituloMetricas.querySelector('.ml-badge-novo');
-            if (!existeBadge) {
-              tituloMetricas.insertAdjacentHTML('beforeend',
-                `<span class="ml-badge-novo">+${novos} hoje</span>`);
-            }
-          }
-          // Salva timestamp da visita atual
-          localStorage.setItem(`angatuba_ultima_visita_${_lojaToken?.slice(-8)}`, Date.now().toString());
-
-          if (isPago) {
-            if (lockEl) lockEl.style.display = 'none';
-            document.getElementById('ml-m-7d').textContent    = m.d7   ?? 0;
-            document.getElementById('ml-m-30d').textContent   = m.d30  ?? 0;
-            document.getElementById('ml-m-total').textContent = m.total ?? 0;
-            document.getElementById('ml-m-wpp').textContent   = m.wpp  ?? 0;
-            document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
-          } else {
-            document.getElementById('ml-m-7d').textContent    = m.d7   ?? 0;
-            document.getElementById('ml-m-30d').textContent   = m.d30  ?? 0;
-            document.getElementById('ml-m-total').textContent = m.total ?? 0;
-            document.getElementById('ml-m-wpp').textContent   = m.wpp  ?? 0;
-            document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
-            document.getElementById('ml-lock-total').textContent = m.total ?? 0;
-            if (lockEl) lockEl.style.display = '';
-          }
-
-          // ── Horário de pico (só Pro) ──────────────────────
-          const picoSection = document.getElementById('ml-pico-section');
-          if (picoSection) {
-            picoSection.style.display = isPro ? '' : 'none';
-            if (isPro && metJson.data.pico) {
-              requestAnimationFrame(() => mlRenderizarPico(metJson.data.pico));
-            }
-          }
-        }
+        _aplicarDadosLoja(dadosJson.data, metJson);
 
         // ── Cardápio ─────────────────────────────────────
-        await mlCardapioCarregar(plano);
+        await mlCardapioCarregar(dadosJson.data.plano || 'GRATIS');
       }
     } catch(e) {
       console.warn('[MinhaLoja] Erro ao carregar dados:', e.message);
@@ -1552,6 +1561,7 @@
     _lojaNome  = '';
     localStorage.removeItem('angatuba_loja_token');
     localStorage.removeItem('angatuba_loja_nome');
+    localStorage.removeItem('angatuba_loja_dados');
     fecharMinhaLoja();
     atualizarNav();
     if (!silencioso) {

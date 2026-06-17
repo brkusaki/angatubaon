@@ -308,11 +308,21 @@
         <div class="plan-header-sub">Deslize para comparar os planos</div>
       </div>
 
-      <!-- Indicadores de dots -->
-      <div class="plan-dots" id="plan-dots">
-        <span class="plan-dot active" data-idx="0"></span>
-        <span class="plan-dot" data-idx="1"></span>
-        <span class="plan-dot" data-idx="2"></span>
+      <!-- Indicadores de dots + setas -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:10px 0 0;">
+        <button onclick="_irParaSlide(_carouselIdx - 1)" id="plan-arrow-left"
+          style="width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);
+                 color:var(--muted);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+                 -webkit-tap-highlight-color:transparent;">‹</button>
+        <div class="plan-dots" id="plan-dots">
+          <span class="plan-dot active" data-idx="0"></span>
+          <span class="plan-dot" data-idx="1"></span>
+          <span class="plan-dot" data-idx="2"></span>
+        </div>
+        <button onclick="_irParaSlide(_carouselIdx + 1)" id="plan-arrow-right"
+          style="width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);
+                 color:var(--muted);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+                 -webkit-tap-highlight-color:transparent;">›</button>
       </div>
 
       <!-- Carrossel -->
@@ -362,7 +372,7 @@
                 <li><span class="feat-icon">✅</span> Visual destacado (fundo índigo)</li>
                 <li><span class="feat-icon">✅</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
                 <li><span class="feat-icon">✅</span> Link de compartilhamento da loja</li>
-                <li><span class="feat-icon">✅</span> Logo e hero no painel</li>
+                <li><span class="feat-icon">✅</span> Foto de capa e logo no painel "Minha Loja"</li>
                 <li><span class="feat-icon">✅</span> Cardápio / Serviços (até 5 itens, sem foto)</li>
                 <li><span class="feat-icon">✅</span> Pedidos direto pelo WhatsApp</li>
                 <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa no card</li>
@@ -392,7 +402,7 @@
                 <li><span class="feat-icon">✅</span> Anúncio do dia no card (24h)</li>
                 <li><span class="feat-icon">✅</span> Cardápio ilimitado com fotos e categorias</li>
                 <li><span class="feat-icon">✅</span> Horário de pico dos cliques</li>
-                <li><span class="feat-icon">✅</span> Hero com foto de capa no painel</li>
+                <li><span class="feat-icon">✅</span> Foto de capa e logo no card e no painel</li>
                 <li><span class="feat-icon">✅</span> Máxima visibilidade</li>
               </ul>
             </div>

@@ -1973,15 +1973,28 @@
                <div style="font-size:10px;color:var(--muted);">${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''}</div>
              </div>
            </div>
-           ${avaliacoes.slice(0,3).map(a => `
+           ${avaliacoes.slice(0,3).map((a, i) => {
+             // Botão sinalizar: só aparece para o dono da loja logado
+             const isDono = _lojaToken && _lojaNome === loja.nome;
+             const sinalizarBtn = isDono
+               ? `<button onclick="avalSinalizar(${idx},${i},'${escAttr(loja.nome)}')" title="Sinalizar para revisão"
+                    style="font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;
+                           padding:2px 6px;border-radius:5px;border:1px solid var(--border);flex-shrink:0;">
+                    🚩
+                  </button>`
+               : '';
+             return `
              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;">
-               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:6px;">
                  <span style="font-size:12px;font-weight:700;">${escHTML(a.autor || 'Anônimo')}</span>
-                 <span style="font-size:11px;color:#f59e0b;">${'★'.repeat(a.nota || 0)}${'☆'.repeat(5-(a.nota||0))}</span>
+                 <div style="display:flex;align-items:center;gap:6px;">
+                   <span style="font-size:11px;color:#f59e0b;">${'★'.repeat(a.nota || 0)}${'☆'.repeat(5-(a.nota||0))}</span>
+                   ${sinalizarBtn}
+                 </div>
                </div>
                ${a.texto ? `<p style="font-size:11px;color:var(--muted);margin:0;line-height:1.5;">${escHTML(a.texto)}</p>` : ''}
              </div>
-           `).join('')}
+           `}).join('')}
          </div>`
       : '';
 
@@ -2967,6 +2980,31 @@
   ══════════════════════════════════════════════════════════════ */
   let _avalNota = {};
 
+  // Dono sinaliza avaliação para revisão
+  window.avalSinalizar = async function(lojaIdx, avalIdx, nomeLoja) {
+    if (!confirm('Sinalizar esta avaliação para revisão? Ela ficará oculta até ser analisada.')) return;
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({
+        action: 'lojaSinalizarAvaliacao',
+        token:  _lojaToken,
+        idx:    avalIdx,
+      }));
+      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
+      const json = await resp.json();
+      if (json.status === 'ok') {
+        alert('Avaliação sinalizada! Será revisada em breve.');
+        // Remove da lista local e reabre detalhes
+        if (LOJAS[lojaIdx].avaliacoes) {
+          LOJAS[lojaIdx].avaliacoes.splice(avalIdx, 1);
+        }
+        abrirDetalhes(lojaIdx);
+      } else throw new Error(json.msg);
+    } catch(e) {
+      alert('Erro ao sinalizar: ' + e.message);
+    }
+  };
+
   window.avalSetNota = function(idx, nota) {
     _avalNota[idx] = nota;
     const stars = document.querySelectorAll(`#aval-stars-${idx} .aval-star`);
@@ -2985,7 +3023,13 @@
       return;
     }
 
-    // Verifica se já avaliou essa loja (localStorage)
+    // Bloqueia dono avaliando a própria loja
+    if (_lojaToken && _lojaNome === nome) {
+      if (msgEl) { msgEl.textContent = '❌ Você não pode avaliar sua própria loja.'; msgEl.style.color = 'var(--red)'; }
+      return;
+    }
+
+    // Verifica se já avaliou esse loja (localStorage)
     const chave = `aval_${toSlug(nome)}`;
     if (localStorage.getItem(chave)) {
       if (msgEl) { msgEl.textContent = 'Você já avaliou esta loja!'; msgEl.style.color = 'var(--muted)'; }
@@ -3007,10 +3051,7 @@
 
       if (json.status === 'ok') {
         localStorage.setItem(chave, Date.now().toString());
-        if (msgEl) { msgEl.textContent = '✅ Avaliação enviada! Obrigado.'; msgEl.style.color = 'var(--green)'; }
-        // Atualiza a nota local da loja
-        if (!LOJAS[idx].avaliacoes) LOJAS[idx].avaliacoes = [];
-        LOJAS[idx].avaliacoes.push({ nota, texto, autor: 'Você' });
+        if (msgEl) { msgEl.textContent = '✅ Avaliação enviada! Aparecerá após moderação.'; msgEl.style.color = 'var(--green)'; }
         // Desabilita o form
         document.getElementById(`aval-form-${idx}`).style.opacity = '0.5';
         document.getElementById(`aval-form-${idx}`).style.pointerEvents = 'none';

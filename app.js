@@ -1795,23 +1795,30 @@
     const isPago = isPro || isPlus;
     const { status, fechaStr } = calcStatusInfo(loja);
 
-    // ── CAPA ──────────────────────────────────────────────────
+    // ── CAPA com logo sobreposto ───────────────────────────────
     const hasFoto = isPago && loja.foto && loja.foto.trim();
+    const hasLogo = isPago && loja.logo && loja.logo.trim();
+
+    const logoOverlay = hasLogo
+      ? `<div style="position:absolute;bottom:12px;left:14px;z-index:3;
+            width:52px;height:52px;border-radius:12px;overflow:hidden;
+            border:2px solid rgba(255,255,255,0.2);box-shadow:0 4px 14px rgba(0,0,0,0.5);
+            background:var(--surface);">
+           <img src="${loja.logo}" style="width:100%;height:100%;object-fit:cover;"
+             onerror="this.parentElement.style.display='none'" />
+         </div>`
+      : '';
+
     const coverHTML = hasFoto
       ? `<div class="detail-cover-wrap">
            <img class="detail-cover" src="${loja.foto}" alt="Foto ${escAttr(loja.nome)}"
              onerror="this.parentElement.innerHTML = placeholderCover('${escAttr(loja.emoji || '🏪')}', '${escAttr(loja.categoria || '')}');" />
            <div class="detail-top-bar">
              <div class="detail-handle"></div>
-             <div style="display:flex;gap:8px;">
-               <button onclick="detalhesCompartilhar(${idx})" class="detail-close" aria-label="Compartilhar"
-                 style="background:rgba(0,0,0,0.35);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.15);color:#fff;">
-                 <i class="fa fa-share-nodes"></i>
-               </button>
-               <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
-             </div>
+             <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
            </div>
            <div class="detail-cover-badge">${badgeHTML(status, fechaStr)}</div>
+           ${logoOverlay}
          </div>`
       : isPago
       ? `<div class="detail-cover-wrap">
@@ -1820,26 +1827,14 @@
            </div>
            <div class="detail-top-bar">
              <div class="detail-handle"></div>
-             <div style="display:flex;gap:8px;">
-               <button onclick="detalhesCompartilhar(${idx})" class="detail-close" aria-label="Compartilhar"
-                 style="background:rgba(0,0,0,0.35);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.15);color:#fff;">
-                 <i class="fa fa-share-nodes"></i>
-               </button>
-               <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
-             </div>
+             <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
            </div>
            <div class="detail-cover-badge">${badgeHTML(status, fechaStr)}</div>
          </div>`
       : `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0;">
            <div class="detail-handle" style="position:static;transform:none;margin:0 auto;"></div>
-           <div style="display:flex;gap:8px;">
-             <button onclick="detalhesCompartilhar(${idx})"
-               style="font-size:13px;color:var(--muted);padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;">
-               <i class="fa fa-share-nodes"></i>
-             </button>
-             <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar"
-               style="position:static;transform:none;background:var(--surface2);color:var(--muted);">✕</button>
-           </div>
+           <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar"
+             style="position:static;transform:none;background:var(--surface2);color:var(--muted);">✕</button>
          </div>`;
 
     // ── BADGE DE PLANO — junto com o nome ─────────────────────
@@ -1887,6 +1882,65 @@
     // ── BOTÕES DE AÇÃO ────────────────────────────────────────
     const actionsHTML = buildActionsHTML(loja, status);
 
+    // ── AVALIAÇÕES ────────────────────────────────────────────
+    const avaliacoes = loja.avaliacoes || [];
+    const mediaAval  = avaliacoes.length
+      ? (avaliacoes.reduce((s, a) => s + (a.nota || 0), 0) / avaliacoes.length).toFixed(1)
+      : null;
+
+    const avalHTML = (isPago && avaliacoes.length > 0)
+      ? `<div style="margin-bottom:14px;">
+           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+             <span style="font-size:1.4rem;font-weight:800;font-family:var(--font-h);">${mediaAval}</span>
+             <div>
+               <div style="display:flex;gap:2px;">${[1,2,3,4,5].map(s =>
+                 `<span style="color:${s<=Math.round(mediaAval)?'#f59e0b':'rgba(255,255,255,0.15)';font-size:14px;">★</span>`
+               ).join('')}</div>
+               <div style="font-size:10px;color:var(--muted);">${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''}</div>
+             </div>
+           </div>
+           ${avaliacoes.slice(0,3).map(a => `
+             <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;">
+               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                 <span style="font-size:12px;font-weight:700;">${escHTML(a.autor || 'Anônimo')}</span>
+                 <span style="font-size:11px;color:#f59e0b;">${'★'.repeat(a.nota || 0)}${'☆'.repeat(5-(a.nota||0))}</span>
+               </div>
+               ${a.texto ? `<p style="font-size:11px;color:var(--muted);margin:0;line-height:1.5;">${escHTML(a.texto)}</p>` : ''}
+             </div>
+           `).join('')}
+         </div>`
+      : '';
+
+    // Formulário de avaliação (todos podem avaliar)
+    const avalFormHTML = `
+      <div id="aval-form-${idx}" style="margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">
+          Avaliar esta loja
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;">
+          <!-- Estrelas clicáveis -->
+          <div style="display:flex;gap:4px;margin-bottom:8px;" id="aval-stars-${idx}">
+            ${[1,2,3,4,5].map(s =>
+              `<button onclick="avalSetNota(${idx},${s})" data-nota="${s}"
+                style="font-size:1.6rem;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.15);
+                       transition:color 0.1s;-webkit-tap-highlight-color:transparent;"
+                class="aval-star">★</button>`
+            ).join('')}
+          </div>
+          <textarea id="aval-texto-${idx}" maxlength="120" rows="2" placeholder="Conte sua experiência... (opcional)"
+            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+                   padding:8px 10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;
+                   font-family:var(--font-b);line-height:1.5;margin-bottom:8px;"></textarea>
+          <button onclick="avalEnviar(${idx},'${escAttr(loja.nome)}')"
+            style="width:100%;padding:10px;border-radius:8px;
+                   background:linear-gradient(135deg,#f59e0b,#d97706);
+                   color:#000;font-family:var(--font-h);font-size:13px;font-weight:800;border:none;cursor:pointer;">
+            ⭐ Enviar avaliação
+          </button>
+          <div id="aval-msg-${idx}" style="font-size:11px;text-align:center;margin-top:6px;min-height:16px;"></div>
+        </div>
+      </div>`;
+
     // ── MONTA SHEET ──────────────────────────────────────────
     sheet.innerHTML = `
       ${coverHTML}
@@ -1903,6 +1957,8 @@
           ${horarioHTML}
           ${obsHTML}
         </div>
+        ${avalHTML}
+        ${avalFormHTML}
       </div>
       <div class="detail-actions">${actionsHTML}</div>
     `;
@@ -2080,6 +2136,14 @@
             <i class="fa fa-map-marker-alt"></i> Como chegar
           </a>`;
     }
+
+    // Botão compartilhar — sempre presente
+    const _idx = LOJAS.indexOf(loja);
+    html += `<button onclick="detalhesCompartilhar(${_idx})"
+      class="detail-btn-maps" aria-label="Compartilhar"
+      style="background:rgba(99,102,241,0.1);border-color:rgba(99,102,241,0.25);color:var(--indigo);">
+      <i class="fa fa-share-nodes"></i>
+    </button>`;
 
     return html;
   }
@@ -2797,3 +2861,63 @@
       console.warn('[Anuncio] Erro ao remover:', e.message);
     }
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     AVALIAÇÕES
+  ══════════════════════════════════════════════════════════════ */
+  let _avalNota = {};
+
+  window.avalSetNota = function(idx, nota) {
+    _avalNota[idx] = nota;
+    const stars = document.querySelectorAll(`#aval-stars-${idx} .aval-star`);
+    stars.forEach((s, i) => {
+      s.style.color = i < nota ? '#f59e0b' : 'rgba(255,255,255,0.15)';
+    });
+  };
+
+  window.avalEnviar = async function(idx, nome) {
+    const nota  = _avalNota[idx];
+    const texto = document.getElementById(`aval-texto-${idx}`)?.value.trim() || '';
+    const msgEl = document.getElementById(`aval-msg-${idx}`);
+
+    if (!nota) {
+      if (msgEl) { msgEl.textContent = 'Selecione uma nota de 1 a 5 ⭐'; msgEl.style.color = 'var(--red)'; }
+      return;
+    }
+
+    // Verifica se já avaliou essa loja (localStorage)
+    const chave = `aval_${toSlug(nome)}`;
+    if (localStorage.getItem(chave)) {
+      if (msgEl) { msgEl.textContent = 'Você já avaliou esta loja!'; msgEl.style.color = 'var(--muted)'; }
+      return;
+    }
+
+    if (msgEl) { msgEl.textContent = '⏳ Enviando...'; msgEl.style.color = 'var(--muted)'; }
+
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({
+        action: 'registrarAvaliacao',
+        loja:   nome,
+        nota,
+        texto,
+      }));
+      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      const json = await resp.json();
+
+      if (json.status === 'ok') {
+        localStorage.setItem(chave, Date.now().toString());
+        if (msgEl) { msgEl.textContent = '✅ Avaliação enviada! Obrigado.'; msgEl.style.color = 'var(--green)'; }
+        // Atualiza a nota local da loja
+        if (!LOJAS[idx].avaliacoes) LOJAS[idx].avaliacoes = [];
+        LOJAS[idx].avaliacoes.push({ nota, texto, autor: 'Você' });
+        // Desabilita o form
+        document.getElementById(`aval-form-${idx}`).style.opacity = '0.5';
+        document.getElementById(`aval-form-${idx}`).style.pointerEvents = 'none';
+      } else {
+        throw new Error(json.msg || 'Erro');
+      }
+    } catch(e) {
+      if (msgEl) { msgEl.textContent = '❌ Erro ao enviar. Tente novamente.'; msgEl.style.color = 'var(--red)'; }
+    }
+  };

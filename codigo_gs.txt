@@ -1,0 +1,1034 @@
+// ════════════════════════════════════════════════════════════════
+//  AngatubaON — Google Apps Script v3
+//  Planilha Cadastros:
+//    A=DataHora  B=Nome      C=Ramo      D=Endereço   E=WhatsApp
+//    F=Telefone  G=HorTexto  H=Obs       I=Status     J=Maps
+//    K=Emoji     L=Sub       M=Tags      N=Recomendado O=Dias
+//    P=HoraAbre  Q=HoraFecha R=FotoURL   S=LogoURL
+//    T=Plano     U=PlanoValidade  V=PlanoPago  W=StatusLoja
+//
+//  Planilha Metricas:
+//    A=DataHora  B=Loja  C=Tipo(wpp/tel)  D=Plano  E=Categoria
+//
+//  Planilha AdminSessions:
+//    A=Token  B=CriadoEm
+//
+//  Planilha LojaSessions:  ← NOVA
+//    A=Token  B=WPP  C=CriadoEm
+//
+//  Planilha LojaCodigos:   ← NOVA
+//    A=WPP  B=Codigo  C=CriadoEm (expira em 10min)
+// ════════════════════════════════════════════════════════════════
+
+const SHEET_URL   = 'https://docs.google.com/spreadsheets/d/1eWWsja2FYQq1uw6DtLzLhzgcCyZd3MU3ACgBBgI7Pj8/edit';
+const SHEET_NAME  = 'Cadastros';
+const SHEET_MET   = 'Metricas';
+const EMAIL_ADMIN = 'ukbbze@gmail.com';
+const ADMIN_WPP   = '5515981125349';
+
+// ── AUTENTICAÇÃO ADMIN ───────────────────────────────────────────
+const ADMIN_PASS_HASH = '8f9de2bb48ae3a36ba54d9b9f2a55d13de11cf78cb4085197fede4dec438230f';
+const SESSION_TTL_MS  = 8 * 60 * 60 * 1000;  // 8 horas
+const LOJA_TTL_MS     = 30 * 24 * 60 * 60 * 1000; // 30 dias
+const CODIGO_TTL_MS   = 10 * 60 * 1000;       // 10 minutos
+
+// ── Mapa de ramo → categoria do front-end ────────────────────────
+// Cada slug aqui corresponde a um { id } no array CATEGORIAS do index.html
+const CATEGORIA_MAP = {
+  // Alimentação e Bebidas
+  'pizzaria':'pizzaria','pizza':'pizzaria',
+  'lanche':'lanches','lanches':'lanches','hamburger':'lanches','hambúrguer':'lanches',
+  'lanchonete':'lanches','pastelaria':'lanches','hot dog':'lanches','sanduiche':'lanches',
+  'adega':'adega','bebida':'adega','bar':'adega','distribuidora':'adega','drinks':'adega',
+  'carnes':'carnes','churrascaria':'carnes','steakhouse':'carnes','açougue':'carnes',
+  'acougue':'carnes','grill':'carnes','churrasco':'carnes',
+
+  // Saúde, Beleza e Bem-Estar
+  'farmácia':'farmacia','farmacia':'farmacia','drogaria':'farmacia','farmácias':'farmacia',
+  'remedio':'farmacia','medicamento':'farmacia',
+  'clínica':'clinica','clinica':'clinica','medica':'clinica','médica':'clinica',
+  'odonto':'clinica','dentista':'clinica','medico':'clinica','médico':'clinica',
+  'laboratorio':'laboratorio','laboratório':'laboratorio','exame':'laboratorio',
+  'analise':'laboratorio','análise':'laboratorio','coleta':'laboratorio',
+  'otica':'otica','ótica':'otica','oculista':'otica','oculos':'otica','óculos':'otica',
+  'barbearia':'barbearia','barber':'barbearia','barbeiro':'barbearia',
+  'salão':'salao','salao':'salao','beleza':'salao','estetica':'salao','estética':'salao',
+  'cabeleireiro':'salao','cabelereiro':'salao','manicure':'salao','sobrancelha':'salao',
+  'depilacao':'salao','depilação':'salao','spa':'salao',
+  'academia':'academia','pilates':'academia','yoga':'academia','ginasio':'academia',
+  'ginásio':'academia','musculacao':'academia','musculação':'academia','crossfit':'academia',
+  'funcional':'academia','fitness':'academia',
+  'tattoo':'tattoo','tatuagem':'tattoo','piercing':'tattoo','body art':'tattoo',
+
+  // Comércio e Variedades
+  'mercado':'mercado','supermercado':'mercado','minimercado':'mercado','mercearia':'mercado',
+  'hortifruti':'mercado',
+  'roupa':'roupas','roupas':'roupas','vestuario':'roupas','vestuário':'roupas',
+  'moda':'roupas','confeccao':'roupas','confecção':'roupas','boutique':'roupas',
+  'calcado':'calcados','calçado':'calcados','sapato':'calcados','tenis':'calcados',
+  'tênis':'calcados','sandalia':'calcados','bota':'calcados','sapataria':'calcados',
+  'calcados':'calcados',
+  'joalheria':'joalheria','joias':'joalheria','relogio':'joalheria','relógio':'joalheria',
+  'relojoaria':'joalheria','ouro':'joalheria','prata':'joalheria','alianca':'joalheria',
+  'festa':'festas','festas':'festas','balao':'festas','balão':'festas',
+  'embalagem':'festas','decoracao':'festas','decoração':'festas','brinquedo':'festas',
+  'armarinho':'armarinho','aviamento':'armarinho','artesanato':'armarinho',
+  'tecido':'armarinho','costura':'armarinho','croche':'armarinho','la':'armarinho',
+  'flor':'floricultura','flores':'floricultura','floricultura':'floricultura',
+  'plantas':'floricultura','paisagismo':'floricultura','jardim':'floricultura',
+  'papelaria':'papelaria','livraria':'papelaria','material escolar':'papelaria',
+  'variedades':'variedades','utilidades':'variedades','bazar':'variedades',
+  'descartavel':'variedades','plastico':'variedades',
+
+  // Automotivo
+  'posto':'posto','combustível':'posto','gasolina':'posto','auto posto':'posto',
+  'etanol':'posto','diesel':'posto',
+  'gás':'gas','gas':'gas','água':'gas','botijão':'gas','gás e água':'gas',
+  'liquigas':'gas','ultragaz':'gas','glp':'gas',
+  'autopecas':'autopecas','autopeças':'autopecas','motopecas':'autopecas',
+  'motopeças':'autopecas','pecas':'autopecas','peças':'autopecas',
+  'mecânica':'mecanica','mecanica':'mecanica','oficina':'mecanica',
+  'elétrica':'mecanica','eletrica':'mecanica','motor':'mecanica',
+  'retifica':'mecanica','auto center':'mecanica','suspensao':'mecanica',
+  'borracharia':'borracharia','pneu':'borracharia','pneus':'borracharia',
+  'funilaria':'funilaria','funileiro':'funilaria','lanternagem':'funilaria',
+  'lataria':'funilaria','pintura auto':'funilaria',
+  'lava-rapido':'lava-rapido','lavagem':'lava-rapido','lavajato':'lava-rapido',
+  'autolavagem':'lava-rapido','car wash':'lava-rapido',
+  'bicicletaria':'bicicletaria','bicicleta':'bicicletaria','bike':'bicicletaria',
+
+  // Casa e Construção
+  'construção':'construcao','construcao':'construcao','material':'construcao',
+  'cimento':'construcao','ferragem':'construcao','tijolo':'construcao','obra':'construcao',
+  'moveis':'moveis','móveis':'moveis','armario':'moveis','sofa':'moveis','cama':'moveis',
+  'eletrodomestico':'moveis','eletrodoméstico':'moveis','geladeira':'moveis',
+  'madeira':'madeireira','madeireira':'madeireira','mdf':'madeireira',
+  'tinta':'tintas','tintas':'tintas','verniz':'tintas',
+  'vidraçaria':'vidracaria','vidracaria':'vidracaria','vidro':'vidracaria',
+  'esquadria':'vidracaria','janela':'vidracaria','espelho':'vidracaria',
+  'serralheria':'serralheria','serralheiro':'serralheria','grade':'serralheria',
+  'portao':'serralheria','portão':'serralheria','ferro':'serralheria',
+  'refrigeração':'refrigeracao','refrigeracao':'refrigeracao',
+  'ar-condicionado':'refrigeracao','ar condicionado':'refrigeracao',
+  'conserto':'consertos','consertos':'consertos','reparo':'consertos',
+  'assistencia':'consertos','assistência':'consertos','manutencao':'consertos',
+
+  // Pet e Agropecuária
+  'pet':'pet','petshop':'pet','pet shop':'pet','veterinário':'pet',
+  'veterinaria':'pet','banho e tosa':'pet','tosa':'pet','racao':'pet','ração':'pet',
+  'agropecuaria':'agropecuaria','agropecuária':'agropecuaria','racoes':'agropecuaria',
+  'rações':'agropecuaria','agro':'agropecuaria','casa rural':'agropecuaria',
+  'insumo':'insumos','insumos':'insumos','agricola':'insumos','agrícola':'insumos',
+  'ferramenta':'insumos','adubo':'insumos','fertilizante':'insumos',
+
+  // Tecnologia e Serviços
+  'informatica':'informatica','informática':'informatica','computador':'informatica',
+  'notebook':'informatica','hardware':'informatica','impressora':'informatica',
+  'celular':'celular','smartphone':'celular','acessorio celular':'celular',
+  'capinha':'celular','carregador':'celular','mobile':'celular',
+  'grafica':'grafica','gráfica':'grafica','comunicação visual':'grafica',
+  'banner':'grafica','adesivo':'grafica','impressao':'grafica','plotagem':'grafica',
+  'imobiliaria':'imobiliaria','imobiliária':'imobiliaria','aluguel':'imobiliaria',
+  'imoveis':'imobiliaria','imóveis':'imobiliaria','corretor':'imobiliaria',
+  'advocacia':'advocacia','advogado':'advocacia','juridico':'advocacia',
+  'contabilidade':'contabilidade','contador':'contabilidade','fiscal':'contabilidade',
+  'imposto':'contabilidade','irpf':'contabilidade',
+  'fotografia':'fotografia','filmagem':'fotografia','fotografo':'fotografia',
+  'fotógrafo':'fotografia','drone':'fotografia','video':'fotografia',
+  'viagem':'viagens','viagens':'viagens','turismo':'viagens','agencia':'viagens',
+  'agência':'viagens','passagem':'viagens','hotel':'viagens','pacote':'viagens',
+
+  // Educação e Finanças
+  'banco':'bancario','bancaria':'bancario','bancária':'bancario',
+  'loterica':'bancario','lotérica':'bancario','loteria':'bancario','caixa economica':'bancario',
+  'seguro':'seguros','seguros':'seguros','corretora':'seguros','apolice':'seguros',
+  'idioma':'idiomas','idiomas':'idiomas','ingles':'idiomas','inglês':'idiomas',
+  'curso':'idiomas','escola':'idiomas','capacitacao':'idiomas',
+  'autoescola':'autoescola','cfc':'autoescola','habilitacao':'autoescola',
+  'cnh':'autoescola','motorista':'autoescola',
+
+  // Genérico
+  'serviço':'servicos','servicos':'servicos','eletricista':'servicos',
+  'pedreiro':'servicos','pintura':'servicos',
+};
+
+function mapCategoria(ramo) {
+  if (!ramo) return 'servicos';
+  return CATEGORIA_MAP[ramo.toLowerCase().trim()] || 'servicos';
+}
+
+// ── Helper: Verifica validade do plano ───────────────────────────
+function planoAtivo(validadeStr) {
+  if (!validadeStr || String(validadeStr).trim() === '') return true;
+  let validade;
+  if (validadeStr instanceof Date) {
+    validade = validadeStr;
+  } else {
+    const partes = String(validadeStr).trim().split('/');
+    if (partes.length !== 3) return false;
+    validade = new Date(parseInt(partes[2]), parseInt(partes[1]) - 1, parseInt(partes[0]));
+  }
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  return validade >= hoje;
+}
+
+// ── Helper: Garante que a aba Metricas exista ────────────────────
+function getMetricasSheet(ss) {
+  let sheet = ss.getSheetByName(SHEET_MET);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_MET);
+    sheet.appendRow(['DataHora', 'Loja', 'Tipo', 'Plano', 'Categoria']);
+    sheet.getRange(1, 1, 1, 5).setFontWeight('bold').setBackground('#6366f1').setFontColor('#ffffff');
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(1, 160); sheet.setColumnWidth(2, 220);
+    sheet.setColumnWidth(3, 80);  sheet.setColumnWidth(4, 80); sheet.setColumnWidth(5, 100);
+  }
+  return sheet;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  AUTENTICAÇÃO ADMIN
+// ════════════════════════════════════════════════════════════════
+function getSessionsSheet(ss) {
+  let sheet = ss.getSheetByName('AdminSessions');
+  if (!sheet) {
+    sheet = ss.insertSheet('AdminSessions');
+    sheet.appendRow(['Token', 'CriadoEm']);
+    sheet.hideSheet();
+  }
+  return sheet;
+}
+
+function gerarToken() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+function sha256(text) {
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8);
+  return digest.map(b => ('0' + (b & 0xff).toString(16)).slice(-2)).join('');
+}
+
+function senhaCorreta(hashEnviado) {
+  return typeof hashEnviado === 'string' && hashEnviado.toLowerCase() === ADMIN_PASS_HASH.toLowerCase();
+}
+
+function criarSessaoAdmin(ss) {
+  const sheet = getSessionsSheet(ss);
+  limparSessoesExpiradas(sheet, SESSION_TTL_MS);
+  const token = gerarToken();
+  sheet.appendRow([token, new Date().getTime()]);
+  return token;
+}
+
+function limparSessoesExpiradas(sheet, ttl) {
+  const agora = new Date().getTime();
+  const dados = sheet.getDataRange().getValues();
+  for (let i = dados.length - 1; i >= 1; i--) {
+    const criadoEm = parseInt(dados[i][1]);
+    if (isNaN(criadoEm) || (agora - criadoEm) > ttl) sheet.deleteRow(i + 1);
+  }
+}
+
+function tokenAdminValido(ss, token) {
+  if (!token || typeof token !== 'string') return false;
+  const sheet = getSessionsSheet(ss);
+  const dados = sheet.getDataRange().getValues();
+  const agora = new Date().getTime();
+  for (let i = 1; i < dados.length; i++) {
+    if (dados[i][0] === token) {
+      const criadoEm = parseInt(dados[i][1]);
+      if (!isNaN(criadoEm) && (agora - criadoEm) <= SESSION_TTL_MS) return true;
+      sheet.deleteRow(i + 1);
+      return false;
+    }
+  }
+  return false;
+}
+
+// Compat alias
+function tokenValido(ss, token) { return tokenAdminValido(ss, token); }
+
+// ════════════════════════════════════════════════════════════════
+//  AUTENTICAÇÃO LOJA — código via WhatsApp
+// ════════════════════════════════════════════════════════════════
+
+function getLojaSessionsSheet(ss) {
+  let sheet = ss.getSheetByName('LojaSessions');
+  if (!sheet) {
+    sheet = ss.insertSheet('LojaSessions');
+    sheet.appendRow(['Token', 'WPP', 'CriadoEm']);
+    sheet.hideSheet();
+  }
+  return sheet;
+}
+
+function getLojaCodigosSheet(ss) {
+  let sheet = ss.getSheetByName('LojaCodigos');
+  if (!sheet) {
+    sheet = ss.insertSheet('LojaCodigos');
+    sheet.appendRow(['WPP', 'Codigo', 'CriadoEm']);
+    sheet.hideSheet();
+  }
+  return sheet;
+}
+
+// Gera código de 6 dígitos e salva na planilha
+function gerarCodigoLoja(ss, wpp) {
+  const sheet = getLojaCodigosSheet(ss);
+  // Limpa códigos expirados deste número
+  const dados = sheet.getDataRange().getValues();
+  const agora = new Date().getTime();
+  for (let i = dados.length - 1; i >= 1; i--) {
+    const rowWpp    = String(dados[i][0]).replace(/\D/g, '');
+    const criadoEm = parseInt(dados[i][2]);
+    if (rowWpp === wpp || isNaN(criadoEm) || (agora - criadoEm) > CODIGO_TTL_MS) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+  const codigo = String(Math.floor(100000 + Math.random() * 900000));
+  sheet.appendRow([wpp, codigo, agora]);
+  return codigo;
+}
+
+// Verifica se o código é válido para o WPP
+function verificarCodigoLoja(ss, wpp, codigo) {
+  const sheet = getLojaCodigosSheet(ss);
+  const dados = sheet.getDataRange().getValues();
+  const agora = new Date().getTime();
+  for (let i = 1; i < dados.length; i++) {
+    const rowWpp    = String(dados[i][0]).replace(/\D/g, '');
+    const rowCodigo = String(dados[i][1]).trim();
+    const criadoEm  = parseInt(dados[i][2]);
+    if (rowWpp === wpp && rowCodigo === String(codigo).trim()) {
+      if (!isNaN(criadoEm) && (agora - criadoEm) <= CODIGO_TTL_MS) {
+        sheet.deleteRow(i + 1); // código de uso único
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Cria sessão de loja (30 dias)
+function criarSessaoLoja(ss, wpp) {
+  const sheet = getLojaSessionsSheet(ss);
+  // Limpa sessões expiradas
+  const dados = sheet.getDataRange().getValues();
+  const agora = new Date().getTime();
+  for (let i = dados.length - 1; i >= 1; i--) {
+    const criadoEm = parseInt(dados[i][2]);
+    if (isNaN(criadoEm) || (agora - criadoEm) > LOJA_TTL_MS) sheet.deleteRow(i + 1);
+  }
+  const token = 'lj_' + gerarToken();
+  sheet.appendRow([token, wpp, agora]);
+  return token;
+}
+
+// Valida token de loja e retorna o WPP ou null
+function tokenLojaValido(ss, token) {
+  if (!token || typeof token !== 'string' || !token.startsWith('lj_')) return null;
+  const sheet = getLojaSessionsSheet(ss);
+  const dados = sheet.getDataRange().getValues();
+  const agora = new Date().getTime();
+  for (let i = 1; i < dados.length; i++) {
+    if (dados[i][0] === token) {
+      const criadoEm = parseInt(dados[i][2]);
+      if (!isNaN(criadoEm) && (agora - criadoEm) <= LOJA_TTL_MS) return String(dados[i][1]);
+      sheet.deleteRow(i + 1);
+      return null;
+    }
+  }
+  return null;
+}
+
+// Busca loja pelo WPP na planilha Cadastros
+function buscarLojaPorWpp(sheet, wpp) {
+  const dados = sheet.getDataRange().getValues();
+  const wppClean = wpp.replace(/\D/g, '');
+  for (let i = 1; i < dados.length; i++) {
+    const rowWpp = String(dados[i][4] || '').replace(/\D/g, '');
+    if (rowWpp === wppClean) {
+      return { rowIndex: i + 1, dados: dados[i] };
+    }
+  }
+  return null;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  doGet
+// ════════════════════════════════════════════════════════════════
+function doGet(e) {
+  const p = (e && e.parameter) ? e.parameter : {};
+
+  if (p.action === 'ping') {
+    return respOk({ msg: 'AngatubaON API v3', ts: new Date().toISOString() });
+  }
+
+  // ── updateStatus via GET ────────────────────────────────────
+  if (p.action === 'updateStatus') {
+    try {
+      const ss = SpreadsheetApp.openByUrl(SHEET_URL);
+      if (!tokenValido(ss, p.token)) return respErro('UNAUTHORIZED');
+      const sheet  = ss.getSheetByName(SHEET_NAME);
+      const row    = parseInt(p.row);
+      const status = String(p.status || '').toUpperCase();
+      if (!row || !status) return respErro('Parâmetros inválidos');
+      sheet.getRange(row, 9).setValue(status);
+      return respOk({ msg: 'Status atualizado', row, status });
+    } catch(err) { return respErro(err.message); }
+  }
+
+  // ── updatePlan via GET ──────────────────────────────────────
+  if (p.action === 'updatePlan') {
+    try {
+      const ss    = SpreadsheetApp.openByUrl(SHEET_URL);
+      if (!tokenValido(ss, p.token)) return respErro('UNAUTHORIZED');
+      const sheet    = ss.getSheetByName(SHEET_NAME);
+      const row      = parseInt(p.row);
+      const plano    = String(p.plano    || 'GRATIS').toUpperCase();
+      const validade = String(p.validade || '');
+      if (!row) return respErro('Parâmetros inválidos');
+      sheet.getRange(row, 20).setNumberFormat('@').setValue(plano);
+      sheet.getRange(row, 21).setNumberFormat('@').setValue(validade);
+      sheet.getRange(row, 22).setNumberFormat('@').setValue(plano !== 'GRATIS' ? 'SIM' : 'NAO');
+      const novoRec = (plano === 'PRO' || plano === 'PLUS') ? 'SIM' : 'NÃO';
+      const cellRec = sheet.getRange(row, 14);
+      cellRec.clearDataValidations();
+      cellRec.setNumberFormat('@').setValue(novoRec);
+      return respOk({ msg: 'Plano atualizado', row, plano, recomendado: novoRec });
+    } catch(err) { return respErro(err.message); }
+  }
+
+  // ── admin — lista cadastros ─────────────────────────────────
+  if (p.action === 'admin') {
+    try {
+      const ss = SpreadsheetApp.openByUrl(SHEET_URL);
+      if (!tokenValido(ss, p.token)) return respErro('UNAUTHORIZED');
+      const sheet = ss.getSheetByName(SHEET_NAME);
+      if (!sheet) return respErro('Aba não encontrada');
+      const dados = sheet.getDataRange().getValues();
+      const rows  = [];
+      for (let i = 1; i < dados.length; i++) {
+        const row = dados[i];
+        if (!row[1]) continue;
+        rows.push({
+          row: i + 1,
+          nome: String(row[1]||'').trim(), ramo: String(row[2]||'').trim(),
+          endereco: String(row[3]||'').trim(), wpp: String(row[4]||'').trim(),
+          tel: String(row[5]||'').trim(), horario: String(row[6]||'').trim(),
+          obs: String(row[7]||'').trim(), status: String(row[8]||'PENDENTE').trim().toUpperCase(),
+          maps: String(row[9]||'').trim(), recomendado: String(row[13]||'NÃO').trim().toUpperCase(),
+          planoSolicitado: String(row[19]||'').trim(),
+          plano: String(row[19]||'GRATIS').trim().toUpperCase(),
+          planoValidade: String(row[20]||'').trim(), planoPago: String(row[21]||'NÃO').trim(),
+          statusLoja: String(row[22]||'').trim(),
+        });
+      }
+      return respOk(rows);
+    } catch(err) { return respErro(err.message); }
+  }
+
+  // ── metricas (admin) ───────────────────────────────────────
+  if (p.action === 'metricas') {
+    try {
+      const ss = SpreadsheetApp.openByUrl(SHEET_URL);
+      if (!tokenValido(ss, p.token)) return respErro('UNAUTHORIZED');
+      return respOk(calcMetricas(ss, null));
+    } catch(err) { return respErro(err.message); }
+  }
+
+  // ── lojaMetricas — métricas da própria loja (token de loja) ─
+  if (p.action === 'lojaMetricas') {
+    try {
+      const ss  = SpreadsheetApp.openByUrl(SHEET_URL);
+      const wpp = tokenLojaValido(ss, p.token);
+      if (!wpp) return respErro('UNAUTHORIZED');
+      const sheet = ss.getSheetByName(SHEET_NAME);
+      const loja  = buscarLojaPorWpp(sheet, wpp);
+      if (!loja) return respErro('Loja não encontrada');
+      const plano = String(loja.dados[19]||'GRATIS').toUpperCase();
+      const nome  = String(loja.dados[1]||'').trim();
+      const metricas = calcMetricasLoja(ss, nome);
+      const pico = (plano === 'PRO') ? calcPicoHoras(ss, nome) : null;
+
+      // Anúncio do dia (col X = índice 23)
+      let anuncio = null;
+      try {
+        const raw = String(loja.dados[23] || '').trim();
+        if (raw) {
+          const obj = JSON.parse(raw);
+          if (obj.expira && new Date(obj.expira) > new Date()) anuncio = obj;
+        }
+      } catch(e) {}
+
+      // Novos cliques de hoje
+      const novosCliques = calcNovosHoje(ss, nome);
+
+      return respOk({ plano, metricas, pico, anuncio, novosCliques });
+    } catch(err) { return respErro(err.message); }
+  }
+
+  // ── lojaDados — dados da própria loja ──────────────────────
+  if (p.action === 'lojaDados') {
+    try {
+      const ss  = SpreadsheetApp.openByUrl(SHEET_URL);
+      const wpp = tokenLojaValido(ss, p.token);
+      if (!wpp) return respErro('UNAUTHORIZED');
+      const sheet = ss.getSheetByName(SHEET_NAME);
+      const loja  = buscarLojaPorWpp(sheet, wpp);
+      if (!loja) return respErro('Loja não encontrada');
+      const r = loja.dados;
+      const plano        = String(r[19]||'GRATIS').toUpperCase();
+      const planoVal     = String(r[20]||'');
+      const planoEstaAti = (plano === 'GRATIS') || planoAtivo(planoVal);
+      return respOk({
+        row:           loja.rowIndex,
+        nome:          String(r[1]||'').trim(),
+        ramo:          String(r[2]||'').trim(),
+        endereco:      String(r[3]||'').trim(),
+        wpp:           String(r[4]||'').trim(),
+        tel:           String(r[5]||'').trim(),
+        horario:       String(r[6]||'').trim(),
+        obs:           String(r[7]||'').trim(),
+        statusCadastro:String(r[8]||'PENDENTE').toUpperCase(),
+        foto:          String(r[17]||'').trim(),  // col R — FotoURL
+        logo:          String(r[18]||'').trim(),  // col S — LogoURL
+        plano:         planoEstaAti ? plano : 'GRATIS',
+        planoValidade: planoVal,
+        statusLoja:    String(r[22]||'').trim(), // 'ABERTO', 'VOLTAMOS', 'FECHADO' ou ''
+      });
+    } catch(err) { return respErro(err.message); }
+  }
+
+  // ── lojaToggle — muda status manual da loja ─────────────────
+  if (p.action === 'lojaToggle') {
+    try {
+      const ss  = SpreadsheetApp.openByUrl(SHEET_URL);
+      const wpp = tokenLojaValido(ss, p.token);
+      if (!wpp) return respErro('UNAUTHORIZED');
+      const sheet = ss.getSheetByName(SHEET_NAME);
+      const loja  = buscarLojaPorWpp(sheet, wpp);
+      if (!loja) return respErro('Loja não encontrada');
+      const novoStatus = String(p.statusLoja || '').toUpperCase();
+      const validos = ['ABERTO', 'VOLTAMOS', 'FECHADO', ''];
+      if (!validos.includes(novoStatus)) return respErro('Status inválido');
+      // Col W = coluna 23
+      sheet.getRange(loja.rowIndex, 23).setNumberFormat('@').setValue(novoStatus);
+      return respOk({ msg: 'Status atualizado', statusLoja: novoStatus });
+    } catch(err) { return respErro(err.message); }
+  }
+
+  // ── lojaLogout ─────────────────────────────────────────────
+  if (p.action === 'lojaLogout') {
+    try {
+      const ss    = SpreadsheetApp.openByUrl(SHEET_URL);
+      const sheet = getLojaSessionsSheet(ss);
+      const dados = sheet.getDataRange().getValues();
+      for (let i = 1; i < dados.length; i++) {
+        if (dados[i][0] === p.token) { sheet.deleteRow(i + 1); break; }
+      }
+      return respOk({ msg: 'Logout OK' });
+    } catch(err) { return respErro(err.message); }
+  }
+
+  // ── lojaAtualizarImagem — salva URL de foto ou logo ─────────
+  if (p.action === 'lojaAtualizarImagem') {
+    try {
+      const ss  = SpreadsheetApp.openByUrl(SHEET_URL);
+      const wpp = tokenLojaValido(ss, p.token);
+      if (!wpp) return respErro('UNAUTHORIZED');
+      const sheet = ss.getSheetByName(SHEET_NAME);
+      const loja  = buscarLojaPorWpp(sheet, wpp);
+      if (!loja) return respErro('Loja não encontrada');
+      const url   = String(p.url   || '').trim();
+      const campo = String(p.campo || '').trim();
+      // col R=18 (fotoUrl), col S=19 (logoUrl) — índice base 1
+      const col = campo === 'logoUrl' ? 19 : 18;
+      sheet.getRange(loja.rowIndex, col).setNumberFormat('@').setValue(url);
+      return respOk({ msg: 'Imagem atualizada', campo, url });
+    } catch(err) { return respErro(err.message); }
+  }
+
+  // ── lojaPublicarAnuncio — salva anúncio do dia (col X=24) ───
+  if (p.action === 'lojaPublicarAnuncio') {
+    try {
+      const ss  = SpreadsheetApp.openByUrl(SHEET_URL);
+      const wpp = tokenLojaValido(ss, p.token);
+      if (!wpp) return respErro('UNAUTHORIZED');
+      const sheet = ss.getSheetByName(SHEET_NAME);
+      const loja  = buscarLojaPorWpp(sheet, wpp);
+      if (!loja) return respErro('Loja não encontrada');
+      const texto = String(p.texto || '').trim().substring(0, 80);
+      const emoji = String(p.emoji || '🎯').trim();
+      if (!texto) return respErro('Texto vazio');
+      // Expira em 24h — guarda JSON na col X (coluna 24)
+      const expira = new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString();
+      const anuncio = JSON.stringify({ emoji, texto, expira });
+      sheet.getRange(loja.rowIndex, 24).setNumberFormat('@').setValue(anuncio);
+      return respOk({ msg: 'Anúncio publicado', data: { emoji, texto, expira } });
+    } catch(err) { return respErro(err.message); }
+  }
+
+  // ── lojaRemoverAnuncio ───────────────────────────────────────
+  if (p.action === 'lojaRemoverAnuncio') {
+    try {
+      const ss  = SpreadsheetApp.openByUrl(SHEET_URL);
+      const wpp = tokenLojaValido(ss, p.token);
+      if (!wpp) return respErro('UNAUTHORIZED');
+      const sheet = ss.getSheetByName(SHEET_NAME);
+      const loja  = buscarLojaPorWpp(sheet, wpp);
+      if (!loja) return respErro('Loja não encontrada');
+      sheet.getRange(loja.rowIndex, 24).setValue('');
+      return respOk({ msg: 'Anúncio removido' });
+    } catch(err) { return respErro(err.message); }
+  }
+
+  // ── Rota pública — lojas APROVADAS ─────────────────────────
+  try {
+    const ss    = SpreadsheetApp.openByUrl(SHEET_URL);
+    garantirColunaAnuncio(ss); // garante que col X existe na planilha
+    const sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet) return respErro('Aba "' + SHEET_NAME + '" não encontrada');
+
+    // Pré-carrega avaliações indexadas por nome de loja
+    const avalMap = {};
+    try {
+      const avalSheet = ss.getSheetByName('Avaliacoes');
+      if (avalSheet) {
+        const avalDados = avalSheet.getDataRange().getValues();
+        for (let i = 1; i < avalDados.length; i++) {
+          const [dataHora, loja, nota, texto] = avalDados[i];
+          if (!loja || !nota) continue;
+          const n = String(loja).trim();
+          if (!avalMap[n]) avalMap[n] = [];
+          avalMap[n].push({ nota: parseInt(nota), texto: String(texto||'').trim() });
+        }
+      }
+    } catch(e) {}
+
+    const dados = sheet.getDataRange().getValues();
+    if (dados.length <= 1) return respOk([]);
+
+    const lojas = [];
+    for (let i = 1; i < dados.length; i++) {
+      const row    = dados[i];
+      const status = String(row[8] || '').trim().toUpperCase();
+      if (status !== 'APROVADO') continue;
+
+      const ramo      = String(row[2]  || '').trim();
+      const horaAbre  = String(row[15] || '').trim();
+      const horaFecha = String(row[16] || '').trim();
+      const diasStr   = String(row[14] || '0,1,2,3,4,5,6').trim();
+
+      let horario = null;
+      if (horaAbre && horaFecha) {
+        const dias = diasStr.split(',').map(d => parseInt(d.trim())).filter(d => !isNaN(d) && d >= 0 && d <= 6);
+        if (dias.length) horario = { dias, abre: horaAbre, fecha: horaFecha };
+      }
+
+      const plano         = String(row[19] || 'GRATIS').trim().toUpperCase();
+      const planoValidade = row[20] || '';
+      const planoEstaAti  = (plano === 'GRATIS') || planoAtivo(planoValidade);
+      const recomendadoRaw = String(row[13] || '').trim().toUpperCase() === 'SIM';
+      const recomendado   = recomendadoRaw && planoEstaAti;
+      const statusLoja    = String(row[22] || '').trim().toUpperCase(); // ABERTO/VOLTAMOS/FECHADO
+
+      lojas.push({
+        nome:        String(row[1]  || '').trim(),
+        categoria:   mapCategoria(ramo),
+        sub:         String(row[11] || '').trim() || ramo,
+        tags:        String(row[12] || '').trim().toLowerCase() || ramo.toLowerCase(),
+        endereco:    String(row[3]  || '').trim(),
+        obs:         String(row[7]  || '').trim(),
+        wpp:         String(row[4]  || '').trim().replace(/\D/g,''),
+        tel:         String(row[5]  || '').trim().replace(/\D/g,''),
+        maps:        String(row[9]  || '').trim(),
+        emoji:       String(row[10] || '🏪').trim() || '🏪',
+        foto:        String(row[17] || '').trim(),
+        logo:        String(row[18] || '').trim(),
+        recomendado,
+        plano:       planoEstaAti ? plano : 'GRATIS',
+        horario,
+        statusLoja,  // override manual do dono da loja
+        anuncio:     (function() {
+          try {
+            const raw = String(row[23] || '').trim();
+            if (!raw) return null;
+            const obj = JSON.parse(raw);
+            return (obj.expira && new Date(obj.expira) > new Date()) ? obj : null;
+          } catch(e) { return null; }
+        })(),
+        avaliacoes: avalMap[String(row[1]||'').trim()] || [],
+      });
+    }
+    return respOk(lojas);
+  } catch (err) {
+    Logger.log('ERRO doGet: ' + err.message);
+    return respErro(err.message);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  doPost
+// ════════════════════════════════════════════════════════════════
+function doPost(e) {
+  try {
+    let payload;
+    if (e.parameter && e.parameter.payload) {
+      payload = JSON.parse(e.parameter.payload);
+    } else if (e.postData && e.postData.type === 'application/json') {
+      payload = JSON.parse(e.postData.contents);
+    } else if (e.parameter && e.parameter.storeName) {
+      payload = e.parameter;
+    } else {
+      throw new Error('Formato de payload não reconhecido');
+    }
+
+    // ── Actions de loja enviadas via POST — redireciona para doGet ──
+    const LOJA_ACTIONS_POST = [
+      'lojaMetricas','lojaDados','lojaToggle','lojaLogout',
+      'lojaAtualizarImagem','lojaPublicarAnuncio','lojaRemoverAnuncio',
+    ];
+    if (payload.action && LOJA_ACTIONS_POST.includes(payload.action)) {
+      return doGet({ parameter: payload });
+    }
+
+    // ── Registrar avaliação ────────────────────────────────────
+    if (payload.action === 'registrarAvaliacao') {
+      try {
+        const ss    = SpreadsheetApp.openByUrl(SHEET_URL);
+        const nome  = String(payload.loja  || '').trim();
+        const nota  = parseInt(payload.nota || 0);
+        const texto = String(payload.texto || '').trim().substring(0, 120);
+        if (!nome || nota < 1 || nota > 5) return respErro('Dados inválidos');
+        let sheet = ss.getSheetByName('Avaliacoes');
+        if (!sheet) {
+          sheet = ss.insertSheet('Avaliacoes');
+          sheet.appendRow(['DataHora','Loja','Nota','Texto']);
+          sheet.getRange(1,1,1,4).setFontWeight('bold').setBackground('#6366f1').setFontColor('#fff');
+          sheet.setFrozenRows(1);
+        }
+        sheet.appendRow([new Date(), nome, nota, texto]);
+        return respOk({ msg: 'Avaliação registrada' });
+      } catch(err) { return respErro(err.message); }
+    }
+    if (payload.action === 'login') {
+      const ss = SpreadsheetApp.openByUrl(SHEET_URL);
+      if (!senhaCorreta(payload.passHash)) return respErro('UNAUTHORIZED');
+      const token = criarSessaoAdmin(ss);
+      return respOk({ token, tipo: 'admin' });
+    }
+
+    // ── Logout Admin ───────────────────────────────────────────
+    if (payload.action === 'logout') {
+      const ss    = SpreadsheetApp.openByUrl(SHEET_URL);
+      const sheet = getSessionsSheet(ss);
+      const dados = sheet.getDataRange().getValues();
+      for (let i = 1; i < dados.length; i++) {
+        if (dados[i][0] === payload.token) { sheet.deleteRow(i + 1); break; }
+      }
+      return respOk({ msg: 'Sessão encerrada' });
+    }
+
+    // ── Login Loja — passo 1: solicita código ──────────────────
+    // O front envia { action:'lojaRequestCodigo', wpp:'5515...' }
+    // O servidor gera o código e retorna o link do WhatsApp para o admin enviar
+    if (payload.action === 'lojaRequestCodigo') {
+      const ss  = SpreadsheetApp.openByUrl(SHEET_URL);
+      const wpp = String(payload.wpp || '').replace(/\D/g, '');
+      if (!wpp || wpp.length < 10) return respErro('WhatsApp inválido');
+
+      // Verifica se o WPP está cadastrado e APROVADO
+      const sheet = ss.getSheetByName(SHEET_NAME);
+      const loja  = buscarLojaPorWpp(sheet, wpp);
+      if (!loja) return respErro('WPP_NAO_ENCONTRADO');
+      const statusCad = String(loja.dados[8] || '').toUpperCase();
+      if (statusCad !== 'APROVADO') return respErro('LOJA_NAO_APROVADA');
+
+      const codigo = gerarCodigoLoja(ss, wpp);
+      const nome   = String(loja.dados[1] || 'sua loja').trim();
+
+      // Monta o link do WhatsApp para o admin enviar o código
+      const msg = encodeURIComponent(
+        `🔐 *AngatubaON* — Código de acesso\n\nOlá, *${nome}*!\n\nSeu código de login é:\n\n*${codigo}*\n\n_Válido por 10 minutos. Não compartilhe com ninguém._`
+      );
+      const wppLink = `https://wa.me/${wpp}?text=${msg}`;
+
+      // Envia e-mail ao admin com o link (para ele clicar e mandar a mensagem)
+      // Obs: em produção você pode usar a API do WhatsApp Business para automatizar
+      MailApp.sendEmail(
+        EMAIL_ADMIN,
+        '[AngatubaON] Código de login — ' + nome,
+        `Clique no link abaixo para enviar o código de login para ${nome} (${wpp}):\n\n${wppLink}\n\nCódigo: ${codigo}\nExpira em 10 minutos.`
+      );
+
+      return respOk({ msg: 'Código gerado. O admin enviará via WhatsApp.', wppLink, nome });
+    }
+
+    // ── Login Loja — passo 2: verifica código ─────────────────
+    if (payload.action === 'lojaVerificarCodigo') {
+      const ss     = SpreadsheetApp.openByUrl(SHEET_URL);
+      const wpp    = String(payload.wpp    || '').replace(/\D/g, '');
+      const codigo = String(payload.codigo || '').trim();
+      if (!wpp || !codigo) return respErro('Dados inválidos');
+
+      if (!verificarCodigoLoja(ss, wpp, codigo)) return respErro('CODIGO_INVALIDO');
+
+      const token = criarSessaoLoja(ss, wpp);
+      const sheet = ss.getSheetByName(SHEET_NAME);
+      const loja  = buscarLojaPorWpp(sheet, wpp);
+      const nome  = loja ? String(loja.dados[1] || '').trim() : '';
+      return respOk({ token, tipo: 'loja', nome });
+    }
+
+    // ── Ações admin protegidas por token ───────────────────────
+    if (payload.action === 'updateStatus' || payload.action === 'updatePlan') {
+      const ss = SpreadsheetApp.openByUrl(SHEET_URL);
+      if (!tokenValido(ss, payload.token)) return respErro('UNAUTHORIZED');
+      const sheet = ss.getSheetByName(SHEET_NAME);
+
+      if (payload.action === 'updateStatus') {
+        sheet.getRange(payload.row, 9).setValue(payload.status);
+        return respOk({ msg: 'Status atualizado', row: payload.row, status: payload.status });
+      }
+      if (payload.action === 'updatePlan') {
+        sheet.getRange(payload.row, 20).setNumberFormat('@').setValue(payload.plano);
+        sheet.getRange(payload.row, 21).setNumberFormat('@').setValue(payload.planoValidade || '');
+        sheet.getRange(payload.row, 22).setNumberFormat('@').setValue(payload.planoPago || 'NÃO');
+        const novoRec = (payload.plano === 'PRO' || payload.plano === 'PLUS') ? 'SIM' : 'NÃO';
+        const cellRec = sheet.getRange(payload.row, 14);
+        cellRec.clearDataValidations();
+        cellRec.setNumberFormat('@').setValue(novoRec);
+        return respOk({ msg: 'Plano atualizado', row: payload.row, plano: payload.plano, recomendado: novoRec });
+      }
+    }
+
+    // ── Registrar clique ───────────────────────────────────────
+    if (payload.action === 'registrarClique') {
+      const ss    = SpreadsheetApp.openByUrl(SHEET_URL);
+      const sheet = getMetricasSheet(ss);
+      sheet.appendRow([
+        new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+        String(payload.loja      || '').trim(),
+        String(payload.tipo      || 'wpp').trim(),
+        String(payload.plano     || 'GRATIS').trim().toUpperCase(),
+        String(payload.categoria || '').trim(),
+      ]);
+      return respOk({ msg: 'Clique registrado' });
+    }
+
+    // ── Novo cadastro (público) — só quando não há action definida ──
+    if (payload.action) {
+      // Action chegou até aqui sem ser tratada — evita criar linhas fantasmas
+      return respErro('Action desconhecida: ' + payload.action);
+    }
+    salvarNaPlanilha(payload);
+    enviarEmailNotificacao(payload);
+    return respOk({ msg: 'Cadastro recebido com sucesso!' });
+
+  } catch (err) {
+    Logger.log('ERRO doPost: ' + err.message + '\n' + err.stack);
+    return respErro(err.message);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MÉTRICAS
+// ════════════════════════════════════════════════════════════════
+
+// Retorna métricas de todas as lojas (admin) ou de uma só (loja)
+function calcMetricas(ss, filtroNome) {
+  const sheet = ss.getSheetByName(SHEET_MET);
+  if (!sheet) return [];
+  const dados = sheet.getDataRange().getValues();
+  if (dados.length <= 1) return [];
+
+  const agora   = new Date().getTime();
+  const ms7d    = 7  * 24 * 60 * 60 * 1000;
+  const ms30d   = 30 * 24 * 60 * 60 * 1000;
+  const contagem = {};
+
+  for (let i = 1; i < dados.length; i++) {
+    const [dataHora, loja, tipo, plano] = dados[i];
+    if (!loja) continue;
+    if (filtroNome && loja !== filtroNome) continue;
+
+    // Parse da data (dd/mm/aaaa hh:mm:ss)
+    let ts = 0;
+    try {
+      if (dataHora instanceof Date) {
+        ts = dataHora.getTime();
+      } else {
+        const parts = String(dataHora).split(' ');
+        const [d, m, y] = parts[0].split('/');
+        const [hh, mm] = (parts[1] || '00:00').split(':');
+        ts = new Date(parseInt(y), parseInt(m)-1, parseInt(d), parseInt(hh), parseInt(mm)).getTime();
+      }
+    } catch(e) { ts = 0; }
+
+    if (!contagem[loja]) contagem[loja] = { loja, plano, total:0, wpp:0, tel:0, d7:0, d30:0 };
+    contagem[loja].total++;
+    if (tipo === 'tel') contagem[loja].tel++; else contagem[loja].wpp++;
+    if (ts && (agora - ts) <= ms7d)  contagem[loja].d7++;
+    if (ts && (agora - ts) <= ms30d) contagem[loja].d30++;
+  }
+
+  return Object.values(contagem).sort((a, b) => b.total - a.total);
+}
+
+function calcMetricasLoja(ss, nome) {
+  const lista = calcMetricas(ss, nome);
+  return lista[0] || { loja: nome, total: 0, wpp: 0, tel: 0, d7: 0, d30: 0 };
+}
+
+// Conta cliques da loja hoje (dia atual, horário de Brasília)
+function calcNovosHoje(ss, nome) {
+  const sheet = ss.getSheetByName(SHEET_MET);
+  if (!sheet) return 0;
+  const dados = sheet.getDataRange().getValues();
+  const agora = new Date();
+  const hoje  = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }); // "dd/mm/aaaa"
+  let count = 0;
+  for (let i = 1; i < dados.length; i++) {
+    const [dataHora, loja] = dados[i];
+    if (!loja || loja !== nome) continue;
+    try {
+      let dataStr = '';
+      if (dataHora instanceof Date) {
+        dataStr = dataHora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+      } else {
+        dataStr = String(dataHora).split(' ')[0];
+      }
+      if (dataStr === hoje) count++;
+    } catch(e) {}
+  }
+  return count;
+}
+
+// Retorna array[24] com contagem de cliques por hora (últimos 30 dias) para uma loja
+function calcPicoHoras(ss, nome) {
+  const sheet = ss.getSheetByName(SHEET_MET);
+  if (!sheet) return new Array(24).fill(0);
+  const dados = sheet.getDataRange().getValues();
+  const agora = new Date().getTime();
+  const ms30d = 30 * 24 * 60 * 60 * 1000;
+  const horas = new Array(24).fill(0);
+
+  for (let i = 1; i < dados.length; i++) {
+    const [dataHora, loja] = dados[i];
+    if (!loja || loja !== nome) continue;
+    try {
+      let hora = -1;
+      if (dataHora instanceof Date) {
+        if ((agora - dataHora.getTime()) <= ms30d) hora = dataHora.getHours();
+      } else {
+        const parts = String(dataHora).split(' ');
+        const [d, m, y] = parts[0].split('/');
+        const [hh, mm]  = (parts[1] || '0:0').split(':');
+        const ts = new Date(parseInt(y), parseInt(m)-1, parseInt(d), parseInt(hh), parseInt(mm)).getTime();
+        if ((agora - ts) <= ms30d) hora = parseInt(hh);
+      }
+      if (hora >= 0 && hora <= 23) horas[hora]++;
+    } catch(e) {}
+  }
+  return horas;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  SALVAR / EMAIL
+// ════════════════════════════════════════════════════════════════
+// Garante que a coluna X (AnuncioLoja) existe — chamada na primeira requisição doGet
+function garantirColunaAnuncio(ss) {
+  try {
+    const sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet) return;
+    if (sheet.getLastColumn() < 24) {
+      sheet.getRange(1, 24)
+        .setFontWeight('bold')
+        .setBackground('#f59e0b')
+        .setFontColor('#000000')
+        .setValue('AnuncioLoja');
+    }
+    // Remove linhas PENDENTE completamente vazias (linhas fantasmas)
+    const dados = sheet.getDataRange().getValues();
+    for (let i = dados.length - 1; i >= 1; i--) {
+      const nome   = String(dados[i][1] || '').trim();
+      const status = String(dados[i][8] || '').trim().toUpperCase();
+      if (status === 'PENDENTE' && !nome) {
+        sheet.deleteRow(i + 1);
+      }
+    }
+  } catch(e) { Logger.log('garantirColunaAnuncio: ' + e.message); }
+}
+
+function salvarNaPlanilha(d) {
+  if (!d || typeof d !== 'object') throw new Error('payload inválido');
+  const ss    = SpreadsheetApp.openByUrl(SHEET_URL);
+  let   sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    sheet.appendRow(['Data/Hora','Nome','Ramo','Endereço','WhatsApp','Telefone',
+      'Horário Texto','Observações','Status','Maps','Emoji','Sub','Tags','Recomendado',
+      'Dias (0=dom)','Hora Abre','Hora Fecha','Foto URL','Logo URL','Plano','PlanoValidade','PlanoPago','StatusLoja','AnuncioLoja']);
+    sheet.getRange(1,1,1,24).setFontWeight('bold').setBackground('#f59e0b').setFontColor('#000000');
+    sheet.setFrozenRows(1);
+  } else {
+    // Garante que a coluna X (AnuncioLoja) existe na planilha já criada
+    const lastCol = sheet.getLastColumn();
+    if (lastCol < 24) {
+      sheet.getRange(1, 24).setFontWeight('bold').setBackground('#f59e0b').setFontColor('#000000').setValue('AnuncioLoja');
+    }
+  }
+  sheet.appendRow([
+    new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+    d.storeName  || d.nome     || '',
+    d.category   || d.ramo     || '',
+    d.address    || d.endereco || '',
+    (d.whatsapp  || '').replace(/\D/g,''),
+    (d.phone     || d.telefone || '').replace(/\D/g,''),
+    d.horario    || d.hours    || '',
+    d.notes      || d.observacoes || '',
+    'PENDENTE', d.mapsUrl || d.maps || '', '🏪', '', '', 'NÃO',
+    d.dias     || '0,1,2,3,4,5,6',
+    d.horaAbre || '', d.horaFecha || '', d.fotoUrl || '', d.logoUrl || '',
+    'GRATIS', '', 'NÃO', '',
+  ]);
+}
+
+function enviarEmailNotificacao(d) {
+  const nome  = d.storeName || d.nome || '—';
+  const plano = d.planoSolicitado || 'GRATIS';
+  MailApp.sendEmail(EMAIL_ADMIN,
+    '[AngatubaON] Novo cadastro: ' + nome,
+    `Novo cadastro!\n\n🏪 ${nome}\n🗂️ ${d.category||d.ramo||'—'}\n📍 ${d.address||d.endereco||'—'}\n📱 ${d.whatsapp||'—'}\n⭐ Plano: ${plano}\n\nhttps://docs.google.com/spreadsheets/d/1eWWsja2FYQq1uw6DtLzLhzgcCyZd3MU3ACgBBgI7Pj8/edit`
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════════════
+function respOk(data) {
+  return ContentService.createTextOutput(JSON.stringify({ status:'ok', data })).setMimeType(ContentService.MimeType.JSON);
+}
+function respErro(msg) {
+  return ContentService.createTextOutput(JSON.stringify({ status:'erro', msg })).setMimeType(ContentService.MimeType.JSON);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  TESTES
+// ════════════════════════════════════════════════════════════════
+function testarLogin() {
+  const hash = sha256('angatuba2025');
+  Logger.log('Hash: ' + hash + ' | Match: ' + senhaCorreta(hash));
+}
+function testarGerarCodigo() {
+  const ss     = SpreadsheetApp.openByUrl(SHEET_URL);
+  const codigo = gerarCodigoLoja(ss, '5515999999999');
+  Logger.log('Código gerado: ' + codigo);
+}
+function testarDoGet() { Logger.log(doGet({}).getContent()); }

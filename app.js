@@ -1893,9 +1893,10 @@
            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
              <span style="font-size:1.4rem;font-weight:800;font-family:var(--font-h);">${mediaAval}</span>
              <div>
-               <div style="display:flex;gap:2px;">${[1,2,3,4,5].map(s =>
-                 `<span style="color:${s<=Math.round(mediaAval)?'#f59e0b':'rgba(255,255,255,0.15)';font-size:14px;">★</span>`
-               ).join('')}</div>
+               <div style="display:flex;gap:2px;">${[1,2,3,4,5].map(s => {
+                 const cor = s <= Math.round(mediaAval) ? '#f59e0b' : 'rgba(255,255,255,0.15)';
+                 return `<span style="color:${cor};font-size:14px;">★</span>`;
+               }).join('')}</div>
                <div style="font-size:10px;color:var(--muted);">${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''}</div>
              </div>
            </div>

@@ -119,10 +119,21 @@
      fechaStr = hora de fechamento formatada (ex: "23:00") ou ''
   ─────────────────────────────────────────────────────────── */
   function calcStatusInfo(loja) {
-    // Override manual do dono da loja (ABERTO / VOLTAMOS / FECHADO)
+    // Override manual do dono da loja
     if (loja.statusLoja === 'ABERTO')   return { status: 'open',   fechaStr: '' };
     if (loja.statusLoja === 'VOLTAMOS') return { status: 'zap',    fechaStr: '' };
     if (loja.statusLoja === 'FECHADO')  return { status: 'closed', fechaStr: '' };
+
+    // Aberto com horário manual: ABERTO_ATE_1900
+    if ((loja.statusLoja || '').startsWith('ABERTO_ATE_')) {
+      const hhmm = loja.statusLoja.replace('ABERTO_ATE_', '');
+      const hh = hhmm.substring(0, 2);
+      const mm = hhmm.substring(2, 4);
+      const ate = new Date();
+      ate.setHours(parseInt(hh), parseInt(mm), 0, 0);
+      if (new Date() < ate) return { status: 'open', fechaStr: `${hh}:${mm}` };
+      // Horário já passou — cai no cálculo automático abaixo
+    }
 
     if (loja.status) return { status: loja.status, fechaStr: '' };
     if (!loja.horario) return { status: 'open', fechaStr: '' };
@@ -1015,8 +1026,8 @@
   /* ══════════════════════════════════════════════════════════════
      SESSÃO DE LOJA — login via WhatsApp + código
   ══════════════════════════════════════════════════════════════ */
-  let _lojaToken = sessionStorage.getItem('angatuba_loja_token') || null;
-  let _lojaNome  = sessionStorage.getItem('angatuba_loja_nome')  || '';
+  let _lojaToken = localStorage.getItem('angatuba_loja_token') || null;
+  let _lojaNome  = localStorage.getItem('angatuba_loja_nome')  || '';
   let _lojaWpp   = ''; // capturado no passo 1 do login
 
   /* ── Atualiza a bottom nav conforme sessão ───────────────── */
@@ -1224,8 +1235,8 @@
       if (json.status === 'ok' && json.data.token) {
         _lojaToken = json.data.token;
         _lojaNome  = json.data.nome || '';
-        sessionStorage.setItem('angatuba_loja_token', _lojaToken);
-        sessionStorage.setItem('angatuba_loja_nome',  _lojaNome);
+        localStorage.setItem('angatuba_loja_token', _lojaToken);
+        localStorage.setItem('angatuba_loja_nome',  _lojaNome);
         closeLoginLoja();
         atualizarNav();
         abrirMinhaLoja();
@@ -1262,7 +1273,7 @@
 
     // Restaura anúncio do sessionStorage enquanto API carrega
     try {
-      const anuncioCache = sessionStorage.getItem('angatuba_anuncio');
+      const anuncioCache = localStorage.getItem('angatuba_anuncio');
       if (anuncioCache) {
         const obj = JSON.parse(anuncioCache);
         if (obj.expira && new Date(obj.expira) > new Date()) {
@@ -1270,7 +1281,7 @@
           if (anuncioSection) anuncioSection.style.display = '';
           mlExibirAnuncioAtivo(obj);
         } else {
-          sessionStorage.removeItem('angatuba_anuncio');
+          localStorage.removeItem('angatuba_anuncio');
         }
       }
     } catch(e) {}
@@ -1293,7 +1304,7 @@
       if (dadosJson.status === 'ok') {
         const d = dadosJson.data;
         _lojaNome = d.nome;
-        sessionStorage.setItem('angatuba_loja_nome', _lojaNome);
+        localStorage.setItem('angatuba_loja_nome', _lojaNome);
 
         document.getElementById('ml-nome').textContent = d.nome;
         document.getElementById('ml-ramo').textContent = d.ramo || '—';
@@ -1401,13 +1412,13 @@
             } else {
               // API não retornou anúncio — tenta usar o cache local
               try {
-                const cache = sessionStorage.getItem('angatuba_anuncio');
+                const cache = localStorage.getItem('angatuba_anuncio');
                 if (cache) {
                   const obj = JSON.parse(cache);
                   if (obj.expira && new Date(obj.expira) > new Date()) {
                     mlExibirAnuncioAtivo(obj);
                   } else {
-                    sessionStorage.removeItem('angatuba_anuncio');
+                    localStorage.removeItem('angatuba_anuncio');
                     document.getElementById('ml-anuncio-ativo').style.display = 'none';
                   }
                 }
@@ -1489,16 +1500,43 @@
     });
   }
 
+  // Botão "Aberto" — mostra campo de horário opcional antes de confirmar
+  function lojaToggleComHorario(status) {
+    const wrap = document.getElementById('ml-aberto-ate-wrap');
+    if (!wrap) { lojaToggle(status); return; }
+    wrap.style.display = '';
+    // Pré-preenche com horário atual + 1h como sugestão
+    const agora = new Date();
+    agora.setHours(agora.getHours() + 1, 0);
+    const hh = String(agora.getHours()).padStart(2,'0');
+    const mm = '00';
+    document.getElementById('ml-aberto-ate-time').value = `${hh}:${mm}`;
+    document.getElementById('ml-aberto-ate-time').focus();
+  }
+
+  // Confirma "Aberto" com horário personalizado
+  async function lojaToggleAberto() {
+    const time = document.getElementById('ml-aberto-ate-time')?.value;
+    const status = time ? `ABERTO_ATE_${time.replace(':','')}` : 'ABERTO';
+    document.getElementById('ml-aberto-ate-wrap').style.display = 'none';
+    await lojaToggle(status);
+  }
+
+  window.lojaToggleComHorario = lojaToggleComHorario;
+  window.lojaToggleAberto     = lojaToggleAberto;
+
   async function lojaToggle(novoStatus) {
     if (!_lojaToken) return;
     marcarToggle(novoStatus); // feedback imediato
+    // Esconde o campo "aberto até" se estiver visível
+    const wrap = document.getElementById('ml-aberto-ate-wrap');
+    if (wrap) wrap.style.display = 'none';
 
     try {
       const url = `${APPS_SCRIPT_URL}?action=lojaToggle&token=${encodeURIComponent(_lojaToken)}&statusLoja=${encodeURIComponent(novoStatus)}`;
       const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
       const json = await resp.json();
       if (json.msg === 'UNAUTHORIZED') { lojaLogout(true); return; }
-      // Sucesso — já foi marcado no feedback imediato
     } catch(e) {
       console.warn('[lojaToggle] Erro:', e.message);
     }
@@ -1512,8 +1550,8 @@
     }
     _lojaToken = null;
     _lojaNome  = '';
-    sessionStorage.removeItem('angatuba_loja_token');
-    sessionStorage.removeItem('angatuba_loja_nome');
+    localStorage.removeItem('angatuba_loja_token');
+    localStorage.removeItem('angatuba_loja_nome');
     fecharMinhaLoja();
     atualizarNav();
     if (!silencioso) {
@@ -1532,7 +1570,7 @@
   if (_lojaToken) {
     fetch(`${APPS_SCRIPT_URL}?action=lojaDados&token=${encodeURIComponent(_lojaToken)}`, { signal: AbortSignal.timeout(8000) })
       .then(r => r.json())
-      .then(j => { if (j.msg === 'UNAUTHORIZED') { _lojaToken = null; sessionStorage.removeItem('angatuba_loja_token'); atualizarNav(); } })
+      .then(j => { if (j.msg === 'UNAUTHORIZED') { _lojaToken = null; localStorage.removeItem('angatuba_loja_token'); atualizarNav(); } })
       .catch(() => {});
   }
 
@@ -2886,12 +2924,12 @@
 
     // Verifica se ainda não expirou
     if (anuncio.expira && new Date(anuncio.expira) <= new Date()) {
-      sessionStorage.removeItem('angatuba_anuncio');
+      localStorage.removeItem('angatuba_anuncio');
       return;
     }
 
     // Persiste no sessionStorage para sobreviver ao recarregar
-    sessionStorage.setItem('angatuba_anuncio', JSON.stringify(anuncio));
+    localStorage.setItem('angatuba_anuncio', JSON.stringify(anuncio));
 
     ativoEl.style.display = '';
     document.getElementById('ml-anuncio-emoji-preview').textContent = anuncio.emoji || '🎯';
@@ -2908,7 +2946,7 @@
       } else {
         timerEl.textContent = 'Expirado';
         ativoEl.style.display = 'none';
-        sessionStorage.removeItem('angatuba_anuncio');
+        localStorage.removeItem('angatuba_anuncio');
         return;
       }
     }
@@ -2969,7 +3007,7 @@
       const textarea = document.getElementById('ml-anuncio-texto');
       if (textarea) { textarea.value = ''; }
       document.getElementById('ml-anuncio-chars').textContent = '0/80';
-      sessionStorage.removeItem('angatuba_anuncio');
+      localStorage.removeItem('angatuba_anuncio');
     } catch(e) {
       console.warn('[Anuncio] Erro ao remover:', e.message);
     }

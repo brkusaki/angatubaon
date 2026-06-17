@@ -1803,7 +1803,13 @@
              onerror="this.parentElement.innerHTML = placeholderCover('${escAttr(loja.emoji || '🏪')}', '${escAttr(loja.categoria || '')}');" />
            <div class="detail-top-bar">
              <div class="detail-handle"></div>
-             <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
+             <div style="display:flex;gap:8px;">
+               <button onclick="detalhesCompartilhar(${idx})" class="detail-close" aria-label="Compartilhar"
+                 style="background:rgba(0,0,0,0.35);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.15);color:#fff;">
+                 <i class="fa fa-share-nodes"></i>
+               </button>
+               <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
+             </div>
            </div>
            <div class="detail-cover-badge">${badgeHTML(status, fechaStr)}</div>
          </div>`
@@ -1814,20 +1820,44 @@
            </div>
            <div class="detail-top-bar">
              <div class="detail-handle"></div>
-             <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
+             <div style="display:flex;gap:8px;">
+               <button onclick="detalhesCompartilhar(${idx})" class="detail-close" aria-label="Compartilhar"
+                 style="background:rgba(0,0,0,0.35);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.15);color:#fff;">
+                 <i class="fa fa-share-nodes"></i>
+               </button>
+               <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
+             </div>
            </div>
            <div class="detail-cover-badge">${badgeHTML(status, fechaStr)}</div>
          </div>`
       : `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0;">
            <div class="detail-handle" style="position:static;transform:none;margin:0 auto;"></div>
-           <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar"
-             style="position:static;transform:none;background:var(--surface2);color:var(--muted);">✕</button>
+           <div style="display:flex;gap:8px;">
+             <button onclick="detalhesCompartilhar(${idx})"
+               style="font-size:13px;color:var(--muted);padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;">
+               <i class="fa fa-share-nodes"></i>
+             </button>
+             <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar"
+               style="position:static;transform:none;background:var(--surface2);color:var(--muted);">✕</button>
+           </div>
          </div>`;
 
-    // ── BADGE DE PLANO ────────────────────────────────────────
+    // ── BADGE DE PLANO — junto com o nome ─────────────────────
     let planBadge = '';
     if (isPro)         planBadge = `<span class="plan-badge badge-pro">⭐ PRO</span>`;
-    else if (plano === 'PLUS') planBadge = `<span class="plan-badge badge-plus">✦ PLUS</span>`;
+    else if (isPlus)   planBadge = `<span class="plan-badge badge-plus">✦ PLUS</span>`;
+
+    // ── ANÚNCIO DO DIA ────────────────────────────────────────
+    const anuncioHTML = (isPro && loja.anuncio && loja.anuncio.texto)
+      ? `<div style="
+            display:flex;align-items:center;gap:10px;
+            background:linear-gradient(135deg,rgba(245,158,11,0.1),rgba(245,158,11,0.04));
+            border:1px solid rgba(245,158,11,0.3);border-radius:10px;
+            padding:10px 12px;margin-bottom:14px;">
+           <span style="font-size:1.3rem;flex-shrink:0;">${loja.anuncio.emoji || '🎯'}</span>
+           <span style="font-size:12px;font-weight:600;color:var(--zap);line-height:1.4;">${escHTML(loja.anuncio.texto)}</span>
+         </div>`
+      : '';
 
     // ── ENDEREÇO ─────────────────────────────────────────────
     const enderecoHTML = loja.endereco
@@ -1867,6 +1897,7 @@
         </div>
         <div class="detail-sub">${escHTML(loja.sub || loja.categoria || '')}</div>
         ${!isPago ? `<div style="margin-bottom:12px;">${badgeHTML(status, fechaStr)}</div>` : ''}
+        ${anuncioHTML}
         <div class="detail-info">
           ${enderecoHTML}
           ${horarioHTML}
@@ -1878,6 +1909,26 @@
 
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
+  }
+
+  // Compartilhar loja via Web Share API ou fallback para clipboard
+  function detalhesCompartilhar(idx) {
+    const loja = LOJAS[idx];
+    if (!loja) return;
+    const url  = `${location.origin}/#${toSlug(loja.nome)}`;
+    const text = `${loja.emoji || '📍'} *${loja.nome}* — ${loja.sub || loja.categoria || ''}\nVeja no AngatubaON: ${url}`;
+    if (navigator.share) {
+      navigator.share({ title: loja.nome, text, url }).catch(() => {});
+    } else {
+      navigator.clipboard?.writeText(url).then(() => {
+        // Toast rápido
+        const t = document.getElementById('toast');
+        document.getElementById('toast-title').textContent = 'Link copiado!';
+        document.getElementById('toast-msg').textContent   = url;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2500);
+      }).catch(() => {});
+    }
   }
 
   function fecharDetalhes() {
@@ -1914,7 +1965,6 @@
   // Constrói a seção de horários legível (grade de dias)
   function buildHorarioHTML(loja) {
     if (!loja.horario) {
-      // Tenta usar o texto livre se disponível
       const txt = loja.horarioTexto || loja.horario_texto || '';
       if (!txt) return '';
       return `<div class="detail-info-row">
@@ -1930,24 +1980,54 @@
     const hoje = new Date().getDay();
     const is24h = abre === '00:00' && fecha === '23:59';
 
-    // Monta grade: linha por cada dia da semana (0-6)
-    const linhas = DIAS_NOMES_FULL.map((nome, d) => {
+    // Separa dias abertos e fechados — dias fechados ficam apagados no fim
+    const abertosDias  = [];
+    const fechadosDias = [];
+    DIAS_NOMES_FULL.forEach((nome, d) => {
       const aberto = dias.includes(d);
       const isHoje = d === hoje;
       const horaStr = is24h ? '24 horas' : `${abre} – ${fecha}`;
-      return `<div class="detail-schedule-row${isHoje ? ' today' : ''}">
-        <span class="detail-schedule-day">${nome}${isHoje ? ' (hoje)' : ''}</span>
-        ${aberto
-          ? `<span class="detail-schedule-time">${horaStr}</span>`
-          : `<span class="detail-schedule-closed">Fechado</span>`}
-      </div>`;
-    }).join('');
+      const row = aberto
+        ? `<div class="detail-schedule-row${isHoje ? ' today' : ''}">
+             <span class="detail-schedule-day">${nome}${isHoje ? ' <span style="font-size:9px;opacity:0.7;">(hoje)</span>' : ''}</span>
+             <span class="detail-schedule-time">${horaStr}</span>
+           </div>`
+        : `<div class="detail-schedule-row day-closed${isHoje ? ' today' : ''}">
+             <span class="detail-schedule-day">${nome}${isHoje ? ' <span style="font-size:9px;">(hoje)</span>' : ''}</span>
+             <span class="detail-schedule-closed">Fechado</span>
+           </div>`;
+      aberto ? abertosDias.push(row) : fechadosDias.push(row);
+    });
+
+    // Hoje fechado → move para cima independentemente
+    const hojeRow = [...abertosDias, ...fechadosDias].find((_, i) => {
+      return false; // já ordenado abaixo
+    });
+
+    // Ordena: hoje sempre primeiro se fechado, depois abertos, depois fechados apagados
+    const todayFechado = !dias.includes(hoje);
+    const linhas = todayFechado
+      ? [
+          ...DIAS_NOMES_FULL.slice(hoje, hoje + 1).map((nome, _) => {
+            const isHoje = true;
+            return `<div class="detail-schedule-row today day-closed">
+              <span class="detail-schedule-day">${nome} <span style="font-size:9px;">(hoje)</span></span>
+              <span class="detail-schedule-closed">Fechado</span>
+            </div>`;
+          }),
+          ...abertosDias.filter((_, i) => {
+            const d = DIAS_NOMES_FULL.indexOf(DIAS_NOMES_FULL[i]);
+            return i !== hoje;
+          }),
+          ...fechadosDias.filter((r, i) => !r.includes('(hoje)')),
+        ]
+      : [...abertosDias, ...fechadosDias];
 
     return `<div class="detail-info-row">
       <div class="detail-info-icon clock"><i class="fa fa-clock"></i></div>
       <div class="detail-info-text" style="flex:1;">
         <span class="detail-info-label">Horário de Funcionamento</span>
-        <div class="detail-schedule">${linhas}</div>
+        <div class="detail-schedule">${linhas.join('')}</div>
       </div>
     </div>`;
   }
@@ -1979,7 +2059,7 @@
       }
     }
 
-    // Botão Telefone (se existir)
+    // Botão Telefone
     if (loja.tel) {
       html += `<a href="tel:${loja.tel}" class="detail-btn-tel"
         onclick="registrarClique('${mNome}','tel','${mPlan}','${mCat}')">
@@ -1987,12 +2067,18 @@
       </a>`;
     }
 
-    // Botão Mapa
+    // Botão Mapa — texto visível se não há WhatsApp, ícone se há
     if (loja.maps) {
-      html += `<a href="${loja.maps}" target="_blank" rel="noopener"
-        class="detail-btn-maps" aria-label="Ver no mapa">
-        <i class="fa fa-map-marker-alt"></i>
-      </a>`;
+      const temContato = loja.wpp || loja.tel;
+      html += temContato
+        ? `<a href="${loja.maps}" target="_blank" rel="noopener"
+            class="detail-btn-maps" aria-label="Como chegar">
+            <i class="fa fa-map-marker-alt"></i>
+          </a>`
+        : `<a href="${loja.maps}" target="_blank" rel="noopener"
+            class="detail-btn-maps-full" aria-label="Como chegar">
+            <i class="fa fa-map-marker-alt"></i> Como chegar
+          </a>`;
     }
 
     return html;

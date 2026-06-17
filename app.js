@@ -330,10 +330,20 @@
            <i class="fa fa-${isPago ? 'expand-alt' : 'info-circle'}" style="font-size:8px;"></i> Ver detalhes
          </span>`;
 
-    // Badge de anúncio do dia (só Pro com anúncio ativo)
-    const anuncioBadge = (isPro && loja.anuncio && loja.anuncio.texto)
-      ? `<div class="store-anuncio-badge"><span>${loja.anuncio.emoji || '🎯'}</span> ${escHTML(loja.anuncio.texto)}</div>`
-      : '';
+    // Badge de anúncio do dia
+    // Plus: texto + emoji | Pro: texto + emoji + indicador de foto (se houver)
+    const temAnuncioPlus = (isPlus && loja.anuncio && loja.anuncio.texto);
+    const temAnuncioPro  = (isPro  && loja.anuncio && loja.anuncio.texto);
+    let anuncioBadge = '';
+    if (temAnuncioPro) {
+      const temFoto = !!loja.anuncio.imagemUrl;
+      const fotoHint = temFoto
+        ? ` <span style="opacity:.75;">📷</span><span style="font-size:9px;opacity:.65;"> · ver foto →</span>`
+        : '';
+      anuncioBadge = `<div class="store-anuncio-badge"><span>${loja.anuncio.emoji || '🎯'}</span> ${escHTML(loja.anuncio.texto)}${fotoHint}</div>`;
+    } else if (temAnuncioPlus) {
+      anuncioBadge = `<div class="store-anuncio-badge"><span>${loja.anuncio.emoji || '🎯'}</span> ${escHTML(loja.anuncio.texto)}</div>`;
+    }
 
     return `
       <div class="${cardClass}"
@@ -1268,6 +1278,8 @@
     const heroImgEl = document.getElementById('ml-hero-img');
     const plano     = d.plano || 'GRATIS';
     const isPago    = plano !== 'GRATIS';
+    const isPro     = plano === 'PRO';
+    const isPlus    = plano === 'PLUS';
 
     // Usa foto/logo do lojaDados; fallback na lista LOJAS já carregada
     const lojaLocal = LOJAS.find(l => l.nome === d.nome);
@@ -1351,12 +1363,21 @@
       }
     }
 
-    // ── Anúncio do dia (só Pro) ──────────────────────────
-    const isPro = plano === 'PRO';
+    // ── Anúncio do dia (Plus = texto; Pro = texto + foto) ──
     const anuncioSection = document.getElementById('ml-anuncio-section');
     if (anuncioSection) {
-      anuncioSection.style.display = isPro ? '' : 'none';
-      if (isPro && metJson && metJson.status === 'ok') {
+      const temAnuncio = isPro || isPlus;
+      anuncioSection.style.display = temAnuncio ? '' : 'none';
+
+      // Badge dinâmico: Plus ou Pro
+      const planoBadgeEl = document.getElementById('ml-anuncio-plano-badge');
+      if (planoBadgeEl) planoBadgeEl.textContent = isPro ? 'PRO' : 'PLUS';
+
+      // Seção upload de imagem: só Pro
+      const imgSection = document.getElementById('ml-anuncio-img-section');
+      if (imgSection) imgSection.style.display = isPro ? '' : 'none';
+
+      if (temAnuncio && metJson && metJson.status === 'ok') {
         if (metJson.data.anuncio) {
           mlExibirAnuncioAtivo(metJson.data.anuncio);
         } else {
@@ -1937,16 +1958,26 @@
     else if (isPlus)   planBadge = `<span class="plan-badge badge-plus">✦ PLUS</span>`;
 
     // ── ANÚNCIO DO DIA ────────────────────────────────────────
-    const anuncioHTML = (isPro && loja.anuncio && loja.anuncio.texto)
-      ? `<div style="
-            display:flex;align-items:center;gap:10px;
+    const temAnuncioModal = ((isPro || isPlus) && loja.anuncio && loja.anuncio.texto);
+    let anuncioHTML = '';
+    if (temAnuncioModal) {
+      const imgHtml = (isPro && loja.anuncio.imagemUrl)
+        ? `<img src="${escAttr(loja.anuncio.imagemUrl)}" alt="Foto do anúncio"
+               style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-top:10px;"
+               onerror="this.style.display='none'" />`
+        : '';
+      anuncioHTML = `<div style="
+            display:flex;flex-direction:column;gap:0;
             background:linear-gradient(135deg,rgba(245,158,11,0.1),rgba(245,158,11,0.04));
             border:1px solid rgba(245,158,11,0.3);border-radius:10px;
             padding:10px 12px;margin-bottom:14px;">
-           <span style="font-size:1.3rem;flex-shrink:0;">${loja.anuncio.emoji || '🎯'}</span>
-           <span style="font-size:12px;font-weight:600;color:var(--zap);line-height:1.4;">${escHTML(loja.anuncio.texto)}</span>
-         </div>`
-      : '';
+           <div style="display:flex;align-items:center;gap:10px;">
+             <span style="font-size:1.3rem;flex-shrink:0;">${loja.anuncio.emoji || '🎯'}</span>
+             <span style="font-size:12px;font-weight:600;color:var(--zap);line-height:1.4;">${escHTML(loja.anuncio.texto)}</span>
+           </div>
+           ${imgHtml}
+         </div>`;
+    }
 
     // ── BOTÃO CARDÁPIO ────────────────────────────────────────
     const temCardapio = loja.cardapio && loja.cardapio.length > 0;
@@ -2914,6 +2945,39 @@
      ANÚNCIO DO DIA — painel Minha Loja
   ══════════════════════════════════════════════════════════════ */
   let _anuncioEmojiSelecionado = '🎯';
+  let _anuncioImagemUrl = ''; // URL final após upload (Pro)
+
+  function mlAnuncioPreviewImagem(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const imgNova   = document.getElementById('ml-anuncio-img-nova');
+    const labelTxt  = document.getElementById('ml-anuncio-img-label-txt');
+    const removerBtn= document.getElementById('ml-anuncio-img-remover');
+    const statusEl  = document.getElementById('ml-anuncio-img-status');
+    const reader = new FileReader();
+    reader.onload = e => {
+      if (imgNova) { imgNova.src = e.target.result; imgNova.style.display = ''; }
+      if (labelTxt) labelTxt.textContent = file.name;
+      if (removerBtn) removerBtn.style.display = '';
+      if (statusEl) statusEl.textContent = '';
+    };
+    reader.readAsDataURL(file);
+    _anuncioImagemUrl = ''; // Resetar URL — será gerado no publicar
+  }
+
+  function mlAnuncioRemoverImagem() {
+    _anuncioImagemUrl = '';
+    const imgNova   = document.getElementById('ml-anuncio-img-nova');
+    const labelTxt  = document.getElementById('ml-anuncio-img-label-txt');
+    const removerBtn= document.getElementById('ml-anuncio-img-remover');
+    const statusEl  = document.getElementById('ml-anuncio-img-status');
+    const input     = document.getElementById('ml-anuncio-img-input');
+    if (imgNova)    { imgNova.src = ''; imgNova.style.display = 'none'; }
+    if (labelTxt)   labelTxt.textContent = 'Toque para escolher uma foto';
+    if (removerBtn) removerBtn.style.display = 'none';
+    if (statusEl)   statusEl.textContent = '';
+    if (input)      input.value = '';
+  }
 
   function mlSelectEmoji(btn) {
     document.querySelectorAll('.anuncio-emoji-btn').forEach(b => b.classList.remove('active'));
@@ -2945,6 +3009,17 @@
     document.getElementById('ml-anuncio-emoji-preview').textContent = anuncio.emoji || '🎯';
     document.getElementById('ml-anuncio-texto-preview').textContent = anuncio.texto;
 
+    // Imagem do anúncio (só Pro)
+    const imgPreview = document.getElementById('ml-anuncio-img-preview');
+    if (imgPreview) {
+      if (anuncio.imagemUrl) {
+        imgPreview.src = anuncio.imagemUrl;
+        imgPreview.style.display = '';
+      } else {
+        imgPreview.style.display = 'none';
+      }
+    }
+
     // Timer de expiração
     const timerEl = document.getElementById('ml-anuncio-timer');
     if (timerEl && anuncio.expira) {
@@ -2969,6 +3044,16 @@
     }
     const emojiBtn = document.querySelector(`.anuncio-emoji-btn[data-emoji="${anuncio.emoji}"]`);
     if (emojiBtn) mlSelectEmoji(emojiBtn);
+
+    // Se tinha imagem salva, mostra no campo de nova imagem também
+    if (anuncio.imagemUrl) {
+      const imgNova = document.getElementById('ml-anuncio-img-nova');
+      const labelTxt = document.getElementById('ml-anuncio-img-label-txt');
+      const removerBtn = document.getElementById('ml-anuncio-img-remover');
+      if (imgNova) { imgNova.src = anuncio.imagemUrl; imgNova.style.display = ''; }
+      if (labelTxt) labelTxt.textContent = 'Foto atual (toque para trocar)';
+      if (removerBtn) removerBtn.style.display = '';
+    }
   }
 
   async function mlPublicarAnuncio() {
@@ -2980,18 +3065,40 @@
     btn.disabled = true;
 
     try {
+      // Upload da imagem (só Pro, se houver arquivo novo)
+      const imgInput  = document.getElementById('ml-anuncio-img-input');
+      const statusEl  = document.getElementById('ml-anuncio-img-status');
+      let imagemUrl   = _anuncioImagemUrl; // Pode ser URL já salva ou vazia
+
+      if (imgInput && imgInput.files[0]) {
+        if (statusEl) { statusEl.textContent = '📤 Enviando foto...'; statusEl.style.color = 'var(--muted)'; }
+        const form = new FormData();
+        form.append('image', imgInput.files[0]);
+        form.append('key', IMGBB_KEY);
+        const uploadResp = await fetch('https://api.imgbb.com/1/upload', { method:'POST', body:form });
+        const uploadJson = await uploadResp.json();
+        if (uploadJson.success) {
+          imagemUrl = uploadJson.data.url;
+          _anuncioImagemUrl = imagemUrl;
+          if (statusEl) { statusEl.textContent = '✅ Foto enviada'; statusEl.style.color = 'var(--green)'; }
+        } else {
+          throw new Error('Falha no upload da foto');
+        }
+      }
+
       const params = new URLSearchParams();
       params.append('payload', JSON.stringify({
-        action: 'lojaPublicarAnuncio',
-        token:  _lojaToken,
-        emoji:  _anuncioEmojiSelecionado,
+        action:    'lojaPublicarAnuncio',
+        token:     _lojaToken,
+        emoji:     _anuncioEmojiSelecionado,
         texto,
+        imagemUrl: imagemUrl || '',
       }));
       const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
       const json = await resp.json();
 
       if (json.status === 'ok') {
-        mlExibirAnuncioAtivo({ emoji: _anuncioEmojiSelecionado, texto, expira: json.data?.expira });
+        mlExibirAnuncioAtivo({ emoji: _anuncioEmojiSelecionado, texto, expira: json.data?.expira, imagemUrl: imagemUrl || '' });
         btn.innerHTML = '<i class="fa fa-check"></i> Publicado!';
         setTimeout(() => {
           btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
@@ -3018,6 +3125,9 @@
       if (textarea) { textarea.value = ''; }
       document.getElementById('ml-anuncio-chars').textContent = '0/80';
       localStorage.removeItem('angatuba_anuncio');
+      // Limpa imagem
+      _anuncioImagemUrl = '';
+      mlAnuncioRemoverImagem();
     } catch(e) {
       console.warn('[Anuncio] Erro ao remover:', e.message);
     }

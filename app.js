@@ -1461,6 +1461,9 @@
             }
           }
         }
+
+        // ── Cardápio ─────────────────────────────────────
+        await mlCardapioCarregar(plano);
       }
     } catch(e) {
       console.warn('[MinhaLoja] Erro ao carregar dados:', e.message);
@@ -1897,6 +1900,22 @@
          </div>`
       : '';
 
+    // ── BOTÃO CARDÁPIO ────────────────────────────────────────
+    const temCardapio = loja.cardapio && loja.cardapio.length > 0;
+    const cardapioBtn = temCardapio
+      ? `<button onclick="abrirCardapioCliente(${idx})" style="
+            width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+            padding:12px;border-radius:12px;margin-bottom:14px;
+            background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.05));
+            border:1px solid rgba(16,185,129,0.3);
+            color:var(--green);font-family:var(--font-h);font-size:13px;font-weight:800;cursor:pointer;">
+           🍽️ Ver Cardápio / Serviços
+           <span style="background:var(--green);color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:20px;">
+             ${loja.cardapio.length} item${loja.cardapio.length !== 1 ? 's' : ''}
+           </span>
+         </button>`
+      : '';
+
     // ── ENDEREÇO ─────────────────────────────────────────────
     const enderecoHTML = loja.endereco
       ? `<div class="detail-info-row">
@@ -1996,6 +2015,7 @@
         <div class="detail-sub">${escHTML(loja.sub || loja.categoria || '')}</div>
         ${!isPago ? `<div style="margin-bottom:12px;">${badgeHTML(status, fechaStr)}</div>` : ''}
         ${anuncioHTML}
+        ${cardapioBtn}
         <div class="detail-info">
           ${enderecoHTML}
           ${horarioHTML}
@@ -2990,3 +3010,372 @@
       if (msgEl) { msgEl.textContent = '❌ Erro ao enviar. Tente novamente.'; msgEl.style.color = 'var(--red)'; }
     }
   };
+
+  /* ══════════════════════════════════════════════════════════════
+     CARDÁPIO — PAINEL DO DONO
+  ══════════════════════════════════════════════════════════════ */
+  let _cardapioItens  = [];
+  let _cardapioPlano  = 'GRATIS';
+  let _cardapioLojaWpp = null;
+  let _cardapioLojaInfo = null;
+
+  async function mlCardapioCarregar(plano) {
+    _cardapioPlano = plano;
+    const isPro  = plano === 'PRO';
+    const isPlus = plano === 'PLUS';
+
+    const section = document.getElementById('ml-cardapio-section');
+    if (!section) return;
+    section.style.display = (isPro || isPlus) ? '' : 'none';
+    if (!isPro && !isPlus) return;
+
+    // Badge do plano
+    const badge = document.getElementById('ml-cardapio-badge');
+    if (badge) {
+      if (isPro) {
+        badge.textContent = 'PRO';
+        badge.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
+      } else {
+        badge.textContent = 'PLUS · até 5 itens';
+        badge.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
+        badge.style.color = '#fff';
+      }
+    }
+
+    // Plus não tem foto nem categoria
+    document.getElementById('ml-cardapio-foto-wrap').style.display = isPro ? '' : 'none';
+    document.getElementById('ml-cardapio-cat-wrap').style.display  = isPro ? '' : 'none';
+
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action:'lojaCardapioListar', token:_lojaToken }));
+      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      const json = await resp.json();
+      if (json.status === 'ok') {
+        _cardapioItens = json.data.itens || [];
+        mlCardapioRenderLista();
+      }
+    } catch(e) { console.warn('[Cardapio] Erro ao carregar:', e.message); }
+  }
+
+  function mlCardapioRenderLista() {
+    const lista  = document.getElementById('ml-cardapio-lista');
+    const limite = document.getElementById('ml-cardapio-limite');
+    if (!lista) return;
+
+    const isPro   = _cardapioPlano === 'PRO';
+    const maxItens = isPro ? null : 5;
+    const ativos  = _cardapioItens.filter(i => i.ativo !== 'NAO');
+
+    if (limite) {
+      limite.textContent = isPro
+        ? `${ativos.length} item${ativos.length !== 1 ? 's' : ''} no cardápio`
+        : `${ativos.length}/5 itens · ${5 - ativos.length} restante${5-ativos.length!==1?'s':''}`;
+    }
+
+    if (ativos.length === 0) {
+      lista.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">
+        Nenhum item ainda.<br>Clique em <strong>Adicionar</strong> para começar.
+      </div>`;
+      return;
+    }
+
+    lista.innerHTML = ativos.map(item => `
+      <div class="ml-cardapio-item">
+        ${item.foto
+          ? `<img src="${item.foto}" class="ml-cardapio-item-foto" onerror="this.style.display='none'">`
+          : `<div class="ml-cardapio-item-foto" style="display:flex;align-items:center;justify-content:center;font-size:1.2rem;">🍽️</div>`}
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:var(--font-h);font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHTML(item.nome)}</div>
+          ${item.categoria ? `<div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:1px;">${escHTML(item.categoria)}</div>` : ''}
+          <div style="font-size:12px;font-weight:700;color:var(--green);margin-top:3px;">R$ ${item.preco.toFixed(2).replace('.',',')}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button onclick="mlCardapioAbrirForm('${item.id}')"
+            style="padding:6px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:10px;font-weight:700;cursor:pointer;">
+            <i class="fa fa-pencil"></i>
+          </button>
+          <button onclick="mlCardapioRemover('${item.id}','${escAttr(item.nome)}')"
+            style="padding:6px 10px;border-radius:7px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.2);color:var(--red);font-size:10px;font-weight:700;cursor:pointer;">
+            <i class="fa fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function mlCardapioAbrirForm(editId) {
+    const form = document.getElementById('ml-cardapio-form');
+    if (!form) return;
+    form.style.display = '';
+    document.getElementById('ml-cardapio-form-msg').textContent = '';
+
+    if (editId) {
+      const item = _cardapioItens.find(i => i.id === editId);
+      if (!item) return;
+      document.getElementById('ml-cardapio-form-title').textContent = 'Editar item';
+      document.getElementById('ml-cardapio-edit-id').value = editId;
+      document.getElementById('ml-cardapio-nome').value    = item.nome;
+      document.getElementById('ml-cardapio-desc').value    = item.descricao || '';
+      document.getElementById('ml-cardapio-preco').value   = item.preco;
+      document.getElementById('ml-cardapio-cat').value     = item.categoria || '';
+      document.getElementById('ml-cardapio-foto-url').value = item.foto || '';
+      const prev = document.getElementById('ml-cardapio-foto-preview');
+      if (prev) prev.innerHTML = item.foto
+        ? `<img src="${item.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">`
+        : '<i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>';
+    } else {
+      document.getElementById('ml-cardapio-form-title').textContent = 'Novo item';
+      document.getElementById('ml-cardapio-edit-id').value = '';
+      document.getElementById('ml-cardapio-nome').value    = '';
+      document.getElementById('ml-cardapio-desc').value    = '';
+      document.getElementById('ml-cardapio-preco').value   = '';
+      document.getElementById('ml-cardapio-cat').value     = '';
+      document.getElementById('ml-cardapio-foto-url').value = '';
+      const prev = document.getElementById('ml-cardapio-foto-preview');
+      if (prev) prev.innerHTML = '<i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>';
+    }
+    form.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  }
+
+  function mlCardapioFecharForm() {
+    document.getElementById('ml-cardapio-form').style.display = 'none';
+  }
+
+  async function mlCardapioFotoPreview(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const prev = document.getElementById('ml-cardapio-foto-preview');
+    // Preview local
+    const reader = new FileReader();
+    reader.onload = e => {
+      prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">`;
+    };
+    reader.readAsDataURL(file);
+    // Upload ImgBB
+    const msgEl = document.getElementById('ml-cardapio-form-msg');
+    msgEl.textContent = '⏳ Enviando foto...';
+    try {
+      const form = new FormData();
+      form.append('image', file);
+      form.append('key', IMGBB_KEY);
+      const resp = await fetch('https://api.imgbb.com/1/upload', { method:'POST', body:form });
+      const json = await resp.json();
+      if (json.success) {
+        document.getElementById('ml-cardapio-foto-url').value = json.data.url;
+        msgEl.textContent = '✅ Foto enviada!';
+        setTimeout(() => { msgEl.textContent = ''; }, 2000);
+      } else throw new Error('Falha no upload');
+    } catch(e) {
+      msgEl.textContent = '❌ Erro na foto: ' + e.message;
+    }
+  }
+
+  window.mlCardapioFotoPreview = mlCardapioFotoPreview;
+
+  async function mlCardapioSalvar() {
+    const nome  = document.getElementById('ml-cardapio-nome').value.trim();
+    const preco = document.getElementById('ml-cardapio-preco').value;
+    const msgEl = document.getElementById('ml-cardapio-form-msg');
+    if (!nome)  { msgEl.textContent = '❌ Informe o nome do item.'; msgEl.style.color='var(--red)'; return; }
+    if (!preco) { msgEl.textContent = '❌ Informe o preço.'; msgEl.style.color='var(--red)'; return; }
+
+    const btn = document.getElementById('ml-cardapio-salvar-btn');
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...';
+    btn.disabled  = true;
+
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({
+        action:     'lojaCardapioSalvar',
+        token:      _lojaToken,
+        id:         document.getElementById('ml-cardapio-edit-id').value,
+        nome,
+        descricao:  document.getElementById('ml-cardapio-desc').value.trim(),
+        preco:      parseFloat(preco),
+        foto:       document.getElementById('ml-cardapio-foto-url').value,
+        categoria:  document.getElementById('ml-cardapio-cat').value.trim(),
+      }));
+      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(15000) });
+      const json = await resp.json();
+      if (json.status === 'ok') {
+        mlCardapioFecharForm();
+        await mlCardapioCarregar(_cardapioPlano);
+        msgEl.textContent = '';
+      } else throw new Error(json.msg || 'Erro');
+    } catch(e) {
+      msgEl.textContent = '❌ ' + e.message;
+      msgEl.style.color = 'var(--red)';
+    } finally {
+      btn.innerHTML = '<i class="fa fa-check"></i> Salvar item';
+      btn.disabled  = false;
+    }
+  }
+
+  async function mlCardapioRemover(id, nome) {
+    if (!confirm(`Remover "${nome}" do cardápio?`)) return;
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action:'lojaCardapioRemover', token:_lojaToken, id }));
+      await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      await mlCardapioCarregar(_cardapioPlano);
+    } catch(e) { alert('Erro ao remover: ' + e.message); }
+  }
+
+  window.mlCardapioAbrirForm  = mlCardapioAbrirForm;
+  window.mlCardapioFecharForm = mlCardapioFecharForm;
+  window.mlCardapioSalvar     = mlCardapioSalvar;
+  window.mlCardapioRemover    = mlCardapioRemover;
+
+  /* ══════════════════════════════════════════════════════════════
+     CARDÁPIO — TELA DO CLIENTE
+  ══════════════════════════════════════════════════════════════ */
+  let _ccLojaIdx   = null;
+  let _ccCarrinho  = {}; // { itemId: { item, qty } }
+
+  window.abrirCardapioCliente = function(idx) {
+    const loja = LOJAS[idx];
+    if (!loja || !loja.cardapio || loja.cardapio.length === 0) return;
+    _ccLojaIdx  = idx;
+    _ccCarrinho = {};
+
+    document.getElementById('cc-loja-nome').textContent = loja.nome;
+    document.getElementById('cc-loja-sub').textContent  = loja.sub || loja.categoria || '';
+
+    ccRenderItens(loja);
+    ccAtualizarCarrinho();
+
+    document.getElementById('modal-cardapio-cliente').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.fecharCardapioCliente = function() {
+    document.getElementById('modal-cardapio-cliente').classList.remove('open');
+    document.body.style.overflow = '';
+  };
+
+  function ccRenderItens(loja) {
+    const wrap  = document.getElementById('cc-itens-wrap');
+    const isPro = (loja.plano || '').toUpperCase() === 'PRO';
+
+    // Agrupa por categoria
+    const grupos = {};
+    loja.cardapio.forEach(item => {
+      const cat = (isPro && item.categoria) ? item.categoria : 'Itens';
+      if (!grupos[cat]) grupos[cat] = [];
+      grupos[cat].push(item);
+    });
+
+    wrap.innerHTML = Object.entries(grupos).map(([cat, itens]) => `
+      <div class="cc-cat-label">${escHTML(cat)}</div>
+      ${itens.map(item => `
+        <div class="cc-item-card" id="cc-card-${item.id}" style="margin-bottom:8px;">
+          ${(isPro && item.foto)
+            ? `<img src="${item.foto}" class="cc-item-foto" onerror="this.style.display='none'">`
+            : `<div class="cc-item-foto-placeholder">${loja.emoji || '🍽️'}</div>`}
+          <div class="cc-item-info">
+            <div class="cc-item-nome">${escHTML(item.nome)}</div>
+            ${item.descricao ? `<div class="cc-item-desc">${escHTML(item.descricao)}</div>` : ''}
+            <div class="cc-item-preco">R$ ${item.preco.toFixed(2).replace('.',',')}</div>
+          </div>
+          <div class="cc-qty-ctrl" id="cc-qty-${item.id}">
+            <button class="cc-item-add" onclick="ccAdicionarItem('${item.id}')">+</button>
+          </div>
+        </div>
+      `).join('')}
+    `).join('');
+  }
+
+  window.ccAdicionarItem = function(itemId) {
+    const loja = LOJAS[_ccLojaIdx];
+    const item = loja.cardapio.find(i => i.id === itemId);
+    if (!item) return;
+
+    if (!_ccCarrinho[itemId]) {
+      _ccCarrinho[itemId] = { item, qty: 0 };
+    }
+    _ccCarrinho[itemId].qty++;
+
+    // Troca botão "+" por controles de quantidade
+    const qtyEl = document.getElementById(`cc-qty-${itemId}`);
+    if (qtyEl) {
+      qtyEl.innerHTML = `
+        <button class="cc-qty-btn" onclick="ccAlterarQty('${itemId}',-1)">−</button>
+        <span class="cc-qty-num">${_ccCarrinho[itemId].qty}</span>
+        <button class="cc-qty-btn" onclick="ccAlterarQty('${itemId}',+1)" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;">+</button>
+      `;
+    }
+    ccAtualizarCarrinho();
+  };
+
+  window.ccAlterarQty = function(itemId, delta) {
+    if (!_ccCarrinho[itemId]) return;
+    _ccCarrinho[itemId].qty += delta;
+    if (_ccCarrinho[itemId].qty <= 0) {
+      delete _ccCarrinho[itemId];
+      // Volta para botão "+"
+      const qtyEl = document.getElementById(`cc-qty-${itemId}`);
+      if (qtyEl) qtyEl.innerHTML = `<button class="cc-item-add" onclick="ccAdicionarItem('${itemId}')">+</button>`;
+    } else {
+      const qtyEl = document.getElementById(`cc-qty-${itemId}`);
+      if (qtyEl) qtyEl.querySelector('.cc-qty-num').textContent = _ccCarrinho[itemId].qty;
+    }
+    ccAtualizarCarrinho();
+  };
+
+  window.ccLimparCarrinho = function() {
+    _ccCarrinho = {};
+    const loja = LOJAS[_ccLojaIdx];
+    if (loja) ccRenderItens(loja);
+    ccAtualizarCarrinho();
+  };
+
+  function ccAtualizarCarrinho() {
+    const bar    = document.getElementById('cc-carrinho-bar');
+    const lista  = document.getElementById('cc-carrinho-itens');
+    const totalEl = document.getElementById('cc-total');
+    const itens  = Object.values(_ccCarrinho);
+
+    if (itens.length === 0) {
+      if (bar) bar.style.display = 'none';
+      return;
+    }
+
+    if (bar) bar.style.display = '';
+
+    let total = 0;
+    if (lista) {
+      lista.innerHTML = itens.map(({ item, qty }) => {
+        const sub = item.preco * qty;
+        total += sub;
+        return `<div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;">
+          <span style="flex:1;color:var(--text);">${qty}× ${escHTML(item.nome)}</span>
+          <span style="color:var(--green);font-weight:700;flex-shrink:0;">R$ ${sub.toFixed(2).replace('.',',')}</span>
+        </div>`;
+      }).join('');
+    }
+    if (totalEl) totalEl.textContent = `R$ ${total.toFixed(2).replace('.',',')}`;
+  }
+
+  window.ccFinalizarPedido = function() {
+    const loja  = LOJAS[_ccLojaIdx];
+    if (!loja || !loja.wpp) { alert('Esta loja não tem WhatsApp cadastrado.'); return; }
+
+    const itens = Object.values(_ccCarrinho);
+    if (itens.length === 0) return;
+
+    let total = 0;
+    const linhas = itens.map(({ item, qty }) => {
+      const sub = item.preco * qty;
+      total += sub;
+      return `• ${qty}× ${item.nome} — R$ ${sub.toFixed(2).replace('.',',')}`;
+    });
+
+    const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n\n*${loja.nome}*\n\n${linhas.join('\n')}\n\n*Total: R$ ${total.toFixed(2).replace('.',',')}*\n\nPoderia confirmar o pedido?`;
+    const url = `https://wa.me/${loja.wpp}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank', 'noopener');
+  };
+
+  document.getElementById('modal-cardapio-cliente')?.addEventListener('click', function(e) {
+    if (e.target === this) fecharCardapioCliente();
+  });

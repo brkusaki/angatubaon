@@ -1565,8 +1565,47 @@
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+        .then(reg => {
+          // Verifica se há update a cada 60 segundos
+          setInterval(() => reg.update(), 60_000);
+
+          // SW esperando para ativar = há versão nova instalada
+          const onUpdateFound = () => {
+            const novo = reg.installing || reg.waiting;
+            if (!novo) return;
+            novo.addEventListener('statechange', () => {
+              if (novo.state === 'installed' && navigator.serviceWorker.controller) {
+                _mostrarBannerUpdate(novo);
+              }
+            });
+          };
+
+          if (reg.waiting) {
+            // Já há update esperando (voltou para a aba após update)
+            _mostrarBannerUpdate(reg.waiting);
+          }
+          reg.addEventListener('updatefound', onUpdateFound);
+        })
         .catch(err => console.warn('[SW] Falha no registro:', err));
+
+      // Quando o SW ativa (após skipWaiting), recarrega a página
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) { refreshing = true; window.location.reload(); }
+      });
     });
+  }
+
+  function _mostrarBannerUpdate(swWaiting) {
+    const banner = document.getElementById('sw-update-banner');
+    const btn    = document.getElementById('sw-update-btn');
+    if (!banner || !btn) return;
+    banner.style.display = 'flex';
+    btn.onclick = () => {
+      btn.textContent = 'Atualizando...';
+      btn.disabled = true;
+      swWaiting.postMessage('SKIP_WAITING');
+    };
   }
 
   /* ── Carrega lojas da API (Apps Script → Google Sheets) ─────── */
@@ -1976,13 +2015,24 @@
   function detalhesCompartilhar(idx) {
     const loja = LOJAS[idx];
     if (!loja) return;
-    const url  = `${location.origin}/#${toSlug(loja.nome)}`;
-    const text = `${loja.emoji || '📍'} *${loja.nome}* — ${loja.sub || loja.categoria || ''}\nVeja no AngatubaON: ${url}`;
+    const url = `${location.origin}/#${toSlug(loja.nome)}`;
+
+    // Monta texto rico com status e horário
+    const { status, fechaStr } = calcStatusInfo(loja);
+    const statusTxt = status === 'open'   ? `✅ Aberto agora${fechaStr ? ` até ${fechaStr}` : ''}`
+                    : status === 'closed' ? '🔴 Fechado agora'
+                    : status === 'zap'    ? '⏰ Já voltamos em breve'
+                    : '';
+    const anuncioTxt = (loja.anuncio?.texto)
+      ? `\n${loja.anuncio.emoji || '🎯'} *Promoção:* ${loja.anuncio.texto}`
+      : '';
+
+    const text = `${loja.emoji || '📍'} *${loja.nome}*\n${loja.sub || loja.categoria || ''}${loja.endereco ? `\n📍 ${loja.endereco}` : ''}\n${statusTxt}${anuncioTxt}\n\nVeja no AngatubaON: ${url}`;
+
     if (navigator.share) {
       navigator.share({ title: loja.nome, text, url }).catch(() => {});
     } else {
       navigator.clipboard?.writeText(url).then(() => {
-        // Toast rápido
         const t = document.getElementById('toast');
         document.getElementById('toast-title').textContent = 'Link copiado!';
         document.getElementById('toast-msg').textContent   = url;
@@ -2038,51 +2088,65 @@
     }
 
     const { dias, abre, fecha } = loja.horario;
-    const hoje = new Date().getDay();
-    const is24h = abre === '00:00' && fecha === '23:59';
+    const hoje   = new Date().getDay();
+    const is24h  = abre === '00:00' && fecha === '23:59';
+    const horaStr = is24h ? '24 horas' : `${abre} – ${fecha}`;
+    const DIAS_ABREV = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
-    // Separa dias abertos e fechados — dias fechados ficam apagados no fim
-    const abertosDias  = [];
-    const fechadosDias = [];
-    DIAS_NOMES_FULL.forEach((nome, d) => {
-      const aberto = dias.includes(d);
-      const isHoje = d === hoje;
-      const horaStr = is24h ? '24 horas' : `${abre} – ${fecha}`;
-      const row = aberto
-        ? `<div class="detail-schedule-row${isHoje ? ' today' : ''}">
-             <span class="detail-schedule-day">${nome}${isHoje ? ' <span style="font-size:9px;opacity:0.7;">(hoje)</span>' : ''}</span>
-             <span class="detail-schedule-time">${horaStr}</span>
-           </div>`
-        : `<div class="detail-schedule-row day-closed${isHoje ? ' today' : ''}">
-             <span class="detail-schedule-day">${nome}${isHoje ? ' <span style="font-size:9px;">(hoje)</span>' : ''}</span>
-             <span class="detail-schedule-closed">Fechado</span>
-           </div>`;
-      aberto ? abertosDias.push(row) : fechadosDias.push(row);
+    // ── Agrupa dias consecutivos com mesmo status ──────────────
+    // Constrói array de segmentos: { label, horario, fechado, temHoje }
+    const segmentos = [];
+    let i = 0;
+    while (i < 7) {
+      const aberto = dias.includes(i);
+      // Avança enquanto o próximo dia tiver mesmo status
+      let j = i + 1;
+      while (j < 7 && dias.includes(j) === aberto) j++;
+
+      const diasDoSeg = Array.from({ length: j - i }, (_, k) => i + k);
+      const temHoje   = diasDoSeg.includes(hoje);
+
+      // Monta label do segmento
+      let label;
+      if (diasDoSeg.length === 1) {
+        label = DIAS_NOMES_FULL[diasDoSeg[0]];
+      } else if (diasDoSeg.length === 2) {
+        label = `${DIAS_ABREV[diasDoSeg[0]]} e ${DIAS_ABREV[diasDoSeg[1]]}`;
+      } else {
+        label = `${DIAS_ABREV[diasDoSeg[0]]}–${DIAS_ABREV[diasDoSeg[diasDoSeg.length - 1]]}`;
+      }
+
+      segmentos.push({ label, aberto, temHoje, dias: diasDoSeg });
+      i = j;
+    }
+
+    // ── Ordena: hoje primeiro, depois abertos, depois fechados ─
+    segmentos.sort((a, b) => {
+      if (a.temHoje && !b.temHoje) return -1;
+      if (!a.temHoje && b.temHoje) return 1;
+      if (a.aberto && !b.aberto)   return -1;
+      if (!a.aberto && b.aberto)   return 1;
+      return 0;
     });
 
-    // Hoje fechado → move para cima independentemente
-    const hojeRow = [...abertosDias, ...fechadosDias].find((_, i) => {
-      return false; // já ordenado abaixo
-    });
+    // ── Gera linhas HTML ───────────────────────────────────────
+    const linhas = segmentos.map(seg => {
+      const hojeLabel = seg.temHoje
+        ? ` <span style="font-size:9px;opacity:0.7;">(hoje)</span>`
+        : '';
 
-    // Ordena: hoje sempre primeiro se fechado, depois abertos, depois fechados apagados
-    const todayFechado = !dias.includes(hoje);
-    const linhas = todayFechado
-      ? [
-          ...DIAS_NOMES_FULL.slice(hoje, hoje + 1).map((nome, _) => {
-            const isHoje = true;
-            return `<div class="detail-schedule-row today day-closed">
-              <span class="detail-schedule-day">${nome} <span style="font-size:9px;">(hoje)</span></span>
-              <span class="detail-schedule-closed">Fechado</span>
-            </div>`;
-          }),
-          ...abertosDias.filter((_, i) => {
-            const d = DIAS_NOMES_FULL.indexOf(DIAS_NOMES_FULL[i]);
-            return i !== hoje;
-          }),
-          ...fechadosDias.filter((r, i) => !r.includes('(hoje)')),
-        ]
-      : [...abertosDias, ...fechadosDias];
+      if (seg.aberto) {
+        return `<div class="detail-schedule-row${seg.temHoje ? ' today' : ''}">
+          <span class="detail-schedule-day">${seg.label}${hojeLabel}</span>
+          <span class="detail-schedule-time">${horaStr}</span>
+        </div>`;
+      } else {
+        return `<div class="detail-schedule-row day-closed${seg.temHoje ? ' today' : ''}">
+          <span class="detail-schedule-day">${seg.label}${hojeLabel}</span>
+          <span class="detail-schedule-closed">Fechado</span>
+        </div>`;
+      }
+    });
 
     return `<div class="detail-info-row">
       <div class="detail-info-icon clock"><i class="fa fa-clock"></i></div>

@@ -3036,7 +3036,11 @@
       }
     }
 
-    // Preenche o texto no campo para edição
+    // Oculta o formulário enquanto há anúncio ativo
+    const formEl = document.getElementById('ml-anuncio-form');
+    if (formEl) formEl.style.display = 'none';
+
+    // Guarda dados no form para caso o usuário remova e queira reeditar
     const textarea = document.getElementById('ml-anuncio-texto');
     if (textarea) {
       textarea.value = anuncio.texto;
@@ -3045,13 +3049,14 @@
     const emojiBtn = document.querySelector(`.anuncio-emoji-btn[data-emoji="${anuncio.emoji}"]`);
     if (emojiBtn) mlSelectEmoji(emojiBtn);
 
-    // Se tinha imagem salva, mostra no campo de nova imagem também
+    // Guarda URL da imagem atual para caso o usuário reedite
     if (anuncio.imagemUrl) {
-      const imgNova = document.getElementById('ml-anuncio-img-nova');
-      const labelTxt = document.getElementById('ml-anuncio-img-label-txt');
+      _anuncioImagemUrl = anuncio.imagemUrl;
+      const imgNova    = document.getElementById('ml-anuncio-img-nova');
+      const labelTxt   = document.getElementById('ml-anuncio-img-label-txt');
       const removerBtn = document.getElementById('ml-anuncio-img-remover');
-      if (imgNova) { imgNova.src = anuncio.imagemUrl; imgNova.style.display = ''; }
-      if (labelTxt) labelTxt.textContent = 'Foto atual (toque para trocar)';
+      if (imgNova)    { imgNova.src = anuncio.imagemUrl; imgNova.style.display = ''; }
+      if (labelTxt)   labelTxt.textContent = 'Foto atual (toque para trocar)';
       if (removerBtn) removerBtn.style.display = '';
     }
   }
@@ -3099,11 +3104,9 @@
 
       if (json.status === 'ok') {
         mlExibirAnuncioAtivo({ emoji: _anuncioEmojiSelecionado, texto, expira: json.data?.expira, imagemUrl: imagemUrl || '' });
-        btn.innerHTML = '<i class="fa fa-check"></i> Publicado!';
-        setTimeout(() => {
-          btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
-          btn.disabled = false;
-        }, 2000);
+        // form já foi ocultado por mlExibirAnuncioAtivo; reabilita btn para quando reaparecer
+        btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
+        btn.disabled = false;
       } else {
         throw new Error(json.msg || 'Erro');
       }
@@ -3121,13 +3124,16 @@
       await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
       document.getElementById('ml-anuncio-ativo').style.display = 'none';
       document.getElementById('ml-anuncio-timer').textContent = '';
+      localStorage.removeItem('angatuba_anuncio');
+      // Limpa imagem e texto
+      _anuncioImagemUrl = '';
+      mlAnuncioRemoverImagem();
       const textarea = document.getElementById('ml-anuncio-texto');
       if (textarea) { textarea.value = ''; }
       document.getElementById('ml-anuncio-chars').textContent = '0/80';
-      localStorage.removeItem('angatuba_anuncio');
-      // Limpa imagem
-      _anuncioImagemUrl = '';
-      mlAnuncioRemoverImagem();
+      // Mostra o formulário de novo
+      const formEl = document.getElementById('ml-anuncio-form');
+      if (formEl) formEl.style.display = '';
     } catch(e) {
       console.warn('[Anuncio] Erro ao remover:', e.message);
     }

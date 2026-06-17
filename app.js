@@ -1800,7 +1800,7 @@
     const hasLogo = isPago && loja.logo && loja.logo.trim();
 
     const logoOverlay = hasLogo
-      ? `<div style="position:absolute;bottom:12px;left:14px;z-index:3;
+      ? `<div style="position:absolute;bottom:12px;right:14px;z-index:3;
             width:52px;height:52px;border-radius:12px;overflow:hidden;
             border:2px solid rgba(255,255,255,0.2);box-shadow:0 4px 14px rgba(0,0,0,0.5);
             background:var(--surface);">
@@ -1831,10 +1831,14 @@
            </div>
            <div class="detail-cover-badge">${badgeHTML(status, fechaStr)}</div>
          </div>`
-      : `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0;">
-           <div class="detail-handle" style="position:static;transform:none;margin:0 auto;"></div>
+      : `<div style="
+            position:relative;height:80px;border-radius:20px 20px 0 0;overflow:hidden;
+            background:linear-gradient(135deg,${CAT_BG[loja.categoria]||'rgba(99,102,241,0.15)'} 0%,#0d0d0d 100%);
+            display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex-shrink:0;">
+           <div style="font-size:2.5rem;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.5));">${loja.emoji||'🏪'}</div>
+           <div class="detail-handle" style="position:absolute;top:10px;left:50%;transform:translateX(-50%);"></div>
            <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar"
-             style="position:static;transform:none;background:var(--surface2);color:var(--muted);">✕</button>
+             style="position:static;transform:none;background:rgba(0,0,0,0.3);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,0.1);color:#fff;">✕</button>
          </div>`;
 
     // ── BADGE DE PLANO — junto com o nome ─────────────────────

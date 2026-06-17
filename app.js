@@ -1902,14 +1902,25 @@
 
     // ── BOTÃO CARDÁPIO ────────────────────────────────────────
     const temCardapio = loja.cardapio && loja.cardapio.length > 0;
+
+    // Label e emoji dinâmico por categoria
+    const _cat = (loja.categoria || '').toLowerCase();
+    const _cardapioLabel = (() => {
+      if (['pizzaria','lanche','restaurante','sorveteria','padaria','doceria','hamburgueria'].some(c => _cat.includes(c)))
+        return { emoji:'🍽️', label:'Ver Cardápio' };
+      if (['mercado','supermercado','farmacia','pet','adega','bebida','conveniencia'].some(c => _cat.includes(c)))
+        return { emoji:'🛒', label:'Ver Produtos' };
+      return { emoji:'🔧', label:'Ver Serviços' };
+    })();
+
     const cardapioBtn = temCardapio
-      ? `<button onclick="abrirCardapioCliente(${idx})" style="
+      ? `<button onclick="fecharDetalhes();abrirCardapioCliente(${idx});" style="
             width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
             padding:12px;border-radius:12px;margin-bottom:14px;
             background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.05));
             border:1px solid rgba(16,185,129,0.3);
             color:var(--green);font-family:var(--font-h);font-size:13px;font-weight:800;cursor:pointer;">
-           🍽️ Ver Cardápio / Serviços
+           ${_cardapioLabel.emoji} ${_cardapioLabel.label}
            <span style="background:var(--green);color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:20px;">
              ${loja.cardapio.length} item${loja.cardapio.length !== 1 ? 's' : ''}
            </span>
@@ -3239,8 +3250,16 @@
     _ccLojaIdx  = idx;
     _ccCarrinho = {};
 
+    // Label dinâmico
+    const cat = (loja.categoria || '').toLowerCase();
+    const label = ['pizzaria','lanche','restaurante','sorveteria','padaria','doceria','hamburgueria'].some(c => cat.includes(c))
+      ? 'Cardápio'
+      : ['mercado','supermercado','farmacia','pet','adega','bebida','conveniencia'].some(c => cat.includes(c))
+      ? 'Produtos'
+      : 'Serviços';
+
     document.getElementById('cc-loja-nome').textContent = loja.nome;
-    document.getElementById('cc-loja-sub').textContent  = loja.sub || loja.categoria || '';
+    document.getElementById('cc-loja-sub').textContent  = label;
 
     ccRenderItens(loja);
     ccAtualizarCarrinho();
@@ -3371,7 +3390,7 @@
       return `• ${qty}× ${item.nome} — R$ ${sub.toFixed(2).replace('.',',')}`;
     });
 
-    const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n\n*${loja.nome}*\n\n${linhas.join('\n')}\n\n*Total: R$ ${total.toFixed(2).replace('.',',')}*\n\nPoderia confirmar o pedido?`;
+    const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n\n${linhas.join('\n')}\n\n*Total: R$ ${total.toFixed(2).replace('.',',')}*\n\nPoderia confirmar?`;
     const url = `https://wa.me/${loja.wpp}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank', 'noopener');
   };

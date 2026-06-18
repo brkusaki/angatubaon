@@ -736,36 +736,35 @@ async function savePlan(row) {
   if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...'; }
 
   try {
-    // Usa GET com params na URL — o doGet do Apps Script tem a rota updatePlan
-    // e retorna JSON legível, evitando o problema de redirect bloqueado do POST no-cors
-    const params = new URLSearchParams({
+    // Usa POST no-cors (mesmo padrão do login) para evitar erros de CORS/redirect do Apps Script
+    const params = new URLSearchParams();
+    params.append('payload', JSON.stringify({
       action:   'updatePlan',
       token:    _sessionToken,
       row:      row,
       plano:    plano,
       validade: validadeBR,
-    });
+      planoPago: plano !== 'GRATIS' ? 'SIM' : 'NAO',
+    }));
 
-    const resp = await fetch(`${APPS_SCRIPT_URL}?${params.toString()}`, {
-      method: 'GET',
+    // no-cors não retorna JSON — assumimos sucesso se não lançou exceção
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode:   'no-cors',
+      body:   params,
       signal: AbortSignal.timeout(15000),
     });
-    const json = await resp.json();
 
-    if (json.status === 'ok') {
-      const r = allRows.find(x => x.row === row);
-      if (r) {
-        r.plano         = plano;
-        r.planoValidade = validadeBR;
-        r.recomendado   = (plano === 'PRO' || plano === 'PLUS') ? 'SIM' : 'NÃO';
-      }
-      toast(`✅ Plano ${plano} salvo${validadeBR ? ' até ' + validadeBR : ' (vitalício)'} · Recomendado: ${json.data?.recomendado || 'atualizado'}`);
-      renderAll();
-    } else if (json.msg === 'UNAUTHORIZED') {
-      handleUnauthorized();
-    } else {
-      toast('❌ Erro: ' + (json.msg || 'Tente novamente'), true);
+    // Atualiza estado local imediatamente (sem esperar a API)
+    const r = allRows.find(x => x.row === row);
+    if (r) {
+      r.plano         = plano;
+      r.planoValidade = validadeBR;
+      r.recomendado   = (plano === 'PRO' || plano === 'PLUS') ? 'SIM' : 'NAO';
     }
+
+    toast(`✅ Plano ${plano} salvo${validadeBR ? ' até ' + validadeBR : ' (vitalício)'}`);
+    renderAll();
 
   } catch(e) {
     toast('❌ Erro ao salvar plano: ' + e.message, true);

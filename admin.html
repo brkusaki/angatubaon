@@ -268,6 +268,39 @@
     .metric-bar-fill  { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
     .metric-bar-fill.wpp { background: #25d366; }
     .metric-bar-fill.tel { background: var(--blue); }
+    .metric-bar-fill.ig  { background: #e1306c; }
+
+    /* Botão excluir loja */
+    .btn-delete-loja {
+      background: rgba(255,68,68,0.1); color: var(--red);
+      border: 1px solid rgba(255,68,68,0.2);
+      padding: 6px 10px; border-radius: 8px; font-size: 11px;
+      font-weight: 700; display: flex; align-items: center; gap: 4px;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .btn-delete-loja:hover { opacity: .8; }
+
+    /* Botões de validade rápida */
+    .plan-quick-dates {
+      display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px;
+    }
+    .plan-quick-btn {
+      font-size: 10px; font-weight: 700; padding: 4px 9px;
+      border-radius: 6px; border: 1px solid var(--border);
+      background: var(--s2); color: var(--muted); cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .plan-quick-btn:hover { background: rgba(245,158,11,0.15); color: var(--zap); border-color: rgba(245,158,11,0.4); }
+    .plan-quick-btn.active { background: rgba(245,158,11,0.2); color: var(--zap); border-color: rgba(245,158,11,0.5); }
+
+    /* Botão reset métricas */
+    .btn-reset-metricas {
+      font-size: 11px; color: var(--red); padding: 6px 12px;
+      border-radius: 8px; border: 1px solid rgba(255,68,68,0.25);
+      background: rgba(255,68,68,0.08); display: flex; align-items: center; gap: 5px;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .btn-reset-metricas:hover { opacity: .8; }
     .metric-total { font-family: var(--font-h); font-size: 1rem; font-weight: 800; min-width: 28px; text-align: right; color: var(--text); }
 
     .metric-refresh {
@@ -364,15 +397,21 @@
     <div class="tab-content" id="tab-metricas">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
         <span class="metric-period" id="metric-period">Carregando...</span>
-        <button class="metric-refresh" onclick="loadMetricas()">
-          <i class="fa fa-rotate-right"></i> Atualizar
-        </button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-reset-metricas" onclick="resetMetricas()">
+            <i class="fa fa-trash"></i> Resetar
+          </button>
+          <button class="metric-refresh" onclick="loadMetricas()">
+            <i class="fa fa-rotate-right"></i> Atualizar
+          </button>
+        </div>
       </div>
       <!-- KPIs resumo -->
-      <div class="metric-summary" id="metric-summary">
+      <div class="metric-summary" id="metric-summary" style="grid-template-columns:repeat(4,1fr);">
         <div class="metric-kpi"><div class="metric-kpi-val" id="kpi-total">—</div><div class="metric-kpi-label">Cliques Totais</div></div>
-        <div class="metric-kpi"><div class="metric-kpi-val" style="color:var(--green);" id="kpi-wpp">—</div><div class="metric-kpi-label">WhatsApp</div></div>
+        <div class="metric-kpi"><div class="metric-kpi-val" style="color:#25d366;" id="kpi-wpp">—</div><div class="metric-kpi-label">WhatsApp</div></div>
         <div class="metric-kpi"><div class="metric-kpi-val" style="color:var(--blue);" id="kpi-tel">—</div><div class="metric-kpi-label">Telefone</div></div>
+        <div class="metric-kpi"><div class="metric-kpi-val" style="color:#e1306c;" id="kpi-ig">—</div><div class="metric-kpi-label">Instagram</div></div>
       </div>
       <!-- Ranking de lojas -->
       <div class="metric-table" id="metric-table">
@@ -618,6 +657,9 @@ function planCardHTML(r) {
   const planColor = { PRO:'var(--zap)', PLUS:'var(--indigo)', GRATIS:'var(--muted)' };
   const cor = planColor[plano] || 'var(--muted)';
 
+  // Calcula qual botão rápido está ativo baseado na validade atual
+  const isoVal = isoDate(validade);
+
   return `
     <div class="admin-card aprovado" id="plan-card-${r.row}" data-nome="${escAttr(r.nome)}">
       <div class="card-top">
@@ -625,7 +667,12 @@ function planCardHTML(r) {
           <div class="card-name">${r.nome}</div>
           <div class="card-ramo">${r.ramo} · linha ${r.row}</div>
         </div>
-        <span style="font-family:var(--font-h);font-size:11px;font-weight:800;color:${cor};">${plano}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-family:var(--font-h);font-size:11px;font-weight:800;color:${cor};">${plano}</span>
+          <button class="btn-delete-loja" onclick="deleteLoja(${r.row}, '${escAttr(r.nome)}')">
+            <i class="fa fa-trash"></i>
+          </button>
+        </div>
       </div>
       <div class="plan-manager-row">
         <select class="plan-select" id="ps-${r.row}">
@@ -633,11 +680,18 @@ function planCardHTML(r) {
           <option value="PLUS"   ${plano==='PLUS'  ?'selected':''}>✦ Plus</option>
           <option value="PRO"    ${plano==='PRO'   ?'selected':''}>⭐ Pro</option>
         </select>
-        <input class="plan-date-input" type="date" id="pd-${r.row}"
-          value="${isoDate(validade)}" title="Validade do plano (vazio = vitalício)" />
+        <input type="hidden" id="pd-${r.row}" value="${isoVal}" />
         <button class="act-btn btn-save-plan" onclick="savePlan(${r.row})">
           <i class="fa fa-save"></i> Salvar
         </button>
+      </div>
+      <div class="plan-quick-dates" id="pq-${r.row}">
+        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 7, this)">1 semana</button>
+        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 14, this)">2 semanas</button>
+        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 30, this)">1 mês</button>
+        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 90, this)">3 meses</button>
+        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 0, this)">Vitalício</button>
+        ${isoVal ? `<span style="font-size:10px;color:var(--muted);align-self:center;">até ${validade}</span>` : ''}
       </div>
     </div>`;
 }
@@ -675,8 +729,8 @@ async function updateStatus(row, newStatus, btn) {
 
 async function savePlan(row) {
   const plano      = document.getElementById('ps-' + row).value;
-  const validade   = document.getElementById('pd-' + row).value;
-  const validadeBR = validade ? validade.split('-').reverse().join('/') : '';
+  const isoVal     = document.getElementById('pd-' + row).value;
+  const validadeBR = isoVal ? isoVal.split('-').reverse().join('/') : '';
 
   const saveBtn = document.querySelector(`#plan-card-${row} .btn-save-plan`);
   if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...'; }
@@ -716,6 +770,83 @@ async function savePlan(row) {
     toast('❌ Erro ao salvar plano: ' + e.message, true);
   } finally {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa fa-save"></i> Salvar'; }
+  }
+}
+
+/* ══ VALIDADE RÁPIDA ══════════════════════════════════════════ */
+function setQuickDate(row, dias, btn) {
+  // Marca o botão ativo
+  document.querySelectorAll(`#pq-${row} .plan-quick-btn`).forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const hiddenInput = document.getElementById('pd-' + row);
+  if (dias === 0) {
+    hiddenInput.value = ''; // vitalício
+  } else {
+    const d = new Date();
+    d.setDate(d.getDate() + dias);
+    hiddenInput.value = d.toISOString().split('T')[0]; // yyyy-mm-dd
+  }
+}
+
+/* ══ EXCLUIR LOJA ═════════════════════════════════════════════ */
+async function deleteLoja(row, nome) {
+  if (!confirm(`Excluir a loja "${nome}" permanentemente?\n\nEssa ação não pode ser desfeita.`)) return;
+
+  try {
+    const params = new URLSearchParams();
+    params.append('payload', JSON.stringify({
+      action: 'deleteLoja',
+      token:  _sessionToken,
+      row:    row,
+    }));
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode:   'no-cors',
+      body:   params,
+      signal: AbortSignal.timeout(15000),
+    });
+    // Remove da lista local e re-renderiza
+    allRows = allRows.filter(r => r.row !== row);
+    renderAll();
+    toast(`🗑️ "${nome}" removida`);
+  } catch(e) {
+    toast('❌ Erro ao excluir: ' + e.message, true);
+  }
+}
+
+/* ══ RESET DE MÉTRICAS ════════════════════════════════════════ */
+async function resetMetricas() {
+  if (!confirm('Resetar TODOS os cliques registrados?\n\nIsso apaga toda a aba Cliques. Essa ação não pode ser desfeita.')) return;
+
+  const btn = document.querySelector('.btn-reset-metricas');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Resetando...'; }
+
+  try {
+    const params = new URLSearchParams();
+    params.append('payload', JSON.stringify({
+      action: 'resetMetricas',
+      token:  _sessionToken,
+    }));
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode:   'no-cors',
+      body:   params,
+      signal: AbortSignal.timeout(15000),
+    });
+    toast('✅ Métricas resetadas');
+    // Limpa KPIs e tabela
+    ['kpi-total','kpi-wpp','kpi-tel','kpi-ig'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '0';
+    });
+    document.getElementById('metric-table').innerHTML =
+      '<div class="admin-empty"><i class="fa fa-chart-bar"></i>Nenhum clique registrado ainda.</div>';
+    document.getElementById('metric-period').textContent = '0 lojas com cliques registrados';
+  } catch(e) {
+    toast('❌ Erro ao resetar: ' + e.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-trash"></i> Resetar'; }
   }
 }
 
@@ -774,9 +905,11 @@ async function loadMetricas() {
     const totCliques = data.reduce((s, r) => s + r.total, 0);
     const totWpp     = data.reduce((s, r) => s + r.wpp,   0);
     const totTel     = data.reduce((s, r) => s + r.tel,   0);
+    const totIg      = data.reduce((s, r) => s + (r.ig || 0), 0);
     document.getElementById('kpi-total').textContent = totCliques;
     document.getElementById('kpi-wpp').textContent   = totWpp;
     document.getElementById('kpi-tel').textContent   = totTel;
+    document.getElementById('kpi-ig').textContent    = totIg;
 
     periodEl.textContent = `${data.length} lojas com cliques registrados`;
 
@@ -814,6 +947,13 @@ async function loadMetricas() {
                 <div class="metric-bar-fill tel" style="width:${pct(r.tel)}%;"></div>
               </div>
             </div>
+            ${(r.ig || 0) > 0 ? `
+            <div class="metric-bar-wrap">
+              <span class="metric-bar-label" style="color:#e1306c;">IG</span>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill ig" style="width:${pct(r.ig||0)}%;"></div>
+              </div>
+            </div>` : ''}
           </div>
           <div class="metric-total">${r.total}</div>
         </div>`;

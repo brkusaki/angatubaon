@@ -102,6 +102,22 @@
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  // Extrai o @handle puro de qualquer formato de entrada do Instagram:
+  // "@usuario", "usuario", "https://instagram.com/usuario", "https://www.instagram.com/usuario?igsh=...", "instagram.com/usuario/"
+  function normalizarInstagramHandle(input) {
+    let s = String(input || '').trim();
+    if (!s) return '';
+    // Remove protocolo + domínio (com ou sem www)
+    s = s.replace(/^https?:\/\/(www\.)?instagram\.com\//i, '');
+    // Remove qualquer coisa a partir de "?" (query string) ou "#" (hash)
+    s = s.split('?')[0].split('#')[0];
+    // Remove barra final e qualquer subcaminho extra (ex: /reels, /p/...)
+    s = s.split('/')[0];
+    // Remove @ inicial
+    s = s.replace(/^@/, '').trim();
+    return s;
+  }
+
   // Gera slug de URL a partir do nome da loja
   function toSlug(nome) {
     return String(nome || '').toLowerCase()
@@ -1423,9 +1439,7 @@
     const mlIgWrap = document.getElementById('ml-instagram-wrap');
     if (mlIgWrap) {
       mlIgWrap.style.display = '';
-      const igHandleAtual = d.instagram
-        ? d.instagram.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/$/, '')
-        : '';
+      const igHandleAtual = normalizarInstagramHandle(d.instagram);
       mlIgWrap.innerHTML = `
         <div style="display:flex;gap:8px;align-items:center;">
           <div style="position:relative;flex:1;display:flex;align-items:center;">
@@ -1447,7 +1461,7 @@
         ${igHandleAtual ? `
         <a href="https://instagram.com/${igHandleAtual}" target="_blank" rel="noopener"
           style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:#e1306c;text-decoration:none;">
-          <i class="fa fa-external-link-alt" style="font-size:9px;"></i> Ver perfil atual
+          <i class="fa fa-external-link-alt" style="font-size:9px;"></i> Ver perfil atual: @${igHandleAtual}
         </a>` : ''}
         <div id="ml-ig-status" style="font-size:10px;margin-top:6px;min-height:13px;"></div>`;
     }
@@ -1710,13 +1724,7 @@
     const btn    = document.getElementById('ml-ig-save-btn');
     if (!input) return;
 
-    let valor = input.value.trim();
-    // Aceita @usuario, usuario, ou link completo — normaliza para @usuario
-    valor = valor
-      .replace(/^https?:\/\/(www\.)?instagram\.com\//i, '')
-      .replace(/\/.*$/, '')
-      .replace(/^@/, '')
-      .trim();
+    const valor = normalizarInstagramHandle(input.value);
 
     if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
     if (status) { status.textContent = ''; status.style.color = ''; }
@@ -1734,7 +1742,6 @@
       if (status) { status.textContent = '✅ Instagram atualizado!'; status.style.color = 'var(--green)'; }
       input.value = valor ? '@' + valor : '';
 
-      // Atualiza link "Ver perfil atual" sem precisar reabrir o painel
       setTimeout(() => abrirMinhaLoja(), 600);
 
     } catch(e) {
@@ -2699,13 +2706,15 @@
 
     // Botão Instagram — linha separada
     if (loja.instagram) {
-      const igHandle = loja.instagram.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/$/, '');
-      const igUrl = `https://instagram.com/${igHandle}`;
-      ig = `<a href="${igUrl}" target="_blank" rel="noopener"
-        class="detail-btn-ig"
-        onclick="registrarClique('${mNome}','ig','${mPlan}','${mCat}')">
-        <i class="fab fa-instagram"></i> @${igHandle}
-      </a>`;
+      const igHandle = normalizarInstagramHandle(loja.instagram);
+      if (igHandle) {
+        const igUrl = `https://instagram.com/${igHandle}`;
+        ig = `<a href="${igUrl}" target="_blank" rel="noopener"
+          class="detail-btn-ig"
+          onclick="registrarClique('${mNome}','ig','${mPlan}','${mCat}')">
+          <i class="fab fa-instagram"></i> @${igHandle}
+        </a>`;
+      }
     }
 
     return { main, ig };

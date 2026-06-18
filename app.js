@@ -658,6 +658,26 @@
     clearTimeout(toastTimer);
   }
 
+  /* ── Tema claro/escuro ───────────────────────────────────────── */
+  function aplicarIconeTema() {
+    const icon = document.getElementById('theme-toggle-icon');
+    if (!icon) return;
+    const isLight = document.body.classList.contains('light-mode');
+    icon.classList.toggle('fa-moon', !isLight);
+    icon.classList.toggle('fa-sun', isLight);
+  }
+
+  function toggleTheme() {
+    document.body.classList.toggle('light-mode');
+    const isLight = document.body.classList.contains('light-mode');
+    try { localStorage.setItem('angatuba_theme', isLight ? 'light' : 'dark'); } catch(e) {}
+    aplicarIconeTema();
+  }
+  window.toggleTheme = toggleTheme;
+
+  // Sincroniza o ícone com o tema já aplicado pelo script inline no <body>
+  aplicarIconeTema();
+
   /* ── Métricas de clique ──────────────────────────────────────── */
   // Fire-and-forget: registra na planilha sem bloquear a ação do usuário.
   // Chamado apenas em botões de lojas ABERTAS (wpp/tel ativos).

@@ -37,6 +37,13 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
+  <script>
+    try {
+      if (localStorage.getItem('angatuba_theme') === 'light') {
+        document.body.classList.add('light-mode');
+      }
+    } catch(e) {}
+  </script>
 
   <!-- ══ TOAST ══ -->
   <div id="toast" role="alert" aria-live="assertive">

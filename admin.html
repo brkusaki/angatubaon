@@ -200,23 +200,26 @@
       justify-content: center;
     }
 
-    /* ── PLAN SECTIONS ───────────────────────────────────── */
-    .plan-section { margin-bottom: 26px; }
-    .plan-section:last-child { margin-bottom: 0; }
-    .plan-section-header {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 12px; padding-bottom: 8px;
-      border-bottom: 1px solid var(--border);
+    /* ── CATEGORIAS DE PLANO (sub-abas lado a lado) ────────── */
+    .plan-cat-tabs {
+      display: flex; gap: 8px; overflow-x: auto;
+      margin-bottom: 16px; scrollbar-width: none;
     }
-    .plan-section-header i { font-size: 12px; }
-    .plan-section-title {
-      font-family: var(--font-h); font-size: 0.85rem; font-weight: 800;
-      text-transform: uppercase; letter-spacing: .04em;
+    .plan-cat-tabs::-webkit-scrollbar { display: none; }
+    .plan-cat-btn {
+      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+      padding: 8px 14px; border-radius: 20px;
+      background: var(--surface); border: 1px solid var(--border);
+      font-family: var(--font-b); font-size: 12px; font-weight: 700;
+      white-space: nowrap; transition: background 0.2s, color 0.2s, border-color 0.2s;
     }
-    .plan-section-count {
-      font-size: 11px; color: var(--muted); background: var(--s2);
-      padding: 2px 9px; border-radius: 20px; margin-left: auto;
+    .plan-cat-btn i { font-size: 11px; }
+    .plan-cat-count {
+      font-size: 10px; font-weight: 800; color: inherit;
+      background: var(--s2); padding: 1px 7px; border-radius: 10px;
     }
+    .plan-cat-btn.active { color: #000; }
+    .plan-cat-btn.active .plan-cat-count { background: rgba(0,0,0,0.18); }
 
     /* ── SEARCH ──────────────────────────────────────────── */
     .admin-search-wrap { position: relative; margin-bottom: 16px; }
@@ -406,6 +409,7 @@
         <input class="admin-search" id="search-planos"
           placeholder="Filtrar pelo nome..." oninput="filterCards('planos')" />
       </div>
+      <div class="plan-cat-tabs" id="plan-cat-tabs"></div>
       <div class="store-cards" id="list-planos">
         <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
       </div>
@@ -613,46 +617,82 @@ function renderList(type, rows) {
   el.innerHTML = rows.map(r => cardHTML(r, type)).join('');
 }
 
+/* Categorias da aba Planos — exibidas como sub-abas lado a lado.
+   "Novas Lojas" = as 5 lojas mais recentes (maior número de linha), não
+   exclusivas: uma loja PRO recém-cadastrada aparece tanto em "Novas Lojas"
+   quanto em "Plano Pro", já que agora são vistas separadas (uma de cada vez),
+   não seções empilhadas. */
+const PLAN_CATS = [
+  { id: 'novas',  titulo: 'Novas Lojas',  icon: 'fa-circle-plus', cor: 'var(--green)'  },
+  { id: 'pro',    titulo: 'Plano Pro',    icon: 'fa-crown',       cor: 'var(--zap)'    },
+  { id: 'plus',   titulo: 'Plano Plus',   icon: 'fa-bolt',        cor: 'var(--indigo)' },
+  { id: 'gratis', titulo: 'Plano Grátis', icon: 'fa-gift',        cor: 'var(--muted)'  },
+];
+const NOVAS_QTD = 5;
+
+let planCategoriaAtiva  = 'novas';
+let planCategoriasCache = { novas: [], pro: [], plus: [], gratis: [] };
+
 function renderPlanos(rows) {
-  const el = document.getElementById('list-planos');
+  const tabsEl = document.getElementById('plan-cat-tabs');
+  const listEl = document.getElementById('list-planos');
+
   if (!rows.length) {
-    el.innerHTML = `<div class="admin-empty"><i class="fa fa-star"></i>Nenhuma loja aprovada ainda.</div>`;
+    tabsEl.innerHTML = '';
+    listEl.innerHTML = `<div class="admin-empty"><i class="fa fa-star"></i>Nenhuma loja aprovada ainda.</div>`;
     return;
   }
 
-  // "Novas Lojas" = as 5 mais recentes (maior número de linha = cadastro mais novo).
-  // Não há timestamp salvo na planilha, então usamos a ordem das linhas como aproximação.
-  const NOVAS_QTD = 5;
   const porRecencia = [...rows].sort((a, b) => b.row - a.row);
-  const novas       = porRecencia.slice(0, NOVAS_QTD);
-  const novasSet    = new Set(novas.map(r => r.row));
 
-  const resto  = rows.filter(r => !novasSet.has(r.row));
-  const pro    = resto.filter(r => r.plano === 'PRO');
-  const plus   = resto.filter(r => r.plano === 'PLUS');
-  const gratis = resto.filter(r => r.plano !== 'PRO' && r.plano !== 'PLUS');
+  planCategoriasCache = {
+    novas:  porRecencia.slice(0, NOVAS_QTD),
+    pro:    rows.filter(r => r.plano === 'PRO'),
+    plus:   rows.filter(r => r.plano === 'PLUS'),
+    gratis: rows.filter(r => r.plano !== 'PRO' && r.plano !== 'PLUS'),
+  };
 
-  const secoes = [
-    { id: 'novas',  titulo: 'Novas Lojas',  icon: 'fa-circle-plus', cor: 'var(--green)',  rows: novas  },
-    { id: 'pro',    titulo: 'Plano Pro',    icon: 'fa-crown',       cor: 'var(--zap)',     rows: pro    },
-    { id: 'plus',   titulo: 'Plano Plus',   icon: 'fa-bolt',        cor: 'var(--indigo)',  rows: plus   },
-    { id: 'gratis', titulo: 'Plano Grátis', icon: 'fa-gift',        cor: 'var(--muted)',   rows: gratis },
-  ];
+  // Se a categoria ativa ficou vazia (ex: era a única loja Pro e ela saiu
+  // do plano), cai para a primeira categoria que ainda tem lojas.
+  if (!planCategoriasCache[planCategoriaAtiva] || !planCategoriasCache[planCategoriaAtiva].length) {
+    const fallback = PLAN_CATS.find(c => planCategoriasCache[c.id].length);
+    planCategoriaAtiva = fallback ? fallback.id : 'novas';
+  }
 
-  el.innerHTML = secoes.map(s => {
-    if (!s.rows.length) return '';
+  renderPlanoTabs();
+  renderPlanoLista();
+}
+
+function renderPlanoTabs() {
+  const tabsEl = document.getElementById('plan-cat-tabs');
+  tabsEl.innerHTML = PLAN_CATS.map(c => {
+    const n     = planCategoriasCache[c.id].length;
+    const ativo = c.id === planCategoriaAtiva;
+    const style = ativo
+      ? `background:${c.cor};border-color:${c.cor};`
+      : `color:${c.cor};border-color:${c.cor};`;
     return `
-      <div class="plan-section" data-section="${s.id}">
-        <div class="plan-section-header">
-          <i class="fa ${s.icon}" style="color:${s.cor};"></i>
-          <span class="plan-section-title" style="color:${s.cor};">${s.titulo}</span>
-          <span class="plan-section-count">${s.rows.length}</span>
-        </div>
-        <div class="store-cards">
-          ${s.rows.map(r => planCardHTML(r)).join('')}
-        </div>
-      </div>`;
+      <button class="plan-cat-btn${ativo ? ' active' : ''}" style="${style}"
+        onclick="switchPlanoCategoria('${c.id}')">
+        <i class="fa ${c.icon}"></i> ${c.titulo}
+        <span class="plan-cat-count">${n}</span>
+      </button>`;
   }).join('');
+}
+
+function renderPlanoLista() {
+  const listEl = document.getElementById('list-planos');
+  const lista  = planCategoriasCache[planCategoriaAtiva] || [];
+  listEl.innerHTML = lista.length
+    ? lista.map(r => planCardHTML(r)).join('')
+    : `<div class="admin-empty"><i class="fa fa-star"></i>Nenhuma loja nessa categoria.</div>`;
+  filterCards('planos'); // reaplica o filtro de busca atual, se houver
+}
+
+function switchPlanoCategoria(id) {
+  planCategoriaAtiva = id;
+  renderPlanoTabs();
+  renderPlanoLista();
 }
 
 /* ── Card de cadastro ─────────────────────────────────────── */
@@ -907,13 +947,6 @@ function filterCards(type) {
   const cards = document.querySelectorAll(`#list-${type} .admin-card`);
   cards.forEach(c => {
     c.style.display = c.dataset.nome.toLowerCase().includes(q) ? '' : 'none';
-  });
-  // Na aba Planos os cards ficam dentro de seções (.plan-section) — esconde a
-  // seção inteira se a busca não deixou nenhum card visível dentro dela.
-  document.querySelectorAll(`#list-${type} .plan-section`).forEach(sec => {
-    const temVisivel = [...sec.querySelectorAll('.admin-card')]
-      .some(c => c.style.display !== 'none');
-    sec.style.display = temVisivel ? '' : 'none';
   });
 }
 

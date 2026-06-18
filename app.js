@@ -2294,16 +2294,8 @@
     // ── HORÁRIO ESTRUTURADO ───────────────────────────────────
     const horarioHTML = buildHorarioHTML(loja);
 
-    // ── OBS ──────────────────────────────────────────────────
-    const obsHTML = loja.obs && loja.obs.trim()
-      ? `<div class="detail-info-row">
-           <div class="detail-info-icon obs"><i class="fa fa-note-sticky"></i></div>
-           <div class="detail-info-text">
-             <span class="detail-info-label">Observações</span>
-             ${escHTML(loja.obs)}
-           </div>
-         </div>`
-      : '';
+    // ── OBS — campo interno (tags de busca), não exibir no modal ──
+    const obsHTML = '';
 
     // ── BOTÕES DE AÇÃO ────────────────────────────────────────
     const { main: actionsMain, ig: actionsIg } = buildActionsHTML(loja, status);

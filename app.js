@@ -124,15 +124,21 @@
     if (loja.statusLoja === 'VOLTAMOS') return { status: 'zap',    fechaStr: '' };
     if (loja.statusLoja === 'FECHADO')  return { status: 'closed', fechaStr: '' };
 
-    // Aberto com horário manual: ABERTO_ATE_1900
+    // Aberto com horário manual: ABERTO_ATE_YYYY-MM-DD_HHMM (ou legado HHMM)
     if ((loja.statusLoja || '').startsWith('ABERTO_ATE_')) {
-      const hhmm = loja.statusLoja.replace('ABERTO_ATE_', '');
-      const hh = parseInt(hhmm.substring(0, 2));
-      const mm = parseInt(hhmm.substring(2, 4));
-      const nowMin2 = new Date().getHours() * 60 + new Date().getMinutes();
-      const ateMin  = hh * 60 + mm;
-      if (nowMin2 < ateMin) return { status: 'open', fechaStr: `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}` };
-      // Horário já passou — cai no cálculo automático abaixo
+      const raw  = loja.statusLoja.replace('ABERTO_ATE_', '');
+      const now3 = new Date();
+      if (raw.includes('_')) {
+        // Novo formato: YYYY-MM-DD_HHMM — compara data+hora exata
+        const parts = raw.split('_');
+        const datePart = parts[0];
+        const hhmm2    = parts[1];
+        const hh2 = parseInt(hhmm2.substring(0, 2));
+        const mm2 = parseInt(hhmm2.substring(2, 4));
+        const ateDate = new Date(`${datePart}T${String(hh2).padStart(2,'0')}:${String(mm2).padStart(2,'0')}:00`);
+        if (now3 < ateDate) return { status: 'open', fechaStr: `${String(hh2).padStart(2,'0')}:${String(mm2).padStart(2,'0')}` };
+      }
+      // Formato legado ou expirado — cai no cálculo automático abaixo
     }
 
     if (loja.status) return { status: loja.status, fechaStr: '' };
@@ -1563,7 +1569,9 @@
   // Confirma "Aberto" com horário personalizado
   async function lojaToggleAberto() {
     const time = document.getElementById('ml-aberto-ate-time')?.value;
-    const status = time ? `ABERTO_ATE_${time.replace(':','')}` : 'ABERTO';
+    // Inclui data para saber quando expirou (formato ABERTO_ATE_YYYY-MM-DD_HHMM)
+    const hoje = new Date().toISOString().slice(0,10);
+    const status = time ? `ABERTO_ATE_${hoje}_${time.replace(':','')}` : 'ABERTO';
     document.getElementById('ml-aberto-ate-wrap').style.display = 'none';
     await lojaToggle(status);
   }

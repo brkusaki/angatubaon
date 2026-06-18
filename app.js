@@ -2652,7 +2652,6 @@
     const fileInput  = document.getElementById(fileInputId);
     const hiddenUrl  = document.getElementById(hiddenId);
     const previewImg = document.getElementById(previewImgId);
-    const previewWrap= document.getElementById(previewWrapId);
     const statusEl   = document.getElementById(statusId);
 
     if (!fileInput) return;
@@ -2661,11 +2660,17 @@
       const file = this.files[0];
       if (!file) return;
 
-      // Preview local imediato
+      // Preview local imediato no card
       const reader = new FileReader();
       reader.onload = e => {
-        previewImg.src = e.target.result;
-        previewWrap.style.display = '';
+        if (previewImg) {
+          previewImg.src = e.target.result;
+          previewImg.style.display = 'block';
+          // Esconde placeholder correspondente
+          const isLogo = previewImgId === 'logo-preview-img';
+          const placeholder = document.getElementById(isLogo ? 'prev-logo-placeholder' : 'prev-capa-placeholder');
+          if (placeholder) placeholder.style.display = 'none';
+        }
       };
       reader.readAsDataURL(file);
 
@@ -2675,9 +2680,32 @@
     });
   }
 
+  // Atualiza nome/ramo no preview do card em tempo real
+  function initCardPreviewSync() {
+    const nomeInput = document.getElementById('f-nome');
+    const prevNome  = document.getElementById('prev-nome');
+    const prevRamo  = document.getElementById('prev-ramo');
+
+    if (nomeInput && prevNome) {
+      nomeInput.addEventListener('input', () => {
+        prevNome.textContent = nomeInput.value.trim() || 'Nome da sua loja';
+      });
+    }
+
+    // Observar mudanças no campo oculto de ramo (preenchido pelo autocomplete)
+    const ramoHidden = document.getElementById('f-ramo');
+    const ramoText   = document.getElementById('f-ramo-text');
+    if (ramoText && prevRamo) {
+      ramoText.addEventListener('input', () => {
+        prevRamo.textContent = ramoText.value.trim() || 'Ramo / categoria';
+      });
+    }
+  }
+  initCardPreviewSync();
+
   // Inicializa os dois campos de upload
-  initImageUpload('f-foto-file', 'f-foto-url', 'foto-preview-img', 'foto-preview-wrap', 'foto-upload-status');
-  initImageUpload('f-logo-file', 'f-logo-url', 'logo-preview-img', 'logo-preview-wrap', 'logo-upload-status');
+  initImageUpload('f-foto-file', 'f-foto-url', 'foto-preview-img', null, 'foto-upload-status');
+  initImageUpload('f-logo-file', 'f-logo-url', 'logo-preview-img', null, 'logo-upload-status');
 
   /* ══════════════════════════════════════════════════════════════
      RAMO AUTOCOMPLETE

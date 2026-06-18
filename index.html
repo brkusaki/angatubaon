@@ -248,58 +248,110 @@
         </div>
 
         <div class="field-group">
-          <label class="field-label" for="f-obs">Observações</label>
+          <label class="field-label" for="f-obs">
+            Tags de Busca
+            <span style="font-size:10px;font-weight:500;color:var(--muted);margin-left:6px;">ajuda clientes a te encontrar</span>
+          </label>
           <textarea class="field-textarea" id="f-obs" name="observacoes"
-            placeholder="Delivery, produtos especiais, promoções..."></textarea>
+            placeholder="Ex: delivery, pizza, esfiha, açaí, produtos naturais, conserto de celular..."
+            style="min-height:70px;"></textarea>
+          <p class="field-hint" style="margin-top:5px;">
+            🔍 Quando alguém pesquisar por essas palavras, sua loja vai aparecer nos resultados.
+          </p>
         </div>
 
-        <!-- Foto e Logo — upload direto para o ImgBB -->
+        <!-- Foto e Logo — preview de card unificado (Plus / Pro) -->
         <div class="field-group" id="foto-group" style="display:none;">
           <label class="field-label">
-            Foto da Fachada / Capa
+            Foto &amp; Logo
             <span style="color:var(--zap);margin-left:4px;">✦ Plus · ⭐ Pro</span>
           </label>
-          <div id="foto-preview-wrap" style="display:none; margin-bottom:8px; border-radius:10px; overflow:hidden; max-height:160px;">
-            <img id="foto-preview-img" src="" alt="Preview da foto" style="width:100%; height:160px; object-fit:cover; display:block;" />
-          </div>
-          <label id="foto-drop" for="f-foto-file" style="
-            display:flex; flex-direction:column; align-items:center; justify-content:center;
-            gap:8px; border:1.5px dashed rgba(245,158,11,0.4); border-radius:10px;
-            padding:20px; cursor:pointer; background:rgba(245,158,11,0.05);
-            transition:background 0.2s; text-align:center;
-          ">
-            <i class="fa fa-image" style="font-size:1.6rem; color:var(--zap);"></i>
-            <span style="font-size:13px; color:var(--text); font-weight:600;">Toque para escolher a foto</span>
-            <span style="font-size:11px; color:var(--muted);">JPG, PNG ou WEBP · máx 5MB</span>
-            <span id="foto-upload-status" style="font-size:11px;"></span>
-          </label>
-          <input type="file" id="f-foto-file" accept="image/*" style="display:none;" />
-          <input type="hidden" id="f-foto-url" name="fotoUrl" />
-        </div>
+          <p class="field-hint" style="margin-bottom:10px;">
+            Veja como sua loja vai aparecer no app. Toque nos ícones para trocar as imagens.
+          </p>
 
-        <div class="field-group" id="logo-group" style="display:none;">
-          <label class="field-label">
-            Logo da Loja
-            <span style="color:var(--zap);margin-left:4px;">✦ Plus · ⭐ Pro</span>
-          </label>
-          <div id="logo-preview-wrap" style="display:none; margin-bottom:8px;">
-            <div style="width:64px; height:64px; border-radius:14px; overflow:hidden; background:#fff; padding:4px; display:flex; align-items:center; justify-content:center;">
-              <img id="logo-preview-img" src="" alt="Preview do logo" style="width:100%; height:100%; object-fit:contain;" />
+          <!-- Preview Card -->
+          <div id="card-preview-wrap" style="
+            border-radius:16px; overflow:hidden; border:1px solid var(--border);
+            background:var(--surface); position:relative; margin-bottom:8px;
+          ">
+            <!-- Capa / hero -->
+            <div id="prev-capa-wrap" style="
+              width:100%; height:130px; background:var(--surface2);
+              display:flex; align-items:center; justify-content:center;
+              position:relative; overflow:hidden;
+            ">
+              <i id="prev-capa-placeholder" class="fa fa-image" style="font-size:2rem;color:var(--border);"></i>
+              <img id="foto-preview-img" src="" alt="" style="
+                display:none; position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+              "/>
+              <!-- botão trocar capa -->
+              <label for="f-foto-file" id="btn-trocar-capa" style="
+                position:absolute; bottom:8px; right:8px;
+                background:rgba(0,0,0,0.65); border:1px solid rgba(255,255,255,0.15);
+                border-radius:8px; padding:5px 9px; cursor:pointer;
+                display:flex; align-items:center; gap:5px;
+                font-size:10px; font-weight:700; color:#fff;
+                backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+              ">
+                <i class="fa fa-camera"></i> Trocar capa
+              </label>
+              <span id="foto-upload-status" style="
+                position:absolute; bottom:8px; left:8px;
+                font-size:10px; background:rgba(0,0,0,0.7); border-radius:6px;
+                padding:3px 7px;
+              "></span>
+            </div>
+
+            <!-- Linha de info do card -->
+            <div style="padding:10px 12px 12px; display:flex; align-items:center; gap:10px;">
+              <!-- Logo -->
+              <div id="prev-logo-wrap" style="
+                width:44px; height:44px; border-radius:10px; flex-shrink:0;
+                background:#fff; border:1.5px solid var(--border); overflow:hidden;
+                display:flex; align-items:center; justify-content:center; position:relative;
+              ">
+                <i id="prev-logo-placeholder" class="fa fa-store" style="font-size:1.1rem;color:var(--border);"></i>
+                <img id="logo-preview-img" src="" alt="" style="
+                  display:none; width:100%; height:100%; object-fit:contain;
+                "/>
+                <!-- botão trocar logo -->
+                <label for="f-logo-file" style="
+                  position:absolute; inset:0; cursor:pointer;
+                  display:flex; align-items:flex-end; justify-content:center;
+                  background:transparent;
+                " title="Trocar logo"></label>
+              </div>
+
+              <div style="flex:1; min-width:0;">
+                <div style="font-family:var(--font-h); font-size:13px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="prev-nome">Nome da sua loja</div>
+                <div style="font-size:11px; color:var(--muted); margin-top:2px;" id="prev-ramo">Ramo / categoria</div>
+              </div>
+            </div>
+
+            <!-- hint do logo abaixo do card -->
+            <div style="
+              display:flex; align-items:center; justify-content:center; gap:16px;
+              padding:8px 12px; border-top:1px solid var(--border);
+              background:var(--surface2);
+            ">
+              <label for="f-logo-file" style="
+                display:flex; align-items:center; gap:5px; cursor:pointer;
+                font-size:11px; font-weight:600; color:var(--text);
+              ">
+                <i class="fa fa-camera" style="font-size:10px;color:var(--muted);"></i> Trocar logo
+              </label>
+              <span id="logo-upload-status" style="font-size:10px;"></span>
             </div>
           </div>
-          <label id="logo-drop" for="f-logo-file" style="
-            display:flex; flex-direction:column; align-items:center; justify-content:center;
-            gap:8px; border:1.5px dashed rgba(99,102,241,0.4); border-radius:10px;
-            padding:20px; cursor:pointer; background:rgba(99,102,241,0.05);
-            transition:background 0.2s; text-align:center;
-          ">
-            <i class="fa fa-store" style="font-size:1.6rem; color:#6366f1;"></i>
-            <span style="font-size:13px; color:var(--text); font-weight:600;">Toque para escolher o logo</span>
-            <span style="font-size:11px; color:var(--muted);">Fundo branco/transparente · máx 2MB</span>
-            <span id="logo-upload-status" style="font-size:11px;"></span>
-          </label>
+
+          <!-- Inputs ocultos -->
+          <input type="file" id="f-foto-file" accept="image/*" style="display:none;" />
+          <input type="hidden" id="f-foto-url" name="fotoUrl" />
           <input type="file" id="f-logo-file" accept="image/*" style="display:none;" />
           <input type="hidden" id="f-logo-url" name="logoUrl" />
+          <!-- logo-group antigo unificado aqui, mantemos o id para compatibilidade JS -->
+          <div id="logo-group" style="display:none;"></div>
         </div>
 
         <p class="field-hint">

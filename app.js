@@ -1042,12 +1042,19 @@
 
   /* ── Atualiza a bottom nav conforme sessão ───────────────── */
   function atualizarNav() {
-    const navLojaBtn = document.getElementById('nav-loja');
+    const navLojaBtn      = document.getElementById('nav-loja');
+    const navCadastrarBtn = document.getElementById('nav-cadastrar');
     if (!navLojaBtn) return;
     if (_lojaToken) {
-      navLojaBtn.innerHTML = `<i class="fa fa-shop-slash" style="color:var(--green);"></i><span style="color:var(--green);">Minha Loja</span>`;
+      // Logado: Minha Loja em verde, Cadastrar some
+      navLojaBtn.innerHTML = `<i class="fa fa-store"></i><span>Minha Loja</span>`;
+      navLojaBtn.classList.add('logado');
+      navCadastrarBtn?.classList.add('hidden');
     } else {
-      navLojaBtn.innerHTML = `<i class="fa fa-store"></i><span>Cadastrar</span>`;
+      // Deslogado: Minha Loja normal, Cadastrar visível
+      navLojaBtn.innerHTML = `<i class="fa fa-store"></i><span>Minha Loja</span>`;
+      navLojaBtn.classList.remove('logado');
+      navCadastrarBtn?.classList.remove('hidden');
     }
   }
 
@@ -1080,8 +1087,14 @@
     if (_lojaToken) {
       abrirMinhaLoja();
     } else {
-      openModal(); // abre o seletor de planos → cadastro
+      openLoginLoja(); // abre direto o login
     }
+  });
+
+  document.getElementById('nav-cadastrar').addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.getElementById('nav-cadastrar').classList.add('active');
+    openModal(); // abre o seletor de planos → cadastro
   });
 
   /* ── Modais de login ─────────────────────────────────────── */

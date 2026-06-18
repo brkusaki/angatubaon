@@ -2007,12 +2007,6 @@
             atualizarEnderecoCompleto();
             setStatus('✅', 'Rua confirmada — adicione o número ao lado', 'var(--green)');
             if (hintEl) hintEl.style.display = 'none';
-            // Detecta bairro automaticamente pelo display_name do Nominatim
-            const bairroDetectado = detectarBairroDaRua(el.dataset.display || el.dataset.rua);
-            const fBairro = document.getElementById('f-bairro');
-            if (fBairro && bairroDetectado && !fBairro.value) {
-              fBairro.value = bairroDetectado;
-            }
             inputNum.focus();
           };
           el.addEventListener('click',   select);

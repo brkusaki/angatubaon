@@ -739,11 +739,11 @@ async function savePlan(row) {
     // Usa POST no-cors (mesmo padrão do login) para evitar erros de CORS/redirect do Apps Script
     const params = new URLSearchParams();
     params.append('payload', JSON.stringify({
-      action:   'updatePlan',
-      token:    _sessionToken,
-      row:      row,
-      plano:    plano,
-      validade: validadeBR,
+      action:    'updatePlan',
+      token:     _sessionToken,
+      row:       row,
+      plano:     plano,
+      planoValidade: validadeBR,
       planoPago: plano !== 'GRATIS' ? 'SIM' : 'NAO',
     }));
 

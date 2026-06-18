@@ -1422,22 +1422,34 @@
     // ── Instagram da loja ─────────────────────────────────
     const mlIgWrap = document.getElementById('ml-instagram-wrap');
     if (mlIgWrap) {
-      if (d.instagram) {
-        const igHandle = d.instagram.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/$/, '');
-        const igUrl = `https://instagram.com/${igHandle}`;
-        mlIgWrap.style.display = '';
-        mlIgWrap.innerHTML = `
-          <a href="${igUrl}" target="_blank" rel="noopener"
-            style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;
-                   background:rgba(225,48,108,0.08);border:1px solid rgba(225,48,108,0.2);
-                   color:#e1306c;text-decoration:none;font-size:12px;font-weight:700;">
-            <i class="fab fa-instagram" style="font-size:1.1rem;"></i>
-            <span>@${igHandle}</span>
-            <i class="fa fa-external-link-alt" style="font-size:9px;margin-left:auto;opacity:0.6;"></i>
-          </a>`;
-      } else {
-        mlIgWrap.style.display = 'none';
-      }
+      mlIgWrap.style.display = '';
+      const igHandleAtual = d.instagram
+        ? d.instagram.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/$/, '')
+        : '';
+      mlIgWrap.innerHTML = `
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div style="position:relative;flex:1;display:flex;align-items:center;">
+            <span style="position:absolute;left:11px;color:#e1306c;font-size:13px;pointer-events:none;">
+              <i class="fab fa-instagram"></i>
+            </span>
+            <input type="text" id="ml-ig-input" value="${igHandleAtual ? '@'+igHandleAtual : ''}"
+              placeholder="@nomedoperfil"
+              style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:9px;
+                     padding:9px 10px 9px 32px;font-size:12px;color:var(--text);box-sizing:border-box;"/>
+          </div>
+          <button onclick="mlSalvarInstagram()" id="ml-ig-save-btn"
+            style="flex-shrink:0;padding:9px 14px;border-radius:9px;
+                   background:linear-gradient(135deg,#e1306c,#c13584);color:#fff;
+                   font-family:var(--font-h);font-size:11px;font-weight:800;border:none;cursor:pointer;">
+            Salvar
+          </button>
+        </div>
+        ${igHandleAtual ? `
+        <a href="https://instagram.com/${igHandleAtual}" target="_blank" rel="noopener"
+          style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:#e1306c;text-decoration:none;">
+          <i class="fa fa-external-link-alt" style="font-size:9px;"></i> Ver perfil atual
+        </a>` : ''}
+        <div id="ml-ig-status" style="font-size:10px;margin-top:6px;min-height:13px;"></div>`;
     }
 
     // Toggle — marca o status atual
@@ -1687,6 +1699,49 @@
       if (json.msg === 'UNAUTHORIZED') { lojaLogout(true); return; }
     } catch(e) {
       console.warn('[lojaToggle] Erro:', e.message);
+    }
+  }
+
+  /* ── Salvar Instagram (painel Minha Loja) ────────────────── */
+  async function mlSalvarInstagram() {
+    if (!_lojaToken) return;
+    const input  = document.getElementById('ml-ig-input');
+    const status = document.getElementById('ml-ig-status');
+    const btn    = document.getElementById('ml-ig-save-btn');
+    if (!input) return;
+
+    let valor = input.value.trim();
+    // Aceita @usuario, usuario, ou link completo — normaliza para @usuario
+    valor = valor
+      .replace(/^https?:\/\/(www\.)?instagram\.com\//i, '')
+      .replace(/\/.*$/, '')
+      .replace(/^@/, '')
+      .trim();
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
+    if (status) { status.textContent = ''; status.style.color = ''; }
+
+    try {
+      const url = `${APPS_SCRIPT_URL}?action=lojaAtualizarInstagram&token=${encodeURIComponent(_lojaToken)}&instagram=${encodeURIComponent(valor)}`;
+      const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      const json = await resp.json();
+
+      if (json.status === 'erro' || json.msg === 'UNAUTHORIZED') {
+        if (status) { status.textContent = '❌ Erro ao salvar. Tente novamente.'; status.style.color = 'var(--red)'; }
+        return;
+      }
+
+      if (status) { status.textContent = '✅ Instagram atualizado!'; status.style.color = 'var(--green)'; }
+      input.value = valor ? '@' + valor : '';
+
+      // Atualiza link "Ver perfil atual" sem precisar reabrir o painel
+      setTimeout(() => abrirMinhaLoja(), 600);
+
+    } catch(e) {
+      if (status) { status.textContent = '❌ Erro de conexão.'; status.style.color = 'var(--red)'; }
+      console.warn('[mlSalvarInstagram] Erro:', e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
     }
   }
 
@@ -3865,6 +3920,7 @@
   window.mlCardapioFecharForm = mlCardapioFecharForm;
   window.mlCardapioSalvar     = mlCardapioSalvar;
   window.mlCardapioRemover    = mlCardapioRemover;
+  window.mlSalvarInstagram    = mlSalvarInstagram;
 
   /* ══════════════════════════════════════════════════════════════
      CARDÁPIO — TELA DO CLIENTE

@@ -350,10 +350,6 @@
     /* ════════════════════════════════════════════
        CHIP DE BAIRRO
     ════════════════════════════════════════════ */
-    .pill-bairro-wrap {
-      position: relative;
-      flex-shrink: 0;
-    }
     .pill-btn.active[data-filter="bairro"] {
       background: rgba(99,179,237,0.12);
       border-color: rgba(99,179,237,0.4);
@@ -361,15 +357,13 @@
       box-shadow: 0 0 0 1px rgba(99,179,237,0.12) inset;
     }
     .bairro-dropdown {
-      position: absolute;
-      left: 0;
-      top: calc(100% + 6px);
+      position: fixed;
       min-width: 220px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
-      z-index: 3000;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      z-index: 9000;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.7);
       overflow: hidden;
     }
     .bairro-search {

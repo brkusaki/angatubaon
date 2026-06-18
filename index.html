@@ -78,15 +78,15 @@
     <button class="pill-btn" data-filter="featured">
       <i class="fa fa-star" style="font-size:10px;"></i> Destaques
     </button>
-    <div class="pill-bairro-wrap" id="pill-bairro-wrap">
-      <button class="pill-btn pill-bairro-btn" id="pill-bairro-btn" data-filter="bairro">
-        <i class="fa fa-map-marker-alt" style="font-size:10px;"></i> <span id="pill-bairro-label">Bairro</span>
-      </button>
-      <div class="bairro-dropdown" id="bairro-dropdown" style="display:none;">
-        <input class="bairro-search" id="bairro-search" type="text" placeholder="Digite o bairro..." autocomplete="off" />
-        <div class="bairro-list" id="bairro-list"></div>
-      </div>
-    </div>
+    <button class="pill-btn pill-bairro-btn" id="pill-bairro-btn" data-filter="bairro">
+      <i class="fa fa-map-marker-alt" style="font-size:10px;"></i> <span id="pill-bairro-label">Bairro</span>
+    </button>
+  </div>
+
+  <!-- Dropdown de bairro — fora do scroll container para não ser clipado -->
+  <div class="bairro-dropdown" id="bairro-dropdown" style="display:none;">
+    <input class="bairro-search" id="bairro-search" type="text" placeholder="Digite o bairro..." autocomplete="off" />
+    <div class="bairro-list" id="bairro-list"></div>
   </div>
 
   <!-- ════════════════════════════════ MAIN -->

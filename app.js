@@ -1750,12 +1750,23 @@
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const open = dropdown.style.display !== 'none';
-      dropdown.style.display = open ? 'none' : 'block';
-      if (!open) {
-        search.value = '';
-        renderBairroList('');
-        search.focus();
+      if (open) {
+        dropdown.style.display = 'none';
+        return;
       }
+      // Posiciona o dropdown abaixo do botão usando coordenadas absolutas na viewport
+      const rect = btn.getBoundingClientRect();
+      dropdown.style.display = 'block';
+      dropdown.style.top  = (rect.bottom + 6) + 'px';
+      // Garante que não saia da tela pela direita
+      const ddW = Math.max(220, btn.offsetWidth);
+      let left = rect.left;
+      if (left + ddW > window.innerWidth - 8) left = window.innerWidth - ddW - 8;
+      dropdown.style.left  = left + 'px';
+      dropdown.style.width = ddW + 'px';
+      search.value = '';
+      renderBairroList('');
+      search.focus();
     });
 
     search.addEventListener('input', () => renderBairroList(search.value));

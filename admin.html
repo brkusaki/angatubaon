@@ -200,6 +200,24 @@
       justify-content: center;
     }
 
+    /* ── PLAN SECTIONS ───────────────────────────────────── */
+    .plan-section { margin-bottom: 26px; }
+    .plan-section:last-child { margin-bottom: 0; }
+    .plan-section-header {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 12px; padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .plan-section-header i { font-size: 12px; }
+    .plan-section-title {
+      font-family: var(--font-h); font-size: 0.85rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    .plan-section-count {
+      font-size: 11px; color: var(--muted); background: var(--s2);
+      padding: 2px 9px; border-radius: 20px; margin-left: auto;
+    }
+
     /* ── SEARCH ──────────────────────────────────────────── */
     .admin-search-wrap { position: relative; margin-bottom: 16px; }
     .admin-search {
@@ -601,7 +619,40 @@ function renderPlanos(rows) {
     el.innerHTML = `<div class="admin-empty"><i class="fa fa-star"></i>Nenhuma loja aprovada ainda.</div>`;
     return;
   }
-  el.innerHTML = rows.map(r => planCardHTML(r)).join('');
+
+  // "Novas Lojas" = as 5 mais recentes (maior número de linha = cadastro mais novo).
+  // Não há timestamp salvo na planilha, então usamos a ordem das linhas como aproximação.
+  const NOVAS_QTD = 5;
+  const porRecencia = [...rows].sort((a, b) => b.row - a.row);
+  const novas       = porRecencia.slice(0, NOVAS_QTD);
+  const novasSet    = new Set(novas.map(r => r.row));
+
+  const resto  = rows.filter(r => !novasSet.has(r.row));
+  const pro    = resto.filter(r => r.plano === 'PRO');
+  const plus   = resto.filter(r => r.plano === 'PLUS');
+  const gratis = resto.filter(r => r.plano !== 'PRO' && r.plano !== 'PLUS');
+
+  const secoes = [
+    { id: 'novas',  titulo: 'Novas Lojas',  icon: 'fa-circle-plus', cor: 'var(--green)',  rows: novas  },
+    { id: 'pro',    titulo: 'Plano Pro',    icon: 'fa-crown',       cor: 'var(--zap)',     rows: pro    },
+    { id: 'plus',   titulo: 'Plano Plus',   icon: 'fa-bolt',        cor: 'var(--indigo)',  rows: plus   },
+    { id: 'gratis', titulo: 'Plano Grátis', icon: 'fa-gift',        cor: 'var(--muted)',   rows: gratis },
+  ];
+
+  el.innerHTML = secoes.map(s => {
+    if (!s.rows.length) return '';
+    return `
+      <div class="plan-section" data-section="${s.id}">
+        <div class="plan-section-header">
+          <i class="fa ${s.icon}" style="color:${s.cor};"></i>
+          <span class="plan-section-title" style="color:${s.cor};">${s.titulo}</span>
+          <span class="plan-section-count">${s.rows.length}</span>
+        </div>
+        <div class="store-cards">
+          ${s.rows.map(r => planCardHTML(r)).join('')}
+        </div>
+      </div>`;
+  }).join('');
 }
 
 /* ── Card de cadastro ─────────────────────────────────────── */
@@ -856,6 +907,13 @@ function filterCards(type) {
   const cards = document.querySelectorAll(`#list-${type} .admin-card`);
   cards.forEach(c => {
     c.style.display = c.dataset.nome.toLowerCase().includes(q) ? '' : 'none';
+  });
+  // Na aba Planos os cards ficam dentro de seções (.plan-section) — esconde a
+  // seção inteira se a busca não deixou nenhum card visível dentro dela.
+  document.querySelectorAll(`#list-${type} .plan-section`).forEach(sec => {
+    const temVisivel = [...sec.querySelectorAll('.admin-card')]
+      .some(c => c.style.display !== 'none');
+    sec.style.display = temVisivel ? '' : 'none';
   });
 }
 

@@ -381,23 +381,23 @@
       anuncioBadge = `<div class="store-anuncio-badge"><span>${loja.anuncio.emoji || '🎯'}</span> ${escHTML(loja.anuncio.texto)}</div>`;
     }
 
-    // Estrelas de avaliação — só aparece quando há avaliações
+    // Estrelas de avaliação — linha própria, só quando há avaliações
     let starsHTML = '';
     const avals = loja.avaliacoes;
     if (avals && avals.length > 0) {
-      const media = (avals.reduce((s, a) => s + (a.nota || 0), 0) / avals.length);
+      const media = avals.reduce((s, a) => s + (a.nota || 0), 0) / avals.length;
       const mediaFmt = media.toFixed(1);
-      // Estrela cheia, meia, ou vazia
+      // Monta string de estrelas cheias/meia/vazias
       let estrelasStr = '';
       for (let s = 1; s <= 5; s++) {
         if (media >= s - 0.25)      estrelasStr += '★';
-        else if (media >= s - 0.75) estrelasStr += '½';
-        else                         estrelasStr += '☆';
+        else if (media >= s - 0.75) estrelasStr += '⭑';
+        else                        estrelasStr += '☆';
       }
       starsHTML = `<div class="store-stars">
-        <span style="letter-spacing:1px;">${estrelasStr.replace(/½/g,'<span style="opacity:.5;">★</span>')}</span>
-        <span style="font-weight:700;">${mediaFmt}</span>
-        <span class="store-stars-count">· ${avals.length}</span>
+        <span style="color:#f59e0b;letter-spacing:1px;font-size:11px;">${estrelasStr}</span>
+        <span style="font-weight:700;font-size:11px;color:#f59e0b;">${mediaFmt}</span>
+        <span style="font-size:10px;color:var(--muted);">· ${avals.length} avaliação${avals.length > 1 ? 'ões' : ''}</span>
       </div>`;
     }
 
@@ -412,7 +412,8 @@
             ${planBadge}
           </div>
           <div class="store-sub">${escHTML(loja.sub)}</div>
-          <div class="store-row">${badgeHTML(status, fechaStr)}${mapBtn}${ctTag}${starsHTML}</div>
+          <div class="store-row">${badgeHTML(status, fechaStr)}${mapBtn}${ctTag}</div>
+          ${starsHTML}
           ${anuncioBadge}
           ${expandHint}
         </div>
@@ -3135,32 +3136,6 @@
     };
 
   })(); // ── fim initRamoAutocomplete ──────────────────────────
-
-  /* ══════════════════════════════════════════════════════════════
-     DARK / LIGHT MODE
-  ══════════════════════════════════════════════════════════════ */
-  function _aplicarTema(tema) {
-    const isLight = tema === 'light';
-    document.body.classList.toggle('light-mode', isLight);
-    // Ícone: lua no dark, sol no light
-    const icon = document.getElementById('theme-toggle-icon');
-    if (icon) {
-      icon.className = isLight ? 'fa fa-sun' : 'fa fa-moon';
-    }
-    // Atualiza meta theme-color para combinar com a barra do browser
-    const meta = document.getElementById('meta-theme-color');
-    if (meta) meta.content = isLight ? '#f4f4f5' : '#0d0d0d';
-  }
-
-  function toggleTheme() {
-    const atual = localStorage.getItem('angatuba_tema') || 'dark';
-    const novo  = atual === 'dark' ? 'light' : 'dark';
-    localStorage.setItem('angatuba_tema', novo);
-    _aplicarTema(novo);
-  }
-
-  // Aplica tema salvo na inicialização (antes do render para evitar flash)
-  _aplicarTema(localStorage.getItem('angatuba_tema') || 'dark');
 
   /* ── INIT ────────────────────────────────────────────────── */
   // Mostra skeletons enquanto API carrega

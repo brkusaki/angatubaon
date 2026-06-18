@@ -3489,6 +3489,11 @@
   window.fecharCardapioCliente = function() {
     document.getElementById('modal-cardapio-cliente').classList.remove('open');
     document.body.style.overflow = '';
+    // Reseta tela de sucesso para a próxima abertura
+    const sucesso = document.getElementById('cc-pedido-sucesso');
+    if (sucesso) sucesso.style.display = 'none';
+    const wrap = document.getElementById('cc-itens-wrap');
+    if (wrap) wrap.style.display = '';
   };
 
   function ccRenderItens(loja) {
@@ -3611,6 +3616,53 @@
     const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n\n${linhas.join('\n')}\n\n*Total: R$ ${total.toFixed(2).replace('.',',')}*\n\nPoderia confirmar?`;
     const url = `https://wa.me/${loja.wpp}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank', 'noopener');
+
+    // Quando o usuário voltar ao app após ir ao WhatsApp, mostra tela de sucesso
+    function onRetorno() {
+      if (!document.hidden) {
+        document.removeEventListener('visibilitychange', onRetorno);
+        _ccMostrarSucesso();
+      }
+    }
+    document.addEventListener('visibilitychange', onRetorno);
+  };
+
+  window._ccMostrarSucesso = function() {
+    // Esconde o carrinho e mostra a mensagem de sucesso dentro do modal
+    const carrinhoBar = document.getElementById('cc-carrinho-bar');
+    const wrap        = document.getElementById('cc-itens-wrap');
+
+    // Cria (ou reutiliza) div de sucesso
+    let sucesso = document.getElementById('cc-pedido-sucesso');
+    if (!sucesso) {
+      sucesso = document.createElement('div');
+      sucesso.id = 'cc-pedido-sucesso';
+      sucesso.style.cssText = `
+        display:flex; flex-direction:column; align-items:center; justify-content:center;
+        gap:12px; padding:40px 24px; text-align:center;
+      `;
+      sucesso.innerHTML = `
+        <div style="font-size:3rem;">✅</div>
+        <div style="font-family:var(--font-h);font-size:1.2rem;font-weight:800;color:var(--text);">Pedido enviado!</div>
+        <p style="font-size:13px;color:var(--muted);margin:0;">Seu pedido foi enviado pelo WhatsApp.<br>Aguarde a confirmação da loja.</p>
+        <button onclick="fecharCardapioCliente()" style="
+          margin-top:8px; padding:12px 28px; border-radius:12px;
+          background:linear-gradient(135deg,#25d366,#128c7e);
+          color:#fff; font-family:var(--font-h); font-size:14px; font-weight:800;
+          border:none; cursor:pointer;
+        ">Fechar</button>
+      `;
+      document.getElementById('modal-cardapio-cliente')
+        ?.querySelector('[style*="overflow-y:auto"]')
+        ?.after(sucesso) || wrap?.parentNode?.insertBefore(sucesso, carrinhoBar);
+    }
+
+    if (carrinhoBar) carrinhoBar.style.display = 'none';
+    if (wrap)        wrap.style.display        = 'none';
+    sucesso.style.display = 'flex';
+
+    // Limpa carrinho
+    _ccCarrinho = {};
   };
 
   document.getElementById('modal-cardapio-cliente')?.addEventListener('click', function(e) {

@@ -381,6 +381,26 @@
       anuncioBadge = `<div class="store-anuncio-badge"><span>${loja.anuncio.emoji || '🎯'}</span> ${escHTML(loja.anuncio.texto)}</div>`;
     }
 
+    // Estrelas de avaliação — só aparece quando há avaliações
+    let starsHTML = '';
+    const avals = loja.avaliacoes;
+    if (avals && avals.length > 0) {
+      const media = (avals.reduce((s, a) => s + (a.nota || 0), 0) / avals.length);
+      const mediaFmt = media.toFixed(1);
+      // Estrela cheia, meia, ou vazia
+      let estrelasStr = '';
+      for (let s = 1; s <= 5; s++) {
+        if (media >= s - 0.25)      estrelasStr += '★';
+        else if (media >= s - 0.75) estrelasStr += '½';
+        else                         estrelasStr += '☆';
+      }
+      starsHTML = `<div class="store-stars">
+        <span style="letter-spacing:1px;">${estrelasStr.replace(/½/g,'<span style="opacity:.5;">★</span>')}</span>
+        <span style="font-weight:700;">${mediaFmt}</span>
+        <span class="store-stars-count">· ${avals.length}</span>
+      </div>`;
+    }
+
     return `
       <div class="${cardClass}"
         data-status="${status}" data-category="${loja.categoria}" data-plano="${plano}"
@@ -392,7 +412,7 @@
             ${planBadge}
           </div>
           <div class="store-sub">${escHTML(loja.sub)}</div>
-          <div class="store-row">${badgeHTML(status, fechaStr)}${mapBtn}${ctTag}</div>
+          <div class="store-row">${badgeHTML(status, fechaStr)}${mapBtn}${ctTag}${starsHTML}</div>
           ${anuncioBadge}
           ${expandHint}
         </div>
@@ -501,7 +521,7 @@
     const frag = document.createDocumentFragment();
     filtradas.forEach((loja, i) => {
       const wrap = document.createElement('div');
-      wrap.innerHTML = cardHTML(loja, Math.min(i * 0.055, 0.8), getStatusInfo(loja), _lojaIdxMap.get(loja) ?? 0);
+      wrap.innerHTML = cardHTML(loja, i * 0.055, getStatusInfo(loja), _lojaIdxMap.get(loja) ?? 0);
       frag.appendChild(wrap.firstElementChild);
     });
 
@@ -1824,16 +1844,9 @@
   })();
 
   /* ── Auto-refresh inteligente ───────────────────────────── */
-  // Só re-renderiza se algum status mudou, evitando repaints desnecessários.
-  // calcStatusInfo é leve (só aritmética), mas com 200+ lojas acumula — usamos
-  // o snapshot do último render como referência rápida.
+  // Só re-renderiza se algum status mudou, evitando repaints desnecessários
   function smartRefresh() {
-    let changed = false;
-    for (const l of LOJAS) {
-      const atual = calcStatus(l);
-      const anterior = _statusSnapshot.get(l)?.status ?? '';
-      if (atual !== anterior) { changed = true; break; } // short-circuit: para no primeiro
-    }
+    const changed = LOJAS.some(l => calcStatus(l) !== (_statusSnapshot.get(l)?.status ?? ''));
     if (changed) {
       renderLojas();
       renderCategorias();
@@ -1898,69 +1911,42 @@
   /* ── Carrega lojas da API (Apps Script → Google Sheets) ─────── */
   const _retryDelays = [8000, 20000, 45000]; // backoff progressivo: 8s, 20s, 45s
   let   _retryCount  = 0;
-  const _CACHE_KEY   = 'angatuba_lojas_cache';
-  const _CACHE_TTL   = 5 * 60 * 1000; // 5 minutos
-
-  function _aplicarLojas(dados) {
-    const nomesApi = new Set(dados.map(l => l.nome.trim().toLowerCase()));
-    const fixasSemDuplicata = LOJAS_FIXAS.filter(l => !nomesApi.has(l.nome.trim().toLowerCase()));
-    LOJAS = [...dados, ...fixasSemDuplicata].map(l => ({
-      ...l,
-      nome:      l.nome      || '',
-      tags:      l.tags      || '',
-      sub:       l.sub       || '',
-      categoria: l.categoria || 'servicos',
-      plano:     (l.plano    || 'GRATIS').toUpperCase(),
-      emoji:     l.emoji     || '🏪',
-    }));
-    _rebuildIdxMap();
-    renderLojas();
-    renderCategorias();
-  }
 
   async function carregarLojas() {
-    // Tenta cache do sessionStorage primeiro (válido por 5 minutos)
-    try {
-      const cached = sessionStorage.getItem(_CACHE_KEY);
-      if (cached) {
-        const { ts, data } = JSON.parse(cached);
-        if (Date.now() - ts < _CACHE_TTL && Array.isArray(data) && data.length > 0) {
-          _aplicarLojas(data);
-          console.log('[AngatubaON] ' + data.length + ' lojas do cache ✅');
-          // Atualiza em background sem bloquear o render
-          _buscarLojasAPI(false);
-          return;
-        }
-      }
-    } catch(e) {}
-    // Cache ausente ou expirado — busca direto
-    await _buscarLojasAPI(true);
-  }
-
-  async function _buscarLojasAPI(mostrarErro) {
     try {
       const resp = await fetch(APPS_SCRIPT_URL, { signal: AbortSignal.timeout(10000) });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const json = await resp.json();
       if (json.status === 'ok' && Array.isArray(json.data) && json.data.length > 0) {
-        // Salva no cache
-        try {
-          sessionStorage.setItem(_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: json.data }));
-        } catch(e) {}
-        _aplicarLojas(json.data);
-        _retryCount = 0;
-        console.log('[AngatubaON] ' + json.data.length + ' da API ✅');
+        // Junta lojas da API com as fixas, evitando duplicatas pelo nome
+        const nomesApi = new Set(json.data.map(l => l.nome.trim().toLowerCase()));
+        const fixasSemDuplicata = LOJAS_FIXAS.filter(l => !nomesApi.has(l.nome.trim().toLowerCase()));
+        LOJAS = [...json.data, ...fixasSemDuplicata].map(l => ({
+          ...l,
+          nome:      l.nome      || '',
+          tags:      l.tags      || '',
+          sub:       l.sub       || '',
+          categoria: l.categoria || 'servicos',
+          plano:     (l.plano    || 'GRATIS').toUpperCase(),
+          emoji:     l.emoji     || '🏪',
+        }));
+        _retryCount = 0; // reseta contador em caso de sucesso
+        _rebuildIdxMap();
+        renderLojas();
+        renderCategorias();
+        console.log('[AngatubaON] ' + json.data.length + ' da API + ' + fixasSemDuplicata.length + ' fixas ✅');
       } else {
         console.warn('[AngatubaON] API retornou dados vazios — usando fallback');
-        if (mostrarErro) _mostrarErroCarregamento(false);
+        _mostrarErroCarregamento(false);
       }
     } catch(err) {
-      console.warn('[AngatubaON] API indisponível:', err.message);
-      if (mostrarErro) _mostrarErroCarregamento(_retryCount < _retryDelays.length);
+      console.warn('[AngatubaON] API indisponível, usando lojas fixas:', err.message);
+      _mostrarErroCarregamento(_retryCount < _retryDelays.length);
+      // Retry com backoff progressivo (máx 3 tentativas)
       if (_retryCount < _retryDelays.length) {
         const delay = _retryDelays[_retryCount++];
         console.log(`[AngatubaON] Retry ${_retryCount}/${_retryDelays.length} em ${delay/1000}s...`);
-        setTimeout(() => _buscarLojasAPI(true), delay);
+        setTimeout(() => carregarLojas(), delay);
       }
     }
   }
@@ -2402,12 +2388,7 @@
   function detalhesCompartilhar(idx) {
     const loja = LOJAS[idx];
     if (!loja) return;
-
-    // Gera slug único: se outro loja tem o mesmo slug, adiciona --idx para diferenciar
-    const slug = toSlug(loja.nome);
-    const colisao = LOJAS.some((l, i) => i !== idx && toSlug(l.nome) === slug);
-    const slugFinal = colisao ? `${slug}--${idx}` : slug;
-    const url = `${location.origin}/#${slugFinal}`;
+    const url = `${location.origin}/#${toSlug(loja.nome)}`;
 
     // Monta texto rico com status e horário
     const { status, fechaStr } = calcStatusInfo(loja);
@@ -3155,6 +3136,32 @@
 
   })(); // ── fim initRamoAutocomplete ──────────────────────────
 
+  /* ══════════════════════════════════════════════════════════════
+     DARK / LIGHT MODE
+  ══════════════════════════════════════════════════════════════ */
+  function _aplicarTema(tema) {
+    const isLight = tema === 'light';
+    document.body.classList.toggle('light-mode', isLight);
+    // Ícone: lua no dark, sol no light
+    const icon = document.getElementById('theme-toggle-icon');
+    if (icon) {
+      icon.className = isLight ? 'fa fa-sun' : 'fa fa-moon';
+    }
+    // Atualiza meta theme-color para combinar com a barra do browser
+    const meta = document.getElementById('meta-theme-color');
+    if (meta) meta.content = isLight ? '#f4f4f5' : '#0d0d0d';
+  }
+
+  function toggleTheme() {
+    const atual = localStorage.getItem('angatuba_tema') || 'dark';
+    const novo  = atual === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('angatuba_tema', novo);
+    _aplicarTema(novo);
+  }
+
+  // Aplica tema salvo na inicialização (antes do render para evitar flash)
+  _aplicarTema(localStorage.getItem('angatuba_tema') || 'dark');
+
   /* ── INIT ────────────────────────────────────────────────── */
   // Mostra skeletons enquanto API carrega
   showSkeleton();
@@ -3168,29 +3175,15 @@
 
   /* ══════════════════════════════════════════════════════════════
      DEEP LINK — /#slug-da-loja
-     Suporta dois formatos:
-       /#nome-da-loja          (slug simples — pode colidir)
-       /#nome-da-loja--42      (slug + índice — único, gerado quando há colisão)
   ══════════════════════════════════════════════════════════════ */
   function _resolverDeepLink() {
     const hash = (location.hash || '').replace('#','').trim();
     if (!hash) return;
-
-    // Formato com índice: slug--N
-    const matchIdx = hash.match(/^(.+)--(\d+)$/);
-    if (matchIdx) {
-      const idx = parseInt(matchIdx[2]);
-      if (idx >= 0 && idx < LOJAS.length) {
-        setTimeout(() => abrirDetalhes(idx), 200);
-        return;
-      }
-    }
-
-    // Formato simples: primeiro match pelo slug
     const loja = LOJAS.find(l => toSlug(l.nome) === hash);
     if (!loja) return;
     const idx = _lojaIdxMap.get(loja);
     if (idx != null) {
+      // Pequeno delay para garantir que o DOM está pronto
       setTimeout(() => abrirDetalhes(idx), 200);
     }
   }
@@ -3227,11 +3220,8 @@
 
   function mlMontarCompartilhamento(nome) {
     const slug    = toSlug(nome);
-    // Gera slug único: verifica colisão com outras lojas
-    const lojaIdx = LOJAS.findIndex(l => l.nome === nome);
-    const colisao = LOJAS.some((l, i) => i !== lojaIdx && toSlug(l.nome) === slug);
-    const slugFinal = (colisao && lojaIdx >= 0) ? `${slug}--${lojaIdx}` : slug;
-    const url     = `${location.origin}/#${slugFinal}`;
+    const baseUrl = location.origin + location.pathname.replace(/\/[^/]*$/, '/');
+    const url     = `${location.origin}/#${slug}`;
     const urlEl   = document.getElementById('ml-share-url');
     const wppEl   = document.getElementById('ml-share-wpp');
     const igEl    = document.getElementById('ml-share-ig');

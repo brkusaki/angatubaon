@@ -1419,3 +1419,61 @@
       object-fit: cover; flex-shrink: 0; background: var(--surface);
       border: 1px solid var(--border);
     }
+    /* ════════════════════════════════════════════
+       LIGHT MODE
+    ════════════════════════════════════════════ */
+    body.light-mode {
+      --bg:       #f4f4f5;
+      --surface:  #ffffff;
+      --surface2: #ebebec;
+      --border:   rgba(0,0,0,0.09);
+      --text:     #111111;
+      --muted:    #888888;
+    }
+    body.light-mode .header       { background: var(--bg); }
+    body.light-mode .filter-pills { background: var(--bg); }
+    body.light-mode .categories   { background: var(--bg); }
+    body.light-mode .main         { background: var(--bg); }
+    body.light-mode .store-card   { background: var(--surface); }
+    body.light-mode .skeleton-card { background: var(--surface); }
+    body.light-mode .skeleton-line,
+    body.light-mode .skeleton-thumb { background: var(--surface2); }
+    body.light-mode .bottom-nav   { background: var(--surface); border-top-color: var(--border); }
+    body.light-mode .nav-item     { color: var(--muted); }
+    body.light-mode .nav-item.active { color: var(--red); }
+    body.light-mode .badge-closed { background: rgba(255,68,68,0.08); }
+    body.light-mode .btn-wpp.closed,
+    body.light-mode .btn-tel.closed { background: var(--surface2); }
+    body.light-mode input,
+    body.light-mode textarea,
+    body.light-mode select { background: var(--surface2) !important; color: var(--text) !important; }
+    body.light-mode .modal-sheet,
+    body.light-mode .modal-overlay { background: var(--surface); }
+    body.light-mode .detail-sheet  { background: var(--surface); }
+    body.light-mode .cat-item .cat-icon { border: 1px solid var(--border); }
+    body.light-mode .pill-btn { background: var(--surface); }
+    body.light-mode .pill-btn.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+    body.light-mode .sw-update-banner { background: var(--surface2); }
+    body.light-mode .bairro-dropdown  { background: var(--surface); border-color: var(--border); }
+    body.light-mode .footer { background: var(--bg); }
+
+    /* Botão de tema no header */
+    .theme-toggle-btn {
+      width: 34px; height: 34px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--muted); font-size: 15px; cursor: pointer;
+      transition: color 0.2s, background 0.2s, transform 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      flex-shrink: 0;
+    }
+    .theme-toggle-btn:active { transform: scale(0.88); }
+    .theme-toggle-btn:hover  { color: var(--text); }
+
+    /* Estrelas nos cards */
+    .store-stars {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 10px; font-weight: 700; color: #f59e0b;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .store-stars-count { color: var(--muted); font-weight: 500; font-size: 9px; }

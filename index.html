@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#0d0d0d" />
+  <meta name="theme-color" content="#0d0d0d" id="meta-theme-color" />
   <meta name="description" content="Angatuba ON — Encontre o que está aberto agora em Angatuba." />
   <title>Angatuba ON</title>
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
@@ -55,7 +55,12 @@
         <div class="logo">Angatuba<span>ON</span></div>
         <div class="logo-city">Angatuba · SP</div>
       </div>
-      <div class="live-pill"><span class="live-dot"></span>ao vivo</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="live-pill"><span class="live-dot"></span>ao vivo</div>
+        <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()" aria-label="Alternar tema">
+          <i class="fa fa-moon" id="theme-toggle-icon"></i>
+        </button>
+      </div>
     </div>
     <div class="search-wrap">
       <i class="fa fa-search search-icon"></i>

@@ -78,6 +78,15 @@
     <button class="pill-btn" data-filter="featured">
       <i class="fa fa-star" style="font-size:10px;"></i> Destaques
     </button>
+    <div class="pill-bairro-wrap" id="pill-bairro-wrap">
+      <button class="pill-btn pill-bairro-btn" id="pill-bairro-btn" data-filter="bairro">
+        <i class="fa fa-map-marker-alt" style="font-size:10px;"></i> <span id="pill-bairro-label">Bairro</span>
+      </button>
+      <div class="bairro-dropdown" id="bairro-dropdown" style="display:none;">
+        <input class="bairro-search" id="bairro-search" type="text" placeholder="Digite o bairro..." autocomplete="off" />
+        <div class="bairro-list" id="bairro-list"></div>
+      </div>
+    </div>
   </div>
 
   <!-- ════════════════════════════════ MAIN -->
@@ -200,6 +209,14 @@
           <p class="field-hint" style="margin-top:6px;" id="maps-hint">
             📍 Digite pelo menos 4 letras para buscar a rua
           </p>
+        </div>
+
+        <div class="field-group" style="position:relative;">
+          <label class="field-label" for="f-bairro">Bairro</label>
+          <input class="field-input" id="f-bairro" name="bairro" type="text"
+            placeholder="Ex: Centro, Vila Ribeiro..." autocomplete="off" />
+          <div class="bairro-cad-dropdown" id="bairro-cad-dropdown" style="display:none;"></div>
+          <p class="field-hint" style="margin-top:4px;">📍 Preenchido automaticamente ao selecionar a rua</p>
         </div>
 
         <div class="field-row">

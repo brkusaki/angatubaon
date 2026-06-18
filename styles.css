@@ -348,6 +348,73 @@
     }
 
     /* ════════════════════════════════════════════
+       CHIP DE BAIRRO
+    ════════════════════════════════════════════ */
+    .pill-bairro-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+    .pill-btn.active[data-filter="bairro"] {
+      background: rgba(99,179,237,0.12);
+      border-color: rgba(99,179,237,0.4);
+      color: #63b3ed;
+      box-shadow: 0 0 0 1px rgba(99,179,237,0.12) inset;
+    }
+    .bairro-dropdown {
+      position: absolute;
+      left: 0;
+      top: calc(100% + 6px);
+      min-width: 220px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      z-index: 3000;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
+    .bairro-search {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      font-family: var(--font);
+    }
+    .bairro-search::placeholder { color: var(--muted); }
+    .bairro-list {
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .bairro-item {
+      padding: 9px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--text);
+      transition: background 0.12s;
+    }
+    .bairro-item:hover, .bairro-item-active { background: rgba(255,255,255,0.06); }
+    .bairro-item-active { color: #63b3ed; font-weight: 600; }
+    .bairro-item-clear { color: var(--red); font-size: 12px; border-bottom: 1px solid var(--border); }
+    .bairro-item-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 16px; }
+
+    /* Autocomplete de bairro no cadastro */
+    .bairro-cad-dropdown {
+      position: absolute;
+      left: 0; right: 0;
+      background: #222;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 0 0 12px 12px;
+      z-index: 3000;
+      max-height: 200px;
+      overflow-y: auto;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+
+    /* ════════════════════════════════════════════
        EMPTY STATE
     ════════════════════════════════════════════ */
     .empty-state { text-align:center; padding:60px 20px 40px; color:var(--muted); display:none; }

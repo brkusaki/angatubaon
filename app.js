@@ -113,6 +113,33 @@
   let activeCat        = 'todos';
   let searchQuery      = '';
   let activePillFilter = 'all';
+  let activeBairro     = '';  // bairro filtrado atualmente
+
+  const BAIRROS_ANGATUBA = [
+    // Urbanos
+    'Centro', 'Vila Ribeiro', 'Vila Volpi', 'Vila Portela', 'Vila Nova',
+    'Vila Salto', 'Vila Parque', 'Vila Maciel', 'Vila Progresso', 'Vila Catanduva',
+    'Jardim Domingos dos Santos', 'Jardim Khouri', 'Jardim Monte Santo',
+    'Jardim Primavera', 'Jardim Sol Nascente', 'Residencial Palas Atenas',
+    'Chácara Santo Antônio',
+    // Distritos e Zona Rural
+    'Bom Retiro da Esperança', 'Bairro dos Rocinhos', 'Bairro dos Venâncios',
+    'Bairro dos Pires', 'Bairro dos Oliveiras', 'Bairro dos Silveiras',
+    'Bairro da Lagoa', 'Bairro do Guarei Velho', 'Bairro Chapada',
+    'Bairro Palmital', 'Bairro Boa Vista', 'Bairro Campininha',
+    'Bairro Faxinal', 'Bairro Morro Azul',
+  ];
+
+  // Normalização: remove acentos e lowercase para comparação fuzzy
+  function normBairro(s) {
+    return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  }
+
+  // Tenta detectar o bairro no display_name do Nominatim
+  function detectarBairroDaRua(displayName) {
+    const norm = normBairro(displayName);
+    return BAIRROS_ANGATUBA.find(b => norm.includes(normBairro(b))) || '';
+  }
 
   /* ── Calcula status pelo horário ─────────────────────────── */
   /* ── calcStatusInfo: retorna { status, fechaStr } ───────────
@@ -437,6 +464,11 @@
       filtradas = filtradas.filter(l => getStatus(l) === 'open');
     } else if (activePillFilter === 'featured') {
       filtradas = filtradas.filter(l => l.recomendado === true);
+    }
+
+    if (activeBairro) {
+      const nb = normBairro(activeBairro);
+      filtradas = filtradas.filter(l => normBairro(l.bairro).includes(nb) || normBairro(l.endereco).includes(nb));
     }
 
     // Peso por plano: PRO=0, PLUS=1, GRATIS=2
@@ -1650,14 +1682,120 @@
   }
 
   /* ── Pill filter events ──────────────────────────────────── */
-  document.querySelectorAll('.pill-btn').forEach(btn => {
+  document.querySelectorAll('.pill-btn:not(.pill-bairro-btn)').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       activePillFilter = btn.dataset.filter;
+      activeBairro     = '';
+      document.getElementById('pill-bairro-label').textContent = 'Bairro';
       renderLojas();
     });
   });
+
+  /* ── Chip de bairro ──────────────────────────────────────── */
+  (function initBairroFilter() {
+    const btn      = document.getElementById('pill-bairro-btn');
+    const dropdown = document.getElementById('bairro-dropdown');
+    const search   = document.getElementById('bairro-search');
+    const list     = document.getElementById('bairro-list');
+    const label    = document.getElementById('pill-bairro-label');
+    if (!btn) return;
+
+    function renderBairroList(query) {
+      const norm = normBairro(query);
+      const filtrados = norm
+        ? BAIRROS_ANGATUBA.filter(b => normBairro(b).includes(norm))
+        : BAIRROS_ANGATUBA;
+
+      list.innerHTML = '';
+      if (activeBairro) {
+        const limpar = document.createElement('div');
+        limpar.className = 'bairro-item bairro-item-clear';
+        limpar.textContent = '✕ Limpar filtro';
+        limpar.addEventListener('click', () => {
+          activeBairro = '';
+          label.textContent = 'Bairro';
+          btn.classList.remove('active');
+          dropdown.style.display = 'none';
+          search.value = '';
+          renderLojas();
+        });
+        list.appendChild(limpar);
+      }
+
+      if (!filtrados.length) {
+        list.innerHTML += '<div class="bairro-item bairro-item-empty">Nenhum bairro encontrado</div>';
+        return;
+      }
+
+      filtrados.forEach(b => {
+        const el = document.createElement('div');
+        el.className = 'bairro-item' + (normBairro(b) === normBairro(activeBairro) ? ' bairro-item-active' : '');
+        el.textContent = b;
+        el.addEventListener('click', () => {
+          activeBairro = b;
+          label.textContent = b;
+          document.querySelectorAll('.pill-btn').forEach(p => p.classList.remove('active'));
+          btn.classList.add('active');
+          activePillFilter = 'all';
+          dropdown.style.display = 'none';
+          search.value = '';
+          renderLojas();
+        });
+        list.appendChild(el);
+      });
+    }
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = dropdown.style.display !== 'none';
+      dropdown.style.display = open ? 'none' : 'block';
+      if (!open) {
+        search.value = '';
+        renderBairroList('');
+        search.focus();
+      }
+    });
+
+    search.addEventListener('input', () => renderBairroList(search.value));
+    search.addEventListener('click', e => e.stopPropagation());
+    list.addEventListener('click', e => e.stopPropagation());
+
+    document.addEventListener('click', () => { dropdown.style.display = 'none'; });
+  })();
+
+  /* ── Autocomplete de bairro no formulário de cadastro ─────── */
+  (function initBairroCadastro() {
+    const input    = document.getElementById('f-bairro');
+    const dropdown = document.getElementById('bairro-cad-dropdown');
+    if (!input || !dropdown) return;
+
+    function renderCadList(query) {
+      const norm = normBairro(query);
+      const filtrados = norm
+        ? BAIRROS_ANGATUBA.filter(b => normBairro(b).includes(norm))
+        : BAIRROS_ANGATUBA;
+
+      if (!filtrados.length || !query) { dropdown.style.display = 'none'; return; }
+
+      dropdown.innerHTML = filtrados.map(b =>
+        `<div class="addr-item" tabindex="0"><i class="fa fa-map-marker-alt"></i><div><div class="addr-item-main">${b}</div></div></div>`
+      ).join('');
+
+      dropdown.querySelectorAll('.addr-item').forEach((el, i) => {
+        const b = filtrados[i];
+        el.addEventListener('click', () => { input.value = b; dropdown.style.display = 'none'; });
+        el.addEventListener('keydown', e => { if (e.key === 'Enter') { input.value = b; dropdown.style.display = 'none'; } });
+      });
+      dropdown.style.display = 'block';
+    }
+
+    input.addEventListener('input', () => renderCadList(input.value));
+    document.addEventListener('click', e => {
+      if (!input.contains(e.target) && !dropdown.contains(e.target)) dropdown.style.display = 'none';
+    });
+  })();
 
   /* ── Auto-refresh inteligente ───────────────────────────── */
   // Só re-renderiza se algum status mudou, evitando repaints desnecessários
@@ -1858,6 +1996,12 @@
             atualizarEnderecoCompleto();
             setStatus('✅', 'Rua confirmada — adicione o número ao lado', 'var(--green)');
             if (hintEl) hintEl.style.display = 'none';
+            // Detecta bairro automaticamente pelo display_name do Nominatim
+            const bairroDetectado = detectarBairroDaRua(el.dataset.display || el.dataset.rua);
+            const fBairro = document.getElementById('f-bairro');
+            if (fBairro && bairroDetectado && !fBairro.value) {
+              fBairro.value = bairroDetectado;
+            }
             inputNum.focus();
           };
           el.addEventListener('click',   select);

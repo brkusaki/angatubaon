@@ -1269,6 +1269,7 @@
         _lojaNome  = json.data.nome || '';
         localStorage.setItem('angatuba_loja_token', _lojaToken);
         localStorage.setItem('angatuba_loja_nome',  _lojaNome);
+        localStorage.setItem('angatuba_loja_wpp',   _lojaWpp);
         closeLoginLoja();
         atualizarNav();
         abrirMinhaLoja();
@@ -1467,6 +1468,12 @@
   async function abrirMinhaLoja() {
     if (!_lojaToken) { openLoginLoja(); return; }
 
+    // ── Limpa cache de anúncio se for uma loja diferente da anterior ──
+    const wppSalvo = localStorage.getItem('angatuba_loja_wpp') || '';
+    if (_lojaWpp && wppSalvo && wppSalvo !== _lojaWpp) {
+      localStorage.removeItem('angatuba_anuncio');
+    }
+
     const overlay = document.getElementById('modal-minha-loja');
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -1606,6 +1613,8 @@
     _lojaNome  = '';
     localStorage.removeItem('angatuba_loja_token');
     localStorage.removeItem('angatuba_loja_nome');
+    localStorage.removeItem('angatuba_loja_wpp');
+    localStorage.removeItem('angatuba_anuncio');
     localStorage.removeItem('angatuba_loja_dados');
     fecharMinhaLoja();
     atualizarNav();

@@ -2306,7 +2306,7 @@
       : '';
 
     // ── BOTÕES DE AÇÃO ────────────────────────────────────────
-    const actionsHTML = buildActionsHTML(loja, status);
+    const { main: actionsMain, ig: actionsIg } = buildActionsHTML(loja, status);
 
     // ── AVALIAÇÕES ────────────────────────────────────────────
     const avaliacoes = loja.avaliacoes || [];
@@ -2401,7 +2401,8 @@
         ${avalHTML}
         ${avalFormHTML}
       </div>
-      <div class="detail-actions">${actionsHTML}</div>
+      <div class="detail-actions">${actionsMain}</div>
+      ${actionsIg ? `<div class="detail-actions" style="padding-top:8px;">${actionsIg}</div>` : ''}
     `;
 
     overlay.classList.add('open');
@@ -2591,26 +2592,28 @@
   }
 
   // Constrói os botões de ação do modal
+  // Retorna { main: html da linha principal, ig: html do botão instagram (linha separada) }
   function buildActionsHTML(loja, status) {
     const mNome = escAttr(loja.nome);
     const mPlan = escAttr(loja.plano || 'GRATIS');
     const mCat  = escAttr(loja.categoria || '');
     const abre  = loja.horario ? loja.horario.abre : '';
 
-    let html = '';
+    let main = '';
+    let ig   = '';
 
     // Botão WhatsApp
     if (loja.wpp) {
       const msg = encodeURIComponent('Olá, vi no AngatubaON! Está aberto agora?');
       const url = `https://wa.me/${loja.wpp}?text=${msg}`;
       if (status === 'open' || status === 'zap') {
-        html += `<a href="${url}" target="_blank" rel="noopener"
+        main += `<a href="${url}" target="_blank" rel="noopener"
           class="detail-btn-wpp"
           onclick="registrarClique('${mNome}','wpp','${mPlan}','${mCat}')">
           <i class="fab fa-whatsapp"></i> WhatsApp
         </a>`;
       } else {
-        html += `<button class="detail-btn-wpp closed-wpp"
+        main += `<button class="detail-btn-wpp closed-wpp"
           onclick="fecharDetalhes(); showToast('${mNome}','${abre}');">
           <i class="fab fa-whatsapp"></i> Fechado agora
         </button>`;
@@ -2619,28 +2622,16 @@
 
     // Botão Telefone
     if (loja.tel) {
-      html += `<a href="tel:${loja.tel}" class="detail-btn-tel"
+      main += `<a href="tel:${loja.tel}" class="detail-btn-tel"
         onclick="registrarClique('${mNome}','tel','${mPlan}','${mCat}')">
         <i class="fa fa-phone"></i> Ligar
-      </a>`;
-    }
-
-    // Botão Instagram
-    if (loja.instagram) {
-      const igUrl = loja.instagram.startsWith('http')
-        ? loja.instagram
-        : `https://instagram.com/${loja.instagram.replace(/^@/, '')}`;
-      html += `<a href="${igUrl}" target="_blank" rel="noopener"
-        class="detail-btn-ig"
-        onclick="registrarClique('${mNome}','ig','${mPlan}','${mCat}')">
-        <i class="fab fa-instagram"></i> @${loja.instagram.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '')}
       </a>`;
     }
 
     // Botão Mapa — texto visível se não há WhatsApp, ícone se há
     if (loja.maps) {
       const temContato = loja.wpp || loja.tel;
-      html += temContato
+      main += temContato
         ? `<a href="${loja.maps}" target="_blank" rel="noopener"
             class="detail-btn-maps" aria-label="Como chegar">
             <i class="fa fa-map-marker-alt"></i>
@@ -2653,13 +2644,24 @@
 
     // Botão compartilhar — sempre presente
     const _idx = LOJAS.indexOf(loja);
-    html += `<button onclick="detalhesCompartilhar(${_idx})"
+    main += `<button onclick="detalhesCompartilhar(${_idx})"
       class="detail-btn-maps" aria-label="Compartilhar"
       style="background:rgba(99,102,241,0.1);border-color:rgba(99,102,241,0.25);color:var(--indigo);">
       <i class="fa fa-share-nodes"></i>
     </button>`;
 
-    return html;
+    // Botão Instagram — linha separada
+    if (loja.instagram) {
+      const igHandle = loja.instagram.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/$/, '');
+      const igUrl = `https://instagram.com/${igHandle}`;
+      ig = `<a href="${igUrl}" target="_blank" rel="noopener"
+        class="detail-btn-ig"
+        onclick="registrarClique('${mNome}','ig','${mPlan}','${mCat}')">
+        <i class="fab fa-instagram"></i> @${igHandle}
+      </a>`;
+    }
+
+    return { main, ig };
   }
 
   /* ══════════════════════════════════════════════════════════════

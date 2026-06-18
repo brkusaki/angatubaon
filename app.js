@@ -2231,8 +2231,44 @@
 
   // Constrói a seção de horários legível (grade de dias)
   function buildHorarioHTML(loja) {
+    const txt = loja.horarioTexto || loja.horario_texto || '';
+
+    // Se tem múltiplos turnos (separados por |), renderiza cada um como linha
+    if (txt && txt.includes('|')) {
+      const hoje = new Date().getDay();
+      const DIAS_LABEL_SHORT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+      const DIAS_IDX = { dom:0, seg:1, ter:2, qua:3, qui:4, sex:5, sáb:6, sab:6 };
+
+      const linhas = txt.split('|').map(parte => {
+        parte = parte.trim();
+        // formato: "Seg, Ter, Qua, Qui, Sex 08:00-18:00"
+        const match = parte.match(/^(.+?)\s+(\d{2}:\d{2})-(\d{2}:\d{2})$/);
+        if (!match) return `<div class="detail-schedule-row"><span class="detail-schedule-day">${escHTML(parte)}</span></div>`;
+        const diasStr = match[1];
+        const horaStr = `${match[2]} – ${match[3]}`;
+        // Verifica se hoje está nesse turno
+        const diasMencioandos = diasStr.split(',').map(d => {
+          const key = d.trim().toLowerCase().slice(0,3);
+          return DIAS_IDX[key];
+        }).filter(d => d !== undefined);
+        const temHoje = diasMencioandos.includes(hoje);
+        const hojeLabel = temHoje ? ` <span style="font-size:9px;opacity:0.7;">(hoje)</span>` : '';
+        return `<div class="detail-schedule-row${temHoje ? ' today' : ''}">
+          <span class="detail-schedule-day">${escHTML(diasStr)}${hojeLabel}</span>
+          <span class="detail-schedule-time">${horaStr}</span>
+        </div>`;
+      }).join('');
+
+      return `<div class="detail-info-row">
+        <div class="detail-info-icon clock"><i class="fa fa-clock"></i></div>
+        <div class="detail-info-text" style="flex:1;">
+          <span class="detail-info-label">Horário de Funcionamento</span>
+          <div class="detail-schedule">${linhas}</div>
+        </div>
+      </div>`;
+    }
+
     if (!loja.horario) {
-      const txt = loja.horarioTexto || loja.horario_texto || '';
       if (!txt) return '';
       return `<div class="detail-info-row">
         <div class="detail-info-icon clock"><i class="fa fa-clock"></i></div>

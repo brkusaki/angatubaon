@@ -279,12 +279,22 @@
             <div id="prev-capa-wrap" style="
               width:100%; height:130px; background:var(--surface2);
               display:flex; align-items:center; justify-content:center;
-              position:relative; overflow:hidden;
+              position:relative; overflow:hidden; touch-action:none; cursor:default;
             ">
-              <i id="prev-capa-placeholder" class="fa fa-image" style="font-size:2rem;color:var(--border);"></i>
+              <i id="prev-capa-placeholder" class="fa fa-image" style="font-size:2rem;color:var(--border);pointer-events:none;"></i>
               <img id="foto-preview-img" src="" alt="" style="
-                display:none; position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+                display:none; position:absolute; inset:0; width:100%; height:100%;
+                object-fit:cover; object-position:50% 50%;
+                user-select:none; -webkit-user-select:none; pointer-events:none;
               "/>
+              <!-- hint de arrastar — aparece após upload -->
+              <div id="prev-capa-drag-hint" style="
+                display:none; position:absolute; top:8px; left:50%; transform:translateX(-50%);
+                background:rgba(0,0,0,0.6); color:#fff; font-size:10px; font-weight:600;
+                padding:3px 10px; border-radius:20px; white-space:nowrap;
+                backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+                pointer-events:none;
+              ">✥ Arraste para reposicionar</div>
               <!-- botão trocar capa -->
               <label for="f-foto-file" id="btn-trocar-capa" style="
                 position:absolute; bottom:8px; right:8px;
@@ -293,15 +303,18 @@
                 display:flex; align-items:center; gap:5px;
                 font-size:10px; font-weight:700; color:#fff;
                 backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+                z-index:2;
               ">
                 <i class="fa fa-camera"></i> Trocar capa
               </label>
               <span id="foto-upload-status" style="
                 position:absolute; bottom:8px; left:8px;
                 font-size:10px; background:rgba(0,0,0,0.7); border-radius:6px;
-                padding:3px 7px;
+                padding:3px 7px; z-index:2; pointer-events:none;
               "></span>
             </div>
+            <!-- campo oculto para guardar posição da capa -->
+            <input type="hidden" id="f-foto-pos" name="fotoPosicao" value="50% 50%" />
 
             <!-- Linha de info do card -->
             <div style="padding:10px 12px 12px; display:flex; align-items:center; gap:10px;">

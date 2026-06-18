@@ -2693,13 +2693,92 @@
     }
 
     // Observar mudanças no campo oculto de ramo (preenchido pelo autocomplete)
-    const ramoHidden = document.getElementById('f-ramo');
-    const ramoText   = document.getElementById('f-ramo-text');
+    const ramoText = document.getElementById('f-ramo-text');
     if (ramoText && prevRamo) {
       ramoText.addEventListener('input', () => {
         prevRamo.textContent = ramoText.value.trim() || 'Ramo / categoria';
       });
     }
+
+    // ── Drag para reposicionar a capa ──────────────────────────
+    const capaWrap = document.getElementById('prev-capa-wrap');
+    const capaImg  = document.getElementById('foto-preview-img');
+    const capaPosEl= document.getElementById('f-foto-pos');
+    const dragHint = document.getElementById('prev-capa-drag-hint');
+
+    if (!capaWrap || !capaImg) return;
+
+    let dragging = false;
+    let startX = 0, startY = 0;
+    // posição atual em % (0–100)
+    let posX = 50, posY = 50;
+
+    function applyPos() {
+      capaImg.style.objectPosition = `${posX}% ${posY}%`;
+      if (capaPosEl) capaPosEl.value = `${posX}% ${posY}%`;
+    }
+
+    function onDragStart(clientX, clientY) {
+      if (capaImg.style.display === 'none') return; // sem foto
+      dragging = true;
+      startX = clientX;
+      startY = clientY;
+      capaWrap.style.cursor = 'grabbing';
+      if (dragHint) dragHint.style.display = 'none';
+    }
+
+    function onDragMove(clientX, clientY) {
+      if (!dragging) return;
+      const dx = clientX - startX;
+      const dy = clientY - startY;
+      startX = clientX;
+      startY = clientY;
+      // sensibilidade: cada px de movimento = 0.3% de deslocamento
+      posX = Math.min(100, Math.max(0, posX - dx * 0.3));
+      posY = Math.min(100, Math.max(0, posY - dy * 0.3));
+      applyPos();
+    }
+
+    function onDragEnd() {
+      dragging = false;
+      capaWrap.style.cursor = 'grab';
+    }
+
+    // Mouse
+    capaWrap.addEventListener('mousedown', e => {
+      if (e.target.closest('label')) return; // não interfere no botão trocar
+      e.preventDefault();
+      onDragStart(e.clientX, e.clientY);
+    });
+    window.addEventListener('mousemove', e => onDragMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup', onDragEnd);
+
+    // Touch
+    capaWrap.addEventListener('touchstart', e => {
+      if (e.target.closest('label')) return;
+      const t = e.touches[0];
+      onDragStart(t.clientX, t.clientY);
+    }, { passive: true });
+    capaWrap.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      onDragMove(t.clientX, t.clientY);
+    }, { passive: false });
+    capaWrap.addEventListener('touchend', onDragEnd);
+
+    // Ativa cursor grab quando há foto
+    const observer = new MutationObserver(() => {
+      if (capaImg.style.display !== 'none') {
+        capaWrap.style.cursor = 'grab';
+        if (dragHint) {
+          dragHint.style.display = 'block';
+          // esconde hint após 3s
+          setTimeout(() => { dragHint.style.display = 'none'; }, 3000);
+        }
+      }
+    });
+    observer.observe(capaImg, { attributes: true, attributeFilter: ['style'] });
   }
   initCardPreviewSync();
 

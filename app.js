@@ -976,6 +976,17 @@
     btn.disabled = true;
 
     try {
+      // Garante que endereço completo foi montado (rua selecionada da lista)
+      const ruaInput  = document.getElementById('f-endereco-rua');
+      const endOculto = document.getElementById('f-endereco');
+      if (ruaInput && ruaInput.value.trim() && !endOculto.value) {
+        endOculto.value = ruaInput.value.trim();
+        const num = document.getElementById('f-endereco-numero')?.value.trim();
+        if (num) endOculto.value += ', ' + num;
+        document.getElementById('f-maps-url').value =
+          `https://www.google.com/maps/search/${encodeURIComponent(endOculto.value + ', Angatuba, SP')}`;
+      }
+
       // Valida horário
       if (!document.getElementById('f-horario').value) {
         alert('Selecione pelo menos um dia e horário de funcionamento.');
@@ -1773,16 +1784,19 @@
   /* ── Address Autocomplete (Nominatim / OpenStreetMap) ──────── */
   // Gratuito, sem chave de API, limitado a 1 req/s (respeitamos com debounce de 500ms)
   (function initAddressAutocomplete() {
-    const input      = document.getElementById('f-endereco');
+    const inputRua   = document.getElementById('f-endereco-rua');
+    const inputNum   = document.getElementById('f-endereco-numero');
     const dropdown   = document.getElementById('addr-suggestions');
+    const hiddenEnd  = document.getElementById('f-endereco');   // endereço completo
     const hiddenMaps = document.getElementById('f-maps-url');
     const statusEl   = document.getElementById('maps-status');
     const hintEl     = document.getElementById('maps-hint');
 
-    if (!input) return;
+    if (!inputRua) return;
 
     let debounceTimer = null;
     let currentQuery  = '';
+    let ruaSelecionada = ''; // nome curto da rua selecionada (ex: "R. Salvador Rodrigues dos Santos")
 
     function setStatus(icon, text, color) {
       statusEl.textContent = icon + ' ' + text;
@@ -1790,17 +1804,29 @@
     }
 
     function clearMaps() {
-      hiddenMaps.value = '';
+      hiddenMaps.value  = '';
+      hiddenEnd.value   = '';
+      ruaSelecionada    = '';
       statusEl.textContent = '';
       statusEl.style.color = 'var(--muted)';
     }
 
-    function setMapsConfirmed(displayName, lat, lon) {
-      // Gera link do Google Maps com coordenadas precisas
-      const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
-      hiddenMaps.value = mapsUrl;
-      setStatus('✅', 'Localização confirmada', 'var(--green)');
-      if (hintEl) hintEl.style.display = 'none';
+    // Monta endereço completo e link Maps sempre que rua ou número mudam
+    function atualizarEnderecoCompleto() {
+      if (!ruaSelecionada) return;
+      const num     = inputNum.value.trim();
+      const endFull = num ? `${ruaSelecionada}, ${num}` : ruaSelecionada;
+      hiddenEnd.value  = endFull;
+      // Link do Maps por texto: legível na planilha
+      hiddenMaps.value = `https://www.google.com/maps/search/${encodeURIComponent(endFull + ', Angatuba, SP')}`;
+    }
+
+    // Extrai o nome curto da rua a partir do display_name do Nominatim
+    // Ex: "Rua Salvador Rodrigues dos Santos, Vila Progresso, Angatuba, ..." → "Rua Salvador Rodrigues dos Santos, Vila Progresso"
+    function extrairNomeRua(displayName) {
+      const parts = displayName.split(', ');
+      // Pega até 2 partes (rua + bairro se houver)
+      return parts.slice(0, 2).join(', ');
     }
 
     function buildSuggestionHTML(item) {
@@ -1810,8 +1836,7 @@
       return `
         <div class="addr-item" tabindex="0"
           data-display="${escAttr(item.display_name)}"
-          data-lat="${item.lat}"
-          data-lon="${item.lon}">
+          data-rua="${escAttr(mainPart)}">
           <i class="fa fa-map-marker-alt"></i>
           <div>
             <div class="addr-item-main">${mainPart}</div>
@@ -1825,12 +1850,15 @@
         dropdown.innerHTML = '<div class="addr-loading">Nenhum endereço encontrado. Tente ser mais específico.</div>';
       } else {
         dropdown.innerHTML = items.map(buildSuggestionHTML).join('');
-        // Eventos de clique em cada item
         dropdown.querySelectorAll('.addr-item').forEach(el => {
           const select = () => {
-            input.value      = el.dataset.display;
-            setMapsConfirmed(el.dataset.display, el.dataset.lat, el.dataset.lon);
+            ruaSelecionada    = el.dataset.rua;
+            inputRua.value    = el.dataset.rua;
             dropdown.style.display = 'none';
+            atualizarEnderecoCompleto();
+            setStatus('✅', 'Rua confirmada — adicione o número ao lado', 'var(--green)');
+            if (hintEl) hintEl.style.display = 'none';
+            inputNum.focus();
           };
           el.addEventListener('click',   select);
           el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') select(); });
@@ -1840,9 +1868,8 @@
     }
 
     async function buscarEnderecos(query) {
-      if (query !== currentQuery) return; // descarta resposta obsoleta
+      if (query !== currentQuery) return;
       try {
-        // Restringe à cidade de Angatuba para resultados mais precisos
         const url = `https://nominatim.openstreetmap.org/search?` +
           `q=${encodeURIComponent(query + ', Angatuba, SP, Brasil')}` +
           `&format=json&limit=5&countrycodes=br&addressdetails=1` +
@@ -1854,10 +1881,9 @@
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const data = await resp.json();
 
-        if (query !== currentQuery) return; // descarta se query mudou durante o fetch
+        if (query !== currentQuery) return;
 
         if (data.length === 0) {
-          // Segunda tentativa sem restrição de cidade
           const url2 = `https://nominatim.openstreetmap.org/search?` +
             `q=${encodeURIComponent(query + ', São Paulo, Brasil')}` +
             `&format=json&limit=5&countrycodes=br` +
@@ -1877,7 +1903,8 @@
       }
     }
 
-    input.addEventListener('input', function() {
+    // Digitar na rua → buscar sugestões
+    inputRua.addEventListener('input', function() {
       const q = this.value.trim();
       clearMaps();
       clearTimeout(debounceTimer);
@@ -1893,19 +1920,23 @@
       dropdown.style.display = 'block';
       if (hintEl) hintEl.style.display = 'none';
 
-      // Debounce 500ms para respeitar o rate limit do Nominatim (1 req/s)
       debounceTimer = setTimeout(() => buscarEnderecos(q), 500);
+    });
+
+    // Digitar número → atualiza endereço completo e link Maps
+    inputNum.addEventListener('input', function() {
+      atualizarEnderecoCompleto();
     });
 
     // Fecha dropdown ao clicar fora
     document.addEventListener('click', function(e) {
-      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+      if (!inputRua.contains(e.target) && !dropdown.contains(e.target)) {
         dropdown.style.display = 'none';
       }
     });
 
     // Navega entre itens com teclado
-    input.addEventListener('keydown', function(e) {
+    inputRua.addEventListener('keydown', function(e) {
       if (!['ArrowDown','ArrowUp','Escape'].includes(e.key)) return;
       if (e.key === 'Escape') { dropdown.style.display = 'none'; return; }
       const items = [...dropdown.querySelectorAll('.addr-item')];

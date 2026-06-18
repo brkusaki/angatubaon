@@ -127,11 +127,11 @@
     // Aberto com horário manual: ABERTO_ATE_1900
     if ((loja.statusLoja || '').startsWith('ABERTO_ATE_')) {
       const hhmm = loja.statusLoja.replace('ABERTO_ATE_', '');
-      const hh = hhmm.substring(0, 2);
-      const mm = hhmm.substring(2, 4);
-      const ate = new Date();
-      ate.setHours(parseInt(hh), parseInt(mm), 0, 0);
-      if (new Date() < ate) return { status: 'open', fechaStr: `${hh}:${mm}` };
+      const hh = parseInt(hhmm.substring(0, 2));
+      const mm = parseInt(hhmm.substring(2, 4));
+      const nowMin2 = new Date().getHours() * 60 + new Date().getMinutes();
+      const ateMin  = hh * 60 + mm;
+      if (nowMin2 < ateMin) return { status: 'open', fechaStr: `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}` };
       // Horário já passou — cai no cálculo automático abaixo
     }
 
@@ -163,18 +163,21 @@
 
     if (abre === fecha) return { status: 'closed', fechaStr };
 
-    const viraNoite  = fecha < abre;
+    const viraNoite  = fecha < abre;   // ex: abre 22:00 fecha 02:00
     const abreHoje   = loja.horario.dias.includes(dow);
     const abriuOntem = loja.horario.dias.includes((dow + 6) % 7);
 
+    // Caso 1: vira a noite — abriu ontem e ainda não chegou no horário de fechamento
     if (viraNoite && abriuOntem && nowMin < fecha)
       return { status: 'open', fechaStr };
 
+    // Caso 2: não vira a noite — só abre se for hoje E ainda estiver dentro do intervalo
     if (abreHoje) {
       if (!viraNoite)
         return (nowMin >= abre && nowMin < fecha)
           ? { status: 'open',   fechaStr }
           : { status: 'closed', fechaStr: loja.horario.abre };
+      // vira a noite e abre hoje: aberto se já passou do horário de abertura
       return nowMin >= abre
         ? { status: 'open',   fechaStr }
         : { status: 'closed', fechaStr: loja.horario.abre };

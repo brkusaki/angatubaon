@@ -395,17 +395,13 @@
     .bairro-item-clear { color: var(--red); font-size: 12px; border-bottom: 1px solid var(--border); }
     .bairro-item-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 16px; }
 
-    /* Autocomplete de bairro no cadastro */
+    /* Autocomplete de bairro no cadastro — posicionado via JS (position:fixed) */
     .bairro-cad-dropdown {
-      position: absolute;
-      left: 0; right: 0;
       background: #222;
       border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 0 0 12px 12px;
-      z-index: 3000;
-      max-height: 200px;
+      border-radius: 12px;
       overflow-y: auto;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.7);
     }
 
     /* ════════════════════════════════════════════

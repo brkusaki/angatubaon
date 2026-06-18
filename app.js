@@ -1782,6 +1782,17 @@
     const dropdown = document.getElementById('bairro-cad-dropdown');
     if (!input || !dropdown) return;
 
+    function posicionarDropdown() {
+      const rect = input.getBoundingClientRect();
+      const ddH  = Math.min(200, window.innerHeight - rect.bottom - 8);
+      dropdown.style.position  = 'fixed';
+      dropdown.style.top       = (rect.bottom + 4) + 'px';
+      dropdown.style.left      = rect.left + 'px';
+      dropdown.style.width     = rect.width + 'px';
+      dropdown.style.maxHeight = ddH + 'px';
+      dropdown.style.zIndex    = '9100';
+    }
+
     function renderCadList(query) {
       const norm = normBairro(query);
       const filtrados = norm
@@ -1796,13 +1807,17 @@
 
       dropdown.querySelectorAll('.addr-item').forEach((el, i) => {
         const b = filtrados[i];
-        el.addEventListener('click', () => { input.value = b; dropdown.style.display = 'none'; });
-        el.addEventListener('keydown', e => { if (e.key === 'Enter') { input.value = b; dropdown.style.display = 'none'; } });
+        const select = () => { input.value = b; dropdown.style.display = 'none'; };
+        el.addEventListener('click', select);
+        el.addEventListener('keydown', e => { if (e.key === 'Enter') select(); });
       });
+
+      posicionarDropdown();
       dropdown.style.display = 'block';
     }
 
     input.addEventListener('input', () => renderCadList(input.value));
+    input.addEventListener('focus', () => { if (input.value) renderCadList(input.value); });
     document.addEventListener('click', e => {
       if (!input.contains(e.target) && !dropdown.contains(e.target)) dropdown.style.display = 'none';
     });
@@ -1980,15 +1995,17 @@
 
     function buildSuggestionHTML(item) {
       const parts    = item.display_name.split(', ');
-      const mainPart = parts.slice(0, 2).join(', ');
-      const subPart  = parts.slice(2, 5).join(', ');
+      // Mostra só a rua (parte[0]) para não confundir com bairros incorretos do Nominatim
+      const ruaPart  = parts[0];
+      // Subtítulo: cidade/estado para contexto
+      const subPart  = parts.slice(2, 4).join(', ');
       return `
         <div class="addr-item" tabindex="0"
           data-display="${escAttr(item.display_name)}"
-          data-rua="${escAttr(mainPart)}">
+          data-rua="${escAttr(ruaPart)}">
           <i class="fa fa-map-marker-alt"></i>
           <div>
-            <div class="addr-item-main">${mainPart}</div>
+            <div class="addr-item-main">${ruaPart}</div>
             ${subPart ? `<div class="addr-item-sub">${subPart}</div>` : ''}
           </div>
         </div>`;

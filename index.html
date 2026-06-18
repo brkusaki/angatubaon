@@ -265,6 +265,24 @@
           </p>
         </div>
 
+        <!-- ── Instagram ── -->
+        <div class="field-group">
+          <label class="field-label" for="f-instagram">
+            Instagram
+            <span style="font-size:10px;font-weight:500;color:var(--muted);margin-left:6px;">opcional</span>
+          </label>
+          <div style="position:relative;display:flex;align-items:center;">
+            <span style="position:absolute;left:12px;color:#e1306c;font-size:14px;pointer-events:none;"><i class="fab fa-instagram"></i></span>
+            <input class="field-input" id="f-instagram" name="instagram" type="text"
+              placeholder="@nomedoperfil"
+              autocomplete="off"
+              style="padding-left:34px;" />
+          </div>
+          <p class="field-hint" style="margin-top:4px;">
+            📸 Aparece como botão no perfil da sua loja no app.
+          </p>
+        </div>
+
         <!-- Foto e Logo — preview de card unificado (Plus / Pro) -->
         <div class="field-group" id="foto-group" style="display:none;">
           <label class="field-label">
@@ -891,6 +909,10 @@
                 <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:var(--blue);" id="ml-m-tel">—</div>
                 <div style="font-size:9px;color:var(--blue);margin-top:2px;">Telefone</div>
               </div>
+              <div style="flex:1;background:rgba(225,48,108,0.08);border:1px solid rgba(225,48,108,0.2);border-radius:10px;padding:10px;text-align:center;">
+                <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:#e1306c;" id="ml-m-ig">—</div>
+                <div style="font-size:9px;color:#e1306c;margin-top:2px;">Instagram</div>
+              </div>
             </div>
             <!-- Lock blur grátis -->
             <div id="ml-metricas-lock" style="display:none;position:absolute;inset:0;z-index:10;border-radius:10px;overflow:hidden;">
@@ -926,7 +948,18 @@
           </div>
         </div>
 
-        <!-- ░░ SEÇÃO 5 — CONFIGURAÇÕES ░░░░░░░░░░░░░░░░░░░░░░░ -->
+        <!-- ░░ SEÇÃO 5 — INSTAGRAM ░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">
+            📱 Instagram da loja
+          </div>
+          <div id="ml-instagram-wrap" style="display:none;"></div>
+          <p style="font-size:10px;color:var(--muted);margin:6px 0 0;line-height:1.5;">
+            Para adicionar ou alterar o Instagram, entre em contato pelo WhatsApp.
+          </p>
+        </div>
+
+        <!-- ░░ SEÇÃO 6 — CONFIGURAÇÕES ░░░░░░░░░░░░░░░░░░░░░░░ -->
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
           <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">
             ⚙️ Configurações da loja

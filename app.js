@@ -1419,6 +1419,27 @@
       planBadge.style.color = 'rgba(255,255,255,0.7)';
     }
 
+    // ── Instagram da loja ─────────────────────────────────
+    const mlIgWrap = document.getElementById('ml-instagram-wrap');
+    if (mlIgWrap) {
+      if (d.instagram) {
+        const igHandle = d.instagram.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/$/, '');
+        const igUrl = `https://instagram.com/${igHandle}`;
+        mlIgWrap.style.display = '';
+        mlIgWrap.innerHTML = `
+          <a href="${igUrl}" target="_blank" rel="noopener"
+            style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;
+                   background:rgba(225,48,108,0.08);border:1px solid rgba(225,48,108,0.2);
+                   color:#e1306c;text-decoration:none;font-size:12px;font-weight:700;">
+            <i class="fab fa-instagram" style="font-size:1.1rem;"></i>
+            <span>@${igHandle}</span>
+            <i class="fa fa-external-link-alt" style="font-size:9px;margin-left:auto;opacity:0.6;"></i>
+          </a>`;
+      } else {
+        mlIgWrap.style.display = 'none';
+      }
+    }
+
     // Toggle — marca o status atual
     marcarToggle(d.statusLoja || '');
 
@@ -1508,12 +1529,14 @@
         document.getElementById('ml-m-total').textContent = m.total ?? 0;
         document.getElementById('ml-m-wpp').textContent   = m.wpp  ?? 0;
         document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
+        if (document.getElementById('ml-m-ig')) document.getElementById('ml-m-ig').textContent = m.ig ?? 0;
       } else {
         document.getElementById('ml-m-7d').textContent    = m.d7   ?? 0;
         document.getElementById('ml-m-30d').textContent   = m.d30  ?? 0;
         document.getElementById('ml-m-total').textContent = m.total ?? 0;
         document.getElementById('ml-m-wpp').textContent   = m.wpp  ?? 0;
         document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
+        if (document.getElementById('ml-m-ig')) document.getElementById('ml-m-ig').textContent = m.ig ?? 0;
         document.getElementById('ml-lock-total').textContent = m.total ?? 0;
         if (lockEl) lockEl.style.display = '';
       }
@@ -2599,6 +2622,18 @@
       html += `<a href="tel:${loja.tel}" class="detail-btn-tel"
         onclick="registrarClique('${mNome}','tel','${mPlan}','${mCat}')">
         <i class="fa fa-phone"></i> Ligar
+      </a>`;
+    }
+
+    // Botão Instagram
+    if (loja.instagram) {
+      const igUrl = loja.instagram.startsWith('http')
+        ? loja.instagram
+        : `https://instagram.com/${loja.instagram.replace(/^@/, '')}`;
+      html += `<a href="${igUrl}" target="_blank" rel="noopener"
+        class="detail-btn-ig"
+        onclick="registrarClique('${mNome}','ig','${mPlan}','${mCat}')">
+        <i class="fab fa-instagram"></i> @${loja.instagram.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '')}
       </a>`;
     }
 

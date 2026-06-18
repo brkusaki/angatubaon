@@ -1266,7 +1266,18 @@
     }
     .detail-btn-tel:active { transform: scale(0.97); opacity: 0.9; }
 
-    .detail-btn-maps {
+    .detail-btn-ig {
+      flex: 1; padding: 14px;
+      background: linear-gradient(135deg,#e1306c,#c13584);
+      color: #fff; border-radius: 14px;
+      font-family: var(--font-h); font-size: .95rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: opacity 0.2s, transform 0.12s;
+      border: none; cursor: pointer; text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+    }
+    .detail-btn-ig:active { transform: scale(0.97); opacity: 0.9; }
       width: 52px; height: 52px; border-radius: 14px;
       background: rgba(66,133,244,0.12); color: var(--blue);
       border: 1px solid rgba(66,133,244,0.22);

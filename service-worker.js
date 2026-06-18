@@ -1,4 +1,4 @@
-const CACHE = 'angatubaon-v6';
+const CACHE = 'angatubaon-v7';
 const STATIC = [
   '/',
   '/index.html',
@@ -6,6 +6,7 @@ const STATIC = [
   '/styles.css',
   '/app.js',
 ];
+
 // Instala e cacheia arquivos estáticos
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -13,6 +14,7 @@ self.addEventListener('install', e => {
   );
   self.skipWaiting();
 });
+
 // Remove caches antigos
 self.addEventListener('activate', e => {
   e.waitUntil(
@@ -22,22 +24,36 @@ self.addEventListener('activate', e => {
   );
   self.clients.claim();
 });
-// Fetch: HTML sempre da rede, resto do cache; fallback offline.html
+
+// Fetch: network-first para HTML/JS/CSS — garante arquivos atualizados
+// Fallback para cache se offline; fallback final para offline.html
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  // Não intercepta chamadas externas (Apps Script, etc.)
   if (!e.request.url.startsWith(self.location.origin)) return;
-  const isHTML = e.request.destination === 'document';
-  e.respondWith(
-    isHTML
-      ? fetch(e.request)
-          .then(r => {
-            const clone = r.clone();
-            caches.open(CACHE).then(c => c.put(e.request, clone));
-            return r;
-          })
-          .catch(() => caches.match(e.request).then(r => r || caches.match('/offline.html')))
-      : caches.match(e.request)
-          .then(r => r || fetch(e.request))
-  );
+
+  const url = e.request.url;
+  const isAsset = url.endsWith('.js') || url.endsWith('.css') || 
+                  e.request.destination === 'document';
+
+  if (isAsset) {
+    // Network-first: tenta rede, atualiza cache, fallback para cache/offline
+    e.respondWith(
+      fetch(e.request)
+        .then(r => {
+          const clone = r.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+          return r;
+        })
+        .catch(() => 
+          caches.match(e.request)
+            .then(r => r || caches.match('/offline.html'))
+        )
+    );
+  } else {
+    // Cache-first para imagens e outros assets estáticos
+    e.respondWith(
+      caches.match(e.request)
+        .then(r => r || fetch(e.request))
+    );
+  }
 });

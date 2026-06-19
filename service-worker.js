@@ -1,4 +1,4 @@
-const CACHE = 'angatubaon-v16';
+const CACHE = 'angatubaon-v17';
 const STATIC = [
   '/',
   '/index.html',
@@ -62,4 +62,9 @@ self.addEventListener('fetch', e => {
         .then(r => r || fetch(e.request))
     );
   }
+});
+
+// Recebe mensagem do cliente pedindo para ativar imediatamente
+self.addEventListener('message', e => {
+  if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });

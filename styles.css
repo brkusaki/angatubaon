@@ -893,6 +893,7 @@
     .plan-card {
       border-radius: 16px; border: 1.5px solid var(--border);
       padding: 16px; cursor: pointer; position: relative;
+      overflow: hidden;
       transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
       -webkit-tap-highlight-color: transparent;
     }

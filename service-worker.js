@@ -1,10 +1,16 @@
-const CACHE = 'angatubaon-v11';
+const CACHE = 'angatubaon-v12';
 const STATIC = [
   '/',
   '/index.html',
   '/offline.html',
   '/styles.css',
   '/app.js',
+  '/owl-badge.webp',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/owl-gratis.png',
+  '/icons/owl-plus.png',
+  '/icons/owl-pro.png',
 ];
 
 // Instala e cacheia arquivos estáticos

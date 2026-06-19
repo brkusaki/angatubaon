@@ -890,14 +890,14 @@
     .plan-dot.active { background: var(--red); width: 18px; border-radius: 3px; }
 
     .plan-carousel-wrap {
-      overflow: hidden; padding: 20px 0 4px; touch-action: pan-y;
+      overflow: hidden; padding: 4px 0 4px; touch-action: pan-y;
     }
     .plan-carousel {
       display: flex; transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
       will-change: transform;
     }
     .plan-slide {
-      flex: 0 0 100%; padding: 0 16px; box-sizing: border-box;
+      flex: 0 0 100%; padding: 14px 16px 0; box-sizing: border-box; position: relative;
     }
 
     .plan-card {
@@ -946,7 +946,7 @@
 
     /* Coruja de fundo nos cards de plano — fica mais "upada" a cada nível */
     .plan-card-content { position: relative; z-index: 1; }
-    .plan-popular { z-index: 2; }
+
     .plan-card-owl {
       position: absolute;
       bottom: -8px;
@@ -1017,12 +1017,13 @@
     }
 
     .plan-popular {
-      position: absolute; top: -10px; left: 50%;
-      transform: translateX(-50%);
+      display: block; text-align: center;
+      margin: 0 auto -1px; position: relative; z-index: 2;
       background: linear-gradient(135deg,#6366f1,#4f46e5);
       color: #fff; font-size: 9px; font-weight: 800;
-      padding: 3px 10px; border-radius: 20px;
+      padding: 4px 14px; border-radius: 20px 20px 0 0;
       letter-spacing: 0.5px; white-space: nowrap;
+      width: fit-content;
     }
 
     .plan-cta {

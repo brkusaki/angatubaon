@@ -1020,11 +1020,11 @@
     }
 
     .plan-popular {
-      position: absolute; top: -10px; left: 50%;
-      transform: translateX(-50%);
+      display: flex; justify-content: center;
+      margin: -16px -16px 12px;
       background: linear-gradient(135deg,#6366f1,#4f46e5);
       color: #fff; font-size: 9px; font-weight: 800;
-      padding: 3px 10px; border-radius: 20px;
+      padding: 5px 10px; border-radius: 14px 14px 0 0;
       letter-spacing: 0.5px; white-space: nowrap;
     }
 

@@ -1967,6 +1967,68 @@
     if (e.target.classList.contains('fade-in')) e.target.style.willChange = 'auto';
   }, { passive: true });
 
+  /* ── Instalação do PWA (banner customizado) ──────────────── */
+  (function () {
+    const ADIAR_KEY = 'angatuba_install_adiado_ate';
+    let deferredPrompt = null;
+
+    function appJaInstalado() {
+      return window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone === true; // iOS (modo "tela de início")
+    }
+
+    function podeMostrarBanner() {
+      if (appJaInstalado()) return false;
+      try {
+        const adiadoAte = localStorage.getItem(ADIAR_KEY);
+        if (adiadoAte && Date.now() < Number(adiadoAte)) return false;
+      } catch (e) {}
+      return true;
+    }
+
+    function adiarBanner(dias) {
+      try {
+        localStorage.setItem(ADIAR_KEY, String(Date.now() + dias * 24 * 60 * 60 * 1000));
+      } catch (e) {}
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();          // bloqueia o mini-infobar nativo do Chrome
+      deferredPrompt = e;
+      if (podeMostrarBanner()) _mostrarBannerInstall();
+    });
+
+    function _mostrarBannerInstall() {
+      const banner = document.getElementById('pwa-install-banner');
+      const btnInstalar = document.getElementById('pwa-install-btn');
+      const btnFechar = document.getElementById('pwa-install-dismiss');
+      if (!banner || !btnInstalar || !btnFechar) return;
+
+      banner.style.display = 'flex';
+
+      btnInstalar.onclick = async () => {
+        banner.style.display = 'none';
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        if (outcome === 'dismissed') adiarBanner(7); // não insiste por 7 dias
+      };
+
+      btnFechar.onclick = () => {
+        banner.style.display = 'none';
+        adiarBanner(7);
+      };
+    }
+
+    window.addEventListener('appinstalled', () => {
+      deferredPrompt = null;
+      const banner = document.getElementById('pwa-install-banner');
+      if (banner) banner.style.display = 'none';
+      try { localStorage.removeItem(ADIAR_KEY); } catch (e) {}
+    });
+  })();
+
   /* ── Service Worker ──────────────────────────────────────── */
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

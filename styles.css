@@ -95,7 +95,7 @@
       background: transparent;
       backdrop-filter: none; -webkit-backdrop-filter: none;
       border-bottom: none;
-      padding: 8px 16px 12px;
+      padding: 8px 8px 12px;
       gap: 10px;
       overflow-y: visible;
     }
@@ -890,7 +890,7 @@
     .plan-dot.active { background: var(--red); width: 18px; border-radius: 3px; }
 
     .plan-carousel-wrap {
-      overflow: hidden; padding: 16px 0 4px; touch-action: pan-y;
+      overflow: hidden; padding: 20px 0 4px; touch-action: pan-y;
     }
     .plan-carousel {
       display: flex; transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
@@ -903,7 +903,7 @@
     .plan-card {
       border-radius: 16px; border: 1.5px solid var(--border);
       padding: 16px; cursor: pointer; position: relative;
-      overflow: hidden;
+      overflow: visible;
       transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
       -webkit-tap-highlight-color: transparent;
     }

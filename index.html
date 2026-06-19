@@ -33,6 +33,7 @@
   <meta name="twitter:image" content="https://angatubaon.com.br/icons/icon-512.png" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -74,26 +75,24 @@
       <input type="text" id="main-search" placeholder="Buscar loja ou serviço..."
         autocomplete="off" autocorrect="off" spellcheck="false" />
     </div>
+    <!-- ══════════════════════════ CATEGORIAS -->
+    <div class="scroll-x categories" id="cat-bar"></div>
+    <!-- ══════════════════════════ FILTER PILLS -->
+    <div class="filter-pills" id="filter-pills">
+      <button class="pill-btn active" data-filter="all">
+        <i class="fa fa-bolt" style="font-size:10px;"></i> Todos
+      </button>
+      <button class="pill-btn" data-filter="open">
+        <span class="pill-dot"></span> Aberto Agora
+      </button>
+      <button class="pill-btn" data-filter="featured">
+        <i class="fa fa-star" style="font-size:10px;"></i> Destaques
+      </button>
+      <button class="pill-btn pill-bairro-btn" id="pill-bairro-btn" data-filter="bairro">
+        <i class="fa fa-map-marker-alt" style="font-size:10px;"></i> <span id="pill-bairro-label">Bairro</span>
+      </button>
+    </div>
   </header>
-
-  <!-- ══════════════════════════ CATEGORIAS -->
-  <div class="scroll-x categories" id="cat-bar"></div>
-
-  <!-- ══════════════════════════ FILTER PILLS -->
-  <div class="filter-pills" id="filter-pills">
-    <button class="pill-btn active" data-filter="all">
-      <i class="fa fa-bolt" style="font-size:10px;"></i> Todos
-    </button>
-    <button class="pill-btn" data-filter="open">
-      <span class="pill-dot"></span> Aberto Agora
-    </button>
-    <button class="pill-btn" data-filter="featured">
-      <i class="fa fa-star" style="font-size:10px;"></i> Destaques
-    </button>
-    <button class="pill-btn pill-bairro-btn" id="pill-bairro-btn" data-filter="bairro">
-      <i class="fa fa-map-marker-alt" style="font-size:10px;"></i> <span id="pill-bairro-label">Bairro</span>
-    </button>
-  </div>
 
   <!-- Dropdown de bairro — fora do scroll container para não ser clipado -->
   <div class="bairro-dropdown" id="bairro-dropdown" style="display:none;">

@@ -60,13 +60,65 @@
     .logo span { color: var(--red); }
     .logo-city { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
 
-    .live-pill {
+    /* ════════ OWL BADGE (substitui "ao vivo") ════════ */
+    .owl-badge {
       display: inline-flex; align-items: center; gap: 5px;
-      font-size: 11px; font-weight: 600; color: var(--green);
-      background: rgba(0,208,132,0.1); border: 1px solid rgba(0,208,132,0.15);
-      padding: 4px 10px; border-radius: 20px; white-space: nowrap;
+      background: rgba(13,13,13,0.85);
+      border: 1px solid rgba(255,60,60,0.25);
+      border-radius: 20px;
+      padding: 3px 10px 3px 4px;
+      box-shadow: 0 0 8px rgba(255,60,60,0.15);
+      animation: owlBadgeGlow 2.5s ease-in-out infinite;
     }
-    .live-dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:blink 1.5s infinite; }
+    @keyframes owlBadgeGlow {
+      0%,100% { box-shadow: 0 0 6px rgba(255,60,60,0.15); border-color: rgba(255,60,60,0.25); }
+      50%      { box-shadow: 0 0 14px rgba(255,60,60,0.45); border-color: rgba(255,60,60,0.55); }
+    }
+
+    .owl-badge-icon {
+      position: relative;
+      width: 28px; height: 28px; flex-shrink: 0;
+    }
+    .owl-badge-img {
+      width: 28px; height: 28px; border-radius: 50%;
+      object-fit: cover; display: block;
+    }
+
+    /* Olhos piscando — duas faixas que deslizam sobre os olhos */
+    .owl-blink-left,
+    .owl-blink-right {
+      position: absolute;
+      width: 5px; height: 2px;
+      background: #2a2a2a;
+      border-radius: 2px;
+      transform: scaleY(0);
+      transform-origin: center center;
+    }
+    .owl-blink-left  { top: 10px; left: 6px; }
+    .owl-blink-right { top: 10px; left: 16px; }
+    .owl-blink-left, .owl-blink-right {
+      animation: owlBlink 4s ease-in-out infinite;
+    }
+    .owl-blink-right { animation-delay: 0.04s; }
+    @keyframes owlBlink {
+      0%,88%,96%,100% { transform: scaleY(0); }
+      90%,94%          { transform: scaleY(6); }
+    }
+
+    /* Texto ON pulsando dourado */
+    .owl-badge-on {
+      font-family: var(--font-h);
+      font-size: 12px; font-weight: 800;
+      letter-spacing: 0.04em;
+      color: #f59e0b;
+      animation: owlOnPulse 2.5s ease-in-out infinite;
+      text-shadow: 0 0 6px rgba(245,158,11,0.4);
+    }
+    @keyframes owlOnPulse {
+      0%,100% { color: #f59e0b; text-shadow: 0 0 4px rgba(245,158,11,0.3); }
+      50%      { color: #fbbf24; text-shadow: 0 0 12px rgba(245,158,11,0.8); }
+    }
+
 
     /* ════════════════════════════════════════════
        BUSCA  (font-size 16px → sem zoom no iOS)

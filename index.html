@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0d0d0d" id="meta-theme-color" />
   <meta name="description" content="Angatuba ON — Encontre o que está aberto agora em Angatuba." />
   <title>Angatuba ON</title>
@@ -58,12 +58,9 @@
   <!-- ══════════════════════════════ HEADER -->
   <header class="header">
     <div class="header-top">
-      <div class="header-brand">
-        <img src="/icons/icon-192.png" alt="Mascote AngatubaON" class="header-mascot" />
-        <div>
-          <div class="logo">Angatuba<span>ON</span></div>
-          <div class="logo-city">Angatuba · SP</div>
-        </div>
+      <div>
+        <div class="logo">Angatuba<span>ON</span></div>
+        <div class="logo-city">Angatuba · SP</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <div class="live-pill"><span class="live-dot"></span>ao vivo</div>
@@ -452,25 +449,28 @@
           <!-- GRÁTIS -->
           <div class="plan-slide" data-plan="GRATIS">
             <div class="plan-card card-gratis selected">
-              <div class="plan-card-top">
-                <div class="plan-card-name">🏪 Grátis</div>
-                <div class="plan-card-price">
-                  <span class="price-val">R$ 0</span>
-                  <span class="price-per">para sempre</span>
+              <img src="/icons/owl-gratis.png" alt="" class="plan-card-owl owl-gratis" />
+              <div class="plan-card-content">
+                <div class="plan-card-top">
+                  <div class="plan-card-name">🏪 Grátis</div>
+                  <div class="plan-card-price">
+                    <span class="price-val">R$ 0</span>
+                    <span class="price-per">para sempre</span>
+                  </div>
                 </div>
+                <ul class="plan-card-features">
+                  <li><span class="feat-icon">✅</span> Loja listada no app</li>
+                  <li><span class="feat-icon">✅</span> Status aberto/fechado em tempo real</li>
+                  <li><span class="feat-icon">✅</span> Botão WhatsApp / Telefone</li>
+                  <li><span class="feat-icon">✅</span> Painel "Minha Loja"</li>
+                  <li><span class="feat-icon">✅</span> Total de cliques (contador simples)</li>
+                  <li><span class="feat-icon">✅</span> Receber avaliações de clientes</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Posição de destaque na lista</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Link de compartilhamento</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Cardápio / Serviços / Produtos</li>
+                </ul>
               </div>
-              <ul class="plan-card-features">
-                <li><span class="feat-icon">✅</span> Loja listada no app</li>
-                <li><span class="feat-icon">✅</span> Status aberto/fechado em tempo real</li>
-                <li><span class="feat-icon">✅</span> Botão WhatsApp / Telefone</li>
-                <li><span class="feat-icon">✅</span> Painel "Minha Loja"</li>
-                <li><span class="feat-icon">✅</span> Total de cliques (contador simples)</li>
-                <li><span class="feat-icon">✅</span> Receber avaliações de clientes</li>
-                <li class="feat-off"><span class="feat-icon">✦</span> Posição de destaque na lista</li>
-                <li class="feat-off"><span class="feat-icon">✦</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
-                <li class="feat-off"><span class="feat-icon">✦</span> Link de compartilhamento</li>
-                <li class="feat-off"><span class="feat-icon">✦</span> Cardápio / Serviços / Produtos</li>
-              </ul>
             </div>
           </div>
 
@@ -478,65 +478,68 @@
           <div class="plan-slide" data-plan="PLUS">
             <div class="plan-card card-plus" style="position:relative;">
               <span class="plan-popular">⭐ MAIS POPULAR</span>
-              <div class="plan-card-top">
-                <div class="plan-card-name">✦ Plus</div>
-                <div class="plan-card-price">
-                  <span class="price-val">R$ 29,90</span>
-                  <span class="price-per">por mês</span>
+              <img src="/icons/owl-plus.png" alt="" class="plan-card-owl owl-plus" />
+              <div class="plan-card-content">
+                <div class="plan-card-top">
+                  <div class="plan-card-name">✦ Plus</div>
+                  <div class="plan-card-price">
+                    <span class="price-val">R$ 29,90</span>
+                    <span class="price-per">por mês</span>
+                  </div>
                 </div>
-              </div>
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);border-radius:20px;padding:4px 10px;">
+                <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);border-radius:20px;padding:4px 10px;margin-bottom:10px;">
                   <span style="font-size:10px;">🔒</span>
                   <span style="font-family:var(--font-h);font-size:10px;font-weight:800;color:#818cf8;letter-spacing:0.03em;">PREÇO DE FUNDADOR</span>
                 </div>
-                <img src="/icons/icon-192.png" alt="" class="plan-card-mascot" />
+                <ul class="plan-card-features">
+                  <li><span class="feat-icon">✅</span> Tudo do Grátis</li>
+                  <li><span class="feat-icon">✅</span> Posição acima das lojas Grátis</li>
+                  <li><span class="feat-icon">✅</span> Selo ✦ PLUS no card</li>
+                  <li><span class="feat-icon">✅</span> Visual destacado (fundo índigo)</li>
+                  <li><span class="feat-icon">✅</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
+                  <li><span class="feat-icon">✅</span> Link de compartilhamento da loja</li>
+                  <li><span class="feat-icon">✅</span> Foto de capa e logo no painel "Minha Loja"</li>
+                  <li><span class="feat-icon">✅</span> Cardápio / Serviços (até 5 itens, sem foto)</li>
+                  <li><span class="feat-icon">✅</span> Pedidos direto pelo WhatsApp</li>
+                  <li><span class="feat-icon">✅</span> Anúncio do dia no card (texto + emoji, 24h)</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa no card</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Topo absoluto da lista</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Foto no anúncio do dia</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Horário de pico dos cliques</li>
+                </ul>
               </div>
-              <ul class="plan-card-features">
-                <li><span class="feat-icon">✅</span> Tudo do Grátis</li>
-                <li><span class="feat-icon">✅</span> Posição acima das lojas Grátis</li>
-                <li><span class="feat-icon">✅</span> Selo ✦ PLUS no card</li>
-                <li><span class="feat-icon">✅</span> Visual destacado (fundo índigo)</li>
-                <li><span class="feat-icon">✅</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
-                <li><span class="feat-icon">✅</span> Link de compartilhamento da loja</li>
-                <li><span class="feat-icon">✅</span> Foto de capa e logo no painel "Minha Loja"</li>
-                <li><span class="feat-icon">✅</span> Cardápio / Serviços (até 5 itens, sem foto)</li>
-                <li><span class="feat-icon">✅</span> Pedidos direto pelo WhatsApp</li>
-                <li><span class="feat-icon">✅</span> Anúncio do dia no card (texto + emoji, 24h)</li>
-                <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa no card</li>
-                <li class="feat-off"><span class="feat-icon">✦</span> Topo absoluto da lista</li>
-                <li class="feat-off"><span class="feat-icon">✦</span> Foto no anúncio do dia</li>
-                <li class="feat-off"><span class="feat-icon">✦</span> Horário de pico dos cliques</li>
-              </ul>
             </div>
           </div>
 
           <!-- PRO -->
           <div class="plan-slide" data-plan="PRO">
             <div class="plan-card card-pro">
-              <div class="plan-card-top">
-                <div class="plan-card-name">⭐ Pro</div>
-                <div class="plan-card-price">
-                  <span class="price-val">R$ 49,90</span>
-                  <span class="price-per">por mês</span>
+              <img src="/icons/owl-pro.png" alt="" class="plan-card-owl owl-pro" />
+              <div class="plan-card-content">
+                <div class="plan-card-top">
+                  <div class="plan-card-name">⭐ Pro</div>
+                  <div class="plan-card-price">
+                    <span class="price-val">R$ 49,90</span>
+                    <span class="price-per">por mês</span>
+                  </div>
                 </div>
+                <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:20px;padding:4px 10px;margin-bottom:10px;">
+                  <span style="font-size:10px;">🔒</span>
+                  <span style="font-family:var(--font-h);font-size:10px;font-weight:800;color:#f59e0b;letter-spacing:0.03em;">PREÇO DE FUNDADOR</span>
+                </div>
+                <ul class="plan-card-features">
+                  <li><span class="feat-icon">✅</span> Tudo do Plus</li>
+                  <li><span class="feat-icon">✅</span> Topo absoluto da lista</li>
+                  <li><span class="feat-icon">✅</span> Foto de capa no card com overlay</li>
+                  <li><span class="feat-icon">✅</span> Borda dourada animada</li>
+                  <li><span class="feat-icon">✅</span> Selo ⭐ PRO em destaque</li>
+                  <li><span class="feat-icon">✅</span> Anúncio do dia com foto (texto + emoji + 📷, 24h)</li>
+                  <li><span class="feat-icon">✅</span> Cardápio ilimitado com fotos e categorias</li>
+                  <li><span class="feat-icon">✅</span> Horário de pico dos cliques</li>
+                  <li><span class="feat-icon">✅</span> Foto de capa e logo no card e no painel</li>
+                  <li><span class="feat-icon">✅</span> Máxima visibilidade</li>
+                </ul>
               </div>
-              <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:20px;padding:4px 10px;margin-bottom:10px;">
-                <span style="font-size:10px;">🔒</span>
-                <span style="font-family:var(--font-h);font-size:10px;font-weight:800;color:#f59e0b;letter-spacing:0.03em;">PREÇO DE FUNDADOR</span>
-              </div>
-              <ul class="plan-card-features">
-                <li><span class="feat-icon">✅</span> Tudo do Plus</li>
-                <li><span class="feat-icon">✅</span> Topo absoluto da lista</li>
-                <li><span class="feat-icon">✅</span> Foto de capa no card com overlay</li>
-                <li><span class="feat-icon">✅</span> Borda dourada animada</li>
-                <li><span class="feat-icon">✅</span> Selo ⭐ PRO em destaque</li>
-                <li><span class="feat-icon">✅</span> Anúncio do dia com foto (texto + emoji + 📷, 24h)</li>
-                <li><span class="feat-icon">✅</span> Cardápio ilimitado com fotos e categorias</li>
-                <li><span class="feat-icon">✅</span> Horário de pico dos cliques</li>
-                <li><span class="feat-icon">✅</span> Foto de capa e logo no card e no painel</li>
-                <li><span class="feat-icon">✅</span> Máxima visibilidade</li>
-              </ul>
             </div>
           </div>
 

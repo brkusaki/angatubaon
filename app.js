@@ -254,7 +254,7 @@
 
   /* ── Formata telefone para exibição ─────────────────────── */
   function formatTel(num) {
-    const d = num.replace(/\D/g,'');
+    const d = String(num || '').replace(/\D/g,'');
     // Fix 8: 0800 com 11 dígitos (ex: 08007257333 → 0800 725 7333)
     if (d.length === 11 && d.startsWith('0800')) return `${d.slice(0,4)} ${d.slice(4,7)} ${d.slice(7)}`;
     if (d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
@@ -738,6 +738,9 @@
       document.getElementById('cadastro-success').classList.remove('show');
       document.getElementById('cadastro-success').querySelector('.success-wpp-btn')?.remove();
       document.getElementById('cadastro-form').reset();
+      // Garante que o botão de submit está habilitado (pode ter ficado preso se modal foi fechado durante envio)
+      const btn = document.querySelector('#cadastro-form .modal-submit');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Cadastro'; btn.style.opacity = ''; }
       // Reinicia o schedule builder visualmente
       scheduleTurnos = [{ dias: [1,2,3,4,5], abre: '08:00', fecha: '18:00' }];
       renderScheduleCards();
@@ -878,7 +881,12 @@
     const hint = document.querySelector('#cadastro-form .field-hint');
     if (hint) {
       const icons = { GRATIS:'🏪', PLUS:'✦', PRO:'⭐' };
-      hint.innerHTML = `${icons[selectedPlan]} Plano <strong>${selectedPlan}</strong> selecionado · Você será notificado pelo WhatsApp.`;
+      const notas = {
+        GRATIS: 'Cadastro gratuito. Entraremos em contato pelo WhatsApp.',
+        PLUS:   'Você será contactado via WhatsApp para ativar o plano.',
+        PRO:    'Você será contactado via WhatsApp para ativar o plano.',
+      };
+      hint.innerHTML = `${icons[selectedPlan]} Plano <strong>${selectedPlan}</strong> selecionado · ${notas[selectedPlan]}`;
     }
     const isPago = selectedPlan !== 'GRATIS';
     document.getElementById('foto-group').style.display = isPago ? '' : 'none';
@@ -1726,6 +1734,12 @@
     const wrap = document.getElementById('ml-aberto-ate-wrap');
     if (wrap) wrap.style.display = 'none';
 
+    // Atualiza cache do localStorage para que próxima abertura mostre status correto
+    try {
+      const cache = JSON.parse(localStorage.getItem('angatuba_loja_dados') || 'null');
+      if (cache) { cache.statusLoja = novoStatus; localStorage.setItem('angatuba_loja_dados', JSON.stringify(cache)); }
+    } catch(e) {}
+
     try {
       const url = `${APPS_SCRIPT_URL}?action=lojaToggle&token=${encodeURIComponent(_lojaToken)}&statusLoja=${encodeURIComponent(novoStatus)}`;
       const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
@@ -1762,7 +1776,22 @@
       if (status) { status.textContent = '✅ Instagram atualizado!'; status.style.color = 'var(--green)'; }
       input.value = valor ? '@' + valor : '';
 
-      setTimeout(() => abrirMinhaLoja(), 600);
+      // Atualiza o link "Ver perfil atual" inline sem re-abrir o painel inteiro
+      const igWrap = document.getElementById('ml-instagram-wrap');
+      if (igWrap && valor) {
+        const linkExistente = igWrap.querySelector('a[href*="instagram.com"]');
+        if (linkExistente) {
+          linkExistente.href = `https://instagram.com/${valor}`;
+          linkExistente.innerHTML = `<i class="fa fa-external-link-alt" style="font-size:9px;"></i> Ver perfil atual: @${valor}`;
+        } else {
+          const a = document.createElement('a');
+          a.href = `https://instagram.com/${valor}`;
+          a.target = '_blank'; a.rel = 'noopener';
+          a.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:#e1306c;text-decoration:none;';
+          a.innerHTML = `<i class="fa fa-external-link-alt" style="font-size:9px;"></i> Ver perfil atual: @${valor}`;
+          igWrap.appendChild(a);
+        }
+      }
 
     } catch(e) {
       if (status) { status.textContent = '❌ Erro de conexão.'; status.style.color = 'var(--red)'; }
@@ -2390,7 +2419,7 @@
             border:1px solid rgba(245,158,11,0.3);border-radius:10px;
             padding:10px 12px;margin-bottom:14px;">
            <div style="display:flex;align-items:center;gap:10px;">
-             <span style="font-size:1.3rem;flex-shrink:0;">${loja.anuncio.emoji || '🎯'}</span>
+             <span style="font-size:1.3rem;flex-shrink:0;">${escHTML(loja.anuncio.emoji || '🎯')}</span>
              <span style="font-size:12px;font-weight:600;color:var(--zap);line-height:1.4;">${escHTML(loja.anuncio.texto)}</span>
            </div>
            ${imgHtml}
@@ -2758,10 +2787,18 @@
 
     // Botão Telefone
     if (loja.tel) {
-      main += `<a href="tel:${loja.tel}" class="detail-btn-tel"
-        onclick="registrarClique('${mNome}','tel','${mPlan}','${mCat}')">
-        <i class="fa fa-phone"></i> Ligar
-      </a>`;
+      if (status === 'closed') {
+        const abreTel = loja.horario ? loja.horario.abre : '';
+        main += `<button class="detail-btn-tel" style="opacity:0.55;"
+          onclick="fecharDetalhes(); showToast('${mNome}','${abreTel}','${loja.tel}');">
+          <i class="fa fa-phone"></i> Fechado
+        </button>`;
+      } else {
+        main += `<a href="tel:${loja.tel}" class="detail-btn-tel"
+          onclick="registrarClique('${mNome}','tel','${mPlan}','${mCat}')">
+          <i class="fa fa-phone"></i> Ligar
+        </a>`;
+      }
     }
 
     // Botão Mapa — texto visível se não há WhatsApp, ícone se há
@@ -2779,7 +2816,7 @@
     }
 
     // Botão compartilhar — sempre presente
-    const _idx = LOJAS.indexOf(loja);
+    const _idx = _lojaIdxMap.get(loja) ?? LOJAS.indexOf(loja);
     main += `<button onclick="detalhesCompartilhar(${_idx})"
       class="detail-btn-maps" aria-label="Compartilhar"
       style="background:rgba(99,102,241,0.1);border-color:rgba(99,102,241,0.25);color:var(--indigo);">
@@ -3370,14 +3407,18 @@
 
   function mlMontarCompartilhamento(nome) {
     const slug    = toSlug(nome);
-    const baseUrl = location.origin + location.pathname.replace(/\/[^/]*$/, '/');
     const url     = `${location.origin}/#${slug}`;
     const urlEl   = document.getElementById('ml-share-url');
     const wppEl   = document.getElementById('ml-share-wpp');
     const igEl    = document.getElementById('ml-share-ig');
     if (urlEl) urlEl.textContent = url;
     if (wppEl) wppEl.href = `https://wa.me/?text=${encodeURIComponent(`Confira ${nome} no AngatubaON! 📍\n${url}`)}`;
-    if (igEl)  igEl.href  = `https://www.instagram.com/`; // Instagram não permite deep link de share, abre o app
+    // Usa o handle do Instagram da loja (se disponível), senão abre o app
+    if (igEl) {
+      const lojaLocal = LOJAS.find(l => l.nome === nome);
+      const igHandle  = lojaLocal ? normalizarInstagramHandle(lojaLocal.instagram || '') : '';
+      igEl.href = igHandle ? `https://www.instagram.com/${igHandle}` : `https://www.instagram.com/`;
+    }
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -3490,7 +3531,9 @@
         campo,
         url,
       }));
-      await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
+      const saveResp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
+      const saveJson = await saveResp.json();
+      if (saveJson.status !== 'ok') throw new Error(saveJson.msg || 'Erro ao salvar na planilha');
 
       // Atualiza hero/logo no painel imediatamente
       if (tipo === 'foto') {
@@ -3873,7 +3916,7 @@
         <div style="flex:1;min-width:0;">
           <div style="font-family:var(--font-h);font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHTML(item.nome)}</div>
           ${item.categoria ? `<div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:1px;">${escHTML(item.categoria)}</div>` : ''}
-          <div style="font-size:12px;font-weight:700;color:var(--green);margin-top:3px;">R$ ${item.preco.toFixed(2).replace('.',',')}</div>
+          <div style="font-size:12px;font-weight:700;color:var(--green);margin-top:3px;">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
           <button onclick="mlCardapioAbrirForm('${item.id}')"
@@ -4002,7 +4045,12 @@
     try {
       const params = new URLSearchParams();
       params.append('payload', JSON.stringify({ action:'lojaCardapioRemover', token:_lojaToken, id }));
-      await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      const json = await resp.json();
+      if (json.status !== 'ok') {
+        alert('Erro ao remover: ' + (json.msg || 'Tente novamente.'));
+        return;
+      }
       await mlCardapioCarregar(_cardapioPlano);
     } catch(e) { alert('Erro ao remover: ' + e.message); }
   }
@@ -4075,7 +4123,7 @@
           <div class="cc-item-info">
             <div class="cc-item-nome">${escHTML(item.nome)}</div>
             ${item.descricao ? `<div class="cc-item-desc">${escHTML(item.descricao)}</div>` : ''}
-            <div class="cc-item-preco">R$ ${item.preco.toFixed(2).replace('.',',')}</div>
+            <div class="cc-item-preco">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}</div>
           </div>
           <div class="cc-qty-ctrl" id="cc-qty-${item.id}">
             <button class="cc-item-add" onclick="ccAdicionarItem('${item.id}')">+</button>
@@ -4145,7 +4193,7 @@
     let total = 0;
     if (lista) {
       lista.innerHTML = itens.map(({ item, qty }) => {
-        const sub = item.preco * qty;
+        const sub = (parseFloat(item.preco) || 0) * qty;
         total += sub;
         return `<div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;">
           <span style="flex:1;color:var(--text);">${qty}× ${escHTML(item.nome)}</span>
@@ -4175,13 +4223,19 @@
     window.open(url, '_blank', 'noopener');
 
     // Quando o usuário voltar ao app após ir ao WhatsApp, mostra tela de sucesso
+    let _retornoRemovido = false;
     function onRetorno() {
       if (!document.hidden) {
         document.removeEventListener('visibilitychange', onRetorno);
+        _retornoRemovido = true;
         _ccMostrarSucesso();
       }
     }
     document.addEventListener('visibilitychange', onRetorno);
+    // Segurança: remove listener após 10 minutos para não vazar
+    setTimeout(() => {
+      if (!_retornoRemovido) document.removeEventListener('visibilitychange', onRetorno);
+    }, 10 * 60 * 1000);
   };
 
   window._ccMostrarSucesso = function() {
@@ -4209,9 +4263,10 @@
           border:none; cursor:pointer;
         ">Fechar</button>
       `;
-      document.getElementById('modal-cardapio-cliente')
-        ?.querySelector('[style*="overflow-y:auto"]')
-        ?.after(sucesso) || wrap?.parentNode?.insertBefore(sucesso, carrinhoBar);
+      // Insere dentro do modal de forma estável, após o wrap de itens
+      const modalBody = document.getElementById('cc-itens-wrap')?.parentNode
+                     || document.getElementById('modal-cardapio-cliente');
+      if (modalBody) modalBody.appendChild(sucesso);
     }
 
     if (carrinhoBar) carrinhoBar.style.display = 'none';

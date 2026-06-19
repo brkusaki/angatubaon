@@ -392,9 +392,9 @@
       const fotoHint = temFoto
         ? ` <span style="opacity:.75;">📷</span><span style="font-size:9px;opacity:.65;"> · ver foto →</span>`
         : '';
-      anuncioBadge = `<div class="store-anuncio-badge"><span>${loja.anuncio.emoji || '🎯'}</span> ${escHTML(loja.anuncio.texto)}${fotoHint}</div>`;
+      anuncioBadge = `<div class="store-anuncio-badge"><span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}${fotoHint}</div>`;
     } else if (temAnuncioPlus) {
-      anuncioBadge = `<div class="store-anuncio-badge"><span>${loja.anuncio.emoji || '🎯'}</span> ${escHTML(loja.anuncio.texto)}</div>`;
+      anuncioBadge = `<div class="store-anuncio-badge"><span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}</div>`;
     }
 
     // Estrelas de avaliação — linha própria, só quando há avaliações
@@ -1065,6 +1065,18 @@
     if (window._validateWpp && !window._validateWpp()) {
       document.getElementById('f-wpp').scrollIntoView({ behavior: 'smooth', block: 'center' });
       document.getElementById('f-wpp').focus();
+      return;
+    }
+
+    // Valida ramo (categoria) — campo obrigatório mas sem required nativo
+    const ramoVal = document.getElementById('f-ramo')?.value.trim();
+    if (!ramoVal) {
+      const ramoInput = document.getElementById('f-ramo-text');
+      ramoInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      ramoInput?.focus();
+      ramoInput?.classList.add('invalid');
+      setTimeout(() => ramoInput?.classList.remove('invalid'), 2500);
+      alert('Selecione o ramo / categoria da loja.');
       return;
     }
 
@@ -2609,6 +2621,8 @@
     const overlay = document.getElementById('modal-detalhes');
     overlay.classList.remove('open');
     document.body.style.overflow = '';
+    // Limpa o hash da URL sem criar entrada no histórico do browser
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   }
 
   // Fecha ao clicar no overlay fora do sheet
@@ -4007,6 +4021,7 @@
     const msgEl = document.getElementById('ml-cardapio-form-msg');
     if (!nome)  { msgEl.textContent = '❌ Informe o nome do item.'; msgEl.style.color='var(--red)'; return; }
     if (!preco) { msgEl.textContent = '❌ Informe o preço.'; msgEl.style.color='var(--red)'; return; }
+    if (parseFloat(preco) < 0) { msgEl.textContent = '❌ Preço não pode ser negativo.'; msgEl.style.color='var(--red)'; return; }
 
     const btn = document.getElementById('ml-cardapio-salvar-btn');
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...';

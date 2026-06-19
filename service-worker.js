@@ -1,11 +1,14 @@
-const CACHE = 'angatubaon-v18';
+const CACHE = 'angatubaon-v13';
 const STATIC = [
   '/',
   '/index.html',
   '/offline.html',
   '/styles.css',
   '/app.js',
-  '/owl-badge.webp',
+  '/webp/owl-badge.webp',
+  '/webp/owl-celebrate-gratis.webp',
+  '/webp/owl-celebrate-plus.webp',
+  '/webp/owl-celebrate-pro.webp',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/owl-gratis.png',
@@ -62,9 +65,4 @@ self.addEventListener('fetch', e => {
         .then(r => r || fetch(e.request))
     );
   }
-});
-
-// Recebe mensagem do cliente pedindo para ativar imediatamente
-self.addEventListener('message', e => {
-  if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });

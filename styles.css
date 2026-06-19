@@ -43,10 +43,9 @@
     ════════════════════════════════════════════ */
     .header {
       position: sticky; top: 0; z-index: 100;
-      background: rgba(14,14,14,0.65);
-      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-      border-bottom: none;
-      padding: 14px 16px 0;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px 12px;
     }
     .header-top {
       display: flex; align-items: center;
@@ -92,12 +91,8 @@
        CATEGORIAS
     ════════════════════════════════════════════ */
     .categories {
-      background: transparent;
-      backdrop-filter: none; -webkit-backdrop-filter: none;
-      border-bottom: none;
-      padding: 8px 8px 12px;
-      gap: 10px;
-      overflow-y: visible;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 14px 16px; gap: 10px;
     }
     .cat-item {
       display: flex; flex-direction: column; align-items: center;
@@ -283,14 +278,10 @@
     .filter-pills {
       display: flex;
       gap: 8px;
-      padding: 10px 16px 14px;
-      margin: 0 -16px;
+      padding: 10px 16px 4px;
       overflow-x: auto;
       scrollbar-width: none;
-      background: transparent;
-      border-top: 1px solid rgba(255,255,255,0.06);
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      background: var(--bg);
     }
     .filter-pills::-webkit-scrollbar { display: none; }
 
@@ -806,6 +797,13 @@
     }
     .modal-success.show { display: flex; }
     .success-icon { font-size: 3rem; }
+    .success-owl {
+      width: 140px; height: 140px;
+      object-fit: contain;
+      border-radius: 50%;
+      margin-bottom: 4px;
+      filter: drop-shadow(0 0 16px rgba(255,60,60,0.3));
+    }
     .success-title {
       font-family: var(--font-h); font-size: 1.2rem; font-weight: 800;
     }
@@ -890,20 +888,20 @@
     .plan-dot.active { background: var(--red); width: 18px; border-radius: 3px; }
 
     .plan-carousel-wrap {
-      overflow: hidden; padding: 4px 0 4px; touch-action: pan-y;
+      overflow: hidden; padding: 16px 0 4px; touch-action: pan-y;
     }
     .plan-carousel {
       display: flex; transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
       will-change: transform;
     }
     .plan-slide {
-      flex: 0 0 100%; padding: 14px 16px 0; box-sizing: border-box; position: relative;
+      flex: 0 0 100%; padding: 0 16px; box-sizing: border-box;
     }
 
     .plan-card {
       border-radius: 16px; border: 1.5px solid var(--border);
       padding: 16px; cursor: pointer; position: relative;
-      overflow: visible;
+      overflow: hidden;
       transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
       -webkit-tap-highlight-color: transparent;
     }
@@ -946,7 +944,7 @@
 
     /* Coruja de fundo nos cards de plano — fica mais "upada" a cada nível */
     .plan-card-content { position: relative; z-index: 1; }
-
+    .plan-popular { z-index: 2; }
     .plan-card-owl {
       position: absolute;
       bottom: -8px;
@@ -1017,13 +1015,12 @@
     }
 
     .plan-popular {
-      display: block; text-align: center;
-      margin: 0 auto -1px; position: relative; z-index: 2;
+      position: absolute; top: -10px; left: 50%;
+      transform: translateX(-50%);
       background: linear-gradient(135deg,#6366f1,#4f46e5);
       color: #fff; font-size: 9px; font-weight: 800;
-      padding: 4px 14px; border-radius: 20px 20px 0 0;
+      padding: 3px 10px; border-radius: 20px;
       letter-spacing: 0.5px; white-space: nowrap;
-      width: fit-content;
     }
 
     .plan-cta {
@@ -1489,9 +1486,9 @@
       --text:     #111111;
       --muted:    #888888;
     }
-    body.light-mode .header       { background: rgba(255,255,255,0.72); }
-    body.light-mode .filter-pills { background: transparent; }
-    body.light-mode .categories   { background: transparent; }
+    body.light-mode .header       { background: var(--bg); }
+    body.light-mode .filter-pills { background: var(--bg); }
+    body.light-mode .categories   { background: var(--bg); }
     body.light-mode .main         { background: var(--bg); }
     body.light-mode .store-card   { background: var(--surface); }
     body.light-mode .skeleton-card { background: var(--surface); }

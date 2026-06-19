@@ -1127,6 +1127,11 @@
       const plano     = selectedPlan;
       const isPago    = plano !== 'GRATIS';
 
+      // Troca a coruja animada conforme o plano
+      const owlMap = { GRATIS: 'gratis', PLUS: 'plus', PRO: 'pro' };
+      const owlEl  = document.getElementById('success-owl');
+      if (owlEl) owlEl.src = `/webp/owl-celebrate-${owlMap[plano] || 'gratis'}.webp`;
+
       if (isPago) {
         const wppMsg = encodeURIComponent(
           `Olá! Acabei de cadastrar *${nomeLoja}* no AngatubaON e escolhi o Plano ${plano}. Gostaria de ativá-lo!`

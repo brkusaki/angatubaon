@@ -3022,9 +3022,10 @@
     });
   }
 
-  // Upload via proxy — envia como text/plain com JSON no body
-  // text/plain não dispara CORS preflight (ao contrário de application/json)
-  // mas permite body livre sem truncamento de base64 (problema do URLSearchParams/e.parameter)
+  // Upload direto para Cloudinary — 2 etapas:
+  // 1. Busca assinatura do GAS (chamada leve, sem base64)
+  // 2. Envia imagem diretamente do browser para Cloudinary (sem passar pelo GAS)
+  // Isso evita o problema de passar megabytes de base64 pelo Apps Script
   async function uploadImagem(file, statusEl) {
     if (!file) return null;
     if (file.size > 5 * 1024 * 1024) {
@@ -3033,30 +3034,47 @@
       return null;
     }
 
-    statusEl.textContent = '⏳ Enviando imagem...';
+    statusEl.textContent = '⏳ Preparando upload...';
     statusEl.style.color = 'var(--muted)';
 
     try {
-      const base64 = await _fileToBase64(file);
-      const body = JSON.stringify({
-        action: 'uploadImagem',
+      // Etapa 1: pede assinatura ao GAS (só timestamp, token e folder — sem base64)
+      const sigParams = new URLSearchParams();
+      sigParams.append('payload', JSON.stringify({
+        action: 'cloudinaryAssinar',
         token:  _lojaToken,
-        base64,
-        mime: file.type || 'image/jpeg',
+      }));
+      const sigResp = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST', body: sigParams,
+        signal: AbortSignal.timeout(15000),
       });
-      const resp = await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body,
-        signal: AbortSignal.timeout(60000),
-      });
-      const json = await resp.json();
-      if (json.status === 'ok' && json.url) {
+      const sigJson = await sigResp.json();
+      if (sigJson.status !== 'ok') throw new Error(sigJson.msg || 'Erro ao assinar upload');
+
+      const { cloud, apiKey, timestamp, folder, signature } = sigJson.data;
+
+      // Etapa 2: upload direto do browser para Cloudinary (sem passar pelo GAS)
+      statusEl.textContent = '⏳ Enviando imagem...';
+      const formData = new FormData();
+      formData.append('file',      file);
+      formData.append('api_key',   apiKey);
+      formData.append('timestamp', timestamp);
+      formData.append('folder',    folder);
+      formData.append('signature', signature);
+
+      const uploadResp = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloud}/image/upload`,
+        { method: 'POST', body: formData, signal: AbortSignal.timeout(60000) }
+      );
+      const uploadJson = await uploadResp.json();
+
+      if (uploadJson.secure_url) {
         statusEl.textContent = '✅ Imagem enviada!';
         statusEl.style.color = 'var(--green)';
-        return json.url;
+        return uploadJson.secure_url;
       } else {
-        throw new Error(json.msg || 'Falha no upload');
+        const msg = uploadJson.error?.message || 'Falha no upload';
+        throw new Error(msg);
       }
     } catch (err) {
       statusEl.textContent = '❌ Erro: ' + err.message;

@@ -445,10 +445,17 @@
     let anuncioBadge = '';
     if (temAnuncioPro) {
       const temFoto = !!loja.anuncio.imagemUrl;
-      const fotoHint = temFoto
-        ? ` <span style="opacity:.75;">📷</span><span style="font-size:9px;opacity:.65;"> · ver foto →</span>`
-        : '';
-      anuncioBadge = `<div class="store-anuncio-badge"><span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}${fotoHint}</div>`;
+      if (temFoto) {
+        // Com foto: texto trunca com ellipsis, "📷 ver foto →" sempre visível à direita
+        anuncioBadge = `<div class="store-anuncio-badge" style="display:flex;align-items:center;gap:6px;">
+          <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            <span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}
+          </div>
+          <span style="flex-shrink:0;font-size:9px;opacity:.8;white-space:nowrap;">📷 ver foto →</span>
+        </div>`;
+      } else {
+        anuncioBadge = `<div class="store-anuncio-badge"><span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}</div>`;
+      }
     } else if (temAnuncioPlus) {
       anuncioBadge = `<div class="store-anuncio-badge"><span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}</div>`;
     }

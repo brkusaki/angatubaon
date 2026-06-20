@@ -208,7 +208,7 @@
               "></div>
             </div>
             <input class="field-input" id="f-endereco-numero" type="text"
-              placeholder="Nº" autocomplete="off"
+              placeholder="Nº" autocomplete="off" inputmode="numeric" pattern="[0-9]*"
               style="width:80px;flex-shrink:0;" />
           </div>
           <!-- campo oculto com endereço completo montado pelo JS -->
@@ -630,7 +630,7 @@
         <div class="field-group">
           <label class="field-label" for="ll-codigo">Código de 6 dígitos <span>*</span></label>
           <input class="field-input" id="ll-codigo" type="text" placeholder="000000"
-            inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+            inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
             style="font-size:1.5rem;letter-spacing:0.3em;text-align:center;"
             oninput="if(this.value.length===6) lojaVerificarCodigo()" />
         </div>

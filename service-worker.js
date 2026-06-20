@@ -1,4 +1,4 @@
-const CACHE = 'angatubaon-v17';
+const CACHE = 'angatubaon-v18';
 const STATIC = [
   '/',
   '/index.html',
@@ -38,6 +38,9 @@ self.addEventListener('activate', e => {
 // Fallback para cache se offline; fallback final para offline.html
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+
+  // Fix #21: não cacheia recursos externos (ImgBB, CDNs, Google Fonts, etc.)
+  // Imagens de lojas trocam com frequência — cachear indefinidamente exibiria fotos antigas
   if (!e.request.url.startsWith(self.location.origin)) return;
 
   const url = e.request.url;
@@ -59,7 +62,7 @@ self.addEventListener('fetch', e => {
         )
     );
   } else {
-    // Cache-first para imagens e outros assets estáticos
+    // Cache-first para imagens e outros assets estáticos DO PRÓPRIO DOMÍNIO
     e.respondWith(
       caches.match(e.request)
         .then(r => r || fetch(e.request))

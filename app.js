@@ -76,6 +76,7 @@
      Lojas hardcoded abaixo são o fallback caso a API falhe
   ══════════════════════════════════════════════════════════════ */
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwmJMmvb5H6KkMWdXJV441SQ2h18SEfLrb_4-kvUYM0IiVL6Co-EKGGay7f_qvUEi0_cg/exec';
+  const ADMIN_WPP_CONTATO = '5515981125349'; // número único — atualizar aqui se mudar
 
   // Lojas fixas (fallback offline / enquanto carrega)
   const LOJAS_FIXAS = []; // migradas para a planilha
@@ -162,7 +163,7 @@
      fechaStr = hora de fechamento formatada (ex: "23:00") ou ''
   ─────────────────────────────────────────────────────────── */
   function calcStatusInfo(loja) {
-    // Override manual do dono da loja
+    // Override manual do dono da loja (campo statusLoja)
     if (loja.statusLoja === 'ABERTO')   return { status: 'open',   fechaStr: '' };
     if (loja.statusLoja === 'VOLTAMOS') return { status: 'zap',    fechaStr: '' };
     if (loja.statusLoja === 'FECHADO')  return { status: 'closed', fechaStr: '' };
@@ -184,7 +185,6 @@
       // Formato legado ou expirado — cai no cálculo automático abaixo
     }
 
-    if (loja.status) return { status: loja.status, fechaStr: '' };
     if (!loja.horario) return { status: 'open', fechaStr: '' };
 
     // Convenção 24h: abre 00:00 e fecha 23:59 (ou abre === fecha em 00:00)
@@ -553,7 +553,7 @@
       if (LOJAS.length === 0) {
         document.getElementById('empty-icon').textContent = '🏗️';
         emptyMsg.textContent = 'Nenhuma loja cadastrada ainda.';
-        emptySub.textContent = 'Adicione lojas no array LOJAS do código.';
+        emptySub.textContent = 'Seja o primeiro a cadastrar seu negócio!';
       } else {
         document.getElementById('empty-icon').textContent = '🔍';
         emptyMsg.textContent = 'Nenhuma loja encontrada.';
@@ -1112,13 +1112,14 @@
       const params = new URLSearchParams();
       params.append('payload', JSON.stringify(payload));
 
-      await fetch(APPS_SCRIPT_URL, {
+      const resp = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
-        mode:   'no-cors',
         body:   params,
+        signal: AbortSignal.timeout(20000),
       });
+      const json = await resp.json();
+      if (json.status !== 'ok') throw new Error(json.msg || 'Erro no servidor. Tente novamente.');
 
-      // no-cors não retorna status — assume sucesso se não lançou exceção
       this.style.display = 'none';
 
       // Monta tela de sucesso com botão de WPP para planos pagos
@@ -1136,7 +1137,7 @@
         const wppMsg = encodeURIComponent(
           `Olá! Acabei de cadastrar *${nomeLoja}* no AngatubaON e escolhi o Plano ${plano}. Gostaria de ativá-lo!`
         );
-        const wppUrl = `https://wa.me/5515981125349?text=${wppMsg}`;
+        const wppUrl = `https://wa.me/${ADMIN_WPP_CONTATO}?text=${wppMsg}`;
         successEl.querySelector('.success-sub').innerHTML =
           `Recebemos os dados da sua loja.<br>` +
           `Agora fale com a gente pelo WhatsApp para ativar o <strong>Plano ${plano}</strong>:`;
@@ -1535,7 +1536,7 @@
     upgradeCta.style.display = (plano === 'GRATIS') ? '' : 'none';
     if (plano === 'GRATIS') {
       const upgradeMsg = encodeURIComponent(`Olá! Sou dono da loja *${d.nome}* no AngatubaON e quero saber mais sobre os planos pagos!`);
-      const upgradeUrl = `https://wa.me/5515981125349?text=${upgradeMsg}`;
+      const upgradeUrl = `https://wa.me/${ADMIN_WPP_CONTATO}?text=${upgradeMsg}`;
       document.getElementById('ml-upgrade-link').href = upgradeUrl;
       const lockLink = document.getElementById('ml-lock-upgrade-link');
       if (lockLink) lockLink.href = upgradeUrl;
@@ -1750,8 +1751,11 @@
   // Confirma "Aberto" com horário personalizado
   async function lojaToggleAberto() {
     const time = document.getElementById('ml-aberto-ate-time')?.value;
-    // Inclui data para saber quando expirou (formato ABERTO_ATE_YYYY-MM-DD_HHMM)
-    const hoje = new Date().toISOString().slice(0,10);
+    // Inclui data LOCAL para saber quando expirou (formato ABERTO_ATE_YYYY-MM-DD_HHMM)
+    // IMPORTANTE: usa getFullYear/Month/Date (local) em vez de toISOString() que retorna UTC
+    // Entre 21:00-23:59 BRT, o UTC já é amanhã — causaria status "aberto por 23h"
+    const _agora = new Date();
+    const hoje = `${_agora.getFullYear()}-${String(_agora.getMonth()+1).padStart(2,'0')}-${String(_agora.getDate()).padStart(2,'0')}`;
     const status = time ? `ABERTO_ATE_${hoje}_${time.replace(':','')}` : 'ABERTO';
     document.getElementById('ml-aberto-ate-wrap').style.display = 'none';
     await lojaToggle(status);
@@ -1856,8 +1860,7 @@
     }
   }
 
-  // Número do admin para CTAs de WhatsApp
-  const ADMIN_WPP = '5515981125349';
+  // Número do admin para CTAs de WhatsApp — definido em ADMIN_WPP_CONTATO no topo do arquivo
 
   /* ── Inicializa nav ──────────────────────────────────────── */
   atualizarNav();
@@ -2059,6 +2062,24 @@
       deferredPrompt = e;
       if (podeMostrarBanner()) _mostrarBannerInstall();
     });
+
+    // iOS/Safari não dispara beforeinstallprompt — exibe instruções manuais
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (isIOS && !appJaInstalado() && podeMostrarBanner()) {
+      const banner = document.getElementById('pwa-install-banner');
+      const btnInstalar = document.getElementById('pwa-install-btn');
+      const btnFechar   = document.getElementById('pwa-install-dismiss');
+      if (banner && btnInstalar) {
+        banner.style.display = 'flex';
+        btnInstalar.textContent = '📱 Como instalar no iPhone';
+        btnInstalar.onclick = () => {
+          banner.style.display = 'none';
+          adiarBanner(7);
+          alert('Para instalar o AngatubaON:\n\n1️⃣ Toque no botão Compartilhar ⬆️ (barra inferior do Safari)\n2️⃣ Role para baixo e toque em "Adicionar à Tela de Início"\n3️⃣ Confirme tocando em "Adicionar"');
+        };
+        if (btnFechar) btnFechar.onclick = () => { banner.style.display = 'none'; adiarBanner(7); };
+      }
+    }
 
     function _mostrarBannerInstall() {
       const banner = document.getElementById('pwa-install-banner');
@@ -2851,7 +2872,8 @@
     }
 
     // Botão Mapa — texto visível se não há WhatsApp, ícone se há
-    if (loja.maps) {
+    // Fix #24: só insere o href se a URL começa com https:// (evita javascript: ou dados inválidos)
+    if (loja.maps && loja.maps.startsWith('https://')) {
       const temContato = loja.wpp || loja.tel;
       main += temContato
         ? `<a href="${loja.maps}" target="_blank" rel="noopener"
@@ -3413,6 +3435,10 @@
      DEEP LINK — /#slug-da-loja
   ══════════════════════════════════════════════════════════════ */
   function _resolverDeepLink() {
+    // Não abre modal de detalhes se outro modal já está aberto
+    const modaisAbertos = ['modal-cadastro','modal-planos','modal-login-loja','modal-minha-loja','modal-detalhes'];
+    if (modaisAbertos.some(id => document.getElementById(id)?.classList.contains('open'))) return;
+
     const hash = (location.hash || '').replace('#','').trim();
     if (!hash) return;
     const loja = LOJAS.find(l => toSlug(l.nome) === hash);
@@ -3737,9 +3763,16 @@
       let imagemUrl   = _anuncioImagemUrl; // Pode ser URL já salva ou vazia
 
       if (imgInput && imgInput.files[0]) {
+        const imgFile = imgInput.files[0];
+        if (imgFile.size > 5 * 1024 * 1024) {
+          alert('❌ Imagem do anúncio muito grande (máx 5MB). Reduza a resolução e tente de novo.');
+          btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
+          btn.disabled = false;
+          return;
+        }
         if (statusEl) { statusEl.textContent = '📤 Enviando foto...'; statusEl.style.color = 'var(--muted)'; }
         const form = new FormData();
-        form.append('image', imgInput.files[0]);
+        form.append('image', imgFile);
         form.append('key', IMGBB_KEY);
         const uploadResp = await fetch('https://api.imgbb.com/1/upload', { method:'POST', body:form });
         const uploadJson = await uploadResp.json();
@@ -3895,6 +3928,7 @@
   let _cardapioPlano  = 'GRATIS';
   let _cardapioLojaWpp = null;
   let _cardapioLojaInfo = null;
+  let _cardapioUploadEmAndamento = false; // Fix #22: bloqueia salvar durante upload de foto
 
   async function mlCardapioCarregar(plano) {
     _cardapioPlano = plano;
@@ -4027,15 +4061,24 @@
     const file = input.files[0];
     if (!file) return;
     const prev = document.getElementById('ml-cardapio-foto-preview');
+    const msgEl = document.getElementById('ml-cardapio-form-msg');
     // Preview local
     const reader = new FileReader();
     reader.onload = e => {
       prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">`;
     };
     reader.readAsDataURL(file);
+    // Verifica tamanho antes de fazer upload
+    if (file.size > 5 * 1024 * 1024) {
+      msgEl.textContent = '❌ Imagem muito grande (máx 5MB). Reduza a resolução e tente de novo.';
+      msgEl.style.color = 'var(--red)';
+      input.value = '';
+      return;
+    }
     // Upload ImgBB
     const msgEl = document.getElementById('ml-cardapio-form-msg');
     msgEl.textContent = '⏳ Enviando foto...';
+    _cardapioUploadEmAndamento = true; // bloqueia o botão Salvar durante o upload
     try {
       const form = new FormData();
       form.append('image', file);
@@ -4049,6 +4092,8 @@
       } else throw new Error('Falha no upload');
     } catch(e) {
       msgEl.textContent = '❌ Erro na foto: ' + e.message;
+    } finally {
+      _cardapioUploadEmAndamento = false; // libera o botão Salvar
     }
   }
 
@@ -4061,6 +4106,12 @@
     if (!nome)  { msgEl.textContent = '❌ Informe o nome do item.'; msgEl.style.color='var(--red)'; return; }
     if (!preco) { msgEl.textContent = '❌ Informe o preço.'; msgEl.style.color='var(--red)'; return; }
     if (parseFloat(preco) < 0) { msgEl.textContent = '❌ Preço não pode ser negativo.'; msgEl.style.color='var(--red)'; return; }
+    // Fix #22: bloqueia se upload de foto ainda está em andamento
+    if (_cardapioUploadEmAndamento) {
+      msgEl.textContent = '⏳ Aguarde o upload da foto terminar antes de salvar.';
+      msgEl.style.color = 'var(--muted)';
+      return;
+    }
 
     const btn = document.getElementById('ml-cardapio-salvar-btn');
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...';
@@ -4361,6 +4412,14 @@
     const itens = Object.values(_ccCarrinho);
     if (itens.length === 0) return;
 
+    // Proteção contra double-submit: desabilita o botão imediatamente
+    const finalizarBtn = document.querySelector('#modal-cardapio-cliente button[onclick="ccFinalizarPedido()"]');
+    if (finalizarBtn) {
+      if (finalizarBtn.disabled) return;
+      finalizarBtn.disabled = true;
+      setTimeout(() => { if (finalizarBtn) finalizarBtn.disabled = false; }, 6000);
+    }
+
     let total = 0;
     const linhas = itens.map(({ item, qty }) => {
       const sub = item.preco * qty;
@@ -4388,20 +4447,21 @@
     const url = `https://wa.me/${loja.wpp}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank', 'noopener');
 
-    // Quando o usuário voltar ao app após ir ao WhatsApp, mostra tela de sucesso
-    let _retornoRemovido = false;
-    function onRetorno() {
-      if (!document.hidden) {
-        document.removeEventListener('visibilitychange', onRetorno);
-        _retornoRemovido = true;
-        _ccMostrarSucesso();
-      }
+    // Exibe botão de confirmação explícita em vez de detectar visibilitychange
+    // (visibilitychange dispara para qualquer troca de app, não só para o WhatsApp)
+    const carrinhoBar = document.getElementById('cc-carrinho-bar');
+    if (carrinhoBar) {
+      const confirmBtn = document.createElement('button');
+      confirmBtn.style.cssText = `
+        width:100%;margin-top:8px;padding:13px;border-radius:12px;
+        background:rgba(37,211,102,0.15);border:1px solid rgba(37,211,102,0.4);
+        color:#25d366;font-family:var(--font-h);font-size:13px;font-weight:800;
+        cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+      `;
+      confirmBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Pedido enviado! Confirmar';
+      confirmBtn.onclick = () => _ccMostrarSucesso();
+      carrinhoBar.appendChild(confirmBtn);
     }
-    document.addEventListener('visibilitychange', onRetorno);
-    // Segurança: remove listener após 10 minutos para não vazar
-    setTimeout(() => {
-      if (!_retornoRemovido) document.removeEventListener('visibilitychange', onRetorno);
-    }, 10 * 60 * 1000);
   };
 
   window._ccMostrarSucesso = function() {

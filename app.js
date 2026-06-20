@@ -4076,7 +4076,6 @@
       return;
     }
     // Upload ImgBB
-    const msgEl = document.getElementById('ml-cardapio-form-msg');
     msgEl.textContent = '⏳ Enviando foto...';
     _cardapioUploadEmAndamento = true; // bloqueia o botão Salvar durante o upload
     try {

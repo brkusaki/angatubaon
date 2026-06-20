@@ -1511,6 +1511,27 @@
         <div id="ml-ig-status" style="font-size:10px;margin-top:6px;min-height:13px;"></div>`;
     }
 
+    // ── Toggle FazEntrega ─────────────────────────────────
+    const mlEntregaWrap = document.getElementById('ml-entrega-wrap');
+    if (mlEntregaWrap) {
+      const entregaOn = !!d.fazEntrega;
+      mlEntregaWrap.innerHTML = `
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:12px;">
+          <span style="font-size:12px;color:var(--text);line-height:1.4;">Fazemos entrega</span>
+          <div id="ml-entrega-toggle"
+            onclick="mlToggleEntrega()"
+            style="flex-shrink:0;width:42px;height:24px;border-radius:12px;
+                   background:${entregaOn ? '#10b981' : 'var(--border)'};
+                   position:relative;cursor:pointer;transition:background .2s;">
+            <div style="position:absolute;top:3px;left:${entregaOn ? '21px' : '3px'};
+                        width:18px;height:18px;border-radius:50%;background:#fff;
+                        transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3);"
+                 id="ml-entrega-thumb"></div>
+          </div>
+        </label>
+        <div id="ml-entrega-status" style="font-size:10px;margin-top:6px;min-height:13px;color:var(--muted);"></div>`;
+    }
+
     // Toggle — marca o status atual
     marcarToggle(d.statusLoja || '');
 
@@ -4100,6 +4121,40 @@
   window.mlCardapioRemover    = mlCardapioRemover;
   window.mlSalvarInstagram    = mlSalvarInstagram;
 
+  window.mlToggleEntrega = async function() {
+    const toggle  = document.getElementById('ml-entrega-toggle');
+    const thumb   = document.getElementById('ml-entrega-thumb');
+    const statusEl = document.getElementById('ml-entrega-status');
+    if (!toggle) return;
+    const novoValor = toggle.style.background !== 'rgb(16, 185, 129)'; // verde = on
+    // Atualiza visual imediatamente
+    toggle.style.background = novoValor ? '#10b981' : 'var(--border)';
+    if (thumb) thumb.style.left = novoValor ? '21px' : '3px';
+    if (statusEl) { statusEl.textContent = 'Salvando…'; statusEl.style.color = 'var(--muted)'; }
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({
+        action: 'lojaAtualizarEntrega',
+        token:  _lojaToken,
+        fazEntrega: novoValor ? 'SIM' : 'NAO',
+      }));
+      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      const json = await resp.json();
+      if (json.status === 'ok') {
+        if (statusEl) {
+          statusEl.textContent = novoValor ? '✅ Entrega ativada' : '✅ Entrega desativada';
+          statusEl.style.color = 'var(--green)';
+          setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
+        }
+      } else throw new Error(json.msg || 'Erro');
+    } catch(e) {
+      // Reverte visual
+      toggle.style.background = novoValor ? 'var(--border)' : '#10b981';
+      if (thumb) thumb.style.left = novoValor ? '3px' : '21px';
+      if (statusEl) { statusEl.textContent = '❌ ' + e.message; statusEl.style.color = 'var(--red)'; }
+    }
+  };
+
   /* ══════════════════════════════════════════════════════════════
      CARDÁPIO — TELA DO CLIENTE
   ══════════════════════════════════════════════════════════════ */
@@ -4157,6 +4212,17 @@
 
     document.getElementById('cc-loja-nome').textContent = loja.nome;
     document.getElementById('cc-loja-sub').textContent  = label;
+
+    // Mostrar/ocultar seção de entrega
+    const entregaSec = document.getElementById('cc-entrega-section');
+    if (entregaSec) {
+      entregaSec.style.display = loja.fazEntrega ? '' : 'none';
+      // Limpa campos a cada abertura
+      const endEl = document.getElementById('cc-entrega-endereco');
+      const pagEl = document.getElementById('cc-entrega-pagamento');
+      if (endEl) endEl.value = '';
+      if (pagEl) pagEl.value = '';
+    }
 
     ccRenderItens(loja);
     ccAtualizarCarrinho();
@@ -4310,7 +4376,20 @@
     const obsEl = document.getElementById('cc-obs-input');
     const obs = obsEl ? obsEl.value.trim() : '';
     const obsLine = obs ? `\n\n📝 *Observações:* ${obs}` : '';
-    const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n\n${linhas.join('\n')}\n\n*Total: R$ ${total.toFixed(2).replace('.',',')}*${obsLine}\n\nPoderia confirmar?`;
+
+    // Dados de entrega (se loja faz entrega)
+    let entregaLine = '';
+    if (loja.fazEntrega) {
+      const endEl = document.getElementById('cc-entrega-endereco');
+      const pagEl = document.getElementById('cc-entrega-pagamento');
+      const end = endEl ? endEl.value.trim() : '';
+      const pag = pagEl ? pagEl.value.trim() : '';
+      if (!end) { alert('Por favor, informe o endereço para entrega.'); return; }
+      if (!pag) { alert('Por favor, selecione a forma de pagamento.'); return; }
+      entregaLine = `\n\n🛵 *Entrega para:* ${end}\n💳 *Pagamento:* ${pag}`;
+    }
+
+    const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n\n${linhas.join('\n')}\n\n*Total: R$ ${total.toFixed(2).replace('.',',')}*${entregaLine}${obsLine}\n\nPoderia confirmar?`;
     const url = `https://wa.me/${loja.wpp}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank', 'noopener');
 

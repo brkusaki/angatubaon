@@ -978,6 +978,17 @@
           </p>
         </div>
 
+        <!-- ░░ SEÇÃO 5b — ENTREGA ░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">
+            🛵 Entrega
+          </div>
+          <div id="ml-entrega-wrap"></div>
+          <p style="font-size:10px;color:var(--muted);margin:8px 0 0;line-height:1.5;">
+            Quando ativado, o cliente poderá informar endereço e pagamento no pedido.
+          </p>
+        </div>
+
         <!-- ░░ SEÇÃO 6 — CONFIGURAÇÕES ░░░░░░░░░░░░░░░░░░░░░░░ -->
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
           <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">
@@ -1074,6 +1085,22 @@
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <span style="font-size:12px;color:var(--muted);">Total</span>
           <span style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:var(--green);" id="cc-total">R$ 0,00</span>
+        </div>
+        <!-- Entrega (visível apenas quando loja.fazEntrega = true) -->
+        <div id="cc-entrega-section" style="display:none;margin-bottom:10px;background:var(--surface2);border:1px solid rgba(251,146,60,0.3);border-radius:12px;padding:12px;">
+          <div style="font-size:10px;font-weight:700;color:#fb923c;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">🛵 Dados da entrega</div>
+          <input type="text" id="cc-entrega-endereco" placeholder="📍 Endereço completo (rua, nº, bairro)"
+            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 10px;color:var(--text);font-size:12px;font-family:var(--font-b);box-sizing:border-box;outline:none;margin-bottom:8px;">
+          <select id="cc-entrega-pagamento"
+            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 10px;color:var(--text);font-size:12px;font-family:var(--font-b);box-sizing:border-box;outline:none;-webkit-appearance:none;appearance:none;">
+            <option value="">💳 Forma de pagamento…</option>
+            <option value="Dinheiro">💵 Dinheiro</option>
+            <option value="PIX">📲 PIX</option>
+            <option value="Cartão de débito">💳 Cartão de débito</option>
+            <option value="Cartão de crédito">💳 Cartão de crédito</option>
+            <option value="Vale-refeição">🍽️ Vale-refeição</option>
+            <option value="Vale-alimentação">🛒 Vale-alimentação</option>
+          </select>
         </div>
         <textarea id="cc-obs-input" placeholder="📝 Alguma observação? (ex: sem cebola, ponto da carne...)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:12px;font-family:var(--font-b);resize:none;height:56px;margin-bottom:10px;box-sizing:border-box;outline:none;"></textarea>
         <button onclick="ccFinalizarPedido()" style="width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;font-family:var(--font-h);font-size:14px;font-weight:800;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">

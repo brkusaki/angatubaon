@@ -1479,7 +1479,7 @@
 
   /* ── Painel Minha Loja ─────────────────────────────────────── */
   // Aplica dados de lojaDados no painel (usado tanto pelo cache quanto pela API)
-  function _aplicarDadosLoja(d, metJson) {
+  function _aplicarDadosLoja(d, metJson, preservarToggle = false) {
     _lojaNome = d.nome;
     localStorage.setItem('angatuba_loja_nome', _lojaNome);
 
@@ -1580,6 +1580,7 @@
           <span style="font-size:12px;color:var(--text);line-height:1.4;">Fazemos entrega</span>
           <div id="ml-entrega-toggle"
             onclick="mlToggleEntrega()"
+            data-ativo="${entregaOn ? '1' : '0'}"
             style="flex-shrink:0;width:42px;height:24px;border-radius:12px;
                    background:${entregaOn ? '#10b981' : 'var(--border)'};
                    position:relative;cursor:pointer;transition:background .2s;">
@@ -1592,8 +1593,8 @@
         <div id="ml-entrega-status" style="font-size:10px;margin-top:6px;min-height:13px;color:var(--muted);"></div>`;
     }
 
-    // Toggle — marca o status atual
-    marcarToggle(d.statusLoja || '');
+    // Toggle — só aplica se o dono não interagiu durante carregamento
+    if (!preservarToggle) marcarToggle(d.statusLoja || '');
 
     // CTA upgrade
     const upgradeCta = document.getElementById('ml-upgrade-cta');
@@ -1751,6 +1752,10 @@
     }
 
     // ── Busca dados frescos em background ─────────────────────
+    let _painelInteragido = false;
+    ['ml-toggle-aberto','ml-toggle-voltamos','ml-toggle-fechado','ml-entrega-toggle'].forEach(id => {
+      document.getElementById(id)?.addEventListener('click', () => { _painelInteragido = true; }, { once: true });
+    });
     try {
       // Token via POST — nunca em query string (logs de servidor, histórico do browser)
       const mkParams = action => {
@@ -1775,7 +1780,7 @@
         // Salva cache para próxima abertura ser instantânea
         try { localStorage.setItem('angatuba_loja_dados', JSON.stringify(dadosJson.data)); } catch(e) {}
 
-        _aplicarDadosLoja(dadosJson.data, metJson);
+        _aplicarDadosLoja(dadosJson.data, metJson, _painelInteragido);
 
         // ── Cardápio ─────────────────────────────────────
         await mlCardapioCarregar(dadosJson.data.plano || 'GRATIS');
@@ -1847,6 +1852,7 @@
       if (cache) { cache.statusLoja = novoStatus; localStorage.setItem('angatuba_loja_dados', JSON.stringify(cache)); }
     } catch(e) {}
 
+    const statusAnterior = document.querySelector('.toggle-status-btn.ativo')?.dataset?.status || '';
     try {
       // Token via POST — nunca em query string (logs de servidor, histórico do browser)
       const params = new URLSearchParams();
@@ -1860,6 +1866,10 @@
       if (json.msg === 'UNAUTHORIZED') { lojaLogout(true); return; }
     } catch(e) {
       console.warn('[lojaToggle] Erro:', e.message);
+      // Reverte visual e avisa o dono
+      if (statusAnterior) marcarToggle(statusAnterior);
+      const errEl = document.getElementById('ml-toggle-erro');
+      if (errEl) { errEl.textContent = '❌ Sem conexão. Status não foi salvo.'; setTimeout(() => { errEl.textContent = ''; }, 4000); }
     }
   }
 
@@ -2110,8 +2120,11 @@
     }
   }
 
-  // Intervalo de 60s — não precisa ser mais rápido pois horários mudam em minuto cheio
-  setInterval(smartRefresh, 60_000);
+  // Intervalo de 60s — referência guardada; pausa/resume com visibilidade da aba
+  const _smartRefreshInterval = setInterval(smartRefresh, 60_000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) smartRefresh(); // refresh imediato ao voltar para a aba
+  }, { passive: true });
 
   /* ── Limpa will-change após animação ─────────────────────── */
   document.addEventListener('animationend', e => {
@@ -2276,6 +2289,11 @@
         renderCategorias();
         _esconderSplash(); // lojas prontas — desvela o app
         console.log('[AngatubaON] ' + json.data.length + ' da API + ' + fixasSemDuplicata.length + ' fixas ✅');
+        // Salva snapshot para uso offline (primeiro acesso sem internet mostra dados cacheados)
+        try {
+          localStorage.setItem('angatuba_lojas_cache', JSON.stringify(LOJAS));
+          localStorage.setItem('angatuba_lojas_cache_ts', Date.now().toString());
+        } catch(e) {}
       } else {
         console.warn('[AngatubaON] API retornou dados vazios — usando fallback');
         _mostrarErroCarregamento(false);
@@ -2297,7 +2315,22 @@
   }
 
   function _mostrarErroCarregamento(vaiRetry) {
-    if (LOJAS.length > 0) return; // tem fallback, não precisa mostrar erro
+    // Tenta usar snapshot cacheado do último acesso com internet (válido por 24h)
+    try {
+      const cached = localStorage.getItem('angatuba_lojas_cache');
+      const ts     = parseInt(localStorage.getItem('angatuba_lojas_cache_ts') || '0');
+      if (cached && (Date.now() - ts) < 86_400_000) {
+        const lojasCache = JSON.parse(cached);
+        if (Array.isArray(lojasCache) && lojasCache.length > 0) {
+          LOJAS = lojasCache;
+          _rebuildIdxMap();
+          renderLojas();
+          renderCategorias();
+          return; // não mostra tela de erro
+        }
+      }
+    } catch(e) {}
+    if (LOJAS.length > 0) return; // tem fallback fixo, não precisa mostrar erro
     const listEl  = document.getElementById('store-list');
     listEl.innerHTML = '';
     listEl.style.display = 'none';
@@ -2491,6 +2524,9 @@
   function abrirDetalhes(idx) {
     const loja = LOJAS[idx];
     if (!loja) return;
+
+    // Back button Android: empurra estado para que voltar feche o modal
+    history.pushState({ modal: 'detalhes', idx }, '', '#' + toSlug(loja.nome));
 
     const overlay = document.getElementById('modal-detalhes');
     const sheet   = document.getElementById('detail-sheet');
@@ -2771,8 +2807,11 @@
     const overlay = document.getElementById('modal-detalhes');
     overlay.classList.remove('open');
     document.body.style.overflow = '';
-    // Limpa o hash da URL sem criar entrada no histórico do browser
-    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+    if (history.state?.modal === 'detalhes') {
+      history.back();
+    } else if (location.hash) {
+      history.replaceState(null, '', location.pathname + location.search);
+    }
   }
 
   // Fecha ao clicar no overlay fora do sheet
@@ -2968,13 +3007,14 @@
     // Botão Mapa — texto visível se não há WhatsApp, ícone se há
     // Fix #24: só insere o href se a URL começa com https:// (evita javascript: ou dados inválidos)
     if (loja.maps && loja.maps.startsWith('https://')) {
+      const mapsUrl = escAttr(loja.maps);
       const temContato = loja.wpp || loja.tel;
       main += temContato
-        ? `<a href="${loja.maps}" target="_blank" rel="noopener"
+        ? `<a href="${mapsUrl}" target="_blank" rel="noopener"
             class="detail-btn-maps" aria-label="Como chegar">
             <i class="fa fa-map-marker-alt"></i>
           </a>`
-        : `<a href="${loja.maps}" target="_blank" rel="noopener"
+        : `<a href="${mapsUrl}" target="_blank" rel="noopener"
             class="detail-btn-maps-full" aria-label="Como chegar">
             <i class="fa fa-map-marker-alt"></i> Como chegar
           </a>`;
@@ -3584,6 +3624,25 @@
   // Também resolve ao navegar pelo histórico (botão voltar/avançar)
   window.addEventListener('hashchange', _resolverDeepLink);
 
+  // Back button Android no PWA — fecha o modal ativo em vez de sair do app
+  window.addEventListener('popstate', function() {
+    if (document.getElementById('modal-detalhes')?.classList.contains('open')) {
+      const overlay = document.getElementById('modal-detalhes');
+      overlay.classList.remove('open');
+      document.body.style.overflow = '';
+      return;
+    }
+    if (document.getElementById('modal-cardapio-cliente')?.classList.contains('open')) {
+      fecharCardapioCliente(); return;
+    }
+    if (document.getElementById('modal-minha-loja')?.classList.contains('open')) {
+      fecharMinhaLoja(); return;
+    }
+    if (document.getElementById('modal-cadastro')?.classList.contains('open')) {
+      closeModal(); return;
+    }
+  });
+
   /* ══════════════════════════════════════════════════════════════
      COMPARTILHAMENTO — painel Minha Loja
   ══════════════════════════════════════════════════════════════ */
@@ -3995,11 +4054,15 @@
   };
 
   window.avalEnviar = async function(idx, nome) {
+    const avalBtn = document.querySelector(`#aval-form-${idx} button[onclick*="avalEnviar"]`);
+    if (avalBtn?.disabled) return;
+    if (avalBtn) avalBtn.disabled = true;
     const nota  = _avalNota[idx];
     const texto = document.getElementById(`aval-texto-${idx}`)?.value.trim() || '';
     const msgEl = document.getElementById(`aval-msg-${idx}`);
 
     if (!nota) {
+      if (avalBtn) avalBtn.disabled = false;
       if (msgEl) { msgEl.textContent = 'Selecione uma nota de 1 a 5 ⭐'; msgEl.style.color = 'var(--red)'; }
       return;
     }
@@ -4305,8 +4368,8 @@
     const thumb   = document.getElementById('ml-entrega-thumb');
     const statusEl = document.getElementById('ml-entrega-status');
     if (!toggle) return;
-    const novoValor = toggle.style.background !== 'rgb(16, 185, 129)'; // verde = on
-    // Atualiza visual imediatamente
+    const novoValor = toggle.dataset.ativo !== '1';
+    toggle.dataset.ativo = novoValor ? '1' : '0';
     toggle.style.background = novoValor ? '#10b981' : 'var(--border)';
     if (thumb) thumb.style.left = novoValor ? '21px' : '3px';
     if (statusEl) { statusEl.textContent = 'Salvando…'; statusEl.style.color = 'var(--muted)'; }
@@ -4327,7 +4390,7 @@
         }
       } else throw new Error(json.msg || 'Erro');
     } catch(e) {
-      // Reverte visual
+      toggle.dataset.ativo = novoValor ? '0' : '1';
       toggle.style.background = novoValor ? 'var(--border)' : '#10b981';
       if (thumb) thumb.style.left = novoValor ? '3px' : '21px';
       if (statusEl) { statusEl.textContent = '❌ ' + e.message; statusEl.style.color = 'var(--red)'; }

@@ -883,6 +883,10 @@
                 </div>
               </div>
             </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.2);border-radius:8px;">
+              <input type="checkbox" id="ml-cardapio-destaque" style="width:16px;height:16px;accent-color:#f59e0b;cursor:pointer;">
+              <label for="ml-cardapio-destaque" style="font-size:11px;font-weight:700;color:#f59e0b;cursor:pointer;">⭐ Marcar como "Mais pedido"</label>
+            </div>
             <div style="display:flex;gap:8px;margin-top:12px;">
               <button onclick="mlCardapioFecharForm()"
                 style="flex:1;padding:10px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;">Cancelar</button>
@@ -1071,6 +1075,7 @@
           <span style="font-size:12px;color:var(--muted);">Total</span>
           <span style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:var(--green);" id="cc-total">R$ 0,00</span>
         </div>
+        <textarea id="cc-obs-input" placeholder="📝 Alguma observação? (ex: sem cebola, ponto da carne...)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:12px;font-family:var(--font-b);resize:none;height:56px;margin-bottom:10px;box-sizing:border-box;outline:none;"></textarea>
         <button onclick="ccFinalizarPedido()" style="width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;font-family:var(--font-h);font-size:14px;font-weight:800;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
           <i class="fab fa-whatsapp"></i> Enviar pedido pelo WhatsApp
         </button>

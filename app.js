@@ -2449,11 +2449,25 @@
     // Label e emoji dinâmico por categoria
     const _cat = (loja.categoria || '').toLowerCase();
     const _cardapioLabel = (() => {
-      if (['pizzaria','lanche','restaurante','sorveteria','padaria','doceria','hamburgueria'].some(c => _cat.includes(c)))
-        return { emoji:'🍽️', label:'Ver Cardápio' };
-      if (['mercado','supermercado','farmacia','pet','adega','bebida','conveniencia'].some(c => _cat.includes(c)))
-        return { emoji:'🛒', label:'Ver Produtos' };
-      return { emoji:'🔧', label:'Ver Serviços' };
+      const _lblMap = {
+        'pizzaria':['🍽️','Ver Cardápio'],'lanches':['🍽️','Ver Cardápio'],'restaurante':['🍽️','Ver Cardápio'],
+        'carnes':['🍽️','Ver Cardápio'],'sorveteria':['🍽️','Ver Cardápio'],'padaria':['🍽️','Ver Cardápio'],
+        'adega':['🛒','Ver Produtos'],'mercado':['🛒','Ver Produtos'],'farmacia':['🛒','Ver Produtos'],
+        'pet':['🛒','Ver Produtos'],'calcados':['🛒','Ver Produtos'],'roupas':['🛒','Ver Produtos'],
+        'joalheria':['🛒','Ver Produtos'],'informatica':['🛒','Ver Produtos'],'celular':['🛒','Ver Produtos'],
+        'papelaria':['🛒','Ver Produtos'],'variedades':['🛒','Ver Produtos'],'moveis':['🛒','Ver Produtos'],
+        'construcao':['🛒','Ver Produtos'],'autopecas':['🛒','Ver Produtos'],'agropecuaria':['🛒','Ver Produtos'],
+        'barbearia':['✂️','Ver Serviços'],'salao':['💅','Ver Serviços'],'mecanica':['🔧','Ver Serviços'],
+        'tattoo':['🎨','Ver Portfólio'],'fotografia':['📸','Ver Portfólio'],
+        'clinica':['🩺','Ver Consultas'],'laboratorio':['🧪','Ver Exames'],
+        'academia':['💪','Ver Planos'],'seguros':['📋','Ver Planos'],
+        'imobiliaria':['🏠','Ver Imóveis'],'viagens':['✈️','Ver Pacotes'],
+        'idiomas':['📚','Ver Cursos'],'grafica':['🖨️','Ver Serviços'],
+        'advocacia':['⚖️','Ver Serviços'],'contabilidade':['📊','Ver Serviços'],
+        'posto':['⛽','Ver Combustíveis'],
+      };
+      const _lbl = _lblMap[_cat] || ['🔧','Ver Serviços'];
+      return { emoji:_lbl[0], label:_lbl[1] };
     })();
 
     const cardapioBtn = temCardapio
@@ -3967,6 +3981,8 @@
       document.getElementById('ml-cardapio-preco').value   = item.preco;
       document.getElementById('ml-cardapio-cat').value     = item.categoria || '';
       document.getElementById('ml-cardapio-foto-url').value = item.foto || '';
+      const destaqueChk = document.getElementById('ml-cardapio-destaque');
+      if (destaqueChk) destaqueChk.checked = item.destaque === 'SIM';
       const prev = document.getElementById('ml-cardapio-foto-preview');
       if (prev) prev.innerHTML = item.foto
         ? `<img src="${item.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">`
@@ -3979,6 +3995,8 @@
       document.getElementById('ml-cardapio-preco').value   = '';
       document.getElementById('ml-cardapio-cat').value     = '';
       document.getElementById('ml-cardapio-foto-url').value = '';
+      const destaqueChkN = document.getElementById('ml-cardapio-destaque');
+      if (destaqueChkN) destaqueChkN.checked = false;
       const prev = document.getElementById('ml-cardapio-foto-preview');
       if (prev) prev.innerHTML = '<i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>';
     }
@@ -4043,6 +4061,7 @@
         preco:      parseFloat(preco),
         foto:       document.getElementById('ml-cardapio-foto-url').value,
         categoria:  document.getElementById('ml-cardapio-cat').value.trim(),
+        destaque:   document.getElementById('ml-cardapio-destaque')?.checked ? 'SIM' : 'NAO',
       }));
       const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(15000) });
       const json = await resp.json();
@@ -4093,13 +4112,48 @@
     _ccLojaIdx  = idx;
     _ccCarrinho = {};
 
-    // Label dinâmico
-    const cat = (loja.categoria || '').toLowerCase();
-    const label = ['pizzaria','lanche','restaurante','sorveteria','padaria','doceria','hamburgueria'].some(c => cat.includes(c))
-      ? 'Cardápio'
-      : ['mercado','supermercado','farmacia','pet','adega','bebida','conveniencia'].some(c => cat.includes(c))
-      ? 'Produtos'
-      : 'Serviços';
+    // Label dinâmico por slug — cada categoria tem seu nome mais adequado
+    const _slug = (loja.categoria || '').toLowerCase();
+    const _labelMap = {
+      // Alimentação — Cardápio
+      'pizzaria':'Cardápio', 'lanches':'Cardápio', 'restaurante':'Cardápio',
+      'sorveteria':'Cardápio', 'padaria':'Cardápio', 'doceria':'Cardápio',
+      'carnes':'Cardápio', 'cafeteria':'Cardápio', 'saudavel':'Cardápio',
+      'japonesa':'Cardápio', 'italiana':'Cardápio', 'marmita':'Cardápio',
+      // Bebidas — Produtos
+      'adega':'Produtos',
+      // Comércio — Produtos
+      'mercado':'Produtos', 'farmacia':'Produtos', 'pet':'Produtos',
+      'calcados':'Produtos', 'roupas':'Produtos', 'joalheria':'Produtos',
+      'otica':'Produtos', 'informatica':'Produtos', 'celular':'Produtos',
+      'papelaria':'Produtos', 'variedades':'Produtos', 'festas':'Produtos',
+      'armarinho':'Produtos', 'floricultura':'Produtos', 'moveis':'Produtos',
+      'tintas':'Produtos', 'construcao':'Produtos', 'madeireira':'Produtos',
+      'autopecas':'Produtos', 'agropecuaria':'Produtos', 'insumos':'Produtos',
+      // Saúde — Serviços específicos
+      'clinica':'Consultas', 'laboratorio':'Exames', 'hospital':'Atendimentos',
+      // Beleza — Serviços específicos
+      'barbearia':'Serviços', 'salao':'Serviços', 'estetica':'Serviços',
+      'tattoo':'Portfólio', 'spa':'Serviços', 'academia':'Planos',
+      // Automotivo — Serviços específicos
+      'mecanica':'Serviços', 'borracharia':'Serviços', 'funilaria':'Serviços',
+      'lava-rapido':'Serviços', 'posto':'Combustíveis', 'autopecas':'Produtos',
+      'bicicletaria':'Serviços',
+      // Casa — Serviços/Produtos
+      'construcao':'Produtos', 'vidracaria':'Serviços', 'serralheria':'Serviços',
+      'refrigeracao':'Serviços', 'consertos':'Serviços', 'eletricista':'Serviços',
+      'encanamento':'Serviços', 'pintura':'Serviços',
+      // Tecnologia — Serviços
+      'grafica':'Serviços', 'informatica':'Produtos', 'celular':'Produtos',
+      // Profissionais — Serviços específicos
+      'advocacia':'Serviços', 'contabilidade':'Serviços', 'fotografia':'Portfólio',
+      'imobiliaria':'Imóveis', 'viagens':'Pacotes', 'seguros':'Planos',
+      // Educação
+      'idiomas':'Cursos', 'escolinha':'Serviços', 'bancario':'Serviços',
+      // Gas/Água
+      'gas':'Produtos',
+    };
+    const label = _labelMap[_slug] || 'Itens';
 
     document.getElementById('cc-loja-nome').textContent = loja.nome;
     document.getElementById('cc-loja-sub').textContent  = label;
@@ -4125,6 +4179,18 @@
     const wrap  = document.getElementById('cc-itens-wrap');
     const isPro = (loja.plano || '').toUpperCase() === 'PRO';
 
+    // Emoji placeholder inteligente por categoria
+    const _catEmoji = {
+      'pizzaria':'🍕','lanches':'🍔','restaurante':'🍽️','carnes':'🥩','sorveteria':'🍦',
+      'padaria':'🥐','adega':'🍺','mercado':'🛒','farmacia':'💊','pet':'🐾',
+      'barbearia':'💈','salao':'💅','mecanica':'🔧','eletricista':'⚡','tattoo':'🎨',
+      'academia':'💪','clinica':'🩺','laboratorio':'🧪','otica':'👓','calcados':'👟',
+      'roupas':'👗','joalheria':'💍','informatica':'💻','celular':'📱',
+      'construcao':'🧱','moveis':'🛋️','autopecas':'🔩','borracharia':'🚗','posto':'⛽',
+      'floricultura':'💐','fotografia':'📸','agropecuaria':'🌾','insumos':'🚜',
+    };
+    const placeholderEmoji = _catEmoji[(loja.categoria||'').toLowerCase()] || loja.emoji || '🏪';
+
     // Agrupa por categoria
     const grupos = {};
     loja.cardapio.forEach(item => {
@@ -4136,12 +4202,15 @@
     wrap.innerHTML = Object.entries(grupos).map(([cat, itens]) => `
       <div class="cc-cat-label">${escHTML(cat)}</div>
       ${itens.map(item => `
-        <div class="cc-item-card" id="cc-card-${item.id}" style="margin-bottom:8px;">
-          ${(isPro && item.foto)
+        <div class="cc-item-card" id="cc-card-${item.id}" style="margin-bottom:8px;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
+          ${item.foto
             ? `<img src="${item.foto}" class="cc-item-foto" onerror="this.style.display='none'">`
-            : `<div class="cc-item-foto-placeholder">${loja.emoji || '🍽️'}</div>`}
+            : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
           <div class="cc-item-info">
-            <div class="cc-item-nome">${escHTML(item.nome)}</div>
+            <div class="cc-item-nome">
+              ${item.destaque === 'SIM' ? '<span style="font-size:10px;background:rgba(245,158,11,0.2);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);border-radius:4px;padding:1px 5px;margin-right:4px;font-weight:800;">⭐ Mais pedido</span>' : ''}
+              ${escHTML(item.nome)}
+            </div>
             ${item.descricao ? `<div class="cc-item-desc">${escHTML(item.descricao)}</div>` : ''}
             <div class="cc-item-preco">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}</div>
           </div>
@@ -4238,7 +4307,10 @@
       return `• ${qty}× ${item.nome} — R$ ${sub.toFixed(2).replace('.',',')}`;
     });
 
-    const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n\n${linhas.join('\n')}\n\n*Total: R$ ${total.toFixed(2).replace('.',',')}*\n\nPoderia confirmar?`;
+    const obsEl = document.getElementById('cc-obs-input');
+    const obs = obsEl ? obsEl.value.trim() : '';
+    const obsLine = obs ? `\n\n📝 *Observações:* ${obs}` : '';
+    const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n\n${linhas.join('\n')}\n\n*Total: R$ ${total.toFixed(2).replace('.',',')}*${obsLine}\n\nPoderia confirmar?`;
     const url = `https://wa.me/${loja.wpp}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank', 'noopener');
 

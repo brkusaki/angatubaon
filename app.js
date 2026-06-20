@@ -401,13 +401,21 @@
     // Foto de capa apenas no PRO
     const hasCover = isPro && loja.foto && loja.foto.trim();
 
-    const mapBtn = loja.maps
-      ? `<a href="${loja.maps}" target="_blank" rel="noopener" class="btn-map" aria-label="Ver ${loja.nome} no mapa"><i class="fa fa-map-marker-alt"></i></a>`
+    // Indicador visual de localização — SEM href para não abrir maps no clique acidental
+    // A função de abrir o maps fica apenas dentro do modal de detalhes
+    const mapPin = loja.maps
+      ? `<span class="contact-tag maps" title="Localização disponível"><i class="fa fa-map-marker-alt"></i> MAPS</span>`
       : '';
 
     const ctTag = loja.tel && !loja.wpp
       ? `<span class="contact-tag tel">📞 TEL</span>`
       : `<span class="contact-tag wpp">💬 WPP</span>`;
+
+    // Linha de indicadores visuais (mapPin + ctTag) — fica no rodapé do card
+    // Posição abaixo de "Ver detalhes" para evitar cliques acidentais ao abrir o card
+    const indicadoresFooter = (mapPin || ctTag)
+      ? `<div style="display:flex;align-items:center;gap:4px;margin-top:3px;">${mapPin}${ctTag}</div>`
+      : '';
 
     // Selo visual por plano
     let planBadge = '';
@@ -476,10 +484,11 @@
             ${planBadge}
           </div>
           <div class="store-sub">${escHTML(loja.sub)}</div>
-          <div class="store-row">${badgeHTML(status, fechaStr)}${mapBtn}${ctTag}</div>
+          <div class="store-row">${badgeHTML(status, fechaStr)}</div>
           ${starsHTML}
           ${anuncioBadge}
           ${expandHint}
+          ${indicadoresFooter}
         </div>
         ${contatoHTML(loja, status)}
       </div>`;

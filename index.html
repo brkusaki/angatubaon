@@ -71,7 +71,7 @@
       #spl-video.pronto { opacity: 1; }
       /* Texto "Angatuba" sobreposto — o vídeo só tem "ON" */
       #spl-texto {
-        position: absolute; bottom: 11%;
+        position: absolute; bottom: 13%;
         left: 0; right: 0; text-align: center;
         opacity: 0; pointer-events: none;
         transition: opacity 0.5s ease 1.6s;
@@ -79,13 +79,21 @@
       #spl-texto.visivel { opacity: 1; }
       .spl-txt-angatuba {
         font-family: 'Syne', sans-serif;
-        font-size: 2rem; font-weight: 800; color: #fff;
-        text-shadow: 0 0 30px rgba(255,55,55,.7), 0 2px 12px rgba(0,0,0,.9);
+        font-size: 2.1rem; font-weight: 800; color: #fff;
+        /* Contorno escuro em todas as direções — garante legibilidade sobre qualquer fundo */
+        text-shadow:
+          0 0 0 #000,
+          -2px -2px 0 rgba(0,0,0,.9),
+           2px -2px 0 rgba(0,0,0,.9),
+          -2px  2px 0 rgba(0,0,0,.9),
+           2px  2px 0 rgba(0,0,0,.9),
+           0    0  20px rgba(0,0,0,.8);
       }
       .spl-txt-cidade {
         font-size: .65rem; font-weight: 600; letter-spacing: .3em;
-        text-transform: uppercase; color: rgba(255,255,255,.45);
-        margin-top: 4px; text-shadow: 0 1px 6px rgba(0,0,0,.9);
+        text-transform: uppercase; color: rgba(255,255,255,.7);
+        margin-top: 4px;
+        text-shadow: 0 1px 4px #000, 0 0 8px #000;
       }
       /* Fallback CSS — visível quando vídeo não está cacheado */
       #spl-fallback {
@@ -359,11 +367,11 @@
         </div>
 
         <div class="field-group">
-          <label class="field-label" for="f-obs">
+          <label class="field-label" for="f-tags">
             Tags de Busca
             <span style="font-size:10px;font-weight:500;color:var(--muted);margin-left:6px;">ajuda clientes a te encontrar</span>
           </label>
-          <textarea class="field-textarea" id="f-obs" name="observacoes"
+          <textarea class="field-textarea" id="f-tags" name="tags"
             placeholder="Ex: delivery, pizza, esfiha, açaí, produtos naturais, conserto de celular..."
             style="min-height:70px;"></textarea>
           <p class="field-hint" style="margin-top:5px;">

@@ -4386,7 +4386,7 @@
       const pag = pagEl ? pagEl.value.trim() : '';
       if (!end) { alert('Por favor, informe o endereço para entrega.'); return; }
       if (!pag) { alert('Por favor, selecione a forma de pagamento.'); return; }
-      entregaLine = `\n\n🛵 *Entrega para:* ${end}\n💳 *Pagamento:* ${pag}`;
+      entregaLine = `\n\n📍 *Entrega para:* ${end}\n💰 *Pagamento:* ${pag}`;
     }
 
     const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n\n${linhas.join('\n')}\n\n*Total: R$ ${total.toFixed(2).replace('.',',')}*${entregaLine}${obsLine}\n\nPoderia confirmar?`;

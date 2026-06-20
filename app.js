@@ -1752,9 +1752,15 @@
 
     // ── Busca dados frescos em background ─────────────────────
     try {
+      // Token via POST — nunca em query string (logs de servidor, histórico do browser)
+      const mkParams = action => {
+        const p = new URLSearchParams();
+        p.append('payload', JSON.stringify({ action, token: _lojaToken }));
+        return p;
+      };
       const [dadosResp, metResp] = await Promise.all([
-        fetch(`${APPS_SCRIPT_URL}?action=lojaDados&token=${encodeURIComponent(_lojaToken)}`, { signal: AbortSignal.timeout(10000) }),
-        fetch(`${APPS_SCRIPT_URL}?action=lojaMetricas&token=${encodeURIComponent(_lojaToken)}`, { signal: AbortSignal.timeout(10000) }),
+        fetch(APPS_SCRIPT_URL, { method: 'POST', body: mkParams('lojaDados'),    signal: AbortSignal.timeout(10000) }),
+        fetch(APPS_SCRIPT_URL, { method: 'POST', body: mkParams('lojaMetricas'), signal: AbortSignal.timeout(10000) }),
       ]);
 
       const dadosJson = await dadosResp.json();
@@ -1842,8 +1848,14 @@
     } catch(e) {}
 
     try {
-      const url = `${APPS_SCRIPT_URL}?action=lojaToggle&token=${encodeURIComponent(_lojaToken)}&statusLoja=${encodeURIComponent(novoStatus)}`;
-      const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      // Token via POST — nunca em query string (logs de servidor, histórico do browser)
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({
+        action:     'lojaToggle',
+        token:      _lojaToken,
+        statusLoja: novoStatus,
+      }));
+      const resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(10000) });
       const json = await resp.json();
       if (json.msg === 'UNAUTHORIZED') { lojaLogout(true); return; }
     } catch(e) {
@@ -1865,8 +1877,14 @@
     if (status) { status.textContent = ''; status.style.color = ''; }
 
     try {
-      const url = `${APPS_SCRIPT_URL}?action=lojaAtualizarInstagram&token=${encodeURIComponent(_lojaToken)}&instagram=${encodeURIComponent(valor)}`;
-      const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      // Token via POST — nunca em query string
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({
+        action:    'lojaAtualizarInstagram',
+        token:     _lojaToken,
+        instagram: valor,
+      }));
+      const resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(10000) });
       const json = await resp.json();
 
       if (json.status === 'erro' || json.msg === 'UNAUTHORIZED') {
@@ -1905,8 +1923,10 @@
   /* ── Logout de loja ──────────────────────────────────────── */
   function lojaLogout(silencioso) {
     if (_lojaToken) {
-      const url = `${APPS_SCRIPT_URL}?action=lojaLogout&token=${encodeURIComponent(_lojaToken)}`;
-      fetch(url).catch(() => {});
+      // Token via POST — nunca em query string
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action: 'lojaLogout', token: _lojaToken }));
+      fetch(APPS_SCRIPT_URL, { method: 'POST', body: params }).catch(() => {});
     }
     _lojaToken = null;
     _lojaNome  = '';
@@ -1930,7 +1950,9 @@
   atualizarNav();
   // Se tem token de loja na session, valida silenciosamente ao carregar
   if (_lojaToken) {
-    fetch(`${APPS_SCRIPT_URL}?action=lojaDados&token=${encodeURIComponent(_lojaToken)}`, { signal: AbortSignal.timeout(8000) })
+    const _validParams = new URLSearchParams();
+    _validParams.append('payload', JSON.stringify({ action: 'lojaDados', token: _lojaToken }));
+    fetch(APPS_SCRIPT_URL, { method: 'POST', body: _validParams, signal: AbortSignal.timeout(8000) })
       .then(r => r.json())
       .then(j => { if (j.msg === 'UNAUTHORIZED') { _lojaToken = null; localStorage.removeItem('angatuba_loja_token'); atualizarNav(); } })
       .catch(() => {});
@@ -2226,6 +2248,7 @@
   /* ── Carrega lojas da API (Apps Script → Google Sheets) ─────── */
   const _retryDelays = [8000, 20000, 45000]; // backoff progressivo: 8s, 20s, 45s
   let   _retryCount  = 0;
+  let   _retryTimer  = null; // referência para cancelar retry pendente
 
   async function carregarLojas() {
     try {
@@ -2245,7 +2268,9 @@
           plano:     (l.plano    || 'GRATIS').toUpperCase(),
           emoji:     l.emoji     || '🏪',
         }));
-        _retryCount = 0; // reseta contador em caso de sucesso
+        // Sucesso: cancela qualquer retry pendente e reseta contador
+        if (_retryTimer) { clearTimeout(_retryTimer); _retryTimer = null; }
+        _retryCount = 0;
         _rebuildIdxMap();
         renderLojas();
         renderCategorias();
@@ -2261,10 +2286,12 @@
       _mostrarErroCarregamento(_retryCount < _retryDelays.length);
       _esconderSplash(); // erro de rede — desvela de qualquer forma
       // Retry com backoff progressivo (máx 3 tentativas)
+      // Cancela timer anterior antes de agendar novo (evita chamadas duplicadas)
       if (_retryCount < _retryDelays.length) {
         const delay = _retryDelays[_retryCount++];
         console.log(`[AngatubaON] Retry ${_retryCount}/${_retryDelays.length} em ${delay/1000}s...`);
-        setTimeout(() => carregarLojas(), delay);
+        if (_retryTimer) clearTimeout(_retryTimer);
+        _retryTimer = setTimeout(() => { _retryTimer = null; carregarLojas(); }, delay);
       }
     }
   }
@@ -2978,12 +3005,24 @@
   }
 
   /* ══════════════════════════════════════════════════════════════
-     UPLOAD DE IMAGENS — ImgBB (gratuito, sem backend)
-     Chave pública da API: registre em https://imgbb.com/api
-     e substitua IMGBB_KEY abaixo pela sua chave.
+     UPLOAD DE IMAGENS — proxy via Apps Script
+     A chave da ImgBB fica no servidor (Script Properties),
+     nunca exposta no JS público.
+     Apps Script action: 'uploadImagem' — recebe base64 + mime,
+     faz o upload e devolve { status:'ok', url:'https://...' }.
   ══════════════════════════════════════════════════════════════ */
-  const IMGBB_KEY = '0eed15a2dd1ee18da2d05c394639b2aa';
 
+  // Converte File em base64 (sem o prefixo data:...)
+  async function _fileToBase64(file) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload  = () => res(r.result.split(',')[1]);
+      r.onerror = () => rej(new Error('Leitura de arquivo falhou'));
+      r.readAsDataURL(file);
+    });
+  }
+
+  // Upload único via proxy — substitui o fetch direto para ImgBB
   async function uploadImagem(file, statusEl) {
     if (!file) return null;
     if (file.size > 5 * 1024 * 1024) {
@@ -2996,21 +3035,24 @@
     statusEl.style.color = 'var(--muted)';
 
     try {
-      const form = new FormData();
-      form.append('image', file);
-      form.append('key', IMGBB_KEY);
-
-      const resp = await fetch('https://api.imgbb.com/1/upload', {
-        method: 'POST', body: form
+      const base64 = await _fileToBase64(file);
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({
+        action: 'uploadImagem',
+        base64,
+        mime: file.type || 'image/jpeg',
+      }));
+      const resp = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST', body: params,
+        signal: AbortSignal.timeout(30000), // uploads podem ser lentos
       });
       const json = await resp.json();
-
-      if (json.success) {
+      if (json.status === 'ok' && json.url) {
         statusEl.textContent = '✅ Imagem enviada!';
         statusEl.style.color = 'var(--green)';
-        return json.data.url;
+        return json.url;
       } else {
-        throw new Error(json.error?.message || 'Falha no upload');
+        throw new Error(json.msg || 'Falha no upload');
       }
     } catch (err) {
       statusEl.textContent = '❌ Erro: ' + err.message;
@@ -3653,16 +3695,9 @@
     statusEl.style.color = 'var(--muted)';
 
     try {
-      const form = new FormData();
-      form.append('image', file);
-      form.append('key', IMGBB_KEY);
-      const resp = await fetch('https://api.imgbb.com/1/upload', { method:'POST', body:form });
-      const json = await resp.json();
-      if (!json.success) throw new Error(json.error?.message || 'Falha');
-
-      const url = json.data.url;
-      statusEl.textContent = '✅ Salvo!';
-      statusEl.style.color = 'var(--green)';
+      // Usa proxy via Apps Script — chave ImgBB nunca exposta no JS
+      const url = await uploadImagem(file, statusEl);
+      if (!url) return; // uploadImagem já exibiu erro no statusEl
 
       // Envia URL para o servidor salvar na planilha
       const campo = tipo === 'logo' ? 'logoUrl' : 'fotoUrl';
@@ -3838,17 +3873,16 @@
           return;
         }
         if (statusEl) { statusEl.textContent = '📤 Enviando foto...'; statusEl.style.color = 'var(--muted)'; }
-        const form = new FormData();
-        form.append('image', imgFile);
-        form.append('key', IMGBB_KEY);
-        const uploadResp = await fetch('https://api.imgbb.com/1/upload', { method:'POST', body:form });
-        const uploadJson = await uploadResp.json();
-        if (uploadJson.success) {
-          imagemUrl = uploadJson.data.url;
+        // Upload via proxy — chave ImgBB nunca exposta no JS
+        const uploadedUrl = await uploadImagem(imgFile, statusEl || { textContent: '', style: {} });
+        if (uploadedUrl) {
+          imagemUrl = uploadedUrl;
           _anuncioImagemUrl = imagemUrl;
-          if (statusEl) { statusEl.textContent = '✅ Foto enviada'; statusEl.style.color = 'var(--green)'; }
         } else {
-          throw new Error('Falha no upload da foto');
+          // uploadImagem já exibiu o erro no statusEl
+          btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
+          btn.disabled = false;
+          return;
         }
       }
 
@@ -4142,24 +4176,17 @@
       input.value = '';
       return;
     }
-    // Upload ImgBB
+    // Upload via proxy (Apps Script → ImgBB) — chave nunca exposta no JS
     msgEl.textContent = '⏳ Enviando foto...';
-    _cardapioUploadEmAndamento = true; // bloqueia o botão Salvar durante o upload
+    _cardapioUploadEmAndamento = true;
     try {
-      const form = new FormData();
-      form.append('image', file);
-      form.append('key', IMGBB_KEY);
-      const resp = await fetch('https://api.imgbb.com/1/upload', { method:'POST', body:form });
-      const json = await resp.json();
-      if (json.success) {
-        document.getElementById('ml-cardapio-foto-url').value = json.data.url;
-        msgEl.textContent = '✅ Foto enviada!';
+      const url = await uploadImagem(file, msgEl);
+      if (url) {
+        document.getElementById('ml-cardapio-foto-url').value = url;
         setTimeout(() => { msgEl.textContent = ''; }, 2000);
-      } else throw new Error('Falha no upload');
-    } catch(e) {
-      msgEl.textContent = '❌ Erro na foto: ' + e.message;
+      }
     } finally {
-      _cardapioUploadEmAndamento = false; // libera o botão Salvar
+      _cardapioUploadEmAndamento = false;
     }
   }
 
@@ -4535,7 +4562,10 @@
     // (visibilitychange dispara para qualquer troca de app, não só para o WhatsApp)
     const carrinhoBar = document.getElementById('cc-carrinho-bar');
     if (carrinhoBar) {
+      // Remove botão anterior se existir (evita acúmulo a cada chamada)
+      carrinhoBar.querySelector('.cc-confirm-btn')?.remove();
       const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'cc-confirm-btn';
       confirmBtn.style.cssText = `
         width:100%;margin-top:8px;padding:13px;border-radius:12px;
         background:rgba(37,211,102,0.15);border:1px solid rgba(37,211,102,0.4);

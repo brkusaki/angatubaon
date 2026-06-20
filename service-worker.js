@@ -1,4 +1,4 @@
-const CACHE = 'angatubaon-v19';
+const CACHE = 'angatubaon-v20';
 const STATIC = [
   '/',
   '/index.html',
@@ -9,7 +9,7 @@ const STATIC = [
   '/webp/owl-celebrate-gratis.webp',
   '/webp/owl-celebrate-plus.webp',
   '/webp/owl-celebrate-pro.webp',
-  '/webp/splash-anim.webm',
+  '/webp/splash-anim.webp',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/owl-gratis.png',
@@ -17,10 +17,20 @@ const STATIC = [
   '/icons/owl-pro.png',
 ];
 
-// Instala e cacheia arquivos estáticos
+// Instala e cacheia arquivos estáticos — best-effort:
+// se um asset falhar (404, rede), o SW ainda instala com os demais.
+// addAll() é atômico e abortaria tudo; allSettled() é resiliente.
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(STATIC))
+    caches.open(CACHE).then(c =>
+      Promise.allSettled(
+        STATIC.map(url =>
+          c.add(url).catch(err =>
+            console.warn('[SW] cache ignorado:', url, err.message)
+          )
+        )
+      )
+    )
   );
   self.skipWaiting();
 });

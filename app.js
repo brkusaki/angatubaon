@@ -2217,7 +2217,7 @@
       navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
         .then(reg => {
           // Verifica se há update a cada 60 segundos
-          setInterval(() => reg.update(), 60_000);
+          setInterval(() => { if (!document.hidden) reg.update(); }, 60_000);
 
           // SW esperando para ativar = há versão nova instalada
           const onUpdateFound = () => {
@@ -2288,6 +2288,13 @@
         renderLojas();
         renderCategorias();
         _esconderSplash(); // lojas prontas — desvela o app
+        // Deep link: abre modal da loja se URL tiver #slug
+        (function _checkDeepLink() {
+          const hash = location.hash.slice(1);
+          if (!hash) return;
+          const idx = LOJAS.findIndex(l => toSlug(l.nome) === hash);
+          if (idx >= 0) setTimeout(() => abrirDetalhes(idx), 100);
+        })();
         console.log('[AngatubaON] ' + json.data.length + ' da API + ' + fixasSemDuplicata.length + ' fixas ✅');
         // Salva snapshot para uso offline (primeiro acesso sem internet mostra dados cacheados)
         try {
@@ -2322,7 +2329,7 @@
       if (cached && (Date.now() - ts) < 86_400_000) {
         const lojasCache = JSON.parse(cached);
         if (Array.isArray(lojasCache) && lojasCache.length > 0) {
-          LOJAS = lojasCache;
+          LOJAS = lojasCache.map(function(l){return Object.assign({},l,{plano:(l.plano||'GRATIS').toUpperCase(),emoji:l.emoji||'🏪'});});
           _rebuildIdxMap();
           renderLojas();
           renderCategorias();
@@ -4081,8 +4088,13 @@
   window.avalEnviar = async function(idx, nome) {
     const avalBtn = document.querySelector(`#aval-form-${idx} button[onclick*="avalEnviar"]`);
     if (avalBtn?.disabled) return;
-    if (avalBtn) avalBtn.disabled = true;
     const nota  = _avalNota[idx];
+    if (!nota || nota < 1) {
+      const msgEl = document.getElementById(`aval-msg-${idx}`);
+      if (msgEl) msgEl.textContent = '\u2b50 Selecione uma nota antes de enviar.';
+      return;
+    }
+    if (avalBtn) avalBtn.disabled = true;
     const texto = document.getElementById(`aval-texto-${idx}`)?.value.trim() || '';
     const msgEl = document.getElementById(`aval-msg-${idx}`);
 
@@ -4647,7 +4659,7 @@
 
     let total = 0;
     const linhas = itens.map(({ item, qty }) => {
-      const sub = item.preco * qty;
+      const sub = (parseFloat(item.preco) || 0) * qty;
       total += sub;
       return `• ${qty}× ${item.nome} — R$ ${sub.toFixed(2).replace('.',',')}`;
     });
@@ -4663,8 +4675,8 @@
       const pagEl = document.getElementById('cc-entrega-pagamento');
       const end = endEl ? endEl.value.trim() : '';
       const pag = pagEl ? pagEl.value.trim() : '';
-      if (!end) { alert('Por favor, informe o endereço para entrega.'); return; }
-      if (!pag) { alert('Por favor, selecione a forma de pagamento.'); return; }
+      if (!end) { if (finalizarBtn) finalizarBtn.disabled = false; alert('Por favor, informe o endereço para entrega.'); return; }
+      if (!pag) { if (finalizarBtn) finalizarBtn.disabled = false; alert('Por favor, selecione a forma de pagamento.'); return; }
       entregaLine = `\n\n📍 *Entrega para:* ${end}\n💰 *Pagamento:* ${pag}`;
     }
 

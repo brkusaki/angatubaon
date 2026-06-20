@@ -3023,8 +3023,9 @@
   }
 
   // Upload único via proxy — substitui o fetch direto para ImgBB
-  // Envia como application/json para suportar base64 grande sem truncamento
-  // (URLSearchParams trunca payloads pesados no Apps Script)
+  // Usa URLSearchParams com campos separados (sem JSON.stringify do base64)
+  // para evitar CORS preflight (application/json dispara OPTIONS, GAS não suporta)
+  // e evitar truncamento (o base64 vai direto em e.parameter.base64, não aninhado).
   async function uploadImagem(file, statusEl) {
     if (!file) return null;
     if (file.size > 5 * 1024 * 1024) {
@@ -3038,16 +3039,17 @@
 
     try {
       const base64 = await _fileToBase64(file);
+      // Campos separados: GAS lê e.parameter.action, e.parameter.token, etc.
+      // Não aninha dentro de JSON — evita limite de parse em strings grandes
+      const params = new URLSearchParams();
+      params.append('action', 'uploadImagem');
+      params.append('token',  _lojaToken);
+      params.append('base64', base64);
+      params.append('mime',   file.type || 'image/jpeg');
       const resp = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'uploadImagem',
-          token:  _lojaToken,
-          base64,
-          mime: file.type || 'image/jpeg',
-        }),
-        signal: AbortSignal.timeout(60000), // uploads grandes podem demorar
+        body: params,
+        signal: AbortSignal.timeout(60000),
       });
       const json = await resp.json();
       if (json.status === 'ok' && json.url) {

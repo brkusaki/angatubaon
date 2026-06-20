@@ -1459,11 +1459,6 @@
       }
     }
 
-    // Status do cadastro
-    const statusMap = { APROVADO: '✅ Loja publicada', PENDENTE: '⏳ Aguardando aprovação', REPROVADO: '❌ Reprovada' };
-    document.getElementById('ml-status-cadastro').textContent = statusMap[d.statusCadastro] || d.statusCadastro;
-    document.getElementById('ml-status-icon').style.color = d.statusCadastro === 'APROVADO' ? 'var(--green)' : 'var(--zap)';
-
     // Badge de plano
     const planBadge = document.getElementById('ml-plan-badge');
     if (plano === 'PRO') {

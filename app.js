@@ -2638,7 +2638,7 @@
     })();
 
     const cardapioBtn = temCardapio
-      ? `<button onclick="fecharDetalhes();abrirCardapioCliente(${idx});" style="
+      ? `<button onclick="fecharDetalhes(true);abrirCardapioCliente(${idx});" style="
             width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
             padding:12px;border-radius:12px;margin-bottom:14px;
             background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.05));
@@ -2803,11 +2803,15 @@
     }
   }
 
-  function fecharDetalhes() {
+  function fecharDetalhes(silencioso = false) {
     const overlay = document.getElementById('modal-detalhes');
     overlay.classList.remove('open');
     document.body.style.overflow = '';
-    if (history.state?.modal === 'detalhes') {
+    if (silencioso) {
+      // Chamado antes de abrir outro modal — limpa o hash sem history.back()
+      // para evitar que o popstate feche o próximo modal
+      if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+    } else if (history.state?.modal === 'detalhes') {
       history.back();
     } else if (location.hash) {
       history.replaceState(null, '', location.pathname + location.search);
@@ -3626,18 +3630,23 @@
 
   // Back button Android no PWA — fecha o modal ativo em vez de sair do app
   window.addEventListener('popstate', function() {
+    // Fecha modal de detalhes se aberto
     if (document.getElementById('modal-detalhes')?.classList.contains('open')) {
       const overlay = document.getElementById('modal-detalhes');
       overlay.classList.remove('open');
       document.body.style.overflow = '';
+      if (location.hash) history.replaceState(null, '', location.pathname + location.search);
       return;
     }
+    // Fecha cardápio cliente se aberto (usuário abriu pelo botão Ver Cardápio)
     if (document.getElementById('modal-cardapio-cliente')?.classList.contains('open')) {
       fecharCardapioCliente(); return;
     }
+    // Fecha painel Minha Loja
     if (document.getElementById('modal-minha-loja')?.classList.contains('open')) {
       fecharMinhaLoja(); return;
     }
+    // Fecha modal de cadastro
     if (document.getElementById('modal-cadastro')?.classList.contains('open')) {
       closeModal(); return;
     }

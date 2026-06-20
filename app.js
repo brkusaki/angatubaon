@@ -2826,6 +2826,12 @@
   // Fecha com tecla Escape — respeita hierarquia de modais abertos
   document.addEventListener('keydown', function(e) {
     if (e.key !== 'Escape') return;
+    if (document.getElementById('modal-cardapio-cliente')?.classList.contains('open')) {
+      fecharCardapioCliente(true); return;
+    }
+    if (document.getElementById('modal-login-loja')?.classList.contains('open')) {
+      closeLoginLoja(); return;
+    }
     if (document.getElementById('modal-detalhes').classList.contains('open')) {
       fecharDetalhes(); return;
     }
@@ -2834,6 +2840,16 @@
     }
     if (document.getElementById('modal-planos').classList.contains('open')) {
       closePlanModal();
+    }
+  });
+
+  // Back button Android — fecha o modal correto ao pressionar voltar
+  window.addEventListener('popstate', function(e) {
+    if (document.getElementById('modal-cardapio-cliente')?.classList.contains('open')) {
+      fecharCardapioCliente(); return;
+    }
+    if (document.getElementById('modal-detalhes').classList.contains('open')) {
+      fecharDetalhes(true); return;
     }
   });
 
@@ -4478,13 +4494,17 @@
     ccRenderItens(loja);
     ccAtualizarCarrinho();
 
+    // Back button Android: empurra estado para que voltar feche o cardápio
+    history.pushState({ modal: 'cardapio', idx }, '', location.pathname + location.search + location.hash);
+
     document.getElementById('modal-cardapio-cliente').classList.add('open');
     document.body.style.overflow = 'hidden';
   };
 
-  window.fecharCardapioCliente = function() {
+  window.fecharCardapioCliente = function(viaPopstate) {
     document.getElementById('modal-cardapio-cliente').classList.remove('open');
     document.body.style.overflow = '';
+    if (!viaPopstate && history.state && history.state.modal === 'cardapio') history.back();
     // Reseta tela de sucesso para a próxima abertura
     const sucesso = document.getElementById('cc-pedido-sucesso');
     if (sucesso) sucesso.style.display = 'none';

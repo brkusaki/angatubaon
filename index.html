@@ -46,6 +46,109 @@
     } catch(e) {}
   </script>
 
+  <!-- ══ SPLASH SCREEN — vídeo da coruja quando cacheado, CSS como fallback ══ -->
+  <div id="splash-screen" aria-hidden="true">
+    <style>
+      #splash-screen {
+        position: fixed; inset: 0; z-index: 99999;
+        background: #070a0f;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        overflow: hidden;
+      }
+      #splash-screen.splash-saindo {
+        transition: opacity 0.6s ease;
+        opacity: 0;
+        pointer-events: none;
+      }
+      #spl-video {
+        position: absolute; inset: 0;
+        width: 100%; height: 100%;
+        object-fit: cover;
+        opacity: 0;
+        transition: opacity 0.35s ease;
+      }
+      #spl-video.pronto { opacity: 1; }
+      /* Texto "Angatuba" sobreposto — o vídeo só tem "ON" */
+      #spl-texto {
+        position: absolute; bottom: 11%;
+        left: 0; right: 0; text-align: center;
+        opacity: 0; pointer-events: none;
+        transition: opacity 0.5s ease 1.6s;
+      }
+      #spl-texto.visivel { opacity: 1; }
+      .spl-txt-angatuba {
+        font-family: 'Syne', sans-serif;
+        font-size: 2rem; font-weight: 800; color: #fff;
+        text-shadow: 0 0 30px rgba(255,55,55,.7), 0 2px 12px rgba(0,0,0,.9);
+      }
+      .spl-txt-cidade {
+        font-size: .65rem; font-weight: 600; letter-spacing: .3em;
+        text-transform: uppercase; color: rgba(255,255,255,.45);
+        margin-top: 4px; text-shadow: 0 1px 6px rgba(0,0,0,.9);
+      }
+      /* Fallback CSS — visível quando vídeo não está cacheado */
+      #spl-fallback {
+        position: relative; z-index: 1;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        transition: opacity 0.3s ease;
+      }
+      #spl-fallback.oculto { opacity: 0; pointer-events: none; }
+      .spl-owl {
+        width: 88px; height: 88px; border-radius: 50%; margin-bottom: 20px;
+        animation: spl-pulsa 1.9s ease-in-out infinite;
+      }
+      @keyframes spl-pulsa {
+        0%,100% { transform:scale(1);    filter:drop-shadow(0 0 10px rgba(255,55,55,.3)); }
+        50%      { transform:scale(1.07); filter:drop-shadow(0 0 24px rgba(255,55,55,.6)); }
+      }
+      .spl-logo {
+        font-family: 'Syne', sans-serif; font-size: 2.2rem;
+        font-weight: 800; color: #fff; letter-spacing: -.02em; line-height: 1; margin-bottom: 5px;
+      }
+      .spl-logo span { color: #ff3737; }
+      .spl-cidade-fb {
+        font-size: .68rem; font-weight: 600; color: rgba(255,255,255,.32);
+        letter-spacing: .28em; text-transform: uppercase; margin-bottom: 36px;
+      }
+      .spl-dots { display: flex; gap: 7px; }
+      .spl-dot {
+        width: 7px; height: 7px; border-radius: 50%; background: #ff3737;
+        animation: spl-dot 1.15s ease-in-out infinite;
+      }
+      .spl-dot:nth-child(2) { animation-delay: .19s; }
+      .spl-dot:nth-child(3) { animation-delay: .38s; }
+      @keyframes spl-dot {
+        0%,80%,100% { opacity:.2; transform:scale(.75); }
+        40%          { opacity:1;  transform:scale(1.35); }
+      }
+    </style>
+
+    <!-- Vídeo da coruja (toca apenas quando já está cacheado) -->
+    <video id="spl-video" autoplay muted playsinline preload="auto">
+      <source src="/webp/splash-anim.webm" type="video/webm" />
+    </video>
+
+    <!-- "Angatuba" aparece junto com o letreiro ON do vídeo (~1.6s) -->
+    <div id="spl-texto">
+      <div class="spl-txt-angatuba">Angatuba</div>
+      <div class="spl-txt-cidade">Angatuba · SP</div>
+    </div>
+
+    <!-- Fallback: coruja animada por CSS (primeira vez, sem cache) -->
+    <div id="spl-fallback">
+      <img src="/webp/owl-badge.webp" alt="" class="spl-owl" />
+      <div class="spl-logo">Angatuba<span>ON</span></div>
+      <div class="spl-cidade-fb">Angatuba · SP</div>
+      <div class="spl-dots">
+        <div class="spl-dot"></div>
+        <div class="spl-dot"></div>
+        <div class="spl-dot"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ TOAST ══ -->
   <div id="toast" role="alert" aria-live="assertive">
     <i class="fa fa-clock-rotate-left toast-icon"></i>
@@ -881,11 +984,18 @@
             <div style="display:flex;gap:8px;margin-top:12px;">
               <button onclick="mlCardapioFecharForm()"
                 style="flex:1;padding:10px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;">Cancelar</button>
-              <button onclick="mlCardapioSalvar()" id="ml-cardapio-salvar-btn"
+              <button onclick="mlCardapioSalvar(false)" id="ml-cardapio-salvar-btn"
                 style="flex:2;padding:10px;border-radius:8px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;">
                 <i class="fa fa-check"></i> Salvar item
               </button>
             </div>
+            <!-- Botão para quem quer cadastrar vários itens seguidos sem reabrir o form -->
+            <button onclick="mlCardapioSalvar(true)" id="ml-cardapio-proximo-btn"
+              style="width:100%;margin-top:6px;padding:9px;border-radius:8px;
+                     background:rgba(16,185,129,0.08);border:1px dashed rgba(16,185,129,0.4);
+                     color:#10b981;font-family:var(--font-h);font-size:11px;font-weight:700;cursor:pointer;">
+              <i class="fa fa-plus"></i> Salvar e adicionar próximo
+            </button>
             <div id="ml-cardapio-form-msg" style="font-size:11px;text-align:center;margin-top:8px;min-height:14px;"></div>
           </div>
         </div>

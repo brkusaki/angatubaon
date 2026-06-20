@@ -78,6 +78,54 @@
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwmJMmvb5H6KkMWdXJV441SQ2h18SEfLrb_4-kvUYM0IiVL6Co-EKGGay7f_qvUEi0_cg/exec';
   const ADMIN_WPP_CONTATO = '5515981125349'; // número único — atualizar aqui se mudar
 
+  /* ══════════════════════════════════════════════════════════════
+     SPLASH SCREEN — vídeo da coruja (cacheado) ou CSS fallback
+     Tempo mínimo: 1.8s. Máximo: 5s (failsafe).
+  ══════════════════════════════════════════════════════════════ */
+  const _splashInicio = Date.now();
+  const _SPLASH_MIN   = 1800;
+  const _SPLASH_MAX   = 5000;
+  let   _splashOculta = false;
+
+  // Inicia lógica do vídeo — só mostra se já estiver no cache (carrega < 400ms)
+  (function _initSplashVideo() {
+    const vid      = document.getElementById('spl-video');
+    const fallback = document.getElementById('spl-fallback');
+    const texto    = document.getElementById('spl-texto');
+    if (!vid) return;
+
+    const t0 = Date.now();
+    vid.addEventListener('canplay', () => {
+      if (Date.now() - t0 > 400) return; // demorou: não estava cacheado, mantém fallback
+      // Vídeo cacheado: troca fallback pelo vídeo
+      if (fallback) fallback.classList.add('oculto');
+      vid.classList.add('pronto');
+      if (texto) texto.classList.add('visivel');
+      vid.play().catch(() => {});
+    }, { once: true });
+
+    // Se o vídeo não estiver disponível, garante que o fallback aparece limpo
+    vid.addEventListener('error', () => {
+      if (fallback) fallback.classList.remove('oculto');
+    }, { once: true });
+  })();
+
+  function _esconderSplash() {
+    if (_splashOculta) return;
+    _splashOculta = true;
+    const decorrido = Date.now() - _splashInicio;
+    const espera    = Math.max(0, _SPLASH_MIN - decorrido);
+    setTimeout(() => {
+      const el = document.getElementById('splash-screen');
+      if (!el) return;
+      el.classList.add('splash-saindo');
+      setTimeout(() => { try { el.remove(); } catch(e) {} }, 650);
+    }, espera);
+  }
+
+  // Failsafe: some em no máximo 5s mesmo se algo travar
+  setTimeout(_esconderSplash, _SPLASH_MAX);
+
   // Lojas fixas (fallback offline / enquanto carrega)
   const LOJAS_FIXAS = []; // migradas para a planilha
 
@@ -2185,14 +2233,17 @@
         _rebuildIdxMap();
         renderLojas();
         renderCategorias();
+        _esconderSplash(); // lojas prontas — desvela o app
         console.log('[AngatubaON] ' + json.data.length + ' da API + ' + fixasSemDuplicata.length + ' fixas ✅');
       } else {
         console.warn('[AngatubaON] API retornou dados vazios — usando fallback');
         _mostrarErroCarregamento(false);
+        _esconderSplash(); // sem dados mas não trava o usuário
       }
     } catch(err) {
       console.warn('[AngatubaON] API indisponível, usando lojas fixas:', err.message);
       _mostrarErroCarregamento(_retryCount < _retryDelays.length);
+      _esconderSplash(); // erro de rede — desvela de qualquer forma
       // Retry com backoff progressivo (máx 3 tentativas)
       if (_retryCount < _retryDelays.length) {
         const delay = _retryDelays[_retryCount++];
@@ -4098,7 +4149,7 @@
 
   window.mlCardapioFotoPreview = mlCardapioFotoPreview;
 
-  async function mlCardapioSalvar() {
+  async function mlCardapioSalvar(manterAberto = false) {
     const nome  = document.getElementById('ml-cardapio-nome').value.trim();
     const preco = document.getElementById('ml-cardapio-preco').value;
     const msgEl = document.getElementById('ml-cardapio-form-msg');
@@ -4112,9 +4163,12 @@
       return;
     }
 
-    const btn = document.getElementById('ml-cardapio-salvar-btn');
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...';
-    btn.disabled  = true;
+    const btn      = document.getElementById('ml-cardapio-salvar-btn');
+    const btnProx  = document.getElementById('ml-cardapio-proximo-btn');
+    const salvarEl = manterAberto ? btnProx : btn;
+    if (btn)      { btn.disabled = true; }
+    if (btnProx)  { btnProx.disabled = true; }
+    if (salvarEl) salvarEl.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...';
 
     try {
       const params = new URLSearchParams();
@@ -4132,16 +4186,31 @@
       const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(15000) });
       const json = await resp.json();
       if (json.status === 'ok') {
-        mlCardapioFecharForm();
+        // Atualiza a lista sem fechar o form quando manterAberto=true
         await mlCardapioCarregar(_cardapioPlano);
-        msgEl.textContent = '';
+
+        if (manterAberto) {
+          // Modo rápido: limpa o form e deixa pronto para o próximo item
+          // Mantém a categoria preenchida para agilizar quando os itens são da mesma categoria
+          const catAtual = document.getElementById('ml-cardapio-cat').value;
+          mlCardapioAbrirForm(null); // reseta form para novo item
+          document.getElementById('ml-cardapio-cat').value = catAtual; // mantém a categoria
+          msgEl.textContent = '✅ Salvo! Preencha o próximo.';
+          msgEl.style.color = 'var(--green)';
+          setTimeout(() => { msgEl.textContent = ''; }, 2500);
+          // Auto-foco no nome para digitação imediata
+          setTimeout(() => document.getElementById('ml-cardapio-nome')?.focus(), 100);
+        } else {
+          mlCardapioFecharForm();
+          msgEl.textContent = '';
+        }
       } else throw new Error(json.msg || 'Erro');
     } catch(e) {
       msgEl.textContent = '❌ ' + e.message;
       msgEl.style.color = 'var(--red)';
     } finally {
-      btn.innerHTML = '<i class="fa fa-check"></i> Salvar item';
-      btn.disabled  = false;
+      if (btn)     { btn.innerHTML = '<i class="fa fa-check"></i> Salvar item'; btn.disabled = false; }
+      if (btnProx) { btnProx.innerHTML = '<i class="fa fa-plus"></i> Salvar e adicionar próximo'; btnProx.disabled = false; }
     }
   }
 

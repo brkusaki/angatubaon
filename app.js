@@ -622,7 +622,7 @@
 
     activePillFilter = 'all';
     document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('.pill-btn[data-filter="all"]')?.classList.add('active');
+
     renderLojas();
   }
 
@@ -709,7 +709,7 @@
     document.querySelectorAll('.cat-icon').forEach(i => i.classList.remove('active'));
     document.querySelector('[data-cat="todos"] .cat-icon')?.classList.add('active');
     document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('.pill-btn[data-filter="all"]')?.classList.add('active');
+
     renderLojas();
   }, 300);
 
@@ -1203,7 +1203,7 @@
     document.querySelectorAll('.cat-icon').forEach(i => i.classList.remove('active'));
     document.querySelector('[data-cat="todos"] .cat-icon')?.classList.add('active');
     document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('.pill-btn[data-filter="all"]')?.classList.add('active');
+
     renderLojas();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
@@ -1876,7 +1876,7 @@
       btn.classList.add('active');
       activePillFilter = btn.dataset.filter;
       activeBairro     = '';
-      document.getElementById('pill-bairro-label').textContent = 'Bairro';
+      document.getElementById('pill-bairro-label').textContent = 'Perto de mim';
       renderLojas();
     });
   });
@@ -1903,7 +1903,7 @@
         limpar.textContent = '✕ Limpar filtro';
         limpar.addEventListener('click', () => {
           activeBairro = '';
-          label.textContent = 'Bairro';
+          label.textContent = 'Perto de mim';
           btn.classList.remove('active');
           dropdown.style.display = 'none';
           search.value = '';

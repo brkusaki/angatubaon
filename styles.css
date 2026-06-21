@@ -20,6 +20,9 @@
       --font-b:   'DM Sans', sans-serif;
       --r-lg:     18px;
       --r-md:     12px;
+      /* FIX 1 — Skeleton tokens adaptáveis ao tema */
+      --sk-base:  #2a2a2a;
+      --sk-shine: #333333;
     }
 
     html { scroll-behavior: smooth; }
@@ -82,7 +85,12 @@
       outline: none; transition: border-color 0.2s;
     }
     .search-wrap input::placeholder { color: var(--muted); font-size: 14px; }
-    .search-wrap input:focus { border-color: rgba(255,255,255,0.25); outline: none; box-shadow: 0 0 0 3px rgba(255,68,68,0.08); }
+    /* FIX 5 — Foco perceptível: border colorida + ring com 14% de opacidade */
+    .search-wrap input:focus {
+      border-color: rgba(255,68,68,0.55);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(255,68,68,0.14);
+    }
     .search-icon {
       position: absolute; left: 14px; top: 50%;
       transform: translateY(-50%); color: var(--muted); font-size: 13px; pointer-events: none;
@@ -97,7 +105,9 @@
     }
     .cat-item {
       display: flex; flex-direction: column; align-items: center;
-      gap: 7px; min-width: 68px; padding: 0;
+      gap: 7px; min-width: 68px; padding: 2px 0;
+      /* FIX 6b — área de toque segura no cat bar */
+      min-height: 44px;
       -webkit-tap-highlight-color: transparent;
     }
     .cat-icon {
@@ -121,19 +131,19 @@
       transition: opacity 0.2s, transform 0.2s;
     }
     .cat-badge.visible { opacity: 1; transform: scale(1); }
-    /* ── Skeleton Categorias ────────────────────────────────── */
+    /* FIX 8b — Skeleton Categorias: variáveis de tema */
     .skeleton-cat {
       display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 68px;
     }
     .skeleton-cat-icon {
       width: 54px; height: 54px; border-radius: 16px;
-      background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+      background: linear-gradient(90deg, var(--sk-base) 25%, var(--sk-shine) 50%, var(--sk-base) 75%);
       background-size: 400px 100%;
       animation: shimmer 1.2s infinite linear;
     }
     .skeleton-cat-label {
       width: 44px; height: 9px; border-radius: 5px;
-      background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+      background: linear-gradient(90deg, var(--sk-base) 25%, var(--sk-shine) 50%, var(--sk-base) 75%);
       background-size: 400px 100%;
       animation: shimmer 1.2s infinite linear;
     }
@@ -178,8 +188,14 @@
     .store-card[data-status="open"]::before   { background: var(--green); }
     .store-card[data-status="zap"]    { border-color: rgba(245,158,11,0.2); }
     .store-card[data-status="zap"]::before    { background: var(--zap); }
-    .store-card[data-status="closed"] { opacity: 0.45; }
-    .store-card[data-status="closed"]::before { background: #444; }
+    /* FIX 2 — fechado: opacity mais alta + dessatura sem escurecer */
+    .store-card[data-status="closed"] { opacity: 0.68; filter: saturate(0.55); }
+    .store-card[data-status="closed"]::before { background: #555; }
+    .store-card[data-status="closed"] .store-thumb { filter: grayscale(45%); }
+    .store-card[data-status="closed"] .store-name  { opacity: 0.85; }
+    /* planos pagos fechados: opacidade ligeiramente menor que o default */
+    .store-card[data-status="closed"].plano-pro  { opacity: 0.60; }
+    .store-card[data-status="closed"].plano-plus { opacity: 0.55; }
 
     .store-thumb {
       width: 58px; height: 58px; min-width: 58px;
@@ -207,13 +223,14 @@
       min-width: 0; flex-wrap: nowrap;
       overflow: hidden; /* garante que badge não estoure o card */
     }
+    /* FIX 3 — Hierarquia de texto: nome mais pesado, sub mais legível */
     .store-name {
-      font-family: var(--font-h); font-size: 0.9rem; font-weight: 700;
+      font-family: var(--font-h); font-size: 0.95rem; font-weight: 800;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      min-width: 0; flex: 1 1 0;
+      min-width: 0; flex: 1 1 0; letter-spacing: -0.01em;
     }
-    .store-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-    .store-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; flex-wrap: nowrap; }
+    .store-sub { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; margin-top: 1px; line-height: 1.3; }
+    .store-row { display: flex; align-items: center; gap: 5px; margin-top: 7px; flex-wrap: nowrap; }
 
     /* badges de status */
     .badge {
@@ -294,7 +311,9 @@
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      padding: 7px 14px;
+      /* FIX 6 — área de toque: 9px vertical → altura ~36px */
+      padding: 9px 14px;
+      min-height: 36px;
       border-radius: 20px;
       font-family: var(--font-b);
       font-size: 12px;
@@ -413,10 +432,21 @@
     /* ════════════════════════════════════════════
        EMPTY STATE
     ════════════════════════════════════════════ */
-    .empty-state { text-align:center; padding:60px 20px 40px; color:var(--muted); display:none; }
-    .empty-state .empty-icon { font-size:2.5rem; margin-bottom:14px; display:block; opacity:0.3; }
-    .empty-state p    { font-size:13px; line-height:1.6; }
-    .empty-state small { font-size:11px; color:#555; margin-top:6px; display:block; }
+    /* FIX 4 — Empty state com hierarquia e botão de ação */
+    .empty-state { text-align:center; padding:48px 24px 40px; color:var(--muted); display:none; }
+    .empty-state .empty-icon { font-size:2.8rem; margin-bottom:16px; display:block; opacity:0.55; }
+    .empty-state .empty-title { font-family: var(--font-h); font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .empty-state p    { font-size:13px; line-height:1.6; margin-bottom: 18px; }
+    .empty-state small { font-size:11px; color:#555; margin-top:4px; display:block; }
+    .empty-action {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 20px; border-radius: 10px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); font-size: 13px; font-weight: 600;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s; font-family: var(--font-b);
+    }
+    .empty-action:active { background: rgba(255,255,255,0.1); transform: scale(0.97); }
 
     /* ════════════════════════════════════════════
        FOOTER
@@ -443,9 +473,15 @@
       display:flex; flex-direction:column; align-items:center;
       gap:3px; font-size:10px; font-weight:500; color:var(--muted);
       min-width:60px; -webkit-tap-highlight-color:transparent;
+      /* FIX 11 — transição suave entre estados */
+      transition: color 0.15s, transform 0.12s;
     }
-    .nav-item i { font-size:1.1rem; display:block; }
+    .nav-item i { font-size:1.1rem; display:block; transition: filter 0.15s; }
     .nav-item.active { color:var(--red); }
+    /* FIX 11b — glow sutil no ícone ativo */
+    .nav-item.active i { filter: drop-shadow(0 0 4px rgba(255,68,68,0.35)); }
+    /* FIX 11c — feedback de toque */
+    .nav-item:active { transform: scale(0.88); will-change: transform; }
 
     /* ════════════════════════════════════════════
        TOAST
@@ -527,12 +563,15 @@
     .modal-title span { color: var(--red); }
     .modal-subtitle { font-size: 12px; color: var(--muted); margin-top: 4px; }
     .modal-close {
-      width: 32px; height: 32px; border-radius: 50%;
+      width: 38px; height: 38px; border-radius: 50%;
       background: var(--surface2); color: var(--muted);
       display: flex; align-items: center; justify-content: center;
       font-size: 14px; flex-shrink: 0; cursor: pointer;
       border: 1px solid var(--border);
+      transition: background 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
     }
+    .modal-close:active { background: rgba(255,255,255,0.1); transform: scale(0.9); }
 
     .modal-body { padding: 20px 20px 0; display: flex; flex-direction: column; gap: 14px; }
 
@@ -720,14 +759,15 @@
       width: 56px; height: 56px;
       border-radius: 14px;
       flex-shrink: 0;
-      background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+      /* FIX 8 — usa variáveis adaptáveis ao tema */
+      background: linear-gradient(90deg, var(--sk-base) 25%, var(--sk-shine) 50%, var(--sk-base) 75%);
       background-size: 400px 100%;
       animation: shimmer 1.2s infinite linear;
     }
     .skeleton-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; }
     .skeleton-line {
       height: 12px; border-radius: 6px;
-      background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+      background: linear-gradient(90deg, var(--sk-base) 25%, var(--sk-shine) 50%, var(--sk-base) 75%);
       background-size: 400px 100%;
       animation: shimmer 1.2s infinite linear;
     }
@@ -1132,6 +1172,20 @@
       box-shadow: 0 1px 6px rgba(99,102,241,0.35);
     }
 
+    /* FIX 10 — badge-gratis: identificação explícita do plano base */
+    .plan-badge.badge-gratis {
+      background: rgba(255,255,255,0.07);
+      color: var(--muted);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: none;
+    }
+
+    /* FIX 10b — card grátis: estilo base neutro sem identidade visual confusa */
+    .store-card.plano-gratis {
+      background: var(--surface);
+      border-color: rgba(255,255,255,0.1);
+    }
+
     /* Pulso dourado sutil no PRO com foto */
     @keyframes pro-pulse {
       0%,100% {
@@ -1174,18 +1228,27 @@
     .detail-sheet::-webkit-scrollbar { display: none; }
     .detail-overlay.open .detail-sheet { transform: translateY(0); }
 
-    /* Capa do modal */
+    /* FIX 9 — Capa do modal: altura unificada para photo e placeholder */
     .detail-cover {
-      width: 100%; height: 200px;
+      width: 100%; height: 180px;
       object-fit: cover; display: block;
       border-radius: 24px 24px 0 0;
       background: var(--surface2);
     }
     .detail-cover-placeholder {
-      width: 100%; height: 160px;
+      width: 100%; height: 180px; /* era 160px — unificado */
       border-radius: 24px 24px 0 0;
+      background: linear-gradient(135deg, var(--surface2) 0%, var(--surface) 100%);
       display: flex; align-items: center; justify-content: center;
-      font-size: 4rem;
+      font-size: 3.5rem;
+    }
+    /* Skeleton de capa enquanto imagem carrega */
+    .detail-cover-skeleton {
+      width: 100%; height: 180px;
+      border-radius: 24px 24px 0 0;
+      background: linear-gradient(90deg, var(--sk-base) 25%, var(--sk-shine) 50%, var(--sk-base) 75%);
+      background-size: 400px 100%;
+      animation: shimmer 1.2s infinite linear;
     }
     /* Gradiente sobre a capa para o handle ficar legível */
     .detail-cover-wrap {
@@ -1212,13 +1275,22 @@
       position: absolute; left: 50%; transform: translateX(-50%);
       top: 10px;
     }
+    /* FIX 7 — botão fechar modal: área de toque maior + feedback de toque */
     .detail-close {
-      width: 32px; height: 32px; border-radius: 50%;
-      background: rgba(0,0,0,0.5); color: #fff;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #fff;
       display: flex; align-items: center; justify-content: center;
-      font-size: 14px; cursor: pointer; border: none;
-      backdrop-filter: blur(4px);
+      font-size: 15px; cursor: pointer;
+      backdrop-filter: blur(6px);
+      transition: background 0.15s, transform 0.1s;
       margin-left: auto;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .detail-close:active {
+      background: rgba(0,0,0,0.82);
+      transform: scale(0.9);
     }
 
     /* Conteúdo textual */
@@ -1437,8 +1509,15 @@
     }
     .cc-item-info { flex: 1; min-width: 0; }
     .cc-item-nome { font-family: var(--font-h); font-size: 13px; font-weight: 800; }
-    .cc-item-desc { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4;
-                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* FIX 12 — descrição do cardápio: 2 linhas com clamp em vez de 1 linha truncada */
+    .cc-item-desc {
+      font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      white-space: normal;
+    }
     .cc-item-preco { font-family: var(--font-h); font-size: 13px; font-weight: 800; color: var(--green); margin-top: 4px; }
 
     .cc-item-add {
@@ -1490,6 +1569,9 @@
       --border:   rgba(0,0,0,0.09);
       --text:     #111111;
       --muted:    #888888;
+      /* FIX 1b — skeleton tokens adaptados ao light mode */
+      --sk-base:  #e0e0e0;
+      --sk-shine: #ebebeb;
     }
     body.light-mode .header       { background: rgba(255,255,255,0.72); }
     body.light-mode .filter-pills { background: transparent; }
@@ -1517,6 +1599,11 @@
     body.light-mode .sw-update-banner { background: var(--surface2); }
     body.light-mode .bairro-dropdown  { background: var(--surface); border-color: var(--border); }
     body.light-mode .footer { background: var(--bg); }
+    /* FIX 5c — Light mode: foco do search com contraste adequado */
+    body.light-mode .search-wrap input:focus {
+      border-color: rgba(200,40,40,0.6);
+      box-shadow: 0 0 0 3px rgba(200,40,40,0.1);
+    }
 
     /* Botão de tema no header */
     .theme-toggle-btn {

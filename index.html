@@ -218,8 +218,12 @@
       <div class="store-list" id="store-list"></div>
       <div class="empty-state" id="empty-state">
         <span class="empty-icon" id="empty-icon">🔍</span>
-        <p id="empty-msg" style="font-weight:600; margin-bottom:4px;">Nenhuma loja encontrada.</p>
+        <div class="empty-title" id="empty-title">Nenhuma loja encontrada</div>
+        <p id="empty-msg" style="margin-bottom:4px;">Tente outro termo ou selecione outra categoria.</p>
         <small id="empty-sub">Tente outro termo ou selecione outra categoria.</small>
+        <button class="empty-action" id="empty-action-btn" onclick="limparFiltros()">
+          <i class="ti ti-refresh" aria-hidden="true"></i> Ver todas as lojas
+        </button>
       </div>
     </section>
 
@@ -1360,5 +1364,17 @@
   </style>
 
   <script src="/app.js"></script>
-</body>
+  <script>
+    /* FIX 4 — Botão do empty state: limpa busca + filtros e re-renderiza */
+    window.limparFiltros = function() {
+      const searchEl = document.getElementById('main-search');
+      if (searchEl) searchEl.value = '';
+      document.querySelectorAll('.cat-icon').forEach(i => i.classList.remove('active'));
+      const todosBtn = document.querySelector('[data-cat="todos"] .cat-icon');
+      if (todosBtn) todosBtn.classList.add('active');
+      document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+      /* dispara o evento de input para o handleSearch do app.js reagir */
+      if (searchEl) searchEl.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+  </script>
 </html>

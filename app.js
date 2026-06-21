@@ -3802,20 +3802,24 @@
 
   // Inicializa drag de reposicionamento da capa no painel (chamado após foto ser exibida)
   let _mlCapaDragInited = false;
-  function mlInitCapaDrag(mostrarHint) {
+  let _mlCapaDragAtivo  = false; // só true após upload de foto na sessão
+
+  function mlInitCapaDrag(foiUpload) {
     const capaWrap = document.getElementById('ml-up-capa-wrap');
     const capaImg  = document.getElementById('ml-up-foto-preview');
     const dragHint = document.getElementById('ml-up-capa-drag-hint');
     if (!capaWrap || !capaImg) return;
 
-    // Atualiza cursor se já há foto
-    if (capaImg.style.display !== 'none') {
+    if (foiUpload) {
+      // Foto nova upada: libera drag e mostra hint
+      _mlCapaDragAtivo = true;
       capaWrap.style.cursor = 'grab';
-      if (mostrarHint && dragHint) {
+      if (dragHint) {
         dragHint.style.display = 'block';
         setTimeout(() => { dragHint.style.display = 'none'; }, 3000);
       }
     }
+    // Foto existente (foiUpload=false): não ativa drag, não muda cursor
 
     if (_mlCapaDragInited) return;
     _mlCapaDragInited = true;
@@ -3826,12 +3830,12 @@
 
     function applyPos() {
       capaImg.style.objectPosition = `${posX}% ${posY}%`;
-      // Replica no hero do painel para feedback em tempo real
       const heroImg = document.getElementById('ml-hero-img');
       if (heroImg) heroImg.style.objectPosition = `${posX}% ${posY}%`;
     }
 
     function onStart(cx, cy) {
+      if (!_mlCapaDragAtivo) return; // drag bloqueado até fazer upload
       if (capaImg.style.display === 'none') return;
       dragging = true; startX = cx; startY = cy;
       capaWrap.style.cursor = 'grabbing';
@@ -3844,7 +3848,11 @@
       startX = cx; startY = cy;
       applyPos();
     }
-    function onEnd() { dragging = false; capaWrap.style.cursor = capaImg.style.display !== 'none' ? 'grab' : 'default'; }
+    function onEnd() {
+      if (!dragging) return;
+      dragging = false;
+      capaWrap.style.cursor = _mlCapaDragAtivo ? 'grab' : 'default';
+    }
 
     capaWrap.addEventListener('mousedown', e => { if (!e.target.closest('label')) { e.preventDefault(); onStart(e.clientX, e.clientY); } });
     window.addEventListener('mousemove',  e => onMove(e.clientX, e.clientY));

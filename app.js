@@ -214,17 +214,22 @@
     // Override manual do dono da loja (campo statusLoja)
     if (loja.statusLoja === 'ABERTO')   return { status: 'open',   fechaStr: '' };
     if (loja.statusLoja === 'VOLTAMOS') return { status: 'zap',    fechaStr: '' };
-    // FECHADO é temporário: expira quando chega o próximo horário de abertura automático.
-    // Se o horário indicar que deveria estar aberto agora, ignora o override.
-    if (loja.statusLoja === 'FECHADO') {
-      // Sem horário cadastrado → fechado permanente (seguro)
-      if (!loja.horario) return { status: 'closed', fechaStr: '' };
-      // Verifica se o horário automático diria "aberto" agora
-      const _lojaSemOverride = Object.assign({}, loja, { statusLoja: '' });
-      const _auto = calcStatusInfo(_lojaSemOverride);
-      if (_auto.status === 'open') return _auto; // horário chegou → volta ao automático
-      return { status: 'closed', fechaStr: _auto.fechaStr }; // ainda fechado → mantém override
+
+    // Ja voltamos com prazo: VOLTAMOS_ATE_YYYY-MM-DD_HHMM
+    if ((loja.statusLoja || '').startsWith('VOLTAMOS_ATE_')) {
+      const raw = loja.statusLoja.replace('VOLTAMOS_ATE_', '');
+      if (raw.includes('_')) {
+        const parts = raw.split('_');
+        const hhmm  = parts[1];
+        const hh = parseInt(hhmm.substring(0, 2));
+        const mm = parseInt(hhmm.substring(2, 4));
+        const ateDate = new Date(parts[0] + 'T' + String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0') + ':00');
+        if (new Date() < ateDate) return { status: 'zap', fechaStr: '' };
+      }
+      // Expirou - cai no automatico abaixo
     }
+
+    if (loja.statusLoja === 'FECHADO')  return { status: 'closed', fechaStr: '' };
 
     // Aberto com horário manual: ABERTO_ATE_YYYY-MM-DD_HHMM (ou legado HHMM)
     if ((loja.statusLoja || '').startsWith('ABERTO_ATE_')) {
@@ -1816,25 +1821,48 @@
   /* ── Toggle de status manual ─────────────────────────────── */
   function marcarToggle(status) {
     document.querySelectorAll('.toggle-status-btn').forEach(btn => {
-      const isActive = btn.dataset.status === status;
+      const isActive = btn.dataset.status === status ||
+                       (btn.dataset.status === 'ABERTO'   && (status || '').startsWith('ABERTO_ATE_')) ||
+                       (btn.dataset.status === 'VOLTAMOS' && (status || '').startsWith('VOLTAMOS_ATE_'));
       btn.style.opacity    = isActive ? '1' : '0.45';
       btn.style.fontWeight = isActive ? '800' : '600';
       btn.style.boxShadow  = isActive ? '0 0 0 2px currentColor inset' : '';
+      btn.style.border     = isActive ? '2px solid currentColor' : '';
     });
   }
 
-  // Botão "Aberto" — mostra campo de horário opcional antes de confirmar
+  // Botão "Aberto" e "Já voltamos" — mostra painel de opções antes de confirmar
   function lojaToggleComHorario(status) {
-    const wrap = document.getElementById('ml-aberto-ate-wrap');
-    if (!wrap) { lojaToggle(status); return; }
-    wrap.style.display = '';
-    // Pré-preenche com horário atual + 1h como sugestão
-    const agora = new Date();
-    agora.setHours(agora.getHours() + 1, 0);
-    const hh = String(agora.getHours()).padStart(2,'0');
-    const mm = '00';
-    document.getElementById('ml-aberto-ate-time').value = `${hh}:${mm}`;
-    document.getElementById('ml-aberto-ate-time').focus();
+    const wrapAberto   = document.getElementById('ml-aberto-ate-wrap');
+    const wrapVoltamos = document.getElementById('ml-voltamos-ate-wrap');
+    // Fecha o outro wrap se estiver aberto
+    if (status === 'ABERTO') {
+      if (wrapVoltamos) wrapVoltamos.style.display = 'none';
+      if (!wrapAberto) { lojaToggle(status); return; }
+      wrapAberto.style.display = '';
+      const agora = new Date();
+      agora.setHours(agora.getHours() + 1, 0);
+      const hh = String(agora.getHours()).padStart(2,'0');
+      document.getElementById('ml-aberto-ate-time').value = `${hh}:00`;
+      document.getElementById('ml-aberto-ate-time').focus();
+    } else if (status === 'VOLTAMOS') {
+      if (wrapAberto) wrapAberto.style.display = 'none';
+      if (!wrapVoltamos) { lojaToggle(status); return; }
+      wrapVoltamos.style.display = '';
+    }
+  }
+
+  // Confirma "Já voltamos" com prazo em minutos (0 = sem previsão)
+  async function lojaToggleVoltamos(minutos) {
+    document.getElementById('ml-voltamos-ate-wrap').style.display = 'none';
+    if (!minutos) { await lojaToggle('VOLTAMOS'); return; }
+    const ate = new Date(Date.now() + minutos * 60000);
+    const yyyy = ate.getFullYear();
+    const mm   = String(ate.getMonth() + 1).padStart(2, '0');
+    const dd   = String(ate.getDate()).padStart(2, '0');
+    const hh   = String(ate.getHours()).padStart(2, '0');
+    const min  = String(ate.getMinutes()).padStart(2, '0');
+    await lojaToggle(`VOLTAMOS_ATE_${yyyy}-${mm}-${dd}_${hh}${min}`);
   }
 
   // Confirma "Aberto" com horário personalizado
@@ -1852,13 +1880,16 @@
 
   window.lojaToggleComHorario = lojaToggleComHorario;
   window.lojaToggleAberto     = lojaToggleAberto;
+  window.lojaToggleVoltamos   = lojaToggleVoltamos;
 
   async function lojaToggle(novoStatus) {
     if (!_lojaToken) return;
     marcarToggle(novoStatus); // feedback imediato
-    // Esconde o campo "aberto até" se estiver visível
+    // Esconde os painéis de opções se estiverem visíveis
     const wrap = document.getElementById('ml-aberto-ate-wrap');
     if (wrap) wrap.style.display = 'none';
+    const wrapV = document.getElementById('ml-voltamos-ate-wrap');
+    if (wrapV) wrapV.style.display = 'none';
 
     // Atualiza cache do localStorage para que próxima abertura mostre status correto
     try {

@@ -833,7 +833,7 @@
             <button class="toggle-status-btn" data-status="VOLTAMOS"
               style="flex:1;padding:10px 4px;border-radius:10px;font-size:11px;font-weight:700;
                      border:2px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.08);color:var(--zap);"
-              onclick="lojaToggle('VOLTAMOS')">
+              onclick="lojaToggleComHorario('VOLTAMOS')">
               <i class="fa fa-clock" style="font-size:8px;"></i><br>Já voltamos
             </button>
             <button class="toggle-status-btn" data-status="FECHADO"
@@ -863,7 +863,21 @@
               <button onclick="lojaToggle('ABERTO')"
                 style="padding:8px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--border);
                        color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;">
-                Sem horário
+                Horário normal
+              </button>
+            </div>
+          </div>
+
+          <!-- Mini modal "volta em x horas" -->
+          <div id="ml-voltamos-ate-wrap" style="display:none;margin-top:10px;padding:10px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.25);border-radius:10px;">
+            <div style="font-size:11px;color:var(--zap);font-weight:700;margin-bottom:8px;">⏰ Volta em quanto tempo? <span style="font-size:10px;color:var(--muted);font-weight:400;">(opcional)</span></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+              <button onclick="lojaToggleVoltamos(30)"  style="padding:6px 10px;border-radius:7px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:var(--zap);font-size:11px;font-weight:700;cursor:pointer;">30 min</button>
+              <button onclick="lojaToggleVoltamos(60)"  style="padding:6px 10px;border-radius:7px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:var(--zap);font-size:11px;font-weight:700;cursor:pointer;">1 hora</button>
+              <button onclick="lojaToggleVoltamos(120)" style="padding:6px 10px;border-radius:7px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:var(--zap);font-size:11px;font-weight:700;cursor:pointer;">2 horas</button>
+              <button onclick="lojaToggleVoltamos(0)"
+                style="padding:6px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;">
+                Sem previsão
               </button>
             </div>
           </div>

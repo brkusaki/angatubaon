@@ -2622,7 +2622,7 @@
     }
 
     // ── BOTÃO CARDÁPIO ────────────────────────────────────────
-    const temCardapio = loja.cardapio && loja.cardapio.length > 0;
+    const temCardapio = (isPro || isPlus) && loja.cardapio && loja.cardapio.length > 0;
 
     // Label e emoji dinâmico por categoria
     const _cat = (loja.categoria || '').toLowerCase();

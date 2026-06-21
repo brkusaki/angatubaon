@@ -1105,34 +1105,74 @@
             ⚙️ Configurações da loja
           </div>
 
-          <!-- Upload de imagens -->
+          <!-- Upload de imagens — preview card com drag na capa -->
           <div id="ml-upload-section" style="display:none;margin-bottom:12px;">
             <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:8px;">📸 Imagens</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-              <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
-                <div style="font-size:9px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;">Logo / Avatar</div>
-                <div id="ml-up-logo-preview" style="width:44px;height:44px;border-radius:8px;background:var(--surface2);border:1px dashed var(--border);margin:0 auto 6px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
-                  <i class="fa fa-image" style="color:var(--muted);"></i>
-                </div>
-                <label style="display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);font-size:9px;font-weight:700;cursor:pointer;color:var(--text);">
-                  <i class="fa fa-upload" style="font-size:8px;"></i> Trocar
-                  <input type="file" accept="image/*" id="ml-up-logo-file" style="display:none;" onchange="mlUploadImagem('logo',this)">
+
+            <!-- Preview card unificado -->
+            <div style="border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--surface);position:relative;margin-bottom:8px;">
+              <!-- Capa arrastável -->
+              <div id="ml-up-capa-wrap" style="
+                width:100%;height:110px;background:var(--surface2);
+                display:flex;align-items:center;justify-content:center;
+                position:relative;overflow:hidden;touch-action:none;cursor:default;
+              ">
+                <i id="ml-up-capa-placeholder" class="fa fa-image" style="font-size:2rem;color:var(--border);pointer-events:none;"></i>
+                <img id="ml-up-foto-preview" src="" alt="" style="
+                  display:none;position:absolute;inset:0;width:100%;height:100%;
+                  object-fit:cover;object-position:50% 50%;
+                  user-select:none;-webkit-user-select:none;pointer-events:none;
+                "/>
+                <!-- hint de arrastar -->
+                <div id="ml-up-capa-drag-hint" style="
+                  display:none;position:absolute;top:6px;left:50%;transform:translateX(-50%);
+                  background:rgba(0,0,0,0.6);color:#fff;font-size:9px;font-weight:600;
+                  padding:3px 9px;border-radius:20px;white-space:nowrap;
+                  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:none;
+                ">✥ Arraste para reposicionar</div>
+                <!-- botão trocar capa -->
+                <label for="ml-up-foto-file" style="
+                  position:absolute;bottom:7px;right:7px;
+                  background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.15);
+                  border-radius:7px;padding:4px 8px;cursor:pointer;
+                  display:flex;align-items:center;gap:4px;
+                  font-size:9px;font-weight:700;color:#fff;
+                  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:2;
+                ">
+                  <i class="fa fa-camera"></i> Trocar capa
                 </label>
-                <div id="ml-up-logo-status" style="font-size:9px;color:var(--muted);margin-top:4px;min-height:12px;"></div>
+                <input type="file" accept="image/*" id="ml-up-foto-file" style="display:none;" onchange="mlUploadImagem('foto',this)">
               </div>
-              <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
-                <div style="font-size:9px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;">Foto de Capa</div>
-                <div id="ml-up-foto-preview" style="width:44px;height:44px;border-radius:8px;background:var(--surface2);border:1px dashed var(--border);margin:0 auto 6px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
-                  <i class="fa fa-image" style="color:var(--muted);"></i>
+
+              <!-- Rodapé: logo + status de erros -->
+              <div style="padding:8px 10px;display:flex;align-items:center;gap:8px;">
+                <!-- Logo clicável -->
+                <div style="position:relative;flex-shrink:0;">
+                  <div id="ml-up-logo-preview" style="
+                    width:40px;height:40px;border-radius:8px;
+                    background:var(--surface2);border:1.5px solid var(--border);
+                    display:flex;align-items:center;justify-content:center;overflow:hidden;
+                  ">
+                    <i class="fa fa-image" style="color:var(--muted);font-size:1rem;"></i>
+                  </div>
+                  <label for="ml-up-logo-file" style="
+                    position:absolute;inset:0;cursor:pointer;border-radius:8px;
+                    background:rgba(0,0,0,0);display:flex;align-items:flex-end;justify-content:flex-end;
+                  " title="Trocar logo"></label>
+                  <input type="file" accept="image/*" id="ml-up-logo-file" style="display:none;" onchange="mlUploadImagem('logo',this)">
+                  <!-- ícone câmera sobre a logo -->
+                  <div style="position:absolute;bottom:-3px;right:-3px;background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+                    <i class="fa fa-camera" style="font-size:7px;color:var(--muted);"></i>
+                  </div>
                 </div>
-                <label style="display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);font-size:9px;font-weight:700;cursor:pointer;color:var(--text);">
-                  <i class="fa fa-upload" style="font-size:8px;"></i> Trocar
-                  <input type="file" accept="image/*" id="ml-up-foto-file" style="display:none;" onchange="mlUploadImagem('foto',this)">
-                </label>
-                <div id="ml-up-foto-status" style="font-size:9px;color:var(--muted);margin-top:4px;min-height:12px;"></div>
+                <div style="flex:1;min-width:0;">
+                  <div id="ml-up-logo-status" style="font-size:9px;color:var(--muted);min-height:12px;"></div>
+                  <div id="ml-up-foto-status" style="font-size:9px;color:var(--muted);min-height:12px;"></div>
+                </div>
               </div>
             </div>
-            <div style="font-size:9px;color:var(--muted);margin-top:6px;text-align:center;">Máx 5MB · JPG, PNG ou WebP</div>
+
+            <div style="font-size:9px;color:var(--muted);text-align:center;">Máx 5MB · JPG, PNG ou WebP</div>
           </div>
 
           <!-- Compartilhar -->

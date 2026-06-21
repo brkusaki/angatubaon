@@ -3779,22 +3779,97 @@
   /* ══════════════════════════════════════════════════════════════
      UPLOAD DE IMAGENS — painel Minha Loja
   ══════════════════════════════════════════════════════════════ */
+  // Atualiza preview da logo ou da capa na seção de configurações
   function mlSetPreviewUpload(tipo, url) {
-    const previewEl = document.getElementById(`ml-up-${tipo}-preview`);
-    if (!previewEl || !url) return;
-    previewEl.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;" onerror="this.parentElement.innerHTML='<i class=\\'fa fa-image\\' style=\\'color:var(--muted);font-size:1.2rem;\\'></i>'" />`;
+    if (!url) return;
+    if (tipo === 'logo') {
+      const previewEl = document.getElementById('ml-up-logo-preview');
+      if (previewEl) previewEl.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:7px;" onerror="this.parentElement.innerHTML='<i class=\\'fa fa-image\\' style=\\'color:var(--muted);font-size:1rem;\\'></i>'" />`;
+    } else {
+      const img = document.getElementById('ml-up-foto-preview');
+      const ph  = document.getElementById('ml-up-capa-placeholder');
+      if (img) { img.src = url; img.style.display = ''; }
+      if (ph)  ph.style.display = 'none';
+      mlInitCapaDrag(); // ativa drag após carregar imagem existente
+    }
+  }
+
+  // Inicializa drag de reposicionamento da capa no painel (chamado após foto ser exibida)
+  let _mlCapaDragInited = false;
+  function mlInitCapaDrag() {
+    if (_mlCapaDragInited) return;
+    const capaWrap = document.getElementById('ml-up-capa-wrap');
+    const capaImg  = document.getElementById('ml-up-foto-preview');
+    const dragHint = document.getElementById('ml-up-capa-drag-hint');
+    if (!capaWrap || !capaImg) return;
+    _mlCapaDragInited = true;
+
+    let dragging = false;
+    let startX = 0, startY = 0;
+    let posX = 50, posY = 50;
+
+    function applyPos() {
+      capaImg.style.objectPosition = `${posX}% ${posY}%`;
+      // Replica no hero do painel para feedback em tempo real
+      const heroImg = document.getElementById('ml-hero-img');
+      if (heroImg) heroImg.style.objectPosition = `${posX}% ${posY}%`;
+    }
+
+    function onStart(cx, cy) {
+      if (capaImg.style.display === 'none') return;
+      dragging = true; startX = cx; startY = cy;
+      capaWrap.style.cursor = 'grabbing';
+      if (dragHint) dragHint.style.display = 'none';
+    }
+    function onMove(cx, cy) {
+      if (!dragging) return;
+      posX = Math.min(100, Math.max(0, posX - (cx - startX) * 0.3));
+      posY = Math.min(100, Math.max(0, posY - (cy - startY) * 0.3));
+      startX = cx; startY = cy;
+      applyPos();
+    }
+    function onEnd() { dragging = false; capaWrap.style.cursor = 'grab'; }
+
+    capaWrap.addEventListener('mousedown', e => { if (!e.target.closest('label')) { e.preventDefault(); onStart(e.clientX, e.clientY); } });
+    window.addEventListener('mousemove',  e => onMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup',    onEnd);
+    capaWrap.addEventListener('touchstart', e => { if (!e.target.closest('label')) { const t=e.touches[0]; onStart(t.clientX, t.clientY); } }, { passive: true });
+    capaWrap.addEventListener('touchmove',  e => { if (!dragging) return; e.preventDefault(); const t=e.touches[0]; onMove(t.clientX, t.clientY); }, { passive: false });
+    capaWrap.addEventListener('touchend', onEnd);
+
+    // Ativa cursor grab e hint quando há imagem
+    new MutationObserver(() => {
+      if (capaImg.style.display !== 'none') {
+        capaWrap.style.cursor = 'grab';
+        if (dragHint) { dragHint.style.display = 'block'; setTimeout(() => { dragHint.style.display = 'none'; }, 3000); }
+      }
+    }).observe(capaImg, { attributes: true, attributeFilter: ['style'] });
+
+    // Se já tem imagem visível ao inicializar
+    if (capaImg.style.display !== 'none') {
+      capaWrap.style.cursor = 'grab';
+      if (dragHint) { dragHint.style.display = 'block'; setTimeout(() => { dragHint.style.display = 'none'; }, 3000); }
+    }
   }
 
   async function mlUploadImagem(tipo, input) {
     const file = input.files[0];
     if (!file) return;
     const statusEl = document.getElementById(`ml-up-${tipo}-status`);
-    const previewEl = document.getElementById(`ml-up-${tipo}-preview`);
 
     // Preview local imediato
     const reader = new FileReader();
     reader.onload = e => {
-      previewEl.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;" />`;
+      if (tipo === 'logo') {
+        const previewEl = document.getElementById('ml-up-logo-preview');
+        if (previewEl) previewEl.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:7px;" />`;
+      } else {
+        const img = document.getElementById('ml-up-foto-preview');
+        const ph  = document.getElementById('ml-up-capa-placeholder');
+        if (img) { img.src = e.target.result; img.style.display = ''; }
+        if (ph)  ph.style.display = 'none';
+        mlInitCapaDrag();
+      }
     };
     reader.readAsDataURL(file);
 
@@ -3808,11 +3883,10 @@
     statusEl.style.color = 'var(--muted)';
 
     try {
-      // Usa proxy via Apps Script — chave ImgBB nunca exposta no JS
       const url = await uploadImagem(file, statusEl);
       if (!url) return; // uploadImagem já exibiu erro no statusEl
 
-      // Envia URL para o servidor salvar na planilha
+      // Salva URL na planilha
       const campo = tipo === 'logo' ? 'logoUrl' : 'fotoUrl';
       const params = new URLSearchParams();
       params.append('payload', JSON.stringify({
@@ -3823,12 +3897,15 @@
       }));
       const saveResp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
       const saveJson = await saveResp.json();
-      if (saveJson.status !== 'ok') throw new Error(saveJson.msg || 'Erro ao salvar na planilha');
+      if (saveJson.status !== 'ok') throw new Error(saveJson.msg || 'Erro ao salvar');
 
       // Atualiza hero/logo no painel imediatamente
       if (tipo === 'foto') {
         const heroImg = document.getElementById('ml-hero-img');
         if (heroImg) { heroImg.src = url; heroImg.style.display = ''; }
+        // Reseta o drag para usar a nova imagem do zero
+        _mlCapaDragInited = false;
+        mlInitCapaDrag();
       } else {
         const logoImg = document.getElementById('ml-logo-img');
         const emojiEl = document.getElementById('ml-emoji');
@@ -3836,9 +3913,11 @@
         if (emojiEl) emojiEl.style.display = 'none';
       }
 
+      statusEl.textContent = '✅ Salvo!';
+      statusEl.style.color = 'var(--green)';
       setTimeout(() => { statusEl.textContent = ''; }, 3000);
     } catch(e) {
-      statusEl.textContent = '❌ Erro: ' + e.message;
+      statusEl.textContent = '❌ ' + e.message;
       statusEl.style.color = 'var(--red)';
     }
   }

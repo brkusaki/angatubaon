@@ -1820,6 +1820,11 @@
 
   /* ── Toggle de status manual ─────────────────────────────── */
   function marcarToggle(status) {
+    const BORDERS = {
+      'ABERTO':   '2px solid rgba(0,208,132,0.3)',
+      'VOLTAMOS': '2px solid rgba(245,158,11,0.3)',
+      'FECHADO':  '2px solid rgba(255,68,68,0.3)',
+    };
     document.querySelectorAll('.toggle-status-btn').forEach(btn => {
       const isActive = btn.dataset.status === status ||
                        (btn.dataset.status === 'ABERTO'   && (status || '').startsWith('ABERTO_ATE_')) ||
@@ -1827,7 +1832,7 @@
       btn.style.opacity    = isActive ? '1' : '0.45';
       btn.style.fontWeight = isActive ? '800' : '600';
       btn.style.boxShadow  = isActive ? '0 0 0 2px currentColor inset' : '';
-      btn.style.border     = isActive ? '2px solid currentColor' : '';
+      btn.style.border     = isActive ? '2px solid currentColor' : (BORDERS[btn.dataset.status] || '');
     });
   }
 

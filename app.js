@@ -214,7 +214,17 @@
     // Override manual do dono da loja (campo statusLoja)
     if (loja.statusLoja === 'ABERTO')   return { status: 'open',   fechaStr: '' };
     if (loja.statusLoja === 'VOLTAMOS') return { status: 'zap',    fechaStr: '' };
-    if (loja.statusLoja === 'FECHADO')  return { status: 'closed', fechaStr: '' };
+    // FECHADO é temporário: expira quando chega o próximo horário de abertura automático.
+    // Se o horário indicar que deveria estar aberto agora, ignora o override.
+    if (loja.statusLoja === 'FECHADO') {
+      // Sem horário cadastrado → fechado permanente (seguro)
+      if (!loja.horario) return { status: 'closed', fechaStr: '' };
+      // Verifica se o horário automático diria "aberto" agora
+      const _lojaSemOverride = Object.assign({}, loja, { statusLoja: '' });
+      const _auto = calcStatusInfo(_lojaSemOverride);
+      if (_auto.status === 'open') return _auto; // horário chegou → volta ao automático
+      return { status: 'closed', fechaStr: _auto.fechaStr }; // ainda fechado → mantém override
+    }
 
     // Aberto com horário manual: ABERTO_ATE_YYYY-MM-DD_HHMM (ou legado HHMM)
     if ((loja.statusLoja || '').startsWith('ABERTO_ATE_')) {
@@ -2622,7 +2632,7 @@
     }
 
     // ── BOTÃO CARDÁPIO ────────────────────────────────────────
-    const temCardapio = (isPro || isPlus) && loja.cardapio && loja.cardapio.length > 0;
+    const temCardapio = loja.cardapio && loja.cardapio.length > 0;
 
     // Label e emoji dinâmico por categoria
     const _cat = (loja.categoria || '').toLowerCase();

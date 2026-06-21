@@ -358,16 +358,15 @@
 
   /* ── Thumb ───────────────────────────────────────────────── */
   function thumbHTML(loja) {
-    const bg = CAT_BG[loja.categoria] || 'rgba(255,255,255,0.06)';
+    const bg    = CAT_BG[loja.categoria] || 'rgba(255,255,255,0.06)';
+    const isPro = (loja.plano || '').toUpperCase() === 'PRO';
 
-    if (loja.logo && loja.logo.trim()) {
-      // Fallback de extensão: tenta loja.logo; se falhar, troca .png↔.jpg (ou vice-versa)
+    // Logo no card: só PRO
+    if (isPro && loja.logo && loja.logo.trim()) {
       const alt = loja.logo.replace(/\.(png)$/i, '.jpg').replace(/\.(jpg|jpeg)$/i, '.png');
-      return `<div class="store-thumb" style="background:#ffffff; padding:4px; display:flex; align-items:center; justify-content:center; position:relative;">
-        <span style="position:absolute; font-size:1.5rem; z-index:1;">${loja.emoji}</span>
+      return `<div class="store-thumb" style="background:${bg}; overflow:hidden;">
         <img src="${loja.logo}" alt="Logo ${loja.nome}" class="store-logo-img" loading="lazy"
-          style="position:relative; z-index:2; background:#ffffff;"
-          onerror="if(this.src !== '${alt}'){ this.src='${alt}'; } else { this.style.display='none'; }" />
+          onerror="if(this.src !== '${alt}'){ this.src='${alt}'; } else { this.style.display='none'; this.parentElement.textContent='${loja.emoji}'; }" />
       </div>`;
     }
 
@@ -3307,6 +3306,24 @@
         busca:['pizza','pizzaria','pizzaiolo'] },
       { emoji:'🍔', label:'Lanches / Hamburgueria',          slug:'lanches',      grupo:'Alimentação e Bebidas',
         busca:['lanche','hamburger','hamburguer','lanchonete','pastelaria','hot dog','hotdog','sanduiche'] },
+      { emoji:'🍽️', label:'Restaurante / Lanchonete',        slug:'restaurante',  grupo:'Alimentação e Bebidas',
+        busca:['restaurante','lanchonete','refeicao','refeição','almoço','almoco','jantar','comida','self service','buffet','prato feito'] },
+      { emoji:'🍱', label:'Marmitaria / Comida Caseira',          slug:'marmita',      grupo:'Alimentação e Bebidas',
+        busca:['marmita','marmitaria','comida caseira','genova','quentinha','rancho','almoço','almoco','quentinha','porção'] },
+      { emoji:'🎂', label:'Doceria / Confeitaria',                slug:'doceria',      grupo:'Alimentação e Bebidas',
+        busca:['doceria','confeitaria','doce','bolo','brigadeiro','cake','torta','sobremesa','doces finos','bem casado'] },
+      { emoji:'🍦', label:'Sorveteria / Açaí',                    slug:'sorveteria',   grupo:'Alimentação e Bebidas',
+        busca:['sorvete','sorveteria','acai','açaí','gelato','milkshake','shake'] },
+      { emoji:'🥐', label:'Padaria / Pão de Queijo',              slug:'padaria',      grupo:'Alimentação e Bebidas',
+        busca:['padaria','panificadora','pao','pão','panificio','padeiro','cafe da manha','café da manhã'] },
+      { emoji:'☕', label:'Cafeteria / Café',                     slug:'cafeteria',    grupo:'Alimentação e Bebidas',
+        busca:['cafe','café','cafeteria','cappuccino','espresso','coffee','lancheria'] },
+      { emoji:'🍣', label:'Culinária Japonesa / Sushi',           slug:'japonesa',     grupo:'Alimentação e Bebidas',
+        busca:['japones','japonesa','sushi','temaki','hashi','oriental','yakisoba','lamen','ramen'] },
+      { emoji:'🍝', label:'Culinária Italiana / Massas',          slug:'italiana',     grupo:'Alimentação e Bebidas',
+        busca:['italiana','massas','massa','macarrao','macarrão','lasanha','nhoque','ravioli','espaguete','pasta'] },
+      { emoji:'🥗', label:'Alimentação Saudável / Vegano',        slug:'saudavel',     grupo:'Alimentação e Bebidas',
+        busca:['saudavel','saudável','vegano','vegetariano','fit','detox','salada','organico','orgânico','natural'] },
       { emoji:'🍺', label:'Adega / Bebidas',                 slug:'adega',        grupo:'Alimentação e Bebidas',
         busca:['adega','bebida','bar','distribuidora','cerveja','drinks','bebidas'] },
       { emoji:'🥩', label:'Steakhouse / Casa de Carnes',     slug:'carnes',       grupo:'Alimentação e Bebidas',
@@ -3517,7 +3534,7 @@
     function escolher(ramo) {
       if (!ramo) return;
       chosen = ramo;
-      inputEl.value    = ramo._custom ? ramo.slug : `${ramo.emoji}  ${ramo.label}`;
+      inputEl.value    = ramo._custom ? ramo.slug : ramo.label;
       hiddenEl.value   = ramo._custom ? ramo.slug : ramo.slug;
       emojiEl.textContent = ramo._custom ? '' : ramo.emoji;
       okEl.classList.add('show');
@@ -3802,24 +3819,20 @@
 
   // Inicializa drag de reposicionamento da capa no painel (chamado após foto ser exibida)
   let _mlCapaDragInited = false;
-  let _mlCapaDragAtivo  = false; // só true após upload de foto na sessão
-
-  function mlInitCapaDrag(foiUpload) {
+  function mlInitCapaDrag(mostrarHint) {
     const capaWrap = document.getElementById('ml-up-capa-wrap');
     const capaImg  = document.getElementById('ml-up-foto-preview');
     const dragHint = document.getElementById('ml-up-capa-drag-hint');
     if (!capaWrap || !capaImg) return;
 
-    if (foiUpload) {
-      // Foto nova upada: libera drag e mostra hint
-      _mlCapaDragAtivo = true;
+    // Atualiza cursor se já há foto
+    if (capaImg.style.display !== 'none') {
       capaWrap.style.cursor = 'grab';
-      if (dragHint) {
+      if (mostrarHint && dragHint) {
         dragHint.style.display = 'block';
         setTimeout(() => { dragHint.style.display = 'none'; }, 3000);
       }
     }
-    // Foto existente (foiUpload=false): não ativa drag, não muda cursor
 
     if (_mlCapaDragInited) return;
     _mlCapaDragInited = true;
@@ -3830,12 +3843,12 @@
 
     function applyPos() {
       capaImg.style.objectPosition = `${posX}% ${posY}%`;
+      // Replica no hero do painel para feedback em tempo real
       const heroImg = document.getElementById('ml-hero-img');
       if (heroImg) heroImg.style.objectPosition = `${posX}% ${posY}%`;
     }
 
     function onStart(cx, cy) {
-      if (!_mlCapaDragAtivo) return; // drag bloqueado até fazer upload
       if (capaImg.style.display === 'none') return;
       dragging = true; startX = cx; startY = cy;
       capaWrap.style.cursor = 'grabbing';
@@ -3848,11 +3861,7 @@
       startX = cx; startY = cy;
       applyPos();
     }
-    function onEnd() {
-      if (!dragging) return;
-      dragging = false;
-      capaWrap.style.cursor = _mlCapaDragAtivo ? 'grab' : 'default';
-    }
+    function onEnd() { dragging = false; capaWrap.style.cursor = capaImg.style.display !== 'none' ? 'grab' : 'default'; }
 
     capaWrap.addEventListener('mousedown', e => { if (!e.target.closest('label')) { e.preventDefault(); onStart(e.clientX, e.clientY); } });
     window.addEventListener('mousemove',  e => onMove(e.clientX, e.clientY));

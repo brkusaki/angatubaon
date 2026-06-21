@@ -1840,7 +1840,8 @@
   function lojaToggleComHorario(status) {
     const wrapAberto   = document.getElementById('ml-aberto-ate-wrap');
     const wrapVoltamos = document.getElementById('ml-voltamos-ate-wrap');
-    // Fecha o outro wrap se estiver aberto
+    // Feedback visual imediato — marca o botão clicado mesmo antes de confirmar
+    marcarToggle(status);
     if (status === 'ABERTO') {
       if (wrapVoltamos) wrapVoltamos.style.display = 'none';
       if (!wrapAberto) { lojaToggle(status); return; }

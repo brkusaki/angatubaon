@@ -4630,7 +4630,7 @@
     wrap.innerHTML = Object.entries(grupos).map(([cat, itens]) => `
       <div class="cc-cat-label">${escHTML(cat)}</div>
       ${itens.map(item => `
-        <div class="cc-item-card" id="cc-card-${item.id}" style="margin-bottom:8px;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
+        <div class="cc-item-card" id="cc-card-${item.id}" style="margin-bottom:8px;cursor:pointer;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}" onclick="ccCardClick('${item.id}')">
           ${item.foto
             ? `<img src="${item.foto}" class="cc-item-foto" onerror="this.style.display='none'">`
             : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
@@ -4642,13 +4642,19 @@
             ${item.descricao ? `<div class="cc-item-desc">${escHTML(item.descricao)}</div>` : ''}
             <div class="cc-item-preco">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}</div>
           </div>
-          <div class="cc-qty-ctrl" id="cc-qty-${item.id}">
+          <div class="cc-qty-ctrl" id="cc-qty-${item.id}" onclick="event.stopPropagation()">
             <button class="cc-item-add" onclick="ccAdicionarItem('${item.id}')">+</button>
           </div>
         </div>
       `).join('')}
     `).join('');
   }
+
+  // Clique no card inteiro: só adiciona se o item ainda não está no carrinho
+  window.ccCardClick = function(itemId) {
+    if (_ccCarrinho[itemId]) return; // já tem qty — usuário usa os botões −/+
+    ccAdicionarItem(itemId);
+  };
 
   window.ccAdicionarItem = function(itemId) {
     const loja = LOJAS[_ccLojaIdx];

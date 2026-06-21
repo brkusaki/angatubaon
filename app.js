@@ -1619,6 +1619,11 @@
     if (uploadSection) {
       uploadSection.style.display = isPago ? '' : 'none';
       if (isPago) {
+        // Preenche nome/ramo no preview do card
+        const nomePreview = document.getElementById('ml-up-nome-preview');
+        const ramoPreview = document.getElementById('ml-up-ramo-preview');
+        if (nomePreview) nomePreview.textContent = d.nome || '—';
+        if (ramoPreview) ramoPreview.textContent = d.categoria || d.ramo || '—';
         if (fotoUrl) mlSetPreviewUpload('foto', fotoUrl);
         if (logoUrl) mlSetPreviewUpload('logo', logoUrl);
       }
@@ -3784,24 +3789,35 @@
     if (!url) return;
     if (tipo === 'logo') {
       const previewEl = document.getElementById('ml-up-logo-preview');
-      if (previewEl) previewEl.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:7px;" onerror="this.parentElement.innerHTML='<i class=\\'fa fa-image\\' style=\\'color:var(--muted);font-size:1rem;\\'></i>'" />`;
+      if (previewEl) previewEl.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:contain;border-radius:9px;" onerror="this.parentElement.innerHTML='<i class=\\'fa fa-store\\' style=\\'color:var(--border);font-size:1.1rem;\\'></i>'" />`;
     } else {
       const img = document.getElementById('ml-up-foto-preview');
       const ph  = document.getElementById('ml-up-capa-placeholder');
       if (img) { img.src = url; img.style.display = ''; }
       if (ph)  ph.style.display = 'none';
-      mlInitCapaDrag(); // ativa drag após carregar imagem existente
+      // Ativa drag sem mostrar hint (foto já existia, não é nova)
+      mlInitCapaDrag(false);
     }
   }
 
   // Inicializa drag de reposicionamento da capa no painel (chamado após foto ser exibida)
   let _mlCapaDragInited = false;
-  function mlInitCapaDrag() {
-    if (_mlCapaDragInited) return;
+  function mlInitCapaDrag(mostrarHint) {
     const capaWrap = document.getElementById('ml-up-capa-wrap');
     const capaImg  = document.getElementById('ml-up-foto-preview');
     const dragHint = document.getElementById('ml-up-capa-drag-hint');
     if (!capaWrap || !capaImg) return;
+
+    // Atualiza cursor se já há foto
+    if (capaImg.style.display !== 'none') {
+      capaWrap.style.cursor = 'grab';
+      if (mostrarHint && dragHint) {
+        dragHint.style.display = 'block';
+        setTimeout(() => { dragHint.style.display = 'none'; }, 3000);
+      }
+    }
+
+    if (_mlCapaDragInited) return;
     _mlCapaDragInited = true;
 
     let dragging = false;
@@ -3828,7 +3844,7 @@
       startX = cx; startY = cy;
       applyPos();
     }
-    function onEnd() { dragging = false; capaWrap.style.cursor = 'grab'; }
+    function onEnd() { dragging = false; capaWrap.style.cursor = capaImg.style.display !== 'none' ? 'grab' : 'default'; }
 
     capaWrap.addEventListener('mousedown', e => { if (!e.target.closest('label')) { e.preventDefault(); onStart(e.clientX, e.clientY); } });
     window.addEventListener('mousemove',  e => onMove(e.clientX, e.clientY));
@@ -3836,20 +3852,6 @@
     capaWrap.addEventListener('touchstart', e => { if (!e.target.closest('label')) { const t=e.touches[0]; onStart(t.clientX, t.clientY); } }, { passive: true });
     capaWrap.addEventListener('touchmove',  e => { if (!dragging) return; e.preventDefault(); const t=e.touches[0]; onMove(t.clientX, t.clientY); }, { passive: false });
     capaWrap.addEventListener('touchend', onEnd);
-
-    // Ativa cursor grab e hint quando há imagem
-    new MutationObserver(() => {
-      if (capaImg.style.display !== 'none') {
-        capaWrap.style.cursor = 'grab';
-        if (dragHint) { dragHint.style.display = 'block'; setTimeout(() => { dragHint.style.display = 'none'; }, 3000); }
-      }
-    }).observe(capaImg, { attributes: true, attributeFilter: ['style'] });
-
-    // Se já tem imagem visível ao inicializar
-    if (capaImg.style.display !== 'none') {
-      capaWrap.style.cursor = 'grab';
-      if (dragHint) { dragHint.style.display = 'block'; setTimeout(() => { dragHint.style.display = 'none'; }, 3000); }
-    }
   }
 
   async function mlUploadImagem(tipo, input) {
@@ -3862,13 +3864,13 @@
     reader.onload = e => {
       if (tipo === 'logo') {
         const previewEl = document.getElementById('ml-up-logo-preview');
-        if (previewEl) previewEl.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:7px;" />`;
+        if (previewEl) previewEl.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:contain;border-radius:9px;" />`;
       } else {
         const img = document.getElementById('ml-up-foto-preview');
         const ph  = document.getElementById('ml-up-capa-placeholder');
         if (img) { img.src = e.target.result; img.style.display = ''; }
         if (ph)  ph.style.display = 'none';
-        mlInitCapaDrag();
+        mlInitCapaDrag(true); // foto nova — mostrar hint
       }
     };
     reader.readAsDataURL(file);
@@ -3905,7 +3907,7 @@
         if (heroImg) { heroImg.src = url; heroImg.style.display = ''; }
         // Reseta o drag para usar a nova imagem do zero
         _mlCapaDragInited = false;
-        mlInitCapaDrag();
+        mlInitCapaDrag(true);
       } else {
         const logoImg = document.getElementById('ml-logo-img');
         const emojiEl = document.getElementById('ml-emoji');
@@ -4630,7 +4632,7 @@
     wrap.innerHTML = Object.entries(grupos).map(([cat, itens]) => `
       <div class="cc-cat-label">${escHTML(cat)}</div>
       ${itens.map(item => `
-        <div class="cc-item-card" id="cc-card-${item.id}" style="margin-bottom:8px;cursor:pointer;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}" onclick="ccCardClick('${item.id}')">
+        <div class="cc-item-card" id="cc-card-${item.id}" style="margin-bottom:8px;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
           ${item.foto
             ? `<img src="${item.foto}" class="cc-item-foto" onerror="this.style.display='none'">`
             : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
@@ -4642,19 +4644,13 @@
             ${item.descricao ? `<div class="cc-item-desc">${escHTML(item.descricao)}</div>` : ''}
             <div class="cc-item-preco">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}</div>
           </div>
-          <div class="cc-qty-ctrl" id="cc-qty-${item.id}" onclick="event.stopPropagation()">
+          <div class="cc-qty-ctrl" id="cc-qty-${item.id}">
             <button class="cc-item-add" onclick="ccAdicionarItem('${item.id}')">+</button>
           </div>
         </div>
       `).join('')}
     `).join('');
   }
-
-  // Clique no card inteiro: só adiciona se o item ainda não está no carrinho
-  window.ccCardClick = function(itemId) {
-    if (_ccCarrinho[itemId]) return; // já tem qty — usuário usa os botões −/+
-    ccAdicionarItem(itemId);
-  };
 
   window.ccAdicionarItem = function(itemId) {
     const loja = LOJAS[_ccLojaIdx];

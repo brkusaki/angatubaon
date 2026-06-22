@@ -754,6 +754,15 @@
       box-shadow: 0 0 0 1px rgba(245,158,11,0.2) inset, 0 4px 20px rgba(245,158,11,0.18);
     }
 
+
+    /* Dots do carousel inline de planos (etapa 3 do stepper) */
+    .cad-plan-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--border); cursor: pointer; display: inline-block;
+      transition: background 0.2s, width 0.2s;
+    }
+    .cad-plan-dot.active { background: var(--red); width: 18px; border-radius: 3px; }
+
     /* ── Skeleton Loading ───────────────────────────────────── */
     @keyframes shimmer {
       0%   { background-position: -400px 0; }

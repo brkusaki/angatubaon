@@ -1012,6 +1012,50 @@
     if (sheet) sheet.scrollTop = 0;
   }
 
+  /* ── Carousel inline de planos (etapa 3) ─────────────────── */
+  let _cadCarouselIdx = 0;
+  const _CAD_PLANS = ['GRATIS','PLUS','PRO'];
+
+  window.cadCarouselIr = function(idx, animar) {
+    animar = animar !== false;
+    _cadCarouselIdx = Math.max(0, Math.min(idx, 2));
+    const car = document.getElementById('cad-plan-carousel');
+    if (car) {
+      car.style.transition = animar ? 'transform 0.35s cubic-bezier(0.32,0.72,0,1)' : 'none';
+      car.style.transform  = 'translateX(-' + (_cadCarouselIdx * 100) + '%)';
+    }
+    // Dots
+    document.querySelectorAll('.cad-plan-dot').forEach((d, i) => {
+      d.classList.toggle('active', i === _cadCarouselIdx);
+    });
+    // Seleciona o plano correspondente
+    cadSelecionarPlano(_CAD_PLANS[_cadCarouselIdx]);
+  };
+
+  // Swipe touch no carousel inline
+  (function initCadCarouselSwipe() {
+    let sx = 0, sy = 0, dragging = false;
+    function onStart(e) {
+      const t = e.touches ? e.touches[0] : e;
+      sx = t.clientX; sy = t.clientY; dragging = true;
+    }
+    function onEnd(e) {
+      if (!dragging) return; dragging = false;
+      const t = e.changedTouches ? e.changedTouches[0] : e;
+      const dx = t.clientX - sx;
+      const dy = Math.abs(t.clientY - sy);
+      if (Math.abs(dx) > 40 && dy < 60) {
+        cadCarouselIr(_cadCarouselIdx + (dx < 0 ? 1 : -1));
+      }
+    }
+    document.addEventListener('touchstart', function(e) {
+      if (e.target.closest('#cad-carousel-wrap')) onStart(e);
+    }, { passive: true });
+    document.addEventListener('touchend', function(e) {
+      if (dragging) onEnd(e);
+    }, { passive: true });
+  })();
+
   window.cadAvancar = function(etapa) {
     // Validação básica antes de avançar
     if (etapa === 2) {
@@ -1030,6 +1074,8 @@
       if (!wpp?.value.trim() || wpp?.classList.contains('invalid')) { wpp?.focus(); return; }
     }
     cadIrParaEtapa(etapa);
+    // Ao entrar na etapa 3, começa no Plus (melhor conversão)
+    if (etapa === 3) setTimeout(() => cadCarouselIr(1), 50);
   };
   window.cadVoltar = function(etapa) { cadIrParaEtapa(etapa); };
 
@@ -1044,6 +1090,12 @@
       el.classList.toggle('selected', p === plano);
       el.setAttribute('aria-checked', p === plano ? 'true' : 'false');
     });
+    // Sincroniza o carousel inline se o clique veio de fora (ex: botão lock)
+    const cadIdx = ['GRATIS','PLUS','PRO'].indexOf(plano);
+    if (cadIdx >= 0 && cadIdx !== _cadCarouselIdx) {
+      _cadCarouselIdx = cadIdx;
+      cadCarouselIr(cadIdx);
+    }
 
     const isPago = plano !== 'GRATIS';
 

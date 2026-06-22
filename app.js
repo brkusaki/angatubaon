@@ -1036,18 +1036,26 @@
   /* ── Seletor de plano inline (etapa 3) ─────────────────── */
   window.cadSelecionarPlano = function(plano) {
     selectedPlan = plano;
+
+    // Marca o card selecionado (remove de todos, adiciona no escolhido)
     ['GRATIS','PLUS','PRO'].forEach(p => {
-      const btn = document.getElementById('plan-sel-' + p.toLowerCase());
-      if (btn) btn.classList.toggle('active', p === plano);
+      const el = document.getElementById('plan-sel-' + p.toLowerCase());
+      if (!el) return;
+      el.classList.toggle('selected', p === plano);
+      el.setAttribute('aria-checked', p === plano ? 'true' : 'false');
     });
+
     const isPago = plano !== 'GRATIS';
-    // Foto: mostra ou esconde o lock
+
+    // Foto: mostra/esconde o lock overlay
     const lockEl = document.getElementById('foto-lock-overlay');
     if (lockEl) lockEl.classList.toggle('show', !isPago);
-    // Logo-group compat
+
+    // Compat com JS antigo que usava logo-group
     const lgEl = document.getElementById('logo-group');
-    if (lgEl) lgEl.style.display = 'none'; // sempre oculto (unificado no card)
-    // Hint do plano
+    if (lgEl) lgEl.style.display = 'none';
+
+    // Hint do plano selecionado
     const icons = { GRATIS:'🏪', PLUS:'✦', PRO:'⭐' };
     const notas = {
       GRATIS: 'Cadastro gratuito, sem compromisso.',

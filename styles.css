@@ -732,6 +732,28 @@
       -webkit-tap-highlight-color: transparent;
     }
     .modal-submit:active { transform: scale(0.97); opacity: 0.9; }
+
+    /* Cards de plano selecionáveis dentro do stepper de cadastro */
+    .cad-plan-card {
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+      margin-bottom: 10px;
+    }
+    .cad-plan-card:last-of-type { margin-bottom: 0; }
+    /* Estado selecionado — reutiliza .selected já existente nos plan-card */
+    .cad-plan-card.card-gratis.selected {
+      border-color: rgba(255,255,255,0.3);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.1) inset;
+    }
+    .cad-plan-card.card-plus.selected {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 1px rgba(99,102,241,0.2) inset, 0 4px 20px rgba(99,102,241,0.15);
+    }
+    .cad-plan-card.card-pro.selected {
+      border-color: #f59e0b;
+      box-shadow: 0 0 0 1px rgba(245,158,11,0.2) inset, 0 4px 20px rgba(245,158,11,0.18);
+    }
+
     /* ── Skeleton Loading ───────────────────────────────────── */
     @keyframes shimmer {
       0%   { background-position: -400px 0; }

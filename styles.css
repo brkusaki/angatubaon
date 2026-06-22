@@ -755,13 +755,155 @@
     }
 
 
-    /* Dots do carousel inline de planos (etapa 3 do stepper) */
-    .cad-plan-dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: var(--border); cursor: pointer; display: inline-block;
-      transition: background 0.2s, width 0.2s;
+    /* ════════════════════════════════════════════
+       PREVIEW DE BENEFÍCIOS POR PLANO (etapa 3)
+    ════════════════════════════════════════════ */
+    .cad-plan-preview {
+      animation: fadeUp 0.2s ease both;
     }
-    .cad-plan-dot.active { background: var(--red); width: 18px; border-radius: 3px; }
+    .cpp-label {
+      font-size: 10px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    /* Mini card de loja simulado */
+    .cpp-store-card {
+      border-radius: 14px; padding: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      margin-bottom: 10px; overflow: hidden;
+    }
+    .cpp-store-card.cpp-plus {
+      background: linear-gradient(135deg, #141420, #1a1a2e);
+      border-color: rgba(99,102,241,0.4);
+      box-shadow: 0 4px 16px rgba(99,102,241,0.12);
+    }
+    .cpp-store-card.cpp-pro.cpp-has-cover {
+      padding: 0 0 10px;
+      background: linear-gradient(135deg, #1c1a14, #25210f);
+      border-color: rgba(245,158,11,0.4);
+      box-shadow: 0 4px 16px rgba(245,158,11,0.15);
+    }
+    /* Capa do card Pro */
+    .cpp-cover {
+      width: 100%; height: 90px; position: relative;
+      background: linear-gradient(135deg, #2a2010, #1c1a0a);
+      display: flex; align-items: flex-end;
+      padding: 8px 10px; box-sizing: border-box;
+      margin-bottom: 0;
+    }
+    .cpp-cover-gradient {
+      position: absolute; inset: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.65) 100%);
+    }
+    .cpp-cover-logo {
+      position: absolute; top: 8px; left: 10px;
+      width: 36px; height: 36px; border-radius: 9px;
+      background: rgba(245,158,11,0.15);
+      border: 1.5px solid rgba(245,158,11,0.4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; z-index: 1;
+    }
+    .cpp-cover-info {
+      position: relative; z-index: 1;
+      padding-left: 44px; display: flex; flex-direction: column; gap: 2px;
+    }
+    .cpp-cover-nome {
+      font-family: var(--font-h); font-size: 13px; font-weight: 800; color: #fff;
+    }
+    .cpp-cover-sub { font-size: 10px; color: rgba(255,255,255,0.55); }
+
+    /* Layout linha: thumb + info + actions */
+    .cpp-store-card:not(.cpp-has-cover) { display: flex; align-items: center; gap: 10px; }
+    .cpp-thumb {
+      width: 46px; height: 46px; border-radius: 11px;
+      background: var(--surface); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; flex-shrink: 0;
+    }
+    .cpp-thumb.cpp-thumb-foto { background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3); }
+    .cpp-info { flex: 1; min-width: 0; }
+    .cpp-nome { font-family: var(--font-h); font-size: 13px; font-weight: 800; color: var(--text); }
+    .cpp-sub  { font-size: 10px; color: var(--muted); }
+    .cpp-anuncio {
+      font-size: 10px; font-weight: 600; color: var(--zap);
+      background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2);
+      border-radius: 5px; padding: 2px 6px; margin-top: 4px;
+      display: inline-block;
+    }
+    .cpp-anuncio-pro { display: block; font-size: 10px; }
+    .cpp-badges { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+    .cpp-badge {
+      font-size: 9px; font-weight: 700; padding: 2px 6px;
+      border-radius: 5px;
+    }
+    .cpp-badge-open {
+      background: rgba(0,208,132,0.12); color: var(--green);
+      border: 1px solid rgba(0,208,132,0.25);
+    }
+    .cpp-badge-plan-gratis {
+      background: rgba(255,255,255,0.07); color: var(--muted);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .cpp-badge-plan-plus {
+      background: rgba(99,102,241,0.15); color: #818cf8;
+      border: 1px solid rgba(99,102,241,0.35);
+    }
+    .cpp-badge-plan-pro {
+      background: rgba(245,158,11,0.15); color: #f59e0b;
+      border: 1px solid rgba(245,158,11,0.35);
+    }
+    .cpp-actions { flex-shrink: 0; }
+    .cpp-action-btn {
+      font-size: 10px; font-weight: 700; padding: 5px 10px; border-radius: 7px;
+    }
+    .cpp-wpp {
+      background: rgba(37,211,102,0.1); color: #25d366;
+      border: 1px solid rgba(37,211,102,0.25);
+    }
+    /* Grade de métricas */
+    .cpp-metrics {
+      display: grid; grid-template-columns: repeat(4,1fr);
+      gap: 6px; margin-bottom: 10px;
+    }
+    .cpp-metric-item {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 7px 4px; text-align: center;
+    }
+    .cpp-metric-val {
+      font-family: var(--font-h); font-size: 1rem; font-weight: 800;
+      color: var(--text);
+    }
+    .cpp-metric-lbl { font-size: 8px; color: var(--muted); margin-top: 2px; }
+    /* Mini gráfico de barras de pico */
+    .cpp-pico {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px; margin-bottom: 10px;
+    }
+    .cpp-pico-label {
+      font-size: 10px; font-weight: 600; color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .cpp-pico-bars {
+      display: flex; align-items: flex-end;
+      gap: 3px; height: 40px;
+    }
+    .cpp-pico-bar {
+      flex: 1; border-radius: 3px 3px 0 0;
+      background: rgba(245,158,11,0.25);
+      transition: height 0.3s ease;
+      min-width: 0;
+    }
+    .cpp-pico-bar.peak { background: #f59e0b; }
+    .cpp-pico-horas {
+      display: flex; justify-content: space-between;
+      font-size: 8px; color: var(--muted); margin-top: 4px;
+    }
+    /* Nota descritiva */
+    .cpp-note {
+      font-size: 10px; color: var(--muted); line-height: 1.5;
+      text-align: center; padding: 4px 0;
+    }
 
     /* ── Skeleton Loading ───────────────────────────────────── */
     @keyframes shimmer {

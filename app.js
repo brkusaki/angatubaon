@@ -1024,35 +1024,24 @@
       car.style.transition = animar ? 'transform 0.35s cubic-bezier(0.32,0.72,0,1)' : 'none';
       car.style.transform  = 'translateX(-' + (_cadCarouselIdx * 100) + '%)';
     }
-    // Dots
     document.querySelectorAll('.cad-plan-dot').forEach((d, i) => {
       d.classList.toggle('active', i === _cadCarouselIdx);
     });
-    // Seleciona o plano correspondente
     cadSelecionarPlano(_CAD_PLANS[_cadCarouselIdx]);
   };
 
   // Swipe touch no carousel inline
   (function initCadCarouselSwipe() {
     let sx = 0, sy = 0, dragging = false;
-    function onStart(e) {
-      const t = e.touches ? e.touches[0] : e;
-      sx = t.clientX; sy = t.clientY; dragging = true;
-    }
-    function onEnd(e) {
-      if (!dragging) return; dragging = false;
-      const t = e.changedTouches ? e.changedTouches[0] : e;
-      const dx = t.clientX - sx;
-      const dy = Math.abs(t.clientY - sy);
-      if (Math.abs(dx) > 40 && dy < 60) {
-        cadCarouselIr(_cadCarouselIdx + (dx < 0 ? 1 : -1));
-      }
-    }
     document.addEventListener('touchstart', function(e) {
-      if (e.target.closest('#cad-carousel-wrap')) onStart(e);
+      if (!e.target.closest('#cad-carousel-wrap')) return;
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY; dragging = true;
     }, { passive: true });
     document.addEventListener('touchend', function(e) {
-      if (dragging) onEnd(e);
+      if (!dragging) return; dragging = false;
+      const dx = e.changedTouches[0].clientX - sx;
+      const dy = Math.abs(e.changedTouches[0].clientY - sy);
+      if (Math.abs(dx) > 40 && dy < 60) cadCarouselIr(_cadCarouselIdx + (dx < 0 ? 1 : -1));
     }, { passive: true });
   })();
 
@@ -1074,8 +1063,11 @@
       if (!wpp?.value.trim() || wpp?.classList.contains('invalid')) { wpp?.focus(); return; }
     }
     cadIrParaEtapa(etapa);
-    // Ao entrar na etapa 3, começa no Plus (melhor conversão)
-    if (etapa === 3) setTimeout(() => cadCarouselIr(1), 50);
+    if (etapa === 3) {
+      setTimeout(function() {
+        cadCarouselIr(1, false); // começa no Plus, sem animação
+      }, 60);
+    }
   };
   window.cadVoltar = function(etapa) { cadIrParaEtapa(etapa); };
 
@@ -1090,12 +1082,6 @@
       el.classList.toggle('selected', p === plano);
       el.setAttribute('aria-checked', p === plano ? 'true' : 'false');
     });
-    // Sincroniza o carousel inline se o clique veio de fora (ex: botão lock)
-    const cadIdx = ['GRATIS','PLUS','PRO'].indexOf(plano);
-    if (cadIdx >= 0 && cadIdx !== _cadCarouselIdx) {
-      _cadCarouselIdx = cadIdx;
-      cadCarouselIr(cadIdx);
-    }
 
     const isPago = plano !== 'GRATIS';
 
@@ -1116,6 +1102,34 @@
     };
     const hintEl = document.getElementById('cad-plan-hint');
     if (hintEl) hintEl.innerHTML = `${icons[plano]} Plano <strong>${plano}</strong> selecionado · ${notas[plano]}`;
+
+    // Sincroniza carousel se clique veio de fora (ex: botão lock)
+    const cadIdx = _CAD_PLANS.indexOf(plano);
+    if (cadIdx >= 0 && cadIdx !== _cadCarouselIdx) {
+      _cadCarouselIdx = cadIdx;
+      const car = document.getElementById('cad-plan-carousel');
+      if (car) { car.style.transition = 'transform 0.35s cubic-bezier(0.32,0.72,0,1)'; car.style.transform = 'translateX(-' + (cadIdx * 100) + '%)'; }
+      document.querySelectorAll('.cad-plan-dot').forEach((d, i) => d.classList.toggle('active', i === cadIdx));
+    }
+
+    // Mostra o preview visual do plano selecionado
+    ['GRATIS','PLUS','PRO'].forEach(p => {
+      const el = document.getElementById('preview-' + p);
+      if (el) el.style.display = (p === plano) ? '' : 'none';
+    });
+
+    // Gera barras de pico no Pro (valores ilustrativos mas realistas)
+    if (plano === 'PRO') {
+      const barsEl = document.getElementById('cpp-pico-bars');
+      if (barsEl && !barsEl.dataset.rendered) {
+        const vals = [12, 18, 35, 28, 45, 60, 72, 55, 48, 65, 80, 58];
+        const peak = Math.max(...vals);
+        barsEl.innerHTML = vals.map(v =>
+          `<div class="cpp-pico-bar${v === peak ? ' peak' : ''}" style="height:${Math.round((v/peak)*100)}%"></div>`
+        ).join('');
+        barsEl.dataset.rendered = '1';
+      }
+    }
   };
 
   /* ── Schedule simplificado ──────────────────────────────── */

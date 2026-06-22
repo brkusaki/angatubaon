@@ -218,12 +218,8 @@
       <div class="store-list" id="store-list"></div>
       <div class="empty-state" id="empty-state">
         <span class="empty-icon" id="empty-icon">🔍</span>
-        <div class="empty-title" id="empty-title">Nenhuma loja encontrada</div>
-        <p id="empty-msg" style="margin-bottom:4px;">Tente outro termo ou selecione outra categoria.</p>
+        <p id="empty-msg" style="font-weight:600; margin-bottom:4px;">Nenhuma loja encontrada.</p>
         <small id="empty-sub">Tente outro termo ou selecione outra categoria.</small>
-        <button class="empty-action" id="empty-action-btn" onclick="limparFiltros()">
-          <i class="ti ti-refresh" aria-hidden="true"></i> Ver todas as lojas
-        </button>
       </div>
     </section>
 
@@ -767,7 +763,7 @@
 
   <!-- ══════════════════════════════════════ PAINEL MINHA LOJA ══ -->
   <div class="detail-overlay" id="modal-minha-loja" role="dialog" aria-modal="true">
-    <div class="detail-sheet" style="max-height:95vh;">
+    <div class="detail-sheet" style="max-height:95vh;display:flex;flex-direction:column;">
 
       <!-- ── Hero da loja ── -->
       <div id="ml-hero" style="
@@ -777,7 +773,7 @@
         <img id="ml-hero-img" src="" alt="" style="
           position:absolute;inset:0;width:100%;height:100%;
           object-fit:cover;display:none;" onerror="this.style.display='none'" />
-        <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.05) 0%,rgba(0,0,0,0.7) 100%);z-index:1;"></div>
+        <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.05) 0%,rgba(0,0,0,0.75) 100%);z-index:1;"></div>
 
         <!-- Handle + Sair -->
         <div style="position:absolute;top:0;left:0;right:0;display:flex;align-items:flex-start;justify-content:space-between;padding:10px 14px;z-index:2;">
@@ -793,459 +789,522 @@
           </div>
         </div>
 
-        <!-- Avatar + nome sobre o hero -->
-        <div style="position:absolute;bottom:12px;left:14px;right:14px;display:flex;align-items:flex-end;gap:10px;z-index:2;">
-          <div id="ml-logo-wrap" style="
-            width:48px;height:48px;border-radius:12px;
-            background:var(--surface);border:2px solid rgba(255,255,255,0.15);
-            display:flex;align-items:center;justify-content:center;
-            overflow:hidden;flex-shrink:0;box-shadow:0 4px 14px rgba(0,0,0,0.5);">
-            <img id="ml-logo-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none;"
-              onerror="this.style.display='none';document.getElementById('ml-emoji').style.display=''"/>
-            <span id="ml-emoji" style="font-size:1.5rem;">🏪</span>
+        <!-- Avatar + nome + STATUS INLINE no hero -->
+        <div style="position:absolute;bottom:10px;left:14px;right:14px;z-index:2;">
+          <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:6px;">
+            <div id="ml-logo-wrap" style="
+              width:48px;height:48px;border-radius:12px;
+              background:var(--surface);border:2px solid rgba(255,255,255,0.15);
+              display:flex;align-items:center;justify-content:center;
+              overflow:hidden;flex-shrink:0;box-shadow:0 4px 14px rgba(0,0,0,0.5);">
+              <img id="ml-logo-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none;"
+                onerror="this.style.display='none';document.getElementById('ml-emoji').style.display=''"/>
+              <span id="ml-emoji" style="font-size:1.5rem;">🏪</span>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-family:var(--font-h);font-size:1rem;font-weight:800;color:#fff;
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                text-shadow:0 1px 6px rgba(0,0,0,0.7);" id="ml-nome">—</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:1px;" id="ml-ramo">—</div>
+            </div>
+            <span id="ml-plan-badge" style="
+              font-family:var(--font-h);font-size:10px;font-weight:800;
+              padding:3px 8px;border-radius:6px;
+              background:rgba(122,122,122,0.4);color:rgba(255,255,255,0.7);
+              backdrop-filter:blur(4px);flex-shrink:0;">GRÁTIS</span>
           </div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-family:var(--font-h);font-size:1rem;font-weight:800;color:#fff;
-              white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-              text-shadow:0 1px 6px rgba(0,0,0,0.7);" id="ml-nome">—</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:1px;" id="ml-ramo">—</div>
+          <!-- MELHORIA 3 — cliques do dia + status resumido no hero -->
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div id="ml-hero-status-pill" style="
+              display:inline-flex;align-items:center;gap:5px;
+              padding:3px 9px;border-radius:20px;
+              background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.15);
+              backdrop-filter:blur(4px);font-size:10px;font-weight:700;color:#fff;">
+              <span id="ml-hero-status-dot" style="width:6px;height:6px;border-radius:50%;background:#555;display:inline-block;"></span>
+              <span id="ml-hero-status-txt">—</span>
+            </div>
+            <div id="ml-hero-cliques" style="
+              display:none;align-items:center;gap:4px;
+              padding:3px 9px;border-radius:20px;
+              background:rgba(0,208,132,0.2);border:1px solid rgba(0,208,132,0.3);
+              backdrop-filter:blur(4px);font-size:10px;font-weight:700;color:#00d084;">
+              <i class="fa fa-mouse-pointer" style="font-size:8px;"></i>
+              <span id="ml-hero-cliques-num">0</span> cliques hoje
+            </div>
           </div>
-          <span id="ml-plan-badge" style="
-            font-family:var(--font-h);font-size:10px;font-weight:800;
-            padding:3px 8px;border-radius:6px;
-            background:rgba(122,122,122,0.4);color:rgba(255,255,255,0.7);
-            backdrop-filter:blur(4px);flex-shrink:0;">GRÁTIS</span>
         </div>
       </div>
 
-      <div style="padding:14px 16px 0;">
+      <!-- MELHORIA 1 — Abas de navegação (Hoje / Loja / Métricas) -->
+      <div id="ml-tabs" style="
+        display:flex;gap:0;padding:0 16px;
+        border-bottom:1px solid var(--border);
+        background:var(--surface);flex-shrink:0;
+      ">
+        <button class="ml-tab-btn ml-tab-active" data-tab="hoje" onclick="mlSwitchTab('hoje')"
+          style="flex:1;padding:11px 4px;font-size:12px;font-weight:700;color:var(--red);
+                 background:none;border:none;border-bottom:2px solid var(--red);cursor:pointer;
+                 font-family:var(--font-b);-webkit-tap-highlight-color:transparent;">
+          <i class="fa fa-bolt" style="font-size:10px;margin-right:3px;"></i>Hoje
+        </button>
+        <button class="ml-tab-btn" data-tab="loja" onclick="mlSwitchTab('loja')"
+          style="flex:1;padding:11px 4px;font-size:12px;font-weight:700;color:var(--muted);
+                 background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;
+                 font-family:var(--font-b);-webkit-tap-highlight-color:transparent;">
+          <i class="fa fa-store" style="font-size:10px;margin-right:3px;"></i>Loja
+        </button>
+        <button class="ml-tab-btn" data-tab="metricas" onclick="mlSwitchTab('metricas')"
+          style="flex:1;padding:11px 4px;font-size:12px;font-weight:700;color:var(--muted);
+                 background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;
+                 font-family:var(--font-b);-webkit-tap-highlight-color:transparent;">
+          <i class="fa fa-chart-bar" style="font-size:10px;margin-right:3px;"></i>Métricas
+          <span id="ml-tab-badge-metricas" style="display:none;margin-left:3px;padding:1px 5px;border-radius:8px;background:var(--green);color:#000;font-size:9px;font-weight:800;"></span>
+        </button>
+      </div>
 
-        <!-- ░░ SEÇÃO 1 — STATUS ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+      <!-- ── Conteúdo das abas (scroll aqui, não no sheet inteiro) ── -->
+      <div style="flex:1;overflow-y:auto;scrollbar-width:none;">
+        <div style="padding:14px 16px 20px;">
 
-          <!-- Toggle de status -->
-          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">
-            Status agora
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="toggle-status-btn" data-status="ABERTO"
-              style="flex:1;padding:10px 4px;border-radius:10px;font-size:11px;font-weight:700;
-                     border:2px solid rgba(0,208,132,0.3);background:rgba(0,208,132,0.08);color:var(--green);"
-              onclick="lojaToggleComHorario('ABERTO')">
-              <i class="fa fa-circle" style="font-size:8px;"></i><br>Aberto
-            </button>
-            <button class="toggle-status-btn" data-status="VOLTAMOS"
-              style="flex:1;padding:10px 4px;border-radius:10px;font-size:11px;font-weight:700;
-                     border:2px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.08);color:var(--zap);"
-              onclick="lojaToggleComHorario('VOLTAMOS')">
-              <i class="fa fa-clock" style="font-size:8px;"></i><br>Já voltamos
-            </button>
-            <button class="toggle-status-btn" data-status="FECHADO"
-              style="flex:1;padding:10px 4px;border-radius:10px;font-size:11px;font-weight:700;
-                     border:2px solid rgba(255,68,68,0.3);background:rgba(255,68,68,0.08);color:var(--red);"
-              onclick="lojaToggle('FECHADO')">
-              <i class="fa fa-ban" style="font-size:8px;"></i><br>Fechado
-            </button>
-          </div>
-          <p style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center;">
-            Sobrepõe o horário automático temporariamente
-          </p>
-          <div id="ml-toggle-erro" style="font-size:11px;color:var(--red);text-align:center;min-height:14px;margin-top:2px;"></div>
+          <!-- ░░ ABA HOJE ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
+          <div id="ml-tab-hoje" class="ml-tab-content">
 
-          <!-- Mini modal "aberto até que horas" -->
-          <div id="ml-aberto-ate-wrap" style="display:none;margin-top:10px;padding:10px;background:rgba(0,208,132,0.06);border:1px solid rgba(0,208,132,0.2);border-radius:10px;">
-            <div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:8px;">⏱ Aberto até que horas? <span style="font-size:10px;color:var(--muted);font-weight:400;">(opcional)</span></div>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <input type="time" id="ml-aberto-ate-time"
-                style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;
-                       padding:8px 10px;font-size:14px;color:var(--text);font-family:var(--font-h);">
-              <button onclick="lojaToggleAberto()"
-                style="padding:8px 14px;border-radius:8px;background:var(--green);color:#000;
-                       font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;">
-                Confirmar
-              </button>
-              <button onclick="lojaToggle('ABERTO')"
-                style="padding:8px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--border);
-                       color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;">
-                Horário normal
-              </button>
-            </div>
-          </div>
-
-          <!-- Mini modal "volta em x horas" -->
-          <div id="ml-voltamos-ate-wrap" style="display:none;margin-top:10px;padding:10px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.25);border-radius:10px;">
-            <div style="font-size:11px;color:var(--zap);font-weight:700;margin-bottom:8px;">⏰ Volta em quanto tempo? <span style="font-size:10px;color:var(--muted);font-weight:400;">(opcional)</span></div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-              <button onclick="lojaToggleVoltamos(30)"  style="padding:6px 10px;border-radius:7px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:var(--zap);font-size:11px;font-weight:700;cursor:pointer;">30 min</button>
-              <button onclick="lojaToggleVoltamos(60)"  style="padding:6px 10px;border-radius:7px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:var(--zap);font-size:11px;font-weight:700;cursor:pointer;">1 hora</button>
-              <button onclick="lojaToggleVoltamos(120)" style="padding:6px 10px;border-radius:7px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:var(--zap);font-size:11px;font-weight:700;cursor:pointer;">2 horas</button>
-              <button onclick="lojaToggleVoltamos(0)"
-                style="padding:6px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;">
-                Sem previsão
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ░░ SEÇÃO 2 — ANÚNCIO ░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
-        <div id="ml-anuncio-section" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">
-              📣 Anúncio do dia
-              <span id="ml-anuncio-plano-badge" style="font-size:9px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PLUS</span>
-            </div>
-            <span id="ml-anuncio-timer" style="font-size:10px;color:var(--muted);"></span>
-          </div>
-          <!-- Anúncio ativo (preview) -->
-          <div id="ml-anuncio-ativo" style="display:none;background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(245,158,11,0.03));border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:10px;margin-bottom:10px;">
-            <div style="display:flex;align-items:flex-start;gap:10px;">
-              <div style="font-size:1.4rem;flex-shrink:0;" id="ml-anuncio-emoji-preview">🎯</div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:12px;font-weight:700;color:var(--text);" id="ml-anuncio-texto-preview">—</div>
-                <div style="font-size:10px;color:var(--muted);margin-top:3px;" id="ml-anuncio-validade-preview"></div>
-                <!-- Preview da imagem ativa (só Pro) -->
-                <img id="ml-anuncio-img-preview" src="" alt="Imagem do anúncio"
-                  style="display:none;width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:8px;" />
+            <!-- MELHORIA 1 — Toggle de status redesenhado como pill segmentado -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">
+                Status agora
               </div>
-              <button onclick="mlRemoverAnuncio()" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:6px;border:1px solid rgba(255,68,68,0.3);flex-shrink:0;">Remover</button>
-            </div>
-          </div>
-          <!-- Formulário -->
-          <div id="ml-anuncio-form" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;">
-            <div style="font-size:10px;color:var(--muted);margin-bottom:8px;" id="ml-anuncio-desc">Oferta ou aviso que aparece no card da sua loja por 24h</div>
-            <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;" id="ml-anuncio-emojis">
-              <button class="anuncio-emoji-btn active" data-emoji="🎯" onclick="mlSelectEmoji(this)">🎯</button>
-              <button class="anuncio-emoji-btn" data-emoji="🔥" onclick="mlSelectEmoji(this)">🔥</button>
-              <button class="anuncio-emoji-btn" data-emoji="💥" onclick="mlSelectEmoji(this)">💥</button>
-              <button class="anuncio-emoji-btn" data-emoji="🏷️" onclick="mlSelectEmoji(this)">🏷️</button>
-              <button class="anuncio-emoji-btn" data-emoji="⚡" onclick="mlSelectEmoji(this)">⚡</button>
-              <button class="anuncio-emoji-btn" data-emoji="🎁" onclick="mlSelectEmoji(this)">🎁</button>
-              <button class="anuncio-emoji-btn" data-emoji="✂️" onclick="mlSelectEmoji(this)">✂️</button>
-              <button class="anuncio-emoji-btn" data-emoji="🚗" onclick="mlSelectEmoji(this)">🚗</button>
-            </div>
-            <textarea id="ml-anuncio-texto" maxlength="80" rows="2"
-              placeholder="Ex: Hoje 10% off em troca de óleo! Venha nos visitar."
-              style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
-                     padding:10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;font-family:var(--font-b);line-height:1.5;"></textarea>
-            <!-- Upload de imagem — só Pro -->
-            <div id="ml-anuncio-img-section" style="display:none;margin-top:8px;">
-              <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">📷 Foto do anúncio <span style="opacity:.6;">(opcional)</span></div>
-              <label id="ml-anuncio-img-label" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px;cursor:pointer;">
-                <i class="fa fa-image" style="color:var(--muted);font-size:14px;"></i>
-                <span id="ml-anuncio-img-label-txt" style="font-size:11px;color:var(--muted);">Toque para escolher uma foto</span>
-                <input type="file" id="ml-anuncio-img-input" accept="image/*" style="display:none;" onchange="mlAnuncioPreviewImagem(this)" />
-              </label>
-              <img id="ml-anuncio-img-nova" src="" alt=""
-                style="display:none;width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-top:8px;border:1px solid var(--border);" />
-              <button id="ml-anuncio-img-remover" onclick="mlAnuncioRemoverImagem()" style="display:none;font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;margin-top:4px;padding:0;">✕ Remover foto</button>
-              <div id="ml-anuncio-img-status" style="font-size:10px;margin-top:4px;"></div>
-            </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
-              <span id="ml-anuncio-chars" style="font-size:10px;color:var(--muted);">0/80</span>
-              <button onclick="mlPublicarAnuncio()" id="ml-anuncio-btn"
-                style="padding:8px 16px;border-radius:8px;background:linear-gradient(135deg,#f59e0b,#d97706);
-                       color:#000;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;">
-                <i class="fa fa-bullhorn"></i> Publicar
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ░░ SEÇÃO 3 — CARDÁPIO ░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
-        <div id="ml-cardapio-section" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">
-              🍽️ Cardápio / Serviços
-              <span id="ml-cardapio-badge" style="font-size:9px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PRO</span>
-            </div>
-            <button onclick="mlCardapioAbrirForm()" id="ml-cardapio-add-btn"
-              style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:7px;
-                     background:linear-gradient(135deg,#10b981,#059669);color:#fff;
-                     font-family:var(--font-h);font-size:10px;font-weight:800;border:none;cursor:pointer;">
-              <i class="fa fa-plus"></i> Adicionar
-            </button>
-          </div>
-          <div id="ml-cardapio-lista" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
-          <div id="ml-cardapio-limite" style="font-size:10px;color:var(--muted);text-align:center;"></div>
-          <!-- Form inline -->
-          <div id="ml-cardapio-form" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px;">
-            <div style="font-family:var(--font-h);font-size:12px;font-weight:800;margin-bottom:10px;" id="ml-cardapio-form-title">Novo item</div>
-            <div id="ml-cardapio-foto-wrap" style="margin-bottom:10px;">
-              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Foto <span style="font-size:9px;opacity:0.6;">(Pro)</span></div>
-              <div style="display:flex;align-items:center;gap:10px;">
-                <div id="ml-cardapio-foto-preview" style="width:52px;height:52px;border-radius:10px;background:var(--surface2);border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
-                  <i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>
-                </div>
-                <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);font-size:11px;font-weight:700;cursor:pointer;color:var(--text);">
-                  <i class="fa fa-upload" style="font-size:10px;"></i> Escolher foto
-                  <input type="file" accept="image/*" id="ml-cardapio-foto-file" style="display:none;" onchange="mlCardapioFotoPreview(this)">
-                </label>
-              </div>
-            </div>
-            <input type="hidden" id="ml-cardapio-edit-id" value="">
-            <input type="hidden" id="ml-cardapio-foto-url" value="">
-            <div style="display:flex;flex-direction:column;gap:8px;">
-              <div>
-                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Nome *</div>
-                <input id="ml-cardapio-nome" type="text" maxlength="60" placeholder="Ex: X-Burguer, Tatuagem 15cm..."
-                  style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
-              </div>
-              <div>
-                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Descrição <span style="opacity:0.5;">(opcional)</span></div>
-                <textarea id="ml-cardapio-desc" maxlength="120" rows="2" placeholder="Ingredientes, detalhes..."
-                  style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;font-family:var(--font-b);"></textarea>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                <div>
-                  <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Preço (R$) *</div>
-                  <input id="ml-cardapio-preco" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" placeholder="0,00"
-                    style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
-                </div>
-                <div id="ml-cardapio-cat-wrap">
-                  <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Categoria <span style="opacity:0.5;">(Pro)</span></div>
-                  <input id="ml-cardapio-cat" type="text" maxlength="40" placeholder="Lanches, Bebidas..."
-                    style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;color:var(--text);box-sizing:border-box;">
-                </div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.2);border-radius:8px;">
-              <input type="checkbox" id="ml-cardapio-destaque" style="width:16px;height:16px;accent-color:#f59e0b;cursor:pointer;">
-              <label for="ml-cardapio-destaque" style="font-size:11px;font-weight:700;color:#f59e0b;cursor:pointer;">⭐ Marcar como "Mais pedido"</label>
-            </div>
-            <div style="display:flex;gap:8px;margin-top:12px;">
-              <button onclick="mlCardapioFecharForm()"
-                style="flex:1;padding:10px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;">Cancelar</button>
-              <button onclick="mlCardapioSalvar(false)" id="ml-cardapio-salvar-btn"
-                style="flex:2;padding:10px;border-radius:8px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;">
-                <i class="fa fa-check"></i> Salvar item
-              </button>
-            </div>
-            <!-- Botão para quem quer cadastrar vários itens seguidos sem reabrir o form -->
-            <button onclick="mlCardapioSalvar(true)" id="ml-cardapio-proximo-btn"
-              style="width:100%;margin-top:6px;padding:9px;border-radius:8px;
-                     background:rgba(16,185,129,0.08);border:1px dashed rgba(16,185,129,0.4);
-                     color:#10b981;font-family:var(--font-h);font-size:11px;font-weight:700;cursor:pointer;">
-              <i class="fa fa-plus"></i> Salvar e adicionar próximo
-            </button>
-            <div id="ml-cardapio-form-msg" style="font-size:11px;text-align:center;margin-top:8px;min-height:14px;"></div>
-          </div>
-        </div>
-
-        <!-- ░░ SEÇÃO 4 — MÉTRICAS ░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
-          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">
-            📊 Cliques na sua loja
-          </div>
-          <div id="ml-metricas-wrap" style="position:relative;">
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">
-              <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
-                <div style="font-family:var(--font-h);font-size:1.3rem;font-weight:800;" id="ml-m-7d">—</div>
-                <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px;">7 dias</div>
-              </div>
-              <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
-                <div style="font-family:var(--font-h);font-size:1.3rem;font-weight:800;" id="ml-m-30d">—</div>
-                <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px;">30 dias</div>
-              </div>
-              <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
-                <div style="font-family:var(--font-h);font-size:1.3rem;font-weight:800;" id="ml-m-total">—</div>
-                <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px;">Total</div>
-              </div>
-            </div>
-            <div style="display:flex;gap:8px;">
-              <div style="flex:1;background:rgba(37,211,102,0.08);border:1px solid rgba(37,211,102,0.2);border-radius:10px;padding:10px;text-align:center;">
-                <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:#25d366;" id="ml-m-wpp">—</div>
-                <div style="font-size:9px;color:#25d366;margin-top:2px;">WhatsApp</div>
-              </div>
-              <div style="flex:1;background:rgba(66,133,244,0.08);border:1px solid rgba(66,133,244,0.2);border-radius:10px;padding:10px;text-align:center;">
-                <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:var(--blue);" id="ml-m-tel">—</div>
-                <div style="font-size:9px;color:var(--blue);margin-top:2px;">Telefone</div>
-              </div>
-              <div style="flex:1;background:rgba(225,48,108,0.08);border:1px solid rgba(225,48,108,0.2);border-radius:10px;padding:10px;text-align:center;">
-                <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:#e1306c;" id="ml-m-ig">—</div>
-                <div style="font-size:9px;color:#e1306c;margin-top:2px;">Instagram</div>
-              </div>
-            </div>
-            <!-- Lock blur grátis -->
-            <div id="ml-metricas-lock" style="display:none;position:absolute;inset:0;z-index:10;border-radius:10px;overflow:hidden;">
-              <div style="position:absolute;inset:0;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);background:rgba(13,13,13,0.55);"></div>
-              <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:12px;text-align:center;">
-                <div style="font-size:1.5rem;margin-bottom:6px;">🔒</div>
-                <div style="font-size:12px;font-weight:800;color:#fff;margin-bottom:3px;">Métricas detalhadas</div>
-                <div style="font-size:10px;color:rgba(255,255,255,0.55);line-height:1.5;margin-bottom:10px;">
-                  Disponível nos planos <strong style="color:#a5b4fc;">Plus</strong> e <strong style="color:#f59e0b;">Pro</strong>.<br>
-                  Você já tem <span id="ml-lock-total" style="color:#fff;font-weight:800;">N</span> cliques registrados!
-                </div>
-                <a id="ml-lock-upgrade-link" href="#" target="_blank" rel="noopener"
-                  style="display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:11px;font-weight:800;padding:7px 14px;border-radius:8px;text-decoration:none;">
-                  ⭐ Ver planos
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <!-- Horário de pico — só Pro -->
-          <div id="ml-pico-section" style="display:none;margin-top:12px;">
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">
-              Horário de pico <span style="font-size:9px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PRO</span>
-            </div>
-            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;">
-              <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">Cliques por hora do dia · últimos 30 dias</div>
-              <canvas id="ml-pico-chart" height="80" style="width:100%;display:block;"></canvas>
-              <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;color:var(--muted);">
-                <span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span>
-              </div>
-              <div id="ml-pico-destaque" style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center;"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ░░ SEÇÃO 5 — INSTAGRAM ░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
-          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">
-            📱 Instagram da loja
-          </div>
-          <div id="ml-instagram-wrap"></div>
-          <p style="font-size:10px;color:var(--muted);margin:8px 0 0;line-height:1.5;">
-            Aparece como botão no perfil da sua loja no app.
-          </p>
-        </div>
-
-        <!-- ░░ SEÇÃO 5b — ENTREGA ░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
-          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">
-            🛵 Entrega
-          </div>
-          <div id="ml-entrega-wrap"></div>
-          <p style="font-size:10px;color:var(--muted);margin:8px 0 0;line-height:1.5;">
-            Quando ativado, o cliente poderá informar endereço e pagamento no pedido.
-          </p>
-        </div>
-
-        <!-- ░░ SEÇÃO 6 — CONFIGURAÇÕES ░░░░░░░░░░░░░░░░░░░░░░░ -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
-          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">
-            ⚙️ Configurações da loja
-          </div>
-
-          <!-- Upload de imagens — preview card igual ao cadastro -->
-          <div id="ml-upload-section" style="display:none;margin-bottom:12px;">
-            <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:8px;">📸 Imagens</div>
-            <div style="font-size:10px;color:var(--muted);margin-bottom:8px;">Veja como sua loja vai aparecer no app. Toque nas imagens para trocar.</div>
-
-            <!-- Preview card unificado — mesmo visual do cadastro -->
-            <div style="border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--surface);position:relative;margin-bottom:8px;">
-
-              <!-- Capa -->
-              <div id="ml-up-capa-wrap" style="
-                width:100%;height:130px;background:var(--surface2);
-                display:flex;align-items:center;justify-content:center;
-                position:relative;overflow:hidden;touch-action:none;cursor:default;
-              ">
-                <i id="ml-up-capa-placeholder" class="fa fa-image" style="font-size:2rem;color:var(--border);pointer-events:none;"></i>
-                <img id="ml-up-foto-preview" src="" alt="" style="
-                  display:none;position:absolute;inset:0;width:100%;height:100%;
-                  object-fit:cover;object-position:50% 50%;
-                  user-select:none;-webkit-user-select:none;pointer-events:none;
-                "/>
-                <!-- hint de arrastar — só aparece após upload -->
-                <div id="ml-up-capa-drag-hint" style="
-                  display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);
-                  background:rgba(0,0,0,0.6);color:#fff;font-size:9px;font-weight:600;
-                  padding:3px 10px;border-radius:20px;white-space:nowrap;
-                  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);pointer-events:none;
-                ">✥ Arraste para reposicionar</div>
-                <!-- botão trocar capa -->
-                <label for="ml-up-foto-file" style="
-                  position:absolute;bottom:8px;right:8px;
-                  background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.15);
-                  border-radius:8px;padding:5px 9px;cursor:pointer;
-                  display:flex;align-items:center;gap:5px;
-                  font-size:10px;font-weight:700;color:#fff;
-                  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:2;
-                ">
-                  <i class="fa fa-camera"></i> Trocar capa
-                </label>
-                <input type="file" accept="image/*" id="ml-up-foto-file" style="display:none;" onchange="mlUploadImagem('foto',this)">
-              </div>
-
-              <!-- Linha: logo + nome da loja (preview real) -->
-              <div style="padding:10px 12px 12px;display:flex;align-items:center;gap:10px;">
-                <!-- Logo clicável -->
-                <div style="position:relative;flex-shrink:0;">
-                  <div id="ml-up-logo-preview" style="
-                    width:44px;height:44px;border-radius:10px;
-                    background:#fff;border:1.5px solid var(--border);
-                    display:flex;align-items:center;justify-content:center;overflow:hidden;
-                  ">
-                    <i class="fa fa-store" style="color:var(--border);font-size:1.1rem;"></i>
-                  </div>
-                  <label for="ml-up-logo-file" style="
-                    position:absolute;inset:0;cursor:pointer;border-radius:10px;
-                    background:rgba(0,0,0,0);
-                  " title="Trocar logo"></label>
-                  <input type="file" accept="image/*" id="ml-up-logo-file" style="display:none;" onchange="mlUploadImagem('logo',this)">
-                </div>
-                <div style="flex:1;min-width:0;">
-                  <div id="ml-up-nome-preview" style="font-family:var(--font-h);font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
-                  <div id="ml-up-ramo-preview" style="font-size:11px;color:var(--muted);margin-top:2px;">—</div>
-                </div>
-              </div>
-
-              <!-- Rodapé: botão trocar logo -->
-              <div style="
-                display:flex;align-items:center;justify-content:center;gap:16px;
-                padding:8px 12px;border-top:1px solid var(--border);background:var(--surface2);
-              ">
-                <label for="ml-up-logo-file" style="
-                  display:flex;align-items:center;gap:5px;cursor:pointer;
-                  font-size:11px;font-weight:600;color:var(--text);
-                ">
-                  <i class="fa fa-camera" style="font-size:10px;color:var(--muted);"></i> Trocar logo
-                </label>
-                <div id="ml-up-logo-status" style="font-size:9px;color:var(--muted);min-height:12px;"></div>
-                <div id="ml-up-foto-status" style="font-size:9px;color:var(--muted);min-height:12px;"></div>
-              </div>
-            </div>
-
-            <div style="font-size:9px;color:var(--muted);text-align:center;line-height:1.5;">
-              Máx 5MB · JPG, PNG ou WebP<br>
-              <span style="color:rgba(99,102,241,0.8);">💡 Para a logo ficar sem fundo branco, use PNG com fundo transparente</span>
-            </div>
-          </div>
-
-          <!-- Compartilhar -->
-          <div id="ml-share-section" style="display:none;">
-            <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:8px;">🔗 Compartilhar minha loja</div>
-            <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 9px;font-size:10px;color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" id="ml-share-url">—</div>
-                <button onclick="mlCopiarLink()" style="flex-shrink:0;padding:7px 10px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;" id="ml-copy-btn">
-                  <i class="fa fa-copy"></i> Copiar
+              <!-- pill segmentado: o ativo fica preenchido, os outros esmaecidos -->
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+                <button class="toggle-status-btn" data-status="ABERTO"
+                  style="padding:11px 4px;border-radius:10px;font-size:11px;font-weight:700;
+                         border:2px solid rgba(0,208,132,0.3);background:rgba(0,208,132,0.08);color:var(--green);
+                         cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .15s;"
+                  onclick="lojaToggleComHorario('ABERTO')">
+                  <i class="fa fa-circle" style="font-size:7px;display:block;margin-bottom:3px;"></i>Aberto
+                </button>
+                <button class="toggle-status-btn" data-status="VOLTAMOS"
+                  style="padding:11px 4px;border-radius:10px;font-size:11px;font-weight:700;
+                         border:2px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.08);color:var(--zap);
+                         cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .15s;"
+                  onclick="lojaToggleComHorario('VOLTAMOS')">
+                  <i class="fa fa-clock" style="font-size:7px;display:block;margin-bottom:3px;"></i>Já voltamos
+                </button>
+                <button class="toggle-status-btn" data-status="FECHADO"
+                  style="padding:11px 4px;border-radius:10px;font-size:11px;font-weight:700;
+                         border:2px solid rgba(255,68,68,0.3);background:rgba(255,68,68,0.08);color:var(--red);
+                         cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .15s;"
+                  onclick="lojaToggle('FECHADO')">
+                  <i class="fa fa-ban" style="font-size:7px;display:block;margin-bottom:3px;"></i>Fechado
                 </button>
               </div>
-              <div style="display:flex;gap:8px;">
-                <a id="ml-share-wpp" href="#" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.2);color:#25d366;font-size:11px;font-weight:700;text-decoration:none;">
-                  <i class="fab fa-whatsapp"></i> WhatsApp
-                </a>
-                <a id="ml-share-ig" href="#" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:rgba(225,48,108,0.08);border:1px solid rgba(225,48,108,0.2);color:#e1306c;font-size:11px;font-weight:700;text-decoration:none;">
-                  <i class="fab fa-instagram"></i> Instagram
-                </a>
+              <p style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center;">
+                Sobrepõe o horário automático temporariamente
+              </p>
+              <div id="ml-toggle-erro" style="font-size:11px;color:var(--red);text-align:center;min-height:14px;margin-top:2px;"></div>
+
+              <!-- Mini modal aberto até que horas -->
+              <div id="ml-aberto-ate-wrap" style="display:none;margin-top:10px;padding:10px;background:rgba(0,208,132,0.06);border:1px solid rgba(0,208,132,0.2);border-radius:10px;">
+                <div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:8px;">⏱ Aberto até que horas? <span style="font-size:10px;color:var(--muted);font-weight:400;">(opcional)</span></div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <input type="time" id="ml-aberto-ate-time"
+                    style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+                           padding:8px 10px;font-size:14px;color:var(--text);font-family:var(--font-h);">
+                  <button onclick="lojaToggleAberto()"
+                    style="padding:8px 14px;border-radius:8px;background:var(--green);color:#000;
+                           font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;">
+                    Confirmar
+                  </button>
+                  <button onclick="lojaToggle('ABERTO')"
+                    style="padding:8px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--border);
+                           color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;">
+                    Horário normal
+                  </button>
+                </div>
+              </div>
+
+              <!-- Mini modal volta em x horas -->
+              <div id="ml-voltamos-ate-wrap" style="display:none;margin-top:10px;padding:10px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.25);border-radius:10px;">
+                <div style="font-size:11px;color:var(--zap);font-weight:700;margin-bottom:8px;">⏰ Volta em quanto tempo? <span style="font-size:10px;color:var(--muted);font-weight:400;">(opcional)</span></div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+                  <button onclick="lojaToggleVoltamos(30)"  style="padding:6px 10px;border-radius:7px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:var(--zap);font-size:11px;font-weight:700;cursor:pointer;">30 min</button>
+                  <button onclick="lojaToggleVoltamos(60)"  style="padding:6px 10px;border-radius:7px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:var(--zap);font-size:11px;font-weight:700;cursor:pointer;">1 hora</button>
+                  <button onclick="lojaToggleVoltamos(120)" style="padding:6px 10px;border-radius:7px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:var(--zap);font-size:11px;font-weight:700;cursor:pointer;">2 horas</button>
+                  <button onclick="lojaToggleVoltamos(0)"
+                    style="padding:6px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;">
+                    Sem previsão
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <!-- ░░ CTA UPGRADE ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
-        <div id="ml-upgrade-cta" style="display:none;background:linear-gradient(135deg,#1c1a14,#25210f);border:1px solid rgba(245,158,11,0.3);border-radius:16px;padding:14px;text-align:center;margin-bottom:20px;">
-          <div style="font-family:var(--font-h);font-size:.9rem;font-weight:800;color:var(--zap);margin-bottom:4px;">⭐ Quer mais visibilidade?</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Lojas Pro aparecem no topo, têm foto de capa, cardápio e muito mais.</div>
-          <a id="ml-upgrade-link" href="#" target="_blank" rel="noopener"
-            style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:.85rem;font-weight:700;padding:10px 18px;border-radius:10px;text-decoration:none;">
-            <i class="fab fa-whatsapp"></i> Quero o Plano Pro
-          </a>
-        </div>
+            <!-- MELHORIA 4 & 5 — Anúncio do dia: templates + feedback inline -->
+            <div id="ml-anuncio-section" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">
+                  📣 Anúncio do dia
+                  <span id="ml-anuncio-plano-badge" style="font-size:9px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PLUS</span>
+                </div>
+                <span id="ml-anuncio-timer" style="font-size:10px;color:var(--muted);"></span>
+              </div>
 
-      </div>
+              <!-- MELHORIA 5 — Preview do anúncio ativo com countdown -->
+              <div id="ml-anuncio-ativo" style="display:none;background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(245,158,11,0.03));border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:10px;margin-bottom:10px;">
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                  <div style="font-size:1.4rem;flex-shrink:0;" id="ml-anuncio-emoji-preview">🎯</div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:12px;font-weight:700;color:var(--text);" id="ml-anuncio-texto-preview">—</div>
+                    <div style="font-size:10px;color:var(--muted);margin-top:3px;" id="ml-anuncio-validade-preview"></div>
+                    <img id="ml-anuncio-img-preview" src="" alt="Imagem do anúncio"
+                      style="display:none;width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:8px;" />
+                  </div>
+                  <button onclick="mlRemoverAnuncio()" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:6px;border:1px solid rgba(255,68,68,0.3);flex-shrink:0;">Remover</button>
+                </div>
+              </div>
+
+              <!-- Formulário do anúncio -->
+              <div id="ml-anuncio-form" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:8px;" id="ml-anuncio-desc">Oferta ou aviso que aparece no card da sua loja por 24h</div>
+                <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;" id="ml-anuncio-emojis">
+                  <button class="anuncio-emoji-btn active" data-emoji="🎯" onclick="mlSelectEmoji(this)">🎯</button>
+                  <button class="anuncio-emoji-btn" data-emoji="🔥" onclick="mlSelectEmoji(this)">🔥</button>
+                  <button class="anuncio-emoji-btn" data-emoji="💥" onclick="mlSelectEmoji(this)">💥</button>
+                  <button class="anuncio-emoji-btn" data-emoji="🏷️" onclick="mlSelectEmoji(this)">🏷️</button>
+                  <button class="anuncio-emoji-btn" data-emoji="⚡" onclick="mlSelectEmoji(this)">⚡</button>
+                  <button class="anuncio-emoji-btn" data-emoji="🎁" onclick="mlSelectEmoji(this)">🎁</button>
+                  <button class="anuncio-emoji-btn" data-emoji="✂️" onclick="mlSelectEmoji(this)">✂️</button>
+                  <button class="anuncio-emoji-btn" data-emoji="🚗" onclick="mlSelectEmoji(this)">🚗</button>
+                </div>
+                <!-- MELHORIA 4 — Templates de 1 toque -->
+                <div style="margin-bottom:8px;">
+                  <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">Sugestões rápidas</div>
+                  <div style="display:flex;gap:5px;flex-wrap:wrap;" id="ml-anuncio-templates">
+                    <button onclick="mlAplicarTemplate(this)" data-tpl="🏷️ Promoção especial hoje!"
+                      style="padding:4px 9px;border-radius:6px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);color:var(--zap);font-size:10px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+                      Promoção hoje
+                    </button>
+                    <button onclick="mlAplicarTemplate(this)" data-tpl="🚗 Fazemos entrega! Chame no WhatsApp."
+                      style="padding:4px 9px;border-radius:6px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);color:var(--zap);font-size:10px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+                      Delivery disponível
+                    </button>
+                    <button onclick="mlAplicarTemplate(this)" data-tpl="🔥 Só hoje! Aproveite antes que acabe."
+                      style="padding:4px 9px;border-radius:6px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);color:var(--zap);font-size:10px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+                      Só hoje
+                    </button>
+                    <button onclick="mlAplicarTemplate(this)" data-tpl="🎁 Brinde na compra acima de R$ 50!"
+                      style="padding:4px 9px;border-radius:6px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);color:var(--zap);font-size:10px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+                      Brinde na compra
+                    </button>
+                  </div>
+                </div>
+                <textarea id="ml-anuncio-texto" maxlength="80" rows="2"
+                  placeholder="Ex: Hoje 10% off em troca de óleo! Venha nos visitar."
+                  style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+                         padding:10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;font-family:var(--font-b);line-height:1.5;"></textarea>
+                <!-- Upload de imagem — só Pro -->
+                <div id="ml-anuncio-img-section" style="display:none;margin-top:8px;">
+                  <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">📷 Foto do anúncio <span style="opacity:.6;">(opcional)</span></div>
+                  <label id="ml-anuncio-img-label" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px;cursor:pointer;">
+                    <i class="fa fa-image" style="color:var(--muted);font-size:14px;"></i>
+                    <span id="ml-anuncio-img-label-txt" style="font-size:11px;color:var(--muted);">Toque para escolher uma foto</span>
+                    <input type="file" id="ml-anuncio-img-input" accept="image/*" style="display:none;" onchange="mlAnuncioPreviewImagem(this)" />
+                  </label>
+                  <img id="ml-anuncio-img-nova" src="" alt=""
+                    style="display:none;width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-top:8px;border:1px solid var(--border);" />
+                  <button id="ml-anuncio-img-remover" onclick="mlAnuncioRemoverImagem()" style="display:none;font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;margin-top:4px;padding:0;">✕ Remover foto</button>
+                  <div id="ml-anuncio-img-status" style="font-size:10px;margin-top:4px;"></div>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
+                  <span id="ml-anuncio-chars" style="font-size:10px;color:var(--muted);">0/80</span>
+                  <button onclick="mlPublicarAnuncio()" id="ml-anuncio-btn"
+                    style="padding:8px 16px;border-radius:8px;background:linear-gradient(135deg,#f59e0b,#d97706);
+                           color:#000;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                    <i class="fa fa-bullhorn"></i> Publicar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- MELHORIA 7 — CTA upgrade contextual (só Grátis) -->
+            <div id="ml-upgrade-cta" style="display:none;border:1px solid rgba(245,158,11,0.3);border-radius:16px;padding:14px;text-align:center;margin-bottom:4px;background:linear-gradient(135deg,rgba(28,26,20,0.8),rgba(37,33,15,0.8));">
+              <div style="font-family:var(--font-h);font-size:.9rem;font-weight:800;color:var(--zap);margin-bottom:4px;">⭐ Quer mais visibilidade?</div>
+              <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Lojas Pro aparecem no topo, têm foto de capa, cardápio e muito mais.</div>
+              <a id="ml-upgrade-link" href="#" target="_blank" rel="noopener"
+                style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:.85rem;font-weight:700;padding:10px 18px;border-radius:10px;text-decoration:none;">
+                <i class="fab fa-whatsapp"></i> Quero o Plano Pro
+              </a>
+            </div>
+
+          </div><!-- /aba hoje -->
+
+          <!-- ░░ ABA LOJA ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
+          <div id="ml-tab-loja" class="ml-tab-content" style="display:none;">
+
+            <!-- Cardápio / Serviços -->
+            <div id="ml-cardapio-section" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">
+                  🍽️ Cardápio / Serviços
+                  <span id="ml-cardapio-badge" style="font-size:9px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PRO</span>
+                </div>
+                <button onclick="mlCardapioAbrirForm()" id="ml-cardapio-add-btn"
+                  style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:7px;
+                         background:linear-gradient(135deg,#10b981,#059669);color:#fff;
+                         font-family:var(--font-h);font-size:10px;font-weight:800;border:none;cursor:pointer;">
+                  <i class="fa fa-plus"></i> Adicionar
+                </button>
+              </div>
+              <div id="ml-cardapio-lista" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
+              <div id="ml-cardapio-limite" style="font-size:10px;color:var(--muted);text-align:center;"></div>
+              <!-- Form inline -->
+              <div id="ml-cardapio-form" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px;">
+                <div style="font-family:var(--font-h);font-size:12px;font-weight:800;margin-bottom:10px;" id="ml-cardapio-form-title">Novo item</div>
+                <div id="ml-cardapio-foto-wrap" style="margin-bottom:10px;">
+                  <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Foto <span style="font-size:9px;opacity:0.6;">(Pro)</span></div>
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <div id="ml-cardapio-foto-preview" style="width:52px;height:52px;border-radius:10px;background:var(--surface2);border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+                      <i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>
+                    </div>
+                    <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);font-size:11px;font-weight:700;cursor:pointer;color:var(--text);">
+                      <i class="fa fa-upload" style="font-size:10px;"></i> Escolher foto
+                      <input type="file" accept="image/*" id="ml-cardapio-foto-file" style="display:none;" onchange="mlCardapioFotoPreview(this)">
+                    </label>
+                  </div>
+                </div>
+                <input type="hidden" id="ml-cardapio-edit-id" value="">
+                <input type="hidden" id="ml-cardapio-foto-url" value="">
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                  <div>
+                    <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Nome *</div>
+                    <input id="ml-cardapio-nome" type="text" maxlength="60" placeholder="Ex: X-Burguer, Tatuagem 15cm..."
+                      style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Descrição <span style="opacity:0.5;">(opcional)</span></div>
+                    <input id="ml-cardapio-desc" type="text" maxlength="80" placeholder="Breve descrição do item..."
+                      style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Preço <span style="opacity:0.5;">(opcional)</span></div>
+                    <input id="ml-cardapio-preco" type="text" maxlength="20" placeholder="Ex: R$ 15,00 ou Consulte"
+                      style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Categoria <span style="opacity:0.5;">(opcional)</span></div>
+                    <input id="ml-cardapio-cat" type="text" maxlength="40" placeholder="Ex: Lanches, Bebidas, Serviços..."
+                      style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                  <button onclick="mlCardapioFecharForm()"
+                    style="flex:1;padding:10px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;">Cancelar</button>
+                  <button onclick="mlCardapioSalvar(false)" id="ml-cardapio-salvar-btn"
+                    style="flex:2;padding:10px;border-radius:8px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;">
+                    <i class="fa fa-check"></i> Salvar item
+                  </button>
+                </div>
+                <button onclick="mlCardapioSalvar(true)" id="ml-cardapio-proximo-btn"
+                  style="width:100%;margin-top:6px;padding:9px;border-radius:8px;
+                         background:rgba(16,185,129,0.08);border:1px dashed rgba(16,185,129,0.4);
+                         color:#10b981;font-family:var(--font-h);font-size:11px;font-weight:700;cursor:pointer;">
+                  <i class="fa fa-plus"></i> Salvar e adicionar próximo
+                </button>
+                <div id="ml-cardapio-form-msg" style="font-size:11px;text-align:center;margin-top:8px;min-height:14px;"></div>
+              </div>
+            </div>
+
+            <!-- Instagram -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">
+                📱 Instagram da loja
+              </div>
+              <div id="ml-instagram-wrap"></div>
+              <p style="font-size:10px;color:var(--muted);margin:8px 0 0;line-height:1.5;">
+                Aparece como botão no perfil da sua loja no app.
+              </p>
+            </div>
+
+            <!-- Entrega -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">
+                🛵 Entrega
+              </div>
+              <div id="ml-entrega-wrap"></div>
+              <p style="font-size:10px;color:var(--muted);margin:8px 0 0;line-height:1.5;">
+                Quando ativado, o cliente poderá informar endereço e pagamento no pedido.
+              </p>
+            </div>
+
+            <!-- Configurações (imagens + compartilhar) -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">
+                ⚙️ Configurações da loja
+              </div>
+              <!-- Upload de imagens -->
+              <div id="ml-upload-section" style="display:none;margin-bottom:12px;">
+                <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:8px;">📸 Imagens</div>
+                <div style="font-size:10px;color:var(--muted);margin-bottom:8px;">Veja como sua loja vai aparecer no app. Toque nas imagens para trocar.</div>
+                <div style="border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--surface);position:relative;margin-bottom:8px;">
+                  <div id="ml-up-capa-wrap" style="
+                    width:100%;height:130px;background:var(--surface2);
+                    display:flex;align-items:center;justify-content:center;
+                    position:relative;overflow:hidden;touch-action:none;cursor:default;">
+                    <i id="ml-up-capa-placeholder" class="fa fa-image" style="font-size:2rem;color:var(--border);pointer-events:none;"></i>
+                    <img id="ml-up-foto-preview" src="" alt="" style="
+                      display:none;position:absolute;inset:0;width:100%;height:100%;
+                      object-fit:cover;object-position:50% 50%;
+                      user-select:none;-webkit-user-select:none;pointer-events:none;"/>
+                    <div id="ml-up-capa-drag-hint" style="
+                      display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);
+                      background:rgba(0,0,0,0.6);color:#fff;font-size:9px;font-weight:600;
+                      padding:3px 10px;border-radius:20px;white-space:nowrap;
+                      backdrop-filter:blur(4px);pointer-events:none;">✥ Arraste para reposicionar</div>
+                    <label for="ml-up-foto-file" style="
+                      position:absolute;bottom:8px;right:8px;
+                      background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.15);
+                      border-radius:8px;padding:5px 9px;cursor:pointer;
+                      display:flex;align-items:center;gap:5px;
+                      font-size:10px;font-weight:700;color:#fff;
+                      backdrop-filter:blur(6px);z-index:2;">
+                      <i class="fa fa-camera"></i> Trocar capa
+                    </label>
+                    <input type="file" accept="image/*" id="ml-up-foto-file" style="display:none;" onchange="mlUploadImagem('foto',this)">
+                  </div>
+                  <div style="padding:10px 12px 12px;display:flex;align-items:center;gap:10px;">
+                    <div style="position:relative;flex-shrink:0;">
+                      <div id="ml-up-logo-preview" style="
+                        width:44px;height:44px;border-radius:10px;
+                        background:#fff;border:1.5px solid var(--border);
+                        display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                        <i class="fa fa-store" style="color:var(--border);font-size:1.1rem;"></i>
+                      </div>
+                      <label for="ml-up-logo-file" style="
+                        position:absolute;inset:0;cursor:pointer;border-radius:10px;
+                        background:rgba(0,0,0,0);" title="Trocar logo"></label>
+                      <input type="file" accept="image/*" id="ml-up-logo-file" style="display:none;" onchange="mlUploadImagem('logo',this)">
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                      <div id="ml-up-nome-preview" style="font-family:var(--font-h);font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+                      <div id="ml-up-ramo-preview" style="font-size:11px;color:var(--muted);margin-top:2px;">—</div>
+                    </div>
+                  </div>
+                  <div style="
+                    display:flex;align-items:center;justify-content:center;gap:16px;
+                    padding:8px 12px;border-top:1px solid var(--border);background:var(--surface2);">
+                    <label for="ml-up-logo-file" style="
+                      display:flex;align-items:center;gap:5px;cursor:pointer;
+                      font-size:11px;font-weight:600;color:var(--text);">
+                      <i class="fa fa-camera" style="font-size:10px;color:var(--muted);"></i> Trocar logo
+                    </label>
+                    <div id="ml-up-logo-status" style="font-size:9px;color:var(--muted);min-height:12px;"></div>
+                    <div id="ml-up-foto-status" style="font-size:9px;color:var(--muted);min-height:12px;"></div>
+                  </div>
+                </div>
+                <div style="font-size:9px;color:var(--muted);text-align:center;line-height:1.5;">
+                  Máx 5MB · JPG, PNG ou WebP<br>
+                  <span style="color:rgba(99,102,241,0.8);">💡 Para a logo ficar sem fundo branco, use PNG com fundo transparente</span>
+                </div>
+              </div>
+              <!-- Compartilhar -->
+              <div id="ml-share-section" style="display:none;">
+                <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:8px;">🔗 Compartilhar minha loja</div>
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 9px;font-size:10px;color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" id="ml-share-url">—</div>
+                    <button onclick="mlCopiarLink()" style="flex-shrink:0;padding:7px 10px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;" id="ml-copy-btn">
+                      <i class="fa fa-copy"></i> Copiar
+                    </button>
+                  </div>
+                  <div style="display:flex;gap:8px;">
+                    <a id="ml-share-wpp" href="#" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.2);color:#25d366;font-size:11px;font-weight:700;text-decoration:none;">
+                      <i class="fab fa-whatsapp"></i> WhatsApp
+                    </a>
+                    <a id="ml-share-ig" href="#" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:rgba(225,48,108,0.08);border:1px solid rgba(225,48,108,0.2);color:#e1306c;font-size:11px;font-weight:700;text-decoration:none;">
+                      <i class="fab fa-instagram"></i> Instagram
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /aba loja -->
+
+          <!-- ░░ ABA MÉTRICAS ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
+          <div id="ml-tab-metricas" class="ml-tab-content" style="display:none;">
+
+            <!-- MELHORIA 2 — Métricas em destaque, primeira seção da aba -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">
+                📊 Cliques na sua loja
+              </div>
+              <div id="ml-metricas-wrap" style="position:relative;">
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.3rem;font-weight:800;" id="ml-m-7d">—</div>
+                    <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px;">7 dias</div>
+                  </div>
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.3rem;font-weight:800;" id="ml-m-30d">—</div>
+                    <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px;">30 dias</div>
+                  </div>
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.3rem;font-weight:800;" id="ml-m-total">—</div>
+                    <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px;">Total</div>
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;">
+                  <div style="flex:1;background:rgba(37,211,102,0.08);border:1px solid rgba(37,211,102,0.2);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:#25d366;" id="ml-m-wpp">—</div>
+                    <div style="font-size:9px;color:#25d366;margin-top:2px;">WhatsApp</div>
+                  </div>
+                  <div style="flex:1;background:rgba(66,133,244,0.08);border:1px solid rgba(66,133,244,0.2);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:var(--blue);" id="ml-m-tel">—</div>
+                    <div style="font-size:9px;color:var(--blue);margin-top:2px;">Telefone</div>
+                  </div>
+                  <div style="flex:1;background:rgba(225,48,108,0.08);border:1px solid rgba(225,48,108,0.2);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:#e1306c;" id="ml-m-ig">—</div>
+                    <div style="font-size:9px;color:#e1306c;margin-top:2px;">Instagram</div>
+                  </div>
+                </div>
+                <!-- Lock blur grátis -->
+                <div id="ml-metricas-lock" style="display:none;position:absolute;inset:0;z-index:10;border-radius:10px;overflow:hidden;">
+                  <div style="position:absolute;inset:0;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);background:rgba(13,13,13,0.55);"></div>
+                  <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:12px;text-align:center;">
+                    <div style="font-size:1.5rem;margin-bottom:6px;">🔒</div>
+                    <div style="font-size:12px;font-weight:800;color:#fff;margin-bottom:3px;">Métricas detalhadas</div>
+                    <div style="font-size:10px;color:rgba(255,255,255,0.55);line-height:1.5;margin-bottom:10px;">
+                      Disponível nos planos <strong style="color:#a5b4fc;">Plus</strong> e <strong style="color:#f59e0b;">Pro</strong>.<br>
+                      Você já tem <span id="ml-lock-total" style="color:#fff;font-weight:800;">N</span> cliques registrados!
+                    </div>
+                    <a id="ml-lock-upgrade-link" href="#" target="_blank" rel="noopener"
+                      style="display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:11px;font-weight:800;padding:7px 14px;border-radius:8px;text-decoration:none;">
+                      ⭐ Ver planos
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Horário de pico — só Pro -->
+              <div id="ml-pico-section" style="display:none;margin-top:12px;">
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">
+                  Horário de pico <span style="font-size:9px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PRO</span>
+                </div>
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;">
+                  <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">Cliques por hora do dia · últimos 30 dias</div>
+                  <canvas id="ml-pico-chart" height="80" style="width:100%;display:block;"></canvas>
+                  <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;color:var(--muted);">
+                    <span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span>
+                  </div>
+                  <div id="ml-pico-destaque" style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center;"></div>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /aba metricas -->
+
+        </div><!-- /padding wrapper -->
+      </div><!-- /scroll area -->
+
     </div>
   </div>
 
@@ -1365,7 +1424,7 @@
 
   <script src="/app.js"></script>
   <script>
-    /* FIX 4 — Botão do empty state: limpa busca + filtros e re-renderiza */
+    /* ── Empty state: limpar filtros ── */
     window.limparFiltros = function() {
       const searchEl = document.getElementById('main-search');
       if (searchEl) searchEl.value = '';
@@ -1373,8 +1432,76 @@
       const todosBtn = document.querySelector('[data-cat="todos"] .cat-icon');
       if (todosBtn) todosBtn.classList.add('active');
       document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
-      /* dispara o evento de input para o handleSearch do app.js reagir */
       if (searchEl) searchEl.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    /* ── Painel Minha Loja — Navegação por abas ── */
+    window.mlSwitchTab = function(tab) {
+      document.querySelectorAll('.ml-tab-content').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.ml-tab-btn').forEach(btn => {
+        btn.classList.remove('ml-tab-active');
+        btn.style.color = 'var(--muted)';
+        btn.style.borderBottomColor = 'transparent';
+      });
+      var content = document.getElementById('ml-tab-' + tab);
+      if (content) content.style.display = '';
+      var btn = document.querySelector('.ml-tab-btn[data-tab="' + tab + '"]');
+      if (btn) {
+        btn.classList.add('ml-tab-active');
+        btn.style.color = 'var(--red)';
+        btn.style.borderBottomColor = 'var(--red)';
+      }
+    };
+
+    /* ── Templates de 1 toque no anúncio ── */
+    window.mlAplicarTemplate = function(btn) {
+      var tpl = btn.dataset.tpl;
+      if (!tpl) return;
+      var textarea = document.getElementById('ml-anuncio-texto');
+      if (!textarea) return;
+      textarea.value = tpl;
+      var chars = document.getElementById('ml-anuncio-chars');
+      if (chars) chars.textContent = tpl.length + '/80';
+      textarea.focus();
+    };
+
+    /* ── Hero: status + cliques ── */
+    window.mlAtualizarHeroStatus = function(statusLoja, cliquesHoje) {
+      var dot  = document.getElementById('ml-hero-status-dot');
+      var txt  = document.getElementById('ml-hero-status-txt');
+      var hDiv = document.getElementById('ml-hero-cliques');
+      var hNum = document.getElementById('ml-hero-cliques-num');
+      if (!dot || !txt) return;
+      var s = (statusLoja || '').toUpperCase();
+      if (s.indexOf('ABERTO') === 0) {
+        dot.style.background = '#00d084'; dot.style.animation = 'blink 1.5s infinite';
+        txt.textContent = 'Aberta agora';
+      } else if (s.indexOf('VOLTAMOS') === 0) {
+        dot.style.background = '#f59e0b'; dot.style.animation = '';
+        txt.textContent = 'Já voltamos';
+      } else if (s === 'FECHADO') {
+        dot.style.background = '#ff4444'; dot.style.animation = '';
+        txt.textContent = 'Fechada agora';
+      } else {
+        dot.style.background = '#555';
+        txt.textContent = 'Status automático';
+      }
+      if (hDiv && hNum && typeof cliquesHoje === 'number' && cliquesHoje > 0) {
+        hNum.textContent = cliquesHoje;
+        hDiv.style.display = 'flex';
+      }
+    };
+
+    /* ── Badge de novos cliques na aba Métricas ── */
+    window.mlAtualizarBadgeMetricas = function(novos) {
+      var badge = document.getElementById('ml-tab-badge-metricas');
+      if (!badge) return;
+      if (novos > 0) {
+        badge.textContent = '+' + novos;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
     };
   </script>
 </html>

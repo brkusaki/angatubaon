@@ -677,12 +677,13 @@
         const isActive = cat.id === activeCat;
 
         return `
-          <button class="cat-item" data-cat="${cat.id}" onclick="setCat('${cat.id}',this)">
+          <button class="cat-item${isActive && cat.id !== 'todos' ? ' has-clear' : ''}" data-cat="${cat.id}" onclick="setCat('${cat.id}',this)">
             <div class="cat-icon ${isActive?'active':''}" style="background:${cat.bg};">
               <i class="ti ${cat.icon}" style="color:${cat.cor};"></i>
               ${badge}
             </div>
             <span class="cat-label">${cat.label}</span>
+            ${cat.id !== 'todos' ? '<button class="cat-clear-btn" onclick="event.stopPropagation();setCat('todos',document.querySelector('[data-cat=\"todos\"]')); return false;" aria-label="Limpar filtro">✕</button>' : ''}
           </button>`;
       }).join('');
   }
@@ -696,7 +697,10 @@
 
     // Remove active de todos os ícones, marca só o clicado — sem re-renderizar o cat-bar inteiro
     document.querySelectorAll('.cat-icon').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.cat-item').forEach(i => i.classList.remove('has-clear'));
     btn.querySelector('.cat-icon').classList.add('active');
+    // has-clear: mostra ✕ apenas quando não é "Todos"
+    if (cat !== 'todos') btn.closest('.cat-item')?.classList.add('has-clear');
 
     activePillFilter = 'all';
     document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
@@ -1610,6 +1614,13 @@
     // Toggle — só aplica se o dono não interagiu durante carregamento
     if (!preservarToggle) marcarToggle(d.statusLoja || '');
 
+    // Atualiza hero com status + cliques do dia
+    const cliquesHoje = (metJson && metJson.status === 'ok' && metJson.data.metricas)
+      ? (metJson.data.metricas.hoje ?? 0) : 0;
+    if (typeof mlAtualizarHeroStatus === 'function') {
+      mlAtualizarHeroStatus(d.statusLoja || '', cliquesHoje);
+    }
+
     // CTA upgrade
     const upgradeCta = document.getElementById('ml-upgrade-cta');
     upgradeCta.style.display = (plano === 'GRATIS') ? '' : 'none';
@@ -1693,6 +1704,9 @@
         }
       }
       localStorage.setItem(`angatuba_ultima_visita_${_lojaToken?.slice(-8)}`, Date.now().toString());
+      if (typeof mlAtualizarBadgeMetricas === 'function') {
+        mlAtualizarBadgeMetricas(novos);
+      }
 
       if (isPago) {
         if (lockEl) lockEl.style.display = 'none';
@@ -4459,6 +4473,77 @@
 
   window.mlCardapioFotoPreview = mlCardapioFotoPreview;
 
+  /* ─────────────────────────────────────────────────────
+     PAINEL MINHA LOJA — funções das abas e hero
+  ───────────────────────────────────────────────────── */
+
+  window.mlSwitchTab = function(tab) {
+    document.querySelectorAll('.ml-tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.ml-tab-btn').forEach(btn => {
+      btn.classList.remove('ml-tab-active');
+      btn.style.color = 'var(--muted)';
+      btn.style.borderBottomColor = 'transparent';
+    });
+    var content = document.getElementById('ml-tab-' + tab);
+    if (content) content.style.display = '';
+    var btn = document.querySelector('.ml-tab-btn[data-tab="' + tab + '"]');
+    if (btn) {
+      btn.classList.add('ml-tab-active');
+      btn.style.color = 'var(--red)';
+      btn.style.borderBottomColor = 'var(--red)';
+    }
+  };
+
+  window.mlAplicarTemplate = function(btn) {
+    var tpl = btn.dataset.tpl;
+    if (!tpl) return;
+    var textarea = document.getElementById('ml-anuncio-texto');
+    if (!textarea) return;
+    textarea.value = tpl;
+    var chars = document.getElementById('ml-anuncio-chars');
+    if (chars) chars.textContent = tpl.length + '/80';
+    textarea.focus();
+    // Dispara evento input para o contador do app.js reagir
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  window.mlAtualizarHeroStatus = function(statusLoja, cliquesHoje) {
+    var dot  = document.getElementById('ml-hero-status-dot');
+    var txt  = document.getElementById('ml-hero-status-txt');
+    var hDiv = document.getElementById('ml-hero-cliques');
+    var hNum = document.getElementById('ml-hero-cliques-num');
+    if (!dot || !txt) return;
+    var s = (statusLoja || '').toUpperCase();
+    if (s.indexOf('ABERTO') === 0) {
+      dot.style.background = '#00d084'; dot.style.animation = 'blink 1.5s infinite';
+      txt.textContent = 'Aberta agora';
+    } else if (s.indexOf('VOLTAMOS') === 0) {
+      dot.style.background = '#f59e0b'; dot.style.animation = '';
+      txt.textContent = 'Já voltamos';
+    } else if (s === 'FECHADO') {
+      dot.style.background = '#ff4444'; dot.style.animation = '';
+      txt.textContent = 'Fechada agora';
+    } else {
+      dot.style.background = '#555';
+      txt.textContent = 'Status automático';
+    }
+    if (hDiv && hNum && typeof cliquesHoje === 'number' && cliquesHoje > 0) {
+      hNum.textContent = cliquesHoje;
+      hDiv.style.display = 'flex';
+    }
+  };
+
+  window.mlAtualizarBadgeMetricas = function(novos) {
+    var badge = document.getElementById('ml-tab-badge-metricas');
+    if (!badge) return;
+    if (novos > 0) {
+      badge.textContent = '+' + novos;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  };
+
   async function mlCardapioSalvar(manterAberto = false) {
     const nome  = document.getElementById('ml-cardapio-nome').value.trim();
     const preco = document.getElementById('ml-cardapio-preco').value;
@@ -4658,6 +4743,19 @@
     document.body.style.overflow = 'hidden';
   };
 
+  window.ccScrollTocat = function(id) {
+    const el = document.getElementById(id);
+    const wrap = document.getElementById('cc-itens-wrap');
+    if (!el || !wrap) return;
+    // scroll suave dentro do wrapper do cardápio
+    const offset = el.offsetTop - 8;
+    wrap.scrollTo({ top: offset, behavior: 'smooth' });
+    // marca tab ativa
+    document.querySelectorAll('.cc-tab-pill').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('onclick').includes(id));
+    });
+  };
+
   window.fecharCardapioCliente = function(viaPopstate) {
     document.getElementById('modal-cardapio-cliente').classList.remove('open');
     document.body.style.overflow = '';
@@ -4693,8 +4791,22 @@
       grupos[cat].push(item);
     });
 
+    // ── Sticky category tabs ──────────────────────────────────────────────
+    const tabsEl = document.getElementById('cc-cat-tabs');
+    const cats = Object.keys(grupos);
+    if (tabsEl) {
+      if (cats.length > 1) {
+        tabsEl.style.display = '';
+        tabsEl.innerHTML = cats.map((cat, i) =>
+          `<button class="cc-tab-pill${i===0?' active':''}" onclick="ccScrollTocat('cc-cat-${cat.replace(/\s+/g,'-')}')">${escHTML(cat)}</button>`
+        ).join('');
+      } else {
+        tabsEl.style.display = 'none';
+      }
+    }
+
     wrap.innerHTML = Object.entries(grupos).map(([cat, itens]) => `
-      <div class="cc-cat-label">${escHTML(cat)}</div>
+      <div class="cc-cat-label" id="cc-cat-${cat.replace(/\s+/g,'-')}">${escHTML(cat)}</div>
       ${itens.map(item => `
         <div class="cc-item-card" id="cc-card-${item.id}" style="margin-bottom:8px;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
           ${item.foto

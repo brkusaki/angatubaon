@@ -764,7 +764,141 @@
     .skeleton-line.short { width: 55%; }
     .skeleton-line.xshort { width: 35%; }
 
-    /* ── Schedule Builder ───────────────────────────────────── */
+
+    /* ════════════════════════════════════════════
+       CADASTRO — STEPPER + MELHORIAS DE CONVERSÃO
+    ════════════════════════════════════════════ */
+    .cad-stepper {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0; padding: 14px 20px 8px; flex-shrink: 0;
+    }
+    .cad-step {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 4px; flex: 1; position: relative;
+    }
+    .cad-step-circle {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800;
+      background: var(--surface2); border: 1.5px solid var(--border);
+      color: var(--muted); transition: all 0.25s; z-index: 1;
+    }
+    .cad-step.active .cad-step-circle {
+      background: var(--red); border-color: var(--red);
+      color: #fff; box-shadow: 0 0 0 4px rgba(255,68,68,0.15);
+    }
+    .cad-step.done .cad-step-circle {
+      background: var(--green); border-color: var(--green); color: #fff;
+    }
+    .cad-step-label {
+      font-size: 9px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;
+    }
+    .cad-step.active .cad-step-label { color: var(--text); }
+    .cad-step.done  .cad-step-label  { color: var(--green); }
+    .cad-step-line {
+      flex: 1; height: 1.5px; background: var(--border);
+      margin: 0 4px; margin-bottom: 18px; transition: background 0.25s;
+      align-self: flex-start; margin-top: 14px;
+    }
+    .cad-step-line.done { background: var(--green); }
+
+    /* Painéis de etapa — só um visível por vez */
+    .cad-step-panel { display: none; }
+    .cad-step-panel.active { display: flex; flex-direction: column; gap: 14px; }
+
+    /* Botão avançar/voltar etapa */
+    .cad-next-btn {
+      margin-top: 6px; padding: 13px 20px; border-radius: 12px;
+      background: var(--red); color: #fff;
+      font-family: var(--font-h); font-size: 1rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      border: none; cursor: pointer; width: 100%;
+      transition: opacity 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cad-next-btn:active { transform: scale(0.97); opacity: 0.9; }
+    .cad-back-btn {
+      background: none; border: none; color: var(--muted);
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      padding: 6px 0; text-align: center; width: 100%;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Schedule simplificado */
+    .sched-simple { display: flex; flex-direction: column; gap: 10px; }
+    .sched-preset-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+    .sched-preset-btn {
+      padding: 10px 8px; border-radius: 10px; font-size: 12px; font-weight: 700;
+      background: var(--surface2); border: 1.5px solid var(--border);
+      color: var(--muted); cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+    }
+    .sched-preset-btn .sched-preset-icon { font-size: 1.1rem; }
+    .sched-preset-btn.active {
+      background: rgba(245,158,11,0.1);
+      border-color: var(--zap); color: var(--zap);
+    }
+    .sched-time-row {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .sched-time-row label {
+      font-size: 10px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .sched-time-row input[type='time'] {
+      flex: 1; background: var(--surface2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 9px 10px; font-size: 15px; font-family: inherit;
+    }
+    .sched-advanced-toggle {
+      font-size: 11px; color: var(--muted); text-align: center;
+      cursor: pointer; text-decoration: underline;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Foto-group com lock visual para Grátis */
+    .foto-lock-overlay {
+      display: none; position: absolute; inset: 0; z-index: 5;
+      border-radius: 14px; overflow: hidden;
+      background: rgba(13,13,13,0.72);
+      backdrop-filter: blur(3px);
+      flex-direction: column; align-items: center; justify-content: center;
+      gap: 6px; text-align: center; padding: 16px;
+    }
+    .foto-lock-overlay.show { display: flex; }
+    .foto-lock-icon { font-size: 1.6rem; }
+    .foto-lock-title { font-size: 13px; font-weight: 800; color: #fff; }
+    .foto-lock-sub   { font-size: 11px; color: rgba(255,255,255,0.55); line-height: 1.5; }
+    .foto-lock-btn {
+      margin-top: 4px; padding: 7px 16px; border-radius: 8px;
+      background: linear-gradient(135deg,#f59e0b,#d97706);
+      color: #000; font-size: 12px; font-weight: 800;
+      border: none; cursor: pointer; font-family: var(--font-h);
+    }
+
+    /* Modal submit — texto mais honesto */
+    .modal-submit-label { font-size: 11px; color: rgba(255,255,255,0.6); margin-top: 6px; text-align: center; }
+
+    /* Tela de sucesso — CTA Instagram */
+    .success-ig-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: linear-gradient(135deg,#e1306c,#c13584);
+      color: #fff; font-family: var(--font-h);
+      font-size: 0.9rem; font-weight: 700;
+      padding: 11px 20px; border-radius: 12px;
+      text-decoration: none;
+      transition: opacity 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .success-ig-btn:active { transform: scale(0.97); opacity: 0.9; }
+
+    /* ── Schedule Builder (avançado — acessível via link) ───── */
     .schedule-builder { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
     .schedule-card {
       background: var(--surface2);

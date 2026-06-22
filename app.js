@@ -800,14 +800,16 @@
 
   /* ── Modal Cadastro ──────────────────────────────────────── */
   function openModal() {
-    // Mostra seletor de planos primeiro
-    openPlanModal();
+    // Abre direto no cadastro — plano é escolhido na etapa 3
+    openCadastroModal();
   }
 
   function openCadastroModal() {
     const overlay = document.getElementById('modal-cadastro');
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
+    // Garante que começa na etapa 1
+    cadIrParaEtapa(1);
   }
 
   function closeModal() {
@@ -839,9 +841,13 @@
         if (hiddenUrl)   hiddenUrl.value = '';
       });
       // Oculta grupos de foto (só visíveis para planos pagos)
-      document.getElementById('foto-group').style.display = 'none';
+      document.getElementById('foto-group').style.display = '';
       document.getElementById('logo-group').style.display = 'none';
       selectedPlan = 'GRATIS';
+      // Reseta foto-lock e stepper
+      const lockEl = document.getElementById('foto-lock-overlay');
+      if (lockEl) lockEl.classList.add('show');
+      cadIrParaEtapa(1);
       // Reseta campo de ramo autocomplete
       if (typeof ramoReset === 'function') ramoReset();
     }, 300);
@@ -960,20 +966,11 @@
 
   function confirmPlan() {
     closePlanModal();
-    const hint = document.querySelector('#cadastro-form .field-hint');
-    if (hint) {
-      const icons = { GRATIS:'🏪', PLUS:'✦', PRO:'⭐' };
-      const notas = {
-        GRATIS: 'Cadastro gratuito. Entraremos em contato pelo WhatsApp.',
-        PLUS:   'Você será contactado via WhatsApp para ativar o plano.',
-        PRO:    'Você será contactado via WhatsApp para ativar o plano.',
-      };
-      hint.innerHTML = `${icons[selectedPlan]} Plano <strong>${selectedPlan}</strong> selecionado · ${notas[selectedPlan]}`;
-    }
-    const isPago = selectedPlan !== 'GRATIS';
-    document.getElementById('foto-group').style.display = isPago ? '' : 'none';
-    document.getElementById('logo-group').style.display = isPago ? '' : 'none';
+    // Aplica o plano selecionado na etapa 3 do cadastro
+    cadSelecionarPlano(selectedPlan);
     openCadastroModal();
+    // Vai direto para etapa 3 se veio do modal de planos
+    setTimeout(() => cadIrParaEtapa(3), 50);
   }
 
   // Fecha plan modal ao clicar fora
@@ -981,7 +978,137 @@
     if (e.target === this) closePlanModal();
   });
 
-  /* ── Schedule Builder ───────────────────────────────────── */
+  /* ── STEPPER DE CADASTRO ───────────────────────────────── */
+  let _cadEtapaAtual = 1;
+
+  function cadIrParaEtapa(n) {
+    _cadEtapaAtual = n;
+    // Painéis
+    [1,2,3].forEach(i => {
+      const panel = document.getElementById('cad-panel-' + i);
+      if (panel) panel.classList.toggle('active', i === n);
+    });
+    // Stepper visual
+    [1,2,3].forEach(i => {
+      const stepEl = document.getElementById('cad-step-ind-' + i);
+      const circEl = document.getElementById('cad-step-circ-' + i);
+      if (!stepEl) return;
+      stepEl.classList.remove('active','done');
+      if (i < n) { stepEl.classList.add('done'); if(circEl) circEl.innerHTML = '✓'; }
+      else if (i === n) { stepEl.classList.add('active'); if(circEl) circEl.textContent = i; }
+      else { if(circEl) circEl.textContent = i; }
+    });
+    // Linhas
+    [1,2].forEach(i => {
+      const lineEl = document.getElementById('cad-line-' + i);
+      if (lineEl) lineEl.classList.toggle('done', i < n);
+    });
+    // Subtitle
+    const subtitles = {1:'Dados da sua loja', 2:'Horário de funcionamento', 3:'Plano e fotos'};
+    const subEl = document.getElementById('cad-modal-subtitle');
+    if (subEl) subEl.textContent = subtitles[n] || '';
+    // Rola para o topo do modal
+    const sheet = document.querySelector('#modal-cadastro .modal-sheet');
+    if (sheet) sheet.scrollTop = 0;
+  }
+
+  window.cadAvancar = function(etapa) {
+    // Validação básica antes de avançar
+    if (etapa === 2) {
+      const nome = document.getElementById('f-nome');
+      const ramo = document.getElementById('f-ramo');
+      const wpp  = document.getElementById('f-wpp');
+      const end  = document.getElementById('f-endereco-rua');
+      if (!nome?.value.trim()) { nome?.focus(); nome?.classList.add('invalid'); return; }
+      nome?.classList.remove('invalid');
+      if (!ramo?.value.trim()) {
+        document.getElementById('f-ramo-text')?.focus();
+        return;
+      }
+      if (!end?.value.trim()) { end?.focus(); end?.classList.add('invalid'); return; }
+      end?.classList.remove('invalid');
+      if (!wpp?.value.trim() || wpp?.classList.contains('invalid')) { wpp?.focus(); return; }
+    }
+    cadIrParaEtapa(etapa);
+  };
+  window.cadVoltar = function(etapa) { cadIrParaEtapa(etapa); };
+
+  /* ── Seletor de plano inline (etapa 3) ─────────────────── */
+  window.cadSelecionarPlano = function(plano) {
+    selectedPlan = plano;
+    ['GRATIS','PLUS','PRO'].forEach(p => {
+      const btn = document.getElementById('plan-sel-' + p.toLowerCase());
+      if (btn) btn.classList.toggle('active', p === plano);
+    });
+    const isPago = plano !== 'GRATIS';
+    // Foto: mostra ou esconde o lock
+    const lockEl = document.getElementById('foto-lock-overlay');
+    if (lockEl) lockEl.classList.toggle('show', !isPago);
+    // Logo-group compat
+    const lgEl = document.getElementById('logo-group');
+    if (lgEl) lgEl.style.display = 'none'; // sempre oculto (unificado no card)
+    // Hint do plano
+    const icons = { GRATIS:'🏪', PLUS:'✦', PRO:'⭐' };
+    const notas = {
+      GRATIS: 'Cadastro gratuito, sem compromisso.',
+      PLUS:   'Você será contactado via WhatsApp para ativar o plano.',
+      PRO:    'Você será contactado via WhatsApp para ativar o plano.',
+    };
+    const hintEl = document.getElementById('cad-plan-hint');
+    if (hintEl) hintEl.innerHTML = `${icons[plano]} Plano <strong>${plano}</strong> selecionado · ${notas[plano]}`;
+  };
+
+  /* ── Schedule simplificado ──────────────────────────────── */
+  let _schedPreset = 'semana';
+  const PRESET_DIAS = {
+    semana:     [1,2,3,4,5],
+    semana_sab: [1,2,3,4,5,6],
+    todos:      [0,1,2,3,4,5,6],
+    custom:     [],
+  };
+
+  window.schedPreset = function(preset, btn) {
+    _schedPreset = preset;
+    document.querySelectorAll('.sched-preset-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    if (preset === 'custom') {
+      schedMostrarAvancado();
+    } else {
+      schedSyncSimples();
+    }
+  };
+
+  window.schedSyncSimples = function() {
+    if (_schedPreset === 'custom') return;
+    const dias  = PRESET_DIAS[_schedPreset] || [1,2,3,4,5];
+    const abre  = document.getElementById('sched-abre')?.value  || '08:00';
+    const fecha = document.getElementById('sched-fecha')?.value || '18:00';
+    // Atualiza o scheduleTurnos para o builder avançado ficar em sincronia
+    scheduleTurnos = [{ dias, abre, fecha }];
+    renderScheduleCards();
+    syncHiddenFields();
+  };
+
+  window.schedMostrarAvancado = function() {
+    document.getElementById('sched-simple').style.display = 'none';
+    document.getElementById('sched-advanced').style.display = '';
+    // Sincroniza turno atual para o builder
+    if (scheduleTurnos.length === 0) {
+      scheduleTurnos = [{ dias: [1,2,3,4,5], abre: '08:00', fecha: '18:00' }];
+      renderScheduleCards();
+      syncHiddenFields();
+    }
+  };
+
+  window.schedOcultarAvancado = function() {
+    document.getElementById('sched-simple').style.display = '';
+    document.getElementById('sched-advanced').style.display = 'none';
+    _schedPreset = 'semana';
+    document.querySelectorAll('.sched-preset-btn').forEach((b,i) => b.classList.toggle('active', i===0));
+    schedSyncSimples();
+  };
+
+  /* ── Schedule Builder (avançado — acessível via link) ───── */
   const DIAS_LABEL = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   const scheduleBuilder = document.getElementById('schedule-builder');
   const scheduleAddBtn  = document.getElementById('schedule-add-btn');
@@ -1084,6 +1211,8 @@
   scheduleTurnos = [{ dias: [1,2,3,4,5], abre: '08:00', fecha: '18:00' }];
   renderScheduleCards();
   syncHiddenFields();
+  // Sincroniza campos simples na inicialização
+  if (typeof schedSyncSimples === 'function') schedSyncSimples();
 
   scheduleAddBtn.addEventListener('click', () => {
     if (scheduleTurnos.length >= 3) return; // máximo 3 turnos
@@ -1220,7 +1349,8 @@
           `Olá! Acabei de cadastrar *${nomeLoja}* no AngatubaON e escolhi o Plano ${plano}. Gostaria de ativá-lo!`
         );
         const wppUrl = `https://wa.me/${ADMIN_WPP_CONTATO}?text=${wppMsg}`;
-        successEl.querySelector('.success-sub').innerHTML =
+        const subTextEl = successEl.querySelector('#success-sub-text') || successEl.querySelector('.success-sub');
+        if (subTextEl) subTextEl.innerHTML =
           `Recebemos os dados da sua loja.<br>` +
           `Agora fale com a gente pelo WhatsApp para ativar o <strong>Plano ${plano}</strong>:`;
         // Adiciona/atualiza botão de WPP dinâmico
@@ -1235,7 +1365,8 @@
         wppBtn.href      = wppUrl;
         wppBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Ativar Plano ' + plano + ' →';
       } else {
-        successEl.querySelector('.success-sub').innerHTML =
+        const subTextEl2 = successEl.querySelector('#success-sub-text') || successEl.querySelector('.success-sub');
+        if (subTextEl2) subTextEl2.innerHTML =
           `Recebemos os dados da sua loja.<br>Vamos analisar e entrar em contato pelo WhatsApp em breve.`;
         // Remove botão de WPP se existia de cadastro anterior na mesma sessão
         successEl.querySelector('.success-wpp-btn')?.remove();

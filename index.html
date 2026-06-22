@@ -262,6 +262,7 @@
   </div>
 
   <!-- ══════════════════════════ MODAL CADASTRO ══ -->
+  <!-- ══════════════════════════ MODAL CADASTRO ══ -->
   <div class="modal-overlay" id="modal-cadastro" role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
@@ -270,261 +271,302 @@
       <div class="modal-header">
         <div>
           <div class="modal-title" id="modal-title-text">Cadastrar no Angatuba<span>ON</span></div>
-          <div class="modal-subtitle">Preencha os dados — a gente analisa e te avisa!</div>
+          <div class="modal-subtitle" id="cad-modal-subtitle">Preencha os dados da sua loja</div>
         </div>
         <button class="modal-close" onclick="closeModal()" aria-label="Fechar">✕</button>
       </div>
 
-      <!-- Formulário -->
-      <form class="modal-body" id="cadastro-form" novalidate>
-
-        <div class="field-group">
-          <label class="field-label" for="f-nome">Nome da loja / empresa <span>*</span></label>
-          <input class="field-input" id="f-nome" name="nome" type="text"
-            placeholder="Ex: Pizzaria do João" required autocomplete="organization" />
+      <!-- Stepper de progresso -->
+      <div class="cad-stepper" id="cad-stepper">
+        <div class="cad-step active" id="cad-step-ind-1">
+          <div class="cad-step-circle" id="cad-step-circ-1">1</div>
+          <div class="cad-step-label">Dados</div>
         </div>
-
-        <div class="field-group">
-          <label class="field-label" for="f-ramo-text">Ramo / categoria <span>*</span></label>
-          <div class="ramo-wrap">
-            <div class="ramo-combobox" id="ramo-combobox">
-              <span class="ramo-selected-emoji" id="ramo-emoji" aria-hidden="true"></span>
-              <input type="text" id="f-ramo-text"
-                placeholder="Digite ou escolha o ramo…"
-                autocomplete="off" autocorrect="off" spellcheck="false"
-                role="combobox" aria-autocomplete="list"
-                aria-controls="ramo-dropdown" aria-haspopup="listbox"
-                aria-expanded="false" />
-              <span class="ramo-ok-mark" id="ramo-ok">✓</span>
-              <button type="button" class="ramo-clear-btn" id="ramo-clear"
-                aria-label="Limpar ramo" tabindex="-1">✕</button>
-            </div>
-            <div class="ramo-dropdown" id="ramo-dropdown" role="listbox"
-              aria-label="Sugestões de ramo"></div>
-            <input type="hidden" id="f-ramo" name="ramo" />
-          </div>
+        <div class="cad-step-line" id="cad-line-1"></div>
+        <div class="cad-step" id="cad-step-ind-2">
+          <div class="cad-step-circle" id="cad-step-circ-2">2</div>
+          <div class="cad-step-label">Horário</div>
         </div>
-
-        <div class="field-group" style="position:relative;">
-          <label class="field-label" for="f-endereco-rua">
-            Endereço <span>*</span>
-            <span id="maps-status" style="font-size:10px;font-weight:600;margin-left:6px;"></span>
-          </label>
-          <div style="display:flex;gap:8px;align-items:flex-start;">
-            <div style="flex:1;position:relative;">
-              <input class="field-input" id="f-endereco-rua" type="text"
-                placeholder="Digite a rua ou nome do estabelecimento..."
-                required autocomplete="off" autocorrect="off" />
-              <div id="addr-suggestions" style="
-                display:none; position:absolute; left:0; right:0; top:100%;
-                background:#222; border:1px solid rgba(255,255,255,0.12);
-                border-radius:0 0 12px 12px; z-index:3000;
-                max-height:220px; overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,0.5);
-              "></div>
-            </div>
-            <input class="field-input" id="f-endereco-numero" type="text"
-              placeholder="Nº" autocomplete="off" inputmode="numeric" pattern="[0-9]*"
-              style="width:80px;flex-shrink:0;" />
-          </div>
-          <!-- campo oculto com endereço completo montado pelo JS -->
-          <input type="hidden" id="f-endereco" name="endereco" />
-          <input type="hidden" id="f-maps-url" name="mapsUrl" />
-          <p class="field-hint" style="margin-top:6px;" id="maps-hint">
-            📍 Digite pelo menos 4 letras para buscar a rua
-          </p>
+        <div class="cad-step-line" id="cad-line-2"></div>
+        <div class="cad-step" id="cad-step-ind-3">
+          <div class="cad-step-circle" id="cad-step-circ-3">3</div>
+          <div class="cad-step-label">Plano</div>
         </div>
+      </div>
 
-        <div class="field-group" style="position:relative;">
-          <label class="field-label" for="f-bairro">Bairro</label>
-          <input class="field-input" id="f-bairro" name="bairro" type="text"
-            placeholder="Ex: Centro, Vila Ribeiro..." autocomplete="off" />
-          <div class="bairro-cad-dropdown" id="bairro-cad-dropdown" style="display:none;"></div>
-          <p class="field-hint" style="margin-top:4px;">📍 Digite o bairro da sua loja</p>
-        </div>
+      <!-- Formulário em etapas -->
+      <form class="modal-body" id="cadastro-form" novalidate style="gap:14px;">
 
-        <div class="field-row">
+        <!-- ── ETAPA 1: Dados básicos ── -->
+        <div class="cad-step-panel active" id="cad-panel-1">
+
           <div class="field-group">
-            <label class="field-label" for="f-wpp">WhatsApp <span>*</span></label>
-            <input class="field-input" id="f-wpp" name="whatsapp" type="tel"
-              placeholder="(15) 9 9999-9999" required autocomplete="tel"
-              inputmode="numeric" maxlength="16" />
-            <span class="field-error" id="f-wpp-err">Digite um número válido com DDD (ex: 15 9 9999-9999)</span>
+            <label class="field-label" for="f-nome">Nome da loja / empresa <span>*</span></label>
+            <input class="field-input" id="f-nome" name="nome" type="text"
+              placeholder="Ex: Pizzaria do João" required autocomplete="organization" />
           </div>
-          <div class="field-group">
-            <label class="field-label" for="f-tel">Telefone fixo</label>
-            <input class="field-input" id="f-tel" name="telefone" type="tel"
-              placeholder="(15) 3255-0000" autocomplete="off"
-              inputmode="numeric" />
-          </div>
-        </div>
 
-        <div class="field-group">
-          <label class="field-label">Horário de funcionamento <span>*</span></label>
-          <div class="schedule-builder" id="schedule-builder"></div>
-          <button type="button" class="schedule-add-btn" id="schedule-add-btn">
-            <i class="fa fa-plus"></i> Adicionar turno diferente
+          <div class="field-group">
+            <label class="field-label" for="f-ramo-text">Ramo / categoria <span>*</span></label>
+            <div class="ramo-wrap">
+              <div class="ramo-combobox" id="ramo-combobox">
+                <span class="ramo-selected-emoji" id="ramo-emoji" aria-hidden="true"></span>
+                <input type="text" id="f-ramo-text"
+                  placeholder="Digite ou escolha o ramo…"
+                  autocomplete="off" autocorrect="off" spellcheck="false"
+                  role="combobox" aria-autocomplete="list"
+                  aria-controls="ramo-dropdown" aria-haspopup="listbox"
+                  aria-expanded="false" />
+                <span class="ramo-ok-mark" id="ramo-ok">✓</span>
+                <button type="button" class="ramo-clear-btn" id="ramo-clear"
+                  aria-label="Limpar ramo" tabindex="-1">✕</button>
+              </div>
+              <div class="ramo-dropdown" id="ramo-dropdown" role="listbox"
+                aria-label="Sugestões de ramo"></div>
+              <input type="hidden" id="f-ramo" name="ramo" />
+            </div>
+          </div>
+
+          <div class="field-group" style="position:relative;">
+            <label class="field-label" for="f-endereco-rua">
+              Endereço <span>*</span>
+              <span id="maps-status" style="font-size:10px;font-weight:600;margin-left:6px;"></span>
+            </label>
+            <div style="display:flex;gap:8px;align-items:flex-start;">
+              <div style="flex:1;position:relative;">
+                <input class="field-input" id="f-endereco-rua" type="text"
+                  placeholder="Digite a rua ou nome do estabelecimento..."
+                  required autocomplete="off" autocorrect="off" />
+                <div id="addr-suggestions" style="
+                  display:none; position:absolute; left:0; right:0; top:100%;
+                  background:#222; border:1px solid rgba(255,255,255,0.12);
+                  border-radius:0 0 12px 12px; z-index:3000;
+                  max-height:220px; overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,0.5);
+                "></div>
+              </div>
+              <input class="field-input" id="f-endereco-numero" type="text"
+                placeholder="Nº" autocomplete="off" inputmode="numeric" pattern="[0-9]*"
+                style="width:80px;flex-shrink:0;" />
+            </div>
+            <input type="hidden" id="f-endereco" name="endereco" />
+            <input type="hidden" id="f-maps-url" name="mapsUrl" />
+            <p class="field-hint" style="margin-top:6px;" id="maps-hint">
+              📍 Digite pelo menos 4 letras para buscar a rua
+            </p>
+          </div>
+
+          <div class="field-group" style="position:relative;">
+            <label class="field-label" for="f-bairro">Bairro</label>
+            <input class="field-input" id="f-bairro" name="bairro" type="text"
+              placeholder="Ex: Centro, Vila Ribeiro..." autocomplete="off" />
+            <div class="bairro-cad-dropdown" id="bairro-cad-dropdown" style="display:none;"></div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label" for="f-wpp">WhatsApp <span>*</span></label>
+              <input class="field-input" id="f-wpp" name="whatsapp" type="tel"
+                placeholder="(15) 9 9999-9999" required autocomplete="tel"
+                inputmode="numeric" maxlength="16" />
+              <span class="field-error" id="f-wpp-err">Digite um número válido com DDD (ex: 15 9 9999-9999)</span>
+            </div>
+            <div class="field-group">
+              <label class="field-label" for="f-tel">Telefone fixo</label>
+              <input class="field-input" id="f-tel" name="telefone" type="tel"
+                placeholder="(15) 3255-0000" autocomplete="off" inputmode="numeric" />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label" for="f-tags">
+              Tags de Busca
+              <span style="font-size:10px;font-weight:500;color:var(--muted);margin-left:6px;">ajuda clientes a te encontrar</span>
+            </label>
+            <textarea class="field-textarea" id="f-tags" name="tags"
+              placeholder="Ex: delivery, pizza, esfiha, açaí, conserto de celular..."
+              style="min-height:64px;"></textarea>
+            <p class="field-hint" style="margin-top:4px;">🔍 Sua loja aparece quando alguém pesquisar por essas palavras.</p>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label" for="f-instagram">
+              Instagram <span style="font-size:10px;font-weight:500;color:var(--muted);margin-left:4px;">opcional</span>
+            </label>
+            <div style="position:relative;display:flex;align-items:center;">
+              <span style="position:absolute;left:12px;color:#e1306c;font-size:14px;pointer-events:none;"><i class="fab fa-instagram"></i></span>
+              <input class="field-input" id="f-instagram" name="instagram" type="text"
+                placeholder="@nomedoperfil" autocomplete="off" style="padding-left:34px;" />
+            </div>
+          </div>
+
+          <button type="button" class="cad-next-btn" onclick="cadAvancar(2)">
+            Próximo — Horário de funcionamento <i class="fa fa-arrow-right"></i>
           </button>
-          <input type="hidden" id="f-horario" name="horario" />
-          <input type="hidden" id="f-dias" name="dias" />
-          <input type="hidden" id="f-hora-abre" name="horaAbre" />
-          <input type="hidden" id="f-hora-fecha" name="horaFecha" />
         </div>
 
-        <div class="field-group">
-          <label class="field-label" for="f-tags">
-            Tags de Busca
-            <span style="font-size:10px;font-weight:500;color:var(--muted);margin-left:6px;">ajuda clientes a te encontrar</span>
-          </label>
-          <textarea class="field-textarea" id="f-tags" name="tags"
-            placeholder="Ex: delivery, pizza, esfiha, açaí, produtos naturais, conserto de celular..."
-            style="min-height:70px;"></textarea>
-          <p class="field-hint" style="margin-top:5px;">
-            🔍 Quando alguém pesquisar por essas palavras, sua loja vai aparecer nos resultados.
-          </p>
-        </div>
+        <!-- ── ETAPA 2: Horário ── -->
+        <div class="cad-step-panel" id="cad-panel-2">
 
-        <!-- ── Instagram ── -->
-        <div class="field-group">
-          <label class="field-label" for="f-instagram">
-            Instagram
-            <span style="font-size:10px;font-weight:500;color:var(--muted);margin-left:6px;">opcional</span>
-          </label>
-          <div style="position:relative;display:flex;align-items:center;">
-            <span style="position:absolute;left:12px;color:#e1306c;font-size:14px;pointer-events:none;"><i class="fab fa-instagram"></i></span>
-            <input class="field-input" id="f-instagram" name="instagram" type="text"
-              placeholder="@nomedoperfil"
-              autocomplete="off"
-              style="padding-left:34px;" />
-          </div>
-          <p class="field-hint" style="margin-top:4px;">
-            📸 Aparece como botão no perfil da sua loja no app.
-          </p>
-        </div>
+          <div class="field-group">
+            <label class="field-label">Horário de funcionamento <span>*</span></label>
 
-        <!-- Foto e Logo — preview de card unificado (Plus / Pro) -->
-        <div class="field-group" id="foto-group" style="display:none;">
-          <label class="field-label">
-            Foto &amp; Logo
-            <span style="color:var(--zap);margin-left:4px;">✦ Plus · ⭐ Pro</span>
-          </label>
-          <p class="field-hint" style="margin-bottom:10px;">
-            Veja como sua loja vai aparecer no app. Toque nos ícones para trocar as imagens.
-          </p>
-
-          <!-- Preview Card -->
-          <div id="card-preview-wrap" style="
-            border-radius:16px; overflow:hidden; border:1px solid var(--border);
-            background:var(--surface); position:relative; margin-bottom:8px;
-          ">
-            <!-- Capa / hero -->
-            <div id="prev-capa-wrap" style="
-              width:100%; height:130px; background:var(--surface2);
-              display:flex; align-items:center; justify-content:center;
-              position:relative; overflow:hidden; touch-action:none; cursor:default;
-            ">
-              <i id="prev-capa-placeholder" class="fa fa-image" style="font-size:2rem;color:var(--border);pointer-events:none;"></i>
-              <img id="foto-preview-img" src="" alt="" style="
-                display:none; position:absolute; inset:0; width:100%; height:100%;
-                object-fit:cover; object-position:50% 50%;
-                user-select:none; -webkit-user-select:none; pointer-events:none;
-              "/>
-              <!-- hint de arrastar — aparece após upload -->
-              <div id="prev-capa-drag-hint" style="
-                display:none; position:absolute; top:8px; left:50%; transform:translateX(-50%);
-                background:rgba(0,0,0,0.6); color:#fff; font-size:10px; font-weight:600;
-                padding:3px 10px; border-radius:20px; white-space:nowrap;
-                backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
-                pointer-events:none;
-              ">✥ Arraste para reposicionar</div>
-              <!-- botão trocar capa -->
-              <label for="f-foto-file" id="btn-trocar-capa" style="
-                position:absolute; bottom:8px; right:8px;
-                background:rgba(0,0,0,0.65); border:1px solid rgba(255,255,255,0.15);
-                border-radius:8px; padding:5px 9px; cursor:pointer;
-                display:flex; align-items:center; gap:5px;
-                font-size:10px; font-weight:700; color:#fff;
-                backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
-                z-index:2;
-              ">
-                <i class="fa fa-camera"></i> Trocar capa
-              </label>
-              <span id="foto-upload-status" style="display:none;"></span>
-            </div>
-            <!-- campo oculto para guardar posição da capa -->
-            <input type="hidden" id="f-foto-pos" name="fotoPosicao" value="50% 50%" />
-
-            <!-- Linha de info do card -->
-            <div style="padding:10px 12px 12px; display:flex; align-items:center; gap:10px;">
-              <!-- Logo -->
-              <div id="prev-logo-wrap" style="
-                width:44px; height:44px; border-radius:10px; flex-shrink:0;
-                background:#fff; border:1.5px solid var(--border); overflow:hidden;
-                display:flex; align-items:center; justify-content:center; position:relative;
-              ">
-                <i id="prev-logo-placeholder" class="fa fa-store" style="font-size:1.1rem;color:var(--border);"></i>
-                <img id="logo-preview-img" src="" alt="" style="
-                  display:none; width:100%; height:100%; object-fit:contain;
-                "/>
-                <!-- botão trocar logo -->
-                <label for="f-logo-file" style="
-                  position:absolute; inset:0; cursor:pointer;
-                  display:flex; align-items:flex-end; justify-content:center;
-                  background:transparent;
-                " title="Trocar logo"></label>
+            <!-- Schedule simplificado -->
+            <div class="sched-simple" id="sched-simple">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">Quais dias você funciona?</div>
+              <div class="sched-preset-grid">
+                <button type="button" class="sched-preset-btn active" data-preset="semana" onclick="schedPreset('semana',this)">
+                  <span class="sched-preset-icon">📅</span>
+                  <span>Seg a Sex</span>
+                </button>
+                <button type="button" class="sched-preset-btn" data-preset="semana_sab" onclick="schedPreset('semana_sab',this)">
+                  <span class="sched-preset-icon">📅</span>
+                  <span>Seg a Sáb</span>
+                </button>
+                <button type="button" class="sched-preset-btn" data-preset="todos" onclick="schedPreset('todos',this)">
+                  <span class="sched-preset-icon">🗓️</span>
+                  <span>Todos os dias</span>
+                </button>
+                <button type="button" class="sched-preset-btn" data-preset="custom" onclick="schedPreset('custom',this)">
+                  <span class="sched-preset-icon">✏️</span>
+                  <span>Personalizar</span>
+                </button>
               </div>
-
-              <div style="flex:1; min-width:0;">
-                <div style="font-family:var(--font-h); font-size:13px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="prev-nome">Nome da sua loja</div>
-                <div style="font-size:11px; color:var(--muted); margin-top:2px;" id="prev-ramo">Ramo / categoria</div>
+              <div class="sched-time-row" style="margin-top:4px;">
+                <label>Abre às</label>
+                <input type="time" id="sched-abre" value="08:00" onchange="schedSyncSimples()" />
+                <label>Fecha às</label>
+                <input type="time" id="sched-fecha" value="18:00" onchange="schedSyncSimples()" />
               </div>
+              <span class="sched-advanced-toggle" onclick="schedMostrarAvancado()">
+                + Adicionar turno especial (sábado/domingo diferente)
+              </span>
             </div>
 
-            <!-- hint do logo abaixo do card -->
-            <div style="
-              display:flex; align-items:center; justify-content:center; gap:16px;
-              padding:8px 12px; border-top:1px solid var(--border);
-              background:var(--surface2);
-            ">
-              <label for="f-logo-file" style="
-                display:flex; align-items:center; gap:5px; cursor:pointer;
-                font-size:11px; font-weight:600; color:var(--text);
-              ">
-                <i class="fa fa-camera" style="font-size:10px;color:var(--muted);"></i> Trocar logo
-              </label>
-              <span id="logo-upload-status" style="display:none;"></span>
+            <!-- Schedule avançado (escondido por padrão) -->
+            <div id="sched-advanced" style="display:none;">
+              <div class="schedule-builder" id="schedule-builder"></div>
+              <button type="button" class="schedule-add-btn" id="schedule-add-btn">
+                <i class="fa fa-plus"></i> Adicionar turno diferente
+              </button>
+              <span class="sched-advanced-toggle" style="margin-top:6px;display:block;" onclick="schedOcultarAvancado()">
+                − Usar horário simplificado
+              </span>
             </div>
+
+            <input type="hidden" id="f-horario" name="horario" />
+            <input type="hidden" id="f-dias" name="dias" />
+            <input type="hidden" id="f-hora-abre" name="horaAbre" />
+            <input type="hidden" id="f-hora-fecha" name="horaFecha" />
           </div>
 
-          <!-- Inputs ocultos -->
-          <input type="file" id="f-foto-file" accept="image/*" style="display:none;" />
-          <input type="hidden" id="f-foto-url" name="fotoUrl" />
-          <input type="file" id="f-logo-file" accept="image/*" style="display:none;" />
-          <input type="hidden" id="f-logo-url" name="logoUrl" />
-          <!-- logo-group antigo unificado aqui, mantemos o id para compatibilidade JS -->
-          <div id="logo-group" style="display:none;"></div>
-          <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.5;">
-            Máx 5MB · JPG, PNG ou WebP<br>
-            <span style="color:rgba(99,102,241,0.8);">💡 Para a logo ficar sem fundo branco, use PNG com fundo transparente</span>
-          </div>
+          <button type="button" class="cad-next-btn" onclick="cadAvancar(3)">
+            Próximo — Escolher plano <i class="fa fa-arrow-right"></i>
+          </button>
+          <button type="button" class="cad-back-btn" onclick="cadVoltar(1)">← Voltar</button>
         </div>
 
-        <p class="field-hint">
-          ✅ Cadastro gratuito · Você será notificado pelo WhatsApp quando a loja for publicada.
-        </p>
+        <!-- ── ETAPA 3: Plano + Foto + Submit ── -->
+        <div class="cad-step-panel" id="cad-panel-3">
 
-        <button type="submit" class="modal-submit">
-          <i class="fab fa-whatsapp"></i> Enviar Cadastro
-        </button>
+          <!-- Plano selecionado (vem do modal de planos, mas pode trocar aqui) -->
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px;">
+            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Plano escolhido</div>
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="sched-preset-btn active" id="plan-sel-gratis" data-plan="GRATIS" onclick="cadSelecionarPlano('GRATIS')" style="flex:1;font-size:11px;">
+                <span class="sched-preset-icon">🏪</span><span>Grátis</span><span style="font-size:9px;color:var(--muted);">R$ 0</span>
+              </button>
+              <button type="button" class="sched-preset-btn" id="plan-sel-plus" data-plan="PLUS" onclick="cadSelecionarPlano('PLUS')" style="flex:1;font-size:11px;">
+                <span class="sched-preset-icon">✦</span><span>Plus</span><span style="font-size:9px;color:var(--muted);">R$ 29,90</span>
+              </button>
+              <button type="button" class="sched-preset-btn" id="plan-sel-pro" data-plan="PRO" onclick="cadSelecionarPlano('PRO')" style="flex:1;font-size:11px;">
+                <span class="sched-preset-icon">⭐</span><span>Pro</span><span style="font-size:9px;color:var(--muted);">R$ 49,90</span>
+              </button>
+            </div>
+            <p class="field-hint" style="margin-top:8px;text-align:center;" id="cad-plan-hint">
+              🏪 Plano <strong>GRÁTIS</strong> selecionado · Cadastro gratuito, sem compromisso.
+            </p>
+          </div>
+
+          <!-- Foto & Logo — sempre visível, com lock para Grátis -->
+          <div class="field-group" id="foto-group" style="position:relative;">
+            <label class="field-label">
+              Foto &amp; Logo
+              <span style="color:var(--zap);margin-left:4px;" id="foto-group-plan-label">✦ Plus · ⭐ Pro</span>
+            </label>
+            <p class="field-hint" style="margin-bottom:10px;">
+              Veja como sua loja vai aparecer no app. Toque nas imagens para trocar.
+            </p>
+
+            <!-- Lock overlay para plano Grátis -->
+            <div class="foto-lock-overlay show" id="foto-lock-overlay">
+              <div class="foto-lock-icon">🔒</div>
+              <div class="foto-lock-title">Foto & Logo</div>
+              <div class="foto-lock-sub">Disponível nos planos <strong>Plus</strong> e <strong>Pro</strong>.<br>Faça o upgrade para destacar sua loja!</div>
+              <button type="button" class="foto-lock-btn" onclick="cadSelecionarPlano('PLUS')">✦ Selecionar Plus</button>
+            </div>
+
+            <!-- Preview Card -->
+            <div id="card-preview-wrap" style="border-radius:16px;overflow:hidden;border:1px solid var(--border);background:var(--surface);position:relative;margin-bottom:8px;">
+              <div id="prev-capa-wrap" style="width:100%;height:130px;background:var(--surface2);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;touch-action:none;cursor:default;">
+                <i id="prev-capa-placeholder" class="fa fa-image" style="font-size:2rem;color:var(--border);pointer-events:none;"></i>
+                <img id="foto-preview-img" src="" alt="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 50%;user-select:none;-webkit-user-select:none;pointer-events:none;"/>
+                <div id="prev-capa-drag-hint" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:#fff;font-size:10px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;backdrop-filter:blur(4px);pointer-events:none;">✥ Arraste para reposicionar</div>
+                <label for="f-foto-file" id="btn-trocar-capa" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:5px 9px;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:#fff;backdrop-filter:blur(6px);z-index:2;">
+                  <i class="fa fa-camera"></i> Trocar capa
+                </label>
+                <span id="foto-upload-status" style="display:none;"></span>
+              </div>
+              <input type="hidden" id="f-foto-pos" name="fotoPosicao" value="50% 50%" />
+              <div style="padding:10px 12px 12px;display:flex;align-items:center;gap:10px;">
+                <div id="prev-logo-wrap" style="width:44px;height:44px;border-radius:10px;flex-shrink:0;background:#fff;border:1.5px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative;">
+                  <i id="prev-logo-placeholder" class="fa fa-store" style="font-size:1.1rem;color:var(--border);"></i>
+                  <img id="logo-preview-img" src="" alt="" style="display:none;width:100%;height:100%;object-fit:contain;"/>
+                  <label for="f-logo-file" style="position:absolute;inset:0;cursor:pointer;background:transparent;" title="Trocar logo"></label>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-family:var(--font-h);font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="prev-nome">Nome da sua loja</div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:2px;" id="prev-ramo">Ramo / categoria</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:center;gap:16px;padding:8px 12px;border-top:1px solid var(--border);background:var(--surface2);">
+                <label for="f-logo-file" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text);">
+                  <i class="fa fa-camera" style="font-size:10px;color:var(--muted);"></i> Trocar logo
+                </label>
+                <span id="logo-upload-status" style="display:none;"></span>
+              </div>
+            </div>
+            <input type="file" id="f-foto-file" accept="image/*" style="display:none;" />
+            <input type="hidden" id="f-foto-url" name="fotoUrl" />
+            <input type="file" id="f-logo-file" accept="image/*" style="display:none;" />
+            <input type="hidden" id="f-logo-url" name="logoUrl" />
+            <div id="logo-group" style="display:none;"></div>
+            <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.5;">
+              Máx 5MB · JPG, PNG ou WebP<br>
+              <span style="color:rgba(99,102,241,0.8);">💡 Para a logo ficar sem fundo branco, use PNG com fundo transparente</span>
+            </div>
+          </div>
+
+          <button type="submit" class="modal-submit">
+            <i class="fab fa-whatsapp"></i> Solicitar meu espaço no AngatubaON
+          </button>
+          <p class="modal-submit-label">Você será avisado pelo WhatsApp quando sua loja for publicada.</p>
+          <button type="button" class="cad-back-btn" onclick="cadVoltar(2)">← Voltar</button>
+        </div>
+
       </form>
 
-      <!-- Tela de sucesso (aparece após envio) -->
+      <!-- Tela de sucesso -->
       <div class="modal-success" id="cadastro-success">
         <img id="success-owl" src="/webp/owl-celebrate-gratis.webp" alt="" class="success-owl" />
-        <div class="success-title">Cadastro enviado!</div>
-        <p class="success-sub">
+        <div class="success-title">Cadastro enviado! 🎉</div>
+        <p class="success-sub" id="success-sub-text">
           Recebemos os dados da sua loja.<br>
           Vamos analisar e entrar em contato pelo WhatsApp em breve.
         </p>
+        <!-- Botão WPP dinâmico para planos pagos (inserido via JS) -->
+        <a href="https://instagram.com/angatubaon_" target="_blank" rel="noopener" class="success-ig-btn">
+          <i class="fab fa-instagram"></i> Seguir o AngatubaON
+        </a>
         <button class="success-close" onclick="closeModal()">Fechar</button>
       </div>
     </div>

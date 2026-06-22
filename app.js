@@ -683,7 +683,7 @@
               ${badge}
             </div>
             <span class="cat-label">${cat.label}</span>
-            ${cat.id !== 'todos' ? '<button class="cat-clear-btn" onclick="event.stopPropagation();setCat('todos',document.querySelector('[data-cat=\"todos\"]')); return false;" aria-label="Limpar filtro">✕</button>' : ''}
+            ${cat.id !== 'todos' ? '<button class="cat-clear-btn" onclick="event.stopPropagation();limparCategoria()" aria-label="Limpar filtro">✕</button>' : ''}
           </button>`;
       }).join('');
   }
@@ -4741,6 +4741,11 @@
 
     document.getElementById('modal-cardapio-cliente').classList.add('open');
     document.body.style.overflow = 'hidden';
+  };
+
+  window.limparCategoria = function() {
+    var todosBtn = document.querySelector('[data-cat="todos"]');
+    if (todosBtn && typeof setCat === 'function') setCat('todos', todosBtn);
   };
 
   window.ccScrollTocat = function(id) {

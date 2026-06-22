@@ -1255,10 +1255,11 @@
     .detail-handle {
       width: 36px; height: 4px; border-radius: 2px;
       background: rgba(255,255,255,0.45);
+      background-clip: content-box; /* fundo só na barrinha, não no padding */
       margin: 0 auto;
       position: absolute; left: 50%; transform: translateX(-50%);
       top: 14px;
-      /* área de toque invisível acima e abaixo */
+      /* padding expande a área de toque sem mostrar fundo */
       padding: 12px 20px;
       box-sizing: content-box;
       -webkit-tap-highlight-color: transparent;

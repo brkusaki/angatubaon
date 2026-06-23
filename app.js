@@ -229,7 +229,20 @@
       // Expirou - cai no automatico abaixo
     }
 
-    if (loja.statusLoja === 'FECHADO')  return { status: 'closed', fechaStr: '' };
+    // Fechado só por hoje: FECHADO_HOJE_YYYY-MM-DD — expira na virada do dia
+    if ((loja.statusLoja || '').startsWith('FECHADO_HOJE_')) {
+      const dataFech = loja.statusLoja.replace('FECHADO_HOJE_', '');
+      const hojeStr  = (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      })();
+      if (dataFech === hojeStr) return { status: 'closed', fechaStr: '' };
+      // Data anterior — expirou, cai no cálculo automático abaixo
+    }
+
+    // FECHADO legado (sem data) — trava permanente; tratamos como expirado
+    // e seguimos para o cálculo automático (o trigger limpa o campo na planilha)
+    if (loja.statusLoja === 'FECHADO')  { /* legado: ignora e usa automático */ }
 
     // Aberto com horário manual: ABERTO_ATE_YYYY-MM-DD_HHMM (ou legado HHMM)
     if ((loja.statusLoja || '').startsWith('ABERTO_ATE_')) {
@@ -1662,7 +1675,7 @@
       params.append('payload', JSON.stringify({ action: 'lojaRequestCodigo', wpp }));
       const resp = await fetch(APPS_SCRIPT_URL, {
         method: 'POST', body: params,
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(30000),
       });
       const json = await resp.json();
 
@@ -1771,7 +1784,7 @@
       params.append('payload', JSON.stringify({ action: 'lojaVerificarCodigo', wpp: _lojaWpp, codigo }));
       const resp = await fetch(APPS_SCRIPT_URL, {
         method: 'POST', body: params,
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(30000),
       });
       const json = await resp.json();
 
@@ -1785,7 +1798,13 @@
         atualizarNav();
         abrirMinhaLoja();
       } else if (json.msg === 'CODIGO_INVALIDO') {
-        document.getElementById('login-codigo-hint').textContent = '❌ Código inválido ou expirado. Solicite um novo.';
+        document.getElementById('login-codigo-hint').textContent = '❌ Código inválido. Confira os dígitos ou solicite um novo.';
+        document.getElementById('ll-codigo').value = '';
+      } else if (json.msg === 'CODIGO_EXPIRADO') {
+        document.getElementById('login-codigo-hint').textContent = '⏱️ Código expirado. Volte e solicite um novo.';
+        document.getElementById('ll-codigo').value = '';
+      } else if (json.msg === 'CODIGO_BLOQUEADO') {
+        document.getElementById('login-codigo-hint').textContent = '🔒 Muitas tentativas. Aguarde e solicite um novo código.';
         document.getElementById('ll-codigo').value = '';
       } else {
         alert('Erro: ' + (json.msg || 'Tente novamente.'));
@@ -2275,7 +2294,8 @@
     document.querySelectorAll('.toggle-status-btn').forEach(btn => {
       const isActive = btn.dataset.status === status ||
                        (btn.dataset.status === 'ABERTO'   && (status || '').startsWith('ABERTO_ATE_')) ||
-                       (btn.dataset.status === 'VOLTAMOS' && (status || '').startsWith('VOLTAMOS_ATE_'));
+                       (btn.dataset.status === 'VOLTAMOS' && (status || '').startsWith('VOLTAMOS_ATE_')) ||
+                       (btn.dataset.status === 'FECHADO'  && (status || '').startsWith('FECHADO_HOJE_'));
       btn.style.opacity    = isActive ? '1' : '0.45';
       btn.style.fontWeight = isActive ? '800' : '600';
       btn.style.boxShadow  = isActive ? '0 0 0 2px currentColor inset' : '';
@@ -2344,6 +2364,15 @@
   window.lojaToggleComHorario = lojaToggleComHorario;
   window.lojaToggleAberto     = lojaToggleAberto;
   window.lojaToggleVoltamos   = lojaToggleVoltamos;
+
+  // Botão "Fechado": fecha apenas até o fim do dia. Grava FECHADO_HOJE_<hoje>
+  // (data LOCAL/BRT) para que o status volte ao automático na virada do dia.
+  async function lojaToggleFechado() {
+    const d = new Date();
+    const hoje = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    await lojaToggle(`FECHADO_HOJE_${hoje}`);
+  }
+  window.lojaToggleFechado = lojaToggleFechado;
 
   async function lojaToggle(novoStatus) {
     if (!_lojaToken) return;
@@ -3629,7 +3658,7 @@
       }));
       const sigResp = await fetch(APPS_SCRIPT_URL, {
         method: 'POST', body: sigParams,
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(30000),
       });
       const sigJson = await sigResp.json();
       if (sigJson.status !== 'ok') throw new Error(sigJson.msg || 'Erro ao assinar upload');
@@ -5017,7 +5046,7 @@
     } else if (s.indexOf('VOLTAMOS') === 0) {
       dot.style.background = '#f59e0b'; dot.style.animation = '';
       txt.textContent = 'Já voltamos';
-    } else if (s === 'FECHADO') {
+    } else if (s === 'FECHADO' || s.indexOf('FECHADO_HOJE_') === 0) {
       dot.style.background = '#ff4444'; dot.style.animation = '';
       txt.textContent = 'Fechada agora';
     } else {
@@ -5077,7 +5106,7 @@
         categoria:  document.getElementById('ml-cardapio-cat').value.trim(),
         destaque:   document.getElementById('ml-cardapio-destaque')?.checked ? 'SIM' : 'NAO',
       }));
-      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(15000) });
+      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(30000) });
       const json = await resp.json();
       if (json.status === 'ok') {
         // Atualiza a lista sem fechar o form quando manterAberto=true

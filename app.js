@@ -1531,6 +1531,7 @@
   });
 
   /* ── Modais de login ─────────────────────────────────────── */
+  let _llMaskBound = false;
   function openLoginLoja() {
     loginStep(1);
     document.getElementById('ll-wpp').value    = '';
@@ -1539,6 +1540,39 @@
     document.getElementById('login-loja-sub').textContent = 'Digite o WhatsApp cadastrado para receber seu código';
     document.getElementById('modal-login-loja').classList.add('open');
     document.body.style.overflow = 'hidden';
+
+    // Reseta validação visual
+    const okEl  = document.getElementById('ll-wpp-ok');
+    const errEl = document.getElementById('ll-wpp-err');
+    const input = document.getElementById('ll-wpp');
+    if (okEl)  okEl.style.opacity = '0';
+    if (errEl) errEl.classList.remove('show');
+    if (input) input.classList.remove('invalid');
+
+    // Aplica máscara de telefone (uma vez só)
+    if (input && !_llMaskBound) {
+      _llMaskBound = true;
+      function mask(v) {
+        const d = v.replace(/\D/g, '').slice(0, 11);
+        if (d.length <= 2)  return d;
+        if (d.length <= 6)  return `(${d.slice(0,2)}) ${d.slice(2)}`;
+        if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+        return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+      }
+      input.addEventListener('input', function() {
+        const pos  = this.selectionStart;
+        const prev = this.value.length;
+        this.value = mask(this.value);
+        const diff = this.value.length - prev;
+        try { this.setSelectionRange(pos + diff, pos + diff); } catch(e) {}
+        const digits = this.value.replace(/\D/g,'');
+        const ok = digits.length === 10 || digits.length === 11;
+        const okMark = document.getElementById('ll-wpp-ok');
+        if (okMark) okMark.style.opacity = ok ? '1' : '0';
+        this.classList.toggle('invalid', digits.length >= 10 && !ok);
+      });
+    }
+
     setTimeout(() => document.getElementById('ll-wpp').focus(), 300);
   }
 
@@ -1561,14 +1595,18 @@
     const wppRaw = document.getElementById('ll-wpp').value.replace(/\D/g,'');
     const wpp = wppRaw.startsWith('55') ? wppRaw : '55' + wppRaw;
     if (wpp.length < 12) {
-      alert('Digite o número de WhatsApp completo com DDD.');
+      const input = document.getElementById('ll-wpp');
+      const errEl = document.getElementById('ll-wpp-err');
+      if (input) { input.classList.add('invalid'); input.focus(); }
+      if (errEl) errEl.classList.add('show');
       return;
     }
     _lojaWpp = wpp;
 
-    const btn = document.querySelector('#login-step1 .modal-submit');
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Solicitando...';
+    const btn = document.getElementById('ll-submit-btn') || document.querySelector('#login-step1 .modal-submit');
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Enviando código...';
     btn.disabled = true;
+    btn.style.opacity = '0.8';
 
     try {
       const params = new URLSearchParams();
@@ -1664,6 +1702,7 @@
     } finally {
       btn.innerHTML = '<i class="fab fa-whatsapp"></i> Receber código';
       btn.disabled = false;
+      btn.style.opacity = '';
     }
   }
 

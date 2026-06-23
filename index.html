@@ -916,13 +916,21 @@
       <div class="modal-body" id="login-step1">
         <div class="field-group">
           <label class="field-label" for="ll-wpp">WhatsApp cadastrado <span>*</span></label>
-          <input class="field-input" id="ll-wpp" type="tel" placeholder="(15) 9 9999-9999"
-            inputmode="numeric" autocomplete="tel" />
+          <div style="position:relative;display:flex;align-items:center;">
+            <input class="field-input" id="ll-wpp" type="tel" placeholder="(15) 9 9999-9999"
+              inputmode="numeric" autocomplete="tel" maxlength="16" style="padding-right:38px;" />
+            <span id="ll-wpp-ok" style="position:absolute;right:14px;color:var(--green);font-size:16px;opacity:0;transition:opacity 0.2s;pointer-events:none;">✓</span>
+          </div>
+          <span class="field-error" id="ll-wpp-err">Digite um número válido com DDD (ex: 15 9 9999-9999)</span>
         </div>
         <p class="field-hint">Você receberá um código de 6 dígitos pelo WhatsApp para confirmar o acesso.</p>
-        <button class="modal-submit" style="background:linear-gradient(135deg,#25d366,#128c7e);"
+        <button class="modal-submit" id="ll-submit-btn" style="background:linear-gradient(135deg,#25d366,#128c7e);"
           onclick="lojaRequestCodigo()">
           <i class="fab fa-whatsapp"></i> Receber código
+        </button>
+        <button type="button" onclick="closeLoginLoja();openModal();"
+          style="background:none;border:none;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;width:100%;text-align:center;padding:10px 0 2px;-webkit-tap-highlight-color:transparent;">
+          Ainda não tenho loja cadastrada →
         </button>
       </div>
       <!-- Passo 2: Código -->

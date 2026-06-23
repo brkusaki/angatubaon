@@ -427,12 +427,13 @@
       ? `<span class="contact-tag maps" title="Localização disponível"><i class="fa fa-map-marker-alt"></i> MAPS</span>`
       : '';
 
-    const ctTag = loja.tel && !loja.wpp
+    // Pill TEL só quando a loja NÃO tem WhatsApp (senão é redundante com o botão flutuante)
+    const ctTag = (loja.tel && !loja.wpp)
       ? `<span class="contact-tag tel">📞 TEL</span>`
-      : `<span class="contact-tag wpp">💬 WPP</span>`;
+      : '';
 
-    // Linha de indicadores visuais (mapPin + ctTag) — fica no rodapé do card
-    // Posição abaixo de "Ver detalhes" para evitar cliques acidentais ao abrir o card
+    // Linha de indicadores visuais (só MAPS + TEL quando relevante)
+    // O WhatsApp já tem botão de ação dedicado à direita — não duplicar aqui
     const indicadoresFooter = (mapPin || ctTag)
       ? `<div style="display:flex;align-items:center;gap:4px;margin-top:3px;">${mapPin}${ctTag}</div>`
       : '';
@@ -684,7 +685,7 @@
 
         return `
           <button class="cat-item${isActive && cat.id !== 'todos' ? ' has-clear' : ''}" data-cat="${cat.id}" onclick="setCat('${cat.id}',this)">
-            <div class="cat-icon ${isActive?'active':''}" style="background:${cat.bg};">
+            <div class="cat-icon ${isActive?'active':''}" style="--cat-accent:${cat.cor};">
               <i class="ti ${cat.icon}" style="color:${cat.cor};"></i>
               ${badge}
             </div>

@@ -1354,6 +1354,42 @@
                     <div style="font-size:9px;color:#e1306c;margin-top:2px;">Instagram</div>
                   </div>
                 </div>
+
+                <!-- Visibilidade: quantas pessoas viram a loja/cardápio -->
+                <div id="ml-visibilidade-row" style="display:none;gap:8px;margin-top:8px;">
+                  <div style="flex:1;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:#f59e0b;" id="ml-m-views">—</div>
+                    <div style="font-size:9px;color:#f59e0b;margin-top:2px;">👁️ Visualizações</div>
+                  </div>
+                  <div style="flex:1;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:#8b5cf6;" id="ml-m-menu">—</div>
+                    <div style="font-size:9px;color:#8b5cf6;margin-top:2px;">📖 Abriram cardápio</div>
+                  </div>
+                </div>
+
+                <!-- Crescimento semanal: variação vs. semana anterior -->
+                <div id="ml-crescimento-box" style="display:none;margin-top:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 12px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                    <div>
+                      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">Cliques esta semana</div>
+                      <div style="font-family:var(--font-h);font-size:1.2rem;font-weight:800;margin-top:1px;" id="ml-cresc-atual">—</div>
+                    </div>
+                    <div id="ml-cresc-badge" style="font-family:var(--font-h);font-size:.85rem;font-weight:800;padding:5px 10px;border-radius:8px;white-space:nowrap;">—</div>
+                  </div>
+                  <div id="ml-cresc-msg" style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.4;"></div>
+                </div>
+
+                <!-- Conversão por canal: barra de proporção wpp/tel/ig -->
+                <div id="ml-conversao-box" style="display:none;margin-top:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 12px;">
+                  <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Como te contatam</div>
+                  <div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--surface2);">
+                    <div id="ml-conv-wpp" style="width:0%;background:#25d366;transition:width .4s;"></div>
+                    <div id="ml-conv-tel" style="width:0%;background:var(--blue);transition:width .4s;"></div>
+                    <div id="ml-conv-ig"  style="width:0%;background:#e1306c;transition:width .4s;"></div>
+                  </div>
+                  <div id="ml-conv-legenda" style="font-size:10px;color:var(--muted);margin-top:7px;line-height:1.4;"></div>
+                </div>
+
                 <div id="ml-metricas-lock" style="display:none;position:absolute;inset:0;z-index:10;border-radius:10px;overflow:hidden;">
                   <div style="position:absolute;inset:0;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);background:rgba(13,13,13,0.55);"></div>
                   <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:12px;text-align:center;">

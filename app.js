@@ -1942,6 +1942,9 @@
         if (lockEl) lockEl.style.display = '';
       }
 
+      // ── Visibilidade / Crescimento / Conversão (só planos pagos) ──
+      mlRenderMetricasExtra(m, isPago);
+
       // ── Horário de pico (só Pro) ──────────────────────
       const picoSection = document.getElementById('ml-pico-section');
       if (picoSection) {
@@ -1950,6 +1953,104 @@
           requestAnimationFrame(() => mlRenderizarPico(metJson.data.pico));
         }
       }
+    }
+  }
+
+  // Renderiza os blocos extra de métricas: visualizações, crescimento semanal
+  // e conversão por canal. Tudo a partir do objeto que o backend já devolve.
+  function mlRenderMetricasExtra(m, isPago) {
+    const visRow   = document.getElementById('ml-visibilidade-row');
+    const crescBox = document.getElementById('ml-crescimento-box');
+    const convBox  = document.getElementById('ml-conversao-box');
+
+    // Em plano grátis, esses blocos ficam escondidos (lock cobre os de cima)
+    if (!isPago) {
+      if (visRow)   visRow.style.display   = 'none';
+      if (crescBox) crescBox.style.display = 'none';
+      if (convBox)  convBox.style.display  = 'none';
+      return;
+    }
+
+    const views = m.views ?? 0;
+    const menu  = m.menu  ?? 0;
+    const wpp   = m.wpp   ?? 0;
+    const tel   = m.tel   ?? 0;
+    const ig    = m.ig    ?? 0;
+    const totalContato = wpp + tel + ig;
+
+    // ── Visualizações ──
+    if (visRow) {
+      const elV = document.getElementById('ml-m-views');
+      const elM = document.getElementById('ml-m-menu');
+      if (elV) elV.textContent = views;
+      if (elM) elM.textContent = menu;
+      visRow.style.display = 'flex';
+    }
+
+    // ── Crescimento semanal (d7 vs d7ant) ──
+    if (crescBox) {
+      const d7    = m.d7    ?? 0;
+      const d7ant = m.d7ant ?? 0;
+      const elAtual = document.getElementById('ml-cresc-atual');
+      const elBadge = document.getElementById('ml-cresc-badge');
+      const elMsg   = document.getElementById('ml-cresc-msg');
+      if (elAtual) elAtual.textContent = d7;
+
+      let pct = null;
+      if (d7ant > 0) pct = Math.round(((d7 - d7ant) / d7ant) * 100);
+
+      if (elBadge && elMsg) {
+        if (d7ant === 0 && d7 === 0) {
+          elBadge.textContent = '—';
+          elBadge.style.background = 'var(--surface2)';
+          elBadge.style.color = 'var(--muted)';
+          elMsg.textContent = 'Ainda sem dados suficientes pra comparar com a semana passada.';
+        } else if (pct === null) {
+          // Semana anterior teve 0, esta teve algo: novo movimento
+          elBadge.textContent = '↑ novo';
+          elBadge.style.background = 'rgba(37,211,102,0.15)';
+          elBadge.style.color = '#25d366';
+          elMsg.textContent = `Você teve ${d7} clique(s) esta semana. Semana passada não houve nenhum.`;
+        } else if (pct >= 0) {
+          elBadge.textContent = `↑ ${pct}%`;
+          elBadge.style.background = 'rgba(37,211,102,0.15)';
+          elBadge.style.color = '#25d366';
+          elMsg.textContent = `${pct === 0 ? 'Estável' : 'Subiu'} em relação à semana passada (${d7ant} → ${d7}).`;
+        } else {
+          elBadge.textContent = `↓ ${Math.abs(pct)}%`;
+          elBadge.style.background = 'rgba(239,68,68,0.13)';
+          elBadge.style.color = 'var(--red)';
+          elMsg.textContent = `Caiu em relação à semana passada (${d7ant} → ${d7}). Que tal publicar um anúncio?`;
+        }
+      }
+      crescBox.style.display = '';
+    }
+
+    // ── Conversão por canal ──
+    if (convBox) {
+      const legenda = document.getElementById('ml-conv-legenda');
+      const bWpp = document.getElementById('ml-conv-wpp');
+      const bTel = document.getElementById('ml-conv-tel');
+      const bIg  = document.getElementById('ml-conv-ig');
+      if (totalContato === 0) {
+        if (bWpp) bWpp.style.width = '0%';
+        if (bTel) bTel.style.width = '0%';
+        if (bIg)  bIg.style.width  = '0%';
+        if (legenda) legenda.textContent = 'Sem contatos registrados ainda.';
+      } else {
+        const pW = Math.round((wpp / totalContato) * 100);
+        const pT = Math.round((tel / totalContato) * 100);
+        const pI = Math.max(0, 100 - pW - pT);
+        if (bWpp) bWpp.style.width = pW + '%';
+        if (bTel) bTel.style.width = pT + '%';
+        if (bIg)  bIg.style.width  = pI + '%';
+        const partes = [];
+        if (wpp) partes.push(`${pW}% WhatsApp`);
+        if (tel) partes.push(`${pT}% telefone`);
+        if (ig)  partes.push(`${pI}% Instagram`);
+        if (legenda) legenda.textContent = partes.join(' · ');
+      }
+      convBox.style.display = '';
     }
   }
 
@@ -4095,7 +4196,9 @@
         destaqueEl.textContent = 'Nenhum clique registrado nos últimos 30 dias.';
       } else {
         const fmt = h => `${String(h).padStart(2,'0')}h`;
-        destaqueEl.innerHTML = `🔥 Pico às <strong style="color:#f59e0b;">${fmt(idxPico)}–${fmt(idxPico+1)}</strong> · ${pico[idxPico]} clique${pico[idxPico]>1?'s':''}`;
+        destaqueEl.innerHTML =
+          `🔥 Pico às <strong style="color:#f59e0b;">${fmt(idxPico)}–${fmt(idxPico+1)}</strong> · ${pico[idxPico]} clique${pico[idxPico]>1?'s':''}` +
+          `<div style="margin-top:5px;color:var(--muted);font-size:10px;line-height:1.4;">💡 Publique seu anúncio do dia perto das ${fmt(idxPico)} — é quando mais gente vê sua loja.</div>`;
       }
     }
   }
@@ -4113,7 +4216,10 @@
       const ph  = document.getElementById('ml-up-capa-placeholder');
       if (img) { img.src = url; img.style.display = ''; }
       if (ph)  ph.style.display = 'none';
-      // Ativa drag sem mostrar hint (foto já existia, não é nova)
+      // Foto JÁ SALVA, só visualização: NÃO ativa edição/drag.
+      // Reposicionar só vale quando a pessoa upa/troca a foto (mlUploadImagem).
+      // Mantém a posição salva (50% padrão) e deixa o scroll da página livre.
+      _mlEditandoCapa = false;
       mlInitCapaDrag(false);
     }
   }
@@ -4123,6 +4229,7 @@
   // Antes, o reset (foto nova) zerava o guard e re-anexava window mousemove/mouseup,
   // vazando um par de listeners globais a cada troca de foto.
   let _mlCapaDragInited = false;
+  let _mlEditandoCapa = false; // só true após upload/troca — libera arraste e bloqueia scroll
   let _mlPosX = 50, _mlPosY = 50;
   function mlInitCapaDrag(mostrarHint) {
     const capaWrap = document.getElementById('ml-up-capa-wrap');
@@ -4130,13 +4237,17 @@
     const dragHint = document.getElementById('ml-up-capa-drag-hint');
     if (!capaWrap || !capaImg) return;
 
-    // Atualiza cursor se já há foto
-    if (capaImg.style.display !== 'none') {
+    // Cursor/hint de arraste SÓ quando em modo edição (foto recém-trocada).
+    // Em visualização, cursor normal e sem hint — nada sugere arraste.
+    if (capaImg.style.display !== 'none' && _mlEditandoCapa) {
       capaWrap.style.cursor = 'grab';
       if (mostrarHint && dragHint) {
         dragHint.style.display = 'block';
         setTimeout(() => { dragHint.style.display = 'none'; }, 3000);
       }
+    } else {
+      capaWrap.style.cursor = 'default';
+      if (dragHint) dragHint.style.display = 'none';
     }
 
     if (_mlCapaDragInited) return;
@@ -4153,6 +4264,8 @@
     }
 
     function onStart(cx, cy) {
+      // Bloqueio principal: sem modo edição, não inicia arraste algum.
+      if (!_mlEditandoCapa) return;
       if (capaImg.style.display === 'none') return;
       dragging = true; startX = cx; startY = cy;
       capaWrap.style.cursor = 'grabbing';
@@ -4170,7 +4283,7 @@
     capaWrap.addEventListener('mousedown', e => { if (!e.target.closest('label')) { e.preventDefault(); onStart(e.clientX, e.clientY); } });
     window.addEventListener('mousemove',  e => onMove(e.clientX, e.clientY));
     window.addEventListener('mouseup',    onEnd);
-    capaWrap.addEventListener('touchstart', e => { if (!e.target.closest('label')) { const t=e.touches[0]; onStart(t.clientX, t.clientY); } }, { passive: true });
+    capaWrap.addEventListener('touchstart', e => { if (!_mlEditandoCapa) return; if (!e.target.closest('label')) { const t=e.touches[0]; onStart(t.clientX, t.clientY); } }, { passive: true });
     capaWrap.addEventListener('touchmove',  e => { if (!dragging) return; e.preventDefault(); const t=e.touches[0]; onMove(t.clientX, t.clientY); }, { passive: false });
     capaWrap.addEventListener('touchend', onEnd);
   }
@@ -4201,7 +4314,8 @@
         const ph  = document.getElementById('ml-up-capa-placeholder');
         if (img) { img.src = e.target.result; img.style.display = ''; }
         if (ph)  ph.style.display = 'none';
-        mlInitCapaDrag(true); // foto nova — mostrar hint
+        _mlEditandoCapa = true;   // foto nova: libera arraste de reposicionamento
+        mlInitCapaDrag(true);     // foto nova — mostrar hint
       }
     };
     reader.readAsDataURL(file);
@@ -5015,6 +5129,11 @@
 
     document.getElementById('modal-cardapio-cliente').classList.add('open');
     document.body.style.overflow = 'hidden';
+
+    // Métrica: registra visualização de cardápio (fire-and-forget, não bloqueia)
+    try {
+      registrarClique(loja.nome, 'menu', loja.plano || 'GRATIS', loja.categoria || '');
+    } catch(e) {}
   };
 
   window.limparCategoria = function() {

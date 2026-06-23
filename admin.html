@@ -166,6 +166,51 @@
     .btn-reject  { background: rgba(255,68,68,0.1);  color: var(--red);   border: 1px solid rgba(255,68,68,0.2); }
     .btn-wpp     { background: rgba(37,211,102,0.12); color: #25d366;      border: 1px solid rgba(37,211,102,0.2); }
     .btn-plan    { background: rgba(99,102,241,0.12); color: var(--indigo);border: 1px solid rgba(99,102,241,0.25); }
+    .btn-edit    { background: rgba(99,102,241,0.1); color: var(--indigo); border: 1px solid rgba(99,102,241,0.22); }
+
+    /* ── FORMULÁRIO DE EDIÇÃO INLINE ─────────────────────── */
+    .edit-form {
+      margin-top: 12px; padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .edit-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    }
+    .edit-lbl {
+      display: flex; flex-direction: column; gap: 4px;
+      font-size: 10px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    .edit-lbl.edit-full { grid-column: 1 / -1; }
+    .edit-input {
+      background: var(--s2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 9px 11px; color: var(--text);
+      font-family: var(--font-b); font-size: 13px; outline: none;
+      text-transform: none; letter-spacing: normal; font-weight: 400;
+      transition: border-color .2s;
+    }
+    .edit-input:focus { border-color: rgba(255,255,255,0.25); }
+    .edit-warn {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 10px; padding: 9px 12px;
+      background: rgba(245,158,11,0.08);
+      border: 1px solid rgba(245,158,11,0.25);
+      border-radius: 8px; font-size: 11px; color: var(--zap); line-height: 1.4;
+    }
+    .edit-warn i { flex-shrink: 0; }
+    .edit-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .btn-save-edit {
+      background: linear-gradient(135deg,#6366f1,#4f46e5);
+      color: #fff; font-weight: 700;
+    }
+    .btn-cancel-edit {
+      background: var(--s2); color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    @media (max-width: 480px) {
+      .edit-grid { grid-template-columns: 1fr; }
+      .edit-lbl.edit-full { grid-column: auto; }
+    }
 
     /* ── PLAN MANAGER ────────────────────────────────────── */
     .plan-manager-row {
@@ -282,6 +327,17 @@
     .metric-info { flex: 1; min-width: 0; }
     .metric-nome { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .metric-plano { font-size: 10px; color: var(--muted); }
+    .metric-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+    .metric-stat {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-weight: 700; color: var(--muted);
+      background: var(--s2); border: 1px solid var(--border);
+      padding: 2px 7px; border-radius: 20px; white-space: nowrap;
+    }
+    .metric-stat i { font-size: 9px; }
+    .metric-stat.up   { color: var(--green); background: rgba(0,208,132,0.1);  border-color: rgba(0,208,132,0.25); }
+    .metric-stat.down { color: var(--red);   background: rgba(255,68,68,0.08);  border-color: rgba(255,68,68,0.22); }
+    .metric-stat.flat { color: var(--muted); }
     .metric-bars { display: flex; flex-direction: column; gap: 4px; min-width: 100px; }
     .metric-bar-wrap { display: flex; align-items: center; gap: 6px; }
     .metric-bar-label { font-size: 10px; color: var(--muted); width: 24px; text-align: right; flex-shrink: 0; }
@@ -385,6 +441,7 @@
         <input class="admin-search" id="search-pendentes"
           placeholder="Filtrar pelo nome..." oninput="filterCards('pendentes')" />
       </div>
+      <div class="plan-cat-tabs" id="pend-periodo-tabs"></div>
       <div class="store-cards" id="list-pendentes">
         <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
       </div>
@@ -429,8 +486,10 @@
         </div>
       </div>
       <!-- KPIs resumo -->
-      <div class="metric-summary" id="metric-summary" style="grid-template-columns:repeat(4,1fr);">
+      <div class="metric-summary" id="metric-summary" style="grid-template-columns:repeat(3,1fr);">
         <div class="metric-kpi"><div class="metric-kpi-val" id="kpi-total">—</div><div class="metric-kpi-label">Cliques Totais</div></div>
+        <div class="metric-kpi"><div class="metric-kpi-val" id="kpi-views">—</div><div class="metric-kpi-label">Visualizações</div></div>
+        <div class="metric-kpi"><div class="metric-kpi-val" id="kpi-conv">—</div><div class="metric-kpi-label">Conversão</div></div>
         <div class="metric-kpi"><div class="metric-kpi-val" style="color:#25d366;" id="kpi-wpp">—</div><div class="metric-kpi-label">WhatsApp</div></div>
         <div class="metric-kpi"><div class="metric-kpi-val" style="color:var(--blue);" id="kpi-tel">—</div><div class="metric-kpi-label">Telefone</div></div>
         <div class="metric-kpi"><div class="metric-kpi-val" style="color:#e1306c;" id="kpi-ig">—</div><div class="metric-kpi-label">Instagram</div></div>
@@ -596,9 +655,80 @@ function renderAll() {
   setCount('pendentes', pendentes.length);
   setCount('aprovados', aprovados.length);
 
-  renderList('pendentes', pendentes);
+  renderPendentesPeriodo(pendentes);
   renderList('aprovados', aprovados);
   renderPlanos(aprovados);
+}
+
+/* ══ PENDENTES POR PERÍODO ════════════════════════════════════ */
+/* A coluna A da planilha grava 'dd/mm/aaaa hh:mm:ss' no fuso de SP.
+   Parseamos isso para classificar cada cadastro em hoje / ontem / semana. */
+function parseDataCadastro(str) {
+  if (!str) return null;
+  const m = String(str).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[ ,]+(\d{1,2}):(\d{2}))?/);
+  if (!m) return null;
+  let [, d, mo, y, hh, mm] = m;
+  if (y.length === 2) y = '20' + y;
+  return new Date(+y, +mo - 1, +d, +(hh || 0), +(mm || 0));
+}
+
+/* Retorna 0 = hoje, 1 = ontem, 2..6 = esta semana, -1 = mais antigo/sem data */
+function diasAtras(dt) {
+  if (!dt) return -1;
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const dia  = new Date(dt); dia.setHours(0, 0, 0, 0);
+  return Math.round((hoje - dia) / 86400000);
+}
+
+const PEND_PERIODOS = [
+  { id: 'hoje',   titulo: 'Hoje',    icon: 'fa-bolt',          cor: 'var(--green)'  },
+  { id: 'ontem',  titulo: 'Ontem',   icon: 'fa-clock-rotate-left', cor: 'var(--zap)' },
+  { id: 'semana', titulo: 'Semana',  icon: 'fa-calendar-week',  cor: 'var(--indigo)' },
+  { id: 'todos',  titulo: 'Todos',   icon: 'fa-layer-group',    cor: 'var(--muted)'  },
+];
+let pendPeriodoAtivo  = 'todos';
+let pendPeriodoCache  = { hoje: [], ontem: [], semana: [], todos: [] };
+
+function renderPendentesPeriodo(pendentes) {
+  // Mais recentes primeiro (maior nº de linha = cadastro mais novo)
+  const ordenados = [...pendentes].sort((a, b) => b.row - a.row);
+  pendPeriodoCache = {
+    todos:  ordenados,
+    hoje:   ordenados.filter(r => diasAtras(parseDataCadastro(r.dataCadastro)) === 0),
+    ontem:  ordenados.filter(r => diasAtras(parseDataCadastro(r.dataCadastro)) === 1),
+    semana: ordenados.filter(r => { const n = diasAtras(parseDataCadastro(r.dataCadastro)); return n >= 0 && n <= 6; }),
+  };
+  renderPendPeriodoTabs();
+  renderPendPeriodoLista();
+}
+
+function renderPendPeriodoTabs() {
+  const el = document.getElementById('pend-periodo-tabs');
+  if (!el) return;
+  el.innerHTML = PEND_PERIODOS.map(c => {
+    const n     = pendPeriodoCache[c.id].length;
+    const ativo = c.id === pendPeriodoAtivo;
+    const style = ativo
+      ? `background:${c.cor};border-color:${c.cor};`
+      : `color:${c.cor};border-color:${c.cor};`;
+    return `
+      <button class="plan-cat-btn${ativo ? ' active' : ''}" style="${style}"
+        onclick="switchPendPeriodo('${c.id}')">
+        <i class="fa ${c.icon}"></i> ${c.titulo}
+        <span class="plan-cat-count">${n}</span>
+      </button>`;
+  }).join('');
+}
+
+function renderPendPeriodoLista() {
+  const lista = pendPeriodoCache[pendPeriodoAtivo] || [];
+  renderList('pendentes', lista);
+}
+
+function switchPendPeriodo(id) {
+  pendPeriodoAtivo = id;
+  renderPendPeriodoTabs();
+  renderPendPeriodoLista();
 }
 
 function setCount(key, n) {
@@ -732,12 +862,126 @@ function cardHTML(r, type) {
           <button class="act-btn btn-reject" onclick="updateStatus(${r.row},'REPROVADO',this)">
             <i class="fa fa-times"></i> Reprovar
           </button>` : ''}
+        ${!isPendente ? `
+          <button class="act-btn btn-edit" onclick="toggleEditLoja(${r.row})">
+            <i class="fa fa-pen"></i> Editar
+          </button>` : ''}
         ${wppLink ? `
           <a href="${wppLink}" target="_blank" class="act-btn btn-wpp">
             <i class="fab fa-whatsapp"></i> WhatsApp
           </a>` : ''}
       </div>
+      ${!isPendente ? editFormHTML(r) : ''}
     </div>`;
+}
+
+/* ── Formulário de edição inline (Aprovados) ──────────────────── */
+function editFormHTML(r) {
+  return `
+    <div class="edit-form" id="edit-${r.row}" style="display:none;">
+      <div class="edit-grid">
+        <label class="edit-lbl">Nome
+          <input class="edit-input" id="ef-nome-${r.row}" value="${escAttr(r.nome)}" />
+        </label>
+        <label class="edit-lbl">Categoria / ramo
+          <input class="edit-input" id="ef-ramo-${r.row}" value="${escAttr(r.ramo)}" />
+        </label>
+        <label class="edit-lbl edit-full">Endereço
+          <input class="edit-input" id="ef-endereco-${r.row}" value="${escAttr(r.endereco)}" />
+        </label>
+        <label class="edit-lbl">WhatsApp
+          <input class="edit-input" id="ef-wpp-${r.row}" value="${escAttr(r.wpp)}" inputmode="numeric" />
+        </label>
+        <label class="edit-lbl">Telefone
+          <input class="edit-input" id="ef-tel-${r.row}" value="${escAttr(r.tel)}" inputmode="numeric" />
+        </label>
+        <label class="edit-lbl edit-full">Horário (texto)
+          <input class="edit-input" id="ef-horario-${r.row}" value="${escAttr(r.horario)}" />
+        </label>
+        <label class="edit-lbl edit-full">Observações
+          <input class="edit-input" id="ef-obs-${r.row}" value="${escAttr(r.obs)}" />
+        </label>
+      </div>
+      <div class="edit-warn" id="edit-warn-${r.row}" style="display:none;">
+        <i class="fa fa-triangle-exclamation"></i>
+        Mudar o <strong>nome</strong> desvincula as métricas antigas desta loja (elas ficam registradas no nome anterior).
+      </div>
+      <div class="edit-actions">
+        <button class="act-btn btn-save-edit" onclick="saveEditLoja(${r.row})">
+          <i class="fa fa-save"></i> Salvar alterações
+        </button>
+        <button class="act-btn btn-cancel-edit" onclick="toggleEditLoja(${r.row})">
+          Cancelar
+        </button>
+      </div>
+    </div>`;
+}
+
+function toggleEditLoja(row) {
+  const box = document.getElementById('edit-' + row);
+  if (!box) return;
+  const aberto = box.style.display !== 'none';
+  box.style.display = aberto ? 'none' : 'block';
+  if (!aberto) {
+    // Liga aviso de métricas órfãs se o nome for alterado
+    const nomeInput = document.getElementById('ef-nome-' + row);
+    const r = allRows.find(x => x.row === row);
+    const nomeOriginal = r ? (r.nome || '') : '';
+    const warn = document.getElementById('edit-warn-' + row);
+    nomeInput.oninput = () => {
+      warn.style.display = (nomeInput.value.trim() !== nomeOriginal.trim()) ? 'flex' : 'none';
+    };
+  }
+}
+
+async function saveEditLoja(row) {
+  const get = id => (document.getElementById(id + '-' + row).value || '').trim();
+  const r = allRows.find(x => x.row === row);
+  const wppAtual = r ? (r.wpp || '') : '';
+
+  const dados = {
+    nome:     get('ef-nome'),
+    ramo:     get('ef-ramo'),
+    endereco: get('ef-endereco'),
+    wpp:      get('ef-wpp'),
+    tel:      get('ef-tel'),
+    horario:  get('ef-horario'),
+    obs:      get('ef-obs'),
+  };
+  if (!dados.nome) { toast('⚠️ Nome não pode ficar vazio', true); return; }
+
+  const btn = document.querySelector(`#edit-${row} .btn-save-edit`);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...'; }
+
+  try {
+    const params = new URLSearchParams();
+    params.append('payload', JSON.stringify({
+      action:   'updateLoja',
+      token:    _sessionToken,
+      row:      row,
+      wppAtual: wppAtual,
+      ...dados,
+    }));
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode:   'no-cors',
+      body:   params,
+      signal: AbortSignal.timeout(15000),
+    });
+
+    // Atualiza estado local (no-cors não retorna corpo)
+    if (r) {
+      r.nome = dados.nome; r.ramo = dados.ramo; r.endereco = dados.endereco;
+      let w = dados.wpp.replace(/\D/g, ''); if (w && !w.startsWith('55')) w = '55' + w;
+      r.wpp = w; r.tel = dados.tel.replace(/\D/g, '');
+      r.horario = dados.horario; r.obs = dados.obs;
+    }
+    toast('✅ Loja atualizada');
+    renderAll();
+  } catch(e) {
+    toast('❌ Erro ao salvar: ' + e.message, true);
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-save"></i> Salvar alterações'; }
+  }
 }
 
 /* ── Card de gestão de plano ─────────────────────────────── */
@@ -928,10 +1172,12 @@ async function resetMetricas() {
     });
     toast('✅ Métricas resetadas');
     // Limpa KPIs e tabela
-    ['kpi-total','kpi-wpp','kpi-tel','kpi-ig'].forEach(id => {
+    ['kpi-total','kpi-wpp','kpi-tel','kpi-ig','kpi-views'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.textContent = '0';
     });
+    const convEl = document.getElementById('kpi-conv');
+    if (convEl) convEl.textContent = '—';
     document.getElementById('metric-table').innerHTML =
       '<div class="admin-empty"><i class="fa fa-chart-bar"></i>Nenhum clique registrado ainda.</div>';
     document.getElementById('metric-period').textContent = '0 lojas com cliques registrados';
@@ -972,6 +1218,24 @@ function toast(msg, isErr = false) {
   toastTimer = setTimeout(() => el.className = '', 3500);
 }
 
+/* Badge de crescimento semanal: compara cliques dos últimos 7 dias (d7)
+   com os 7 dias anteriores (d7ant). Verde ▲ se subiu, vermelho ▼ se caiu. */
+function crescimentoBadge(r) {
+  const atual = r.d7 || 0;
+  const ant   = r.d7ant || 0;
+  if (atual === 0 && ant === 0) return '';
+  if (ant === 0) {
+    // Sem base na semana anterior — mostra só que houve atividade nova
+    return `<span class="metric-stat up"><i class="fa fa-arrow-trend-up"></i> novo</span>`;
+  }
+  const pct = Math.round(((atual - ant) / ant) * 100);
+  if (pct === 0) return `<span class="metric-stat flat">≈ 0%</span>`;
+  const up = pct > 0;
+  return `<span class="metric-stat ${up ? 'up' : 'down'}">
+    <i class="fa fa-arrow-trend-${up ? 'up' : 'down'}"></i> ${up ? '+' : ''}${pct}%
+  </span>`;
+}
+
 /* ══ MÉTRICAS ═════════════════════════════════════════════════ */
 const PLAN_COLOR = { PRO: '#f59e0b', PLUS: '#6366f1', GRATIS: '#7a7a7a' };
 
@@ -998,7 +1262,11 @@ async function loadMetricas() {
     const totWpp     = data.reduce((s, r) => s + r.wpp,   0);
     const totTel     = data.reduce((s, r) => s + r.tel,   0);
     const totIg      = data.reduce((s, r) => s + (r.ig || 0), 0);
+    const totViews   = data.reduce((s, r) => s + (r.views || 0), 0);
+    const conv       = totViews > 0 ? Math.round((totCliques / totViews) * 100) : 0;
     document.getElementById('kpi-total').textContent = totCliques;
+    document.getElementById('kpi-views').textContent = totViews;
+    document.getElementById('kpi-conv').textContent  = totViews > 0 ? conv + '%' : '—';
     document.getElementById('kpi-wpp').textContent   = totWpp;
     document.getElementById('kpi-tel').textContent   = totTel;
     document.getElementById('kpi-ig').textContent    = totIg;
@@ -1025,6 +1293,11 @@ async function loadMetricas() {
           <div class="metric-info">
             <div class="metric-nome">${r.loja}</div>
             <div class="metric-plano" style="color:${cor};">${r.plano}</div>
+            <div class="metric-stats">
+              ${(r.views || 0) > 0 ? `<span class="metric-stat"><i class="fa fa-eye"></i> ${r.views}</span>` : ''}
+              ${(r.menu  || 0) > 0 ? `<span class="metric-stat"><i class="fa fa-utensils"></i> ${r.menu}</span>` : ''}
+              ${crescimentoBadge(r)}
+            </div>
           </div>
           <div class="metric-bars">
             <div class="metric-bar-wrap">

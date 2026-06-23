@@ -296,6 +296,33 @@
     }
     #admin-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     #admin-toast.err  { border-left-color: var(--red); }
+    /* ── COBRANÇAS ───────────────────────────────────────── */
+    .cobr-summary {
+      display: grid; grid-template-columns: repeat(3,1fr); gap: 10px;
+      margin-bottom: 16px;
+    }
+    .cobr-kpi {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 16px 14px; text-align: center;
+    }
+    .cobr-kpi.alert { border-color: rgba(255,68,68,0.3); background: rgba(255,68,68,0.05); }
+    .cobr-kpi.warn  { border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.05); }
+    .cobr-kpi-val {
+      font-family: var(--font-h); font-size: 1.7rem; font-weight: 800; line-height: 1;
+    }
+    .cobr-kpi.alert .cobr-kpi-val { color: var(--red); }
+    .cobr-kpi.warn  .cobr-kpi-val { color: var(--zap); }
+    .cobr-kpi-label { font-size: 10px; color: var(--muted); margin-top: 6px; text-transform: uppercase; letter-spacing: .04em; }
+    .cobr-cat-tabs {
+      display: flex; gap: 8px; overflow-x: auto;
+      margin-bottom: 16px; scrollbar-width: none;
+    }
+    .cobr-cat-tabs::-webkit-scrollbar { display: none; }
+    @media (max-width: 480px) {
+      .cobr-summary { grid-template-columns: 1fr 1fr; }
+      .cobr-summary .cobr-kpi:last-child { grid-column: 1 / -1; }
+    }
+
     /* ── MÉTRICAS ────────────────────────────────────────────── */
     .metric-summary {
       display: grid; grid-template-columns: repeat(3,1fr); gap: 10px;
@@ -427,6 +454,10 @@
     <button class="tab-btn" onclick="switchTab('planos', this)">
       <i class="fa fa-star"></i> Planos
     </button>
+    <button class="tab-btn" onclick="switchTab('cobrancas', this)">
+      <i class="fa fa-money-bill-wave"></i> Cobranças
+      <span class="tab-count" id="count-cobrancas"></span>
+    </button>
     <button class="tab-btn" onclick="switchTab('metricas', this)">
       <i class="fa fa-chart-bar"></i> Métricas
     </button>
@@ -468,6 +499,15 @@
       </div>
       <div class="plan-cat-tabs" id="plan-cat-tabs"></div>
       <div class="store-cards" id="list-planos">
+        <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
+      </div>
+    </div>
+
+    <!-- TAB: Cobranças -->
+    <div class="tab-content" id="tab-cobrancas">
+      <div class="cobr-summary" id="cobr-summary"></div>
+      <div class="cobr-cat-tabs" id="cobr-cat-tabs"></div>
+      <div class="store-cards" id="list-cobrancas">
         <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
       </div>
     </div>
@@ -615,6 +655,7 @@ function switchTab(name, btn) {
   btn.classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'metricas') loadMetricas();
+  if (name === 'cobrancas') renderCobrancas();
 }
 
 /* ══ DATA ═════════════════════════════════════════════════════ */
@@ -954,22 +995,15 @@ async function saveEditLoja(row) {
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...'; }
 
   try {
-    const params = new URLSearchParams();
-    params.append('payload', JSON.stringify({
+    await postAction({
       action:   'updateLoja',
       token:    _sessionToken,
       row:      row,
       wppAtual: wppAtual,
       ...dados,
-    }));
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode:   'no-cors',
-      body:   params,
-      signal: AbortSignal.timeout(15000),
     });
 
-    // Atualiza estado local (no-cors não retorna corpo)
+    // Atualiza estado local após confirmação do servidor
     if (r) {
       r.nome = dados.nome; r.ramo = dados.ramo; r.endereco = dados.endereco;
       let w = dados.wpp.replace(/\D/g, ''); if (w && !w.startsWith('55')) w = '55' + w;
@@ -1032,29 +1066,46 @@ function planCardHTML(r) {
     </div>`;
 }
 
+/* ══ POST COM CONFIRMAÇÃO REAL ════════════════════════════════
+   Substitui o antigo padrão no-cors (que "assumia sucesso" às cegas).
+   Como o body é URLSearchParams (form-urlencoded = simple request),
+   não há preflight CORS e conseguimos LER a resposta JSON do Apps Script
+   — exatamente como o login já fazia. Lança erro se o servidor recusar. */
+async function postAction(payloadObj, timeout = 15000) {
+  const params = new URLSearchParams();
+  params.append('payload', JSON.stringify(payloadObj));
+  const resp = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    body:   params,
+    signal: AbortSignal.timeout(timeout),
+  });
+  const json = await resp.json();
+  if (json.status === 'erro') {
+    if (json.msg === 'UNAUTHORIZED') { handleUnauthorized(); throw new Error('Sessão expirada'); }
+    throw new Error(json.msg || 'Falha no servidor');
+  }
+  return json.data || {};
+}
+
 /* ══ AÇÕES ════════════════════════════════════════════════════ */
 async function updateStatus(row, newStatus, btn) {
   btn.disabled = true;
   btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
   try {
-    // POST no-cors — mesmo padrão do login para evitar erros de CORS/redirect
-    const params = new URLSearchParams();
-    params.append('payload', JSON.stringify({
+    await postAction({
       action: 'updateStatus',
       token:  _sessionToken,
       row:    row,
       status: newStatus,
-    }));
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode:   'no-cors',
-      body:   params,
-      signal: AbortSignal.timeout(15000),
     });
-    // no-cors não retorna JSON — assume sucesso
     toast('✅ Status atualizado para ' + newStatus);
     const r = allRows.find(x => x.row === row);
     if (r) r.status = newStatus;
+
+    // Ao aprovar, abre o WhatsApp já com a mensagem de boas-vindas
+    if (newStatus === 'APROVADO' && r && r.wpp) {
+      abrirWppBoasVindas(r);
+    }
     renderAll();
   } catch(e) {
     toast('❌ Erro ao atualizar: ' + e.message, true);
@@ -1072,26 +1123,16 @@ async function savePlan(row) {
   if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...'; }
 
   try {
-    // Usa POST no-cors (mesmo padrão do login) para evitar erros de CORS/redirect do Apps Script
-    const params = new URLSearchParams();
-    params.append('payload', JSON.stringify({
+    await postAction({
       action:    'updatePlan',
       token:     _sessionToken,
       row:       row,
       plano:     plano,
       planoValidade: validadeBR,
       planoPago: plano !== 'GRATIS' ? 'SIM' : 'NAO',
-    }));
-
-    // no-cors não retorna JSON — assumimos sucesso se não lançou exceção
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode:   'no-cors',
-      body:   params,
-      signal: AbortSignal.timeout(15000),
     });
 
-    // Atualiza estado local imediatamente (sem esperar a API)
+    // Atualiza estado local após confirmação do servidor
     const r = allRows.find(x => x.row === row);
     if (r) {
       r.plano         = plano;
@@ -1130,19 +1171,12 @@ async function deleteLoja(row, nome) {
   if (!confirm(`Excluir a loja "${nome}" permanentemente?\n\nEssa ação não pode ser desfeita.`)) return;
 
   try {
-    const params = new URLSearchParams();
-    params.append('payload', JSON.stringify({
+    await postAction({
       action: 'deleteLoja',
       token:  _sessionToken,
       row:    row,
-    }));
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode:   'no-cors',
-      body:   params,
-      signal: AbortSignal.timeout(15000),
     });
-    // Remove da lista local e re-renderiza
+    // Remove da lista local e re-renderiza após confirmação
     allRows = allRows.filter(r => r.row !== row);
     renderAll();
     toast(`🗑️ "${nome}" removida`);
@@ -1159,16 +1193,9 @@ async function resetMetricas() {
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Resetando...'; }
 
   try {
-    const params = new URLSearchParams();
-    params.append('payload', JSON.stringify({
+    await postAction({
       action: 'resetMetricas',
       token:  _sessionToken,
-    }));
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode:   'no-cors',
-      body:   params,
-      signal: AbortSignal.timeout(15000),
     });
     toast('✅ Métricas resetadas');
     // Limpa KPIs e tabela
@@ -1195,6 +1222,23 @@ function filterCards(type) {
   cards.forEach(c => {
     c.style.display = c.dataset.nome.toLowerCase().includes(q) ? '' : 'none';
   });
+}
+
+/* ══ WHATSAPP DE BOAS-VINDAS (ao aprovar) ═════════════════════ */
+function abrirWppBoasVindas(r) {
+  const nome  = r.nome || '';
+  const plano = (r.planoSolicitado || r.plano || 'GRATIS').toUpperCase();
+  const linkApp = 'https://angatubaon.com.br';
+
+  let msg;
+  if (plano === 'PRO' || plano === 'PLUS') {
+    msg = `Olá ${nome}! 🎉\n\nSeu cadastro no AngatubaON foi aprovado e sua loja já está no ar!\n\nVocê solicitou o plano *${plano}*. Para ativá-lo, é só confirmar o pagamento e liberamos todos os recursos na hora.\n\nAcesse: ${linkApp}\n\nQualquer dúvida, é só chamar por aqui. Bem-vindo(a)! 🦉`;
+  } else {
+    msg = `Olá ${nome}! 🎉\n\nSeu cadastro no AngatubaON foi aprovado e sua loja já aparece para os moradores de Angatuba!\n\nAcesse e veja como ficou: ${linkApp}\n\nQuando quiser mais destaque e recursos, temos os planos Plus e Pro. É só me chamar. Bem-vindo(a)! 🦉`;
+  }
+
+  const numero = String(r.wpp).replace(/\D/g, '');
+  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 /* ══ HELPERS ══════════════════════════════════════════════════ */
@@ -1234,6 +1278,173 @@ function crescimentoBadge(r) {
   return `<span class="metric-stat ${up ? 'up' : 'down'}">
     <i class="fa fa-arrow-trend-${up ? 'up' : 'down'}"></i> ${up ? '+' : ''}${pct}%
   </span>`;
+}
+
+/* ══ COBRANÇAS / VENCIMENTOS ══════════════════════════════════
+   Lê planoValidade (dd/mm/aaaa) das lojas PRO/PLUS e classifica por
+   urgência. Vitalício (validade vazia) é ignorado — não vence.
+   Grátis também fica fora: não há o que cobrar. */
+const COBR_CATS = [
+  { id: 'vencidas', titulo: 'Vencidas',    icon: 'fa-circle-exclamation', cor: 'var(--red)'    },
+  { id: 'd7',       titulo: 'Vence em 7d', icon: 'fa-hourglass-half',      cor: 'var(--zap)'    },
+  { id: 'd30',      titulo: 'Vence em 30d',icon: 'fa-calendar-day',        cor: 'var(--indigo)' },
+  { id: 'emdia',    titulo: 'Em dia',      icon: 'fa-circle-check',        cor: 'var(--green)'  },
+];
+let cobrCatAtiva  = 'vencidas';
+let cobrCache     = { vencidas: [], d7: [], d30: [], emdia: [] };
+
+/* dias até vencer: negativo = já venceu, null = vitalício/sem data */
+function diasAteVencer(validadeBR) {
+  if (!validadeBR) return null;
+  const m = String(validadeBR).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (!m) return null;
+  let [, d, mo, y] = m;
+  if (y.length === 2) y = '20' + y;
+  const venc = new Date(+y, +mo - 1, +d); venc.setHours(0,0,0,0);
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  return Math.round((venc - hoje) / 86400000);
+}
+
+function renderCobrancas() {
+  // Só lojas aprovadas e pagas (PRO/PLUS)
+  const pagas = allRows.filter(r =>
+    r.status === 'APROVADO' &&
+    (String(r.plano).toUpperCase() === 'PRO' || String(r.plano).toUpperCase() === 'PLUS')
+  );
+
+  cobrCache = { vencidas: [], d7: [], d30: [], emdia: [] };
+  pagas.forEach(r => {
+    const dias = diasAteVencer(r.planoValidade);
+    if (dias === null) return; // vitalício — não entra em cobrança
+    const item = { ...r, _dias: dias };
+    if (dias < 0)        cobrCache.vencidas.push(item);
+    else if (dias <= 7)  cobrCache.d7.push(item);
+    else if (dias <= 30) cobrCache.d30.push(item);
+    else                 cobrCache.emdia.push(item);
+  });
+  // Ordena cada grupo pelo mais urgente primeiro
+  Object.keys(cobrCache).forEach(k =>
+    cobrCache[k].sort((a, b) => a._dias - b._dias)
+  );
+
+  // Badge na aba = vencidas + vence em 7d (o que precisa de ação agora)
+  const urgentes = cobrCache.vencidas.length + cobrCache.d7.length;
+  setCount('cobrancas', urgentes);
+
+  // Se a categoria ativa está vazia, cai pra primeira com itens
+  if (!cobrCache[cobrCatAtiva].length) {
+    const fb = COBR_CATS.find(c => cobrCache[c.id].length);
+    cobrCatAtiva = fb ? fb.id : 'vencidas';
+  }
+
+  renderCobrSummary();
+  renderCobrTabs();
+  renderCobrLista();
+}
+
+function renderCobrSummary() {
+  const el = document.getElementById('cobr-summary');
+  const totalReceita = cobrCache.vencidas.length + cobrCache.d7.length;
+  el.innerHTML = `
+    <div class="cobr-kpi alert">
+      <div class="cobr-kpi-val">${cobrCache.vencidas.length}</div>
+      <div class="cobr-kpi-label">Vencidas</div>
+    </div>
+    <div class="cobr-kpi warn">
+      <div class="cobr-kpi-val">${cobrCache.d7.length}</div>
+      <div class="cobr-kpi-label">Vencem em 7 dias</div>
+    </div>
+    <div class="cobr-kpi">
+      <div class="cobr-kpi-val">${totalReceita}</div>
+      <div class="cobr-kpi-label">Precisam de ação</div>
+    </div>`;
+}
+
+function renderCobrTabs() {
+  const el = document.getElementById('cobr-cat-tabs');
+  el.innerHTML = COBR_CATS.map(c => {
+    const n     = cobrCache[c.id].length;
+    const ativo = c.id === cobrCatAtiva;
+    const style = ativo
+      ? `background:${c.cor};border-color:${c.cor};`
+      : `color:${c.cor};border-color:${c.cor};`;
+    return `
+      <button class="plan-cat-btn${ativo ? ' active' : ''}" style="${style}"
+        onclick="switchCobrCat('${c.id}')">
+        <i class="fa ${c.icon}"></i> ${c.titulo}
+        <span class="plan-cat-count">${n}</span>
+      </button>`;
+  }).join('');
+}
+
+function renderCobrLista() {
+  const el    = document.getElementById('list-cobrancas');
+  const lista = cobrCache[cobrCatAtiva] || [];
+  if (!lista.length) {
+    el.innerHTML = `<div class="admin-empty"><i class="fa fa-circle-check"></i>Nenhuma loja nesta situação.</div>`;
+    return;
+  }
+  el.innerHTML = lista.map(r => cobrCardHTML(r)).join('');
+}
+
+function switchCobrCat(id) {
+  cobrCatAtiva = id;
+  renderCobrTabs();
+  renderCobrLista();
+}
+
+function cobrCardHTML(r) {
+  const dias  = r._dias;
+  const plano = String(r.plano).toUpperCase();
+  const planColor = { PRO:'var(--zap)', PLUS:'var(--indigo)' };
+  const cor = planColor[plano] || 'var(--muted)';
+
+  let situacao, sitCor;
+  if (dias < 0)       { situacao = `Venceu há ${Math.abs(dias)} dia(s)`; sitCor = 'var(--red)'; }
+  else if (dias === 0){ situacao = 'Vence hoje';                          sitCor = 'var(--zap)'; }
+  else                { situacao = `Vence em ${dias} dia(s)`;             sitCor = dias <= 7 ? 'var(--zap)' : 'var(--muted)'; }
+
+  const numero = String(r.wpp || '').replace(/\D/g, '');
+  const podeWpp = numero.length >= 10;
+
+  return `
+    <div class="admin-card aprovado" data-nome="${escAttr(r.nome)}">
+      <div class="card-top">
+        <div>
+          <div class="card-name">${r.nome || '—'}</div>
+          <div class="card-ramo">${r.ramo || '—'} · linha ${r.row}</div>
+        </div>
+        <span style="font-family:var(--font-h);font-size:11px;font-weight:800;color:${cor};">${plano}</span>
+      </div>
+      <div class="card-info">
+        <div class="card-info-row"><i class="fa fa-calendar-xmark"></i>Validade: <strong style="margin-left:4px;color:${sitCor};">${r.planoValidade || '—'}</strong></div>
+        <div class="card-info-row"><i class="fa fa-circle-info"></i><span style="color:${sitCor};font-weight:700;">${situacao}</span></div>
+      </div>
+      <div class="card-actions">
+        ${podeWpp ? `
+          <button class="act-btn btn-wpp" onclick="abrirWppCobranca(${r.row}, ${dias})">
+            <i class="fab fa-whatsapp"></i> Cobrar
+          </button>` : '<span style="font-size:11px;color:var(--muted);">Sem WhatsApp cadastrado</span>'}
+      </div>
+    </div>`;
+}
+
+/* WhatsApp de cobrança — texto muda se venceu ou está a vencer */
+function abrirWppCobranca(row, dias) {
+  const r = allRows.find(x => x.row === row);
+  if (!r) return;
+  const nome  = r.nome || '';
+  const plano = String(r.plano || '').toUpperCase();
+  let msg;
+  if (dias < 0) {
+    msg = `Olá ${nome}! 👋\n\nPassando para avisar que seu plano *${plano}* no AngatubaON venceu. Para manter sua loja com todos os recursos ativos, é só renovar.\n\nQualquer dúvida estou à disposição! 🦉`;
+  } else if (dias === 0) {
+    msg = `Olá ${nome}! 👋\n\nSeu plano *${plano}* no AngatubaON vence *hoje*. Para não perder o destaque da sua loja, vamos renovar?\n\nQualquer dúvida me chame! 🦉`;
+  } else {
+    msg = `Olá ${nome}! 👋\n\nSeu plano *${plano}* no AngatubaON vence em ${dias} dia(s). Quer já deixar a renovação garantida para não perder nenhum recurso?\n\nÉ só me avisar! 🦉`;
+  }
+  const numero = String(r.wpp || '').replace(/\D/g, '');
+  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 /* ══ MÉTRICAS ═════════════════════════════════════════════════ */

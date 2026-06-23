@@ -327,7 +327,13 @@
 
   /* ── Escapa aspas em strings usadas em atributos HTML ───────── */
   function escAttr(s) {
-    return String(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    // Barra invertida primeiro para nao re-escapar as entidades inseridas depois.
+    // Protege onclick inline (registrarClique) contra nomes com \\ ' " e quebra de linha.
+    return String(s)
+      .replace(/\\/g, '&#92;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/[\r\n]/g, ' ');
   }
 
   /* ── Botão de contato ────────────────────────────────────── */
@@ -2533,7 +2539,10 @@
   let   _retryCount  = 0;
   let   _retryTimer  = null; // referência para cancelar retry pendente
 
+  let _carregandoLojas = false;
   async function carregarLojas() {
+    if (_carregandoLojas) return; // evita execucoes concorrentes (retry + reconexao)
+    _carregandoLojas = true;
     try {
       const resp = await fetch(APPS_SCRIPT_URL, { signal: AbortSignal.timeout(10000) });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -2588,6 +2597,8 @@
         if (_retryTimer) clearTimeout(_retryTimer);
         _retryTimer = setTimeout(() => { _retryTimer = null; carregarLojas(); }, delay);
       }
+    } finally {
+      _carregandoLojas = false; // libera para o proximo retry/reconexao
     }
   }
 
@@ -3121,15 +3132,6 @@
   });
 
   // Back button Android — fecha o modal correto ao pressionar voltar
-  window.addEventListener('popstate', function(e) {
-    if (document.getElementById('modal-cardapio-cliente')?.classList.contains('open')) {
-      fecharCardapioCliente(); return;
-    }
-    if (document.getElementById('modal-detalhes').classList.contains('open')) {
-      fecharDetalhes(true); return;
-    }
-  });
-
   // Placeholder quando foto falha
   function placeholderCover(emoji, categoria) {
     const bg = CAT_BG[categoria] || 'rgba(255,255,255,0.06)';
@@ -3940,7 +3942,14 @@
   window.addEventListener('hashchange', _resolverDeepLink);
 
   // Back button Android no PWA — fecha o modal ativo em vez de sair do app
+  // Handler único de popstate (botão voltar Android). Ordem importa:
+  // cardápio → detalhes → minha-loja → cadastro. Cada return encerra o handler,
+  // então um único "voltar" fecha apenas o modal do topo da pilha.
   window.addEventListener('popstate', function() {
+    // Cardápio cliente vem primeiro: pode estar empilhado sobre detalhes
+    if (document.getElementById('modal-cardapio-cliente')?.classList.contains('open')) {
+      fecharCardapioCliente(true); return;
+    }
     // Fecha modal de detalhes se aberto
     if (document.getElementById('modal-detalhes')?.classList.contains('open')) {
       const overlay = document.getElementById('modal-detalhes');
@@ -3948,10 +3957,6 @@
       document.body.style.overflow = '';
       if (location.hash) history.replaceState(null, '', location.pathname + location.search);
       return;
-    }
-    // Fecha cardápio cliente se aberto (usuário abriu pelo botão Ver Cardápio)
-    if (document.getElementById('modal-cardapio-cliente')?.classList.contains('open')) {
-      fecharCardapioCliente(); return;
     }
     // Fecha painel Minha Loja
     if (document.getElementById('modal-minha-loja')?.classList.contains('open')) {
@@ -4755,7 +4760,9 @@
     const msgEl = document.getElementById('ml-cardapio-form-msg');
     if (!nome)  { msgEl.textContent = '❌ Informe o nome do item.'; msgEl.style.color='var(--red)'; return; }
     if (!preco) { msgEl.textContent = '❌ Informe o preço.'; msgEl.style.color='var(--red)'; return; }
-    if (parseFloat(preco) < 0) { msgEl.textContent = '❌ Preço não pode ser negativo.'; msgEl.style.color='var(--red)'; return; }
+    const precoNum = parseFloat(String(preco).replace(/[^\d,.-]/g, '').replace(',', '.'));
+    if (isNaN(precoNum)) { msgEl.textContent = '❌ Preço inválido. Use apenas números (ex: 15,00).'; msgEl.style.color='var(--red)'; return; }
+    if (precoNum < 0) { msgEl.textContent = '❌ Preço não pode ser negativo.'; msgEl.style.color='var(--red)'; return; }
     // Fix #22: bloqueia se upload de foto ainda está em andamento
     if (_cardapioUploadEmAndamento) {
       msgEl.textContent = '⏳ Aguarde o upload da foto terminar antes de salvar.';
@@ -4778,7 +4785,7 @@
         id:         document.getElementById('ml-cardapio-edit-id').value,
         nome,
         descricao:  document.getElementById('ml-cardapio-desc').value.trim(),
-        preco:      parseFloat(preco),
+        preco:      precoNum,
         foto:       document.getElementById('ml-cardapio-foto-url').value,
         categoria:  document.getElementById('ml-cardapio-cat').value.trim(),
         destaque:   document.getElementById('ml-cardapio-destaque')?.checked ? 'SIM' : 'NAO',
@@ -4880,6 +4887,8 @@
     if (!loja || !loja.cardapio || loja.cardapio.length === 0) return;
     _ccLojaIdx  = idx;
     _ccCarrinho = {};
+    // Remove botao de confirmacao residual de um pedido anterior (Fix: botao fantasma)
+    document.getElementById('cc-carrinho-bar')?.querySelector('.cc-confirm-btn')?.remove();
 
     // Label dinâmico por slug — cada categoria tem seu nome mais adequado
     const _slug = (loja.categoria || '').toLowerCase();

@@ -1,4 +1,4 @@
-const CACHE = 'angatubaon-v34';
+const CACHE = 'angatubaon-v35';
 const STATIC = [
   '/',
   '/index.html',
@@ -32,7 +32,9 @@ self.addEventListener('install', e => {
       )
     )
   );
-  self.skipWaiting();
+  // Fix #2: NÃO chama skipWaiting() aqui — isso ativava o SW novo na hora
+  // e recarregava a página sozinha no meio da sessão. Agora o SW novo fica
+  // "waiting" até o usuário clicar no banner de atualização (ver listener message abaixo).
 });
 
 // Remove caches antigos
@@ -45,6 +47,12 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Fix #3: ativa o SW novo SOMENTE quando o app pede (clique no banner de update).
+// O app chama swWaiting.postMessage('SKIP_WAITING') — sem isto, o botão não fazia nada.
+self.addEventListener('message', e => {
+  if (e.data === 'SKIP_WAITING') self.skipWaiting();
+});
+
 // Fetch: network-first para HTML/JS/CSS — garante arquivos atualizados
 // Fallback para cache se offline; fallback final para offline.html
 self.addEventListener('fetch', e => {
@@ -53,6 +61,10 @@ self.addEventListener('fetch', e => {
   // Fix #21: não cacheia recursos externos (ImgBB, CDNs, Google Fonts, etc.)
   // Imagens de lojas trocam com frequência — cachear indefinidamente exibiria fotos antigas
   if (!e.request.url.startsWith(self.location.origin)) return;
+
+  // Fix #9: nunca intercepta o próprio service-worker.js — deixa o navegador buscar
+  // direto da rede (com no-store via _headers), garantindo detecção de versão nova.
+  if (e.request.url.includes('/service-worker.js')) return;
 
   const url = e.request.url;
   const isAsset = url.endsWith('.js') || url.endsWith('.css') || 

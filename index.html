@@ -1222,6 +1222,12 @@
                     <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Categoria <span style="opacity:0.5;">(opcional)</span></div>
                     <input id="ml-cardapio-cat" type="text" maxlength="40" placeholder="Ex: Lanches, Bebidas..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
                   </div>
+                  <!-- Fix #1: checkbox de destaque (faltava no HTML — feature Pro estava silenciosamente quebrada) -->
+                  <label id="ml-cardapio-destaque-wrap" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 2px;">
+                    <input type="checkbox" id="ml-cardapio-destaque" style="width:16px;height:16px;accent-color:#f59e0b;cursor:pointer;">
+                    <span style="font-size:12px;font-weight:700;color:var(--text);">⭐ Item em destaque</span>
+                    <span style="font-size:10px;color:var(--muted);">(aparece no topo do cardápio)</span>
+                  </label>
                 </div>
                 <div style="display:flex;gap:8px;margin-top:12px;">
                   <button onclick="mlCardapioFecharForm()" style="flex:1;padding:10px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;">Cancelar</button>

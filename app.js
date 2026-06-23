@@ -814,14 +814,18 @@
     const overlay = document.getElementById('modal-cadastro');
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
+    // Fix #6: entrada no histórico para o botão "voltar" (Android) fechar o modal
+    if (history.state?.modal !== 'cadastro') history.pushState({ modal: 'cadastro' }, '');
     // Garante que começa na etapa 1
     cadIrParaEtapa(1);
   }
 
-  function closeModal() {
+  function closeModal(viaPopstate) {
     const overlay = document.getElementById('modal-cadastro');
     overlay.classList.remove('open');
     document.body.style.overflow = '';
+    // Fix #6: desfaz a entrada do histórico ao fechar manualmente (popstate já consumiu)
+    if (!viaPopstate && history.state?.modal === 'cadastro') history.back();
     // Reseta tela de sucesso após fechar (com delay para não piscar)
     setTimeout(() => {
       document.getElementById('cadastro-form').style.display = 'flex';
@@ -1961,6 +1965,8 @@
     const overlay = document.getElementById('modal-minha-loja');
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
+    // Fix #6: entrada no histórico para o botão "voltar" (Android) fechar o painel
+    if (history.state?.modal !== 'minha-loja') history.pushState({ modal: 'minha-loja' }, '');
 
     // ── Abre instantaneamente com cache do localStorage ───────
     const dadosCache = (() => {
@@ -2034,9 +2040,11 @@
     }
   }
 
-  function fecharMinhaLoja() {
+  function fecharMinhaLoja(viaPopstate) {
     document.getElementById('modal-minha-loja').classList.remove('open');
     document.body.style.overflow = '';
+    // Fix #6: desfaz a entrada do histórico ao fechar manualmente (popstate já consumiu)
+    if (!viaPopstate && history.state?.modal === 'minha-loja') history.back();
   }
 
   document.getElementById('modal-minha-loja').addEventListener('click', function(e) {
@@ -2058,6 +2066,8 @@
       btn.style.fontWeight = isActive ? '800' : '600';
       btn.style.boxShadow  = isActive ? '0 0 0 2px currentColor inset' : '';
       btn.style.border     = isActive ? '2px solid currentColor' : (BORDERS[btn.dataset.status] || '');
+      // Fix #4: marca a classe .ativo para que o rollback de lojaToggle saiba o status anterior
+      btn.classList.toggle('ativo', isActive);
     });
   }
 
@@ -2103,7 +2113,15 @@
     // IMPORTANTE: usa getFullYear/Month/Date (local) em vez de toISOString() que retorna UTC
     // Entre 21:00-23:59 BRT, o UTC já é amanhã — causaria status "aberto por 23h"
     const _agora = new Date();
-    const hoje = `${_agora.getFullYear()}-${String(_agora.getMonth()+1).padStart(2,'0')}-${String(_agora.getDate()).padStart(2,'0')}`;
+    // Fix #5: "aberto até" com horário menor/igual ao horário atual (ex: 00:00 = meia-noite)
+    // significa amanhã. Sem isto, ABERTO_ATE_<hoje>_0000 vira "início de hoje", já no passado.
+    const _alvo = new Date(_agora);
+    if (time) {
+      const [_h, _m] = time.split(':').map(Number);
+      _alvo.setHours(_h, _m, 0, 0);
+      if (_alvo <= _agora) _alvo.setDate(_alvo.getDate() + 1); // rola para o dia seguinte
+    }
+    const hoje = `${_alvo.getFullYear()}-${String(_alvo.getMonth()+1).padStart(2,'0')}-${String(_alvo.getDate()).padStart(2,'0')}`;
     const status = time ? `ABERTO_ATE_${hoje}_${time.replace(':','')}` : 'ABERTO';
     document.getElementById('ml-aberto-ate-wrap').style.display = 'none';
     await lojaToggle(status);
@@ -2115,6 +2133,14 @@
 
   async function lojaToggle(novoStatus) {
     if (!_lojaToken) return;
+    // Fix #4: captura o status anterior ANTES do feedback otimista (para rollback em falha)
+    const statusAnterior = document.querySelector('.toggle-status-btn.ativo')?.dataset?.status || '';
+    let statusCacheAnterior = null;
+    try {
+      const c = JSON.parse(localStorage.getItem('angatuba_loja_dados') || 'null');
+      if (c) statusCacheAnterior = c.statusLoja ?? '';
+    } catch(e) {}
+
     marcarToggle(novoStatus); // feedback imediato
     // Esconde os painéis de opções se estiverem visíveis
     const wrap = document.getElementById('ml-aberto-ate-wrap');
@@ -2127,8 +2153,6 @@
       const cache = JSON.parse(localStorage.getItem('angatuba_loja_dados') || 'null');
       if (cache) { cache.statusLoja = novoStatus; localStorage.setItem('angatuba_loja_dados', JSON.stringify(cache)); }
     } catch(e) {}
-
-    const statusAnterior = document.querySelector('.toggle-status-btn.ativo')?.dataset?.status || '';
     try {
       // Token via POST — nunca em query string (logs de servidor, histórico do browser)
       const params = new URLSearchParams();
@@ -2142,8 +2166,14 @@
       if (json.msg === 'UNAUTHORIZED') { lojaLogout(true); return; }
     } catch(e) {
       console.warn('[lojaToggle] Erro:', e.message);
-      // Reverte visual e avisa o dono
+      // Fix #4: reverte visual E cache do localStorage (estava sobrescrevendo otimista)
       if (statusAnterior) marcarToggle(statusAnterior);
+      if (statusCacheAnterior !== null) {
+        try {
+          const cache = JSON.parse(localStorage.getItem('angatuba_loja_dados') || 'null');
+          if (cache) { cache.statusLoja = statusCacheAnterior; localStorage.setItem('angatuba_loja_dados', JSON.stringify(cache)); }
+        } catch(e2) {}
+      }
       const errEl = document.getElementById('ml-toggle-erro');
       if (errEl) { errEl.textContent = '❌ Sem conexão. Status não foi salvo.'; setTimeout(() => { errEl.textContent = ''; }, 4000); }
     }
@@ -3960,11 +3990,11 @@
     }
     // Fecha painel Minha Loja
     if (document.getElementById('modal-minha-loja')?.classList.contains('open')) {
-      fecharMinhaLoja(); return;
+      fecharMinhaLoja(true); return;
     }
     // Fecha modal de cadastro
     if (document.getElementById('modal-cadastro')?.classList.contains('open')) {
-      closeModal(); return;
+      closeModal(true); return;
     }
   });
 
@@ -4089,7 +4119,11 @@
   }
 
   // Inicializa drag de reposicionamento da capa no painel (chamado após foto ser exibida)
+  // Fix #8: estado de posição no escopo pai — listeners são anexados UMA vez só.
+  // Antes, o reset (foto nova) zerava o guard e re-anexava window mousemove/mouseup,
+  // vazando um par de listeners globais a cada troca de foto.
   let _mlCapaDragInited = false;
+  let _mlPosX = 50, _mlPosY = 50;
   function mlInitCapaDrag(mostrarHint) {
     const capaWrap = document.getElementById('ml-up-capa-wrap');
     const capaImg  = document.getElementById('ml-up-foto-preview');
@@ -4110,13 +4144,12 @@
 
     let dragging = false;
     let startX = 0, startY = 0;
-    let posX = 50, posY = 50;
 
     function applyPos() {
-      capaImg.style.objectPosition = `${posX}% ${posY}%`;
+      capaImg.style.objectPosition = `${_mlPosX}% ${_mlPosY}%`;
       // Replica no hero do painel para feedback em tempo real
       const heroImg = document.getElementById('ml-hero-img');
-      if (heroImg) heroImg.style.objectPosition = `${posX}% ${posY}%`;
+      if (heroImg) heroImg.style.objectPosition = `${_mlPosX}% ${_mlPosY}%`;
     }
 
     function onStart(cx, cy) {
@@ -4127,8 +4160,8 @@
     }
     function onMove(cx, cy) {
       if (!dragging) return;
-      posX = Math.min(100, Math.max(0, posX - (cx - startX) * 0.3));
-      posY = Math.min(100, Math.max(0, posY - (cy - startY) * 0.3));
+      _mlPosX = Math.min(100, Math.max(0, _mlPosX - (cx - startX) * 0.3));
+      _mlPosY = Math.min(100, Math.max(0, _mlPosY - (cy - startY) * 0.3));
       startX = cx; startY = cy;
       applyPos();
     }
@@ -4140,6 +4173,16 @@
     capaWrap.addEventListener('touchstart', e => { if (!e.target.closest('label')) { const t=e.touches[0]; onStart(t.clientX, t.clientY); } }, { passive: true });
     capaWrap.addEventListener('touchmove',  e => { if (!dragging) return; e.preventDefault(); const t=e.touches[0]; onMove(t.clientX, t.clientY); }, { passive: false });
     capaWrap.addEventListener('touchend', onEnd);
+  }
+
+  // Fix #8: reseta posição da capa para o centro SEM re-anexar listeners.
+  function _mlResetCapaPos(mostrarHint) {
+    _mlPosX = 50; _mlPosY = 50;
+    const capaImg = document.getElementById('ml-up-foto-preview');
+    const heroImg = document.getElementById('ml-hero-img');
+    if (capaImg) capaImg.style.objectPosition = '50% 50%';
+    if (heroImg) heroImg.style.objectPosition = '50% 50%';
+    mlInitCapaDrag(mostrarHint); // garante init na 1ª vez; nas seguintes só atualiza cursor/hint
   }
 
   async function mlUploadImagem(tipo, input) {
@@ -4193,9 +4236,8 @@
       if (tipo === 'foto') {
         const heroImg = document.getElementById('ml-hero-img');
         if (heroImg) { heroImg.src = url; heroImg.style.display = ''; }
-        // Reseta o drag para usar a nova imagem do zero
-        _mlCapaDragInited = false;
-        mlInitCapaDrag(true);
+        // Fix #8: reseta posição sem re-anexar listeners globais (evita vazamento)
+        _mlResetCapaPos(true);
       } else {
         const logoImg = document.getElementById('ml-logo-img');
         const emojiEl = document.getElementById('ml-emoji');
@@ -4545,9 +4587,12 @@
       }
     }
 
-    // Plus não tem foto nem categoria
+    // Plus não tem foto, categoria nem destaque (recursos só do PRO)
     document.getElementById('ml-cardapio-foto-wrap').style.display = isPro ? '' : 'none';
     document.getElementById('ml-cardapio-cat-wrap').style.display  = isPro ? '' : 'none';
+    // Fix #1: gate do checkbox de destaque na UI (gate real é server-side)
+    const _destWrap = document.getElementById('ml-cardapio-destaque-wrap');
+    if (_destWrap) _destWrap.style.display = isPro ? 'flex' : 'none';
 
     try {
       const params = new URLSearchParams();
@@ -4567,13 +4612,15 @@
     if (!lista) return;
 
     const isPro   = _cardapioPlano === 'PRO';
-    const maxItens = isPro ? null : 5;
     const ativos  = _cardapioItens.filter(i => i.ativo !== 'NAO');
 
     if (limite) {
+      // Fix #7: restaura cor padrão (mlCardapioAbrirForm pinta de vermelho ao bloquear)
+      limite.style.color = 'var(--muted)';
+      const restam = Math.max(0, 5 - ativos.length);
       limite.textContent = isPro
         ? `${ativos.length} item${ativos.length !== 1 ? 's' : ''} no cardápio`
-        : `${ativos.length}/5 itens · ${5 - ativos.length} restante${5-ativos.length!==1?'s':''}`;
+        : `${ativos.length}/5 itens · ${restam} restante${restam!==1?'s':''}`;
     }
 
     if (ativos.length === 0) {
@@ -4610,6 +4657,19 @@
   function mlCardapioAbrirForm(editId) {
     const form = document.getElementById('ml-cardapio-form');
     if (!form) return;
+    // Fix #7: PLUS é limitado a 5 itens — bloqueia abrir form para NOVO item ao atingir o limite
+    if (!editId && _cardapioPlano !== 'PRO') {
+      const ativos = _cardapioItens.filter(i => i.ativo !== 'NAO').length;
+      if (ativos >= 5) {
+        const limiteEl = document.getElementById('ml-cardapio-limite');
+        if (limiteEl) {
+          limiteEl.textContent = '⚠️ Limite de 5 itens do plano PLUS atingido. Faça upgrade para PRO para itens ilimitados.';
+          limiteEl.style.color = 'var(--red)';
+          setTimeout(() => { mlCardapioRenderLista(); }, 4000); // restaura o texto normal do contador
+        }
+        return;
+      }
+    }
     form.style.display = '';
     document.getElementById('ml-cardapio-form-msg').textContent = '';
 

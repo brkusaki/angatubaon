@@ -1760,7 +1760,20 @@
         alert('Erro: ' + (json.msg || 'Tente novamente.'));
       }
     } catch(e) {
-      alert('Erro de conexão. Verifique sua internet e tente novamente.');
+      // Timeout não significa falha: o backend quase sempre já gerou e enviou
+      // o código (o e-mail/WhatsApp chega), só não devolveu a resposta a tempo.
+      // Em vez de travar, avança para a tela do código.
+      const ehTimeout = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
+      if (ehTimeout) {
+        loginStep(2);
+        document.getElementById('login-loja-sub').textContent =
+          'Se você está cadastrado, o código já está a caminho. Confira seu WhatsApp.';
+        const cardEl = document.getElementById('login-loja-card');
+        if (cardEl) cardEl.style.display = 'none';
+        setTimeout(() => document.getElementById('ll-codigo').focus(), 100);
+      } else {
+        alert('Erro de conexão. Verifique sua internet e tente novamente.');
+      }
     } finally {
       btn.innerHTML = '<i class="fab fa-whatsapp"></i> Receber código';
       btn.disabled = false;
@@ -1810,7 +1823,13 @@
         alert('Erro: ' + (json.msg || 'Tente novamente.'));
       }
     } catch(e) {
-      alert('Erro de conexão. Verifique sua internet.');
+      const ehTimeout = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
+      const hintEl = document.getElementById('login-codigo-hint');
+      if (ehTimeout && hintEl) {
+        hintEl.textContent = '⏱️ O servidor demorou a responder. Aguarde alguns segundos e toque em Confirmar de novo.';
+      } else {
+        alert('Erro de conexão. Verifique sua internet.');
+      }
     } finally {
       btn.innerHTML = '<i class="fa fa-check"></i> Confirmar código';
       btn.disabled = false;

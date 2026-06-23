@@ -1225,6 +1225,9 @@
   }
 
 
+  /* ── Schedule simplificado ──────────────────────────────── */
+  let _schedPreset = 'semana';
+
   const PRESET_DIAS = {
     semana:     [1,2,3,4,5],
     semana_sab: [1,2,3,4,5,6],

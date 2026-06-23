@@ -781,6 +781,7 @@ function planCardHTML(r) {
         <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 14, this)">2 semanas</button>
         <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 30, this)">1 mês</button>
         <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 90, this)">3 meses</button>
+        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 365, this)">1 ano</button>
         <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 0, this)">Vitalício</button>
         ${isoVal ? `<span style="font-size:10px;color:var(--muted);align-self:center;">até ${validade}</span>` : ''}
       </div>

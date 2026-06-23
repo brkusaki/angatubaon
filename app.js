@@ -427,13 +427,12 @@
       ? `<span class="contact-tag maps" title="Localização disponível"><i class="fa fa-map-marker-alt"></i> MAPS</span>`
       : '';
 
-    // Pill TEL só quando a loja NÃO tem WhatsApp (senão é redundante com o botão flutuante)
-    const ctTag = (loja.tel && !loja.wpp)
+    const ctTag = loja.tel && !loja.wpp
       ? `<span class="contact-tag tel">📞 TEL</span>`
-      : '';
+      : `<span class="contact-tag wpp">💬 WPP</span>`;
 
-    // Linha de indicadores visuais (só MAPS + TEL quando relevante)
-    // O WhatsApp já tem botão de ação dedicado à direita — não duplicar aqui
+    // Linha de indicadores visuais (mapPin + ctTag) — fica no rodapé do card
+    // Posição abaixo de "Ver detalhes" para evitar cliques acidentais ao abrir o card
     const indicadoresFooter = (mapPin || ctTag)
       ? `<div style="display:flex;align-items:center;gap:4px;margin-top:3px;">${mapPin}${ctTag}</div>`
       : '';
@@ -685,7 +684,7 @@
 
         return `
           <button class="cat-item${isActive && cat.id !== 'todos' ? ' has-clear' : ''}" data-cat="${cat.id}" onclick="setCat('${cat.id}',this)">
-            <div class="cat-icon ${isActive?'active':''}" style="--cat-accent:${cat.cor};">
+            <div class="cat-icon ${isActive?'active':''}" style="background:${cat.bg};">
               <i class="ti ${cat.icon}" style="color:${cat.cor};"></i>
               ${badge}
             </div>
@@ -819,6 +818,8 @@
     if (history.state?.modal !== 'cadastro') history.pushState({ modal: 'cadastro' }, '');
     // Garante que começa na etapa 1
     cadIrParaEtapa(1);
+    // Garante preços coerentes com o ciclo atual (default mensal)
+    if (typeof cadAtualizarPrecos === 'function') cadAtualizarPrecos();
   }
 
   function closeModal(viaPopstate) {
@@ -871,6 +872,40 @@
 
   /* ── Modal de Planos ─────────────────────────────────────── */
   let selectedPlan = 'GRATIS';
+
+  /* ── Ciclos de cobrança e preços ──────────────────────────────
+     Base mensal: Plus R$29,90 · Pro R$49,90.
+     Trimestral: -10%.  Anual: paga 10 meses (≈ -17%, "2 meses grátis").
+     Tudo calculado a partir do mensal pra ficar fácil ajustar depois. */
+  const PLANO_MENSAL = { PLUS: 29.90, PRO: 49.90 };
+  const CICLOS = {
+    mensal:     { meses: 1,  rotulo: 'Mensal',     fator: 1,    selo: '' },
+    trimestral: { meses: 3,  rotulo: 'Trimestral', fator: 0.90, selo: '-10%' },
+    anual:      { meses: 12, rotulo: 'Anual',      fator: null, selo: '2 meses grátis' }, // fator null = paga 10
+  };
+  let _cicloSelecionado = 'mensal';
+
+  // Retorna { total, porMes, economia } de um plano pago num ciclo.
+  function calcPreco(plano, ciclo) {
+    const base = PLANO_MENSAL[plano];
+    if (!base) return null;
+    const c = CICLOS[ciclo] || CICLOS.mensal;
+    let total;
+    if (ciclo === 'anual') {
+      total = base * 10;            // paga 10, leva 12
+    } else {
+      total = base * c.meses * c.fator;
+    }
+    const cheio   = base * c.meses; // o que custaria sem desconto
+    const porMes  = total / c.meses;
+    const economia = cheio - total;
+    return { total, porMes, economia, meses: c.meses };
+  }
+
+  // Formata número como moeda BRL (R$ 1.234,56)
+  function fmtBRL(v) {
+    return 'R$ ' + v.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
   let _carouselIdx = 0;
   const PLANS_ORDER = ['GRATIS', 'PLUS', 'PRO'];
 
@@ -1143,8 +1178,53 @@
     }
   };
 
-  /* ── Schedule simplificado ──────────────────────────────── */
-  let _schedPreset = 'semana';
+  /* ── Seleção de ciclo de cobrança ─────────────────────────── */
+  window.cadSelecionarCiclo = function(ciclo) {
+    if (!CICLOS[ciclo]) ciclo = 'mensal';
+    _cicloSelecionado = ciclo;
+
+    // Marca botão ativo
+    document.querySelectorAll('#cad-ciclo-toggle .ciclo-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.ciclo === ciclo);
+    });
+
+    cadAtualizarPrecos();
+  };
+
+  // Atualiza os preços exibidos nos cards Plus/Pro conforme o ciclo escolhido.
+  function cadAtualizarPrecos() {
+    const ciclo = _cicloSelecionado;
+    ['PLUS','PRO'].forEach(plano => {
+      const sufixo  = plano.toLowerCase();
+      const precoEl = document.getElementById('cad-preco-' + sufixo);
+      const perEl   = document.getElementById('cad-per-' + sufixo);
+      const infoEl  = document.getElementById('cad-ciclo-' + sufixo);
+      const calc    = calcPreco(plano, ciclo);
+      if (!precoEl || !calc) return;
+
+      if (ciclo === 'mensal') {
+        precoEl.classList.remove('price-riscado');
+        precoEl.textContent = fmtBRL(calc.porMes);
+        if (perEl)  perEl.textContent = 'por mês';
+        if (infoEl) { infoEl.style.display = 'none'; infoEl.innerHTML = ''; }
+      } else {
+        // Mostra preço POR MÊS em destaque (mais convertível) + total no rodapé
+        precoEl.classList.remove('price-riscado');
+        precoEl.textContent = fmtBRL(calc.porMes);
+        if (perEl) perEl.textContent = 'por mês';
+        if (infoEl) {
+          const totalTxt = `${fmtBRL(calc.total)} a cada ${calc.meses} meses`;
+          const econTxt  = calc.economia > 0
+            ? ` · <span class="plan-ciclo-economia">economize ${fmtBRL(calc.economia)}</span>`
+            : '';
+          infoEl.innerHTML = totalTxt + econTxt;
+          infoEl.style.display = '';
+        }
+      }
+    });
+  }
+
+
   const PRESET_DIAS = {
     semana:     [1,2,3,4,5],
     semana_sab: [1,2,3,4,5,6],
@@ -1430,14 +1510,18 @@
       if (owlEl) owlEl.src = `/webp/owl-celebrate-${owlMap[plano] || 'gratis'}.webp`;
 
       if (isPago) {
+        const cicloInfo = CICLOS[_cicloSelecionado] || CICLOS.mensal;
+        const calc      = calcPreco(plano, _cicloSelecionado);
+        const cicloTxt  = cicloInfo.rotulo.toLowerCase();
+        const valorTxt  = calc ? ` (${fmtBRL(calc.total)}${_cicloSelecionado !== 'mensal' ? ' a cada ' + calc.meses + ' meses' : '/mês'})` : '';
         const wppMsg = encodeURIComponent(
-          `Olá! Acabei de cadastrar *${nomeLoja}* no AngatubaON e escolhi o Plano ${plano}. Gostaria de ativá-lo!`
+          `Olá! Acabei de cadastrar *${nomeLoja}* no AngatubaON e escolhi o Plano ${plano} ${cicloTxt}${valorTxt}. Gostaria de ativá-lo!`
         );
         const wppUrl = `https://wa.me/${ADMIN_WPP_CONTATO}?text=${wppMsg}`;
         const subTextEl = successEl.querySelector('#success-sub-text') || successEl.querySelector('.success-sub');
         if (subTextEl) subTextEl.innerHTML =
           `Recebemos os dados da sua loja.<br>` +
-          `Agora fale com a gente pelo WhatsApp para ativar o <strong>Plano ${plano}</strong>:`;
+          `Agora fale com a gente pelo WhatsApp para ativar o <strong>Plano ${plano} ${cicloTxt}</strong>:`;
         // Adiciona/atualiza botão de WPP dinâmico
         let wppBtn = successEl.querySelector('.success-wpp-btn');
         if (!wppBtn) {
@@ -1531,7 +1615,6 @@
   });
 
   /* ── Modais de login ─────────────────────────────────────── */
-  let _llMaskBound = false;
   function openLoginLoja() {
     loginStep(1);
     document.getElementById('ll-wpp').value    = '';
@@ -1540,39 +1623,6 @@
     document.getElementById('login-loja-sub').textContent = 'Digite o WhatsApp cadastrado para receber seu código';
     document.getElementById('modal-login-loja').classList.add('open');
     document.body.style.overflow = 'hidden';
-
-    // Reseta validação visual
-    const okEl  = document.getElementById('ll-wpp-ok');
-    const errEl = document.getElementById('ll-wpp-err');
-    const input = document.getElementById('ll-wpp');
-    if (okEl)  okEl.style.opacity = '0';
-    if (errEl) errEl.classList.remove('show');
-    if (input) input.classList.remove('invalid');
-
-    // Aplica máscara de telefone (uma vez só)
-    if (input && !_llMaskBound) {
-      _llMaskBound = true;
-      function mask(v) {
-        const d = v.replace(/\D/g, '').slice(0, 11);
-        if (d.length <= 2)  return d;
-        if (d.length <= 6)  return `(${d.slice(0,2)}) ${d.slice(2)}`;
-        if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
-        return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
-      }
-      input.addEventListener('input', function() {
-        const pos  = this.selectionStart;
-        const prev = this.value.length;
-        this.value = mask(this.value);
-        const diff = this.value.length - prev;
-        try { this.setSelectionRange(pos + diff, pos + diff); } catch(e) {}
-        const digits = this.value.replace(/\D/g,'');
-        const ok = digits.length === 10 || digits.length === 11;
-        const okMark = document.getElementById('ll-wpp-ok');
-        if (okMark) okMark.style.opacity = ok ? '1' : '0';
-        this.classList.toggle('invalid', digits.length >= 10 && !ok);
-      });
-    }
-
     setTimeout(() => document.getElementById('ll-wpp').focus(), 300);
   }
 
@@ -1595,18 +1645,14 @@
     const wppRaw = document.getElementById('ll-wpp').value.replace(/\D/g,'');
     const wpp = wppRaw.startsWith('55') ? wppRaw : '55' + wppRaw;
     if (wpp.length < 12) {
-      const input = document.getElementById('ll-wpp');
-      const errEl = document.getElementById('ll-wpp-err');
-      if (input) { input.classList.add('invalid'); input.focus(); }
-      if (errEl) errEl.classList.add('show');
+      alert('Digite o número de WhatsApp completo com DDD.');
       return;
     }
     _lojaWpp = wpp;
 
-    const btn = document.getElementById('ll-submit-btn') || document.querySelector('#login-step1 .modal-submit');
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Enviando código...';
+    const btn = document.querySelector('#login-step1 .modal-submit');
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Solicitando...';
     btn.disabled = true;
-    btn.style.opacity = '0.8';
 
     try {
       const params = new URLSearchParams();
@@ -1702,7 +1748,6 @@
     } finally {
       btn.innerHTML = '<i class="fab fa-whatsapp"></i> Receber código';
       btn.disabled = false;
-      btn.style.opacity = '';
     }
   }
 
@@ -1982,8 +2027,8 @@
         if (lockEl) lockEl.style.display = '';
       }
 
-      // ── Visibilidade / Crescimento / Conversão (só planos pagos) ──
-      mlRenderMetricasExtra(m, isPago);
+      // ── Visibilidade / Crescimento / Conversão (só Pro) ──
+      mlRenderMetricasExtra(m, isPro);
 
       // ── Horário de pico (só Pro) ──────────────────────
       const picoSection = document.getElementById('ml-pico-section');
@@ -1997,17 +2042,20 @@
   }
 
   // Renderiza os blocos extra de métricas: visualizações, crescimento semanal
-  // e conversão por canal. Tudo a partir do objeto que o backend já devolve.
-  function mlRenderMetricasExtra(m, isPago) {
+  // e conversão por canal. Exclusivos do plano Pro. Tudo a partir do objeto
+  // que o backend já devolve.
+  function mlRenderMetricasExtra(m, isPro) {
     const visRow   = document.getElementById('ml-visibilidade-row');
     const crescBox = document.getElementById('ml-crescimento-box');
     const convBox  = document.getElementById('ml-conversao-box');
 
-    // Em plano grátis, esses blocos ficam escondidos (lock cobre os de cima)
-    if (!isPago) {
+    // Só Pro: nos demais planos esses blocos ficam escondidos.
+    if (!isPro) {
       if (visRow)   visRow.style.display   = 'none';
       if (crescBox) crescBox.style.display = 'none';
       if (convBox)  convBox.style.display  = 'none';
+      const taxaBoxHide = document.getElementById('ml-taxaconv-box');
+      if (taxaBoxHide) taxaBoxHide.style.display = 'none';
       return;
     }
 
@@ -2025,6 +2073,28 @@
       if (elV) elV.textContent = views;
       if (elM) elM.textContent = menu;
       visRow.style.display = 'flex';
+    }
+
+    // ── Taxa de conversão (views → cliques de contato) ──
+    const taxaBox = document.getElementById('ml-taxaconv-box');
+    if (taxaBox) {
+      const elVal = document.getElementById('ml-taxaconv-val');
+      const elMsg = document.getElementById('ml-taxaconv-msg');
+      if (views === 0) {
+        if (elVal) elVal.textContent = '—';
+        if (elMsg) elMsg.textContent = 'Quando as pessoas começarem a ver sua loja, mostramos aqui quantas chamam você.';
+      } else {
+        const taxa = (totalContato / views) * 100;
+        // 1 casa decimal só quando < 10%, senão inteiro (fica mais limpo)
+        const taxaTxt = taxa < 10 ? taxa.toFixed(1) : Math.round(taxa).toString();
+        if (elVal) elVal.textContent = taxaTxt + '%';
+        if (elMsg) {
+          elMsg.textContent =
+            `De cada 100 pessoas que veem sua loja, cerca de ${Math.round(taxa)} entram em contato ` +
+            `(${totalContato} de ${views} visualizações).`;
+        }
+      }
+      taxaBox.style.display = '';
     }
 
     // ── Crescimento semanal (d7 vs d7ant) ──

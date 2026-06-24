@@ -5103,10 +5103,18 @@
     if (limite) {
       // Fix #7: restaura cor padrão (mlCardapioAbrirForm pinta de vermelho ao bloquear)
       limite.style.color = 'var(--muted)';
-      const restam = Math.max(0, PLUS_LIMITE_ITENS - ativos.length);
-      limite.textContent = isPro
-        ? `${ativos.length} item${ativos.length !== 1 ? 's' : ''} no cardápio`
-        : `${ativos.length}/${PLUS_LIMITE_ITENS} itens · ${restam} restante${restam!==1?'s':''}`;
+      const restam = PLUS_LIMITE_ITENS - ativos.length;
+      if (isPro) {
+        limite.textContent = `${ativos.length} item${ativos.length !== 1 ? 's' : ''} no cardápio`;
+        limite.style.color = 'var(--muted)';
+      } else if (restam < 0) {
+        // Acima do limite: avisa que itens extras ficam ocultos no app
+        limite.textContent = `${ativos.length}/${PLUS_LIMITE_ITENS} itens · ${Math.abs(restam)} oculto${Math.abs(restam)!==1?'s':''} no app (faça upgrade para PRO)`;
+        limite.style.color = 'var(--orange, #f59e0b)';
+      } else {
+        limite.textContent = `${ativos.length}/${PLUS_LIMITE_ITENS} itens · ${restam} restante${restam!==1?'s':''}`;
+        limite.style.color = 'var(--muted)';
+      }
     }
 
     // Mostra busca apenas para PRO com itens suficientes para justificar

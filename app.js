@@ -5173,12 +5173,14 @@
   ══════════════════════════════════════════════════════════════ */
   let _ccLojaIdx   = null;
   let _ccCarrinho  = {}; // { itemId: { item, qty } }
+  let _ccCartExpanded = false; // estado do carrinho colapsável
 
   window.abrirCardapioCliente = function(idx) {
     const loja = LOJAS[idx];
     if (!loja || !loja.cardapio || loja.cardapio.length === 0) return;
     _ccLojaIdx  = idx;
     _ccCarrinho = {};
+    _ccCartExpanded = false;
     // Remove botao de confirmacao residual de um pedido anterior (Fix: botao fantasma)
     document.getElementById('cc-carrinho-bar')?.querySelector('.cc-confirm-btn')?.remove();
 
@@ -5410,28 +5412,67 @@
     const bar    = document.getElementById('cc-carrinho-bar');
     const lista  = document.getElementById('cc-carrinho-itens');
     const totalEl = document.getElementById('cc-total');
+    const totalHeadEl = document.getElementById('cc-total-head');
+    const countEl = document.getElementById('cc-cart-count');
     const itens  = Object.values(_ccCarrinho);
 
     if (itens.length === 0) {
       if (bar) bar.style.display = 'none';
+      _ccCartExpanded = false;
+      ccAplicarEstadoCarrinho();
       return;
     }
 
     if (bar) bar.style.display = '';
 
-    let total = 0;
+    let total = 0, totalQty = 0;
     if (lista) {
       lista.innerHTML = itens.map(({ item, qty }) => {
         const sub = (parseFloat(item.preco) || 0) * qty;
-        total += sub;
+        total += sub; totalQty += qty;
         return `<div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;">
           <span style="flex:1;color:var(--text);">${qty}× ${escHTML(item.nome)}</span>
           <span style="color:var(--green);font-weight:700;flex-shrink:0;">R$ ${sub.toFixed(2).replace('.',',')}</span>
         </div>`;
       }).join('');
+    } else {
+      itens.forEach(({ item, qty }) => { total += (parseFloat(item.preco) || 0) * qty; totalQty += qty; });
     }
-    if (totalEl) totalEl.textContent = `R$ ${total.toFixed(2).replace('.',',')}`;
+    const totalStr = `R$ ${total.toFixed(2).replace('.',',')}`;
+    if (totalEl) totalEl.textContent = totalStr;
+    if (totalHeadEl) totalHeadEl.textContent = totalStr;
+    if (countEl) countEl.textContent = `${totalQty} ${totalQty === 1 ? 'item' : 'itens'}`;
+
+    // Se o carrinho está aberto, recalcula a altura (conteúdo mudou)
+    if (_ccCartExpanded) ccAplicarEstadoCarrinho();
   }
+
+  // Estado de expansão do carrinho colapsável
+
+  function ccAplicarEstadoCarrinho() {
+    const body    = document.getElementById('cc-cart-body');
+    const head    = document.getElementById('cc-cart-head');
+    const chevron = document.getElementById('cc-cart-chevron');
+    if (!body) return;
+    if (_ccCartExpanded) {
+      // limita a metade da altura do sheet para nunca cobrir a lista toda
+      const max = Math.round(window.innerHeight * 0.5);
+      body.style.maxHeight = Math.min(body.scrollHeight, max) + 'px';
+      body.style.overflowY = body.scrollHeight > max ? 'auto' : 'hidden';
+      if (chevron) chevron.style.transform = 'rotate(180deg)';
+      if (head) head.setAttribute('aria-expanded', 'true');
+    } else {
+      body.style.maxHeight = '0px';
+      body.style.overflowY = 'hidden';
+      if (chevron) chevron.style.transform = '';
+      if (head) head.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  window.ccToggleCarrinho = function() {
+    _ccCartExpanded = !_ccCartExpanded;
+    ccAplicarEstadoCarrinho();
+  };
 
   window.ccFinalizarPedido = function() {
     const loja  = LOJAS[_ccLojaIdx];
@@ -5477,10 +5518,11 @@
 
     // Exibe botão de confirmação explícita em vez de detectar visibilitychange
     // (visibilitychange dispara para qualquer troca de app, não só para o WhatsApp)
-    const carrinhoBar = document.getElementById('cc-carrinho-bar');
-    if (carrinhoBar) {
+    const cartInner = document.querySelector('#cc-cart-body > div')
+                   || document.getElementById('cc-carrinho-bar');
+    if (cartInner) {
       // Remove botão anterior se existir (evita acúmulo a cada chamada)
-      carrinhoBar.querySelector('.cc-confirm-btn')?.remove();
+      cartInner.querySelector('.cc-confirm-btn')?.remove();
       const confirmBtn = document.createElement('button');
       confirmBtn.className = 'cc-confirm-btn';
       confirmBtn.style.cssText = `
@@ -5491,7 +5533,10 @@
       `;
       confirmBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Pedido enviado! Confirmar';
       confirmBtn.onclick = () => _ccMostrarSucesso();
-      carrinhoBar.appendChild(confirmBtn);
+      cartInner.appendChild(confirmBtn);
+      // Garante que o carrinho fique aberto para o usuário ver o botão de confirmar
+      _ccCartExpanded = true;
+      ccAplicarEstadoCarrinho();
     }
   };
 

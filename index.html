@@ -1512,39 +1512,56 @@
       <div class="cc-sticky-tabs" id="cc-cat-tabs" style="display:none;"></div>
 
       <!-- Lista de itens por categoria -->
-      <div style="overflow-y:auto;flex:1 1 0;min-height:30vh;padding:8px 16px 14px;-webkit-overflow-scrolling:touch;" id="cc-itens-wrap"></div>
+      <div style="overflow-y:auto;flex:1 1 auto;padding:8px 16px 14px;-webkit-overflow-scrolling:touch;" id="cc-itens-wrap"></div>
 
-      <!-- Carrinho flutuante dentro do modal -->
-      <div id="cc-carrinho-bar" style="display:none;padding:12px 16px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;max-height:48vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-family:var(--font-h);font-size:13px;font-weight:800;">🛒 Seu pedido</div>
-          <button onclick="ccLimparCarrinho()" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;">Limpar</button>
-        </div>
-        <div id="cc-carrinho-itens" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;max-height:140px;overflow-y:auto;"></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <span style="font-size:12px;color:var(--muted);">Total</span>
-          <span style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:var(--green);" id="cc-total">R$ 0,00</span>
-        </div>
-        <!-- Entrega (visível apenas quando loja.fazEntrega = true) -->
-        <div id="cc-entrega-section" style="display:none;margin-bottom:10px;background:var(--surface2);border:1px solid rgba(251,146,60,0.3);border-radius:12px;padding:12px;">
-          <div style="font-size:10px;font-weight:700;color:#fb923c;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">🛵 Dados da entrega</div>
-          <input type="text" id="cc-entrega-endereco" placeholder="📍 Endereço completo (rua, nº, bairro)"
-            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 10px;color:var(--text);font-size:12px;font-family:var(--font-b);box-sizing:border-box;outline:none;margin-bottom:8px;">
-          <select id="cc-entrega-pagamento"
-            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 10px;color:var(--text);font-size:12px;font-family:var(--font-b);box-sizing:border-box;outline:none;-webkit-appearance:none;appearance:none;">
-            <option value="">💳 Forma de pagamento…</option>
-            <option value="Dinheiro">💵 Dinheiro</option>
-            <option value="PIX">📲 PIX</option>
-            <option value="Cartão de débito">💳 Cartão de débito</option>
-            <option value="Cartão de crédito">💳 Cartão de crédito</option>
-            <option value="Vale-refeição">🍽️ Vale-refeição</option>
-            <option value="Vale-alimentação">🛒 Vale-alimentação</option>
-          </select>
-        </div>
-        <textarea id="cc-obs-input" placeholder="📝 Alguma observação? (ex: sem cebola, ponto da carne...)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:12px;font-family:var(--font-b);resize:none;height:56px;margin-bottom:10px;box-sizing:border-box;outline:none;"></textarea>
-        <button onclick="ccFinalizarPedido()" style="width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;font-family:var(--font-h);font-size:14px;font-weight:800;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-          <i class="fab fa-whatsapp"></i> Enviar pedido pelo WhatsApp
+      <!-- Carrinho — barra colapsável (toque no cabeçalho expande/recolhe) -->
+      <div id="cc-carrinho-bar" class="cc-cart" style="display:none;flex-shrink:0;background:var(--surface);border-top:1px solid var(--border);">
+
+        <!-- Cabeçalho sempre visível (toggle) -->
+        <button type="button" id="cc-cart-head" onclick="ccToggleCarrinho()" aria-expanded="false"
+          style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+          padding:12px 16px;background:none;border:none;cursor:pointer;-webkit-tap-highlight-color:transparent;color:var(--text);">
+          <span style="display:flex;align-items:center;gap:8px;font-family:var(--font-h);font-size:13px;font-weight:800;">
+            🛒 <span id="cc-cart-count">0 itens</span>
+            <i class="fas fa-chevron-up" id="cc-cart-chevron" style="font-size:11px;color:var(--muted);transition:transform .25s;"></i>
+          </span>
+          <span style="font-family:var(--font-h);font-size:1.05rem;font-weight:800;color:var(--green);" id="cc-total-head">R$ 0,00</span>
         </button>
+
+        <!-- Corpo expansível -->
+        <div id="cc-cart-body" style="max-height:0;overflow:hidden;transition:max-height .28s cubic-bezier(0.32,0.72,0,1);">
+          <div style="padding:0 16px 12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Itens</div>
+              <button onclick="ccLimparCarrinho()" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;">Limpar</button>
+            </div>
+            <div id="cc-carrinho-itens" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;max-height:120px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <span style="font-size:12px;color:var(--muted);">Total</span>
+              <span style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:var(--green);" id="cc-total">R$ 0,00</span>
+            </div>
+            <!-- Entrega (visível apenas quando loja.fazEntrega = true) -->
+            <div id="cc-entrega-section" style="display:none;margin-bottom:10px;background:var(--surface2);border:1px solid rgba(251,146,60,0.3);border-radius:12px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#fb923c;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">🛵 Dados da entrega</div>
+              <input type="text" id="cc-entrega-endereco" placeholder="📍 Endereço completo (rua, nº, bairro)"
+                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 10px;color:var(--text);font-size:12px;font-family:var(--font-b);box-sizing:border-box;outline:none;margin-bottom:8px;">
+              <select id="cc-entrega-pagamento"
+                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 10px;color:var(--text);font-size:12px;font-family:var(--font-b);box-sizing:border-box;outline:none;-webkit-appearance:none;appearance:none;">
+                <option value="">💳 Forma de pagamento…</option>
+                <option value="Dinheiro">💵 Dinheiro</option>
+                <option value="PIX">📲 PIX</option>
+                <option value="Cartão de débito">💳 Cartão de débito</option>
+                <option value="Cartão de crédito">💳 Cartão de crédito</option>
+                <option value="Vale-refeição">🍽️ Vale-refeição</option>
+                <option value="Vale-alimentação">🛒 Vale-alimentação</option>
+              </select>
+            </div>
+            <textarea id="cc-obs-input" placeholder="📝 Alguma observação? (ex: sem cebola, ponto da carne...)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:12px;font-family:var(--font-b);resize:none;height:56px;margin-bottom:10px;box-sizing:border-box;outline:none;"></textarea>
+            <button onclick="ccFinalizarPedido()" style="width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;font-family:var(--font-h);font-size:14px;font-weight:800;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+              <i class="fab fa-whatsapp"></i> Enviar pedido pelo WhatsApp
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

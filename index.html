@@ -1239,10 +1239,16 @@
                     <div id="ml-cardapio-foto-preview" style="width:52px;height:52px;border-radius:10px;background:var(--surface2);border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
                       <i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>
                     </div>
-                    <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);font-size:11px;font-weight:700;cursor:pointer;color:var(--text);">
-                      <i class="fa fa-upload" style="font-size:10px;"></i> Escolher foto
-                      <input type="file" accept="image/*" id="ml-cardapio-foto-file" style="display:none;" onchange="mlCardapioFotoPreview(this)">
-                    </label>
+                    <div style="flex:1;display:flex;gap:8px;">
+                      <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);font-size:11px;font-weight:700;cursor:pointer;color:var(--text);">
+                        <i class="fa fa-camera" style="font-size:10px;"></i> Câmera
+                        <input type="file" accept="image/*" capture="environment" id="ml-cardapio-foto-cam" style="display:none;" onchange="mlCardapioFotoPreview(this)">
+                      </label>
+                      <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);font-size:11px;font-weight:700;cursor:pointer;color:var(--text);">
+                        <i class="fa fa-image" style="font-size:10px;"></i> Galeria
+                        <input type="file" accept="image/*" id="ml-cardapio-foto-file" style="display:none;" onchange="mlCardapioFotoPreview(this)">
+                      </label>
+                    </div>
                   </div>
                 </div>
                 <input type="hidden" id="ml-cardapio-edit-id" value="">

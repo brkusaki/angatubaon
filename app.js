@@ -1,5 +1,8 @@
 'use strict';
 
+  /* Flag de debug — ligue para ver logs no console (window.__ANGATUBA_DEBUG = true) */
+  const DEBUG = (typeof window !== 'undefined' && window.__ANGATUBA_DEBUG === true);
+
   /* ══════════════════════════════════════════════════════════════
      CATEGORIAS
   ══════════════════════════════════════════════════════════════ */
@@ -2956,7 +2959,7 @@
           const idx = LOJAS.findIndex(l => toSlug(l.nome) === hash);
           if (idx >= 0) setTimeout(() => abrirDetalhes(idx), 100);
         })();
-        console.log('[AngatubaON] ' + json.data.length + ' da API + ' + fixasSemDuplicata.length + ' fixas ✅');
+        if (DEBUG) console.log('[AngatubaON] ' + json.data.length + ' da API + ' + fixasSemDuplicata.length + ' fixas ✅');
         // Salva snapshot para uso offline (primeiro acesso sem internet mostra dados cacheados)
         try {
           localStorage.setItem('angatuba_lojas_cache', JSON.stringify(LOJAS));
@@ -2975,7 +2978,7 @@
       // Cancela timer anterior antes de agendar novo (evita chamadas duplicadas)
       if (_retryCount < _retryDelays.length) {
         const delay = _retryDelays[_retryCount++];
-        console.log(`[AngatubaON] Retry ${_retryCount}/${_retryDelays.length} em ${delay/1000}s...`);
+        if (DEBUG) console.log(`[AngatubaON] Retry ${_retryCount}/${_retryDelays.length} em ${delay/1000}s...`);
         if (_retryTimer) clearTimeout(_retryTimer);
         _retryTimer = setTimeout(() => { _retryTimer = null; carregarLojas(); }, delay);
       }
@@ -3110,7 +3113,8 @@
           `&accept-language=pt-BR`;
 
         const resp = await fetch(url, {
-          headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'AngatubaON/1.0' }
+          headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'AngatubaON/1.0' },
+          signal: AbortSignal.timeout(8000)
         });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const data = await resp.json();
@@ -3123,7 +3127,8 @@
             `&format=json&limit=5&countrycodes=br` +
             `&accept-language=pt-BR`;
           const resp2 = await fetch(url2, {
-            headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'AngatubaON/1.0' }
+            headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'AngatubaON/1.0' },
+            signal: AbortSignal.timeout(8000)
           });
           const data2 = await resp2.json();
           showDropdown(data2);
@@ -3216,14 +3221,14 @@
             width:52px;height:52px;border-radius:12px;overflow:hidden;
             border:2px solid rgba(255,255,255,0.2);box-shadow:0 4px 14px rgba(0,0,0,0.5);
             background:var(--surface);">
-           <img src="${loja.logo}" style="width:100%;height:100%;object-fit:cover;"
+           <img src="${loja.logo}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;"
              onerror="this.parentElement.style.display='none'" />
          </div>`
       : '';
 
     const coverHTML = hasFoto
       ? `<div class="detail-cover-wrap">
-           <img class="detail-cover" src="${loja.foto}" alt="Foto ${escAttr(loja.nome)}"
+           <img class="detail-cover" loading="lazy" decoding="async" src="${loja.foto}" alt="Foto ${escAttr(loja.nome)}"
              onerror="this.parentElement.innerHTML = placeholderCover('${escAttr(loja.emoji || '🏪')}', '${escAttr(loja.categoria || '')}');" />
            <div class="detail-top-bar">
              <div class="detail-handle"></div>
@@ -3263,7 +3268,7 @@
     let anuncioHTML = '';
     if (temAnuncioModal) {
       const imgHtml = (isPro && loja.anuncio.imagemUrl)
-        ? `<img src="${escAttr(loja.anuncio.imagemUrl)}" alt="Foto do anúncio"
+        ? `<img loading="lazy" decoding="async" src="${escAttr(loja.anuncio.imagemUrl)}" alt="Foto do anúncio"
                style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-top:10px;"
                onerror="this.style.display='none'" />`
         : '';
@@ -4860,7 +4865,7 @@
     lista.innerHTML = ativos.map(item => `
       <div class="ml-cardapio-item">
         ${item.foto
-          ? `<img src="${item.foto}" class="ml-cardapio-item-foto" onerror="this.style.display='none'">`
+          ? `<img loading="lazy" decoding="async" src="${item.foto}" class="ml-cardapio-item-foto" onerror="this.style.display='none'">`
           : `<div class="ml-cardapio-item-foto" style="display:flex;align-items:center;justify-content:center;font-size:1.2rem;">🍽️</div>`}
         <div style="flex:1;min-width:0;">
           <div style="font-family:var(--font-h);font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHTML(item.nome)}</div>
@@ -5321,7 +5326,7 @@
       ${itens.map(item => `
         <div class="cc-item-card" id="cc-card-${item.id}" style="margin-bottom:8px;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
           ${item.foto
-            ? `<img src="${item.foto}" class="cc-item-foto" onerror="this.style.display='none'">`
+            ? `<img loading="lazy" decoding="async" src="${item.foto}" class="cc-item-foto" onerror="this.style.display='none'">`
             : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
           <div class="cc-item-info">
             <div class="cc-item-nome">

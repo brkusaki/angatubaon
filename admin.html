@@ -506,6 +506,11 @@
     <!-- TAB: Cobranças -->
     <div class="tab-content" id="tab-cobrancas">
       <div class="cobr-summary" id="cobr-summary"></div>
+      <div class="admin-search-wrap">
+        <i class="fa fa-search admin-search-icon"></i>
+        <input class="admin-search" id="search-cobrancas"
+          placeholder="Filtrar pelo nome..." oninput="filterCards('cobrancas')" />
+      </div>
       <div class="cobr-cat-tabs" id="cobr-cat-tabs"></div>
       <div class="store-cards" id="list-cobrancas">
         <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
@@ -683,10 +688,14 @@ async function loadData() {
 }
 
 function showFallbackError() {
-  ['pendentes','aprovados','planos'].forEach(k => {
-    document.getElementById('list-' + k).innerHTML =
+  ['pendentes','aprovados','planos','cobrancas'].forEach(k => {
+    const el = document.getElementById('list-' + k);
+    if (el) el.innerHTML =
       `<div class="admin-empty"><i class="fa fa-triangle-exclamation"></i>Erro ao carregar dados.<br>Verifique a URL do Apps Script.</div>`;
   });
+  const mt = document.getElementById('metric-table');
+  if (mt) mt.innerHTML =
+    `<div class="admin-empty"><i class="fa fa-triangle-exclamation"></i>Erro ao carregar dados.</div>`;
 }
 
 function renderAll() {
@@ -697,7 +706,7 @@ function renderAll() {
   setCount('aprovados', aprovados.length);
 
   renderPendentesPeriodo(pendentes);
-  renderList('aprovados', aprovados);
+  renderList('aprovados', [...aprovados].sort((a, b) => b.row - a.row));
   renderPlanos(aprovados);
 }
 
@@ -710,7 +719,12 @@ function parseDataCadastro(str) {
   if (!m) return null;
   let [, d, mo, y, hh, mm] = m;
   if (y.length === 2) y = '20' + y;
-  return new Date(+y, +mo - 1, +d, +(hh || 0), +(mm || 0));
+  d = +d; mo = +mo; y = +y;
+  // Rejeita datas impossíveis (ex: 32/13/2026) que o Date "rolaria" silenciosamente
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  const dt = new Date(y, mo - 1, d, +(hh || 0), +(mm || 0));
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+  return dt;
 }
 
 /* Retorna 0 = hoje, 1 = ontem, 2..6 = esta semana, -1 = mais antigo/sem data */
@@ -764,6 +778,7 @@ function renderPendPeriodoTabs() {
 function renderPendPeriodoLista() {
   const lista = pendPeriodoCache[pendPeriodoAtivo] || [];
   renderList('pendentes', lista);
+  filterCards('pendentes'); // reaplica busca atual, se houver
 }
 
 function switchPendPeriodo(id) {
@@ -774,6 +789,7 @@ function switchPendPeriodo(id) {
 
 function setCount(key, n) {
   const el = document.getElementById('count-' + key);
+  if (!el) return;
   el.textContent = n;
   el.classList.toggle('visible', n > 0);
 }
@@ -882,18 +898,18 @@ function cardHTML(r, type) {
     <div class="admin-card ${cls}" id="card-${r.row}" data-nome="${escAttr(r.nome)}">
       <div class="card-top">
         <div>
-          <div class="card-name">${r.nome || '—'}</div>
-          <div class="card-ramo">${r.ramo || '—'} · linha ${r.row}</div>
+          <div class="card-name">${escHtml(r.nome) || '—'}</div>
+          <div class="card-ramo">${escHtml(r.ramo) || '—'} · linha ${r.row}</div>
         </div>
-        <span class="status-pill ${pill}">${r.status}</span>
+        <span class="status-pill ${pill}">${escHtml(r.status)}</span>
       </div>
       <div class="card-info">
-        ${r.endereco ? `<div class="card-info-row"><i class="fa fa-map-marker-alt"></i>${r.endereco}</div>` : ''}
-        ${r.wpp      ? `<div class="card-info-row"><i class="fab fa-whatsapp"></i>${r.wpp}</div>` : ''}
-        ${r.tel      ? `<div class="card-info-row"><i class="fa fa-phone"></i>${r.tel}</div>` : ''}
-        ${r.horario  ? `<div class="card-info-row"><i class="fa fa-clock"></i>${r.horario}</div>` : ''}
-        ${r.planoSolicitado ? `<div class="card-info-row"><i class="fa fa-star"></i>Plano solicitado: <strong style="color:var(--zap);margin-left:4px;">${r.planoSolicitado}</strong></div>` : ''}
-        ${r.obs      ? `<div class="card-info-row"><i class="fa fa-note-sticky"></i>${r.obs}</div>` : ''}
+        ${r.endereco ? `<div class="card-info-row"><i class="fa fa-map-marker-alt"></i>${escHtml(r.endereco)}</div>` : ''}
+        ${r.wpp      ? `<div class="card-info-row"><i class="fab fa-whatsapp"></i>${escHtml(r.wpp)}</div>` : ''}
+        ${r.tel      ? `<div class="card-info-row"><i class="fa fa-phone"></i>${escHtml(r.tel)}</div>` : ''}
+        ${r.horario  ? `<div class="card-info-row"><i class="fa fa-clock"></i>${escHtml(r.horario)}</div>` : ''}
+        ${r.planoSolicitado ? `<div class="card-info-row"><i class="fa fa-star"></i>Plano solicitado: <strong style="color:var(--zap);margin-left:4px;">${escHtml(r.planoSolicitado)}</strong></div>` : ''}
+        ${r.obs      ? `<div class="card-info-row"><i class="fa fa-note-sticky"></i>${escHtml(r.obs)}</div>` : ''}
       </div>
       <div class="card-actions">
         ${isPendente ? `
@@ -1033,11 +1049,11 @@ function planCardHTML(r) {
     <div class="admin-card aprovado" id="plan-card-${r.row}" data-nome="${escAttr(r.nome)}">
       <div class="card-top">
         <div>
-          <div class="card-name">${r.nome}</div>
-          <div class="card-ramo">${r.ramo} · linha ${r.row}</div>
+          <div class="card-name">${escHtml(r.nome)}</div>
+          <div class="card-ramo">${escHtml(r.ramo)} · linha ${r.row}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-family:var(--font-h);font-size:11px;font-weight:800;color:${cor};">${plano}</span>
+          <span style="font-family:var(--font-h);font-size:11px;font-weight:800;color:${cor};">${escHtml(plano)}</span>
           <button class="btn-delete-loja" onclick="deleteLoja(${r.row}, '${escAttr(r.nome)}')">
             <i class="fa fa-trash"></i>
           </button>
@@ -1061,7 +1077,7 @@ function planCardHTML(r) {
         <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 90, this)">3 meses</button>
         <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 365, this)">1 ano</button>
         <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 0, this)">Vitalício</button>
-        ${isoVal ? `<span style="font-size:10px;color:var(--muted);align-self:center;">até ${validade}</span>` : ''}
+        ${isoVal ? `<span style="font-size:10px;color:var(--muted);align-self:center;">até ${escHtml(validade)}</span>` : ''}
       </div>
     </div>`;
 }
@@ -1089,6 +1105,13 @@ async function postAction(payloadObj, timeout = 15000) {
 
 /* ══ AÇÕES ════════════════════════════════════════════════════ */
 async function updateStatus(row, newStatus, btn) {
+  // Confirmação ao reprovar (evita reprovar por engano)
+  if (newStatus === 'REPROVADO') {
+    const r0 = allRows.find(x => x.row === row);
+    const nome0 = r0 ? (r0.nome || 'esta loja') : 'esta loja';
+    if (!confirm(`Reprovar "${nome0}"?\n\nEla deixará de aparecer no app.`)) return;
+  }
+  const labelOriginal = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
   try {
@@ -1110,7 +1133,7 @@ async function updateStatus(row, newStatus, btn) {
   } catch(e) {
     toast('❌ Erro ao atualizar: ' + e.message, true);
     btn.disabled = false;
-    btn.innerHTML = '<i class="fa fa-check"></i> Aprovar';
+    btn.innerHTML = labelOriginal;
   }
 }
 
@@ -1217,11 +1240,30 @@ async function resetMetricas() {
 
 /* ══ FILTRO ═══════════════════════════════════════════════════ */
 function filterCards(type) {
-  const q   = document.getElementById('search-' + type).value.toLowerCase();
-  const cards = document.querySelectorAll(`#list-${type} .admin-card`);
+  const input = document.getElementById('search-' + type);
+  if (!input) return;
+  const q     = input.value.toLowerCase().trim();
+  const listEl = document.getElementById('list-' + type);
+  if (!listEl) return;
+  const cards = listEl.querySelectorAll('.admin-card');
+  let visiveis = 0;
   cards.forEach(c => {
-    c.style.display = c.dataset.nome.toLowerCase().includes(q) ? '' : 'none';
+    const bate = (c.dataset.nome || '').toLowerCase().includes(q);
+    c.style.display = bate ? '' : 'none';
+    if (bate) visiveis++;
   });
+  // Feedback "nada encontrado" — só quando há busca ativa e nenhum card bate
+  let semRes = listEl.querySelector('.search-empty');
+  if (q && cards.length && visiveis === 0) {
+    if (!semRes) {
+      semRes = document.createElement('div');
+      semRes.className = 'admin-empty search-empty';
+      semRes.innerHTML = '<i class="fa fa-magnifying-glass"></i>Nenhuma loja encontrada para essa busca.';
+      listEl.appendChild(semRes);
+    }
+  } else if (semRes) {
+    semRes.remove();
+  }
 }
 
 /* ══ WHATSAPP DE BOAS-VINDAS (ao aprovar) ═════════════════════ */
@@ -1244,6 +1286,17 @@ function abrirWppBoasVindas(r) {
 /* ══ HELPERS ══════════════════════════════════════════════════ */
 function escAttr(s) {
   return String(s || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* Escapa conteúdo de texto visível (anti-XSS). Os dados vêm do cadastro
+   público, então nome/ramo/endereço/obs podem conter HTML malicioso. */
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function isoDate(br) {
@@ -1300,7 +1353,10 @@ function diasAteVencer(validadeBR) {
   if (!m) return null;
   let [, d, mo, y] = m;
   if (y.length === 2) y = '20' + y;
-  const venc = new Date(+y, +mo - 1, +d); venc.setHours(0,0,0,0);
+  d = +d; mo = +mo; y = +y;
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  const venc = new Date(y, mo - 1, d); venc.setHours(0,0,0,0);
+  if (venc.getFullYear() !== y || venc.getMonth() !== mo - 1 || venc.getDate() !== d) return null;
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   return Math.round((venc - hoje) / 86400000);
 }
@@ -1385,6 +1441,7 @@ function renderCobrLista() {
     return;
   }
   el.innerHTML = lista.map(r => cobrCardHTML(r)).join('');
+  filterCards('cobrancas'); // reaplica busca atual, se houver
 }
 
 function switchCobrCat(id) {
@@ -1411,10 +1468,10 @@ function cobrCardHTML(r) {
     <div class="admin-card aprovado" data-nome="${escAttr(r.nome)}">
       <div class="card-top">
         <div>
-          <div class="card-name">${r.nome || '—'}</div>
-          <div class="card-ramo">${r.ramo || '—'} · linha ${r.row}</div>
+          <div class="card-name">${escHtml(r.nome) || '—'}</div>
+          <div class="card-ramo">${escHtml(r.ramo) || '—'} · linha ${r.row}</div>
         </div>
-        <span style="font-family:var(--font-h);font-size:11px;font-weight:800;color:${cor};">${plano}</span>
+        <span style="font-family:var(--font-h);font-size:11px;font-weight:800;color:${cor};">${escHtml(plano)}</span>
       </div>
       <div class="card-info">
         <div class="card-info-row"><i class="fa fa-calendar-xmark"></i>Validade: <strong style="margin-left:4px;color:${sitCor};">${r.planoValidade || '—'}</strong></div>

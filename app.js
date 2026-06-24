@@ -1012,60 +1012,6 @@
   function fmtBRL(v) {
     return 'R$ ' + v.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   }
-
-  /* ── Pagamento Mercado Pago ────────────────────────────────────
-     Chama o backend para criar a preference e redireciona o usuário
-     para o checkout do Mercado Pago. O valor é calculado no servidor. */
-  async function iniciarPagamentoMP(wpp, plano, ciclo, btnEl) {
-    const labelOrig = btnEl ? btnEl.innerHTML : '';
-    if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = '<i class="ti ti-loader-2"></i> Gerando pagamento…'; }
-    try {
-      const params = new URLSearchParams();
-      params.append('payload', JSON.stringify({
-        action: 'criarPreferenciaMP',
-        wpp:    String(wpp || '').replace(/\D/g, ''),
-        plano:  plano,
-        ciclo:  ciclo || 'mensal',
-      }));
-      const resp = await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        body:   params,
-        signal: AbortSignal.timeout(20000),
-      });
-      const json = await resp.json();
-      if (json.status !== 'ok' || !json.data || !json.data.initPoint) {
-        throw new Error((json && json.msg) || 'Não foi possível gerar o pagamento');
-      }
-      // Redireciona para o checkout do Mercado Pago
-      window.location.href = json.data.initPoint;
-    } catch (err) {
-      if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = labelOrig; }
-      alert('Erro ao iniciar pagamento: ' + (err.message || 'tente novamente') +
-            '\n\nVocê também pode ativar pelo WhatsApp no botão abaixo.');
-    }
-  }
-  window.iniciarPagamentoMP = iniciarPagamentoMP;
-
-  /* ── Retorno do checkout (?pagamento=sucesso|pendente|falha) ──── */
-  (function tratarRetornoPagamento() {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const status = params.get('pagamento');
-      if (!status) return;
-      const msgs = {
-        sucesso:  { t: '✅ Pagamento aprovado!', m: 'Seu plano está sendo ativado. Pode levar alguns instantes para aparecer em "Minha Loja".' },
-        pendente: { t: '⏳ Pagamento pendente', m: 'Estamos aguardando a confirmação. Assim que for aprovado, seu plano será ativado automaticamente.' },
-        falha:    { t: '❌ Pagamento não concluído', m: 'O pagamento não foi finalizado. Você pode tentar de novo ou falar com a gente pelo WhatsApp.' },
-      };
-      const info = msgs[status];
-      if (info) setTimeout(() => alert(info.t + '\n\n' + info.m), 400);
-      // Limpa o parâmetro da URL sem recarregar
-      params.delete('pagamento');
-      const novaUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
-      window.history.replaceState({}, '', novaUrl);
-    } catch (e) {}
-  })();
-
   let _carouselIdx = 0;
   const PLANS_ORDER = ['GRATIS', 'PLUS', 'PRO'];
 
@@ -1696,18 +1642,6 @@
         }
         wppBtn.href      = wppUrl;
         wppBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Ativar Plano ' + plano + ' →';
-
-        // ── Botão "Pagar agora" (Mercado Pago) — ao lado do WhatsApp ──
-        const wppLoja = String(payload.whatsapp || '').replace(/\D/g, '');
-        let payBtn = successEl.querySelector('.success-pay-btn');
-        if (!payBtn) {
-          payBtn = document.createElement('button');
-          payBtn.type      = 'button';
-          payBtn.className  = 'success-pay-btn';
-          wppBtn.before(payBtn);
-        }
-        payBtn.innerHTML = '<i class="ti ti-credit-card"></i> Pagar agora ' + (calc ? fmtBRL(calc.total) : '') + ' →';
-        payBtn.onclick = () => iniciarPagamentoMP(wppLoja, plano, _cicloSelecionado, payBtn);
       } else {
         const subTextEl2 = successEl.querySelector('#success-sub-text') || successEl.querySelector('.success-sub');
         if (subTextEl2) subTextEl2.innerHTML =
@@ -5390,7 +5324,7 @@
     wrap.innerHTML = Object.entries(grupos).map(([cat, itens]) => `
       <div class="cc-cat-label" id="cc-cat-${cat.replace(/\s+/g,'-')}">${escHTML(cat)}</div>
       ${itens.map(item => `
-        <div class="cc-item-card" id="cc-card-${item.id}" style="margin-bottom:8px;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
+        <div class="cc-item-card cc-item-clickable" id="cc-card-${item.id}" role="button" tabindex="0" onclick="ccCardClick(event,'${item.id}')" style="margin-bottom:8px;cursor:pointer;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
           ${item.foto
             ? `<img loading="lazy" decoding="async" src="${item.foto}" class="cc-item-foto" onerror="this.style.display='none'">`
             : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
@@ -5402,13 +5336,31 @@
             ${item.descricao ? `<div class="cc-item-desc">${escHTML(item.descricao)}</div>` : ''}
             <div class="cc-item-preco">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}</div>
           </div>
-          <div class="cc-qty-ctrl" id="cc-qty-${item.id}">
-            <button class="cc-item-add" onclick="ccAdicionarItem('${item.id}')">+</button>
+          <div class="cc-qty-ctrl" id="cc-qty-${item.id}" onclick="event.stopPropagation()">
+            <button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>
           </div>
         </div>
       `).join('')}
     `).join('');
   }
+
+  // Clique no card inteiro adiciona +1 ao carrinho.
+  // Guarda anti-scroll: se o dedo se moveu (rolagem), não conta como clique.
+  let _ccTouchY = null, _ccTouchMoved = false;
+  document.addEventListener('touchstart', function(e) {
+    const card = e.target.closest && e.target.closest('.cc-item-clickable');
+    if (card) { _ccTouchY = e.touches[0].clientY; _ccTouchMoved = false; }
+  }, { passive: true });
+  document.addEventListener('touchmove', function(e) {
+    if (_ccTouchY !== null && Math.abs(e.touches[0].clientY - _ccTouchY) > 8) _ccTouchMoved = true;
+  }, { passive: true });
+
+  window.ccCardClick = function(event, itemId) {
+    // Ignora se o toque foi na verdade uma rolagem
+    if (_ccTouchMoved) { _ccTouchMoved = false; _ccTouchY = null; return; }
+    _ccTouchY = null;
+    ccAdicionarItem(itemId);
+  };
 
   window.ccAdicionarItem = function(itemId) {
     const loja = LOJAS[_ccLojaIdx];
@@ -5424,9 +5376,9 @@
     const qtyEl = document.getElementById(`cc-qty-${itemId}`);
     if (qtyEl) {
       qtyEl.innerHTML = `
-        <button class="cc-qty-btn" onclick="ccAlterarQty('${itemId}',-1)">−</button>
+        <button class="cc-qty-btn" onclick="event.stopPropagation();ccAlterarQty('${itemId}',-1)">−</button>
         <span class="cc-qty-num">${_ccCarrinho[itemId].qty}</span>
-        <button class="cc-qty-btn" onclick="ccAlterarQty('${itemId}',+1)" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;">+</button>
+        <button class="cc-qty-btn" onclick="event.stopPropagation();ccAlterarQty('${itemId}',+1)" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;">+</button>
       `;
     }
     ccAtualizarCarrinho();
@@ -5439,7 +5391,7 @@
       delete _ccCarrinho[itemId];
       // Volta para botão "+"
       const qtyEl = document.getElementById(`cc-qty-${itemId}`);
-      if (qtyEl) qtyEl.innerHTML = `<button class="cc-item-add" onclick="ccAdicionarItem('${itemId}')">+</button>`;
+      if (qtyEl) qtyEl.innerHTML = `<button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${itemId}')">+</button>`;
     } else {
       const qtyEl = document.getElementById(`cc-qty-${itemId}`);
       if (qtyEl) qtyEl.querySelector('.cc-qty-num').textContent = _ccCarrinho[itemId].qty;
@@ -5585,3 +5537,91 @@
   document.getElementById('modal-cardapio-cliente')?.addEventListener('click', function(e) {
     if (e.target === this) fecharCardapioCliente();
   });
+  /* ───────────────────────────────────────────────────────────
+     Swipe-to-dismiss: arrastar a barrinha para baixo fecha o modal.
+     Funciona em todos os sheets que têm handle (.detail-handle /
+     .modal-handle / .cc-handle-bar). Segue o dedo e fecha se passar
+     do limiar; senão volta à posição.
+     ─────────────────────────────────────────────────────────── */
+  (function initSheetSwipe() {
+    // overlayId -> { sheetSelector, close }
+    const MAP = {
+      'modal-detalhes':         { sheet: '.detail-sheet', close: () => fecharDetalhes() },
+      'modal-minha-loja':       { sheet: '.detail-sheet', close: () => fecharMinhaLoja() },
+      'modal-cardapio-cliente': { sheet: '.detail-sheet', close: () => fecharCardapioCliente() },
+      'modal-cadastro':         { sheet: '.modal-sheet',  close: () => closeModal() },
+    };
+
+    const THRESHOLD = 90;   // px para fechar
+    const VELOCITY  = 0.5;  // px/ms — flick rápido também fecha
+
+    let active = null;      // { sheet, close, startY, lastY, lastT, dy }
+
+    function isHandle(el) {
+      return el && el.closest && el.closest('.detail-handle, .modal-handle, .cc-handle-bar');
+    }
+
+    function findCtx(handle) {
+      const overlay = handle.closest('.detail-overlay, .modal-overlay');
+      if (!overlay || !overlay.id) return null;
+      const cfg = MAP[overlay.id];
+      if (!cfg) return null;
+      const sheet = overlay.querySelector(cfg.sheet);
+      if (!sheet) return null;
+      return { sheet, close: cfg.close };
+    }
+
+    function start(clientY, handle) {
+      const ctx = findCtx(handle);
+      if (!ctx) return;
+      active = { sheet: ctx.sheet, close: ctx.close, startY: clientY, lastY: clientY, lastT: Date.now(), dy: 0 };
+      ctx.sheet.style.transition = 'none';
+    }
+
+    function move(clientY) {
+      if (!active) return;
+      const dy = clientY - active.startY;
+      active.dy = dy;
+      active.lastY = clientY;
+      active.lastT = Date.now();
+      // só permite arrastar para baixo
+      const offset = Math.max(0, dy);
+      active.sheet.style.transform = `translateY(${offset}px)`;
+      active.sheet.style.opacity = String(Math.max(0.4, 1 - offset / 600));
+    }
+
+    function end() {
+      if (!active) return;
+      const a = active; active = null;
+      a.sheet.style.transition = '';
+      const dt = Math.max(1, Date.now() - a.lastT);
+      const v  = a.dy / dt;
+      if (a.dy > THRESHOLD || v > VELOCITY) {
+        a.close();
+      }
+      // limpa estilos inline (a classe .open reaplica o transform correto)
+      setTimeout(() => {
+        a.sheet.style.transform = '';
+        a.sheet.style.opacity = '';
+      }, 0);
+    }
+
+    // Touch
+    document.addEventListener('touchstart', e => {
+      const h = isHandle(e.target);
+      if (h) start(e.touches[0].clientY, h);
+    }, { passive: true });
+    document.addEventListener('touchmove', e => {
+      if (active) { move(e.touches[0].clientY); e.preventDefault(); }
+    }, { passive: false });
+    document.addEventListener('touchend', end);
+    document.addEventListener('touchcancel', end);
+
+    // Mouse (desktop)
+    document.addEventListener('mousedown', e => {
+      const h = isHandle(e.target);
+      if (h) { start(e.clientY, h); e.preventDefault(); }
+    });
+    document.addEventListener('mousemove', e => { if (active) move(e.clientY); });
+    document.addEventListener('mouseup', end);
+  })();

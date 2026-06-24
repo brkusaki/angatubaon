@@ -4973,6 +4973,9 @@
      CARDÁPIO — PAINEL DO DONO
   ══════════════════════════════════════════════════════════════ */
   let _cardapioItens  = [];
+  const PLUS_LIMITE_ITENS = 8; // fonte única do limite de itens do plano PLUS
+  let _cardapioBusca = '';           // termo de busca atual (em memória)
+  let _cardapioGruposFechados = {};  // { categoria: true } = colapsado
   let _cardapioPlano  = 'GRATIS';
   let _cardapioLojaWpp = null;
   let _cardapioLojaInfo = null;
@@ -4980,6 +4983,9 @@
 
   async function mlCardapioCarregar(plano) {
     _cardapioPlano = plano;
+    _cardapioBusca = '';
+    const buscaInput = document.getElementById('ml-cardapio-busca');
+    if (buscaInput) buscaInput.value = '';
     const isPro  = plano === 'PRO';
     const isPlus = plano === 'PLUS';
 
@@ -4995,7 +5001,7 @@
         badge.textContent = 'PRO';
         badge.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
       } else {
-        badge.textContent = 'PLUS · até 5 itens';
+        badge.textContent = 'PLUS · até ' + PLUS_LIMITE_ITENS + ' itens';
         badge.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
         badge.style.color = '#fff';
       }
@@ -5031,11 +5037,15 @@
     if (limite) {
       // Fix #7: restaura cor padrão (mlCardapioAbrirForm pinta de vermelho ao bloquear)
       limite.style.color = 'var(--muted)';
-      const restam = Math.max(0, 5 - ativos.length);
+      const restam = Math.max(0, PLUS_LIMITE_ITENS - ativos.length);
       limite.textContent = isPro
         ? `${ativos.length} item${ativos.length !== 1 ? 's' : ''} no cardápio`
-        : `${ativos.length}/5 itens · ${restam} restante${restam!==1?'s':''}`;
+        : `${ativos.length}/${PLUS_LIMITE_ITENS} itens · ${restam} restante${restam!==1?'s':''}`;
     }
+
+    // Mostra busca apenas para PRO com itens suficientes para justificar
+    const buscaWrap = document.getElementById('ml-cardapio-busca-wrap');
+    if (buscaWrap) buscaWrap.style.display = (isPro && ativos.length > 6) ? '' : 'none';
 
     if (ativos.length === 0) {
       lista.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">
@@ -5044,7 +5054,53 @@
       return;
     }
 
-    lista.innerHTML = ativos.map(item => `
+    // Aplica filtro de busca (em memória)
+    const termo = (_cardapioBusca || '').trim().toLowerCase();
+    const visiveis = termo
+      ? ativos.filter(i => (i.nome||'').toLowerCase().includes(termo) || (i.categoria||'').toLowerCase().includes(termo))
+      : ativos;
+
+    if (visiveis.length === 0) {
+      lista.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">
+        Nenhum item encontrado para "<strong>${escHTML(termo)}</strong>".
+      </div>`;
+      return;
+    }
+
+    // PRO + sem busca ativa + tem categorias → agrupa em seções colapsáveis
+    const usarGrupos = isPro && !termo && ativos.some(i => i.categoria);
+
+    if (!usarGrupos) {
+      lista.innerHTML = visiveis.map(mlCardapioItemHTML).join('');
+      return;
+    }
+
+    // Agrupa por categoria preservando ordem de aparição
+    const grupos = {};
+    const ordemCats = [];
+    visiveis.forEach(item => {
+      const cat = (item.categoria || '').trim() || 'Sem categoria';
+      if (!grupos[cat]) { grupos[cat] = []; ordemCats.push(cat); }
+      grupos[cat].push(item);
+    });
+
+    lista.innerHTML = ordemCats.map(cat => {
+      const aberto = _cardapioGruposFechados[cat] !== true; // padrão: aberto
+      const itens = grupos[cat].map(mlCardapioItemHTML).join('');
+      return `
+        <div class="ml-cardapio-grupo">
+          <button type="button" class="ml-cardapio-grupo-head" onclick="mlCardapioToggleGrupo('${escAttr(cat)}')">
+            <span><i class="fa fa-chevron-${aberto ? 'down' : 'right'}" style="font-size:9px;margin-right:6px;opacity:.7;"></i>${escHTML(cat)}</span>
+            <span class="ml-cardapio-grupo-count">${grupos[cat].length}</span>
+          </button>
+          <div class="ml-cardapio-grupo-body" style="display:${aberto ? 'flex' : 'none'};">${itens}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // HTML de um único item do cardápio (reutilizado em lista plana e agrupada)
+  function mlCardapioItemHTML(item) {
+    return `
       <div class="ml-cardapio-item">
         ${item.foto
           ? `<img loading="lazy" decoding="async" src="${item.foto}" class="ml-cardapio-item-foto" onerror="this.style.display='none'">`
@@ -5064,8 +5120,19 @@
             <i class="fa fa-trash"></i>
           </button>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+  }
+
+  // Busca: filtra em memória e re-renderiza
+  function mlCardapioFiltrar(termo) {
+    _cardapioBusca = termo || '';
+    mlCardapioRenderLista();
+  }
+
+  // Colapsa/expande um grupo de categoria
+  function mlCardapioToggleGrupo(cat) {
+    _cardapioGruposFechados[cat] = !_cardapioGruposFechados[cat];
+    mlCardapioRenderLista();
   }
 
   function mlCardapioAbrirForm(editId) {
@@ -5074,10 +5141,10 @@
     // Fix #7: PLUS é limitado a 5 itens — bloqueia abrir form para NOVO item ao atingir o limite
     if (!editId && _cardapioPlano !== 'PRO') {
       const ativos = _cardapioItens.filter(i => i.ativo !== 'NAO').length;
-      if (ativos >= 5) {
+      if (ativos >= PLUS_LIMITE_ITENS) {
         const limiteEl = document.getElementById('ml-cardapio-limite');
         if (limiteEl) {
-          limiteEl.textContent = '⚠️ Limite de 5 itens do plano PLUS atingido. Faça upgrade para PRO para itens ilimitados.';
+          limiteEl.textContent = `⚠️ Limite de ${PLUS_LIMITE_ITENS} itens do plano PLUS atingido. Faça upgrade para PRO para itens ilimitados.`;
           limiteEl.style.color = 'var(--red)';
           setTimeout(() => { mlCardapioRenderLista(); }, 4000); // restaura o texto normal do contador
         }
@@ -5311,6 +5378,8 @@
   }
 
   window.mlCardapioAbrirForm  = mlCardapioAbrirForm;
+  window.mlCardapioFiltrar    = mlCardapioFiltrar;
+  window.mlCardapioToggleGrupo = mlCardapioToggleGrupo;
   window.mlCardapioFecharForm = mlCardapioFecharForm;
   window.mlCardapioSalvar     = mlCardapioSalvar;
   window.mlCardapioRemover    = mlCardapioRemover;

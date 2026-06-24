@@ -2062,6 +2062,23 @@
       object-fit: cover; flex-shrink: 0; background: var(--surface);
       border: 1px solid var(--border);
     }
+    .ml-cardapio-grupo { margin-bottom: 8px; }
+    .ml-cardapio-grupo-head {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; box-sizing: border-box;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 9px; padding: 9px 11px; margin-bottom: 6px;
+      color: var(--text); cursor: pointer;
+      font-family: var(--font-h); font-size: 11px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: .03em;
+    }
+    .ml-cardapio-grupo-head:hover { border-color: var(--green); }
+    .ml-cardapio-grupo-count {
+      font-size: 10px; font-weight: 700; color: var(--muted);
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 20px; padding: 1px 8px; min-width: 18px; text-align: center;
+    }
+    .ml-cardapio-grupo-body { flex-direction: column; gap: 8px; padding-left: 4px; }
 
     /* ════════════════════════════════════════════
        PAINEL MINHA LOJA — ABAS

@@ -556,7 +556,7 @@
                 <li><span class="feat-icon">✅</span> Selo ✦ PLUS no card</li>
                 <li><span class="feat-icon">✅</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
                 <li><span class="feat-icon">✅</span> Foto de capa e logo na página da loja</li>
-                <li><span class="feat-icon">✅</span> Cardápio / Serviços (até 5 itens)</li>
+                <li><span class="feat-icon">✅</span> Cardápio / Serviços (até 8 itens)</li>
                 <li><span class="feat-icon">✅</span> Anúncio do dia no card (texto + emoji)</li>
                 <li class="feat-off"><span class="feat-icon">⭐</span> Foto no card da listagem</li>
                 <li class="feat-off"><span class="feat-icon">⭐</span> Topo absoluto da lista</li>
@@ -885,7 +885,7 @@
                   <li><span class="feat-icon">✅</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
                   <li><span class="feat-icon">✅</span> Link de compartilhamento da loja</li>
                   <li><span class="feat-icon">✅</span> Foto de capa e logo na página da loja</li>
-                  <li><span class="feat-icon">✅</span> Cardápio / Serviços (até 5 itens, sem foto)</li>
+                  <li><span class="feat-icon">✅</span> Cardápio / Serviços (até 8 itens, sem foto)</li>
                   <li><span class="feat-icon">✅</span> Pedidos direto pelo WhatsApp</li>
                   <li><span class="feat-icon">✅</span> Anúncio do dia no card (texto + emoji, 24h)</li>
                   <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa e logo no card da listagem</li>
@@ -1231,7 +1231,7 @@
 
             <!-- Cardápio -->
             <div id="ml-cardapio-section" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;position:sticky;top:0;z-index:5;background:var(--surface2);padding:4px 0;">
                 <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">
                   🍽️ Cardápio / Serviços
                   <span id="ml-cardapio-badge" style="font-size:9px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PRO</span>
@@ -1239,6 +1239,10 @@
                 <button onclick="mlCardapioAbrirForm()" id="ml-cardapio-add-btn" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:7px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-family:var(--font-h);font-size:10px;font-weight:800;border:none;cursor:pointer;">
                   <i class="fa fa-plus"></i> Adicionar
                 </button>
+              </div>
+              <div id="ml-cardapio-busca-wrap" style="display:none;margin-bottom:10px;position:relative;">
+                <i class="fa fa-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none;"></i>
+                <input id="ml-cardapio-busca" type="text" maxlength="40" placeholder="Buscar item por nome ou categoria..." oninput="mlCardapioFiltrar(this.value)" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 10px 9px 30px;font-size:12px;color:var(--text);box-sizing:border-box;">
               </div>
               <div id="ml-cardapio-lista" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
               <div id="ml-cardapio-limite" style="font-size:10px;color:var(--muted);text-align:center;"></div>

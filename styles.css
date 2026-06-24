@@ -651,6 +651,96 @@
 
     .field-hint { font-size: 11px; color: var(--muted); line-height: 1.5; }
 
+    /* ════════════════ LOGIN LOJA — visual moderno ════════════════ */
+    /* subtítulo mais legível só no login */
+    #modal-login-loja .modal-subtitle { color: #9a9a9a; }
+
+    /* input de WhatsApp com ícone */
+    .ll-input-wrap { position: relative; }
+    .ll-input-icon {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      color: #25d366; font-size: 17px; pointer-events: none; z-index: 1;
+    }
+    .ll-wpp-input {
+      padding-left: 42px !important;
+      font-size: 17px !important; font-weight: 600; letter-spacing: 0.01em;
+    }
+    #modal-login-loja .ll-wpp-input:focus {
+      border-color: rgba(37,211,102,0.55);
+      box-shadow: 0 0 0 3px rgba(37,211,102,0.14);
+    }
+
+    /* CTAs com gradiente */
+    .ll-submit-zap { background: linear-gradient(135deg,#25d366,#128c7e) !important; }
+    .ll-submit-go  { background: linear-gradient(135deg,#6366f1,#4f46e5) !important; }
+
+    /* card de identidade da loja */
+    .ll-loja-card {
+      position: relative; border-radius: 18px; overflow: hidden;
+      margin-bottom: 18px; min-height: 90px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+      animation: llCardIn 0.4s cubic-bezier(0.32,0.72,0,1);
+    }
+    @keyframes llCardIn {
+      from { opacity: 0; transform: translateY(10px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* OTP — 6 caixinhas */
+    .ll-otp { display: flex; gap: 8px; justify-content: space-between; }
+    .ll-otp-box {
+      flex: 1; min-width: 0; aspect-ratio: 1 / 1.15;
+      background: var(--surface2);
+      border: 1.5px solid var(--border); border-radius: 13px;
+      color: var(--text); text-align: center;
+      font-family: var(--font-h); font-size: 1.5rem; font-weight: 800;
+      outline: none; -webkit-appearance: none;
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s, background 0.15s;
+    }
+    .ll-otp-box:focus {
+      border-color: rgba(99,102,241,0.7);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.18);
+      background: #262633;
+      transform: translateY(-1px);
+    }
+    .ll-otp-box.filled {
+      border-color: rgba(99,102,241,0.45);
+      background: color-mix(in srgb, #6366f1 12%, var(--surface2));
+    }
+    .ll-otp.error .ll-otp-box {
+      border-color: rgba(255,68,68,0.65);
+      box-shadow: 0 0 0 3px rgba(255,68,68,0.10);
+    }
+    .ll-otp.success .ll-otp-box {
+      border-color: rgba(0,208,132,0.7);
+      box-shadow: 0 0 0 3px rgba(0,208,132,0.14);
+      background: color-mix(in srgb, #00d084 12%, var(--surface2));
+    }
+    .ll-otp.shake { animation: llShake 0.4s; }
+    @keyframes llShake {
+      0%,100% { transform: translateX(0); }
+      20%,60% { transform: translateX(-7px); }
+      40%,80% { transform: translateX(7px); }
+    }
+
+    /* ações do passo 2 */
+    .ll-step2-actions {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px; margin-top: 14px;
+    }
+    .ll-link-btn {
+      font-family: var(--font-b); font-size: 12.5px; font-weight: 600;
+      color: var(--muted); background: none; border: none; cursor: pointer;
+      padding: 4px 2px; transition: color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ll-link-btn:hover, .ll-link-btn:active { color: var(--text); }
+    .ll-link-btn:disabled { color: #4a4a4a; cursor: not-allowed; }
+    #ll-reenviar:not(:disabled) { color: #25d366; }
+    .ll-sep { color: var(--border); font-size: 12px; }
+    #ll-timer { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text); }
+
     /* Address autocomplete */
     .addr-item {
       padding: 10px 14px;

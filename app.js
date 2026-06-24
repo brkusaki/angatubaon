@@ -1665,6 +1665,10 @@
   let _lojaToken = localStorage.getItem('angatuba_loja_token') || null;
   let _lojaNome  = localStorage.getItem('angatuba_loja_nome')  || '';
   let _lojaWpp   = ''; // capturado no passo 1 do login
+  let _llVerificando = false;          // trava anti-duplo-submit do código
+  let _llTimerInt    = null;           // timer de expiração (10 min)
+  let _llTimerRestante = 0;            // segundos restantes
+  let _llCooldownInt = null;           // cooldown do botão reenviar
 
   /* ── Atualiza a bottom nav conforme sessão ───────────────── */
   function atualizarNav() {
@@ -1728,6 +1732,11 @@
     loginStep(1);
     document.getElementById('ll-wpp').value    = '';
     document.getElementById('ll-codigo').value = '';
+    const errEl = document.getElementById('ll-wpp-err');
+    if (errEl) errEl.classList.remove('show');
+    document.getElementById('ll-wpp').classList.remove('invalid');
+    llOtpInit();
+    llOtpReset();
     document.getElementById('login-loja-title').innerHTML = 'Acessar <span>Minha Loja</span>';
     document.getElementById('login-loja-sub').textContent = 'Digite o WhatsApp cadastrado para receber seu código';
     document.getElementById('modal-login-loja').classList.add('open');
@@ -1736,6 +1745,8 @@
   }
 
   function closeLoginLoja() {
+    llPararTimer();
+    if (_llCooldownInt) { clearInterval(_llCooldownInt); _llCooldownInt = null; }
     document.getElementById('modal-login-loja').classList.remove('open');
     document.body.style.overflow = '';
   }
@@ -1747,14 +1758,176 @@
   function loginStep(step) {
     document.getElementById('login-step1').style.display = step === 1 ? 'flex' : 'none';
     document.getElementById('login-step2').style.display = step === 2 ? 'flex' : 'none';
+    if (step === 1) {
+      llPararTimer();
+      if (_llCooldownInt) { clearInterval(_llCooldownInt); _llCooldownInt = null; }
+      const otp = document.getElementById('ll-otp');
+      if (otp) otp.classList.remove('error','success');
+    }
+  }
+
+  /* ════════════ OTP: 6 caixinhas com auto-advance/paste ═══════ */
+  function llOtpBoxes() {
+    return Array.from(document.querySelectorAll('#ll-otp .ll-otp-box'));
+  }
+  function llOtpFocus(i) {
+    const b = llOtpBoxes();
+    if (b[i]) { b[i].focus(); b[i].select && b[i].select(); }
+  }
+  function llOtpValor() {
+    return llOtpBoxes().map(x => x.value).join('').replace(/\D/g,'');
+  }
+  function llOtpSync() {
+    const hid = document.getElementById('ll-codigo');
+    if (hid) hid.value = llOtpValor();
+  }
+  function llOtpReset() {
+    const otp = document.getElementById('ll-otp');
+    if (otp) otp.classList.remove('error','success');
+    llOtpBoxes().forEach(b => { b.value = ''; b.classList.remove('filled'); });
+    llOtpSync();
+    llOtpFocus(0);
+  }
+  function llOtpErro(msg) {
+    const hint = document.getElementById('login-codigo-hint');
+    const otp  = document.getElementById('ll-otp');
+    if (hint) hint.textContent = msg;
+    if (otp) {
+      otp.classList.add('error','shake');
+      setTimeout(() => otp.classList.remove('shake'), 420);
+    }
+    setTimeout(() => llOtpReset(), 450);
+  }
+  // Liga os eventos das caixinhas (uma única vez)
+  function llOtpInit() {
+    const boxes = llOtpBoxes();
+    if (!boxes.length || boxes[0].dataset.bound) return;
+    boxes.forEach((box, i) => {
+      box.dataset.bound = '1';
+      box.addEventListener('input', () => {
+        box.value = box.value.replace(/\D/g,'').slice(0,1);
+        box.classList.toggle('filled', !!box.value);
+        const otp = document.getElementById('ll-otp');
+        if (otp) otp.classList.remove('error');
+        if (box.value && i < boxes.length - 1) llOtpFocus(i + 1);
+        llOtpSync();
+        if (llOtpValor().length === 6) {
+          setTimeout(() => lojaVerificarCodigo(), 120); // pequeno debounce p/ paste
+        }
+      });
+      box.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !box.value && i > 0) {
+          const prev = boxes[i-1];
+          prev.value = ''; prev.classList.remove('filled');
+          llOtpFocus(i-1); llOtpSync(); e.preventDefault();
+        } else if (e.key === 'ArrowLeft' && i > 0) {
+          llOtpFocus(i-1); e.preventDefault();
+        } else if (e.key === 'ArrowRight' && i < boxes.length-1) {
+          llOtpFocus(i+1); e.preventDefault();
+        }
+      });
+      box.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const txt = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'').slice(0,6);
+        if (!txt) return;
+        boxes.forEach((b, k) => {
+          b.value = txt[k] || '';
+          b.classList.toggle('filled', !!b.value);
+        });
+        llOtpSync();
+        llOtpFocus(Math.min(txt.length, 5));
+        if (txt.length === 6) setTimeout(() => lojaVerificarCodigo(), 120);
+      });
+    });
+  }
+
+  /* ════════════ Timer de expiração (10 min) ═══════════════════ */
+  function llIniciarTimer() {
+    llPararTimer();
+    _llTimerRestante = 600; // 10 minutos
+    llRenderTimer();
+    _llTimerInt = setInterval(() => {
+      _llTimerRestante--;
+      if (_llTimerRestante <= 0) {
+        llPararTimer();
+        const hint = document.getElementById('login-codigo-hint');
+        if (hint) hint.textContent = '⏱️ Código expirado. Toque em "Reenviar código".';
+      } else {
+        llRenderTimer();
+      }
+    }, 1000);
+  }
+  function llRenderTimer() {
+    const el = document.getElementById('ll-timer');
+    if (!el) return;
+    const m = Math.floor(_llTimerRestante / 60);
+    const s = _llTimerRestante % 60;
+    el.textContent = m + ':' + String(s).padStart(2,'0');
+  }
+  function llPararTimer() {
+    if (_llTimerInt) { clearInterval(_llTimerInt); _llTimerInt = null; }
+  }
+
+  /* ════════════ Cooldown do botão "Reenviar" (45s) ════════════ */
+  function llIniciarCooldown() {
+    const btn = document.getElementById('ll-reenviar');
+    if (!btn) return;
+    if (_llCooldownInt) clearInterval(_llCooldownInt);
+    let restante = 45;
+    btn.disabled = true;
+    btn.textContent = `Reenviar em ${restante}s`;
+    _llCooldownInt = setInterval(() => {
+      restante--;
+      if (restante <= 0) {
+        clearInterval(_llCooldownInt); _llCooldownInt = null;
+        btn.disabled = false;
+        btn.textContent = 'Reenviar código';
+      } else {
+        btn.textContent = `Reenviar em ${restante}s`;
+      }
+    }, 1000);
+  }
+  function lojaReenviarCodigo() {
+    const btn = document.getElementById('ll-reenviar');
+    if (btn && btn.disabled) return;
+    llOtpReset();
+    const hint = document.getElementById('login-codigo-hint');
+    if (hint) hint.innerHTML = 'Reenviando código…';
+    // reaproveita o fluxo: _lojaWpp já está setado
+    lojaRequestCodigo(true);
+  }
+
+  /* ── Máscara progressiva de WhatsApp: (15) 9 9999-9999 ─────── */
+  function llMascaraWpp(el) {
+    let d = el.value.replace(/\D/g,'').slice(0,11);
+    let out = '';
+    if (d.length > 0)  out  = '(' + d.slice(0,2);
+    if (d.length >= 2) out += ') ';
+    if (d.length > 2 && d.length <= 6) {
+      out += d.slice(2);
+    } else if (d.length > 6) {
+      out += d.slice(2,3) + ' ' + d.slice(3,7) + '-' + d.slice(7);
+    }
+    el.value = out;
+    // limpa erro ao digitar
+    el.classList.remove('invalid');
+    const errEl = document.getElementById('ll-wpp-err');
+    if (errEl) errEl.classList.remove('show');
+  }
+
+  function llWppErro(msg) {
+    const input = document.getElementById('ll-wpp');
+    const errEl = document.getElementById('ll-wpp-err');
+    if (input) input.classList.add('invalid');
+    if (errEl) { errEl.textContent = msg; errEl.classList.add('show'); }
   }
 
   /* ── Passo 1: solicita código ──────────────────────────────── */
-  async function lojaRequestCodigo() {
+  async function lojaRequestCodigo(_ehReenvio) {
     const wppRaw = document.getElementById('ll-wpp').value.replace(/\D/g,'');
     const wpp = wppRaw.startsWith('55') ? wppRaw : '55' + wppRaw;
     if (wpp.length < 12) {
-      alert('Digite o número de WhatsApp completo com DDD.');
+      llWppErro('Digite o número completo com DDD.');
       return;
     }
     _lojaWpp = wpp;
@@ -1844,13 +2017,15 @@
           }
         }
 
-        setTimeout(() => document.getElementById('ll-codigo').focus(), 100);
+        setTimeout(() => { llOtpFocus(0); }, 120);
+        llIniciarTimer();
+        llIniciarCooldown();
       } else if (json.msg === 'WPP_NAO_ENCONTRADO') {
-        alert('Número não encontrado. Verifique se o WhatsApp cadastrado está correto.\n\nSe ainda não tem cadastro, use "Cadastrar" para se registrar.');
+        llWppErro('Número não encontrado. Confira o WhatsApp ou use "Cadastrar".');
       } else if (json.msg === 'LOJA_NAO_APROVADA') {
-        alert('Sua loja ainda está pendente de aprovação. Aguarde o contato pelo WhatsApp.');
+        llWppErro('Sua loja ainda está pendente de aprovação. Aguarde o contato.');
       } else {
-        alert('Erro: ' + (json.msg || 'Tente novamente.'));
+        llWppErro(json.msg || 'Erro ao solicitar. Tente novamente.');
       }
     } catch(e) {
       // Timeout não significa falha: o backend quase sempre já gerou e enviou
@@ -1863,9 +2038,11 @@
           'Se você está cadastrado, o código já está a caminho. Confira seu WhatsApp.';
         const cardEl = document.getElementById('login-loja-card');
         if (cardEl) cardEl.style.display = 'none';
-        setTimeout(() => document.getElementById('ll-codigo').focus(), 100);
+        setTimeout(() => { llOtpFocus(0); }, 120);
+        llIniciarTimer();
+        llIniciarCooldown();
       } else {
-        alert('Erro de conexão. Verifique sua internet e tente novamente.');
+        llWppErro('Erro de conexão. Verifique sua internet.');
       }
     } finally {
       btn.innerHTML = '<i class="fab fa-whatsapp"></i> Receber código';
@@ -1875,11 +2052,13 @@
 
   /* ── Passo 2: verifica código ─────────────────────────────── */
   async function lojaVerificarCodigo() {
-    const codigo = document.getElementById('ll-codigo').value.trim();
-    if (codigo.length !== 6) {
+    if (_llVerificando) return;            // evita disparo duplo (auto + clique)
+    const codigo = (document.getElementById('ll-codigo').value || '').trim();
+    if (!/^\d{6}$/.test(codigo)) {
       document.getElementById('login-codigo-hint').textContent = 'O código tem 6 dígitos.';
       return;
     }
+    _llVerificando = true;
 
     const btn = document.querySelector('#login-step2 .modal-submit');
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Verificando...';
@@ -1895,25 +2074,27 @@
       const json = await resp.json();
 
       if (json.status === 'ok' && json.data.token) {
+        llPararTimer();
+        const otp = document.getElementById('ll-otp');
+        if (otp) { otp.classList.remove('error'); otp.classList.add('success'); }
         _lojaToken = json.data.token;
         _lojaNome  = json.data.nome || '';
         localStorage.setItem('angatuba_loja_token', _lojaToken);
         localStorage.setItem('angatuba_loja_nome',  _lojaNome);
         localStorage.setItem('angatuba_loja_wpp',   _lojaWpp);
-        closeLoginLoja();
-        atualizarNav();
-        abrirMinhaLoja();
+        setTimeout(() => {
+          closeLoginLoja();
+          atualizarNav();
+          abrirMinhaLoja();
+        }, 350);
       } else if (json.msg === 'CODIGO_INVALIDO') {
-        document.getElementById('login-codigo-hint').textContent = '❌ Código inválido. Confira os dígitos ou solicite um novo.';
-        document.getElementById('ll-codigo').value = '';
+        llOtpErro('❌ Código inválido. Confira os dígitos ou solicite um novo.');
       } else if (json.msg === 'CODIGO_EXPIRADO') {
-        document.getElementById('login-codigo-hint').textContent = '⏱️ Código expirado. Volte e solicite um novo.';
-        document.getElementById('ll-codigo').value = '';
+        llOtpErro('⏱️ Código expirado. Toque em "Reenviar código".');
       } else if (json.msg === 'CODIGO_BLOQUEADO') {
-        document.getElementById('login-codigo-hint').textContent = '🔒 Muitas tentativas. Aguarde e solicite um novo código.';
-        document.getElementById('ll-codigo').value = '';
+        llOtpErro('🔒 Muitas tentativas. Aguarde e reenvie o código.');
       } else {
-        alert('Erro: ' + (json.msg || 'Tente novamente.'));
+        llOtpErro(json.msg || 'Erro ao verificar. Tente novamente.');
       }
     } catch(e) {
       const ehTimeout = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
@@ -1924,6 +2105,7 @@
         alert('Erro de conexão. Verifique sua internet.');
       }
     } finally {
+      _llVerificando = false;
       btn.innerHTML = '<i class="fa fa-check"></i> Confirmar código';
       btn.disabled = false;
     }

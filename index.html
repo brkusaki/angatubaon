@@ -2,1606 +2,1665 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin · AngatubaON</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0d0d0d" id="meta-theme-color" />
+  <meta name="description" content="Angatuba ON — Encontre o que está aberto agora em Angatuba." />
+  <title>Angatuba ON</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png" />
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-HN0L0GDCPG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-HN0L0GDCPG');
+  </script>
+ 
+  <!-- PWA / SEO -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="AngatubaON" />
+  <meta property="og:title" content="Angatuba ON — O que está aberto agora?" />
+  <meta property="og:description" content="Encontre lojas, farmácias, adegas e serviços abertos agora em Angatuba-SP." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://angatubaon.com.br/icons/icon-512.png" />
+  <meta property="og:url" content="https://angatubaon.com.br" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:image" content="https://angatubaon.com.br/icons/icon-512.png" />
+  <link rel="manifest" href="/manifest.json" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    a { text-decoration: none; color: inherit; }
-    button { font-family: inherit; cursor: pointer; border: none; background: none; }
-
-    :root {
-      --bg:      #0d0d0d;
-      --surface: #181818;
-      --s2:      #222;
-      --border:  rgba(255,255,255,0.08);
-      --text:    #f0f0f0;
-      --muted:   #7a7a7a;
-      --green:   #00d084;
-      --red:     #ff4444;
-      --zap:     #f59e0b;
-      --blue:    #4285f4;
-      --indigo:  #6366f1;
-      --font-h:  'Syne', sans-serif;
-      --font-b:  'DM Sans', sans-serif;
-      --r:       14px;
-    }
-
-    body {
-      background: var(--bg); color: var(--text);
-      font-family: var(--font-b); font-size: 14px;
-      line-height: 1.5; min-height: 100vh;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ── LOGIN ─────────────────────────────────────────── */
-    #login-screen {
-      min-height: 100vh; display: flex;
-      align-items: center; justify-content: center; padding: 24px;
-    }
-    .login-box {
-      width: 100%; max-width: 360px;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 20px; padding: 32px 24px; text-align: center;
-    }
-    .login-logo {
-      font-family: var(--font-h); font-size: 1.6rem; font-weight: 800;
-      margin-bottom: 4px;
-    }
-    .login-logo span { color: var(--red); }
-    .login-sub { font-size: 12px; color: var(--muted); margin-bottom: 28px; }
-    .login-field {
-      width: 100%; background: var(--s2); border: 1px solid var(--border);
-      border-radius: 10px; padding: 12px 14px; color: var(--text);
-      font-family: var(--font-b); font-size: 15px; outline: none;
-      margin-bottom: 12px; transition: border-color 0.2s;
-    }
-    .login-field:focus { border-color: rgba(255,255,255,0.25); }
-    .login-btn {
-      width: 100%; padding: 13px; border-radius: 12px;
-      background: var(--red); color: #fff;
-      font-family: var(--font-h); font-size: 1rem; font-weight: 700;
-      transition: opacity 0.2s;
-    }
-    .login-btn:hover { opacity: 0.88; }
-    .login-err {
-      font-size: 12px; color: var(--red); margin-top: 10px;
-      display: none;
-    }
-
-    /* ── PAINEL ─────────────────────────────────────────── */
-    #admin-panel { display: none; }
-
-    .admin-header {
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      padding: 14px 20px; display: flex; align-items: center;
-      justify-content: space-between; position: sticky; top: 0; z-index: 100;
-    }
-    .admin-logo { font-family: var(--font-h); font-size: 1.1rem; font-weight: 800; }
-    .admin-logo span { color: var(--red); }
-    .admin-badge {
-      font-size: 11px; background: var(--s2); border: 1px solid var(--border);
-      color: var(--muted); padding: 4px 10px; border-radius: 20px;
-    }
-    .logout-btn {
-      font-size: 12px; color: var(--muted); padding: 6px 12px;
-      border-radius: 8px; border: 1px solid var(--border);
-      background: var(--s2); transition: color 0.2s;
-    }
-    .logout-btn:hover { color: var(--red); }
-
-    /* ── TABS ────────────────────────────────────────────── */
-    .tabs {
-      display: flex; border-bottom: 1px solid var(--border);
-      padding: 0 20px; background: var(--surface);
-      overflow-x: auto; scrollbar-width: none;
-    }
-    .tabs::-webkit-scrollbar { display: none; }
-    .tab-btn {
-      padding: 12px 16px; font-size: 13px; font-weight: 600;
-      color: var(--muted); border-bottom: 2px solid transparent;
-      white-space: nowrap; transition: color 0.2s, border-color 0.2s;
-      display: flex; align-items: center; gap: 6px;
-    }
-    .tab-btn.active { color: var(--text); border-bottom-color: var(--red); }
-    .tab-count {
-      background: var(--red); color: #fff;
-      font-size: 9px; font-weight: 800;
-      padding: 2px 6px; border-radius: 10px; min-width: 18px;
-      text-align: center; display: none;
-    }
-    .tab-count.visible { display: inline-block; }
-
-    /* ── CONTEÚDO PRINCIPAL ─────────────────────────────── */
-    .admin-body { padding: 20px; max-width: 720px; margin: 0 auto; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-
-    /* ── CARDS DE CADASTRO ──────────────────────────────── */
-    .store-cards { display: flex; flex-direction: column; gap: 12px; }
-
-    .admin-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 16px; position: relative;
-    }
-    .admin-card.pendente { border-left: 3px solid var(--zap); }
-    .admin-card.aprovado { border-left: 3px solid var(--green); }
-    .admin-card.reprovado { border-left: 3px solid var(--red); opacity: 0.55; }
-
-    .card-top {
-      display: flex; align-items: flex-start;
-      justify-content: space-between; gap: 10px; margin-bottom: 10px;
-    }
-    .card-name {
-      font-family: var(--font-h); font-size: 0.95rem; font-weight: 700;
-    }
-    .card-ramo {
-      font-size: 11px; color: var(--muted); margin-top: 2px;
-    }
-    .status-pill {
-      font-size: 9px; font-weight: 800; text-transform: uppercase;
-      padding: 3px 8px; border-radius: 20px; white-space: nowrap; flex-shrink: 0;
-    }
-    .pill-pendente { background: rgba(245,158,11,0.15); color: var(--zap); }
-    .pill-aprovado { background: rgba(0,208,132,0.12); color: var(--green); }
-    .pill-reprovado { background: rgba(255,68,68,0.12); color: var(--red); }
-
-    .card-info { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-    .card-info-row {
-      display: flex; align-items: center; gap: 7px;
-      font-size: 12px; color: var(--muted);
-    }
-    .card-info-row i { width: 14px; text-align: center; font-size: 11px; flex-shrink: 0; }
-    .card-info-row a { color: var(--blue); }
-
-    .card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .act-btn {
-      padding: 7px 14px; border-radius: 8px; font-size: 12px;
-      font-weight: 600; display: flex; align-items: center; gap: 5px;
-      transition: opacity 0.2s, transform 0.1s;
-    }
-    .act-btn:active { transform: scale(0.96); }
-    .btn-approve { background: rgba(0,208,132,0.12); color: var(--green); border: 1px solid rgba(0,208,132,0.25); }
-    .btn-reject  { background: rgba(255,68,68,0.1);  color: var(--red);   border: 1px solid rgba(255,68,68,0.2); }
-    .btn-wpp     { background: rgba(37,211,102,0.12); color: #25d366;      border: 1px solid rgba(37,211,102,0.2); }
-    .btn-plan    { background: rgba(99,102,241,0.12); color: var(--indigo);border: 1px solid rgba(99,102,241,0.25); }
-    .btn-edit    { background: rgba(99,102,241,0.1); color: var(--indigo); border: 1px solid rgba(99,102,241,0.22); }
-
-    /* ── FORMULÁRIO DE EDIÇÃO INLINE ─────────────────────── */
-    .edit-form {
-      margin-top: 12px; padding-top: 12px;
-      border-top: 1px solid var(--border);
-    }
-    .edit-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-    }
-    .edit-lbl {
-      display: flex; flex-direction: column; gap: 4px;
-      font-size: 10px; font-weight: 600; color: var(--muted);
-      text-transform: uppercase; letter-spacing: .04em;
-    }
-    .edit-lbl.edit-full { grid-column: 1 / -1; }
-    .edit-input {
-      background: var(--s2); border: 1px solid var(--border);
-      border-radius: 8px; padding: 9px 11px; color: var(--text);
-      font-family: var(--font-b); font-size: 13px; outline: none;
-      text-transform: none; letter-spacing: normal; font-weight: 400;
-      transition: border-color .2s;
-    }
-    .edit-input:focus { border-color: rgba(255,255,255,0.25); }
-    .edit-warn {
-      display: flex; align-items: center; gap: 8px;
-      margin-top: 10px; padding: 9px 12px;
-      background: rgba(245,158,11,0.08);
-      border: 1px solid rgba(245,158,11,0.25);
-      border-radius: 8px; font-size: 11px; color: var(--zap); line-height: 1.4;
-    }
-    .edit-warn i { flex-shrink: 0; }
-    .edit-actions { display: flex; gap: 8px; margin-top: 12px; }
-    .btn-save-edit {
-      background: linear-gradient(135deg,#6366f1,#4f46e5);
-      color: #fff; font-weight: 700;
-    }
-    .btn-cancel-edit {
-      background: var(--s2); color: var(--muted);
-      border: 1px solid var(--border);
-    }
-    @media (max-width: 480px) {
-      .edit-grid { grid-template-columns: 1fr; }
-      .edit-lbl.edit-full { grid-column: auto; }
-    }
-
-    /* ── PLAN MANAGER ────────────────────────────────────── */
-    .plan-manager-row {
-      display: flex; gap: 8px; align-items: center;
-      flex-wrap: wrap; margin-top: 10px; padding-top: 10px;
-      border-top: 1px solid var(--border);
-    }
-    .plan-select, .plan-date-input {
-      background: var(--s2); border: 1px solid var(--border);
-      border-radius: 8px; padding: 7px 10px; color: var(--text);
-      font-family: var(--font-b); font-size: 12px; outline: none;
-    }
-    .plan-select { cursor: pointer; }
-    .plan-date-input { color-scheme: dark; }
-    .btn-save-plan {
-      background: linear-gradient(135deg,#f59e0b,#d97706);
-      color: #000; font-weight: 700; font-size: 12px;
-      padding: 7px 14px; border-radius: 8px; display: flex;
-      align-items: center; gap: 5px;
-    }
-
-    /* ── EMPTY / LOADING ─────────────────────────────────── */
-    .admin-empty {
-      text-align: center; padding: 48px 20px;
-      color: var(--muted); font-size: 13px;
-    }
-    .admin-empty i { font-size: 2rem; display: block; margin-bottom: 12px; opacity: 0.3; }
-
-    .loading-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 20px; color: var(--muted); font-size: 13px;
-      justify-content: center;
-    }
-
-    /* ── CATEGORIAS DE PLANO (sub-abas lado a lado) ────────── */
-    .plan-cat-tabs {
-      display: flex; gap: 8px; overflow-x: auto;
-      margin-bottom: 16px; scrollbar-width: none;
-    }
-    .plan-cat-tabs::-webkit-scrollbar { display: none; }
-    .plan-cat-btn {
-      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
-      padding: 8px 14px; border-radius: 20px;
-      background: var(--surface); border: 1px solid var(--border);
-      font-family: var(--font-b); font-size: 12px; font-weight: 700;
-      white-space: nowrap; transition: background 0.2s, color 0.2s, border-color 0.2s;
-    }
-    .plan-cat-btn i { font-size: 11px; }
-    .plan-cat-count {
-      font-size: 10px; font-weight: 800; color: inherit;
-      background: var(--s2); padding: 1px 7px; border-radius: 10px;
-    }
-    .plan-cat-btn.active { color: #000; }
-    .plan-cat-btn.active .plan-cat-count { background: rgba(0,0,0,0.18); }
-
-    /* ── SEARCH ──────────────────────────────────────────── */
-    .admin-search-wrap { position: relative; margin-bottom: 16px; }
-    .admin-search {
-      width: 100%; background: var(--surface);
-      border: 1px solid var(--border); border-radius: 10px;
-      padding: 10px 14px 10px 38px; color: var(--text);
-      font-family: var(--font-b); font-size: 14px; outline: none;
-    }
-    .admin-search:focus { border-color: rgba(255,255,255,0.2); }
-    .admin-search-icon {
-      position: absolute; left: 13px; top: 50%;
-      transform: translateY(-50%); color: var(--muted); font-size: 12px;
-      pointer-events: none;
-    }
-
-    /* ── TOAST ───────────────────────────────────────────── */
-    #admin-toast {
-      position: fixed; bottom: 24px; left: 50%;
-      transform: translateX(-50%) translateY(20px);
-      background: var(--surface); border: 1px solid var(--border);
-      border-left: 3px solid var(--green);
-      border-radius: 12px; padding: 12px 18px;
-      font-size: 13px; color: var(--text);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-      opacity: 0; pointer-events: none; z-index: 9999;
-      transition: opacity 0.25s, transform 0.25s;
-      white-space: nowrap;
-    }
-    #admin-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-    #admin-toast.err  { border-left-color: var(--red); }
-    /* ── COBRANÇAS ───────────────────────────────────────── */
-    .cobr-summary {
-      display: grid; grid-template-columns: repeat(3,1fr); gap: 10px;
-      margin-bottom: 16px;
-    }
-    .cobr-kpi {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 16px 14px; text-align: center;
-    }
-    .cobr-kpi.alert { border-color: rgba(255,68,68,0.3); background: rgba(255,68,68,0.05); }
-    .cobr-kpi.warn  { border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.05); }
-    .cobr-kpi-val {
-      font-family: var(--font-h); font-size: 1.7rem; font-weight: 800; line-height: 1;
-    }
-    .cobr-kpi.alert .cobr-kpi-val { color: var(--red); }
-    .cobr-kpi.warn  .cobr-kpi-val { color: var(--zap); }
-    .cobr-kpi-label { font-size: 10px; color: var(--muted); margin-top: 6px; text-transform: uppercase; letter-spacing: .04em; }
-    .cobr-cat-tabs {
-      display: flex; gap: 8px; overflow-x: auto;
-      margin-bottom: 16px; scrollbar-width: none;
-    }
-    .cobr-cat-tabs::-webkit-scrollbar { display: none; }
-    @media (max-width: 480px) {
-      .cobr-summary { grid-template-columns: 1fr 1fr; }
-      .cobr-summary .cobr-kpi:last-child { grid-column: 1 / -1; }
-    }
-
-    /* ── MÉTRICAS ────────────────────────────────────────────── */
-    .metric-summary {
-      display: grid; grid-template-columns: repeat(3,1fr); gap: 10px;
-      margin-bottom: 20px;
-    }
-    .metric-kpi {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 14px; text-align: center;
-    }
-    .metric-kpi-val {
-      font-family: var(--font-h); font-size: 1.6rem; font-weight: 800;
-      line-height: 1;
-    }
-    .metric-kpi-label { font-size: 10px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .05em; }
-
-    .metric-table { display: flex; flex-direction: column; gap: 8px; }
-    .metric-row {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 12px 14px;
-      display: flex; align-items: center; gap: 12px;
-    }
-    .metric-rank {
-      font-family: var(--font-h); font-size: 1rem; font-weight: 800;
-      color: var(--muted); min-width: 24px; text-align: center;
-    }
-    .metric-rank.gold   { color: #f59e0b; }
-    .metric-rank.silver { color: #94a3b8; }
-    .metric-rank.bronze { color: #b45309; }
-    .metric-info { flex: 1; min-width: 0; }
-    .metric-nome { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .metric-plano { font-size: 10px; color: var(--muted); }
-    .metric-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
-    .metric-stat {
-      display: inline-flex; align-items: center; gap: 4px;
-      font-size: 10px; font-weight: 700; color: var(--muted);
-      background: var(--s2); border: 1px solid var(--border);
-      padding: 2px 7px; border-radius: 20px; white-space: nowrap;
-    }
-    .metric-stat i { font-size: 9px; }
-    .metric-stat.up   { color: var(--green); background: rgba(0,208,132,0.1);  border-color: rgba(0,208,132,0.25); }
-    .metric-stat.down { color: var(--red);   background: rgba(255,68,68,0.08);  border-color: rgba(255,68,68,0.22); }
-    .metric-stat.flat { color: var(--muted); }
-    .metric-bars { display: flex; flex-direction: column; gap: 4px; min-width: 100px; }
-    .metric-bar-wrap { display: flex; align-items: center; gap: 6px; }
-    .metric-bar-label { font-size: 10px; color: var(--muted); width: 24px; text-align: right; flex-shrink: 0; }
-    .metric-bar-track { flex: 1; height: 6px; border-radius: 3px; background: var(--s2); overflow: hidden; }
-    .metric-bar-fill  { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
-    .metric-bar-fill.wpp { background: #25d366; }
-    .metric-bar-fill.tel { background: var(--blue); }
-    .metric-bar-fill.ig  { background: #e1306c; }
-
-    /* Botão excluir loja */
-    .btn-delete-loja {
-      background: rgba(255,68,68,0.1); color: var(--red);
-      border: 1px solid rgba(255,68,68,0.2);
-      padding: 6px 10px; border-radius: 8px; font-size: 11px;
-      font-weight: 700; display: flex; align-items: center; gap: 4px;
-      cursor: pointer; transition: opacity .2s;
-    }
-    .btn-delete-loja:hover { opacity: .8; }
-
-    /* Botões de validade rápida */
-    .plan-quick-dates {
-      display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px;
-    }
-    .plan-quick-btn {
-      font-size: 10px; font-weight: 700; padding: 4px 9px;
-      border-radius: 6px; border: 1px solid var(--border);
-      background: var(--s2); color: var(--muted); cursor: pointer;
-      transition: background .15s, color .15s, border-color .15s;
-    }
-    .plan-quick-btn:hover { background: rgba(245,158,11,0.15); color: var(--zap); border-color: rgba(245,158,11,0.4); }
-    .plan-quick-btn.active { background: rgba(245,158,11,0.2); color: var(--zap); border-color: rgba(245,158,11,0.5); }
-
-    /* Botão reset métricas */
-    .btn-reset-metricas {
-      font-size: 11px; color: var(--red); padding: 6px 12px;
-      border-radius: 8px; border: 1px solid rgba(255,68,68,0.25);
-      background: rgba(255,68,68,0.08); display: flex; align-items: center; gap: 5px;
-      cursor: pointer; transition: opacity .2s;
-    }
-    .btn-reset-metricas:hover { opacity: .8; }
-    .metric-total { font-family: var(--font-h); font-size: 1rem; font-weight: 800; min-width: 28px; text-align: right; color: var(--text); }
-
-    .metric-refresh {
-      font-size: 11px; color: var(--muted); padding: 6px 12px;
-      border-radius: 8px; border: 1px solid var(--border);
-      background: var(--s2); display: flex; align-items: center; gap: 5px;
-      cursor: pointer; transition: color .2s;
-    }
-    .metric-refresh:hover { color: var(--green); }
-    .metric-period {
-      font-size: 11px; color: var(--muted);
-    }
-  </style>
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-
-<!-- ══ LOGIN ══ -->
-<div id="login-screen">
-  <div class="login-box">
-    <div class="login-logo">Angatuba<span>ON</span></div>
-    <div class="login-sub">Painel Administrativo</div>
-    <input class="login-field" id="login-pass" type="password"
-      placeholder="Senha de acesso" autocomplete="current-password"
-      onkeydown="if(event.key==='Enter') doLogin()" />
-    <button class="login-btn" onclick="doLogin()">Entrar</button>
-    <div class="login-err" id="login-err">Senha incorreta.</div>
+  <script>
+    try {
+      if (localStorage.getItem('angatuba_theme') === 'light') {
+        document.body.classList.add('light-mode');
+      }
+    } catch(e) {}
+  </script>
+ 
+  <!-- ══ SPLASH SCREEN — vídeo da coruja quando cacheado, CSS como fallback ══ -->
+  <div id="splash-screen" aria-hidden="true">
+    <style>
+      #splash-screen {
+        position: fixed; inset: 0; z-index: 99999;
+        background: #070a0f;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        overflow: hidden;
+      }
+      #splash-screen.splash-saindo {
+        transition: opacity 0.6s ease;
+        opacity: 0;
+        pointer-events: none;
+      }
+      #spl-video {
+        position: absolute; inset: 0;
+        width: 100%; height: 100%;
+        object-fit: cover;
+        opacity: 0;
+        transition: opacity 0.35s ease;
+      }
+      #spl-video.pronto { opacity: 1; }
+      /* Texto "Angatuba" sobreposto — o vídeo só tem "ON" */
+      #spl-texto {
+        position: absolute; bottom: 13%;
+        left: 0; right: 0; text-align: center;
+        opacity: 0; pointer-events: none;
+        transition: opacity 0.5s ease 1.6s;
+      }
+      #spl-texto.visivel { opacity: 1; }
+      .spl-txt-angatuba {
+        font-family: 'Syne', sans-serif;
+        font-size: 2.1rem; font-weight: 800; color: #fff;
+        /* Contorno escuro em todas as direções — garante legibilidade sobre qualquer fundo */
+        text-shadow:
+          0 0 0 #000,
+          -2px -2px 0 rgba(0,0,0,.9),
+           2px -2px 0 rgba(0,0,0,.9),
+          -2px  2px 0 rgba(0,0,0,.9),
+           2px  2px 0 rgba(0,0,0,.9),
+           0    0  20px rgba(0,0,0,.8);
+      }
+      .spl-txt-cidade {
+        font-size: .65rem; font-weight: 600; letter-spacing: .3em;
+        text-transform: uppercase; color: rgba(255,255,255,.7);
+        margin-top: 4px;
+        text-shadow: 0 1px 4px #000, 0 0 8px #000;
+      }
+      /* Fallback CSS — visível quando vídeo não está cacheado */
+      #spl-fallback {
+        position: relative; z-index: 1;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        transition: opacity 0.3s ease;
+      }
+      #spl-fallback.oculto { opacity: 0; pointer-events: none; }
+      .spl-owl {
+        width: 88px; height: 88px; border-radius: 50%; margin-bottom: 20px;
+        animation: spl-pulsa 1.9s ease-in-out infinite;
+      }
+      @keyframes spl-pulsa {
+        0%,100% { transform:scale(1);    filter:drop-shadow(0 0 10px rgba(255,55,55,.3)); }
+        50%      { transform:scale(1.07); filter:drop-shadow(0 0 24px rgba(255,55,55,.6)); }
+      }
+      .spl-logo {
+        font-family: 'Syne', sans-serif; font-size: 2.2rem;
+        font-weight: 800; color: #fff; letter-spacing: -.02em; line-height: 1; margin-bottom: 5px;
+      }
+      .spl-logo span { color: #ff3737; }
+      .spl-cidade-fb {
+        font-size: .68rem; font-weight: 600; color: rgba(255,255,255,.32);
+        letter-spacing: .28em; text-transform: uppercase; margin-bottom: 36px;
+      }
+      .spl-dots { display: flex; gap: 7px; }
+      .spl-dot {
+        width: 7px; height: 7px; border-radius: 50%; background: #ff3737;
+        animation: spl-dot 1.15s ease-in-out infinite;
+      }
+      .spl-dot:nth-child(2) { animation-delay: .19s; }
+      .spl-dot:nth-child(3) { animation-delay: .38s; }
+      @keyframes spl-dot {
+        0%,80%,100% { opacity:.2; transform:scale(.75); }
+        40%          { opacity:1;  transform:scale(1.35); }
+      }
+    </style>
+ 
+    <!-- Vídeo da coruja (toca apenas quando já está cacheado) -->
+    <video id="spl-video" autoplay muted playsinline preload="auto">
+      <source src="/webp/splash-anim.webm" type="video/webm" />
+    </video>
+ 
+    <!-- "Angatuba" aparece junto com o letreiro ON do vídeo (~1.6s) -->
+    <div id="spl-texto">
+      <div class="spl-txt-angatuba">Angatuba</div>
+      <div class="spl-txt-cidade">Angatuba · SP</div>
+    </div>
+ 
+    <!-- Fallback: coruja animada por CSS (primeira vez, sem cache) -->
+    <div id="spl-fallback">
+      <img src="/webp/owl-badge.webp" alt="" class="spl-owl" />
+      <div class="spl-logo">Angatuba<span>ON</span></div>
+      <div class="spl-cidade-fb">Angatuba · SP</div>
+      <div class="spl-dots">
+        <div class="spl-dot"></div>
+        <div class="spl-dot"></div>
+        <div class="spl-dot"></div>
+      </div>
+    </div>
   </div>
-</div>
-
-<!-- ══ PAINEL ══ -->
-<div id="admin-panel">
-
-  <header class="admin-header">
-    <div class="admin-logo">Angatuba<span>ON</span> <span style="font-size:11px;color:var(--muted);font-family:var(--font-b);font-weight:400;">· Admin</span></div>
-    <button class="logout-btn" onclick="doLogout()"><i class="fa fa-right-from-bracket"></i> Sair</button>
+ 
+  <!-- ══ TOAST ══ -->
+  <div id="toast" role="alert" aria-live="assertive">
+    <i class="fa fa-clock-rotate-left toast-icon"></i>
+    <div class="toast-body">
+      <strong id="toast-title">Loja fechada agora</strong>
+      <span id="toast-msg">Abre em breve</span>
+    </div>
+    <button id="toast-close" onclick="hideToast()" aria-label="Fechar">✕</button>
+  </div>
+ 
+  <!-- ══════════════════════════════ HEADER -->
+  <header class="header">
+    <div class="header-top">
+      <div>
+        <div class="logo">Angatuba<span>ON</span></div>
+        <div class="logo-city">Angatuba · SP</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <img src="/webp/owl-badge.webp" alt="AngatubaON ao vivo" class="owl-badge-anim" />
+        <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()" aria-label="Alternar tema">
+          <i class="fa fa-moon" id="theme-toggle-icon"></i>
+        </button>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <i class="fa fa-search search-icon"></i>
+      <input type="text" id="main-search" placeholder="Buscar loja ou serviço..."
+        autocomplete="off" autocorrect="off" spellcheck="false" />
+    </div>
+    <!-- ══════════════════════════ CATEGORIAS -->
+    <div class="scroll-x categories" id="cat-bar"></div>
+    <!-- ══════════════════════════ FILTER PILLS -->
+    <div class="filter-pills" id="filter-pills">
+      <button class="pill-btn" data-filter="open">
+        <span class="pill-dot"></span> Aberto Agora
+      </button>
+      <button class="pill-btn" data-filter="featured">
+        <i class="fa fa-star" style="font-size:10px;"></i> Destaques
+      </button>
+      <button class="pill-btn pill-bairro-btn" id="pill-bairro-btn" data-filter="bairro">
+        <i class="fa fa-map-marker-alt" style="font-size:10px;"></i> <span id="pill-bairro-label">Perto de mim</span>
+      </button>
+    </div>
   </header>
-
-  <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('pendentes', this)">
-      <i class="fa fa-clock"></i> Pendentes
-      <span class="tab-count" id="count-pendentes"></span>
-    </button>
-    <button class="tab-btn" onclick="switchTab('aprovados', this)">
-      <i class="fa fa-check-circle"></i> Aprovados
-      <span class="tab-count" id="count-aprovados"></span>
-    </button>
-    <button class="tab-btn" onclick="switchTab('planos', this)">
-      <i class="fa fa-star"></i> Planos
-    </button>
-    <button class="tab-btn" onclick="switchTab('cobrancas', this)">
-      <i class="fa fa-money-bill-wave"></i> Cobranças
-      <span class="tab-count" id="count-cobrancas"></span>
-    </button>
-    <button class="tab-btn" onclick="switchTab('metricas', this)">
-      <i class="fa fa-chart-bar"></i> Métricas
-    </button>
+ 
+  <!-- Dropdown de bairro — fora do scroll container para não ser clipado -->
+  <div class="bairro-dropdown" id="bairro-dropdown" style="display:none;">
+    <input class="bairro-search" id="bairro-search" type="text" placeholder="Digite o bairro..." autocomplete="off" />
+    <div class="bairro-list" id="bairro-list"></div>
   </div>
-
-  <div class="admin-body">
-
-    <!-- TAB: Pendentes -->
-    <div class="tab-content active" id="tab-pendentes">
-      <div class="admin-search-wrap">
-        <i class="fa fa-search admin-search-icon"></i>
-        <input class="admin-search" id="search-pendentes"
-          placeholder="Filtrar pelo nome..." oninput="filterCards('pendentes')" />
+ 
+  <!-- ════════════════════════════════ MAIN -->
+  <main class="main">
+    <section>
+      <div class="section-header">
+        <h2 class="section-title" id="list-title">📍 Todas as Lojas</h2>
+        <span class="filter-info" id="filter-info"></span>
       </div>
-      <div class="plan-cat-tabs" id="pend-periodo-tabs"></div>
-      <div class="store-cards" id="list-pendentes">
-        <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
+      <div class="store-list" id="store-list"></div>
+      <div class="empty-state" id="empty-state">
+        <span class="empty-icon" id="empty-icon">🔍</span>
+        <div class="empty-title" id="empty-title">Nenhuma loja encontrada</div>
+        <p id="empty-msg">Tente outro termo ou selecione outra categoria.</p>
+        <small id="empty-sub"></small>
+        <button class="empty-action" onclick="limparFiltros()">
+          <i class="ti ti-refresh" aria-hidden="true"></i> Ver todas as lojas
+        </button>
+      </div>
+    </section>
+ 
+    <div class="footer">
+      <div class="footer-logo">Angatuba<span>ON</span></div>
+      <div class="footer-sub">Seu guia de plantão 24 horas.</div>
+    </div>
+ 
+    <div style="margin:8px 0 20px; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px; text-align:center;">
+      <div style="font-family:'Syne',sans-serif; font-size:1rem; font-weight:800; margin-bottom:4px;">Siga o <span style="color:var(--red);">AngatubaON</span></div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:16px;">Compartilhe com quem é de Angatuba 💙</div>
+      <div style="display:flex; justify-content:center; gap:12px;">
+        <a href="https://www.instagram.com/angatubaon_?igsh=MTBmZGNieTFsOWVicg==" target="_blank" rel="noopener"
+          style="display:flex; align-items:center; gap:8px; padding:11px 20px; border-radius:12px;
+                 background:linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045); color:#fff;
+                 font-family:'Syne',sans-serif; font-weight:700; font-size:13px; text-decoration:none;
+                 transition:opacity 0.2s;">
+          <i class="fab fa-instagram" style="font-size:1.1rem;"></i> Instagram
+        </a>
+        <a href="https://www.facebook.com/share/1aFzf9Szuf/" target="_blank" rel="noopener"
+          style="display:flex; align-items:center; gap:8px; padding:11px 20px; border-radius:12px;
+                 background:#1877f2; color:#fff;
+                 font-family:'Syne',sans-serif; font-weight:700; font-size:13px; text-decoration:none;
+                 transition:opacity 0.2s;">
+          <i class="fab fa-facebook" style="font-size:1.1rem;"></i> Facebook
+        </a>
       </div>
     </div>
-
-    <!-- TAB: Aprovados -->
-    <div class="tab-content" id="tab-aprovados">
-      <div class="admin-search-wrap">
-        <i class="fa fa-search admin-search-icon"></i>
-        <input class="admin-search" id="search-aprovados"
-          placeholder="Filtrar pelo nome..." oninput="filterCards('aprovados')" />
-      </div>
-      <div class="store-cards" id="list-aprovados">
-        <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
-      </div>
+  </main>
+ 
+  <!-- ══════════════════════════ MODAL DETALHES (Planos Pagos) ══ -->
+  <div class="detail-overlay" id="modal-detalhes" role="dialog" aria-modal="true" aria-labelledby="detail-name-text">
+    <div class="detail-sheet" id="detail-sheet">
+      <!-- Conteúdo preenchido dinamicamente pelo JS -->
     </div>
-
-    <!-- TAB: Planos -->
-    <div class="tab-content" id="tab-planos">
-      <div class="admin-search-wrap">
-        <i class="fa fa-search admin-search-icon"></i>
-        <input class="admin-search" id="search-planos"
-          placeholder="Filtrar pelo nome..." oninput="filterCards('planos')" />
-      </div>
-      <div class="plan-cat-tabs" id="plan-cat-tabs"></div>
-      <div class="store-cards" id="list-planos">
-        <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
-      </div>
-    </div>
-
-    <!-- TAB: Cobranças -->
-    <div class="tab-content" id="tab-cobrancas">
-      <div class="cobr-summary" id="cobr-summary"></div>
-      <div class="admin-search-wrap">
-        <i class="fa fa-search admin-search-icon"></i>
-        <input class="admin-search" id="search-cobrancas"
-          placeholder="Filtrar pelo nome..." oninput="filterCards('cobrancas')" />
-      </div>
-      <div class="cobr-cat-tabs" id="cobr-cat-tabs"></div>
-      <div class="store-cards" id="list-cobrancas">
-        <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
-      </div>
-    </div>
-
-    <!-- TAB: Métricas -->
-    <div class="tab-content" id="tab-metricas">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <span class="metric-period" id="metric-period">Carregando...</span>
-        <div style="display:flex;gap:8px;">
-          <button class="btn-reset-metricas" onclick="resetMetricas()">
-            <i class="fa fa-trash"></i> Resetar
-          </button>
-          <button class="metric-refresh" onclick="loadMetricas()">
-            <i class="fa fa-rotate-right"></i> Atualizar
-          </button>
-        </div>
-      </div>
-      <!-- KPIs resumo -->
-      <div class="metric-summary" id="metric-summary" style="grid-template-columns:repeat(3,1fr);">
-        <div class="metric-kpi"><div class="metric-kpi-val" id="kpi-total">—</div><div class="metric-kpi-label">Cliques Totais</div></div>
-        <div class="metric-kpi"><div class="metric-kpi-val" id="kpi-views">—</div><div class="metric-kpi-label">Visualizações</div></div>
-        <div class="metric-kpi"><div class="metric-kpi-val" id="kpi-conv">—</div><div class="metric-kpi-label">Conversão</div></div>
-        <div class="metric-kpi"><div class="metric-kpi-val" style="color:#25d366;" id="kpi-wpp">—</div><div class="metric-kpi-label">WhatsApp</div></div>
-        <div class="metric-kpi"><div class="metric-kpi-val" style="color:var(--blue);" id="kpi-tel">—</div><div class="metric-kpi-label">Telefone</div></div>
-        <div class="metric-kpi"><div class="metric-kpi-val" style="color:#e1306c;" id="kpi-ig">—</div><div class="metric-kpi-label">Instagram</div></div>
-      </div>
-      <!-- Ranking de lojas -->
-      <div class="metric-table" id="metric-table">
-        <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando métricas...</div>
-      </div>
-    </div>
-
   </div>
-</div>
-
-<!-- Toast -->
-<div id="admin-toast"></div>
-
-<script>
-'use strict';
-
-/* ══ CONFIG ══════════════════════════════════════════════════ */
-// Sem senha aqui — autenticação é feita no servidor (Apps Script).
-// O HTML só envia o SHA-256 da senha; o servidor valida e devolve um token.
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwmJMmvb5H6KkMWdXJV441SQ2h18SEfLrb_4-kvUYM0IiVL6Co-EKGGay7f_qvUEi0_cg/exec';
-const ADMIN_WPP       = '5515981125349';
-
-// Token de sessão — salvo na memória da página (não no localStorage)
-let _sessionToken = null;
-
-/* ══ CRYPTO: SHA-256 via Web Crypto API ═══════════════════════ */
-async function sha256(text) {
-  const encoder = new TextEncoder();
-  const data    = encoder.encode(text);
-  const hashBuf = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuf))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-/* ══ LOGIN ════════════════════════════════════════════════════ */
-async function doLogin() {
-  const passInput = document.getElementById('login-pass');
-  const errEl     = document.getElementById('login-err');
-  const loginBtn  = document.querySelector('.login-btn');
-  const val = passInput.value.trim();
-  if (!val) return;
-
-  loginBtn.textContent = 'Verificando...';
-  loginBtn.disabled    = true;
-  errEl.style.display  = 'none';
-
-  try {
-    const passHash = await sha256(val);
-    const params   = new URLSearchParams();
-    params.append('payload', JSON.stringify({ action: 'login', passHash }));
-
-    const resp = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      body:   params,
-      signal: AbortSignal.timeout(15000),
-    });
-    const json = await resp.json();
-
-    if (json.status === 'ok' && json.data && json.data.token) {
-      _sessionToken = json.data.token;
-      sessionStorage.setItem('angatuba_token', _sessionToken);
-      mostrarPainel();
-    } else {
-      errEl.textContent   = 'Senha incorreta.';
-      errEl.style.display = 'block';
-      passInput.value     = '';
-    }
-  } catch(e) {
-    errEl.textContent   = 'Erro de conexão. Tente novamente.';
-    errEl.style.display = 'block';
-  } finally {
-    loginBtn.textContent = 'Entrar';
-    loginBtn.disabled    = false;
-    passInput.focus();
-  }
-}
-
-function mostrarPainel() {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('admin-panel').style.display  = 'block';
-  loadData();
-}
-
-async function doLogout() {
-  // Invalida o token no servidor (fire-and-forget)
-  if (_sessionToken) {
-    const params = new URLSearchParams();
-    params.append('payload', JSON.stringify({ action: 'logout', token: _sessionToken }));
-    fetch(APPS_SCRIPT_URL, { method: 'POST', body: params }).catch(() => {});
-  }
-  _sessionToken = null;
-  sessionStorage.removeItem('angatuba_token');
-  location.reload();
-}
-
-// Restaura sessão se token ainda existe na sessionStorage
-const _storedToken = sessionStorage.getItem('angatuba_token');
-if (_storedToken) {
-  _sessionToken = _storedToken;
-  // Mostra painel imediatamente; se o token expirou, loadData() vai detectar e forçar logout
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('admin-panel').style.display  = 'block';
-}
-
-// Intercepta respostas UNAUTHORIZED e força logout automático
-function handleUnauthorized() {
-  toast('⚠️ Sessão expirada. Faça login novamente.', true);
-  setTimeout(() => {
-    _sessionToken = null;
-    sessionStorage.removeItem('angatuba_token');
-    location.reload();
-  }, 2000);
-}
-
-/* ══ TABS ═════════════════════════════════════════════════════ */
-function switchTab(name, btn) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('tab-' + name).classList.add('active');
-  if (name === 'metricas') loadMetricas();
-  if (name === 'cobrancas') renderCobrancas();
-}
-
-/* ══ DATA ═════════════════════════════════════════════════════ */
-let allRows = [];
-
-async function loadData() {
-  try {
-    const resp = await fetch(
-      `${APPS_SCRIPT_URL}?action=admin&token=${encodeURIComponent(_sessionToken || '')}`,
-      { signal: AbortSignal.timeout(12000) }
-    );
-    const json = await resp.json();
-    if (json.status === 'erro' && json.msg === 'UNAUTHORIZED') {
-      handleUnauthorized(); return;
-    }
-    if (json.status === 'ok' && Array.isArray(json.data)) {
-      allRows = json.data;
-      renderAll();
-    } else {
-      showFallbackError();
-    }
-  } catch(e) {
-    showFallbackError();
-  }
-}
-
-function showFallbackError() {
-  ['pendentes','aprovados','planos','cobrancas'].forEach(k => {
-    const el = document.getElementById('list-' + k);
-    if (el) el.innerHTML =
-      `<div class="admin-empty"><i class="fa fa-triangle-exclamation"></i>Erro ao carregar dados.<br>Verifique a URL do Apps Script.</div>`;
-  });
-  const mt = document.getElementById('metric-table');
-  if (mt) mt.innerHTML =
-    `<div class="admin-empty"><i class="fa fa-triangle-exclamation"></i>Erro ao carregar dados.</div>`;
-}
-
-function renderAll() {
-  const pendentes = allRows.filter(r => r.status === 'PENDENTE');
-  const aprovados = allRows.filter(r => r.status === 'APROVADO');
-
-  setCount('pendentes', pendentes.length);
-  setCount('aprovados', aprovados.length);
-
-  renderPendentesPeriodo(pendentes);
-  renderList('aprovados', [...aprovados].sort((a, b) => b.row - a.row));
-  renderPlanos(aprovados);
-}
-
-/* ══ PENDENTES POR PERÍODO ════════════════════════════════════ */
-/* A coluna A da planilha grava 'dd/mm/aaaa hh:mm:ss' no fuso de SP.
-   Parseamos isso para classificar cada cadastro em hoje / ontem / semana. */
-function parseDataCadastro(str) {
-  if (!str) return null;
-  const m = String(str).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[ ,]+(\d{1,2}):(\d{2}))?/);
-  if (!m) return null;
-  let [, d, mo, y, hh, mm] = m;
-  if (y.length === 2) y = '20' + y;
-  d = +d; mo = +mo; y = +y;
-  // Rejeita datas impossíveis (ex: 32/13/2026) que o Date "rolaria" silenciosamente
-  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
-  const dt = new Date(y, mo - 1, d, +(hh || 0), +(mm || 0));
-  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
-  return dt;
-}
-
-/* Retorna 0 = hoje, 1 = ontem, 2..6 = esta semana, -1 = mais antigo/sem data */
-function diasAtras(dt) {
-  if (!dt) return -1;
-  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-  const dia  = new Date(dt); dia.setHours(0, 0, 0, 0);
-  return Math.round((hoje - dia) / 86400000);
-}
-
-const PEND_PERIODOS = [
-  { id: 'hoje',   titulo: 'Hoje',    icon: 'fa-bolt',          cor: 'var(--green)'  },
-  { id: 'ontem',  titulo: 'Ontem',   icon: 'fa-clock-rotate-left', cor: 'var(--zap)' },
-  { id: 'semana', titulo: 'Semana',  icon: 'fa-calendar-week',  cor: 'var(--indigo)' },
-  { id: 'todos',  titulo: 'Todos',   icon: 'fa-layer-group',    cor: 'var(--muted)'  },
-];
-let pendPeriodoAtivo  = 'todos';
-let pendPeriodoCache  = { hoje: [], ontem: [], semana: [], todos: [] };
-
-function renderPendentesPeriodo(pendentes) {
-  // Mais recentes primeiro (maior nº de linha = cadastro mais novo)
-  const ordenados = [...pendentes].sort((a, b) => b.row - a.row);
-  pendPeriodoCache = {
-    todos:  ordenados,
-    hoje:   ordenados.filter(r => diasAtras(parseDataCadastro(r.dataCadastro)) === 0),
-    ontem:  ordenados.filter(r => diasAtras(parseDataCadastro(r.dataCadastro)) === 1),
-    semana: ordenados.filter(r => { const n = diasAtras(parseDataCadastro(r.dataCadastro)); return n >= 0 && n <= 6; }),
-  };
-  renderPendPeriodoTabs();
-  renderPendPeriodoLista();
-}
-
-function renderPendPeriodoTabs() {
-  const el = document.getElementById('pend-periodo-tabs');
-  if (!el) return;
-  el.innerHTML = PEND_PERIODOS.map(c => {
-    const n     = pendPeriodoCache[c.id].length;
-    const ativo = c.id === pendPeriodoAtivo;
-    const style = ativo
-      ? `background:${c.cor};border-color:${c.cor};`
-      : `color:${c.cor};border-color:${c.cor};`;
-    return `
-      <button class="plan-cat-btn${ativo ? ' active' : ''}" style="${style}"
-        onclick="switchPendPeriodo('${c.id}')">
-        <i class="fa ${c.icon}"></i> ${c.titulo}
-        <span class="plan-cat-count">${n}</span>
-      </button>`;
-  }).join('');
-}
-
-function renderPendPeriodoLista() {
-  const lista = pendPeriodoCache[pendPeriodoAtivo] || [];
-  renderList('pendentes', lista);
-  filterCards('pendentes'); // reaplica busca atual, se houver
-}
-
-function switchPendPeriodo(id) {
-  pendPeriodoAtivo = id;
-  renderPendPeriodoTabs();
-  renderPendPeriodoLista();
-}
-
-function setCount(key, n) {
-  const el = document.getElementById('count-' + key);
-  if (!el) return;
-  el.textContent = n;
-  el.classList.toggle('visible', n > 0);
-}
-
-/* ══ RENDER LISTS ═════════════════════════════════════════════ */
-function renderList(type, rows) {
-  const el = document.getElementById('list-' + type);
-  if (!rows.length) {
-    el.innerHTML = `<div class="admin-empty"><i class="fa fa-inbox"></i>Nenhum cadastro aqui.</div>`;
-    return;
-  }
-  el.innerHTML = rows.map(r => cardHTML(r, type)).join('');
-}
-
-/* Categorias da aba Planos — exibidas como sub-abas lado a lado.
-   "Novas Lojas" = as 5 lojas mais recentes (maior número de linha), não
-   exclusivas: uma loja PRO recém-cadastrada aparece tanto em "Novas Lojas"
-   quanto em "Plano Pro", já que agora são vistas separadas (uma de cada vez),
-   não seções empilhadas. */
-const PLAN_CATS = [
-  { id: 'novas',  titulo: 'Novas Lojas',  icon: 'fa-circle-plus', cor: 'var(--green)'  },
-  { id: 'pro',    titulo: 'Plano Pro',    icon: 'fa-crown',       cor: 'var(--zap)'    },
-  { id: 'plus',   titulo: 'Plano Plus',   icon: 'fa-bolt',        cor: 'var(--indigo)' },
-  { id: 'gratis', titulo: 'Plano Grátis', icon: 'fa-gift',        cor: 'var(--muted)'  },
-];
-const NOVAS_QTD = 5;
-
-let planCategoriaAtiva  = 'novas';
-let planCategoriasCache = { novas: [], pro: [], plus: [], gratis: [] };
-
-function renderPlanos(rows) {
-  const tabsEl = document.getElementById('plan-cat-tabs');
-  const listEl = document.getElementById('list-planos');
-
-  if (!rows.length) {
-    tabsEl.innerHTML = '';
-    listEl.innerHTML = `<div class="admin-empty"><i class="fa fa-star"></i>Nenhuma loja aprovada ainda.</div>`;
-    return;
-  }
-
-  const porRecencia = [...rows].sort((a, b) => b.row - a.row);
-
-  planCategoriasCache = {
-    novas:  porRecencia.slice(0, NOVAS_QTD),
-    pro:    rows.filter(r => r.plano === 'PRO'),
-    plus:   rows.filter(r => r.plano === 'PLUS'),
-    gratis: rows.filter(r => r.plano !== 'PRO' && r.plano !== 'PLUS'),
-  };
-
-  // Se a categoria ativa ficou vazia (ex: era a única loja Pro e ela saiu
-  // do plano), cai para a primeira categoria que ainda tem lojas.
-  if (!planCategoriasCache[planCategoriaAtiva] || !planCategoriasCache[planCategoriaAtiva].length) {
-    const fallback = PLAN_CATS.find(c => planCategoriasCache[c.id].length);
-    planCategoriaAtiva = fallback ? fallback.id : 'novas';
-  }
-
-  renderPlanoTabs();
-  renderPlanoLista();
-}
-
-function renderPlanoTabs() {
-  const tabsEl = document.getElementById('plan-cat-tabs');
-  tabsEl.innerHTML = PLAN_CATS.map(c => {
-    const n     = planCategoriasCache[c.id].length;
-    const ativo = c.id === planCategoriaAtiva;
-    const style = ativo
-      ? `background:${c.cor};border-color:${c.cor};`
-      : `color:${c.cor};border-color:${c.cor};`;
-    return `
-      <button class="plan-cat-btn${ativo ? ' active' : ''}" style="${style}"
-        onclick="switchPlanoCategoria('${c.id}')">
-        <i class="fa ${c.icon}"></i> ${c.titulo}
-        <span class="plan-cat-count">${n}</span>
-      </button>`;
-  }).join('');
-}
-
-function renderPlanoLista() {
-  const listEl = document.getElementById('list-planos');
-  const lista  = planCategoriasCache[planCategoriaAtiva] || [];
-  listEl.innerHTML = lista.length
-    ? lista.map(r => planCardHTML(r)).join('')
-    : `<div class="admin-empty"><i class="fa fa-star"></i>Nenhuma loja nessa categoria.</div>`;
-  filterCards('planos'); // reaplica o filtro de busca atual, se houver
-}
-
-function switchPlanoCategoria(id) {
-  planCategoriaAtiva = id;
-  renderPlanoTabs();
-  renderPlanoLista();
-}
-
-/* ── Card de cadastro ─────────────────────────────────────── */
-function cardHTML(r, type) {
-  const statusCls = { PENDENTE:'pendente', APROVADO:'aprovado', REPROVADO:'reprovado' };
-  const pillCls   = { PENDENTE:'pill-pendente', APROVADO:'pill-aprovado', REPROVADO:'pill-reprovado' };
-  const cls  = statusCls[r.status] || 'pendente';
-  const pill = pillCls[r.status]   || 'pill-pendente';
-
-  const wppMsg = encodeURIComponent(`Olá ${r.nome}! Recebemos seu cadastro no AngatubaON. `);
-  const wppLink = r.wpp ? `https://wa.me/${r.wpp.replace(/\D/g,'')}?text=${wppMsg}` : '';
-
-  const isPendente = r.status === 'PENDENTE';
-
-  return `
-    <div class="admin-card ${cls}" id="card-${r.row}" data-nome="${escAttr(r.nome)}">
-      <div class="card-top">
+ 
+  <!-- ══════════════════════════ MODAL CADASTRO ══ -->
+  <!-- ══════════════════════════ MODAL CADASTRO ══ -->
+  <div class="modal-overlay" id="modal-cadastro" role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+ 
+      <!-- Cabeçalho -->
+      <div class="modal-header">
         <div>
-          <div class="card-name">${escHtml(r.nome) || '—'}</div>
-          <div class="card-ramo">${escHtml(r.ramo) || '—'} · linha ${r.row}</div>
+          <div class="modal-title" id="modal-title-text">Cadastrar no Angatuba<span>ON</span></div>
+          <div class="modal-subtitle" id="cad-modal-subtitle">Preencha os dados da sua loja</div>
         </div>
-        <span class="status-pill ${pill}">${escHtml(r.status)}</span>
+        <button class="modal-close" onclick="closeModal()" aria-label="Fechar">✕</button>
       </div>
-      <div class="card-info">
-        ${r.endereco ? `<div class="card-info-row"><i class="fa fa-map-marker-alt"></i>${escHtml(r.endereco)}</div>` : ''}
-        ${r.wpp      ? `<div class="card-info-row"><i class="fab fa-whatsapp"></i>${escHtml(r.wpp)}</div>` : ''}
-        ${r.tel      ? `<div class="card-info-row"><i class="fa fa-phone"></i>${escHtml(r.tel)}</div>` : ''}
-        ${r.horario  ? `<div class="card-info-row"><i class="fa fa-clock"></i>${escHtml(r.horario)}</div>` : ''}
-        ${r.planoSolicitado ? `<div class="card-info-row"><i class="fa fa-star"></i>Plano solicitado: <strong style="color:var(--zap);margin-left:4px;">${escHtml(r.planoSolicitado)}</strong></div>` : ''}
-        ${r.obs      ? `<div class="card-info-row"><i class="fa fa-note-sticky"></i>${escHtml(r.obs)}</div>` : ''}
+ 
+      <!-- Stepper de progresso -->
+      <div class="cad-stepper" id="cad-stepper">
+        <div class="cad-step active" id="cad-step-ind-1">
+          <div class="cad-step-circle" id="cad-step-circ-1">1</div>
+          <div class="cad-step-label">Dados</div>
+        </div>
+        <div class="cad-step-line" id="cad-line-1"></div>
+        <div class="cad-step" id="cad-step-ind-2">
+          <div class="cad-step-circle" id="cad-step-circ-2">2</div>
+          <div class="cad-step-label">Horário</div>
+        </div>
+        <div class="cad-step-line" id="cad-line-2"></div>
+        <div class="cad-step" id="cad-step-ind-3">
+          <div class="cad-step-circle" id="cad-step-circ-3">3</div>
+          <div class="cad-step-label">Plano</div>
+        </div>
       </div>
-      <div class="card-actions">
-        ${isPendente ? `
-          <button class="act-btn btn-approve" onclick="updateStatus(${r.row},'APROVADO',this)">
-            <i class="fa fa-check"></i> Aprovar
+ 
+      <!-- Formulário em etapas -->
+      <form class="modal-body" id="cadastro-form" novalidate style="gap:14px;">
+ 
+        <!-- ── ETAPA 1: Dados básicos ── -->
+        <div class="cad-step-panel active" id="cad-panel-1">
+ 
+          <div class="field-group">
+            <label class="field-label" for="f-nome">Nome da loja / empresa <span>*</span></label>
+            <input class="field-input" id="f-nome" name="nome" type="text"
+              placeholder="Ex: Pizzaria do João" required autocomplete="organization" />
+          </div>
+ 
+          <div class="field-group">
+            <label class="field-label" for="f-ramo-text">Ramo / categoria <span>*</span></label>
+            <div class="ramo-wrap">
+              <div class="ramo-combobox" id="ramo-combobox">
+                <span class="ramo-selected-emoji" id="ramo-emoji" aria-hidden="true"></span>
+                <input type="text" id="f-ramo-text"
+                  placeholder="Digite ou escolha o ramo…"
+                  autocomplete="off" autocorrect="off" spellcheck="false"
+                  role="combobox" aria-autocomplete="list"
+                  aria-controls="ramo-dropdown" aria-haspopup="listbox"
+                  aria-expanded="false" />
+                <span class="ramo-ok-mark" id="ramo-ok">✓</span>
+                <button type="button" class="ramo-clear-btn" id="ramo-clear"
+                  aria-label="Limpar ramo" tabindex="-1">✕</button>
+              </div>
+              <div class="ramo-dropdown" id="ramo-dropdown" role="listbox"
+                aria-label="Sugestões de ramo"></div>
+              <input type="hidden" id="f-ramo" name="ramo" />
+            </div>
+          </div>
+ 
+          <div class="field-group" style="position:relative;">
+            <label class="field-label" for="f-endereco-rua">
+              Endereço <span>*</span>
+              <span id="maps-status" style="font-size:10px;font-weight:600;margin-left:6px;"></span>
+            </label>
+            <div style="display:flex;gap:8px;align-items:flex-start;">
+              <div style="flex:1;position:relative;">
+                <input class="field-input" id="f-endereco-rua" type="text"
+                  placeholder="Digite a rua ou nome do estabelecimento..."
+                  required autocomplete="off" autocorrect="off" />
+                <div id="addr-suggestions" style="
+                  display:none; position:absolute; left:0; right:0; top:100%;
+                  background:#222; border:1px solid rgba(255,255,255,0.12);
+                  border-radius:0 0 12px 12px; z-index:3000;
+                  max-height:220px; overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,0.5);
+                "></div>
+              </div>
+              <input class="field-input" id="f-endereco-numero" type="text"
+                placeholder="Nº" autocomplete="off" inputmode="numeric" pattern="[0-9]*"
+                style="width:80px;flex-shrink:0;" />
+            </div>
+            <input type="hidden" id="f-endereco" name="endereco" />
+            <input type="hidden" id="f-maps-url" name="mapsUrl" />
+            <p class="field-hint" style="margin-top:6px;" id="maps-hint">
+              📍 Digite pelo menos 4 letras para buscar a rua
+            </p>
+          </div>
+ 
+          <div class="field-group" style="position:relative;">
+            <label class="field-label" for="f-bairro">Bairro</label>
+            <input class="field-input" id="f-bairro" name="bairro" type="text"
+              placeholder="Ex: Centro, Vila Ribeiro..." autocomplete="off" />
+            <div class="bairro-cad-dropdown" id="bairro-cad-dropdown" style="display:none;"></div>
+          </div>
+ 
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label" for="f-wpp">WhatsApp <span>*</span></label>
+              <input class="field-input" id="f-wpp" name="whatsapp" type="tel"
+                placeholder="(15) 9 9999-9999" required autocomplete="tel"
+                inputmode="numeric" maxlength="16" />
+              <span class="field-error" id="f-wpp-err">Digite um número válido com DDD (ex: 15 9 9999-9999)</span>
+            </div>
+            <div class="field-group">
+              <label class="field-label" for="f-tel">Telefone fixo</label>
+              <input class="field-input" id="f-tel" name="telefone" type="tel"
+                placeholder="(15) 3255-0000" autocomplete="off" inputmode="numeric" />
+            </div>
+          </div>
+ 
+          <div class="field-group">
+            <label class="field-label" for="f-tags">
+              Tags de Busca
+              <span style="font-size:10px;font-weight:500;color:var(--muted);margin-left:6px;">ajuda clientes a te encontrar</span>
+            </label>
+            <textarea class="field-textarea" id="f-tags" name="tags"
+              placeholder="Ex: delivery, pizza, esfiha, açaí, conserto de celular..."
+              style="min-height:64px;"></textarea>
+            <p class="field-hint" style="margin-top:4px;">🔍 Sua loja aparece quando alguém pesquisar por essas palavras.</p>
+          </div>
+ 
+          <div class="field-group">
+            <label class="field-label" for="f-instagram">
+              Instagram <span style="font-size:10px;font-weight:500;color:var(--muted);margin-left:4px;">opcional</span>
+            </label>
+            <div style="position:relative;display:flex;align-items:center;">
+              <span style="position:absolute;left:12px;color:#e1306c;font-size:14px;pointer-events:none;"><i class="fab fa-instagram"></i></span>
+              <input class="field-input" id="f-instagram" name="instagram" type="text"
+                placeholder="@nomedoperfil" autocomplete="off" style="padding-left:34px;" />
+            </div>
+          </div>
+ 
+          <button type="button" class="cad-next-btn" onclick="cadAvancar(2)">
+            Próximo — Horário de funcionamento <i class="fa fa-arrow-right"></i>
           </button>
-          <button class="act-btn btn-reject" onclick="updateStatus(${r.row},'REPROVADO',this)">
-            <i class="fa fa-times"></i> Reprovar
-          </button>` : ''}
-        ${!isPendente ? `
-          <button class="act-btn btn-edit" onclick="toggleEditLoja(${r.row})">
-            <i class="fa fa-pen"></i> Editar
-          </button>` : ''}
-        ${wppLink ? `
-          <a href="${wppLink}" target="_blank" class="act-btn btn-wpp">
-            <i class="fab fa-whatsapp"></i> WhatsApp
-          </a>` : ''}
+        </div>
+ 
+        <!-- ── ETAPA 2: Horário ── -->
+        <div class="cad-step-panel" id="cad-panel-2">
+ 
+          <div class="field-group">
+            <label class="field-label">Horário de funcionamento <span>*</span></label>
+ 
+            <!-- Schedule simplificado -->
+            <div class="sched-simple" id="sched-simple">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:2px;">Quais dias você funciona?</div>
+              <div class="sched-preset-grid">
+                <button type="button" class="sched-preset-btn active" data-preset="semana" onclick="schedPreset('semana',this)">
+                  <span class="sched-preset-icon">📅</span>
+                  <span>Seg a Sex</span>
+                </button>
+                <button type="button" class="sched-preset-btn" data-preset="semana_sab" onclick="schedPreset('semana_sab',this)">
+                  <span class="sched-preset-icon">📅</span>
+                  <span>Seg a Sáb</span>
+                </button>
+                <button type="button" class="sched-preset-btn" data-preset="todos" onclick="schedPreset('todos',this)">
+                  <span class="sched-preset-icon">🗓️</span>
+                  <span>Todos os dias</span>
+                </button>
+                <button type="button" class="sched-preset-btn" data-preset="custom" onclick="schedPreset('custom',this)">
+                  <span class="sched-preset-icon">✏️</span>
+                  <span>Personalizar</span>
+                </button>
+              </div>
+              <div class="sched-time-row" style="margin-top:4px;">
+                <label>Abre às</label>
+                <input type="time" id="sched-abre" value="08:00" onchange="schedSyncSimples()" />
+                <label>Fecha às</label>
+                <input type="time" id="sched-fecha" value="18:00" onchange="schedSyncSimples()" />
+              </div>
+              <span class="sched-advanced-toggle" onclick="schedMostrarAvancado()">
+                + Adicionar turno especial (sábado/domingo diferente)
+              </span>
+            </div>
+ 
+            <!-- Schedule avançado (escondido por padrão) -->
+            <div id="sched-advanced" style="display:none;">
+              <div class="schedule-builder" id="schedule-builder"></div>
+              <button type="button" class="schedule-add-btn" id="schedule-add-btn">
+                <i class="fa fa-plus"></i> Adicionar turno diferente
+              </button>
+              <span class="sched-advanced-toggle" style="margin-top:6px;display:block;" onclick="schedOcultarAvancado()">
+                − Usar horário simplificado
+              </span>
+            </div>
+ 
+            <input type="hidden" id="f-horario" name="horario" />
+            <input type="hidden" id="f-dias" name="dias" />
+            <input type="hidden" id="f-hora-abre" name="horaAbre" />
+            <input type="hidden" id="f-hora-fecha" name="horaFecha" />
+          </div>
+ 
+          <button type="button" class="cad-next-btn" onclick="cadAvancar(3)">
+            Próximo — Escolher plano <i class="fa fa-arrow-right"></i>
+          </button>
+          <button type="button" class="cad-back-btn" onclick="cadVoltar(1)">← Voltar</button>
+        </div>
+ 
+        <!-- ── ETAPA 3: Plano + Foto + Submit ── -->
+        <div class="cad-step-panel" id="cad-panel-3">
+ 
+          <!-- Cards de plano com visual completo — selecionável -->
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Escolha seu plano</div>
+ 
+          <!-- Seletor de ciclo de cobrança -->
+          <div class="ciclo-toggle" id="cad-ciclo-toggle" role="tablist" aria-label="Ciclo de cobrança">
+            <button type="button" class="ciclo-btn active" data-ciclo="mensal" onclick="cadSelecionarCiclo('mensal')">Mensal</button>
+            <button type="button" class="ciclo-btn" data-ciclo="trimestral" onclick="cadSelecionarCiclo('trimestral')">
+              Trimestral <span class="ciclo-selo">-10%</span>
+            </button>
+            <button type="button" class="ciclo-btn" data-ciclo="anual" onclick="cadSelecionarCiclo('anual')">
+              Anual <span class="ciclo-selo ciclo-selo-destaque">2 meses grátis</span>
+            </button>
+          </div>
+ 
+          <!-- GRÁTIS -->
+          <div class="plan-card card-gratis cad-plan-card selected" id="plan-sel-gratis"
+            onclick="cadSelecionarPlano('GRATIS')" role="radio" aria-checked="true" tabindex="0">
+            <img src="/icons/owl-gratis.png" alt="" class="plan-card-owl owl-gratis" />
+            <div class="plan-card-content">
+              <div class="plan-card-top">
+                <div class="plan-card-name">🏪 Grátis</div>
+                <div class="plan-card-price">
+                  <span class="price-val">R$ 0</span>
+                  <span class="price-per">para sempre</span>
+                </div>
+              </div>
+              <ul class="plan-card-features">
+                <li><span class="feat-icon">✅</span> Loja listada no app</li>
+                <li><span class="feat-icon">✅</span> Status aberto/fechado em tempo real</li>
+                <li><span class="feat-icon">✅</span> Botão WhatsApp / Telefone</li>
+                <li><span class="feat-icon">✅</span> Painel "Minha Loja"</li>
+                <li><span class="feat-icon">✅</span> Total de cliques</li>
+                <li class="feat-off"><span class="feat-icon">✦</span> Posição de destaque na lista</li>
+                <li class="feat-off"><span class="feat-icon">✦</span> Métricas detalhadas</li>
+                <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa, logo e cardápio</li>
+              </ul>
+            </div>
+          </div>
+ 
+          <!-- PLUS -->
+          <div class="plan-card card-plus cad-plan-card" id="plan-sel-plus"
+            onclick="cadSelecionarPlano('PLUS')" role="radio" aria-checked="false" tabindex="0">
+            <img src="/icons/owl-plus.png" alt="" class="plan-card-owl owl-plus" />
+            <div class="plan-card-content">
+              <span class="plan-popular">⭐ MAIS POPULAR</span>
+              <div class="plan-card-top">
+                <div class="plan-card-name">✦ Plus</div>
+                <div class="plan-card-price">
+                  <span class="price-val" id="cad-preco-plus">R$ 29,90</span>
+                  <span class="price-per" id="cad-per-plus">por mês</span>
+                </div>
+                <div class="plan-ciclo-info" id="cad-ciclo-plus" style="display:none;font-size:10px;color:var(--muted);margin-top:2px;"></div>
+              </div>
+              <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);border-radius:20px;padding:3px 9px;margin-bottom:8px;">
+                <span style="font-size:9px;">🔒</span>
+                <span style="font-family:var(--font-h);font-size:9px;font-weight:800;color:#818cf8;letter-spacing:0.03em;">PREÇO DE FUNDADOR</span>
+              </div>
+              <ul class="plan-card-features">
+                <li><span class="feat-icon">✅</span> Tudo do Grátis</li>
+                <li><span class="feat-icon">✅</span> Posição acima das lojas Grátis</li>
+                <li><span class="feat-icon">✅</span> Selo ✦ PLUS no card</li>
+                <li><span class="feat-icon">✅</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
+                <li><span class="feat-icon">✅</span> Foto de capa e logo na página da loja</li>
+                <li><span class="feat-icon">✅</span> Cardápio / Serviços (até 5 itens)</li>
+                <li><span class="feat-icon">✅</span> Anúncio do dia no card (texto + emoji)</li>
+                <li class="feat-off"><span class="feat-icon">⭐</span> Foto no card da listagem</li>
+                <li class="feat-off"><span class="feat-icon">⭐</span> Topo absoluto da lista</li>
+                <li class="feat-off"><span class="feat-icon">⭐</span> Relatório avançado (visualizações, crescimento, conversão)</li>
+                <li class="feat-off"><span class="feat-icon">⭐</span> Horário de pico dos cliques</li>
+              </ul>
+            </div>
+          </div>
+ 
+          <!-- PRO -->
+          <div class="plan-card card-pro cad-plan-card" id="plan-sel-pro"
+            onclick="cadSelecionarPlano('PRO')" role="radio" aria-checked="false" tabindex="0">
+            <img src="/icons/owl-pro.png" alt="" class="plan-card-owl owl-pro" />
+            <div class="plan-card-content">
+              <div class="plan-card-top">
+                <div class="plan-card-name">⭐ Pro</div>
+                <div class="plan-card-price">
+                  <span class="price-val" id="cad-preco-pro">R$ 49,90</span>
+                  <span class="price-per" id="cad-per-pro">por mês</span>
+                </div>
+                <div class="plan-ciclo-info" id="cad-ciclo-pro" style="display:none;font-size:10px;color:var(--muted);margin-top:2px;"></div>
+              </div>
+              <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.35);border-radius:20px;padding:3px 9px;margin-bottom:8px;">
+                <span style="font-size:9px;">🔒</span>
+                <span style="font-family:var(--font-h);font-size:9px;font-weight:800;color:#f59e0b;letter-spacing:0.03em;">PREÇO DE FUNDADOR</span>
+              </div>
+              <ul class="plan-card-features">
+                <li><span class="feat-icon">✅</span> Tudo do Plus</li>
+                <li><span class="feat-icon">✅</span> Foto de capa e logo no card da listagem</li>
+                <li><span class="feat-icon">✅</span> Topo absoluto da lista</li>
+                <li><span class="feat-icon">✅</span> Cardápio ilimitado com fotos dos itens</li>
+                <li><span class="feat-icon">✅</span> Foto no anúncio do dia</li>
+                <li><span class="feat-icon">✅</span> Relatório avançado: visualizações, abriram cardápio, crescimento semanal e conversão por canal</li>
+                <li><span class="feat-icon">✅</span> Horário de pico dos cliques</li>
+                <li><span class="feat-icon">✅</span> Selo ⭐ PRO em destaque no card</li>
+              </ul>
+            </div>
+          </div>
+ 
+          <!-- Hint do plano selecionado -->
+          <p class="field-hint" style="text-align:center;" id="cad-plan-hint">
+            🏪 Plano <strong>GRÁTIS</strong> selecionado · Cadastro gratuito, sem compromisso.
+          </p>
+ 
+          <!-- ── Preview visual dos benefícios por plano ── -->
+ 
+          <!-- PREVIEW GRÁTIS -->
+          <div class="cad-plan-preview" id="preview-GRATIS">
+            <div class="cpp-label">Como sua loja vai aparecer</div>
+            <!-- Mini card Grátis -->
+            <div class="cpp-store-card cpp-gratis">
+              <div class="cpp-thumb">🏪</div>
+              <div class="cpp-info">
+                <div class="cpp-nome">Sua Loja</div>
+                <div class="cpp-sub">categoria</div>
+                <div class="cpp-badges">
+                  <span class="cpp-badge cpp-badge-open">● Aberto</span>
+                  <span class="cpp-badge cpp-badge-plan-gratis">GRÁTIS</span>
+                </div>
+              </div>
+              <div class="cpp-actions">
+                <div class="cpp-action-btn cpp-wpp">WPP</div>
+              </div>
+            </div>
+            <div class="cpp-note">Aparece na lista geral, sem destaque visual.</div>
+          </div>
+ 
+          <!-- PREVIEW PLUS -->
+          <div class="cad-plan-preview" id="preview-PLUS" style="display:none;">
+            <div class="cpp-label">Como sua loja vai aparecer</div>
+            <!-- Mini card Plus destacado -->
+            <div class="cpp-store-card cpp-plus">
+              <div class="cpp-thumb cpp-thumb-foto">📸</div>
+              <div class="cpp-info">
+                <div class="cpp-nome">Sua Loja</div>
+                <div class="cpp-sub">categoria</div>
+                <div class="cpp-anuncio">🎯 Promoção especial hoje!</div>
+                <div class="cpp-badges">
+                  <span class="cpp-badge cpp-badge-open">● Aberto</span>
+                  <span class="cpp-badge cpp-badge-plan-plus">✦ PLUS</span>
+                </div>
+              </div>
+              <div class="cpp-actions">
+                <div class="cpp-action-btn cpp-wpp">WPP</div>
+              </div>
+            </div>
+            <!-- Mini métricas -->
+            <div class="cpp-metrics">
+              <div class="cpp-metric-item">
+                <div class="cpp-metric-val">47</div>
+                <div class="cpp-metric-lbl">7 dias</div>
+              </div>
+              <div class="cpp-metric-item">
+                <div class="cpp-metric-val">183</div>
+                <div class="cpp-metric-lbl">30 dias</div>
+              </div>
+              <div class="cpp-metric-item cpp-metric-wpp">
+                <div class="cpp-metric-val" style="color:#25d366;">38</div>
+                <div class="cpp-metric-lbl">WhatsApp</div>
+              </div>
+              <div class="cpp-metric-item cpp-metric-tel">
+                <div class="cpp-metric-val" style="color:var(--blue);">9</div>
+                <div class="cpp-metric-lbl">Telefone</div>
+              </div>
+            </div>
+            <div class="cpp-note">Posição acima das lojas Grátis + anúncio do dia + métricas detalhadas.</div>
+          </div>
+ 
+          <!-- PREVIEW PRO -->
+          <div class="cad-plan-preview" id="preview-PRO" style="display:none;">
+            <div class="cpp-label">Como sua loja vai aparecer</div>
+            <!-- Mini card Pro com capa -->
+            <div class="cpp-store-card cpp-pro cpp-has-cover">
+              <div class="cpp-cover">
+                <div class="cpp-cover-gradient"></div>
+                <div class="cpp-cover-logo">⭐</div>
+                <div class="cpp-cover-info">
+                  <div class="cpp-cover-nome">Sua Loja</div>
+                  <div class="cpp-cover-sub">categoria</div>
+                  <span class="cpp-badge cpp-badge-open" style="font-size:9px;">● Aberto</span>
+                </div>
+                <span class="cpp-badge cpp-badge-plan-pro" style="position:absolute;top:8px;right:8px;">⭐ PRO</span>
+              </div>
+              <div class="cpp-anuncio cpp-anuncio-pro" style="margin:8px 10px 0;">
+                📸 Foto no anúncio + cardápio ilimitado!
+              </div>
+            </div>
+            <!-- Mini métricas Pro com pico -->
+            <div class="cpp-metrics">
+              <div class="cpp-metric-item">
+                <div class="cpp-metric-val" style="color:var(--zap);">94</div>
+                <div class="cpp-metric-lbl">7 dias</div>
+              </div>
+              <div class="cpp-metric-item">
+                <div class="cpp-metric-val" style="color:var(--zap);">371</div>
+                <div class="cpp-metric-lbl">30 dias</div>
+              </div>
+              <div class="cpp-metric-item">
+                <div class="cpp-metric-val" style="color:#25d366;">76</div>
+                <div class="cpp-metric-lbl">WhatsApp</div>
+              </div>
+              <div class="cpp-metric-item">
+                <div class="cpp-metric-val" style="color:var(--blue);">18</div>
+                <div class="cpp-metric-lbl">Telefone</div>
+              </div>
+            </div>
+            <!-- Mini gráfico de pico (barras simples) -->
+            <div class="cpp-pico">
+              <div class="cpp-pico-label">📈 Horário de pico dos cliques</div>
+              <div class="cpp-pico-bars" id="cpp-pico-bars">
+                <!-- gerado via JS -->
+              </div>
+              <div class="cpp-pico-horas">
+                <span>8h</span><span>10h</span><span>12h</span><span>14h</span><span>16h</span><span>18h</span>
+              </div>
+            </div>
+            <div class="cpp-note">Topo absoluto da lista + foto de capa no card + cardápio ilimitado com fotos.</div>
+          </div>
+ 
+          <!-- Foto & Logo — sempre visível, com lock para Grátis -->
+          <div class="field-group" id="foto-group" style="position:relative;">
+            <label class="field-label">
+              Foto &amp; Logo
+              <span style="color:var(--zap);margin-left:4px;" id="foto-group-plan-label">✦ Plus · ⭐ Pro</span>
+            </label>
+            <p class="field-hint" style="margin-bottom:10px;">
+              Veja como sua loja vai aparecer no app. Toque nas imagens para trocar.
+            </p>
+ 
+            <!-- Lock overlay para plano Grátis -->
+            <div class="foto-lock-overlay show" id="foto-lock-overlay">
+              <div class="foto-lock-icon">🔒</div>
+              <div class="foto-lock-title">Foto & Logo</div>
+              <div class="foto-lock-sub">Disponível nos planos <strong>Plus</strong> e <strong>Pro</strong>.<br>Faça o upgrade para destacar sua loja!</div>
+              <button type="button" class="foto-lock-btn" onclick="cadSelecionarPlano('PLUS')">✦ Selecionar Plus</button>
+            </div>
+ 
+            <!-- Preview Card -->
+            <div id="card-preview-wrap" style="border-radius:16px;overflow:hidden;border:1px solid var(--border);background:var(--surface);position:relative;margin-bottom:8px;">
+              <div id="prev-capa-wrap" style="width:100%;height:130px;background:var(--surface2);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;touch-action:none;cursor:default;">
+                <i id="prev-capa-placeholder" class="fa fa-image" style="font-size:2rem;color:var(--border);pointer-events:none;"></i>
+                <img id="foto-preview-img" src="" alt="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 50%;user-select:none;-webkit-user-select:none;pointer-events:none;"/>
+                <div id="prev-capa-drag-hint" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:#fff;font-size:10px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;backdrop-filter:blur(4px);pointer-events:none;">✥ Arraste para reposicionar</div>
+                <label for="f-foto-file" id="btn-trocar-capa" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:5px 9px;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:#fff;backdrop-filter:blur(6px);z-index:2;">
+                  <i class="fa fa-camera"></i> Trocar capa
+                </label>
+                <span id="foto-upload-status" style="display:none;"></span>
+              </div>
+              <input type="hidden" id="f-foto-pos" name="fotoPosicao" value="50% 50%" />
+              <div style="padding:10px 12px 12px;display:flex;align-items:center;gap:10px;">
+                <div id="prev-logo-wrap" style="width:44px;height:44px;border-radius:10px;flex-shrink:0;background:#fff;border:1.5px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative;">
+                  <i id="prev-logo-placeholder" class="fa fa-store" style="font-size:1.1rem;color:var(--border);"></i>
+                  <img id="logo-preview-img" src="" alt="" style="display:none;width:100%;height:100%;object-fit:contain;"/>
+                  <label for="f-logo-file" style="position:absolute;inset:0;cursor:pointer;background:transparent;" title="Trocar logo"></label>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-family:var(--font-h);font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="prev-nome">Nome da sua loja</div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:2px;" id="prev-ramo">Ramo / categoria</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:center;gap:16px;padding:8px 12px;border-top:1px solid var(--border);background:var(--surface2);">
+                <label for="f-logo-file" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text);">
+                  <i class="fa fa-camera" style="font-size:10px;color:var(--muted);"></i> Trocar logo
+                </label>
+                <span id="logo-upload-status" style="display:none;"></span>
+              </div>
+            </div>
+            <input type="file" id="f-foto-file" accept="image/*" style="display:none;" />
+            <input type="hidden" id="f-foto-url" name="fotoUrl" />
+            <input type="file" id="f-logo-file" accept="image/*" style="display:none;" />
+            <input type="hidden" id="f-logo-url" name="logoUrl" />
+            <div id="logo-group" style="display:none;"></div>
+            <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.5;">
+              Máx 5MB · JPG, PNG ou WebP<br>
+              <span style="color:rgba(99,102,241,0.8);">💡 Para a logo ficar sem fundo branco, use PNG com fundo transparente</span>
+            </div>
+          </div>
+ 
+          <button type="submit" class="modal-submit">
+            <i class="fab fa-whatsapp"></i> Solicitar meu espaço no AngatubaON
+          </button>
+          <p class="modal-submit-label">Você será avisado pelo WhatsApp quando sua loja for publicada.</p>
+          <button type="button" class="cad-back-btn" onclick="cadVoltar(2)">← Voltar</button>
+        </div>
+ 
+      </form>
+ 
+      <!-- Tela de sucesso -->
+      <div class="modal-success" id="cadastro-success">
+        <img id="success-owl" src="/webp/owl-celebrate-gratis.webp" alt="" class="success-owl" />
+        <div class="success-title">Cadastro enviado! 🎉</div>
+        <p class="success-sub" id="success-sub-text">
+          Recebemos os dados da sua loja.<br>
+          Vamos analisar e entrar em contato pelo WhatsApp em breve.
+        </p>
+        <!-- Botão WPP dinâmico para planos pagos (inserido via JS) -->
+        <a href="https://instagram.com/angatubaon_" target="_blank" rel="noopener" class="success-ig-btn">
+          <i class="fab fa-instagram"></i> Seguir o AngatubaON
+        </a>
+        <button class="success-close" onclick="closeModal()">Fechar</button>
       </div>
-      ${!isPendente ? editFormHTML(r) : ''}
-    </div>`;
-}
-
-/* ── Formulário de edição inline (Aprovados) ──────────────────── */
-function editFormHTML(r) {
-  return `
-    <div class="edit-form" id="edit-${r.row}" style="display:none;">
-      <div class="edit-grid">
-        <label class="edit-lbl">Nome
-          <input class="edit-input" id="ef-nome-${r.row}" value="${escAttr(r.nome)}" />
-        </label>
-        <label class="edit-lbl">Categoria / ramo
-          <input class="edit-input" id="ef-ramo-${r.row}" value="${escAttr(r.ramo)}" />
-        </label>
-        <label class="edit-lbl edit-full">Endereço
-          <input class="edit-input" id="ef-endereco-${r.row}" value="${escAttr(r.endereco)}" />
-        </label>
-        <label class="edit-lbl">WhatsApp
-          <input class="edit-input" id="ef-wpp-${r.row}" value="${escAttr(r.wpp)}" inputmode="numeric" />
-        </label>
-        <label class="edit-lbl">Telefone
-          <input class="edit-input" id="ef-tel-${r.row}" value="${escAttr(r.tel)}" inputmode="numeric" />
-        </label>
-        <label class="edit-lbl edit-full">Horário (texto)
-          <input class="edit-input" id="ef-horario-${r.row}" value="${escAttr(r.horario)}" />
-        </label>
-        <label class="edit-lbl edit-full">Observações
-          <input class="edit-input" id="ef-obs-${r.row}" value="${escAttr(r.obs)}" />
-        </label>
+    </div>
+  </div>
+ 
+  <!-- ══════════════════════════ MODAL PLANOS ══ -->
+  <div class="plan-overlay" id="modal-planos" role="dialog" aria-modal="true">
+    <div class="plan-sheet">
+      <div class="plan-handle"></div>
+ 
+      <div class="plan-header">
+        <div class="plan-header-title">Escolha seu Plano<span> ✦</span></div>
+        <div class="plan-header-sub">Deslize para comparar os planos</div>
       </div>
-      <div class="edit-warn" id="edit-warn-${r.row}" style="display:none;">
-        <i class="fa fa-triangle-exclamation"></i>
-        Mudar o <strong>nome</strong> desvincula as métricas antigas desta loja (elas ficam registradas no nome anterior).
+ 
+      <!-- Indicadores de dots + setas -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:10px 0 0;">
+        <button onclick="_irParaSlide(_carouselIdx - 1)" id="plan-arrow-left"
+          style="width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);
+                 color:var(--muted);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+                 -webkit-tap-highlight-color:transparent;">‹</button>
+        <div class="plan-dots" id="plan-dots">
+          <span class="plan-dot active" data-idx="0"></span>
+          <span class="plan-dot" data-idx="1"></span>
+          <span class="plan-dot" data-idx="2"></span>
+        </div>
+        <button onclick="_irParaSlide(_carouselIdx + 1)" id="plan-arrow-right"
+          style="width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);
+                 color:var(--muted);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+                 -webkit-tap-highlight-color:transparent;">›</button>
       </div>
-      <div class="edit-actions">
-        <button class="act-btn btn-save-edit" onclick="saveEditLoja(${r.row})">
-          <i class="fa fa-save"></i> Salvar alterações
+ 
+      <!-- Carrossel -->
+      <div class="plan-carousel-wrap">
+        <div class="plan-carousel" id="plan-carousel">
+ 
+          <!-- GRÁTIS -->
+          <div class="plan-slide" data-plan="GRATIS">
+            <div class="plan-card card-gratis selected">
+              <img src="/icons/owl-gratis.png" alt="" class="plan-card-owl owl-gratis" />
+              <div class="plan-card-content">
+                <div class="plan-card-top">
+                  <div class="plan-card-name">🏪 Grátis</div>
+                  <div class="plan-card-price">
+                    <span class="price-val">R$ 0</span>
+                    <span class="price-per">para sempre</span>
+                  </div>
+                </div>
+                <ul class="plan-card-features">
+                  <li><span class="feat-icon">✅</span> Loja listada no app</li>
+                  <li><span class="feat-icon">✅</span> Status aberto/fechado em tempo real</li>
+                  <li><span class="feat-icon">✅</span> Botão WhatsApp / Telefone</li>
+                  <li><span class="feat-icon">✅</span> Painel "Minha Loja"</li>
+                  <li><span class="feat-icon">✅</span> Total de cliques (contador simples)</li>
+                  <li><span class="feat-icon">✅</span> Receber avaliações de clientes</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Posição de destaque na lista</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Link de compartilhamento</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Cardápio / Serviços / Produtos</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+ 
+          <!-- PLUS -->
+          <div class="plan-slide" data-plan="PLUS">
+            <div class="plan-card card-plus" style="position:relative;">
+              <img src="/icons/owl-plus.png" alt="" class="plan-card-owl owl-plus" />
+              <div class="plan-card-content">
+                <span class="plan-popular">⭐ MAIS POPULAR</span>
+                <div class="plan-card-top">
+                  <div class="plan-card-name">✦ Plus</div>
+                  <div class="plan-card-price">
+                    <span class="price-val">R$ 29,90</span>
+                    <span class="price-per">por mês</span>
+                  </div>
+                </div>
+                <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);border-radius:20px;padding:4px 10px;margin-bottom:10px;">
+                  <span style="font-size:10px;">🔒</span>
+                  <span style="font-family:var(--font-h);font-size:10px;font-weight:800;color:#818cf8;letter-spacing:0.03em;">PREÇO DE FUNDADOR</span>
+                </div>
+                <ul class="plan-card-features">
+                  <li><span class="feat-icon">✅</span> Tudo do Grátis</li>
+                  <li><span class="feat-icon">✅</span> Posição acima das lojas Grátis</li>
+                  <li><span class="feat-icon">✅</span> Selo ✦ PLUS no card</li>
+                  <li><span class="feat-icon">✅</span> Visual destacado (fundo índigo)</li>
+                  <li><span class="feat-icon">✅</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
+                  <li><span class="feat-icon">✅</span> Link de compartilhamento da loja</li>
+                  <li><span class="feat-icon">✅</span> Foto de capa e logo na página da loja</li>
+                  <li><span class="feat-icon">✅</span> Cardápio / Serviços (até 5 itens, sem foto)</li>
+                  <li><span class="feat-icon">✅</span> Pedidos direto pelo WhatsApp</li>
+                  <li><span class="feat-icon">✅</span> Anúncio do dia no card (texto + emoji, 24h)</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa e logo no card da listagem</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Topo absoluto da lista</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Foto no anúncio do dia</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Relatório avançado (visualizações, crescimento, conversão)</li>
+                  <li class="feat-off"><span class="feat-icon">✦</span> Horário de pico dos cliques</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+ 
+          <!-- PRO -->
+          <div class="plan-slide" data-plan="PRO">
+            <div class="plan-card card-pro">
+              <img src="/icons/owl-pro.png" alt="" class="plan-card-owl owl-pro" />
+              <div class="plan-card-content">
+                <div class="plan-card-top">
+                  <div class="plan-card-name">⭐ Pro</div>
+                  <div class="plan-card-price">
+                    <span class="price-val">R$ 49,90</span>
+                    <span class="price-per">por mês</span>
+                  </div>
+                </div>
+                <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:20px;padding:4px 10px;margin-bottom:10px;">
+                  <span style="font-size:10px;">🔒</span>
+                  <span style="font-family:var(--font-h);font-size:10px;font-weight:800;color:#f59e0b;letter-spacing:0.03em;">PREÇO DE FUNDADOR</span>
+                </div>
+                <ul class="plan-card-features">
+                  <li><span class="feat-icon">✅</span> Tudo do Plus</li>
+                  <li><span class="feat-icon">✅</span> Topo absoluto da lista</li>
+                  <li><span class="feat-icon">✅</span> Logo da loja no card da listagem</li>
+                  <li><span class="feat-icon">✅</span> Foto de capa no card com overlay</li>
+                  <li><span class="feat-icon">✅</span> Borda dourada animada</li>
+                  <li><span class="feat-icon">✅</span> Selo ⭐ PRO em destaque</li>
+                  <li><span class="feat-icon">✅</span> Anúncio do dia com foto (texto + emoji + 📷, 24h)</li>
+                  <li><span class="feat-icon">✅</span> Cardápio ilimitado com fotos e categorias</li>
+                  <li><span class="feat-icon">✅</span> Relatório avançado: visualizações, abriram cardápio, crescimento semanal e conversão por canal</li>
+                  <li><span class="feat-icon">✅</span> Horário de pico dos cliques</li>
+                  <li><span class="feat-icon">✅</span> Máxima visibilidade</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+ 
+        </div>
+      </div>
+ 
+      <button class="plan-cta cta-gratis" id="plan-cta-btn" onclick="confirmPlan()">
+        Continuar com Grátis →
+      </button>
+      <p class="plan-note" id="plan-note">
+        Planos pagos são ativados após análise e pagamento via WhatsApp.
+      </p>
+    </div>
+  </div>
+ 
+  <!-- ══════════════════════════════════════ MODAL LOGIN LOJA ══ -->
+  <div class="modal-overlay" id="modal-login-loja" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="login-loja-title">Acessar <span>Minha Loja</span></div>
+          <div class="modal-subtitle" id="login-loja-sub">Digite o WhatsApp cadastrado para receber seu código</div>
+        </div>
+        <button class="modal-close" onclick="closeLoginLoja()" aria-label="Fechar">✕</button>
+      </div>
+      <!-- Passo 1: WhatsApp -->
+      <div class="modal-body" id="login-step1">
+        <div class="field-group">
+          <label class="field-label" for="ll-wpp">WhatsApp cadastrado <span>*</span></label>
+          <input class="field-input" id="ll-wpp" type="tel" placeholder="(15) 9 9999-9999"
+            inputmode="numeric" autocomplete="tel" />
+        </div>
+        <p class="field-hint">Você receberá um código de 6 dígitos pelo WhatsApp para confirmar o acesso.</p>
+        <button class="modal-submit" style="background:linear-gradient(135deg,#25d366,#128c7e);"
+          onclick="lojaRequestCodigo()">
+          <i class="fab fa-whatsapp"></i> Receber código
         </button>
-        <button class="act-btn btn-cancel-edit" onclick="toggleEditLoja(${r.row})">
-          Cancelar
+      </div>
+      <!-- Passo 2: Código -->
+      <div class="modal-body" id="login-step2" style="display:none;">
+ 
+        <!-- Card de identidade da loja — preenchido dinamicamente -->
+        <div id="login-loja-card" style="
+          display:none;
+          position:relative;
+          border-radius:16px;
+          overflow:hidden;
+          margin-bottom:16px;
+          min-height:90px;
+        ">
+          <!-- BG foto de capa (borrada) -->
+          <div id="login-loja-bg" style="
+            position:absolute;inset:0;
+            background-size:cover;background-position:center;
+            filter:blur(10px) brightness(0.35);
+            transform:scale(1.1);
+            z-index:0;
+          "></div>
+          <!-- Fallback de cor quando não há foto -->
+          <div id="login-loja-bg-color" style="
+            position:absolute;inset:0;
+            z-index:0;
+            background:linear-gradient(135deg,rgba(99,102,241,0.25),rgba(15,15,15,0.8));
+          "></div>
+          <!-- Conteúdo -->
+          <div style="position:relative;z-index:1;display:flex;align-items:center;gap:12px;padding:14px 14px;">
+            <!-- Logo / emoji -->
+            <div id="login-loja-logo-wrap" style="
+              width:52px;height:52px;border-radius:12px;
+              background:var(--surface2);border:2px solid rgba(255,255,255,0.12);
+              display:flex;align-items:center;justify-content:center;
+              overflow:hidden;flex-shrink:0;
+            ">
+              <img id="login-loja-logo-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none;"
+                onerror="this.style.display='none';document.getElementById('login-loja-logo-emoji').style.display=''"/>
+              <span id="login-loja-logo-emoji" style="font-size:1.6rem;">🏪</span>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div id="login-loja-nome" style="font-family:var(--font-h);font-size:1rem;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+              <div id="login-loja-ramo" style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:2px;"></div>
+              <div style="margin-top:5px;">
+                <span id="login-loja-badge" style="font-family:var(--font-h);font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;background:rgba(122,122,122,0.3);color:rgba(255,255,255,0.6);">GRÁTIS</span>
+              </div>
+            </div>
+            <div style="flex-shrink:0;text-align:center;">
+              <div style="font-size:1.4rem;">🔐</div>
+            </div>
+          </div>
+        </div>
+ 
+        <div class="field-group">
+          <label class="field-label" for="ll-codigo">Código de 6 dígitos <span>*</span></label>
+          <input class="field-input" id="ll-codigo" type="text" placeholder="000000"
+            inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
+            style="font-size:1.5rem;letter-spacing:0.3em;text-align:center;"
+            oninput="if(this.value.length===6) lojaVerificarCodigo()" />
+        </div>
+        <p class="field-hint" id="login-codigo-hint">Verifique seu WhatsApp. O código expira em 10 minutos.</p>
+        <button class="modal-submit" style="background:linear-gradient(135deg,#6366f1,#4f46e5);"
+          onclick="lojaVerificarCodigo()">
+          <i class="fa fa-check"></i> Confirmar código
+        </button>
+        <button onclick="loginStep(1)" style="margin:8px auto 0;display:block;font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;">
+          ← Voltar e trocar número
         </button>
       </div>
-    </div>`;
-}
-
-function toggleEditLoja(row) {
-  const box = document.getElementById('edit-' + row);
-  if (!box) return;
-  const aberto = box.style.display !== 'none';
-  box.style.display = aberto ? 'none' : 'block';
-  if (!aberto) {
-    // Liga aviso de métricas órfãs se o nome for alterado
-    const nomeInput = document.getElementById('ef-nome-' + row);
-    const r = allRows.find(x => x.row === row);
-    const nomeOriginal = r ? (r.nome || '') : '';
-    const warn = document.getElementById('edit-warn-' + row);
-    nomeInput.oninput = () => {
-      warn.style.display = (nomeInput.value.trim() !== nomeOriginal.trim()) ? 'flex' : 'none';
+    </div>
+  </div>
+ 
+  <!-- ══════════════════════════════════════ PAINEL MINHA LOJA ══ -->
+  <div class="detail-overlay" id="modal-minha-loja" role="dialog" aria-modal="true">
+    <div class="detail-sheet" style="max-height:95vh;display:flex;flex-direction:column;">
+ 
+      <!-- ── Hero ── -->
+      <div id="ml-hero" style="position:relative;height:118px;border-radius:20px 20px 0 0;overflow:hidden;background:linear-gradient(135deg,#1a1a2e,#16213e);flex-shrink:0;">
+        <img id="ml-hero-img" src="" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;" onerror="this.style.display='none'" />
+        <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.05) 0%,rgba(0,0,0,0.75) 100%);z-index:1;"></div>
+ 
+        <!-- Handle + Sair -->
+        <div style="position:absolute;top:0;left:0;right:0;display:flex;align-items:flex-start;justify-content:space-between;padding:10px 14px;z-index:2;">
+          <div style="flex:1;"></div>
+          <div style="flex:1;display:flex;justify-content:center;padding-top:4px;">
+            <div style="width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,0.25);"></div>
+          </div>
+          <div style="flex:1;display:flex;justify-content:flex-end;">
+            <button onclick="lojaLogout()" style="font-size:11px;color:#fff;padding:5px 12px;border-radius:20px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.35);backdrop-filter:blur(6px);cursor:pointer;font-weight:600;">Sair</button>
+          </div>
+        </div>
+ 
+        <!-- Avatar + nome + status pill no hero -->
+        <div style="position:absolute;bottom:10px;left:14px;right:14px;z-index:2;">
+          <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:6px;">
+            <div id="ml-logo-wrap" style="width:48px;height:48px;border-radius:12px;background:var(--surface);border:2px solid rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;box-shadow:0 4px 14px rgba(0,0,0,0.5);">
+              <img id="ml-logo-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none;" onerror="this.style.display='none';document.getElementById('ml-emoji').style.display=''"/>
+              <span id="ml-emoji" style="font-size:1.5rem;">🏪</span>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-family:var(--font-h);font-size:1rem;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 6px rgba(0,0,0,0.7);" id="ml-nome">—</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:1px;" id="ml-ramo">—</div>
+            </div>
+            <span id="ml-plan-badge" style="font-family:var(--font-h);font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;background:rgba(122,122,122,0.4);color:rgba(255,255,255,0.7);backdrop-filter:blur(4px);flex-shrink:0;">GRÁTIS</span>
+          </div>
+          <!-- Pills de status + cliques hoje -->
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div id="ml-hero-status-pill" style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.15);backdrop-filter:blur(4px);font-size:10px;font-weight:700;color:#fff;">
+              <span id="ml-hero-status-dot" style="width:6px;height:6px;border-radius:50%;background:#555;display:inline-block;"></span>
+              <span id="ml-hero-status-txt">—</span>
+            </div>
+            <div id="ml-hero-cliques" style="display:none;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;background:rgba(0,208,132,0.2);border:1px solid rgba(0,208,132,0.3);backdrop-filter:blur(4px);font-size:10px;font-weight:700;color:#00d084;">
+              <i class="fa fa-mouse-pointer" style="font-size:8px;"></i>
+              <span id="ml-hero-cliques-num">0</span> hoje
+            </div>
+          </div>
+        </div>
+      </div>
+ 
+      <!-- ── Abas ── -->
+      <div id="ml-tabs" style="display:flex;gap:0;padding:0 16px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;">
+        <button class="ml-tab-btn ml-tab-active" data-tab="hoje" onclick="mlSwitchTab('hoje')" style="flex:1;padding:11px 4px;font-size:12px;font-weight:700;color:var(--red);background:none;border:none;border-bottom:2px solid var(--red);cursor:pointer;font-family:var(--font-b);-webkit-tap-highlight-color:transparent;">
+          <i class="fa fa-bolt" style="font-size:10px;margin-right:3px;"></i>Hoje
+        </button>
+        <button class="ml-tab-btn" data-tab="loja" onclick="mlSwitchTab('loja')" style="flex:1;padding:11px 4px;font-size:12px;font-weight:700;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:var(--font-b);-webkit-tap-highlight-color:transparent;">
+          <i class="fa fa-store" style="font-size:10px;margin-right:3px;"></i>Loja
+        </button>
+        <button class="ml-tab-btn" data-tab="metricas" onclick="mlSwitchTab('metricas')" style="flex:1;padding:11px 4px;font-size:12px;font-weight:700;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:var(--font-b);-webkit-tap-highlight-color:transparent;">
+          <i class="fa fa-chart-bar" style="font-size:10px;margin-right:3px;"></i>Métricas
+          <span id="ml-tab-badge-metricas" style="display:none;margin-left:3px;padding:1px 5px;border-radius:8px;background:var(--green);color:#000;font-size:9px;font-weight:800;"></span>
+        </button>
+      </div>
+ 
+      <!-- ── Conteúdo rolável das abas ── -->
+      <div style="flex:1;overflow-y:auto;scrollbar-width:none;">
+        <div style="padding:14px 16px 20px;">
+ 
+          <!-- ░░ ABA HOJE ░░ -->
+          <div id="ml-tab-hoje" class="ml-tab-content">
+ 
+            <!-- Status -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Status agora</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+                <button class="toggle-status-btn" data-status="ABERTO" style="padding:11px 4px;border-radius:10px;font-size:11px;font-weight:700;border:2px solid rgba(0,208,132,0.3);background:rgba(0,208,132,0.08);color:var(--green);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .15s;" onclick="lojaToggleComHorario('ABERTO')">
+                  <i class="fa fa-circle" style="font-size:7px;display:block;margin-bottom:3px;"></i>Aberto
+                </button>
+                <button class="toggle-status-btn" data-status="VOLTAMOS" style="padding:11px 4px;border-radius:10px;font-size:11px;font-weight:700;border:2px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.08);color:var(--zap);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .15s;" onclick="lojaToggleComHorario('VOLTAMOS')">
+                  <i class="fa fa-clock" style="font-size:7px;display:block;margin-bottom:3px;"></i>Já voltamos
+                </button>
+                <button class="toggle-status-btn" data-status="FECHADO" style="padding:11px 4px;border-radius:10px;font-size:11px;font-weight:700;border:2px solid rgba(255,68,68,0.3);background:rgba(255,68,68,0.08);color:var(--red);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .15s;" onclick="lojaToggleFechado()">
+                  <i class="fa fa-ban" style="font-size:7px;display:block;margin-bottom:3px;"></i>Fechado
+                </button>
+              </div>
+              <p style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center;">Sobrepõe o horário automático temporariamente</p>
+              <div id="ml-toggle-erro" style="font-size:11px;color:var(--red);text-align:center;min-height:14px;margin-top:2px;"></div>
+              <div id="ml-aberto-ate-wrap" style="display:none;margin-top:10px;padding:10px;background:rgba(0,208,132,0.06);border:1px solid rgba(0,208,132,0.2);border-radius:10px;">
+                <div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:8px;">⏱ Aberto até que horas? <span style="font-size:10px;color:var(--muted);font-weight:400;">(opcional)</span></div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <input type="time" id="ml-aberto-ate-time" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;color:var(--text);font-family:var(--font-h);">
+                  <button onclick="lojaToggleAberto()" style="padding:8px 14px;border-radius:8px;background:var(--green);color:#000;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;">Confirmar</button>
+                  <button onclick="lojaToggle('ABERTO')" style="padding:8px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;">Horário normal</button>
+                </div>
+              </div>
+              <div id="ml-voltamos-ate-wrap" style="display:none;margin-top:10px;padding:10px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.25);border-radius:10px;">
+                <div style="font-size:11px;color:var(--zap);font-weight:700;margin-bottom:8px;">⏰ Volta em quanto tempo? <span style="font-size:10px;color:var(--muted);font-weight:400;">(opcional)</span></div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+                  <button onclick="lojaToggleVoltamos(30)"  style="padding:6px 10px;border-radius:7px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:var(--zap);font-size:11px;font-weight:700;cursor:pointer;">30 min</button>
+                  <button onclick="lojaToggleVoltamos(60)"  style="padding:6px 10px;border-radius:7px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:var(--zap);font-size:11px;font-weight:700;cursor:pointer;">1 hora</button>
+                  <button onclick="lojaToggleVoltamos(120)" style="padding:6px 10px;border-radius:7px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:var(--zap);font-size:11px;font-weight:700;cursor:pointer;">2 horas</button>
+                  <button onclick="lojaToggleVoltamos(0)"   style="padding:6px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;">Sem previsão</button>
+                </div>
+              </div>
+            </div>
+ 
+            <!-- Anúncio do dia -->
+            <div id="ml-anuncio-section" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">
+                  📣 Anúncio do dia
+                  <span id="ml-anuncio-plano-badge" style="font-size:9px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PLUS</span>
+                </div>
+                <span id="ml-anuncio-timer" style="font-size:10px;color:var(--muted);"></span>
+              </div>
+              <div id="ml-anuncio-ativo" style="display:none;background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(245,158,11,0.03));border:1px solid rgba(245,158,11,0.25);border-left:3px solid var(--zap);border-radius:10px;padding:10px;margin-bottom:10px;">
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                  <div style="font-size:1.4rem;flex-shrink:0;" id="ml-anuncio-emoji-preview">🎯</div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:12px;font-weight:700;color:var(--text);" id="ml-anuncio-texto-preview">—</div>
+                    <div style="font-size:10px;color:var(--muted);margin-top:3px;" id="ml-anuncio-validade-preview"></div>
+                    <img id="ml-anuncio-img-preview" src="" alt="Imagem do anúncio" style="display:none;width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:8px;" />
+                  </div>
+                  <button onclick="mlRemoverAnuncio()" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:6px;border:1px solid rgba(255,68,68,0.3);flex-shrink:0;">Remover</button>
+                </div>
+              </div>
+              <div id="ml-anuncio-form" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:8px;" id="ml-anuncio-desc">Oferta ou aviso que aparece no card da sua loja por 24h</div>
+                <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;" id="ml-anuncio-emojis">
+                  <button class="anuncio-emoji-btn active" data-emoji="🎯" onclick="mlSelectEmoji(this)">🎯</button>
+                  <button class="anuncio-emoji-btn" data-emoji="🔥" onclick="mlSelectEmoji(this)">🔥</button>
+                  <button class="anuncio-emoji-btn" data-emoji="💥" onclick="mlSelectEmoji(this)">💥</button>
+                  <button class="anuncio-emoji-btn" data-emoji="🏷️" onclick="mlSelectEmoji(this)">🏷️</button>
+                  <button class="anuncio-emoji-btn" data-emoji="⚡" onclick="mlSelectEmoji(this)">⚡</button>
+                  <button class="anuncio-emoji-btn" data-emoji="🎁" onclick="mlSelectEmoji(this)">🎁</button>
+                  <button class="anuncio-emoji-btn" data-emoji="✂️" onclick="mlSelectEmoji(this)">✂️</button>
+                  <button class="anuncio-emoji-btn" data-emoji="🚗" onclick="mlSelectEmoji(this)">🚗</button>
+                </div>
+                <!-- Templates de 1 toque -->
+                <div style="margin-bottom:8px;">
+                  <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">Sugestões rápidas</div>
+                  <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                    <button onclick="mlAplicarTemplate(this)" data-tpl="🏷️ Promoção especial hoje!" style="padding:4px 9px;border-radius:6px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);color:var(--zap);font-size:10px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;">Promoção hoje</button>
+                    <button onclick="mlAplicarTemplate(this)" data-tpl="🚗 Fazemos entrega! Chame no WhatsApp." style="padding:4px 9px;border-radius:6px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);color:var(--zap);font-size:10px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;">Delivery disponível</button>
+                    <button onclick="mlAplicarTemplate(this)" data-tpl="🔥 Só hoje! Aproveite antes que acabe." style="padding:4px 9px;border-radius:6px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);color:var(--zap);font-size:10px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;">Só hoje</button>
+                    <button onclick="mlAplicarTemplate(this)" data-tpl="🎁 Brinde na compra acima de R$ 50!" style="padding:4px 9px;border-radius:6px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);color:var(--zap);font-size:10px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;">Brinde na compra</button>
+                  </div>
+                </div>
+                <textarea id="ml-anuncio-texto" maxlength="80" rows="2" placeholder="Ex: Hoje 10% off em troca de óleo! Venha nos visitar." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;font-family:var(--font-b);line-height:1.5;"></textarea>
+                <div id="ml-anuncio-img-section" style="display:none;margin-top:8px;">
+                  <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">📷 Foto do anúncio <span style="opacity:.6;">(opcional)</span></div>
+                  <label id="ml-anuncio-img-label" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px;cursor:pointer;">
+                    <i class="fa fa-image" style="color:var(--muted);font-size:14px;"></i>
+                    <span id="ml-anuncio-img-label-txt" style="font-size:11px;color:var(--muted);">Toque para escolher uma foto</span>
+                    <input type="file" id="ml-anuncio-img-input" accept="image/*" style="display:none;" onchange="mlAnuncioPreviewImagem(this)" />
+                  </label>
+                  <img id="ml-anuncio-img-nova" src="" alt="" style="display:none;width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-top:8px;border:1px solid var(--border);" />
+                  <button id="ml-anuncio-img-remover" onclick="mlAnuncioRemoverImagem()" style="display:none;font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;margin-top:4px;padding:0;">✕ Remover foto</button>
+                  <div id="ml-anuncio-img-status" style="font-size:10px;margin-top:4px;"></div>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
+                  <span id="ml-anuncio-chars" style="font-size:10px;color:var(--muted);">0/80</span>
+                  <button onclick="mlPublicarAnuncio()" id="ml-anuncio-btn" style="padding:8px 16px;border-radius:8px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                    <i class="fa fa-bullhorn"></i> Publicar
+                  </button>
+                </div>
+              </div>
+            </div>
+ 
+            <!-- CTA upgrade contextual -->
+            <div id="ml-upgrade-cta" style="display:none;border:1px solid rgba(245,158,11,0.3);border-radius:16px;padding:14px;text-align:center;margin-bottom:4px;background:linear-gradient(135deg,rgba(28,26,20,0.8),rgba(37,33,15,0.8));">
+              <div style="font-family:var(--font-h);font-size:.9rem;font-weight:800;color:var(--zap);margin-bottom:4px;">⭐ Quer mais visibilidade?</div>
+              <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Lojas Pro aparecem no topo, têm foto de capa, cardápio e muito mais.</div>
+              <a id="ml-upgrade-link" href="#" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:.85rem;font-weight:700;padding:10px 18px;border-radius:10px;text-decoration:none;">
+                <i class="fab fa-whatsapp"></i> Quero o Plano Pro
+              </a>
+            </div>
+ 
+          </div><!-- /aba hoje -->
+ 
+          <!-- ░░ ABA LOJA ░░ -->
+          <div id="ml-tab-loja" class="ml-tab-content" style="display:none;">
+ 
+            <!-- Cardápio -->
+            <div id="ml-cardapio-section" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">
+                  🍽️ Cardápio / Serviços
+                  <span id="ml-cardapio-badge" style="font-size:9px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PRO</span>
+                </div>
+                <button onclick="mlCardapioAbrirForm()" id="ml-cardapio-add-btn" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:7px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-family:var(--font-h);font-size:10px;font-weight:800;border:none;cursor:pointer;">
+                  <i class="fa fa-plus"></i> Adicionar
+                </button>
+              </div>
+              <div id="ml-cardapio-lista" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
+              <div id="ml-cardapio-limite" style="font-size:10px;color:var(--muted);text-align:center;"></div>
+              <div id="ml-cardapio-form" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px;">
+                <div style="font-family:var(--font-h);font-size:12px;font-weight:800;margin-bottom:10px;" id="ml-cardapio-form-title">Novo item</div>
+                <div id="ml-cardapio-foto-wrap" style="margin-bottom:10px;">
+                  <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Foto <span style="font-size:9px;opacity:0.6;">(Pro)</span></div>
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <div id="ml-cardapio-foto-preview" style="width:52px;height:52px;border-radius:10px;background:var(--surface2);border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+                      <i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>
+                    </div>
+                    <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);font-size:11px;font-weight:700;cursor:pointer;color:var(--text);">
+                      <i class="fa fa-upload" style="font-size:10px;"></i> Escolher foto
+                      <input type="file" accept="image/*" id="ml-cardapio-foto-file" style="display:none;" onchange="mlCardapioFotoPreview(this)">
+                    </label>
+                  </div>
+                </div>
+                <input type="hidden" id="ml-cardapio-edit-id" value="">
+                <input type="hidden" id="ml-cardapio-foto-url" value="">
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                  <div>
+                    <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Nome *</div>
+                    <input id="ml-cardapio-nome" type="text" maxlength="60" placeholder="Ex: X-Burguer, Tatuagem 15cm..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Descrição <span style="opacity:0.5;">(opcional)</span></div>
+                    <input id="ml-cardapio-desc" type="text" maxlength="80" placeholder="Breve descrição..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                  </div>
+                  <div>
+                    <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Preço <span style="opacity:0.5;">(opcional)</span></div>
+                    <input id="ml-cardapio-preco" type="text" maxlength="20" placeholder="Ex: R$ 15,00 ou Consulte" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                  </div>
+                  <div id="ml-cardapio-cat-wrap">
+                    <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Categoria <span style="opacity:0.5;">(opcional)</span></div>
+                    <input id="ml-cardapio-cat" type="text" maxlength="40" placeholder="Ex: Lanches, Bebidas..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                  </div>
+                  <!-- Fix #1: checkbox de destaque (faltava no HTML — feature Pro estava silenciosamente quebrada) -->
+                  <label id="ml-cardapio-destaque-wrap" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 2px;">
+                    <input type="checkbox" id="ml-cardapio-destaque" style="width:16px;height:16px;accent-color:#f59e0b;cursor:pointer;">
+                    <span style="font-size:12px;font-weight:700;color:var(--text);">⭐ Item em destaque</span>
+                    <span style="font-size:10px;color:var(--muted);">(aparece no topo do cardápio)</span>
+                  </label>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                  <button onclick="mlCardapioFecharForm()" style="flex:1;padding:10px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;">Cancelar</button>
+                  <button onclick="mlCardapioSalvar(false)" id="ml-cardapio-salvar-btn" style="flex:2;padding:10px;border-radius:8px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;">
+                    <i class="fa fa-check"></i> Salvar item
+                  </button>
+                </div>
+                <button onclick="mlCardapioSalvar(true)" id="ml-cardapio-proximo-btn" style="width:100%;margin-top:6px;padding:9px;border-radius:8px;background:rgba(16,185,129,0.08);border:1px dashed rgba(16,185,129,0.4);color:#10b981;font-family:var(--font-h);font-size:11px;font-weight:700;cursor:pointer;">
+                  <i class="fa fa-plus"></i> Salvar e adicionar próximo
+                </button>
+                <div id="ml-cardapio-form-msg" style="font-size:11px;text-align:center;margin-top:8px;min-height:14px;"></div>
+              </div>
+            </div>
+ 
+            <!-- Instagram -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">📱 Instagram da loja</div>
+              <div id="ml-instagram-wrap"></div>
+              <p style="font-size:10px;color:var(--muted);margin:8px 0 0;line-height:1.5;">Aparece como botão no perfil da sua loja no app.</p>
+            </div>
+ 
+            <!-- Entrega -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">🛵 Entrega</div>
+              <div id="ml-entrega-wrap"></div>
+              <p style="font-size:10px;color:var(--muted);margin:8px 0 0;line-height:1.5;">Quando ativado, o cliente poderá informar endereço e pagamento no pedido.</p>
+            </div>
+ 
+            <!-- Configurações -->
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">⚙️ Configurações da loja</div>
+              <div id="ml-upload-section" style="display:none;margin-bottom:12px;">
+                <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:8px;">📸 Imagens</div>
+                <div style="font-size:10px;color:var(--muted);margin-bottom:8px;">Veja como sua loja vai aparecer no app. Toque nas imagens para trocar.</div>
+                <div style="border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--surface);position:relative;margin-bottom:8px;">
+                  <div id="ml-up-capa-wrap" style="width:100%;height:130px;background:var(--surface2);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;touch-action:none;cursor:default;">
+                    <i id="ml-up-capa-placeholder" class="fa fa-image" style="font-size:2rem;color:var(--border);pointer-events:none;"></i>
+                    <img id="ml-up-foto-preview" src="" alt="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 50%;user-select:none;-webkit-user-select:none;pointer-events:none;"/>
+                    <div id="ml-up-capa-drag-hint" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:#fff;font-size:9px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;backdrop-filter:blur(4px);pointer-events:none;">✥ Arraste para reposicionar</div>
+                    <label for="ml-up-foto-file" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:5px 9px;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:#fff;backdrop-filter:blur(6px);z-index:2;">
+                      <i class="fa fa-camera"></i> Trocar capa
+                    </label>
+                    <input type="file" accept="image/*" id="ml-up-foto-file" style="display:none;" onchange="mlUploadImagem('foto',this)">
+                  </div>
+                  <div style="padding:10px 12px 12px;display:flex;align-items:center;gap:10px;">
+                    <div style="position:relative;flex-shrink:0;">
+                      <div id="ml-up-logo-preview" style="width:44px;height:44px;border-radius:10px;background:#fff;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                        <i class="fa fa-store" style="color:var(--border);font-size:1.1rem;"></i>
+                      </div>
+                      <label for="ml-up-logo-file" style="position:absolute;inset:0;cursor:pointer;border-radius:10px;background:rgba(0,0,0,0);" title="Trocar logo"></label>
+                      <input type="file" accept="image/*" id="ml-up-logo-file" style="display:none;" onchange="mlUploadImagem('logo',this)">
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                      <div id="ml-up-nome-preview" style="font-family:var(--font-h);font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+                      <div id="ml-up-ramo-preview" style="font-size:11px;color:var(--muted);margin-top:2px;">—</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:center;gap:16px;padding:8px 12px;border-top:1px solid var(--border);background:var(--surface2);">
+                    <label for="ml-up-logo-file" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text);">
+                      <i class="fa fa-camera" style="font-size:10px;color:var(--muted);"></i> Trocar logo
+                    </label>
+                    <div id="ml-up-logo-status" style="font-size:9px;color:var(--muted);min-height:12px;"></div>
+                    <div id="ml-up-foto-status" style="font-size:9px;color:var(--muted);min-height:12px;"></div>
+                  </div>
+                </div>
+                <div style="font-size:9px;color:var(--muted);text-align:center;line-height:1.5;">
+                  Máx 5MB · JPG, PNG ou WebP<br>
+                  <span style="color:rgba(99,102,241,0.8);">💡 Para a logo ficar sem fundo branco, use PNG com fundo transparente</span>
+                </div>
+              </div>
+              <div id="ml-share-section" style="display:none;">
+                <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:8px;">🔗 Compartilhar minha loja</div>
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 9px;font-size:10px;color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" id="ml-share-url">—</div>
+                    <button onclick="mlCopiarLink()" style="flex-shrink:0;padding:7px 10px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;" id="ml-copy-btn">
+                      <i class="fa fa-copy"></i> Copiar
+                    </button>
+                  </div>
+                  <div style="display:flex;gap:8px;">
+                    <a id="ml-share-wpp" href="#" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.2);color:#25d366;font-size:11px;font-weight:700;text-decoration:none;">
+                      <i class="fab fa-whatsapp"></i> WhatsApp
+                    </a>
+                    <a id="ml-share-ig" href="#" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:rgba(225,48,108,0.08);border:1px solid rgba(225,48,108,0.2);color:#e1306c;font-size:11px;font-weight:700;text-decoration:none;">
+                      <i class="fab fa-instagram"></i> Instagram
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+ 
+          </div><!-- /aba loja -->
+ 
+          <!-- ░░ ABA MÉTRICAS ░░ -->
+          <div id="ml-tab-metricas" class="ml-tab-content" style="display:none;">
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">📊 Cliques na sua loja</div>
+              <div id="ml-metricas-wrap" style="position:relative;">
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.3rem;font-weight:800;" id="ml-m-7d">—</div>
+                    <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px;">7 dias</div>
+                  </div>
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.3rem;font-weight:800;" id="ml-m-30d">—</div>
+                    <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px;">30 dias</div>
+                  </div>
+                  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.3rem;font-weight:800;" id="ml-m-total">—</div>
+                    <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px;">Total</div>
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;">
+                  <div style="flex:1;background:rgba(37,211,102,0.08);border:1px solid rgba(37,211,102,0.2);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:#25d366;" id="ml-m-wpp">—</div>
+                    <div style="font-size:9px;color:#25d366;margin-top:2px;">WhatsApp</div>
+                  </div>
+                  <div style="flex:1;background:rgba(66,133,244,0.08);border:1px solid rgba(66,133,244,0.2);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:var(--blue);" id="ml-m-tel">—</div>
+                    <div style="font-size:9px;color:var(--blue);margin-top:2px;">Telefone</div>
+                  </div>
+                  <div style="flex:1;background:rgba(225,48,108,0.08);border:1px solid rgba(225,48,108,0.2);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:#e1306c;" id="ml-m-ig">—</div>
+                    <div style="font-size:9px;color:#e1306c;margin-top:2px;">Instagram</div>
+                  </div>
+                </div>
+ 
+                <!-- Visibilidade: quantas pessoas viram a loja/cardápio -->
+                <div id="ml-visibilidade-row" style="display:none;gap:8px;margin-top:8px;">
+                  <div style="flex:1;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:#f59e0b;" id="ml-m-views">—</div>
+                    <div style="font-size:9px;color:#f59e0b;margin-top:2px;">👁️ Visualizações</div>
+                  </div>
+                  <div style="flex:1;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:#8b5cf6;" id="ml-m-menu">—</div>
+                    <div style="font-size:9px;color:#8b5cf6;margin-top:2px;">📖 Abriram cardápio</div>
+                  </div>
+                </div>
+ 
+                <!-- Crescimento semanal: variação vs. semana anterior -->
+                <div id="ml-crescimento-box" style="display:none;margin-top:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 12px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                    <div>
+                      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">Cliques esta semana</div>
+                      <div style="font-family:var(--font-h);font-size:1.2rem;font-weight:800;margin-top:1px;" id="ml-cresc-atual">—</div>
+                    </div>
+                    <div id="ml-cresc-badge" style="font-family:var(--font-h);font-size:.85rem;font-weight:800;padding:5px 10px;border-radius:8px;white-space:nowrap;">—</div>
+                  </div>
+                  <div id="ml-cresc-msg" style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.4;"></div>
+                </div>
+ 
+                <!-- Taxa de conversão: views → cliques de contato -->
+                <div id="ml-taxaconv-box" style="display:none;margin-top:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 12px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                    <div>
+                      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">Taxa de conversão</div>
+                      <div style="font-size:10px;color:var(--muted);margin-top:1px;">de quem vê, quantos chamam</div>
+                    </div>
+                    <div id="ml-taxaconv-val" style="font-family:var(--font-h);font-size:1.4rem;font-weight:800;color:#f59e0b;white-space:nowrap;">—</div>
+                  </div>
+                  <div id="ml-taxaconv-msg" style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.4;"></div>
+                </div>
+ 
+                <!-- Conversão por canal: barra de proporção wpp/tel/ig -->
+                <div id="ml-conversao-box" style="display:none;margin-top:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 12px;">
+                  <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Como te contatam</div>
+                  <div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--surface2);">
+                    <div id="ml-conv-wpp" style="width:0%;background:#25d366;transition:width .4s;"></div>
+                    <div id="ml-conv-tel" style="width:0%;background:var(--blue);transition:width .4s;"></div>
+                    <div id="ml-conv-ig"  style="width:0%;background:#e1306c;transition:width .4s;"></div>
+                  </div>
+                  <div id="ml-conv-legenda" style="font-size:10px;color:var(--muted);margin-top:7px;line-height:1.4;"></div>
+                </div>
+ 
+                <div id="ml-metricas-lock" style="display:none;position:absolute;inset:0;z-index:10;border-radius:10px;overflow:hidden;">
+                  <div style="position:absolute;inset:0;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);background:rgba(13,13,13,0.55);"></div>
+                  <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:12px;text-align:center;">
+                    <div style="font-size:1.5rem;margin-bottom:6px;">🔒</div>
+                    <div style="font-size:12px;font-weight:800;color:#fff;margin-bottom:3px;">Métricas detalhadas</div>
+                    <div style="font-size:10px;color:rgba(255,255,255,0.55);line-height:1.5;margin-bottom:10px;">
+                      Disponível nos planos <strong style="color:#a5b4fc;">Plus</strong> e <strong style="color:#f59e0b;">Pro</strong>.<br>
+                      Você já tem <span id="ml-lock-total" style="color:#fff;font-weight:800;">N</span> cliques registrados!
+                    </div>
+                    <a id="ml-lock-upgrade-link" href="#" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:11px;font-weight:800;padding:7px 14px;border-radius:8px;text-decoration:none;">⭐ Ver planos</a>
+                  </div>
+                </div>
+              </div>
+              <div id="ml-pico-section" style="display:none;margin-top:12px;">
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">
+                  Horário de pico <span style="font-size:9px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PRO</span>
+                </div>
+                <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;">
+                  <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">Cliques por hora do dia · últimos 30 dias</div>
+                  <canvas id="ml-pico-chart" height="80" style="width:100%;display:block;"></canvas>
+                  <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;color:var(--muted);">
+                    <span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span>
+                  </div>
+                  <div id="ml-pico-destaque" style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center;"></div>
+                </div>
+              </div>
+            </div>
+          </div><!-- /aba metricas -->
+ 
+        </div>
+      </div><!-- /scroll area -->
+    </div>
+  </div>
+ 
+  <!-- ══════════════════════════════ MODAL CARDÁPIO CLIENTE -->
+  <div class="detail-overlay" id="modal-cardapio-cliente" role="dialog" aria-modal="true" style="z-index:1100;">
+    <div class="detail-sheet" style="max-height:92vh;display:flex;flex-direction:column;">
+ 
+      <!-- Header fixo -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;flex-shrink:0;">
+        <div>
+          <div style="font-family:var(--font-h);font-size:1rem;font-weight:800;" id="cc-loja-nome">Cardápio</div>
+          <div style="font-size:11px;color:var(--muted);" id="cc-loja-sub"></div>
+        </div>
+        <button onclick="fecharCardapioCliente()" style="
+          font-size:14px;color:var(--muted);background:var(--surface2);
+          border:1px solid var(--border);border-radius:10px;
+          width:38px;height:38px;cursor:pointer;
+          display:flex;align-items:center;justify-content:center;
+          transition:background 0.15s,transform 0.1s;
+          -webkit-tap-highlight-color:transparent;"
+          onpointerdown="this.style.transform='scale(0.9)'"
+          onpointerup="this.style.transform=''"
+          onpointercancel="this.style.transform=''">✕</button>
+      </div>
+ 
+      <!-- Sticky category tabs — preenchido via JS -->
+      <div class="cc-sticky-tabs" id="cc-cat-tabs" style="display:none;"></div>
+ 
+      <!-- Lista de itens por categoria -->
+      <div style="overflow-y:auto;flex:1;padding:8px 16px 14px;" id="cc-itens-wrap"></div>
+ 
+      <!-- Carrinho flutuante dentro do modal -->
+      <div id="cc-carrinho-bar" style="display:none;padding:12px 16px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-family:var(--font-h);font-size:13px;font-weight:800;">🛒 Seu pedido</div>
+          <button onclick="ccLimparCarrinho()" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;">Limpar</button>
+        </div>
+        <div id="cc-carrinho-itens" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;max-height:140px;overflow-y:auto;"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span style="font-size:12px;color:var(--muted);">Total</span>
+          <span style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:var(--green);" id="cc-total">R$ 0,00</span>
+        </div>
+        <!-- Entrega (visível apenas quando loja.fazEntrega = true) -->
+        <div id="cc-entrega-section" style="display:none;margin-bottom:10px;background:var(--surface2);border:1px solid rgba(251,146,60,0.3);border-radius:12px;padding:12px;">
+          <div style="font-size:10px;font-weight:700;color:#fb923c;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">🛵 Dados da entrega</div>
+          <input type="text" id="cc-entrega-endereco" placeholder="📍 Endereço completo (rua, nº, bairro)"
+            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 10px;color:var(--text);font-size:12px;font-family:var(--font-b);box-sizing:border-box;outline:none;margin-bottom:8px;">
+          <select id="cc-entrega-pagamento"
+            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 10px;color:var(--text);font-size:12px;font-family:var(--font-b);box-sizing:border-box;outline:none;-webkit-appearance:none;appearance:none;">
+            <option value="">💳 Forma de pagamento…</option>
+            <option value="Dinheiro">💵 Dinheiro</option>
+            <option value="PIX">📲 PIX</option>
+            <option value="Cartão de débito">💳 Cartão de débito</option>
+            <option value="Cartão de crédito">💳 Cartão de crédito</option>
+            <option value="Vale-refeição">🍽️ Vale-refeição</option>
+            <option value="Vale-alimentação">🛒 Vale-alimentação</option>
+          </select>
+        </div>
+        <textarea id="cc-obs-input" placeholder="📝 Alguma observação? (ex: sem cebola, ponto da carne...)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:12px;font-family:var(--font-b);resize:none;height:56px;margin-bottom:10px;box-sizing:border-box;outline:none;"></textarea>
+        <button onclick="ccFinalizarPedido()" style="width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;font-family:var(--font-h);font-size:14px;font-weight:800;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <i class="fab fa-whatsapp"></i> Enviar pedido pelo WhatsApp
+        </button>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- ══════════════════════════════ BOTTOM NAV -->
+  <nav class="bottom-nav" id="bottom-nav">
+    <button class="nav-item active" id="nav-inicio"><i class="fa fa-house"></i><span>Início</span></button>
+    <button class="nav-item" id="nav-buscar"><i class="fa fa-search"></i><span>Buscar</span></button>
+    <button class="nav-item nav-item--loja" id="nav-loja"><i class="fa fa-store"></i><span>Minha Loja</span></button>
+    <button class="nav-item nav-item--cadastrar" id="nav-cadastrar"><i class="fa fa-plus-circle"></i><span>Cadastrar</span></button>
+  </nav>
+ 
+  <!-- ══════════════════════════════ UPDATE BANNER -->
+  <div id="sw-update-banner" style="
+    display:none;position:fixed;bottom:72px;left:12px;right:12px;z-index:9999;
+    background:linear-gradient(135deg,#1e1b4b,#312e81);
+    border:1px solid rgba(99,102,241,0.4);border-radius:16px;
+    padding:12px 14px;box-shadow:0 8px 32px rgba(0,0,0,0.5);
+    display:none;align-items:center;gap:10px;
+    animation: slideUpBanner 0.35s cubic-bezier(0.32,0.72,0,1) forwards;">
+    <div style="font-size:1.4rem;flex-shrink:0;">🚀</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-family:var(--font-h);font-size:13px;font-weight:800;color:#fff;">Nova versão disponível!</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:1px;">Clique para atualizar agora</div>
+    </div>
+    <button id="sw-update-btn" style="
+      padding:8px 14px;border-radius:9px;
+      background:linear-gradient(135deg,#6366f1,#4f46e5);
+      color:#fff;font-family:var(--font-h);font-size:12px;font-weight:800;
+      border:none;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+      Atualizar
+    </button>
+    <button onclick="document.getElementById('sw-update-banner').style.display='none'" style="
+      background:none;border:none;color:rgba(255,255,255,0.4);
+      font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;">✕</button>
+  </div>
+ 
+  <!-- ══════════════════════════════ INSTALL BANNER (PWA) -->
+  <div id="pwa-install-banner" style="
+    display:none;position:fixed;bottom:72px;left:12px;right:12px;z-index:9998;
+    background:linear-gradient(135deg,#1a1a1a,#262626);
+    border:1px solid rgba(255,68,68,0.35);border-radius:16px;
+    padding:12px 14px;box-shadow:0 8px 32px rgba(0,0,0,0.5);
+    align-items:center;gap:10px;
+    animation: slideUpBanner 0.35s cubic-bezier(0.32,0.72,0,1) forwards;">
+    <img src="/icons/icon-192.png" alt="" style="width:38px;height:38px;border-radius:10px;flex-shrink:0;object-fit:cover;" />
+    <div style="flex:1;min-width:0;">
+      <div style="font-family:var(--font-h);font-size:13px;font-weight:800;color:#fff;">Instalar AngatubaON</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:1px;">Acesso rápido direto da tela inicial</div>
+    </div>
+    <button id="pwa-install-btn" style="
+      padding:8px 14px;border-radius:9px;
+      background:linear-gradient(135deg,#ff4444,#cc2222);
+      color:#fff;font-family:var(--font-h);font-size:12px;font-weight:800;
+      border:none;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+      Instalar
+    </button>
+    <button id="pwa-install-dismiss" style="
+      background:none;border:none;color:rgba(255,255,255,0.4);
+      font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;">✕</button>
+  </div>
+ 
+  <style>
+    @keyframes slideUpBanner {
+      from { opacity:0; transform:translateY(20px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+  </style>
+ 
+  <script src="/app.js"></script>
+  <script>
+    /* ── Empty state: limpar filtros ── */
+    window.limparFiltros = function() {
+      const searchEl = document.getElementById('main-search');
+      if (searchEl) searchEl.value = '';
+      document.querySelectorAll('.cat-icon').forEach(i => i.classList.remove('active'));
+      const todosBtn = document.querySelector('[data-cat="todos"] .cat-icon');
+      if (todosBtn) todosBtn.classList.add('active');
+      document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+      if (searchEl) searchEl.dispatchEvent(new Event('input', { bubbles: true }));
     };
-  }
-}
-
-async function saveEditLoja(row) {
-  const get = id => (document.getElementById(id + '-' + row).value || '').trim();
-  const r = allRows.find(x => x.row === row);
-  const wppAtual = r ? (r.wpp || '') : '';
-
-  const dados = {
-    nome:     get('ef-nome'),
-    ramo:     get('ef-ramo'),
-    endereco: get('ef-endereco'),
-    wpp:      get('ef-wpp'),
-    tel:      get('ef-tel'),
-    horario:  get('ef-horario'),
-    obs:      get('ef-obs'),
-  };
-  if (!dados.nome) { toast('⚠️ Nome não pode ficar vazio', true); return; }
-
-  const btn = document.querySelector(`#edit-${row} .btn-save-edit`);
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...'; }
-
-  try {
-    await postAction({
-      action:   'updateLoja',
-      token:    _sessionToken,
-      row:      row,
-      wppAtual: wppAtual,
-      ...dados,
-    });
-
-    // Atualiza estado local após confirmação do servidor
-    if (r) {
-      r.nome = dados.nome; r.ramo = dados.ramo; r.endereco = dados.endereco;
-      let w = dados.wpp.replace(/\D/g, ''); if (w && !w.startsWith('55')) w = '55' + w;
-      r.wpp = w; r.tel = dados.tel.replace(/\D/g, '');
-      r.horario = dados.horario; r.obs = dados.obs;
-    }
-    toast('✅ Loja atualizada');
-    renderAll();
-  } catch(e) {
-    toast('❌ Erro ao salvar: ' + e.message, true);
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-save"></i> Salvar alterações'; }
-  }
-}
-
-/* ── Card de gestão de plano ─────────────────────────────── */
-function planCardHTML(r) {
-  const plano    = r.plano || 'GRATIS';
-  const validade = r.planoValidade || '';
-
-  const planColor = { PRO:'var(--zap)', PLUS:'var(--indigo)', GRATIS:'var(--muted)' };
-  const cor = planColor[plano] || 'var(--muted)';
-
-  // Calcula qual botão rápido está ativo baseado na validade atual
-  const isoVal = isoDate(validade);
-
-  return `
-    <div class="admin-card aprovado" id="plan-card-${r.row}" data-nome="${escAttr(r.nome)}">
-      <div class="card-top">
-        <div>
-          <div class="card-name">${escHtml(r.nome)}</div>
-          <div class="card-ramo">${escHtml(r.ramo)} · linha ${r.row}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-family:var(--font-h);font-size:11px;font-weight:800;color:${cor};">${escHtml(plano)}</span>
-          <button class="btn-delete-loja" onclick="deleteLoja(${r.row}, '${escAttr(r.nome)}')">
-            <i class="fa fa-trash"></i>
-          </button>
-        </div>
-      </div>
-      <div class="plan-manager-row">
-        <select class="plan-select" id="ps-${r.row}">
-          <option value="GRATIS" ${plano==='GRATIS'?'selected':''}>🏪 Grátis</option>
-          <option value="PLUS"   ${plano==='PLUS'  ?'selected':''}>✦ Plus</option>
-          <option value="PRO"    ${plano==='PRO'   ?'selected':''}>⭐ Pro</option>
-        </select>
-        <input type="hidden" id="pd-${r.row}" value="${isoVal}" />
-        <button class="act-btn btn-save-plan" onclick="savePlan(${r.row})">
-          <i class="fa fa-save"></i> Salvar
-        </button>
-      </div>
-      <div class="plan-quick-dates" id="pq-${r.row}">
-        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 7, this)">1 semana</button>
-        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 14, this)">2 semanas</button>
-        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 30, this)">1 mês</button>
-        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 90, this)">3 meses</button>
-        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 365, this)">1 ano</button>
-        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 0, this)">Vitalício</button>
-        ${isoVal ? `<span style="font-size:10px;color:var(--muted);align-self:center;">até ${escHtml(validade)}</span>` : ''}
-      </div>
-    </div>`;
-}
-
-/* ══ POST COM CONFIRMAÇÃO REAL ════════════════════════════════
-   Substitui o antigo padrão no-cors (que "assumia sucesso" às cegas).
-   Como o body é URLSearchParams (form-urlencoded = simple request),
-   não há preflight CORS e conseguimos LER a resposta JSON do Apps Script
-   — exatamente como o login já fazia. Lança erro se o servidor recusar. */
-async function postAction(payloadObj, timeout = 15000) {
-  const params = new URLSearchParams();
-  params.append('payload', JSON.stringify(payloadObj));
-  const resp = await fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    body:   params,
-    signal: AbortSignal.timeout(timeout),
-  });
-  const json = await resp.json();
-  if (json.status === 'erro') {
-    if (json.msg === 'UNAUTHORIZED') { handleUnauthorized(); throw new Error('Sessão expirada'); }
-    throw new Error(json.msg || 'Falha no servidor');
-  }
-  return json.data || {};
-}
-
-/* ══ AÇÕES ════════════════════════════════════════════════════ */
-async function updateStatus(row, newStatus, btn) {
-  // Confirmação ao reprovar (evita reprovar por engano)
-  if (newStatus === 'REPROVADO') {
-    const r0 = allRows.find(x => x.row === row);
-    const nome0 = r0 ? (r0.nome || 'esta loja') : 'esta loja';
-    if (!confirm(`Reprovar "${nome0}"?\n\nEla deixará de aparecer no app.`)) return;
-  }
-  const labelOriginal = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
-  try {
-    await postAction({
-      action: 'updateStatus',
-      token:  _sessionToken,
-      row:    row,
-      status: newStatus,
-    });
-    toast('✅ Status atualizado para ' + newStatus);
-    const r = allRows.find(x => x.row === row);
-    if (r) r.status = newStatus;
-
-    // Ao aprovar, abre o WhatsApp já com a mensagem de boas-vindas
-    if (newStatus === 'APROVADO' && r && r.wpp) {
-      abrirWppBoasVindas(r);
-    }
-    renderAll();
-  } catch(e) {
-    toast('❌ Erro ao atualizar: ' + e.message, true);
-    btn.disabled = false;
-    btn.innerHTML = labelOriginal;
-  }
-}
-
-async function savePlan(row) {
-  const plano      = document.getElementById('ps-' + row).value;
-  const isoVal     = document.getElementById('pd-' + row).value;
-  const validadeBR = isoVal ? isoVal.split('-').reverse().join('/') : '';
-
-  const saveBtn = document.querySelector(`#plan-card-${row} .btn-save-plan`);
-  if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...'; }
-
-  try {
-    await postAction({
-      action:    'updatePlan',
-      token:     _sessionToken,
-      row:       row,
-      plano:     plano,
-      planoValidade: validadeBR,
-      planoPago: plano !== 'GRATIS' ? 'SIM' : 'NAO',
-    });
-
-    // Atualiza estado local após confirmação do servidor
-    const r = allRows.find(x => x.row === row);
-    if (r) {
-      r.plano         = plano;
-      r.planoValidade = validadeBR;
-      r.recomendado   = (plano === 'PRO' || plano === 'PLUS') ? 'SIM' : 'NAO';
-    }
-
-    toast(`✅ Plano ${plano} salvo${validadeBR ? ' até ' + validadeBR : ' (vitalício)'}`);
-    renderAll();
-
-  } catch(e) {
-    toast('❌ Erro ao salvar plano: ' + e.message, true);
-  } finally {
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa fa-save"></i> Salvar'; }
-  }
-}
-
-/* ══ VALIDADE RÁPIDA ══════════════════════════════════════════ */
-function setQuickDate(row, dias, btn) {
-  // Marca o botão ativo
-  document.querySelectorAll(`#pq-${row} .plan-quick-btn`).forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-
-  const hiddenInput = document.getElementById('pd-' + row);
-  if (dias === 0) {
-    hiddenInput.value = ''; // vitalício
-  } else {
-    const d = new Date();
-    d.setDate(d.getDate() + dias);
-    hiddenInput.value = d.toISOString().split('T')[0]; // yyyy-mm-dd
-  }
-}
-
-/* ══ EXCLUIR LOJA ═════════════════════════════════════════════ */
-async function deleteLoja(row, nome) {
-  if (!confirm(`Excluir a loja "${nome}" permanentemente?\n\nEssa ação não pode ser desfeita.`)) return;
-
-  try {
-    await postAction({
-      action: 'deleteLoja',
-      token:  _sessionToken,
-      row:    row,
-    });
-    // Remove da lista local e re-renderiza após confirmação
-    allRows = allRows.filter(r => r.row !== row);
-    renderAll();
-    toast(`🗑️ "${nome}" removida`);
-  } catch(e) {
-    toast('❌ Erro ao excluir: ' + e.message, true);
-  }
-}
-
-/* ══ RESET DE MÉTRICAS ════════════════════════════════════════ */
-async function resetMetricas() {
-  if (!confirm('Resetar TODOS os cliques registrados?\n\nIsso apaga toda a aba Cliques. Essa ação não pode ser desfeita.')) return;
-
-  const btn = document.querySelector('.btn-reset-metricas');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Resetando...'; }
-
-  try {
-    await postAction({
-      action: 'resetMetricas',
-      token:  _sessionToken,
-    });
-    toast('✅ Métricas resetadas');
-    // Limpa KPIs e tabela
-    ['kpi-total','kpi-wpp','kpi-tel','kpi-ig','kpi-views'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = '0';
-    });
-    const convEl = document.getElementById('kpi-conv');
-    if (convEl) convEl.textContent = '—';
-    document.getElementById('metric-table').innerHTML =
-      '<div class="admin-empty"><i class="fa fa-chart-bar"></i>Nenhum clique registrado ainda.</div>';
-    document.getElementById('metric-period').textContent = '0 lojas com cliques registrados';
-  } catch(e) {
-    toast('❌ Erro ao resetar: ' + e.message, true);
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-trash"></i> Resetar'; }
-  }
-}
-
-/* ══ FILTRO ═══════════════════════════════════════════════════ */
-function filterCards(type) {
-  const input = document.getElementById('search-' + type);
-  if (!input) return;
-  const q     = input.value.toLowerCase().trim();
-  const listEl = document.getElementById('list-' + type);
-  if (!listEl) return;
-  const cards = listEl.querySelectorAll('.admin-card');
-  let visiveis = 0;
-  cards.forEach(c => {
-    const bate = (c.dataset.nome || '').toLowerCase().includes(q);
-    c.style.display = bate ? '' : 'none';
-    if (bate) visiveis++;
-  });
-  // Feedback "nada encontrado" — só quando há busca ativa e nenhum card bate
-  let semRes = listEl.querySelector('.search-empty');
-  if (q && cards.length && visiveis === 0) {
-    if (!semRes) {
-      semRes = document.createElement('div');
-      semRes.className = 'admin-empty search-empty';
-      semRes.innerHTML = '<i class="fa fa-magnifying-glass"></i>Nenhuma loja encontrada para essa busca.';
-      listEl.appendChild(semRes);
-    }
-  } else if (semRes) {
-    semRes.remove();
-  }
-}
-
-/* ══ WHATSAPP DE BOAS-VINDAS (ao aprovar) ═════════════════════ */
-function abrirWppBoasVindas(r) {
-  const nome  = r.nome || '';
-  const plano = (r.planoSolicitado || r.plano || 'GRATIS').toUpperCase();
-  const linkApp = 'https://angatubaon.com.br';
-
-  let msg;
-  if (plano === 'PRO' || plano === 'PLUS') {
-    msg = `Olá ${nome}! 🎉\n\nSeu cadastro no AngatubaON foi aprovado e sua loja já está no ar!\n\nVocê solicitou o plano *${plano}*. Para ativá-lo, é só confirmar o pagamento e liberamos todos os recursos na hora.\n\nAcesse: ${linkApp}\n\nQualquer dúvida, é só chamar por aqui. Bem-vindo(a)! 🦉`;
-  } else {
-    msg = `Olá ${nome}! 🎉\n\nSeu cadastro no AngatubaON foi aprovado e sua loja já aparece para os moradores de Angatuba!\n\nAcesse e veja como ficou: ${linkApp}\n\nQuando quiser mais destaque e recursos, temos os planos Plus e Pro. É só me chamar. Bem-vindo(a)! 🦉`;
-  }
-
-  const numero = String(r.wpp).replace(/\D/g, '');
-  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`, '_blank');
-}
-
-/* ══ HELPERS ══════════════════════════════════════════════════ */
-function escAttr(s) {
-  return String(s || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-/* Escapa conteúdo de texto visível (anti-XSS). Os dados vêm do cadastro
-   público, então nome/ramo/endereço/obs podem conter HTML malicioso. */
-function escHtml(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function isoDate(br) {
-  if (!br) return '';
-  const p = br.split('/');
-  if (p.length !== 3) return '';
-  return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
-}
-
-let toastTimer;
-function toast(msg, isErr = false) {
-  const el = document.getElementById('admin-toast');
-  el.textContent = msg;
-  el.className   = 'show' + (isErr ? ' err' : '');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.className = '', 3500);
-}
-
-/* Badge de crescimento semanal: compara cliques dos últimos 7 dias (d7)
-   com os 7 dias anteriores (d7ant). Verde ▲ se subiu, vermelho ▼ se caiu. */
-function crescimentoBadge(r) {
-  const atual = r.d7 || 0;
-  const ant   = r.d7ant || 0;
-  if (atual === 0 && ant === 0) return '';
-  if (ant === 0) {
-    // Sem base na semana anterior — mostra só que houve atividade nova
-    return `<span class="metric-stat up"><i class="fa fa-arrow-trend-up"></i> novo</span>`;
-  }
-  const pct = Math.round(((atual - ant) / ant) * 100);
-  if (pct === 0) return `<span class="metric-stat flat">≈ 0%</span>`;
-  const up = pct > 0;
-  return `<span class="metric-stat ${up ? 'up' : 'down'}">
-    <i class="fa fa-arrow-trend-${up ? 'up' : 'down'}"></i> ${up ? '+' : ''}${pct}%
-  </span>`;
-}
-
-/* ══ COBRANÇAS / VENCIMENTOS ══════════════════════════════════
-   Lê planoValidade (dd/mm/aaaa) das lojas PRO/PLUS e classifica por
-   urgência. Vitalício (validade vazia) é ignorado — não vence.
-   Grátis também fica fora: não há o que cobrar. */
-const COBR_CATS = [
-  { id: 'vencidas', titulo: 'Vencidas',    icon: 'fa-circle-exclamation', cor: 'var(--red)'    },
-  { id: 'd7',       titulo: 'Vence em 7d', icon: 'fa-hourglass-half',      cor: 'var(--zap)'    },
-  { id: 'd30',      titulo: 'Vence em 30d',icon: 'fa-calendar-day',        cor: 'var(--indigo)' },
-  { id: 'emdia',    titulo: 'Em dia',      icon: 'fa-circle-check',        cor: 'var(--green)'  },
-];
-let cobrCatAtiva  = 'vencidas';
-let cobrCache     = { vencidas: [], d7: [], d30: [], emdia: [] };
-
-/* dias até vencer: negativo = já venceu, null = vitalício/sem data */
-function diasAteVencer(validadeBR) {
-  if (!validadeBR) return null;
-  const m = String(validadeBR).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-  if (!m) return null;
-  let [, d, mo, y] = m;
-  if (y.length === 2) y = '20' + y;
-  d = +d; mo = +mo; y = +y;
-  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
-  const venc = new Date(y, mo - 1, d); venc.setHours(0,0,0,0);
-  if (venc.getFullYear() !== y || venc.getMonth() !== mo - 1 || venc.getDate() !== d) return null;
-  const hoje = new Date(); hoje.setHours(0,0,0,0);
-  return Math.round((venc - hoje) / 86400000);
-}
-
-function renderCobrancas() {
-  // Só lojas aprovadas e pagas (PRO/PLUS)
-  const pagas = allRows.filter(r =>
-    r.status === 'APROVADO' &&
-    (String(r.plano).toUpperCase() === 'PRO' || String(r.plano).toUpperCase() === 'PLUS')
-  );
-
-  cobrCache = { vencidas: [], d7: [], d30: [], emdia: [] };
-  pagas.forEach(r => {
-    const dias = diasAteVencer(r.planoValidade);
-    if (dias === null) return; // vitalício — não entra em cobrança
-    const item = { ...r, _dias: dias };
-    if (dias < 0)        cobrCache.vencidas.push(item);
-    else if (dias <= 7)  cobrCache.d7.push(item);
-    else if (dias <= 30) cobrCache.d30.push(item);
-    else                 cobrCache.emdia.push(item);
-  });
-  // Ordena cada grupo pelo mais urgente primeiro
-  Object.keys(cobrCache).forEach(k =>
-    cobrCache[k].sort((a, b) => a._dias - b._dias)
-  );
-
-  // Badge na aba = vencidas + vence em 7d (o que precisa de ação agora)
-  const urgentes = cobrCache.vencidas.length + cobrCache.d7.length;
-  setCount('cobrancas', urgentes);
-
-  // Se a categoria ativa está vazia, cai pra primeira com itens
-  if (!cobrCache[cobrCatAtiva].length) {
-    const fb = COBR_CATS.find(c => cobrCache[c.id].length);
-    cobrCatAtiva = fb ? fb.id : 'vencidas';
-  }
-
-  renderCobrSummary();
-  renderCobrTabs();
-  renderCobrLista();
-}
-
-function renderCobrSummary() {
-  const el = document.getElementById('cobr-summary');
-  const totalReceita = cobrCache.vencidas.length + cobrCache.d7.length;
-  el.innerHTML = `
-    <div class="cobr-kpi alert">
-      <div class="cobr-kpi-val">${cobrCache.vencidas.length}</div>
-      <div class="cobr-kpi-label">Vencidas</div>
-    </div>
-    <div class="cobr-kpi warn">
-      <div class="cobr-kpi-val">${cobrCache.d7.length}</div>
-      <div class="cobr-kpi-label">Vencem em 7 dias</div>
-    </div>
-    <div class="cobr-kpi">
-      <div class="cobr-kpi-val">${totalReceita}</div>
-      <div class="cobr-kpi-label">Precisam de ação</div>
-    </div>`;
-}
-
-function renderCobrTabs() {
-  const el = document.getElementById('cobr-cat-tabs');
-  el.innerHTML = COBR_CATS.map(c => {
-    const n     = cobrCache[c.id].length;
-    const ativo = c.id === cobrCatAtiva;
-    const style = ativo
-      ? `background:${c.cor};border-color:${c.cor};`
-      : `color:${c.cor};border-color:${c.cor};`;
-    return `
-      <button class="plan-cat-btn${ativo ? ' active' : ''}" style="${style}"
-        onclick="switchCobrCat('${c.id}')">
-        <i class="fa ${c.icon}"></i> ${c.titulo}
-        <span class="plan-cat-count">${n}</span>
-      </button>`;
-  }).join('');
-}
-
-function renderCobrLista() {
-  const el    = document.getElementById('list-cobrancas');
-  const lista = cobrCache[cobrCatAtiva] || [];
-  if (!lista.length) {
-    el.innerHTML = `<div class="admin-empty"><i class="fa fa-circle-check"></i>Nenhuma loja nesta situação.</div>`;
-    return;
-  }
-  el.innerHTML = lista.map(r => cobrCardHTML(r)).join('');
-  filterCards('cobrancas'); // reaplica busca atual, se houver
-}
-
-function switchCobrCat(id) {
-  cobrCatAtiva = id;
-  renderCobrTabs();
-  renderCobrLista();
-}
-
-function cobrCardHTML(r) {
-  const dias  = r._dias;
-  const plano = String(r.plano).toUpperCase();
-  const planColor = { PRO:'var(--zap)', PLUS:'var(--indigo)' };
-  const cor = planColor[plano] || 'var(--muted)';
-
-  let situacao, sitCor;
-  if (dias < 0)       { situacao = `Venceu há ${Math.abs(dias)} dia(s)`; sitCor = 'var(--red)'; }
-  else if (dias === 0){ situacao = 'Vence hoje';                          sitCor = 'var(--zap)'; }
-  else                { situacao = `Vence em ${dias} dia(s)`;             sitCor = dias <= 7 ? 'var(--zap)' : 'var(--muted)'; }
-
-  const numero = String(r.wpp || '').replace(/\D/g, '');
-  const podeWpp = numero.length >= 10;
-
-  return `
-    <div class="admin-card aprovado" data-nome="${escAttr(r.nome)}">
-      <div class="card-top">
-        <div>
-          <div class="card-name">${escHtml(r.nome) || '—'}</div>
-          <div class="card-ramo">${escHtml(r.ramo) || '—'} · linha ${r.row}</div>
-        </div>
-        <span style="font-family:var(--font-h);font-size:11px;font-weight:800;color:${cor};">${escHtml(plano)}</span>
-      </div>
-      <div class="card-info">
-        <div class="card-info-row"><i class="fa fa-calendar-xmark"></i>Validade: <strong style="margin-left:4px;color:${sitCor};">${r.planoValidade || '—'}</strong></div>
-        <div class="card-info-row"><i class="fa fa-circle-info"></i><span style="color:${sitCor};font-weight:700;">${situacao}</span></div>
-      </div>
-      <div class="card-actions">
-        ${podeWpp ? `
-          <button class="act-btn btn-wpp" onclick="abrirWppCobranca(${r.row}, ${dias})">
-            <i class="fab fa-whatsapp"></i> Cobrar
-          </button>` : '<span style="font-size:11px;color:var(--muted);">Sem WhatsApp cadastrado</span>'}
-      </div>
-    </div>`;
-}
-
-/* WhatsApp de cobrança — texto muda se venceu ou está a vencer */
-function abrirWppCobranca(row, dias) {
-  const r = allRows.find(x => x.row === row);
-  if (!r) return;
-  const nome  = r.nome || '';
-  const plano = String(r.plano || '').toUpperCase();
-  let msg;
-  if (dias < 0) {
-    msg = `Olá ${nome}! 👋\n\nPassando para avisar que seu plano *${plano}* no AngatubaON venceu. Para manter sua loja com todos os recursos ativos, é só renovar.\n\nQualquer dúvida estou à disposição! 🦉`;
-  } else if (dias === 0) {
-    msg = `Olá ${nome}! 👋\n\nSeu plano *${plano}* no AngatubaON vence *hoje*. Para não perder o destaque da sua loja, vamos renovar?\n\nQualquer dúvida me chame! 🦉`;
-  } else {
-    msg = `Olá ${nome}! 👋\n\nSeu plano *${plano}* no AngatubaON vence em ${dias} dia(s). Quer já deixar a renovação garantida para não perder nenhum recurso?\n\nÉ só me avisar! 🦉`;
-  }
-  const numero = String(r.wpp || '').replace(/\D/g, '');
-  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`, '_blank');
-}
-
-/* ══ MÉTRICAS ═════════════════════════════════════════════════ */
-const PLAN_COLOR = { PRO: '#f59e0b', PLUS: '#6366f1', GRATIS: '#7a7a7a' };
-
-async function loadMetricas() {
-  const tableEl  = document.getElementById('metric-table');
-  const periodEl = document.getElementById('metric-period');
-  tableEl.innerHTML = '<div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>';
-
-  try {
-    const resp = await fetch(
-      `${APPS_SCRIPT_URL}?action=metricas&token=${encodeURIComponent(_sessionToken || '')}`,
-      { signal: AbortSignal.timeout(12000) }
-    );
-    const json = await resp.json();
-    if (json.status === 'erro' && json.msg === 'UNAUTHORIZED') {
-      handleUnauthorized(); return;
-    }
-    if (json.status !== 'ok' || !Array.isArray(json.data)) throw new Error('Resposta inválida');
-
-    const data = json.data; // já vem ordenado por total desc
-
-    // KPIs
-    const totCliques = data.reduce((s, r) => s + r.total, 0);
-    const totWpp     = data.reduce((s, r) => s + r.wpp,   0);
-    const totTel     = data.reduce((s, r) => s + r.tel,   0);
-    const totIg      = data.reduce((s, r) => s + (r.ig || 0), 0);
-    const totViews   = data.reduce((s, r) => s + (r.views || 0), 0);
-    const conv       = totViews > 0 ? Math.round((totCliques / totViews) * 100) : 0;
-    document.getElementById('kpi-total').textContent = totCliques;
-    document.getElementById('kpi-views').textContent = totViews;
-    document.getElementById('kpi-conv').textContent  = totViews > 0 ? conv + '%' : '—';
-    document.getElementById('kpi-wpp').textContent   = totWpp;
-    document.getElementById('kpi-tel').textContent   = totTel;
-    document.getElementById('kpi-ig').textContent    = totIg;
-
-    periodEl.textContent = `${data.length} lojas com cliques registrados`;
-
-    if (!data.length) {
-      tableEl.innerHTML = '<div class="admin-empty"><i class="fa fa-chart-bar"></i>Nenhum clique registrado ainda.</div>';
-      return;
-    }
-
-    const maxTotal = data[0].total || 1;
-    const rankIcon = ['🥇','🥈','🥉'];
-    const rankCls  = ['gold','silver','bronze'];
-
-    tableEl.innerHTML = data.map((r, i) => {
-      const pct    = w => Math.round((w / maxTotal) * 100);
-      const cor    = PLAN_COLOR[r.plano] || '#7a7a7a';
-      const rIcon  = rankIcon[i] ?? (i + 1);
-      const rCls   = rankCls[i] ?? '';
-      return `
-        <div class="metric-row">
-          <div class="metric-rank ${rCls}">${rIcon}</div>
-          <div class="metric-info">
-            <div class="metric-nome">${r.loja}</div>
-            <div class="metric-plano" style="color:${cor};">${r.plano}</div>
-            <div class="metric-stats">
-              ${(r.views || 0) > 0 ? `<span class="metric-stat"><i class="fa fa-eye"></i> ${r.views}</span>` : ''}
-              ${(r.menu  || 0) > 0 ? `<span class="metric-stat"><i class="fa fa-utensils"></i> ${r.menu}</span>` : ''}
-              ${crescimentoBadge(r)}
-            </div>
-          </div>
-          <div class="metric-bars">
-            <div class="metric-bar-wrap">
-              <span class="metric-bar-label" style="color:#25d366;">WPP</span>
-              <div class="metric-bar-track">
-                <div class="metric-bar-fill wpp" style="width:${pct(r.wpp)}%;"></div>
-              </div>
-            </div>
-            <div class="metric-bar-wrap">
-              <span class="metric-bar-label" style="color:var(--blue);">TEL</span>
-              <div class="metric-bar-track">
-                <div class="metric-bar-fill tel" style="width:${pct(r.tel)}%;"></div>
-              </div>
-            </div>
-            ${(r.ig || 0) > 0 ? `
-            <div class="metric-bar-wrap">
-              <span class="metric-bar-label" style="color:#e1306c;">IG</span>
-              <div class="metric-bar-track">
-                <div class="metric-bar-fill ig" style="width:${pct(r.ig||0)}%;"></div>
-              </div>
-            </div>` : ''}
-          </div>
-          <div class="metric-total">${r.total}</div>
-        </div>`;
-    }).join('');
-
-  } catch(e) {
-    tableEl.innerHTML = '<div class="admin-empty"><i class="fa fa-triangle-exclamation"></i>Erro ao carregar métricas.</div>';
-    periodEl.textContent = '';
-  }
-}
-
-// Carrega métricas quando a aba é ativada — integrado ao switchTab original acima
-
-/* ══ INIT ═════════════════════════════════════════════════════ */
-if (_storedToken) loadData();
-</script>
-</body>
+ 
+    /* ── Painel Minha Loja — Navegação por abas ── */
+    window.mlSwitchTab = function(tab) {
+      document.querySelectorAll('.ml-tab-content').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.ml-tab-btn').forEach(btn => {
+        btn.classList.remove('ml-tab-active');
+        btn.style.color = 'var(--muted)';
+        btn.style.borderBottomColor = 'transparent';
+      });
+      var content = document.getElementById('ml-tab-' + tab);
+      if (content) content.style.display = '';
+      var btn = document.querySelector('.ml-tab-btn[data-tab="' + tab + '"]');
+      if (btn) {
+        btn.classList.add('ml-tab-active');
+        btn.style.color = 'var(--red)';
+        btn.style.borderBottomColor = 'var(--red)';
+      }
+    };
+ 
+    /* ── Templates de 1 toque no anúncio ── */
+    window.mlAplicarTemplate = function(btn) {
+      var tpl = btn.dataset.tpl;
+      if (!tpl) return;
+      var textarea = document.getElementById('ml-anuncio-texto');
+      if (!textarea) return;
+      textarea.value = tpl;
+      var chars = document.getElementById('ml-anuncio-chars');
+      if (chars) chars.textContent = tpl.length + '/80';
+      textarea.focus();
+    };
+ 
+    /* ── Hero: status + cliques ── */
+    window.mlAtualizarHeroStatus = function(statusLoja, cliquesHoje) {
+      var dot  = document.getElementById('ml-hero-status-dot');
+      var txt  = document.getElementById('ml-hero-status-txt');
+      var hDiv = document.getElementById('ml-hero-cliques');
+      var hNum = document.getElementById('ml-hero-cliques-num');
+      if (!dot || !txt) return;
+      var s = (statusLoja || '').toUpperCase();
+      if (s.indexOf('ABERTO') === 0) {
+        dot.style.background = '#00d084'; dot.style.animation = 'blink 1.5s infinite';
+        txt.textContent = 'Aberta agora';
+      } else if (s.indexOf('VOLTAMOS') === 0) {
+        dot.style.background = '#f59e0b'; dot.style.animation = '';
+        txt.textContent = 'Já voltamos';
+      } else if (s === 'FECHADO') {
+        dot.style.background = '#ff4444'; dot.style.animation = '';
+        txt.textContent = 'Fechada agora';
+      } else {
+        dot.style.background = '#555';
+        txt.textContent = 'Status automático';
+      }
+      if (hDiv && hNum && typeof cliquesHoje === 'number' && cliquesHoje > 0) {
+        hNum.textContent = cliquesHoje;
+        hDiv.style.display = 'flex';
+      }
+    };
+ 
+    /* ── Badge de novos cliques na aba Métricas ── */
+    window.mlAtualizarBadgeMetricas = function(novos) {
+      var badge = document.getElementById('ml-tab-badge-metricas');
+      if (!badge) return;
+      if (novos > 0) {
+        badge.textContent = '+' + novos;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    };
+  </script>
 </html>

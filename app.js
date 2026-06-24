@@ -5552,10 +5552,11 @@
       'modal-cadastro':         { sheet: '.modal-sheet',  close: () => closeModal() },
     };
 
-    const THRESHOLD = 90;   // px para fechar
-    const VELOCITY  = 0.5;  // px/ms — flick rápido também fecha
+    const THRESHOLD   = 130;  // px de arraste para fechar (puxão claro)
+    const FLICK_DY    = 50;   // px mínimos para considerar flick
+    const FLICK_VEL   = 0.9;  // px/ms — flick precisa ser rápido E ter distância
 
-    let active = null;      // { sheet, close, startY, lastY, lastT, dy }
+    let active = null;      // { sheet, close, startY, lastY, lastT, dy, samples }
 
     function isHandle(el) {
       return el && el.closest && el.closest('.detail-handle, .modal-handle, .cc-handle-bar');
@@ -5574,16 +5575,22 @@
     function start(clientY, handle) {
       const ctx = findCtx(handle);
       if (!ctx) return;
-      active = { sheet: ctx.sheet, close: ctx.close, startY: clientY, lastY: clientY, lastT: Date.now(), dy: 0 };
+      active = { sheet: ctx.sheet, close: ctx.close, startY: clientY, lastY: clientY, lastT: Date.now(), dy: 0, samples: [{ y: clientY, t: Date.now() }] };
       ctx.sheet.style.transition = 'none';
     }
 
     function move(clientY) {
       if (!active) return;
+      const now = Date.now();
       const dy = clientY - active.startY;
       active.dy = dy;
       active.lastY = clientY;
-      active.lastT = Date.now();
+      active.lastT = now;
+      // mantém amostras dos últimos ~120ms para medir velocidade real
+      active.samples.push({ y: clientY, t: now });
+      while (active.samples.length > 1 && now - active.samples[0].t > 120) {
+        active.samples.shift();
+      }
       // só permite arrastar para baixo
       const offset = Math.max(0, dy);
       active.sheet.style.transform = `translateY(${offset}px)`;
@@ -5594,10 +5601,27 @@
       if (!active) return;
       const a = active; active = null;
       a.sheet.style.transition = '';
-      const dt = Math.max(1, Date.now() - a.lastT);
-      const v  = a.dy / dt;
-      if (a.dy > THRESHOLD || v > VELOCITY) {
+
+      // velocidade média na janela de amostras (px/ms), nunca por um único frame curto
+      let vel = 0;
+      if (a.samples.length >= 2) {
+        const first = a.samples[0];
+        const last  = a.samples[a.samples.length - 1];
+        const dt = last.t - first.t;
+        if (dt > 0) vel = (last.y - first.y) / dt;
+      }
+
+      // Fecha se: puxou bem longe (THRESHOLD)  OU  flick rápido para baixo com distância mínima
+      const fecharPorArraste = a.dy > THRESHOLD;
+      const fecharPorFlick   = a.dy > FLICK_DY && vel > FLICK_VEL;
+
+      if (fecharPorArraste || fecharPorFlick) {
         a.close();
+      } else {
+        // volta suave para o lugar
+        a.sheet.style.transform = '';
+        a.sheet.style.opacity = '';
+        return;
       }
       // limpa estilos inline (a classe .open reaplica o transform correto)
       setTimeout(() => {

@@ -5423,7 +5423,16 @@
       return;
     }
 
+    // Pulse de atenção quando o carrinho aparece (estava oculto e agora tem itens)
+    const estavaOculto = bar && (bar.style.display === 'none' || bar.style.display === '');
     if (bar) bar.style.display = '';
+    if (estavaOculto && bar && !_ccCartExpanded) {
+      bar.classList.remove('cc-cart-pulse');
+      // força reflow para reiniciar a animação
+      void bar.offsetWidth;
+      bar.classList.add('cc-cart-pulse');
+      setTimeout(() => bar.classList.remove('cc-cart-pulse'), 600);
+    }
 
     let total = 0, totalQty = 0;
     if (lista) {
@@ -5453,6 +5462,7 @@
     const body    = document.getElementById('cc-cart-body');
     const head    = document.getElementById('cc-cart-head');
     const chevron = document.getElementById('cc-cart-chevron');
+    const action  = document.getElementById('cc-cart-action-text');
     if (!body) return;
     if (_ccCartExpanded) {
       // limita a metade da altura do sheet para nunca cobrir a lista toda
@@ -5460,11 +5470,13 @@
       body.style.maxHeight = Math.min(body.scrollHeight, max) + 'px';
       body.style.overflowY = body.scrollHeight > max ? 'auto' : 'hidden';
       if (chevron) chevron.style.transform = 'rotate(180deg)';
+      if (action)  action.textContent = 'Recolher pedido';
       if (head) head.setAttribute('aria-expanded', 'true');
     } else {
       body.style.maxHeight = '0px';
       body.style.overflowY = 'hidden';
       if (chevron) chevron.style.transform = '';
+      if (action)  action.textContent = 'Ver pedido e finalizar';
       if (head) head.setAttribute('aria-expanded', 'false');
     }
   }

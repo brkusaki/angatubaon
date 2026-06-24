@@ -1012,6 +1012,60 @@
   function fmtBRL(v) {
     return 'R$ ' + v.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   }
+
+  /* ── Pagamento Mercado Pago ────────────────────────────────────
+     Chama o backend para criar a preference e redireciona o usuário
+     para o checkout do Mercado Pago. O valor é calculado no servidor. */
+  async function iniciarPagamentoMP(wpp, plano, ciclo, btnEl) {
+    const labelOrig = btnEl ? btnEl.innerHTML : '';
+    if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = '<i class="ti ti-loader-2"></i> Gerando pagamento…'; }
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({
+        action: 'criarPreferenciaMP',
+        wpp:    (() => { let n = String(wpp || '').replace(/\D/g, ''); return n && !n.startsWith('55') ? '55' + n : n; })(),
+        plano:  plano,
+        ciclo:  ciclo || 'mensal',
+      }));
+      const resp = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body:   params,
+        signal: AbortSignal.timeout(20000),
+      });
+      const json = await resp.json();
+      if (json.status !== 'ok' || !json.data || !json.data.initPoint) {
+        throw new Error((json && json.msg) || 'Não foi possível gerar o pagamento');
+      }
+      // Redireciona para o checkout do Mercado Pago
+      window.location.href = json.data.initPoint;
+    } catch (err) {
+      if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = labelOrig; }
+      alert('Erro ao iniciar pagamento: ' + (err.message || 'tente novamente') +
+            '\n\nVocê também pode ativar pelo WhatsApp no botão abaixo.');
+    }
+  }
+  window.iniciarPagamentoMP = iniciarPagamentoMP;
+
+  /* ── Retorno do checkout (?pagamento=sucesso|pendente|falha) ──── */
+  (function tratarRetornoPagamento() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const status = params.get('pagamento');
+      if (!status) return;
+      const msgs = {
+        sucesso:  { t: '✅ Pagamento aprovado!', m: 'Seu plano está sendo ativado. Pode levar alguns instantes para aparecer em "Minha Loja".' },
+        pendente: { t: '⏳ Pagamento pendente', m: 'Estamos aguardando a confirmação. Assim que for aprovado, seu plano será ativado automaticamente.' },
+        falha:    { t: '❌ Pagamento não concluído', m: 'O pagamento não foi finalizado. Você pode tentar de novo ou falar com a gente pelo WhatsApp.' },
+      };
+      const info = msgs[status];
+      if (info) setTimeout(() => alert(info.t + '\n\n' + info.m), 400);
+      // Limpa o parâmetro da URL sem recarregar
+      params.delete('pagamento');
+      const novaUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+      window.history.replaceState({}, '', novaUrl);
+    } catch (e) {}
+  })();
+
   let _carouselIdx = 0;
   const PLANS_ORDER = ['GRATIS', 'PLUS', 'PRO'];
 
@@ -1642,6 +1696,18 @@
         }
         wppBtn.href      = wppUrl;
         wppBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Ativar Plano ' + plano + ' →';
+
+        // ── Botão "Pagar agora" (Mercado Pago) ──
+        const wppLoja = String(payload.whatsapp || '').replace(/\D/g, '');
+        let payBtn = successEl.querySelector('.success-pay-btn');
+        if (!payBtn) {
+          payBtn = document.createElement('button');
+          payBtn.type      = 'button';
+          payBtn.className  = 'success-pay-btn';
+          wppBtn.before(payBtn);
+        }
+        payBtn.innerHTML = '<i class="ti ti-credit-card"></i> Pagar agora ' + (calc ? fmtBRL(calc.total) : '') + ' →';
+        payBtn.onclick = () => iniciarPagamentoMP(wppLoja, plano, _cicloSelecionado, payBtn);
       } else {
         const subTextEl2 = successEl.querySelector('#success-sub-text') || successEl.querySelector('.success-sub');
         if (subTextEl2) subTextEl2.innerHTML =

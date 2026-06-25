@@ -4463,6 +4463,15 @@
     const ehNoite = (h >= 22 || h < 5);
     el.style.display = ehNoite ? 'flex' : 'none';
   }
+  function saudacaoNoturnaFiltrar() {
+    const pillAberto = document.querySelector('.pill-btn[data-filter="open"]');
+    if (pillAberto) {
+      pillAberto.click();
+      const lista = document.getElementById('store-list');
+      if (lista) lista.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+  window.saudacaoNoturnaFiltrar = saudacaoNoturnaFiltrar;
   atualizarSaudacaoNoturna();
 
   carregarLojas().then(() => {

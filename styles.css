@@ -2280,16 +2280,16 @@
   min-width: 100%;             /* << causa-raiz: impede encolher */
   box-sizing: border-box;
   margin: 0 !important;        /* anula o margin-bottom do empilhamento antigo */
-  padding: 16px 20px;          /* respiro lateral dentro do slide */
+  padding: 14px 16px;          /* mais compacto */
 }
 
 /* Hint "← deslize →" (1ª visita) */
 .cad-carousel-hint {
   display: none;
   position: absolute;
-  top: 10px; left: 50%;
+  top: 14px; left: 50%;
   transform: translateX(-50%);
-  z-index: 5;
+  z-index: 4;
   background: rgba(0,0,0,0.72);
   backdrop-filter: blur(6px);
   color: #fff;
@@ -2346,17 +2346,12 @@
 
 /* ── [2] MODAL SHEET — STICKY HEADER / STEPPER ────────────── */
 /* O container rola; header + stepper + ciclo grudam no topo. */
-#modal-cadastro .modal-handle,
-#modal-cadastro .modal-header,
+/* Apenas o stepper gruda no topo; header e handle rolam normal (sem colidir). */
 #modal-cadastro .cad-stepper {
   position: sticky;
+  top: 0;
   z-index: 20;
   background: var(--surface);
-}
-#modal-cadastro .modal-handle { top: 0; padding-top: 10px; }
-#modal-cadastro .modal-header { top: 16px; }
-#modal-cadastro .cad-stepper {
-  top: 70px;
   box-shadow: 0 6px 12px -8px rgba(0,0,0,0.5);
 }
 
@@ -2388,9 +2383,8 @@
 
 /* ── [4] CICLO TOGGLE — sticky + selo destacado ───────────── */
 #cad-ciclo-toggle {
-  position: sticky;
-  top: 124px;                  /* logo abaixo do stepper sticky */
-  z-index: 15;
+  position: relative;
+  z-index: 1;
 }
 /* selo "2 meses grátis" mais chamativo (âmbar pulsante) */
 .ciclo-selo-destaque {
@@ -2404,12 +2398,13 @@
 
 /* ── [5] TIPOGRAFIA — preço dominante, features legíveis ──── */
 .cad-plan-carousel .plan-card-price .price-val {
-  font-size: 1.9rem;           /* preço é o elemento dominante */
+  font-size: 1.5rem;           /* preço dominante, sem inflar o card */
   line-height: 1;
 }
-.cad-plan-carousel .plan-card-price .price-per { font-size: 11px; }
-.cad-plan-carousel .plan-card-features li { font-size: 13px; }  /* nada < 13px em leitura */
-.cad-plan-carousel .plan-card-name { font-size: 1.15rem; }
+.cad-plan-carousel .plan-card-price .price-per { font-size: 10px; }
+.cad-plan-carousel .plan-card-features { gap: 4px; }
+.cad-plan-carousel .plan-card-features li { font-size: 12px; line-height: 1.3; }
+.cad-plan-carousel .plan-card-name { font-size: 1.05rem; }
 /* feat-off: line-through legível, sem sumir */
 .cad-plan-carousel .feat-off { opacity: 0.5 !important; }
 .cad-plan-carousel .feat-off .feat-icon { opacity: 0.7; }

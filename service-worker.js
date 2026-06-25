@@ -1,17 +1,17 @@
-const CACHE = 'angatubaon-v55';
+const CACHE = 'angatubaon-v56';
 const STATIC = [
   '/',
   '/index.html',
   '/offline.html',
   '/styles.css',
   '/app.js',
+  '/img/igreja-noite.jpg',
   '/webp/owl-badge.webp',
   '/webp/owl-celebrate-gratis.webp',
   '/webp/owl-celebrate-plus.webp',
   '/webp/owl-celebrate-pro.webp',
   '/webp/owl-celebrate-flying.webp',
   '/webp/splash-anim.webp',
-  // Corujas estáticas (usadas em empty-state, toast, futuros estados de UI)
   '/webp/owl-search.webp',
   '/webp/owl-idea.webp',
   '/webp/owl-sleeping.webp',

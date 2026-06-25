@@ -4467,8 +4467,7 @@
     const pillAberto = document.querySelector('.pill-btn[data-filter="open"]');
     if (pillAberto) {
       pillAberto.click();
-      const lista = document.getElementById('store-list');
-      if (lista) lista.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }
   window.saudacaoNoturnaFiltrar = saudacaoNoturnaFiltrar;

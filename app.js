@@ -3635,6 +3635,14 @@
       ? (avaliacoes.reduce((s, a) => s + (a.nota || 0), 0) / avaliacoes.length).toFixed(1)
       : null;
 
+    // Selo de excelência: nota máxima com volume mínimo de avaliações
+    const isTopRated = mediaAval && parseFloat(mediaAval) >= 5 && avaliacoes.length >= 3;
+    const trofeuHTML = (isPago && isTopRated)
+      ? `<img src="/webp/owl-trophy.webp" alt="Loja nota máxima" title="Nota máxima!"
+             style="width:40px;height:40px;object-fit:contain;flex-shrink:0;margin-left:auto;
+                    filter:drop-shadow(0 2px 6px rgba(245,158,11,0.4));" onerror="this.style.display='none'" />`
+      : '';
+
     const avalHTML = (isPago && avaliacoes.length > 0)
       ? `<div style="margin-bottom:14px;">
            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
@@ -3646,6 +3654,7 @@
                }).join('')}</div>
                <div style="font-size:10px;color:var(--muted);">${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''}</div>
              </div>
+             ${trofeuHTML}
            </div>
            ${avaliacoes.slice(0,3).map((a, i) => {
              // Botão sinalizar: só aparece para o dono da loja logado
@@ -4446,6 +4455,16 @@
   showSkeletonCat();
 
   // Carrega lojas dinâmicas em background
+  // ── Saudação noturna (22h–5h) ─────────────────────────────
+  function atualizarSaudacaoNoturna() {
+    const el = document.getElementById('saudacao-noturna');
+    if (!el) return;
+    const h = new Date().getHours();
+    const ehNoite = (h >= 22 || h < 5);
+    el.style.display = ehNoite ? 'flex' : 'none';
+  }
+  atualizarSaudacaoNoturna();
+
   carregarLojas().then(() => {
     // Deep link: abre detalhes de loja pelo hash da URL (ex: /#mr-centro-automotivo)
     _resolverDeepLink();

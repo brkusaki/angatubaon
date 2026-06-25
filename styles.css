@@ -2255,3 +2255,226 @@
     .price-val.price-riscado {
       text-decoration: line-through; opacity: .5; font-size: .75em; margin-right: 4px;
     }
+
+
+/* ════════════════════════════════════════════════════════════
+   AUDITORIA UX — CADASTRO (carousel, sticky, microinterações)
+   ════════════════════════════════════════════════════════════ */
+
+/* ── [1] CAROUSEL DE PLANOS (etapa 3) ─────────────────────── */
+.cad-carousel-wrap {
+  position: relative;
+  overflow: hidden;            /* << causa-raiz: clipa os slides */
+  margin: 0 -20px 4px;         /* sangra até as bordas do modal-body (pad 20px) */
+  padding: 4px 0;
+  touch-action: pan-y;         /* permite scroll vertical, swipe horiz tratado no JS */
+}
+.cad-plan-carousel {
+  display: flex;
+  will-change: transform;      /* performance no swipe */
+  transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+}
+/* cada card vira um slide de largura total */
+.cad-plan-carousel > .cad-plan-card {
+  flex: 0 0 100%;
+  min-width: 100%;             /* << causa-raiz: impede encolher */
+  box-sizing: border-box;
+  margin: 0 !important;        /* anula o margin-bottom do empilhamento antigo */
+  padding: 16px 20px;          /* respiro lateral dentro do slide */
+}
+
+/* Hint "← deslize →" (1ª visita) */
+.cad-carousel-hint {
+  display: none;
+  position: absolute;
+  top: 10px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 12px; font-weight: 700;
+  padding: 5px 14px; border-radius: 20px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+}
+.cad-carousel-hint.show {
+  display: inline-flex; align-items: center; gap: 6px;
+  animation: cchFade 0.3s ease both;
+}
+.cad-carousel-hint .cch-arrow {
+  display: inline-block;
+  animation: cchNudge 1.2s ease-in-out infinite;
+}
+.cad-carousel-hint .cch-arrow:last-child { animation-delay: 0.15s; }
+@keyframes cchFade { from { opacity: 0; transform: translate(-50%, -4px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes cchNudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
+
+/* Dots */
+.cad-plan-dots {
+  display: flex; justify-content: center; gap: 8px;
+  margin-top: 12px;
+}
+.cad-plan-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--border); border: none; padding: 0;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s, width 0.2s;
+  /* área de toque 44×44 sem deformar o ponto visível */
+  position: relative;
+}
+.cad-plan-dot::before {
+  content: ''; position: absolute;
+  top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: 44px; height: 44px;
+}
+.cad-plan-dot.active {
+  width: 22px; border-radius: 5px;
+  background: var(--green);
+}
+
+/* Pulse no card que entra em foco no carousel */
+.cad-plan-card.cad-pulse {
+  animation: cadCardPulse 0.4s ease;
+}
+@keyframes cadCardPulse {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.022); }
+  100% { transform: scale(1); }
+}
+
+/* ── [2] MODAL SHEET — STICKY HEADER / STEPPER ────────────── */
+/* O container rola; header + stepper + ciclo grudam no topo. */
+#modal-cadastro .modal-handle,
+#modal-cadastro .modal-header,
+#modal-cadastro .cad-stepper {
+  position: sticky;
+  z-index: 20;
+  background: var(--surface);
+}
+#modal-cadastro .modal-handle { top: 0; padding-top: 10px; }
+#modal-cadastro .modal-header { top: 16px; }
+#modal-cadastro .cad-stepper {
+  top: 70px;
+  box-shadow: 0 6px 12px -8px rgba(0,0,0,0.5);
+}
+
+/* ── [3] STEPPER — animação done + fill da linha ──────────── */
+.cad-step-circle { transition: background 0.3s, border-color 0.3s, color 0.3s, box-shadow 0.3s; }
+.cad-step.done .cad-step-circle {
+  animation: stepDone 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes stepDone {
+  0%   { transform: scale(0.6); }
+  60%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+/* Linha: fill animado da esquerda p/ direita ao concluir */
+.cad-step-line {
+  position: relative;
+  background: var(--border) !important;
+  overflow: hidden;
+}
+.cad-step-line::after {
+  content: ''; position: absolute; inset: 0;
+  background: var(--green);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 0.4s ease;
+}
+.cad-step-line.done::after { transform: scaleX(1); }
+/* labels: evita corte */
+.cad-step-label { max-width: 72px; overflow: visible; }
+
+/* ── [4] CICLO TOGGLE — sticky + selo destacado ───────────── */
+#cad-ciclo-toggle {
+  position: sticky;
+  top: 124px;                  /* logo abaixo do stepper sticky */
+  z-index: 15;
+}
+/* selo "2 meses grátis" mais chamativo (âmbar pulsante) */
+.ciclo-selo-destaque {
+  box-shadow: 0 0 0 0 rgba(245,158,11,0.5);
+  animation: seloGlow 2s ease-in-out infinite;
+}
+@keyframes seloGlow {
+  0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.0); }
+  50%     { box-shadow: 0 0 0 4px rgba(245,158,11,0.18); }
+}
+
+/* ── [5] TIPOGRAFIA — preço dominante, features legíveis ──── */
+.cad-plan-carousel .plan-card-price .price-val {
+  font-size: 1.9rem;           /* preço é o elemento dominante */
+  line-height: 1;
+}
+.cad-plan-carousel .plan-card-price .price-per { font-size: 11px; }
+.cad-plan-carousel .plan-card-features li { font-size: 13px; }  /* nada < 13px em leitura */
+.cad-plan-carousel .plan-card-name { font-size: 1.15rem; }
+/* feat-off: line-through legível, sem sumir */
+.cad-plan-carousel .feat-off { opacity: 0.5 !important; }
+.cad-plan-carousel .feat-off .feat-icon { opacity: 0.7; }
+
+/* micro-animação de troca de preço */
+.price-flash { animation: priceFlash 0.3s ease; }
+@keyframes priceFlash {
+  0%   { opacity: 0.3; transform: translateY(-2px); }
+  100% { opacity: 1;   transform: translateY(0); }
+}
+
+/* ── [6] CTA STICKY BOTTOM (safe-area) ────────────────────── */
+.cad-sticky-cta {
+  position: sticky;
+  bottom: 0;
+  z-index: 18;
+  margin: 8px -20px 0;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--surface) 70%, transparent);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.cad-sticky-cta .modal-submit,
+.cad-sticky-cta .cad-next-btn {
+  margin: 0; width: 100%;
+  min-height: 48px;            /* touch target */
+}
+
+/* ── [7] SHAKE em campos inválidos ────────────────────────── */
+.cad-shake { animation: cadShake 0.4s cubic-bezier(0.36,0.07,0.19,0.97); }
+@keyframes cadShake {
+  10%,90% { transform: translateX(-1px); }
+  20%,80% { transform: translateX(2px); }
+  30%,50%,70% { transform: translateX(-4px); }
+  40%,60% { transform: translateX(4px); }
+}
+
+/* loading state do submit (class-based, preserva o label) */
+.modal-submit.is-loading { pointer-events: none; opacity: 0.75; }
+.modal-submit.is-loading .cad-submit-txt::after {
+  content: '';
+  display: inline-block;
+  width: 14px; height: 14px;
+  margin-left: 4px; vertical-align: -2px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── [8] TOUCH TARGETS ────────────────────────────────────── */
+#modal-cadastro .modal-close { width: 44px; height: 44px; }
+.ciclo-btn { min-height: 44px; }
+
+/* ── [9] PERFORMANCE — owls dos cards ─────────────────────── */
+/* contém o blend/glow dentro do card e evita reflow no swipe */
+.cad-plan-carousel .plan-card { contain: paint; }
+
+/* transição de painel: slide horizontal entre etapas */
+.cad-step-panel.active { animation: panelSlide 0.28s ease both; }
+@keyframes panelSlide {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.cad-step-panel.active.cad-back { animation: panelSlideBack 0.28s ease both; }
+@keyframes panelSlideBack {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}

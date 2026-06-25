@@ -171,7 +171,7 @@
 
     <!-- Fallback: coruja animada por CSS (primeira vez, sem cache) -->
     <div id="spl-fallback">
-      <img src="/webp/owl-badge.webp" alt="" class="spl-owl" />
+      <img src="/webp/owl-badge.webp" alt="" class="spl-owl" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
       <div class="spl-logo">Angatuba<span>ON</span></div>
       <div class="spl-cidade-fb">Angatuba · SP</div>
       <div class="spl-dots">
@@ -202,7 +202,7 @@
         <div class="logo-city">Angatuba · SP</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <img src="/webp/owl-badge.webp" alt="AngatubaON ao vivo" class="owl-badge-anim" />
+        <img src="/webp/owl-badge.webp" alt="AngatubaON ao vivo" class="owl-badge-anim" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
         <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()" aria-label="Alternar tema">
           <i class="fa fa-moon" id="theme-toggle-icon"></i>
         </button>
@@ -443,9 +443,11 @@
             </div>
           </div>
 
-          <button type="button" class="cad-next-btn" onclick="cadAvancar(2)">
-            Próximo — Horário de funcionamento <i class="fa fa-arrow-right"></i>
-          </button>
+          <div class="cad-sticky-cta">
+            <button type="button" class="cad-next-btn" onclick="cadAvancar(2)">
+              Próximo — Horário de funcionamento <i class="fa fa-arrow-right"></i>
+            </button>
+          </div>
         </div>
 
         <!-- ── ETAPA 2: Horário ── -->
@@ -503,10 +505,12 @@
             <input type="hidden" id="f-hora-fecha" name="horaFecha" />
           </div>
 
-          <button type="button" class="cad-next-btn" onclick="cadAvancar(3)">
-            Próximo — Escolher plano <i class="fa fa-arrow-right"></i>
-          </button>
-          <button type="button" class="cad-back-btn" onclick="cadVoltar(1)">← Voltar</button>
+          <div class="cad-sticky-cta">
+            <button type="button" class="cad-next-btn" onclick="cadAvancar(3)">
+              Próximo — Escolher plano <i class="fa fa-arrow-right"></i>
+            </button>
+            <button type="button" class="cad-back-btn" onclick="cadVoltar(1)">← Voltar</button>
+          </div>
         </div>
 
         <!-- ── ETAPA 3: Plano + Foto + Submit ── -->
@@ -526,10 +530,18 @@
             </button>
           </div>
 
+          <!-- Carousel horizontal de planos (swipe) -->
+          <div class="cad-carousel-wrap" id="cad-carousel-wrap">
+            <!-- Hint primeira visita: "deslize" -->
+            <div class="cad-carousel-hint" id="cad-carousel-hint" aria-hidden="true">
+              <span class="cch-arrow">←</span> deslize para comparar <span class="cch-arrow">→</span>
+            </div>
+            <div class="cad-plan-carousel" id="cad-plan-carousel">
+
           <!-- GRÁTIS -->
           <div class="plan-card card-gratis cad-plan-card selected" id="plan-sel-gratis"
             onclick="cadSelecionarPlano('GRATIS')" role="radio" aria-checked="true" tabindex="0">
-            <img src="/icons/owl-gratis.png" alt="" class="plan-card-owl owl-gratis" />
+            <img src="/owlbadge.webp" alt="" class="plan-card-owl owl-gratis" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
             <div class="plan-card-content">
               <div class="plan-card-top">
                 <div class="plan-card-name">🏪 Grátis</div>
@@ -554,7 +566,7 @@
           <!-- PLUS -->
           <div class="plan-card card-plus cad-plan-card" id="plan-sel-plus"
             onclick="cadSelecionarPlano('PLUS')" role="radio" aria-checked="false" tabindex="0">
-            <img src="/icons/owl-plus.png" alt="" class="plan-card-owl owl-plus" />
+            <img src="/owlhighlight.webp" alt="" class="plan-card-owl owl-plus" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
             <div class="plan-card-content">
               <span class="plan-popular">⭐ MAIS POPULAR</span>
               <div class="plan-card-top">
@@ -588,7 +600,7 @@
           <!-- PRO -->
           <div class="plan-card card-pro cad-plan-card" id="plan-sel-pro"
             onclick="cadSelecionarPlano('PRO')" role="radio" aria-checked="false" tabindex="0">
-            <img src="/icons/owl-pro.png" alt="" class="plan-card-owl owl-pro" />
+            <img src="/owltrophy.webp" alt="" class="plan-card-owl owl-pro" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
             <div class="plan-card-content">
               <div class="plan-card-top">
                 <div class="plan-card-name">⭐ Pro</div>
@@ -614,6 +626,16 @@
               </ul>
             </div>
           </div>
+
+            </div><!-- /cad-plan-carousel -->
+
+            <!-- Dots -->
+            <div class="cad-plan-dots" id="cad-plan-dots" role="tablist" aria-label="Planos">
+              <button type="button" class="cad-plan-dot" role="tab" aria-label="Plano Grátis" onclick="cadCarouselIr(0)"></button>
+              <button type="button" class="cad-plan-dot active" role="tab" aria-label="Plano Plus" aria-selected="true" onclick="cadCarouselIr(1)"></button>
+              <button type="button" class="cad-plan-dot" role="tab" aria-label="Plano Pro" onclick="cadCarouselIr(2)"></button>
+            </div>
+          </div><!-- /cad-carousel-wrap -->
 
           <!-- Hint do plano selecionado -->
           <p class="field-hint" style="text-align:center;" id="cad-plan-hint">
@@ -787,25 +809,26 @@
             <input type="hidden" id="f-foto-url" name="fotoUrl" />
             <input type="file" id="f-logo-file" accept="image/*" style="display:none;" />
             <input type="hidden" id="f-logo-url" name="logoUrl" />
-            <div id="logo-group" style="display:none;"></div>
             <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.5;">
               Máx 5MB · JPG, PNG ou WebP<br>
               <span style="color:rgba(99,102,241,0.8);">💡 Para a logo ficar sem fundo branco, use PNG com fundo transparente</span>
             </div>
           </div>
 
-          <button type="submit" class="modal-submit">
-            <i class="fab fa-whatsapp"></i> Solicitar meu espaço no AngatubaON
-          </button>
-          <p class="modal-submit-label">Você será avisado pelo WhatsApp quando sua loja for publicada.</p>
-          <button type="button" class="cad-back-btn" onclick="cadVoltar(2)">← Voltar</button>
+          <div class="cad-sticky-cta">
+            <button type="submit" class="modal-submit" id="cad-submit-btn">
+              <i class="fab fa-whatsapp"></i> <span class="cad-submit-txt">Solicitar meu espaço no AngatubaON</span>
+            </button>
+            <p class="modal-submit-label">Você será avisado pelo WhatsApp quando sua loja for publicada.</p>
+            <button type="button" class="cad-back-btn" onclick="cadVoltar(2)">← Voltar</button>
+          </div>
         </div>
 
       </form>
 
       <!-- Tela de sucesso -->
       <div class="modal-success" id="cadastro-success">
-        <img id="success-owl" src="/webp/owl-celebrate-gratis.webp" alt="" class="success-owl" />
+        <img id="success-owl" src="/webp/owl-celebrate-gratis.webp" alt="" class="success-owl" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
         <div class="success-title">Cadastro enviado! 🎉</div>
         <p class="success-sub" id="success-sub-text">
           Recebemos os dados da sua loja.<br>
@@ -854,7 +877,7 @@
           <!-- GRÁTIS -->
           <div class="plan-slide" data-plan="GRATIS">
             <div class="plan-card card-gratis selected">
-              <img src="/icons/owl-gratis.png" alt="" class="plan-card-owl owl-gratis" />
+              <img src="/owlbadge.webp" alt="" class="plan-card-owl owl-gratis" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
               <div class="plan-card-content">
                 <div class="plan-card-top">
                   <div class="plan-card-name">🏪 Grátis</div>
@@ -882,7 +905,7 @@
           <!-- PLUS -->
           <div class="plan-slide" data-plan="PLUS">
             <div class="plan-card card-plus" style="position:relative;">
-              <img src="/icons/owl-plus.png" alt="" class="plan-card-owl owl-plus" />
+              <img src="/owlhighlight.webp" alt="" class="plan-card-owl owl-plus" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
               <div class="plan-card-content">
                 <span class="plan-popular">⭐ MAIS POPULAR</span>
                 <div class="plan-card-top">
@@ -920,7 +943,7 @@
           <!-- PRO -->
           <div class="plan-slide" data-plan="PRO">
             <div class="plan-card card-pro">
-              <img src="/icons/owl-pro.png" alt="" class="plan-card-owl owl-pro" />
+              <img src="/owltrophy.webp" alt="" class="plan-card-owl owl-pro" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
               <div class="plan-card-content">
                 <div class="plan-card-top">
                   <div class="plan-card-name">⭐ Pro</div>
@@ -1139,7 +1162,7 @@
             <!-- Dica da Coruja -->
             <div id="ml-dica-coruja" style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(245,158,11,0.10),rgba(255,68,68,0.06));border:1px solid rgba(245,158,11,0.22);border-radius:16px;padding:12px 14px;margin-bottom:12px;cursor:pointer;" onclick="mlProximaDica()">
               <img id="ml-dica-owl" src="/webp/owl-tip.webp" alt="" style="width:46px;height:46px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.45));"
-                   onerror="this.style.display='none'" />
+                   onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
               <div style="flex:1;min-width:0;">
                 <div style="font-family:var(--font-h);font-size:11px;font-weight:800;color:var(--zap);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Dica da Coruja</div>
                 <div id="ml-dica-texto" style="font-size:12px;line-height:1.45;color:var(--text);">Mantenha seu status sempre atualizado — lojas abertas aparecem primeiro na busca.</div>
@@ -1162,7 +1185,7 @@
                 </button>
               </div>
               <p style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center;">Sobrepõe o horário automático temporariamente</p>
-              <div id="ml-toggle-erro" style="font-size:11px;color:var(--red);text-align:center;min-height:14px;margin-top:2px;"></div>
+              <div id="ml-toggle-erro" role="status" aria-live="polite" style="font-size:11px;color:var(--red);text-align:center;min-height:14px;margin-top:2px;"></div>
               <div id="ml-aberto-ate-wrap" style="display:none;margin-top:10px;padding:10px;background:rgba(0,208,132,0.06);border:1px solid rgba(0,208,132,0.2);border-radius:10px;">
                 <div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:8px;">⏱ Aberto até que horas? <span style="font-size:10px;color:var(--muted);font-weight:400;">(opcional)</span></div>
                 <div style="display:flex;gap:8px;align-items:center;">
@@ -1309,7 +1332,7 @@
                   </div>
                   <div>
                     <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Preço <span style="opacity:0.5;">(opcional)</span></div>
-                    <input id="ml-cardapio-preco" type="text" maxlength="20" placeholder="Ex: R$ 15,00 ou Consulte" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                    <input id="ml-cardapio-preco" type="text" maxlength="20" placeholder="Ex: 15,00 (apenas números)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
                   </div>
                   <div id="ml-cardapio-cat-wrap">
                     <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Categoria <span style="opacity:0.5;">(opcional)</span></div>
@@ -1331,7 +1354,7 @@
                 <button onclick="mlCardapioSalvar(true)" id="ml-cardapio-proximo-btn" style="width:100%;margin-top:6px;padding:9px;border-radius:8px;background:rgba(16,185,129,0.08);border:1px dashed rgba(16,185,129,0.4);color:#10b981;font-family:var(--font-h);font-size:11px;font-weight:700;cursor:pointer;">
                   <i class="fa fa-plus"></i> Salvar e adicionar próximo
                 </button>
-                <div id="ml-cardapio-form-msg" style="font-size:11px;text-align:center;margin-top:8px;min-height:14px;"></div>
+                <div id="ml-cardapio-form-msg" role="status" aria-live="polite" style="font-size:11px;text-align:center;margin-top:8px;min-height:14px;"></div>
               </div>
             </div>
 

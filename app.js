@@ -171,6 +171,45 @@
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwmJMmvb5H6KkMWdXJV441SQ2h18SEfLrb_4-kvUYM0IiVL6Co-EKGGay7f_qvUEi0_cg/exec';
   const ADMIN_WPP_CONTATO = '5515981125349'; // número único — atualizar aqui se mudar
 
+  /* ════════════════════════════════════════════════════════════
+     HELPER de API — centraliza o padrão repetido de POST ao Apps Script.
+     Monta o payload, aplica timeout, lê JSON e trata UNAUTHORIZED de forma
+     consistente. Usado pelos fluxos homogêneos (toggle, cardápio, instagram,
+     entrega, anúncio). Casos especiais (no-cors fire-and-forget, Promise.all,
+     GET de carregarLojas) seguem com fetch direto de propósito.
+     Retorna o objeto JSON parseado. Lança Error em falha de rede/timeout.
+  ════════════════════════════════════════════════════════════ */
+  async function apiPost(action, dados = {}, opts = {}) {
+    const timeout = opts.timeout || 12000;
+    const params  = new URLSearchParams();
+    params.append('payload', JSON.stringify(Object.assign({ action }, dados)));
+    const resp = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body:   params,
+      signal: AbortSignal.timeout(timeout),
+    });
+    const json = await resp.json();
+    // Sessão expirada: trata de forma central (a menos que o chamador peça pra não)
+    if (json && json.msg === 'UNAUTHORIZED' && !opts.ignoreUnauthorized) {
+      if (typeof lojaLogout === 'function') lojaLogout(true);
+      throw new Error('UNAUTHORIZED');
+    }
+    return json;
+  }
+
+  /* ── Máscara de WhatsApp progressiva: (15) 9 9999-9999 ──────────
+     Fonte única usada tanto no cadastro quanto no login de loja. */
+  function mascararWppBR(valorBruto) {
+    const d = String(valorBruto || '').replace(/\D/g, '').slice(0, 11);
+    if (d.length === 0) return '';
+    if (d.length <= 2)  return '(' + d;
+    if (d.length <= 6)  return `(${d.slice(0,2)}) ${d.slice(2)}`;
+    // Fixo (10 dígitos): (XX) XXXX-XXXX. Celular (11, com 9): (XX) 9 XXXX-XXXX.
+    // Enquanto digita (7-10), assume fixo; ao chegar no 11º dígito, vira celular.
+    if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+    return `(${d.slice(0,2)}) ${d.slice(2,3)} ${d.slice(3,7)}-${d.slice(7)}`;
+  }
+
   /* ══════════════════════════════════════════════════════════════
      SPLASH SCREEN — vídeo da coruja (cacheado) ou CSS fallback
      Tempo mínimo: 1.8s. Máximo: 5s (failsafe).
@@ -949,7 +988,7 @@
       document.getElementById('cadastro-form').reset();
       // Garante que o botão de submit está habilitado (pode ter ficado preso se modal foi fechado durante envio)
       const btn = document.querySelector('#cadastro-form .modal-submit');
-      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Cadastro'; btn.style.opacity = ''; }
+      if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); }
       // Reinicia o schedule builder visualmente
       scheduleTurnos = [{ dias: [1,2,3,4,5], abre: '08:00', fecha: '18:00' }];
       renderScheduleCards();
@@ -967,7 +1006,6 @@
       });
       // Oculta grupos de foto (só visíveis para planos pagos)
       document.getElementById('foto-group').style.display = '';
-      document.getElementById('logo-group').style.display = 'none';
       selectedPlan = 'GRATIS';
       // Reseta foto-lock e stepper
       const lockEl = document.getElementById('foto-lock-overlay');
@@ -1066,12 +1104,61 @@
       };
       const info = msgs[status];
       if (info) setTimeout(() => alert(info.t + '\n\n' + info.m), 400);
+      // Fix: no retorno de pagamento (sucesso ou pendente) o plano pode ter mudado no backend
+      // via webhook. Invalida o cache da loja para forçar fetch fresco na próxima abertura
+      // do painel — sem isto o lojista via o plano antigo até relogar.
+      if (status === 'sucesso' || status === 'pendente') {
+        try { localStorage.removeItem('angatuba_loja_dados'); } catch (e) {}
+        // Melhoria: polling do plano. O webhook costuma confirmar em segundos, então
+        // consultamos lojaDados algumas vezes e, assim que o plano mudar de GRATIS,
+        // atualizamos cache + badge ao vivo (sem o lojista precisar reabrir nada).
+        if (status === 'sucesso') iniciarPollingPlano();
+      }
       // Limpa o parâmetro da URL sem recarregar
       params.delete('pagamento');
       const novaUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
       window.history.replaceState({}, '', novaUrl);
     } catch (e) {}
   })();
+
+  /* ── Polling do plano após pagamento aprovado ─────────────────
+     Consulta lojaDados em intervalos crescentes. Para assim que detectar
+     plano != GRATIS (webhook processou) ou após esgotar as tentativas. */
+  let _pollPlanoTimers = [];
+  function pararPollingPlano() {
+    _pollPlanoTimers.forEach(t => clearTimeout(t));
+    _pollPlanoTimers = [];
+  }
+  function iniciarPollingPlano() {
+    const token = localStorage.getItem('angatuba_loja_token');
+    if (!token) return; // só faz sentido com loja logada
+    pararPollingPlano();
+    const atrasos = [3000, 7000, 13000, 22000]; // ~45s no total
+    atrasos.forEach(ms => {
+      const t = setTimeout(async () => {
+        try {
+          const json = await apiPost('lojaDados', { token }, { timeout: 10000, ignoreUnauthorized: true });
+          if (json && json.status === 'ok' && json.data) {
+            const plano = (json.data.plano || 'GRATIS').toUpperCase();
+            // Atualiza o cache sempre (mantém painel fresco)
+            try { localStorage.setItem('angatuba_loja_dados', JSON.stringify(json.data)); } catch(e) {}
+            if (plano !== 'GRATIS') {
+              pararPollingPlano();
+              // Atualiza o badge ao vivo se o painel estiver aberto
+              if (typeof _aplicarBadgePlano === 'function') _aplicarBadgePlano(plano);
+              const overlay = document.getElementById('modal-minha-loja');
+              if (overlay && overlay.classList.contains('open') && typeof _aplicarDadosLoja === 'function') {
+                _aplicarDadosLoja(json.data, null, true);
+                if (typeof mlCardapioCarregar === 'function') mlCardapioCarregar(plano);
+              }
+            }
+          }
+        } catch(e) { /* silencioso — é só um upgrade de UX */ }
+      }, ms);
+      _pollPlanoTimers.push(t);
+    });
+  }
+  window.iniciarPollingPlano = iniciarPollingPlano;
 
   let _carouselIdx = 0;
   const PLANS_ORDER = ['GRATIS', 'PLUS', 'PRO'];
@@ -1194,12 +1281,17 @@
   /* ── STEPPER DE CADASTRO ───────────────────────────────── */
   let _cadEtapaAtual = 1;
 
+  let _cadIndoVoltar = false;
   function cadIrParaEtapa(n) {
     _cadEtapaAtual = n;
+    const voltando = _cadIndoVoltar; _cadIndoVoltar = false;
     // Painéis
     [1,2,3].forEach(i => {
       const panel = document.getElementById('cad-panel-' + i);
-      if (panel) panel.classList.toggle('active', i === n);
+      if (!panel) return;
+      const ativo = (i === n);
+      panel.classList.toggle('active', ativo);
+      panel.classList.toggle('cad-back', ativo && voltando);
     });
     // Stepper visual
     [1,2,3].forEach(i => {
@@ -1239,8 +1331,15 @@
     }
     document.querySelectorAll('.cad-plan-dot').forEach((d, i) => {
       d.classList.toggle('active', i === _cadCarouselIdx);
+      d.setAttribute('aria-selected', i === _cadCarouselIdx ? 'true' : 'false');
     });
     cadSelecionarPlano(_CAD_PLANS[_cadCarouselIdx]);
+    var ativo = document.getElementById('plan-sel-' + _CAD_PLANS[_cadCarouselIdx].toLowerCase());
+    if (ativo) {
+      ativo.classList.remove('cad-pulse');
+      void ativo.offsetWidth;
+      ativo.classList.add('cad-pulse');
+    }
   };
 
   // Swipe touch no carousel inline
@@ -1261,28 +1360,74 @@
   window.cadAvancar = function(etapa) {
     // Validação básica antes de avançar
     if (etapa === 2) {
-      const nome = document.getElementById('f-nome');
-      const ramo = document.getElementById('f-ramo');
-      const wpp  = document.getElementById('f-wpp');
-      const end  = document.getElementById('f-endereco-rua');
-      if (!nome?.value.trim()) { nome?.focus(); nome?.classList.add('invalid'); return; }
+      const nome   = document.getElementById('f-nome');
+      const ramo   = document.getElementById('f-ramo');
+      const wpp    = document.getElementById('f-wpp');
+      const end    = document.getElementById('f-endereco-rua');
+      const bairro = document.getElementById('f-bairro');
+      if (!nome?.value.trim()) { cadShake(nome); nome?.focus(); return; }
       nome?.classList.remove('invalid');
       if (!ramo?.value.trim()) {
         document.getElementById('f-ramo-text')?.focus();
         return;
       }
-      if (!end?.value.trim()) { end?.focus(); end?.classList.add('invalid'); return; }
+      if (!end?.value.trim()) { cadShake(end); end?.focus(); return; }
       end?.classList.remove('invalid');
-      if (!wpp?.value.trim() || wpp?.classList.contains('invalid')) { wpp?.focus(); return; }
+      // Fix: valida o comprimento real do WPP (10-11 dígitos) em vez de só checar a classe
+      // .invalid — um número incompleto que nunca recebeu blur passava direto pro step 2.
+      const _wppDigits = (wpp?.value || '').replace(/\D/g, '');
+      if (_wppDigits.length !== 10 && _wppDigits.length !== 11) {
+        cadShake(wpp);
+        wpp?.focus();
+        return;
+      }
+      wpp?.classList.remove('invalid');
+      // Fix: bairro é obrigatório (vai pro backend e alimenta o filtro "Perto de mim").
+      if (bairro && !bairro.value.trim()) {
+        cadShake(bairro);
+        bairro.focus();
+        setTimeout(() => bairro.classList.remove('invalid'), 2500);
+        return;
+      }
+      bairro?.classList.remove('invalid');
     }
     cadIrParaEtapa(etapa);
     if (etapa === 3) {
       setTimeout(function() {
         cadCarouselIr(1, false); // começa no Plus, sem animação
+        cadMostrarHintCarousel();
       }, 60);
     }
   };
-  window.cadVoltar = function(etapa) { cadIrParaEtapa(etapa); };
+
+  // Mostra o hint "← deslize →" só na primeira visita à etapa 3.
+  function cadMostrarHintCarousel() {
+    var hint = document.getElementById('cad-carousel-hint');
+    if (!hint) return;
+    var KEY = 'cad_carousel_hint_v1';
+    var jaViu;
+    try { jaViu = localStorage.getItem(KEY); } catch (e) { jaViu = null; }
+    if (jaViu) { hint.style.display = 'none'; return; }
+    hint.classList.add('show');
+    var esconder = function () {
+      hint.classList.remove('show');
+      try { localStorage.setItem(KEY, '1'); } catch (e) {}
+    };
+    var wrap = document.getElementById('cad-carousel-wrap');
+    if (wrap) wrap.addEventListener('touchstart', esconder, { passive: true, once: true });
+    setTimeout(esconder, 5000);
+  }
+
+  // Marca campo inválido + dispara shake (sem duplicar listeners).
+  function cadShake(el) {
+    if (!el) return;
+    el.classList.add('invalid');
+    el.classList.remove('cad-shake');
+    void el.offsetWidth;
+    el.classList.add('cad-shake');
+    setTimeout(function () { el.classList.remove('cad-shake'); }, 450);
+  }
+  window.cadVoltar = function(etapa) { _cadIndoVoltar = true; cadIrParaEtapa(etapa); };
 
   /* ── Seletor de plano inline (etapa 3) ─────────────────── */
   window.cadSelecionarPlano = function(plano) {
@@ -1301,10 +1446,6 @@
     // Foto: mostra/esconde o lock overlay
     const lockEl = document.getElementById('foto-lock-overlay');
     if (lockEl) lockEl.classList.toggle('show', !isPago);
-
-    // Compat com JS antigo que usava logo-group
-    const lgEl = document.getElementById('logo-group');
-    if (lgEl) lgEl.style.display = 'none';
 
     // Hint do plano selecionado
     const icons = { GRATIS:'🏪', PLUS:'✦', PRO:'⭐' };
@@ -1368,6 +1509,11 @@
       const infoEl  = document.getElementById('cad-ciclo-' + sufixo);
       const calc    = calcPreco(plano, ciclo);
       if (!precoEl || !calc) return;
+
+      // micro-animação ao trocar o preço (fade rápido)
+      precoEl.classList.remove('price-flash');
+      void precoEl.offsetWidth;
+      precoEl.classList.add('price-flash');
 
       if (ciclo === 'mensal') {
         precoEl.classList.remove('price-riscado');
@@ -1564,13 +1710,8 @@
     const errEl = document.getElementById('f-wpp-err');
     if (!input) return;
 
-    function mask(v) {
-      const d = v.replace(/\D/g, '').slice(0, 11);
-      if (d.length <= 2)  return d;
-      if (d.length <= 6)  return `(${d.slice(0,2)}) ${d.slice(2)}`;
-      if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
-      return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
-    }
+    // Usa a máscara única (mascararWppBR) — antes havia duas implementações divergentes.
+    function mask(v) { return mascararWppBR(v); }
 
     function validate(showErr) {
       const digits = input.value.replace(/\D/g,'');
@@ -1620,14 +1761,13 @@
       const ramoInput = document.getElementById('f-ramo-text');
       ramoInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       ramoInput?.focus();
-      ramoInput?.classList.add('invalid');
+      cadShake(ramoInput);
       setTimeout(() => ramoInput?.classList.remove('invalid'), 2500);
       alert('Selecione o ramo / categoria da loja.');
       return;
     }
 
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Enviando...';
-    btn.style.opacity = '0.7';
+    btn.classList.add('is-loading');
     btn.disabled = true;
 
     try {
@@ -1645,8 +1785,7 @@
       // Valida horário
       if (!document.getElementById('f-horario').value) {
         alert('Selecione pelo menos um dia e horário de funcionamento.');
-        btn.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Cadastro';
-        btn.style.opacity = '';
+        btn.classList.remove('is-loading');
         btn.disabled = false;
         return;
       }
@@ -1725,8 +1864,7 @@
 
       successEl.classList.add('show');
     } catch {
-      btn.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Cadastro';
-      btn.style.opacity = '';
+      btn.classList.remove('is-loading');
       btn.disabled = false;
       alert('Erro ao enviar. Verifique sua conexão e tente novamente.');
     }
@@ -1809,6 +1947,8 @@
     if (errEl) errEl.classList.remove('show');
     document.getElementById('ll-wpp').classList.remove('invalid');
     llOtpInit();
+    // Melhoria: retoma o cooldown de reenvio se ainda estava ativo (reload da página).
+    llIniciarCooldown(true);
     llOtpReset();
     document.getElementById('login-loja-title').innerHTML = 'Acessar <span>Minha Loja</span>';
     document.getElementById('login-loja-sub').textContent = 'Digite o WhatsApp cadastrado para receber seu código';
@@ -1942,23 +2082,39 @@
   }
 
   /* ════════════ Cooldown do botão "Reenviar" (45s) ════════════ */
-  function llIniciarCooldown() {
+  const _LL_COOLDOWN_KEY = 'angatuba_otp_cooldown_ate';
+  const _LL_COOLDOWN_SEG  = 60; // alinhado ao rate-limit do backend
+
+  // Inicia o cooldown e grava o timestamp-alvo. Se 'restaurar' for true, retoma
+  // um cooldown já em andamento (ex: usuário recarregou a página).
+  function llIniciarCooldown(restaurar) {
     const btn = document.getElementById('ll-reenviar');
     if (!btn) return;
     if (_llCooldownInt) clearInterval(_llCooldownInt);
-    let restante = 45;
-    btn.disabled = true;
-    btn.textContent = `Reenviar em ${restante}s`;
-    _llCooldownInt = setInterval(() => {
-      restante--;
+
+    let alvo;
+    if (restaurar) {
+      try { alvo = Number(localStorage.getItem(_LL_COOLDOWN_KEY)) || 0; } catch(e) { alvo = 0; }
+      if (!alvo || alvo <= Date.now()) return; // nada a restaurar
+    } else {
+      alvo = Date.now() + _LL_COOLDOWN_SEG * 1000;
+      try { localStorage.setItem(_LL_COOLDOWN_KEY, String(alvo)); } catch(e) {}
+    }
+
+    const tick = () => {
+      const restante = Math.ceil((alvo - Date.now()) / 1000);
       if (restante <= 0) {
         clearInterval(_llCooldownInt); _llCooldownInt = null;
         btn.disabled = false;
         btn.textContent = 'Reenviar código';
+        try { localStorage.removeItem(_LL_COOLDOWN_KEY); } catch(e) {}
       } else {
+        btn.disabled = true;
         btn.textContent = `Reenviar em ${restante}s`;
       }
-    }, 1000);
+    };
+    tick();
+    _llCooldownInt = setInterval(tick, 1000);
   }
   function lojaReenviarCodigo() {
     const btn = document.getElementById('ll-reenviar');
@@ -1972,16 +2128,8 @@
 
   /* ── Máscara progressiva de WhatsApp: (15) 9 9999-9999 ─────── */
   function llMascaraWpp(el) {
-    let d = el.value.replace(/\D/g,'').slice(0,11);
-    let out = '';
-    if (d.length > 0)  out  = '(' + d.slice(0,2);
-    if (d.length >= 2) out += ') ';
-    if (d.length > 2 && d.length <= 6) {
-      out += d.slice(2);
-    } else if (d.length > 6) {
-      out += d.slice(2,3) + ' ' + d.slice(3,7) + '-' + d.slice(7);
-    }
-    el.value = out;
+    // Máscara única (mascararWppBR) — mesma lógica do campo de cadastro.
+    el.value = mascararWppBR(el.value);
     // limpa erro ao digitar
     el.classList.remove('invalid');
     const errEl = document.getElementById('ll-wpp-err');
@@ -2005,9 +2153,16 @@
     }
     _lojaWpp = wpp;
 
-    const btn = document.querySelector('#login-step1 .modal-submit');
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Solicitando...';
-    btn.disabled = true;
+    // Fix: no reenvio o usuário está no step 2 — o botão do step 1 está oculto.
+    // Mostra o loading no botão correto conforme o contexto.
+    const btn = _ehReenvio
+      ? document.getElementById('ll-reenviar')
+      : document.querySelector('#login-step1 .modal-submit');
+    const _btnLabelOrig = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ' + (_ehReenvio ? 'Reenviando...' : 'Solicitando...');
+      btn.disabled = true;
+    }
 
     try {
       const params = new URLSearchParams();
@@ -2018,7 +2173,15 @@
       });
       const json = await resp.json();
 
-      if (json.status === 'ok') {
+      // Fix: backend devolve status:'ok' com cooldown:true quando o código já foi pedido
+      // há pouco (rate-limit). Tratar como sucesso mostrava "código enviado" sem enviar nada.
+      if (json.status === 'ok' && (json.data?.cooldown || json.cooldown)) {
+        loginStep(2);
+        const hintEl = document.getElementById('login-codigo-hint');
+        if (hintEl) hintEl.textContent = json.msg || 'Código já enviado há pouco. Aguarde antes de pedir outro.';
+        setTimeout(() => { llOtpFocus(0); }, 120);
+        llIniciarCooldown();
+      } else if (json.status === 'ok') {
         loginStep(2);
         document.getElementById('login-loja-sub').textContent = 'Código enviado! Confira seu WhatsApp.';
 
@@ -2118,8 +2281,14 @@
         llWppErro('Erro de conexão. Verifique sua internet.');
       }
     } finally {
-      btn.innerHTML = '<i class="fab fa-whatsapp"></i> Receber código';
-      btn.disabled = false;
+      // Fix: restaura o botão certo. No reenvio o cooldown (llIniciarCooldown) cuida do
+      // texto/disabled do link; só restauramos o botão do step 1 aqui.
+      if (btn && !_ehReenvio) {
+        btn.innerHTML = '<i class="fab fa-whatsapp"></i> Receber código';
+        btn.disabled = false;
+      } else if (btn && _ehReenvio && !btn.disabled) {
+        btn.innerHTML = _btnLabelOrig || 'Reenviar código';
+      }
     }
   }
 
@@ -2185,6 +2354,28 @@
   }
 
   /* ── Painel Minha Loja ─────────────────────────────────────── */
+  // Atualiza só o badge de plano no hero do painel. Extraído para ser reutilizado
+  // pelo polling pós-pagamento (atualiza ao vivo mesmo fora do _aplicarDadosLoja).
+  function _aplicarBadgePlano(plano) {
+    const planBadge = document.getElementById('ml-plan-badge');
+    if (!planBadge) return;
+    const p = (plano || 'GRATIS').toUpperCase();
+    if (p === 'PRO') {
+      planBadge.textContent = '⭐ PRO';
+      planBadge.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
+      planBadge.style.color = '#000';
+    } else if (p === 'PLUS') {
+      planBadge.textContent = '✦ PLUS';
+      planBadge.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
+      planBadge.style.color = '#fff';
+    } else {
+      planBadge.textContent = 'GRÁTIS';
+      planBadge.style.background = 'rgba(122,122,122,0.4)';
+      planBadge.style.color = 'rgba(255,255,255,0.7)';
+    }
+  }
+  window._aplicarBadgePlano = _aplicarBadgePlano;
+
   // Aplica dados de lojaDados no painel (usado tanto pelo cache quanto pela API)
   function _aplicarDadosLoja(d, metJson, preservarToggle = false) {
     _lojaNome = d.nome;
@@ -2232,20 +2423,7 @@
     }
 
     // Badge de plano
-    const planBadge = document.getElementById('ml-plan-badge');
-    if (plano === 'PRO') {
-      planBadge.textContent = '⭐ PRO';
-      planBadge.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
-      planBadge.style.color = '#000';
-    } else if (plano === 'PLUS') {
-      planBadge.textContent = '✦ PLUS';
-      planBadge.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
-      planBadge.style.color = '#fff';
-    } else {
-      planBadge.textContent = 'GRÁTIS';
-      planBadge.style.background = 'rgba(122,122,122,0.4)';
-      planBadge.style.color = 'rgba(255,255,255,0.7)';
-    }
+    _aplicarBadgePlano(plano);
 
     // ── Instagram da loja ─────────────────────────────────
     const mlIgWrap = document.getElementById('ml-instagram-wrap');
@@ -2275,7 +2453,7 @@
           style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:#e1306c;text-decoration:none;">
           <i class="fa fa-external-link-alt" style="font-size:9px;"></i> Ver perfil atual: @${igHandleAtual}
         </a>` : ''}
-        <div id="ml-ig-status" style="font-size:10px;margin-top:6px;min-height:13px;"></div>`;
+        <div id="ml-ig-status" role="status" aria-live="polite" style="font-size:10px;margin-top:6px;min-height:13px;"></div>`;
     }
 
     // ── Toggle FazEntrega ─────────────────────────────────
@@ -2297,7 +2475,7 @@
                  id="ml-entrega-thumb"></div>
           </div>
         </label>
-        <div id="ml-entrega-status" style="font-size:10px;margin-top:6px;min-height:13px;color:var(--muted);"></div>`;
+        <div id="ml-entrega-status" role="status" aria-live="polite" style="font-size:10px;margin-top:6px;min-height:13px;color:var(--muted);"></div>`;
     }
 
     // Toggle — só aplica se o dono não interagiu durante carregamento
@@ -2630,9 +2808,15 @@
     }
 
     // ── Busca dados frescos em background ─────────────────────
-    let _painelInteragido = false;
+    // Fix: bind único por botão (dataset.flagBound) — antes acumulava um listener a cada
+    // abertura do painel quando o usuário não clicava em nenhum toggle.
+    window._mlPainelInteragido = false;
     ['ml-toggle-aberto','ml-toggle-voltamos','ml-toggle-fechado','ml-entrega-toggle'].forEach(id => {
-      document.getElementById(id)?.addEventListener('click', () => { _painelInteragido = true; }, { once: true });
+      const elT = document.getElementById(id);
+      if (elT && !elT.dataset.flagBound) {
+        elT.dataset.flagBound = '1';
+        elT.addEventListener('click', () => { window._mlPainelInteragido = true; });
+      }
     });
     try {
       // Token via POST — nunca em query string (logs de servidor, histórico do browser)
@@ -2658,7 +2842,7 @@
         // Salva cache para próxima abertura ser instantânea
         try { localStorage.setItem('angatuba_loja_dados', JSON.stringify(dadosJson.data)); } catch(e) {}
 
-        _aplicarDadosLoja(dadosJson.data, metJson, _painelInteragido);
+        _aplicarDadosLoja(dadosJson.data, metJson, window._mlPainelInteragido);
 
         // ── Cardápio ─────────────────────────────────────
         await mlCardapioCarregar(dadosJson.data.plano || 'GRATIS');
@@ -2793,16 +2977,18 @@
     } catch(e) {}
     try {
       // Token via POST — nunca em query string (logs de servidor, histórico do browser)
-      const params = new URLSearchParams();
-      params.append('payload', JSON.stringify({
-        action:     'lojaToggle',
-        token:      _lojaToken,
-        statusLoja: novoStatus,
-      }));
-      const resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(10000) });
-      const json = await resp.json();
-      if (json.msg === 'UNAUTHORIZED') { lojaLogout(true); return; }
+      const json = await apiPost('lojaToggle', { token: _lojaToken, statusLoja: novoStatus }, { timeout: 10000 });
+      // backend pode devolver erro de negócio (linha mudou, data inválida) com status != ok.
+      if (json.status !== 'ok') throw new Error(json.msg || 'Falha ao salvar status');
+      // Melhoria: feedback de sucesso (antes só o erro tinha feedback visível).
+      const okEl = document.getElementById('ml-toggle-erro');
+      if (okEl) {
+        okEl.style.color = 'var(--green)';
+        okEl.textContent = '✅ Status salvo';
+        setTimeout(() => { if (okEl) { okEl.textContent = ''; okEl.style.color = 'var(--red)'; } }, 2500);
+      }
     } catch(e) {
+      if (e.message === 'UNAUTHORIZED') return; // apiPost já fez logout
       console.warn('[lojaToggle] Erro:', e.message);
       // Fix #4: reverte visual E cache do localStorage (estava sobrescrevendo otimista)
       if (statusAnterior) marcarToggle(statusAnterior);
@@ -2831,15 +3017,7 @@
     if (status) { status.textContent = ''; status.style.color = ''; }
 
     try {
-      // Token via POST — nunca em query string
-      const params = new URLSearchParams();
-      params.append('payload', JSON.stringify({
-        action:    'lojaAtualizarInstagram',
-        token:     _lojaToken,
-        instagram: valor,
-      }));
-      const resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(10000) });
-      const json = await resp.json();
+      const json = await apiPost('lojaAtualizarInstagram', { token: _lojaToken, instagram: valor }, { timeout: 10000, ignoreUnauthorized: true });
 
       if (json.status === 'erro' || json.msg === 'UNAUTHORIZED') {
         if (status) { status.textContent = '❌ Erro ao salvar. Tente novamente.'; status.style.color = 'var(--red)'; }
@@ -4472,6 +4650,9 @@
   }
   window.saudacaoNoturnaFiltrar = saudacaoNoturnaFiltrar;
   atualizarSaudacaoNoturna();
+  // Fix: reavalia a cada minuto para o banner aparecer/sumir sozinho ao cruzar 22h/05h
+  // sem precisar recarregar a página.
+  setInterval(atualizarSaudacaoNoturna, 60_000);
 
   carregarLojas().then(() => {
     // Deep link: abre detalhes de loja pelo hash da URL (ex: /#mr-centro-automotivo)
@@ -5181,7 +5362,7 @@
 
     // Mostra busca apenas para PRO com itens suficientes para justificar
     const buscaWrap = document.getElementById('ml-cardapio-busca-wrap');
-    if (buscaWrap) buscaWrap.style.display = (isPro && ativos.length > 6) ? '' : 'none';
+    if (buscaWrap) buscaWrap.style.display = (isPro && ativos.length >= 6) ? '' : 'none';
 
     if (ativos.length === 0) {
       lista.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">
@@ -5501,16 +5682,16 @@
   async function mlCardapioRemover(id, nome) {
     if (!confirm(`Remover "${nome}" do cardápio?`)) return;
     try {
-      const params = new URLSearchParams();
-      params.append('payload', JSON.stringify({ action:'lojaCardapioRemover', token:_lojaToken, id }));
-      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
-      const json = await resp.json();
+      const json = await apiPost('lojaCardapioRemover', { token: _lojaToken, id });
       if (json.status !== 'ok') {
         alert('Erro ao remover: ' + (json.msg || 'Tente novamente.'));
         return;
       }
       await mlCardapioCarregar(_cardapioPlano);
-    } catch(e) { alert('Erro ao remover: ' + e.message); }
+    } catch(e) {
+      if (e.message === 'UNAUTHORIZED') return; // apiPost já fez logout
+      alert('Erro ao remover: ' + e.message);
+    }
   }
 
   window.mlCardapioAbrirForm  = mlCardapioAbrirForm;
@@ -5532,14 +5713,7 @@
     if (thumb) thumb.style.left = novoValor ? '21px' : '3px';
     if (statusEl) { statusEl.textContent = 'Salvando…'; statusEl.style.color = 'var(--muted)'; }
     try {
-      const params = new URLSearchParams();
-      params.append('payload', JSON.stringify({
-        action: 'lojaAtualizarEntrega',
-        token:  _lojaToken,
-        fazEntrega: novoValor ? 'SIM' : 'NAO',
-      }));
-      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
-      const json = await resp.json();
+      const json = await apiPost('lojaAtualizarEntrega', { token: _lojaToken, fazEntrega: novoValor ? 'SIM' : 'NAO' });
       if (json.status === 'ok') {
         if (statusEl) {
           statusEl.textContent = novoValor ? '✅ Entrega ativada' : '✅ Entrega desativada';
@@ -5548,6 +5722,7 @@
         }
       } else throw new Error(json.msg || 'Erro');
     } catch(e) {
+      if (e.message === 'UNAUTHORIZED') return; // apiPost já fez logout
       toggle.dataset.ativo = novoValor ? '0' : '1';
       toggle.style.background = novoValor ? 'var(--border)' : '#10b981';
       if (thumb) thumb.style.left = novoValor ? '3px' : '21px';

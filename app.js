@@ -742,16 +742,19 @@
       emptyEl.style.display = 'block';
       const emptyOwl = document.getElementById('empty-owl');
       const owlOk = emptyOwl && emptyOwl.dataset.failed !== '1';
+      const emptyTitle = document.getElementById('empty-title');
       if (LOJAS.length === 0) {
         document.getElementById('empty-icon').textContent = '🏗️';
         if (owlOk) { emptyOwl.src = '/webp/owl-idea.webp'; emptyOwl.style.display = 'block'; }
-        emptyMsg.textContent = 'Nenhuma loja cadastrada ainda.';
-        emptySub.textContent = 'Seja o primeiro a cadastrar seu negócio!';
+        if (emptyTitle) emptyTitle.textContent = 'Nenhuma loja por aqui ainda';
+        emptyMsg.textContent = 'Seja o primeiro a cadastrar seu negócio em Angatuba!';
+        emptySub.textContent = '';
       } else {
         document.getElementById('empty-icon').textContent = '🔍';
         if (owlOk) { emptyOwl.src = '/webp/owl-search.webp'; emptyOwl.style.display = 'block'; }
-        emptyMsg.textContent = 'Nenhuma loja encontrada.';
-        emptySub.textContent = 'Tente outro termo ou selecione outra categoria.';
+        if (emptyTitle) emptyTitle.textContent = 'Nenhuma loja encontrada';
+        emptyMsg.textContent = 'A coruja procurou e não achou nada. Tente outro termo ou categoria.';
+        emptySub.textContent = '';
       }
     } else {
       emptyEl.style.display = 'none';
@@ -2550,6 +2553,33 @@
     }
   }
 
+  // ── Dicas da Coruja (painel do lojista) ──────────────────
+  const ML_DICAS = [
+    'Mantenha seu status sempre atualizado — lojas abertas aparecem primeiro na busca.',
+    'Adicione uma foto de capa caprichada: lojas com foto recebem muito mais cliques.',
+    'Responda no WhatsApp o mais rápido possível — agilidade fecha mais vendas.',
+    'Peça aos clientes satisfeitos para avaliarem sua loja. Estrelas atraem novos clientes.',
+    'Confira o endereço e o horário de funcionamento: dados certos evitam clientes perdidos.',
+    'Use o botão "Já voltamos" quando sair rapidinho — assim ninguém pensa que fechou de vez.',
+    'Compartilhe o link da sua loja nas suas redes sociais para alcançar mais gente.',
+    'No plano Pro você adiciona logo, cardápio e vê métricas detalhadas dos seus cliques.',
+  ];
+  let _mlDicaIdx = -1;
+
+  function mlSortearDica() {
+    _mlDicaIdx = Math.floor(Math.random() * ML_DICAS.length);
+    mlAplicarDica();
+  }
+  function mlProximaDica() {
+    _mlDicaIdx = (_mlDicaIdx + 1) % ML_DICAS.length;
+    mlAplicarDica();
+  }
+  function mlAplicarDica() {
+    const el = document.getElementById('ml-dica-texto');
+    if (el) el.textContent = ML_DICAS[_mlDicaIdx] || ML_DICAS[0];
+  }
+  window.mlProximaDica = mlProximaDica;
+
   async function abrirMinhaLoja() {
     if (!_lojaToken) { openLoginLoja(); return; }
 
@@ -2562,6 +2592,7 @@
     const overlay = document.getElementById('modal-minha-loja');
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
+    mlSortearDica();
     // Fix #6: entrada no histórico para o botão "voltar" (Android) fechar o painel
     if (history.state?.modal !== 'minha-loja') history.pushState({ modal: 'minha-loja' }, '');
 

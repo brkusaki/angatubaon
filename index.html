@@ -1121,6 +1121,17 @@
           <!-- ░░ ABA HOJE ░░ -->
           <div id="ml-tab-hoje" class="ml-tab-content">
 
+            <!-- Dica da Coruja -->
+            <div id="ml-dica-coruja" style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(245,158,11,0.10),rgba(255,68,68,0.06));border:1px solid rgba(245,158,11,0.22);border-radius:16px;padding:12px 14px;margin-bottom:12px;cursor:pointer;" onclick="mlProximaDica()">
+              <img id="ml-dica-owl" src="/webp/owl-tip.webp" alt="" style="width:46px;height:46px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.45));"
+                   onerror="this.style.display='none'" />
+              <div style="flex:1;min-width:0;">
+                <div style="font-family:var(--font-h);font-size:11px;font-weight:800;color:var(--zap);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Dica da Coruja</div>
+                <div id="ml-dica-texto" style="font-size:12px;line-height:1.45;color:var(--text);">Mantenha seu status sempre atualizado — lojas abertas aparecem primeiro na busca.</div>
+              </div>
+              <i class="fa fa-rotate-right" style="font-size:12px;color:var(--muted);flex-shrink:0;" aria-hidden="true"></i>
+            </div>
+
             <!-- Status -->
             <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
               <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Status agora</div>

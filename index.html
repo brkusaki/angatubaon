@@ -184,7 +184,9 @@
 
   <!-- ══ TOAST ══ -->
   <div id="toast" role="alert" aria-live="assertive">
-    <i class="fa fa-clock-rotate-left toast-icon"></i>
+    <img src="/webp/owl-sleeping.webp" alt="" class="toast-owl"
+         onerror="this.style.display='none';var s=this.nextElementSibling;if(s)s.style.display='inline-block';" />
+    <i class="fa fa-clock-rotate-left toast-icon" style="display:none;"></i>
     <div class="toast-body">
       <strong id="toast-title">Loja fechada agora</strong>
       <span id="toast-msg">Abre em breve</span>
@@ -242,7 +244,9 @@
       </div>
       <div class="store-list" id="store-list"></div>
       <div class="empty-state" id="empty-state">
-        <span class="empty-icon" id="empty-icon">🔍</span>
+        <img id="empty-owl" class="empty-owl" src="/webp/owl-search.webp" alt=""
+             onerror="this.dataset.failed='1';this.style.display='none';var e=document.getElementById('empty-icon');if(e)e.style.display='block';" />
+        <span class="empty-icon" id="empty-icon" style="display:none;">🔍</span>
         <div class="empty-title" id="empty-title">Nenhuma loja encontrada</div>
         <p id="empty-msg">Tente outro termo ou selecione outra categoria.</p>
         <small id="empty-sub"></small>

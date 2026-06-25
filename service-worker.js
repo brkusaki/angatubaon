@@ -1,4 +1,4 @@
-const CACHE = 'angatubaon-v52';
+const CACHE = 'angatubaon-v53';
 const STATIC = [
   '/',
   '/index.html',
@@ -9,7 +9,24 @@ const STATIC = [
   '/webp/owl-celebrate-gratis.webp',
   '/webp/owl-celebrate-plus.webp',
   '/webp/owl-celebrate-pro.webp',
+  '/webp/owl-celebrate-flying.webp',
   '/webp/splash-anim.webp',
+  // Corujas estáticas (usadas em empty-state, toast, futuros estados de UI)
+  '/webp/owl-search.webp',
+  '/webp/owl-idea.webp',
+  '/webp/owl-sleeping.webp',
+  '/webp/owl-empty-wallet.webp',
+  '/webp/owl-goodnight.webp',
+  '/webp/owl-approved.webp',
+  '/webp/owl-wave.webp',
+  '/webp/owl-tip.webp',
+  '/webp/owl-highlight.webp',
+  '/webp/owl-tada.webp',
+  '/webp/owl-trophy.webp',
+  '/webp/owl-thumbsup.webp',
+  '/webp/owl-phone.webp',
+  '/webp/owl-sign.webp',
+  '/webp/owl-portrait.webp',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/owl-gratis.png',

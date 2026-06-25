@@ -740,12 +740,16 @@
 
     if (!temResultado) {
       emptyEl.style.display = 'block';
+      const emptyOwl = document.getElementById('empty-owl');
+      const owlOk = emptyOwl && emptyOwl.dataset.failed !== '1';
       if (LOJAS.length === 0) {
         document.getElementById('empty-icon').textContent = '🏗️';
+        if (owlOk) { emptyOwl.src = '/webp/owl-idea.webp'; emptyOwl.style.display = 'block'; }
         emptyMsg.textContent = 'Nenhuma loja cadastrada ainda.';
         emptySub.textContent = 'Seja o primeiro a cadastrar seu negócio!';
       } else {
         document.getElementById('empty-icon').textContent = '🔍';
+        if (owlOk) { emptyOwl.src = '/webp/owl-search.webp'; emptyOwl.style.display = 'block'; }
         emptyMsg.textContent = 'Nenhuma loja encontrada.';
         emptySub.textContent = 'Tente outro termo ou selecione outra categoria.';
       }

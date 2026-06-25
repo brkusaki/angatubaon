@@ -4941,6 +4941,7 @@
     try {
       const url = await uploadImagem(file, statusEl);
       if (!url) return; // uploadImagem já exibiu erro no statusEl
+      console.log('[DEBUG] tipo=' + tipo + ' | url=' + url); // TEMP
 
       // Salva URL na planilha
       const campo = tipo === 'logo' ? 'logoUrl' : 'fotoUrl';
@@ -4953,6 +4954,7 @@
       }));
       const saveResp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
       const saveJson = await saveResp.json();
+      console.log('[DEBUG] saveJson=', saveJson); // TEMP
       if (saveJson.status !== 'ok') throw new Error(saveJson.msg || 'Erro ao salvar');
 
       // Atualiza hero/logo no painel imediatamente

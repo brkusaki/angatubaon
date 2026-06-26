@@ -563,6 +563,30 @@ const ADMIN_WPP       = '5515981125349';
 // Token de sessão — salvo na memória da página (não no localStorage)
 let _sessionToken = null;
 
+/* Fetch com timeout compativel com WebView/navegadores antigos.
+   AbortSignal.timeout() so existe em Chrome 103+/Safari 16+; em celulares
+   antigos (publico-alvo) ela nem existe e quebraria toda acao POST. Aqui
+   fazemos feature-detect e caimos para AbortController + setTimeout. */
+function fetchComTimeout(url, options = {}, timeout = 15000) {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return fetch(url, { ...options, signal: AbortSignal.timeout(timeout) });
+  }
+  // Fallback manual
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), timeout);
+  return fetch(url, { ...options, signal: ctrl.signal })
+    .finally(() => clearTimeout(id));
+}
+
+/* Normaliza a mensagem de erro de uma falha de fetch para algo legivel ao
+   admin. Timeouts/abortos viram uma mensagem clara em vez do texto cru. */
+function msgErroRede(e) {
+  if (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+    return 'Tempo esgotado. Verifique a conexão e tente novamente.';
+  }
+  return (e && e.message) ? e.message : 'Falha de conexão';
+}
+
 /* ══ CRYPTO: SHA-256 via Web Crypto API ═══════════════════════ */
 async function sha256(text) {
   const encoder = new TextEncoder();
@@ -590,11 +614,10 @@ async function doLogin() {
     const params   = new URLSearchParams();
     params.append('payload', JSON.stringify({ action: 'login', passHash }));
 
-    const resp = await fetch(APPS_SCRIPT_URL, {
+    const resp = await fetchComTimeout(APPS_SCRIPT_URL, {
       method: 'POST',
       body:   params,
-      signal: AbortSignal.timeout(15000),
-    });
+    }, 15000);
     const json = await resp.json();
 
     if (json.status === 'ok' && json.data && json.data.token) {
@@ -634,13 +657,14 @@ async function doLogout() {
   location.reload();
 }
 
-// Restaura sessão se token ainda existe na sessionStorage
+// Restaura sessão se token ainda existe na sessionStorage.
+// NAO revela o painel administrativo imediatamente: valida o token via
+// loadData() primeiro (no INIT, no fim do arquivo). Enquanto valida, mantem
+// a tela de login visivel com um aviso discreto. Se o token for invalido,
+// handleUnauthorized() trata; se for valido, mostrarPainel() revela a UI.
 const _storedToken = sessionStorage.getItem('angatuba_token');
 if (_storedToken) {
   _sessionToken = _storedToken;
-  // Mostra painel imediatamente; se o token expirou, loadData() vai detectar e forçar logout
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('admin-panel').style.display  = 'block';
 }
 
 // Intercepta respostas UNAUTHORIZED e força logout automático
@@ -654,7 +678,12 @@ function handleUnauthorized() {
 }
 
 /* ══ TABS ═════════════════════════════════════════════════════ */
+/* Aba principal atualmente visivel. Permite re-disparar o loader correto
+   apos mutacoes (deleteLoja/savePlan/etc) e ao fim do loadData inicial. */
+let abaAtiva = 'pendentes';
+
 function switchTab(name, btn) {
+  abaAtiva = name;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
@@ -668,17 +697,26 @@ let allRows = [];
 
 async function loadData() {
   try {
-    const resp = await fetch(
+    const resp = await fetchComTimeout(
       `${APPS_SCRIPT_URL}?action=admin&token=${encodeURIComponent(_sessionToken || '')}`,
-      { signal: AbortSignal.timeout(12000) }
+      {}, 12000
     );
     const json = await resp.json();
     if (json.status === 'erro' && json.msg === 'UNAUTHORIZED') {
       handleUnauthorized(); return;
     }
     if (json.status === 'ok' && Array.isArray(json.data)) {
+      // Token confirmado pelo servidor: agora sim revela o painel (caso o
+      // carregamento tenha vindo da restauracao de sessao no reload).
+      if (document.getElementById('admin-panel').style.display !== 'block') {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('admin-panel').style.display  = 'block';
+      }
       allRows = json.data;
       renderAll();
+      // renderAll ja recalcula cobrancas. Metricas tem fetch proprio: se a aba
+      // ativa for Metricas (ex: aberta durante o carregamento), recarrega.
+      if (abaAtiva === 'metricas') loadMetricas();
     } else {
       showFallbackError();
     }
@@ -688,6 +726,17 @@ async function loadData() {
 }
 
 function showFallbackError() {
+  // Caso o erro ocorra durante a restauracao de sessao (painel ainda oculto),
+  // o usuario ficaria preso na tela de login com o botao travado. Restaura o
+  // botao e mostra um aviso para que ele possa tentar entrar novamente.
+  const painelVisivel = document.getElementById('admin-panel').style.display === 'block';
+  if (!painelVisivel) {
+    const lb = document.querySelector('.login-btn');
+    if (lb) { lb.textContent = 'Entrar'; lb.disabled = false; }
+    const errEl = document.getElementById('login-err');
+    if (errEl) { errEl.textContent = 'Erro de conexão ao restaurar sessão. Tente novamente.'; errEl.style.display = 'block'; }
+    return;
+  }
   ['pendentes','aprovados','planos','cobrancas'].forEach(k => {
     const el = document.getElementById('list-' + k);
     if (el) el.innerHTML =
@@ -707,7 +756,12 @@ function renderAll() {
 
   renderPendentesPeriodo(pendentes);
   renderList('aprovados', [...aprovados].sort((a, b) => b.row - a.row));
+  filterCards('aprovados'); // reaplica busca ativa nesta aba (igual as outras)
   renderPlanos(aprovados);
+
+  // Recalcula cobrancas a cada render: mantem o badge de urgencia correto
+  // mesmo sem o usuario abrir a aba, e atualiza a lista se ela ja estiver visivel.
+  renderCobrancas();
 }
 
 /* ══ PENDENTES POR PERÍODO ════════════════════════════════════ */
@@ -786,6 +840,8 @@ function switchPendPeriodo(id) {
   renderPendPeriodoTabs();
   renderPendPeriodoLista();
 }
+// pendPeriodoAtivo nao tem fallback automatico (default 'todos' nunca esvazia
+// quando ha pendentes), entao basta preservar a selecao — ja feito acima.
 
 function setCount(key, n) {
   const el = document.getElementById('count-' + key);
@@ -818,6 +874,7 @@ const PLAN_CATS = [
 const NOVAS_QTD = 5;
 
 let planCategoriaAtiva  = 'novas';
+let planCatTocada       = false;
 let planCategoriasCache = { novas: [], pro: [], plus: [], gratis: [] };
 
 function renderPlanos(rows) {
@@ -839,11 +896,12 @@ function renderPlanos(rows) {
     gratis: rows.filter(r => r.plano !== 'PRO' && r.plano !== 'PLUS'),
   };
 
-  // Se a categoria ativa ficou vazia (ex: era a única loja Pro e ela saiu
-  // do plano), cai para a primeira categoria que ainda tem lojas.
-  if (!planCategoriasCache[planCategoriaAtiva] || !planCategoriasCache[planCategoriaAtiva].length) {
+  // Fallback so enquanto o admin nao escolheu uma categoria manualmente.
+  // Depois disso respeita a selecao (mostra "Nenhuma loja nessa categoria"
+  // em vez de pular sozinho), evitando trocar de aba apos salvar um plano.
+  if (!planCatTocada && (!planCategoriasCache[planCategoriaAtiva] || !planCategoriasCache[planCategoriaAtiva].length)) {
     const fallback = PLAN_CATS.find(c => planCategoriasCache[c.id].length);
-    planCategoriaAtiva = fallback ? fallback.id : 'novas';
+    if (fallback) planCategoriaAtiva = fallback.id;
   }
 
   renderPlanoTabs();
@@ -878,6 +936,7 @@ function renderPlanoLista() {
 
 function switchPlanoCategoria(id) {
   planCategoriaAtiva = id;
+  planCatTocada = true;
   renderPlanoTabs();
   renderPlanoLista();
 }
@@ -890,7 +949,8 @@ function cardHTML(r, type) {
   const pill = pillCls[r.status]   || 'pill-pendente';
 
   const wppMsg = encodeURIComponent(`Olá ${r.nome}! Recebemos seu cadastro no AngatubaON. `);
-  const wppLink = r.wpp ? `https://wa.me/${r.wpp.replace(/\D/g,'')}?text=${wppMsg}` : '';
+  const wppLimpo = String(r.wpp || '').replace(/\D/g,'');
+  const wppLink  = wppLimpo ? `https://wa.me/${wppLimpo}?text=${wppMsg}` : '';
 
   const isPendente = r.status === 'PENDENTE';
 
@@ -978,17 +1038,36 @@ function toggleEditLoja(row) {
   const box = document.getElementById('edit-' + row);
   if (!box) return;
   const aberto = box.style.display !== 'none';
-  box.style.display = aberto ? 'none' : 'block';
-  if (!aberto) {
-    // Liga aviso de métricas órfãs se o nome for alterado
-    const nomeInput = document.getElementById('ef-nome-' + row);
-    const r = allRows.find(x => x.row === row);
-    const nomeOriginal = r ? (r.nome || '') : '';
-    const warn = document.getElementById('edit-warn-' + row);
-    nomeInput.oninput = () => {
-      warn.style.display = (nomeInput.value.trim() !== nomeOriginal.trim()) ? 'flex' : 'none';
-    };
+
+  if (aberto) {
+    // Esta fechando o proprio form (botao Cancelar / toggle).
+    box.style.display = 'none';
+    return;
   }
+
+  // Accordion: fecha qualquer outro formulario de edicao aberto antes de abrir
+  // este, para nao acumular varios forms expandidos (ruim em mobile).
+  document.querySelectorAll('.edit-form').forEach(f => {
+    if (f.id !== 'edit-' + row) f.style.display = 'none';
+  });
+
+  box.style.display = 'block';
+
+  // Liga aviso de métricas órfãs se o nome for alterado
+  const nomeInput = document.getElementById('ef-nome-' + row);
+  const r = allRows.find(x => x.row === row);
+  const nomeOriginal = r ? (r.nome || '') : '';
+  const warn = document.getElementById('edit-warn-' + row);
+  nomeInput.oninput = () => {
+    warn.style.display = (nomeInput.value.trim() !== nomeOriginal.trim()) ? 'flex' : 'none';
+  };
+}
+
+// Normaliza WhatsApp: so digitos, garante prefixo 55 (igual ao backend).
+function normalizarWpp(valor) {
+  let w = String(valor || '').replace(/\D/g, '');
+  if (w && !w.startsWith('55')) w = '55' + w;
+  return w;
 }
 
 async function saveEditLoja(row) {
@@ -996,12 +1075,23 @@ async function saveEditLoja(row) {
   const r = allRows.find(x => x.row === row);
   const wppAtual = r ? (r.wpp || '') : '';
 
+  // Normaliza ANTES de enviar, para que servidor, estado local e o que o
+  // admin ve no input fiquem identicos (sem divergencia ate o proximo reload).
+  const wppNorm = normalizarWpp(get('ef-wpp'));
+  const telNorm = get('ef-tel').replace(/\D/g, '');
+
+  // Reflete os valores normalizados de volta nos inputs (feedback visual)
+  const wppInput = document.getElementById('ef-wpp-' + row);
+  const telInput = document.getElementById('ef-tel-' + row);
+  if (wppInput) wppInput.value = wppNorm;
+  if (telInput) telInput.value = telNorm;
+
   const dados = {
     nome:     get('ef-nome'),
     ramo:     get('ef-ramo'),
     endereco: get('ef-endereco'),
-    wpp:      get('ef-wpp'),
-    tel:      get('ef-tel'),
+    wpp:      wppNorm,
+    tel:      telNorm,
     horario:  get('ef-horario'),
     obs:      get('ef-obs'),
   };
@@ -1019,11 +1109,10 @@ async function saveEditLoja(row) {
       ...dados,
     });
 
-    // Atualiza estado local após confirmação do servidor
+    // Atualiza estado local após confirmação do servidor (ja normalizado)
     if (r) {
       r.nome = dados.nome; r.ramo = dados.ramo; r.endereco = dados.endereco;
-      let w = dados.wpp.replace(/\D/g, ''); if (w && !w.startsWith('55')) w = '55' + w;
-      r.wpp = w; r.tel = dados.tel.replace(/\D/g, '');
+      r.wpp = wppNorm; r.tel = telNorm;
       r.horario = dados.horario; r.obs = dados.obs;
     }
     toast('✅ Loja atualizada');
@@ -1042,8 +1131,12 @@ function planCardHTML(r) {
   const planColor = { PRO:'var(--zap)', PLUS:'var(--indigo)', GRATIS:'var(--muted)' };
   const cor = planColor[plano] || 'var(--muted)';
 
-  // Calcula qual botão rápido está ativo baseado na validade atual
   const isoVal = isoDate(validade);
+  // Marca o botao de validade que corresponde a data atual (se algum bater).
+  // 'vitalicio' quando nao ha validade; senao compara dias restantes.
+  const diasRest = isoVal ? diasEntreHojeE(isoVal) : null;
+  const act = d => (diasRest === d ? ' active' : '');
+  const actVit = (isoVal ? '' : ' active');
 
   return `
     <div class="admin-card aprovado" id="plan-card-${r.row}" data-nome="${escAttr(r.nome)}">
@@ -1071,12 +1164,12 @@ function planCardHTML(r) {
         </button>
       </div>
       <div class="plan-quick-dates" id="pq-${r.row}">
-        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 7, this)">1 semana</button>
-        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 14, this)">2 semanas</button>
-        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 30, this)">1 mês</button>
-        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 90, this)">3 meses</button>
-        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 365, this)">1 ano</button>
-        <button class="plan-quick-btn" onclick="setQuickDate(${r.row}, 0, this)">Vitalício</button>
+        <button class="plan-quick-btn${act(7)}"   onclick="setQuickDate(${r.row}, 7, this)">1 semana</button>
+        <button class="plan-quick-btn${act(14)}"  onclick="setQuickDate(${r.row}, 14, this)">2 semanas</button>
+        <button class="plan-quick-btn${act(30)}"  onclick="setQuickDate(${r.row}, 30, this)">1 mês</button>
+        <button class="plan-quick-btn${act(90)}"  onclick="setQuickDate(${r.row}, 90, this)">3 meses</button>
+        <button class="plan-quick-btn${act(365)}" onclick="setQuickDate(${r.row}, 365, this)">1 ano</button>
+        <button class="plan-quick-btn${actVit}"   onclick="setQuickDate(${r.row}, 0, this)">Vitalício</button>
         ${isoVal ? `<span style="font-size:10px;color:var(--muted);align-self:center;">até ${escHtml(validade)}</span>` : ''}
       </div>
     </div>`;
@@ -1090,11 +1183,16 @@ function planCardHTML(r) {
 async function postAction(payloadObj, timeout = 15000) {
   const params = new URLSearchParams();
   params.append('payload', JSON.stringify(payloadObj));
-  const resp = await fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    body:   params,
-    signal: AbortSignal.timeout(timeout),
-  });
+  let resp;
+  try {
+    resp = await fetchComTimeout(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body:   params,
+    }, timeout);
+  } catch(e) {
+    // Timeout/abort/rede: re-lanca com mensagem legivel (o chamador faz toast)
+    throw new Error(msgErroRede(e));
+  }
   const json = await resp.json();
   if (json.status === 'erro') {
     if (json.msg === 'UNAUTHORIZED') { handleUnauthorized(); throw new Error('Sessão expirada'); }
@@ -1174,6 +1272,15 @@ async function savePlan(row) {
 }
 
 /* ══ VALIDADE RÁPIDA ══════════════════════════════════════════ */
+// Converte um Date para 'yyyy-mm-dd' usando os componentes LOCAIS.
+// (toISOString() usa UTC e, a noite em SP/UTC-3, adianta a data em 1 dia.)
+function localISODate(d) {
+  const y  = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${da}`;
+}
+
 function setQuickDate(row, dias, btn) {
   // Marca o botão ativo
   document.querySelectorAll(`#pq-${row} .plan-quick-btn`).forEach(b => b.classList.remove('active'));
@@ -1185,7 +1292,7 @@ function setQuickDate(row, dias, btn) {
   } else {
     const d = new Date();
     d.setDate(d.getDate() + dias);
-    hiddenInput.value = d.toISOString().split('T')[0]; // yyyy-mm-dd
+    hiddenInput.value = localISODate(d); // yyyy-mm-dd no fuso local
   }
 }
 
@@ -1279,7 +1386,8 @@ function abrirWppBoasVindas(r) {
     msg = `Olá ${nome}! 🎉\n\nSeu cadastro no AngatubaON foi aprovado e sua loja já aparece para os moradores de Angatuba!\n\nAcesse e veja como ficou: ${linkApp}\n\nQuando quiser mais destaque e recursos, temos os planos Plus e Pro. É só me chamar. Bem-vindo(a)! 🦉`;
   }
 
-  const numero = String(r.wpp).replace(/\D/g, '');
+  const numero = String(r.wpp || '').replace(/\D/g, '');
+  if (!numero) { toast('⚠️ Loja sem WhatsApp válido', true); return; }
   window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
@@ -1306,13 +1414,45 @@ function isoDate(br) {
   return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
 }
 
-let toastTimer;
+/* Dias inteiros entre hoje (00:00 local) e uma data 'yyyy-mm-dd'.
+   Usado para marcar qual botao de validade rapida corresponde a data salva.
+   Parseia em horario local (sem 'Z') para nao sofrer desvio de fuso. */
+function diasEntreHojeE(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  if (!m) return null;
+  const alvo = new Date(+m[1], +m[2] - 1, +m[3]); alvo.setHours(0, 0, 0, 0);
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  return Math.round((alvo - hoje) / 86400000);
+}
+
+/* Toast com fila: mensagens em sequencia rapida nao se sobrescrevem
+   instantaneamente (importante para nao "engolir" um erro com um sucesso
+   logo depois). Cada toast fica visivel por um tempo minimo antes do proximo.
+   Erros ficam um pouco mais de tempo na tela. */
+const _toastFila = [];
+let _toastAtivo = false;
+
 function toast(msg, isErr = false) {
+  _toastFila.push({ msg, isErr });
+  if (!_toastAtivo) _processarToast();
+}
+
+function _processarToast() {
   const el = document.getElementById('admin-toast');
-  el.textContent = msg;
-  el.className   = 'show' + (isErr ? ' err' : '');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.className = '', 3500);
+  if (!el) return;
+  const item = _toastFila.shift();
+  if (!item) { _toastAtivo = false; return; }
+
+  _toastAtivo = true;
+  el.textContent = item.msg;
+  el.className   = 'show' + (item.isErr ? ' err' : '');
+
+  const visivelPor = item.isErr ? 4200 : 3000;
+  setTimeout(() => {
+    el.className = ''; // inicia fade-out
+    // Espera o fim da transicao (250ms no CSS) antes do proximo toast
+    setTimeout(_processarToast, 280);
+  }, visivelPor);
 }
 
 /* Badge de crescimento semanal: compara cliques dos últimos 7 dias (d7)
@@ -1344,6 +1484,7 @@ const COBR_CATS = [
   { id: 'emdia',    titulo: 'Em dia',      icon: 'fa-circle-check',        cor: 'var(--green)'  },
 ];
 let cobrCatAtiva  = 'vencidas';
+let cobrCatTocada = false; // vira true quando o admin escolhe uma categoria
 let cobrCache     = { vencidas: [], d7: [], d30: [], emdia: [] };
 
 /* dias até vencer: negativo = já venceu, null = vitalício/sem data */
@@ -1387,10 +1528,13 @@ function renderCobrancas() {
   const urgentes = cobrCache.vencidas.length + cobrCache.d7.length;
   setCount('cobrancas', urgentes);
 
-  // Se a categoria ativa está vazia, cai pra primeira com itens
-  if (!cobrCache[cobrCatAtiva].length) {
+  // Fallback APENAS no primeiro carregamento (selecao default 'vencidas'
+  // ainda nao tocada pelo usuario). Depois disso a selecao do admin e
+  // sempre respeitada, mesmo que a categoria esteja vazia (mostra "Nenhuma
+  // loja nesta situacao" em vez de pular sozinho para outra aba).
+  if (!cobrCatTocada && !cobrCache[cobrCatAtiva].length) {
     const fb = COBR_CATS.find(c => cobrCache[c.id].length);
-    cobrCatAtiva = fb ? fb.id : 'vencidas';
+    if (fb) cobrCatAtiva = fb.id;
   }
 
   renderCobrSummary();
@@ -1446,6 +1590,7 @@ function renderCobrLista() {
 
 function switchCobrCat(id) {
   cobrCatAtiva = id;
+  cobrCatTocada = true;
   renderCobrTabs();
   renderCobrLista();
 }
@@ -1513,9 +1658,9 @@ async function loadMetricas() {
   tableEl.innerHTML = '<div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>';
 
   try {
-    const resp = await fetch(
+    const resp = await fetchComTimeout(
       `${APPS_SCRIPT_URL}?action=metricas&token=${encodeURIComponent(_sessionToken || '')}`,
-      { signal: AbortSignal.timeout(12000) }
+      {}, 12000
     );
     const json = await resp.json();
     if (json.status === 'erro' && json.msg === 'UNAUTHORIZED') {
@@ -1601,7 +1746,12 @@ async function loadMetricas() {
 // Carrega métricas quando a aba é ativada — integrado ao switchTab original acima
 
 /* ══ INIT ═════════════════════════════════════════════════════ */
-if (_storedToken) loadData();
+if (_storedToken) {
+  // Feedback enquanto valida o token salvo (o painel so aparece apos confirmar)
+  const lb = document.querySelector('.login-btn');
+  if (lb) { lb.textContent = 'Restaurando sessão...'; lb.disabled = true; }
+  loadData();
+}
 </script>
 </body>
 </html>

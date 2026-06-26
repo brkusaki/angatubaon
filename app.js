@@ -4736,6 +4736,16 @@
     const h = new Date().getHours();
     const ehNoite = (h >= 22 || h < 5);
     el.style.display = ehNoite ? 'flex' : 'none';
+    // Igreja Matriz no header — alterna dia (5h-18h) / noite (22h-5h)
+    // Entardecer (18h-22h): sem imagem (overlap de transição)
+    const _hdr = document.querySelector('header.header');
+    if (_hdr) {
+      const _hh = new Date().getHours();
+      const _ehDia    = (_hh >= 5  && _hh < 18);
+      const _ehNoite2 = (_hh >= 22 || _hh < 5);
+      _hdr.classList.toggle('header-dia',     _ehDia);
+      _hdr.classList.toggle('header-noturno', _ehNoite2);
+    }
   }
   function saudacaoNoturnaFiltrar() {
     const pillAberto = document.querySelector('.pill-btn[data-filter="open"]');

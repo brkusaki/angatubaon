@@ -50,6 +50,24 @@
       backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       border-bottom: none;
       padding: 14px 16px 0;
+      background-size: cover;
+      background-position: center 30%;
+    }
+
+    /* Igreja Matriz — fundo do header — troca dia/noite */
+    .header-dia {
+      background:
+        linear-gradient(to bottom, rgba(10,20,40,0.55) 0%, rgba(10,20,40,0.72) 100%),
+        url('/img/igreja-dia.jpg') center 30% / cover no-repeat;
+    }
+    .header-noturno {
+      background:
+        linear-gradient(to bottom, rgba(5,5,20,0.68) 0%, rgba(5,5,20,0.88) 100%),
+        url('/img/igreja-noite.jpg') center 30% / cover no-repeat;
+    }
+    /* Transição suave ao trocar as classes */
+    .header-dia, .header-noturno {
+      transition: opacity 1s ease;
     }
     .header-top {
       display: flex; align-items: center;

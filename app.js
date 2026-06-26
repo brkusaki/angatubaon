@@ -3853,11 +3853,15 @@
       : '';
 
     // ── ENDEREÇO ─────────────────────────────────────────────
+    const _mapsHref = (loja.maps && loja.maps.startsWith('https://'))
+      ? ` onclick="window.open('${loja.maps}','_blank','noopener')" style="cursor:pointer;"` : '';
+    const _mapsTag = (loja.maps && loja.maps.startsWith('https://'))
+      ? '<span style="font-size:9px;opacity:.55;margin-left:4px;color:var(--green);">↗ Maps</span>' : '';
     const enderecoHTML = loja.endereco
-      ? `<div class="detail-info-row">
+      ? `<div class="detail-info-row"${_mapsHref}>
            <div class="detail-info-icon addr"><i class="fa fa-map-marker-alt"></i></div>
            <div class="detail-info-text">
-             <span class="detail-info-label">Endereço</span>
+             <span class="detail-info-label">Endereço ${_mapsTag}</span>
              ${escHTML(loja.endereco)}
            </div>
          </div>`
@@ -3953,8 +3957,9 @@
     // Formulário de avaliação (todos podem avaliar)
     const avalFormHTML = `
       <div id="aval-form-${idx}" style="margin-bottom:14px;margin-top:4px;padding-top:14px;border-top:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">
-          Avaliar esta loja
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <img src="/webp/owl-wave.webp" alt="" style="width:32px;height:32px;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'" />
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Avaliar esta loja</div>
         </div>
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;">
           <!-- Estrelas clicáveis -->
@@ -4252,28 +4257,27 @@
       }
     }
 
-    // Botão Mapa — texto visível se não há WhatsApp, ícone se há
-    // Fix #24: só insere o href se a URL começa com https:// (evita javascript: ou dados inválidos)
+    // Botão Mapa: mostrado apenas quando NÃO há contato (wpp/tel)
+    // Quando há contato, o endereço já é clicável → sem duplicidade
+    // Fix #24: só insere o href se a URL começa com https://
     if (loja.maps && loja.maps.startsWith('https://')) {
       const mapsUrl = escAttr(loja.maps);
       const temContato = loja.wpp || loja.tel;
-      main += temContato
-        ? `<a href="${mapsUrl}" target="_blank" rel="noopener"
-            class="detail-btn-maps" aria-label="Como chegar">
-            <i class="fa fa-map-marker-alt"></i>
-          </a>`
-        : `<a href="${mapsUrl}" target="_blank" rel="noopener"
+      if (!temContato) {
+        main += `<a href="${mapsUrl}" target="_blank" rel="noopener"
             class="detail-btn-maps-full" aria-label="Como chegar">
             <i class="fa fa-map-marker-alt"></i> Como chegar
           </a>`;
+      }
     }
 
     // Botão compartilhar — sempre presente
     const _idx = _lojaIdxMap.get(loja) ?? LOJAS.indexOf(loja);
+    const _temContBtns = !!(loja.wpp || loja.tel);
     main += `<button onclick="detalhesCompartilhar(${_idx})"
-      class="detail-btn-maps" aria-label="Compartilhar"
+      class="${_temContBtns ? 'detail-btn-maps' : 'detail-btn-maps-full'}" aria-label="Compartilhar"
       style="background:rgba(99,102,241,0.1);border-color:rgba(99,102,241,0.25);color:var(--indigo);">
-      <i class="fa fa-share-nodes"></i>
+      <i class="fa fa-share-nodes"></i>${_temContBtns ? '' : ' Compartilhar'}
     </button>`;
 
     // Botão Instagram — linha separada
@@ -5502,8 +5506,10 @@
     if (buscaWrap) buscaWrap.style.display = (isPro && ativos.length >= 6) ? '' : 'none';
 
     if (ativos.length === 0) {
-      lista.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">
-        Nenhum item ainda.<br>Clique em <strong>Adicionar</strong> para começar.
+      lista.innerHTML = `<div style="text-align:center;padding:24px 16px 20px;color:var(--muted);">
+        <img src="/webp/owl-idea.webp" alt="" style="width:72px;height:72px;object-fit:contain;margin-bottom:8px;opacity:.9;" onerror="this.style.display='none'" />
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">Cardápio vazio</div>
+        <div style="font-size:11px;line-height:1.5;">Clique em <strong style="color:var(--green);">+ Adicionar</strong> para incluir<br>seu primeiro produto ou serviço.</div>
       </div>`;
       return;
     }

@@ -1196,11 +1196,13 @@
             localStorage.setItem('angatuba_loja_nome',  _lojaNome);
             localStorage.setItem('angatuba_loja_wpp',   wpp);
             atualizarNav();
+            // Fecha o modal de cadastro se ainda estiver aberto e abre o painel.
+            // Abre o Minha Loja SEMPRE que aprovar — mesmo que o usuário já tenha
+            // fechado a tela de sucesso —, senão o login automático salva o token
+            // mas o lojista fica sem feedback e precisa clicar manualmente.
             const modalCad = document.getElementById('modal-cadastro');
-            if (modalCad && modalCad.classList.contains('open')) {
-              closeModal(false);
-              setTimeout(() => abrirMinhaLoja(), 400);
-            }
+            if (modalCad && modalCad.classList.contains('open')) closeModal(false);
+            setTimeout(() => abrirMinhaLoja(), 400);
           } else { tentar(); }
         } catch(e) { tentar(); }
       }, INTERVALO_MS);
@@ -1209,12 +1211,6 @@
     tentar();
   }
   window.iniciarPollingAprovacao = iniciarPollingAprovacao;
-
-  // Retoma polling se havia WPP pendente (ex: recarregou a página)
-  (function retomaPendente() {
-    const wppPend = localStorage.getItem('angatuba_pendente_wpp');
-    if (wppPend && !_lojaToken) iniciarPollingAprovacao(wppPend);
-  })();
 
   let _carouselIdx = 0;
   const PLANS_ORDER = ['GRATIS', 'PLUS', 'PRO'];
@@ -1943,6 +1939,15 @@
   let _llTimerInt    = null;           // timer de expiração (10 min)
   let _llTimerRestante = 0;            // segundos restantes
   let _llCooldownInt = null;           // cooldown do botão reenviar
+
+  // Retoma o polling de aprovação se havia um WPP pendente (ex.: o lojista
+  // recarregou a página antes da loja ser aprovada). Precisa rodar DEPOIS da
+  // declaração de _lojaToken acima — se rodar antes, acessar _lojaToken cai na
+  // TDZ (ReferenceError) e derruba o restante do script no reload.
+  (function retomaPendente() {
+    const wppPend = localStorage.getItem('angatuba_pendente_wpp');
+    if (wppPend && !_lojaToken) iniciarPollingAprovacao(wppPend);
+  })();
 
   /* ── Atualiza a bottom nav conforme sessão ───────────────── */
   function atualizarNav() {

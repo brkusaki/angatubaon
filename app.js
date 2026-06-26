@@ -1160,70 +1160,6 @@
   }
   window.iniciarPollingPlano = iniciarPollingPlano;
 
-  /* ── Polling de aprovação pós-cadastro ────────────────────────
-     Após o cadastro, verifica periodicamente se a loja foi aprovada.
-     Quando aprovada, faz login automático e abre Minha Loja.
-     Para quando logado, ou após ~5 min, ou quando o modal fecha. */
-  let _pollAprovTimers = [];
-  function pararPollingAprovacao() {
-    _pollAprovTimers.forEach(t => clearTimeout(t));
-    _pollAprovTimers = [];
-  }
-  function iniciarPollingAprovacao(wpp) {
-    if (!wpp) return;
-    pararPollingAprovacao();
-    // Tenta a cada 15s por até 5 minutos (20 tentativas)
-    const INTERVALO_MS = 15000;
-    const MAX_TENTATIVAS = 20;
-    let tentativa = 0;
-    function tentar() {
-      if (_lojaToken) { pararPollingAprovacao(); return; } // já logado
-      tentativa++;
-      if (tentativa > MAX_TENTATIVAS) { pararPollingAprovacao(); return; }
-      const t = setTimeout(async () => {
-        try {
-          const params = new URLSearchParams();
-          params.append('payload', JSON.stringify({ action: 'lojaVerificarAprovacao', wpp }));
-          const resp = await fetch(APPS_SCRIPT_URL, {
-            method: 'POST', body: params,
-            signal: AbortSignal.timeout(12000),
-          });
-          const json = await resp.json();
-          if (json.status === 'ok' && json.data && json.data.token) {
-            // Aprovada! Faz login automático
-            pararPollingAprovacao();
-            localStorage.removeItem('angatuba_pendente_wpp');
-            _lojaToken = json.data.token;
-            _lojaNome  = json.data.nome || '';
-            localStorage.setItem('angatuba_loja_token', _lojaToken);
-            localStorage.setItem('angatuba_loja_nome',  _lojaNome);
-            localStorage.setItem('angatuba_loja_wpp',   wpp);
-            atualizarNav();
-            // Se o modal de cadastro ainda estiver aberto, fecha e abre Minha Loja
-            const modalCad = document.getElementById('modal-cadastro');
-            if (modalCad && modalCad.classList.contains('open')) {
-              closeModal(false);
-              setTimeout(() => abrirMinhaLoja(), 400);
-            }
-          }
-          // Se PENDENTE ou erro, agenda próxima tentativa
-          else { tentar(); }
-        } catch(e) {
-          tentar(); // erro de rede, tenta de novo
-        }
-      }, INTERVALO_MS);
-      _pollAprovTimers.push(t);
-    }
-    tentar();
-  }
-  window.iniciarPollingAprovacao = iniciarPollingAprovacao;
-
-  // Retoma polling se havia WPP pendente de sessão anterior (recarregou a página)
-  (function retomaPendente() {
-    const wppPend = localStorage.getItem('angatuba_pendente_wpp');
-    if (wppPend && !_lojaToken) iniciarPollingAprovacao(wppPend);
-  })();
-
   let _carouselIdx = 0;
   const PLANS_ORDER = ['GRATIS', 'PLUS', 'PRO'];
 
@@ -1927,13 +1863,6 @@
       }
 
       successEl.classList.add('show');
-
-      // Salva WPP para polling de aprovação automático
-      const wppCadastro = String(payload.whatsapp || '').replace(/\D/g, '');
-      if (wppCadastro) {
-        localStorage.setItem('angatuba_pendente_wpp', wppCadastro);
-        iniciarPollingAprovacao(wppCadastro);
-      }
     } catch {
       btn.classList.remove('is-loading');
       btn.disabled = false;
@@ -3138,8 +3067,6 @@
     localStorage.removeItem('angatuba_loja_wpp');
     localStorage.removeItem('angatuba_anuncio');
     localStorage.removeItem('angatuba_loja_dados');
-    localStorage.removeItem('angatuba_pendente_wpp');
-    pararPollingAprovacao();
     fecharMinhaLoja();
     atualizarNav();
     if (!silencioso) {
@@ -3894,9 +3821,11 @@
                     filter:drop-shadow(0 2px 6px rgba(245,158,11,0.4));" onerror="this.style.display='none'" />`
       : '';
 
-    const avalHTML = (isPago && avaliacoes.length > 0)
-      ? `<div style="margin-bottom:14px;">
-           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+    // ── Resumo de avaliações: média + estrelas + troféu + botão expandir ──
+    const temAvals = isPago && avaliacoes.length > 0;
+    const avalResumoHTML = temAvals
+      ? `<div style="margin-bottom:12px;">
+           <div style="display:flex;align-items:center;gap:8px;">
              <span style="font-size:1.4rem;font-weight:800;font-family:var(--font-h);">${mediaAval}</span>
              <div>
                <div style="display:flex;gap:2px;">${[1,2,3,4,5].map(s => {
@@ -3907,34 +3836,58 @@
              </div>
              ${trofeuHTML}
            </div>
-           ${avaliacoes.slice(0,3).map((a, i) => {
-             // Botão sinalizar: só aparece para o dono da loja logado
-             const isDono = _lojaToken && _lojaNome === loja.nome;
-             const sinalizarBtn = isDono
-               ? `<button onclick="avalSinalizar(${idx},${i},'${escAttr(loja.nome)}')" title="Sinalizar para revisão"
-                    style="font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;
-                           padding:2px 6px;border-radius:5px;border:1px solid var(--border);flex-shrink:0;">
-                    🚩
-                  </button>`
-               : '';
-             return `
-             <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;">
-               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:6px;">
-                 <span style="font-size:12px;font-weight:700;">${escHTML(a.autor || 'Anônimo')}</span>
-                 <div style="display:flex;align-items:center;gap:6px;">
-                   <span style="font-size:11px;color:#f59e0b;">${'★'.repeat(a.nota || 0)}${'☆'.repeat(5-(a.nota||0))}</span>
-                   ${sinalizarBtn}
-                 </div>
-               </div>
-               ${a.texto ? `<p style="font-size:11px;color:var(--muted);margin:0;line-height:1.5;">${escHTML(a.texto)}</p>` : ''}
-             </div>
-           `}).join('')}
+           <button type="button" id="aval-toggle-${idx}" onclick="avalToggleLista(${idx})"
+             style="width:100%;margin-top:10px;padding:9px;border-radius:9px;cursor:pointer;
+                    background:var(--surface2);border:1px solid var(--border);color:var(--text);
+                    font-family:var(--font-b);font-size:12.5px;font-weight:600;
+                    display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent;">
+             <span class="aval-toggle-txt">Ver ${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''}</span>
+             <span class="aval-toggle-chev" style="transition:transform 0.25s;">⌄</span>
+           </button>
+         </div>`
+      : '';
+
+    // ── Lista de avaliações (colapsável, renderiza no máx. 8 por vez) ──
+    const AVAL_VISIVEIS = 8;
+    const avalListaItens = (lista) => lista.map((a, i) => {
+      const isDono = _lojaToken && _lojaNome === loja.nome;
+      const sinalizarBtn = isDono
+        ? `<button onclick="avalSinalizar(${idx},${i},'${escAttr(loja.nome)}')" title="Sinalizar para revisão"
+             style="font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;
+                    padding:2px 6px;border-radius:5px;border:1px solid var(--border);flex-shrink:0;">🚩</button>`
+        : '';
+      return `
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:6px;">
+            <span style="font-size:12px;font-weight:700;">${escHTML(a.autor || 'Anônimo')}</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:11px;color:#f59e0b;">${'★'.repeat(a.nota || 0)}${'☆'.repeat(5-(a.nota||0))}</span>
+              ${sinalizarBtn}
+            </div>
+          </div>
+          ${a.texto ? `<p style="font-size:11px;color:var(--muted);margin:0;line-height:1.5;">${escHTML(a.texto)}</p>` : ''}
+        </div>`;
+    }).join('');
+
+    const avalMaisBtn = avaliacoes.length > AVAL_VISIVEIS
+      ? `<button type="button" id="aval-mais-${idx}" onclick="avalVerTodas(${idx})"
+           style="width:100%;padding:8px;border-radius:8px;cursor:pointer;margin-top:2px;
+                  background:none;border:1px dashed var(--border);color:var(--muted);
+                  font-family:var(--font-b);font-size:12px;font-weight:600;-webkit-tap-highlight-color:transparent;">
+           + Ver todas as ${avaliacoes.length}
+         </button>`
+      : '';
+
+    const avalListaHTML = temAvals
+      ? `<div id="aval-lista-${idx}" class="aval-lista-colapsada">
+           <div id="aval-lista-itens-${idx}">${avalListaItens(avaliacoes.slice(0, AVAL_VISIVEIS))}</div>
+           ${avalMaisBtn}
          </div>`
       : '';
 
     // Formulário de avaliação (todos podem avaliar)
     const avalFormHTML = `
-      <div id="aval-form-${idx}" style="margin-bottom:14px;">
+      <div id="aval-form-${idx}" style="margin-bottom:14px;margin-top:4px;padding-top:14px;border-top:1px solid var(--border);">
         <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">
           Avaliar esta loja
         </div>
@@ -3979,7 +3932,8 @@
           ${horarioHTML}
           ${obsHTML}
         </div>
-        ${avalHTML}
+        ${avalResumoHTML}
+        ${avalListaHTML}
         ${avalFormHTML}
       </div>
       <div class="detail-actions">${actionsMain}</div>
@@ -5282,6 +5236,51 @@
     } catch(e) {
       alert('Erro ao sinalizar: ' + e.message);
     }
+  };
+
+  // Expande/recolhe a lista de avaliações
+  window.avalToggleLista = function(idx) {
+    const lista = document.getElementById('aval-lista-' + idx);
+    const btn   = document.getElementById('aval-toggle-' + idx);
+    if (!lista || !btn) return;
+    const aberta = lista.classList.toggle('aberta');
+    const chev = btn.querySelector('.aval-toggle-chev');
+    const txt  = btn.querySelector('.aval-toggle-txt');
+    if (chev) chev.style.transform = aberta ? 'rotate(180deg)' : '';
+    if (aberta) {
+      lista.style.maxHeight = lista.scrollHeight + 'px';
+      if (txt) txt.textContent = 'Ocultar avaliações';
+    } else {
+      lista.style.maxHeight = '0px';
+      const loja = LOJAS[idx];
+      const n = loja && loja.avaliacoes ? loja.avaliacoes.length : 0;
+      if (txt) txt.textContent = 'Ver ' + n + ' avaliação' + (n > 1 ? 'ões' : '');
+    }
+  };
+
+  // Renderiza TODAS as avaliações (quando passam do limite inicial)
+  window.avalVerTodas = function(idx) {
+    const loja = LOJAS[idx];
+    if (!loja || !loja.avaliacoes) return;
+    const cont = document.getElementById('aval-lista-itens-' + idx);
+    const maisBtn = document.getElementById('aval-mais-' + idx);
+    const lista = document.getElementById('aval-lista-' + idx);
+    if (!cont) return;
+    const isDono = _lojaToken && _lojaNome === loja.nome;
+    cont.innerHTML = loja.avaliacoes.map((a, i) => {
+      const sin = isDono
+        ? '<button onclick="avalSinalizar(' + idx + ',' + i + ',\'' + escAttr(loja.nome) + '\')" title="Sinalizar para revisão" style="font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:5px;border:1px solid var(--border);flex-shrink:0;">🚩</button>'
+        : '';
+      const estrelas = '★'.repeat(a.nota || 0) + '☆'.repeat(5 - (a.nota || 0));
+      const txt = a.texto ? '<p style="font-size:11px;color:var(--muted);margin:0;line-height:1.5;">' + escHTML(a.texto) + '</p>' : '';
+      return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:6px;">'
+        + '<span style="font-size:12px;font-weight:700;">' + escHTML(a.autor || 'Anônimo') + '</span>'
+        + '<div style="display:flex;align-items:center;gap:6px;">'
+        + '<span style="font-size:11px;color:#f59e0b;">' + estrelas + '</span>' + sin + '</div></div>' + txt + '</div>';
+    }).join('');
+    if (maisBtn) maisBtn.remove();
+    if (lista && lista.classList.contains('aberta')) lista.style.maxHeight = lista.scrollHeight + 'px';
   };
 
   window.avalSetNota = function(idx, nota) {

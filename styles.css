@@ -2485,3 +2485,13 @@
   margin-bottom: 14px;
 }
 #aval-toggle-1:active, [id^="aval-toggle-"]:active { opacity: 0.85; }
+
+/* Form de avaliação: último item do card, alinhado às ações */
+.detail-aval-form-wrap {
+  padding: 0 20px;
+  margin-top: 14px;
+}
+.detail-aval-form-wrap #aval-form-undefined,
+.detail-aval-form-wrap [id^="aval-form-"] {
+  margin-bottom: 0 !important;
+}

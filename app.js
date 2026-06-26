@@ -3934,10 +3934,10 @@
         </div>
         ${avalResumoHTML}
         ${avalListaHTML}
-        ${avalFormHTML}
       </div>
       <div class="detail-actions">${actionsMain}</div>
       ${actionsIg ? `<div class="detail-actions" style="padding-top:8px;">${actionsIg}</div>` : ''}
+      <div class="detail-aval-form-wrap">${avalFormHTML}</div>
     `;
 
     overlay.classList.add('open');

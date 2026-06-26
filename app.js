@@ -5539,7 +5539,7 @@
     });
 
     lista.innerHTML = ordemCats.map(cat => {
-      const aberto = _cardapioGruposFechados[cat] !== true; // padrão: aberto
+      const aberto = _cardapioGruposFechados[cat] === true; // padrão: fechado — lojista expande
       const itens = grupos[cat].map(mlCardapioItemHTML).join('');
       return `
         <div class="ml-cardapio-grupo">

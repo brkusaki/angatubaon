@@ -1161,24 +1161,83 @@
   window.iniciarPollingPlano = iniciarPollingPlano;
 
   /* ── Polling de aprovação pós-cadastro ────────────────────────
-     Após o cadastro, verifica periodicamente se a loja foi aprovada.
-     Quando aprovada, faz login automático e abre Minha Loja. */
+     Após o cadastro (ou ao reabrir o app com cadastro pendente), verifica
+     periodicamente se a loja foi aprovada. Enquanto aguarda, mostra a tela
+     "Aguardando aprovação" (coruja analisando). Quando aprovada, troca para a
+     coruja de celebração do plano, faz login automático e abre Minha Loja. */
   let _pollAprovTimers = [];
   function pararPollingAprovacao() {
     _pollAprovTimers.forEach(t => clearTimeout(t));
     _pollAprovTimers = [];
   }
+
+  // Aplica o login e transição visual quando a loja é aprovada.
+  function _aoAprovar(wpp, data) {
+    pararPollingAprovacao();
+    localStorage.removeItem('angatuba_pendente_wpp');
+    localStorage.removeItem('angatuba_pendente_plano');
+    localStorage.removeItem('angatuba_pendente_ciclo');
+    _lojaToken = data.token;
+    _lojaNome  = data.nome || '';
+    localStorage.setItem('angatuba_loja_token', _lojaToken);
+    localStorage.setItem('angatuba_loja_nome',  _lojaNome);
+    localStorage.setItem('angatuba_loja_wpp',   wpp);
+    atualizarNav();
+
+    const aguardando = document.getElementById('modal-aguardando');
+    const aguardandoAberto = aguardando && aguardando.classList.contains('open');
+
+    if (aguardandoAberto) {
+      // Transição comemorativa: troca a coruja analisando pela de celebração
+      // do plano e mostra "Aprovado!" por ~1,6s antes de abrir o painel.
+      const plano = (data.plano || 'GRATIS').toUpperCase();
+      const owlMap = { GRATIS: 'gratis', PLUS: 'plus', PRO: 'pro' };
+      const owlEl = document.getElementById('aguardando-owl');
+      if (owlEl) {
+        owlEl.dataset.failed = '';
+        owlEl.style.display = '';
+        owlEl.src = `/webp/owl-celebrate-${owlMap[plano] || 'gratis'}.webp`;
+      }
+      const bigEl = document.getElementById('aguardando-title-big');
+      if (bigEl) bigEl.innerHTML = 'Loja aprovada! 🎉';
+      const subEl = document.getElementById('aguardando-sub');
+      if (subEl) subEl.innerHTML = 'Tudo certo! Estamos abrindo a sua loja…';
+      const statusEl = document.getElementById('aguardando-status');
+      if (statusEl) statusEl.classList.add('aprovado');
+      const statusTxt = document.getElementById('aguardando-status-text');
+      if (statusTxt) statusTxt.textContent = 'Acesso liberado';
+      const acoesEl = document.getElementById('aguardando-acoes');
+      if (acoesEl) acoesEl.innerHTML = '';
+      const hintEl = document.getElementById('aguardando-hint');
+      if (hintEl) hintEl.style.display = 'none';
+      const titEl = document.getElementById('aguardando-title');
+      if (titEl) titEl.innerHTML = 'Pronto! <span>🎊</span>';
+
+      setTimeout(() => {
+        fecharAguardando(true);
+        setTimeout(() => abrirMinhaLoja(), 250);
+      }, 1600);
+    } else {
+      // App não estava na tela de aguardando (ex.: ainda no modal de cadastro,
+      // ou aprovação detectada em background). Fecha o cadastro se aberto e abre.
+      const modalCad = document.getElementById('modal-cadastro');
+      if (modalCad && modalCad.classList.contains('open')) closeModal(false);
+      setTimeout(() => abrirMinhaLoja(), 400);
+    }
+  }
+
   function iniciarPollingAprovacao(wpp) {
     if (!wpp) return;
     pararPollingAprovacao();
-    const INTERVALO_MS = 15000;
-    const MAX_TENTATIVAS = 20;
+    const INTERVALO_MS = 20000;            // 20s entre checagens
+    const MAX_TENTATIVAS = 90;             // ~30 min de espera
     let tentativa = 0;
     function tentar() {
       if (_lojaToken) { pararPollingAprovacao(); return; }
       tentativa++;
       if (tentativa > MAX_TENTATIVAS) { pararPollingAprovacao(); return; }
       const t = setTimeout(async () => {
+        if (_lojaToken) { pararPollingAprovacao(); return; }
         try {
           const params = new URLSearchParams();
           params.append('payload', JSON.stringify({ action: 'lojaVerificarAprovacao', wpp }));
@@ -1188,21 +1247,7 @@
           });
           const json = await resp.json();
           if (json.status === 'ok' && json.data && json.data.token) {
-            pararPollingAprovacao();
-            localStorage.removeItem('angatuba_pendente_wpp');
-            _lojaToken = json.data.token;
-            _lojaNome  = json.data.nome || '';
-            localStorage.setItem('angatuba_loja_token', _lojaToken);
-            localStorage.setItem('angatuba_loja_nome',  _lojaNome);
-            localStorage.setItem('angatuba_loja_wpp',   wpp);
-            atualizarNav();
-            // Fecha o modal de cadastro se ainda estiver aberto e abre o painel.
-            // Abre o Minha Loja SEMPRE que aprovar — mesmo que o usuário já tenha
-            // fechado a tela de sucesso —, senão o login automático salva o token
-            // mas o lojista fica sem feedback e precisa clicar manualmente.
-            const modalCad = document.getElementById('modal-cadastro');
-            if (modalCad && modalCad.classList.contains('open')) closeModal(false);
-            setTimeout(() => abrirMinhaLoja(), 400);
+            _aoAprovar(wpp, json.data);
           } else { tentar(); }
         } catch(e) { tentar(); }
       }, INTERVALO_MS);
@@ -1211,6 +1256,92 @@
     tentar();
   }
   window.iniciarPollingAprovacao = iniciarPollingAprovacao;
+
+  /* ── Tela "Aguardando aprovação" ──────────────────────────────
+     Mostra a coruja analisando enquanto o cadastro não é aprovado. Pode ser
+     aberta logo após o cadastro OU ao reabrir o app e tocar em "Minha Loja"
+     com um cadastro ainda pendente. Reconstrói os botões de pagamento (planos
+     pagos) a partir do plano/ciclo salvos. */
+  function abrirAguardando(wpp, plano, ciclo) {
+    const overlay = document.getElementById('modal-aguardando');
+    if (!overlay) return;
+
+    plano = (plano || 'GRATIS').toUpperCase();
+    ciclo = ciclo || 'mensal';
+
+    // Reseta o visual para o estado "analisando" (caso tenha ficado no estado
+    // aprovado de uma sessão anterior na mesma aba)
+    const owlEl = document.getElementById('aguardando-owl');
+    if (owlEl) { owlEl.dataset.failed = ''; owlEl.style.display = ''; owlEl.src = '/webp/owl-search.webp'; }
+    const titEl = document.getElementById('aguardando-title');
+    if (titEl) titEl.innerHTML = 'Quase <span>lá!</span>';
+    const bigEl = document.getElementById('aguardando-title-big');
+    if (bigEl) bigEl.innerHTML = 'Estamos analisando 🔍';
+    const statusEl = document.getElementById('aguardando-status');
+    if (statusEl) statusEl.classList.remove('aprovado');
+    const statusTxt = document.getElementById('aguardando-status-text');
+    if (statusTxt) statusTxt.textContent = 'Verificando aprovação…';
+    const hintEl = document.getElementById('aguardando-hint');
+    if (hintEl) hintEl.style.display = '';
+
+    const subEl   = document.getElementById('aguardando-sub');
+    const acoesEl = document.getElementById('aguardando-acoes');
+    if (acoesEl) acoesEl.innerHTML = '';
+
+    const isPago = plano !== 'GRATIS';
+    if (isPago && subEl) {
+      const calc     = calcPreco(plano, ciclo);
+      const cicloTxt = (CICLOS[ciclo] || CICLOS.mensal).rotulo.toLowerCase();
+      const valorTxt = calc ? ` (${fmtBRL(calc.total)}${ciclo !== 'mensal' ? ' a cada ' + calc.meses + ' meses' : '/mês'})` : '';
+      subEl.innerHTML =
+        `Sua loja está em análise. <strong>Adiante a ativação do Plano ${plano}</strong> ` +
+        `pagando agora — assim que aprovarmos, seu plano já entra ativo:`;
+
+      // Botão "Pagar agora" (Mercado Pago) — ação primária
+      const payBtn = document.createElement('button');
+      payBtn.type = 'button';
+      payBtn.className = 'success-pay-btn';
+      payBtn.innerHTML = '<i class="ti ti-credit-card"></i> Pagar agora ' + (calc ? fmtBRL(calc.total) : '') + ' →';
+      payBtn.onclick = () => iniciarPagamentoMP(wpp, plano, ciclo, payBtn);
+      acoesEl.appendChild(payBtn);
+
+      // Botão "Ativar via WhatsApp" — alternativa
+      const wppMsg = encodeURIComponent(
+        `Olá! Cadastrei minha loja no AngatubaON e escolhi o Plano ${plano} ${cicloTxt}${valorTxt}. Gostaria de ativá-lo!`
+      );
+      const wppBtn = document.createElement('a');
+      wppBtn.className = 'success-wpp-btn';
+      wppBtn.target = '_blank';
+      wppBtn.rel = 'noopener';
+      wppBtn.href = `https://wa.me/${ADMIN_WPP_CONTATO}?text=${wppMsg}`;
+      wppBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Ativar pelo WhatsApp →';
+      acoesEl.appendChild(wppBtn);
+    } else if (subEl) {
+      subEl.innerHTML =
+        `Recebemos os dados da sua loja e logo liberamos seu acesso.<br>` +
+        `<strong>Assim que aprovarmos, sua loja abre aqui automaticamente.</strong>`;
+    }
+
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    // Garante o polling rodando (normaliza WPP com 55, igual à planilha)
+    const wppNorm = (() => { const n = String(wpp || '').replace(/\D/g, ''); return n && !n.startsWith('55') ? '55' + n : n; })();
+    if (wppNorm) iniciarPollingAprovacao(wppNorm);
+  }
+  window.abrirAguardando = abrirAguardando;
+
+  function fecharAguardando(manterPolling) {
+    const overlay = document.getElementById('modal-aguardando');
+    if (overlay) overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    // Ao fechar manualmente, o polling continua rodando em background até o
+    // limite de tempo — mas só faz sentido se ainda há cadastro pendente.
+    if (!manterPolling && !_lojaToken && !localStorage.getItem('angatuba_pendente_wpp')) {
+      pararPollingAprovacao();
+    }
+  }
+  window.fecharAguardando = fecharAguardando;
 
   let _carouselIdx = 0;
   const PLANS_ORDER = ['GRATIS', 'PLUS', 'PRO'];
@@ -1859,69 +1990,31 @@
 
       this.style.display = 'none';
 
-      // Monta tela de sucesso com botão de WPP para planos pagos
-      const successEl = document.getElementById('cadastro-success');
       const nomeLoja  = payload.nome || payload.storeName || 'sua loja';
       const plano     = selectedPlan;
-      const isPago    = plano !== 'GRATIS';
 
-      // Troca a coruja animada conforme o plano
-      const owlMap = { GRATIS: 'gratis', PLUS: 'plus', PRO: 'pro' };
-      const owlEl  = document.getElementById('success-owl');
-      if (owlEl) owlEl.src = `/webp/owl-celebrate-${owlMap[plano] || 'gratis'}.webp`;
+      // Normaliza o WPP com DDI 55, pois é assim que salvarNaPlanilha() grava na
+      // planilha (col E). Sem o 55, buscarLojaPorWpp() faz comparação exata e
+      // NUNCA encontra a loja — o auto-login ficaria preso em "PENDENTE".
+      const wppCadastro = (() => {
+        const n = String(payload.whatsapp || '').replace(/\D/g, '');
+        return n && !n.startsWith('55') ? '55' + n : n;
+      })();
 
-      if (isPago) {
-        const cicloInfo = CICLOS[_cicloSelecionado] || CICLOS.mensal;
-        const calc      = calcPreco(plano, _cicloSelecionado);
-        const cicloTxt  = cicloInfo.rotulo.toLowerCase();
-        const valorTxt  = calc ? ` (${fmtBRL(calc.total)}${_cicloSelecionado !== 'mensal' ? ' a cada ' + calc.meses + ' meses' : '/mês'})` : '';
-        const wppMsg = encodeURIComponent(
-          `Olá! Acabei de cadastrar *${nomeLoja}* no AngatubaON e escolhi o Plano ${plano} ${cicloTxt}${valorTxt}. Gostaria de ativá-lo!`
-        );
-        const wppUrl = `https://wa.me/${ADMIN_WPP_CONTATO}?text=${wppMsg}`;
-        const subTextEl = successEl.querySelector('#success-sub-text') || successEl.querySelector('.success-sub');
-        if (subTextEl) subTextEl.innerHTML =
-          `Recebemos os dados da sua loja.<br>` +
-          `Agora fale com a gente pelo WhatsApp para ativar o <strong>Plano ${plano} ${cicloTxt}</strong>:`;
-        // Adiciona/atualiza botão de WPP dinâmico
-        let wppBtn = successEl.querySelector('.success-wpp-btn');
-        if (!wppBtn) {
-          wppBtn = document.createElement('a');
-          wppBtn.className = 'success-wpp-btn';
-          wppBtn.target    = '_blank';
-          wppBtn.rel       = 'noopener';
-          successEl.querySelector('.success-close').before(wppBtn);
-        }
-        wppBtn.href      = wppUrl;
-        wppBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Ativar Plano ' + plano + ' →';
-
-        // ── Botão "Pagar agora" (Mercado Pago) ──
-        const wppLoja = String(payload.whatsapp || '').replace(/\D/g, '');
-        let payBtn = successEl.querySelector('.success-pay-btn');
-        if (!payBtn) {
-          payBtn = document.createElement('button');
-          payBtn.type      = 'button';
-          payBtn.className  = 'success-pay-btn';
-          wppBtn.before(payBtn);
-        }
-        payBtn.innerHTML = '<i class="ti ti-credit-card"></i> Pagar agora ' + (calc ? fmtBRL(calc.total) : '') + ' →';
-        payBtn.onclick = () => iniciarPagamentoMP(wppLoja, plano, _cicloSelecionado, payBtn);
-      } else {
-        const subTextEl2 = successEl.querySelector('#success-sub-text') || successEl.querySelector('.success-sub');
-        if (subTextEl2) subTextEl2.innerHTML =
-          `Recebemos os dados da sua loja.<br>Vamos analisar e entrar em contato pelo WhatsApp em breve.`;
-        // Remove botão de WPP se existia de cadastro anterior na mesma sessão
-        successEl.querySelector('.success-wpp-btn')?.remove();
-      }
-
-      successEl.classList.add('show');
-
-      // Salva WPP para polling de aprovação automático
-      const wppCadastro = String(payload.whatsapp || '').replace(/\D/g, '');
+      // Persiste o cadastro pendente (WPP + plano + ciclo) para que, se a pessoa
+      // fechar e reabrir o app, a tela de aguardando seja reconstruída igual.
       if (wppCadastro) {
-        localStorage.setItem('angatuba_pendente_wpp', wppCadastro);
-        iniciarPollingAprovacao(wppCadastro);
+        localStorage.setItem('angatuba_pendente_wpp',   wppCadastro);
+        localStorage.setItem('angatuba_pendente_plano', plano);
+        localStorage.setItem('angatuba_pendente_ciclo', _cicloSelecionado);
       }
+
+      // Fecha o modal de cadastro e abre a tela "Aguardando aprovação".
+      // Ela mostra a coruja analisando, faz o polling e, ao aprovar, troca para
+      // a coruja de celebração do plano e entra direto na conta.
+      const modalCad = document.getElementById('modal-cadastro');
+      if (modalCad && modalCad.classList.contains('open')) closeModal(false);
+      setTimeout(() => abrirAguardando(wppCadastro, plano, _cicloSelecionado), 350);
     } catch {
       btn.classList.remove('is-loading');
       btn.disabled = false;
@@ -1945,8 +2038,19 @@
   // declaração de _lojaToken acima — se rodar antes, acessar _lojaToken cai na
   // TDZ (ReferenceError) e derruba o restante do script no reload.
   (function retomaPendente() {
-    const wppPend = localStorage.getItem('angatuba_pendente_wpp');
-    if (wppPend && !_lojaToken) iniciarPollingAprovacao(wppPend);
+    let wppPend = localStorage.getItem('angatuba_pendente_wpp');
+    if (wppPend && !_lojaToken) {
+      // Normaliza com DDI 55 — cobre valores antigos salvos sem o 55 por
+      // versões anteriores, que de outra forma nunca casariam na planilha.
+      const n = String(wppPend).replace(/\D/g, '');
+      wppPend = n && !n.startsWith('55') ? '55' + n : n;
+      localStorage.setItem('angatuba_pendente_wpp', wppPend);
+      // Retoma o polling em background (sem abrir modal sozinho — seria
+      // intrusivo no load). Se aprovar com o app aberto, _aoAprovar entra
+      // direto no painel; se a pessoa tocar em "Minha Loja", vê a tela de
+      // aguardando com o status ao vivo.
+      iniciarPollingAprovacao(wppPend);
+    }
   })();
 
   /* ── Atualiza a bottom nav conforme sessão ───────────────── */
@@ -1995,6 +2099,13 @@
     document.getElementById('nav-loja').classList.add('active');
     if (_lojaToken) {
       abrirMinhaLoja();
+    } else if (localStorage.getItem('angatuba_pendente_wpp')) {
+      // Tem cadastro aguardando aprovação — reabre a tela de status (checa na
+      // hora se já foi aprovado), em vez de pedir login por código.
+      const wpp   = localStorage.getItem('angatuba_pendente_wpp');
+      const plano = localStorage.getItem('angatuba_pendente_plano') || 'GRATIS';
+      const ciclo = localStorage.getItem('angatuba_pendente_ciclo') || 'mensal';
+      abrirAguardando(wpp, plano, ciclo);
     } else {
       openLoginLoja(); // abre direto o login
     }
@@ -3136,6 +3247,8 @@
     localStorage.removeItem('angatuba_anuncio');
     localStorage.removeItem('angatuba_loja_dados');
     localStorage.removeItem('angatuba_pendente_wpp');
+    localStorage.removeItem('angatuba_pendente_plano');
+    localStorage.removeItem('angatuba_pendente_ciclo');
     pararPollingAprovacao();
     fecharMinhaLoja();
     atualizarNav();

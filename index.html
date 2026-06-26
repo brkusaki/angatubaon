@@ -1091,6 +1091,46 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════ AGUARDANDO APROVAÇÃO ══ -->
+  <div class="modal-overlay" id="modal-aguardando" role="dialog" aria-modal="true" aria-labelledby="aguardando-title">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="aguardando-title">Quase <span>lá!</span></div>
+          <div class="modal-subtitle">Sua loja está em análise</div>
+        </div>
+        <button class="modal-close" onclick="fecharAguardando()" aria-label="Fechar">✕</button>
+      </div>
+      <div class="modal-body aguardando-body">
+        <div class="aguardando-owl-wrap">
+          <img id="aguardando-owl" src="/webp/owl-search.webp" alt="" class="aguardando-owl"
+            onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
+          <div class="aguardando-ring"></div>
+        </div>
+        <div class="aguardando-title-big" id="aguardando-title-big">Estamos analisando 🔍</div>
+        <p class="aguardando-sub" id="aguardando-sub">
+          Recebemos os dados da sua loja e logo liberamos seu acesso.<br>
+          <strong>Assim que aprovarmos, sua loja abre aqui automaticamente.</strong>
+        </p>
+
+        <!-- Pílula "verificando" — pulsa enquanto faz o polling -->
+        <div class="aguardando-status" id="aguardando-status">
+          <span class="aguardando-dot"></span>
+          <span id="aguardando-status-text">Verificando aprovação…</span>
+        </div>
+
+        <!-- Botões de pagamento (planos pagos) — inseridos via JS -->
+        <div id="aguardando-acoes" class="aguardando-acoes"></div>
+
+        <p class="aguardando-hint" id="aguardando-hint">
+          Pode fechar e voltar quando quiser — é só tocar em <strong>Minha Loja</strong> de novo.
+        </p>
+        <button class="success-close" onclick="fecharAguardando()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══════════════════════════════════════ PAINEL MINHA LOJA ══ -->
   <div class="detail-overlay" id="modal-minha-loja" role="dialog" aria-modal="true">
     <div class="detail-sheet" style="max-height:95vh;display:flex;flex-direction:column;">

@@ -1160,6 +1160,62 @@
   }
   window.iniciarPollingPlano = iniciarPollingPlano;
 
+  /* ── Polling de aprovação pós-cadastro ────────────────────────
+     Após o cadastro, verifica periodicamente se a loja foi aprovada.
+     Quando aprovada, faz login automático e abre Minha Loja. */
+  let _pollAprovTimers = [];
+  function pararPollingAprovacao() {
+    _pollAprovTimers.forEach(t => clearTimeout(t));
+    _pollAprovTimers = [];
+  }
+  function iniciarPollingAprovacao(wpp) {
+    if (!wpp) return;
+    pararPollingAprovacao();
+    const INTERVALO_MS = 15000;
+    const MAX_TENTATIVAS = 20;
+    let tentativa = 0;
+    function tentar() {
+      if (_lojaToken) { pararPollingAprovacao(); return; }
+      tentativa++;
+      if (tentativa > MAX_TENTATIVAS) { pararPollingAprovacao(); return; }
+      const t = setTimeout(async () => {
+        try {
+          const params = new URLSearchParams();
+          params.append('payload', JSON.stringify({ action: 'lojaVerificarAprovacao', wpp }));
+          const resp = await fetch(APPS_SCRIPT_URL, {
+            method: 'POST', body: params,
+            signal: AbortSignal.timeout(12000),
+          });
+          const json = await resp.json();
+          if (json.status === 'ok' && json.data && json.data.token) {
+            pararPollingAprovacao();
+            localStorage.removeItem('angatuba_pendente_wpp');
+            _lojaToken = json.data.token;
+            _lojaNome  = json.data.nome || '';
+            localStorage.setItem('angatuba_loja_token', _lojaToken);
+            localStorage.setItem('angatuba_loja_nome',  _lojaNome);
+            localStorage.setItem('angatuba_loja_wpp',   wpp);
+            atualizarNav();
+            const modalCad = document.getElementById('modal-cadastro');
+            if (modalCad && modalCad.classList.contains('open')) {
+              closeModal(false);
+              setTimeout(() => abrirMinhaLoja(), 400);
+            }
+          } else { tentar(); }
+        } catch(e) { tentar(); }
+      }, INTERVALO_MS);
+      _pollAprovTimers.push(t);
+    }
+    tentar();
+  }
+  window.iniciarPollingAprovacao = iniciarPollingAprovacao;
+
+  // Retoma polling se havia WPP pendente (ex: recarregou a página)
+  (function retomaPendente() {
+    const wppPend = localStorage.getItem('angatuba_pendente_wpp');
+    if (wppPend && !_lojaToken) iniciarPollingAprovacao(wppPend);
+  })();
+
   let _carouselIdx = 0;
   const PLANS_ORDER = ['GRATIS', 'PLUS', 'PRO'];
 
@@ -1863,6 +1919,13 @@
       }
 
       successEl.classList.add('show');
+
+      // Salva WPP para polling de aprovação automático
+      const wppCadastro = String(payload.whatsapp || '').replace(/\D/g, '');
+      if (wppCadastro) {
+        localStorage.setItem('angatuba_pendente_wpp', wppCadastro);
+        iniciarPollingAprovacao(wppCadastro);
+      }
     } catch {
       btn.classList.remove('is-loading');
       btn.disabled = false;
@@ -3067,6 +3130,8 @@
     localStorage.removeItem('angatuba_loja_wpp');
     localStorage.removeItem('angatuba_anuncio');
     localStorage.removeItem('angatuba_loja_dados');
+    localStorage.removeItem('angatuba_pendente_wpp');
+    pararPollingAprovacao();
     fecharMinhaLoja();
     atualizarNav();
     if (!silencioso) {

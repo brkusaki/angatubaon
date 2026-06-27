@@ -1248,32 +1248,10 @@
             signal: AbortSignal.timeout(12000),
           });
           const json = await resp.json();
-          // DIAGNÓSTICO TEMPORÁRIO — remover após resolver o polling de aprovação.
-          // Mostra a resposta crua no console E na própria pílula de status.
-          try {
-            console.log('[AGUARDANDO] wpp=' + wpp + ' tentativa=' + tentativa +
-              ' resposta=' + JSON.stringify(json).slice(0, 300));
-          } catch(_) {}
-          try {
-            const st = document.getElementById('aguardando-status-text');
-            if (st && !(json.status === 'ok' && json.data && json.data.token)) {
-              const r = (json && json.data && json.data.status) ? json.data.status
-                      : (json && json.msg) ? json.msg
-                      : (json && json.status) ? json.status : '???';
-              st.textContent = 'Verificando… (' + r + ' #' + tentativa + ')';
-            }
-          } catch(_) {}
           if (json.status === 'ok' && json.data && json.data.token) {
             _aoAprovar(wpp, json.data);
           } else { tentar(); }
-        } catch(e) {
-          try { console.log('[AGUARDANDO] erro no fetch: ' + (e && e.message)); } catch(_) {}
-          try {
-            const st = document.getElementById('aguardando-status-text');
-            if (st) st.textContent = 'Verificando… (falha de rede #' + tentativa + ')';
-          } catch(_) {}
-          tentar();
-        }
+        } catch(e) { tentar(); }
       }, delay);
       _pollAprovTimers.push(t);
     }
@@ -1351,13 +1329,6 @@
 
     // Garante o polling rodando (normaliza WPP com 55, igual à planilha)
     const wppNorm = (() => { const n = String(wpp || '').replace(/\D/g, ''); return n && !n.startsWith('55') ? '55' + n : n; })();
-    // DIAGNÓSTICO TEMPORÁRIO: mostra na tela qual WPP o polling consulta.
-    const hintDiag = document.getElementById('aguardando-hint');
-    if (hintDiag) {
-      hintDiag.innerHTML =
-        'Pode fechar e voltar quando quiser — é só tocar em <strong>Minha Loja</strong> de novo.' +
-        '<br><span style="opacity:.5;font-size:10px;">consultando: ' + wppNorm + '</span>';
-    }
     if (wppNorm) iniciarPollingAprovacao(wppNorm);
   }
   window.abrirAguardando = abrirAguardando;

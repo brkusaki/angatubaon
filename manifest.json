@@ -8,6 +8,8 @@
   "orientation": "portrait",
   "background_color": "#0d0d0d",
   "theme_color": "#0d0d0d",
+  "categories": ["business", "shopping", "lifestyle"],
+  "lang": "pt-BR",
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -32,6 +34,29 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/home-mobile.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Tela inicial — descubra o que está aberto agora em Angatuba"
+    },
+    {
+      "src": "/screenshots/lojas-mobile.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Lojas, farmácias e serviços com contato direto pelo WhatsApp"
+    },
+    {
+      "src": "/screenshots/detalhe-mobile.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Veja horários, localização e cardápio de cada estabelecimento"
     }
   ]
 }

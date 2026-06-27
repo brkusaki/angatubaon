@@ -2939,6 +2939,58 @@
   }
   window.mlProximaDica = mlProximaDica;
 
+  // ══════════════════════════════════════════════════════════
+  //  ONBOARDING — tela de boas-vindas no 1º acesso ao painel
+  //  Aparece uma única vez por loja (flag por WhatsApp no localStorage).
+  //  Reusa o tema dos modais; coruja owl-wave. Cria o overlay via JS
+  //  (sem tocar no index.html). Fecha no botão ou no X e nunca mais volta.
+  // ══════════════════════════════════════════════════════════
+  function mostrarOnboarding() {
+    const wpp = _lojaWpp || localStorage.getItem('angatuba_loja_wpp') || '';
+    const flag = 'angatuba_onboarded_' + wpp;
+    // Já viu? Não mostra de novo.
+    try { if (localStorage.getItem(flag) === '1') return; } catch(e) { return; }
+    // Evita empilhar dois overlays se chamado mais de uma vez.
+    if (document.getElementById('onboarding-overlay')) return;
+
+    const nome = (_lojaNome || localStorage.getItem('angatuba_loja_nome') || '').trim();
+    const primeiroNome = nome ? nome.split(' ')[0] : '';
+    const saud = primeiroNome ? ('Bem-vindo, ' + escHTML(primeiroNome) + '!') : 'Bem-vindo!';
+
+    const ov = document.createElement('div');
+    ov.id = 'onboarding-overlay';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.innerHTML =
+      '<div class="onb-card">' +
+        '<button type="button" class="onb-close" aria-label="Fechar" onclick="fecharOnboarding()">&times;</button>' +
+        '<img class="onb-owl" src="/webp/owl-wave.webp" alt="" onerror="if(!this.dataset.f){this.dataset.f=1;this.style.display=\'none\';}" />' +
+        '<div class="onb-title">' + saud + ' <span>\uD83C\uDF89</span></div>' +
+        '<div class="onb-sub">Sua loja está no ar! Veja o que você pode fazer por aqui:</div>' +
+        '<div class="onb-steps">' +
+          '<div class="onb-step"><div class="onb-ico"><i class="ti ti-pencil"></i></div>' +
+            '<div class="onb-step-txt"><strong>Edite sua loja</strong>Atualize horários, endereço, fotos e contatos quando quiser.</div></div>' +
+          '<div class="onb-step"><div class="onb-ico"><i class="ti ti-tools-kitchen-2"></i></div>' +
+            '<div class="onb-step-txt"><strong>Monte seu cardápio</strong>Adicione seus produtos e preços para os clientes verem.</div></div>' +
+          '<div class="onb-step"><div class="onb-ico"><i class="ti ti-chart-bar"></i></div>' +
+            '<div class="onb-step-txt"><strong>Acompanhe os acessos</strong>Veja quantas pessoas viram sua loja e clicaram no WhatsApp.</div></div>' +
+        '</div>' +
+        '<button type="button" class="onb-cta" onclick="fecharOnboarding()">Bora começar \u2192</button>' +
+      '</div>';
+    document.body.appendChild(ov);
+    requestAnimationFrame(() => ov.classList.add('open'));
+
+    // Marca como visto já na exibição (não arrisca não-marcar se o app fechar).
+    try { localStorage.setItem(flag, '1'); } catch(e) {}
+  }
+  function fecharOnboarding() {
+    const ov = document.getElementById('onboarding-overlay');
+    if (!ov) return;
+    ov.classList.remove('open');
+    setTimeout(() => { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 300);
+  }
+  window.fecharOnboarding = fecharOnboarding;
+
   async function abrirMinhaLoja() {
     if (!_lojaToken) { openLoginLoja(); return; }
 
@@ -2952,6 +3004,8 @@
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
     mlSortearDica();
+    // Onboarding de boas-vindas: só na 1ª vez que esta loja abre o painel.
+    setTimeout(() => mostrarOnboarding(), 700);
     // Fix #6: entrada no histórico para o botão "voltar" (Android) fechar o painel
     if (history.state?.modal !== 'minha-loja') history.pushState({ modal: 'minha-loja' }, '');
 

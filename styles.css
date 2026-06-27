@@ -2699,3 +2699,216 @@
 }
 .onb-cta:hover { opacity: 0.92; }
 .onb-cta:active { transform: scale(0.98); }
+
+/* ════════════════════════════════════════════════════════════
+   ACORDEÃO DE PLANOS — etapa 3 do cadastro (substitui carousel)
+   3 planos sempre visíveis; 1 expandido por vez. Plus = recomendado.
+════════════════════════════════════════════════════════════ */
+
+/* Cabeçalho da etapa */
+.cad-plan-head { margin-bottom: 14px; }
+.cad-plan-head-eyebrow {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
+}
+.cad-plan-head-title {
+  font-family: var(--font-h); font-size: 1.25rem; font-weight: 800;
+  color: var(--text); line-height: 1.15;
+}
+
+/* Container do acordeão */
+.acc-planos { display: flex; flex-direction: column; gap: 10px; }
+
+/* Card de plano (recolhido por padrão) */
+.acc-plan {
+  position: relative;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: var(--surface2);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+  contain: paint;
+}
+.acc-plan:active { transform: scale(0.995); }
+
+/* Cores por tier */
+.acc-plan.card-gratis { background: var(--surface2); }
+.acc-plan.card-plus {
+  background: linear-gradient(135deg, #141420, #1a1a2e);
+}
+.acc-plan.card-pro {
+  background: linear-gradient(135deg, #1c1a14, #25210f);
+  border-color: rgba(245,158,11,0.25);
+}
+
+/* Selecionado (expandido) — realce por tier */
+.acc-plan.card-gratis.selected {
+  border-color: rgba(255,255,255,0.3);
+}
+.acc-plan.card-plus.selected {
+  border-color: #6366f1;
+  box-shadow: 0 4px 20px rgba(99,102,241,0.18);
+}
+.acc-plan.card-pro.selected {
+  border-color: #f59e0b;
+  box-shadow: 0 4px 20px rgba(245,158,11,0.18);
+}
+
+/* Badge "mais escolhido" no Plus */
+.acc-popular {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: #fff; font-family: var(--font-h);
+  font-size: 9px; font-weight: 800; letter-spacing: 0.5px;
+  text-align: center; padding: 5px; white-space: nowrap;
+}
+
+/* Barra clicável (sempre visível) */
+.acc-plan-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 14px;
+}
+.acc-plan-bar-left { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.acc-plan-bar-id { min-width: 0; }
+
+/* Rádio */
+.acc-radio {
+  width: 19px; height: 19px; border-radius: 50%;
+  border: 2px solid var(--border); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.2s;
+}
+.acc-plan.card-plus .acc-radio { border-color: rgba(99,102,241,0.5); }
+.acc-plan.card-pro  .acc-radio { border-color: rgba(245,158,11,0.5); }
+.acc-plan.selected .acc-radio::after {
+  content: ''; width: 9px; height: 9px; border-radius: 50%;
+}
+.acc-plan.card-gratis.selected .acc-radio { border-color: #fff; }
+.acc-plan.card-gratis.selected .acc-radio::after { background: #fff; }
+.acc-plan.card-plus.selected  .acc-radio { border-color: #6366f1; }
+.acc-plan.card-plus.selected  .acc-radio::after { background: #6366f1; }
+.acc-plan.card-pro.selected   .acc-radio { border-color: #f59e0b; }
+.acc-plan.card-pro.selected   .acc-radio::after { background: #f59e0b; }
+
+/* Nome + âncora */
+.acc-plan-name {
+  font-family: var(--font-h); font-size: 1.05rem; font-weight: 800;
+  display: flex; align-items: center; gap: 6px; line-height: 1.1;
+}
+.acc-plan.card-gratis .acc-plan-name { color: #cbd5e1; }
+.acc-plan.card-plus   .acc-plan-name { color: #a5b4fc; }
+.acc-plan.card-pro    .acc-plan-name { color: #fbbf24; }
+.acc-plan-anchor {
+  font-size: 11px; color: var(--muted); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Preço */
+.acc-plan-price { text-align: right; flex-shrink: 0; }
+.acc-price-val {
+  font-family: var(--font-h); font-size: 1.3rem; font-weight: 800;
+  color: var(--text); line-height: 1; display: block;
+}
+.acc-plan.selected .acc-price-val { font-size: 1.45rem; }
+.acc-price-per { font-size: 10px; color: var(--muted); display: block; margin-top: 1px; }
+.acc-plan-price .plan-ciclo-info {
+  font-size: 10px; color: var(--muted); margin-top: 3px;
+}
+.acc-plan-price .plan-ciclo-economia { color: var(--green); font-weight: 700; }
+
+/* Corpo (escondido quando recolhido) — grid trick p/ animar altura */
+.acc-plan-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.32s cubic-bezier(0.4,0,0.2,1);
+}
+.acc-plan-body > * { overflow: hidden; min-height: 0; }
+.acc-plan.selected .acc-plan-body {
+  grid-template-rows: 1fr;
+}
+/* padding interno só quando aberto (evita vazamento no estado fechado) */
+.acc-plan-body > :first-child { padding: 0 14px; }
+.acc-plan.selected .acc-plan-body > :first-child { padding: 0 14px 14px; }
+
+/* wrapper interno do corpo */
+.acc-plan-body-inner { padding: 0 14px 14px; }
+
+/* Selo preço de fundador */
+.acc-fundador {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.35);
+  border-radius: 20px; padding: 3px 9px; margin-bottom: 11px;
+  font-family: var(--font-h); font-size: 9px; font-weight: 800;
+  color: #818cf8; letter-spacing: 0.03em;
+}
+.acc-fundador i { font-size: 10px; }
+.acc-fundador-pro {
+  background: rgba(245,158,11,0.15); border-color: rgba(245,158,11,0.35);
+  color: #f59e0b;
+}
+
+/* Features */
+.acc-features {
+  list-style: none; padding: 0; margin: 0 0 4px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.acc-features li {
+  font-size: 12.5px; line-height: 1.35; color: var(--text);
+  display: flex; align-items: flex-start; gap: 7px; opacity: 0.92;
+}
+.acc-features li i { color: var(--green); font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+.acc-features li.feat-off { opacity: 0.42; }
+.acc-features li.feat-off i { color: var(--muted); }
+
+/* Botão "ver tudo" */
+.acc-vertudo {
+  background: none; border: none; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 700; padding: 6px 0 10px;
+  -webkit-tap-highlight-color: transparent;
+}
+.acc-plan.card-plus .acc-vertudo { color: #818cf8; }
+.acc-plan.card-pro  .acc-vertudo { color: #f59e0b; }
+.acc-vertudo i { font-size: 13px; }
+.acc-features-extra { margin-top: 2px; padding-top: 8px; border-top: 1px solid var(--border); }
+
+/* Ciclo toggle dentro do card — compacto */
+.acc-plan .ciclo-toggle {
+  display: flex; gap: 5px;
+  background: rgba(0,0,0,0.28); border-radius: 11px;
+  padding: 4px; margin-bottom: 13px;
+}
+.acc-plan .ciclo-btn {
+  flex: 1; border: none; background: none; cursor: pointer;
+  border-radius: 8px; padding: 8px 4px; min-height: 44px;
+  font-family: var(--font-h); font-size: 11px; font-weight: 700;
+  color: var(--muted); line-height: 1.15;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  transition: background 0.18s, color 0.18s;
+  -webkit-tap-highlight-color: transparent;
+}
+.acc-plan .ciclo-btn.active { background: rgba(255,255,255,0.12); color: var(--text); }
+.acc-plan.card-plus .ciclo-btn.active { background: rgba(99,102,241,0.28); color: #c7d2fe; }
+.acc-plan.card-pro  .ciclo-btn.active { background: rgba(245,158,11,0.25); color: #fde68a; }
+.acc-plan .ciclo-selo {
+  font-size: 8px; font-weight: 800; padding: 1px 5px; border-radius: 8px;
+  background: rgba(16,185,129,0.18); color: #34d399;
+}
+.acc-plan .ciclo-selo-destaque {
+  background: rgba(245,158,11,0.2); color: #fbbf24;
+  animation: seloGlow 2s ease-in-out infinite;
+}
+
+/* Aviso "foto depois" */
+.cad-foto-aviso {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin-top: 12px; padding: 12px 13px;
+  background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.22);
+  border-radius: 12px; font-size: 12px; line-height: 1.45; color: var(--text);
+}
+.cad-foto-aviso i { font-size: 18px; color: #818cf8; flex-shrink: 0; margin-top: 1px; }
+.cad-foto-aviso strong { display: block; font-weight: 800; margin-bottom: 2px; color: #c7d2fe; }
+
+/* O preview já tem estilos próprios (cpp-*); aqui só garante respiro no topo */
+.acc-plan-body .cad-plan-preview { margin-top: 4px; }

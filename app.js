@@ -1004,12 +1004,10 @@
         if (statusEl)    statusEl.textContent = '';
         if (hiddenUrl)   hiddenUrl.value = '';
       });
-      // Oculta grupos de foto (só visíveis para planos pagos)
-      document.getElementById('foto-group').style.display = '';
+      // Reseta aviso de foto e plano selecionado
+      const avisoEl = document.getElementById('cad-foto-aviso');
+      if (avisoEl) avisoEl.style.display = 'none';
       selectedPlan = 'GRATIS';
-      // Reseta foto-lock e stepper
-      const lockEl = document.getElementById('foto-lock-overlay');
-      if (lockEl) lockEl.classList.add('show');
       cadIrParaEtapa(1);
       // Reseta campo de ramo autocomplete
       if (typeof ramoReset === 'function') ramoReset();
@@ -1503,45 +1501,17 @@
     if (sheet) sheet.scrollTop = 0;
   }
 
-  /* ── Carousel inline de planos (etapa 3) ─────────────────── */
-  let _cadCarouselIdx = 0;
+  /* ── Acordeão de planos (etapa 3) ────────────────────────────
+     Substituiu o carousel. _cadCarouselIdx é mantido só por
+     compatibilidade com confirmPlan(). cadCarouselIr() vira um
+     atalho que apenas seleciona o plano correspondente. */
+  let _cadCarouselIdx = 1; // Plus por padrão
   const _CAD_PLANS = ['GRATIS','PLUS','PRO'];
 
-  window.cadCarouselIr = function(idx, animar) {
-    animar = animar !== false;
-    _cadCarouselIdx = Math.max(0, Math.min(idx, 2));
-    const car = document.getElementById('cad-plan-carousel');
-    if (car) {
-      car.style.transition = animar ? 'transform 0.35s cubic-bezier(0.32,0.72,0,1)' : 'none';
-      car.style.transform  = 'translateX(-' + (_cadCarouselIdx * 100) + '%)';
-    }
-    document.querySelectorAll('.cad-plan-dot').forEach((d, i) => {
-      d.classList.toggle('active', i === _cadCarouselIdx);
-      d.setAttribute('aria-selected', i === _cadCarouselIdx ? 'true' : 'false');
-    });
-    cadSelecionarPlano(_CAD_PLANS[_cadCarouselIdx]);
-    var ativo = document.getElementById('plan-sel-' + _CAD_PLANS[_cadCarouselIdx].toLowerCase());
-    if (ativo) {
-      ativo.classList.remove('cad-pulse');
-      void ativo.offsetWidth;
-      ativo.classList.add('cad-pulse');
-    }
+  window.cadCarouselIr = function(idx) {
+    idx = Math.max(0, Math.min(idx, 2));
+    cadSelecionarPlano(_CAD_PLANS[idx]);
   };
-
-  // Swipe touch no carousel inline
-  (function initCadCarouselSwipe() {
-    let sx = 0, sy = 0, dragging = false;
-    document.addEventListener('touchstart', function(e) {
-      if (!e.target.closest('#cad-carousel-wrap')) return;
-      sx = e.touches[0].clientX; sy = e.touches[0].clientY; dragging = true;
-    }, { passive: true });
-    document.addEventListener('touchend', function(e) {
-      if (!dragging) return; dragging = false;
-      const dx = e.changedTouches[0].clientX - sx;
-      const dy = Math.abs(e.changedTouches[0].clientY - sy);
-      if (Math.abs(dx) > 40 && dy < 60) cadCarouselIr(_cadCarouselIdx + (dx < 0 ? 1 : -1));
-    }, { passive: true });
-  })();
 
   window.cadAvancar = function(etapa) {
     // Validação básica antes de avançar
@@ -1579,30 +1549,25 @@
     }
     cadIrParaEtapa(etapa);
     if (etapa === 3) {
-      setTimeout(function() {
-        cadCarouselIr(1, false); // começa no Plus, sem animação
-        cadMostrarHintCarousel();
-      }, 60);
+      // Abre já no Plus (mais escolhido) expandido; Grátis e Pro recolhidos.
+      setTimeout(function() { cadSelecionarPlano('PLUS'); }, 60);
     }
   };
 
-  // Mostra o hint "← deslize →" só na primeira visita à etapa 3.
-  function cadMostrarHintCarousel() {
-    var hint = document.getElementById('cad-carousel-hint');
-    if (!hint) return;
-    var KEY = 'cad_carousel_hint_v1';
-    var jaViu;
-    try { jaViu = localStorage.getItem(KEY); } catch (e) { jaViu = null; }
-    if (jaViu) { hint.style.display = 'none'; return; }
-    hint.classList.add('show');
-    var esconder = function () {
-      hint.classList.remove('show');
-      try { localStorage.setItem(KEY, '1'); } catch (e) {}
-    };
-    var wrap = document.getElementById('cad-carousel-wrap');
-    if (wrap) wrap.addEventListener('touchstart', esconder, { passive: true, once: true });
-    setTimeout(esconder, 5000);
+  // (Removido) O hint de swipe do carousel não existe mais no acordeão.
+  function cadToggleVerTudo(plano, btn) {
+    var ul = document.getElementById('acc-extra-' + plano);
+    if (!ul) return;
+    var aberto = ul.style.display !== 'none';
+    ul.style.display = aberto ? 'none' : '';
+    if (btn) {
+      var ic  = btn.querySelector('i');
+      var txt = btn.querySelector('span');
+      if (ic)  ic.className = aberto ? 'ti ti-chevron-down' : 'ti ti-chevron-up';
+      if (txt) txt.textContent = aberto ? 'ver o que mais vem no Plus' : 'ver menos';
+    }
   }
+  window.cadToggleVerTudo = cadToggleVerTudo;
 
   // Marca campo inválido + dispara shake (sem duplicar listeners).
   function cadShake(el) {
@@ -1617,48 +1582,29 @@
 
   /* ── Seletor de plano inline (etapa 3) ─────────────────── */
   window.cadSelecionarPlano = function(plano) {
+    if (!_CAD_PLANS.includes(plano)) plano = 'GRATIS';
     selectedPlan = plano;
-
-    // Marca o card selecionado (remove de todos, adiciona no escolhido)
-    ['GRATIS','PLUS','PRO'].forEach(p => {
-      const el = document.getElementById('plan-sel-' + p.toLowerCase());
-      if (!el) return;
-      el.classList.toggle('selected', p === plano);
-      el.setAttribute('aria-checked', p === plano ? 'true' : 'false');
-    });
+    _cadCarouselIdx = _CAD_PLANS.indexOf(plano);
 
     const isPago = plano !== 'GRATIS';
 
-    // Foto: mostra/esconde o lock overlay
-    const lockEl = document.getElementById('foto-lock-overlay');
-    if (lockEl) lockEl.classList.toggle('show', !isPago);
-
-    // Hint do plano selecionado
-    const icons = { GRATIS:'🏪', PLUS:'✦', PRO:'⭐' };
-    const notas = {
-      GRATIS: 'Cadastro gratuito, sem compromisso.',
-      PLUS:   'Você será contactado via WhatsApp para ativar o plano.',
-      PRO:    'Você será contactado via WhatsApp para ativar o plano.',
-    };
-    const hintEl = document.getElementById('cad-plan-hint');
-    if (hintEl) hintEl.innerHTML = `${icons[plano]} Plano <strong>${plano}</strong> selecionado · ${notas[plano]}`;
-
-    // Sincroniza carousel se clique veio de fora (ex: botão lock)
-    const cadIdx = _CAD_PLANS.indexOf(plano);
-    if (cadIdx >= 0 && cadIdx !== _cadCarouselIdx) {
-      _cadCarouselIdx = cadIdx;
-      const car = document.getElementById('cad-plan-carousel');
-      if (car) { car.style.transition = 'transform 0.35s cubic-bezier(0.32,0.72,0,1)'; car.style.transform = 'translateX(-' + (cadIdx * 100) + '%)'; }
-      document.querySelectorAll('.cad-plan-dot').forEach((d, i) => d.classList.toggle('active', i === cadIdx));
-    }
-
-    // Mostra o preview visual do plano selecionado
+    // Acordeão: marca selecionado (expande) e recolhe os demais.
     ['GRATIS','PLUS','PRO'].forEach(p => {
-      const el = document.getElementById('preview-' + p);
-      if (el) el.style.display = (p === plano) ? '' : 'none';
+      const el = document.getElementById('plan-sel-' + p.toLowerCase());
+      if (!el) return;
+      const ativo = (p === plano);
+      el.classList.toggle('selected', ativo);
+      el.setAttribute('aria-checked', ativo ? 'true' : 'false');
     });
 
-    // Gera barras de pico no Pro (valores ilustrativos mas realistas)
+    // Aviso "foto depois" só aparece em plano pago.
+    const avisoEl = document.getElementById('cad-foto-aviso');
+    if (avisoEl) avisoEl.style.display = isPago ? '' : 'none';
+
+    // Mantém os previews todos renderizados (cada um vive dentro do seu card),
+    // mas o card recolhido esconde o corpo via CSS, então não precisa toggle aqui.
+
+    // Gera as barras de pico do Pro uma única vez.
     if (plano === 'PRO') {
       const barsEl = document.getElementById('cpp-pico-bars');
       if (barsEl && !barsEl.dataset.rendered) {
@@ -1670,6 +1616,9 @@
         barsEl.dataset.rendered = '1';
       }
     }
+
+    // Garante que os preços do ciclo atual estão aplicados nos cards pagos.
+    if (typeof cadAtualizarPrecos === 'function') cadAtualizarPrecos();
   };
 
   /* ── Seleção de ciclo de cobrança ─────────────────────────── */
@@ -1677,8 +1626,8 @@
     if (!CICLOS[ciclo]) ciclo = 'mensal';
     _cicloSelecionado = ciclo;
 
-    // Marca botão ativo
-    document.querySelectorAll('#cad-ciclo-toggle .ciclo-btn').forEach(b => {
+    // Marca o botão ativo em TODOS os toggles de ciclo (Plus e Pro espelham o mesmo estado).
+    document.querySelectorAll('#cad-ciclo-toggle .ciclo-btn, #cad-ciclo-toggle-pro .ciclo-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.ciclo === ciclo);
     });
 

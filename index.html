@@ -522,302 +522,241 @@
         <div class="cad-step-panel" id="cad-panel-3">
 
           <!-- Cards de plano com visual completo — selecionável -->
-          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Escolha seu plano</div>
-
-          <!-- Seletor de ciclo de cobrança -->
-          <div class="ciclo-toggle" id="cad-ciclo-toggle" role="tablist" aria-label="Ciclo de cobrança">
-            <button type="button" class="ciclo-btn active" data-ciclo="mensal" onclick="cadSelecionarCiclo('mensal')">Mensal</button>
-            <button type="button" class="ciclo-btn" data-ciclo="trimestral" onclick="cadSelecionarCiclo('trimestral')">
-              Trimestral <span class="ciclo-selo">-10%</span>
-            </button>
-            <button type="button" class="ciclo-btn" data-ciclo="anual" onclick="cadSelecionarCiclo('anual')">
-              Anual <span class="ciclo-selo ciclo-selo-destaque">2 meses grátis</span>
-            </button>
+          <div class="cad-plan-head">
+            <div class="cad-plan-head-eyebrow">Passo 3 de 3 · Plano</div>
+            <div class="cad-plan-head-title">Qual plano combina com sua loja?</div>
           </div>
 
-          <!-- Carousel horizontal de planos (swipe) -->
-          <div class="cad-carousel-wrap" id="cad-carousel-wrap">
-            <!-- Hint primeira visita: "deslize" -->
-            <div class="cad-carousel-hint" id="cad-carousel-hint" aria-hidden="true">
-              <span class="cch-arrow">←</span> deslize para comparar <span class="cch-arrow">→</span>
-            </div>
-            <div class="cad-plan-carousel" id="cad-plan-carousel">
+          <!-- Acordeão de planos: 3 visíveis, 1 expandido por vez -->
+          <div class="acc-planos" id="acc-planos" role="radiogroup" aria-label="Escolha seu plano">
 
-          <!-- GRÁTIS -->
-          <div class="plan-card card-gratis cad-plan-card selected" id="plan-sel-gratis"
-            onclick="cadSelecionarPlano('GRATIS')" role="radio" aria-checked="true" tabindex="0">
-            <img src="/icons/owl-gratis.png" alt="" class="plan-card-owl owl-gratis" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
-            <div class="plan-card-content">
-              <div class="plan-card-top">
-                <div class="plan-card-name">🏪 Grátis</div>
-                <div class="plan-card-price">
-                  <span class="price-val">R$ 0</span>
-                  <span class="price-per">para sempre</span>
+            <!-- ───────── GRÁTIS ───────── -->
+            <div class="acc-plan card-gratis" id="plan-sel-gratis"
+                 role="radio" aria-checked="false" tabindex="0"
+                 onclick="cadSelecionarPlano('GRATIS')"
+                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();cadSelecionarPlano('GRATIS')}">
+              <div class="acc-plan-bar">
+                <div class="acc-plan-bar-left">
+                  <span class="acc-radio" aria-hidden="true"></span>
+                  <div class="acc-plan-bar-id">
+                    <div class="acc-plan-name">🏪 Grátis</div>
+                    <div class="acc-plan-anchor">Aparece na lista, sem destaque</div>
+                  </div>
+                </div>
+                <div class="acc-plan-price">
+                  <span class="acc-price-val">R$ 0</span>
+                  <span class="acc-price-per">para sempre</span>
                 </div>
               </div>
-              <ul class="plan-card-features">
-                <li><span class="feat-icon">✅</span> Loja listada no app</li>
-                <li><span class="feat-icon">✅</span> Status aberto/fechado em tempo real</li>
-                <li><span class="feat-icon">✅</span> Botão WhatsApp / Telefone</li>
-                <li><span class="feat-icon">✅</span> Painel "Minha Loja"</li>
-                <li><span class="feat-icon">✅</span> Total de cliques</li>
-                <li class="feat-off"><span class="feat-icon">✦</span> Posição de destaque na lista</li>
-                <li class="feat-off"><span class="feat-icon">✦</span> Métricas detalhadas</li>
-                <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa, logo e cardápio</li>
-              </ul>
+              <div class="acc-plan-body">
+                <ul class="acc-features">
+                  <li><i class="ti ti-check"></i> Loja listada no app</li>
+                  <li><i class="ti ti-check"></i> Status aberto/fechado em tempo real</li>
+                  <li><i class="ti ti-check"></i> Botão WhatsApp / Telefone</li>
+                  <li><i class="ti ti-check"></i> Painel "Minha Loja" + total de cliques</li>
+                </ul>
+                <!-- Preview GRÁTIS -->
+                <div class="cad-plan-preview" id="preview-GRATIS">
+                  <div class="cpp-label">Como sua loja vai aparecer</div>
+                  <div class="cpp-store-card cpp-gratis">
+                    <div class="cpp-thumb">🏪</div>
+                    <div class="cpp-info">
+                      <div class="cpp-nome">Sua Loja</div>
+                      <div class="cpp-sub">categoria</div>
+                      <div class="cpp-badges">
+                        <span class="cpp-badge cpp-badge-open">● Aberto</span>
+                        <span class="cpp-badge cpp-badge-plan-gratis">GRÁTIS</span>
+                      </div>
+                    </div>
+                    <div class="cpp-actions">
+                      <div class="cpp-action-btn cpp-wpp">WPP</div>
+                    </div>
+                  </div>
+                  <div class="cpp-note">Cadastro gratuito, sem compromisso.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ───────── PLUS (recomendado) ───────── -->
+            <div class="acc-plan card-plus selected" id="plan-sel-plus"
+                 role="radio" aria-checked="true" tabindex="0"
+                 onclick="cadSelecionarPlano('PLUS')"
+                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();cadSelecionarPlano('PLUS')}">
+              <div class="acc-popular">★ Mais escolhido</div>
+              <div class="acc-plan-bar">
+                <div class="acc-plan-bar-left">
+                  <span class="acc-radio" aria-hidden="true"></span>
+                  <div class="acc-plan-bar-id">
+                    <div class="acc-plan-name">✦ Plus</div>
+                    <div class="acc-plan-anchor">Destaque + foto + métricas</div>
+                  </div>
+                </div>
+                <div class="acc-plan-price">
+                  <span class="acc-price-val" id="cad-preco-plus">R$ 29,90</span>
+                  <span class="acc-price-per" id="cad-per-plus">por mês</span>
+                  <div class="plan-ciclo-info" id="cad-ciclo-plus" style="display:none;"></div>
+                </div>
+              </div>
+              <div class="acc-plan-body">
+                <div class="acc-fundador">
+                  <i class="ti ti-lock"></i> PREÇO DE FUNDADOR
+                </div>
+
+                <!-- Ciclo de cobrança — só aparece dentro de plano pago -->
+                <div class="ciclo-toggle" id="cad-ciclo-toggle" role="tablist" aria-label="Ciclo de cobrança">
+                  <button type="button" class="ciclo-btn active" data-ciclo="mensal" onclick="event.stopPropagation();cadSelecionarCiclo('mensal')">Mensal</button>
+                  <button type="button" class="ciclo-btn" data-ciclo="trimestral" onclick="event.stopPropagation();cadSelecionarCiclo('trimestral')">
+                    Trimestral <span class="ciclo-selo">-10%</span>
+                  </button>
+                  <button type="button" class="ciclo-btn" data-ciclo="anual" onclick="event.stopPropagation();cadSelecionarCiclo('anual')">
+                    Anual <span class="ciclo-selo ciclo-selo-destaque">2 meses grátis</span>
+                  </button>
+                </div>
+
+                <ul class="acc-features">
+                  <li><i class="ti ti-check"></i> Posição acima das lojas Grátis</li>
+                  <li><i class="ti ti-check"></i> Foto de capa e logo na página da loja</li>
+                  <li><i class="ti ti-check"></i> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
+                  <li><i class="ti ti-check"></i> Cardápio / Serviços (até 8 itens)</li>
+                  <li><i class="ti ti-check"></i> Anúncio do dia no card + selo ✦ PLUS</li>
+                </ul>
+                <button type="button" class="acc-vertudo" onclick="event.stopPropagation();cadToggleVerTudo('plus',this)">
+                  <i class="ti ti-chevron-down"></i> <span>ver o que mais vem no Plus</span>
+                </button>
+                <ul class="acc-features acc-features-extra" id="acc-extra-plus" style="display:none;">
+                  <li class="feat-off"><i class="ti ti-star"></i> Foto no card da listagem (só Pro)</li>
+                  <li class="feat-off"><i class="ti ti-star"></i> Topo absoluto da lista (só Pro)</li>
+                  <li class="feat-off"><i class="ti ti-star"></i> Relatório avançado (só Pro)</li>
+                  <li class="feat-off"><i class="ti ti-star"></i> Horário de pico dos cliques (só Pro)</li>
+                </ul>
+
+                <!-- Preview PLUS -->
+                <div class="cad-plan-preview" id="preview-PLUS">
+                  <div class="cpp-label">Como sua loja vai aparecer</div>
+                  <div class="cpp-store-card cpp-plus">
+                    <div class="cpp-thumb cpp-thumb-foto">📸</div>
+                    <div class="cpp-info">
+                      <div class="cpp-nome">Sua Loja</div>
+                      <div class="cpp-sub">categoria</div>
+                      <div class="cpp-anuncio">🎯 Promoção especial hoje!</div>
+                      <div class="cpp-badges">
+                        <span class="cpp-badge cpp-badge-open">● Aberto</span>
+                        <span class="cpp-badge cpp-badge-plan-plus">✦ PLUS</span>
+                      </div>
+                    </div>
+                    <div class="cpp-actions">
+                      <div class="cpp-action-btn cpp-wpp">WPP</div>
+                    </div>
+                  </div>
+                  <div class="cpp-metrics">
+                    <div class="cpp-metric-item"><div class="cpp-metric-val">47</div><div class="cpp-metric-lbl">7 dias</div></div>
+                    <div class="cpp-metric-item"><div class="cpp-metric-val">183</div><div class="cpp-metric-lbl">30 dias</div></div>
+                    <div class="cpp-metric-item cpp-metric-wpp"><div class="cpp-metric-val" style="color:#25d366;">38</div><div class="cpp-metric-lbl">WhatsApp</div></div>
+                    <div class="cpp-metric-item cpp-metric-tel"><div class="cpp-metric-val" style="color:var(--blue);">9</div><div class="cpp-metric-lbl">Telefone</div></div>
+                  </div>
+                  <div class="cpp-note">Posição acima das lojas Grátis + anúncio do dia + métricas detalhadas.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ───────── PRO ───────── -->
+            <div class="acc-plan card-pro" id="plan-sel-pro"
+                 role="radio" aria-checked="false" tabindex="0"
+                 onclick="cadSelecionarPlano('PRO')"
+                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();cadSelecionarPlano('PRO')}">
+              <div class="acc-plan-bar">
+                <div class="acc-plan-bar-left">
+                  <span class="acc-radio" aria-hidden="true"></span>
+                  <div class="acc-plan-bar-id">
+                    <div class="acc-plan-name">⭐ Pro</div>
+                    <div class="acc-plan-anchor">Topo absoluto + cardápio ilimitado</div>
+                  </div>
+                </div>
+                <div class="acc-plan-price">
+                  <span class="acc-price-val" id="cad-preco-pro">R$ 49,90</span>
+                  <span class="acc-price-per" id="cad-per-pro">por mês</span>
+                  <div class="plan-ciclo-info" id="cad-ciclo-pro" style="display:none;"></div>
+                </div>
+              </div>
+              <div class="acc-plan-body">
+                <div class="acc-fundador acc-fundador-pro">
+                  <i class="ti ti-lock"></i> PREÇO DE FUNDADOR
+                </div>
+
+                <!-- Ciclo de cobrança PRO (espelha o estado global) -->
+                <div class="ciclo-toggle" id="cad-ciclo-toggle-pro" role="tablist" aria-label="Ciclo de cobrança">
+                  <button type="button" class="ciclo-btn active" data-ciclo="mensal" onclick="event.stopPropagation();cadSelecionarCiclo('mensal')">Mensal</button>
+                  <button type="button" class="ciclo-btn" data-ciclo="trimestral" onclick="event.stopPropagation();cadSelecionarCiclo('trimestral')">
+                    Trimestral <span class="ciclo-selo">-10%</span>
+                  </button>
+                  <button type="button" class="ciclo-btn" data-ciclo="anual" onclick="event.stopPropagation();cadSelecionarCiclo('anual')">
+                    Anual <span class="ciclo-selo ciclo-selo-destaque">2 meses grátis</span>
+                  </button>
+                </div>
+
+                <ul class="acc-features">
+                  <li><i class="ti ti-check"></i> Tudo do Plus, e mais:</li>
+                  <li><i class="ti ti-check"></i> Foto de capa e logo no card da listagem</li>
+                  <li><i class="ti ti-check"></i> Topo absoluto da lista</li>
+                  <li><i class="ti ti-check"></i> Cardápio ilimitado com fotos dos itens</li>
+                  <li><i class="ti ti-check"></i> Relatório avançado + horário de pico</li>
+                </ul>
+
+                <!-- Preview PRO -->
+                <div class="cad-plan-preview" id="preview-PRO">
+                  <div class="cpp-label">Como sua loja vai aparecer</div>
+                  <div class="cpp-store-card cpp-pro cpp-has-cover">
+                    <div class="cpp-cover">
+                      <div class="cpp-cover-gradient"></div>
+                      <div class="cpp-cover-logo">⭐</div>
+                      <div class="cpp-cover-info">
+                        <div class="cpp-cover-nome">Sua Loja</div>
+                        <div class="cpp-cover-sub">categoria</div>
+                        <span class="cpp-badge cpp-badge-open" style="font-size:9px;">● Aberto</span>
+                      </div>
+                      <span class="cpp-badge cpp-badge-plan-pro" style="position:absolute;top:8px;right:8px;">⭐ PRO</span>
+                    </div>
+                    <div class="cpp-anuncio cpp-anuncio-pro" style="margin:8px 10px 0;">
+                      📸 Foto no anúncio + cardápio ilimitado!
+                    </div>
+                  </div>
+                  <div class="cpp-metrics">
+                    <div class="cpp-metric-item"><div class="cpp-metric-val" style="color:var(--zap);">94</div><div class="cpp-metric-lbl">7 dias</div></div>
+                    <div class="cpp-metric-item"><div class="cpp-metric-val" style="color:var(--zap);">371</div><div class="cpp-metric-lbl">30 dias</div></div>
+                    <div class="cpp-metric-item"><div class="cpp-metric-val" style="color:#25d366;">76</div><div class="cpp-metric-lbl">WhatsApp</div></div>
+                    <div class="cpp-metric-item"><div class="cpp-metric-val" style="color:var(--blue);">18</div><div class="cpp-metric-lbl">Telefone</div></div>
+                  </div>
+                  <div class="cpp-pico">
+                    <div class="cpp-pico-label">📈 Horário de pico dos cliques</div>
+                    <div class="cpp-pico-bars" id="cpp-pico-bars"></div>
+                    <div class="cpp-pico-horas">
+                      <span>8h</span><span>10h</span><span>12h</span><span>14h</span><span>16h</span><span>18h</span>
+                    </div>
+                  </div>
+                  <div class="cpp-note">Topo absoluto da lista + foto de capa no card + cardápio ilimitado com fotos.</div>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /acc-planos -->
+
+          <!-- Nota de upload pós-aprovação (planos pagos) -->
+          <div class="cad-foto-aviso" id="cad-foto-aviso" style="display:none;">
+            <i class="ti ti-photo"></i>
+            <div>
+              <strong>Foto &amp; logo você adiciona depois.</strong>
+              Assim que sua loja for aprovada, é só abrir o painel "Minha Loja" e subir as imagens com calma.
             </div>
           </div>
 
-          <!-- PLUS -->
-          <div class="plan-card card-plus cad-plan-card" id="plan-sel-plus"
-            onclick="cadSelecionarPlano('PLUS')" role="radio" aria-checked="false" tabindex="0">
-            <img src="/icons/owl-plus.png" alt="" class="plan-card-owl owl-plus" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
-            <div class="plan-card-content">
-              <span class="plan-popular">⭐ MAIS POPULAR</span>
-              <div class="plan-card-top">
-                <div class="plan-card-name">✦ Plus</div>
-                <div class="plan-card-price">
-                  <span class="price-val" id="cad-preco-plus">R$ 29,90</span>
-                  <span class="price-per" id="cad-per-plus">por mês</span>
-                </div>
-                <div class="plan-ciclo-info" id="cad-ciclo-plus" style="display:none;font-size:10px;color:var(--muted);margin-top:2px;"></div>
-              </div>
-              <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);border-radius:20px;padding:3px 9px;margin-bottom:8px;">
-                <span style="font-size:9px;">🔒</span>
-                <span style="font-family:var(--font-h);font-size:9px;font-weight:800;color:#818cf8;letter-spacing:0.03em;">PREÇO DE FUNDADOR</span>
-              </div>
-              <ul class="plan-card-features">
-                <li><span class="feat-icon">✅</span> Tudo do Grátis</li>
-                <li><span class="feat-icon">✅</span> Posição acima das lojas Grátis</li>
-                <li><span class="feat-icon">✅</span> Selo ✦ PLUS no card</li>
-                <li><span class="feat-icon">✅</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
-                <li><span class="feat-icon">✅</span> Foto de capa e logo na página da loja</li>
-                <li><span class="feat-icon">✅</span> Cardápio / Serviços (até 8 itens)</li>
-                <li><span class="feat-icon">✅</span> Anúncio do dia no card (texto + emoji)</li>
-                <li class="feat-off"><span class="feat-icon">⭐</span> Foto no card da listagem</li>
-                <li class="feat-off"><span class="feat-icon">⭐</span> Topo absoluto da lista</li>
-                <li class="feat-off"><span class="feat-icon">⭐</span> Relatório avançado (visualizações, crescimento, conversão)</li>
-                <li class="feat-off"><span class="feat-icon">⭐</span> Horário de pico dos cliques</li>
-              </ul>
-            </div>
-          </div>
-
-          <!-- PRO -->
-          <div class="plan-card card-pro cad-plan-card" id="plan-sel-pro"
-            onclick="cadSelecionarPlano('PRO')" role="radio" aria-checked="false" tabindex="0">
-            <img src="/icons/owl-pro.png" alt="" class="plan-card-owl owl-pro" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
-            <div class="plan-card-content">
-              <div class="plan-card-top">
-                <div class="plan-card-name">⭐ Pro</div>
-                <div class="plan-card-price">
-                  <span class="price-val" id="cad-preco-pro">R$ 49,90</span>
-                  <span class="price-per" id="cad-per-pro">por mês</span>
-                </div>
-                <div class="plan-ciclo-info" id="cad-ciclo-pro" style="display:none;font-size:10px;color:var(--muted);margin-top:2px;"></div>
-              </div>
-              <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.35);border-radius:20px;padding:3px 9px;margin-bottom:8px;">
-                <span style="font-size:9px;">🔒</span>
-                <span style="font-family:var(--font-h);font-size:9px;font-weight:800;color:#f59e0b;letter-spacing:0.03em;">PREÇO DE FUNDADOR</span>
-              </div>
-              <ul class="plan-card-features">
-                <li><span class="feat-icon">✅</span> Tudo do Plus</li>
-                <li><span class="feat-icon">✅</span> Foto de capa e logo no card da listagem</li>
-                <li><span class="feat-icon">✅</span> Topo absoluto da lista</li>
-                <li><span class="feat-icon">✅</span> Cardápio ilimitado com fotos dos itens</li>
-                <li><span class="feat-icon">✅</span> Foto no anúncio do dia</li>
-                <li><span class="feat-icon">✅</span> Relatório avançado: visualizações, abriram cardápio, crescimento semanal e conversão por canal</li>
-                <li><span class="feat-icon">✅</span> Horário de pico dos cliques</li>
-                <li><span class="feat-icon">✅</span> Selo ⭐ PRO em destaque no card</li>
-              </ul>
-            </div>
-          </div>
-
-            </div><!-- /cad-plan-carousel -->
-
-            <!-- Dots -->
-            <div class="cad-plan-dots" id="cad-plan-dots" role="tablist" aria-label="Planos">
-              <button type="button" class="cad-plan-dot" role="tab" aria-label="Plano Grátis" onclick="cadCarouselIr(0)"></button>
-              <button type="button" class="cad-plan-dot active" role="tab" aria-label="Plano Plus" aria-selected="true" onclick="cadCarouselIr(1)"></button>
-              <button type="button" class="cad-plan-dot" role="tab" aria-label="Plano Pro" onclick="cadCarouselIr(2)"></button>
-            </div>
-          </div><!-- /cad-carousel-wrap -->
-
-          <!-- Hint do plano selecionado -->
-          <p class="field-hint" style="text-align:center;" id="cad-plan-hint">
-            🏪 Plano <strong>GRÁTIS</strong> selecionado · Cadastro gratuito, sem compromisso.
-          </p>
-
-          <!-- ── Preview visual dos benefícios por plano ── -->
-
-          <!-- PREVIEW GRÁTIS -->
-          <div class="cad-plan-preview" id="preview-GRATIS">
-            <div class="cpp-label">Como sua loja vai aparecer</div>
-            <!-- Mini card Grátis -->
-            <div class="cpp-store-card cpp-gratis">
-              <div class="cpp-thumb">🏪</div>
-              <div class="cpp-info">
-                <div class="cpp-nome">Sua Loja</div>
-                <div class="cpp-sub">categoria</div>
-                <div class="cpp-badges">
-                  <span class="cpp-badge cpp-badge-open">● Aberto</span>
-                  <span class="cpp-badge cpp-badge-plan-gratis">GRÁTIS</span>
-                </div>
-              </div>
-              <div class="cpp-actions">
-                <div class="cpp-action-btn cpp-wpp">WPP</div>
-              </div>
-            </div>
-            <div class="cpp-note">Aparece na lista geral, sem destaque visual.</div>
-          </div>
-
-          <!-- PREVIEW PLUS -->
-          <div class="cad-plan-preview" id="preview-PLUS" style="display:none;">
-            <div class="cpp-label">Como sua loja vai aparecer</div>
-            <!-- Mini card Plus destacado -->
-            <div class="cpp-store-card cpp-plus">
-              <div class="cpp-thumb cpp-thumb-foto">📸</div>
-              <div class="cpp-info">
-                <div class="cpp-nome">Sua Loja</div>
-                <div class="cpp-sub">categoria</div>
-                <div class="cpp-anuncio">🎯 Promoção especial hoje!</div>
-                <div class="cpp-badges">
-                  <span class="cpp-badge cpp-badge-open">● Aberto</span>
-                  <span class="cpp-badge cpp-badge-plan-plus">✦ PLUS</span>
-                </div>
-              </div>
-              <div class="cpp-actions">
-                <div class="cpp-action-btn cpp-wpp">WPP</div>
-              </div>
-            </div>
-            <!-- Mini métricas -->
-            <div class="cpp-metrics">
-              <div class="cpp-metric-item">
-                <div class="cpp-metric-val">47</div>
-                <div class="cpp-metric-lbl">7 dias</div>
-              </div>
-              <div class="cpp-metric-item">
-                <div class="cpp-metric-val">183</div>
-                <div class="cpp-metric-lbl">30 dias</div>
-              </div>
-              <div class="cpp-metric-item cpp-metric-wpp">
-                <div class="cpp-metric-val" style="color:#25d366;">38</div>
-                <div class="cpp-metric-lbl">WhatsApp</div>
-              </div>
-              <div class="cpp-metric-item cpp-metric-tel">
-                <div class="cpp-metric-val" style="color:var(--blue);">9</div>
-                <div class="cpp-metric-lbl">Telefone</div>
-              </div>
-            </div>
-            <div class="cpp-note">Posição acima das lojas Grátis + anúncio do dia + métricas detalhadas.</div>
-          </div>
-
-          <!-- PREVIEW PRO -->
-          <div class="cad-plan-preview" id="preview-PRO" style="display:none;">
-            <div class="cpp-label">Como sua loja vai aparecer</div>
-            <!-- Mini card Pro com capa -->
-            <div class="cpp-store-card cpp-pro cpp-has-cover">
-              <div class="cpp-cover">
-                <div class="cpp-cover-gradient"></div>
-                <div class="cpp-cover-logo">⭐</div>
-                <div class="cpp-cover-info">
-                  <div class="cpp-cover-nome">Sua Loja</div>
-                  <div class="cpp-cover-sub">categoria</div>
-                  <span class="cpp-badge cpp-badge-open" style="font-size:9px;">● Aberto</span>
-                </div>
-                <span class="cpp-badge cpp-badge-plan-pro" style="position:absolute;top:8px;right:8px;">⭐ PRO</span>
-              </div>
-              <div class="cpp-anuncio cpp-anuncio-pro" style="margin:8px 10px 0;">
-                📸 Foto no anúncio + cardápio ilimitado!
-              </div>
-            </div>
-            <!-- Mini métricas Pro com pico -->
-            <div class="cpp-metrics">
-              <div class="cpp-metric-item">
-                <div class="cpp-metric-val" style="color:var(--zap);">94</div>
-                <div class="cpp-metric-lbl">7 dias</div>
-              </div>
-              <div class="cpp-metric-item">
-                <div class="cpp-metric-val" style="color:var(--zap);">371</div>
-                <div class="cpp-metric-lbl">30 dias</div>
-              </div>
-              <div class="cpp-metric-item">
-                <div class="cpp-metric-val" style="color:#25d366;">76</div>
-                <div class="cpp-metric-lbl">WhatsApp</div>
-              </div>
-              <div class="cpp-metric-item">
-                <div class="cpp-metric-val" style="color:var(--blue);">18</div>
-                <div class="cpp-metric-lbl">Telefone</div>
-              </div>
-            </div>
-            <!-- Mini gráfico de pico (barras simples) -->
-            <div class="cpp-pico">
-              <div class="cpp-pico-label">📈 Horário de pico dos cliques</div>
-              <div class="cpp-pico-bars" id="cpp-pico-bars">
-                <!-- gerado via JS -->
-              </div>
-              <div class="cpp-pico-horas">
-                <span>8h</span><span>10h</span><span>12h</span><span>14h</span><span>16h</span><span>18h</span>
-              </div>
-            </div>
-            <div class="cpp-note">Topo absoluto da lista + foto de capa no card + cardápio ilimitado com fotos.</div>
-          </div>
-
-          <!-- Foto & Logo — sempre visível, com lock para Grátis -->
-          <div class="field-group" id="foto-group" style="position:relative;">
-            <label class="field-label">
-              Foto &amp; Logo
-              <span style="color:var(--zap);margin-left:4px;" id="foto-group-plan-label">✦ Plus · ⭐ Pro</span>
-            </label>
-            <p class="field-hint" style="margin-bottom:10px;">
-              Veja como sua loja vai aparecer no app. Toque nas imagens para trocar.
-            </p>
-
-            <!-- Lock overlay para plano Grátis -->
-            <div class="foto-lock-overlay show" id="foto-lock-overlay">
-              <div class="foto-lock-icon">🔒</div>
-              <div class="foto-lock-title">Foto & Logo</div>
-              <div class="foto-lock-sub">Disponível nos planos <strong>Plus</strong> e <strong>Pro</strong>.<br>Faça o upgrade para destacar sua loja!</div>
-              <button type="button" class="foto-lock-btn" onclick="cadSelecionarPlano('PLUS')">✦ Selecionar Plus</button>
-            </div>
-
-            <!-- Preview Card -->
-            <div id="card-preview-wrap" style="border-radius:16px;overflow:hidden;border:1px solid var(--border);background:var(--surface);position:relative;margin-bottom:8px;">
-              <div id="prev-capa-wrap" style="width:100%;height:130px;background:var(--surface2);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;touch-action:none;cursor:default;">
-                <i id="prev-capa-placeholder" class="fa fa-image" style="font-size:2rem;color:var(--border);pointer-events:none;"></i>
-                <img id="foto-preview-img" src="" alt="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 50%;user-select:none;-webkit-user-select:none;pointer-events:none;"/>
-                <div id="prev-capa-drag-hint" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);color:#fff;font-size:10px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;backdrop-filter:blur(4px);pointer-events:none;">✥ Arraste para reposicionar</div>
-                <label for="f-foto-file" id="btn-trocar-capa" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:5px 9px;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:#fff;backdrop-filter:blur(6px);z-index:2;">
-                  <i class="fa fa-camera"></i> Trocar capa
-                </label>
-                <span id="foto-upload-status" style="display:none;"></span>
-              </div>
-              <input type="hidden" id="f-foto-pos" name="fotoPosicao" value="50% 50%" />
-              <div style="padding:10px 12px 12px;display:flex;align-items:center;gap:10px;">
-                <div id="prev-logo-wrap" style="width:44px;height:44px;border-radius:10px;flex-shrink:0;background:#fff;border:1.5px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative;">
-                  <i id="prev-logo-placeholder" class="fa fa-store" style="font-size:1.1rem;color:var(--border);"></i>
-                  <img id="logo-preview-img" src="" alt="" style="display:none;width:100%;height:100%;object-fit:contain;"/>
-                  <label for="f-logo-file" style="position:absolute;inset:0;cursor:pointer;background:transparent;" title="Trocar logo"></label>
-                </div>
-                <div style="flex:1;min-width:0;">
-                  <div style="font-family:var(--font-h);font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="prev-nome">Nome da sua loja</div>
-                  <div style="font-size:11px;color:var(--muted);margin-top:2px;" id="prev-ramo">Ramo / categoria</div>
-                </div>
-              </div>
-              <div style="display:flex;align-items:center;justify-content:center;gap:16px;padding:8px 12px;border-top:1px solid var(--border);background:var(--surface2);">
-                <label for="f-logo-file" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text);">
-                  <i class="fa fa-camera" style="font-size:10px;color:var(--muted);"></i> Trocar logo
-                </label>
-                <span id="logo-upload-status" style="display:none;"></span>
-              </div>
-            </div>
-            <input type="file" id="f-foto-file" accept="image/*" style="display:none;" />
+          <!-- Inputs de foto/logo mantidos no DOM (ocultos) p/ não quebrar o submit/upload.
+               O upload real acontece no painel pós-aprovação. -->
+          <div style="display:none;" aria-hidden="true">
+            <input type="hidden" id="f-foto-pos" name="fotoPosicao" value="50% 50%" />
+            <input type="file" id="f-foto-file" accept="image/*" />
             <input type="hidden" id="f-foto-url" name="fotoUrl" />
-            <input type="file" id="f-logo-file" accept="image/*" style="display:none;" />
+            <input type="file" id="f-logo-file" accept="image/*" />
             <input type="hidden" id="f-logo-url" name="logoUrl" />
-            <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.5;">
-              Máx 5MB · JPG, PNG ou WebP<br>
-              <span style="color:rgba(99,102,241,0.8);">💡 Para a logo ficar sem fundo branco, use PNG com fundo transparente</span>
-            </div>
           </div>
 
           <div class="cad-sticky-cta">

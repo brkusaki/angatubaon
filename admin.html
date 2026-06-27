@@ -90,6 +90,36 @@
       background: var(--s2); transition: color 0.2s;
     }
     .logout-btn:hover { color: var(--red); }
+    .hist-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 16px; height: 16px; padding: 0 4px; margin-left: 3px;
+      background: var(--zap); color: #000; border-radius: 10px;
+      font-size: 9px; font-weight: 800; font-family: var(--font-b);
+    }
+    .hist-panel {
+      position: absolute; top: calc(100% + 8px); right: 0; z-index: 50;
+      width: min(320px, 80vw); max-height: 400px; overflow-y: auto;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    }
+    .hist-item { padding: 6px 8px; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .hist-item:last-child { border-bottom: none; }
+    .hist-hora { color: var(--muted); font-family: var(--font-b); font-size: 11px; margin-right: 4px; }
+
+    /* Modal de configuracao (#7) */
+    .cfg-modal {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    .cfg-box {
+      width: min(440px, 100%); background: var(--card);
+      border: 1px solid var(--border); border-radius: var(--r);
+      padding: 22px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .cfg-title { font-family: var(--font-h); font-size: 1.3rem; font-weight: 800; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+    .cfg-desc { font-size: 12px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+    .cfg-actions { display: flex; gap: 8px; margin-top: 16px; }
 
     /* ── TABS ────────────────────────────────────────────── */
     .tabs {
@@ -166,6 +196,8 @@
     .btn-reject  { background: rgba(255,68,68,0.1);  color: var(--red);   border: 1px solid rgba(255,68,68,0.2); }
     .btn-wpp     { background: rgba(37,211,102,0.12); color: #25d366;      border: 1px solid rgba(37,211,102,0.2); }
     .btn-plan    { background: rgba(99,102,241,0.12); color: var(--indigo);border: 1px solid rgba(99,102,241,0.25); }
+    .btn-renovar { background: rgba(0,208,132,0.1); color: var(--green); border: 1px solid rgba(0,208,132,0.25); }
+    .btn-copiar  { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid rgba(255,255,255,0.1); }
     .btn-edit    { background: rgba(99,102,241,0.1); color: var(--indigo); border: 1px solid rgba(99,102,241,0.22); }
 
     /* ── FORMULÁRIO DE EDIÇÃO INLINE ─────────────────────── */
@@ -324,9 +356,13 @@
     }
 
     /* ── MÉTRICAS ────────────────────────────────────────────── */
-    .metric-summary {
+    .metric-summary, .pag-summary {
       display: grid; grid-template-columns: repeat(3,1fr); gap: 10px;
       margin-bottom: 20px;
+    }
+    @media (max-width: 480px) {
+      .pag-summary { grid-template-columns: 1fr 1fr; }
+      .pag-summary .metric-kpi:last-child { grid-column: 1 / -1; }
     }
     .metric-kpi {
       background: var(--surface); border: 1px solid var(--border);
@@ -417,6 +453,35 @@
     .metric-period {
       font-size: 11px; color: var(--muted);
     }
+    /* Selos de pagamento (aba Planos / Cobrancas) */
+    .selo-pago, .selo-naopago {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 9px; font-weight: 800; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 20px; white-space: nowrap;
+      letter-spacing: .02em;
+    }
+    .nota-admin-box {
+      margin: 10px 0; padding: 10px 12px;
+      background: rgba(245,158,11,0.05); border: 1px dashed rgba(245,158,11,0.3);
+      border-radius: var(--r);
+    }
+    .nota-admin-input { width: 100%; resize: vertical; min-height: 44px; margin-top: 6px; }
+    .nota-admin-box .edit-lbl span { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--zap); }
+    .btn-nota { background: rgba(245,158,11,0.12); color: var(--zap); border: 1px solid rgba(245,158,11,0.3); margin-top: 8px; }
+
+    .selo-pago    { background: rgba(0,208,132,0.14); color: var(--green); border: 1px solid rgba(0,208,132,0.3); }
+    .selo-naopago { background: rgba(245,158,11,0.12); color: var(--zap);  border: 1px solid rgba(245,158,11,0.3); }
+    .selo-pago i, .selo-naopago i { font-size: 8px; }
+
+    /* Banner de receita em risco (topo de Cobrancas) */
+    .cobr-receita {
+      grid-column: 1 / -1; display: flex; align-items: center; gap: 10px;
+      background: rgba(255,68,68,0.06); border: 1px solid rgba(255,68,68,0.25);
+      border-radius: var(--r); padding: 12px 16px; margin-top: 2px;
+    }
+    .cobr-receita i { color: var(--red); font-size: 1.1rem; flex-shrink: 0; }
+    .cobr-receita-val { font-family: var(--font-h); font-size: 1.3rem; font-weight: 800; color: var(--red); }
+    .cobr-receita-lbl { font-size: 11px; color: var(--muted); }
   </style>
 </head>
 <body>
@@ -439,8 +504,35 @@
 
   <header class="admin-header">
     <div class="admin-logo">Angatuba<span>ON</span> <span style="font-size:11px;color:var(--muted);font-family:var(--font-b);font-weight:400;">· Admin</span></div>
-    <button class="logout-btn" onclick="doLogout()"><i class="fa fa-right-from-bracket"></i> Sair</button>
+    <div style="display:flex;align-items:center;gap:14px;position:relative;">
+      <button class="logout-btn" onclick="toggleHistorico()" title="Histórico de ações desta sessão">
+        <i class="fa fa-clock-rotate-left"></i>
+        <span class="hist-badge" id="hist-badge" style="display:none;">0</span>
+      </button>
+      <button class="logout-btn" onclick="exportarCSV()" title="Baixar todas as lojas em CSV"><i class="fa fa-file-csv"></i> CSV</button>
+      <button class="logout-btn" onclick="abrirConfigMsg()" title="Configurar mensagens de WhatsApp"><i class="fa fa-gear"></i></button>
+      <button class="logout-btn" onclick="doLogout()"><i class="fa fa-right-from-bracket"></i> Sair</button>
+      <div class="hist-panel" id="hist-panel" style="display:none;"></div>
+    </div>
   </header>
+
+  <!-- Modal de configuracao de mensagens (#7) -->
+  <div class="cfg-modal" id="cfg-modal" style="display:none;">
+    <div class="cfg-box">
+      <div class="cfg-title"><i class="fa fa-gear"></i> Configurar mensagens</div>
+      <p class="cfg-desc">Personalize as partes fixas das mensagens de WhatsApp. O resto (nome da loja, plano, datas) é preenchido automaticamente.</p>
+      <label class="edit-lbl edit-full">Link do app
+        <input class="edit-input" id="cfg-link" placeholder="https://angatubaon.com.br" />
+      </label>
+      <label class="edit-lbl edit-full">Assinatura / emoji final
+        <input class="edit-input" id="cfg-assinatura" placeholder="🦉" />
+      </label>
+      <div class="cfg-actions">
+        <button class="act-btn btn-save-edit" onclick="salvarConfigMsg()"><i class="fa fa-save"></i> Salvar</button>
+        <button class="act-btn btn-cancel-edit" onclick="fecharConfigMsg()">Cancelar</button>
+      </div>
+    </div>
+  </div>
 
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('pendentes', this)">
@@ -451,12 +543,19 @@
       <i class="fa fa-check-circle"></i> Aprovados
       <span class="tab-count" id="count-aprovados"></span>
     </button>
+    <button class="tab-btn" onclick="switchTab('reprovados', this)">
+      <i class="fa fa-ban"></i> Reprovados
+      <span class="tab-count" id="count-reprovados"></span>
+    </button>
     <button class="tab-btn" onclick="switchTab('planos', this)">
       <i class="fa fa-star"></i> Planos
     </button>
     <button class="tab-btn" onclick="switchTab('cobrancas', this)">
       <i class="fa fa-money-bill-wave"></i> Cobranças
       <span class="tab-count" id="count-cobrancas"></span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('pagamentos', this)">
+      <i class="fa fa-receipt"></i> Pagamentos
     </button>
     <button class="tab-btn" onclick="switchTab('metricas', this)">
       <i class="fa fa-chart-bar"></i> Métricas
@@ -490,6 +589,18 @@
       </div>
     </div>
 
+    <!-- TAB: Reprovados -->
+    <div class="tab-content" id="tab-reprovados">
+      <div class="admin-search-wrap">
+        <i class="fa fa-search admin-search-icon"></i>
+        <input class="admin-search" id="search-reprovados"
+          placeholder="Filtrar pelo nome..." oninput="filterCards('reprovados')" />
+      </div>
+      <div class="store-cards" id="list-reprovados">
+        <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
+      </div>
+    </div>
+
     <!-- TAB: Planos -->
     <div class="tab-content" id="tab-planos">
       <div class="admin-search-wrap">
@@ -514,6 +625,25 @@
       <div class="cobr-cat-tabs" id="cobr-cat-tabs"></div>
       <div class="store-cards" id="list-cobrancas">
         <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando...</div>
+      </div>
+    </div>
+
+    <!-- TAB: Pagamentos -->
+    <div class="tab-content" id="tab-pagamentos">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:10px;flex-wrap:wrap;">
+        <span class="metric-period" id="pag-period">Carregando...</span>
+        <button class="metric-refresh" onclick="loadPagamentos()">
+          <i class="fa fa-rotate-right"></i> Atualizar
+        </button>
+      </div>
+      <div class="pag-summary" id="pag-summary"></div>
+      <div class="admin-search-wrap">
+        <i class="fa fa-search admin-search-icon"></i>
+        <input class="admin-search" id="search-pagamentos"
+          placeholder="Filtrar por nome ou WhatsApp..." oninput="filterPagamentos()" />
+      </div>
+      <div class="store-cards" id="list-pagamentos">
+        <div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando pagamentos...</div>
       </div>
     </div>
 
@@ -643,6 +773,7 @@ function mostrarPainel() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('admin-panel').style.display  = 'block';
   loadData();
+  iniciarAutoRefresh();
 }
 
 async function doLogout() {
@@ -690,6 +821,7 @@ function switchTab(name, btn) {
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'metricas') loadMetricas();
   if (name === 'cobrancas') renderCobrancas();
+  if (name === 'pagamentos') loadPagamentos();
 }
 
 /* ══ DATA ═════════════════════════════════════════════════════ */
@@ -754,14 +886,30 @@ function renderAll() {
   setCount('pendentes', pendentes.length);
   setCount('aprovados', aprovados.length);
 
+  const reprovados = allRows.filter(r => r.status === 'REPROVADO');
+  setCount('reprovados', reprovados.length);
+
   renderPendentesPeriodo(pendentes);
   renderList('aprovados', [...aprovados].sort((a, b) => b.row - a.row));
   filterCards('aprovados'); // reaplica busca ativa nesta aba (igual as outras)
+  renderList('reprovados', [...reprovados].sort((a, b) => b.row - a.row));
+  filterCards('reprovados');
   renderPlanos(aprovados);
 
   // Recalcula cobrancas a cada render: mantem o badge de urgencia correto
   // mesmo sem o usuario abrir a aba, e atualiza a lista se ela ja estiver visivel.
   renderCobrancas();
+
+  // Atualiza o titulo da aba do navegador com o total de pendentes (#4)
+  atualizarTituloAba(pendentes.length);
+}
+
+/* Mostra o numero de pendentes no titulo da aba do navegador, para o admin
+   perceber novos cadastros sem precisar abrir o painel. */
+function atualizarTituloAba(nPendentes) {
+  document.title = (nPendentes > 0)
+    ? `(${nPendentes}) Admin · AngatubaON`
+    : 'Admin · AngatubaON';
 }
 
 /* ══ PENDENTES POR PERÍODO ════════════════════════════════════ */
@@ -979,16 +1127,23 @@ function cardHTML(r, type) {
           <button class="act-btn btn-reject" onclick="updateStatus(${r.row},'REPROVADO',this)">
             <i class="fa fa-times"></i> Reprovar
           </button>` : ''}
-        ${!isPendente ? `
+        ${r.status === 'REPROVADO' ? `
+          <button class="act-btn btn-approve" onclick="updateStatus(${r.row},'APROVADO',this)">
+            <i class="fa fa-rotate-left"></i> Reativar
+          </button>` : ''}
+        ${r.status === 'APROVADO' ? `
           <button class="act-btn btn-edit" onclick="toggleEditLoja(${r.row})">
             <i class="fa fa-pen"></i> Editar
+          </button>
+          <button class="act-btn btn-copiar" onclick="copiarDados(${r.row})">
+            <i class="fa fa-copy"></i> Copiar
           </button>` : ''}
         ${wppLink ? `
           <a href="${wppLink}" target="_blank" class="act-btn btn-wpp">
             <i class="fab fa-whatsapp"></i> WhatsApp
           </a>` : ''}
       </div>
-      ${!isPendente ? editFormHTML(r) : ''}
+      ${r.status === 'APROVADO' ? editFormHTML(r) : ''}
     </div>`;
 }
 
@@ -1022,6 +1177,16 @@ function editFormHTML(r) {
       <div class="edit-warn" id="edit-warn-${r.row}" style="display:none;">
         <i class="fa fa-triangle-exclamation"></i>
         Mudar o <strong>nome</strong> desvincula as métricas antigas desta loja (elas ficam registradas no nome anterior).
+      </div>
+      <div class="nota-admin-box">
+        <label class="edit-lbl edit-full">
+          <span><i class="fa fa-note-sticky"></i> Nota interna (só você vê — não aparece no app)</span>
+          <textarea class="edit-input nota-admin-input" id="ef-nota-${r.row}" rows="2"
+            placeholder="Ex: ligar depois das 18h, dono é o João...">${escHtml(r.notaAdmin || '')}</textarea>
+        </label>
+        <button class="act-btn btn-nota" onclick="salvarNota(${r.row})">
+          <i class="fa fa-floppy-disk"></i> Salvar nota
+        </button>
       </div>
       <div class="edit-actions">
         <button class="act-btn btn-save-edit" onclick="saveEditLoja(${r.row})">
@@ -1116,11 +1281,93 @@ async function saveEditLoja(row) {
       r.horario = dados.horario; r.obs = dados.obs;
     }
     toast('✅ Loja atualizada');
+    logAcao(`Editou <strong>${dados.nome}</strong>`);
     renderAll();
   } catch(e) {
     toast('❌ Erro ao salvar: ' + e.message, true);
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-save"></i> Salvar alterações'; }
   }
+}
+
+/* Salva a nota interna do admin para uma loja (col AB na planilha).
+   So leitura/escrita admin — nunca aparece no app publico. */
+async function salvarNota(row) {
+  const ta = document.getElementById('ef-nota-' + row);
+  if (!ta) return;
+  const nota = ta.value.trim();
+  const btn = document.querySelector(`#edit-${row} .btn-nota`);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...'; }
+  try {
+    await postAction({ action: 'salvarNotaAdmin', token: _sessionToken, row, nota });
+    const r = allRows.find(x => x.row === row);
+    if (r) r.notaAdmin = nota;
+    logAcao(`Nota salva${r ? ' em <strong>' + r.nome + '</strong>' : ''}`);
+    toast('✅ Nota salva');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-floppy-disk"></i> Salvar nota'; }
+  } catch(e) {
+    toast('❌ Erro ao salvar nota: ' + e.message, true);
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-floppy-disk"></i> Salvar nota'; }
+  }
+}
+
+/* Copia os dados principais da loja para a area de transferencia,
+   num formato pronto para colar (nome, wpp, endereco, ramo). */
+function copiarDados(row) {
+  const r = allRows.find(x => x.row === row);
+  if (!r) return;
+  const linhas = [
+    r.nome,
+    r.ramo ? `Ramo: ${r.ramo}` : '',
+    r.wpp ? `WhatsApp: ${r.wpp}` : '',
+    r.tel ? `Telefone: ${r.tel}` : '',
+    r.endereco ? `Endereço: ${r.endereco}` : '',
+  ].filter(Boolean).join('\n');
+
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = linhas; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('✅ Dados copiados'); }
+    catch(e) { toast('❌ Não foi possível copiar', true); }
+    document.body.removeChild(ta);
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(linhas)
+      .then(() => toast('✅ Dados copiados'))
+      .catch(fallback);
+  } else { fallback(); }
+}
+
+/* Exporta todas as lojas (allRows) para um arquivo CSV baixavel.
+   Util para backup ou analise externa. Gera no proprio navegador. */
+function exportarCSV() {
+  if (!allRows.length) { toast('⚠️ Nenhuma loja para exportar', true); return; }
+  const cols = [
+    ['nome', 'Nome'], ['ramo', 'Ramo'], ['wpp', 'WhatsApp'], ['tel', 'Telefone'],
+    ['endereco', 'Endereco'], ['status', 'Status'], ['plano', 'Plano'],
+    ['planoValidade', 'Validade'], ['planoPago', 'Pago'], ['dataCadastro', 'Cadastro'],
+  ];
+  // Escapa campo CSV: aspas duplicadas, envolve em aspas se tiver virgula/quebra
+  const esc = v => {
+    const s = String(v == null ? '' : v);
+    return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const head = cols.map(c => c[1]).join(';');
+  const linhas = allRows.map(r => cols.map(c => esc(r[c[0]])).join(';'));
+  // BOM para Excel reconhecer UTF-8 (acentos)
+  const csv = '\ufeff' + [head, ...linhas].join('\r\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const hoje = new Date();
+  const stamp = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
+  a.href = url;
+  a.download = `angatubaon-lojas-${stamp}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`✅ ${allRows.length} lojas exportadas`);
 }
 
 /* ── Card de gestão de plano ─────────────────────────────── */
@@ -1145,8 +1392,9 @@ function planCardHTML(r) {
           <div class="card-name">${escHtml(r.nome)}</div>
           <div class="card-ramo">${escHtml(r.ramo)} · linha ${r.row}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
           <span style="font-family:var(--font-h);font-size:11px;font-weight:800;color:${cor};">${escHtml(plano)}</span>
+          ${seloPagamento(r)}
           <button class="btn-delete-loja" onclick="deleteLoja(${r.row}, '${escAttr(r.nome)}')">
             <i class="fa fa-trash"></i>
           </button>
@@ -1219,6 +1467,9 @@ async function updateStatus(row, newStatus, btn) {
       row:    row,
       status: newStatus,
     });
+    const _rSt = allRows.find(x => x.row === row);
+    const _acao = newStatus === 'APROVADO' ? 'Aprovou' : (newStatus === 'REPROVADO' ? 'Reprovou' : 'Alterou');
+    logAcao(`${_acao} <strong>${_rSt ? _rSt.nome : 'loja ' + row}</strong>`);
     toast('✅ Status atualizado para ' + newStatus);
     const r = allRows.find(x => x.row === row);
     if (r) r.status = newStatus;
@@ -1261,6 +1512,8 @@ async function savePlan(row) {
       r.recomendado   = (plano === 'PRO' || plano === 'PLUS') ? 'SIM' : 'NAO';
     }
 
+    const _rPl = allRows.find(x => x.row === row);
+    logAcao(`Plano <strong>${plano}</strong> em ${_rPl ? _rPl.nome : 'loja ' + row}${validadeBR ? ' (até ' + validadeBR + ')' : ''}`);
     toast(`✅ Plano ${plano} salvo${validadeBR ? ' até ' + validadeBR : ' (vitalício)'}`);
     renderAll();
 
@@ -1359,31 +1612,52 @@ function filterCards(type) {
     c.style.display = bate ? '' : 'none';
     if (bate) visiveis++;
   });
-  // Feedback "nada encontrado" — só quando há busca ativa e nenhum card bate
+  // Feedback "nada encontrado" — só quando há busca ativa e nenhum card bate.
+  // Cross-aba (#9): se a loja nao esta nesta aba mas existe em outra, avisa qual,
+  // evitando o falso negativo de "loja nao cadastrada".
   let semRes = listEl.querySelector('.search-empty');
   if (q && cards.length && visiveis === 0) {
+    const ondeEsta = acharLojaEmOutraAba(q, type);
+    const dica = ondeEsta
+      ? `<br><span style="font-size:11px;color:var(--zap);">Encontrada na aba <strong>${ondeEsta}</strong>.</span>`
+      : '';
     if (!semRes) {
       semRes = document.createElement('div');
       semRes.className = 'admin-empty search-empty';
-      semRes.innerHTML = '<i class="fa fa-magnifying-glass"></i>Nenhuma loja encontrada para essa busca.';
       listEl.appendChild(semRes);
     }
+    semRes.innerHTML = `<i class="fa fa-magnifying-glass"></i>Nenhuma loja encontrada nesta aba.${dica}`;
   } else if (semRes) {
     semRes.remove();
   }
 }
 
+/* Procura uma loja (por trecho do nome) em qualquer status e devolve o nome
+   amigavel da aba onde ela aparece, ou null. Usado pela busca cross-aba. */
+function acharLojaEmOutraAba(q, abaAtual) {
+  const match = allRows.find(r => String(r.nome || '').toLowerCase().includes(q));
+  if (!match) return null;
+  const st = String(match.status || '').toUpperCase();
+  // Mapeia status -> aba(s) onde a loja eh exibida
+  if (st === 'PENDENTE' && abaAtual !== 'pendentes') return 'Pendentes';
+  if (st === 'REPROVADO' && abaAtual !== 'reprovados') return 'Reprovados';
+  if (st === 'APROVADO' && abaAtual !== 'aprovados' && abaAtual !== 'planos') return 'Aprovados';
+  return null;
+}
+
 /* ══ WHATSAPP DE BOAS-VINDAS (ao aprovar) ═════════════════════ */
 function abrirWppBoasVindas(r) {
+  carregarCfgMsg();
   const nome  = r.nome || '';
   const plano = (r.planoSolicitado || r.plano || 'GRATIS').toUpperCase();
-  const linkApp = 'https://angatubaon.com.br';
+  const linkApp = _cfgMsg.linkApp;
+  const assin = _cfgMsg.assinatura;
 
   let msg;
   if (plano === 'PRO' || plano === 'PLUS') {
-    msg = `Olá ${nome}! 🎉\n\nSeu cadastro no AngatubaON foi aprovado e sua loja já está no ar!\n\nVocê solicitou o plano *${plano}*. Para ativá-lo, é só confirmar o pagamento e liberamos todos os recursos na hora.\n\nAcesse: ${linkApp}\n\nQualquer dúvida, é só chamar por aqui. Bem-vindo(a)! 🦉`;
+    msg = `Olá ${nome}! 🎉\n\nSeu cadastro no AngatubaON foi aprovado e sua loja já está no ar!\n\nVocê solicitou o plano *${plano}*. Para ativá-lo, é só confirmar o pagamento e liberamos todos os recursos na hora.\n\nAcesse: ${linkApp}\n\nQualquer dúvida, é só chamar por aqui. Bem-vindo(a)! ${assin}`;
   } else {
-    msg = `Olá ${nome}! 🎉\n\nSeu cadastro no AngatubaON foi aprovado e sua loja já aparece para os moradores de Angatuba!\n\nAcesse e veja como ficou: ${linkApp}\n\nQuando quiser mais destaque e recursos, temos os planos Plus e Pro. É só me chamar. Bem-vindo(a)! 🦉`;
+    msg = `Olá ${nome}! 🎉\n\nSeu cadastro no AngatubaON foi aprovado e sua loja já aparece para os moradores de Angatuba!\n\nAcesse e veja como ficou: ${linkApp}\n\nQuando quiser mais destaque e recursos, temos os planos Plus e Pro. É só me chamar. Bem-vindo(a)! ${assin}`;
   }
 
   const numero = String(r.wpp || '').replace(/\D/g, '');
@@ -1414,6 +1688,23 @@ function isoDate(br) {
   return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
 }
 
+/* Valor mensal de cada plano (R$) — usado para estimar receita em risco. */
+const PLANO_VALOR = { PRO: 49.90, PLUS: 29.90, GRATIS: 0 };
+function valorPlano(plano) { return PLANO_VALOR[String(plano || '').toUpperCase()] || 0; }
+function brl(v) { return 'R$ ' + (Number(v) || 0).toFixed(2).replace('.', ','); }
+
+/* Selo de pagamento: mostra se uma loja paga (PRO/PLUS) ja quitou ou nao.
+   planoPago vem do backend como 'SIM'/'NAO'/'NÃO'. Gratis nao tem selo. */
+function seloPagamento(r) {
+  const plano = String(r.plano || '').toUpperCase();
+  if (plano !== 'PRO' && plano !== 'PLUS') return '';
+  const pago = String(r.planoPago || '').toUpperCase().replace('Ã', 'A'); // NÃO -> NAO
+  if (pago === 'SIM') {
+    return `<span class="selo-pago"><i class="fa fa-circle-check"></i> Pago</span>`;
+  }
+  return `<span class="selo-naopago"><i class="fa fa-hourglass-half"></i> Aguardando pgto</span>`;
+}
+
 /* Dias inteiros entre hoje (00:00 local) e uma data 'yyyy-mm-dd'.
    Usado para marcar qual botao de validade rapida corresponde a data salva.
    Parseia em horario local (sem 'Z') para nao sofrer desvio de fuso. */
@@ -1435,6 +1726,65 @@ let _toastAtivo = false;
 function toast(msg, isErr = false) {
   _toastFila.push({ msg, isErr });
   if (!_toastAtivo) _processarToast();
+}
+
+/* HISTORICO DE ACOES (#8) — registro em memoria da sessao das acoes do admin,
+   para conferencia rapida ("ja aprovei essa loja?"). Some ao recarregar. */
+const _historico = [];
+function logAcao(texto) {
+  const agora = new Date();
+  const hh = String(agora.getHours()).padStart(2, '0');
+  const mm = String(agora.getMinutes()).padStart(2, '0');
+  _historico.unshift({ hora: `${hh}:${mm}`, texto }); // mais recente primeiro
+  if (_historico.length > 50) _historico.pop();
+  const badge = document.getElementById('hist-badge');
+  if (badge) { badge.textContent = _historico.length; badge.style.display = 'inline-flex'; }
+}
+
+function toggleHistorico() {
+  const box = document.getElementById('hist-panel');
+  if (!box) return;
+  const aberto = box.style.display === 'block';
+  if (aberto) { box.style.display = 'none'; return; }
+  box.innerHTML = _historico.length
+    ? _historico.map(h => `<div class="hist-item"><span class="hist-hora">${h.hora}</span> ${h.texto}</div>`).join('')
+    : '<div class="hist-item" style="color:var(--muted);">Nenhuma ação nesta sessão ainda.</div>';
+  box.style.display = 'block';
+}
+
+/* CONFIGURACOES DE MENSAGEM (#7) — link do app e assinatura editaveis,
+   persistidos no navegador (localStorage). Mantem a logica condicional das
+   mensagens (PRO/PLUS vs gratis, vencido vs a vencer), so personaliza as
+   partes que fazem sentido o admin trocar sem editar codigo. */
+const CFG_DEFAULTS = {
+  linkApp: 'https://angatubaon.com.br',
+  assinatura: '🦉',
+};
+let _cfgMsg = { ...CFG_DEFAULTS };
+
+function carregarCfgMsg() {
+  try {
+    const raw = localStorage.getItem('angatuba_cfg_msg');
+    if (raw) _cfgMsg = { ...CFG_DEFAULTS, ...JSON.parse(raw) };
+  } catch(e) { _cfgMsg = { ...CFG_DEFAULTS }; }
+}
+
+function abrirConfigMsg() {
+  carregarCfgMsg();
+  document.getElementById('cfg-link').value = _cfgMsg.linkApp;
+  document.getElementById('cfg-assinatura').value = _cfgMsg.assinatura;
+  document.getElementById('cfg-modal').style.display = 'flex';
+}
+function fecharConfigMsg() {
+  document.getElementById('cfg-modal').style.display = 'none';
+}
+function salvarConfigMsg() {
+  const link = document.getElementById('cfg-link').value.trim() || CFG_DEFAULTS.linkApp;
+  const assin = document.getElementById('cfg-assinatura').value.trim() || CFG_DEFAULTS.assinatura;
+  _cfgMsg = { linkApp: link, assinatura: assin };
+  try { localStorage.setItem('angatuba_cfg_msg', JSON.stringify(_cfgMsg)); } catch(e) {}
+  toast('✅ Configurações salvas');
+  fecharConfigMsg();
 }
 
 function _processarToast() {
@@ -1519,8 +1869,14 @@ function renderCobrancas() {
     else if (dias <= 30) cobrCache.d30.push(item);
     else                 cobrCache.emdia.push(item);
   });
-  // Ordena cada grupo pelo mais urgente primeiro
-  Object.keys(cobrCache).forEach(k =>
+  // Ordenacao por grupo:
+  //  - vencidas: por VALOR do plano (desc) e depois por dias — cobra primeiro
+  //    quem representa mais receita e ha mais tempo esta devendo;
+  //  - demais grupos: por urgencia (menos dias primeiro).
+  cobrCache.vencidas.sort((a, b) =>
+    (valorPlano(b.plano) - valorPlano(a.plano)) || (a._dias - b._dias)
+  );
+  ['d7', 'd30', 'emdia'].forEach(k =>
     cobrCache[k].sort((a, b) => a._dias - b._dias)
   );
 
@@ -1545,6 +1901,9 @@ function renderCobrancas() {
 function renderCobrSummary() {
   const el = document.getElementById('cobr-summary');
   const totalReceita = cobrCache.vencidas.length + cobrCache.d7.length;
+  // Receita mensal em risco = soma do valor dos planos vencidos + a vencer em 7d
+  const emRisco = [...cobrCache.vencidas, ...cobrCache.d7]
+    .reduce((s, r) => s + valorPlano(r.plano), 0);
   el.innerHTML = `
     <div class="cobr-kpi alert">
       <div class="cobr-kpi-val">${cobrCache.vencidas.length}</div>
@@ -1557,7 +1916,15 @@ function renderCobrSummary() {
     <div class="cobr-kpi">
       <div class="cobr-kpi-val">${totalReceita}</div>
       <div class="cobr-kpi-label">Precisam de ação</div>
-    </div>`;
+    </div>
+    ${emRisco > 0 ? `
+    <div class="cobr-receita">
+      <i class="fa fa-money-bill-trend-up"></i>
+      <div>
+        <div class="cobr-receita-val">${brl(emRisco)}/mês</div>
+        <div class="cobr-receita-lbl">Receita mensal em risco (vencidas + 7 dias)</div>
+      </div>
+    </div>` : ''}`;
 }
 
 function renderCobrTabs() {
@@ -1616,7 +1983,10 @@ function cobrCardHTML(r) {
           <div class="card-name">${escHtml(r.nome) || '—'}</div>
           <div class="card-ramo">${escHtml(r.ramo) || '—'} · linha ${r.row}</div>
         </div>
-        <span style="font-family:var(--font-h);font-size:11px;font-weight:800;color:${cor};">${escHtml(plano)}</span>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+          <span style="font-family:var(--font-h);font-size:11px;font-weight:800;color:${cor};">${escHtml(plano)}</span>
+          ${seloPagamento(r)}
+        </div>
       </div>
       <div class="card-info">
         <div class="card-info-row"><i class="fa fa-calendar-xmark"></i>Validade: <strong style="margin-left:4px;color:${sitCor};">${r.planoValidade || '—'}</strong></div>
@@ -1627,29 +1997,200 @@ function cobrCardHTML(r) {
           <button class="act-btn btn-wpp" onclick="abrirWppCobranca(${r.row}, ${dias})">
             <i class="fab fa-whatsapp"></i> Cobrar
           </button>` : '<span style="font-size:11px;color:var(--muted);">Sem WhatsApp cadastrado</span>'}
+        <button class="act-btn btn-renovar" onclick="renovarPlano(${r.row}, 30)">
+          <i class="fa fa-rotate-right"></i> Renovar +30d
+        </button>
       </div>
     </div>`;
+}
+
+/* Renovacao rapida: estende a validade do plano atual em N dias.
+   Se a loja ja venceu, conta a partir de HOJE; se ainda esta no prazo,
+   soma a partir da validade vigente (nao "perde" os dias restantes).
+   Reusa a action updatePlan — mesmo caminho do botao Salvar em Planos. */
+async function renovarPlano(row, dias) {
+  const r = allRows.find(x => x.row === row);
+  if (!r) return;
+  const plano = String(r.plano || '').toUpperCase();
+  if (plano !== 'PRO' && plano !== 'PLUS') {
+    toast('⚠️ Só planos pagos podem ser renovados', true); return;
+  }
+
+  // Base da renovacao: a maior data entre hoje e a validade atual
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  let base = hoje;
+  const isoAtual = isoDate(r.planoValidade || '');
+  if (isoAtual) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoAtual);
+    if (m) {
+      const v = new Date(+m[1], +m[2] - 1, +m[3]); v.setHours(0, 0, 0, 0);
+      if (v > hoje) base = v; // ainda no prazo: estende a partir da validade
+    }
+  }
+  const nova = new Date(base);
+  nova.setDate(nova.getDate() + dias);
+  const validadeBR = `${String(nova.getDate()).padStart(2,'0')}/${String(nova.getMonth()+1).padStart(2,'0')}/${nova.getFullYear()}`;
+
+  if (!confirm(`Renovar "${r.nome}" por +${dias} dias?\n\nNova validade: ${validadeBR}`)) return;
+
+  try {
+    await postAction({
+      action:    'updatePlan',
+      token:     _sessionToken,
+      row:       row,
+      plano:     plano,
+      planoValidade: validadeBR,
+      planoPago: 'SIM',
+    });
+    if (r) {
+      r.planoValidade = validadeBR;
+      r.planoPago = 'SIM';
+      r.recomendado = 'SIM';
+    }
+    logAcao(`Renovou <strong>${r.nome}</strong> até ${validadeBR}`);
+    toast(`✅ ${r.nome} renovada até ${validadeBR}`);
+    renderAll();
+  } catch(e) {
+    toast('❌ Erro ao renovar: ' + e.message, true);
+  }
 }
 
 /* WhatsApp de cobrança — texto muda se venceu ou está a vencer */
 function abrirWppCobranca(row, dias) {
   const r = allRows.find(x => x.row === row);
   if (!r) return;
+  carregarCfgMsg();
   const nome  = r.nome || '';
   const plano = String(r.plano || '').toUpperCase();
+  const assin = _cfgMsg.assinatura;
   let msg;
   if (dias < 0) {
-    msg = `Olá ${nome}! 👋\n\nPassando para avisar que seu plano *${plano}* no AngatubaON venceu. Para manter sua loja com todos os recursos ativos, é só renovar.\n\nQualquer dúvida estou à disposição! 🦉`;
+    msg = `Olá ${nome}! 👋\n\nPassando para avisar que seu plano *${plano}* no AngatubaON venceu. Para manter sua loja com todos os recursos ativos, é só renovar.\n\nQualquer dúvida estou à disposição! ${assin}`;
   } else if (dias === 0) {
-    msg = `Olá ${nome}! 👋\n\nSeu plano *${plano}* no AngatubaON vence *hoje*. Para não perder o destaque da sua loja, vamos renovar?\n\nQualquer dúvida me chame! 🦉`;
+    msg = `Olá ${nome}! 👋\n\nSeu plano *${plano}* no AngatubaON vence *hoje*. Para não perder o destaque da sua loja, vamos renovar?\n\nQualquer dúvida me chame! ${assin}`;
   } else {
-    msg = `Olá ${nome}! 👋\n\nSeu plano *${plano}* no AngatubaON vence em ${dias} dia(s). Quer já deixar a renovação garantida para não perder nenhum recurso?\n\nÉ só me avisar! 🦉`;
+    msg = `Olá ${nome}! 👋\n\nSeu plano *${plano}* no AngatubaON vence em ${dias} dia(s). Quer já deixar a renovação garantida para não perder nenhum recurso?\n\nÉ só me avisar! ${assin}`;
   }
   const numero = String(r.wpp || '').replace(/\D/g, '');
   window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 /* ══ MÉTRICAS ═════════════════════════════════════════════════ */
+/* PAGAMENTOS (Mercado Pago)
+   Le a aba PagamentosMP via action=listarPagamentos (gravada pelo webhook).
+   Mostra historico, total recebido e KPIs. So leitura — nao altera nada. */
+let _pagamentosCache = [];
+
+async function loadPagamentos() {
+  const listEl   = document.getElementById('list-pagamentos');
+  const periodEl = document.getElementById('pag-period');
+  listEl.innerHTML = '<div class="loading-row"><i class="fa fa-spinner fa-spin"></i> Carregando pagamentos...</div>';
+
+  try {
+    const resp = await fetchComTimeout(
+      `${APPS_SCRIPT_URL}?action=listarPagamentos&token=${encodeURIComponent(_sessionToken || '')}`,
+      {}, 12000
+    );
+    const json = await resp.json();
+    if (json.status === 'erro' && json.msg === 'UNAUTHORIZED') { handleUnauthorized(); return; }
+    if (json.status !== 'ok' || !Array.isArray(json.data)) throw new Error('Resposta inválida');
+
+    _pagamentosCache = json.data;
+    renderPagSummary();
+    renderPagLista();
+  } catch(e) {
+    listEl.innerHTML = '<div class="admin-empty"><i class="fa fa-triangle-exclamation"></i>Erro ao carregar pagamentos.</div>';
+    periodEl.textContent = '';
+    document.getElementById('pag-summary').innerHTML = '';
+  }
+}
+
+function renderPagSummary() {
+  const el = document.getElementById('pag-summary');
+  const periodEl = document.getElementById('pag-period');
+  const aprovados = _pagamentosCache.filter(p => p.status === 'APPROVED');
+  const totalReceb = aprovados.reduce((s, p) => s + (p.valor || 0), 0);
+
+  // Recebido no mes corrente (compara mm/aaaa do campo data dd/MM/yyyy HH:mm)
+  const agora = new Date();
+  const mmAtual = String(agora.getMonth() + 1).padStart(2, '0');
+  const aaAtual = String(agora.getFullYear());
+  const noMes = aprovados.filter(p => {
+    const m = /^\d{1,2}\/(\d{1,2})\/(\d{4})/.exec(p.data || '');
+    return m && m[1].padStart(2,'0') === mmAtual && m[2] === aaAtual;
+  });
+  const totalMes = noMes.reduce((s, p) => s + (p.valor || 0), 0);
+
+  periodEl.textContent = `${_pagamentosCache.length} pagamento(s) registrado(s)`;
+  el.innerHTML = `
+    <div class="metric-kpi"><div class="metric-kpi-val" style="color:var(--green);">${brl(totalReceb)}</div><div class="metric-kpi-label">Total recebido</div></div>
+    <div class="metric-kpi"><div class="metric-kpi-val" style="color:var(--green);">${brl(totalMes)}</div><div class="metric-kpi-label">Recebido este mês</div></div>
+    <div class="metric-kpi"><div class="metric-kpi-val">${aprovados.length}</div><div class="metric-kpi-label">Pagamentos OK</div></div>`;
+}
+
+function renderPagLista() {
+  const el = document.getElementById('list-pagamentos');
+  if (!_pagamentosCache.length) {
+    el.innerHTML = '<div class="admin-empty"><i class="fa fa-receipt"></i>Nenhum pagamento registrado ainda.</div>';
+    return;
+  }
+  el.innerHTML = _pagamentosCache.map(p => pagCardHTML(p)).join('');
+  filterPagamentos();
+}
+
+function pagCardHTML(p) {
+  const plano = String(p.plano || '').toUpperCase();
+  const planColor = { PRO:'var(--zap)', PLUS:'var(--indigo)' };
+  const cor = planColor[plano] || 'var(--muted)';
+  const ok = p.status === 'APPROVED';
+  const statusCor = ok ? 'var(--green)' : (p.status === 'VALOR_DIVERGENTE' ? 'var(--red)' : 'var(--muted)');
+  const statusTxt = ok ? 'Aprovado' : (p.status === 'VALOR_DIVERGENTE' ? 'Valor divergente' : (p.status || '—'));
+  const filtro = (String(p.nome || '') + ' ' + String(p.wpp || '')).toLowerCase();
+
+  return `
+    <div class="admin-card aprovado" data-filtro="${escAttr(filtro)}">
+      <div class="card-top">
+        <div>
+          <div class="card-name">${escHtml(p.nome) || '—'}</div>
+          <div class="card-ramo">${escHtml(p.data)} · ID ${escHtml(p.paymentId)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:var(--green);">${brl(p.valor)}</div>
+          <div style="font-size:9px;font-weight:800;color:${statusCor};text-transform:uppercase;">${statusTxt}</div>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-info-row"><i class="fa fa-star"></i>Plano <strong style="color:${cor};margin-left:4px;">${escHtml(plano)}</strong>${p.ciclo ? ` · ${escHtml(p.ciclo)}` : ''}</div>
+        ${p.validade ? `<div class="card-info-row"><i class="fa fa-calendar-check"></i>Válido até ${escHtml(p.validade)}</div>` : ''}
+        ${p.wpp ? `<div class="card-info-row"><i class="fab fa-whatsapp"></i>${escHtml(p.wpp)}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+function filterPagamentos() {
+  const input = document.getElementById('search-pagamentos');
+  if (!input) return;
+  const q = input.value.toLowerCase().trim();
+  const listEl = document.getElementById('list-pagamentos');
+  if (!listEl) return;
+  const cards = listEl.querySelectorAll('.admin-card');
+  let vis = 0;
+  cards.forEach(c => {
+    const bate = (c.dataset.filtro || '').includes(q);
+    c.style.display = bate ? '' : 'none';
+    if (bate) vis++;
+  });
+  let semRes = listEl.querySelector('.search-empty');
+  if (q && cards.length && vis === 0) {
+    if (!semRes) {
+      semRes = document.createElement('div');
+      semRes.className = 'admin-empty search-empty';
+      semRes.innerHTML = '<i class="fa fa-magnifying-glass"></i>Nenhum pagamento encontrado.';
+      listEl.appendChild(semRes);
+    }
+  } else if (semRes) { semRes.remove(); }
+}
+
 const PLAN_COLOR = { PRO: '#f59e0b', PLUS: '#6366f1', GRATIS: '#7a7a7a' };
 
 async function loadMetricas() {
@@ -1752,6 +2293,48 @@ if (_storedToken) {
   if (lb) { lb.textContent = 'Restaurando sessão...'; lb.disabled = true; }
   loadData();
 }
+
+/* AUTO-REFRESH LEVE (#6)
+   Recarrega os cadastros periodicamente para o admin ver lojas novas sem F5.
+   Cuidados: (1) so quando ha sessao ativa; (2) so quando a aba do navegador
+   esta VISIVEL (evita queimar cota do Apps Script com abas em background);
+   (3) intervalo conservador; (4) se chegou loja nova, avisa por toast. */
+const AUTO_REFRESH_MS = 90000; // 90s
+let _autoRefreshTimer = null;
+
+function compararEAvisarNovas(rowsNovas) {
+  try {
+    const pendAntes = allRows.filter(r => r.status === 'PENDENTE').length;
+    const pendDepois = rowsNovas.filter(r => r.status === 'PENDENTE').length;
+    const diff = pendDepois - pendAntes;
+    if (diff > 0) toast(`🔔 ${diff} novo(s) cadastro(s) chegaram`);
+  } catch(e) {}
+}
+
+async function autoRefresh() {
+  if (!_sessionToken) return;
+  if (document.hidden) return; // aba em background: pula esta rodada
+  try {
+    const resp = await fetchComTimeout(
+      `${APPS_SCRIPT_URL}?action=admin&token=${encodeURIComponent(_sessionToken)}`,
+      {}, 12000
+    );
+    const json = await resp.json();
+    if (json.status === 'erro' && json.msg === 'UNAUTHORIZED') { handleUnauthorized(); return; }
+    if (json.status === 'ok' && Array.isArray(json.data)) {
+      compararEAvisarNovas(json.data);
+      allRows = json.data;
+      renderAll();
+    }
+  } catch(e) { /* silencioso: proxima rodada tenta de novo */ }
+}
+
+function iniciarAutoRefresh() {
+  if (_autoRefreshTimer) clearInterval(_autoRefreshTimer);
+  _autoRefreshTimer = setInterval(autoRefresh, AUTO_REFRESH_MS);
+}
+// Liga o auto-refresh assim que houver token (login ou sessao restaurada)
+if (_storedToken) iniciarAutoRefresh();
 </script>
 </body>
 </html>

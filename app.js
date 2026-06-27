@@ -522,27 +522,69 @@
       aria-label="Loja fechada"><i class="fab fa-whatsapp"></i></button>`;
   }
 
+  /* ── Lightbox de foto do anúncio (estilo status WPP) ─────── */
+  function abrirFotoAnuncio(url, nomeAnuncio) {
+    // Remove lightbox anterior se existir
+    const old = document.getElementById('anuncio-lightbox');
+    if (old) old.remove();
+
+    const lb = document.createElement('div');
+    lb.id = 'anuncio-lightbox';
+    lb.innerHTML = `
+      <div id="anuncio-lightbox-backdrop"></div>
+      <div id="anuncio-lightbox-inner">
+        <button id="anuncio-lightbox-close" aria-label="Fechar">✕</button>
+        <img src="${escAttr(url)}" alt="${escAttr(nomeAnuncio || 'Anúncio')}" id="anuncio-lightbox-img"
+          onerror="this.parentElement.innerHTML+='<p style=\\'color:#fff;opacity:.6;font-size:13px;\\'>Imagem indisponível</p>';this.remove();" />
+        <div id="anuncio-lightbox-label">${escHTML(nomeAnuncio || '')}</div>
+      </div>`;
+    document.body.appendChild(lb);
+
+    // Forçar reflow antes de animar
+    lb.getBoundingClientRect();
+    lb.classList.add('lb-visible');
+
+    const fechar = () => {
+      lb.classList.remove('lb-visible');
+      lb.addEventListener('transitionend', () => lb.remove(), { once: true });
+    };
+
+    lb.querySelector('#anuncio-lightbox-close').onclick = fechar;
+    lb.querySelector('#anuncio-lightbox-backdrop').onclick = fechar;
+
+    // Fechar com Escape
+    const onKey = (e) => { if (e.key === 'Escape') { fechar(); document.removeEventListener('keydown', onKey); } };
+    document.addEventListener('keydown', onKey);
+  }
+  window.abrirFotoAnuncio = abrirFotoAnuncio;
+
   /* ── Thumb ───────────────────────────────────────────────── */
   function thumbHTML(loja) {
     const bg    = CAT_BG[loja.categoria] || 'rgba(255,255,255,0.06)';
+    // Ring "status WPP" — aparece apenas para PRO com foto de anúncio
+    const temFotoAnuncio = (loja.plano || '').toUpperCase() === 'PRO'
+      && loja.anuncio && loja.anuncio.imagemUrl;
+    const ringOpen  = temFotoAnuncio
+      ? `<div class="anuncio-ring" onclick="event.stopPropagation();abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}')" title="Ver foto do anúncio">`
+      : '';
     const isPro = (loja.plano || '').toUpperCase() === 'PRO';
 
     // Logo no card: só PRO
     if (isPro && loja.logo && loja.logo.trim()) {
       const alt = loja.logo.replace(/\.(png)$/i, '.jpg').replace(/\.(jpg|jpeg)$/i, '.png');
-      return `<div class="store-thumb" style="background:${bg}; overflow:hidden;">
+      return `${ringOpen}<div class="store-thumb" style="background:${bg}; overflow:hidden;">
         <img src="${loja.logo}" alt="Logo ${loja.nome}" class="store-logo-img" loading="lazy"
           onerror="if(this.src !== '${alt}'){ this.src='${alt}'; } else { this.style.display='none'; this.parentElement.textContent='${loja.emoji}'; }" />
-      </div>`;
+      </div>${ringOpen ? '</div>' : ''}`;
     }
 
     if (!loja.recomendado && loja.foto && loja.foto.trim()) {
-      return `<div class="store-thumb" style="background:${bg};">
+      return `${ringOpen}<div class="store-thumb" style="background:${bg};">
         <img src="${loja.foto}" alt="${loja.nome}" loading="lazy" />
-      </div>`;
+      </div>${ringOpen ? '</div>' : ''}`;
     }
 
-    return `<div class="store-thumb" style="background:${bg};">${loja.emoji}</div>`;
+    return `${ringOpen}<div class="store-thumb" style="background:${bg};">${loja.emoji}</div>${ringOpen ? '</div>' : ''}`;
   }
 
   /* ── HTML de um card ─────────────────────────────────────── */
@@ -3974,7 +4016,8 @@
     if (temAnuncioModal) {
       const imgHtml = (isPro && loja.anuncio.imagemUrl)
         ? `<img loading="lazy" decoding="async" src="${escAttr(loja.anuncio.imagemUrl)}" alt="Foto do anúncio"
-               style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-top:10px;"
+               style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-top:10px;cursor:zoom-in;"
+               onclick="abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}')"
                onerror="this.style.display='none'" />`
         : '';
       anuncioHTML = `<div style="

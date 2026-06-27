@@ -4026,7 +4026,7 @@
             color:var(--green);font-family:var(--font-h);font-size:13px;font-weight:800;cursor:pointer;">
            ${_cardapioLabel.emoji} ${_cardapioLabel.label}
            <span style="background:var(--green);color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:20px;">
-             ${loja.cardapio.length} item${loja.cardapio.length !== 1 ? 's' : ''}
+             ${loja.cardapio.length} ${loja.cardapio.length !== 1 ? 'itens' : 'item'}
            </span>
          </button>`
       : '';
@@ -4382,11 +4382,30 @@
       }
     });
 
-    return `<div class="detail-info-row">
+    // Horário colapsável: 1ª linha (hoje) sempre visível como resumo;
+    // demais dias dentro do bloco expansível (toque para abrir/fechar).
+    const primeira = linhas.length ? linhas[0] : '';
+    const resto    = linhas.length > 1 ? linhas.slice(1).join('') : '';
+    const temResto = resto.trim().length > 0;
+
+    const toggle = temResto
+      ? `<span class="detail-horario-toggle">ver todos <i class="fa fa-chevron-down"></i></span>`
+      : '';
+    const onclick = temResto
+      ? ` onclick="this.closest('.detail-horario-wrap').classList.toggle('expanded')"`
+      : '';
+
+    return `<div class="detail-info-row detail-horario-wrap">
       <div class="detail-info-icon clock"><i class="fa fa-clock"></i></div>
       <div class="detail-info-text" style="flex:1;">
         <span class="detail-info-label">Horário de Funcionamento</span>
-        <div class="detail-schedule">${linhas.join('')}</div>
+        <div class="detail-schedule">
+          <div class="detail-horario-resumo"${onclick}>
+            <div style="flex:1;min-width:0;">${primeira}</div>
+            ${toggle}
+          </div>
+          ${temResto ? `<div class="detail-horario-full"><div>${resto}</div></div>` : ''}
+        </div>
       </div>
     </div>`;
   }

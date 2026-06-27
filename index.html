@@ -224,15 +224,26 @@
         <i class="fa fa-star" style="font-size:10px;"></i> Destaques
       </button>
       <button class="pill-btn pill-bairro-btn" id="pill-bairro-btn" data-filter="bairro">
-        <i class="fa fa-map-marker-alt" style="font-size:10px;"></i> <span id="pill-bairro-label">Perto de mim</span>
+        <i class="fa fa-map-marker-alt" style="font-size:10px;"></i> <span id="pill-bairro-label">Bairro</span>
+        <i class="fa fa-chevron-down pill-bairro-caret" style="font-size:8px;margin-left:2px;opacity:.6;"></i>
       </button>
     </div>
   </header>
 
-  <!-- Dropdown de bairro — fora do scroll container para não ser clipado -->
-  <div class="bairro-dropdown" id="bairro-dropdown" style="display:none;">
-    <input class="bairro-search" id="bairro-search" type="text" placeholder="Digite o bairro..." autocomplete="off" />
-    <div class="bairro-list" id="bairro-list"></div>
+  <!-- Bottom sheet de bairro -->
+  <div class="bairro-sheet-overlay" id="bairro-sheet-overlay" aria-hidden="true">
+    <div class="bairro-sheet" id="bairro-sheet" role="dialog" aria-modal="true" aria-label="Filtrar por bairro">
+      <div class="bairro-sheet-grabber" id="bairro-sheet-grabber"></div>
+      <div class="bairro-sheet-head">
+        <div class="bairro-sheet-title"><i class="fa fa-map-marker-alt"></i> Filtrar por bairro</div>
+        <button class="bairro-sheet-close" id="bairro-sheet-close" aria-label="Fechar"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="bairro-search-wrap">
+        <i class="fa fa-search bairro-search-ico"></i>
+        <input class="bairro-search" id="bairro-search" type="text" placeholder="Buscar bairro..." autocomplete="off" />
+      </div>
+      <div class="bairro-chips" id="bairro-list"></div>
+    </div>
   </div>
 
   <!-- ════════════════════════════════ MAIN -->

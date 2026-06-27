@@ -523,37 +523,54 @@
   }
 
   /* ── Lightbox de foto do anúncio (estilo status WPP) ─────── */
-  function abrirFotoAnuncio(url, nomeAnuncio) {
+  // Lojas cujo anúncio já foi visualizado nesta sessão
+  const _anunciosVistos = new Set();
+
+  function abrirFotoAnuncio(url, nomeAnuncio, lojaId) {
     // Remove lightbox anterior se existir
-    const old = document.getElementById('anuncio-lightbox');
-    if (old) old.remove();
+    const oldLb = document.getElementById('anuncio-lightbox');
+    if (oldLb) oldLb.remove();
 
     const lb = document.createElement('div');
     lb.id = 'anuncio-lightbox';
     lb.innerHTML = `
-      <div id="anuncio-lightbox-backdrop"></div>
-      <div id="anuncio-lightbox-inner">
-        <button id="anuncio-lightbox-close" aria-label="Fechar">✕</button>
-        <img src="${escAttr(url)}" alt="${escAttr(nomeAnuncio || 'Anúncio')}" id="anuncio-lightbox-img"
-          onerror="this.parentElement.innerHTML+='<p style=\\'color:#fff;opacity:.6;font-size:13px;\\'>Imagem indisponível</p>';this.remove();" />
-        <div id="anuncio-lightbox-label">${escHTML(nomeAnuncio || '')}</div>
+      <div id="anuncio-lightbox-bg"></div>
+      <div id="anuncio-lightbox-wrap">
+        <div id="anuncio-lightbox-topbar">
+          <button id="anuncio-lightbox-close" aria-label="Fechar">
+            <i class="ti ti-x"></i>
+          </button>
+          <span id="anuncio-lightbox-titulo">${escHTML(nomeAnuncio || '')}</span>
+        </div>
+        <div id="anuncio-lightbox-imgwrap">
+          <img src="${escAttr(url)}" alt="${escAttr(nomeAnuncio || 'Anúncio')}" id="anuncio-lightbox-img"
+            onerror="this.style.display='none'" />
+        </div>
       </div>`;
     document.body.appendChild(lb);
 
-    // Forçar reflow antes de animar
-    lb.getBoundingClientRect();
+    lb.getBoundingClientRect(); // forçar reflow
     lb.classList.add('lb-visible');
 
-    const fechar = () => {
+    const fechar = (ringEl) => {
+      // Marcar como visto e remover ring do card correspondente
+      if (lojaId != null) {
+        _anunciosVistos.add(lojaId);
+        // Remove ring de todos os thumbs desta loja
+        document.querySelectorAll('.anuncio-ring[data-loja-id="' + lojaId + '"]').forEach(el => {
+          el.classList.add('ring-visto');
+        });
+      }
       lb.classList.remove('lb-visible');
       lb.addEventListener('transitionend', () => lb.remove(), { once: true });
     };
 
-    lb.querySelector('#anuncio-lightbox-close').onclick = fechar;
-    lb.querySelector('#anuncio-lightbox-backdrop').onclick = fechar;
+    lb.querySelector('#anuncio-lightbox-close').onclick = () => fechar();
+    lb.querySelector('#anuncio-lightbox-bg').onclick = () => fechar();
 
-    // Fechar com Escape
-    const onKey = (e) => { if (e.key === 'Escape') { fechar(); document.removeEventListener('keydown', onKey); } };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { fechar(); document.removeEventListener('keydown', onKey); }
+    };
     document.addEventListener('keydown', onKey);
   }
   window.abrirFotoAnuncio = abrirFotoAnuncio;
@@ -564,8 +581,10 @@
     // Ring "status WPP" — aparece apenas para PRO com foto de anúncio
     const temFotoAnuncio = (loja.plano || '').toUpperCase() === 'PRO'
       && loja.anuncio && loja.anuncio.imagemUrl;
+    const lojaId = loja.id || loja.wpp || loja.nome;
+    const jaVisto = temFotoAnuncio && _anunciosVistos.has(lojaId);
     const ringOpen  = temFotoAnuncio
-      ? `<div class="anuncio-ring" onclick="event.stopPropagation();abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}')" title="Ver foto do anúncio">`
+      ? `<div class="anuncio-ring${jaVisto ? ' ring-visto' : ''}" data-loja-id="${escAttr(lojaId)}" onclick="event.stopPropagation();abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(lojaId)}')" title="Ver foto do anúncio">`
       : '';
     const isPro = (loja.plano || '').toUpperCase() === 'PRO';
 

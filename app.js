@@ -4299,13 +4299,36 @@
           <span class="detail-schedule-day">${escHTML(diasStr)}${hojeLabel}</span>
           <span class="detail-schedule-time">${horaStr}</span>
         </div>`;
-      }).join('');
+      });
 
-      return `<div class="detail-info-row">
+      // Colapso: linha de hoje primeiro como resumo, demais expansíveis
+      const linhasArr = linhas; // é array neste ponto (antes do join)
+      // ordena hoje primeiro
+      linhasArr.sort((a, b) => {
+        const aHoje = a.includes('(hoje)');
+        const bHoje = b.includes('(hoje)');
+        return aHoje === bHoje ? 0 : aHoje ? -1 : 1;
+      });
+      const primeiraP = linhasArr.length ? linhasArr[0] : '';
+      const restoP    = linhasArr.slice(1).join('');
+      const temRestoP = restoP.trim().length > 0;
+      const toggleP   = temRestoP
+        ? `<span class="detail-horario-toggle">ver todos <i class="fa fa-chevron-down"></i></span>`
+        : '';
+      const onclickP  = temRestoP
+        ? ` onclick="this.closest('.detail-horario-wrap').classList.toggle('expanded')"` : '';
+
+      return `<div class="detail-info-row detail-horario-wrap">
         <div class="detail-info-icon clock"><i class="fa fa-clock"></i></div>
         <div class="detail-info-text" style="flex:1;">
           <span class="detail-info-label">Horário de Funcionamento</span>
-          <div class="detail-schedule">${linhas}</div>
+          <div class="detail-schedule">
+            <div class="detail-horario-resumo"${onclickP}>
+              <div style="flex:1;min-width:0;">${primeiraP}</div>
+              ${toggleP}
+            </div>
+            ${temRestoP ? `<div class="detail-horario-full"><div>${restoP}</div></div>` : ''}
+          </div>
         </div>
       </div>`;
     }

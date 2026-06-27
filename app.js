@@ -1182,6 +1182,7 @@
     localStorage.setItem('angatuba_loja_token', _lojaToken);
     localStorage.setItem('angatuba_loja_nome',  _lojaNome);
     localStorage.setItem('angatuba_loja_wpp',   wpp);
+    _lojaWpp = wpp; // Fix onboarding: sem isto a flag por-loja não resolvia no fluxo de aprovação
     atualizarNav();
 
     const aguardando = document.getElementById('modal-aguardando');
@@ -2941,16 +2942,28 @@
 
   // ══════════════════════════════════════════════════════════
   //  ONBOARDING — tela de boas-vindas no 1º acesso ao painel
-  //  Aparece uma única vez por loja (flag por WhatsApp no localStorage).
-  //  Reusa o tema dos modais; coruja owl-wave. Cria o overlay via JS
-  //  (sem tocar no index.html). Fecha no botão ou no X e nunca mais volta.
+  //  Aparece uma única vez por loja. A chave usa o WhatsApp NORMALIZADO
+  //  (DDI 55) para que login e aprovação gerem a mesma flag — sem isso,
+  //  conta nova (fluxo de aprovação) não casava com a flag e reaparecia
+  //  ou (no caso atual) o número vazio fazia a flag virar 'angatuba_onboarded_'.
+  //  Coruja owl-wave. Overlay criado via JS (sem tocar no index.html).
   // ══════════════════════════════════════════════════════════
-  function mostrarOnboarding() {
-    const wpp = _lojaWpp || localStorage.getItem('angatuba_loja_wpp') || '';
-    const flag = 'angatuba_onboarded_' + wpp;
-    // Já viu? Não mostra de novo.
+  function _wppFlagOnb() {
+    let n = String(_lojaWpp || localStorage.getItem('angatuba_loja_wpp') || '').replace(/\D/g, '');
+    if (n && !n.startsWith('55')) n = '55' + n;
+    return n;
+  }
+  function mostrarOnboarding(_tentativa) {
+    const wppN = _wppFlagOnb();
+    // Sem WhatsApp resolvido ainda (token via cache, dados a caminho): tenta de novo
+    // até 3x com intervalo curto, em vez de gravar uma flag genérica vazia.
+    if (!wppN) {
+      const t = (_tentativa || 0) + 1;
+      if (t <= 3) { setTimeout(() => mostrarOnboarding(t), 500); }
+      return;
+    }
+    const flag = 'angatuba_onboarded_' + wppN;
     try { if (localStorage.getItem(flag) === '1') return; } catch(e) { return; }
-    // Evita empilhar dois overlays se chamado mais de uma vez.
     if (document.getElementById('onboarding-overlay')) return;
 
     const nome = (_lojaNome || localStorage.getItem('angatuba_loja_nome') || '').trim();
@@ -2979,8 +2992,6 @@
       '</div>';
     document.body.appendChild(ov);
     requestAnimationFrame(() => ov.classList.add('open'));
-
-    // Marca como visto já na exibição (não arrisca não-marcar se o app fechar).
     try { localStorage.setItem(flag, '1'); } catch(e) {}
   }
   function fecharOnboarding() {
@@ -3005,7 +3016,8 @@
     document.body.style.overflow = 'hidden';
     mlSortearDica();
     // Onboarding de boas-vindas: só na 1ª vez que esta loja abre o painel.
-    setTimeout(() => mostrarOnboarding(), 700);
+    // Espera o painel pintar antes de sobrepor (evita corrida com a transição de aprovação).
+    setTimeout(() => mostrarOnboarding(), 900);
     // Fix #6: entrada no histórico para o botão "voltar" (Android) fechar o painel
     if (history.state?.modal !== 'minha-loja') history.pushState({ modal: 'minha-loja' }, '');
 

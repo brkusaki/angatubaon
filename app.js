@@ -3297,7 +3297,7 @@
       btn.classList.add('active');
       activePillFilter = btn.dataset.filter;
       activeBairro     = '';
-      document.getElementById('pill-bairro-label').textContent = 'Perto de mim';
+      document.getElementById('pill-bairro-label').textContent = 'Bairro';
       renderLojas();
     });
   });
@@ -3305,84 +3305,128 @@
   /* ── Chip de bairro ──────────────────────────────────────── */
   (function initBairroFilter() {
     const btn      = document.getElementById('pill-bairro-btn');
-    const dropdown = document.getElementById('bairro-dropdown');
+    const overlay  = document.getElementById('bairro-sheet-overlay');
+    const sheet    = document.getElementById('bairro-sheet');
+    const grabber  = document.getElementById('bairro-sheet-grabber');
+    const closeBtn = document.getElementById('bairro-sheet-close');
     const search   = document.getElementById('bairro-search');
     const list     = document.getElementById('bairro-list');
     const label    = document.getElementById('pill-bairro-label');
-    if (!btn) return;
+    if (!btn || !overlay) return;
 
-    function renderBairroList(query) {
+    function abrirSheet() {
+      overlay.classList.add('open');
+      overlay.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      search.value = '';
+      renderBairroChips('');
+      btn.classList.add('active');
+    }
+
+    function fecharSheet() {
+      overlay.classList.remove('open');
+      overlay.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+      // Se nenhum bairro está ativo, tira o destaque da pill
+      if (!activeBairro) btn.classList.remove('active');
+    }
+
+    function aplicarBairro(b) {
+      activeBairro = b;
+      label.textContent = b || 'Bairro';
+      document.querySelectorAll('.pill-btn').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      activePillFilter = 'all';
+      renderLojas();
+      fecharSheet();
+    }
+
+    function limparBairro() {
+      activeBairro = '';
+      label.textContent = 'Bairro';
+      btn.classList.remove('active');
+      activePillFilter = 'all';
+      renderLojas();
+      fecharSheet();
+    }
+
+    function renderBairroChips(query) {
       const norm = normBairro(query);
       const filtrados = norm
         ? BAIRROS_ANGATUBA.filter(b => normBairro(b).includes(norm))
         : BAIRROS_ANGATUBA;
 
       list.innerHTML = '';
+
+      // Chip "limpar" no topo, ocupando a linha inteira, só se há filtro ativo
       if (activeBairro) {
-        const limpar = document.createElement('div');
-        limpar.className = 'bairro-item bairro-item-clear';
-        limpar.textContent = '✕ Limpar filtro';
-        limpar.addEventListener('click', () => {
-          activeBairro = '';
-          label.textContent = 'Perto de mim';
-          btn.classList.remove('active');
-          dropdown.style.display = 'none';
-          search.value = '';
-          renderLojas();
-        });
+        const limpar = document.createElement('button');
+        limpar.type = 'button';
+        limpar.className = 'bairro-chip bairro-chip-clear';
+        limpar.innerHTML = '<i class="fa fa-times"></i> Limpar filtro de bairro';
+        limpar.addEventListener('click', limparBairro);
         list.appendChild(limpar);
       }
 
       if (!filtrados.length) {
-        list.innerHTML += '<div class="bairro-item bairro-item-empty">Nenhum bairro encontrado</div>';
+        const vazio = document.createElement('div');
+        vazio.className = 'bairro-chips-empty';
+        vazio.textContent = 'Nenhum bairro encontrado';
+        list.appendChild(vazio);
         return;
       }
 
       filtrados.forEach(b => {
-        const el = document.createElement('div');
-        el.className = 'bairro-item' + (normBairro(b) === normBairro(activeBairro) ? ' bairro-item-active' : '');
-        el.textContent = b;
-        el.addEventListener('click', () => {
-          activeBairro = b;
-          label.textContent = b;
-          document.querySelectorAll('.pill-btn').forEach(p => p.classList.remove('active'));
-          btn.classList.add('active');
-          activePillFilter = 'all';
-          dropdown.style.display = 'none';
-          search.value = '';
-          renderLojas();
-        });
-        list.appendChild(el);
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'bairro-chip' + (normBairro(b) === normBairro(activeBairro) ? ' bairro-chip-active' : '');
+        chip.textContent = b;
+        chip.addEventListener('click', () => aplicarBairro(b));
+        list.appendChild(chip);
       });
     }
 
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const open = dropdown.style.display !== 'none';
-      if (open) {
-        dropdown.style.display = 'none';
-        return;
-      }
-      // Posiciona o dropdown abaixo do botão usando coordenadas absolutas na viewport
-      const rect = btn.getBoundingClientRect();
-      dropdown.style.display = 'block';
-      dropdown.style.top  = (rect.bottom + 6) + 'px';
-      // Garante que não saia da tela pela direita
-      const ddW = Math.max(220, btn.offsetWidth);
-      let left = rect.left;
-      if (left + ddW > window.innerWidth - 8) left = window.innerWidth - ddW - 8;
-      dropdown.style.left  = left + 'px';
-      dropdown.style.width = ddW + 'px';
-      search.value = '';
-      renderBairroList('');
-      search.focus();
+      if (overlay.classList.contains('open')) fecharSheet();
+      else abrirSheet();
     });
 
-    search.addEventListener('input', () => renderBairroList(search.value));
-    search.addEventListener('click', e => e.stopPropagation());
-    list.addEventListener('click', e => e.stopPropagation());
+    search.addEventListener('input', () => renderBairroChips(search.value));
 
-    document.addEventListener('click', () => { dropdown.style.display = 'none'; });
+    // Fechar: botão, clique no overlay (fora do sheet), Esc
+    if (closeBtn) closeBtn.addEventListener('click', fecharSheet);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) fecharSheet(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && overlay.classList.contains('open')) fecharSheet();
+    });
+
+    // Swipe-down no grabber/sheet para fechar
+    let startY = 0, curY = 0, dragging = false;
+    function onStart(y) { startY = y; curY = y; dragging = true; sheet.style.transition = 'none'; }
+    function onMove(y) {
+      if (!dragging) return;
+      curY = y;
+      const dy = Math.max(0, curY - startY);
+      sheet.style.transform = 'translateY(' + dy + 'px)';
+    }
+    function onEnd() {
+      if (!dragging) return;
+      dragging = false;
+      sheet.style.transition = '';
+      const dy = curY - startY;
+      sheet.style.transform = '';
+      if (dy > 90) fecharSheet();
+    }
+    [grabber, sheet].forEach(el => {
+      if (!el) return;
+      el.addEventListener('touchstart', (e) => onStart(e.touches[0].clientY), { passive: true });
+      el.addEventListener('touchmove',  (e) => {
+        // só arrasta se o gesto começou perto do topo (grabber) ou a lista está no topo
+        if (el === grabber || list.scrollTop <= 0) onMove(e.touches[0].clientY);
+      }, { passive: true });
+      el.addEventListener('touchend', onEnd, { passive: true });
+    });
   })();
 
   /* ── Autocomplete de bairro no formulário de cadastro ─────── */

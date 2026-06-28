@@ -840,19 +840,9 @@
     if (temAnuncioPro) {
       const temFoto = !!loja.anuncio.imagemUrl;
       if (temFoto) {
-        // Com foto: o badge INTEIRO abre o story (igual ao anel do logo).
-        // Pilula "ver foto" a direita deixa claro que e o botao, separado do icone do WhatsApp.
-        const _bLojaId = loja.id || loja.wpp || loja.nome;
-        const _bAssin  = _assinaturaAnuncio(loja);
-        anuncioBadge = `<div class="store-anuncio-badge anuncio-badge-foto"
-            onclick="event.stopPropagation();abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(_bLojaId)}','${escAttr(_bAssin)}','${escAttr(loja.nome)}','${escAttr(loja.plano||'PRO')}','${escAttr(loja.categoria||'')}')"
-            role="button" tabindex="0" title="Ver foto do anuncio">
-          <div class="anuncio-badge-txt">
-            <span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}
-          </div>
-          <span class="anuncio-badge-cta"><i class="fa fa-camera"></i> ver foto</span>
-        </div>`;
-      } else {
+        // Com foto: texto trunca com ellipsis. O gatilho da foto e o anel
+        // animado no logo (thumbHTML) — sem botao extra no badge pra nao poluir.
+        anuncioBadge = `<div class="store-anuncio-badge"><span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}</div>`;      } else {
         anuncioBadge = `<div class="store-anuncio-badge"><span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}</div>`;
       }
     } else if (temAnuncioPlus) {

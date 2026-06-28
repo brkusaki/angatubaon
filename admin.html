@@ -240,7 +240,7 @@
       border: 1px solid var(--border);
     }
 
-    /* ── Seletor de horário (dias + abre/fecha) ── */
+    /* ── Seletor de horário (turnos: dias + abre/fecha) ── */
     .hr-box {
       grid-column: 1 / -1;
       border: 1px solid var(--border);
@@ -252,18 +252,27 @@
       text-transform: uppercase; color: var(--muted);
       margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
     }
-    .hr-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-    .hr-preset {
-      font: inherit; font-size: 12px; font-weight: 600;
-      padding: 6px 11px; border-radius: 999px; cursor: pointer;
-      background: var(--s2); color: var(--text);
-      border: 1px solid var(--border); transition: all .12s;
+    .hr-turnos { display: flex; flex-direction: column; gap: 10px; }
+    .hr-turno-card {
+      position: relative;
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px; background: rgba(255,255,255,0.015);
     }
-    .hr-preset:hover { border-color: rgba(99,102,241,0.5); }
-    .hr-preset.active {
-      background: rgba(99,102,241,0.18); color: #c7d2fe;
-      border-color: rgba(99,102,241,0.6);
+    .hr-turno-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 9px;
     }
+    .hr-turno-title {
+      font-size: 11px; font-weight: 700; color: var(--indigo);
+      letter-spacing: .03em; text-transform: uppercase;
+    }
+    .hr-turno-remove {
+      background: rgba(255,68,68,0.1); color: var(--red);
+      border: 1px solid rgba(255,68,68,0.3); border-radius: 7px;
+      width: 26px; height: 26px; cursor: pointer; font-size: 12px;
+      display: flex; align-items: center; justify-content: center; transition: all .12s;
+    }
+    .hr-turno-remove:hover { background: rgba(255,68,68,0.2); }
     .hr-days { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
     .hr-day {
       font: inherit; font-size: 12px; font-weight: 700;
@@ -286,10 +295,19 @@
     }
     .hr-time-field input[type="time"]:focus { border-color: rgba(99,102,241,0.5); outline: none; }
     .hr-sep { color: var(--muted); padding-bottom: 8px; font-weight: 700; }
+    .hr-add-turno {
+      margin-top: 10px; width: 100%;
+      background: rgba(99,102,241,0.08); color: #c7d2fe;
+      border: 1px dashed rgba(99,102,241,0.4); border-radius: 9px;
+      padding: 9px; font: inherit; font-size: 12px; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+      transition: all .12s;
+    }
+    .hr-add-turno:hover { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.6); }
     .hr-preview {
       margin-top: 12px; padding: 9px 12px; border-radius: 8px;
       background: rgba(0,208,132,0.06); border: 1px solid rgba(0,208,132,0.2);
-      font-size: 13px; color: var(--text);
+      font-size: 13px; color: var(--text); line-height: 1.5;
     }
     .hr-preview strong { color: var(--green); }
     .hr-preview .hr-preview-empty { color: var(--muted); font-style: italic; }
@@ -1237,37 +1255,16 @@ function editFormHTML(r) {
         </label>
         <div class="hr-box" id="hr-box-${r.row}">
           <div class="hr-box-title"><i class="fa fa-clock"></i> Horário de funcionamento</div>
-          <div class="hr-presets">
-            <button type="button" class="hr-preset" data-preset="1,2,3,4,5" onclick="hrPreset(${r.row},'1,2,3,4,5')">Seg a Sex</button>
-            <button type="button" class="hr-preset" data-preset="1,2,3,4,5,6" onclick="hrPreset(${r.row},'1,2,3,4,5,6')">Seg a Sáb</button>
-            <button type="button" class="hr-preset" data-preset="0,1,2,3,4,5,6" onclick="hrPreset(${r.row},'0,1,2,3,4,5,6')">Todos os dias</button>
-            <button type="button" class="hr-preset" data-preset="6" onclick="hrPreset(${r.row},'6')">Só Sábado</button>
-            <button type="button" class="hr-preset" data-preset="0,6" onclick="hrPreset(${r.row},'0,6')">Sáb e Dom</button>
-          </div>
-          <div class="hr-days" id="hr-days-${r.row}">
-            <button type="button" class="hr-day" data-dia="1" onclick="hrToggleDia(${r.row},1)">Seg</button>
-            <button type="button" class="hr-day" data-dia="2" onclick="hrToggleDia(${r.row},2)">Ter</button>
-            <button type="button" class="hr-day" data-dia="3" onclick="hrToggleDia(${r.row},3)">Qua</button>
-            <button type="button" class="hr-day" data-dia="4" onclick="hrToggleDia(${r.row},4)">Qui</button>
-            <button type="button" class="hr-day" data-dia="5" onclick="hrToggleDia(${r.row},5)">Sex</button>
-            <button type="button" class="hr-day" data-dia="6" onclick="hrToggleDia(${r.row},6)">Sáb</button>
-            <button type="button" class="hr-day" data-dia="0" onclick="hrToggleDia(${r.row},0)">Dom</button>
-          </div>
-          <div class="hr-times">
-            <label class="hr-time-field"><span>Abre</span>
-              <input type="time" id="ef-abre-${r.row}" value="${escAttr(hrFmtTime(r.abre))}" onchange="hrUpdatePreview(${r.row})" />
-            </label>
-            <span class="hr-sep">até</span>
-            <label class="hr-time-field"><span>Fecha</span>
-              <input type="time" id="ef-fecha-${r.row}" value="${escAttr(hrFmtTime(r.fecha))}" onchange="hrUpdatePreview(${r.row})" />
-            </label>
-          </div>
+          <div class="hr-turnos" id="hr-turnos-${r.row}"></div>
+          <button type="button" class="hr-add-turno" id="hr-add-${r.row}" onclick="hrAddTurno(${r.row})">
+            <i class="fa fa-plus"></i> Adicionar turno diferente (sábado/domingo)
+          </button>
           <div class="hr-preview" id="hr-preview-${r.row}"></div>
           <details class="hr-advanced">
             <summary>Editar texto manualmente (avançado)</summary>
             <input class="edit-input" id="ef-horario-${r.row}" value="${escAttr(r.horario)}"
-              placeholder="Ex: Todos os dias 08:00-19:00"
-              oninput="document.getElementById('hr-box-'+${r.row}).dataset.textoManual='1'" />
+              placeholder="Ex: Seg a Sex 08:00-18:00 | Sáb 08:00-12:00"
+              oninput="document.getElementById('hr-box-'+${r.row}).dataset.textoManual='1'; hrUpdatePreview(${r.row})" />
           </details>
           <input type="hidden" id="ef-dias-${r.row}" value="${escAttr(r.dias || '')}" />
         </div>
@@ -1336,9 +1333,12 @@ function toggleEditLoja(row) {
    Dias: 0=Dom,1=Seg,...,6=Sáb (igual ao getDay() usado no app).
    O hidden #ef-dias guarda a lista CSV; os botões refletem o estado. */
 const HR_NOMES = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const HR_DIAS_IDX = { dom:0, seg:1, ter:2, qua:3, qui:4, sex:5, sab:6 };
 
-// Normaliza hora variada ("8:00", "08:00:00", "8h") p/ "HH:MM" exigido pelo
-// <input type=time>. Retorna '' se não conseguir extrair hora válida.
+// Estado dos turnos por linha (row): [{dias:[1..6], abre:'HH:MM', fecha:'HH:MM'}]
+const hrTurnosState = {};
+
+// Normaliza hora variada ("8:00","08:00:00","8h") -> "HH:MM" do <input type=time>.
 function hrFmtTime(v) {
   const m = String(v == null ? '' : v).match(/(\d{1,2})[:h]?(\d{2})?/);
   if (!m) return '';
@@ -1349,95 +1349,178 @@ function hrFmtTime(v) {
   return (h < 10 ? '0' : '') + h + ':' + (mi < 10 ? '0' : '') + mi;
 }
 
-
-function hrGetDias(row) {
-  const h = document.getElementById('ef-dias-' + row);
-  if (!h) return [];
-  return String(h.value || '').split(',')
-    .map(d => parseInt(d.trim(), 10))
-    .filter(d => !isNaN(d) && d >= 0 && d <= 6);
+// Faz parse do texto "Seg, Ter 08:00-18:00 | Sáb 08:00-12:00" em turnos.
+function hrParseTexto(txt) {
+  const turnos = [];
+  String(txt || '').split('|').forEach(function(parte){
+    parte = parte.trim();
+    const m = parte.match(/^(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+    if (!m) return;
+    const dias = m[1].split(',').map(function(d){
+      const key = d.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').slice(0,3);
+      return HR_DIAS_IDX[key];
+    }).filter(function(d){ return d !== undefined; });
+    if (dias.length) turnos.push({ dias: dias, abre: hrFmtTime(m[2]), fecha: hrFmtTime(m[3]) });
+  });
+  return turnos;
 }
-function hrSetDias(row, dias) {
-  const arr = Array.from(new Set(dias)).filter(d => d >= 0 && d <= 6).sort((a,b)=>a-b);
-  const h = document.getElementById('ef-dias-' + row);
-  if (h) h.value = arr.join(',');
-  // Reflete nos botões de dia
-  document.querySelectorAll('#hr-days-' + row + ' .hr-day').forEach(btn => {
-    const d = parseInt(btn.dataset.dia, 10);
-    btn.classList.toggle('on', arr.indexOf(d) !== -1);
+
+// Monta o texto legível a partir dos turnos (mesmo formato do cadastro).
+function hrTurnosParaTexto(turnos) {
+  return (turnos || []).map(function(t){
+    if (!t.dias || !t.dias.length) return null;
+    const nomes = t.dias.slice().sort(function(a,b){return a-b;}).map(function(d){ return HR_NOMES[d]; }).join(', ');
+    const abre = t.abre || '', fecha = t.fecha || '';
+    if (!abre || !fecha) return nomes;
+    return nomes + ' ' + abre + '-' + fecha;
+  }).filter(Boolean).join(' | ');
+}
+
+// Inicializa o estado dos turnos a partir do que veio do backend:
+// 1º tenta o texto multi-turno; se não der, usa o estruturado (dias/abre/fecha);
+// se nada, começa com um turno padrão Seg-Sex.
+function hrInit(row) {
+  const r = allRows.find(function(x){ return x.row === row; });
+  let turnos = [];
+  if (r) {
+    turnos = hrParseTexto(r.horario);
+    if (!turnos.length) {
+      const dias = String(r.dias || '').split(',').map(function(d){ return parseInt(d.trim(),10); })
+        .filter(function(d){ return !isNaN(d) && d>=0 && d<=6; });
+      const abre = hrFmtTime(r.abre), fecha = hrFmtTime(r.fecha);
+      if (dias.length && abre && fecha) turnos = [{ dias: dias, abre: abre, fecha: fecha }];
+    }
+  }
+  if (!turnos.length) turnos = [{ dias: [1,2,3,4,5], abre: '08:00', fecha: '18:00' }];
+  hrTurnosState[row] = turnos;
+  hrRenderTurnos(row);
+}
+
+// Renderiza os cards de turno no container.
+function hrRenderTurnos(row) {
+  const cont = document.getElementById('hr-turnos-' + row);
+  if (!cont) return;
+  const turnos = hrTurnosState[row] || [];
+  cont.innerHTML = '';
+  turnos.forEach(function(t, idx){
+    const card = document.createElement('div');
+    card.className = 'hr-turno-card';
+
+    const head = document.createElement('div');
+    head.className = 'hr-turno-head';
+    const ttl = document.createElement('span');
+    ttl.className = 'hr-turno-title';
+    ttl.textContent = idx === 0 ? 'Horário principal' : 'Turno adicional';
+    head.appendChild(ttl);
+    if (idx > 0) {
+      const rm = document.createElement('button');
+      rm.type = 'button'; rm.className = 'hr-turno-remove';
+      rm.innerHTML = '<i class="fa fa-times"></i>';
+      rm.onclick = function(){ hrRemoveTurno(row, idx); };
+      head.appendChild(rm);
+    }
+    card.appendChild(head);
+
+    // Dias (ordem visual Seg..Dom)
+    const daysWrap = document.createElement('div');
+    daysWrap.className = 'hr-days';
+    [1,2,3,4,5,6,0].forEach(function(d){
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'hr-day' + (t.dias.indexOf(d) !== -1 ? ' on' : '');
+      btn.textContent = HR_NOMES[d];
+      btn.onclick = function(){
+        const i = t.dias.indexOf(d);
+        if (i === -1) t.dias.push(d); else t.dias.splice(i, 1);
+        btn.classList.toggle('on');
+        hrSync(row);
+      };
+      daysWrap.appendChild(btn);
+    });
+    card.appendChild(daysWrap);
+
+    // Horas
+    const times = document.createElement('div');
+    times.className = 'hr-times';
+    const fAbre = document.createElement('label'); fAbre.className = 'hr-time-field';
+    fAbre.innerHTML = '<span>Abre</span>';
+    const iAbre = document.createElement('input');
+    iAbre.type = 'time'; iAbre.value = t.abre || '';
+    iAbre.onchange = function(){ t.abre = iAbre.value; hrSync(row); };
+    fAbre.appendChild(iAbre);
+    const sep = document.createElement('span'); sep.className = 'hr-sep'; sep.textContent = 'até';
+    const fFecha = document.createElement('label'); fFecha.className = 'hr-time-field';
+    fFecha.innerHTML = '<span>Fecha</span>';
+    const iFecha = document.createElement('input');
+    iFecha.type = 'time'; iFecha.value = t.fecha || '';
+    iFecha.onchange = function(){ t.fecha = iFecha.value; hrSync(row); };
+    fFecha.appendChild(iFecha);
+    times.appendChild(fAbre); times.appendChild(sep); times.appendChild(fFecha);
+    card.appendChild(times);
+
+    cont.appendChild(card);
   });
-  // Marca preset ativo se bater exatamente
-  const csv = arr.join(',');
-  document.querySelectorAll('#hr-box-' + row + ' .hr-preset').forEach(p => {
-    const presetArr = p.dataset.preset.split(',').map(Number).sort((a,b)=>a-b).join(',');
-    p.classList.toggle('active', presetArr === csv);
-  });
+
+  // Esconde "adicionar" se já há 3 turnos (limite igual ao cadastro).
+  const addBtn = document.getElementById('hr-add-' + row);
+  if (addBtn) addBtn.style.display = (turnos.length >= 3) ? 'none' : '';
+
+  hrSync(row);
+}
+
+function hrAddTurno(row) {
+  const box = document.getElementById('hr-box-' + row);
+  if (box) delete box.dataset.textoManual;
+  if (!hrTurnosState[row]) hrTurnosState[row] = [];
+  if (hrTurnosState[row].length >= 3) return;
+  hrTurnosState[row].push({ dias: [6], abre: '08:00', fecha: '12:00' });
+  hrRenderTurnos(row);
+}
+
+function hrRemoveTurno(row, idx) {
+  const box = document.getElementById('hr-box-' + row);
+  if (box) delete box.dataset.textoManual;
+  if (!hrTurnosState[row]) return;
+  hrTurnosState[row].splice(idx, 1);
+  hrRenderTurnos(row);
+}
+
+// Atualiza o hidden de texto + dias agregados + preview.
+function hrSync(row) {
+  const turnos = hrTurnosState[row] || [];
+  const texto = hrTurnosParaTexto(turnos);
+  const diasAgg = Array.from(new Set(turnos.flatMap(function(t){ return t.dias; })))
+    .filter(function(d){ return d>=0 && d<=6; }).sort(function(a,b){return a-b;}).join(',');
+  const hHor = document.getElementById('ef-horario-' + row);
+  const hDias = document.getElementById('ef-dias-' + row);
+  // Só sobrescreve o texto se NÃO estiver em modo manual.
+  const box = document.getElementById('hr-box-' + row);
+  if (!(box && box.dataset.textoManual === '1')) {
+    if (hHor) hHor.value = texto;
+  }
+  if (hDias) hDias.value = diasAgg;
   hrUpdatePreview(row);
 }
-function hrInit(row) {
-  hrSetDias(row, hrGetDias(row));   // pinta botões + preset + preview
-}
-function hrPreset(row, csv) {
-  // Marca como gerado automaticamente (descarta override de texto manual)
-  const box = document.getElementById('hr-box-' + row);
-  if (box) delete box.dataset.textoManual;
-  hrSetDias(row, csv.split(',').map(Number));
-}
-function hrToggleDia(row, dia) {
-  const box = document.getElementById('hr-box-' + row);
-  if (box) delete box.dataset.textoManual;
-  const dias = hrGetDias(row);
-  const i = dias.indexOf(dia);
-  if (i === -1) dias.push(dia); else dias.splice(i, 1);
-  hrSetDias(row, dias);
-}
-// Versão JS de gerarTextoHorario (espelha a do backend p/ o preview).
-function hrGerarTexto(dias, abre, fecha) {
-  const arr = (dias || []).slice().filter(d => d >= 0 && d <= 6);
-  const horaTxt = (abre && fecha) ? (abre + '-' + fecha) : '';
-  if (!arr.length) return horaTxt ? ('Horário ' + horaTxt) : '';
-  const set = {}; arr.forEach(d => set[d] = true);
-  const soEsses = a => arr.length === a.length && a.every(d => set[d]);
-  let rot;
-  if (soEsses([0,1,2,3,4,5,6]))      rot = 'Todos os dias';
-  else if (soEsses([1,2,3,4,5]))     rot = 'Seg a Sex';
-  else if (soEsses([1,2,3,4,5,6]))   rot = 'Seg a Sáb';
-  else if (soEsses([0,6]))           rot = 'Sáb e Dom';
-  else if (soEsses([6]))             rot = 'Sábado';
-  else if (soEsses([0]))             rot = 'Domingo';
-  else {
-    const o = arr.slice().sort((a,b)=>a-b);
-    let contig = true;
-    for (let i = 1; i < o.length; i++) if (o[i] !== o[i-1] + 1) { contig = false; break; }
-    rot = (contig && o.length >= 3)
-      ? HR_NOMES[o[0]] + ' a ' + HR_NOMES[o[o.length-1]]
-      : o.map(d => HR_NOMES[d]).join(', ');
-  }
-  return horaTxt ? (rot + ' ' + horaTxt) : rot;
-}
+
 function hrUpdatePreview(row) {
   const prev = document.getElementById('hr-preview-' + row);
   if (!prev) return;
-  const abre  = (document.getElementById('ef-abre-' + row)  || {}).value || '';
-  const fecha = (document.getElementById('ef-fecha-' + row) || {}).value || '';
-  const dias  = hrGetDias(row);
   const box = document.getElementById('hr-box-' + row);
   const manual = box && box.dataset.textoManual === '1';
+  let texto;
   if (manual) {
-    const txt = (document.getElementById('ef-horario-' + row) || {}).value || '';
-    prev.innerHTML = txt
-      ? 'No app vai aparecer: <strong>' + escHtml(txt) + '</strong>'
-      : '<span class="hr-preview-empty">Sem horário definido</span>';
+    texto = (document.getElementById('ef-horario-' + row) || {}).value || '';
+  } else {
+    texto = hrTurnosParaTexto(hrTurnosState[row] || []);
+  }
+  if (!texto) {
+    prev.innerHTML = '<span class="hr-preview-empty">Selecione os dias e horários</span>';
     return;
   }
-  if (!dias.length) {
-    prev.innerHTML = '<span class="hr-preview-empty">Selecione os dias de funcionamento</span>';
-    return;
-  }
-  const txt = hrGerarTexto(dias, abre, fecha);
-  prev.innerHTML = 'No app vai aparecer: <strong>' + escHtml(txt) + '</strong>';
+  // Mostra cada turno em sua própria linha no preview.
+  const linhas = texto.split('|').map(function(s){ return escHtml(s.trim()); });
+  prev.innerHTML = 'No app vai aparecer:<br><strong>' + linhas.join('</strong><br><strong>') + '</strong>';
 }
-
 
 // Normaliza WhatsApp: so digitos, garante prefixo 55 (igual ao backend).
 function normalizarWpp(valor) {
@@ -1472,24 +1555,34 @@ async function saveEditLoja(row) {
   };
   if (!dados.nome) { toast('⚠️ Nome não pode ficar vazio', true); return; }
 
-  // Horário: se o admin editou no texto manual (avançado), envia o texto e o
-  // backend mantém só a coluna G. Caso contrário, envia dias/abre/fecha e o
-  // backend grava as colunas O/P/Q E gera o texto da coluna G sincronizado.
+  // Horário: modo manual envia o texto digitado. Caso contrário, serializa os
+  // turnos no formato "Seg, Ter 08:00-18:00 | Sáb 08:00-12:00" e também manda o
+  // 1º turno como dias/abre/fecha (compat com colunas estruturadas O/P/Q).
   const hrBox = document.getElementById('hr-box-' + row);
   const usouManual = hrBox && hrBox.dataset.textoManual === '1';
   let horarioPreview;
   if (usouManual) {
     dados.horario = get('ef-horario');
     horarioPreview = dados.horario;
+    // No modo manual, tenta extrair o 1º turno do texto p/ manter o estruturado.
+    const tManual = hrParseTexto(dados.horario);
+    if (tManual.length) {
+      dados.dias  = tManual[0].dias.join(',');
+      dados.abre  = tManual[0].abre;
+      dados.fecha = tManual[0].fecha;
+    }
   } else {
-    const dias  = (document.getElementById('ef-dias-' + row)  || {}).value || '';
-    const abre  = (document.getElementById('ef-abre-' + row)  || {}).value || '';
-    const fecha = (document.getElementById('ef-fecha-' + row) || {}).value || '';
-    dados.dias  = dias;
-    dados.abre  = abre;
-    dados.fecha = fecha;
-    horarioPreview = hrGerarTexto(
-      dias.split(',').map(Number).filter(d => d >= 0 && d <= 6), abre, fecha);
+    const turnos = (hrTurnosState[row] || []).filter(t => t.dias && t.dias.length);
+    const texto = hrTurnosParaTexto(turnos);
+    dados.horario = texto;
+    horarioPreview = texto;
+    if (turnos.length) {
+      dados.dias  = turnos[0].dias.slice().sort((a,b)=>a-b).join(',');
+      dados.abre  = turnos[0].abre || '';
+      dados.fecha = turnos[0].fecha || '';
+    } else {
+      dados.dias = ''; dados.abre = ''; dados.fecha = '';
+    }
   }
 
   const btn = document.querySelector(`#edit-${row} .btn-save-edit`);

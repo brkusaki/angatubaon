@@ -393,53 +393,117 @@
       // Formato legado ou expirado — cai no cálculo automático abaixo
     }
 
-    if (!loja.horario) return { status: 'open', fechaStr: '' };
+    if (!loja.horario && !(loja.horarioTexto || loja.horario_texto)) {
+      return { status: 'open', fechaStr: '' };
+    }
 
-    // Convenção 24h: abre 00:00 e fecha 23:59 (ou abre === fecha em 00:00)
-    const is24h = (loja.horario.abre === '00:00' && loja.horario.fecha === '23:59')
-               || (loja.horario.abre === '00:00' && loja.horario.fecha === '00:00');
-    if (is24h) {
-      const hoje = new Date().getDay();
-      if (loja.horario.dias.includes(hoje)) return { status: 'open', fechaStr: '24h' };
-      return { status: 'closed', fechaStr: '' };
+    // ── Múltiplos turnos ──────────────────────────────────────
+    // Fonte da verdade: o texto "Seg, Ter 08:00-18:00 | Sáb 08:00-12:00"
+    // (separado por "|"). Se não houver texto parseável, cai no horário
+    // estruturado legado {abre,fecha,dias} (turno único). Cada turno é
+    // avaliado para o dia de HOJE/ONTEM; "aberto" vence, e o fechamento
+    // exibido é o do turno que está aberto agora.
+    const turnos = extrairTurnos(loja);
+    if (!turnos.length) {
+      // Sem horário utilizável — assume aberto (comportamento legado).
+      return { status: 'open', fechaStr: '' };
     }
 
     const now    = new Date();
     const dow    = now.getDay();
     const nowMin = now.getHours() * 60 + now.getMinutes();
-
     // 00:00 como fechamento = meia-noite (1440 min)
     const parse = s => {
-      const [h, m] = s.split(':').map(Number);
+      const [h, m] = String(s).split(':').map(Number);
       return (h === 0 && m === 0) ? 1440 : h * 60 + m;
     };
 
-    const abre     = parse(loja.horario.abre);
-    const fecha    = parse(loja.horario.fecha);
-    const fechaStr = loja.horario.fecha;
+    let melhorFechado = null; // guarda um "abre às" p/ exibir se nada abrir
 
-    if (abre === fecha) return { status: 'closed', fechaStr };
+    for (let ti = 0; ti < turnos.length; ti++) {
+      const t = turnos[ti];
+      if (!t.dias || !t.dias.length) continue;
 
-    const viraNoite  = fecha < abre;   // ex: abre 22:00 fecha 02:00
-    const abreHoje   = loja.horario.dias.includes(dow);
-    const abriuOntem = loja.horario.dias.includes((dow + 6) % 7);
+      // 24h: abre 00:00 e fecha 23:59 (ou 00:00) — aberto o dia todo se for hoje
+      const is24h = (t.abre === '00:00' && t.fecha === '23:59')
+                 || (t.abre === '00:00' && t.fecha === '00:00');
+      if (is24h) {
+        if (t.dias.includes(dow)) return { status: 'open', fechaStr: '24h' };
+        continue;
+      }
 
-    // Caso 1: vira a noite — abriu ontem e ainda não chegou no horário de fechamento
-    if (viraNoite && abriuOntem && nowMin < fecha)
-      return { status: 'open', fechaStr };
+      const abre  = parse(t.abre);
+      const fecha = parse(t.fecha);
+      if (abre === fecha) { // intervalo nulo, ignora este turno
+        continue;
+      }
 
-    // Caso 2: não vira a noite — só abre se for hoje E ainda estiver dentro do intervalo
-    if (abreHoje) {
-      if (!viraNoite)
-        return (nowMin >= abre && nowMin < fecha)
-          ? { status: 'open',   fechaStr }
-          : { status: 'closed', fechaStr: loja.horario.abre };
-      // vira a noite e abre hoje: aberto se já passou do horário de abertura
-      return nowMin >= abre
-        ? { status: 'open',   fechaStr }
-        : { status: 'closed', fechaStr: loja.horario.abre };
+      const viraNoite  = fecha < abre;            // ex: 22:00 → 02:00
+      const abreHoje   = t.dias.includes(dow);
+      const abriuOntem = t.dias.includes((dow + 6) % 7);
+
+      // Vira a noite: abriu ontem e ainda não fechou
+      if (viraNoite && abriuOntem && nowMin < fecha)
+        return { status: 'open', fechaStr: t.fecha };
+
+      if (abreHoje) {
+        if (!viraNoite) {
+          if (nowMin >= abre && nowMin < fecha)
+            return { status: 'open', fechaStr: t.fecha };
+          // fechado neste turno — lembra do "abre às" se ainda não abriu hoje
+          if (nowMin < abre && melhorFechado === null) melhorFechado = t.abre;
+        } else {
+          // vira a noite e abre hoje: aberto se já passou da abertura
+          if (nowMin >= abre) return { status: 'open', fechaStr: t.fecha };
+          if (melhorFechado === null) melhorFechado = t.abre;
+        }
+      }
     }
-    return { status: 'closed', fechaStr: loja.horario.abre };
+
+    return { status: 'closed', fechaStr: melhorFechado || '' };
+  }
+
+  /* ── extrairTurnos: normaliza o horário da loja em lista de turnos ──
+     Retorna [{dias:[0..6], abre:'HH:MM', fecha:'HH:MM'}, ...].
+     Prioriza o texto multi-turno (separado por "|"); se não houver,
+     usa o objeto estruturado loja.horario (turno único legado). */
+  function extrairTurnos(loja) {
+    const DIAS_IDX = { dom:0, seg:1, ter:2, qua:3, qui:4, sex:5, sab:6 };
+    const txt = String(loja.horarioTexto || loja.horario_texto || '').trim();
+
+    if (txt && txt.indexOf('|') !== -1) {
+      const turnos = [];
+      txt.split('|').forEach(parte => {
+        parte = parte.trim();
+        // "Seg, Ter, Qua 08:00-18:00"
+        const m = parte.match(/^(.+?)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+        if (!m) return;
+        const dias = m[1].split(',').map(d => {
+          const key = d.trim().toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '').slice(0, 3); // remove acento, sáb→sab
+          return DIAS_IDX[key];
+        }).filter(d => d !== undefined);
+        const fmt = hm => {
+          const mm = hm.match(/(\d{1,2}):(\d{2})/);
+          const h = Math.min(23, parseInt(mm[1], 10));
+          const mi = Math.min(59, parseInt(mm[2], 10));
+          return (h < 10 ? '0' : '') + h + ':' + (mi < 10 ? '0' : '') + mi;
+        };
+        if (dias.length) turnos.push({ dias, abre: fmt(m[2]), fecha: fmt(m[3]) });
+      });
+      if (turnos.length) return turnos;
+    }
+
+    // Fallback: estruturado legado (turno único)
+    if (loja.horario && loja.horario.abre && loja.horario.fecha
+        && Array.isArray(loja.horario.dias) && loja.horario.dias.length) {
+      return [{
+        dias: loja.horario.dias.slice(),
+        abre: loja.horario.abre,
+        fecha: loja.horario.fecha,
+      }];
+    }
+    return [];
   }
 
   // Compat: calcStatus continua retornando só a string (usado em vários lugares)

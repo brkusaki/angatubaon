@@ -568,10 +568,19 @@
     const oldLb = document.getElementById('anuncio-lightbox');
     if (oldLb) oldLb.remove();
 
-    // Métrica: registra a visualização do anúncio (1x por abertura).
-    // Reaproveita a infra de registrarClique com tipo 'anuncio'.
+    // Métrica: conta UMA visualização por pessoa por versão do anúncio.
+    // Se esta pessoa já viu esta mesma versão (assinatura já registrada no
+    // localStorage), não conta de novo. Se o lojista publicar um anúncio
+    // novo (assinatura muda), conta como uma nova visualização única.
     try {
-      if (nomeLoja) registrarClique(nomeLoja, 'anuncio', planoLoja || 'PRO', categoriaLoja || '');
+      let jaContabilizado = false;
+      if (lojaId != null && assinatura) {
+        const vistos = _carregarVistos();
+        jaContabilizado = (vistos[lojaId] === assinatura);
+      }
+      if (nomeLoja && !jaContabilizado) {
+        registrarClique(nomeLoja, 'anuncio', planoLoja || 'PRO', categoriaLoja || '');
+      }
     } catch (e) {}
 
     const lb = document.createElement('div');
@@ -598,15 +607,23 @@
     lb.getBoundingClientRect();
     lb.classList.add('lb-visible');
 
+    // Botão voltar do Android: cria entrada no histórico para que "voltar"
+    // apenas feche o lightbox em vez de sair do app/PWA. O handler global de
+    // popstate chama window._fecharAnuncioLightbox(true) quando isso ocorre.
+    if (history.state?.modal !== 'anuncio-foto') {
+      history.pushState({ modal: 'anuncio-foto' }, '');
+    }
+
     let _fechado = false;
     let _autoTimer = null;
 
-    const fechar = () => {
+    const fechar = (viaPopstate = false) => {
       if (_fechado) return;
       _fechado = true;
       if (_autoTimer) { clearTimeout(_autoTimer); _autoTimer = null; }
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onVisibility);
+      window._fecharAnuncioLightbox = null;
 
       if (lojaId != null) {
         _marcarAnuncioVisto(lojaId, assinatura);
@@ -617,18 +634,29 @@
         });
       }
 
+      // Fechamento manual (X, tap, swipe, Escape): desfaz a entrada fantasma.
+      // Se veio do popstate, o histórico já foi consumido — não mexer.
+      if (!viaPopstate && history.state?.modal === 'anuncio-foto') {
+        history.back();
+      }
+
       lb.classList.remove('lb-visible');
       lb.addEventListener('transitionend', () => lb.remove(), { once: true });
       setTimeout(() => { if (lb.parentNode) lb.remove(); }, 400);
     };
 
+    // Exposto para o handler global de popstate fechar este lightbox.
+    window._fecharAnuncioLightbox = fechar;
+
     // ── Barra de progresso do "story" ──────────────────────────
     const fill = lb.querySelector('#anuncio-lightbox-progress-fill');
     if (fill) {
       fill.style.animationDuration = _ANUNCIO_STORY_MS + 'ms';
-      fill.addEventListener('animationend', fechar, { once: true });
+      // Auto-fecha ao fim da barra. Fechamento "automático" conta como manual
+      // para fins de histórico (precisa desfazer a entrada fantasma).
+      fill.addEventListener('animationend', () => fechar(), { once: true });
     } else {
-      _autoTimer = setTimeout(fechar, _ANUNCIO_STORY_MS);
+      _autoTimer = setTimeout(() => fechar(), _ANUNCIO_STORY_MS);
     }
 
     // Controle de pausa robusto: contador de "travas" ativas.
@@ -645,7 +673,7 @@
     lb.addEventListener('contextmenu', (e) => { e.preventDefault(); return false; });
 
     lb.querySelector('#anuncio-lightbox-close').onclick = (e) => { e.stopPropagation(); fechar(); };
-    lb.querySelector('#anuncio-lightbox-bg').onclick = fechar;
+    lb.querySelector('#anuncio-lightbox-bg').onclick = () => fechar();
 
     // Se a aba perde foco/volta, garante estado coerente do progresso.
     const onVisibility = () => {
@@ -4119,8 +4147,14 @@
     const loja = LOJAS[idx];
     if (!loja) return;
 
-    // Back button Android: empurra estado para que voltar feche o modal
-    history.pushState({ modal: 'detalhes', idx }, '', '#' + toSlug(loja.nome));
+    // Back button Android: empurra estado para que voltar feche o modal.
+    // Evita empilhar entrada duplicada se já estamos num estado 'detalhes'
+    // (ex.: abrir outra loja a partir de dentro do próprio modal).
+    if (history.state?.modal === 'detalhes') {
+      history.replaceState({ modal: 'detalhes', idx }, '', '#' + toSlug(loja.nome));
+    } else {
+      history.pushState({ modal: 'detalhes', idx }, '', '#' + toSlug(loja.nome));
+    }
 
     const overlay = document.getElementById('modal-detalhes');
     const sheet   = document.getElementById('detail-sheet');
@@ -5231,6 +5265,10 @@
   // cardápio → detalhes → minha-loja → cadastro. Cada return encerra o handler,
   // então um único "voltar" fecha apenas o modal do topo da pilha.
   window.addEventListener('popstate', function() {
+    // Lightbox do anúncio (status) vem primeiro: pode estar sobre detalhes/lista
+    if (typeof window._fecharAnuncioLightbox === 'function') {
+      window._fecharAnuncioLightbox(true); return;
+    }
     // Cardápio cliente vem primeiro: pode estar empilhado sobre detalhes
     if (document.getElementById('modal-cardapio-cliente')?.classList.contains('open')) {
       fecharCardapioCliente(true); return;

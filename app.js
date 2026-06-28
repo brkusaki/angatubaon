@@ -564,9 +564,15 @@
   // Duração do "story" antes de fechar sozinho (ms)
   const _ANUNCIO_STORY_MS = 6000;
 
-  function abrirFotoAnuncio(url, nomeAnuncio, lojaId, assinatura) {
+  function abrirFotoAnuncio(url, nomeAnuncio, lojaId, assinatura, nomeLoja, planoLoja, categoriaLoja) {
     const oldLb = document.getElementById('anuncio-lightbox');
     if (oldLb) oldLb.remove();
+
+    // Métrica: registra a visualização do anúncio (1x por abertura).
+    // Reaproveita a infra de registrarClique com tipo 'anuncio'.
+    try {
+      if (nomeLoja) registrarClique(nomeLoja, 'anuncio', planoLoja || 'PRO', categoriaLoja || '');
+    } catch (e) {}
 
     const lb = document.createElement('div');
     lb.id = 'anuncio-lightbox';
@@ -582,7 +588,7 @@
         </div>
         <div id="anuncio-lightbox-imgwrap">
           <div id="anuncio-lightbox-spinner" aria-hidden="true"></div>
-          <img src="${escAttr(url)}" alt="${escAttr(nomeAnuncio || 'Anúncio')}" id="anuncio-lightbox-img"
+          <img src="${escAttr(url)}" alt="${escAttr(nomeAnuncio || 'Anúncio')}" id="anuncio-lightbox-img" draggable="false"
             onload="this.classList.add('carregada');var s=document.getElementById('anuncio-lightbox-spinner');if(s)s.style.display='none';"
             onerror="this.style.display='none';var s=document.getElementById('anuncio-lightbox-spinner');if(s)s.style.display='none';var w=document.getElementById('anuncio-lightbox-imgwrap');if(w)w.insertAdjacentHTML('beforeend','<p style=\'color:#fff;opacity:.55;font-size:13px\'>Imagem indisponível</p>');" />
         </div>
@@ -599,6 +605,8 @@
       if (_fechado) return;
       _fechado = true;
       if (_autoTimer) { clearTimeout(_autoTimer); _autoTimer = null; }
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('visibilitychange', onVisibility);
 
       if (lojaId != null) {
         _marcarAnuncioVisto(lojaId, assinatura);
@@ -610,11 +618,11 @@
       }
 
       lb.classList.remove('lb-visible');
-      document.removeEventListener('keydown', onKey);
       lb.addEventListener('transitionend', () => lb.remove(), { once: true });
       setTimeout(() => { if (lb.parentNode) lb.remove(); }, 400);
     };
 
+    // ── Barra de progresso do "story" ──────────────────────────
     const fill = lb.querySelector('#anuncio-lightbox-progress-fill');
     if (fill) {
       fill.style.animationDuration = _ANUNCIO_STORY_MS + 'ms';
@@ -623,41 +631,85 @@
       _autoTimer = setTimeout(fechar, _ANUNCIO_STORY_MS);
     }
 
+    // Controle de pausa robusto: contador de "travas" ativas.
+    // Só retoma quando NENHUMA trava estiver ativa (dedo fora da tela).
+    let _segurando = false;
+    const pausar  = () => { _segurando = true;  if (fill) fill.style.animationPlayState = 'paused';  };
+    const retomar = () => { _segurando = false; if (fill && !_fechado) fill.style.animationPlayState = 'running'; };
+
     const imgwrap = lb.querySelector('#anuncio-lightbox-imgwrap');
-    const pausar  = () => { if (fill) fill.style.animationPlayState = 'paused'; };
-    const retomar = () => { if (fill) fill.style.animationPlayState = 'running'; };
+    const wrap    = lb.querySelector('#anuncio-lightbox-wrap');
+
+    // Bloqueia o menu de contexto nativo (copiar/baixar imagem) — igual WhatsApp.
+    // Sem isso o long-press abre o menu do Chrome e "rouba" o touchend, travando o timer.
+    lb.addEventListener('contextmenu', (e) => { e.preventDefault(); return false; });
 
     lb.querySelector('#anuncio-lightbox-close').onclick = (e) => { e.stopPropagation(); fechar(); };
     lb.querySelector('#anuncio-lightbox-bg').onclick = fechar;
 
-    let _touchStartY = null, _moveu = false;
+    // Se a aba perde foco/volta, garante estado coerente do progresso.
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') { if (fill) fill.style.animationPlayState = 'paused'; }
+      else if (!_segurando) { retomar(); }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     if (imgwrap) {
+      let _touchStartY = null, _touchStartT = 0, _moveu = false;
+
       imgwrap.addEventListener('touchstart', (e) => {
-        _touchStartY = e.touches[0].clientY; _moveu = false; pausar();
+        _touchStartY = e.touches[0].clientY;
+        _touchStartT = Date.now();
+        _moveu = false;
+        pausar(); // segurar pausa imediatamente
       }, { passive: true });
+
       imgwrap.addEventListener('touchmove', (e) => {
         if (_touchStartY == null) return;
         const dy = e.touches[0].clientY - _touchStartY;
-        if (dy > 8) { _moveu = true; lb.style.transform = 'translateY(' + Math.min(dy, 400) + 'px)'; lb.style.opacity = String(Math.max(1 - dy / 500, 0.2)); }
+        if (Math.abs(dy) > 8) _moveu = true;
+        // swipe-down arrasta o lightbox
+        if (dy > 8) {
+          lb.style.transform = 'translateY(' + Math.min(dy, 400) + 'px)';
+          lb.style.opacity = String(Math.max(1 - dy / 500, 0.2));
+        }
       }, { passive: true });
-      imgwrap.addEventListener('touchend', () => {
+
+      const _fimToque = () => {
+        const dur = Date.now() - _touchStartT;
         const t = lb.style.transform;
         const dy = t ? parseFloat(t.replace(/[^0-9.]/g, '')) || 0 : 0;
-        if (dy > 110) { fechar(); }
-        else if (!_moveu) { fechar(); }
-        else { lb.style.transform = ''; lb.style.opacity = ''; retomar(); }
+        if (dy > 110) { fechar(); return; }
+        // tap rápido (curto e sem mover) fecha; long-press apenas retoma
+        if (!_moveu && dur < 250) { fechar(); return; }
+        lb.style.transform = ''; lb.style.opacity = '';
+        retomar(); // soltou o dedo → volta a contar
+        _touchStartY = null;
+      };
+      imgwrap.addEventListener('touchend', _fimToque, { passive: true });
+      // touchcancel dispara quando o sistema "rouba" o toque (menu, gesto do SO).
+      // ESSENCIAL: sem isto o timer ficava travado em 'paused' pra sempre.
+      imgwrap.addEventListener('touchcancel', () => {
+        lb.style.transform = ''; lb.style.opacity = '';
+        retomar();
         _touchStartY = null;
       }, { passive: true });
-      imgwrap.addEventListener('mousedown', pausar);
-      imgwrap.addEventListener('mouseup', retomar);
-      imgwrap.addEventListener('click', (e) => {
-        if (e.target.id === 'anuncio-lightbox-img' || e.target.id === 'anuncio-lightbox-imgwrap') fechar();
+
+      // Desktop: segurar pausa, soltar retoma, clique simples fecha
+      let _mouseDownT = 0, _mouseMoved = false, _mouseStartY = 0;
+      imgwrap.addEventListener('mousedown', (e) => { _mouseDownT = Date.now(); _mouseMoved = false; _mouseStartY = e.clientY; pausar(); });
+      imgwrap.addEventListener('mousemove', (e) => { if (_mouseDownT && Math.abs(e.clientY - _mouseStartY) > 6) _mouseMoved = true; });
+      imgwrap.addEventListener('mouseup', () => {
+        const dur = Date.now() - _mouseDownT;
+        retomar();
+        if (!_mouseMoved && dur < 250) fechar();
+        _mouseDownT = 0;
       });
+      // Se o mouse sai da área enquanto pressionado, retoma (não trava)
+      imgwrap.addEventListener('mouseleave', () => { if (_mouseDownT) { retomar(); _mouseDownT = 0; } });
     }
 
-    const onKey = (e) => {
-      if (e.key === 'Escape') fechar();
-    };
+    const onKey = (e) => { if (e.key === 'Escape') fechar(); };
     document.addEventListener('keydown', onKey);
   }
   window.abrirFotoAnuncio = abrirFotoAnuncio;
@@ -672,7 +724,7 @@
     const assinatura = temFotoAnuncio ? _assinaturaAnuncio(loja) : '';
     const jaVisto = temFotoAnuncio && anuncioJaVisto(loja, lojaId);
     const ringOpen  = temFotoAnuncio
-      ? `<div class="anuncio-ring${jaVisto ? ' ring-visto' : ''}" data-loja-id="${escAttr(lojaId)}" onclick="event.stopPropagation();abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(lojaId)}','${escAttr(assinatura)}')" title="Ver foto do anúncio">`
+      ? `<div class="anuncio-ring${jaVisto ? ' ring-visto' : ''}" data-loja-id="${escAttr(lojaId)}" onclick="event.stopPropagation();abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(lojaId)}','${escAttr(assinatura)}','${escAttr(loja.nome)}','${escAttr(loja.plano||'PRO')}','${escAttr(loja.categoria||'')}')" title="Ver foto do anúncio">`
       : '';
     const isPro = (loja.plano || '').toUpperCase() === 'PRO';
 
@@ -2922,6 +2974,19 @@
       visRow.style.display = 'flex';
     }
 
+    // ── Viram anúncio (só aparece quando há registros) ──
+    const anuncios = m.anuncios ?? 0;
+    const anuncioCard = document.getElementById('ml-m-anuncio-card');
+    const elAnuncio = document.getElementById('ml-m-anuncio');
+    if (anuncioCard && elAnuncio) {
+      if (anuncios > 0) {
+        elAnuncio.textContent = anuncios;
+        anuncioCard.style.display = '';
+      } else {
+        anuncioCard.style.display = 'none';
+      }
+    }
+
     // ── Taxa de conversão (views → cliques de contato) ──
     const taxaBox = document.getElementById('ml-taxaconv-box');
     if (taxaBox) {
@@ -4126,7 +4191,7 @@
       const imgHtml = (isPro && loja.anuncio.imagemUrl)
         ? `<img loading="lazy" decoding="async" src="${escAttr(loja.anuncio.imagemUrl)}" alt="Foto do anúncio"
                style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-top:10px;cursor:zoom-in;"
-               onclick="abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(_mLojaId)}','${escAttr(_mAssin)}')"
+               onclick="abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(_mLojaId)}','${escAttr(_mAssin)}','${escAttr(loja.nome)}','${escAttr(loja.plano||'PRO')}','${escAttr(loja.categoria||'')}')"
                onerror="this.style.display='none'" />`
         : '';
       anuncioHTML = `<div style="

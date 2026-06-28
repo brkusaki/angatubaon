@@ -3216,6 +3216,9 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   flex: 1;
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 #anuncio-lightbox-img {
   max-width: 100%;
@@ -3224,6 +3227,14 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   display: block;
   transform: scale(.95);
   transition: transform .22s ease;
+  /* Bloqueia menu de long-press, seleção e arrasto da imagem (igual WhatsApp) */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-select: none;
+  pointer-events: auto;
 }
 #anuncio-lightbox.lb-visible #anuncio-lightbox-img {
   transform: scale(1);

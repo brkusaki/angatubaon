@@ -840,12 +840,17 @@
     if (temAnuncioPro) {
       const temFoto = !!loja.anuncio.imagemUrl;
       if (temFoto) {
-        // Com foto: texto trunca com ellipsis, "📷 ver foto →" sempre visível à direita
-        anuncioBadge = `<div class="store-anuncio-badge" style="display:flex;align-items:center;gap:6px;">
-          <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        // Com foto: o badge INTEIRO abre o story (igual ao anel do logo).
+        // Pilula "ver foto" a direita deixa claro que e o botao, separado do icone do WhatsApp.
+        const _bLojaId = loja.id || loja.wpp || loja.nome;
+        const _bAssin  = _assinaturaAnuncio(loja);
+        anuncioBadge = `<div class="store-anuncio-badge anuncio-badge-foto"
+            onclick="event.stopPropagation();abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(_bLojaId)}','${escAttr(_bAssin)}','${escAttr(loja.nome)}','${escAttr(loja.plano||'PRO')}','${escAttr(loja.categoria||'')}')"
+            role="button" tabindex="0" title="Ver foto do anuncio">
+          <div class="anuncio-badge-txt">
             <span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}
           </div>
-          <span style="flex-shrink:0;font-size:9px;opacity:.8;white-space:nowrap;">📷 ver foto →</span>
+          <span class="anuncio-badge-cta"><i class="fa fa-camera"></i> ver foto</span>
         </div>`;
       } else {
         anuncioBadge = `<div class="store-anuncio-badge"><span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}</div>`;
@@ -4169,14 +4174,29 @@
     const hasFoto = isPago && loja.foto && loja.foto.trim();
     const hasLogo = isPago && loja.logo && loja.logo.trim();
 
+    // Tem foto de anuncio? Logo ganha anel animado + abre o story ao tocar.
+    const _mLogoAnuncio = isPro && loja.anuncio && loja.anuncio.imagemUrl;
+    const _mLogoId  = loja.id || loja.wpp || loja.nome;
+    const _mLogoAss = _mLogoAnuncio ? _assinaturaAnuncio(loja) : '';
+    const _mLogoVisto = _mLogoAnuncio && anuncioJaVisto(loja, _mLogoId);
     const logoOverlay = hasLogo
-      ? `<div style="position:absolute;bottom:12px;right:14px;z-index:3;
+      ? (_mLogoAnuncio
+        ? `<div class="detail-logo-ring${_mLogoVisto ? ' ring-visto' : ''}"
+             onclick="abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(_mLogoId)}','${escAttr(_mLogoAss)}','${escAttr(loja.nome)}','${escAttr(loja.plano||'PRO')}','${escAttr(loja.categoria||'')}')"
+             role="button" tabindex="0" title="Ver foto do anuncio">
+           <div class="detail-logo-inner">
+             <img src="${loja.logo}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;"
+               onerror="this.parentElement.parentElement.style.display='none'" />
+           </div>
+           <span class="detail-logo-cam"><i class="fa fa-camera"></i></span>
+         </div>`
+        : `<div style="position:absolute;bottom:12px;right:14px;z-index:3;
             width:52px;height:52px;border-radius:12px;overflow:hidden;
             border:2px solid rgba(255,255,255,0.2);box-shadow:0 4px 14px rgba(0,0,0,0.5);
             background:var(--surface);">
            <img src="${loja.logo}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;"
              onerror="this.parentElement.style.display='none'" />
-         </div>`
+         </div>`)
       : '';
 
     const coverHTML = hasFoto
@@ -4220,24 +4240,23 @@
     const temAnuncioModal = ((isPro || isPlus) && loja.anuncio && loja.anuncio.texto);
     let anuncioHTML = '';
     if (temAnuncioModal) {
-      const _mLojaId = loja.id || loja.wpp || loja.nome;
-      const _mAssin  = _assinaturaAnuncio(loja);
-      const imgHtml = (isPro && loja.anuncio.imagemUrl)
-        ? `<img loading="lazy" decoding="async" src="${escAttr(loja.anuncio.imagemUrl)}" alt="Foto do anúncio"
-               style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-top:10px;cursor:zoom-in;"
-               onclick="abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(_mLojaId)}','${escAttr(_mAssin)}','${escAttr(loja.nome)}','${escAttr(loja.plano||'PRO')}','${escAttr(loja.categoria||'')}')"
-               onerror="this.style.display='none'" />`
+      // Com foto, a imagem NAO ocupa o bloco: ela vive no anel do logo (acima).
+      // Aqui fica so o texto + uma pista discreta de que da pra ver a foto tocando no logo.
+      const _temFotoModal = isPro && loja.anuncio.imagemUrl;
+      const fotoHint = _temFotoModal
+        ? `<span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;
+             font-size:10px;font-weight:700;color:var(--zap);opacity:.85;white-space:nowrap;">
+             <i class="fa fa-camera"></i> toque no logo
+           </span>`
         : '';
       anuncioHTML = `<div style="
-            display:flex;flex-direction:column;gap:0;
+            display:flex;align-items:center;gap:10px;
             background:linear-gradient(135deg,rgba(245,158,11,0.1),rgba(245,158,11,0.04));
             border:1px solid rgba(245,158,11,0.3);border-radius:10px;
             padding:10px 12px;margin-bottom:14px;">
-           <div style="display:flex;align-items:center;gap:10px;">
-             <span style="font-size:1.3rem;flex-shrink:0;">${escHTML(loja.anuncio.emoji || '🎯')}</span>
-             <span style="font-size:12px;font-weight:600;color:var(--zap);line-height:1.4;">${escHTML(loja.anuncio.texto)}</span>
-           </div>
-           ${imgHtml}
+           <span style="font-size:1.3rem;flex-shrink:0;">${escHTML(loja.anuncio.emoji || '🎯')}</span>
+           <span style="flex:1;min-width:0;font-size:12px;font-weight:600;color:var(--zap);line-height:1.4;">${escHTML(loja.anuncio.texto)}</span>
+           ${fotoHint}
          </div>`;
     }
 

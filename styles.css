@@ -3091,6 +3091,79 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   line-height: 1.25;
 }
 
+/* ── Badge de anuncio PRO COM FOTO: vira botao clicavel ──── */
+/* O badge inteiro abre o story. A pilula "ver foto" deixa claro
+   que e o gatilho — separado do icone verde do WhatsApp.        */
+.anuncio-badge-foto {
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer;
+  border: 1px solid rgba(245,158,11,0.28);
+  background: linear-gradient(135deg,rgba(245,158,11,0.10),rgba(245,158,11,0.03));
+  border-radius: 8px;
+  padding: 4px 6px 4px 8px;
+  transition: background .15s ease, border-color .15s ease;
+}
+.anuncio-badge-foto:active { background: rgba(245,158,11,0.18); }
+@media (hover:hover) {
+  .anuncio-badge-foto:hover { border-color: rgba(245,158,11,0.5); }
+}
+.anuncio-badge-txt {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.anuncio-badge-cta {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 9.5px; font-weight: 800; letter-spacing: .2px;
+  white-space: nowrap;
+  color: #000;
+  background: var(--zap);
+  padding: 2px 7px; border-radius: 20px;
+}
+.anuncio-badge-cta .fa { font-size: 9px; }
+
+/* ── Logo do MODAL como anel de anuncio (estilo status WPP) ── */
+.detail-logo-ring {
+  position: absolute; bottom: 12px; right: 14px; z-index: 3;
+  width: 52px; height: 52px;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+}
+.detail-logo-ring::before {
+  content: ''; position: absolute; inset: -3px;
+  border-radius: 15px;
+  background: conic-gradient(#ff6b00 0deg,#f59e0b 80deg,#ffcc00 140deg,#ff3d6e 200deg,#f59e0b 280deg,#ff6b00 360deg);
+  animation: ring-spin 2.5s linear infinite;
+  z-index: -1;
+}
+.detail-logo-ring::after {
+  content: ''; position: absolute; inset: -1px;
+  border-radius: 13px; background: #0d0d0d; z-index: -1;
+}
+.detail-logo-inner {
+  width: 52px; height: 52px;
+  border-radius: 12px; overflow: hidden;
+  background: var(--surface);
+  position: relative; z-index: 1;
+}
+/* Marcador de camera no canto do logo: reforca "tem foto aqui" */
+.detail-logo-cam {
+  position: absolute; bottom: -4px; right: -4px; z-index: 2;
+  width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--zap); color: #000;
+  font-size: 8.5px;
+  border: 2px solid #0d0d0d;
+}
+/* Anel "visto": some o contorno animado, mantem o cam discreto */
+.detail-logo-ring.ring-visto::before,
+.detail-logo-ring.ring-visto::after { display: none; }
+.detail-logo-ring.ring-visto {
+  border: 2px solid rgba(255,255,255,0.2);
+}
+.detail-logo-ring.ring-visto .detail-logo-cam { opacity: .85; }
+
 /* Indicadores (MAPS/WPP): mais discretos e colados */
 .contact-tag {
   font-size: 8.5px;
@@ -3289,7 +3362,8 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 
 /* Respeita quem prefere menos movimento */
 @media (prefers-reduced-motion: reduce) {
-  .anuncio-ring::before { animation: none; }
+  .anuncio-ring::before,
+  .detail-logo-ring::before { animation: none; }
   #anuncio-lightbox-progress-fill { animation-duration: 0s; }
 }
 

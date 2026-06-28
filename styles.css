@@ -3228,6 +3228,54 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 #anuncio-lightbox.lb-visible #anuncio-lightbox-img {
   transform: scale(1);
 }
+/* Imagem ainda carregando: leve fade-in ao concluir */
+#anuncio-lightbox-img { opacity: 0; transition: transform .22s ease, opacity .25s ease; }
+#anuncio-lightbox-img.carregada { opacity: 1; }
+
+/* Spinner enquanto a foto do anúncio carrega */
+#anuncio-lightbox-spinner {
+  position: absolute;
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.18);
+  border-top-color: rgba(255,255,255,.85);
+  animation: anuncio-spin .8s linear infinite;
+}
+@keyframes anuncio-spin { to { transform: rotate(360deg); } }
+
+/* Barra de progresso do "story" (igual status WPP) */
+#anuncio-lightbox-progress {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  margin: 10px 12px 0;
+  background: rgba(255,255,255,.25);
+  border-radius: 3px;
+  overflow: hidden;
+  z-index: 3;
+}
+#anuncio-lightbox-progress-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #fff;
+  border-radius: 3px;
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation-name: anuncio-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes anuncio-progress {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* Respeita quem prefere menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  .anuncio-ring::before { animation: none; }
+  #anuncio-lightbox-progress-fill { animation-duration: 0s; }
+}
 
 
 .store-card.plano-pro.has-cover .store-info {

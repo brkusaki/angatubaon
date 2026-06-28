@@ -523,11 +523,48 @@
   }
 
   /* ── Lightbox de foto do anúncio (estilo status WPP) ─────── */
-  // Lojas cujo anúncio já foi visualizado nesta sessão
-  const _anunciosVistos = new Set();
+  // Persistência: marca qual VERSÃO do anúncio de cada loja já foi vista.
+  // A chave inclui uma assinatura do conteúdo (texto+imagem), então se o
+  // lojista publicar um anúncio novo, o ring reaparece — igual ao WhatsApp.
+  const _ANUNCIO_VISTOS_KEY = 'angatuba_anuncios_vistos';
 
-  function abrirFotoAnuncio(url, nomeAnuncio, lojaId) {
-    // Remove lightbox anterior se existir
+  function _carregarVistos() {
+    try {
+      const raw = localStorage.getItem(_ANUNCIO_VISTOS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+
+  // Assinatura curta e estável do conteúdo do anúncio (hash djb2)
+  function _assinaturaAnuncio(loja) {
+    const a = loja && loja.anuncio ? loja.anuncio : {};
+    const base = (a.texto || '') + '|' + (a.imagemUrl || '');
+    let h = 5381;
+    for (let i = 0; i < base.length; i++) {
+      h = ((h << 5) + h + base.charCodeAt(i)) | 0;
+    }
+    return (h >>> 0).toString(36);
+  }
+
+  // True se o anúncio ATUAL desta loja já foi visto
+  function anuncioJaVisto(loja, lojaId) {
+    const vistos = _carregarVistos();
+    return vistos[lojaId] === _assinaturaAnuncio(loja);
+  }
+
+  function _marcarAnuncioVisto(lojaId, assinatura) {
+    if (lojaId == null) return;
+    try {
+      const vistos = _carregarVistos();
+      vistos[lojaId] = assinatura;
+      localStorage.setItem(_ANUNCIO_VISTOS_KEY, JSON.stringify(vistos));
+    } catch (e) {}
+  }
+
+  // Duração do "story" antes de fechar sozinho (ms)
+  const _ANUNCIO_STORY_MS = 6000;
+
+  function abrirFotoAnuncio(url, nomeAnuncio, lojaId, assinatura) {
     const oldLb = document.getElementById('anuncio-lightbox');
     if (oldLb) oldLb.remove();
 
@@ -536,6 +573,7 @@
     lb.innerHTML = `
       <div id="anuncio-lightbox-bg"></div>
       <div id="anuncio-lightbox-wrap">
+        <div id="anuncio-lightbox-progress"><span id="anuncio-lightbox-progress-fill"></span></div>
         <div id="anuncio-lightbox-topbar">
           <button id="anuncio-lightbox-close" aria-label="Fechar">
             <i class="ti ti-x"></i>
@@ -543,33 +581,82 @@
           <span id="anuncio-lightbox-titulo">${escHTML(nomeAnuncio || '')}</span>
         </div>
         <div id="anuncio-lightbox-imgwrap">
+          <div id="anuncio-lightbox-spinner" aria-hidden="true"></div>
           <img src="${escAttr(url)}" alt="${escAttr(nomeAnuncio || 'Anúncio')}" id="anuncio-lightbox-img"
-            onerror="this.style.display='none'" />
+            onload="this.classList.add('carregada');var s=document.getElementById('anuncio-lightbox-spinner');if(s)s.style.display='none';"
+            onerror="this.style.display='none';var s=document.getElementById('anuncio-lightbox-spinner');if(s)s.style.display='none';var w=document.getElementById('anuncio-lightbox-imgwrap');if(w)w.insertAdjacentHTML('beforeend','<p style=\'color:#fff;opacity:.55;font-size:13px\'>Imagem indisponível</p>');" />
         </div>
       </div>`;
     document.body.appendChild(lb);
 
-    lb.getBoundingClientRect(); // forçar reflow
+    lb.getBoundingClientRect();
     lb.classList.add('lb-visible');
 
-    const fechar = (ringEl) => {
-      // Marcar como visto e remover ring do card correspondente
+    let _fechado = false;
+    let _autoTimer = null;
+
+    const fechar = () => {
+      if (_fechado) return;
+      _fechado = true;
+      if (_autoTimer) { clearTimeout(_autoTimer); _autoTimer = null; }
+
       if (lojaId != null) {
-        _anunciosVistos.add(lojaId);
-        // Remove ring de todos os thumbs desta loja
-        document.querySelectorAll('.anuncio-ring[data-loja-id="' + lojaId + '"]').forEach(el => {
-          el.classList.add('ring-visto');
+        _marcarAnuncioVisto(lojaId, assinatura);
+        document.querySelectorAll('.anuncio-ring').forEach(el => {
+          if (el.getAttribute('data-loja-id') === String(lojaId)) {
+            el.classList.add('ring-visto');
+          }
         });
       }
+
       lb.classList.remove('lb-visible');
+      document.removeEventListener('keydown', onKey);
       lb.addEventListener('transitionend', () => lb.remove(), { once: true });
+      setTimeout(() => { if (lb.parentNode) lb.remove(); }, 400);
     };
 
-    lb.querySelector('#anuncio-lightbox-close').onclick = () => fechar();
-    lb.querySelector('#anuncio-lightbox-bg').onclick = () => fechar();
+    const fill = lb.querySelector('#anuncio-lightbox-progress-fill');
+    if (fill) {
+      fill.style.animationDuration = _ANUNCIO_STORY_MS + 'ms';
+      fill.addEventListener('animationend', fechar, { once: true });
+    } else {
+      _autoTimer = setTimeout(fechar, _ANUNCIO_STORY_MS);
+    }
+
+    const imgwrap = lb.querySelector('#anuncio-lightbox-imgwrap');
+    const pausar  = () => { if (fill) fill.style.animationPlayState = 'paused'; };
+    const retomar = () => { if (fill) fill.style.animationPlayState = 'running'; };
+
+    lb.querySelector('#anuncio-lightbox-close').onclick = (e) => { e.stopPropagation(); fechar(); };
+    lb.querySelector('#anuncio-lightbox-bg').onclick = fechar;
+
+    let _touchStartY = null, _moveu = false;
+    if (imgwrap) {
+      imgwrap.addEventListener('touchstart', (e) => {
+        _touchStartY = e.touches[0].clientY; _moveu = false; pausar();
+      }, { passive: true });
+      imgwrap.addEventListener('touchmove', (e) => {
+        if (_touchStartY == null) return;
+        const dy = e.touches[0].clientY - _touchStartY;
+        if (dy > 8) { _moveu = true; lb.style.transform = 'translateY(' + Math.min(dy, 400) + 'px)'; lb.style.opacity = String(Math.max(1 - dy / 500, 0.2)); }
+      }, { passive: true });
+      imgwrap.addEventListener('touchend', () => {
+        const t = lb.style.transform;
+        const dy = t ? parseFloat(t.replace(/[^0-9.]/g, '')) || 0 : 0;
+        if (dy > 110) { fechar(); }
+        else if (!_moveu) { fechar(); }
+        else { lb.style.transform = ''; lb.style.opacity = ''; retomar(); }
+        _touchStartY = null;
+      }, { passive: true });
+      imgwrap.addEventListener('mousedown', pausar);
+      imgwrap.addEventListener('mouseup', retomar);
+      imgwrap.addEventListener('click', (e) => {
+        if (e.target.id === 'anuncio-lightbox-img' || e.target.id === 'anuncio-lightbox-imgwrap') fechar();
+      });
+    }
 
     const onKey = (e) => {
-      if (e.key === 'Escape') { fechar(); document.removeEventListener('keydown', onKey); }
+      if (e.key === 'Escape') fechar();
     };
     document.addEventListener('keydown', onKey);
   }
@@ -582,9 +669,10 @@
     const temFotoAnuncio = (loja.plano || '').toUpperCase() === 'PRO'
       && loja.anuncio && loja.anuncio.imagemUrl;
     const lojaId = loja.id || loja.wpp || loja.nome;
-    const jaVisto = temFotoAnuncio && _anunciosVistos.has(lojaId);
+    const assinatura = temFotoAnuncio ? _assinaturaAnuncio(loja) : '';
+    const jaVisto = temFotoAnuncio && anuncioJaVisto(loja, lojaId);
     const ringOpen  = temFotoAnuncio
-      ? `<div class="anuncio-ring${jaVisto ? ' ring-visto' : ''}" data-loja-id="${escAttr(lojaId)}" onclick="event.stopPropagation();abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(lojaId)}')" title="Ver foto do anúncio">`
+      ? `<div class="anuncio-ring${jaVisto ? ' ring-visto' : ''}" data-loja-id="${escAttr(lojaId)}" onclick="event.stopPropagation();abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(lojaId)}','${escAttr(assinatura)}')" title="Ver foto do anúncio">`
       : '';
     const isPro = (loja.plano || '').toUpperCase() === 'PRO';
 
@@ -4033,10 +4121,12 @@
     const temAnuncioModal = ((isPro || isPlus) && loja.anuncio && loja.anuncio.texto);
     let anuncioHTML = '';
     if (temAnuncioModal) {
+      const _mLojaId = loja.id || loja.wpp || loja.nome;
+      const _mAssin  = _assinaturaAnuncio(loja);
       const imgHtml = (isPro && loja.anuncio.imagemUrl)
         ? `<img loading="lazy" decoding="async" src="${escAttr(loja.anuncio.imagemUrl)}" alt="Foto do anúncio"
                style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-top:10px;cursor:zoom-in;"
-               onclick="abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}')"
+               onclick="abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(_mLojaId)}','${escAttr(_mAssin)}')"
                onerror="this.style.display='none'" />`
         : '';
       anuncioHTML = `<div style="

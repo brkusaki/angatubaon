@@ -1,5 +1,4 @@
-const CACHE = 'angatubaon-v61
-  ';
+const CACHE = 'angatubaon-v62';
 const STATIC = [
   '/',
   '/index.html',
@@ -85,11 +84,12 @@ self.addEventListener('fetch', e => {
   if (e.request.url.includes('/service-worker.js')) return;
 
   const url = e.request.url;
-  const isAsset = url.endsWith('.js') || url.endsWith('.css') || 
-                  e.request.destination === 'document';
+  const isDoc = e.request.destination === 'document';
+  const isJsCss = url.endsWith('.js') || url.endsWith('.css');
 
-  if (isAsset) {
-    // Network-first: tenta rede, atualiza cache, fallback para cache/offline
+  if (isDoc) {
+    // HTML: network-first — reflete deploys imediatamente (detecta nova versão do app).
+    // Fallback para cache e, por fim, offline.html.
     e.respondWith(
       fetch(e.request)
         .then(r => {
@@ -97,10 +97,26 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(c => c.put(e.request, clone));
           return r;
         })
-        .catch(() => 
+        .catch(() =>
           caches.match(e.request)
             .then(r => r || caches.match('/offline.html'))
         )
+    );
+  } else if (isJsCss) {
+    // JS/CSS: stale-while-revalidate — serve do cache na hora (boot instantâneo),
+    // revalida em background e atualiza o cache. Como o app versiona via CACHE name
+    // e o HTML vem network-first, a próxima carga já pega o bundle novo.
+    e.respondWith(
+      caches.match(e.request).then(cached => {
+        const net = fetch(e.request)
+          .then(r => {
+            const clone = r.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
+            return r;
+          })
+          .catch(() => cached || caches.match('/offline.html'));
+        return cached || net;
+      })
     );
   } else {
     // Cache-first para imagens e outros assets estáticos DO PRÓPRIO DOMÍNIO

@@ -5196,9 +5196,42 @@
   })(); // ── fim initRamoAutocomplete ──────────────────────────
 
   /* ── INIT ────────────────────────────────────────────────── */
-  // Mostra skeletons enquanto API carrega
-  showSkeleton();
-  showSkeletonCat();
+  // Stale-while-revalidate: se houver snapshot cacheado válido (24h), renderiza
+  // IMEDIATAMENTE — app interativo em ~50ms em vez de esperar o GAS (400–1200ms).
+  // carregarLojas() roda em seguida e re-renderiza com dados frescos da rede.
+  // Mesmo padrão de _mostrarErroCarregamento: _rebuildIdxMap() ANTES do render,
+  // garantindo que os índices embutidos nos cards (onclick=abrirDetalhes(idx)) fiquem corretos.
+  let _renderizouDoCache = false;
+  (function _renderCacheImediato() {
+    try {
+      const cached = localStorage.getItem('angatuba_lojas_cache');
+      const ts     = parseInt(localStorage.getItem('angatuba_lojas_cache_ts') || '0');
+      if (cached && (Date.now() - ts) < 86_400_000) {
+        const arr = JSON.parse(cached);
+        if (Array.isArray(arr) && arr.length > 0) {
+          LOJAS = arr.map(function(l){ return Object.assign({}, l, {
+            nome:      l.nome      || '',
+            tags:      l.tags      || '',
+            sub:       l.sub       || '',
+            categoria: l.categoria || 'servicos',
+            plano:     (l.plano    || 'GRATIS').toUpperCase(),
+            emoji:     l.emoji     || '🏪',
+          }); });
+          _rebuildIdxMap();
+          renderLojas();
+          renderCategorias();
+          _esconderSplash();   // app já usável; rede atualiza por baixo
+          _renderizouDoCache = true;
+        }
+      }
+    } catch(e) {}
+  })();
+
+  // Mostra skeletons enquanto API carrega (só se o cache não pintou nada ainda)
+  if (!_renderizouDoCache) {
+    showSkeleton();
+    showSkeletonCat();
+  }
 
   // Carrega lojas dinâmicas em background
   // ── Saudação noturna (22h–5h) ─────────────────────────────

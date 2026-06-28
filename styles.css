@@ -4,6 +4,12 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     a    { text-decoration: none; color: inherit; }
     button { font-family: inherit; cursor: pointer; border: none; background: none; }
+    /* touch-action: manipulation — desliga double-tap-zoom nos clicaveis, corta a
+       janela residual de ~300ms de deteccao de toque. Nao afeta scroll/swipe (tratados
+       no JS com pan-y/none onde necessario). */
+    button, a, .store-card, .store-info, .cat-item, .pill-btn,
+    .nav-item, [role="button"], .detail-btn-wpp, .detail-btn-tel,
+    .btn-wpp, .btn-tel { touch-action: manipulation; }
 
     :root {
       --bg:       #0d0d0d;
@@ -233,7 +239,7 @@
       position: relative; overflow: hidden;
       transform: translateZ(0); transition: transform 0.15s, border-color 0.3s;
     }
-    .store-card:active { will-change: transform; transform: scale(0.984) translateZ(0); }
+    .store-card:active { transform: scale(0.984) translateZ(0); }
 
     .store-card::before {
       content: ''; position: absolute; left: 0; top: 12px; bottom: 12px;
@@ -337,7 +343,7 @@
       transform:translateZ(0); transition:transform 0.1s;
       -webkit-tap-highlight-color:transparent;
     }
-    .btn-wpp:active { will-change:transform; transform:scale(0.88) translateZ(0); }
+    .btn-wpp:active { transform:scale(0.88) translateZ(0); }
     .btn-wpp.open   { background:linear-gradient(135deg,#25d366,#128c7e); color:#fff; box-shadow:0 2px 12px rgba(37,211,102,0.4); }
     .btn-wpp.zap    { background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; box-shadow:0 2px 12px rgba(245,158,11,0.35); }
     .btn-wpp.disabled { background:var(--surface2); color:#333; cursor:not-allowed; pointer-events:none; opacity:0.4; }
@@ -357,7 +363,7 @@
       transform:translateZ(0); transition:transform 0.1s;
       -webkit-tap-highlight-color:transparent;
     }
-    .btn-tel:active { transform:scale(0.88) translateZ(0); will-change:transform; }
+    .btn-tel:active { transform:scale(0.88) translateZ(0); }
     .btn-tel.open   { background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; }
     .btn-tel.closed { background:var(--surface2); color:#555; cursor:pointer; pointer-events:auto; }
     .btn-tel.disabled { background:var(--surface2); color:#333; cursor:not-allowed; pointer-events:none; opacity:0.4; }
@@ -410,7 +416,6 @@
 
     .pill-btn:active {
       transform: scale(0.94);
-      will-change: transform;
     }
 
     .pill-btn.active[data-filter="all"] {
@@ -553,7 +558,7 @@
     .nav-item i { font-size:1.1rem; display:block; transition: filter 0.15s; }
     .nav-item.active { color:var(--red); }
     .nav-item.active i { filter: drop-shadow(0 0 4px rgba(255,68,68,0.35)); }
-    .nav-item:active { transform: scale(0.88); will-change: transform; }
+    .nav-item:active { transform: scale(0.88); }
     .nav-item.hidden { display: none !important; }
 
     /* ════════════════════════════════════════════
@@ -591,7 +596,7 @@
       from { opacity:0; transform:translateY(10px) translateZ(0); }
       to   { opacity:1; transform:translateY(0) translateZ(0); }
     }
-    .fade-in { will-change:transform,opacity; animation:fadeUp 0.32s ease both; }
+    .fade-in { animation:fadeUp 0.32s ease both; }
 
     /* ════════════════════════════════════════════
        MODAL CADASTRO
@@ -1682,7 +1687,7 @@
       background-position: center;
       background-repeat: no-repeat;
       border-color: rgba(245,158,11,0.65);
-      animation: pro-pulse 3s ease-in-out infinite;
+      box-shadow: 0 0 0 1.5px rgba(245,158,11,0.5) inset, 0 6px 32px rgba(245,158,11,0.22);
     }
 
     /* Overlay reforçado — texto sempre legível sobre qualquer foto */

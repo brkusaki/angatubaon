@@ -3255,3 +3255,65 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .pill-btn[data-filter="open"] .pill-dot {
   animation: blink 1.8s infinite;
 }
+
+/* ════════════════════════════════════════════════════════════
+   BADGE DE STATUS LEGÍVEL SOBRE A FOTO DO DETALHE
+   (fundo escuro sólido + blur — não some sobre comida clara)
+════════════════════════════════════════════════════════════ */
+.detail-cover-badge {
+  bottom: 14px; left: 16px;
+}
+.detail-cover-badge .badge {
+  font-size: 11px;
+  padding: 6px 11px;
+  border-radius: 20px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+.detail-cover-badge .badge-open {
+  background: rgba(8,40,28,0.82);
+  color: #4ade80;
+  border: 1px solid rgba(74,222,128,0.4);
+}
+.detail-cover-badge .badge-zap {
+  background: rgba(48,34,8,0.82);
+  color: #fbbf24;
+  border: 1px solid rgba(251,191,36,0.4);
+}
+.detail-cover-badge .badge-closed {
+  background: rgba(48,12,12,0.82);
+  color: #fca5a5;
+  border: 1px solid rgba(252,165,165,0.4);
+}
+
+/* Reforça gradiente inferior da foto → base escura sempre presente */
+.detail-cover-wrap::after {
+  background: linear-gradient(to bottom,
+    rgba(0,0,0,0.45) 0%,
+    transparent 40%,
+    transparent 70%,
+    rgba(0,0,0,0.55) 100%);
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   HORÁRIO COLAPSÁVEL — modal de detalhes
+   Linha de hoje sempre visível; demais dias atrás de "ver todos"
+════════════════════════════════════════════════════════════ */
+.detail-horario-resumo {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.detail-horario-toggle {
+  font-size: 11px; color: var(--muted); font-weight: 600;
+  display: flex; align-items: center; gap: 3px; flex-shrink: 0;
+}
+.detail-horario-toggle i { transition: transform 0.2s; font-size: 10px; }
+.detail-horario-full {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s cubic-bezier(0.4,0,0.2,1);
+}
+.detail-horario-full > div { overflow: hidden; min-height: 0; }
+.detail-horario-wrap.expanded .detail-horario-full { grid-template-rows: 1fr; }
+.detail-horario-wrap.expanded .detail-horario-toggle i { transform: rotate(180deg); }

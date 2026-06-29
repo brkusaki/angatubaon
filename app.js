@@ -4688,7 +4688,7 @@
         const horaStr = `${match[2]} – ${match[3]}`;
         // Verifica se hoje está nesse turno
         const diasMencioandos = diasStr.split(',').map(d => {
-          const key = d.trim().toLowerCase().slice(0,3);
+          const key = d.trim().toLowerCase().normalize('NFC').slice(0,3);
           return DIAS_IDX[key];
         }).filter(d => d !== undefined);
         const temHoje = diasMencioandos.includes(hoje);

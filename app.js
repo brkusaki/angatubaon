@@ -1059,6 +1059,8 @@
       filtradas = filtradas.filter(l => getStatus(l) === 'open');
     } else if (activePillFilter === 'featured') {
       filtradas = filtradas.filter(l => l.recomendado === true);
+    } else if (activePillFilter === 'delivery') {
+      filtradas = filtradas.filter(l => l.fazEntrega === true);
     }
 
     if (activeBairro) {

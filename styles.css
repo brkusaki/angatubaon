@@ -3015,6 +3015,19 @@
   display: inline-flex; align-items: center; gap: 6px;
 }
 .bairro-chip:active { transform: scale(0.96); }
+/* Nome do bairro dentro do chip */
+.bairro-chip-nome { line-height: 1; }
+/* Contador de lojas no bairro: discreto, em pilula */
+.bairro-chip-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 10px; font-size: 11.5px; font-weight: 700;
+  background: rgba(99,179,237,0.16); color: #63b3ed;
+  line-height: 1;
+}
+.bairro-chip.bairro-chip-active .bairro-chip-count {
+  background: rgba(99,179,237,0.28); color: #bfe0fa;
+}
 .bairro-chip.bairro-chip-active {
   background: rgba(99,179,237,0.16);
   border-color: #63b3ed; color: #63b3ed;
@@ -3041,6 +3054,7 @@
 body.light-mode .bairro-sheet { background: var(--surface); }
 body.light-mode .bairro-search { background: rgba(0,0,0,0.04); }
 body.light-mode .bairro-chip { background: rgba(0,0,0,0.04); }
+body.light-mode .bairro-chip-count { background: rgba(37,99,235,0.12); color: #2563eb; }
 body.light-mode .bairro-sheet-grabber { background: rgba(0,0,0,0.2); }
 body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 

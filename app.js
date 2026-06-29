@@ -314,17 +314,24 @@
 
   const BAIRROS_ANGATUBA = [
     // Urbanos
-    'Centro', 'Vila Ribeiro', 'Vila Volpi', 'Vila Portela', 'Vila Nova',
-    'Vila Salto', 'Vila Parque', 'Vila Maciel', 'Vila Progresso', 'Vila Catanduva',
-    'Jardim Domingos dos Santos', 'Jardim Khouri', 'Jardim Monte Santo',
-    'Jardim Primavera', 'Jardim Sol Nascente', 'Residencial Palas Atenas',
-    'Chácara Santo Antônio',
+    'Centro', 'Vila Ribeiro', 'Vila Volpi',
+    'Vila Portela', 'Vila Nova', 'Vila Salto',
+    'Vila Parque', 'Vila Maciel', 'Vila Progresso',
+    'Vila Catanduva', 'Vila São Cristóvão', 'Vila Bela Vista',
+    'Vila Nhô Ribeiro', 'Jardim Domingos dos Santos', 'Jardim Domingos Orsi',
+    'Jardim Khouri', 'Jardim Monte Santo', 'Jardim Primavera',
+    'Jardim Sol Nascente', 'Jardim Bela Vista', 'Jardim Ana',
+    'Jardim Elisa', 'Jardim Luiza', 'Jardim do Paço',
+    'Residencial Palas Atenas', 'Residencial Bela Vista', 'Residencial Simões',
+    'Residencial Ingá', 'Residencial Vitória', 'Chácara Santo Antônio',
+    'Portal Novo Horizonte',
     // Distritos e Zona Rural
     'Bom Retiro da Esperança', 'Bairro dos Rocinhos', 'Bairro dos Venâncios',
     'Bairro dos Pires', 'Bairro dos Oliveiras', 'Bairro dos Silveiras',
     'Bairro da Lagoa', 'Bairro do Guarei Velho', 'Bairro Chapada',
     'Bairro Palmital', 'Bairro Boa Vista', 'Bairro Campininha',
-    'Bairro Faxinal', 'Bairro Morro Azul',
+    'Bairro Faxinal', 'Bairro Morro Azul', 'Bairro dos Leites',
+    'Bairro Machadinho',
   ];
 
   // Normalização: remove acentos e lowercase para comparação fuzzy
@@ -336,6 +343,40 @@
   function detectarBairroDaRua(displayName) {
     const norm = normBairro(displayName);
     return BAIRROS_ANGATUBA.find(b => norm.includes(normBairro(b))) || '';
+  }
+
+  // Match unico usado pelo filtro E pela contagem de lojas por bairro,
+  // garantindo que o numero no chip bata com o resultado ao clicar.
+  function lojaEhDoBairro(loja, bairro) {
+    if (!bairro) return true;
+    const nb = normBairro(bairro);
+    const lb = normBairro(loja.bairro);
+    // 1) bairro salvo na loja bate exatamente (canonico)
+    if (lb && lb === nb) return true;
+    // 2) bairro salvo contem o filtro (tolera grafia parcial)
+    if (lb && lb.includes(nb)) return true;
+    // 3) fallback: detecta pelo endereco
+    const end = normBairro(loja.endereco);
+    if (end.includes(nb)) return true;
+    // 4) rurais: endereco costuma omitir o prefixo 'Bairro '
+    if (nb.startsWith('bairro ')) {
+      const semPrefixo = nb.replace('bairro ', '');
+      if (end.includes('- ' + semPrefixo) || end.startsWith(semPrefixo)) return true;
+      if (lb.includes(semPrefixo)) return true;
+    }
+    return false;
+  }
+
+  // Conta quantas lojas casam com cada bairro (mesma logica do filtro).
+  function contarLojasPorBairro() {
+    const mapa = {};
+    BAIRROS_ANGATUBA.forEach(b => { mapa[b] = 0; });
+    LOJAS.forEach(loja => {
+      BAIRROS_ANGATUBA.forEach(b => {
+        if (lojaEhDoBairro(loja, b)) mapa[b]++;
+      });
+    });
+    return mapa;
   }
 
   /* ── Calcula status pelo horário ─────────────────────────── */
@@ -1021,8 +1062,7 @@
     }
 
     if (activeBairro) {
-      const nb = normBairro(activeBairro);
-      filtradas = filtradas.filter(l => normBairro(l.bairro).includes(nb) || normBairro(l.endereco).includes(nb));
+      filtradas = filtradas.filter(l => lojaEhDoBairro(l, activeBairro));
     }
 
     // Peso por plano: PRO=0, PLUS=1, GRATIS=2
@@ -1826,12 +1866,24 @@
         return;
       }
       wpp?.classList.remove('invalid');
-      // Fix: bairro é obrigatório (vai pro backend e alimenta o filtro "Perto de mim").
-      if (bairro && !bairro.value.trim()) {
-        cadShake(bairro);
-        bairro.focus();
-        setTimeout(() => bairro.classList.remove('invalid'), 2500);
-        return;
+      // Bairro e obrigatorio E precisa ser um da lista oficial,
+      // senao a loja some do filtro por bairro (match nao bate).
+      if (bairro) {
+        const bv = bairro.value.trim();
+        const bvNorm = normBairro(bv);
+        const ehValido = BAIRROS_ANGATUBA.some(b => normBairro(b) === bvNorm);
+        if (!bv || !ehValido) {
+          // Se digitou algo valido com grafia diferente, normaliza pro canonico
+          const canonico = BAIRROS_ANGATUBA.find(b => normBairro(b) === bvNorm);
+          if (canonico) {
+            bairro.value = canonico;
+          } else {
+            cadShake(bairro);
+            bairro.focus();
+            setTimeout(() => bairro.classList.remove('invalid'), 2500);
+            return;
+          }
+        }
       }
       bairro?.classList.remove('invalid');
     }
@@ -3653,9 +3705,15 @@
 
     function renderBairroChips(query) {
       const norm = normBairro(query);
-      const filtrados = norm
+      const contagem = contarLojasPorBairro();
+      let filtrados = norm
         ? BAIRROS_ANGATUBA.filter(b => normBairro(b).includes(norm))
         : BAIRROS_ANGATUBA;
+      // Esconde bairros sem nenhuma loja (a menos que seja o filtro ativo).
+      // Limpa a lista de 47 itens mostrando so onde ha comercio.
+      filtrados = filtrados.filter(b =>
+        contagem[b] > 0 || normBairro(b) === normBairro(activeBairro)
+      );
 
       list.innerHTML = '';
 
@@ -3681,7 +3739,17 @@
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className = 'bairro-chip' + (normBairro(b) === normBairro(activeBairro) ? ' bairro-chip-active' : '');
-        chip.textContent = b;
+        const nome = document.createElement('span');
+        nome.className = 'bairro-chip-nome';
+        nome.textContent = b;
+        chip.appendChild(nome);
+        const n = contagem[b] || 0;
+        if (n > 0) {
+          const badge = document.createElement('span');
+          badge.className = 'bairro-chip-count';
+          badge.textContent = n;
+          chip.appendChild(badge);
+        }
         chip.addEventListener('click', () => aplicarBairro(b));
         list.appendChild(chip);
       });

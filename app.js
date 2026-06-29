@@ -1052,15 +1052,15 @@
 
     const abertas = filtradas.filter(l => getStatus(l) === 'open').length;
 
-    const frag = document.createDocumentFragment();
-    filtradas.forEach((loja, i) => {
-      const wrap = document.createElement('div');
-      wrap.innerHTML = cardHTML(loja, i * 0.055, getStatusInfo(loja), _lojaIdxMap.get(loja) ?? 0);
-      frag.appendChild(wrap.firstElementChild);
-    });
-
-    listEl.innerHTML = '';
-    listEl.appendChild(frag);
+    // Perf: um unico parse de innerHTML para toda a lista, em vez de criar um
+    // <div> orfao + innerHTML por card (N parses). O onclick inline de cada card
+    // carrega _lojaIdxMap.get(loja) — o indice REAL da loja em LOJAS — preservado
+    // aqui para que abrirDetalhes(idx) abra sempre a loja correta. Stagger do
+    // fade-in limitado aos primeiros 8 cards (ver styles.css) para nao cintilar
+    // a lista inteira em re-filtros.
+    listEl.innerHTML = filtradas
+      .map((loja, i) => cardHTML(loja, i < 8 ? i * 0.04 : 0, getStatusInfo(loja), _lojaIdxMap.get(loja) ?? 0))
+      .join('');
 
     const temResultado = filtradas.length > 0;
     listEl.style.display = temResultado ? 'flex' : 'none';
@@ -4218,6 +4218,13 @@
     const overlay = document.getElementById('modal-detalhes');
     const sheet   = document.getElementById('detail-sheet');
 
+    // Perf: feedback imediato — o sheet comeca a animar JA, antes de montar
+    // o conteudo pesado. A montagem (innerHTML gigante) e diferida para o
+    // proximo frame dentro do rAF abaixo, mascarada pela animacao de entrada.
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    requestAnimationFrame(() => {
     const plano  = (loja.plano || 'GRATIS').toUpperCase();
     const isPro  = plano === 'PRO';
     const isPlus = plano === 'PLUS';
@@ -4513,8 +4520,7 @@
       <div class="detail-aval-form-wrap">${avalFormHTML}</div>
     `;
 
-    overlay.classList.add('open');
-    document.body.style.overflow = 'hidden';
+    });
   }
 
   // Compartilhar loja via Web Share API ou fallback para clipboard

@@ -3804,17 +3804,10 @@
     const dropdown = document.getElementById('bairro-cad-dropdown');
     if (!input || !dropdown) return;
 
-    function posicionarDropdown() {
-      const rect = input.getBoundingClientRect();
-      const ddH  = Math.min(200, window.innerHeight - rect.bottom - 8);
-      dropdown.style.position  = 'fixed';
-      dropdown.style.top       = (rect.bottom + 4) + 'px';
-      dropdown.style.left      = rect.left + 'px';
-      dropdown.style.width     = rect.width + 'px';
-      dropdown.style.maxHeight = ddH + 'px';
-      dropdown.style.zIndex    = '9100';
-    }
-
+    // Posicionamento agora e 100% CSS (position:absolute ancorado ao
+    // .field-group pai). Antes usava position:fixed com coordenadas
+    // calculadas, que defasavam quando o teclado abria/fechava no mobile
+    // -> dropdown flutuava longe do campo. Ancorar resolve nativamente.
     function renderCadList(query) {
       const norm = normBairro(query);
       const filtrados = norm
@@ -3834,7 +3827,6 @@
         el.addEventListener('keydown', e => { if (e.key === 'Enter') select(); });
       });
 
-      posicionarDropdown();
       dropdown.style.display = 'block';
     }
 

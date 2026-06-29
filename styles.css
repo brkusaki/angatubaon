@@ -497,6 +497,13 @@
 
     /* Autocomplete de bairro no cadastro — posicionado via JS (position:fixed) */
     .bairro-cad-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      margin-top: 4px;
+      z-index: 9100;
+      max-height: 220px;
       background: #222;
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 12px;

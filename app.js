@@ -942,15 +942,9 @@
     const temAnuncioPlus = (isPlus && loja.anuncio && loja.anuncio.texto);
     const temAnuncioPro  = (isPro  && loja.anuncio && loja.anuncio.texto);
     let anuncioBadge = '';
-    if (temAnuncioPro) {
-      const temFoto = !!loja.anuncio.imagemUrl;
-      if (temFoto) {
-        // Com foto: texto trunca com ellipsis. O gatilho da foto e o anel
-        // animado no logo (thumbHTML) — sem botao extra no badge pra nao poluir.
-        anuncioBadge = `<div class="store-anuncio-badge"><span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}</div>`;      } else {
-        anuncioBadge = `<div class="store-anuncio-badge"><span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}</div>`;
-      }
-    } else if (temAnuncioPlus) {
+    if (temAnuncioPro || temAnuncioPlus) {
+      // Badge de texto. Quando há foto, o gatilho visual é o anel animado no logo
+      // (thumbHTML) — não duplicamos botão aqui pra não poluir o card.
       anuncioBadge = `<div class="store-anuncio-badge"><span>${escHTML(loja.anuncio.emoji || '🎯')}</span> ${escHTML(loja.anuncio.texto)}</div>`;
     }
 
@@ -2930,6 +2924,9 @@
     }
 
     // ── Toggle FazEntrega ─────────────────────────────────
+    // Informacoes da loja (nome, telefone, endereco, horario, tags, descricao)
+    if (typeof window.mlRenderInfo === 'function') window.mlRenderInfo(d);
+
     const mlEntregaWrap = document.getElementById('ml-entrega-wrap');
     if (mlEntregaWrap) {
       const entregaOn = !!d.fazEntrega;
@@ -5237,6 +5234,8 @@
       clearEl.classList.add('show');
       fecharDrop();
       inputEl.setAttribute('aria-expanded', 'false');
+      // Sugere tags padrão da categoria escolhida (balões no campo de tags)
+      if (window.tagsInjectDefaults) window.tagsInjectDefaults(ramo._custom ? '' : ramo.slug);
     }
 
     /* ── Abre / fecha ─────────────────────────────────────── */
@@ -5332,9 +5331,846 @@
       okEl.classList.remove('show');
       clearEl.classList.remove('show');
       fecharDrop();
+      if (window.tagsClearDefaults) window.tagsClearDefaults();
     };
 
   })(); // ── fim initRamoAutocomplete ──────────────────────────
+
+  /* ──────────────────────────────────────────────────────────
+     TAGS DE BUSCA — caixa de balões (chips)
+     ----------------------------------------------------------
+     Sementes vindas de CAT_DEF[].busca da categoria escolhida.
+     Os chips sincronizam SEMPRE para #f-tags (textarea oculto),
+     que é o que o FormData do cadastro envia ao servidor — sem
+     alterar nem o submit nem o backend.
+     • Chip "padrão" (veio da categoria) tem visual neutro.
+     • Chip "manual" (digitado) tem visual âmbar.
+     • Trocar de ramo: recarrega os padrões e PRESERVA os manuais.
+     • Enter ou vírgula adiciona; ✕ remove; teto de 20; dedupe.
+     ────────────────────────────────────────────────────────── */
+  (function initTagChips() {
+    const box     = document.getElementById('f-tags-box');
+    const chipsEl = document.getElementById('f-tags-chips');
+    const inputEl = document.getElementById('f-tags-input');
+    const hidden  = document.getElementById('f-tags'); // textarea oculto (name="tags")
+    if (!box || !chipsEl || !inputEl || !hidden) return;
+
+    const MAX_TAGS = 20;
+    const MAX_LEN  = 28;
+
+    // Normaliza p/ comparação (dedupe): minúsculas, sem acento, espaços colapsados.
+    function norm(s) {
+      return String(s).toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ').trim();
+    }
+    // Limpa o texto exibido no chip (preserva acentos, corta tamanho).
+    function limpar(s) {
+      return String(s).replace(/[,\n\r]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, MAX_LEN);
+    }
+
+    // Estado: cada tag = { texto, isDefault }
+    let tags = [];
+
+    function sincronizarHidden() {
+      hidden.value = tags.map(t => t.texto).join(', ');
+    }
+
+    function jaExiste(txt) {
+      const n = norm(txt);
+      return tags.some(t => norm(t.texto) === n);
+    }
+
+    function atualizarEstadoCaixa() {
+      const cheio = tags.length >= MAX_TAGS;
+      box.classList.toggle('is-full', cheio);
+      inputEl.disabled = cheio;
+      inputEl.placeholder = cheio
+        ? `Máximo de ${MAX_TAGS} tags atingido`
+        : (tags.length ? 'Adicionar outra…' : 'Digite e tecle Enter (ex: açaí, marmita...)');
+    }
+
+    function render() {
+      chipsEl.innerHTML = '';
+      tags.forEach((t, i) => {
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip' + (t.isDefault ? ' is-default' : '');
+        const txt = document.createElement('span');
+        txt.className = 'tag-chip-txt';
+        txt.textContent = t.texto;
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'tag-chip-x';
+        x.setAttribute('aria-label', 'Remover ' + t.texto);
+        x.textContent = '✕';
+        x.addEventListener('click', (e) => { e.stopPropagation(); removerIdx(i); });
+        chip.appendChild(txt);
+        chip.appendChild(x);
+        chipsEl.appendChild(chip);
+      });
+      atualizarEstadoCaixa();
+      sincronizarHidden();
+    }
+
+    function adicionar(textoRaw, isDefault) {
+      const texto = limpar(textoRaw);
+      if (!texto) return false;
+      if (tags.length >= MAX_TAGS) return false;
+      if (jaExiste(texto)) return false;
+      tags.push({ texto, isDefault: !!isDefault });
+      return true;
+    }
+
+    function removerIdx(i) {
+      tags.splice(i, 1);
+      render();
+    }
+
+    // Processa o que está no input (Enter/vírgula/blur). Aceita vários separados por vírgula.
+    function consumirInput() {
+      const partes = inputEl.value.split(',');
+      let mudou = false;
+      partes.forEach(p => { if (adicionar(p, false)) mudou = true; });
+      inputEl.value = '';
+      if (mudou) render();
+      else atualizarEstadoCaixa();
+    }
+
+    /* ── API pública (chamada pelo combobox de ramo) ───────── */
+    // Injeta as tags padrão da categoria; preserva tags manuais já digitadas
+    // e remove as tags-padrão de uma categoria anterior.
+    window.tagsInjectDefaults = function (slug) {
+      // Mantém só os chips manuais (digitados pela pessoa)
+      tags = tags.filter(t => !t.isDefault);
+      if (slug) {
+        const def = (typeof CAT_DEF !== 'undefined')
+          ? CAT_DEF.find(c => c.id === slug)
+          : null;
+        const sementes = (def && Array.isArray(def.busca)) ? def.busca : [];
+        sementes.forEach(s => adicionar(s, true)); // adicionar() já dedupa contra os manuais
+      }
+      render();
+    };
+
+    // Limpa tudo (usado no ramoReset / fechar modal de cadastro)
+    window.tagsClearDefaults = function () {
+      tags = [];
+      inputEl.value = '';
+      render();
+    };
+
+    /* ── Eventos ───────────────────────────────────────────── */
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        consumirInput();
+      } else if (e.key === 'Backspace' && inputEl.value === '' && tags.length) {
+        // Backspace com input vazio remove o último chip
+        removerIdx(tags.length - 1);
+      }
+    });
+    // Vírgula digitada/colada também separa
+    inputEl.addEventListener('input', () => {
+      if (inputEl.value.includes(',')) consumirInput();
+    });
+    inputEl.addEventListener('blur', () => {
+      box.classList.remove('is-focused');
+      if (inputEl.value.trim()) consumirInput();
+    });
+    inputEl.addEventListener('focus', () => box.classList.add('is-focused'));
+    // Clicar em qualquer ponto da caixa foca o input
+    box.addEventListener('click', () => { if (!inputEl.disabled) inputEl.focus(); });
+
+    render(); // estado inicial vazio
+  })(); // ── fim initTagChips ──────────────────────────────────
+
+  /* ══════════════════════════════════════════════════════════════
+     MINHA LOJA — Edição de informações (nome, telefone, endereço,
+     descrição, tags, horário). UI inline com leitura→edição.
+     Cada save chama um endpoint dedicado do GAS.
+  ══════════════════════════════════════════════════════════════ */
+  (function initMlInfoEditor() {
+    const DIAS_LBL = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+    // Estado dos dados atuais da loja (preenchido por mlRenderInfo)
+    let cur = {};
+    // Flag: há um editor de campo aberto? Bloqueia re-render (evita perder edição
+    // quando os dados frescos da API chegam logo após o cache — race condition).
+    let editando = false;
+
+    // Helpers locais ----------------------------------------------------
+    function el(id) { return document.getElementById(id); }
+    // Persiste o cur atualizado no cache local, para que ao reabrir o painel
+    // o valor editado já apareça (evita piscar o valor antigo até o fetch).
+    function persistirCache() {
+      try {
+        const c = JSON.parse(localStorage.getItem('angatuba_loja_dados') || 'null');
+        if (c) {
+          // Sincroniza só os campos que o painel edita
+          ['nome','tel','endereco','horario','tags','obs','bairro'].forEach(function (k) {
+            if (cur[k] !== undefined) c[k] = cur[k];
+          });
+          localStorage.setItem('angatuba_loja_dados', JSON.stringify(c));
+        }
+      } catch (e) { /* cache é só otimização — falha silenciosa */ }
+    }
+    function fmtTel(d) {
+      d = String(d || '').replace(/\D/g, '');
+      if (!d) return '';
+      if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+      return `(${d.slice(0,2)}) ${d.slice(2,3)} ${d.slice(3,7)}-${d.slice(7)}`;
+    }
+
+    // ── Render principal: monta as linhas de info ─────────────────────
+    window.mlRenderInfo = function (d) {
+      // Se o usuário está editando um campo, NÃO re-renderiza (perderia a edição).
+      // Apenas atualiza os dados de fundo para refletir os valores frescos da API
+      // nos campos que NÃO estão sendo editados (visíveis na próxima vez que abrir).
+      if (editando) {
+        if (d) {
+          // Preserva o objeto cur (mesma referência) mesclando os campos novos
+          Object.keys(d).forEach(function (k) { cur[k] = d[k]; });
+        }
+        return;
+      }
+      cur = d || {};
+      const list = el('ml-info-list');
+      if (!list) return;
+
+      const rows = [
+        { key:'nome',      icon:'fa-store',        label:'Nome da loja',  val: cur.nome || '',                empty:'Sem nome' },
+        { key:'telefone',  icon:'fa-phone',        label:'Telefone fixo', val: fmtTel(cur.tel),               empty:'Não informado' },
+        { key:'endereco',  icon:'fa-location-dot', label:'Endereço',      val: cur.endereco || '',            empty:'Não informado' },
+        { key:'horario',   icon:'fa-clock',        label:'Horário',       val: cur.horario || '',             empty:'Não informado' },
+        { key:'tags',      icon:'fa-magnifying-glass', label:'Tags de busca', val: cur.tags || '',            empty:'Nenhuma palavra-chave' },
+        { key:'descricao', icon:'fa-align-left',   label:'Descrição',     val: cur.obs || '',                 empty:'Sem descrição' },
+      ];
+
+      list.innerHTML = rows.map(function (r) {
+        const isEmpty = !r.val;
+        const shown = isEmpty ? r.empty : escHTML(r.val);
+        return `
+        <div class="ml-info-row" id="ml-info-row-${r.key}">
+          <div class="ml-info-icon"><i class="fa ${r.icon}"></i></div>
+          <div class="ml-info-body">
+            <div class="ml-info-label">${r.label}</div>
+            <div class="ml-info-value${isEmpty ? ' is-empty' : ''}" id="ml-info-val-${r.key}">${shown}</div>
+          </div>
+          <button class="ml-info-edit-btn" aria-label="Editar ${r.label}" onclick="mlEditField('${r.key}')">
+            <i class="fa fa-pen"></i>
+          </button>
+        </div>`;
+      }).join('');
+    };
+
+    // ── Fecha o editor: zera a flag e re-renderiza ────────────────────
+    // Usado por Cancelar e após salvar com sucesso.
+    // keyDestaque (opcional): chave do campo salvo, para flash de confirmação.
+    window.mlFecharEditor = function (d, keyDestaque) {
+      editando = false;
+      window.mlRenderInfo(d || cur);
+      if (keyDestaque) {
+        const row = el('ml-info-row-' + keyDestaque);
+        if (row) {
+          row.classList.add('salvou');
+          setTimeout(function () { row.classList.remove('salvou'); }, 1100);
+        }
+      }
+    };
+
+    // ── Entra em modo edição de um campo ──────────────────────────────
+    window.mlEditField = function (key) {
+      const row = el('ml-info-row-' + key);
+      if (!row) return;
+      editando = true; // bloqueia re-render enquanto edita
+
+      if (key === 'tags')     return abrirEditorTags(row);
+      if (key === 'horario')  return abrirEditorHorario(row);
+      if (key === 'endereco') return abrirEditorEndereco(row);
+
+      // Campos simples: nome, telefone, descrição
+      const cfg = {
+        nome:      { label:'Nome da loja',  ph:'Nome da sua loja',          max:60,  multiline:false, val: cur.nome || '' },
+        telefone:  { label:'Telefone fixo', ph:'(15) 3255-0000',            max:16,  multiline:false, val: fmtTel(cur.tel), tel:true },
+        descricao: { label:'Descrição',     ph:'Conte o que sua loja oferece…', max:200, multiline:true, val: cur.obs || '' },
+      }[key];
+      if (!cfg) return;
+
+      const inputHTML = cfg.multiline
+        ? `<textarea class="ml-info-input" id="ml-info-edit-input" maxlength="${cfg.max}" placeholder="${escAttr(cfg.ph)}" rows="3">${escHTML(cfg.val)}</textarea>`
+        : `<input type="${cfg.tel ? 'tel' : 'text'}" class="ml-info-input" id="ml-info-edit-input" maxlength="${cfg.max}" placeholder="${escAttr(cfg.ph)}" value="${escAttr(cfg.val)}" ${cfg.tel ? 'inputmode="numeric"' : ''}/>`;
+
+      row.innerHTML = `
+        <div class="ml-info-icon"><i class="fa fa-pen"></i></div>
+        <div class="ml-info-editor">
+          <div class="ml-info-label">${cfg.label}</div>
+          ${inputHTML}
+          <div class="ml-info-actions">
+            <button class="ml-info-btn ml-info-btn-cancel" onclick="mlFecharEditor()">Cancelar</button>
+            <button class="ml-info-btn ml-info-btn-save" id="ml-info-save-btn" onclick="mlSaveField('${key}')">Salvar</button>
+          </div>
+          <div class="ml-info-msg" id="ml-info-msg"></div>
+        </div>`;
+
+      const inp = el('ml-info-edit-input');
+      if (inp) {
+        inp.focus();
+        if (cfg.tel) inp.addEventListener('input', function () { inp.value = mascararWppBR(inp.value); });
+      }
+    };
+    // Guarda referência para o cancelar reconstruir
+    Object.defineProperty(window, '_mlInfoCur', { get: function () { return cur; }, configurable: true });
+
+    // ── Salva campo simples ───────────────────────────────────────────
+    window.mlSaveField = async function (key) {
+      const inp = el('ml-info-edit-input');
+      const msg = el('ml-info-msg');
+      const btn = el('ml-info-save-btn');
+      if (!inp) return;
+      const raw = inp.value.trim();
+
+      // Validações leves client-side
+      if (key === 'nome' && !raw) { if (msg) { msg.textContent = 'O nome não pode ficar vazio.'; msg.style.color = '#ef4444'; } return; }
+
+      const map = {
+        nome:      { action:'lojaAtualizarNome',      payload:{ nome: raw },                          apply:function(){ cur.nome = raw; } },
+        telefone:  { action:'lojaAtualizarTelefone',  payload:{ telefone: raw.replace(/\D/g,'') },    apply:function(){ cur.tel = raw.replace(/\D/g,''); } },
+        descricao: { action:'lojaAtualizarDescricao', payload:{ descricao: raw },                     apply:function(){ cur.obs = raw; } },
+      }[key];
+      if (!map) return;
+
+      if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
+      try {
+        const json = await apiPost(map.action, Object.assign({ token: _lojaToken }, map.payload), { timeout: 10000, ignoreUnauthorized: true });
+        if (json.status === 'ok') {
+          map.apply();
+          persistirCache();
+          mlFecharEditor(cur, key);
+        } else {
+          throw new Error(json.msg || 'Erro');
+        }
+      } catch (e) {
+        if (msg) { msg.textContent = 'Erro ao salvar: ' + e.message; msg.style.color = '#ef4444'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
+      }
+    };
+
+    /* ════════════════ TAGS (chips) ════════════════ */
+    let tagState = []; // [{texto, isDefault}]
+
+    function normTag(s) {
+      return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+    }
+    function limparTag(s) {
+      return String(s).replace(/[,\n\r]/g,' ').replace(/\s+/g,' ').trim().slice(0, 28);
+    }
+
+    function abrirEditorTags(row) {
+      // Semeia o estado com as tags atuais (todas como "manuais" — já são da loja)
+      const atuais = String(cur.tags || '').split(',').map(function(t){return t.trim();}).filter(Boolean);
+      tagState = atuais.map(function(t){ return { texto: t, isDefault: false }; });
+
+      // Descobre a categoria da loja p/ oferecer sugestões padrão
+      const slug = mlSlugDaLoja();
+      const def = (typeof CAT_DEF !== 'undefined' && slug) ? CAT_DEF.find(function(c){ return c.id === slug; }) : null;
+      const sementes = (def && Array.isArray(def.busca)) ? def.busca : [];
+
+      row.innerHTML = `
+        <div class="ml-info-icon"><i class="fa fa-magnifying-glass"></i></div>
+        <div class="ml-info-editor">
+          <div class="ml-info-label">Tags de busca</div>
+          <div class="tags-box" id="mle-tags-box">
+            <div class="tags-chips" id="mle-tags-chips"></div>
+            <input type="text" class="tags-input" id="mle-tags-input" placeholder="Adicionar palavra…" autocomplete="off" maxlength="28"/>
+          </div>
+          ${sementes.length ? `<div class="ml-info-hint" id="mle-tags-sugestoes-wrap"><span style="opacity:.7;">Sugestões da sua categoria:</span> <span id="mle-tags-sugestoes"></span></div>` : ''}
+          <div class="ml-info-actions">
+            <button class="ml-info-btn ml-info-btn-cancel" onclick="mlFecharEditor()">Cancelar</button>
+            <button class="ml-info-btn ml-info-btn-save" id="mle-tags-save" onclick="mlSaveTags()">Salvar</button>
+          </div>
+          <div class="ml-info-msg" id="mle-tags-msg"></div>
+        </div>`;
+
+      renderTagChips();
+      renderSugestoes(sementes);
+
+      const inp = el('mle-tags-input');
+      if (inp) {
+        inp.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); consumirTagInput(); }
+          else if (e.key === 'Backspace' && inp.value === '' && tagState.length) { tagState.pop(); renderTagChips(); }
+        });
+        inp.addEventListener('input', function () { if (inp.value.includes(',')) consumirTagInput(); });
+        inp.addEventListener('blur', function () {
+          el('mle-tags-box')?.classList.remove('is-focused');
+          if (inp.value.trim()) consumirTagInput();
+        });
+        inp.addEventListener('focus', function () { el('mle-tags-box')?.classList.add('is-focused'); });
+      }
+      const box = el('mle-tags-box');
+      if (box) box.addEventListener('click', function () { if (!inp.disabled) inp.focus(); });
+    }
+
+    function tagExiste(txt) {
+      const n = normTag(txt);
+      return tagState.some(function (t) { return normTag(t.texto) === n; });
+    }
+    function addTag(raw, isDef) {
+      const t = limparTag(raw);
+      if (!t) return false;
+      if (tagState.length >= 20) return false;
+      if (tagExiste(t)) return false;
+      tagState.push({ texto: t, isDefault: !!isDef });
+      return true;
+    }
+    function consumirTagInput() {
+      const inp = el('mle-tags-input');
+      if (!inp) return;
+      let mudou = false;
+      inp.value.split(',').forEach(function (p) { if (addTag(p, false)) mudou = true; });
+      inp.value = '';
+      if (mudou) { renderTagChips(); renderSugestoes(); }
+    }
+    function renderTagChips() {
+      const wrap = el('mle-tags-chips');
+      if (!wrap) return;
+      wrap.innerHTML = '';
+      tagState.forEach(function (t, i) {
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip' + (t.isDefault ? ' is-default' : '');
+        const txt = document.createElement('span');
+        txt.className = 'tag-chip-txt';
+        txt.textContent = t.texto;
+        const x = document.createElement('button');
+        x.type = 'button'; x.className = 'tag-chip-x'; x.textContent = '✕';
+        x.setAttribute('aria-label', 'Remover ' + t.texto);
+        x.addEventListener('click', function (e) { e.stopPropagation(); tagState.splice(i, 1); renderTagChips(); renderSugestoes(); });
+        chip.appendChild(txt); chip.appendChild(x);
+        wrap.appendChild(chip);
+      });
+      const inp = el('mle-tags-input');
+      const cheio = tagState.length >= 20;
+      if (inp) { inp.disabled = cheio; inp.placeholder = cheio ? 'Máximo de 20 tags' : 'Adicionar palavra…'; }
+    }
+    // Sugestões clicáveis (só mostra as que ainda não estão no estado)
+    let _sementesCache = [];
+    function renderSugestoes(sementes) {
+      if (sementes) _sementesCache = sementes;
+      const wrap = el('mle-tags-sugestoes');
+      if (!wrap) return;
+      const disponiveis = _sementesCache.filter(function (s) { return !tagExiste(s); });
+      const sugWrap = el('mle-tags-sugestoes-wrap');
+      if (!disponiveis.length) { if (sugWrap) sugWrap.style.display = 'none'; return; }
+      if (sugWrap) sugWrap.style.display = '';
+      // Monta os botões com textContent (sem injeção) e liga via listener (evita
+      // quebra se um termo tiver apóstrofo).
+      wrap.innerHTML = '';
+      disponiveis.forEach(function (s) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.style.cssText = 'display:inline-flex;align-items:center;gap:3px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);color:var(--zap);border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer;margin:2px 3px 2px 0;font-family:var(--font-b);';
+        b.textContent = '+ ' + s;
+        b.addEventListener('click', function () {
+          if (addTag(s, true)) { renderTagChips(); renderSugestoes(); }
+        });
+        wrap.appendChild(b);
+      });
+    }
+    window.mlAddSugestao = function (s) {
+      if (addTag(s, true)) { renderTagChips(); renderSugestoes(); }
+    };
+
+    window.mlSaveTags = async function () {
+      const btn = el('mle-tags-save');
+      const msg = el('mle-tags-msg');
+      const valor = tagState.map(function (t) { return t.texto; }).join(', ');
+      if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
+      try {
+        const json = await apiPost('lojaAtualizarTags', { token: _lojaToken, tags: valor }, { timeout: 10000, ignoreUnauthorized: true });
+        if (json.status === 'ok') {
+          cur.tags = json.data && typeof json.data.tags === 'string' ? json.data.tags : valor;
+          persistirCache();
+          mlFecharEditor(cur, 'tags');
+        } else { throw new Error(json.msg || 'Erro'); }
+      } catch (e) {
+        if (msg) { msg.textContent = 'Erro ao salvar: ' + e.message; msg.style.color = '#ef4444'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
+      }
+    };
+
+    /* ════════════════ ENDEREÇO (com autocomplete) ════════════════ */
+    let mleAddrRua = '';
+    let mleAddrTimer = null;
+
+    function abrirEditorEndereco(row) {
+      mleAddrRua = '';
+      // Separa rua e número do endereço atual. Ex: "Rua X, 123" → rua "Rua X", num "123".
+      // Pega o último trecho após vírgula se for só dígitos; senão deixa tudo na rua.
+      let ruaInicial = cur.endereco || '';
+      let numInicial = '';
+      const mNum = ruaInicial.match(/^(.*),\s*(\d+[A-Za-z]?)\s*$/);
+      if (mNum) { ruaInicial = mNum[1].trim(); numInicial = mNum[2].trim(); }
+      row.innerHTML = `
+        <div class="ml-info-icon"><i class="fa fa-location-dot"></i></div>
+        <div class="ml-info-editor">
+          <div class="ml-info-label">Endereço</div>
+          <div style="display:flex;gap:8px;align-items:flex-start;">
+            <div style="flex:1;position:relative;">
+              <input type="text" class="ml-info-input" id="mle-addr-rua" placeholder="Digite a rua…" value="${escAttr(ruaInicial)}" autocomplete="off"/>
+              <div class="mle-addr-suggestions" id="mle-addr-sugg" style="display:none;"></div>
+            </div>
+            <input type="text" class="ml-info-input" id="mle-addr-num" placeholder="Nº" inputmode="numeric" value="${escAttr(numInicial)}" style="width:70px;flex-shrink:0;"/>
+          </div>
+          <div class="ml-info-hint" id="mle-addr-status">📍 Digite ao menos 4 letras para buscar a rua.</div>
+          <div class="ml-info-label" style="margin-top:10px;">Bairro</div>
+          <select class="ml-info-input" id="mle-addr-bairro" style="cursor:pointer;">
+            <option value="">Selecione o bairro…</option>
+            ${BAIRROS_ANGATUBA.map(function (b) {
+              const sel = (normBairro(b) === normBairro(cur.bairro || '')) ? ' selected' : '';
+              return `<option value="${escAttr(b)}"${sel}>${escHTML(b)}</option>`;
+            }).join('')}
+          </select>
+          <div class="ml-info-actions">
+            <button class="ml-info-btn ml-info-btn-cancel" onclick="mlFecharEditor()">Cancelar</button>
+            <button class="ml-info-btn ml-info-btn-save" id="mle-addr-save" onclick="mlSaveEndereco()">Salvar</button>
+          </div>
+          <div class="ml-info-msg" id="mle-addr-msg"></div>
+        </div>`;
+
+      const inpRua = el('mle-addr-rua');
+      const sugg   = el('mle-addr-sugg');
+      if (inpRua) {
+        inpRua.focus();
+        inpRua.addEventListener('input', function () {
+          mleAddrRua = ''; // invalida seleção ao digitar
+          const q = inpRua.value.trim();
+          if (mleAddrTimer) clearTimeout(mleAddrTimer);
+          if (q.length < 4) { if (sugg) sugg.style.display = 'none'; return; }
+          mleAddrTimer = setTimeout(function () { mleBuscarEndereco(q); }, 500);
+        });
+      }
+    }
+
+    async function mleBuscarEndereco(query) {
+      const sugg = el('mle-addr-sugg');
+      const status = el('mle-addr-status');
+      if (status) status.textContent = '🔎 Buscando…';
+      try {
+        const headers = { 'Accept-Language': 'pt-BR', 'User-Agent': 'AngatubaON/1.0' };
+        const url = 'https://nominatim.openstreetmap.org/search?q=' +
+          encodeURIComponent(query + ', Angatuba, SP, Brasil') +
+          '&format=json&limit=5&countrycodes=br&addressdetails=1&accept-language=pt-BR';
+        const resp = await fetch(url, { headers: headers, signal: AbortSignal.timeout(8000) });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        let items = await resp.json();
+        // Fallback: amplia a busca se nada vier (mesma estratégia do cadastro)
+        if (!items.length) {
+          const url2 = 'https://nominatim.openstreetmap.org/search?q=' +
+            encodeURIComponent(query + ', São Paulo, Brasil') +
+            '&format=json&limit=5&countrycodes=br&accept-language=pt-BR';
+          const resp2 = await fetch(url2, { headers: headers, signal: AbortSignal.timeout(8000) });
+          if (resp2.ok) items = await resp2.json();
+        }
+        if (!sugg) return;
+        if (!items.length) {
+          sugg.innerHTML = '<div class="mle-addr-item" style="cursor:default;color:var(--muted);">Nenhum endereço encontrado.</div>';
+          sugg.style.display = 'block';
+          if (status) status.textContent = '📍 Tente ser mais específico ou digite manualmente.';
+          return;
+        }
+        sugg.innerHTML = items.map(function (it) {
+          const parts = it.display_name.split(', ');
+          const rua = parts[0];
+          const sub = parts.slice(2, 4).join(', ');
+          return `<div class="mle-addr-item" data-rua="${escAttr(rua)}">
+            <i class="fa fa-map-marker-alt"></i>
+            <div><div>${escHTML(rua)}</div>${sub ? `<div class="mle-addr-item-sub">${escHTML(sub)}</div>` : ''}</div>
+          </div>`;
+        }).join('');
+        sugg.querySelectorAll('.mle-addr-item').forEach(function (elItem) {
+          if (!elItem.dataset.rua) return;
+          elItem.addEventListener('click', function () {
+            mleAddrRua = elItem.dataset.rua;
+            el('mle-addr-rua').value = mleAddrRua;
+            sugg.style.display = 'none';
+            if (status) { status.textContent = '✅ Rua confirmada — adicione o número ao lado.'; }
+            el('mle-addr-num')?.focus();
+          });
+        });
+        sugg.style.display = 'block';
+      } catch (e) {
+        if (status) status.textContent = '⚠️ Erro na busca. Você pode digitar o endereço manualmente.';
+      }
+    }
+
+    window.mlSaveEndereco = async function () {
+      const inpRua = el('mle-addr-rua');
+      const inpNum = el('mle-addr-num');
+      const selBairro = el('mle-addr-bairro');
+      const msg = el('mle-addr-msg');
+      const btn = el('mle-addr-save');
+      if (!inpRua) return;
+      // Usa a rua selecionada se houver; senão o texto digitado (permite endereço manual)
+      const ruaBase = mleAddrRua || inpRua.value.trim();
+      if (!ruaBase) { if (msg) { msg.textContent = 'Informe o endereço.'; msg.style.color = '#ef4444'; } return; }
+      const num = (inpNum?.value || '').trim();
+      const endFull = num ? (ruaBase + ', ' + num) : ruaBase;
+      const bairro = selBairro ? selBairro.value : '';
+
+      if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
+      try {
+        const json = await apiPost('lojaAtualizarEndereco', { token: _lojaToken, endereco: endFull, bairro: bairro }, { timeout: 10000, ignoreUnauthorized: true });
+        if (json.status === 'ok') {
+          cur.endereco = endFull;
+          cur.bairro = bairro;
+          persistirCache();
+          mlFecharEditor(cur, 'endereco');
+        } else { throw new Error(json.msg || 'Erro'); }
+      } catch (e) {
+        if (msg) { msg.textContent = 'Erro ao salvar: ' + e.message; msg.style.color = '#ef4444'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
+      }
+    };
+
+    /* ════════════════ HORÁRIO (turnos) ════════════════ */
+    let mleTurnos = []; // [{dias:[...], abre, fecha}]
+
+    const MLE_PRESET_DIAS = {
+      semana:     [1,2,3,4,5],
+      semana_sab: [1,2,3,4,5,6],
+      todos:      [0,1,2,3,4,5,6],
+    };
+
+    function abrirEditorHorario(row) {
+      // Tenta parsear o horarioTexto atual.
+      const parsed = mleParseHorario(cur.horario);
+      // Se NÃO conseguiu parsear mas HAVIA um horário salvo, não assume Seg-Sex
+      // silenciosamente (sobrescreveria o horário real). Avisa e começa vazio.
+      const horarioSalvoNaoReconhecido = !parsed && !!String(cur.horario || '').trim();
+      mleTurnos = parsed || [{ dias:[1,2,3,4,5], abre:'08:00', fecha:'18:00' }];
+
+      row.innerHTML = `
+        <div class="ml-info-icon"><i class="fa fa-clock"></i></div>
+        <div class="ml-info-editor">
+          <div class="ml-info-label">Horário de funcionamento</div>
+          ${horarioSalvoNaoReconhecido ? `<div class="ml-info-msg" style="color:var(--zap);margin:0 0 8px;">⚠️ Seu horário atual ("${escHTML(String(cur.horario).slice(0,40))}") está num formato antigo. Monte abaixo para atualizar.</div>` : ''}
+          <div class="mle-sched-presets">
+            <button type="button" class="mle-sched-preset" data-preset="semana" onclick="mlSchedPreset('semana')">📅 Seg a Sex</button>
+            <button type="button" class="mle-sched-preset" data-preset="semana_sab" onclick="mlSchedPreset('semana_sab')">📅 Seg a Sáb</button>
+            <button type="button" class="mle-sched-preset" data-preset="todos" onclick="mlSchedPreset('todos')">🗓️ Todos os dias</button>
+            <button type="button" class="mle-sched-preset" data-preset="custom" onclick="mlSchedPreset('custom')">✏️ Personalizar</button>
+          </div>
+          <div id="mle-sched-cards"></div>
+          <button type="button" class="mle-sched-add" id="mle-sched-add" onclick="mlSchedAddTurno()" style="display:none;"><i class="fa fa-plus"></i> Adicionar turno diferente</button>
+          <div class="ml-info-hint" id="mle-sched-preview"></div>
+          <div class="ml-info-actions">
+            <button class="ml-info-btn ml-info-btn-cancel" onclick="mlFecharEditor()">Cancelar</button>
+            <button class="ml-info-btn ml-info-btn-save" id="mle-sched-save" onclick="mlSaveHorario()">Salvar</button>
+          </div>
+          <div class="ml-info-msg" id="mle-sched-msg"></div>
+        </div>`;
+
+      mleRenderCards();
+      mleMarcarPreset();
+    }
+
+    // Parse "Seg, Ter 08:00-18:00 | Sáb 08:00-12:00" → [{dias,abre,fecha}]
+    // Tolerante: aceita acento ou não (Sáb/Sab), separador vírgula OU hífen (Seg-Sex).
+    function mleParseHorario(txt) {
+      if (!txt) return null;
+      try {
+        // Normaliza acentos para casar "Sab"/"Sáb", "Ter"/"Têr" etc.
+        const semAcento = function (s) {
+          return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        };
+        const LBL_NORM = DIAS_LBL.map(semAcento); // ['Dom','Seg',...,'Sab']
+        const blocos = String(txt).split('|').map(function (b) { return b.trim(); }).filter(Boolean);
+        const turnos = [];
+        blocos.forEach(function (bl) {
+          const m = bl.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+          if (!m) return;
+          const abre = m[1].padStart(5, '0');
+          const fecha = m[2].padStart(5, '0');
+          const diasParte = semAcento(bl.slice(0, m.index).trim());
+          let dias = [];
+
+          // Caso 1: range com hífen entre dois dias (ex: "Seg-Sex", "Seg - Sab")
+          const rangeMatch = diasParte.match(new RegExp('(' + LBL_NORM.join('|') + ')\\s*[-–]\\s*(' + LBL_NORM.join('|') + ')', 'i'));
+          if (rangeMatch) {
+            const ini = LBL_NORM.findIndex(function (l) { return l.toLowerCase() === rangeMatch[1].toLowerCase(); });
+            const fim = LBL_NORM.findIndex(function (l) { return l.toLowerCase() === rangeMatch[2].toLowerCase(); });
+            if (ini >= 0 && fim >= 0 && fim >= ini) {
+              for (let d = ini; d <= fim; d++) dias.push(d);
+            }
+          }
+          // Caso 2 (ou complemento): dias listados individualmente
+          if (!dias.length) {
+            LBL_NORM.forEach(function (lbl, idx) {
+              const re = new RegExp('(^|[,\\s])' + lbl + '([,\\s]|$)', 'i');
+              if (re.test(diasParte)) dias.push(idx);
+            });
+          }
+          if (dias.length) {
+            // Remove duplicatas e ordena
+            dias = dias.filter(function (v, i, a) { return a.indexOf(v) === i; }).sort(function (a, b) { return a - b; });
+            turnos.push({ dias: dias, abre: abre, fecha: fecha });
+          }
+        });
+        return turnos.length ? turnos : null;
+      } catch (e) { return null; }
+    }
+
+    window.mlSchedPreset = function (preset) {
+      if (preset === 'custom') {
+        // Modo livre: mostra botão de adicionar turno, mantém turnos atuais
+        el('mle-sched-add').style.display = '';
+        mleMarcarPreset('custom');
+        return;
+      }
+      mleTurnos = [{ dias: MLE_PRESET_DIAS[preset].slice(), abre: mleTurnos[0]?.abre || '08:00', fecha: mleTurnos[0]?.fecha || '18:00' }];
+      el('mle-sched-add').style.display = 'none';
+      mleRenderCards();
+      mleMarcarPreset(preset);
+    };
+
+    function mleMarcarPreset(forcado) {
+      let presetAtivo = forcado || null;
+      if (!presetAtivo) {
+        // Detecta preset pelos dias do turno único
+        if (mleTurnos.length === 1) {
+          const ds = mleTurnos[0].dias.slice().sort().join(',');
+          if (ds === '1,2,3,4,5') presetAtivo = 'semana';
+          else if (ds === '1,2,3,4,5,6') presetAtivo = 'semana_sab';
+          else if (ds === '0,1,2,3,4,5,6') presetAtivo = 'todos';
+          else presetAtivo = 'custom';
+        } else {
+          presetAtivo = 'custom';
+        }
+      }
+      document.querySelectorAll('.mle-sched-preset').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.preset === presetAtivo);
+      });
+      if (presetAtivo === 'custom') el('mle-sched-add').style.display = '';
+      mleAtualizarPreview();
+    }
+
+    window.mlSchedAddTurno = function () {
+      mleTurnos.push({ dias: [6], abre: '08:00', fecha: '12:00' });
+      mleRenderCards();
+      mleAtualizarPreview();
+    };
+
+    function mleRenderCards() {
+      const wrap = el('mle-sched-cards');
+      if (!wrap) return;
+      wrap.innerHTML = '';
+      mleTurnos.forEach(function (turno, idx) {
+        const card = document.createElement('div');
+        card.className = 'mle-sched-card';
+
+        const title = document.createElement('div');
+        title.className = 'mle-sched-card-title';
+        title.textContent = idx === 0 ? 'Dias e horário' : 'Turno adicional';
+        card.appendChild(title);
+
+        const daysRow = document.createElement('div');
+        daysRow.className = 'mle-sched-days';
+        DIAS_LBL.forEach(function (lbl, d) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'mle-sched-day' + (turno.dias.includes(d) ? ' active' : '');
+          b.textContent = lbl;
+          b.addEventListener('click', function () {
+            const di = turno.dias.indexOf(d);
+            if (di >= 0) turno.dias.splice(di, 1); else turno.dias.push(d);
+            b.classList.toggle('active');
+            mleMarcarPreset();
+          });
+          daysRow.appendChild(b);
+        });
+        card.appendChild(daysRow);
+
+        const times = document.createElement('div');
+        times.className = 'mle-sched-times';
+        const inA = document.createElement('input');
+        inA.type = 'time'; inA.value = turno.abre;
+        inA.addEventListener('change', function () { turno.abre = inA.value; mleAtualizarPreview(); });
+        const sep = document.createElement('span'); sep.textContent = 'até';
+        const inF = document.createElement('input');
+        inF.type = 'time'; inF.value = turno.fecha;
+        inF.addEventListener('change', function () { turno.fecha = inF.value; mleAtualizarPreview(); });
+        times.appendChild(inA); times.appendChild(sep); times.appendChild(inF);
+        card.appendChild(times);
+
+        if (idx > 0) {
+          const rm = document.createElement('button');
+          rm.type = 'button'; rm.className = 'mle-sched-remove';
+          rm.innerHTML = '<i class="fa fa-times"></i>';
+          rm.addEventListener('click', function () { mleTurnos.splice(idx, 1); mleRenderCards(); mleMarcarPreset(); });
+          card.appendChild(rm);
+        }
+        wrap.appendChild(card);
+      });
+      mleAtualizarPreview();
+    }
+
+    function mleMontarTexto() {
+      return mleTurnos.map(function (t) {
+        if (!t.dias.length) return null;
+        const nomes = t.dias.slice().sort(function (a, b) { return a - b; }).map(function (d) { return DIAS_LBL[d]; }).join(', ');
+        return nomes + ' ' + t.abre + '-' + t.fecha;
+      }).filter(Boolean).join(' | ');
+    }
+    function mleMontarDias() {
+      return mleTurnos.flatMap(function (t) { return t.dias; })
+        .filter(function (v, i, a) { return a.indexOf(v) === i; })
+        .sort(function (a, b) { return a - b; }).join(',');
+    }
+    function mleAtualizarPreview() {
+      const pv = el('mle-sched-preview');
+      if (!pv) return;
+      const txt = mleMontarTexto();
+      pv.textContent = txt ? ('Resumo: ' + txt) : 'Selecione pelo menos um dia.';
+    }
+
+    window.mlSaveHorario = async function () {
+      const btn = el('mle-sched-save');
+      const msg = el('mle-sched-msg');
+      const texto = mleMontarTexto();
+      if (!texto) { if (msg) { msg.textContent = 'Selecione ao menos um dia e horário.'; msg.style.color = '#ef4444'; } return; }
+      if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
+      try {
+        const json = await apiPost('lojaAtualizarHorario', { token: _lojaToken, horario: texto, dias: mleMontarDias() }, { timeout: 10000, ignoreUnauthorized: true });
+        if (json.status === 'ok') {
+          cur.horario = texto;
+          persistirCache();
+          mlFecharEditor(cur, 'horario');
+        } else { throw new Error(json.msg || 'Erro'); }
+      } catch (e) {
+        if (msg) { msg.textContent = 'Erro ao salvar: ' + e.message; msg.style.color = '#ef4444'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
+      }
+    };
+
+    /* ── Descobre o slug da categoria da loja (p/ sugestões de tags) ── */
+    function mlSlugDaLoja() {
+      // 1) tenta pela lista LOJAS (já tem categoria mapeada)
+      const lj = (typeof LOJAS !== 'undefined') ? LOJAS.find(function (l) { return l.nome === cur.nome; }) : null;
+      if (lj && lj.categoria) return lj.categoria;
+      // 2) tenta casar o ramo textual contra os ramoLabel de CAT_DEF
+      if (typeof CAT_DEF !== 'undefined' && cur.ramo) {
+        const rn = String(cur.ramo).toLowerCase();
+        const hit = CAT_DEF.find(function (c) {
+          return String(c.ramoLabel || '').toLowerCase() === rn ||
+                 String(c.chipLabel || '').toLowerCase() === rn ||
+                 (Array.isArray(c.busca) && c.busca.some(function (b) { return rn.includes(String(b).toLowerCase()); }));
+        });
+        if (hit) return hit.id;
+      }
+      return '';
+    }
+
+  })(); // ── fim initMlInfoEditor ──────────────────────────────────
 
   /* ── INIT ────────────────────────────────────────────────── */
   // Stale-while-revalidate: se houver snapshot cacheado válido (24h), renderiza
@@ -5785,7 +6621,7 @@
   });
 
   function mlExibirAnuncioAtivo(anuncio) {
-    if (!anuncio || !anuncio.texto) return;
+    if (!anuncio || (!anuncio.texto && !anuncio.imagemUrl)) return;
     const ativoEl = document.getElementById('ml-anuncio-ativo');
     if (!ativoEl) return;
 
@@ -5800,7 +6636,11 @@
 
     ativoEl.style.display = '';
     document.getElementById('ml-anuncio-emoji-preview').textContent = anuncio.emoji || '🎯';
-    document.getElementById('ml-anuncio-texto-preview').textContent = anuncio.texto;
+    const _txtPrev = document.getElementById('ml-anuncio-texto-preview');
+    if (_txtPrev) {
+      _txtPrev.textContent = anuncio.texto || '';
+      _txtPrev.style.display = anuncio.texto ? '' : 'none';
+    }
 
     // Imagem do anúncio (só Pro)
     const imgPreview = document.getElementById('ml-anuncio-img-preview');
@@ -5836,8 +6676,8 @@
     // Guarda dados no form para caso o usuário remova e queira reeditar
     const textarea = document.getElementById('ml-anuncio-texto');
     if (textarea) {
-      textarea.value = anuncio.texto;
-      document.getElementById('ml-anuncio-chars').textContent = `${anuncio.texto.length}/80`;
+      textarea.value = anuncio.texto || '';
+      document.getElementById('ml-anuncio-chars').textContent = `${(anuncio.texto || '').length}/80`;
     }
     const emojiBtn = document.querySelector(`.anuncio-emoji-btn[data-emoji="${anuncio.emoji}"]`);
     if (emojiBtn) mlSelectEmoji(emojiBtn);
@@ -5855,8 +6695,7 @@
   }
 
   async function mlPublicarAnuncio() {
-    const texto = document.getElementById('ml-anuncio-texto')?.value.trim();
-    if (!texto) { alert('Escreva o texto do anúncio.'); return; }
+    const texto = document.getElementById('ml-anuncio-texto')?.value.trim() || '';
 
     const btn = document.getElementById('ml-anuncio-btn');
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Publicando...';
@@ -5888,6 +6727,14 @@
           btn.disabled = false;
           return;
         }
+      }
+
+      // Exige pelo menos texto OU foto (foto sozinha vale para PRO)
+      if (!texto && !imagemUrl) {
+        alert('Escreva um texto ou escolha uma foto para o anúncio.');
+        btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
+        btn.disabled = false;
+        return;
       }
 
       const params = new URLSearchParams();

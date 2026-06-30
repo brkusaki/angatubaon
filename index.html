@@ -447,14 +447,18 @@
           </div>
 
           <div class="field-group">
-            <label class="field-label" for="f-tags">
+            <label class="field-label" for="f-tags-input">
               Tags de Busca
               <span style="font-size:10px;font-weight:500;color:var(--muted);margin-left:6px;">ajuda clientes a te encontrar</span>
             </label>
-            <textarea class="field-textarea" id="f-tags" name="tags"
-              placeholder="Ex: delivery, pizza, esfiha, açaí, conserto de celular..."
-              style="min-height:64px;"></textarea>
-            <p class="field-hint" style="margin-top:4px;">🔍 Sua loja aparece quando alguém pesquisar por essas palavras.</p>
+            <div class="tags-box" id="f-tags-box">
+              <div class="tags-chips" id="f-tags-chips"></div>
+              <input type="text" class="tags-input" id="f-tags-input"
+                placeholder="Digite e tecle Enter (ex: açaí, marmita...)"
+                autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="28" />
+            </div>
+            <textarea id="f-tags" name="tags" style="display:none;" aria-hidden="true"></textarea>
+            <p class="field-hint" id="f-tags-hint" style="margin-top:4px;">🔍 Escolha o ramo acima e já sugerimos palavras. Toque no ✕ pra remover ou adicione as suas.</p>
           </div>
 
           <div class="field-group">
@@ -1291,6 +1295,13 @@
 
           <!-- ░░ ABA LOJA ░░ -->
           <div id="ml-tab-loja" class="ml-tab-content" style="display:none;">
+
+            <!-- Informações da loja (edição inline) -->
+            <div id="ml-info-section" style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">✏️ Informações da loja</div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Toque no lápis para editar cada campo.</div>
+              <div id="ml-info-list"></div>
+            </div>
 
             <!-- Cardápio -->
             <div id="ml-cardapio-section" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">

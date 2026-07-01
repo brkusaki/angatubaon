@@ -3549,9 +3549,9 @@
   ══════════════════════════════════════════════════════════════ */
   const VISITAS_KEY   = 'angatuba_visitas_avaliar';
   const AVALIADAS_KEY = 'angatuba_lojas_avaliadas';
-  // Só sugere avaliar depois deste tempo desde a visita (2h): dá tempo de a
-  // pessoa realmente ter ido/comprado antes de pedir opinião.
-  const NUDGE_DELAY_MS = 2 * 60 * 60 * 1000;
+  // Só sugere avaliar depois deste tempo desde a visita (30 min): dá tempo de a
+  // pessoa ter ido/comprado, sem deixar o convite distante demais do contexto.
+  const NUDGE_DELAY_MS = 30 * 60 * 1000;
   // Não sugere visitas muito antigas (7 dias) — perderia o contexto.
   const NUDGE_MAX_IDADE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -3681,6 +3681,38 @@
     setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
   }
   window.mostrarNudgeAvaliacao = mostrarNudgeAvaliacao;
+
+  // Dispara o nudge no máximo 1x por sessão, e só quando já há lojas carregadas
+  // e nenhum overlay competindo. Chamado após cada render de lojas.
+  let _nudgeJaTentado = false;
+  function _tentarNudgeAposCarga() {
+    if (_nudgeJaTentado) return;
+    if (location.hash) return;                                   // deep-link para uma loja
+    if (!Array.isArray(LOJAS) || LOJAS.length === 0) return;     // lista ainda não carregou
+    if (document.getElementById('cliente-onb-overlay')) return;  // onboarding na tela
+    _nudgeJaTentado = true;
+    mostrarNudgeAvaliacao();
+  }
+  window._tentarNudgeAposCarga = _tentarNudgeAposCarga;
+
+  // ── Helper de teste (console): força uma visita "antiga" e mostra o nudge ──
+  // Uso no DevTools: _testarNudge('Nome da Loja')  — ou sem argumento usa a 1ª loja.
+  window._testarNudge = function (nome) {
+    const alvo = nome || (LOJAS[0] && LOJAS[0].nome);
+    if (!alvo) { console.warn('[nudge] nenhuma loja disponível'); return; }
+    const n = favNormNome(alvo);
+    const visitas = _lerJSON(VISITAS_KEY, {});
+    // Simula visita de 1h atrás (passa do delay), não avaliada nem dispensada
+    visitas[n] = { nome: String(alvo).trim(), ts: Date.now() - (60 * 60 * 1000), dispensada: false };
+    _gravarJSON(VISITAS_KEY, visitas);
+    // Remove de avaliadas, se estiver
+    const av = _lerJSON(AVALIADAS_KEY, []);
+    const i = av.indexOf(n); if (i !== -1) { av.splice(i, 1); _gravarJSON(AVALIADAS_KEY, av); }
+    const fila = document.getElementById('nudge-aval'); if (fila) fila.remove();
+    _nudgeJaTentado = false;
+    mostrarNudgeAvaliacao();
+    console.log('[nudge] tentativa forçada para:', alvo);
+  };
 
   async function abrirMinhaLoja() {
     if (!_lojaToken) { openLoginLoja(); return; }
@@ -4396,6 +4428,7 @@
         renderLojas();
         renderCategorias();
         _esconderSplash(); // lojas prontas — desvela o app
+        _tentarNudgeAposCarga(); // lojas carregadas: pode sugerir avaliação
         // Deep link: abre modal da loja se URL tiver #slug
         (function _checkDeepLink() {
           const hash = location.hash.slice(1);
@@ -4443,6 +4476,7 @@
           _rebuildIdxMap();
           renderLojas();
           renderCategorias();
+          _tentarNudgeAposCarga(); // lojas do cache carregadas
           return; // não mostra tela de erro
         }
       }
@@ -5510,13 +5544,10 @@
     }, 900);
   }
 
-  // Nudge de avaliação: só depois que a lista carregou e se não houver
-  // onboarding na tela. Espera um pouco mais para não competir com a pintura.
-  setTimeout(function () {
-    if (!location.hash && !document.getElementById('cliente-onb-overlay')) {
-      mostrarNudgeAvaliacao();
-    }
-  }, 2600);
+  // Nudge de avaliação: disparado após as lojas carregarem de verdade
+  // (ver _tentarNudgeAposCarga chamado no fim de carregarLojas). O timeout
+  // aqui é só uma rede de segurança caso o cache já esteja em memória.
+  setTimeout(function () { _tentarNudgeAposCarga(); }, 2600);
 
   // Inicializa os dois campos de upload
   initImageUpload('f-foto-file', 'f-foto-url', 'foto-preview-img', null, 'foto-upload-status');
@@ -6598,6 +6629,7 @@
           renderCategorias();
           _esconderSplash();   // app já usável; rede atualiza por baixo
           _renderizouDoCache = true;
+          if (typeof _tentarNudgeAposCarga === 'function') _tentarNudgeAposCarga();
         }
       }
     } catch(e) {}

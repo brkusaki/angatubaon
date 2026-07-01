@@ -241,6 +241,43 @@
     }
     .store-card:active { transform: scale(0.984) translateZ(0); }
 
+    /* ── Favoritos: coração no card e no modal ── */
+    .fav-btn {
+      position: absolute; top: 8px; right: 8px; z-index: 4;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(0,0,0,0.35); backdrop-filter: blur(4px);
+      border: 1px solid rgba(255,255,255,0.12);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; padding: 0; -webkit-tap-highlight-color: transparent;
+      transition: transform .15s, background .2s, border-color .2s;
+    }
+    .fav-btn i { font-size: 14px; color: rgba(255,255,255,0.75); transition: color .2s; }
+    .fav-btn:active { transform: scale(0.85); }
+    .fav-btn.is-fav { background: rgba(239,68,68,0.16); border-color: rgba(239,68,68,0.4); }
+    .fav-btn.is-fav i { color: #ef4444; animation: favPop .32s ease; }
+    /* has-cover: card com foto de fundo — reforça contraste do botão */
+    .store-card.has-cover .fav-btn { background: rgba(0,0,0,0.5); }
+    /* Coração grande no modal (ao lado do nome) */
+    .fav-btn-big {
+      position: static; width: 40px; height: 40px; flex-shrink: 0; margin-left: auto;
+      background: var(--surface2); border: 1px solid var(--border);
+    }
+    .fav-btn-big i { font-size: 17px; }
+    .fav-btn-big.is-fav { background: rgba(239,68,68,0.14); border-color: rgba(239,68,68,0.4); }
+    @keyframes favPop {
+      0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); }
+    }
+
+    /* ── Pill de Favoritos no filtro ── */
+    .pill-fav-btn.active { background: rgba(239,68,68,0.16); border-color: rgba(239,68,68,0.45); color: #ef4444; }
+    .pill-fav-btn.active .pill-fav-count { background: #ef4444; color: #fff; }
+    .pill-fav-count {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 16px; height: 16px; padding: 0 4px; margin-left: 4px;
+      border-radius: 999px; background: rgba(239,68,68,0.25); color: #ef4444;
+      font-size: 10px; font-weight: 800; line-height: 1;
+    }
+
     .store-card::before {
       content: ''; position: absolute; left: 0; top: 12px; bottom: 12px;
       width: 4px; border-radius: 0 4px 4px 0;
@@ -2898,6 +2935,144 @@
 }
 .onb-cta:hover { opacity: 0.92; }
 .onb-cta:active { transform: scale(0.98); }
+
+/* ════════════════════════════════════════════════════════════
+   ONBOARDING DO CLIENTE — 3 telas de boas-vindas (morador)
+════════════════════════════════════════════════════════════ */
+#cliente-onb-overlay {
+  position: fixed; inset: 0; z-index: 10001;
+  background: rgba(0,0,0,0.78);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; opacity: 0; transition: opacity 0.3s ease;
+}
+#cliente-onb-overlay.open { opacity: 1; }
+#cliente-onb-overlay .conb-card {
+  position: relative; width: 100%; max-width: 380px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 26px; padding: 32px 24px 24px; text-align: center;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.65);
+  transform: translateY(18px) scale(0.96);
+  transition: transform 0.34s cubic-bezier(0.32,0.72,0,1);
+}
+#cliente-onb-overlay.open .conb-card { transform: translateY(0) scale(1); }
+.conb-skip {
+  position: absolute; top: 14px; right: 16px;
+  background: none; border: none; color: var(--muted);
+  font-family: var(--font-b); font-size: 13px; font-weight: 600;
+  cursor: pointer; padding: 4px 8px; transition: color .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.conb-skip:hover { color: var(--text); }
+.conb-owl-wrap {
+  height: 130px; display: flex; align-items: center; justify-content: center;
+  margin-bottom: 4px;
+}
+.conb-owl {
+  width: 130px; height: 130px; object-fit: contain;
+  animation: conbOwlIn 0.4s ease;
+}
+@keyframes conbOwlIn {
+  from { opacity: 0; transform: scale(0.8) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.conb-icon { font-size: 1.8rem; margin-bottom: 4px; }
+.conb-title {
+  font-family: var(--font-h); font-weight: 800;
+  font-size: 1.5rem; line-height: 1.15; color: var(--text);
+  margin-bottom: 10px;
+}
+.conb-text {
+  font-family: var(--font-b); font-size: 14px; line-height: 1.55;
+  color: var(--muted); margin-bottom: 22px; min-height: 66px;
+}
+.conb-text strong { color: var(--text); font-weight: 700; }
+.conb-dots {
+  display: flex; gap: 7px; justify-content: center; margin-bottom: 20px;
+}
+.conb-dot {
+  width: 7px; height: 7px; border-radius: 999px;
+  background: var(--border); transition: all .25s;
+}
+.conb-dot.active { width: 22px; background: var(--zap); }
+.conb-cta {
+  width: 100%; padding: 14px; border-radius: 14px;
+  background: linear-gradient(135deg,#f59e0b,#d97706); color: #1a1206;
+  font-family: var(--font-h); font-size: 15px; font-weight: 800;
+  border: none; cursor: pointer; transition: opacity .2s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.conb-cta:hover { opacity: 0.93; }
+.conb-cta:active { transform: scale(0.98); }
+
+/* ════════════════════════════════════════════════════════════
+   NUDGE DE AVALIAÇÃO — card flutuante convidando a avaliar
+════════════════════════════════════════════════════════════ */
+#nudge-aval {
+  position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 9500;
+  display: flex; justify-content: center; pointer-events: none;
+  opacity: 0; transform: translateY(20px);
+  transition: opacity .3s ease, transform .3s cubic-bezier(0.32,0.72,0,1);
+}
+#nudge-aval.open { opacity: 1; transform: translateY(0); }
+.nudge-aval-card {
+  position: relative; pointer-events: auto;
+  width: 100%; max-width: 440px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 18px; padding: 14px 14px 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  display: grid; grid-template-columns: auto 1fr auto; gap: 12px;
+  align-items: center;
+}
+.nudge-aval-owl {
+  width: 46px; height: 46px; object-fit: contain; grid-row: 1;
+}
+.nudge-aval-body { min-width: 0; grid-row: 1; }
+.nudge-aval-title {
+  font-family: var(--font-h); font-weight: 800; font-size: 15px;
+  color: var(--text); line-height: 1.2; margin-bottom: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nudge-aval-sub {
+  font-family: var(--font-b); font-size: 11.5px; color: var(--muted); line-height: 1.35;
+}
+.nudge-aval-close {
+  grid-row: 1; align-self: flex-start;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--surface2); border: none; color: var(--muted);
+  font-size: 18px; line-height: 1; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.nudge-aval-close:hover { color: var(--text); }
+.nudge-aval-actions {
+  grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 4px;
+}
+.nudge-aval-btn-later, .nudge-aval-btn-go {
+  padding: 9px 14px; border-radius: 10px;
+  font-family: var(--font-h); font-size: 12.5px; font-weight: 800;
+  cursor: pointer; border: none; -webkit-tap-highlight-color: transparent;
+  transition: opacity .15s, transform .1s;
+}
+.nudge-aval-btn-later {
+  background: var(--surface2); color: var(--muted); border: 1px solid var(--border);
+}
+.nudge-aval-btn-go {
+  flex: 1; background: linear-gradient(135deg,#f59e0b,#d97706); color: #1a1206;
+}
+.nudge-aval-btn-later:active, .nudge-aval-btn-go:active { transform: scale(0.97); }
+
+/* Destaque temporário no formulário de avaliação (quando aberto pelo nudge) */
+.aval-form-highlight {
+  animation: avalHl 1.8s ease;
+  border-radius: 12px;
+}
+@keyframes avalHl {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+  30%      { box-shadow: 0 0 0 3px rgba(245,158,11,0.35); }
+}
+
+
 
 /* ════════════════════════════════════════════════════════════
    ACORDEÃO DE PLANOS — etapa 3 do cadastro (substitui carousel)

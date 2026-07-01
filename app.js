@@ -312,6 +312,88 @@
   let activePillFilter = 'all';
   let activeBairro     = '';  // bairro filtrado atualmente
 
+  /* ══════════════════════════════════════════════════════════════
+     FAVORITOS — "Minhas lojas"
+     ----------------------------------------------------------
+     O cliente marca lojas com ❤️ e filtra só elas. Guardamos o
+     NOME da loja (identificador estável entre sessões — o índice
+     do array muda a cada carga). Persiste em localStorage.
+  ══════════════════════════════════════════════════════════════ */
+  const FAVORITOS_KEY = 'angatuba_favoritos';
+  let _favoritos = (function () {
+    try {
+      const arr = JSON.parse(localStorage.getItem(FAVORITOS_KEY) || '[]');
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  })();
+
+  function favNormNome(nome) {
+    return String(nome || '').trim().toLowerCase();
+  }
+  function isFavorito(nome) {
+    return _favoritos.indexOf(favNormNome(nome)) !== -1;
+  }
+  function _salvarFavoritos() {
+    try { localStorage.setItem(FAVORITOS_KEY, JSON.stringify(_favoritos)); } catch (e) {}
+  }
+  // Alterna o favorito de uma loja. Retorna o novo estado (true = favoritada).
+  window.toggleFavorito = function (nomeRaw, ev) {
+    if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+    const n = favNormNome(nomeRaw);
+    if (!n) return false;
+    const i = _favoritos.indexOf(n);
+    const agoraFav = (i === -1);
+    if (agoraFav) _favoritos.push(n); else _favoritos.splice(i, 1);
+    _salvarFavoritos();
+
+    // Atualiza todos os corações dessa loja na tela (card + modal) sem re-render
+    document.querySelectorAll('.fav-btn[data-fav-nome="' + cssEscapeAttr(n) + '"]').forEach(function (btn) {
+      btn.classList.toggle('is-fav', agoraFav);
+      btn.setAttribute('aria-pressed', agoraFav ? 'true' : 'false');
+      btn.setAttribute('aria-label', agoraFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos');
+      const ico = btn.querySelector('i');
+      if (ico) ico.className = agoraFav ? 'fa fa-heart' : 'fa fa-heart-o';
+    });
+
+    // Feedback curto
+    if (typeof showToastSimples === 'function') {
+      showToastSimples(agoraFav ? '❤️ Adicionada às suas lojas' : 'Removida das suas lojas');
+    }
+
+    // Se o filtro de favoritos está ativo e a loja saiu, re-renderiza a lista
+    if (activePillFilter === 'favoritos' && !agoraFav) {
+      renderLojas();
+    }
+    // Atualiza o contador no pill de favoritos, se existir
+    atualizarBadgeFavoritos();
+    return agoraFav;
+  };
+  function contarFavoritos() { return _favoritos.length; }
+  function atualizarBadgeFavoritos() {
+    const lbl = document.getElementById('pill-fav-count');
+    if (lbl) {
+      const n = contarFavoritos();
+      lbl.textContent = n > 0 ? String(n) : '';
+      lbl.style.display = n > 0 ? '' : 'none';
+    }
+  }
+  // Escapa um valor para uso seguro dentro de seletor de atributo CSS.
+  function cssEscapeAttr(s) {
+    return String(s).replace(/["\\]/g, '\\$&');
+  }
+  // Botão de coração reutilizável (card e modal). 'big' aumenta no modal.
+  function favBtnHTML(nome, big) {
+    const n = favNormNome(nome);
+    const fav = isFavorito(nome);
+    const cls = 'fav-btn' + (fav ? ' is-fav' : '') + (big ? ' fav-btn-big' : '');
+    const ico = fav ? 'fa fa-heart' : 'fa fa-heart-o';
+    return '<button type="button" class="' + cls + '" data-fav-nome="' + escAttr(n) + '"'
+      + ' aria-pressed="' + (fav ? 'true' : 'false') + '"'
+      + ' aria-label="' + (fav ? 'Remover dos favoritos' : 'Adicionar aos favoritos') + '"'
+      + ' onclick="toggleFavorito(this.dataset.favNome, event)">'
+      + '<i class="' + ico + '"></i></button>';
+  }
+
   const BAIRROS_ANGATUBA = [
     // Urbanos
     'Centro', 'Vila Ribeiro', 'Vila Volpi',
@@ -972,6 +1054,7 @@
       <div class="${cardClass}"
         data-status="${status}" data-category="${loja.categoria}" data-plano="${plano}"
         style="animation-delay:${delay}s;${bgStyle}">
+        ${favBtnHTML(loja.nome, false)}
         ${thumbHTML(loja)}
         <div class="store-info" ${infoClick}>
           <div class="store-name-row">
@@ -1055,6 +1138,8 @@
       filtradas = filtradas.filter(l => l.recomendado === true);
     } else if (activePillFilter === 'delivery') {
       filtradas = filtradas.filter(l => l.fazEntrega === true);
+    } else if (activePillFilter === 'favoritos') {
+      filtradas = filtradas.filter(l => isFavorito(l.nome));
     }
 
     if (activeBairro) {
@@ -1106,7 +1191,13 @@
       const emptyOwl = document.getElementById('empty-owl');
       const owlOk = emptyOwl && emptyOwl.dataset.failed !== '1';
       const emptyTitle = document.getElementById('empty-title');
-      if (LOJAS.length === 0) {
+      if (activePillFilter === 'favoritos') {
+        document.getElementById('empty-icon').textContent = '❤️';
+        if (owlOk) { emptyOwl.src = '/webp/owl-love.webp'; emptyOwl.style.display = 'block'; }
+        if (emptyTitle) emptyTitle.textContent = 'Você ainda não tem lojas favoritas';
+        emptyMsg.textContent = 'Toque no ❤️ de uma loja para salvá-la aqui e achar rapidinho depois.';
+        emptySub.textContent = '';
+      } else if (LOJAS.length === 0) {
         document.getElementById('empty-icon').textContent = '🏗️';
         if (owlOk) { emptyOwl.src = '/webp/owl-idea.webp'; emptyOwl.style.display = 'block'; }
         if (emptyTitle) emptyTitle.textContent = 'Nenhuma loja por aqui ainda';
@@ -1222,6 +1313,22 @@
     clearTimeout(toastTimer);
   }
 
+  // Toast genérico de mensagem curta (favoritos, avisos rápidos). Reusa o
+  // elemento #toast, mas exibe só uma linha simples e some mais rápido.
+  function showToastSimples(mensagem) {
+    const el    = document.getElementById('toast');
+    const title = document.getElementById('toast-title');
+    const msg   = document.getElementById('toast-msg');
+    if (!el || !title || !msg) return;
+    title.textContent = mensagem;
+    msg.textContent = '';
+    clearTimeout(toastTimer);
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    toastTimer = setTimeout(hideToast, 2200);
+  }
+
   /* ── Tema claro/escuro ───────────────────────────────────────── */
   function aplicarIconeTema() {
     const icon = document.getElementById('theme-toggle-icon');
@@ -1246,6 +1353,10 @@
   // Fire-and-forget: registra na planilha sem bloquear a ação do usuário.
   // Chamado apenas em botões de lojas ABERTAS (wpp/tel ativos).
   function registrarClique(nome, tipo, plano, categoria) {
+    // Registra a visita para o "nudge" de avaliação (só contatos diretos)
+    if (tipo === 'wpp' || tipo === 'tel') {
+      registrarVisitaParaAvaliar(nome);
+    }
     const params = new URLSearchParams();
     params.append('payload', JSON.stringify({
       action:    'registrarClique',
@@ -3303,6 +3414,253 @@
   }
   window.fecharOnboarding = fecharOnboarding;
 
+  /* ══════════════════════════════════════════════════════════════
+     ONBOARDING DO CLIENTE — 3 telas na primeira vez que abre o app
+     ----------------------------------------------------------
+     Diferente do onboarding do lojista (boas-vindas ao painel).
+     Este explica ao morador como usar: buscar, filtrar, contatar.
+     Aparece só 1x (flag em localStorage) e pode ser pulado.
+  ══════════════════════════════════════════════════════════════ */
+  const CLIENTE_ONB_KEY = 'angatuba_cliente_onboarded';
+  const CLIENTE_ONB_SLIDES = [
+    {
+      owl: '/webp/owl-search.webp',
+      icon: '🔎',
+      titulo: 'Ache tudo em Angatuba',
+      texto: 'Busque por nome ou tipo — pizza, farmácia, mercado — ou navegue pelas categorias. As lojas da cidade num só lugar.'
+    },
+    {
+      owl: '/webp/owl-point.webp',
+      icon: '🎯',
+      titulo: 'Filtre do seu jeito',
+      texto: 'Veja só o que está <strong>aberto agora</strong>, quem <strong>faz entrega</strong>, ou filtre pelo <strong>seu bairro</strong>. Menos rolagem, mais praticidade.'
+    },
+    {
+      owl: '/webp/owl-love.webp',
+      icon: '💬',
+      titulo: 'Fale e favorite',
+      texto: 'Chame a loja direto no <strong>WhatsApp</strong> com um toque, e salve suas preferidas no <strong>❤️</strong> para achar rapidinho depois.'
+    }
+  ];
+  let _clienteOnbIdx = 0;
+
+  function clienteJaViuOnboarding() {
+    try { return localStorage.getItem(CLIENTE_ONB_KEY) === '1'; } catch (e) { return true; }
+  }
+  function marcarClienteOnboarding() {
+    try { localStorage.setItem(CLIENTE_ONB_KEY, '1'); } catch (e) {}
+  }
+
+  function mostrarOnboardingCliente() {
+    if (clienteJaViuOnboarding()) return;
+    if (document.getElementById('cliente-onb-overlay')) return;
+    _clienteOnbIdx = 0;
+
+    const ov = document.createElement('div');
+    ov.id = 'cliente-onb-overlay';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-label', 'Bem-vindo ao AngatubaON');
+    ov.innerHTML =
+      '<div class="conb-card">' +
+        '<button type="button" class="conb-skip" onclick="pularOnboardingCliente()">Pular</button>' +
+        '<div class="conb-owl-wrap"><img class="conb-owl" id="conb-owl" src="" alt="" ' +
+          'onerror="if(!this.dataset.f){this.dataset.f=1;this.style.display=\'none\';}" /></div>' +
+        '<div class="conb-icon" id="conb-icon"></div>' +
+        '<div class="conb-title" id="conb-title"></div>' +
+        '<div class="conb-text" id="conb-text"></div>' +
+        '<div class="conb-dots" id="conb-dots"></div>' +
+        '<button type="button" class="conb-cta" id="conb-cta" onclick="avancarOnboardingCliente()">Próximo</button>' +
+      '</div>';
+    document.body.appendChild(ov);
+    requestAnimationFrame(function () { ov.classList.add('open'); });
+    renderOnboardingClienteSlide();
+  }
+
+  function renderOnboardingClienteSlide() {
+    const s = CLIENTE_ONB_SLIDES[_clienteOnbIdx];
+    if (!s) return;
+    const owl = document.getElementById('conb-owl');
+    const icon = document.getElementById('conb-icon');
+    const titulo = document.getElementById('conb-title');
+    const texto = document.getElementById('conb-text');
+    const dots = document.getElementById('conb-dots');
+    const cta = document.getElementById('conb-cta');
+    if (owl) { owl.dataset.f = ''; owl.style.display = ''; owl.src = s.owl; }
+    if (icon) icon.textContent = s.icon;
+    if (titulo) titulo.textContent = s.titulo;
+    if (texto) texto.innerHTML = s.texto;
+    if (dots) {
+      dots.innerHTML = CLIENTE_ONB_SLIDES.map(function (_, i) {
+        return '<span class="conb-dot' + (i === _clienteOnbIdx ? ' active' : '') + '"></span>';
+      }).join('');
+    }
+    if (cta) cta.textContent = (_clienteOnbIdx === CLIENTE_ONB_SLIDES.length - 1) ? 'Começar a explorar 🚀' : 'Próximo';
+  }
+
+  window.avancarOnboardingCliente = function () {
+    if (_clienteOnbIdx < CLIENTE_ONB_SLIDES.length - 1) {
+      _clienteOnbIdx++;
+      renderOnboardingClienteSlide();
+    } else {
+      fecharOnboardingCliente();
+    }
+  };
+  window.pularOnboardingCliente = function () { fecharOnboardingCliente(); };
+
+  function fecharOnboardingCliente() {
+    marcarClienteOnboarding();
+    const ov = document.getElementById('cliente-onb-overlay');
+    if (!ov) return;
+    ov.classList.remove('open');
+    setTimeout(function () { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 300);
+  }
+  window.mostrarOnboardingCliente = mostrarOnboardingCliente;
+
+  /* ══════════════════════════════════════════════════════════════
+     NUDGE DE AVALIAÇÃO — convida o cliente a avaliar depois de usar
+     ----------------------------------------------------------
+     Quando o cliente chama uma loja no WhatsApp/telefone, guardamos
+     a visita. Numa PRÓXIMA abertura (algumas horas depois — não no
+     mesmo momento, pra não atrapalhar), aparece um convite gentil
+     para avaliar. Respeita: 1 loja por vez, some se já avaliou/pulou,
+     e nunca insiste na mesma loja.
+  ══════════════════════════════════════════════════════════════ */
+  const VISITAS_KEY   = 'angatuba_visitas_avaliar';
+  const AVALIADAS_KEY = 'angatuba_lojas_avaliadas';
+  // Só sugere avaliar depois deste tempo desde a visita (2h): dá tempo de a
+  // pessoa realmente ter ido/comprado antes de pedir opinião.
+  const NUDGE_DELAY_MS = 2 * 60 * 60 * 1000;
+  // Não sugere visitas muito antigas (7 dias) — perderia o contexto.
+  const NUDGE_MAX_IDADE_MS = 7 * 24 * 60 * 60 * 1000;
+
+  function _lerJSON(key, fallback) {
+    try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v || fallback; }
+    catch (e) { return fallback; }
+  }
+  function _gravarJSON(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  }
+
+  // Registra (ou atualiza) a visita a uma loja para futura sugestão de avaliação.
+  function registrarVisitaParaAvaliar(nome) {
+    const n = favNormNome(nome);
+    if (!n) return;
+    // Se já avaliou essa loja, não registra
+    const avaliadas = _lerJSON(AVALIADAS_KEY, []);
+    if (avaliadas.indexOf(n) !== -1) return;
+    const visitas = _lerJSON(VISITAS_KEY, {});
+    // Guarda nome original (pra exibir bonito) + quando + se já foi dispensada
+    const existente = visitas[n] || {};
+    visitas[n] = {
+      nome: String(nome).trim(),
+      ts: Date.now(),
+      dispensada: existente.dispensada || false
+    };
+    _gravarJSON(VISITAS_KEY, visitas);
+  }
+
+  // Marca que o cliente já avaliou uma loja (chamado após envio de avaliação).
+  window.marcarLojaAvaliada = function (nome) {
+    const n = favNormNome(nome);
+    if (!n) return;
+    const avaliadas = _lerJSON(AVALIADAS_KEY, []);
+    if (avaliadas.indexOf(n) === -1) { avaliadas.push(n); _gravarJSON(AVALIADAS_KEY, avaliadas); }
+    // Remove das visitas pendentes
+    const visitas = _lerJSON(VISITAS_KEY, {});
+    if (visitas[n]) { delete visitas[n]; _gravarJSON(VISITAS_KEY, visitas); }
+  };
+
+  // Escolhe a melhor visita elegível para sugerir avaliação (mais recente
+  // dentro da janela válida, ainda não dispensada nem avaliada).
+  function escolherVisitaParaAvaliar() {
+    const visitas = _lerJSON(VISITAS_KEY, {});
+    const avaliadas = _lerJSON(AVALIADAS_KEY, []);
+    const agora = Date.now();
+    let melhor = null;
+    Object.keys(visitas).forEach(function (n) {
+      const v = visitas[n];
+      if (!v || v.dispensada) return;
+      if (avaliadas.indexOf(n) !== -1) return;
+      const idade = agora - (v.ts || 0);
+      if (idade < NUDGE_DELAY_MS) return;      // muito recente
+      if (idade > NUDGE_MAX_IDADE_MS) return;  // muito antiga
+      if (!melhor || v.ts > melhor.ts) melhor = v;
+    });
+    return melhor;
+  }
+
+  function mostrarNudgeAvaliacao() {
+    // Não sobrepõe outros overlays (onboarding, modais)
+    if (document.getElementById('cliente-onb-overlay')) return;
+    if (document.getElementById('nudge-aval')) return;
+    const v = escolherVisitaParaAvaliar();
+    if (!v) return;
+    // Confirma que a loja ainda existe na lista atual
+    const loja = LOJAS.find(function (l) { return favNormNome(l.nome) === favNormNome(v.nome); });
+    if (!loja) return;
+
+    const el = document.createElement('div');
+    el.id = 'nudge-aval';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', 'Convite para avaliar loja');
+    el.innerHTML =
+      '<div class="nudge-aval-card">' +
+        '<img class="nudge-aval-owl" src="/webp/owl-tip.webp" alt="" ' +
+          'onerror="if(!this.dataset.f){this.dataset.f=1;this.style.display=\'none\';}" />' +
+        '<div class="nudge-aval-body">' +
+          '<div class="nudge-aval-title">Como foi na ' + escHTML(v.nome) + '?</div>' +
+          '<div class="nudge-aval-sub">Sua avaliação ajuda outros moradores de Angatuba. 🌟</div>' +
+        '</div>' +
+        '<button type="button" class="nudge-aval-close" aria-label="Agora não" ' +
+          'onclick="dispensarNudgeAvaliacao()">&times;</button>' +
+        '<div class="nudge-aval-actions">' +
+          '<button type="button" class="nudge-aval-btn-later" onclick="dispensarNudgeAvaliacao()">Agora não</button>' +
+          '<button type="button" class="nudge-aval-btn-go" data-nome="' + escAttr(v.nome) + '" ' +
+            'onclick="abrirAvaliacaoDoNudge(this.dataset.nome)">⭐ Avaliar</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(el);
+    requestAnimationFrame(function () { el.classList.add('open'); });
+  }
+
+  // "Agora não": não insiste nessa loja de novo (marca dispensada).
+  window.dispensarNudgeAvaliacao = function () {
+    const el = document.getElementById('nudge-aval');
+    const nome = el ? el.querySelector('.nudge-aval-btn-go')?.dataset.nome : '';
+    if (nome) {
+      const n = favNormNome(nome);
+      const visitas = _lerJSON(VISITAS_KEY, {});
+      if (visitas[n]) { visitas[n].dispensada = true; _gravarJSON(VISITAS_KEY, visitas); }
+    }
+    _fecharNudgeAval();
+  };
+
+  // "Avaliar": abre o modal da loja já na seção de avaliação.
+  window.abrirAvaliacaoDoNudge = function (nome) {
+    _fecharNudgeAval();
+    const idx = LOJAS.findIndex(function (l) { return favNormNome(l.nome) === favNormNome(nome); });
+    if (idx === -1) return;
+    abrirDetalhes(idx);
+    // Após o modal montar, rola até o formulário de avaliação e destaca
+    setTimeout(function () {
+      const form = document.getElementById('aval-form-' + idx);
+      if (form) {
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        form.classList.add('aval-form-highlight');
+        setTimeout(function () { form.classList.remove('aval-form-highlight'); }, 1800);
+      }
+    }, 350);
+  };
+
+  function _fecharNudgeAval() {
+    const el = document.getElementById('nudge-aval');
+    if (!el) return;
+    el.classList.remove('open');
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
+  }
+  window.mostrarNudgeAvaliacao = mostrarNudgeAvaliacao;
+
   async function abrirMinhaLoja() {
     if (!_lojaToken) { openLoginLoja(); return; }
 
@@ -4561,6 +4919,7 @@
         <div class="detail-name-row">
           <div class="detail-name" id="detail-name-text">${escHTML(loja.nome)}</div>
           ${planBadge}
+          ${favBtnHTML(loja.nome, true)}
         </div>
         <div class="detail-sub">${escHTML(loja.sub || loja.categoria || '')}</div>
         ${!isPago ? `<div style="margin-bottom:12px;">${badgeHTML(status, fechaStr)}</div>` : ''}
@@ -5118,6 +5477,25 @@
     observer.observe(capaImg, { attributes: true, attributeFilter: ['style'] });
   }
   initCardPreviewSync();
+
+  // Mostra o contador de favoritos no pill logo na carga
+  atualizarBadgeFavoritos();
+
+  // Onboarding do cliente (1ª vez): espera a lista pintar e não interrompe
+  // quem abriu direto num link de loja (deep-link com #hash).
+  if (!location.hash) {
+    setTimeout(function () {
+      if (!location.hash) mostrarOnboardingCliente();
+    }, 900);
+  }
+
+  // Nudge de avaliação: só depois que a lista carregou e se não houver
+  // onboarding na tela. Espera um pouco mais para não competir com a pintura.
+  setTimeout(function () {
+    if (!location.hash && !document.getElementById('cliente-onb-overlay')) {
+      mostrarNudgeAvaliacao();
+    }
+  }, 2600);
 
   // Inicializa os dois campos de upload
   initImageUpload('f-foto-file', 'f-foto-url', 'foto-preview-img', null, 'foto-upload-status');
@@ -6915,6 +7293,8 @@
 
       if (json.status === 'ok') {
         localStorage.setItem(chave, Date.now().toString());
+        // Remove esta loja da fila de sugestão de avaliação (já avaliou)
+        if (typeof window.marcarLojaAvaliada === 'function') window.marcarLojaAvaliada(nome);
         if (msgEl) { msgEl.textContent = '✅ Avaliação enviada! Aparecerá após moderação.'; msgEl.style.color = 'var(--green)'; }
         // Desabilita o form
         document.getElementById(`aval-form-${idx}`).style.opacity = '0.5';

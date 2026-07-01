@@ -346,18 +346,21 @@
     if (agoraFav) _favoritos.push(n); else _favoritos.splice(i, 1);
     _salvarFavoritos();
 
-    // Atualiza todos os corações dessa loja na tela (card + modal) sem re-render
-    document.querySelectorAll('.fav-btn[data-fav-nome="' + cssEscapeAttr(n) + '"]').forEach(function (btn) {
+    // Atualiza o coração no modal (se aberto) sem re-render
+    document.querySelectorAll('.fav-btn-big[data-fav-nome="' + cssEscapeAttr(n) + '"]').forEach(function (btn) {
       btn.classList.toggle('is-fav', agoraFav);
       btn.setAttribute('aria-pressed', agoraFav ? 'true' : 'false');
       btn.setAttribute('aria-label', agoraFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos');
       const ico = btn.querySelector('i');
-      if (ico) ico.className = agoraFav ? 'fa fa-heart' : 'fa fa-heart-o';
+      if (ico) ico.className = agoraFav ? 'fa-solid fa-heart' : 'fa-regular fa-heart';
     });
 
     // Feedback curto
     if (typeof showToastSimples === 'function') {
-      showToastSimples(agoraFav ? '❤️ Adicionada às suas lojas' : 'Removida das suas lojas');
+      showToastSimples(
+        agoraFav ? '❤️ Adicionada às suas lojas' : 'Removida das suas lojas',
+        agoraFav ? '/webp/owl-love.webp' : '/webp/owl-wave.webp'
+      );
     }
 
     // Se o filtro de favoritos está ativo e a loja saiu, re-renderiza a lista
@@ -381,12 +384,12 @@
   function cssEscapeAttr(s) {
     return String(s).replace(/["\\]/g, '\\$&');
   }
-  // Botão de coração reutilizável (card e modal). 'big' aumenta no modal.
-  function favBtnHTML(nome, big) {
+  // Botão de coração do modal de detalhes (favoritar/desfavoritar).
+  function favBtnHTML(nome) {
     const n = favNormNome(nome);
     const fav = isFavorito(nome);
-    const cls = 'fav-btn' + (fav ? ' is-fav' : '') + (big ? ' fav-btn-big' : '');
-    const ico = fav ? 'fa fa-heart' : 'fa fa-heart-o';
+    const cls = 'fav-btn-big' + (fav ? ' is-fav' : '');
+    const ico = fav ? 'fa-solid fa-heart' : 'fa-regular fa-heart';
     return '<button type="button" class="' + cls + '" data-fav-nome="' + escAttr(n) + '"'
       + ' aria-pressed="' + (fav ? 'true' : 'false') + '"'
       + ' aria-label="' + (fav ? 'Remover dos favoritos' : 'Adicionar aos favoritos') + '"'
@@ -1054,7 +1057,6 @@
       <div class="${cardClass}"
         data-status="${status}" data-category="${loja.categoria}" data-plano="${plano}"
         style="animation-delay:${delay}s;${bgStyle}">
-        ${favBtnHTML(loja.nome, false)}
         ${thumbHTML(loja)}
         <div class="store-info" ${infoClick}>
           <div class="store-name-row">
@@ -1289,6 +1291,9 @@
     const title = document.getElementById('toast-title');
     const msg   = document.getElementById('toast-msg');
 
+    // Garante a coruja dormindo (o toast simples pode ter trocado antes)
+    _setToastOwl('/webp/owl-sleeping.webp');
+
     title.textContent = `${nomeLoja} — fechado agora`;
 
     if (tel) {
@@ -1313,13 +1318,29 @@
     clearTimeout(toastTimer);
   }
 
+  // Troca a coruja do toast (restaura src e visibilidade, mesmo após erro de load).
+  function _setToastOwl(src) {
+    const owl = document.getElementById('toast-owl');
+    if (!owl) return;
+    owl.style.display = '';
+    owl.dataset.f = '';
+    owl.src = src;
+    // Esconde o ícone-fallback caso estivesse visível
+    const fallback = owl.nextElementSibling;
+    if (fallback && fallback.classList && fallback.classList.contains('toast-icon')) {
+      fallback.style.display = 'none';
+    }
+  }
+
   // Toast genérico de mensagem curta (favoritos, avisos rápidos). Reusa o
   // elemento #toast, mas exibe só uma linha simples e some mais rápido.
-  function showToastSimples(mensagem) {
+  // owlSrc (opcional): caminho de uma coruja específica para o contexto.
+  function showToastSimples(mensagem, owlSrc) {
     const el    = document.getElementById('toast');
     const title = document.getElementById('toast-title');
     const msg   = document.getElementById('toast-msg');
     if (!el || !title || !msg) return;
+    if (owlSrc) _setToastOwl(owlSrc);
     title.textContent = mensagem;
     msg.textContent = '';
     clearTimeout(toastTimer);
@@ -4919,7 +4940,7 @@
         <div class="detail-name-row">
           <div class="detail-name" id="detail-name-text">${escHTML(loja.nome)}</div>
           ${planBadge}
-          ${favBtnHTML(loja.nome, true)}
+          ${favBtnHTML(loja.nome)}
         </div>
         <div class="detail-sub">${escHTML(loja.sub || loja.categoria || '')}</div>
         ${!isPago ? `<div style="margin-bottom:12px;">${badgeHTML(status, fechaStr)}</div>` : ''}

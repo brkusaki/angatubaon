@@ -4923,7 +4923,8 @@
             style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
                    padding:8px 10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;
                    font-family:var(--font-b);line-height:1.5;margin-bottom:8px;"></textarea>
-          <button onclick="avalEnviar(${idx},'${escAttr(loja.nome)}')"
+          <button data-idx="${idx}" data-nome="${escAttr(loja.nome)}"
+            onclick="avalEnviar(this.dataset.idx,this.dataset.nome)"
             style="width:100%;padding:10px;border-radius:8px;
                    background:linear-gradient(135deg,#f59e0b,#d97706);
                    color:#000;font-family:var(--font-h);font-size:13px;font-weight:800;border:none;cursor:pointer;">
@@ -7280,14 +7281,9 @@
     const texto = document.getElementById(`aval-texto-${idx}`)?.value.trim() || '';
     const msgEl = document.getElementById(`aval-msg-${idx}`);
 
-    if (!nota) {
-      if (avalBtn) avalBtn.disabled = false;
-      if (msgEl) { msgEl.textContent = 'Selecione uma nota de 1 a 5 ⭐'; msgEl.style.color = 'var(--red)'; }
-      return;
-    }
-
     // Bloqueia dono avaliando a própria loja
     if (_lojaToken && _lojaNome === nome) {
+      if (avalBtn) avalBtn.disabled = false;
       if (msgEl) { msgEl.textContent = '❌ Você não pode avaliar sua própria loja.'; msgEl.style.color = 'var(--red)'; }
       return;
     }
@@ -7295,6 +7291,7 @@
     // Verifica se já avaliou esse loja (localStorage)
     const chave = `aval_${toSlug(nome)}`;
     if (localStorage.getItem(chave)) {
+      if (avalBtn) avalBtn.disabled = false;
       if (msgEl) { msgEl.textContent = 'Você já avaliou esta loja!'; msgEl.style.color = 'var(--muted)'; }
       return;
     }
@@ -7324,6 +7321,7 @@
         throw new Error(json.msg || 'Erro');
       }
     } catch(e) {
+      if (avalBtn) avalBtn.disabled = false;
       if (msgEl) { msgEl.textContent = '❌ Erro ao enviar. Tente novamente.'; msgEl.style.color = 'var(--red)'; }
     }
   };

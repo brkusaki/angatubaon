@@ -315,9 +315,14 @@
   /* ══════════════════════════════════════════════════════════════
      FAVORITOS — "Minhas lojas"
      ----------------------------------------------------------
-     O cliente marca lojas com ❤️ e filtra só elas. Guardamos o
-     NOME da loja (identificador estável entre sessões — o índice
-     do array muda a cada carga). Persiste em localStorage.
+     O cliente marca lojas com ❤️ e filtra só elas. Guardamos um
+     IDENTIFICADOR ESTÁVEL da loja (id || wpp || nome — mesmo padrão
+     já usado em thumbHTML/detalhes para o anel de anúncio), não o
+     nome puro: o lojista pode renomear a loja pelo painel, e o WhatsApp
+     (chave de login, praticamente imutável) sobrevive a isso. Favoritos
+     salvos antes dessa mudança (por nome) são migrados automaticamente
+     assim que as lojas carregam — ver _migrarFavoritosParaId().
+     Persiste em localStorage.
   ══════════════════════════════════════════════════════════════ */
   const FAVORITOS_KEY = 'angatuba_favoritos';
   let _favoritos = (function () {
@@ -330,16 +335,22 @@
   function favNormNome(nome) {
     return String(nome || '').trim().toLowerCase();
   }
-  function isFavorito(nome) {
-    return _favoritos.indexOf(favNormNome(nome)) !== -1;
+  // Identificador estável de uma loja para fins de favorito (mesmo critério
+  // usado em outros pontos do app: id > wpp > nome, o mais durável primeiro).
+  function favIdDeLoja(loja) {
+    return favNormNome(loja && (loja.id || loja.wpp || loja.nome));
+  }
+  function isFavorito(idOuNome) {
+    return _favoritos.indexOf(favNormNome(idOuNome)) !== -1;
   }
   function _salvarFavoritos() {
     try { localStorage.setItem(FAVORITOS_KEY, JSON.stringify(_favoritos)); } catch (e) {}
   }
-  // Alterna o favorito de uma loja. Retorna o novo estado (true = favoritada).
-  window.toggleFavorito = function (nomeRaw, ev) {
+  // Alterna o favorito de uma loja (recebe o id estável, não o nome).
+  // Retorna o novo estado (true = favoritada).
+  window.toggleFavorito = function (idRaw, ev) {
     if (ev) { ev.stopPropagation(); ev.preventDefault(); }
-    const n = favNormNome(nomeRaw);
+    const n = favNormNome(idRaw);
     if (!n) return false;
     const i = _favoritos.indexOf(n);
     const agoraFav = (i === -1);
@@ -347,7 +358,7 @@
     _salvarFavoritos();
 
     // Atualiza o coração no modal (se aberto) sem re-render
-    document.querySelectorAll('.fav-btn-big[data-fav-nome="' + cssEscapeAttr(n) + '"]').forEach(function (btn) {
+    document.querySelectorAll('.fav-btn-big[data-fav-id="' + cssEscapeAttr(n) + '"]').forEach(function (btn) {
       btn.classList.toggle('is-fav', agoraFav);
       btn.setAttribute('aria-pressed', agoraFav ? 'true' : 'false');
       btn.setAttribute('aria-label', agoraFav ? 'Remover dos favoritos' : 'Adicionar aos favoritos');
@@ -385,16 +396,47 @@
     return String(s).replace(/["\\]/g, '\\$&');
   }
   // Botão de coração do modal de detalhes (favoritar/desfavoritar).
-  function favBtnHTML(nome) {
-    const n = favNormNome(nome);
-    const fav = isFavorito(nome);
+  // Recebe o objeto loja inteiro (precisa dele pra calcular o id estável).
+  function favBtnHTML(loja) {
+    const n = favIdDeLoja(loja);
+    const fav = isFavorito(n);
     const cls = 'fav-btn-big' + (fav ? ' is-fav' : '');
     const ico = fav ? 'fa-solid fa-heart' : 'fa-regular fa-heart';
-    return '<button type="button" class="' + cls + '" data-fav-nome="' + escAttr(n) + '"'
+    return '<button type="button" class="' + cls + '" data-fav-id="' + escAttr(n) + '"'
       + ' aria-pressed="' + (fav ? 'true' : 'false') + '"'
       + ' aria-label="' + (fav ? 'Remover dos favoritos' : 'Adicionar aos favoritos') + '"'
-      + ' onclick="toggleFavorito(this.dataset.favNome, event)">'
+      + ' onclick="toggleFavorito(this.dataset.favId, event)">'
       + '<i class="' + ico + '"></i></button>';
+  }
+
+  // Migra favoritos salvos no formato antigo (nome da loja) para o novo
+  // formato (id estável). Roda a cada carregamento de LOJAS (barato e
+  // idempotente) em vez de travar com uma flag "rodou 1x" — assim, se o
+  // cache-first inicial tiver uma lista parcial/desatualizada e não achar
+  // a loja, a migração se corrige sozinha quando a API trouxer os dados
+  // completos, sem precisar de nova ação do usuário.
+  function _migrarFavoritosParaId() {
+    if (!Array.isArray(LOJAS) || LOJAS.length === 0) return;
+    if (!_favoritos.length) return;
+    let mudou = false;
+    const novos = _favoritos.map(function (entrada) {
+      // Já bate com o id estável de alguma loja atual? Mantém como está.
+      const jaBateId = LOJAS.some(function (l) { return favIdDeLoja(l) === entrada; });
+      if (jaBateId) return entrada;
+      // Formato legado: a entrada era o NOME normalizado da loja. Acha a
+      // loja correspondente e migra para o id estável dela.
+      const loja = LOJAS.find(function (l) { return favNormNome(l.nome) === entrada; });
+      if (loja) { mudou = true; return favIdDeLoja(loja); }
+      // Não achou (loja removida, ou ainda não carregada) — preserva a
+      // entrada como está; se a loja reaparecer depois, tenta de novo.
+      return entrada;
+    });
+    const dedup = novos.filter(function (v, i) { return novos.indexOf(v) === i; });
+    if (mudou || dedup.length !== _favoritos.length) {
+      _favoritos = dedup;
+      _salvarFavoritos();
+      atualizarBadgeFavoritos();
+    }
   }
 
   const BAIRROS_ANGATUBA = [
@@ -1141,7 +1183,7 @@
     } else if (activePillFilter === 'delivery') {
       filtradas = filtradas.filter(l => l.fazEntrega === true);
     } else if (activePillFilter === 'favoritos') {
-      filtradas = filtradas.filter(l => isFavorito(l.nome));
+      filtradas = filtradas.filter(l => isFavorito(favIdDeLoja(l)));
     }
 
     if (activeBairro) {
@@ -3494,6 +3536,7 @@
         '<button type="button" class="conb-cta" id="conb-cta" onclick="avancarOnboardingCliente()">Próximo</button>' +
       '</div>';
     document.body.appendChild(ov);
+    document.body.style.overflow = 'hidden';
     requestAnimationFrame(function () { ov.classList.add('open'); });
     renderOnboardingClienteSlide();
   }
@@ -3534,6 +3577,7 @@
     const ov = document.getElementById('cliente-onb-overlay');
     if (!ov) return;
     ov.classList.remove('open');
+    document.body.style.overflow = '';
     setTimeout(function () { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 300);
   }
   window.mostrarOnboardingCliente = mostrarOnboardingCliente;
@@ -3554,6 +3598,7 @@
   const NUDGE_DELAY_MS = 30 * 60 * 1000;
   // Não sugere visitas muito antigas (7 dias) — perderia o contexto.
   const NUDGE_MAX_IDADE_MS = 7 * 24 * 60 * 60 * 1000;
+  let _nudgeAutoDismissTimer = null;
 
   function _lerJSON(key, fallback) {
     try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v || fallback; }
@@ -3606,6 +3651,10 @@
       const idade = agora - (v.ts || 0);
       if (idade < NUDGE_DELAY_MS) return;      // muito recente
       if (idade > NUDGE_MAX_IDADE_MS) return;  // muito antiga
+      // A loja mais recente pode ter sido removida/renomeada — não vale a
+      // pena escolhê-la e travar aqui; segue procurando a próxima elegível.
+      const existe = LOJAS.some(function (l) { return favNormNome(l.nome) === favNormNome(v.nome); });
+      if (!existe) return;
       if (!melhor || v.ts > melhor.ts) melhor = v;
     });
     return melhor;
@@ -3616,10 +3665,7 @@
     if (document.getElementById('cliente-onb-overlay')) return;
     if (document.getElementById('nudge-aval')) return;
     const v = escolherVisitaParaAvaliar();
-    if (!v) return;
-    // Confirma que a loja ainda existe na lista atual
-    const loja = LOJAS.find(function (l) { return favNormNome(l.nome) === favNormNome(v.nome); });
-    if (!loja) return;
+    if (!v) return; // já garante que a loja existe (checado dentro da função acima)
 
     const el = document.createElement('div');
     el.id = 'nudge-aval';
@@ -3643,6 +3689,10 @@
       '</div>';
     document.body.appendChild(el);
     requestAnimationFrame(function () { el.classList.add('open'); });
+    // Some sozinho depois de um tempo — não deve ficar flutuando por cima
+    // de outros modais indefinidamente se o usuário simplesmente ignorar.
+    // Não marca como "dispensada": pode ser sugerido de novo em outra sessão.
+    _nudgeAutoDismissTimer = setTimeout(function () { _fecharNudgeAval(); }, 12000);
   }
 
   // "Agora não": não insiste nessa loja de novo (marca dispensada).
@@ -3675,6 +3725,7 @@
   };
 
   function _fecharNudgeAval() {
+    if (_nudgeAutoDismissTimer) { clearTimeout(_nudgeAutoDismissTimer); _nudgeAutoDismissTimer = null; }
     const el = document.getElementById('nudge-aval');
     if (!el) return;
     el.classList.remove('open');
@@ -4428,6 +4479,7 @@
         renderLojas();
         renderCategorias();
         _esconderSplash(); // lojas prontas — desvela o app
+        _migrarFavoritosParaId();
         _tentarNudgeAposCarga(); // lojas carregadas: pode sugerir avaliação
         // Deep link: abre modal da loja se URL tiver #slug
         (function _checkDeepLink() {
@@ -4476,6 +4528,7 @@
           _rebuildIdxMap();
           renderLojas();
           renderCategorias();
+          _migrarFavoritosParaId();
           _tentarNudgeAposCarga(); // lojas do cache carregadas
           return; // não mostra tela de erro
         }
@@ -4677,6 +4730,11 @@
   function abrirDetalhes(idx) {
     const loja = LOJAS[idx];
     if (!loja) return;
+
+    // Fecha o nudge de avaliação se estiver visível — evita ele flutuar
+    // por cima do modal que está abrindo (idempotente: _fecharNudgeAval
+    // já verifica se o elemento existe antes de agir).
+    if (typeof _fecharNudgeAval === 'function') _fecharNudgeAval();
 
     // Back button Android: empurra estado para que voltar feche o modal.
     // Evita empilhar entrada duplicada se já estamos num estado 'detalhes'
@@ -4974,7 +5032,7 @@
         <div class="detail-name-row">
           <div class="detail-name" id="detail-name-text">${escHTML(loja.nome)}</div>
           ${planBadge}
-          ${favBtnHTML(loja.nome)}
+          ${favBtnHTML(loja)}
         </div>
         <div class="detail-sub">${escHTML(loja.sub || loja.categoria || '')}</div>
         ${!isPago ? `<div style="margin-bottom:12px;">${badgeHTML(status, fechaStr)}</div>` : ''}
@@ -5547,7 +5605,7 @@
   // Nudge de avaliação: disparado após as lojas carregarem de verdade
   // (ver _tentarNudgeAposCarga chamado no fim de carregarLojas). O timeout
   // aqui é só uma rede de segurança caso o cache já esteja em memória.
-  setTimeout(function () { _tentarNudgeAposCarga(); }, 2600);
+  setTimeout(function () { _migrarFavoritosParaId(); _tentarNudgeAposCarga(); }, 2600);
 
   // Inicializa os dois campos de upload
   initImageUpload('f-foto-file', 'f-foto-url', 'foto-preview-img', null, 'foto-upload-status');
@@ -6629,6 +6687,7 @@
           renderCategorias();
           _esconderSplash();   // app já usável; rede atualiza por baixo
           _renderizouDoCache = true;
+          if (typeof _migrarFavoritosParaId === 'function') _migrarFavoritosParaId();
           if (typeof _tentarNudgeAposCarga === 'function') _tentarNudgeAposCarga();
         }
       }

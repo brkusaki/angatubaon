@@ -164,6 +164,14 @@
 
   const CAT_BG = Object.fromEntries(CATEGORIAS.map(c => [c.id, c.bg]));
 
+  // Mapa categoria→sinônimos de busca (reaproveita CAT_DEF.busca, já usado no
+  // autocomplete de cadastro) para a busca do CLIENTE também entender termos
+  // como "hamburguer", "sorvete" etc. mesmo que a loja não tenha essa palavra
+  // literal em tags/nome/sub.
+  const CAT_BUSCA_MAP = Object.fromEntries(
+    CAT_DEF.filter(c => Array.isArray(c.busca)).map(c => [c.id, c.busca.map(b => String(b).toLowerCase())])
+  );
+
   /* ══════════════════════════════════════════════════════════════
      LOJAS — carregadas dinamicamente do Google Sheets via Apps Script
      Lojas hardcoded abaixo são o fallback caso a API falhe
@@ -277,6 +285,52 @@
   /* ══════════════════════════════════════════════════════════════
      ENGINE
   ══════════════════════════════════════════════════════════════ */
+
+  /* ══════════════════════════════════════════════════════════════
+     FOCUS TRAP — genérico, usado pelos modais do cliente (detalhes,
+     onboarding, cardápio, nudge de avaliação). Sem isso, Tab/Shift+Tab
+     "vazava" para trás do backdrop, deixando elementos escondidos
+     focáveis via teclado/leitor de tela.
+  ══════════════════════════════════════════════════════════════ */
+  const _FOCUS_SELECTOR = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  let _focusTrapEl = null;
+  let _focusTrapAnterior = null;
+  function _focusTrapKeydown(e) {
+    if (e.key !== 'Tab' || !_focusTrapEl) return;
+    const focaveis = Array.prototype.slice.call(_focusTrapEl.querySelectorAll(_FOCUS_SELECTOR))
+      .filter(el => el.offsetParent !== null); // só os visíveis
+    if (!focaveis.length) return;
+    const primeiro = focaveis[0];
+    const ultimo   = focaveis[focaveis.length - 1];
+    if (e.shiftKey && document.activeElement === primeiro) {
+      e.preventDefault(); ultimo.focus();
+    } else if (!e.shiftKey && document.activeElement === ultimo) {
+      e.preventDefault(); primeiro.focus();
+    }
+  }
+  // Ativa o trap: guarda o foco anterior e move o foco para dentro do container.
+  function _focusTrapAtivar(container) {
+    if (!container) return;
+    _focusTrapAnterior = document.activeElement;
+    _focusTrapEl = container;
+    document.addEventListener('keydown', _focusTrapKeydown, true);
+    // Move o foco pro primeiro elemento focável (ou pro próprio container).
+    setTimeout(() => {
+      if (!_focusTrapEl) return;
+      const alvo = _focusTrapEl.querySelector(_FOCUS_SELECTOR);
+      if (alvo) alvo.focus();
+      else { _focusTrapEl.setAttribute('tabindex', '-1'); _focusTrapEl.focus(); }
+    }, 50);
+  }
+  // Desativa o trap e devolve o foco a quem estava focado antes de abrir o modal.
+  function _focusTrapDesativar() {
+    document.removeEventListener('keydown', _focusTrapKeydown, true);
+    _focusTrapEl = null;
+    if (_focusTrapAnterior && document.contains(_focusTrapAnterior) && typeof _focusTrapAnterior.focus === 'function') {
+      _focusTrapAnterior.focus();
+    }
+    _focusTrapAnterior = null;
+  }
 
   // Helper: escapa HTML para evitar XSS — definido cedo pois é usado em cardHTML
   function escHTML(s) {
@@ -507,10 +561,47 @@
   }
 
   /* ── Calcula status pelo horário ─────────────────────────── */
+  // Devolve o "agora" civil em America/Sao_Paulo (independente do fuso do
+  // APARELHO do cliente). Sem isso, um celular com fuso errado/viajando
+  // mostra Aberto/Fechado incorreto — a planilha/back-end já fixam SP,
+  // o front precisa fazer o mesmo para o cálculo bater.
+  const _DOW_MAP_SP = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+  function _agoraSP() {
+    let partes = {};
+    try {
+      const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short',
+      });
+      fmt.formatToParts(new Date()).forEach(p => { if (p.type !== 'literal') partes[p.type] = p.value; });
+    } catch (e) { partes = {}; }
+    if (!partes.year) {
+      // Fallback (Intl indisponível): usa o relógio do aparelho mesmo.
+      const d = new Date();
+      return {
+        y: d.getFullYear(), mo: d.getMonth() + 1, d: d.getDate(),
+        hh: d.getHours(), mm: d.getMinutes(), dow: d.getDay(),
+      };
+    }
+    // Alguns motores retornam "24" na hora da meia-noite com hour12:false.
+    const hh = parseInt(partes.hour, 10) % 24;
+    return {
+      y: parseInt(partes.year, 10), mo: parseInt(partes.month, 10), d: parseInt(partes.day, 10),
+      hh, mm: parseInt(partes.minute, 10),
+      dow: _DOW_MAP_SP[partes.weekday] ?? new Date().getDay(),
+    };
+  }
+  // Chave numérica AAAAMMDDHHMM p/ comparar "agora" com um alvo ATE_/VOLTAMOS_ATE_
+  // sem instanciar Date() (evita reintroduzir dependência do fuso do aparelho).
+  function _chaveDataHora(y, mo, d, hh, mm) {
+    return y * 100000000 + mo * 1000000 + d * 10000 + hh * 100 + mm;
+  }
   /* ── calcStatusInfo: retorna { status, fechaStr } ───────────
      fechaStr = hora de fechamento formatada (ex: "23:00") ou ''
   ─────────────────────────────────────────────────────────── */
   function calcStatusInfo(loja) {
+    const _agora = _agoraSP();
     // Override manual do dono da loja (campo statusLoja)
     if (loja.statusLoja === 'ABERTO')   return { status: 'open',   fechaStr: '' };
     if (loja.statusLoja === 'VOLTAMOS') return { status: 'zap',    fechaStr: '' };
@@ -523,8 +614,10 @@
         const hhmm  = parts[1];
         const hh = parseInt(hhmm.substring(0, 2));
         const mm = parseInt(hhmm.substring(2, 4));
-        const ateDate = new Date(parts[0] + 'T' + String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0') + ':00');
-        if (new Date() < ateDate) return { status: 'zap', fechaStr: '' };
+        const [ay, amo, ad] = parts[0].split('-').map(Number);
+        const alvo = _chaveDataHora(ay, amo, ad, hh, mm);
+        const agoraChave = _chaveDataHora(_agora.y, _agora.mo, _agora.d, _agora.hh, _agora.mm);
+        if (agoraChave < alvo) return { status: 'zap', fechaStr: '' };
       }
       // Expirou - cai no automatico abaixo
     }
@@ -532,10 +625,7 @@
     // Fechado só por hoje: FECHADO_HOJE_YYYY-MM-DD — expira na virada do dia
     if ((loja.statusLoja || '').startsWith('FECHADO_HOJE_')) {
       const dataFech = loja.statusLoja.replace('FECHADO_HOJE_', '');
-      const hojeStr  = (() => {
-        const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      })();
+      const hojeStr  = `${_agora.y}-${String(_agora.mo).padStart(2,'0')}-${String(_agora.d).padStart(2,'0')}`;
       if (dataFech === hojeStr) return { status: 'closed', fechaStr: '' };
       // Data anterior — expirou, cai no cálculo automático abaixo
     }
@@ -547,7 +637,6 @@
     // Aberto com horário manual: ABERTO_ATE_YYYY-MM-DD_HHMM (ou legado HHMM)
     if ((loja.statusLoja || '').startsWith('ABERTO_ATE_')) {
       const raw  = loja.statusLoja.replace('ABERTO_ATE_', '');
-      const now3 = new Date();
       if (raw.includes('_')) {
         // Novo formato: YYYY-MM-DD_HHMM — compara data+hora exata
         const parts = raw.split('_');
@@ -555,8 +644,10 @@
         const hhmm2    = parts[1];
         const hh2 = parseInt(hhmm2.substring(0, 2));
         const mm2 = parseInt(hhmm2.substring(2, 4));
-        const ateDate = new Date(`${datePart}T${String(hh2).padStart(2,'0')}:${String(mm2).padStart(2,'0')}:00`);
-        if (now3 < ateDate) return { status: 'open', fechaStr: `${String(hh2).padStart(2,'0')}:${String(mm2).padStart(2,'0')}` };
+        const [ay2, amo2, ad2] = datePart.split('-').map(Number);
+        const alvo2 = _chaveDataHora(ay2, amo2, ad2, hh2, mm2);
+        const agoraChave2 = _chaveDataHora(_agora.y, _agora.mo, _agora.d, _agora.hh, _agora.mm);
+        if (agoraChave2 < alvo2) return { status: 'open', fechaStr: `${String(hh2).padStart(2,'0')}:${String(mm2).padStart(2,'0')}` };
       }
       // Formato legado ou expirado — cai no cálculo automático abaixo
     }
@@ -577,9 +668,8 @@
       return { status: 'open', fechaStr: '' };
     }
 
-    const now    = new Date();
-    const dow    = now.getDay();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const dow    = _agora.dow;
+    const nowMin = _agora.hh * 60 + _agora.mm;
     // 00:00 como fechamento = meia-noite (1440 min)
     const parse = s => {
       const [h, m] = String(s).split(':').map(Number);
@@ -1221,7 +1311,10 @@
       const nome = (loja.nome  || '').toLowerCase();
       const tags = (loja.tags  || '').toLowerCase();
       const sub  = (loja.sub   || '').toLowerCase();
-      return nome.includes(q) || tags.includes(q) || sub.includes(q);
+      if (nome.includes(q) || tags.includes(q) || sub.includes(q)) return true;
+      // Sinônimos da categoria (ex.: buscar "hamburguer" acha lojas de "lanches")
+      const sinonimos = CAT_BUSCA_MAP[loja.categoria];
+      return !!sinonimos && sinonimos.some(s => s.includes(q) || q.includes(s));
     });
 
     if (activePillFilter === 'open') {
@@ -1461,25 +1554,78 @@
     toastTimer = setTimeout(hideToast, 2200);
   }
 
-  /* ── Tema claro/escuro ───────────────────────────────────────── */
+  /* ── Tema dia/noite (auto/claro/escuro) ──────────────────────────
+     3 modos guardados em localStorage 'angatuba_theme':
+       'auto'  → segue o relógio, IGUAL à foto da Igreja (dia 5h-18h = claro).
+       'light' → força tema DIA (azul-céu).
+       'dark'  → força tema NOITE (escuro).
+     Toque no botão cicla auto → light → dark → auto.
+     A janela do "dia" (5h-18h) é a MESMA de atualizarSaudacaoNoturna(),
+     então fundo e foto da Igreja trocam juntos. */
+
+  // Mesmo critério de "dia" da faixa da Igreja (htop-dia): 5h ≤ h < 18h.
+  function _ehHorarioDia() {
+    const h = new Date().getHours();
+    return (h >= 5 && h < 18);
+  }
+
+  function _lerModoTema() {
+    try {
+      const m = localStorage.getItem('angatuba_theme');
+      if (m === 'light' || m === 'dark' || m === 'auto') return m;
+    } catch(e) {}
+    return 'auto';
+  }
+
+  // Resolve o modo atual para claro(true)/escuro(false).
+  function _temaClaroResolvido(modo) {
+    if (modo === 'light') return true;
+    if (modo === 'dark')  return false;
+    return _ehHorarioDia(); // auto
+  }
+
+  // Ícone: sol (dia/claro), lua (noite/escuro), relógio quando em auto.
   function aplicarIconeTema() {
     const icon = document.getElementById('theme-toggle-icon');
     if (!icon) return;
+    const modo    = _lerModoTema();
     const isLight = document.body.classList.contains('light-mode');
-    icon.classList.toggle('fa-moon', !isLight);
-    icon.classList.toggle('fa-sun', isLight);
+    icon.classList.remove('fa-moon', 'fa-sun', 'fa-clock');
+    if (modo === 'auto')   icon.classList.add('fa-clock');
+    else if (isLight)      icon.classList.add('fa-sun');
+    else                   icon.classList.add('fa-moon');
+    const btn = document.getElementById('theme-toggle-btn');
+    if (btn) {
+      const rotulo = modo === 'auto'
+        ? (isLight ? 'Tema automático (dia)' : 'Tema automático (noite)')
+        : (isLight ? 'Tema dia (fixo)' : 'Tema noite (fixo)');
+      btn.setAttribute('aria-label', rotulo);
+      btn.setAttribute('title', rotulo);
+    }
   }
 
-  function toggleTheme() {
-    document.body.classList.toggle('light-mode');
-    const isLight = document.body.classList.contains('light-mode');
-    try { localStorage.setItem('angatuba_theme', isLight ? 'light' : 'dark'); } catch(e) {}
+  // Aplica classe .light-mode + cor da barra do sistema conforme o modo.
+  function aplicarTema() {
+    const claro = _temaClaroResolvido(_lerModoTema());
+    document.body.classList.toggle('light-mode', claro);
+    const meta = document.getElementById('meta-theme-color');
+    if (meta) meta.setAttribute('content', claro ? '#dfe8f5' : '#0d0d0d');
     aplicarIconeTema();
+  }
+  window.aplicarTema = aplicarTema;
+
+  // Toque cicla os 3 modos.
+  function toggleTheme() {
+    const ordem = ['auto', 'light', 'dark'];
+    const atual = _lerModoTema();
+    const prox  = ordem[(ordem.indexOf(atual) + 1) % ordem.length];
+    try { localStorage.setItem('angatuba_theme', prox); } catch(e) {}
+    aplicarTema();
   }
   window.toggleTheme = toggleTheme;
 
-  // Sincroniza o ícone com o tema já aplicado pelo script inline no <body>
-  aplicarIconeTema();
+  // Aplica no boot (o script inline no <body> já evitou o flash inicial).
+  aplicarTema();
 
   /* ── Métricas de clique ──────────────────────────────────────── */
   // Fire-and-forget: registra na planilha sem bloquear a ação do usuário.
@@ -3780,6 +3926,7 @@
     document.body.style.overflow = 'hidden';
     requestAnimationFrame(function () { ov.classList.add('open'); });
     renderOnboardingClienteSlide();
+    _focusTrapAtivar(ov);
   }
 
   function renderOnboardingClienteSlide() {
@@ -3819,7 +3966,14 @@
     if (!ov) return;
     ov.classList.remove('open');
     document.body.style.overflow = '';
-    setTimeout(function () { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 300);
+    _focusTrapDesativar();
+    setTimeout(function () {
+      if (ov.parentNode) ov.parentNode.removeChild(ov);
+      // O onboarding pode ter bloqueado as tentativas automáticas do nudge de
+      // avaliação (que checam se este overlay está na tela) — tenta de novo
+      // agora que ele já saiu, para não perder o convite nesta sessão.
+      if (typeof _tentarNudgeAposCarga === 'function') _tentarNudgeAposCarga();
+    }, 300);
   }
   window.mostrarOnboardingCliente = mostrarOnboardingCliente;
 
@@ -5013,6 +5167,7 @@
     // proximo frame dentro do rAF abaixo, mascarada pela animacao de entrada.
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
+    _focusTrapAtivar(sheet);
 
     requestAnimationFrame(() => {
     const plano  = (loja.plano || 'GRATIS').toUpperCase();
@@ -5277,9 +5432,11 @@
             ).join('')}
           </div>
           <textarea id="aval-texto-${idx}" maxlength="120" rows="2" placeholder="Conte sua experiência... (opcional)"
+            oninput="var c=document.getElementById('aval-contador-${idx}');if(c)c.textContent=this.value.length+'/120';"
             style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
                    padding:8px 10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;
-                   font-family:var(--font-b);line-height:1.5;margin-bottom:8px;"></textarea>
+                   font-family:var(--font-b);line-height:1.5;margin-bottom:2px;"></textarea>
+          <div id="aval-contador-${idx}" style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:6px;">0/120</div>
           <button onclick="avalEnviar(${idx},'${escAttr(loja.nome)}')"
             style="width:100%;padding:10px;border-radius:8px;
                    background:linear-gradient(135deg,#f59e0b,#d97706);
@@ -5358,6 +5515,7 @@
     const overlay = document.getElementById('modal-detalhes');
     overlay.classList.remove('open');
     document.body.style.overflow = '';
+    _focusTrapDesativar();
     if (silencioso) {
       // Chamado antes de abrir outro modal — limpa o hash sem history.back()
       // para evitar que o popstate feche o próximo modal
@@ -6993,6 +7151,8 @@
       _htop.classList.toggle('htop-dia',   _ehDia);
       _htop.classList.toggle('htop-noite', _ehNoite2);
     }
+    // Tema dia/noite acompanha a foto quando em modo automático.
+    if (typeof aplicarTema === 'function') aplicarTema();
   }
   function saudacaoNoturnaFiltrar() {
     const pillAberto = document.querySelector('.pill-btn[data-filter="open"]');
@@ -7636,19 +7796,10 @@
   window.avalEnviar = async function(idx, nome) {
     const avalBtn = document.querySelector(`#aval-form-${idx} button[onclick*="avalEnviar"]`);
     if (avalBtn?.disabled) return;
+    const msgEl = document.getElementById(`aval-msg-${idx}`);
     const nota  = _avalNota[idx];
     if (!nota || nota < 1) {
-      const msgEl = document.getElementById(`aval-msg-${idx}`);
-      if (msgEl) msgEl.textContent = '\u2b50 Selecione uma nota antes de enviar.';
-      return;
-    }
-    if (avalBtn) avalBtn.disabled = true;
-    const texto = document.getElementById(`aval-texto-${idx}`)?.value.trim() || '';
-    const msgEl = document.getElementById(`aval-msg-${idx}`);
-
-    if (!nota) {
-      if (avalBtn) avalBtn.disabled = false;
-      if (msgEl) { msgEl.textContent = 'Selecione uma nota de 1 a 5 ⭐'; msgEl.style.color = 'var(--red)'; }
+      if (msgEl) { msgEl.textContent = '\u2b50 Selecione uma nota antes de enviar.'; msgEl.style.color = 'var(--red)'; }
       return;
     }
 
@@ -7665,6 +7816,9 @@
       return;
     }
 
+    // Só a partir daqui há de fato uma tentativa de envio — trava o botão.
+    if (avalBtn) avalBtn.disabled = true;
+    const texto = document.getElementById(`aval-texto-${idx}`)?.value.trim() || '';
     if (msgEl) { msgEl.textContent = '⏳ Enviando...'; msgEl.style.color = 'var(--muted)'; }
 
     try {
@@ -7683,13 +7837,16 @@
         // Remove esta loja da fila de sugestão de avaliação (já avaliou)
         if (typeof window.marcarLojaAvaliada === 'function') window.marcarLojaAvaliada(nome);
         if (msgEl) { msgEl.textContent = '✅ Avaliação enviada! Aparecerá após moderação.'; msgEl.style.color = 'var(--green)'; }
-        // Desabilita o form
+        // Desabilita o form (sucesso definitivo — não precisa reabilitar o botão)
         document.getElementById(`aval-form-${idx}`).style.opacity = '0.5';
         document.getElementById(`aval-form-${idx}`).style.pointerEvents = 'none';
       } else {
         throw new Error(json.msg || 'Erro');
       }
     } catch(e) {
+      // Falha de rede/servidor: reabilita o botão para o cliente poder tentar de novo
+      // sem precisar fechar e reabrir o modal.
+      if (avalBtn) avalBtn.disabled = false;
       if (msgEl) { msgEl.textContent = '❌ Erro ao enviar. Tente novamente.'; msgEl.style.color = 'var(--red)'; }
     }
   };
@@ -8229,6 +8386,7 @@
 
     document.getElementById('modal-cardapio-cliente').classList.add('open');
     document.body.style.overflow = 'hidden';
+    _focusTrapAtivar(document.getElementById('modal-cardapio-cliente'));
 
     // Métrica: registra visualização de cardápio (fire-and-forget, não bloqueia)
     try {
@@ -8259,6 +8417,7 @@
   window.fecharCardapioCliente = function(viaPopstate) {
     document.getElementById('modal-cardapio-cliente').classList.remove('open');
     document.body.style.overflow = '';
+    _focusTrapDesativar();
     if (!viaPopstate && history.state && history.state.modal === 'cardapio') history.back();
     // Reseta tela de sucesso para a próxima abertura
     const sucesso = document.getElementById('cc-pedido-sucesso');
@@ -8310,7 +8469,7 @@
       ${itens.map(item => `
         <div class="cc-item-card cc-item-clickable" id="cc-card-${item.id}" role="button" tabindex="0" onclick="ccCardClick(event,'${item.id}')" style="margin-bottom:8px;cursor:pointer;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
           ${item.foto
-            ? `<img loading="lazy" decoding="async" src="${item.foto}" class="cc-item-foto" onerror="this.style.display='none'">`
+            ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" onerror="this.style.display='none'">`
             : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
           <div class="cc-item-info">
             <div class="cc-item-nome">

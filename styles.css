@@ -81,6 +81,21 @@
         linear-gradient(to bottom, rgba(5,5,20,0.45) 0%, rgba(14,14,14,0.88) 100%),
         url('/img/igreja-noite.jpg') center 35% / cover no-repeat;
     }
+    /* Tema DIA: gradiente da foto clareia p/ fundir com o fundo azul-céu */
+    body.light-mode .header-top.htop-dia {
+      background:
+        linear-gradient(to bottom, rgba(150,185,230,0.15) 0%, rgba(223,232,245,0.88) 100%),
+        url('/img/igreja-dia.jpg') center 35% / cover no-repeat;
+    }
+    /* Sobre a foto clara, o logo escurece p/ manter contraste */
+    body.light-mode .header-top.htop-dia .logo {
+      text-shadow: 0 1px 3px rgba(255,255,255,0.7), 0 1px 8px rgba(255,255,255,0.5);
+    }
+    body.light-mode .header-top.htop-dia .logo-city {
+      background: rgba(255,255,255,0.55);
+      border-color: rgba(30,58,95,0.18);
+      color: rgba(22,35,58,0.9);
+    }
     .logo {
       font-family: var(--font-h);
       font-size: 1.55rem; font-weight: 800;
@@ -2500,8 +2515,6 @@
       line-height: 1;
       -webkit-tap-highlight-color: transparent;
     }
-    /* #9: área de toque invisível ampliada (~40px) sem inchar o visual do badge.
-       Só aparece na categoria ativa, então o leve overshoot não rouba toques. */
     .cat-clear-btn::before {
       content: ""; position: absolute;
       top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -2513,18 +2526,21 @@
     /* ════════════════════════════════════════════
        LIGHT MODE
     ════════════════════════════════════════════ */
+    /* Tema DIA — puxa o azul do céu da foto da Igreja de dia.
+       Fundo periwinkle claro, surfaces brancas com leve tom frio,
+       bordas/texto azul-acinzentados. Acentos neon seguem legíveis. */
     body.light-mode {
-      --bg:       #f4f4f5;
+      --bg:       #dfe8f5;
       --surface:  #ffffff;
-      --surface2: #ebebec;
-      --border:   rgba(0,0,0,0.09);
-      --text:     #111111;
-      --muted:    #6a6a6a; /* #6: era #888 (~3:1 no claro) → ~4.6:1 AA */
-      /* skeleton tokens claros */
-      --sk-base:  #e0e0e0;
-      --sk-shine: #ebebeb;
+      --surface2: #eaf0fa;
+      --border:   rgba(30,58,95,0.12);
+      --text:     #16233a;
+      --muted:    #5b6a82; /* ~5:1 AA sobre as surfaces claras */
+      /* skeleton tokens claros (levemente azulados) */
+      --sk-base:  #d3ddec;
+      --sk-shine: #e4ebf6;
     }
-    body.light-mode .header       { background: rgba(255,255,255,0.72); }
+    body.light-mode .header       { background: rgba(223,232,245,0.72); }
     body.light-mode .filter-pills { background: transparent; }
     body.light-mode .categories   { background: transparent; }
     body.light-mode .main         { background: var(--bg); }
@@ -3035,12 +3051,19 @@
   font-family: var(--font-b); font-size: 11.5px; color: var(--muted); line-height: 1.35;
 }
 .nudge-aval-close {
-  grid-row: 1; align-self: flex-start;
+  grid-row: 1; align-self: flex-start; position: relative;
   width: 26px; height: 26px; border-radius: 50%;
   background: var(--surface2); border: none; color: var(--muted);
   font-size: 18px; line-height: 1; cursor: pointer; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   -webkit-tap-highlight-color: transparent;
+}
+/* Área de toque invisível ampliada (~40px) sem inchar o botão visual de 26px
+   (alvo de toque pequeno demais pra mobile — recomendação Apple/Google/WCAG 2.5.8). */
+.nudge-aval-close::before {
+  content: ""; position: absolute;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 40px; height: 40px; border-radius: 50%;
 }
 .nudge-aval-close:hover { color: var(--text); }
 .nudge-aval-actions {

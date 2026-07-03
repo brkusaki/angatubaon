@@ -734,7 +734,8 @@
           aria-label="Loja fechada"><i class="fa fa-phone"></i></button>`;
       }
       return `<a href="tel:${loja.tel}" class="btn-tel open" aria-label="Ligar"
-        onclick="registrarClique('${mNome}','tel','${mPlan}','${mCat}')">
+        data-nome="${mNome}" data-tipo="tel" data-plano="${mPlan}" data-cat="${mCat}"
+        onclick="registrarClique(this.dataset.nome,this.dataset.tipo,this.dataset.plano,this.dataset.cat)">
         <i class="fa fa-phone"></i></a>`;
     }
 
@@ -744,7 +745,8 @@
     if (status === 'open' || status === 'zap') {
       const cls = status === 'zap' ? 'zap' : 'open';
       return `<a href="${url}" target="_blank" rel="noopener" class="btn-wpp ${cls}" aria-label="WhatsApp"
-        onclick="registrarClique('${mNome}','wpp','${mPlan}','${mCat}')">
+        data-nome="${mNome}" data-tipo="wpp" data-plano="${mPlan}" data-cat="${mCat}"
+        onclick="registrarClique(this.dataset.nome,this.dataset.tipo,this.dataset.plano,this.dataset.cat)">
         <i class="fab fa-whatsapp"></i></a>`;
     }
 
@@ -974,6 +976,41 @@
   }
   window.abrirFotoAnuncio = abrirFotoAnuncio;
 
+  // Abre o lightbox do anúncio lendo os dados do próprio elemento (data-*),
+  // em vez de interpolar strings no onclick inline — nomes com aspas/apóstrofo
+  // (ex.: "D'Angelo") decodificavam de volta e quebravam o handler. (#2/#3)
+  window.abrirFotoAnuncioEl = function (el) {
+    if (!el) return;
+    const d = el.dataset;
+    abrirFotoAnuncio(d.auImg, d.auTxt, d.auId, d.auAss, d.auNome, d.auPlano, d.auCat);
+  };
+
+  // Monta os atributos data-* seguros do anel de anúncio (card e modal).
+  function _ringAnuncioData(loja, lojaId, assinatura) {
+    return 'data-loja-id="' + escAttr(lojaId) + '"'
+      + ' data-au-img="'   + escAttr(loja.anuncio.imagemUrl) + '"'
+      + ' data-au-txt="'   + escAttr(loja.anuncio.texto || loja.nome) + '"'
+      + ' data-au-id="'    + escAttr(lojaId) + '"'
+      + ' data-au-ass="'   + escAttr(assinatura) + '"'
+      + ' data-au-nome="'  + escAttr(loja.nome) + '"'
+      + ' data-au-plano="' + escAttr(loja.plano || 'PRO') + '"'
+      + ' data-au-cat="'   + escAttr(loja.categoria || '') + '"';
+  }
+
+  // Fallback do logo no card (#3): tenta a extensão alternativa e, se falhar,
+  // cai no emoji. Lê data-* em vez de interpolar valores no onerror inline.
+  window.thumbLogoFallback = function (img) {
+    if (!img) return;
+    const alt = img.dataset.alt || '';
+    if (alt && img.dataset.altTried !== '1' && img.src !== alt) {
+      img.dataset.altTried = '1';
+      img.src = alt;
+      return;
+    }
+    img.style.display = 'none';
+    if (img.parentElement) img.parentElement.textContent = img.dataset.emoji || '';
+  };
+
   /* ── Thumb ───────────────────────────────────────────────── */
   function thumbHTML(loja) {
     const bg    = CAT_BG[loja.categoria] || 'rgba(255,255,255,0.06)';
@@ -984,7 +1021,7 @@
     const assinatura = temFotoAnuncio ? _assinaturaAnuncio(loja) : '';
     const jaVisto = temFotoAnuncio && anuncioJaVisto(loja, lojaId);
     const ringOpen  = temFotoAnuncio
-      ? `<div class="anuncio-ring${jaVisto ? ' ring-visto' : ''}" data-loja-id="${escAttr(lojaId)}" onclick="event.stopPropagation();abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(lojaId)}','${escAttr(assinatura)}','${escAttr(loja.nome)}','${escAttr(loja.plano||'PRO')}','${escAttr(loja.categoria||'')}')" title="Ver foto do anúncio">`
+      ? `<div class="anuncio-ring${jaVisto ? ' ring-visto' : ''}" ${_ringAnuncioData(loja, lojaId, assinatura)} onclick="event.stopPropagation();abrirFotoAnuncioEl(this)" title="Ver foto do anúncio">`
       : '';
     const isPro = (loja.plano || '').toUpperCase() === 'PRO';
 
@@ -992,18 +1029,18 @@
     if (isPro && loja.logo && loja.logo.trim()) {
       const alt = loja.logo.replace(/\.(png)$/i, '.jpg').replace(/\.(jpg|jpeg)$/i, '.png');
       return `${ringOpen}<div class="store-thumb" style="background:${bg}; overflow:hidden;">
-        <img src="${loja.logo}" alt="Logo ${loja.nome}" class="store-logo-img" loading="lazy"
-          onerror="if(this.src !== '${alt}'){ this.src='${alt}'; } else { this.style.display='none'; this.parentElement.textContent='${loja.emoji}'; }" />
+        <img src="${escAttr(loja.logo)}" alt="Logo ${escHTML(loja.nome)}" class="store-logo-img" loading="lazy"
+          data-alt="${escAttr(alt)}" data-emoji="${escAttr(loja.emoji || '')}" onerror="thumbLogoFallback(this)" />
       </div>${ringOpen ? '</div>' : ''}`;
     }
 
     if (!loja.recomendado && loja.foto && loja.foto.trim()) {
       return `${ringOpen}<div class="store-thumb" style="background:${bg};">
-        <img src="${loja.foto}" alt="${loja.nome}" loading="lazy" />
+        <img src="${escAttr(loja.foto)}" alt="${escHTML(loja.nome)}" loading="lazy" />
       </div>${ringOpen ? '</div>' : ''}`;
     }
 
-    return `${ringOpen}<div class="store-thumb" style="background:${bg};">${loja.emoji}</div>${ringOpen ? '</div>' : ''}`;
+    return `${ringOpen}<div class="store-thumb" style="background:${bg};">${escHTML(loja.emoji)}</div>${ringOpen ? '</div>' : ''}`;
   }
 
   /* ── HTML de um card ─────────────────────────────────────── */
@@ -1054,10 +1091,14 @@
     if (isPlus)   cardClass += ' plano-plus';
     if (hasCover) cardClass += ' has-cover';
 
-    const bgStyle = hasCover ? `background-image:url('${loja.foto}');` : '';
+    // #3: remove caracteres que poderiam encerrar o url()/atributo antes da hora.
+    // URLs de imagem válidas (Cloudinary/ImgBB) não contêm aspas/parênteses/barra invertida.
+    const _fotoCss = hasCover ? String(loja.foto).replace(/['"()\\]/g, '') : '';
+    const bgStyle = hasCover ? `background-image:url('${_fotoCss}');` : '';
 
-    // Todos os cards abrem o modal — pagos com visual completo, grátis simplificado
-    const infoClick = `onclick="abrirDetalhes(${idx})" style="cursor:pointer;" role="button" tabindex="0"`;
+    // Todos os cards abrem o modal — pagos com visual completo, grátis simplificado.
+    // #8: role=button + tabindex exigem ativação por teclado (Enter/Espaço).
+    const infoClick = `onclick="abrirDetalhes(${idx})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();abrirDetalhes(${idx});}" style="cursor:pointer;" role="button" tabindex="0"`;
 
     // Dica visual: "Ver detalhes" em todos, ícone diferente para grátis
     const expandHint = `<span style="font-size:9px;color:var(--muted);display:flex;align-items:center;gap:3px;margin-top:2px;">
@@ -1082,14 +1123,16 @@
       const media = avals.reduce((s, a) => s + (a.nota || 0), 0) / avals.length;
       const mediaFmt = media.toFixed(1);
       // Monta string de estrelas cheias/meia/vazias
-      let estrelasStr = '';
+      // #15: meia-estrela real via ligadura de fonte (FA6), não mais o glifo
+      // ⭑ (estrela pequena) que parecia defeito visual em notas como 4.5.
+      let estrelasHTML = '';
       for (let s = 1; s <= 5; s++) {
-        if (media >= s - 0.25)      estrelasStr += '★';
-        else if (media >= s - 0.75) estrelasStr += '⭑';
-        else                        estrelasStr += '☆';
+        if (media >= s - 0.25)      estrelasHTML += '<i class="fa-solid fa-star"></i>';
+        else if (media >= s - 0.75) estrelasHTML += '<i class="fa-solid fa-star-half-stroke"></i>';
+        else                        estrelasHTML += '<i class="fa-regular fa-star"></i>';
       }
       starsHTML = `<div class="store-stars">
-        <span style="color:#f59e0b;letter-spacing:1px;font-size:11px;">${estrelasStr}</span>
+        <span style="color:#f59e0b;letter-spacing:1px;font-size:10px;">${estrelasHTML}</span>
         <span style="font-weight:700;font-size:11px;color:#f59e0b;">${mediaFmt}</span>
         <span style="font-size:10px;color:var(--muted);">· ${avals.length} avaliação${avals.length > 1 ? 'ões' : ''}</span>
       </div>`;
@@ -1145,6 +1188,11 @@
   // renderCategorias usa _statusSnapshot.get(l)?.status com fallback para calcStatus,
   // então é seguro mesmo antes do primeiro render.
   let _statusSnapshot = new Map();
+
+  /* ── Cache de nós de card p/ reconciliação (#7) ─────────────
+     chave estável (id > wpp > nome) → { html, el }. Reaproveita o
+     nó quando o HTML não muda, evitando recriar <img> idênticos. */
+  let _cardNodes = new Map();
 
   /* ── Renderiza lista principal ───────────────────────────── */
   function renderLojas() {
@@ -1217,15 +1265,36 @@
 
     const abertas = filtradas.filter(l => getStatus(l) === 'open').length;
 
-    // Perf: um unico parse de innerHTML para toda a lista, em vez de criar um
-    // <div> orfao + innerHTML por card (N parses). O onclick inline de cada card
-    // carrega _lojaIdxMap.get(loja) — o indice REAL da loja em LOJAS — preservado
-    // aqui para que abrirDetalhes(idx) abra sempre a loja correta. Stagger do
-    // fade-in limitado aos primeiros 8 cards (ver styles.css) para nao cintilar
-    // a lista inteira em re-filtros.
-    listEl.innerHTML = filtradas
-      .map((loja, i) => cardHTML(loja, i < 8 ? i * 0.04 : 0, getStatusInfo(loja), _lojaIdxMap.get(loja) ?? 0))
-      .join('');
+    // Perf (#7): reconciliação por chave estável em vez de reconstruir todo o
+    // innerHTML a cada tecla/filtro. Reaproveita os nós cujo HTML não mudou —
+    // não recria <img> idênticos (sem flicker/reload) e reduz thrash de layout.
+    // O onclick inline de cada card carrega _lojaIdxMap.get(loja) — o índice REAL
+    // da loja em LOJAS — para que abrirDetalhes(idx) abra sempre a loja certa.
+    // O stagger posicional foi removido do HTML (assinatura independe da posição:
+    // reordenar não recria o nó); cards novos ainda entram com fade via CSS.
+    const _ordem  = [];
+    const _vistos = new Set();
+    for (let i = 0; i < filtradas.length; i++) {
+      const loja  = filtradas[i];
+      const idxReal = _lojaIdxMap.get(loja) ?? 0;
+      const chave = favIdDeLoja(loja) || ('idx:' + idxReal);
+      const html  = cardHTML(loja, 0, getStatusInfo(loja), idxReal);
+      _vistos.add(chave);
+      let entry = _cardNodes.get(chave);
+      if (!entry || entry.html !== html) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        entry = { html, el: tmp.firstElementChild };
+        _cardNodes.set(chave, entry);
+      }
+      if (entry.el) _ordem.push(entry.el);
+    }
+    // Descarta nós de lojas que saíram do resultado atual (evita vazamento do Map)
+    _cardNodes.forEach((_v, k) => { if (!_vistos.has(k)) _cardNodes.delete(k); });
+    // Reaplica na ordem: mover um nó já existente para o fragment NÃO o recria
+    const _frag = document.createDocumentFragment();
+    for (let i = 0; i < _ordem.length; i++) _frag.appendChild(_ordem[i]);
+    listEl.replaceChildren(_frag);
 
     const temResultado = filtradas.length > 0;
     listEl.style.display = temResultado ? 'flex' : 'none';
@@ -1441,13 +1510,9 @@
   const searchEl = document.getElementById('main-search');
 
   const handleSearch = debounce(function(e) {
+    // #14: busca não reseta mais categoria/pill ativos — refina dentro do
+    // filtro já escolhido, em vez de descartá-lo silenciosamente a cada tecla.
     searchQuery = e.target.value.trim();
-    activeCat = 'todos';
-    activePillFilter = 'all';
-    document.querySelectorAll('.cat-icon').forEach(i => i.classList.remove('active'));
-    document.querySelector('[data-cat="todos"] .cat-icon')?.classList.add('active');
-    document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
-
     renderLojas();
   }, 300);
 
@@ -3143,6 +3208,10 @@
       if (lockLink) lockLink.href = upgradeUrl;
     }
 
+    // ── Banners da aba Hoje: vencimento (#3) e nova avaliação (#5) ──
+    mlRenderVencimento(d);
+    mlRenderAvaliacaoNova(d);
+
     // ── Link de compartilhamento (Plus e Pro) ────────────
     const shareSection = document.getElementById('ml-share-section');
     if (shareSection) {
@@ -3241,6 +3310,9 @@
       // ── Visibilidade / Crescimento / Conversão (só Pro) ──
       mlRenderMetricasExtra(m, isPro);
 
+      // ── Melhor mês histórico (#6, só Pro) ──
+      mlRenderMelhorMes(metJson.data.melhorMes, isPro);
+
       // ── Horário de pico (só Pro) ──────────────────────
       const picoSection = document.getElementById('ml-pico-section');
       if (picoSection) {
@@ -3250,6 +3322,175 @@
         }
       }
     }
+  }
+
+  // ── Banner de vencimento do plano (#3) ───────────────────
+  // Usa d.planoValidade ('dd/mm/yyyy') que já vem do backend. Mostra o banner
+  // quando faltam <= 7 dias, ou quando já venceu (edge: cache antigo). Só pagas.
+  function mlRenderVencimento(d) {
+    const banner = document.getElementById('ml-vencimento-banner');
+    if (!banner) return;
+    const plano = (d.plano || 'GRATIS').toUpperCase();
+    const val   = String(d.planoValidade || '').trim();
+    // Grátis, ou sem validade (vitalício admin): nunca mostra.
+    if (plano === 'GRATIS' || !val) { banner.style.display = 'none'; return; }
+    const partes = val.split('/');
+    if (partes.length !== 3) { banner.style.display = 'none'; return; }
+    // Meia-noite BRT do dia de validade vs. hoje BRT (mesma referência do backend)
+    const validade = new Date(Date.UTC(
+      parseInt(partes[2], 10), parseInt(partes[1], 10) - 1, parseInt(partes[0], 10), 3, 0, 0));
+    const now  = new Date();
+    const hoje = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 3, 0, 0));
+    const dias = Math.round((validade.getTime() - hoje.getTime()) / (24 * 60 * 60 * 1000));
+
+    const titulo = document.getElementById('ml-vencimento-titulo');
+    const texto  = document.getElementById('ml-vencimento-texto');
+    const owl    = document.getElementById('ml-vencimento-owl');
+    const nomePlano = plano === 'PRO' ? 'Pro' : 'Plus';
+
+    // Só avisa a partir de 7 dias antes. Mais que isso: não incomoda.
+    if (dias > 7) { banner.style.display = 'none'; return; }
+
+    let urgente = false;
+    let msg = '';
+    if (dias > 1) {
+      msg = `Seu plano ${nomePlano} vence em ${dias} dias. Renove para não perder o destaque e as métricas.`;
+    } else if (dias === 1) {
+      urgente = true;
+      msg = `Seu plano ${nomePlano} vence amanhã. Renove para não cair para o Grátis.`;
+    } else if (dias === 0) {
+      urgente = true;
+      msg = `Seu plano ${nomePlano} vence hoje. Renove agora para não perder seus benefícios.`;
+    } else {
+      // já venceu (backend ainda não rebaixou, ou cache antigo)
+      urgente = true;
+      msg = `Seu plano ${nomePlano} venceu. Renove para reativar o destaque e as métricas.`;
+    }
+
+    // Cor: âmbar (aviso) até 2 dias, vermelho (urgente) em 0/1/vencido
+    if (urgente) {
+      banner.style.background = 'linear-gradient(135deg,rgba(239,68,68,0.14),rgba(239,68,68,0.05))';
+      banner.style.border = '1px solid rgba(239,68,68,0.35)';
+      if (titulo) titulo.style.color = 'var(--red)';
+      if (owl) owl.src = '/webp/owl-empty-wallet.webp';
+    } else {
+      banner.style.background = 'linear-gradient(135deg,rgba(245,158,11,0.14),rgba(245,158,11,0.05))';
+      banner.style.border = '1px solid rgba(245,158,11,0.3)';
+      if (titulo) titulo.style.color = 'var(--zap)';
+      if (owl) owl.src = '/webp/owl-sign.webp';
+    }
+    if (texto) texto.textContent = msg;
+    banner.style.display = 'flex';
+  }
+
+  // ── Banner de nova avaliação (#5, só pagas) ──────────────
+  // Compara nº de avaliações atual (da lista pública LOJAS) com o total
+  // guardado na última visita ao painel. Se aumentou, avisa. Chave por loja.
+  function mlRenderAvaliacaoNova(d) {
+    const banner = document.getElementById('ml-aval-nova-banner');
+    if (!banner) return;
+    const plano = (d.plano || 'GRATIS').toUpperCase();
+    if (plano === 'GRATIS') { banner.style.display = 'none'; return; }
+
+    const lojaLocal = LOJAS.find(l => l.nome === d.nome);
+    const avals = (lojaLocal && lojaLocal.avaliacoes) ? lojaLocal.avaliacoes : null;
+    // Sem dados de avaliação carregados ainda: não arrisca falso positivo.
+    if (!avals) { banner.style.display = 'none'; return; }
+    const atual = avals.length;
+
+    const chave = `angatuba_aval_count_${toSlug(d.nome)}`;
+    let anterior = null;
+    try {
+      const v = localStorage.getItem(chave);
+      if (v !== null) anterior = parseInt(v, 10);
+    } catch(e) {}
+
+    // Primeira visita (sem baseline): só registra, não mostra banner.
+    if (anterior === null || isNaN(anterior)) {
+      try { localStorage.setItem(chave, String(atual)); } catch(e) {}
+      banner.style.display = 'none';
+      return;
+    }
+
+    const novas = atual - anterior;
+    if (novas <= 0) {
+      // Empatou ou diminuiu (avaliação removida/sinalizada): atualiza baseline.
+      try { localStorage.setItem(chave, String(atual)); } catch(e) {}
+      banner.style.display = 'none';
+      return;
+    }
+
+    // Há avaliações novas: monta mensagem com a nota mais recente, se houver.
+    const texto = document.getElementById('ml-aval-nova-texto');
+    let msg;
+    if (novas === 1) {
+      // Tenta destacar a nota da avaliação mais recente (última do array)
+      const ultima = avals[avals.length - 1];
+      const nota = ultima && ultima.nota ? ultima.nota : null;
+      msg = nota
+        ? `Você recebeu uma nova avaliação ${nota}★! Toque para ver.`
+        : `Você recebeu uma nova avaliação! Toque para ver.`;
+    } else {
+      msg = `Você recebeu ${novas} novas avaliações! Toque para ver.`;
+    }
+    if (texto) texto.textContent = msg;
+    banner.style.display = 'flex';
+
+    // NÃO atualiza o baseline aqui: só depois que o lojista abrir as avaliações
+    // (mlIrParaAvaliacoes). Assim o aviso persiste até ele de fato conferir.
+    banner.dataset.avalCount = String(atual);
+    banner.dataset.avalChave = chave;
+  }
+
+  // Abre os detalhes públicos da própria loja (onde ficam as avaliações)
+  // e zera o baseline de "novas avaliações".
+  window.mlIrParaAvaliacoes = function() {
+    const banner = document.getElementById('ml-aval-nova-banner');
+    // Consolida baseline: o lojista está indo conferir.
+    if (banner && banner.dataset.avalChave) {
+      try { localStorage.setItem(banner.dataset.avalChave, banner.dataset.avalCount || '0'); } catch(e) {}
+      banner.style.display = 'none';
+    }
+    const nome = _lojaNome || localStorage.getItem('angatuba_loja_nome') || '';
+    if (!nome) return;
+    const idx = LOJAS.findIndex(l => l.nome === nome);
+    if (idx < 0) return;
+    // Fecha o painel e abre os detalhes da loja
+    if (typeof fecharMinhaLoja === 'function') fecharMinhaLoja();
+    setTimeout(() => { if (typeof abrirDetalhes === 'function') abrirDetalhes(idx); }, 200);
+  };
+
+  // Botão "Renovar" do banner de vencimento → WhatsApp de contato (mesmo do upgrade)
+  window.mlRenovarPlano = function() {
+    const nome = _lojaNome || localStorage.getItem('angatuba_loja_nome') || 'minha loja';
+    const msg = encodeURIComponent(`Olá! Sou dono da loja *${nome}* no AngatubaON e quero renovar meu plano.`);
+    window.open(`https://wa.me/${ADMIN_WPP_CONTATO}?text=${msg}`, '_blank', 'noopener');
+  };
+
+  // ── Card "Seu melhor mês" (#6, só Pro) ───────────────────
+  // Recebe { rotulo, total, ym } do backend (calcMelhorMesComDados) ou null.
+  function mlRenderMelhorMes(mm, isPro) {
+    const box = document.getElementById('ml-melhormes-box');
+    if (!box) return;
+    if (!isPro || !mm || !mm.total) { box.style.display = 'none'; return; }
+
+    const elRot   = document.getElementById('ml-melhormes-rotulo');
+    const elTotal = document.getElementById('ml-melhormes-total');
+    const elMsg   = document.getElementById('ml-melhormes-msg');
+    if (elRot)   elRot.textContent = mm.rotulo || '—';
+    if (elTotal) elTotal.textContent = mm.total;
+
+    if (elMsg) {
+      // Se o melhor mês é o mês atual, celebra recorde em andamento.
+      const now = new Date();
+      const ymAtual = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
+      if (mm.ym === ymAtual) {
+        elMsg.textContent = 'É este mês! Você está batendo seu próprio recorde. 🚀';
+      } else {
+        elMsg.textContent = `Seu recorde de cliques de contato num único mês. Bora superar?`;
+      }
+    }
+    box.style.display = '';
   }
 
   // Renderiza os blocos extra de métricas: visualizações, crescimento semanal
@@ -4107,9 +4348,16 @@
   /* ── Pill filter events ──────────────────────────────────── */
   document.querySelectorAll('.pill-btn:not(.pill-bairro-btn)').forEach(btn => {
     btn.addEventListener('click', () => {
+      // #12: clicar de novo na pill já ativa desliga o filtro (toggle-off),
+      // em vez de reaplicar o mesmo filtro sem dar jeito de "limpar" pela pill.
+      const isTogglingOff = btn.classList.contains('active') && activePillFilter === btn.dataset.filter;
       document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      activePillFilter = btn.dataset.filter;
+      if (isTogglingOff) {
+        activePillFilter = 'all';
+      } else {
+        btn.classList.add('active');
+        activePillFilter = btn.dataset.filter;
+      }
       activeBairro     = '';
       document.getElementById('pill-bairro-label').textContent = 'Bairro';
       renderLojas();
@@ -4308,10 +4556,17 @@
     }
   }
 
-  // Intervalo de 60s — referência guardada; pausa/resume com visibilidade da aba
-  const _smartRefreshInterval = setInterval(smartRefresh, 60_000);
+  // Intervalo de 60s — #13: pausa de verdade (clearInterval) com a aba oculta
+  // e retoma ao voltar, em vez de rodar em background indefinidamente.
+  let _smartRefreshInterval = setInterval(smartRefresh, 60_000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) smartRefresh(); // refresh imediato ao voltar para a aba
+    if (document.hidden) {
+      clearInterval(_smartRefreshInterval);
+    } else {
+      smartRefresh(); // refresh imediato ao voltar para a aba
+      clearInterval(_smartRefreshInterval);
+      _smartRefreshInterval = setInterval(smartRefresh, 60_000);
+    }
   }, { passive: true });
 
   /* ── Limpa will-change após animação ─────────────────────── */
@@ -4426,9 +4681,14 @@
         })
         .catch(err => console.warn('[SW] Falha no registro:', err));
 
-      // Quando o SW ativa (após skipWaiting), recarrega a página
+      // Quando o SW ativa (após skipWaiting), recarrega a página.
+      // #10: o 1º controlador de uma aba recém-aberta vem do clients.claim() do
+      // install inicial — NÃO deve recarregar (evita o "flash"/reload no primeiro
+      // acesso). Só recarrega em trocas posteriores (update via SKIP_WAITING).
       let refreshing = false;
+      let _tinhaControlador = !!navigator.serviceWorker.controller;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!_tinhaControlador) { _tinhaControlador = true; return; }
         if (!refreshing) { refreshing = true; window.location.reload(); }
       });
     });
@@ -4461,8 +4721,8 @@
       const json = await resp.json();
       if (json.status === 'ok' && Array.isArray(json.data) && json.data.length > 0) {
         // Junta lojas da API com as fixas, evitando duplicatas pelo nome
-        const nomesApi = new Set(json.data.map(l => l.nome.trim().toLowerCase()));
-        const fixasSemDuplicata = LOJAS_FIXAS.filter(l => !nomesApi.has(l.nome.trim().toLowerCase()));
+        const nomesApi = new Set(json.data.map(l => (l.nome || '').trim().toLowerCase()));
+        const fixasSemDuplicata = LOJAS_FIXAS.filter(l => !nomesApi.has((l.nome || '').trim().toLowerCase()));
         LOJAS = [...json.data, ...fixasSemDuplicata].map(l => ({
           ...l,
           nome:      l.nome      || '',
@@ -4773,10 +5033,11 @@
     const logoOverlay = hasLogo
       ? (_mLogoAnuncio
         ? `<div class="detail-logo-ring${_mLogoVisto ? ' ring-visto' : ''}"
-             onclick="abrirFotoAnuncio('${escAttr(loja.anuncio.imagemUrl)}','${escAttr(loja.anuncio.texto||loja.nome)}','${escAttr(_mLogoId)}','${escAttr(_mLogoAss)}','${escAttr(loja.nome)}','${escAttr(loja.plano||'PRO')}','${escAttr(loja.categoria||'')}')"
-             role="button" tabindex="0" title="Ver foto do anuncio">
+             ${_ringAnuncioData(loja, _mLogoId, _mLogoAss)} onclick="abrirFotoAnuncioEl(this)"
+             role="button" tabindex="0" title="Ver foto do anuncio"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();abrirFotoAnuncioEl(this);}">
            <div class="detail-logo-inner">
-             <img src="${loja.logo}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;"
+             <img src="${escAttr(loja.logo)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;"
                onerror="this.parentElement.parentElement.style.display='none'" />
            </div>
            <span class="detail-logo-cam"><i class="fa fa-camera"></i></span>
@@ -4785,14 +5046,14 @@
             width:52px;height:52px;border-radius:12px;overflow:hidden;
             border:2px solid rgba(255,255,255,0.2);box-shadow:0 4px 14px rgba(0,0,0,0.5);
             background:var(--surface);">
-           <img src="${loja.logo}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;"
+           <img src="${escAttr(loja.logo)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;"
              onerror="this.parentElement.style.display='none'" />
          </div>`)
       : '';
 
     const coverHTML = hasFoto
       ? `<div class="detail-cover-wrap">
-           <img class="detail-cover" loading="lazy" decoding="async" src="${loja.foto}" alt="Foto ${escAttr(loja.nome)}"
+           <img class="detail-cover" loading="lazy" decoding="async" src="${escAttr(loja.foto)}" alt="Foto ${escAttr(loja.nome)}"
              onerror="this.parentElement.innerHTML = placeholderCover('${escAttr(loja.emoji || '🏪')}', '${escAttr(loja.categoria || '')}');" />
            <div class="detail-top-bar">
              <div class="detail-handle"></div>
@@ -4894,7 +5155,7 @@
 
     // ── ENDEREÇO ─────────────────────────────────────────────
     const _mapsHref = (loja.maps && loja.maps.startsWith('https://'))
-      ? ` onclick="window.open('${loja.maps}','_blank','noopener')" style="cursor:pointer;"` : '';
+      ? ` data-maps="${escAttr(loja.maps)}" onclick="window.open(this.dataset.maps,'_blank','noopener')" style="cursor:pointer;"` : '';
     const _mapsTag = (loja.maps && loja.maps.startsWith('https://'))
       ? '<span style="font-size:9px;opacity:.55;margin-left:4px;color:var(--green);">↗ Maps</span>' : '';
     const enderecoHTML = loja.endereco
@@ -4931,7 +5192,11 @@
       : '';
 
     // ── Resumo de avaliações: média + estrelas + troféu + botão expandir ──
-    const temAvals = isPago && avaliacoes.length > 0;
+    // #4: o card já mostra a média e o formulário de avaliar aparece para todos,
+    // então a lista/resumo também deve aparecer para lojas Grátis (antes era
+    // `isPago && ...`, criando "propaganda enganosa": card com nota, modal vazio).
+    // O troféu de excelência segue exclusivo de planos pagos (perk mantido).
+    const temAvals = avaliacoes.length > 0;
     const avalResumoHTML = temAvals
       ? `<div style="margin-bottom:12px;">
            <div style="display:flex;align-items:center;gap:8px;">
@@ -5003,12 +5268,12 @@
         </div>
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;">
           <!-- Estrelas clicáveis -->
-          <div style="display:flex;gap:4px;margin-bottom:8px;" id="aval-stars-${idx}">
+          <div style="display:flex;gap:4px;margin-bottom:8px;" id="aval-stars-${idx}" role="radiogroup" aria-label="Sua nota, de 1 a 5 estrelas">
             ${[1,2,3,4,5].map(s =>
               `<button onclick="avalSetNota(${idx},${s})" data-nota="${s}"
                 style="font-size:1.6rem;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.15);
                        transition:color 0.1s;-webkit-tap-highlight-color:transparent;"
-                class="aval-star">★</button>`
+                class="aval-star" role="radio" aria-checked="false" aria-label="${s} estrela${s > 1 ? 's' : ''}">★</button>`
             ).join('')}
           </div>
           <textarea id="aval-texto-${idx}" maxlength="120" rows="2" placeholder="Conte sua experiência... (opcional)"
@@ -5076,11 +5341,15 @@
       navigator.share({ title: loja.nome, text, url }).catch(() => {});
     } else {
       navigator.clipboard?.writeText(url).then(() => {
+        // #17: reseta a coruja do toast (evita herdar a coruja de um toast
+        // anterior) e reusa o timer global para não colidir com outro toast.
         const t = document.getElementById('toast');
+        _setToastOwl('/webp/owl-tada.webp');
         document.getElementById('toast-title').textContent = 'Link copiado!';
         document.getElementById('toast-msg').textContent   = url;
+        clearTimeout(toastTimer);
         t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 2500);
+        toastTimer = setTimeout(hideToast, 2500);
       }).catch(() => {});
     }
   }
@@ -5312,12 +5581,14 @@
       if (status === 'open' || status === 'zap') {
         main += `<a href="${url}" target="_blank" rel="noopener"
           class="detail-btn-wpp"
-          onclick="registrarClique('${mNome}','wpp','${mPlan}','${mCat}')">
+          data-nome="${mNome}" data-tipo="wpp" data-plano="${mPlan}" data-cat="${mCat}"
+          onclick="registrarClique(this.dataset.nome,this.dataset.tipo,this.dataset.plano,this.dataset.cat)">
           <i class="fab fa-whatsapp"></i> WhatsApp
         </a>`;
       } else {
         main += `<button class="detail-btn-wpp closed-wpp"
-          onclick="fecharDetalhes(); showToast('${mNome}','${abre}');">
+          data-nome="${mNome}" data-abre="${escAttr(abre)}"
+          onclick="fecharDetalhes(); showToast(this.dataset.nome, this.dataset.abre);">
           <i class="fab fa-whatsapp"></i> Fechado agora
         </button>`;
       }
@@ -5328,12 +5599,14 @@
       if (status === 'closed') {
         const abreTel = loja.horario ? loja.horario.abre : '';
         main += `<button class="detail-btn-tel" style="opacity:0.55;"
-          onclick="fecharDetalhes(); showToast('${mNome}','${abreTel}','${loja.tel}');">
+          data-nome="${mNome}" data-abre="${escAttr(abreTel)}" data-tel="${escAttr(loja.tel)}"
+          onclick="fecharDetalhes(); showToast(this.dataset.nome, this.dataset.abre, this.dataset.tel);">
           <i class="fa fa-phone"></i> Fechado
         </button>`;
       } else {
         main += `<a href="tel:${loja.tel}" class="detail-btn-tel"
-          onclick="registrarClique('${mNome}','tel','${mPlan}','${mCat}')">
+          data-nome="${mNome}" data-tipo="tel" data-plano="${mPlan}" data-cat="${mCat}"
+          onclick="registrarClique(this.dataset.nome,this.dataset.tipo,this.dataset.plano,this.dataset.cat)">
           <i class="fa fa-phone"></i> Ligar
         </a>`;
       }
@@ -5369,7 +5642,8 @@
         const igUrl = `https://instagram.com/${igHandle}`;
         ig = `<a href="${igUrl}" target="_blank" rel="noopener"
           class="detail-btn-ig"
-          onclick="registrarClique('${mNome}','ig','${mPlan}','${mCat}')">
+          data-nome="${mNome}" data-tipo="ig" data-plano="${mPlan}" data-cat="${mCat}"
+          onclick="registrarClique(this.dataset.nome,this.dataset.tipo,this.dataset.plano,this.dataset.cat)">
           <i class="fab fa-instagram"></i> @${igHandle}
         </a>`;
       }
@@ -7355,6 +7629,7 @@
     const stars = document.querySelectorAll(`#aval-stars-${idx} .aval-star`);
     stars.forEach((s, i) => {
       s.style.color = i < nota ? '#f59e0b' : 'rgba(255,255,255,0.15)';
+      s.setAttribute('aria-checked', i < nota ? 'true' : 'false'); // #16
     });
   };
 
@@ -7973,9 +8248,11 @@
     // scroll suave dentro do wrapper do cardápio
     const offset = el.offsetTop - 8;
     wrap.scrollTo({ top: offset, behavior: 'smooth' });
-    // marca tab ativa
+    // marca tab ativa — #11: comparação exata via data-cat-id, não mais
+    // substring do onclick (quebrava com categorias-prefixo, ex. "Bebidas"
+    // dentro de "Bebidas Quentes").
     document.querySelectorAll('.cc-tab-pill').forEach(b => {
-      b.classList.toggle('active', b.getAttribute('onclick').includes(id));
+      b.classList.toggle('active', b.dataset.catId === id);
     });
   };
 
@@ -8021,7 +8298,7 @@
       if (cats.length > 1) {
         tabsEl.style.display = '';
         tabsEl.innerHTML = cats.map((cat, i) =>
-          `<button class="cc-tab-pill${i===0?' active':''}" onclick="ccScrollTocat('cc-cat-${cat.replace(/\s+/g,'-')}')">${escHTML(cat)}</button>`
+          `<button class="cc-tab-pill${i===0?' active':''}" data-cat-id="cc-cat-${escAttr(cat.replace(/\s+/g,'-'))}" onclick="ccScrollTocat('cc-cat-${cat.replace(/\s+/g,'-')}')">${escHTML(cat)}</button>`
         ).join('');
       } else {
         tabsEl.style.display = 'none';

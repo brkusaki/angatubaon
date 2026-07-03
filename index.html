@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0d0d0d" id="meta-theme-color" />
   <meta name="description" content="Angatuba ON — Encontre o que está aberto agora em Angatuba." />
   <title>Angatuba ON</title>
@@ -1187,6 +1187,28 @@
               <i class="fa fa-rotate-right" style="font-size:12px;color:var(--muted);flex-shrink:0;" aria-hidden="true"></i>
             </div>
 
+            <!-- Banner: nova(s) avaliação(ões) desde a última visita (#5, só pagas) -->
+            <div id="ml-aval-nova-banner" style="display:none;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(245,158,11,0.14),rgba(245,158,11,0.05));border:1px solid rgba(245,158,11,0.3);border-radius:16px;padding:12px 14px;margin-bottom:12px;cursor:pointer;" onclick="mlIrParaAvaliacoes()">
+              <img id="ml-aval-nova-owl" src="/webp/owl-love.webp" alt="" style="width:46px;height:46px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.45));"
+                   onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
+              <div style="flex:1;min-width:0;">
+                <div style="font-family:var(--font-h);font-size:11px;font-weight:800;color:var(--zap);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Novidade boa!</div>
+                <div id="ml-aval-nova-texto" style="font-size:12.5px;line-height:1.45;color:var(--text);font-weight:600;">Você recebeu uma nova avaliação.</div>
+              </div>
+              <i class="fa fa-chevron-right" style="font-size:12px;color:var(--muted);flex-shrink:0;" aria-hidden="true"></i>
+            </div>
+
+            <!-- Banner: plano prestes a vencer (#3) -->
+            <div id="ml-vencimento-banner" style="display:none;align-items:center;gap:12px;border-radius:16px;padding:12px 14px;margin-bottom:12px;">
+              <img id="ml-vencimento-owl" src="/webp/owl-sign.webp" alt="" style="width:46px;height:46px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.45));"
+                   onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
+              <div style="flex:1;min-width:0;">
+                <div id="ml-vencimento-titulo" style="font-family:var(--font-h);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Seu plano vence em breve</div>
+                <div id="ml-vencimento-texto" style="font-size:12.5px;line-height:1.45;color:var(--text);font-weight:600;">Renove para não perder seus benefícios.</div>
+              </div>
+              <button id="ml-vencimento-btn" onclick="mlRenovarPlano()" style="flex-shrink:0;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:11px;font-weight:800;padding:8px 12px;border-radius:9px;border:none;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;">Renovar</button>
+            </div>
+
             <!-- Status -->
             <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
               <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Status agora</div>
@@ -1521,6 +1543,21 @@
                     <div id="ml-cresc-badge" style="font-family:var(--font-h);font-size:.85rem;font-weight:800;padding:5px 10px;border-radius:8px;white-space:nowrap;">—</div>
                   </div>
                   <div id="ml-cresc-msg" style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.4;"></div>
+                </div>
+
+                <!-- Melhor mês histórico (#6, só Pro) -->
+                <div id="ml-melhormes-box" style="display:none;margin-top:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 12px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                    <div>
+                      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">Seu melhor mês</div>
+                      <div style="font-family:var(--font-h);font-size:1.2rem;font-weight:800;margin-top:1px;text-transform:capitalize;" id="ml-melhormes-rotulo">—</div>
+                    </div>
+                    <div style="text-align:right;">
+                      <div style="font-family:var(--font-h);font-size:1.4rem;font-weight:800;color:#f59e0b;white-space:nowrap;" id="ml-melhormes-total">—</div>
+                      <div style="font-size:9px;color:var(--muted);">cliques</div>
+                    </div>
+                  </div>
+                  <div id="ml-melhormes-msg" style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.4;"></div>
                 </div>
 
                 <!-- Taxa de conversão: views → cliques de contato -->

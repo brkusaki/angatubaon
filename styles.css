@@ -17,7 +17,7 @@
       --surface2: #222222;
       --border:   rgba(255,255,255,0.08);
       --text:     #f0f0f0;
-      --muted:    #7a7a7a;
+      --muted:    #9a9a9a; /* #6: era #7a7a7a (~4.1:1 nas surfaces) → agora ~6:1 AA */
       --green:    #00d084;
       --red:      #ff4444;
       --zap:      #f59e0b;
@@ -392,7 +392,7 @@
     }
     .btn-tel:active { transform:scale(0.88) translateZ(0); }
     .btn-tel.open   { background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; }
-    .btn-tel.closed { background:var(--surface2); color:#555; cursor:pointer; pointer-events:auto; }
+    .btn-tel.closed { background:var(--surface2); color:#8a8a8a; cursor:pointer; pointer-events:auto; }
     .btn-tel.disabled { background:var(--surface2); color:#333; cursor:not-allowed; pointer-events:none; opacity:0.4; }
 
     /* ════════════════════════════════════════════
@@ -551,7 +551,7 @@
     .empty-state .empty-icon { font-size:2.8rem; margin-bottom:16px; display:block; opacity:0.55; }
     .empty-state .empty-title { font-family:var(--font-h); font-size:1rem; font-weight:700; color:var(--text); margin-bottom:6px; }
     .empty-state p    { font-size:13px; line-height:1.6; margin-bottom:18px; }
-    .empty-state small { font-size:11px; color:#555; margin-top:4px; display:block; }
+    .empty-state small { font-size:11px; color:#8a8a8a; margin-top:4px; display:block; }
     .empty-action {
       display:inline-flex; align-items:center; gap:6px;
       padding:10px 20px; border-radius:10px;
@@ -2153,7 +2153,7 @@
     .detail-schedule-row.today .detail-schedule-day { color: var(--green); }
     .detail-schedule-time { color: var(--muted); font-size: 11px; }
     .detail-schedule-row.today .detail-schedule-time { color: var(--green); font-weight: 600; }
-    .detail-schedule-closed { color: #555; font-size: 11px; }
+    .detail-schedule-closed { color: #8a8a8a; font-size: 11px; }
 
     /* Status badge no modal */
     .detail-status-row {
@@ -2491,13 +2491,21 @@
     }
     /* filtro ✕ na categoria ativa do cat-bar */
     .cat-clear-btn {
-      position: absolute; top: -3px; right: -3px;
-      width: 14px; height: 14px; border-radius: 50%;
+      position: absolute; top: -5px; right: -5px;
+      width: 20px; height: 20px; border-radius: 50%;
       background: var(--red); color: #fff;
-      font-size: 8px; font-weight: 800;
+      font-size: 10px; font-weight: 800;
       display: none; align-items: center; justify-content: center;
-      cursor: pointer; border: none; z-index: 2;
+      cursor: pointer; border: none; z-index: 3;
       line-height: 1;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* #9: área de toque invisível ampliada (~40px) sem inchar o visual do badge.
+       Só aparece na categoria ativa, então o leve overshoot não rouba toques. */
+    .cat-clear-btn::before {
+      content: ""; position: absolute;
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 40px; height: 40px; border-radius: 50%;
     }
     .cat-item { position: relative; }
     .cat-item.has-clear .cat-clear-btn { display: flex; }
@@ -2511,7 +2519,7 @@
       --surface2: #ebebec;
       --border:   rgba(0,0,0,0.09);
       --text:     #111111;
-      --muted:    #888888;
+      --muted:    #6a6a6a; /* #6: era #888 (~3:1 no claro) → ~4.6:1 AA */
       /* skeleton tokens claros */
       --sk-base:  #e0e0e0;
       --sk-shine: #ebebeb;

@@ -5720,6 +5720,10 @@
   // Fecha com tecla Escape — respeita hierarquia de modais abertos
   document.addEventListener('keydown', function(e) {
     if (e.key !== 'Escape') return;
+    // Lightbox de foto tem prioridade máxima — fecha antes de qualquer modal
+    if (document.getElementById('cc-lightbox')?.classList.contains('open')) {
+      ccFecharFoto(); return;
+    }
     if (document.getElementById('modal-cardapio-cliente')?.classList.contains('open')) {
       fecharCardapioCliente(true); return;
     }
@@ -8630,6 +8634,7 @@
   let _ccLojaIdx   = null;
   let _ccCarrinho  = {}; // { itemId: { item, qty } }
   let _ccCartExpanded = false; // estado do carrinho colapsável
+  let _ccModoAtual = 'produto'; // 'produto' | 'servico' | 'vitrine
 
   window.abrirCardapioCliente = function(idx) {
     const loja = LOJAS[idx];
@@ -8745,21 +8750,54 @@
     if (wrap) wrap.style.display = '';
   };
 
+  // Emoji placeholder inteligente por categoria (usado por todos os modos)
+  const _ccCatEmoji = {
+    'pizzaria':'🍕','lanches':'🍔','restaurante':'🍽️','carnes':'🥩','sorveteria':'🍦',
+    'padaria':'🥐','adega':'🍺','mercado':'🛒','farmacia':'💊','pet':'🐾',
+    'barbearia':'💈','salao':'💅','mecanica':'🔧','eletricista':'⚡','tattoo':'🎨',
+    'academia':'💪','clinica':'🩺','laboratorio':'🧪','otica':'👓','calcados':'👟',
+    'roupas':'👗','joalheria':'💍','informatica':'💻','celular':'📱',
+    'construcao':'🧱','moveis':'🛋️','autopecas':'🔩','borracharia':'🚗','posto':'⛽',
+    'floricultura':'💐','fotografia':'📸','agropecuaria':'🌾','insumos':'🚜',
+    'estetica':'💆','spa':'🧖','funilaria':'🚙','lava-rapido':'🚿','bicicletaria':'🚲',
+    'vidracaria':'🪟','serralheria':'🔩','refrigeracao':'❄️','consertos':'🛠️',
+    'encanamento':'🚰','pintura':'🎨','grafica':'🖨️','advocacia':'⚖️','contabilidade':'📊',
+    'imobiliaria':'🏠','viagens':'✈️','seguros':'🛡️','idiomas':'📚','escolinha':'✏️',
+    'papelaria':'📎','variedades':'🎁','festas':'🎉','armarinho':'🧵','tintas':'🎨',
+    'madeireira':'🪵','gas':'🔥','hospital':'🏥','saudavel':'🥗','cafeteria':'☕',
+    'japonesa':'🍱','italiana':'🍝','marmita':'🍱','doceria':'🍰','bancario':'🏦',
+  };
+
+  // Define o MODO de exibição do cardápio conforme o tipo de negócio.
+  //   'produto' → card em lista, tap adiciona ao carrinho (comida, mercado, farmácia…)
+  //   'servico' → card em lista, botão "Agendar" abre WhatsApp (barbearia, mecânica, clínica…)
+  //   'vitrine' → grade 2 colunas com foto grande, botão "Tenho interesse" (roupas, móveis, imóveis…)
+  const _CC_MODO_SERVICO = new Set([
+    'barbearia','salao','estetica','tattoo','spa','academia',
+    'mecanica','borracharia','funilaria','lava-rapido','bicicletaria',
+    'clinica','laboratorio','hospital',
+    'vidracaria','serralheria','refrigeracao','consertos','eletricista',
+    'encanamento','pintura','grafica','advocacia','contabilidade','fotografia',
+    'viagens','seguros','idiomas','escolinha','bancario',
+  ]);
+  const _CC_MODO_VITRINE = new Set([
+    'roupas','calcados','joalheria','otica','moveis','floricultura',
+    'imobiliaria','informatica','celular',
+  ]);
+  function _ccModoLoja(loja) {
+    const slug = (loja.categoria || '').toLowerCase();
+    if (_CC_MODO_SERVICO.has(slug)) return 'servico';
+    if (_CC_MODO_VITRINE.has(slug)) return 'vitrine';
+    return 'produto';
+  }
+
   function ccRenderItens(loja) {
     const wrap  = document.getElementById('cc-itens-wrap');
     const isPro = (loja.plano || '').toUpperCase() === 'PRO';
+    const modo  = _ccModoLoja(loja);
+    _ccModoAtual = modo;
 
-    // Emoji placeholder inteligente por categoria
-    const _catEmoji = {
-      'pizzaria':'🍕','lanches':'🍔','restaurante':'🍽️','carnes':'🥩','sorveteria':'🍦',
-      'padaria':'🥐','adega':'🍺','mercado':'🛒','farmacia':'💊','pet':'🐾',
-      'barbearia':'💈','salao':'💅','mecanica':'🔧','eletricista':'⚡','tattoo':'🎨',
-      'academia':'💪','clinica':'🩺','laboratorio':'🧪','otica':'👓','calcados':'👟',
-      'roupas':'👗','joalheria':'💍','informatica':'💻','celular':'📱',
-      'construcao':'🧱','moveis':'🛋️','autopecas':'🔩','borracharia':'🚗','posto':'⛽',
-      'floricultura':'💐','fotografia':'📸','agropecuaria':'🌾','insumos':'🚜',
-    };
-    const placeholderEmoji = _catEmoji[(loja.categoria||'').toLowerCase()] || loja.emoji || '🏪';
+    const placeholderEmoji = _ccCatEmoji[(loja.categoria||'').toLowerCase()] || loja.emoji || '🏪';
 
     // Agrupa por categoria
     const grupos = {};
@@ -8783,27 +8821,88 @@
       }
     }
 
+    // Escolhe o renderizador de item conforme o modo
+    const renderItem = modo === 'vitrine'
+      ? (item) => _ccItemVitrineHTML(item, placeholderEmoji)
+      : modo === 'servico'
+        ? (item) => _ccItemServicoHTML(item, placeholderEmoji)
+        : (item) => _ccItemProdutoHTML(item, placeholderEmoji);
+
+    // Vitrine embrulha os itens numa grade 2-colunas; os demais empilham.
     wrap.innerHTML = Object.entries(grupos).map(([cat, itens]) => `
       <div class="cc-cat-label" id="cc-cat-${cat.replace(/\s+/g,'-')}">${escHTML(cat)}</div>
-      ${itens.map(item => `
-        <div class="cc-item-card cc-item-clickable" id="cc-card-${item.id}" role="button" tabindex="0" onclick="ccCardClick(event,'${item.id}')" style="margin-bottom:8px;cursor:pointer;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
-          ${item.foto
-            ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" onerror="this.style.display='none'">`
-            : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
-          <div class="cc-item-info">
-            <div class="cc-item-nome">
-              ${item.destaque === 'SIM' ? '<span style="font-size:10px;background:rgba(245,158,11,0.2);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);border-radius:4px;padding:1px 5px;margin-right:4px;font-weight:800;">⭐ Mais pedido</span>' : ''}
-              ${escHTML(item.nome)}
-            </div>
-            ${item.descricao ? `<div class="cc-item-desc">${escHTML(item.descricao)}</div>` : ''}
-            <div class="cc-item-preco">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}</div>
-          </div>
-          <div class="cc-qty-ctrl" id="cc-qty-${item.id}" onclick="event.stopPropagation()">
-            <button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>
-          </div>
-        </div>
-      `).join('')}
+      ${modo === 'vitrine'
+        ? `<div class="cc-vitrine-grid">${itens.map(renderItem).join('')}</div>`
+        : itens.map(renderItem).join('')}
     `).join('');
+  }
+
+  // ── MODO PRODUTO: card em lista, tap adiciona ao carrinho ─────────────────
+  function _ccItemProdutoHTML(item, placeholderEmoji) {
+    const temFoto = !!item.foto;
+    return `
+      <div class="cc-item-card cc-item-clickable" id="cc-card-${item.id}" role="button" tabindex="0" onclick="ccCardClick(event,'${item.id}')" style="margin-bottom:8px;cursor:pointer;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
+        ${temFoto
+          ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" onclick="event.stopPropagation();ccAbrirFoto('${item.id}')" onerror="this.style.display='none'">`
+          : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
+        <div class="cc-item-info">
+          <div class="cc-item-nome">
+            ${item.destaque === 'SIM' ? '<span class="cc-badge-destaque">⭐ Mais pedido</span>' : ''}
+            ${escHTML(item.nome)}
+          </div>
+          ${item.descricao ? `<div class="cc-item-desc">${escHTML(item.descricao)}</div>` : ''}
+          <div class="cc-item-preco">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}</div>
+        </div>
+        <div class="cc-qty-ctrl" id="cc-qty-${item.id}" onclick="event.stopPropagation()">
+          <button class="cc-item-add" aria-label="Adicionar ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>
+        </div>
+      </div>`;
+  }
+
+  // ── MODO SERVIÇO: card em lista, botão "Agendar" abre WhatsApp ─────────────
+  function _ccItemServicoHTML(item, placeholderEmoji) {
+    const temFoto = !!item.foto;
+    const preco = parseFloat(item.preco) || 0;
+    return `
+      <div class="cc-item-card cc-servico-card" id="cc-card-${item.id}" style="margin-bottom:8px;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
+        ${temFoto
+          ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" onclick="ccAbrirFoto('${item.id}')" style="cursor:zoom-in;" onerror="this.style.display='none'">`
+          : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
+        <div class="cc-item-info">
+          <div class="cc-item-nome">
+            ${item.destaque === 'SIM' ? '<span class="cc-badge-destaque">⭐ Mais procurado</span>' : ''}
+            ${escHTML(item.nome)}
+          </div>
+          ${item.descricao ? `<div class="cc-item-desc">${escHTML(item.descricao)}</div>` : ''}
+          ${preco > 0 ? `<div class="cc-item-preco">R$ ${preco.toFixed(2).replace('.',',')}</div>` : '<div class="cc-item-preco cc-preco-consultar">Sob consulta</div>'}
+        </div>
+        <button class="cc-btn-agendar" onclick="ccAgendarServico('${item.id}')">
+          <i class="fab fa-whatsapp"></i> Agendar
+        </button>
+      </div>`;
+  }
+
+  // ── MODO VITRINE: grade 2 colunas, foto grande, "Tenho interesse" ─────────
+  function _ccItemVitrineHTML(item, placeholderEmoji) {
+    const temFoto = !!item.foto;
+    const preco = parseFloat(item.preco) || 0;
+    return `
+      <div class="cc-vitrine-card" id="cc-card-${item.id}">
+        <div class="cc-vitrine-foto-wrap" onclick="ccAbrirFoto('${item.id}')">
+          ${temFoto
+            ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-vitrine-foto" onerror="this.parentNode.innerHTML='<div class=&quot;cc-vitrine-foto-ph&quot;>${placeholderEmoji}</div>'">`
+            : `<div class="cc-vitrine-foto-ph">${placeholderEmoji}</div>`}
+          ${item.destaque === 'SIM' ? '<span class="cc-vitrine-badge">⭐ Destaque</span>' : ''}
+        </div>
+        <div class="cc-vitrine-info">
+          <div class="cc-vitrine-nome">${escHTML(item.nome)}</div>
+          ${item.descricao ? `<div class="cc-vitrine-desc">${escHTML(item.descricao)}</div>` : ''}
+          ${preco > 0 ? `<div class="cc-vitrine-preco">R$ ${preco.toFixed(2).replace('.',',')}</div>` : '<div class="cc-vitrine-preco cc-preco-consultar">Sob consulta</div>'}
+          <button class="cc-btn-interesse" onclick="ccInteresse('${item.id}')">
+            <i class="fab fa-whatsapp"></i> Tenho interesse
+          </button>
+        </div>
+      </div>`;
   }
 
   // Clique no card inteiro adiciona +1 ao carrinho.
@@ -8866,6 +8965,65 @@
     const loja = LOJAS[_ccLojaIdx];
     if (loja) ccRenderItens(loja);
     ccAtualizarCarrinho();
+  };
+
+  // ── Foto ampliada (lightbox) — compartilhado por todos os modos ──────────
+  window.ccAbrirFoto = function(itemId) {
+    const loja = LOJAS[_ccLojaIdx];
+    const item = loja && loja.cardapio.find(i => i.id === itemId);
+    if (!item || !item.foto) return;
+    let lb = document.getElementById('cc-lightbox');
+    if (!lb) {
+      lb = document.createElement('div');
+      lb.id = 'cc-lightbox';
+      lb.className = 'cc-lightbox';
+      lb.onclick = () => ccFecharFoto();
+      document.body.appendChild(lb);
+    }
+    const preco = parseFloat(item.preco) || 0;
+    lb.innerHTML = `
+      <button class="cc-lightbox-close" aria-label="Fechar" onclick="event.stopPropagation();ccFecharFoto()">&times;</button>
+      <div class="cc-lightbox-inner" onclick="event.stopPropagation()">
+        <img src="${escAttr(item.foto)}" class="cc-lightbox-img" alt="${escAttr(item.nome)}">
+        <div class="cc-lightbox-meta">
+          <div class="cc-lightbox-nome">${escHTML(item.nome)}</div>
+          ${item.descricao ? `<div class="cc-lightbox-desc">${escHTML(item.descricao)}</div>` : ''}
+          ${preco > 0 ? `<div class="cc-lightbox-preco">R$ ${preco.toFixed(2).replace('.',',')}</div>` : ''}
+        </div>
+      </div>`;
+    // força reflow para animar entrada
+    void lb.offsetWidth;
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  };
+  window.ccFecharFoto = function() {
+    const lb = document.getElementById('cc-lightbox');
+    if (!lb) return;
+    lb.classList.remove('open');
+    // mantém overflow travado se o modal do cardápio ainda estiver aberto
+    const cardapioAberto = document.getElementById('modal-cardapio-cliente')?.classList.contains('open');
+    document.body.style.overflow = cardapioAberto ? 'hidden' : '';
+  };
+
+  // ── Ação por WhatsApp para modos serviço/vitrine (sem carrinho) ──────────
+  function _ccAbrirWhatsItem(itemId, verbo) {
+    const loja = LOJAS[_ccLojaIdx];
+    if (!loja) return;
+    const item = loja.cardapio.find(i => i.id === itemId);
+    if (!item) return;
+    if (!loja.wpp) { alert('Esta loja não tem WhatsApp cadastrado.'); return; }
+    const preco = parseFloat(item.preco) || 0;
+    const precoTxt = preco > 0 ? ` (R$ ${preco.toFixed(2).replace('.',',')})` : '';
+    const msg = `Olá! Vim pelo AngatubaON 👋\n\n${verbo}: *${item.nome}*${precoTxt}\n\nPoderia me passar mais informações?`;
+    const url = `https://wa.me/${loja.wpp}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank', 'noopener');
+    try { registrarClique(loja.nome, 'whatsapp', loja.plano || 'GRATIS', loja.categoria || ''); } catch(e) {}
+  }
+  window.ccAgendarServico = function(itemId) { _ccAbrirWhatsItem(itemId, 'Quero agendar'); };
+  window.ccInteresse = function(itemId) {
+    const loja = LOJAS[_ccLojaIdx];
+    const slug = (loja && loja.categoria || '').toLowerCase();
+    _ccAbrirWhatsItem(itemId, slug === 'imobiliaria' ? 'Tenho interesse neste imóvel' : 'Tenho interesse em');
   };
 
   function ccAtualizarCarrinho() {

@@ -8739,6 +8739,9 @@
   };
 
   window.fecharCardapioCliente = function(viaPopstate) {
+    // Se o lightbox de foto estiver aberto, fecha junto (evita ficar órfão sobre a home)
+    const lb = document.getElementById('cc-lightbox');
+    if (lb) lb.classList.remove('open');
     document.getElementById('modal-cardapio-cliente').classList.remove('open');
     document.body.style.overflow = '';
     _focusTrapDesativar();
@@ -8843,7 +8846,10 @@
     return `
       <div class="cc-item-card cc-item-clickable" id="cc-card-${item.id}" role="button" tabindex="0" onclick="ccCardClick(event,'${item.id}')" style="margin-bottom:8px;cursor:pointer;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
         ${temFoto
-          ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" onclick="event.stopPropagation();ccAbrirFoto('${item.id}')" onerror="this.style.display='none'">`
+          ? `<div class="cc-foto-wrap">
+               <img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" onerror="this.parentNode.style.display='none'">
+               <button class="cc-foto-zoom" aria-label="Ver foto de ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAbrirFoto('${item.id}')">🔍</button>
+             </div>`
           : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
         <div class="cc-item-info">
           <div class="cc-item-nome">
@@ -8886,12 +8892,17 @@
   function _ccItemVitrineHTML(item, placeholderEmoji) {
     const temFoto = !!item.foto;
     const preco = parseFloat(item.preco) || 0;
+    // Placeholder fica sempre no fundo do wrap; a foto (se houver) cobre por cima.
+    // Se a foto falhar, onerror apenas esconde a <img> e o placeholder reaparece,
+    // sem destruir o badge de destaque (bug antigo: innerHTML apagava a estrela).
+    const zoomAttr = temFoto ? ` onclick="ccAbrirFoto('${item.id}')" style="cursor:zoom-in;"` : '';
     return `
       <div class="cc-vitrine-card" id="cc-card-${item.id}">
-        <div class="cc-vitrine-foto-wrap" onclick="ccAbrirFoto('${item.id}')">
+        <div class="cc-vitrine-foto-wrap"${zoomAttr}>
+          <div class="cc-vitrine-foto-ph">${placeholderEmoji}</div>
           ${temFoto
-            ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-vitrine-foto" onerror="this.parentNode.innerHTML='<div class=&quot;cc-vitrine-foto-ph&quot;>${placeholderEmoji}</div>'">`
-            : `<div class="cc-vitrine-foto-ph">${placeholderEmoji}</div>`}
+            ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-vitrine-foto" onerror="this.style.display='none'">`
+            : ''}
           ${item.destaque === 'SIM' ? '<span class="cc-vitrine-badge">⭐ Destaque</span>' : ''}
         </div>
         <div class="cc-vitrine-info">

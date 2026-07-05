@@ -2463,6 +2463,20 @@
       white-space: nowrap;
     }
 
+    /* Foto do card de produto: wrapper para posicionar a lupa de ampliar */
+    .cc-foto-wrap { position: relative; flex-shrink: 0; width: 60px; height: 60px; }
+    .cc-foto-wrap .cc-item-foto { width: 100%; height: 100%; }
+    .cc-foto-zoom {
+      position: absolute; bottom: 2px; right: 2px;
+      width: 20px; height: 20px; border-radius: 6px;
+      background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2);
+      color: #fff; font-size: 10px; line-height: 1; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.1s, background 0.15s;
+    }
+    .cc-foto-zoom:active { transform: scale(0.85); background: rgba(0,0,0,0.8); }
+
     /* Quando não há descrição, centraliza nome+preço verticalmente (sem buraco) */
     .cc-item-card:not(:has(.cc-item-desc)) .cc-item-info {
       display: flex; flex-direction: column; justify-content: center;
@@ -2493,12 +2507,18 @@
     }
     .cc-vitrine-foto-wrap {
       position: relative; width: 100%; aspect-ratio: 1 / 1;
-      background: #1a1a1a; cursor: zoom-in; overflow: hidden;
+      background: #1a1a1a; overflow: hidden;
     }
-    .cc-vitrine-foto { width: 100%; height: 100%; object-fit: cover; display: block; }
+    /* placeholder ocupa o wrap; a foto (absolute) cobre por cima quando carrega */
     .cc-vitrine-foto-ph {
-      width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
       font-size: 2.6rem; background: var(--surface);
+    }
+    .cc-vitrine-foto {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%; object-fit: cover; display: block;
+      background: #1a1a1a;   /* evita ver o placeholder através de PNG transparente */
     }
     .cc-vitrine-badge {
       position: absolute; top: 6px; left: 6px;

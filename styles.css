@@ -22,6 +22,14 @@
       --red:      #ff4444;
       --zap:      #f59e0b;
       --blue:     #4285f4;
+      /* Item 12: cores canônicas de plano (antes espalhadas em vários hex divergentes:
+         PLUS aparecia como #6366f1, #a5b4fc, #818cf6; PRO com âmbares variados). */
+      --plano-plus-1: #6366f1;
+      --plano-plus-2: #4f46e5;
+      --plano-plus-txt: #a5b4fc;
+      --plano-pro-1: #f59e0b;
+      --plano-pro-2: #d97706;
+      --plano-pro-txt: #fbbf24;
       --font-h:   'Syne', sans-serif;
       --font-b:   'DM Sans', sans-serif;
       --r-lg:     18px;
@@ -810,6 +818,12 @@
       color: var(--muted); font-size: 12px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: color .15s, border-color .15s; margin-top: 1px;
+      position: relative; -webkit-tap-highlight-color: transparent;
+    }
+    /* Item 5: hit-area de 44px sem alterar o tamanho visual (30px). */
+    .ml-info-edit-btn::before {
+      content: ""; position: absolute; top: 50%; left: 50%;
+      width: 44px; height: 44px; transform: translate(-50%, -50%);
     }
     .ml-info-edit-btn:hover { color: var(--zap); border-color: rgba(245,158,11,0.4); }
     .ml-info-edit-btn:active { transform: scale(0.9); }
@@ -862,7 +876,7 @@
     }
     .mle-sched-preset {
       display: flex; align-items: center; justify-content: center; gap: 5px;
-      padding: 9px 6px; border-radius: 9px; background: var(--surface);
+      padding: 12px 6px; min-height: 44px; box-sizing: border-box; border-radius: 9px; background: var(--surface);
       border: 1px solid var(--border); color: var(--muted);
       font-family: var(--font-b); font-size: 11px; font-weight: 700;
       cursor: pointer; transition: all .15s; -webkit-tap-highlight-color: transparent;
@@ -877,7 +891,7 @@
     .mle-sched-card-title { font-size: 10px; font-weight: 700; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; }
     .mle-sched-days { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
     .mle-sched-day {
-      flex: 1; min-width: 34px; padding: 7px 2px; border-radius: 7px;
+      flex: 1; min-width: 38px; padding: 11px 2px; min-height: 40px; box-sizing: border-box; border-radius: 7px;
       background: var(--surface2); border: 1px solid var(--border);
       color: var(--muted); font-family: var(--font-b); font-size: 11px;
       font-weight: 700; cursor: pointer; transition: all .12s;
@@ -895,6 +909,12 @@
       position: absolute; top: 8px; right: 8px; width: 22px; height: 22px;
       border-radius: 6px; background: rgba(239,68,68,0.12); border: none;
       color: #ef4444; font-size: 11px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Item 5: hit-area de 44px sem alterar o tamanho visual (22px). */
+    .mle-sched-remove::before {
+      content: ""; position: absolute; top: 50%; left: 50%;
+      width: 44px; height: 44px; transform: translate(-50%, -50%);
     }
     .mle-sched-add {
       width: 100%; padding: 9px; border-radius: 8px;
@@ -1990,13 +2010,13 @@
     }
 
     .plan-badge.badge-pro {
-      background: linear-gradient(135deg,#f59e0b,#d97706);
+      background: linear-gradient(135deg, var(--plano-pro-1), var(--plano-pro-2));
       color: #000;
       box-shadow: 0 1px 6px rgba(245,158,11,0.4);
     }
 
     .plan-badge.badge-plus {
-      background: linear-gradient(135deg,#6366f1,#4f46e5);
+      background: linear-gradient(135deg, var(--plano-plus-1), var(--plano-plus-2));
       color: #fff;
       box-shadow: 0 1px 6px rgba(99,102,241,0.35);
     }

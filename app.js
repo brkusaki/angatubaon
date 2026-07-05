@@ -353,6 +353,15 @@
     return s;
   }
 
+  // Item 7: valida o formato de um handle do Instagram JÁ normalizado.
+  // Regras do Instagram: letras, números, ponto e underscore; 1–30 caracteres.
+  // Vazio é considerado válido (permite limpar o campo). Serve para não mostrar
+  // "✅ atualizado" quando o link do perfil ficaria quebrado.
+  function _igHandleValido(h) {
+    if (!h) return true; // vazio = limpar, ok
+    return /^[a-zA-Z0-9._]{1,30}$/.test(h);
+  }
+
   // Gera slug de URL a partir do nome da loja
   function toSlug(nome) {
     return String(nome || '').toLowerCase()
@@ -1553,6 +1562,56 @@
     el.classList.add('show');
     toastTimer = setTimeout(hideToast, 2200);
   }
+
+  // Item 11: toast padronizado (avisos/sucesso/erro efemeros) no lugar de alert().
+  // Reusa a infra visual de #toast (com a coruja) — troca a coruja conforme o tipo.
+  function mlToast(mensagem, tipo, owlSrc) {
+    var owl = owlSrc || (tipo === 'erro' ? '/webp/owl-sign.webp'
+                       : tipo === 'ok'  ? '/webp/owl-thumbs-up.webp'
+                       : '/webp/owl-tip.webp');
+    if (typeof showToastSimples === 'function') { showToastSimples(mensagem, owl); return; }
+    try { console.log('[toast]', mensagem); } catch(e) {}
+  }
+
+  // Item 11: modal de confirmacao no tema dark. Retorna Promise<boolean>.
+  // Substitui o confirm() nativo (fundo branco + dominio no iOS).
+  function mlConfirmar(titulo, mensagem, opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+      var ov = document.getElementById('ml-confirm-overlay');
+      var tEl = document.getElementById('ml-confirm-titulo');
+      var mEl = document.getElementById('ml-confirm-msg');
+      var okB = document.getElementById('ml-confirm-ok');
+      var cnB = document.getElementById('ml-confirm-cancel');
+      var owl = document.getElementById('ml-confirm-owl');
+      if (!ov || !tEl || !mEl || !okB || !cnB) { resolve(window.confirm((titulo ? titulo + '\n\n' : '') + (mensagem || ''))); return; }
+      tEl.textContent = titulo || 'Confirmar';
+      mEl.textContent = mensagem || '';
+      okB.textContent = opts.okLabel || 'Confirmar';
+      cnB.textContent = opts.cancelLabel || 'Cancelar';
+      okB.style.background = (opts.okCor === 'ok') ? 'var(--green)' : 'var(--red)';
+      okB.style.color = (opts.okCor === 'ok') ? '#000' : '#fff';
+      if (owl && opts.owlSrc) owl.src = opts.owlSrc;
+      var fechar = function (val) {
+        ov.style.display = 'none';
+        okB.onclick = null; cnB.onclick = null; ov.onclick = null;
+        document.removeEventListener('keydown', onKey);
+        resolve(val);
+      };
+      var onKey = function (e) {
+        if (e.key === 'Escape') fechar(false);
+        else if (e.key === 'Enter') fechar(true);
+      };
+      okB.onclick = function () { fechar(true); };
+      cnB.onclick = function () { fechar(false); };
+      ov.onclick = function (e) { if (e.target === ov) fechar(false); };
+      document.addEventListener('keydown', onKey);
+      ov.style.display = 'flex';
+      okB.focus();
+    });
+  }
+  window.mlConfirmar = mlConfirmar;
+  window.mlToast = mlToast;
 
   /* ── Tema dia/noite (auto/claro/escuro) ──────────────────────────
      3 modos guardados em localStorage 'angatuba_theme':
@@ -3055,11 +3114,11 @@
             const plano = (infoLoja.plano || 'GRATIS').toUpperCase();
             if (plano === 'PRO') {
               badgeEl.textContent = '⭐ PRO';
-              badgeEl.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
+              badgeEl.style.background = 'linear-gradient(135deg, var(--plano-pro-1), var(--plano-pro-2))';
               badgeEl.style.color = '#000';
             } else if (plano === 'PLUS') {
               badgeEl.textContent = '✦ PLUS';
-              badgeEl.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
+              badgeEl.style.background = 'linear-gradient(135deg, var(--plano-plus-1), var(--plano-plus-2))';
               badgeEl.style.color = '#fff';
             } else {
               badgeEl.textContent = 'GRÁTIS';
@@ -3206,19 +3265,55 @@
   }
 
   /* ── Painel Minha Loja ─────────────────────────────────────── */
+  // Item 2: junção estável da própria loja com a lista pública LOJAS.
+  // Antes cruzava por nome (LOJAS.find(l => l.nome === d.nome)); ao renomear
+  // a loja, d.nome (cache fresco) deixava de casar com LOJAS (nome antigo até
+  // o feed público revalidar) e o hero perdia foto/logo, o banner de avaliação
+  // e as sugestões de tags paravam de achar a loja. O WhatsApp é chave estável:
+  // não muda ao editar o nome. Comparamos só os dígitos, tolerando o prefixo 55
+  // (o feed público faz replace(/\D/g,'') sem garantir 55; lojaDados pode ter 55).
+  function _mlDigitos(v) { return String(v || '').replace(/\D/g, ''); }
+  function _mlMesmoWpp(a, b) {
+    a = _mlDigitos(a); b = _mlDigitos(b);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    // Tolera divergência do prefixo país: compara os últimos 11 dígitos (DDD+numero)
+    const ax = a.startsWith('55') ? a.slice(2) : a;
+    const bx = b.startsWith('55') ? b.slice(2) : b;
+    return ax === bx && ax.length >= 10;
+  }
+  // Resolve o objeto da loja em LOJAS a partir dos dados do painel (d) ou de um
+  // wpp/nome soltos. Prioriza wpp; nome é só último recurso (retrocompat).
+  function _mlAcharLojaLocal(dOuWpp, nomeFallback) {
+    if (typeof LOJAS === 'undefined' || !Array.isArray(LOJAS)) return null;
+    let wpp = '', nome = '';
+    if (dOuWpp && typeof dOuWpp === 'object') { wpp = dOuWpp.wpp || ''; nome = dOuWpp.nome || ''; }
+    else { wpp = dOuWpp || ''; }
+    if (!wpp) wpp = _lojaWpp || localStorage.getItem('angatuba_loja_wpp') || '';
+    if (!nome) nome = nomeFallback || '';
+    let loja = wpp ? LOJAS.find(l => _mlMesmoWpp(l.wpp, wpp)) : null;
+    if (!loja && nome) loja = LOJAS.find(l => l.nome === nome); // fallback legado
+    return loja || null;
+  }
+  function _mlAcharIdxLojaLocal(dOuWpp, nomeFallback) {
+    const loja = _mlAcharLojaLocal(dOuWpp, nomeFallback);
+    return loja ? LOJAS.indexOf(loja) : -1;
+  }
+
   // Atualiza só o badge de plano no hero do painel. Extraído para ser reutilizado
   // pelo polling pós-pagamento (atualiza ao vivo mesmo fora do _aplicarDadosLoja).
   function _aplicarBadgePlano(plano) {
     const planBadge = document.getElementById('ml-plan-badge');
     if (!planBadge) return;
     const p = (plano || 'GRATIS').toUpperCase();
+    // Item 12: usa os tokens canônicos de plano (var(--plano-*)) em vez de hex soltos.
     if (p === 'PRO') {
       planBadge.textContent = '⭐ PRO';
-      planBadge.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
+      planBadge.style.background = 'linear-gradient(135deg, var(--plano-pro-1), var(--plano-pro-2))';
       planBadge.style.color = '#000';
     } else if (p === 'PLUS') {
       planBadge.textContent = '✦ PLUS';
-      planBadge.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
+      planBadge.style.background = 'linear-gradient(135deg, var(--plano-plus-1), var(--plano-plus-2))';
       planBadge.style.color = '#fff';
     } else {
       planBadge.textContent = 'GRÁTIS';
@@ -3244,8 +3339,9 @@
     const isPro     = plano === 'PRO';
     const isPlus    = plano === 'PLUS';
 
-    // Usa foto/logo do lojaDados; fallback na lista LOJAS já carregada
-    const lojaLocal = LOJAS.find(l => l.nome === d.nome);
+    // Usa foto/logo do lojaDados; fallback na lista LOJAS já carregada.
+    // Item 2: junção por WhatsApp (estável a renomeações), não por nome.
+    const lojaLocal = _mlAcharLojaLocal(d);
     const fotoUrl   = d.foto  || lojaLocal?.foto  || '';
     const logoUrl   = d.logo  || lojaLocal?.logo  || '';
 
@@ -3315,20 +3411,27 @@
     const mlEntregaWrap = document.getElementById('ml-entrega-wrap');
     if (mlEntregaWrap) {
       const entregaOn = !!d.fazEntrega;
+      // Item 15: rótulo textual do estado ao lado do switch (antes a cor era o único
+      // sinal de on/off, destoando dos botões de status que dizem o estado por extenso).
+      // Item 12: cor verde padronizada em var(--green) (era #10b981, fora da paleta).
       mlEntregaWrap.innerHTML = `
         <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:12px;">
           <span style="font-size:12px;color:var(--text);line-height:1.4;">Fazemos entrega</span>
-          <div id="ml-entrega-toggle"
-            onclick="mlToggleEntrega()"
-            data-ativo="${entregaOn ? '1' : '0'}"
-            style="flex-shrink:0;width:42px;height:24px;border-radius:12px;
-                   background:${entregaOn ? '#10b981' : 'var(--border)'};
-                   position:relative;cursor:pointer;transition:background .2s;">
-            <div style="position:absolute;top:3px;left:${entregaOn ? '21px' : '3px'};
-                        width:18px;height:18px;border-radius:50%;background:#fff;
-                        transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3);"
-                 id="ml-entrega-thumb"></div>
-          </div>
+          <span style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <span id="ml-entrega-label" style="font-size:11px;font-weight:700;color:${entregaOn ? 'var(--green)' : 'var(--muted)'};min-width:64px;text-align:right;">${entregaOn ? 'Ativado' : 'Desativado'}</span>
+            <div id="ml-entrega-toggle"
+              onclick="mlToggleEntrega()"
+              role="switch" tabindex="0" aria-checked="${entregaOn ? 'true' : 'false'}" aria-label="Fazemos entrega"
+              data-ativo="${entregaOn ? '1' : '0'}"
+              style="flex-shrink:0;width:42px;height:24px;border-radius:12px;
+                     background:${entregaOn ? 'var(--green)' : 'var(--border)'};
+                     position:relative;cursor:pointer;transition:background .2s;">
+              <div style="position:absolute;top:3px;left:${entregaOn ? '21px' : '3px'};
+                          width:18px;height:18px;border-radius:50%;background:#fff;
+                          transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3);"
+                   id="ml-entrega-thumb"></div>
+            </div>
+          </span>
         </label>
         <div id="ml-entrega-status" role="status" aria-live="polite" style="font-size:10px;margin-top:6px;min-height:13px;color:var(--muted);"></div>`;
     }
@@ -3374,7 +3477,9 @@
         const nomePreview = document.getElementById('ml-up-nome-preview');
         const ramoPreview = document.getElementById('ml-up-ramo-preview');
         if (nomePreview) nomePreview.textContent = d.nome || '—';
-        if (ramoPreview) ramoPreview.textContent = d.categoria || d.ramo || '—';
+        // Item 14: lojaDados devolve `ramo` (não `categoria`) — usa a fonte real.
+        // Antes usava `d.categoria || d.ramo`, e d.categoria era sempre undefined.
+        if (ramoPreview) ramoPreview.textContent = d.ramo || '—';
         if (fotoUrl) mlSetPreviewUpload('foto', fotoUrl);
         if (logoUrl) mlSetPreviewUpload('logo', logoUrl);
       }
@@ -3429,7 +3534,10 @@
             `<span class="ml-badge-novo">+${novos} hoje</span>`);
         }
       }
-      localStorage.setItem(`angatuba_ultima_visita_${_lojaToken?.slice(-8)}`, Date.now().toString());
+      // Item 4: removida a escrita de `angatuba_ultima_visita_<token>` — a chave
+      // era gravada aqui mas NUNCA lida em nenhum ponto do código (código morto que
+      // ainda acumulava uma chave órfã por sessão no localStorage). O cálculo de
+      // "novos cliques hoje" é feito 100% no backend (calcNovosHojeComDados).
       if (typeof mlAtualizarBadgeMetricas === 'function') {
         mlAtualizarBadgeMetricas(novos);
       }
@@ -3443,12 +3551,16 @@
         document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
         if (document.getElementById('ml-m-ig')) document.getElementById('ml-m-ig').textContent = m.ig ?? 0;
       } else {
-        document.getElementById('ml-m-7d').textContent    = m.d7   ?? 0;
-        document.getElementById('ml-m-30d').textContent   = m.d30  ?? 0;
-        document.getElementById('ml-m-total').textContent = m.total ?? 0;
-        document.getElementById('ml-m-wpp').textContent   = m.wpp  ?? 0;
-        document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
-        if (document.getElementById('ml-m-ig')) document.getElementById('ml-m-ig').textContent = m.ig ?? 0;
+        // Item 1: plano Grátis NÃO deve renderizar os números detalhados no DOM.
+        // O backend já envia só { total, bloqueado } — aqui escrevemos '—' nos
+        // campos travados (o overlay de bloqueio cobre o grid) e populamos apenas
+        // o total do overlay ("você já tem N cliques"). Nada de dado real no DOM.
+        document.getElementById('ml-m-7d').textContent    = '—';
+        document.getElementById('ml-m-30d').textContent   = '—';
+        document.getElementById('ml-m-total').textContent = '—';
+        document.getElementById('ml-m-wpp').textContent   = '—';
+        document.getElementById('ml-m-tel').textContent   = '—';
+        if (document.getElementById('ml-m-ig')) document.getElementById('ml-m-ig').textContent = '—';
         document.getElementById('ml-lock-total').textContent = m.total ?? 0;
         if (lockEl) lockEl.style.display = '';
       }
@@ -3538,7 +3650,8 @@
     const plano = (d.plano || 'GRATIS').toUpperCase();
     if (plano === 'GRATIS') { banner.style.display = 'none'; return; }
 
-    const lojaLocal = LOJAS.find(l => l.nome === d.nome);
+    // Item 2: junção por WhatsApp (estável a renomeações), não por nome.
+    const lojaLocal = _mlAcharLojaLocal(d);
     const avals = (lojaLocal && lojaLocal.avaliacoes) ? lojaLocal.avaliacoes : null;
     // Sem dados de avaliação carregados ainda: não arrisca falso positivo.
     if (!avals) { banner.style.display = 'none'; return; }
@@ -3598,8 +3711,8 @@
       banner.style.display = 'none';
     }
     const nome = _lojaNome || localStorage.getItem('angatuba_loja_nome') || '';
-    if (!nome) return;
-    const idx = LOJAS.findIndex(l => l.nome === nome);
+    // Item 2: acha a própria loja por WhatsApp (estável a renomeações); nome é fallback.
+    const idx = _mlAcharIdxLojaLocal(null, nome);
     if (idx < 0) return;
     // Fecha o painel e abre os detalhes da loja
     if (typeof fecharMinhaLoja === 'function') fecharMinhaLoja();
@@ -4172,6 +4285,7 @@
     const overlay = document.getElementById('modal-minha-loja');
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
+    if (typeof mlAvisoOffline === 'function') mlAvisoOffline(false); // Item 3: reseta aviso ao (re)abrir
     mlSortearDica();
     // Onboarding de boas-vindas: só na 1ª vez que esta loja abre o painel.
     // Espera o painel pintar antes de sobrepor (evita corrida com a transição de aprovação).
@@ -4248,18 +4362,39 @@
         try { localStorage.setItem('angatuba_loja_dados', JSON.stringify(dadosJson.data)); } catch(e) {}
 
         _aplicarDadosLoja(dadosJson.data, metJson, window._mlPainelInteragido);
+        mlAvisoOffline(false); // Item 3: rede ok — garante que o aviso não fica preso
 
         // ── Cardápio ─────────────────────────────────────
         await mlCardapioCarregar(dadosJson.data.plano || 'GRATIS');
       }
     } catch(e) {
       console.warn('[MinhaLoja] Erro ao carregar dados:', e.message);
+      // Item 3: a atualização de rede falhou. Antes ficava só no console e o painel
+      // exibia cache (ou placeholders '—') sem avisar — dava impressão de "zerou".
+      // Mostra um aviso discreto, diferenciando ter dados salvos de não ter.
+      mlAvisoOffline(true, dadosCache
+        ? 'Sem conexão — mostrando os últimos dados salvos.'
+        : 'Sem conexão — não foi possível carregar seus dados agora.');
+    }
+  }
+
+  // Item 3: controla o banner de aviso offline do painel Minha Loja.
+  function mlAvisoOffline(mostrar, txt) {
+    const box = document.getElementById('ml-aviso-offline');
+    if (!box) return;
+    if (mostrar) {
+      const t = document.getElementById('ml-aviso-offline-txt');
+      if (t && txt) t.textContent = txt;
+      box.style.display = 'flex';
+    } else {
+      box.style.display = 'none';
     }
   }
 
   function fecharMinhaLoja(viaPopstate) {
     document.getElementById('modal-minha-loja').classList.remove('open');
     document.body.style.overflow = '';
+    if (typeof _mlPararTimerAnuncio === 'function') _mlPararTimerAnuncio(); // Item 17: não deixa o interval rodando com o painel fechado
     // Fix #6: desfaz a entrada do histórico ao fechar manualmente (popstate já consumiu)
     if (!viaPopstate && history.state?.modal === 'minha-loja') history.back();
   }
@@ -4291,6 +4426,8 @@
 
   // Botão "Aberto" e "Já voltamos" — mostra painel de opções antes de confirmar
   function lojaToggleComHorario(status) {
+    // Item 6: escolher ABERTO/VOLTAMOS cancela uma confirmação de "Fechado" pendente.
+    if (typeof _mlResetFechadoConfirm === 'function') _mlResetFechadoConfirm();
     const wrapAberto   = document.getElementById('ml-aberto-ate-wrap');
     const wrapVoltamos = document.getElementById('ml-voltamos-ate-wrap');
     // Feedback visual imediato — marca o botão clicado mesmo antes de confirmar
@@ -4351,12 +4488,54 @@
 
   // Botão "Fechado": fecha apenas até o fim do dia. Grava FECHADO_HOJE_<hoje>
   // (data LOCAL/BRT) para que o status volte ao automático na virada do dia.
+  // Item 6: fechar a loja some da descoberta pública — é destrutivo e acontecia
+  // com um único toque. Exige confirmação de dois toques (sem confirm() nativo,
+  // pra não quebrar o tema dark).
+  let _mlFechadoConfirmar = false;
+  let _mlFechadoTimer = null;
   async function lojaToggleFechado() {
+    if (!_mlFechadoConfirmar) {
+      _mlFechadoConfirmar = true;
+      _mlToggleFeedback('aviso', '⚠️ Isso fecha sua loja para os clientes hoje. Toque de novo em "Fechado" para confirmar.');
+      const btn = document.querySelector('.toggle-status-btn[data-status="FECHADO"]');
+      if (btn) btn.textContent = 'Confirmar?';
+      // Reseta a intenção se o lojista não confirmar em 5s
+      if (_mlFechadoTimer) clearTimeout(_mlFechadoTimer);
+      _mlFechadoTimer = setTimeout(() => { _mlResetFechadoConfirm(); }, 5000);
+      return;
+    }
+    _mlResetFechadoConfirm();
     const d = new Date();
     const hoje = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     await lojaToggle(`FECHADO_HOJE_${hoje}`);
   }
+  function _mlResetFechadoConfirm() {
+    _mlFechadoConfirmar = false;
+    if (_mlFechadoTimer) { clearTimeout(_mlFechadoTimer); _mlFechadoTimer = null; }
+    const btn = document.querySelector('.toggle-status-btn[data-status="FECHADO"]');
+    if (btn) btn.textContent = 'Fechado';
+  }
   window.lojaToggleFechado = lojaToggleFechado;
+
+  // Item 6: feedback unificado e à prova de corrida para o toggle de status.
+  // Antes sucesso e erro escreviam no mesmo #ml-toggle-erro trocando a cor na mão,
+  // e uma troca rápida de status fazia um setTimeout apagar a mensagem da outra.
+  // Aqui cancelamos qualquer timer pendente antes de exibir a nova mensagem.
+  let _mlToggleMsgTimer = null;
+  function _mlToggleFeedback(tipo, texto) {
+    const box = document.getElementById('ml-toggle-erro');
+    if (!box) return;
+    if (_mlToggleMsgTimer) { clearTimeout(_mlToggleMsgTimer); _mlToggleMsgTimer = null; }
+    const cor = tipo === 'ok' ? 'var(--green)' : (tipo === 'aviso' ? 'var(--zap)' : 'var(--red)');
+    box.style.color = cor;
+    box.textContent = texto;
+    // Avisos de confirmação não somem sozinhos (o fluxo do botão os limpa);
+    // sucesso/erro auto-limpam.
+    if (tipo === 'ok' || tipo === 'erro') {
+      const ms = tipo === 'ok' ? 2500 : 4000;
+      _mlToggleMsgTimer = setTimeout(() => { if (box) { box.textContent = ''; box.style.color = 'var(--red)'; } _mlToggleMsgTimer = null; }, ms);
+    }
+  }
 
   async function lojaToggle(novoStatus) {
     if (!_lojaToken) return;
@@ -4385,13 +4564,8 @@
       const json = await apiPost('lojaToggle', { token: _lojaToken, statusLoja: novoStatus }, { timeout: 10000 });
       // backend pode devolver erro de negócio (linha mudou, data inválida) com status != ok.
       if (json.status !== 'ok') throw new Error(json.msg || 'Falha ao salvar status');
-      // Melhoria: feedback de sucesso (antes só o erro tinha feedback visível).
-      const okEl = document.getElementById('ml-toggle-erro');
-      if (okEl) {
-        okEl.style.color = 'var(--green)';
-        okEl.textContent = '✅ Status salvo';
-        setTimeout(() => { if (okEl) { okEl.textContent = ''; okEl.style.color = 'var(--red)'; } }, 2500);
-      }
+      // Item 6: feedback de sucesso via helper à prova de corrida.
+      _mlToggleFeedback('ok', '✅ Status salvo');
     } catch(e) {
       if (e.message === 'UNAUTHORIZED') return; // apiPost já fez logout
       console.warn('[lojaToggle] Erro:', e.message);
@@ -4403,8 +4577,7 @@
           if (cache) { cache.statusLoja = statusCacheAnterior; localStorage.setItem('angatuba_loja_dados', JSON.stringify(cache)); }
         } catch(e2) {}
       }
-      const errEl = document.getElementById('ml-toggle-erro');
-      if (errEl) { errEl.textContent = '❌ Sem conexão. Status não foi salvo.'; setTimeout(() => { errEl.textContent = ''; }, 4000); }
+      _mlToggleFeedback('erro', '❌ Sem conexão. Status não foi salvo.');
     }
   }
 
@@ -4417,6 +4590,18 @@
     if (!input) return;
 
     const valor = normalizarInstagramHandle(input.value);
+
+    // Item 7: valida o formato antes de salvar. Sem isto, um valor com espaços,
+    // acentos ou caracteres inválidos era aceito e o link "Ver perfil atual"
+    // apontava para instagram.com/<lixo> — o lojista achava que salvou certo.
+    if (!_igHandleValido(valor)) {
+      if (status) {
+        status.textContent = '⚠️ Usuário do Instagram inválido. Use só letras, números, ponto e "_" (ex.: minha.loja).';
+        status.style.color = 'var(--zap)';
+      }
+      input.focus();
+      return;
+    }
 
     if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
     if (status) { status.textContent = ''; status.style.color = ''; }
@@ -5832,8 +6017,65 @@
   // 1. Busca assinatura do GAS (chamada leve, sem base64)
   // 2. Envia imagem diretamente do browser para Cloudinary (sem passar pelo GAS)
   // Isso evita o problema de passar megabytes de base64 pelo Apps Script
+  // Item 13: redimensiona/recomprime a imagem no browser antes de enviar.
+  // Foto de celular tem 3–8MB e ~4000px; o card exibe pequeno e a capa/hero puxa
+  // a imagem para todo cliente que abre a loja. Reduzir para ~1280px e recomprimir
+  // acelera muito o upload (crítico no 4G rural de Angatuba) e o carregamento público.
+  // Preserva proporção, nunca faz upscale, mantém PNG (alpha de logos) quando aplicável,
+  // e cai no arquivo original se algo falhar.
+  function _mlRedimensionarImagem(file, maxDim, quality) {
+    return new Promise(function (resolve) {
+      try {
+        if (!file || !/^image\//.test(file.type) || file.type === 'image/gif') {
+          return resolve(file); // gif animado / não-imagem: não mexe
+        }
+        const reader = new FileReader();
+        reader.onerror = function () { resolve(file); };
+        reader.onload = function (ev) {
+          const img = new Image();
+          img.onerror = function () { resolve(file); };
+          img.onload = function () {
+            try {
+              const w = img.naturalWidth, h = img.naturalHeight;
+              if (!w || !h) return resolve(file);
+              // Já pequena o suficiente: não redimensiona (evita upscale e perda à toa).
+              if (Math.max(w, h) <= maxDim) return resolve(file);
+              const escala = maxDim / Math.max(w, h);
+              const nw = Math.round(w * escala), nh = Math.round(h * escala);
+              const canvas = document.createElement('canvas');
+              canvas.width = nw; canvas.height = nh;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) return resolve(file);
+              ctx.drawImage(img, 0, 0, nw, nh);
+              // PNG preserva transparência (logos); resto vira JPEG comprimido.
+              const ehPng = file.type === 'image/png';
+              const mime  = ehPng ? 'image/png' : 'image/jpeg';
+              canvas.toBlob(function (blob) {
+                // Se a conversão falhou ou ficou maior que o original, usa o original.
+                if (!blob || blob.size >= file.size) return resolve(file);
+                const nome = (file.name || 'img').replace(/\.[^.]+$/, '') + (ehPng ? '.png' : '.jpg');
+                try {
+                  resolve(new File([blob], nome, { type: mime, lastModified: Date.now() }));
+                } catch (e) {
+                  // Ambientes sem construtor File: devolve o Blob (FormData aceita).
+                  resolve(blob);
+                }
+              }, mime, ehPng ? undefined : (quality || 0.85));
+            } catch (e) { resolve(file); }
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      } catch (e) { resolve(file); }
+    });
+  }
+
   async function uploadImagem(file, statusEl) {
     if (!file) return null;
+    // Item 13: reduz antes de qualquer checagem de tamanho (uma foto de 6MB/4000px
+    // costuma cair para poucas centenas de KB, evitando o erro de "máx 5MB" e timeouts).
+    if (statusEl) { statusEl.textContent = '⏳ Otimizando imagem...'; statusEl.style.color = 'var(--muted)'; }
+    file = await _mlRedimensionarImagem(file, 1280, 0.85);
     if (file.size > 5 * 1024 * 1024) {
       statusEl.textContent = '❌ Arquivo muito grande (máx 5MB)';
       statusEl.style.color = 'var(--red)';
@@ -6553,7 +6795,19 @@
       if (key === 'nome' && !raw) { if (msg) { msg.textContent = 'O nome não pode ficar vazio.'; msg.style.color = '#ef4444'; } return; }
 
       const map = {
-        nome:      { action:'lojaAtualizarNome',      payload:{ nome: raw },                          apply:function(){ cur.nome = raw; } },
+        // Item 2: ao renomear, propaga o novo nome para todos os pontos que ainda
+        // usam nome como referência (global _lojaNome, objeto em LOJAS via wpp,
+        // e o cache do localStorage). Assim a renomeação fica consistente na hora,
+        // sem esperar o feed público revalidar (cache de até 60s no GAS).
+        nome:      { action:'lojaAtualizarNome',      payload:{ nome: raw },                          apply:function(){
+                       cur.nome = raw;
+                       _lojaNome = raw;
+                       try { localStorage.setItem('angatuba_loja_nome', raw); } catch(e) {}
+                       // _lojaIdxMap indexa por REFERÊNCIA do objeto (não por nome),
+                       // então mutar lj.nome não invalida o índice — basta atualizar o campo.
+                       const lj = _mlAcharLojaLocal(cur);
+                       if (lj) lj.nome = raw;
+                     } },
         telefone:  { action:'lojaAtualizarTelefone',  payload:{ telefone: raw.replace(/\D/g,'') },    apply:function(){ cur.tel = raw.replace(/\D/g,''); } },
         descricao: { action:'lojaAtualizarDescricao', payload:{ descricao: raw },                     apply:function(){ cur.obs = raw; } },
       }[key];
@@ -6763,6 +7017,9 @@
         inpRua.focus();
         inpRua.addEventListener('input', function () {
           mleAddrRua = ''; // invalida seleção ao digitar
+          // Item 10: mudou o texto → reseta o estado de confirmação de endereço livre.
+          _mleEndConfirmarLivre = false;
+          const btnS = el('mle-addr-save'); if (btnS && !btnS.disabled) btnS.textContent = 'Salvar';
           const q = inpRua.value.trim();
           if (mleAddrTimer) clearTimeout(mleAddrTimer);
           if (q.length < 4) { if (sugg) sugg.style.display = 'none'; return; }
@@ -6813,6 +7070,10 @@
             mleAddrRua = elItem.dataset.rua;
             el('mle-addr-rua').value = mleAddrRua;
             sugg.style.display = 'none';
+            // Item 10: seleção confirmada no mapa → limpa estado de confirmação livre.
+            _mleEndConfirmarLivre = false;
+            const btnS = el('mle-addr-save'); if (btnS && !btnS.disabled) btnS.textContent = 'Salvar';
+            const msgE = el('mle-addr-msg'); if (msgE) { msgE.textContent = ''; }
             if (status) { status.textContent = '✅ Rua confirmada — adicione o número ao lado.'; }
             el('mle-addr-num')?.focus();
           });
@@ -6823,6 +7084,13 @@
       }
     }
 
+    // Item 10: guarda o estado "endereço digitado à mão, sem confirmar no mapa".
+    // Se o lojista não escolheu uma sugestão do autocomplete, o backend gera o link
+    // do Maps por busca textual — que pode cair no lugar errado. Em vez de salvar
+    // silenciosamente, exigimos um segundo toque de confirmação (sem confirm() nativo,
+    // pra não quebrar o tema dark — o próprio botão vira o aviso).
+    let _mleEndConfirmarLivre = false;
+
     window.mlSaveEndereco = async function () {
       const inpRua = el('mle-addr-rua');
       const inpNum = el('mle-addr-num');
@@ -6832,7 +7100,20 @@
       if (!inpRua) return;
       // Usa a rua selecionada se houver; senão o texto digitado (permite endereço manual)
       const ruaBase = mleAddrRua || inpRua.value.trim();
-      if (!ruaBase) { if (msg) { msg.textContent = 'Informe o endereço.'; msg.style.color = '#ef4444'; } return; }
+      if (!ruaBase) { if (msg) { msg.textContent = 'Informe o endereço.'; msg.style.color = '#ef4444'; _mleEndConfirmarLivre = false; return; } return; }
+
+      // Item 10: endereço não veio de uma sugestão do mapa → confirma antes de salvar.
+      const enderecoNaoConfirmado = !mleAddrRua;
+      if (enderecoNaoConfirmado && !_mleEndConfirmarLivre) {
+        _mleEndConfirmarLivre = true;
+        if (msg) {
+          msg.innerHTML = '⚠️ Não confirmamos esse endereço no mapa — o link de "como chegar" pode ficar impreciso. Toque em <b>Salvar assim mesmo</b> para continuar, ou escolha uma sugestão da lista.';
+          msg.style.color = 'var(--zap)';
+        }
+        if (btn) { btn.textContent = 'Salvar assim mesmo'; }
+        return;
+      }
+
       const num = (inpNum?.value || '').trim();
       const endFull = num ? (ruaBase + ', ' + num) : ruaBase;
       const bairro = selBairro ? selBairro.value : '';
@@ -6843,12 +7124,13 @@
         if (json.status === 'ok') {
           cur.endereco = endFull;
           cur.bairro = bairro;
+          _mleEndConfirmarLivre = false;
           persistirCache();
           mlFecharEditor(cur, 'endereco');
         } else { throw new Error(json.msg || 'Erro'); }
       } catch (e) {
         if (msg) { msg.textContent = 'Erro ao salvar: ' + e.message; msg.style.color = '#ef4444'; }
-        if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
+        if (btn) { btn.disabled = false; btn.textContent = _mleEndConfirmarLivre ? 'Salvar assim mesmo' : 'Salvar'; }
       }
     };
 
@@ -6867,7 +7149,17 @@
       // Se NÃO conseguiu parsear mas HAVIA um horário salvo, não assume Seg-Sex
       // silenciosamente (sobrescreveria o horário real). Avisa e começa vazio.
       const horarioSalvoNaoReconhecido = !parsed && !!String(cur.horario || '').trim();
-      mleTurnos = parsed || [{ dias:[1,2,3,4,5], abre:'08:00', fecha:'18:00' }];
+      // Item 9: se havia horário salvo mas o formato não foi reconhecido, NÃO semeia
+      // Seg-Sex 08-18 (o lojista poderia salvar sem reparar e sobrescrever o horário
+      // real por um genérico). Começa com um turno de DIAS VAZIOS: os cards aparecem
+      // sem nenhum dia marcado, o preview pede "selecione um dia" e o mlSaveHorario
+      // bloqueia salvar enquanto não houver dia+horário escolhidos de fato.
+      // Só quando não há horário nenhum (loja nova) usamos o default de conveniência.
+      mleTurnos = parsed
+        ? parsed
+        : (horarioSalvoNaoReconhecido
+            ? [{ dias:[], abre:'08:00', fecha:'18:00' }]
+            : [{ dias:[1,2,3,4,5], abre:'08:00', fecha:'18:00' }]);
 
       row.innerHTML = `
         <div class="ml-info-icon"><i class="fa fa-clock"></i></div>
@@ -7075,7 +7367,8 @@
     /* ── Descobre o slug da categoria da loja (p/ sugestões de tags) ── */
     function mlSlugDaLoja() {
       // 1) tenta pela lista LOJAS (já tem categoria mapeada)
-      const lj = (typeof LOJAS !== 'undefined') ? LOJAS.find(function (l) { return l.nome === cur.nome; }) : null;
+      // Item 2: junção por WhatsApp (estável a renomeações), não por nome.
+      const lj = _mlAcharLojaLocal(cur);
       if (lj && lj.categoria) return lj.categoria;
       // 2) tenta casar o ramo textual contra os ramoLabel de CAT_DEF
       if (typeof CAT_DEF !== 'undefined' && cur.ramo) {
@@ -7262,7 +7555,8 @@
     if (wppEl) wppEl.href = `https://wa.me/?text=${encodeURIComponent(`Confira ${nome} no AngatubaON! 📍\n${url}`)}`;
     // Usa o handle do Instagram da loja (se disponível), senão abre o app
     if (igEl) {
-      const lojaLocal = LOJAS.find(l => l.nome === nome);
+      // Item 2: junção por WhatsApp (estável a renomeações); nome é fallback.
+      const lojaLocal = _mlAcharLojaLocal(null, nome);
       const igHandle  = lojaLocal ? normalizarInstagramHandle(lojaLocal.instagram || '') : '';
       igEl.href = igHandle ? `https://www.instagram.com/${igHandle}` : `https://www.instagram.com/`;
     }
@@ -7446,12 +7740,9 @@
     };
     reader.readAsDataURL(file);
 
-    if (file.size > 5 * 1024 * 1024) {
-      statusEl.textContent = '❌ Máx 5MB';
-      statusEl.style.color = 'var(--red)';
-      return;
-    }
-
+    // Item 13: a checagem de tamanho saiu daqui — uploadImagem() redimensiona a
+    // imagem antes de validar, então uma foto grande de celular passa a ser aceita
+    // (vira poucos KB) em vez de barrada de cara.
     statusEl.textContent = '⏳ Enviando...';
     statusEl.style.color = 'var(--muted)';
 
@@ -7499,6 +7790,7 @@
   ══════════════════════════════════════════════════════════════ */
   let _anuncioEmojiSelecionado = '🎯';
   let _anuncioImagemUrl = ''; // URL final após upload (Pro)
+  let _anuncioTimerInterval = null; // Item 17: handle do setInterval do contador de expiração
 
   function mlAnuncioPreviewImagem(input) {
     const file = input.files[0];
@@ -7577,20 +7869,13 @@
       }
     }
 
-    // Timer de expiração
-    const timerEl = document.getElementById('ml-anuncio-timer');
-    if (timerEl && anuncio.expira) {
-      const restante = new Date(anuncio.expira) - new Date();
-      if (restante > 0) {
-        const h = Math.floor(restante / 3600000);
-        const m = Math.floor((restante % 3600000) / 60000);
-        timerEl.textContent = `Expira em ${h}h ${m}m`;
-      } else {
-        timerEl.textContent = 'Expirado';
-        ativoEl.style.display = 'none';
-        localStorage.removeItem('angatuba_anuncio');
-        return;
-      }
+    // Timer de expiração — Item 17: atualiza a cada 60s (antes era calculado uma
+    // única vez; com o painel aberto o número ficava velho e, ao cruzar a virada
+    // do dia, o anúncio sumia no público mas o painel ainda mostrava tempo restante).
+    if (anuncio.expira) {
+      _mlIniciarTimerAnuncio(anuncio.expira, ativoEl);
+      // Se já expirou na primeira checagem, aborta a exibição.
+      if (new Date(anuncio.expira) - new Date() <= 0) return;
     }
 
     // Oculta o formulário enquanto há anúncio ativo
@@ -7618,6 +7903,34 @@
     }
   }
 
+  // Item 17: contador de expiração do anúncio que se atualiza sozinho a cada 60s.
+  // Renderiza imediatamente e reagenda; ao expirar, esconde o card, limpa o cache
+  // e para o timer. Também para no visibilitychange→hidden e ao fechar o painel.
+  function _mlIniciarTimerAnuncio(expira, ativoEl) {
+    _mlPararTimerAnuncio(); // nunca acumula mais de um interval
+    const render = () => {
+      const timerEl = document.getElementById('ml-anuncio-timer');
+      const restante = new Date(expira) - new Date();
+      if (restante <= 0) {
+        if (timerEl) timerEl.textContent = 'Expirado';
+        if (ativoEl) ativoEl.style.display = 'none';
+        try { localStorage.removeItem('angatuba_anuncio'); } catch(e) {}
+        _mlPararTimerAnuncio();
+        return;
+      }
+      if (timerEl) {
+        const h = Math.floor(restante / 3600000);
+        const m = Math.floor((restante % 3600000) / 60000);
+        timerEl.textContent = `Expira em ${h}h ${m}m`;
+      }
+    };
+    render();
+    _anuncioTimerInterval = setInterval(render, 60000);
+  }
+  function _mlPararTimerAnuncio() {
+    if (_anuncioTimerInterval) { clearInterval(_anuncioTimerInterval); _anuncioTimerInterval = null; }
+  }
+
   async function mlPublicarAnuncio() {
     const texto = document.getElementById('ml-anuncio-texto')?.value.trim() || '';
 
@@ -7633,12 +7946,7 @@
 
       if (imgInput && imgInput.files[0]) {
         const imgFile = imgInput.files[0];
-        if (imgFile.size > 5 * 1024 * 1024) {
-          alert('❌ Imagem do anúncio muito grande (máx 5MB). Reduza a resolução e tente de novo.');
-          btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
-          btn.disabled = false;
-          return;
-        }
+        // Item 13: sem barreira antecipada de 5MB — uploadImagem() reduz antes de validar.
         if (statusEl) { statusEl.textContent = '📤 Enviando foto...'; statusEl.style.color = 'var(--muted)'; }
         // Upload via proxy — chave ImgBB nunca exposta no JS
         const uploadedUrl = await uploadImagem(imgFile, statusEl || { textContent: '', style: {} });
@@ -7655,7 +7963,7 @@
 
       // Exige pelo menos texto OU foto (foto sozinha vale para PRO)
       if (!texto && !imagemUrl) {
-        alert('Escreva um texto ou escolha uma foto para o anúncio.');
+        mlToast('Escreva um texto ou escolha uma foto para o anúncio.', 'erro');
         btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
         btn.disabled = false;
         return;
@@ -7681,7 +7989,7 @@
         throw new Error(json.msg || 'Erro');
       }
     } catch(e) {
-      alert('Erro ao publicar: ' + e.message);
+      mlToast('Erro ao publicar: ' + e.message, 'erro');
       btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
       btn.disabled = false;
     }
@@ -7694,6 +8002,7 @@
       await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
       document.getElementById('ml-anuncio-ativo').style.display = 'none';
       document.getElementById('ml-anuncio-timer').textContent = '';
+      if (typeof _mlPararTimerAnuncio === 'function') _mlPararTimerAnuncio(); // Item 17
       localStorage.removeItem('angatuba_anuncio');
       // Limpa imagem e texto
       _anuncioImagemUrl = '';
@@ -7716,7 +8025,8 @@
 
   // Dono sinaliza avaliação para revisão
   window.avalSinalizar = async function(lojaIdx, avalIdx, nomeLoja) {
-    if (!confirm('Sinalizar esta avaliação para revisão? Ela ficará oculta até ser analisada.')) return;
+    const ok = await mlConfirmar('Sinalizar avaliação?', 'Ela ficará oculta até ser analisada pela nossa equipe.', { okLabel: 'Sinalizar', owlSrc: '/webp/owl-sign.webp' });
+    if (!ok) return;
     try {
       const params = new URLSearchParams();
       params.append('payload', JSON.stringify({
@@ -7727,7 +8037,7 @@
       const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
       const json = await resp.json();
       if (json.status === 'ok') {
-        alert('Avaliação sinalizada! Será revisada em breve.');
+        mlToast('Avaliação sinalizada! Será revisada em breve.', 'ok');
         // Remove da lista local e reabre detalhes
         if (LOJAS[lojaIdx].avaliacoes) {
           LOJAS[lojaIdx].avaliacoes.splice(avalIdx, 1);
@@ -7735,7 +8045,7 @@
         abrirDetalhes(lojaIdx);
       } else throw new Error(json.msg);
     } catch(e) {
-      alert('Erro ao sinalizar: ' + e.message);
+      mlToast('Erro ao sinalizar: ' + e.message, 'erro');
     }
   };
 
@@ -7881,10 +8191,10 @@
     if (badge) {
       if (isPro) {
         badge.textContent = 'PRO';
-        badge.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
+        badge.style.background = 'linear-gradient(135deg, var(--plano-pro-1), var(--plano-pro-2))';
       } else {
         badge.textContent = 'PLUS · até ' + PLUS_LIMITE_ITENS + ' itens';
-        badge.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
+        badge.style.background = 'linear-gradient(135deg, var(--plano-plus-1), var(--plano-plus-2))';
         badge.style.color = '#fff';
       }
     }
@@ -8093,13 +8403,7 @@
       prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">`;
     };
     reader.readAsDataURL(file);
-    // Verifica tamanho antes de fazer upload
-    if (file.size > 5 * 1024 * 1024) {
-      msgEl.textContent = '❌ Imagem muito grande (máx 5MB). Reduza a resolução e tente de novo.';
-      msgEl.style.color = 'var(--red)';
-      input.value = '';
-      return;
-    }
+    // Item 13: sem barreira antecipada de 5MB — uploadImagem() reduz antes de validar.
     // Upload via proxy (Apps Script → ImgBB) — chave nunca exposta no JS
     msgEl.textContent = '⏳ Enviando foto...';
     _cardapioUploadEmAndamento = true;
@@ -8255,17 +8559,18 @@
   }
 
   async function mlCardapioRemover(id, nome) {
-    if (!confirm(`Remover "${nome}" do cardápio?`)) return;
+    const ok = await mlConfirmar('Remover do cardápio?', `"${nome}" será removido do seu cardápio.`, { okLabel: 'Remover', owlSrc: '/webp/owl-sign.webp' });
+    if (!ok) return;
     try {
       const json = await apiPost('lojaCardapioRemover', { token: _lojaToken, id });
       if (json.status !== 'ok') {
-        alert('Erro ao remover: ' + (json.msg || 'Tente novamente.'));
+        mlToast('Erro ao remover: ' + (json.msg || 'tente novamente.'), 'erro');
         return;
       }
       await mlCardapioCarregar(_cardapioPlano);
     } catch(e) {
       if (e.message === 'UNAUTHORIZED') return; // apiPost já fez logout
-      alert('Erro ao remover: ' + e.message);
+      mlToast('Erro ao remover: ' + e.message, 'erro');
     }
   }
 
@@ -8280,12 +8585,16 @@
   window.mlToggleEntrega = async function() {
     const toggle  = document.getElementById('ml-entrega-toggle');
     const thumb   = document.getElementById('ml-entrega-thumb');
+    const label   = document.getElementById('ml-entrega-label');
     const statusEl = document.getElementById('ml-entrega-status');
     if (!toggle) return;
     const novoValor = toggle.dataset.ativo !== '1';
     toggle.dataset.ativo = novoValor ? '1' : '0';
-    toggle.style.background = novoValor ? '#10b981' : 'var(--border)';
+    toggle.setAttribute('aria-checked', novoValor ? 'true' : 'false');
+    toggle.style.background = novoValor ? 'var(--green)' : 'var(--border)';
     if (thumb) thumb.style.left = novoValor ? '21px' : '3px';
+    // Item 15: mantém o rótulo textual sincronizado com o estado.
+    if (label) { label.textContent = novoValor ? 'Ativado' : 'Desativado'; label.style.color = novoValor ? 'var(--green)' : 'var(--muted)'; }
     if (statusEl) { statusEl.textContent = 'Salvando…'; statusEl.style.color = 'var(--muted)'; }
     try {
       const json = await apiPost('lojaAtualizarEntrega', { token: _lojaToken, fazEntrega: novoValor ? 'SIM' : 'NAO' });
@@ -8298,12 +8607,22 @@
       } else throw new Error(json.msg || 'Erro');
     } catch(e) {
       if (e.message === 'UNAUTHORIZED') return; // apiPost já fez logout
+      // Reverte estado, cor, thumb E rótulo
       toggle.dataset.ativo = novoValor ? '0' : '1';
-      toggle.style.background = novoValor ? 'var(--border)' : '#10b981';
+      toggle.setAttribute('aria-checked', novoValor ? 'false' : 'true');
+      toggle.style.background = novoValor ? 'var(--border)' : 'var(--green)';
       if (thumb) thumb.style.left = novoValor ? '3px' : '21px';
+      if (label) { label.textContent = novoValor ? 'Desativado' : 'Ativado'; label.style.color = novoValor ? 'var(--muted)' : 'var(--green)'; }
       if (statusEl) { statusEl.textContent = '❌ ' + e.message; statusEl.style.color = 'var(--red)'; }
     }
   };
+  // Item 15: acessibilidade — o switch agora é focável (role="switch"); Enter/Espaço alternam.
+  document.addEventListener('keydown', function(e) {
+    if ((e.key === 'Enter' || e.key === ' ') && document.activeElement?.id === 'ml-entrega-toggle') {
+      e.preventDefault();
+      if (typeof window.mlToggleEntrega === 'function') window.mlToggleEntrega();
+    }
+  });
 
   /* ══════════════════════════════════════════════════════════════
      CARDÁPIO — TELA DO CLIENTE

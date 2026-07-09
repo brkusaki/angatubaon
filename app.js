@@ -144,6 +144,23 @@
       cadastro:true, filtro:true, busca:['idioma','idiomas','ingles','inglês','curso','escola','ensino','educacao','educação','capacitacao'] },
     { id:'autoescola', chipLabel:'Autoescola', ramoLabel:'Autoescola (CFC)', emoji:'🚗', icon:'ti-car', cor:'#fb923c', bg:'rgba(251,146,60,0.12)',
       cadastro:true, filtro:true, busca:['autoescola','cfc','habilitacao','habilitação','cnh','motorista','primeira habilitacao'] },
+    // ── Serviços e Reformas (mão de obra — normalmente por agendamento) ──
+    { id:'pedreiro', chipLabel:'Pedreiro/Reformas', ramoLabel:'Pedreiro / Reformas', emoji:'👷', icon:'ti-tools', cor:'#f59e0b', bg:'rgba(245,158,11,0.12)',
+      cadastro:true, filtro:true, busca:['pedreiro','reforma','reformas','obra','obras','alvenaria','construcao civil','construção civil','assentamento','reboco','contrapiso','muro','laje','mao de obra','mão de obra','empreiteiro'] },
+    { id:'eletricista', chipLabel:'Eletricista', ramoLabel:'Eletricista', emoji:'⚡', icon:'ti-bolt', cor:'#facc15', bg:'rgba(250,204,21,0.12)',
+      cadastro:true, filtro:true, busca:['eletricista','eletrica','elétrica','instalacao eletrica','instalação elétrica','fiacao','fiação','disjuntor','tomada','padrao de entrada','padrão de entrada','curto','quadro de luz'] },
+    { id:'encanador', chipLabel:'Encanador', ramoLabel:'Encanador / Hidráulica', emoji:'🔧', icon:'ti-droplet', cor:'#38bdf8', bg:'rgba(56,189,248,0.12)',
+      cadastro:true, filtro:true, busca:['encanador','hidraulica','hidráulica','vazamento','cano','encanamento','desentupimento','desentupidor','caixa dagua','caixa d\'agua','torneira','esgoto','bombeiro hidraulico'] },
+    { id:'pintor', chipLabel:'Pintor', ramoLabel:'Pintor / Pintura Residencial', emoji:'🖌️', icon:'ti-brush', cor:'#f472b6', bg:'rgba(244,114,182,0.12)',
+      cadastro:true, filtro:true, busca:['pintor','pintura','pintar','textura','massa corrida','grafiato','pintura residencial','pintura predial','parede','verniz'] },
+    { id:'marceneiro', chipLabel:'Marcenaria', ramoLabel:'Marceneiro / Móveis Planejados', emoji:'🪚', icon:'ti-ruler-2', cor:'#d4a373', bg:'rgba(212,163,115,0.12)',
+      cadastro:true, filtro:true, busca:['marceneiro','marcenaria','moveis planejados','móveis planejados','planejados','sob medida','armario planejado','armário planejado','cozinha planejada','madeira'] },
+    { id:'jardinagem', chipLabel:'Jardinagem', ramoLabel:'Jardinagem / Corte de Grama', emoji:'🌳', icon:'ti-plant', cor:'#4ade80', bg:'rgba(74,222,128,0.12)',
+      cadastro:true, filtro:true, busca:['jardinagem','jardineiro','corte de grama','grama','poda','roçada','rocada','jardim','paisagismo','capina','manutencao de jardim'] },
+    { id:'diarista', chipLabel:'Diarista/Faxina', ramoLabel:'Diarista / Faxina', emoji:'🧹', icon:'ti-spray', cor:'#67e8f9', bg:'rgba(103,232,249,0.12)',
+      cadastro:true, filtro:true, busca:['diarista','faxina','faxineira','limpeza','limpeza residencial','passadeira','servicos domesticos','serviços domésticos','limpeza pos obra','limpeza pós obra'] },
+    { id:'fretes', chipLabel:'Fretes/Mudanças', ramoLabel:'Fretes / Carretos / Mudanças', emoji:'🚚', icon:'ti-truck', cor:'#fb923c', bg:'rgba(251,146,60,0.12)',
+      cadastro:true, filtro:true, busca:['frete','fretes','carreto','carretos','mudanca','mudança','mudancas','transporte','caminhao','caminhão','entrega','carga','guincho'] },
   ];
 
   /* ── Derivados automáticos (NÃO editar à mão) ─────────────────── */
@@ -615,6 +632,15 @@
     if (loja.statusLoja === 'ABERTO')   return { status: 'open',   fechaStr: '' };
     if (loja.statusLoja === 'VOLTAMOS') return { status: 'zap',    fechaStr: '' };
 
+    // Atende por agendamento: sem override manual acima, a loja não tem
+    // aberto/fechado — mostra 'Sob agendamento'. Reaproveita o visual 'zap',
+    // mas marca agendado:true para o badge trocar o texto. Só se aplica quando
+    // não há um ABERTO_ATE_/VOLTAMOS_ATE_/FECHADO_HOJE_ ativo (esses são
+    // temporários e o dono os define de propósito, então continuam valendo).
+    if (loja.agendamento && !(loja.statusLoja || '').trim()) {
+      return { status: 'zap', fechaStr: '', agendado: true };
+    }
+
     // Ja voltamos com prazo: VOLTAMOS_ATE_YYYY-MM-DD_HHMM
     if ((loja.statusLoja || '').startsWith('VOLTAMOS_ATE_')) {
       const raw = loja.statusLoja.replace('VOLTAMOS_ATE_', '');
@@ -778,13 +804,14 @@
 
   /* ── Badge de status ─────────────────────────────────────── */
   // fechaStr opcional: se fornecido, exibe "Aberto até HH:MM" ou "Abre às HH:MM"
-  function badgeHTML(status, fechaStr) {
+  function badgeHTML(status, fechaStr, agendado) {
     if (status === 'open') {
       const label = fechaStr ? `Aberto até ${fechaStr}` : 'Aberto Agora';
       return `<span class="badge badge-open"><span class="badge-dot"></span>${label}</span>`;
     }
     if (status === 'zap') {
-      return `<span class="badge badge-zap"><span class="badge-dot"></span>Chamar no Zap</span>`;
+      const zLabel = agendado ? 'Sob agendamento' : 'Chamar no Zap';
+      return `<span class="badge badge-zap"><span class="badge-dot"></span>${zLabel}</span>`;
     }
     // closed
     const label = fechaStr ? `Abre às ${fechaStr}` : 'Fechado';
@@ -1146,13 +1173,16 @@
   // statusInfo pode ser string (compat) ou objeto { status, fechaStr }
   function cardHTML(loja, delay, statusInfo, idx) {
     // normaliza entrada: aceita string legada ou objeto novo
-    let status, fechaStr;
+    let status, fechaStr, agendado;
     if (statusInfo && typeof statusInfo === 'object') {
       status   = statusInfo.status;
       fechaStr = statusInfo.fechaStr || '';
+      agendado = !!statusInfo.agendado;
     } else {
-      status   = statusInfo ?? calcStatus(loja);
+      const _si = calcStatusInfo(loja);
+      status   = statusInfo ?? _si.status;
       fechaStr = '';
+      agendado = !!_si.agendado;
     }
 
     const plano  = (loja.plano || 'GRATIS').toUpperCase();
@@ -1248,7 +1278,7 @@
             ${planBadge}
           </div>
           <div class="store-sub">${escHTML(loja.sub)}</div>
-          <div class="store-row">${badgeHTML(status, fechaStr)}</div>
+          <div class="store-row">${badgeHTML(status, fechaStr, agendado)}</div>
           ${starsHTML}
           ${anuncioBadge}
           ${expandHint}
@@ -2281,6 +2311,35 @@
     cadSelecionarPlano(_CAD_PLANS[idx]);
   };
 
+  // ── Toggle 'Atendo por agendamento' no cadastro ─────────────
+  // Liga/desliga o visual do switch e, principalmente, torna endereço e
+  // horário opcionais (mão de obra não tem ponto fixo nem horário fixo).
+  window.cadToggleAgendamento = function(on) {
+    const sw    = document.getElementById('f-agendamento-switch');
+    const thumb = document.getElementById('f-agendamento-thumb');
+    const endReq  = document.getElementById('f-endereco-req');
+    const horReq  = document.getElementById('f-horario-req');
+    const endRua  = document.getElementById('f-endereco-rua');
+    if (sw) {
+      sw.style.background = on ? 'var(--green)' : 'var(--border)';
+      sw.setAttribute('aria-checked', on ? 'true' : 'false');
+    }
+    if (thumb) thumb.style.left = on ? '21px' : '3px';
+    // Endereço: some o asterisco e remove o required nativo do input de rua.
+    if (endReq) endReq.style.display = on ? 'none' : '';
+    if (endRua) { if (on) endRua.removeAttribute('required'); else endRua.setAttribute('required',''); }
+    if (horReq) horReq.style.display = on ? 'none' : '';
+    // Nota informativa na etapa de horário + esmaece o schedule builder.
+    const note   = document.getElementById('f-agend-horario-note');
+    const sched  = document.getElementById('sched-simple');
+    const schedA = document.getElementById('sched-advanced');
+    if (note) note.style.display = on ? '' : 'none';
+    [sched, schedA].forEach(function(elx){
+      if (!elx) return;
+      elx.style.opacity = on ? '0.55' : '';
+    });
+  };
+
   window.cadAvancar = function(etapa) {
     // Validação básica antes de avançar
     if (etapa === 2) {
@@ -2295,7 +2354,8 @@
         document.getElementById('f-ramo-text')?.focus();
         return;
       }
-      if (!end?.value.trim()) { cadShake(end); end?.focus(); return; }
+      const _agendOn = document.getElementById('f-agendamento')?.checked;
+      if (!_agendOn && !end?.value.trim()) { cadShake(end); end?.focus(); return; }
       end?.classList.remove('invalid');
       // Fix: valida o comprimento real do WPP (10-11 dígitos) em vez de só checar a classe
       // .invalid — um número incompleto que nunca recebeu blur passava direto pro step 2.
@@ -2697,8 +2757,10 @@
           `https://www.google.com/maps/search/${encodeURIComponent(endOculto.value + ', Angatuba, SP')}`;
       }
 
-      // Valida horário
-      if (!document.getElementById('f-horario').value) {
+      // Valida horário — exceto quando a loja atende só por agendamento
+      // (mão de obra não tem horário fixo).
+      const _agendOn = document.getElementById('f-agendamento')?.checked;
+      if (!_agendOn && !document.getElementById('f-horario').value) {
         alert('Selecione pelo menos um dia e horário de funcionamento.');
         btn.classList.remove('is-loading');
         btn.disabled = false;
@@ -2708,6 +2770,15 @@
       const formData = new FormData(this);
       const payload  = Object.fromEntries(formData.entries());
       payload.planoSolicitado = selectedPlan; // envia o plano escolhido
+      // Agendamento: não grava horário fixo (o schedule tem um default
+      // Seg-Sex 08-18 que não faz sentido para mão de obra). Zera os campos
+      // para que a loja apareça como 'Sob agendamento', não aberto/fechado.
+      if (payload.agendamento === 'SIM') {
+        payload.horario  = '';
+        payload.dias     = '';
+        payload.horaAbre = '';
+        payload.horaFecha = '';
+      }
 
       const params = new URLSearchParams();
       params.append('payload', JSON.stringify(payload));
@@ -3434,6 +3505,32 @@
           </span>
         </label>
         <div id="ml-entrega-status" role="status" aria-live="polite" style="font-size:10px;margin-top:6px;min-height:13px;color:var(--muted);"></div>`;
+    }
+
+    // ── Toggle Agendamento (espelho do FazEntrega) ───────────
+    const mlAgendWrap = document.getElementById('ml-agendamento-wrap');
+    if (mlAgendWrap) {
+      const agendOn = !!d.agendamento;
+      mlAgendWrap.innerHTML = `
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:12px;">
+          <span style="font-size:12px;color:var(--text);line-height:1.4;">Atendo por agendamento</span>
+          <span style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <span id="ml-agend-label" style="font-size:11px;font-weight:700;color:${agendOn ? 'var(--green)' : 'var(--muted)'};min-width:64px;text-align:right;">${agendOn ? 'Ativado' : 'Desativado'}</span>
+            <div id="ml-agend-toggle"
+              onclick="mlToggleAgendamento()"
+              role="switch" tabindex="0" aria-checked="${agendOn ? 'true' : 'false'}" aria-label="Atendo por agendamento"
+              data-ativo="${agendOn ? '1' : '0'}"
+              style="flex-shrink:0;width:42px;height:24px;border-radius:12px;
+                     background:${agendOn ? 'var(--green)' : 'var(--border)'};
+                     position:relative;cursor:pointer;transition:background .2s;">
+              <div style="position:absolute;top:3px;left:${agendOn ? '21px' : '3px'};
+                          width:18px;height:18px;border-radius:50%;background:#fff;
+                          transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3);"
+                   id="ml-agend-thumb"></div>
+            </div>
+          </span>
+        </label>
+        <div id="ml-agend-status" role="status" aria-live="polite" style="font-size:10px;margin-top:6px;min-height:13px;color:var(--muted);"></div>`;
     }
 
     // Toggle — só aplica se o dono não interagiu durante carregamento
@@ -5359,7 +5456,7 @@
     const isPro  = plano === 'PRO';
     const isPlus = plano === 'PLUS';
     const isPago = isPro || isPlus;
-    const { status, fechaStr } = calcStatusInfo(loja);
+    const { status, fechaStr, agendado } = calcStatusInfo(loja);
 
     // ── CAPA com logo sobreposto ───────────────────────────────
     const hasFoto = isPago && loja.foto && loja.foto.trim();
@@ -5399,7 +5496,7 @@
              <div class="detail-handle"></div>
              <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
            </div>
-           <div class="detail-cover-badge">${badgeHTML(status, fechaStr)}</div>
+           <div class="detail-cover-badge">${badgeHTML(status, fechaStr, agendado)}</div>
            ${logoOverlay}
          </div>`
       : isPago
@@ -5411,7 +5508,7 @@
              <div class="detail-handle"></div>
              <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
            </div>
-           <div class="detail-cover-badge">${badgeHTML(status, fechaStr)}</div>
+           <div class="detail-cover-badge">${badgeHTML(status, fechaStr, agendado)}</div>
          </div>`
       : `<div style="
             position:relative;height:80px;border-radius:20px 20px 0 0;overflow:hidden;
@@ -5642,7 +5739,7 @@
           ${favBtnHTML(loja)}
         </div>
         <div class="detail-sub">${escHTML(loja.sub || loja.categoria || '')}</div>
-        ${!isPago ? `<div style="margin-bottom:12px;">${badgeHTML(status, fechaStr)}</div>` : ''}
+        ${!isPago ? `<div style="margin-bottom:12px;">${badgeHTML(status, fechaStr, agendado)}</div>` : ''}
         ${anuncioHTML}
         ${cardapioBtn}
         <div class="detail-info">
@@ -5752,6 +5849,24 @@
   function buildHorarioHTML(loja) {
     const txt = loja.horarioTexto || loja.horario_texto || '';
 
+    // ── Agendamento ───────────────────────────────────────────
+    // Sem horário definido: a linha vira 'Atende por agendamento' (sem
+    // aberto/fechado). Com horário definido: mostra o horário normal, mas
+    // com um selo indicando que o atendimento é só com agendamento.
+    const _temHorario = !!txt || !!loja.horario;
+    if (loja.agendamento && !_temHorario) {
+      return `<div class="detail-info-row">
+        <div class="detail-info-icon clock"><i class="fa fa-calendar-check"></i></div>
+        <div class="detail-info-text">
+          <span class="detail-info-label">Atendimento</span>
+          <span class="detail-agendamento-txt">Atende por agendamento</span>
+        </div>
+      </div>`;
+    }
+    const _seloAgend = loja.agendamento
+      ? '<div class="detail-agendamento-selo"><i class="fa fa-calendar-check"></i> Somente com agendamento</div>'
+      : '';
+
     // Se tem múltiplos turnos (separados por |), renderiza cada um como linha
     if (txt && txt.includes('|')) {
       const hoje = new Date().getDay();
@@ -5806,6 +5921,7 @@
             </div>
             ${temRestoP ? `<div class="detail-horario-full"><div>${restoP}</div></div>` : ''}
           </div>
+          ${_seloAgend}
         </div>
       </div>`;
     }
@@ -5817,6 +5933,7 @@
         <div class="detail-info-text">
           <span class="detail-info-label">Horário</span>
           ${escHTML(txt)}
+          ${_seloAgend}
         </div>
       </div>`;
     }
@@ -5906,6 +6023,7 @@
           </div>
           ${temResto ? `<div class="detail-horario-full"><div>${resto}</div></div>` : ''}
         </div>
+        ${_seloAgend}
       </div>
     </div>`;
   }
@@ -8628,6 +8746,46 @@
     }
   });
 
+  // ── Toggle 'Atendo por agendamento' no painel Minha Loja ────
+  window.mlToggleAgendamento = async function() {
+    const toggle   = document.getElementById('ml-agend-toggle');
+    const thumb    = document.getElementById('ml-agend-thumb');
+    const label    = document.getElementById('ml-agend-label');
+    const statusEl = document.getElementById('ml-agend-status');
+    if (!toggle) return;
+    const novoValor = toggle.dataset.ativo !== '1';
+    toggle.dataset.ativo = novoValor ? '1' : '0';
+    toggle.setAttribute('aria-checked', novoValor ? 'true' : 'false');
+    toggle.style.background = novoValor ? 'var(--green)' : 'var(--border)';
+    if (thumb) thumb.style.left = novoValor ? '21px' : '3px';
+    if (label) { label.textContent = novoValor ? 'Ativado' : 'Desativado'; label.style.color = novoValor ? 'var(--green)' : 'var(--muted)'; }
+    if (statusEl) { statusEl.textContent = 'Salvando…'; statusEl.style.color = 'var(--muted)'; }
+    try {
+      const json = await apiPost('lojaAtualizarAgendamento', { token: _lojaToken, agendamento: novoValor ? 'SIM' : 'NAO' });
+      if (json.status === 'ok') {
+        if (statusEl) {
+          statusEl.textContent = novoValor ? '✅ Agendamento ativado' : '✅ Agendamento desativado';
+          statusEl.style.color = 'var(--green)';
+          setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
+        }
+      } else throw new Error(json.msg || 'Erro');
+    } catch(e) {
+      if (e.message === 'UNAUTHORIZED') return;
+      toggle.dataset.ativo = novoValor ? '0' : '1';
+      toggle.setAttribute('aria-checked', novoValor ? 'false' : 'true');
+      toggle.style.background = novoValor ? 'var(--border)' : 'var(--green)';
+      if (thumb) thumb.style.left = novoValor ? '3px' : '21px';
+      if (label) { label.textContent = novoValor ? 'Desativado' : 'Ativado'; label.style.color = novoValor ? 'var(--muted)' : 'var(--green)'; }
+      if (statusEl) { statusEl.textContent = '❌ ' + e.message; statusEl.style.color = 'var(--red)'; }
+    }
+  };
+  document.addEventListener('keydown', function(e) {
+    if ((e.key === 'Enter' || e.key === ' ') && document.activeElement?.id === 'ml-agend-toggle') {
+      e.preventDefault();
+      if (typeof window.mlToggleAgendamento === 'function') window.mlToggleAgendamento();
+    }
+  });
+
   /* ══════════════════════════════════════════════════════════════
      CARDÁPIO — TELA DO CLIENTE
   ══════════════════════════════════════════════════════════════ */
@@ -8779,15 +8937,22 @@
     'barbearia','salao','estetica','tattoo','spa','academia',
     'mecanica','borracharia','funilaria','lava-rapido','bicicletaria',
     'clinica','laboratorio','hospital',
-    'vidracaria','serralheria','refrigeracao','consertos','eletricista',
-    'encanamento','pintura','grafica','advocacia','contabilidade','fotografia',
+    'vidracaria','serralheria','refrigeracao','consertos',
+    'grafica','advocacia','contabilidade','fotografia',
     'viagens','seguros','idiomas','escolinha','bancario',
+    // Serviços e Reformas (mão de obra) — sempre modo Agendar
+    'pedreiro','eletricista','encanador','pintor','marceneiro',
+    'jardinagem','diarista','fretes',
   ]);
   const _CC_MODO_VITRINE = new Set([
     'roupas','calcados','joalheria','otica','moveis','floricultura',
     'imobiliaria','informatica','celular',
   ]);
   function _ccModoLoja(loja) {
+    // Loja por agendamento sempre usa o modo serviço (botão Agendar), mesmo que
+    // a categoria normalmente fosse produto/vitrine — ninguém adiciona pedreiro
+    // ao carrinho.
+    if (loja.agendamento) return 'servico';
     const slug = (loja.categoria || '').toLowerCase();
     if (_CC_MODO_SERVICO.has(slug)) return 'servico';
     if (_CC_MODO_VITRINE.has(slug)) return 'vitrine';

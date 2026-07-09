@@ -369,6 +369,19 @@
     .badge-zap    { background:rgba(245,158,11,0.12); color:var(--zap); }
     .badge-zap    .badge-dot { background:var(--zap); animation:blink 2s infinite; }
 
+    /* ── Agendamento: texto e selo no modal de detalhes ── */
+    .detail-agendamento-txt {
+      display:inline-flex; align-items:center; font-weight:700;
+      color:var(--zap); font-size:13px;
+    }
+    .detail-agendamento-selo {
+      display:inline-flex; align-items:center; gap:5px; margin-top:6px;
+      font-size:11px; font-weight:700; color:var(--zap);
+      background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.25);
+      padding:3px 9px; border-radius:20px;
+    }
+    .detail-agendamento-selo i { font-size:10px; }
+
     /* pill TEL / WPP */
     .contact-tag {
       font-size: 9px; font-weight: 700; padding: 2px 5px;

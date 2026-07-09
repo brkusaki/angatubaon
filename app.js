@@ -1784,6 +1784,11 @@
       document.getElementById('cadastro-success').classList.remove('show');
       document.getElementById('cadastro-success').querySelector('.success-wpp-btn')?.remove();
       document.getElementById('cadastro-form').reset();
+      // Reseta o estado do toggle de agendamento (form.reset desmarca o checkbox,
+      // mas o visual do switch/nota/botão precisa ser re-sincronizado) e a flag
+      // de horário-tocado, para o próximo cadastro começar limpo.
+      _schedTouched = false;
+      if (typeof window.cadToggleAgendamento === 'function') window.cadToggleAgendamento(false);
       // Garante que o botão de submit está habilitado (pode ter ficado preso se modal foi fechado durante envio)
       const btn = document.querySelector('#cadastro-form .modal-submit');
       if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); }
@@ -2338,6 +2343,15 @@
       if (!elx) return;
       elx.style.opacity = on ? '0.55' : '';
     });
+    // Botão 'Próximo' da etapa de horário vira um 'pular' explícito, já que
+    // a nota promete que dá pra pular. Sem isso o usuário não percebe que
+    // clicar em Próximo já é o pulo.
+    const nextBtn = document.querySelector('#cad-panel-2 .cad-next-btn');
+    if (nextBtn) {
+      nextBtn.innerHTML = on
+        ? 'Pular horário — Escolher plano <i class="fa fa-arrow-right"></i>'
+        : 'Próximo — Escolher plano <i class="fa fa-arrow-right"></i>';
+    }
   };
 
   window.cadAvancar = function(etapa) {
@@ -2366,22 +2380,27 @@
         return;
       }
       wpp?.classList.remove('invalid');
-      // Bairro e obrigatorio E precisa ser um da lista oficial,
-      // senao a loja some do filtro por bairro (match nao bate).
+      // Bairro: obrigatório para lojas com ponto fixo (alimenta o filtro por
+      // bairro). Para agendamento (mão de obra) é opcional — o autônomo atende
+      // a cidade/região. Se preencher mesmo assim, validamos contra a lista.
       if (bairro) {
         const bv = bairro.value.trim();
-        const bvNorm = normBairro(bv);
-        const ehValido = BAIRROS_ANGATUBA.some(b => normBairro(b) === bvNorm);
-        if (!bv || !ehValido) {
-          // Se digitou algo valido com grafia diferente, normaliza pro canonico
-          const canonico = BAIRROS_ANGATUBA.find(b => normBairro(b) === bvNorm);
-          if (canonico) {
-            bairro.value = canonico;
-          } else {
-            cadShake(bairro);
-            bairro.focus();
-            setTimeout(() => bairro.classList.remove('invalid'), 2500);
-            return;
+        // Vazio + agendamento: pode seguir sem bairro.
+        if (!bv && _agendOn) {
+          bairro.classList.remove('invalid');
+        } else {
+          const bvNorm = normBairro(bv);
+          const ehValido = BAIRROS_ANGATUBA.some(b => normBairro(b) === bvNorm);
+          if (!bv || !ehValido) {
+            const canonico = BAIRROS_ANGATUBA.find(b => normBairro(b) === bvNorm);
+            if (canonico) {
+              bairro.value = canonico;
+            } else {
+              cadShake(bairro);
+              bairro.focus();
+              setTimeout(() => bairro.classList.remove('invalid'), 2500);
+              return;
+            }
           }
         }
       }
@@ -2515,6 +2534,12 @@
 
   /* ── Schedule simplificado ──────────────────────────────── */
   let _schedPreset = 'semana';
+  // Marca se o usuário mexeu no horário. Usado no submit: loja de agendamento
+  // que NÃO tocou no horário tem os campos zerados (vira 'Sob agendamento');
+  // se tocou, mantém como horário de referência.
+  let _schedTouched = false;
+  window._schedFoiTocado = function() { return _schedTouched; };
+  window._schedMarcarTocado = function() { _schedTouched = true; };
 
   const PRESET_DIAS = {
     semana:     [1,2,3,4,5],
@@ -2524,6 +2549,7 @@
   };
 
   window.schedPreset = function(preset, btn) {
+    _schedTouched = true;
     _schedPreset = preset;
     document.querySelectorAll('.sched-preset-btn').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
@@ -2770,10 +2796,12 @@
       const formData = new FormData(this);
       const payload  = Object.fromEntries(formData.entries());
       payload.planoSolicitado = selectedPlan; // envia o plano escolhido
-      // Agendamento: não grava horário fixo (o schedule tem um default
-      // Seg-Sex 08-18 que não faz sentido para mão de obra). Zera os campos
-      // para que a loja apareça como 'Sob agendamento', não aberto/fechado.
-      if (payload.agendamento === 'SIM') {
+      // Agendamento: se o dono NÃO mexeu no horário, zera os campos (o schedule
+      // tem um default Seg-Sex 08-18 que não faz sentido para mão de obra) →
+      // a loja aparece como 'Sob agendamento'. Se ele mexeu de propósito,
+      // mantém como horário de referência (a nota promete isso).
+      const _tocou = (typeof window._schedFoiTocado === 'function') && window._schedFoiTocado();
+      if (payload.agendamento === 'SIM' && !_tocou) {
         payload.horario  = '';
         payload.dias     = '';
         payload.horaAbre = '';

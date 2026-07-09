@@ -461,10 +461,9 @@
                   <input type="checkbox" id="f-agendamento" name="agendamento" value="SIM"
                     onchange="cadToggleAgendamento(this.checked)" style="display:none;" />
                   <div id="f-agendamento-switch"
-                    onclick="var c=document.getElementById('f-agendamento');c.checked=!c.checked;cadToggleAgendamento(c.checked);"
-                    role="switch" tabindex="0" aria-checked="false" aria-label="Atendo por agendamento"
+                    role="switch" aria-checked="false" aria-hidden="true"
                     style="width:42px;height:24px;border-radius:12px;background:var(--border);
-                           position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;">
+                           position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;pointer-events:none;">
                     <div id="f-agendamento-thumb" style="position:absolute;top:3px;left:3px;width:18px;height:18px;
                          border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3);"></div>
                   </div>
@@ -565,9 +564,9 @@
               </div>
               <div class="sched-time-row" style="margin-top:4px;">
                 <label>Abre às</label>
-                <input type="time" id="sched-abre" value="08:00" onchange="schedSyncSimples()" />
+                <input type="time" id="sched-abre" value="08:00" onchange="if(window._schedMarcarTocado)window._schedMarcarTocado();schedSyncSimples()" />
                 <label>Fecha às</label>
-                <input type="time" id="sched-fecha" value="18:00" onchange="schedSyncSimples()" />
+                <input type="time" id="sched-fecha" value="18:00" onchange="if(window._schedMarcarTocado)window._schedMarcarTocado();schedSyncSimples()" />
               </div>
               <span class="sched-advanced-toggle" onclick="schedMostrarAvancado()">
                 + Adicionar turno especial (sábado/domingo diferente)

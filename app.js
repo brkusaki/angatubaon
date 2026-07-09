@@ -181,6 +181,20 @@
 
   const CAT_BG = Object.fromEntries(CATEGORIAS.map(c => [c.id, c.bg]));
 
+  // Mapa categoria→emoji (derivado do CAT_DEF). Usado como FALLBACK quando a
+  // loja não tem emoji próprio ou está com o genérico '🏪' que o cadastro
+  // grava por padrão — assim um pedreiro mostra 👷, uma sorveteria 🍦, etc.,
+  // sem o dono precisar configurar nada.
+  const CAT_EMOJI = Object.fromEntries(CAT_DEF.map(c => [c.id, c.emoji]));
+
+  // Retorna o emoji de exibição de uma loja: o próprio, se for específico;
+  // senão o da categoria; senão o genérico. Trata '🏪' e vazio como 'sem emoji'.
+  function emojiLoja(loja) {
+    const e = String(loja && loja.emoji || '').trim();
+    if (e && e !== '🏪') return e;
+    return CAT_EMOJI[loja && loja.categoria] || e || '🏪';
+  }
+
   // Mapa categoria→sinônimos de busca (reaproveita CAT_DEF.busca, já usado no
   // autocomplete de cadastro) para a busca do CLIENTE também entender termos
   // como "hamburguer", "sorvete" etc. mesmo que a loja não tenha essa palavra
@@ -1156,7 +1170,7 @@
       const alt = loja.logo.replace(/\.(png)$/i, '.jpg').replace(/\.(jpg|jpeg)$/i, '.png');
       return `${ringOpen}<div class="store-thumb" style="background:${bg}; overflow:hidden;">
         <img src="${escAttr(loja.logo)}" alt="Logo ${escHTML(loja.nome)}" class="store-logo-img" loading="lazy"
-          data-alt="${escAttr(alt)}" data-emoji="${escAttr(loja.emoji || '')}" onerror="thumbLogoFallback(this)" />
+          data-alt="${escAttr(alt)}" data-emoji="${escAttr(emojiLoja(loja))}" onerror="thumbLogoFallback(this)" />
       </div>${ringOpen ? '</div>' : ''}`;
     }
 
@@ -1166,7 +1180,7 @@
       </div>${ringOpen ? '</div>' : ''}`;
     }
 
-    return `${ringOpen}<div class="store-thumb" style="background:${bg};">${escHTML(loja.emoji)}</div>${ringOpen ? '</div>' : ''}`;
+    return `${ringOpen}<div class="store-thumb" style="background:${bg};">${escHTML(emojiLoja(loja))}</div>${ringOpen ? '</div>' : ''}`;
   }
 
   /* ── HTML de um card ─────────────────────────────────────── */
@@ -5519,7 +5533,7 @@
     const coverHTML = hasFoto
       ? `<div class="detail-cover-wrap">
            <img class="detail-cover" loading="lazy" decoding="async" src="${escAttr(loja.foto)}" alt="Foto ${escAttr(loja.nome)}"
-             onerror="this.parentElement.innerHTML = placeholderCover('${escAttr(loja.emoji || '🏪')}', '${escAttr(loja.categoria || '')}');" />
+             onerror="this.parentElement.innerHTML = placeholderCover('${escAttr(emojiLoja(loja))}', '${escAttr(loja.categoria || '')}');" />
            <div class="detail-top-bar">
              <div class="detail-handle"></div>
              <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
@@ -5530,7 +5544,7 @@
       : isPago
       ? `<div class="detail-cover-wrap">
            <div class="detail-cover-placeholder" style="background:${CAT_BG[loja.categoria] || 'rgba(255,255,255,0.06)'};">
-             ${loja.emoji || '🏪'}
+             ${emojiLoja(loja)}
            </div>
            <div class="detail-top-bar">
              <div class="detail-handle"></div>
@@ -5542,7 +5556,7 @@
             position:relative;height:80px;border-radius:20px 20px 0 0;overflow:hidden;
             background:linear-gradient(135deg,${CAT_BG[loja.categoria]||'rgba(99,102,241,0.15)'} 0%,#0d0d0d 100%);
             display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex-shrink:0;">
-           <div style="font-size:2.5rem;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.5));">${loja.emoji||'🏪'}</div>
+           <div style="font-size:2.5rem;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.5));">${emojiLoja(loja)}</div>
            <div class="detail-handle" style="position:absolute;top:10px;left:50%;transform:translateX(-50%);"></div>
            <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar"
              style="position:static;transform:none;background:rgba(0,0,0,0.3);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,0.1);color:#fff;">✕</button>
@@ -5802,7 +5816,7 @@
       ? `\n${loja.anuncio.emoji || '🎯'} *Promoção:* ${loja.anuncio.texto}`
       : '';
 
-    const text = `${loja.emoji || '📍'} *${loja.nome}*\n${loja.sub || loja.categoria || ''}${loja.endereco ? `\n📍 ${loja.endereco}` : ''}\n${statusTxt}${anuncioTxt}\n\nVeja no AngatubaON: ${url}`;
+    const text = `${emojiLoja(loja) || '📍'} *${loja.nome}*\n${loja.sub || loja.categoria || ''}${loja.endereco ? `\n📍 ${loja.endereco}` : ''}\n${statusTxt}${anuncioTxt}\n\nVeja no AngatubaON: ${url}`;
 
     if (navigator.share) {
       navigator.share({ title: loja.nome, text, url }).catch(() => {});
@@ -8993,7 +9007,7 @@
     const modo  = _ccModoLoja(loja);
     _ccModoAtual = modo;
 
-    const placeholderEmoji = _ccCatEmoji[(loja.categoria||'').toLowerCase()] || loja.emoji || '🏪';
+    const placeholderEmoji = emojiLoja(loja) || _ccCatEmoji[(loja.categoria||'').toLowerCase()] || '🏪';
 
     // Agrupa por categoria
     const grupos = {};

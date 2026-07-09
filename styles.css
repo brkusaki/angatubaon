@@ -199,7 +199,13 @@
     }
     .cat-label {
       font-size: 11px; font-weight: 600; color: var(--muted);
-      white-space: nowrap; transition: color 0.2s, font-weight 0.2s;
+      line-height: 1.15; text-align: center;
+      width: 100%; max-width: 72px;
+      display: -webkit-box; -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2; overflow: hidden;
+      word-break: break-word; overflow-wrap: anywhere;
+      min-height: calc(2 * 1.15em);
+      transition: color 0.2s, font-weight 0.2s;
     }
     .cat-icon.active + .cat-label { color: var(--text); font-weight: 700; }
 

@@ -160,7 +160,27 @@
     { id:'diarista', chipLabel:'Diarista/Faxina', ramoLabel:'Diarista / Faxina', emoji:'🧹', icon:'ti-spray', cor:'#67e8f9', bg:'rgba(103,232,249,0.12)',
       cadastro:true, filtro:true, busca:['diarista','faxina','faxineira','limpeza','limpeza residencial','passadeira','servicos domesticos','serviços domésticos','limpeza pos obra','limpeza pós obra'] },
     { id:'fretes', chipLabel:'Fretes/Mudanças', ramoLabel:'Fretes / Carretos / Mudanças', emoji:'🚚', icon:'ti-truck', cor:'#fb923c', bg:'rgba(251,146,60,0.12)',
-      cadastro:true, filtro:true, busca:['frete','fretes','carreto','carretos','mudanca','mudança','mudancas','transporte','caminhao','caminhão','entrega','carga','guincho'] },
+      cadastro:true, filtro:true, busca:['frete','fretes','carreto','carretos','mudanca','mudança','mudancas','caminhao','caminhão','carga'] },
+    // ── Transporte de passageiros (1 categoria guarda-chuva) ──
+    { id:'transporte', chipLabel:'Táxi/Transporte', ramoLabel:'Táxi / Transporte de Passageiros', emoji:'🚕', icon:'ti-car', cor:'#facc15', bg:'rgba(250,204,21,0.12)',
+      cadastro:true, filtro:true, busca:['taxi','táxi','taxista','mototaxi','mototáxi','moto taxi','moto táxi','van escolar','transporte escolar','perua escolar','transporte de pacientes','transporte de passageiros','corrida','uber','motorista','ponto de taxi'] },
+    // ── Outros serviços / autônomos ──
+    { id:'chaveiro', chipLabel:'Chaveiro', ramoLabel:'Chaveiro', emoji:'🔑', icon:'ti-key', cor:'#fbbf24', bg:'rgba(251,191,36,0.12)',
+      cadastro:true, filtro:true, busca:['chaveiro','chave','copia de chave','cópia de chave','fechadura','abertura de porta','abertura de fechadura','trava','cadeado','chaveiro 24h'] },
+    { id:'costureira', chipLabel:'Costureira', ramoLabel:'Costureira / Ateliê de Costura', emoji:'🧵', icon:'ti-needle-thread', cor:'#f472b6', bg:'rgba(244,114,182,0.12)',
+      cadastro:true, filtro:true, busca:['costureira','costura','atelie','ateliê','ajuste de roupa','reforma de roupa','conserto de roupa','bainha','barra','sob medida','alfaiate'] },
+    { id:'dedetizacao', chipLabel:'Dedetização', ramoLabel:'Dedetização / Controle de Pragas', emoji:'🐜', icon:'ti-bug', cor:'#4ade80', bg:'rgba(74,222,128,0.12)',
+      cadastro:true, filtro:true, busca:['dedetizacao','dedetização','dedetizadora','controle de pragas','pragas','desratizacao','desratização','descupinizacao','cupim','barata','rato','escorpiao','escorpião'] },
+    { id:'guincho', chipLabel:'Guincho', ramoLabel:'Guincho / Reboque', emoji:'🚛', icon:'ti-truck-loading', cor:'#fb923c', bg:'rgba(251,146,60,0.12)',
+      cadastro:true, filtro:true, busca:['guincho','reboque','rebocar','socorro','auto socorro','carro quebrado','pane','remocao de veiculo','remoção de veículo','24h'] },
+    { id:'assistencia', chipLabel:'Assist. Técnica', ramoLabel:'Assistência Técnica a Domicílio', emoji:'🔧', icon:'ti-device-laptop', cor:'#38bdf8', bg:'rgba(56,189,248,0.12)',
+      cadastro:true, filtro:true, busca:['assistencia tecnica','assistência técnica','conserto','tecnico a domicilio','técnico a domicílio','conserto de computador','conserto de celular','conserto de notebook','formatacao','formatação','manutencao','manutenção','tecnico de informatica'] },
+    { id:'aulas', chipLabel:'Aulas Particulares', ramoLabel:'Aulas Particulares / Reforço', emoji:'📚', icon:'ti-school', cor:'#a78bfa', bg:'rgba(167,139,250,0.12)',
+      cadastro:true, filtro:true, busca:['aula particular','aulas particulares','reforco escolar','reforço escolar','professor particular','explicadora','explicador','reforco','aula de matematica','aula de ingles','musica','violao','violão'] },
+    { id:'personal', chipLabel:'Personal Trainer', ramoLabel:'Personal Trainer', emoji:'🏋️', icon:'ti-barbell', cor:'#fb7185', bg:'rgba(251,113,133,0.12)',
+      cadastro:true, filtro:true, busca:['personal','personal trainer','treinador','treino','educador fisico','educador físico','treino em casa','condicionamento','musculacao','musculação'] },
+    { id:'beleza-domicilio', chipLabel:'Beleza a Domicílio', ramoLabel:'Cabeleireiro / Manicure a Domicílio', emoji:'💅', icon:'ti-hand-finger', cor:'#f9a8d4', bg:'rgba(249,168,212,0.12)',
+      cadastro:true, filtro:true, busca:['manicure','pedicure','cabeleireira a domicilio','cabeleireiro a domicilio','a domicilio','a domicílio','unha','esmalte','maquiagem','maquiadora','sobrancelha','depilacao','depilação'] },
   ];
 
   /* ── Derivados automáticos (NÃO editar à mão) ─────────────────── */
@@ -8985,6 +9005,9 @@
     // Serviços e Reformas (mão de obra) — sempre modo Agendar
     'pedreiro','eletricista','encanador','pintor','marceneiro',
     'jardinagem','diarista','fretes',
+    // Transporte + outros autônomos — também modo Agendar
+    'transporte','chaveiro','costureira','dedetizacao','guincho',
+    'assistencia','aulas','personal','beleza-domicilio',
   ]);
   const _CC_MODO_VITRINE = new Set([
     'roupas','calcados','joalheria','otica','moveis','floricultura',

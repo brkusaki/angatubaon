@@ -313,6 +313,9 @@
         <button class="empty-action" onclick="limparFiltros()">
           <i class="ti ti-refresh" aria-hidden="true"></i> Ver todas as lojas
         </button>
+        <a id="empty-indicar" class="empty-indicar" href="#" target="_blank" rel="noopener" style="display:none;">
+          <i class="ti ti-brand-whatsapp" aria-hidden="true"></i> <span id="empty-indicar-label">Indicar um comércio</span>
+        </a>
       </div>
     </section>
 
@@ -1542,6 +1545,18 @@
                     </a>
                     <a id="ml-share-ig" href="#" target="_blank" rel="noopener" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:rgba(225,48,108,0.08);border:1px solid rgba(225,48,108,0.2);color:#e1306c;font-size:11px;font-weight:700;text-decoration:none;">
                       <i class="fab fa-instagram"></i> Instagram
+                    </a>
+                  </div>
+                  <div id="ml-share-cardapio-wrap" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
+                    <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">Link direto do seu cardápio (abre já no menu):</div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 9px;font-size:10px;color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" id="ml-share-cardapio-url">—</div>
+                      <button onclick="mlCopiarCardapio()" style="flex-shrink:0;padding:7px 10px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:10px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;" id="ml-copy-cardapio-btn">
+                        <i class="fa fa-copy"></i> Copiar
+                      </button>
+                    </div>
+                    <a id="ml-share-cardapio-wpp" href="#" target="_blank" rel="noopener" style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;background:rgba(37,211,102,0.1);border:1px solid rgba(37,211,102,0.2);color:#25d366;font-size:11px;font-weight:700;text-decoration:none;">
+                      <i class="fab fa-whatsapp"></i> Enviar cardápio no WhatsApp
                     </a>
                   </div>
                 </div>

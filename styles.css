@@ -603,6 +603,15 @@
       transition:background 0.15s; font-family:var(--font-b);
     }
     .empty-action:active { background:rgba(255,255,255,0.1); transform:scale(0.97); }
+    .empty-indicar {
+      display:inline-flex; align-items:center; gap:6px; margin-top:10px;
+      padding:10px 20px; border-radius:10px;
+      background:rgba(37,211,102,0.12); border:1px solid rgba(37,211,102,0.35);
+      color:#25d366; font-size:13px; font-weight:700;
+      cursor:pointer; -webkit-tap-highlight-color:transparent; text-decoration:none;
+      transition:background 0.15s, transform 0.15s; font-family:var(--font-b);
+    }
+    .empty-indicar:active { background:rgba(37,211,102,0.2); transform:scale(0.97); }
 
     /* ════════════════════════════════════════════
        FOOTER

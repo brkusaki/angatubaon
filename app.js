@@ -233,6 +233,44 @@
     CAT_DEF.filter(c => Array.isArray(c.busca)).map(c => [c.id, c.busca.map(b => String(b).toLowerCase())])
   );
 
+  // Distância de edição (Levenshtein) com CORTE em 1: retorna true se `a` e `b`
+  // estão a no máximo 1 edição (troca/insercao/remocao de 1 caractere). Usada
+  // como ÚLTIMO recurso da busca do cliente, para tolerar erro de teclado
+  // ("acugue" → "acougue", "farmacya" → "farmacia"). Curto-circuita cedo por
+  // diferença de tamanho e aborta assim que passa de 1 erro — barato o suficiente
+  // para rodar por termo só quando nada bateu por substring.
+  function _lev1(a, b) {
+    if (a === b) return true;
+    const la = a.length, lb = b.length;
+    if (Math.abs(la - lb) > 1) return false;
+    if (la > lb) { const t = a; a = b; b = t; }
+    const n = a.length, m = b.length;
+    let i = 0, j = 0, erros = 0;
+    while (i < n && j < m) {
+      if (a[i] === b[j]) { i++; j++; continue; }
+      if (++erros > 1) return false;
+      if (n === m) { i++; j++; }
+      else { j++; }
+    }
+    if (j < m || i < n) erros++;
+    return erros <= 1;
+  }
+
+  // Casa um termo de busca contra um alvo tolerando 1 erro de digitacao.
+  // So aplica fuzzy em termos "longos o suficiente" (>=4 chars) para nao
+  // colar coisas curtas por acaso ("bar" ~ "mar"). Compara o termo inteiro
+  // contra o alvo inteiro E contra cada palavra do alvo.
+  function _matchFuzzy(termo, alvo) {
+    if (!termo || termo.length < 4 || !alvo) return false;
+    if (_lev1(termo, alvo)) return true;
+    const palavras = alvo.split(/[^a-z0-9]+/);
+    for (let k = 0; k < palavras.length; k++) {
+      const w = palavras[k];
+      if (w.length >= 4 && _lev1(termo, w)) return true;
+    }
+    return false;
+  }
+
   /* ══════════════════════════════════════════════════════════════
      LOJAS — carregadas dinamicamente do Google Sheets via Apps Script
      Lojas hardcoded abaixo são o fallback caso a API falhe
@@ -1367,6 +1405,22 @@
      nó quando o HTML não muda, evitando recriar <img> idênticos. */
   let _cardNodes = new Map();
 
+  // Mostra/esconde o botao "Indicar um comercio" do estado vazio e monta o
+  // link de WhatsApp pro admin ja com uma mensagem pronta. `contexto` e o que
+  // faltou (nome da categoria como "Farmácias", ou o termo buscado entre aspas);
+  // null esconde o botao.
+  function _emptyIndicar(contexto) {
+    const btn = document.getElementById('empty-indicar');
+    if (!btn) return;
+    if (!contexto) { btn.style.display = 'none'; return; }
+    const lbl = document.getElementById('empty-indicar-label');
+    if (lbl) lbl.textContent = 'Indicar ' + contexto;
+    const msg = 'Olá! Procurei por ' + contexto + ' no AngatubaON e não encontrei. '
+              + 'Queria indicar um estabelecimento pra vocês adicionarem. 🦉';
+    btn.href = 'https://wa.me/' + ADMIN_WPP_CONTATO + '?text=' + encodeURIComponent(msg);
+    btn.style.display = 'inline-flex';
+  }
+
   /* ── Renderiza lista principal ───────────────────────────── */
   function renderLojas() {
     const listEl   = document.getElementById('store-list');
@@ -1397,7 +1451,12 @@
       if (nome.includes(q) || tags.includes(q) || sub.includes(q)) return true;
       // Sinônimos da categoria (ex.: buscar "hamburguer" acha lojas de "lanches")
       const sinonimos = CAT_BUSCA_MAP[loja.categoria];
-      return !!sinonimos && sinonimos.some(s => s.includes(q) || q.includes(s));
+      if (!!sinonimos && sinonimos.some(s => s.includes(q) || q.includes(s))) return true;
+      // Último recurso: tolera 1 erro de digitação no nome ou nos sinônimos
+      // ("acugue"→açougue, "farmacya"→farmácia). Só roda aqui, quando nada
+      // bateu por substring — custo zero no caminho comum.
+      if (_matchFuzzy(q, nome)) return true;
+      return !!sinonimos && sinonimos.some(s => _matchFuzzy(q, s));
     });
 
     if (activePillFilter === 'open') {
@@ -1480,24 +1539,38 @@
       const emptyOwl = document.getElementById('empty-owl');
       const owlOk = emptyOwl && emptyOwl.dataset.failed !== '1';
       const emptyTitle = document.getElementById('empty-title');
+      // Uma categoria específica está selecionada (não "todos") e não há busca:
+      // então o vazio é "não temos esse ramo ainda", não "não achei nada".
+      const catEspecificaVazia = activeCat !== 'todos' && !q && activePillFilter === 'all' && !activeBairro;
       if (activePillFilter === 'favoritos') {
         document.getElementById('empty-icon').textContent = '❤️';
         if (owlOk) { emptyOwl.src = '/webp/owl-love.webp'; emptyOwl.style.display = 'block'; }
         if (emptyTitle) emptyTitle.textContent = 'Você ainda não tem lojas favoritas';
         emptyMsg.textContent = 'Toque no ❤️ de uma loja para salvá-la aqui e achar rapidinho depois.';
         emptySub.textContent = '';
+        _emptyIndicar(null);
       } else if (LOJAS.length === 0) {
         document.getElementById('empty-icon').textContent = '🏗️';
         if (owlOk) { emptyOwl.src = '/webp/owl-idea.webp'; emptyOwl.style.display = 'block'; }
         if (emptyTitle) emptyTitle.textContent = 'Nenhuma loja por aqui ainda';
         emptyMsg.textContent = 'Seja o primeiro a cadastrar seu negócio em Angatuba!';
         emptySub.textContent = '';
+        _emptyIndicar(null);
+      } else if (catEspecificaVazia) {
+        const catLabel = CATEGORIAS.find(c => c.id === activeCat)?.label ?? 'esse tipo';
+        document.getElementById('empty-icon').textContent = '🔎';
+        if (owlOk) { emptyOwl.src = '/webp/owl-search.webp'; emptyOwl.style.display = 'block'; }
+        if (emptyTitle) emptyTitle.textContent = 'Ainda não temos ' + catLabel + ' aqui';
+        emptyMsg.textContent = 'Conhece um bom estabelecimento de ' + catLabel + ' em Angatuba? Indique pra gente — a coruja convida!';
+        emptySub.textContent = '';
+        _emptyIndicar(catLabel);
       } else {
         document.getElementById('empty-icon').textContent = '🔍';
         if (owlOk) { emptyOwl.src = '/webp/owl-search.webp'; emptyOwl.style.display = 'block'; }
         if (emptyTitle) emptyTitle.textContent = 'Nenhuma loja encontrada';
         emptyMsg.textContent = 'A coruja procurou e não achou nada. Tente outro termo ou categoria.';
         emptySub.textContent = '';
+        _emptyIndicar(q ? ('"' + q + '"') : null);
       }
     } else {
       emptyEl.style.display = 'none';
@@ -5249,13 +5322,9 @@
         _esconderSplash(); // lojas prontas — desvela o app
         _migrarFavoritosParaId();
         _tentarNudgeAposCarga(); // lojas carregadas: pode sugerir avaliação
-        // Deep link: abre modal da loja se URL tiver #slug
-        (function _checkDeepLink() {
-          const hash = location.hash.slice(1);
-          if (!hash) return;
-          const idx = LOJAS.findIndex(l => toSlug(l.nome) === hash);
-          if (idx >= 0) setTimeout(() => abrirDetalhes(idx), 100);
-        })();
+        // Deep link: abre a loja (e o cardápio, se o hash pedir /cardapio).
+        // Centralizado em _resolverDeepLink — antes havia lógica duplicada aqui.
+        _resolverDeepLink();
         if (DEBUG) console.log('[AngatubaON] ' + json.data.length + ' da API + ' + fixasSemDuplicata.length + ' fixas ✅');
         // Salva snapshot para uso offline (primeiro acesso sem internet mostra dados cacheados)
         try {
@@ -7660,22 +7729,40 @@
   });
 
   /* ══════════════════════════════════════════════════════════════
-     DEEP LINK — /#slug-da-loja
+     DEEP LINK — /#slug-da-loja  ou  /#slug-da-loja/cardapio
   ══════════════════════════════════════════════════════════════ */
+  // Separa o hash em { slug, cardapio }. Aceita "#loja" e "#loja/cardapio".
+  // O slug de loja nunca contém "/" (toSlug troca tudo que não é a-z0-9 por "-"),
+  // então a primeira "/" divide com segurança o slug do sufixo de ação.
+  function _parseHash() {
+    const raw = (location.hash || '').replace(/^#/, '').trim();
+    if (!raw) return { slug: '', cardapio: false };
+    const barra = raw.indexOf('/');
+    if (barra === -1) return { slug: raw, cardapio: false };
+    const slug   = raw.slice(0, barra);
+    const sufixo = raw.slice(barra + 1).toLowerCase();
+    return { slug: slug, cardapio: sufixo === 'cardapio' || sufixo === 'cardápio' };
+  }
+
   function _resolverDeepLink() {
     // Não abre modal de detalhes se outro modal já está aberto
     const modaisAbertos = ['modal-cadastro','modal-planos','modal-login-loja','modal-minha-loja','modal-detalhes'];
     if (modaisAbertos.some(id => document.getElementById(id)?.classList.contains('open'))) return;
 
-    const hash = (location.hash || '').replace('#','').trim();
-    if (!hash) return;
-    const loja = LOJAS.find(l => toSlug(l.nome) === hash);
+    const { slug, cardapio } = _parseHash();
+    if (!slug) return;
+    const loja = LOJAS.find(l => toSlug(l.nome) === slug);
     if (!loja) return;
     const idx = _lojaIdxMap.get(loja);
-    if (idx != null) {
-      // Pequeno delay para garantir que o DOM está pronto
-      setTimeout(() => abrirDetalhes(idx), 200);
-    }
+    if (idx == null) return;
+    // Pequeno delay para garantir que o DOM está pronto
+    setTimeout(() => {
+      abrirDetalhes(idx);
+      // Se o link pede o cardápio E a loja tem itens, abre por cima dos detalhes.
+      if (cardapio && loja.cardapio && loja.cardapio.length > 0) {
+        setTimeout(() => abrirCardapioCliente(idx), 260);
+      }
+    }, 200);
   }
 
   // Também resolve ao navegar pelo histórico (botão voltar/avançar)
@@ -7739,6 +7826,28 @@
     });
   };
 
+  // Copia o link direto do cardápio (mesma UX do mlCopiarLink, botão próprio).
+  window.mlCopiarCardapio = function() {
+    const urlEl = document.getElementById('ml-share-cardapio-url');
+    const btn   = document.getElementById('ml-copy-cardapio-btn');
+    if (!urlEl || !btn) return;
+    const texto = urlEl.textContent.trim();
+    const feedback = () => {
+      btn.innerHTML = '<i class="fa fa-check"></i> Copiado!';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => { btn.innerHTML = '<i class="fa fa-copy"></i> Copiar'; btn.style.color = ''; }, 2000);
+    };
+    navigator.clipboard.writeText(texto).then(feedback).catch(() => {
+      const tmp = document.createElement('input');
+      tmp.value = texto;
+      document.body.appendChild(tmp);
+      tmp.select();
+      document.execCommand('copy');
+      document.body.removeChild(tmp);
+      feedback();
+    });
+  };
+
   function mlMontarCompartilhamento(nome) {
     const slug    = toSlug(nome);
     const url     = `${location.origin}/#${slug}`;
@@ -7748,11 +7857,29 @@
     if (urlEl) urlEl.textContent = url;
     if (wppEl) wppEl.href = `https://wa.me/?text=${encodeURIComponent(`Confira ${nome} no AngatubaON! 📍\n${url}`)}`;
     // Usa o handle do Instagram da loja (se disponível), senão abre o app
+    const lojaLocal = _mlAcharLojaLocal(null, nome);
     if (igEl) {
       // Item 2: junção por WhatsApp (estável a renomeações); nome é fallback.
-      const lojaLocal = _mlAcharLojaLocal(null, nome);
       const igHandle  = lojaLocal ? normalizarInstagramHandle(lojaLocal.instagram || '') : '';
       igEl.href = igHandle ? `https://www.instagram.com/${igHandle}` : `https://www.instagram.com/`;
+    }
+    // Link direto do cardápio: só aparece se a loja tem itens no menu.
+    // Usa o sufixo /cardapio que o _resolverDeepLink entende (abre a loja
+    // e já sobe o cardápio por cima).
+    const cardWrap = document.getElementById('ml-share-cardapio-wrap');
+    if (cardWrap) {
+      const temCardapio = !!(lojaLocal && Array.isArray(lojaLocal.cardapio) && lojaLocal.cardapio.length > 0);
+      if (temCardapio) {
+        const urlCard = `${location.origin}/#${slug}/cardapio`;
+        const urlCardEl = document.getElementById('ml-share-cardapio-url');
+        const wppCardEl = document.getElementById('ml-share-cardapio-wpp');
+        if (urlCardEl) urlCardEl.textContent = urlCard;
+        if (wppCardEl) wppCardEl.href = `https://wa.me/?text=${encodeURIComponent(`Veja o cardápio de ${nome} no AngatubaON! 📖
+${urlCard}`)}`;
+        cardWrap.style.display = '';
+      } else {
+        cardWrap.style.display = 'none';
+      }
     }
   }
 

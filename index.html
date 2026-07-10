@@ -1757,9 +1757,21 @@
               <button onclick="ccLimparCarrinho()" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;">Limpar</button>
             </div>
             <div id="cc-carrinho-itens" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;max-height:120px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-              <span style="font-size:12px;color:var(--muted);">Total</span>
-              <span style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:var(--green);" id="cc-total">R$ 0,00</span>
+            <!-- Resumo de valores: subtotal + entrega aparecem só quando há taxa -->
+            <div id="cc-resumo" style="margin-bottom:10px;">
+              <div id="cc-subtotal-row" style="display:none;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                <span style="font-size:12px;color:var(--muted);">Subtotal</span>
+                <span style="font-size:12px;color:var(--text);font-weight:600;" id="cc-subtotal">R$ 0,00</span>
+              </div>
+              <div id="cc-entrega-row" style="display:none;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                <span style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px;">🛵 Entrega</span>
+                <span style="font-size:12px;font-weight:700;" id="cc-entrega-valor">R$ 0,00</span>
+              </div>
+              <div id="cc-entrega-hint" style="display:none;font-size:10.5px;color:#fb923c;margin-bottom:6px;line-height:1.35;"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:12px;color:var(--muted);">Total</span>
+                <span style="font-family:var(--font-h);font-size:1.1rem;font-weight:800;color:var(--green);" id="cc-total">R$ 0,00</span>
+              </div>
             </div>
             <!-- Entrega (visível apenas quando loja.fazEntrega = true) -->
             <div id="cc-entrega-section" style="display:none;margin-bottom:10px;background:var(--surface2);border:1px solid rgba(251,146,60,0.3);border-radius:12px;padding:12px;">

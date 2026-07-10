@@ -436,6 +436,52 @@
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  // Formata número em reais no padrão BR (R$ 5,00).
+  function _fmtBRL(n) {
+    return 'R$ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
+  }
+
+  // ── Taxa de entrega — parse do campo salvo (coluna AD) ──
+  // Formatos: '' (sem taxa) | 'GRATIS' | 'COMBINAR' | 'FIXA:5.00' | 'MINIMO:100.00:8.00'
+  // Recebe o subtotal do carrinho e devolve um objeto pronto para renderizar:
+  //   { modo, valor, gratis, combinar, faltaParaGratis }
+  //   - valor: quanto somar ao total (0 se grátis/combinar/sem taxa)
+  //   - gratis: true quando não há custo de entrega
+  //   - combinar: true quando o valor é 'a combinar com a loja'
+  //   - faltaParaGratis: no modo MÍNIMO, quanto falta para zerar a taxa (0 se já zerou)
+  //   - label: texto curto pronto ('Grátis', 'R$ 5,00', 'A combinar')
+  function calcularTaxaEntrega(taxaStr, subtotal) {
+    const s = String(taxaStr || '').trim().toUpperCase();
+    const sub = Number(subtotal) || 0;
+    const semTaxa = { modo: 'NENHUMA', valor: 0, gratis: true, combinar: false, faltaParaGratis: 0, label: '' };
+    if (!s) return semTaxa;
+
+    if (s === 'GRATIS') {
+      return { modo: 'GRATIS', valor: 0, gratis: true, combinar: false, faltaParaGratis: 0, label: 'Grátis' };
+    }
+    if (s === 'COMBINAR') {
+      return { modo: 'COMBINAR', valor: 0, gratis: false, combinar: true, faltaParaGratis: 0, label: 'A combinar' };
+    }
+    if (s.indexOf('FIXA:') === 0) {
+      const v = parseFloat(s.slice(5).replace(',', '.'));
+      if (isNaN(v) || v <= 0) return { modo: 'GRATIS', valor: 0, gratis: true, combinar: false, faltaParaGratis: 0, label: 'Grátis' };
+      return { modo: 'FIXA', valor: v, gratis: false, combinar: false, faltaParaGratis: 0, label: _fmtBRL(v) };
+    }
+    if (s.indexOf('MINIMO:') === 0) {
+      const partes = s.slice(7).split(':');
+      const piso = parseFloat(String(partes[0] || '').replace(',', '.'));
+      const taxa = parseFloat(String(partes[1] || '').replace(',', '.'));
+      if (isNaN(piso) || isNaN(taxa) || taxa <= 0) {
+        return { modo: 'GRATIS', valor: 0, gratis: true, combinar: false, faltaParaGratis: 0, label: 'Grátis' };
+      }
+      if (sub >= piso) {
+        return { modo: 'MINIMO', valor: 0, gratis: true, combinar: false, faltaParaGratis: 0, piso: piso, taxaBase: taxa, label: 'Grátis' };
+      }
+      return { modo: 'MINIMO', valor: taxa, gratis: false, combinar: false, faltaParaGratis: piso - sub, piso: piso, taxaBase: taxa, label: _fmtBRL(taxa) };
+    }
+    return semTaxa; // formato desconhecido — trata como sem taxa
+  }
+
   // Extrai o @handle puro de qualquer formato de entrada do Instagram:
   // "@usuario", "usuario", "https://instagram.com/usuario", "https://www.instagram.com/usuario?igsh=...", "instagram.com/usuario/"
   function normalizarInstagramHandle(input) {
@@ -3649,7 +3695,46 @@
             </div>
           </span>
         </label>
-        <div id="ml-entrega-status" role="status" aria-live="polite" style="font-size:10px;margin-top:6px;min-height:13px;color:var(--muted);"></div>`;
+        <div id="ml-entrega-status" role="status" aria-live="polite" style="font-size:10px;margin-top:6px;min-height:13px;color:var(--muted);"></div>
+        <!-- Painel de taxa: visível só quando 'Fazemos entrega' está ligado -->
+        <div id="ml-taxa-wrap" style="display:${entregaOn ? 'block' : 'none'};margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;color:var(--text);font-weight:600;margin-bottom:8px;">Como você cobra a entrega?</div>
+          <select id="ml-taxa-modo" onchange="mlTaxaModoChange()"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px;color:var(--text);font-size:12px;font-family:var(--font-b);box-sizing:border-box;outline:none;-webkit-appearance:none;appearance:none;margin-bottom:8px;">
+            <option value="GRATIS">🎉 Entrega grátis (não cobro)</option>
+            <option value="FIXA">💵 Valor fixo</option>
+            <option value="MINIMO">🎁 Grátis acima de um valor</option>
+            <option value="COMBINAR">💬 A combinar com o cliente</option>
+          </select>
+          <!-- Campo: valor fixo -->
+          <div id="ml-taxa-fixa-box" style="display:none;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 10px;">
+              <span style="font-size:12px;color:var(--muted);">R$</span>
+              <input type="text" id="ml-taxa-fixa-val" inputmode="decimal" placeholder="5,00"
+                style="flex:1;background:none;border:none;color:var(--text);font-size:12px;font-family:var(--font-b);outline:none;">
+            </div>
+          </div>
+          <!-- Campos: mínimo (piso + taxa) -->
+          <div id="ml-taxa-min-box" style="display:none;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 10px;margin-bottom:6px;">
+              <span style="font-size:11px;color:var(--muted);white-space:nowrap;">Grátis acima de R$</span>
+              <input type="text" id="ml-taxa-min-piso" inputmode="decimal" placeholder="100,00"
+                style="flex:1;background:none;border:none;color:var(--text);font-size:12px;font-family:var(--font-b);outline:none;">
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 10px;">
+              <span style="font-size:11px;color:var(--muted);white-space:nowrap;">Senão, cobro R$</span>
+              <input type="text" id="ml-taxa-min-val" inputmode="decimal" placeholder="8,00"
+                style="flex:1;background:none;border:none;color:var(--text);font-size:12px;font-family:var(--font-b);outline:none;">
+            </div>
+          </div>
+          <button onclick="mlSalvarTaxaEntrega()" id="ml-taxa-salvar-btn"
+            style="width:100%;padding:10px;border-radius:9px;background:var(--surface2);border:1px solid var(--green);color:var(--green);font-family:var(--font-h);font-size:12px;font-weight:700;cursor:pointer;">
+            Salvar forma de cobrança
+          </button>
+          <div id="ml-taxa-status" role="status" aria-live="polite" style="font-size:10px;margin-top:6px;min-height:13px;color:var(--muted);"></div>
+        </div>`;
+      // Preenche a UI de taxa com o valor salvo (parse do formato MODO:VALOR).
+      _mlPreencherTaxa(String(d.taxaEntrega || ''));
     }
 
     // ── Toggle Agendamento (espelho do FazEntrega) ───────────
@@ -8917,6 +9002,9 @@ ${urlCard}`)}`;
     // Item 15: mantém o rótulo textual sincronizado com o estado.
     if (label) { label.textContent = novoValor ? 'Ativado' : 'Desativado'; label.style.color = novoValor ? 'var(--green)' : 'var(--muted)'; }
     if (statusEl) { statusEl.textContent = 'Salvando…'; statusEl.style.color = 'var(--muted)'; }
+    // Mostra/esconde o painel de forma de cobrança junto com o toggle.
+    const taxaWrap = document.getElementById('ml-taxa-wrap');
+    if (taxaWrap) taxaWrap.style.display = novoValor ? 'block' : 'none';
     try {
       const json = await apiPost('lojaAtualizarEntrega', { token: _lojaToken, fazEntrega: novoValor ? 'SIM' : 'NAO' });
       if (json.status === 'ok') {
@@ -8944,6 +9032,101 @@ ${urlCard}`)}`;
       if (typeof window.mlToggleEntrega === 'function') window.mlToggleEntrega();
     }
   });
+
+  // ── Taxa de entrega (painel lojista) ────────────────────────
+  // Converte 'reais' digitado para número (aceita vírgula ou ponto).
+  function _mlParseReais(str) {
+    const v = parseFloat(String(str || '').replace(/\s/g, '').replace(',', '.'));
+    return (isNaN(v) || v < 0) ? null : v;
+  }
+  function _mlFmtInput(n) {
+    return (Number(n) || 0).toFixed(2).replace('.', ',');
+  }
+
+  // Preenche a UI de taxa a partir do valor salvo (formato MODO:VALOR).
+  window._mlPreencherTaxa = function(taxaStr) {
+    const s = String(taxaStr || '').trim().toUpperCase();
+    const modoEl = document.getElementById('ml-taxa-modo');
+    const fixaEl = document.getElementById('ml-taxa-fixa-val');
+    const pisoEl = document.getElementById('ml-taxa-min-piso');
+    const minValEl = document.getElementById('ml-taxa-min-val');
+    if (!modoEl) return;
+
+    let modo = 'GRATIS';
+    if (s.indexOf('FIXA:') === 0) {
+      modo = 'FIXA';
+      if (fixaEl) fixaEl.value = _mlFmtInput(parseFloat(s.slice(5).replace(',', '.')));
+    } else if (s.indexOf('MINIMO:') === 0) {
+      modo = 'MINIMO';
+      const p = s.slice(7).split(':');
+      if (pisoEl)  pisoEl.value  = _mlFmtInput(parseFloat(String(p[0] || '').replace(',', '.')));
+      if (minValEl) minValEl.value = _mlFmtInput(parseFloat(String(p[1] || '').replace(',', '.')));
+    } else if (s === 'COMBINAR') {
+      modo = 'COMBINAR';
+    } else {
+      modo = 'GRATIS'; // '' ou 'GRATIS'
+    }
+    modoEl.value = modo;
+    if (typeof window.mlTaxaModoChange === 'function') window.mlTaxaModoChange();
+  };
+
+  // Mostra/esconde os campos conforme o modo escolhido.
+  window.mlTaxaModoChange = function() {
+    const modo = (document.getElementById('ml-taxa-modo') || {}).value || 'GRATIS';
+    const fixaBox = document.getElementById('ml-taxa-fixa-box');
+    const minBox  = document.getElementById('ml-taxa-min-box');
+    if (fixaBox) fixaBox.style.display = (modo === 'FIXA')   ? 'block' : 'none';
+    if (minBox)  minBox.style.display  = (modo === 'MINIMO') ? 'block' : 'none';
+  };
+
+  // Valida e salva a forma de cobrança da entrega.
+  window.mlSalvarTaxaEntrega = async function() {
+    const modo = (document.getElementById('ml-taxa-modo') || {}).value || 'GRATIS';
+    const statusEl = document.getElementById('ml-taxa-status');
+    const btn = document.getElementById('ml-taxa-salvar-btn');
+    const setStatus = (txt, cor) => { if (statusEl) { statusEl.textContent = txt; statusEl.style.color = cor || 'var(--muted)'; } };
+
+    // Monta a string MODO:VALOR e valida no cliente antes de enviar.
+    let taxa = '';
+    if (modo === 'GRATIS')   taxa = 'GRATIS';
+    else if (modo === 'COMBINAR') taxa = 'COMBINAR';
+    else if (modo === 'FIXA') {
+      const v = _mlParseReais((document.getElementById('ml-taxa-fixa-val') || {}).value);
+      if (v === null || v === 0) { setStatus('❌ Digite um valor de entrega válido', 'var(--red)'); return; }
+      taxa = 'FIXA:' + v.toFixed(2);
+    } else if (modo === 'MINIMO') {
+      const piso = _mlParseReais((document.getElementById('ml-taxa-min-piso') || {}).value);
+      const val  = _mlParseReais((document.getElementById('ml-taxa-min-val') || {}).value);
+      if (piso === null || piso === 0) { setStatus('❌ Digite o valor mínimo para frete grátis', 'var(--red)'); return; }
+      if (val === null || val === 0)   { setStatus('❌ Digite a taxa cobrada abaixo do mínimo', 'var(--red)'); return; }
+      taxa = 'MINIMO:' + piso.toFixed(2) + ':' + val.toFixed(2);
+    }
+
+    if (btn) btn.disabled = true;
+    setStatus('Salvando…', 'var(--muted)');
+    try {
+      const json = await apiPost('lojaAtualizarTaxaEntrega', { token: _lojaToken, taxa });
+      if (json.status === 'ok') {
+        setStatus('✅ Forma de cobrança salva', 'var(--green)');
+        // Atualiza o objeto da loja em memória para refletir no cardápio sem recarregar.
+        try {
+          const wppLoja = (typeof _lojaWpp !== 'undefined') ? _lojaWpp : '';
+          if (wppLoja) {
+            const alvo = String(wppLoja).replace(/\D/g, '');
+            for (let i = 0; i < LOJAS.length; i++) {
+              if (LOJAS[i] && String(LOJAS[i].wpp).replace(/\D/g, '') === alvo) { LOJAS[i].taxaEntrega = json.data.taxaEntrega; break; }
+            }
+          }
+        } catch(e) {}
+        setTimeout(() => setStatus('', 'var(--muted)'), 3000);
+      } else throw new Error(json.msg || 'Erro');
+    } catch(e) {
+      if (e.message === 'UNAUTHORIZED') return; // apiPost já fez logout
+      setStatus('❌ ' + e.message, 'var(--red)');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  };
 
   // ── Toggle 'Atendo por agendamento' no painel Minha Loja ────
   window.mlToggleAgendamento = async function() {
@@ -9430,19 +9613,68 @@ ${urlCard}`)}`;
       setTimeout(() => bar.classList.remove('cc-cart-pulse'), 600);
     }
 
-    let total = 0, totalQty = 0;
+    let subtotal = 0, totalQty = 0;
     if (lista) {
       lista.innerHTML = itens.map(({ item, qty }) => {
         const sub = (parseFloat(item.preco) || 0) * qty;
-        total += sub; totalQty += qty;
+        subtotal += sub; totalQty += qty;
         return `<div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;">
           <span style="flex:1;color:var(--text);">${qty}× ${escHTML(item.nome)}</span>
           <span style="color:var(--green);font-weight:700;flex-shrink:0;">R$ ${sub.toFixed(2).replace('.',',')}</span>
         </div>`;
       }).join('');
     } else {
-      itens.forEach(({ item, qty }) => { total += (parseFloat(item.preco) || 0) * qty; totalQty += qty; });
+      itens.forEach(({ item, qty }) => { subtotal += (parseFloat(item.preco) || 0) * qty; totalQty += qty; });
     }
+
+    // ── Taxa de entrega: só entra no cálculo se a loja faz entrega ──
+    const loja = LOJAS[_ccLojaIdx];
+    const taxa = (loja && loja.fazEntrega)
+      ? calcularTaxaEntrega(loja.taxaEntrega, subtotal)
+      : { modo: 'NENHUMA', valor: 0, gratis: true, combinar: false, faltaParaGratis: 0, label: '' };
+
+    const total = subtotal + (taxa.valor || 0);
+
+    // Elementos do resumo
+    const subRow    = document.getElementById('cc-subtotal-row');
+    const subEl     = document.getElementById('cc-subtotal');
+    const entRow    = document.getElementById('cc-entrega-row');
+    const entValEl  = document.getElementById('cc-entrega-valor');
+    const entHint   = document.getElementById('cc-entrega-hint');
+
+    // Mostra linha de subtotal + entrega apenas quando há taxa (fixa/mínimo/combinar/grátis explícito)
+    const temTaxaDefinida = loja && loja.fazEntrega && taxa.modo !== 'NENHUMA';
+    if (subRow) subRow.style.display = temTaxaDefinida ? 'flex' : 'none';
+    if (subEl)  subEl.textContent = `R$ ${subtotal.toFixed(2).replace('.',',')}`;
+
+    if (entRow && entValEl) {
+      if (temTaxaDefinida) {
+        entRow.style.display = 'flex';
+        if (taxa.combinar) {
+          entValEl.textContent = 'A combinar';
+          entValEl.style.color = '#fb923c';
+        } else if (taxa.gratis) {
+          entValEl.textContent = 'Grátis';
+          entValEl.style.color = 'var(--green)';
+        } else {
+          entValEl.textContent = _fmtBRL(taxa.valor);
+          entValEl.style.color = 'var(--text)';
+        }
+      } else {
+        entRow.style.display = 'none';
+      }
+    }
+
+    // Dica "falta R$ X para frete grátis" (só no modo MÍNIMO ainda não atingido)
+    if (entHint) {
+      if (temTaxaDefinida && taxa.modo === 'MINIMO' && taxa.faltaParaGratis > 0) {
+        entHint.textContent = `🎁 Falta ${_fmtBRL(taxa.faltaParaGratis)} para ganhar entrega grátis`;
+        entHint.style.display = 'block';
+      } else {
+        entHint.style.display = 'none';
+      }
+    }
+
     const totalStr = `R$ ${total.toFixed(2).replace('.',',')}`;
     if (totalEl) totalEl.textContent = totalStr;
     if (totalHeadEl) totalHeadEl.textContent = totalStr;
@@ -9497,16 +9729,23 @@ ${urlCard}`)}`;
       setTimeout(() => { if (finalizarBtn) finalizarBtn.disabled = false; }, 6000);
     }
 
-    let total = 0;
+    let subtotal = 0;
     const linhas = itens.map(({ item, qty }) => {
       const sub = (parseFloat(item.preco) || 0) * qty;
-      total += sub;
+      subtotal += sub;
       return `• ${qty}× ${item.nome} — R$ ${sub.toFixed(2).replace('.',',')}`;
     });
 
     const obsEl = document.getElementById('cc-obs-input');
     const obs = obsEl ? obsEl.value.trim() : '';
     const obsLine = obs ? `\n\n📝 *Observações:* ${obs}` : '';
+
+    // ── Taxa de entrega ──
+    const taxa = loja.fazEntrega
+      ? calcularTaxaEntrega(loja.taxaEntrega, subtotal)
+      : { modo: 'NENHUMA', valor: 0, gratis: true, combinar: false, label: '' };
+    const total = subtotal + (taxa.valor || 0);
+    const temTaxaDefinida = loja.fazEntrega && taxa.modo !== 'NENHUMA';
 
     // Dados de entrega (se loja faz entrega)
     let entregaLine = '';
@@ -9520,7 +9759,21 @@ ${urlCard}`)}`;
       entregaLine = `\n\n📍 *Entrega para:* ${end}\n💰 *Pagamento:* ${pag}`;
     }
 
-    const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n\n${linhas.join('\n')}\n\n*Total: R$ ${total.toFixed(2).replace('.',',')}*${entregaLine}${obsLine}\n\nPoderia confirmar?`;
+    // Bloco de valores: mostra subtotal + entrega separados só quando há taxa definida
+    let valoresBloco;
+    if (temTaxaDefinida) {
+      let entTxt;
+      if (taxa.combinar)   entTxt = 'a combinar';
+      else if (taxa.gratis) entTxt = 'grátis';
+      else                  entTxt = 'R$ ' + taxa.valor.toFixed(2).replace('.', ',');
+      valoresBloco = `Subtotal: R$ ${subtotal.toFixed(2).replace('.',',')}\n`
+                   + `🛵 Entrega: ${entTxt}\n`
+                   + `*Total: R$ ${total.toFixed(2).replace('.',',')}*`;
+    } else {
+      valoresBloco = `*Total: R$ ${total.toFixed(2).replace('.',',')}*`;
+    }
+
+    const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n\n${linhas.join('\n')}\n\n${valoresBloco}${entregaLine}${obsLine}\n\nPoderia confirmar?`;
     const url = `https://wa.me/${loja.wpp}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank', 'noopener');
 

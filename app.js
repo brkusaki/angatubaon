@@ -215,6 +215,16 @@
     return CAT_EMOJI[loja && loja.categoria] || e || '🏪';
   }
 
+  // Mensagem inicial do WhatsApp ao tocar no botão WPP de uma loja.
+  // Loja por agendamento não tem 'aberto agora' — a pessoa quer contratar,
+  // então a saudação pede o agendamento em vez de perguntar se está aberto.
+  function saudacaoWhats(loja) {
+    if (loja && loja.agendamento) {
+      return 'Olá, vi no AngatubaON! Gostaria de agendar seu serviço. Tem disponibilidade?';
+    }
+    return 'Olá, vi no AngatubaON! Está aberto agora?';
+  }
+
   // Mapa categoria→sinônimos de busca (reaproveita CAT_DEF.busca, já usado no
   // autocomplete de cadastro) para a busca do CLIENTE também entender termos
   // como "hamburguer", "sorvete" etc. mesmo que a loja não tenha essa palavra
@@ -899,7 +909,7 @@
         <i class="fa fa-phone"></i></a>`;
     }
 
-    const msg = encodeURIComponent('Olá, vi no AngatubaON! Está aberto agora?');
+    const msg = encodeURIComponent(saudacaoWhats(loja));
     const url = `https://wa.me/${loja.wpp}?text=${msg}`;
 
     if (status === 'open' || status === 'zap') {
@@ -6103,7 +6113,7 @@
 
     // Botão WhatsApp
     if (loja.wpp) {
-      const msg = encodeURIComponent('Olá, vi no AngatubaON! Está aberto agora?');
+      const msg = encodeURIComponent(saudacaoWhats(loja));
       const url = `https://wa.me/${loja.wpp}?text=${msg}`;
       if (status === 'open' || status === 'zap') {
         main += `<a href="${url}" target="_blank" rel="noopener"

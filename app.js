@@ -5835,14 +5835,41 @@
     const horarioHTML = buildHorarioHTML(loja);
 
     // ── OBS — col H reaproveitada como descrição pública ("sobre") ──
-    // Fica dentro de .detail-info fica vazio; a descrição é renderizada como
-    // bloco "sobre" logo abaixo da categoria (ver sobreHTML mais abaixo).
+    // obsHTML dentro de .detail-info fica vazio; a descrição é renderizada como
+    // bloco "sobre" logo abaixo da categoria (ver sobreHTML abaixo).
     const obsHTML = '';
     // Descrição pública: só para lojas pagas (perk PRO/PLUS) e só se preenchida.
-    const _descTxt = (loja.obs || '').trim();
-    const sobreHTML = (isPago && _descTxt)
-      ? `<div class="detail-sobre">${escHTML(_descTxt)}</div>`
-      : '';
+    // Além disso, o bloco se protege de "lixo": se a descrição for só uma cópia
+    // das tags ou parecer uma lista de palavras-chave (e não uma frase), não mostra
+    // — senão só repetiria a categoria que já aparece logo acima.
+    const sobreHTML = (function () {
+      if (!isPago) return '';
+      // (1) tira vírgula/espaço pendurados no fim ("...suco," → "...suco")
+      let txt = (loja.obs || '').trim().replace(/[\s,;]+$/, '').trim();
+      if (!txt) return '';
+      // Normalizador: minúsculas, sem acento, vírgulas/espaços colapsados.
+      const norm = function (s) {
+        return String(s).toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[\s,;]+/g, ' ').trim();
+      };
+      // (2) é basicamente igual às tags? então é duplicata — esconde.
+      const tagsTxt = (loja.tags || '').trim();
+      if (tagsTxt && norm(txt) === norm(tagsTxt)) return '';
+      // (3) "parece lista de keywords" e não frase? esconde.
+      //     Heurística: tem vírgula, NÃO tem pontuação de frase (.!?:) e
+      //     todo segmento tem no máx. 2 palavras. Frases de verdade passam.
+      const temVirgula = txt.indexOf(',') !== -1;
+      const temPontFrase = /[.!?:]/.test(txt);
+      if (temVirgula && !temPontFrase) {
+        const segs = txt.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+        const todosCurtos = segs.length >= 2 && segs.every(function (s) {
+          return s.split(/\s+/).filter(Boolean).length <= 2;
+        });
+        if (todosCurtos) return '';
+      }
+      return `<div class="detail-sobre">${escHTML(txt)}</div>`;
+    })();
 
     // ── BOTÕES DE AÇÃO ────────────────────────────────────────
     const { main: actionsMain, ig: actionsIg } = buildActionsHTML(loja, status);
@@ -7110,7 +7137,8 @@
       const cfg = {
         nome:      { label:'Nome da loja',  ph:'Nome da sua loja',          max:60,  multiline:false, val: cur.nome || '' },
         telefone:  { label:'Telefone fixo', ph:'(15) 3255-0000',            max:16,  multiline:false, val: fmtTel(cur.tel), tel:true },
-        descricao: { label:'Descrição',     ph:'Conte o que sua loja oferece…', max:200, multiline:true, val: cur.obs || '' },
+        descricao: { label:'Descrição',     ph:'Ex: Hambúrguer artesanal na chapa, massa de pizza fermentada 48h…', max:200, multiline:true, val: cur.obs || '',
+                     hint:'Conte o diferencial da sua loja — não repita as palavras-chave de busca. É o texto que aparece no seu anúncio.' },
       }[key];
       if (!cfg) return;
 
@@ -7123,6 +7151,7 @@
         <div class="ml-info-editor">
           <div class="ml-info-label">${cfg.label}</div>
           ${inputHTML}
+          ${cfg.hint ? `<div class="ml-info-hint">${escHTML(cfg.hint)}</div>` : ''}
           <div class="ml-info-actions">
             <button class="ml-info-btn ml-info-btn-cancel" onclick="mlFecharEditor()">Cancelar</button>
             <button class="ml-info-btn ml-info-btn-save" id="ml-info-save-btn" onclick="mlSaveField('${key}')">Salvar</button>

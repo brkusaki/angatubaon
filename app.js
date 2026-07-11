@@ -5834,8 +5834,15 @@
     // ── HORÁRIO ESTRUTURADO ───────────────────────────────────
     const horarioHTML = buildHorarioHTML(loja);
 
-    // ── OBS — campo interno (tags de busca), não exibir no modal ──
+    // ── OBS — col H reaproveitada como descrição pública ("sobre") ──
+    // Fica dentro de .detail-info fica vazio; a descrição é renderizada como
+    // bloco "sobre" logo abaixo da categoria (ver sobreHTML mais abaixo).
     const obsHTML = '';
+    // Descrição pública: só para lojas pagas (perk PRO/PLUS) e só se preenchida.
+    const _descTxt = (loja.obs || '').trim();
+    const sobreHTML = (isPago && _descTxt)
+      ? `<div class="detail-sobre">${escHTML(_descTxt)}</div>`
+      : '';
 
     // ── BOTÕES DE AÇÃO ────────────────────────────────────────
     const { main: actionsMain, ig: actionsIg } = buildActionsHTML(loja, status);
@@ -5965,6 +5972,7 @@
           ${favBtnHTML(loja)}
         </div>
         <div class="detail-sub">${escHTML(loja.sub || loja.categoria || '')}</div>
+        ${sobreHTML}
         ${!isPago ? `<div style="margin-bottom:12px;">${badgeHTML(status, fechaStr, agendado)}</div>` : ''}
         ${anuncioHTML}
         ${cardapioBtn}
@@ -7731,6 +7739,21 @@
       return '';
     }
 
+  // ── Acordeão das "Informações da loja" ────────────────────
+  // Alterna a visibilidade do corpo (#ml-info-body) e gira a seta.
+  // forcar (opcional): true = abrir, false = fechar; ausente = alterna.
+  window.mlToggleInfoSection = function (forcar) {
+    const body = document.getElementById('ml-info-body');
+    const chev = document.getElementById('ml-info-chev');
+    const hdr  = document.getElementById('ml-info-header');
+    if (!body) return;
+    const estaAberto = body.style.display !== 'none';
+    const abrir = (typeof forcar === 'boolean') ? forcar : !estaAberto;
+    body.style.display = abrir ? '' : 'none';
+    if (chev) chev.style.transform = abrir ? 'rotate(180deg)' : 'rotate(0deg)';
+    if (hdr)  hdr.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+  };
+
   })(); // ── fim initMlInfoEditor ──────────────────────────────────
 
   /* ── INIT ────────────────────────────────────────────────── */
@@ -8590,6 +8613,11 @@ ${urlCard}`)}`;
     const section = document.getElementById('ml-cardapio-section');
     if (!section) return;
     section.style.display = (isPro || isPlus) ? '' : 'none';
+    // Acordeão de infos: loja paga (com cardápio no topo) começa fechada;
+    // loja Grátis (sem cardápio) começa aberta — senão a aba abriria vazia.
+    if (typeof window.mlToggleInfoSection === 'function') {
+      window.mlToggleInfoSection(!(isPro || isPlus));
+    }
     if (!isPro && !isPlus) return;
 
     // Badge do plano

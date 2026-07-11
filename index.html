@@ -1384,13 +1384,6 @@
           <!-- ░░ ABA LOJA ░░ -->
           <div id="ml-tab-loja" class="ml-tab-content" style="display:none;">
 
-            <!-- Informações da loja (edição inline) -->
-            <div id="ml-info-section" style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
-              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">✏️ Informações da loja</div>
-              <div style="font-size:10px;color:var(--muted);margin-bottom:12px;line-height:1.5;">Toque no lápis para editar cada campo.</div>
-              <div id="ml-info-list"></div>
-            </div>
-
             <!-- Cardápio -->
             <div id="ml-cardapio-section" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;position:sticky;top:0;z-index:5;background:var(--surface2);padding:4px 0;">
@@ -1464,6 +1457,18 @@
                   <i class="fa fa-plus"></i> Salvar e adicionar próximo
                 </button>
                 <div id="ml-cardapio-form-msg" role="status" aria-live="polite" style="font-size:11px;text-align:center;margin-top:8px;min-height:14px;"></div>
+              </div>
+            </div>
+
+            <!-- Informações da loja (acordeão colapsável) -->
+            <div id="ml-info-section" style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <button type="button" id="ml-info-header" onclick="mlToggleInfoSection()" aria-expanded="true" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:none;border:none;padding:0;cursor:pointer;color:var(--text);-webkit-tap-highlight-color:transparent;text-align:left;">
+                <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">✏️ Informações da loja</span>
+                <span id="ml-info-chev" style="font-size:13px;color:var(--muted);transition:transform .25s ease;">⌄</span>
+              </button>
+              <div id="ml-info-body">
+                <div style="font-size:10px;color:var(--muted);margin:10px 0 12px;line-height:1.5;">Toque no lápis para editar cada campo.</div>
+                <div id="ml-info-list"></div>
               </div>
             </div>
 

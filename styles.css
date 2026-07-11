@@ -2179,6 +2179,15 @@
       font-size: 12px; color: var(--muted); margin-bottom: 16px;
     }
 
+    /* Descrição pública ("sobre") — só lojas pagas */
+    .detail-sobre {
+      font-size: 13px; line-height: 1.5; color: var(--text);
+      background: rgba(245,158,11,0.06);
+      border-left: 3px solid rgba(245,158,11,0.55);
+      border-radius: 0 10px 10px 0;
+      padding: 10px 12px; margin: -6px 0 16px;
+    }
+
     /* Linha de info (endereço, horário etc.) */
     .detail-info { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
 

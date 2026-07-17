@@ -1780,10 +1780,19 @@
       if (!ov || !tEl || !mEl || !okB || !cnB) { resolve(window.confirm((titulo ? titulo + '\n\n' : '') + (mensagem || ''))); return; }
       tEl.textContent = titulo || 'Confirmar';
       mEl.textContent = mensagem || '';
-      okB.textContent = opts.okLabel || 'Confirmar';
+      mEl.style.whiteSpace = 'pre-line';
+      okB.textContent = opts.okLabel || (opts.soOk ? 'Entendi' : 'Confirmar');
       cnB.textContent = opts.cancelLabel || 'Cancelar';
-      okB.style.background = (opts.okCor === 'ok') ? 'var(--green)' : 'var(--red)';
-      okB.style.color = (opts.okCor === 'ok') ? '#000' : '#fff';
+      cnB.style.display = opts.soOk ? 'none' : '';
+      if (opts.soOk && !opts.okCor) {
+        okB.style.background = 'var(--surface2)';
+        okB.style.color = 'var(--text)';
+        okB.style.border = '1px solid var(--border)';
+      } else {
+        okB.style.background = (opts.okCor === 'ok') ? 'var(--green)' : 'var(--red)';
+        okB.style.color = (opts.okCor === 'ok') ? '#000' : '#fff';
+        okB.style.border = 'none';
+      }
       if (owl && opts.owlSrc) owl.src = opts.owlSrc;
       var fechar = function (val) {
         ov.style.display = 'none';
@@ -1805,6 +1814,12 @@
   }
   window.mlConfirmar = mlConfirmar;
   window.mlToast = mlToast;
+
+  // Item 11b: aviso informativo (so OK) no tema dark — reusa o overlay do mlConfirmar.
+  function mlAviso(titulo, mensagem, owlSrc) {
+    return mlConfirmar(titulo, mensagem, { soOk: true, owlSrc: owlSrc });
+  }
+  window.mlAviso = mlAviso;
 
   /* ── Tema dia/noite (auto/claro/escuro) ──────────────────────────
      3 modos guardados em localStorage 'angatuba_theme':
@@ -2049,8 +2064,9 @@
       window.location.href = json.data.initPoint;
     } catch (err) {
       if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = labelOrig; }
-      alert('Erro ao iniciar pagamento: ' + (err.message || 'tente novamente') +
-            '\n\nVocê também pode ativar pelo WhatsApp no botão abaixo.');
+      mlAviso('Não foi possível gerar o pagamento',
+              (err.message || 'Tente novamente.') + '\n\nVocê também pode ativar pelo WhatsApp no botão abaixo.',
+              '/webp/owl-sign.webp');
     }
   }
   window.iniciarPagamentoMP = iniciarPagamentoMP;
@@ -2067,7 +2083,7 @@
         falha:    { t: '❌ Pagamento não concluído', m: 'O pagamento não foi finalizado. Você pode tentar de novo ou falar com a gente pelo WhatsApp.' },
       };
       const info = msgs[status];
-      if (info) setTimeout(() => alert(info.t + '\n\n' + info.m), 400);
+      if (info) setTimeout(() => mlAviso(info.t, info.m, status === 'sucesso' ? '/webp/owl-thumbsup.webp' : status === 'falha' ? '/webp/owl-sign.webp' : '/webp/owl-tip.webp'), 400);
       // Fix: no retorno de pagamento (sucesso ou pendente) o plano pode ter mudado no backend
       // via webhook. Invalida o cache da loja para forçar fetch fresco na próxima abertura
       // do painel — sem isto o lojista via o plano antigo até relogar.
@@ -2927,7 +2943,7 @@
       ramoInput?.focus();
       cadShake(ramoInput);
       setTimeout(() => ramoInput?.classList.remove('invalid'), 2500);
-      alert('Selecione o ramo / categoria da loja.');
+      mlToast('Selecione o ramo / categoria da loja.', 'erro');
       return;
     }
 
@@ -2950,7 +2966,7 @@
       // (mão de obra não tem horário fixo).
       const _agendOn = document.getElementById('f-agendamento')?.checked;
       if (!_agendOn && !document.getElementById('f-horario').value) {
-        alert('Selecione pelo menos um dia e horário de funcionamento.');
+        mlToast('Selecione pelo menos um dia e horário de funcionamento.', 'erro');
         btn.classList.remove('is-loading');
         btn.disabled = false;
         return;
@@ -3012,7 +3028,7 @@
     } catch {
       btn.classList.remove('is-loading');
       btn.disabled = false;
-      alert('Erro ao enviar. Verifique sua conexão e tente novamente.');
+      mlToast('Erro ao enviar. Verifique sua conexão e tente novamente.', 'erro');
     }
   });
 
@@ -3517,7 +3533,7 @@
       if (ehTimeout && hintEl) {
         hintEl.textContent = '⏱️ O servidor demorou a responder. Aguarde alguns segundos e toque em Confirmar de novo.';
       } else {
-        alert('Erro de conexão. Verifique sua internet.');
+        mlToast('Erro de conexão. Verifique sua internet.', 'erro');
       }
     } finally {
       _llVerificando = false;
@@ -5283,7 +5299,7 @@
         btnInstalar.onclick = () => {
           banner.style.display = 'none';
           adiarBanner(7);
-          alert('Para instalar o AngatubaON:\n\n1️⃣ Toque no botão Compartilhar ⬆️ (barra inferior do Safari)\n2️⃣ Role para baixo e toque em "Adicionar à Tela de Início"\n3️⃣ Confirme tocando em "Adicionar"');
+          mlAviso('Instalar no iPhone', '1️⃣ Toque no botão Compartilhar ⬆️ (barra inferior do Safari)\n\n2️⃣ Role para baixo e toque em "Adicionar à Tela de Início"\n\n3️⃣ Confirme tocando em "Adicionar"', '/webp/owl-phone.webp');
         };
         if (btnFechar) btnFechar.onclick = () => { banner.style.display = 'none'; adiarBanner(7); };
       }
@@ -9292,11 +9308,16 @@ ${urlCard}`)}`;
     const entregaSec = document.getElementById('cc-entrega-section');
     if (entregaSec) {
       entregaSec.style.display = loja.fazEntrega ? '' : 'none';
-      // Limpa campos a cada abertura
+      // Pré-preenche com o último endereço/pagamento usado (recompra mais rápida)
       const endEl = document.getElementById('cc-entrega-endereco');
       const pagEl = document.getElementById('cc-entrega-pagamento');
-      if (endEl) endEl.value = '';
-      if (pagEl) pagEl.value = '';
+      let _cliEnd = '', _cliPag = '';
+      try {
+        _cliEnd = localStorage.getItem('angatuba_cli_endereco') || '';
+        _cliPag = localStorage.getItem('angatuba_cli_pagamento') || '';
+      } catch (e) {}
+      if (endEl) endEl.value = _cliEnd;
+      if (pagEl) pagEl.value = _cliPag;
     }
 
     ccRenderItens(loja);
@@ -9629,7 +9650,7 @@ ${urlCard}`)}`;
     if (!loja) return;
     const item = loja.cardapio.find(i => i.id === itemId);
     if (!item) return;
-    if (!loja.wpp) { alert('Esta loja não tem WhatsApp cadastrado.'); return; }
+    if (!loja.wpp) { mlToast('Esta loja não tem WhatsApp cadastrado.', 'erro'); return; }
     const preco = parseFloat(item.preco) || 0;
     const precoTxt = preco > 0 ? ` (R$ ${preco.toFixed(2).replace('.',',')})` : '';
     const msg = `Olá! Vim pelo AngatubaON 👋\n\n${verbo}: *${item.nome}*${precoTxt}\n\nPoderia me passar mais informações?`;
@@ -9773,7 +9794,7 @@ ${urlCard}`)}`;
 
   window.ccFinalizarPedido = function() {
     const loja  = LOJAS[_ccLojaIdx];
-    if (!loja || !loja.wpp) { alert('Esta loja não tem WhatsApp cadastrado.'); return; }
+    if (!loja || !loja.wpp) { mlToast('Esta loja não tem WhatsApp cadastrado.', 'erro'); return; }
 
     const itens = Object.values(_ccCarrinho);
     if (itens.length === 0) return;
@@ -9811,9 +9832,11 @@ ${urlCard}`)}`;
       const pagEl = document.getElementById('cc-entrega-pagamento');
       const end = endEl ? endEl.value.trim() : '';
       const pag = pagEl ? pagEl.value.trim() : '';
-      if (!end) { if (finalizarBtn) finalizarBtn.disabled = false; alert('Por favor, informe o endereço para entrega.'); return; }
-      if (!pag) { if (finalizarBtn) finalizarBtn.disabled = false; alert('Por favor, selecione a forma de pagamento.'); return; }
+      if (!end) { if (finalizarBtn) finalizarBtn.disabled = false; mlToast('Informe o endereço para entrega.', 'erro'); return; }
+      if (!pag) { if (finalizarBtn) finalizarBtn.disabled = false; mlToast('Selecione a forma de pagamento.', 'erro'); return; }
       entregaLine = `\n\n📍 *Entrega para:* ${end}\n💰 *Pagamento:* ${pag}`;
+      // Guarda para acelerar o próximo pedido (recompra)
+      try { localStorage.setItem('angatuba_cli_endereco', end); localStorage.setItem('angatuba_cli_pagamento', pag); } catch (e) {}
     }
 
     // Bloco de valores: mostra subtotal + entrega separados só quando há taxa definida

@@ -276,6 +276,61 @@
      Lojas hardcoded abaixo são o fallback caso a API falhe
   ══════════════════════════════════════════════════════════════ */
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwmJMmvb5H6KkMWdXJV441SQ2h18SEfLrb_4-kvUYM0IiVL6Co-EKGGay7f_qvUEi0_cg/exec';
+
+  /* ── Identidade leve p/ avaliações + utilitário de data ───────
+     O sid NÃO é autenticação: é um identificador de dispositivo/navegador
+     usado só para deduplicar e permitir editar/remover a própria avaliação. */
+  function getAvalSid() {
+    try {
+      let sid = localStorage.getItem('angatuba_sid');
+      if (!sid) {
+        sid = (self.crypto && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : 'sid-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem('angatuba_sid', sid);
+      }
+      return sid;
+    } catch (e) { return 'sid-anon'; }
+  }
+  function getAvalNome() {
+    try { return localStorage.getItem('angatuba_aval_nome') || ''; } catch (e) { return ''; }
+  }
+  function setAvalNome(nome) {
+    try { localStorage.setItem('angatuba_aval_nome', String(nome || '').slice(0, 40)); } catch (e) {}
+  }
+  // Registro local da avaliação do usuário (p/ editar/remover): { nota, texto, autor, ts }.
+  // Retrocompat: valor legado era um timestamp puro — normaliza p/ objeto.
+  function getMinhaAval(nome) {
+    try {
+      const v = JSON.parse(localStorage.getItem('aval_' + toSlug(nome)) || 'null');
+      if (v && typeof v === 'object') return v;
+      return v ? { legacy: true } : null;
+    } catch (e) { return null; }
+  }
+  function setMinhaAval(nome, obj) {
+    try { localStorage.setItem('aval_' + toSlug(nome), JSON.stringify(obj)); } catch (e) {}
+  }
+  function limparMinhaAval(nome) {
+    try { localStorage.removeItem('aval_' + toSlug(nome)); } catch (e) {}
+  }
+  // "há 3 dias", "ontem", "há 2 h", "agora" — a partir de timestamp em ms.
+  function tempoRelativo(ms) {
+    const t = Number(ms);
+    if (!t || isNaN(t)) return '';
+    const diff = Date.now() - t;
+    if (diff < 60000) return 'agora';
+    const min = Math.floor(diff / 60000);
+    if (min < 60) return 'há ' + min + ' min';
+    const h = Math.floor(min / 60);
+    if (h < 24) return 'há ' + h + ' h';
+    const d = Math.floor(h / 24);
+    if (d === 1) return 'ontem';
+    if (d < 30) return 'há ' + d + ' dias';
+    const mes = Math.floor(d / 30);
+    if (mes < 12) return 'há ' + mes + (mes === 1 ? ' mês' : ' meses');
+    const anos = Math.floor(d / 365);
+    return 'há ' + anos + (anos === 1 ? ' ano' : ' anos');
+  }
   const ADMIN_WPP_CONTATO = '5515981125349'; // número único — atualizar aqui se mudar
 
   /* ════════════════════════════════════════════════════════════
@@ -1376,7 +1431,8 @@
     // Estrelas de avaliação — linha própria, só quando há avaliações
     let starsHTML = '';
     const avals = loja.avaliacoes;
-    if (avals && avals.length > 0) {
+    // #7: mostra a nota no card só com volume mínimo (>=3) — evita "5.0" de 1 avaliação
+    if (avals && avals.length >= 3) {
       const media = avals.reduce((s, a) => s + (a.nota || 0), 0) / avals.length;
       const mediaFmt = media.toFixed(1);
       // Monta string de estrelas cheias/meia/vazias
@@ -5904,25 +5960,30 @@
                     filter:drop-shadow(0 2px 6px rgba(245,158,11,0.4));" onerror="this.style.display='none'" />`
       : '';
 
-    // ── Resumo de avaliações: média + estrelas + troféu + botão expandir ──
-    // #4: o card já mostra a média e o formulário de avaliar aparece para todos,
-    // então a lista/resumo também deve aparecer para lojas Grátis (antes era
-    // `isPago && ...`, criando "propaganda enganosa": card com nota, modal vazio).
+    // ── Resumo de avaliações: honesto quanto a volume ──
+    // Média/estrelas em destaque só com volume mínimo (>=3). Com 1-2, mostra
+    // contagem + microcopy — evita "5.0" enganoso de uma única avaliação.
     // O troféu de excelência segue exclusivo de planos pagos (perk mantido).
+    const AVAL_MIN_MEDIA = 3;
     const temAvals = avaliacoes.length > 0;
+    const temMedia = avaliacoes.length >= AVAL_MIN_MEDIA;
     const avalResumoHTML = temAvals
       ? `<div style="margin-bottom:12px;">
-           <div style="display:flex;align-items:center;gap:8px;">
-             <span style="font-size:1.4rem;font-weight:800;font-family:var(--font-h);">${mediaAval}</span>
-             <div>
-               <div style="display:flex;gap:2px;">${[1,2,3,4,5].map(s => {
-                 const cor = s <= Math.round(mediaAval) ? '#f59e0b' : 'rgba(255,255,255,0.15)';
-                 return `<span style="color:${cor};font-size:14px;">★</span>`;
-               }).join('')}</div>
-               <div style="font-size:10px;color:var(--muted);">${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''}</div>
-             </div>
-             ${trofeuHTML}
-           </div>
+           ${temMedia
+             ? `<div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:1.4rem;font-weight:800;font-family:var(--font-h);">${mediaAval}</span>
+                  <div>
+                    <div style="display:flex;gap:2px;">${[1,2,3,4,5].map(s => {
+                      const cor = s <= Math.round(mediaAval) ? '#f59e0b' : 'rgba(255,255,255,0.15)';
+                      return `<span style="color:${cor};font-size:14px;">★</span>`;
+                    }).join('')}</div>
+                    <div style="font-size:10px;color:var(--muted);">${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''}</div>
+                  </div>
+                  ${trofeuHTML}
+                </div>`
+             : `<div style="font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px;">
+                  <span style="color:#f59e0b;">★</span> ${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''} · a média aparece a partir de ${AVAL_MIN_MEDIA}
+                </div>`}
            <button type="button" id="aval-toggle-${idx}" onclick="avalToggleLista(${idx})"
              style="width:100%;margin-top:10px;padding:9px;border-radius:9px;cursor:pointer;
                     background:var(--surface2);border:1px solid var(--border);color:var(--text);
@@ -5936,25 +5997,8 @@
 
     // ── Lista de avaliações (colapsável, renderiza no máx. 8 por vez) ──
     const AVAL_VISIVEIS = 8;
-    const avalListaItens = (lista) => lista.map((a, i) => {
-      const isDono = _lojaToken && _lojaNome === loja.nome;
-      const sinalizarBtn = isDono
-        ? `<button onclick="avalSinalizar(${idx},${i},'${escAttr(loja.nome)}')" title="Sinalizar para revisão"
-             style="font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;
-                    padding:2px 6px;border-radius:5px;border:1px solid var(--border);flex-shrink:0;">🚩</button>`
-        : '';
-      return `
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:6px;">
-            <span style="font-size:12px;font-weight:700;">${escHTML(a.autor || 'Anônimo')}</span>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:11px;color:#f59e0b;">${'★'.repeat(a.nota || 0)}${'☆'.repeat(5-(a.nota||0))}</span>
-              ${sinalizarBtn}
-            </div>
-          </div>
-          ${a.texto ? `<p style="font-size:11px;color:var(--muted);margin:0;line-height:1.5;">${escHTML(a.texto)}</p>` : ''}
-        </div>`;
-    }).join('');
+    const _isDonoAval = _lojaToken && _lojaNome === loja.nome;
+    const avalListaItens = (lista) => lista.map((a) => avalItemHTML(a, idx, _isDonoAval)).join('');
 
     const avalMaisBtn = avaliacoes.length > AVAL_VISIVEIS
       ? `<button type="button" id="aval-mais-${idx}" onclick="avalVerTodas(${idx})"
@@ -5972,38 +6016,12 @@
          </div>`
       : '';
 
-    // Formulário de avaliação (todos podem avaliar)
-    const avalFormHTML = `
-      <div id="aval-form-${idx}" style="margin-bottom:14px;margin-top:4px;padding-top:14px;border-top:1px solid var(--border);">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <img src="/webp/owl-wave.webp" alt="" style="width:32px;height:32px;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'" />
-          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Avaliar esta loja</div>
-        </div>
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;">
-          <!-- Estrelas clicáveis -->
-          <div style="display:flex;gap:4px;margin-bottom:8px;" id="aval-stars-${idx}" role="radiogroup" aria-label="Sua nota, de 1 a 5 estrelas">
-            ${[1,2,3,4,5].map(s =>
-              `<button onclick="avalSetNota(${idx},${s})" data-nota="${s}"
-                style="font-size:1.6rem;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.15);
-                       transition:color 0.1s;-webkit-tap-highlight-color:transparent;"
-                class="aval-star" role="radio" aria-checked="false" aria-label="${s} estrela${s > 1 ? 's' : ''}">★</button>`
-            ).join('')}
-          </div>
-          <textarea id="aval-texto-${idx}" maxlength="120" rows="2" placeholder="Conte sua experiência... (opcional)"
-            oninput="var c=document.getElementById('aval-contador-${idx}');if(c)c.textContent=this.value.length+'/120';"
-            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
-                   padding:8px 10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;
-                   font-family:var(--font-b);line-height:1.5;margin-bottom:2px;"></textarea>
-          <div id="aval-contador-${idx}" style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:6px;">0/120</div>
-          <button onclick="avalEnviar(${idx},'${escAttr(loja.nome)}')"
-            style="width:100%;padding:10px;border-radius:8px;
-                   background:linear-gradient(135deg,#f59e0b,#d97706);
-                   color:#000;font-family:var(--font-h);font-size:13px;font-weight:800;border:none;cursor:pointer;">
-            ⭐ Enviar avaliação
-          </button>
-          <div id="aval-msg-${idx}" style="font-size:11px;text-align:center;margin-top:6px;min-height:16px;"></div>
-        </div>
-      </div>`;
+    // Formulário de avaliação — 3 estados: dono (nada), já avaliou (editar/remover), novo.
+    const _souDonoAval = _lojaToken && _lojaNome === loja.nome;
+    const _minhaAval   = getMinhaAval(loja.nome);
+    const avalFormHTML = _souDonoAval
+      ? ''
+      : (_minhaAval ? avalMinhaPainelHTML(idx, loja.nome, _minhaAval) : avalFormNovoHTML(idx, loja.nome));
 
     // ── MONTA SHEET ──────────────────────────────────────────
     sheet.innerHTML = `
@@ -8495,10 +8513,92 @@ ${urlCard}`)}`;
   /* ══════════════════════════════════════════════════════════════
      AVALIAÇÕES
   ══════════════════════════════════════════════════════════════ */
+  // Fonte única do HTML de um item de avaliação (lista inicial e "ver todas").
+  function avalItemHTML(a, idx, isDono) {
+    const nota = a.nota || 0;
+    const estrelas = '★'.repeat(nota) + '☆'.repeat(5 - nota);
+    const quando = tempoRelativo(a.data);
+    const dataHTML = quando ? `<span style="font-size:10px;color:var(--muted);">· ${quando}</span>` : '';
+    const idSafe = String(a.id || '');
+    const sinalizarBtn = isDono
+      ? `<button onclick="avalSinalizar(${idx},'${escAttr(idSafe)}','${escAttr(a.texto||'')}')" title="Sinalizar para revisão" style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:5px;border:1px solid var(--border);flex-shrink:0;">🚩</button>`
+      : '';
+    const responderBtn = (isDono && !a.resposta)
+      ? `<button onclick="avalResponder(${idx},'${escAttr(idSafe)}')" style="font-size:10.5px;color:#f59e0b;background:none;border:none;cursor:pointer;padding:2px 4px;font-weight:700;">Responder</button>`
+      : '';
+    const textoHTML = a.texto ? `<p style="font-size:11.5px;color:var(--text);margin:0;line-height:1.5;">${escHTML(a.texto)}</p>` : '';
+    const respHTML = a.resposta
+      ? `<div style="margin-top:8px;padding:8px 10px;background:var(--surface);border-left:3px solid #f59e0b;border-radius:6px;">
+           <div style="font-size:9.5px;font-weight:800;color:#f59e0b;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Resposta da loja</div>
+           <p style="font-size:11px;color:var(--muted);margin:0;line-height:1.45;">${escHTML(a.resposta)}</p>
+         </div>`
+      : '';
+    return `<div id="aval-item-${idx}-${idSafe}" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:6px;">
+          <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+            <span style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHTML(a.autor || 'Anônimo')}</span>${dataHTML}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+            <span style="font-size:11px;color:#f59e0b;letter-spacing:1px;">${estrelas}</span>${responderBtn}${sinalizarBtn}
+          </div>
+        </div>
+        ${textoHTML}${respHTML}
+      </div>`;
+  }
+
+  // Form de nova avaliação (com nome obrigatório).
+  function avalFormNovoHTML(idx, nome) {
+    const nomeSalvo = getAvalNome();
+    return `
+      <div id="aval-form-${idx}" style="margin-bottom:14px;margin-top:4px;padding-top:14px;border-top:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <img src="/webp/owl-wave.webp" alt="" style="width:32px;height:32px;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'" />
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Avaliar esta loja</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;">
+          <div style="display:flex;gap:4px;margin-bottom:8px;" id="aval-stars-${idx}" role="radiogroup" aria-label="Sua nota, de 1 a 5 estrelas">
+            ${[1,2,3,4,5].map(st => `<button onclick="avalSetNota(${idx},${st})" data-nota="${st}" style="font-size:1.6rem;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.15);transition:color 0.1s;-webkit-tap-highlight-color:transparent;" class="aval-star" role="radio" aria-checked="false" aria-label="${st} estrela${st > 1 ? 's' : ''}">★</button>`).join('')}
+          </div>
+          <input id="aval-nome-${idx}" type="text" maxlength="40" value="${escAttr(nomeSalvo)}" placeholder="Seu nome (ex.: João S.)" autocomplete="name"
+            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text);box-sizing:border-box;font-family:var(--font-b);margin-bottom:6px;" />
+          <textarea id="aval-texto-${idx}" maxlength="120" rows="2" placeholder="Conte sua experiência... (opcional)"
+            oninput="var c=document.getElementById('aval-contador-${idx}');if(c)c.textContent=this.value.length+'/120';"
+            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;font-family:var(--font-b);line-height:1.5;margin-bottom:2px;"></textarea>
+          <div id="aval-contador-${idx}" style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:6px;">0/120</div>
+          <button onclick="avalEnviar(${idx},'${escAttr(nome)}')"
+            style="width:100%;padding:10px;border-radius:8px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:13px;font-weight:800;border:none;cursor:pointer;">
+            ⭐ Enviar avaliação
+          </button>
+          <div id="aval-msg-${idx}" style="font-size:11px;text-align:center;margin-top:6px;min-height:16px;"></div>
+        </div>
+      </div>`;
+  }
+
+  // Painel "você já avaliou" (editar/remover), autenticado por sid no backend.
+  function avalMinhaPainelHTML(idx, nome, minha) {
+    const nota = (minha && minha.nota) || 0;
+    const estrelas = nota ? ('★'.repeat(nota) + '☆'.repeat(5 - nota)) : '';
+    const notaTxt = estrelas ? `<span style="color:#f59e0b;">${estrelas}</span>` : '';
+    return `
+      <div id="aval-form-${idx}" style="margin-bottom:14px;margin-top:4px;padding-top:14px;border-top:1px solid var(--border);">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <img src="/webp/owl-thumbsup.webp" alt="" style="width:28px;height:28px;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'" />
+            <div style="font-size:12px;font-weight:700;color:var(--text);">Você já avaliou esta loja ${notaTxt}</div>
+          </div>
+          <div id="aval-min-area-${idx}" style="display:flex;gap:8px;">
+            <button onclick="avalEditarAbrir(${idx},'${escAttr(nome)}')" style="flex:1;padding:9px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--font-b);font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">✏️ Editar</button>
+            <button onclick="avalRemover(${idx},'${escAttr(nome)}')" style="flex:1;padding:9px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--red);font-family:var(--font-b);font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">🗑️ Remover</button>
+          </div>
+          <div id="aval-msg-${idx}" style="font-size:11px;text-align:center;margin-top:8px;min-height:16px;"></div>
+        </div>
+      </div>`;
+  }
+
   let _avalNota = {};
 
-  // Dono sinaliza avaliação para revisão
-  window.avalSinalizar = async function(lojaIdx, avalIdx, nomeLoja) {
+  // Dono sinaliza avaliação para revisão (localiza pela ID estável, não por índice)
+  window.avalSinalizar = async function(lojaIdx, avalId, textoEsperado) {
     const ok = await mlConfirmar('Sinalizar avaliação?', 'Ela ficará oculta até ser analisada pela nossa equipe.', { okLabel: 'Sinalizar', owlSrc: '/webp/owl-sign.webp' });
     if (!ok) return;
     try {
@@ -8506,15 +8606,17 @@ ${urlCard}`)}`;
       params.append('payload', JSON.stringify({
         action: 'lojaSinalizarAvaliacao',
         token:  _lojaToken,
-        idx:    avalIdx,
+        avalId: avalId,
+        textoEsperado: textoEsperado || '',
       }));
       const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
       const json = await resp.json();
       if (json.status === 'ok') {
         mlToast('Avaliação sinalizada! Será revisada em breve.', 'ok');
-        // Remove da lista local e reabre detalhes
-        if (LOJAS[lojaIdx].avaliacoes) {
-          LOJAS[lojaIdx].avaliacoes.splice(avalIdx, 1);
+        const arr = LOJAS[lojaIdx] && LOJAS[lojaIdx].avaliacoes;
+        if (arr) {
+          const pos = arr.findIndex(function(a){ return String(a.id||'') === String(avalId); });
+          if (pos !== -1) arr.splice(pos, 1);
         }
         abrirDetalhes(lojaIdx);
       } else throw new Error(json.msg);
@@ -8552,18 +8654,7 @@ ${urlCard}`)}`;
     const lista = document.getElementById('aval-lista-' + idx);
     if (!cont) return;
     const isDono = _lojaToken && _lojaNome === loja.nome;
-    cont.innerHTML = loja.avaliacoes.map((a, i) => {
-      const sin = isDono
-        ? '<button onclick="avalSinalizar(' + idx + ',' + i + ',\'' + escAttr(loja.nome) + '\')" title="Sinalizar para revisão" style="font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:5px;border:1px solid var(--border);flex-shrink:0;">🚩</button>'
-        : '';
-      const estrelas = '★'.repeat(a.nota || 0) + '☆'.repeat(5 - (a.nota || 0));
-      const txt = a.texto ? '<p style="font-size:11px;color:var(--muted);margin:0;line-height:1.5;">' + escHTML(a.texto) + '</p>' : '';
-      return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:6px;">'
-        + '<span style="font-size:12px;font-weight:700;">' + escHTML(a.autor || 'Anônimo') + '</span>'
-        + '<div style="display:flex;align-items:center;gap:6px;">'
-        + '<span style="font-size:11px;color:#f59e0b;">' + estrelas + '</span>' + sin + '</div></div>' + txt + '</div>';
-    }).join('');
+    cont.innerHTML = loja.avaliacoes.map(function(a){ return avalItemHTML(a, idx, isDono); }).join('');
     if (maisBtn) maisBtn.remove();
     if (lista && lista.classList.contains('aberta')) lista.style.maxHeight = lista.scrollHeight + 'px';
   };
@@ -8579,59 +8670,189 @@ ${urlCard}`)}`;
 
   window.avalEnviar = async function(idx, nome) {
     const avalBtn = document.querySelector(`#aval-form-${idx} button[onclick*="avalEnviar"]`);
-    if (avalBtn?.disabled) return;
+    if (avalBtn && avalBtn.disabled) return;
     const msgEl = document.getElementById(`aval-msg-${idx}`);
     const nota  = _avalNota[idx];
     if (!nota || nota < 1) {
-      if (msgEl) { msgEl.textContent = '\u2b50 Selecione uma nota antes de enviar.'; msgEl.style.color = 'var(--red)'; }
+      if (msgEl) { msgEl.textContent = '⭐ Selecione uma nota antes de enviar.'; msgEl.style.color = 'var(--red)'; }
       return;
     }
-
-    // Bloqueia dono avaliando a própria loja
+    const nomeInput = document.getElementById(`aval-nome-${idx}`);
+    const autor = ((nomeInput && nomeInput.value) || '').trim();
+    if (autor.length < 2) {
+      if (msgEl) { msgEl.textContent = '✍️ Coloque seu nome (ao menos 2 letras).'; msgEl.style.color = 'var(--red)'; }
+      if (nomeInput) nomeInput.focus();
+      return;
+    }
     if (_lojaToken && _lojaNome === nome) {
       if (msgEl) { msgEl.textContent = '❌ Você não pode avaliar sua própria loja.'; msgEl.style.color = 'var(--red)'; }
       return;
     }
-
-    // Verifica se já avaliou esse loja (localStorage)
-    const chave = `aval_${toSlug(nome)}`;
-    if (localStorage.getItem(chave)) {
+    if (getMinhaAval(nome)) {
       if (msgEl) { msgEl.textContent = 'Você já avaliou esta loja!'; msgEl.style.color = 'var(--muted)'; }
       return;
     }
-
-    // Só a partir daqui há de fato uma tentativa de envio — trava o botão.
     if (avalBtn) avalBtn.disabled = true;
-    const texto = document.getElementById(`aval-texto-${idx}`)?.value.trim() || '';
+    const textoEl = document.getElementById(`aval-texto-${idx}`);
+    const texto = (textoEl && textoEl.value.trim()) || '';
     if (msgEl) { msgEl.textContent = '⏳ Enviando...'; msgEl.style.color = 'var(--muted)'; }
-
     try {
+      setAvalNome(autor);
       const params = new URLSearchParams();
       params.append('payload', JSON.stringify({
         action: 'registrarAvaliacao',
         loja:   nome,
         nota,
         texto,
+        autor,
+        sessionId: getAvalSid(),
       }));
       const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
       const json = await resp.json();
-
       if (json.status === 'ok') {
-        localStorage.setItem(chave, Date.now().toString());
-        // Remove esta loja da fila de sugestão de avaliação (já avaliou)
+        setMinhaAval(nome, { nota, texto, autor, ts: Date.now() });
         if (typeof window.marcarLojaAvaliada === 'function') window.marcarLojaAvaliada(nome);
-        if (msgEl) { msgEl.textContent = '✅ Avaliação enviada! Aparecerá após moderação.'; msgEl.style.color = 'var(--green)'; }
-        // Desabilita o form (sucesso definitivo — não precisa reabilitar o botão)
-        document.getElementById(`aval-form-${idx}`).style.opacity = '0.5';
-        document.getElementById(`aval-form-${idx}`).style.pointerEvents = 'none';
+        const aprovada = json.data && json.data.aprovada;
+        if (msgEl) {
+          msgEl.textContent = aprovada ? '✅ Avaliação publicada. Obrigado!' : '✅ Enviada! Aparecerá após moderação.';
+          msgEl.style.color = 'var(--green)';
+        }
+        const formEl = document.getElementById(`aval-form-${idx}`);
+        if (formEl) { formEl.style.opacity = '0.5'; formEl.style.pointerEvents = 'none'; }
       } else {
-        throw new Error(json.msg || 'Erro');
+        if (avalBtn) avalBtn.disabled = false;
+        if (msgEl) { msgEl.textContent = '❌ ' + (json.msg || 'Erro ao enviar.'); msgEl.style.color = 'var(--red)'; }
       }
     } catch(e) {
-      // Falha de rede/servidor: reabilita o botão para o cliente poder tentar de novo
-      // sem precisar fechar e reabrir o modal.
       if (avalBtn) avalBtn.disabled = false;
       if (msgEl) { msgEl.textContent = '❌ Erro ao enviar. Tente novamente.'; msgEl.style.color = 'var(--red)'; }
+    }
+  };
+
+  /* ── Editar / remover a própria avaliação (auth por sid no backend) ── */
+  window._avalEditNota = window._avalEditNota || {};
+  window.avalEditSetNota = function(idx, nota) {
+    window._avalEditNota[idx] = nota;
+    document.querySelectorAll(`#avaledit-stars-${idx} .aval-star`).forEach(function(el, i){
+      el.style.color = i < nota ? '#f59e0b' : 'rgba(255,255,255,0.15)';
+      el.setAttribute('aria-checked', i < nota ? 'true' : 'false');
+    });
+  };
+  window.avalEditarAbrir = function(idx, nome) {
+    const area = document.getElementById('aval-min-area-' + idx);
+    if (!area) return;
+    const minha = getMinhaAval(nome) || {};
+    const nota = minha.nota || 0;
+    window._avalEditNota[idx] = nota;
+    const stars = [1,2,3,4,5].map(function(st){
+      return `<button onclick="avalEditSetNota(${idx},${st})" class="aval-star" role="radio" aria-checked="${st<=nota?'true':'false'}" style="font-size:1.5rem;background:none;border:none;cursor:pointer;color:${st<=nota?'#f59e0b':'rgba(255,255,255,0.15)'};-webkit-tap-highlight-color:transparent;">★</button>`;
+    }).join('');
+    area.innerHTML = `
+      <div style="width:100%;">
+        <div style="display:flex;gap:4px;margin-bottom:8px;" id="avaledit-stars-${idx}" role="radiogroup" aria-label="Nova nota">${stars}</div>
+        <textarea id="avaledit-texto-${idx}" maxlength="120" rows="2" placeholder="Conte sua experiência... (opcional)"
+          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;font-family:var(--font-b);line-height:1.5;margin-bottom:6px;">${escHTML(minha.texto || '')}</textarea>
+        <div style="display:flex;gap:8px;">
+          <button onclick="avalEditarEnviar(${idx},'${escAttr(nome)}')" style="flex:1;padding:9px;border-radius:8px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;">Salvar</button>
+          <button onclick="abrirDetalhes(${idx})" style="padding:9px 14px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-family:var(--font-b);font-size:12px;font-weight:700;cursor:pointer;">Cancelar</button>
+        </div>
+      </div>`;
+  };
+  window.avalEditarEnviar = async function(idx, nome) {
+    const msgEl = document.getElementById('aval-msg-' + idx);
+    const nota = window._avalEditNota[idx];
+    if (!nota || nota < 1) { if (msgEl) { msgEl.textContent = '⭐ Selecione uma nota.'; msgEl.style.color = 'var(--red)'; } return; }
+    const txtEl = document.getElementById('avaledit-texto-' + idx);
+    const texto = (txtEl && txtEl.value.trim()) || '';
+    const minhaOld = getMinhaAval(nome) || {};
+    if (msgEl) { msgEl.textContent = '⏳ Salvando...'; msgEl.style.color = 'var(--muted)'; }
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action:'editarAvaliacao', loja:nome, nota:nota, texto:texto, sessionId:getAvalSid() }));
+      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      const json = await resp.json();
+      if (json.status !== 'ok') { if (msgEl) { msgEl.textContent = '❌ ' + (json.msg || 'Erro ao salvar.'); msgEl.style.color = 'var(--red)'; } return; }
+      setMinhaAval(nome, { nota:nota, texto:texto, autor:getAvalNome(), ts:Date.now() });
+      const aprovada = json.data && json.data.aprovada;
+      const arr = LOJAS[idx] && LOJAS[idx].avaliacoes;
+      if (arr) {
+        const pos = arr.findIndex(function(a){
+          return (a.autor||'') === (minhaOld.autor||getAvalNome()) && (a.nota||0) === (minhaOld.nota||0) && (a.texto||'') === (minhaOld.texto||'');
+        });
+        if (pos !== -1) {
+          if (aprovada) { arr[pos].nota = nota; arr[pos].texto = texto; arr[pos].data = Date.now(); }
+          else { arr.splice(pos, 1); }
+        }
+      }
+      if (msgEl) { msgEl.textContent = aprovada ? '✅ Avaliação atualizada!' : '✅ Atualizada! Passará por moderação.'; msgEl.style.color = 'var(--green)'; }
+      setTimeout(function(){ abrirDetalhes(idx); }, 700);
+    } catch(e) {
+      if (msgEl) { msgEl.textContent = '❌ Erro ao salvar.'; msgEl.style.color = 'var(--red)'; }
+    }
+  };
+  window.avalRemover = async function(idx, nome) {
+    const ok = await mlConfirmar('Remover sua avaliação?', 'Ela deixará de aparecer para todos.', { okLabel:'Remover', owlSrc:'/webp/owl-sign.webp' });
+    if (!ok) return;
+    const msgEl = document.getElementById('aval-msg-' + idx);
+    const minhaOld = getMinhaAval(nome) || {};
+    if (msgEl) { msgEl.textContent = '⏳ Removendo...'; msgEl.style.color = 'var(--muted)'; }
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action:'removerAvaliacao', loja:nome, sessionId:getAvalSid() }));
+      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      const json = await resp.json();
+      if (json.status !== 'ok') { if (msgEl) { msgEl.textContent = '❌ ' + (json.msg || 'Erro ao remover.'); msgEl.style.color = 'var(--red)'; } return; }
+      limparMinhaAval(nome);
+      const arr = LOJAS[idx] && LOJAS[idx].avaliacoes;
+      if (arr) {
+        const pos = arr.findIndex(function(a){
+          return (a.autor||'') === (minhaOld.autor||getAvalNome()) && (a.nota||0) === (minhaOld.nota||0) && (a.texto||'') === (minhaOld.texto||'');
+        });
+        if (pos !== -1) arr.splice(pos, 1);
+      }
+      mlToast('Avaliação removida.', 'ok');
+      abrirDetalhes(idx);
+    } catch(e) {
+      if (msgEl) { msgEl.textContent = '❌ Erro ao remover.'; msgEl.style.color = 'var(--red)'; }
+    }
+  };
+
+  /* ── Dono responde publicamente uma avaliação ── */
+  window.avalResponder = function(lojaIdx, avalId) {
+    const item = document.getElementById('aval-item-' + lojaIdx + '-' + avalId);
+    if (!item || item.querySelector('.aval-resp-form')) return;
+    const div = document.createElement('div');
+    div.className = 'aval-resp-form';
+    div.style.marginTop = '8px';
+    div.innerHTML =
+      `<textarea id="aval-resp-txt-${lojaIdx}-${avalId}" maxlength="150" rows="2" placeholder="Responder publicamente..." style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:7px 9px;font-size:11px;color:var(--text);resize:none;box-sizing:border-box;font-family:var(--font-b);margin-bottom:6px;"></textarea>
+       <div style="display:flex;gap:6px;">
+         <button onclick="avalResponderEnviar(${lojaIdx},'${escAttr(avalId)}')" style="flex:1;padding:7px;border-radius:6px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:11px;font-weight:800;border:none;cursor:pointer;">Publicar</button>
+         <button onclick="this.closest('.aval-resp-form').remove()" style="padding:7px 12px;border-radius:6px;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;">Cancelar</button>
+       </div>
+       <div class="aval-resp-msg" style="font-size:10px;text-align:center;margin-top:4px;min-height:12px;"></div>`;
+    item.appendChild(div);
+    const ta = div.querySelector('textarea'); if (ta) ta.focus();
+  };
+  window.avalResponderEnviar = async function(lojaIdx, avalId) {
+    const item = document.getElementById('aval-item-' + lojaIdx + '-' + avalId);
+    const ta = document.getElementById('aval-resp-txt-' + lojaIdx + '-' + avalId);
+    const msg = item ? item.querySelector('.aval-resp-msg') : null;
+    const resposta = ((ta && ta.value) || '').trim();
+    if (resposta.length < 2) { if (msg) { msg.textContent = 'Escreva uma resposta.'; msg.style.color = 'var(--red)'; } return; }
+    if (msg) { msg.textContent = 'Publicando...'; msg.style.color = 'var(--muted)'; }
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action:'lojaResponderAvaliacao', token:_lojaToken, avalId:avalId, resposta:resposta }));
+      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
+      const json = await resp.json();
+      if (json.status !== 'ok') { if (msg) { msg.textContent = '❌ ' + (json.msg || 'Erro.'); msg.style.color = 'var(--red)'; } return; }
+      const arr = LOJAS[lojaIdx] && LOJAS[lojaIdx].avaliacoes;
+      if (arr) { const a = arr.find(function(x){ return String(x.id||'') === String(avalId); }); if (a) a.resposta = resposta; }
+      mlToast('Resposta publicada!', 'ok');
+      abrirDetalhes(lojaIdx);
+    } catch(e) {
+      if (msg) { msg.textContent = '❌ Erro ao publicar.'; msg.style.color = 'var(--red)'; }
     }
   };
 

@@ -5807,6 +5807,7 @@
              <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
            </div>
            <div class="detail-cover-badge">${badgeHTML(status, fechaStr, agendado)}</div>
+           ${logoOverlay}
          </div>`
       : `<div style="
             position:relative;height:80px;border-radius:20px 20px 0 0;overflow:hidden;

@@ -1556,9 +1556,17 @@
 
     if (imgwrap) {
       var _sy=null,_st0=0,_moveu=false,_downX=0;
-      imgwrap.addEventListener('touchstart', function(e){ _sy=e.touches[0].clientY; _downX=e.touches[0].clientX; _st0=Date.now(); _moveu=false; pausar(); }, { passive:true });
-      imgwrap.addEventListener('touchmove', function(e){ if (_sy==null) return; var dy=e.touches[0].clientY-_sy; if (Math.abs(dy)>8) _moveu=true; if (dy>8){ lb.style.transform='translateY('+Math.min(dy,400)+'px)'; lb.style.opacity=String(Math.max(1-dy/500,0.2)); } }, { passive:true });
+      // Guarda contra o "ghost click": no celular, um toque dispara touchend E,
+      // ~300ms depois, um mousedown/mouseup sintético. Sem isto, o toque avançava
+      // DOIS stories (uma vez no touchend, outra no mouseup fantasma). Marcamos o
+      // instante do último toque; os handlers de mouse ignoram eventos dentro da
+      // janela do fantasma. No PC (sem touch) nada é ignorado.
+      var _lastTouch = 0;
+      var _ehFantasma = function(){ return (Date.now() - _lastTouch) < 700; };
+      imgwrap.addEventListener('touchstart', function(e){ _lastTouch=Date.now(); _sy=e.touches[0].clientY; _downX=e.touches[0].clientX; _st0=Date.now(); _moveu=false; pausar(); }, { passive:true });
+      imgwrap.addEventListener('touchmove', function(e){ _lastTouch=Date.now(); if (_sy==null) return; var dy=e.touches[0].clientY-_sy; if (Math.abs(dy)>8) _moveu=true; if (dy>8){ lb.style.transform='translateY('+Math.min(dy,400)+'px)'; lb.style.opacity=String(Math.max(1-dy/500,0.2)); } }, { passive:true });
       var _fim = function(e){
+        _lastTouch=Date.now();
         var dur = Date.now()-_st0; var t=lb.style.transform; var dy=t?parseFloat(t.replace(/[^0-9.]/g,''))||0:0;
         if (dy>110){ fechar(); return; }
         lb.style.transform=''; lb.style.opacity='';
@@ -1571,12 +1579,12 @@
         retomar(); _sy=null;
       };
       imgwrap.addEventListener('touchend', _fim, { passive:true });
-      imgwrap.addEventListener('touchcancel', function(){ lb.style.transform=''; lb.style.opacity=''; retomar(); _sy=null; }, { passive:true });
-      // desktop
+      imgwrap.addEventListener('touchcancel', function(){ _lastTouch=Date.now(); lb.style.transform=''; lb.style.opacity=''; retomar(); _sy=null; }, { passive:true });
+      // desktop (mouse). Ignora eventos sintéticos logo após um toque real.
       var _mdT=0,_mMoved=false,_mx=0,_my=0;
-      imgwrap.addEventListener('mousedown', function(e){ _mdT=Date.now(); _mMoved=false; _mx=e.clientX; _my=e.clientY; pausar(); });
+      imgwrap.addEventListener('mousedown', function(e){ if (_ehFantasma()) return; _mdT=Date.now(); _mMoved=false; _mx=e.clientX; _my=e.clientY; pausar(); });
       imgwrap.addEventListener('mousemove', function(e){ if (_mdT && (Math.abs(e.clientX-_mx)>6||Math.abs(e.clientY-_my)>6)) _mMoved=true; });
-      imgwrap.addEventListener('mouseup', function(e){ var dur=Date.now()-_mdT; retomar(); if (!_mMoved && dur<250){ if (e.clientX < window.innerWidth*0.33) voltar(); else avancar(); } _mdT=0; });
+      imgwrap.addEventListener('mouseup', function(e){ if (_ehFantasma()) return; var dur=Date.now()-_mdT; retomar(); if (!_mMoved && dur<250){ if (e.clientX < window.innerWidth*0.33) voltar(); else avancar(); } _mdT=0; });
       imgwrap.addEventListener('mouseleave', function(){ if (_mdT){ retomar(); _mdT=0; } });
     }
 

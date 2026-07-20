@@ -1078,10 +1078,31 @@
     } catch (e) { return {}; }
   }
 
+  // Fase 2: normaliza os stories de uma loja. Se vier o array 'stories' do
+  // backend, usa-o; senão converte o anúncio único (Fase 1) em array de 1.
+  // Também preenche loja.anuncio com o PRIMEIRO story, para que todo o código
+  // legado de card/badge/modal (que lê loja.anuncio) siga funcionando.
+  function _normalizarStories(loja) {
+    if (!loja) return [];
+    if (Array.isArray(loja._stories)) return loja._stories; // já normalizado
+    var arr = [];
+    if (Array.isArray(loja.stories) && loja.stories.length) {
+      arr = loja.stories.filter(function(st){ return st && (st.texto || st.imagemUrl); });
+    } else if (loja.anuncio && (loja.anuncio.texto || loja.anuncio.imagemUrl)) {
+      arr = [loja.anuncio];
+    }
+    loja._stories = arr;
+    // Espelha o primeiro no campo antigo (fonte para card/badge/modal).
+    if (arr.length) loja.anuncio = arr[0];
+    return arr;
+  }
+
   // Assinatura curta e estável do conteúdo do anúncio (hash djb2)
   function _assinaturaAnuncio(loja) {
-    const a = loja && loja.anuncio ? loja.anuncio : {};
-    const base = (a.texto || '') + '|' + (a.imagemUrl || '');
+    var arr = _normalizarStories(loja);
+    var base = arr.length
+      ? arr.map(function(a){ return (a.texto||'') + '~' + (a.imagemUrl||''); }).join('|')
+      : '';
     let h = 5381;
     for (let i = 0; i < base.length; i++) {
       h = ((h << 5) + h + base.charCodeAt(i)) | 0;
@@ -1350,6 +1371,236 @@
     abrirFotoAnuncio(d.auImg, d.auTxt, d.auId, d.auAss, d.auNome, d.auPlano, d.auCat, d.auTipo);
   };
 
+  // ══════════════════════════════════════════════════════════════
+  //  FASE 2 — Lightbox de MÚLTIPLOS stories (navegável, estilo Instagram).
+  //  Barra segmentada (1 por story), foto 6s, vídeo = duração real,
+  //  avança ao terminar, fecha no último. Tap direita=próximo,
+  //  esquerda=anterior, long-press=pausa, swipe-down=fecha.
+  // ══════════════════════════════════════════════════════════════
+  function abrirStories(stories, nomeLoja, lojaId, assinatura, planoLoja, categoriaLoja) {
+    stories = (stories || []).filter(function(st){ return st && (st.texto || st.imagemUrl); });
+    if (!stories.length) return;
+    var oldLb = document.getElementById('anuncio-lightbox');
+    if (oldLb) oldLb.remove();
+
+    // Métrica: 1 view por pessoa por versão do conjunto (mesma regra da Fase 1).
+    try {
+      var jaCont = false;
+      if (lojaId != null && assinatura) { var v = _carregarVistos(); jaCont = (v[lojaId] === assinatura); }
+      if (nomeLoja && !jaCont) registrarClique(nomeLoja, 'anuncio', planoLoja || 'PRO', categoriaLoja || '');
+    } catch (e) {}
+
+    var idx = 0; // story atual
+    var _fechado = false;
+    var _timer = null;
+
+    var lb = document.createElement('div');
+    lb.id = 'anuncio-lightbox';
+    // Barra segmentada: um <span> por story dentro de um wrapper flex.
+    var segs = stories.map(function(_, i){
+      return '<span class="anuncio-seg" data-i="' + i + '"><span class="anuncio-seg-fill"></span></span>';
+    }).join('');
+    lb.innerHTML =
+      '<div id="anuncio-lightbox-bg"></div>' +
+      '<div id="anuncio-lightbox-wrap">' +
+        '<div id="anuncio-lightbox-segs">' + segs + '</div>' +
+        '<div id="anuncio-lightbox-topbar">' +
+          '<button id="anuncio-lightbox-close" aria-label="Fechar"><i class="ti ti-x"></i></button>' +
+          '<span id="anuncio-lightbox-titulo">' + escHTML(nomeLoja || '') + '</span>' +
+          '<button id="anuncio-lightbox-som" aria-label="Ativar som" title="Ativar som" style="display:none;"><i class="ti ti-volume-off"></i></button>' +
+        '</div>' +
+        '<div id="anuncio-lightbox-imgwrap">' +
+          '<div id="anuncio-lightbox-spinner" aria-hidden="true"></div>' +
+          '<div id="anuncio-story-slot"></div>' +
+          '<div id="anuncio-story-caption"></div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(lb);
+    lb.getBoundingClientRect();
+    lb.classList.add('lb-visible');
+
+    if (history.state && history.state.modal === 'anuncio-foto') { /* já */ }
+    else { history.pushState({ modal: 'anuncio-foto' }, ''); }
+
+    var slot    = lb.querySelector('#anuncio-story-slot');
+    var caption = lb.querySelector('#anuncio-story-caption');
+    var spinner = lb.querySelector('#anuncio-lightbox-spinner');
+    var somBtn  = lb.querySelector('#anuncio-lightbox-som');
+    var segEls  = Array.prototype.slice.call(lb.querySelectorAll('.anuncio-seg-fill'));
+
+    function _pintarSegsAntes() {
+      // Segmentos já vistos ficam cheios; o atual anima; os próximos vazios.
+      for (var i = 0; i < segEls.length; i++) {
+        var f = segEls[i];
+        f.style.animation = 'none';
+        f.style.transform = (i < idx) ? 'scaleX(1)' : 'scaleX(0)';
+      }
+    }
+
+    var fechar = function (viaPopstate) {
+      if (_fechado) return; _fechado = true;
+      if (_timer) { clearTimeout(_timer); _timer = null; }
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('visibilitychange', onVis);
+      window._fecharAnuncioLightbox = null;
+      if (lojaId != null) {
+        _marcarAnuncioVisto(lojaId, assinatura);
+        document.querySelectorAll('.anuncio-ring').forEach(function(el){
+          if (el.getAttribute('data-loja-id') === String(lojaId)) el.classList.add('ring-visto');
+        });
+      }
+      if (!viaPopstate && history.state && history.state.modal === 'anuncio-foto') history.back();
+      lb.classList.remove('lb-visible');
+      lb.addEventListener('transitionend', function(){ lb.remove(); }, { once: true });
+      setTimeout(function(){ if (lb.parentNode) lb.remove(); }, 400);
+    };
+    window._fecharAnuncioLightbox = fechar;
+
+    // Renderiza o story de índice i (mídia + legenda + botão de som se vídeo).
+    function render(i) {
+      if (_fechado) return;
+      idx = i;
+      if (idx >= stories.length) { fechar(); return; }
+      if (idx < 0) idx = 0;
+      if (_timer) { clearTimeout(_timer); _timer = null; }
+      var st = stories[idx];
+      var ehVideo = String(st.midiaTipo || 'foto') === 'video';
+      _pintarSegsAntes();
+      // limpa slot
+      slot.innerHTML = '';
+      if (spinner) spinner.style.display = st.imagemUrl ? '' : 'none';
+      // legenda (texto/emoji) sobreposta
+      if (caption) {
+        if (st.texto) {
+          caption.innerHTML = '<span class="anuncio-cap-emoji">' + escHTML(st.emoji || '\ud83c\udfaf') + '</span> ' + escHTML(st.texto);
+          caption.style.display = '';
+        } else { caption.style.display = 'none'; }
+      }
+      var fill = segEls[idx];
+      var startFillCss = function (ms) {
+        if (!fill) return;
+        fill.style.animation = 'none';
+        // reflow para reiniciar a animação
+        void fill.offsetWidth;
+        fill.style.animation = 'anuncio-progress ' + ms + 'ms linear forwards';
+        fill.addEventListener('animationend', function _ae(){ fill.removeEventListener('animationend', _ae); avancar(); }, { once: true });
+      };
+      if (ehVideo && st.imagemUrl) {
+        if (somBtn) somBtn.style.display = '';
+        var vid = document.createElement('video');
+        vid.id = 'anuncio-lightbox-video';
+        vid.src = st.imagemUrl;
+        vid.setAttribute('playsinline',''); vid.setAttribute('webkit-playsinline','');
+        vid.muted = true; vid.autoplay = true; vid.preload = 'auto';
+        vid.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;';
+        vid.oncanplay = function(){ vid.classList.add('carregada'); if (spinner) spinner.style.display='none'; };
+        vid.onerror = function(){ if (spinner) spinner.style.display='none'; avancar(); };
+        // barra segue o tempo real do vídeo
+        vid.addEventListener('timeupdate', function(){
+          if (!fill) return; var d = vid.duration;
+          if (d && isFinite(d) && d > 0) fill.style.transform = 'scaleX(' + Math.min(vid.currentTime / d, 1) + ')';
+        });
+        vid.addEventListener('timeupdate', function(){
+          var d = vid.duration; if (d && isFinite(d) && vid.currentTime >= d - 0.15) avancar();
+        });
+        if (fill) { fill.style.animation = 'none'; fill.style.transform = 'scaleX(0)'; }
+        // fallback se metadados não vierem
+        _timer = setTimeout(function(){ if (!vid.duration) avancar(); }, 25000);
+        // botão de som deste story
+        somBtn.onclick = function(e){ e.stopPropagation();
+          vid.muted = !vid.muted;
+          if (!vid.muted) { vid.volume = 1; try { vid.play(); } catch(err){} }
+          var ic = somBtn.querySelector('i'); if (ic) ic.className = vid.muted ? 'ti ti-volume-off' : 'ti ti-volume';
+        };
+        slot.appendChild(vid);
+        try { vid.play(); } catch(e){}
+      } else {
+        if (somBtn) somBtn.style.display = 'none';
+        if (st.imagemUrl) {
+          var img = document.createElement('img');
+          img.id = 'anuncio-lightbox-img'; img.src = st.imagemUrl; img.draggable = false;
+          img.onload = function(){ img.classList.add('carregada'); if (spinner) spinner.style.display='none'; };
+          img.onerror = function(){ if (spinner) spinner.style.display='none'; };
+          slot.appendChild(img);
+        }
+        startFillCss(_ANUNCIO_STORY_MS);
+      }
+      // Pré-carrega a mídia do próximo (leve) para transição fluida.
+      var prox = stories[idx + 1];
+      if (prox && prox.imagemUrl && String(prox.midiaTipo||'foto') !== 'video') {
+        var pre = new Image(); pre.src = prox.imagemUrl;
+      }
+    }
+
+    function avancar() { if (_fechado) return; if (idx + 1 >= stories.length) fechar(); else render(idx + 1); }
+    function voltar()  { if (_fechado) return; if (idx <= 0) render(0); else render(idx - 1); }
+
+    // pausa/retoma (long-press). Para vídeo, pausa o elemento; para foto,
+    // pausa a animação CSS do segmento atual.
+    var _segurando = false;
+    function _fillAtual(){ return segEls[idx]; }
+    function _vidAtual(){ return lb.querySelector('#anuncio-lightbox-video'); }
+    var pausar = function(){ _segurando = true; var f=_fillAtual(); if (f) f.style.animationPlayState='paused'; var v=_vidAtual(); if (v){ try{v.pause();}catch(e){} } };
+    var retomar = function(){ _segurando = false; if (_fechado) return; var f=_fillAtual(); if (f) f.style.animationPlayState='running'; var v=_vidAtual(); if (v){ try{v.play();}catch(e){} } };
+
+    var imgwrap = lb.querySelector('#anuncio-lightbox-imgwrap');
+    lb.addEventListener('contextmenu', function(e){ e.preventDefault(); return false; });
+    lb.querySelector('#anuncio-lightbox-close').onclick = function(e){ e.stopPropagation(); fechar(); };
+    lb.querySelector('#anuncio-lightbox-bg').onclick = function(){ fechar(); };
+
+    var onVis = function(){
+      if (document.visibilityState === 'hidden') { var f=_fillAtual(); if (f) f.style.animationPlayState='paused'; var v=_vidAtual(); if (v){ try{v.pause();}catch(e){} } }
+      else if (!_segurando) retomar();
+    };
+    document.addEventListener('visibilitychange', onVis);
+
+    if (imgwrap) {
+      var _sy=null,_st0=0,_moveu=false,_downX=0;
+      imgwrap.addEventListener('touchstart', function(e){ _sy=e.touches[0].clientY; _downX=e.touches[0].clientX; _st0=Date.now(); _moveu=false; pausar(); }, { passive:true });
+      imgwrap.addEventListener('touchmove', function(e){ if (_sy==null) return; var dy=e.touches[0].clientY-_sy; if (Math.abs(dy)>8) _moveu=true; if (dy>8){ lb.style.transform='translateY('+Math.min(dy,400)+'px)'; lb.style.opacity=String(Math.max(1-dy/500,0.2)); } }, { passive:true });
+      var _fim = function(e){
+        var dur = Date.now()-_st0; var t=lb.style.transform; var dy=t?parseFloat(t.replace(/[^0-9.]/g,''))||0:0;
+        if (dy>110){ fechar(); return; }
+        lb.style.transform=''; lb.style.opacity='';
+        if (!_moveu && dur<250){
+          // tap curto: metade direita avança, esquerda volta.
+          var x = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX : _downX;
+          if (x < window.innerWidth * 0.33) voltar(); else avancar();
+          return;
+        }
+        retomar(); _sy=null;
+      };
+      imgwrap.addEventListener('touchend', _fim, { passive:true });
+      imgwrap.addEventListener('touchcancel', function(){ lb.style.transform=''; lb.style.opacity=''; retomar(); _sy=null; }, { passive:true });
+      // desktop
+      var _mdT=0,_mMoved=false,_mx=0,_my=0;
+      imgwrap.addEventListener('mousedown', function(e){ _mdT=Date.now(); _mMoved=false; _mx=e.clientX; _my=e.clientY; pausar(); });
+      imgwrap.addEventListener('mousemove', function(e){ if (_mdT && (Math.abs(e.clientX-_mx)>6||Math.abs(e.clientY-_my)>6)) _mMoved=true; });
+      imgwrap.addEventListener('mouseup', function(e){ var dur=Date.now()-_mdT; retomar(); if (!_mMoved && dur<250){ if (e.clientX < window.innerWidth*0.33) voltar(); else avancar(); } _mdT=0; });
+      imgwrap.addEventListener('mouseleave', function(){ if (_mdT){ retomar(); _mdT=0; } });
+    }
+
+    var onKey = function(e){ if (e.key==='Escape') fechar(); else if (e.key==='ArrowRight') avancar(); else if (e.key==='ArrowLeft') voltar(); };
+    document.addEventListener('keydown', onKey);
+
+    render(0);
+  }
+  window.abrirStories = abrirStories;
+
+  // Abre a sequência lendo o array do registro global pelo lojaId (data-* não
+  // comporta um array; o thumb já guardou os stories em window._STORIES_REG).
+  window.abrirStoriesEl = function (el) {
+    if (!el) return;
+    var d = el.dataset;
+    var reg = (window._STORIES_REG || {});
+    var arr = reg[String(d.auId)] || reg[String(d.lojaId)] || [];
+    if (!arr.length) {
+      // Fallback: se por algum motivo o registro sumiu, abre o único do data-*.
+      if (d.auImg || d.auTxt) arr = [{ midiaTipo: d.auTipo || 'foto', imagemUrl: d.auImg || '', texto: d.auTxt || '', emoji: '\ud83c\udfaf' }];
+    }
+    abrirStories(arr, d.auNome, d.auId, d.auAss, d.auPlano, d.auCat);
+  };
+
   // Monta os atributos data-* seguros do anel de anúncio (card e modal).
   function _ringAnuncioData(loja, lojaId, assinatura) {
     return 'data-loja-id="' + escAttr(lojaId) + '"'
@@ -1381,13 +1632,17 @@
   function thumbHTML(loja) {
     const bg    = CAT_BG[loja.categoria] || 'rgba(255,255,255,0.06)';
     // Ring "status WPP" — aparece apenas para PRO com foto de anúncio
+    var _storiesArr = _normalizarStories(loja);
     const temFotoAnuncio = (loja.plano || '').toUpperCase() === 'PRO'
-      && loja.anuncio && loja.anuncio.imagemUrl;
+      && _storiesArr.some(function(st){ return st.imagemUrl; });
     const lojaId = loja.id || loja.wpp || loja.nome;
     const assinatura = temFotoAnuncio ? _assinaturaAnuncio(loja) : '';
     const jaVisto = temFotoAnuncio && anuncioJaVisto(loja, lojaId);
+    // Guarda os stories desta loja num registro global, endereçado pelo lojaId,
+    // para o clique do anel abrir a sequência (data-* não comporta um array).
+    if (temFotoAnuncio) { try { (window._STORIES_REG = window._STORIES_REG || {})[String(lojaId)] = _storiesArr; } catch(e){} }
     const ringOpen  = temFotoAnuncio
-      ? `<div class="anuncio-ring${jaVisto ? ' ring-visto' : ''}" ${_ringAnuncioData(loja, lojaId, assinatura)} onclick="event.stopPropagation();abrirFotoAnuncioEl(this)" title="Ver foto do anúncio">`
+      ? `<div class="anuncio-ring${jaVisto ? ' ring-visto' : ''}" ${_ringAnuncioData(loja, lojaId, assinatura)} onclick="event.stopPropagation();abrirStoriesEl(this)" title="Ver stories">`
       : '';
     const isPro = (loja.plano || '').toUpperCase() === 'PRO';
 
@@ -3150,6 +3405,7 @@
   ══════════════════════════════════════════════════════════════ */
   let _lojaToken = localStorage.getItem('angatuba_loja_token') || null;
   let _lojaNome  = localStorage.getItem('angatuba_loja_nome')  || '';
+  let _mlPlanoAtual = 'GRATIS'; // plano da loja logada (Fase 2: decide stories múltiplos)
   let _lojaWpp   = ''; // capturado no passo 1 do login
   let _llVerificando = false;          // trava anti-duplo-submit do código
   let _llTimerInt    = null;           // timer de expiração (10 min)
@@ -3728,6 +3984,7 @@
     const plano     = d.plano || 'GRATIS';
     const isPago    = plano !== 'GRATIS';
     const isPro     = plano === 'PRO';
+    _mlPlanoAtual = (plano || 'GRATIS').toUpperCase();
     const isPlus    = plano === 'PLUS';
 
     // Usa foto/logo do lojaDados; fallback na lista LOJAS já carregada.
@@ -3955,7 +4212,18 @@
       const imgSection = document.getElementById('ml-anuncio-img-section');
       if (imgSection) imgSection.style.display = isPro ? '' : 'none';
 
-      if (temAnuncio && metJson && metJson.status === 'ok') {
+      if (isPro) {
+        // Fase 2: Pro usa lista de stories (até 5). Esconde o card único
+        // e carrega a lista do backend.
+        var _av = document.getElementById('ml-anuncio-ativo');
+        if (_av) _av.style.display = 'none';
+        var _lst = document.getElementById('ml-stories-lista');
+        var _cnt = document.getElementById('ml-stories-contador');
+        if (_lst) _lst.style.display = '';
+        if (_cnt) _cnt.style.display = '';
+        mlStoriesCarregar();
+      } else if (temAnuncio && metJson && metJson.status === 'ok') {
+        // PLUS: comportamento Fase 1 (anúncio único de texto).
         if (metJson.data.anuncio) {
           mlExibirAnuncioAtivo(metJson.data.anuncio);
         } else {
@@ -8411,6 +8679,7 @@ ${urlCard}`)}`;
   let _anuncioEmojiSelecionado = '🎯';
   let _anuncioImagemUrl = ''; // URL final após upload (Pro)
   let _anuncioMidiaTipo = 'foto'; // 'foto' | 'video' — tipo da mídia selecionada (Pro)
+  let _mlStoriesCache = []; // Fase 2: stories atuais do painel (Pro)
   let _anuncioTimerInterval = null; // Item 17: handle do setInterval do contador de expiração
 
   // Garante um <video> de preview ao lado do <img> de preview. Criado sob
@@ -8616,6 +8885,8 @@ ${urlCard}`)}`;
   }
 
   async function mlPublicarAnuncio() {
+    // Fase 2: no Pro, publicar = adicionar um story à lista (até 5).
+    if (_mlPlanoAtual === 'PRO') { return mlStoryAdicionar(); }
     const texto = document.getElementById('ml-anuncio-texto')?.value.trim() || '';
 
     const btn = document.getElementById('ml-anuncio-btn');
@@ -8682,6 +8953,114 @@ ${urlCard}`)}`;
       btn.disabled = false;
     }
   }
+
+  // ── Fase 2: lista de stories no painel (Pro) ─────────────────
+  function _mlLimparFormAnuncio() {
+    var t = document.getElementById('ml-anuncio-texto'); if (t) t.value = '';
+    var c = document.getElementById('ml-anuncio-chars'); if (c) c.textContent = '0/80';
+    if (typeof mlAnuncioRemoverImagem === 'function') { try { mlAnuncioRemoverImagem(); } catch(e){} }
+    _anuncioImagemUrl = ''; _anuncioMidiaTipo = 'foto';
+  }
+
+  async function mlStoriesCarregar() {
+    var lst = document.getElementById('ml-stories-lista');
+    var cnt = document.getElementById('ml-stories-contador');
+    if (!lst) return;
+    try {
+      var params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action:'lojaStoriesListar', token:_lojaToken }));
+      var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      var json = await resp.json();
+      if (json.status !== 'ok') { lst.innerHTML = ''; return; }
+      var stories = json.data.stories || [];
+      var limite = json.data.limite || 5;
+      _mlStoriesCache = stories;
+      if (cnt) cnt.textContent = stories.length + ' de ' + limite + ' stories publicados';
+      if (!stories.length) {
+        lst.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 2px;">Nenhum story ainda. Crie o primeiro abaixo \u2014 pode ter at\u00e9 ' + limite + '.</div>';
+      } else {
+        lst.innerHTML = stories.map(function(st){
+          var ehVideo = String(st.midiaTipo||'foto') === 'video';
+          var thumb = st.imagemUrl
+            ? (ehVideo
+                ? '<div style="width:44px;height:44px;border-radius:8px;background:#000;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="ti ti-player-play" style="color:#fff;font-size:16px;"></i></div>'
+                : '<img src="' + escAttr(st.imagemUrl) + '" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;" />')
+            : '<div style="width:44px;height:44px;border-radius:8px;background:var(--surface);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.2rem;">' + escHTML(st.emoji||'\ud83c\udfaf') + '</div>';
+          var txt = st.texto ? escHTML(st.texto) : '<span style="opacity:.5;">(sem texto)</span>';
+          var tag = ehVideo ? '<span style="font-size:8px;background:rgba(245,158,11,.2);color:var(--zap);padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px;">V\u00cdDEO</span>' : '';
+          return '<div style="display:flex;align-items:center;gap:9px;padding:7px;background:var(--surface);border:1px solid var(--border);border-radius:9px;margin-bottom:6px;">' +
+            thumb +
+            '<div style="flex:1;min-width:0;font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + txt + tag + '</div>' +
+            '<button onclick="mlStoryRemover(\'' + escAttr(st.id) + '\')" style="font-size:10px;color:var(--red);background:none;border:1px solid rgba(255,68,68,0.3);border-radius:6px;cursor:pointer;padding:3px 8px;flex-shrink:0;">Remover</button>' +
+          '</div>';
+        }).join('');
+      }
+      // Esconde/mostra o form conforme o limite.
+      var form = document.getElementById('ml-anuncio-form');
+      var btn = document.getElementById('ml-anuncio-btn');
+      if (stories.length >= limite) {
+        if (form) form.style.opacity = '.5';
+        if (btn) { btn.disabled = true; btn.title = 'Limite de ' + limite + ' stories atingido'; }
+      } else {
+        if (form) form.style.opacity = '';
+        if (btn) { btn.disabled = false; btn.title = ''; }
+      }
+    } catch(e) { lst.innerHTML = '<div style="font-size:11px;color:var(--red);">Erro ao carregar stories.</div>'; }
+  }
+  window.mlStoriesCarregar = mlStoriesCarregar;
+
+  async function mlStoryAdicionar() {
+    var texto = (document.getElementById('ml-anuncio-texto')||{}).value;
+    texto = (texto || '').trim();
+    var btn = document.getElementById('ml-anuncio-btn');
+    if (btn) { btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Publicando...'; btn.disabled = true; }
+    try {
+      var imgInput = document.getElementById('ml-anuncio-img-input');
+      var statusEl = document.getElementById('ml-anuncio-img-status');
+      var imagemUrl = _anuncioImagemUrl;
+      var midiaTipo = _anuncioMidiaTipo;
+      if (imgInput && imgInput.files[0]) {
+        var f = imgInput.files[0];
+        var ehVid = /^video\//.test(f.type) || _anuncioMidiaTipo === 'video';
+        var dst = statusEl || { textContent:'', style:{} };
+        var url = ehVid ? await uploadVideoAnuncio(f, dst) : await uploadImagem(f, dst);
+        if (!url) { if (btn){ btn.innerHTML='<i class="fa fa-bullhorn"></i> Publicar'; btn.disabled=false; } return; }
+        imagemUrl = url; midiaTipo = ehVid ? 'video' : 'foto';
+      }
+      if (!texto && !imagemUrl) {
+        mlToast('Escreva um texto ou escolha uma foto/vídeo.', 'erro');
+        if (btn){ btn.innerHTML='<i class="fa fa-bullhorn"></i> Publicar'; btn.disabled=false; } return;
+      }
+      var params = new URLSearchParams();
+      params.append('payload', JSON.stringify({
+        action:'lojaStorySalvar', token:_lojaToken,
+        emoji:_anuncioEmojiSelecionado, texto:texto,
+        imagemUrl: imagemUrl || '', midiaTipo: imagemUrl ? midiaTipo : 'foto',
+      }));
+      var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(15000) });
+      var json = await resp.json();
+      if (json.status === 'ok') {
+        mlToast('Story publicado!', 'ok');
+        _mlLimparFormAnuncio();
+        await mlStoriesCarregar();
+      } else { throw new Error(json.msg || 'Erro'); }
+    } catch(e) { mlToast('Erro ao publicar: ' + e.message, 'erro'); }
+    finally { if (btn){ btn.innerHTML='<i class="fa fa-bullhorn"></i> Publicar'; btn.disabled=false; } }
+  }
+  window.mlStoryAdicionar = mlStoryAdicionar;
+
+  async function mlStoryRemover(id) {
+    if (!id) return;
+    try {
+      var params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action:'lojaStoryRemover', token:_lojaToken, id:id }));
+      var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      var json = await resp.json();
+      if (json.status === 'ok') { mlToast('Story removido.', 'ok'); await mlStoriesCarregar(); }
+      else { mlToast('Erro ao remover: ' + (json.msg||''), 'erro'); }
+    } catch(e) { mlToast('Erro ao remover.', 'erro'); }
+  }
+  window.mlStoryRemover = mlStoryRemover;
 
   async function mlRemoverAnuncio() {
     try {

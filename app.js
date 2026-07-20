@@ -1107,7 +1107,8 @@
   // Duração do "story" antes de fechar sozinho (ms)
   const _ANUNCIO_STORY_MS = 6000;
 
-  function abrirFotoAnuncio(url, nomeAnuncio, lojaId, assinatura, nomeLoja, planoLoja, categoriaLoja) {
+  function abrirFotoAnuncio(url, nomeAnuncio, lojaId, assinatura, nomeLoja, planoLoja, categoriaLoja, midiaTipo) {
+    var _ehVideo = String(midiaTipo || 'foto') === 'video';
     const oldLb = document.getElementById('anuncio-lightbox');
     if (oldLb) oldLb.remove();
 
@@ -1140,9 +1141,15 @@
         </div>
         <div id="anuncio-lightbox-imgwrap">
           <div id="anuncio-lightbox-spinner" aria-hidden="true"></div>
-          <img src="${escAttr(url)}" alt="${escAttr(nomeAnuncio || 'Anúncio')}" id="anuncio-lightbox-img" draggable="false"
-            onload="this.classList.add('carregada');var s=document.getElementById('anuncio-lightbox-spinner');if(s)s.style.display='none';"
-            onerror="this.style.display='none';var s=document.getElementById('anuncio-lightbox-spinner');if(s)s.style.display='none';var w=document.getElementById('anuncio-lightbox-imgwrap');if(w)w.insertAdjacentHTML('beforeend','<p style=\'color:#fff;opacity:.55;font-size:13px\'>Imagem indisponível</p>');" />
+          ${_ehVideo
+            ? `<video src="${escAttr(url)}" id="anuncio-lightbox-video" playsinline webkit-playsinline muted autoplay loop preload="auto"
+                 style="max-width:100%;max-height:100%;object-fit:contain;"
+                 oncanplay="this.classList.add('carregada');var s=document.getElementById('anuncio-lightbox-spinner');if(s)s.style.display='none';"
+                 onerror="this.style.display='none';var s=document.getElementById('anuncio-lightbox-spinner');if(s)s.style.display='none';var w=document.getElementById('anuncio-lightbox-imgwrap');if(w)w.insertAdjacentHTML('beforeend','<p style=\'color:#fff;opacity:.55;font-size:13px\'>Vídeo indisponível</p>');"></video>`
+            : `<img src="${escAttr(url)}" alt="${escAttr(nomeAnuncio || 'Anúncio')}" id="anuncio-lightbox-img" draggable="false"
+                 onload="this.classList.add('carregada');var s=document.getElementById('anuncio-lightbox-spinner');if(s)s.style.display='none';"
+                 onerror="this.style.display='none';var s=document.getElementById('anuncio-lightbox-spinner');if(s)s.style.display='none';var w=document.getElementById('anuncio-lightbox-imgwrap');if(w)w.insertAdjacentHTML('beforeend','<p style=\'color:#fff;opacity:.55;font-size:13px\'>Imagem indisponível</p>');" />`
+          }
         </div>
       </div>`;
     document.body.appendChild(lb);
@@ -1193,7 +1200,29 @@
 
     // ── Barra de progresso do "story" ──────────────────────────
     const fill = lb.querySelector('#anuncio-lightbox-progress-fill');
-    if (fill) {
+    const _videoEl = lb.querySelector('#anuncio-lightbox-video');
+    if (_ehVideo && _videoEl) {
+      // Vídeo: a barra segue o tempo real do vídeo (timeupdate). Sem duração
+      // fixa — respeita clipes de 5s ou 20s igualmente. Ao terminar, fecha.
+      // A animação CSS é desligada; controlamos scaleX manualmente.
+      if (fill) { fill.style.animation = 'none'; fill.style.transform = 'scaleX(0)'; }
+      const _sync = () => {
+        if (_fechado || !fill) return;
+        const d = _videoEl.duration;
+        if (d && isFinite(d) && d > 0) {
+          fill.style.transform = 'scaleX(' + Math.min(_videoEl.currentTime / d, 1) + ')';
+        }
+      };
+      _videoEl.addEventListener('timeupdate', _sync);
+      // 'ended' não dispara com loop=true; usamos o próprio timeupdate para
+      // fechar quando chega ao fim (evita depender de 'ended').
+      _videoEl.addEventListener('timeupdate', () => {
+        const d = _videoEl.duration;
+        if (d && isFinite(d) && _videoEl.currentTime >= d - 0.15) fechar();
+      });
+      // Fallback: se os metadados não carregarem, fecha no tempo padrão.
+      _autoTimer = setTimeout(() => { if (!_videoEl.duration) fechar(); }, _ANUNCIO_STORY_MS + 20000);
+    } else if (fill) {
       fill.style.animationDuration = _ANUNCIO_STORY_MS + 'ms';
       // Auto-fecha ao fim da barra. Fechamento "automático" conta como manual
       // para fins de histórico (precisa desfazer a entrada fantasma).
@@ -1205,8 +1234,10 @@
     // Controle de pausa robusto: contador de "travas" ativas.
     // Só retoma quando NENHUMA trava estiver ativa (dedo fora da tela).
     let _segurando = false;
-    const pausar  = () => { _segurando = true;  if (fill) fill.style.animationPlayState = 'paused';  };
-    const retomar = () => { _segurando = false; if (fill && !_fechado) fill.style.animationPlayState = 'running'; };
+    const pausar  = () => { _segurando = true;  if (fill) fill.style.animationPlayState = 'paused';
+      if (_ehVideo && _videoEl) { try { _videoEl.pause(); } catch(e){} } };
+    const retomar = () => { _segurando = false; if (fill && !_fechado) fill.style.animationPlayState = 'running';
+      if (_ehVideo && _videoEl && !_fechado) { try { _videoEl.play(); } catch(e){} } };
 
     const imgwrap = lb.querySelector('#anuncio-lightbox-imgwrap');
     const wrap    = lb.querySelector('#anuncio-lightbox-wrap');
@@ -1291,7 +1322,7 @@
   window.abrirFotoAnuncioEl = function (el) {
     if (!el) return;
     const d = el.dataset;
-    abrirFotoAnuncio(d.auImg, d.auTxt, d.auId, d.auAss, d.auNome, d.auPlano, d.auCat);
+    abrirFotoAnuncio(d.auImg, d.auTxt, d.auId, d.auAss, d.auNome, d.auPlano, d.auCat, d.auTipo);
   };
 
   // Monta os atributos data-* seguros do anel de anúncio (card e modal).
@@ -1303,7 +1334,8 @@
       + ' data-au-ass="'   + escAttr(assinatura) + '"'
       + ' data-au-nome="'  + escAttr(loja.nome) + '"'
       + ' data-au-plano="' + escAttr(loja.plano || 'PRO') + '"'
-      + ' data-au-cat="'   + escAttr(loja.categoria || '') + '"';
+      + ' data-au-cat="'   + escAttr(loja.categoria || '') + '"'
+      + ' data-au-tipo="'  + escAttr((loja.anuncio && loja.anuncio.midiaTipo) || 'foto') + '"';
   }
 
   // Fallback do logo no card (#3): tenta a extensão alternativa e, se falhar,
@@ -6549,6 +6581,76 @@
     }
   }
 
+  // Lê a duração de um arquivo de vídeo sem reproduzir. Resolve em segundos
+  // (ou 0 se não conseguir). Usa um <video> temporário só com metadados.
+  function _duracaoVideo(file) {
+    return new Promise(function (resolve) {
+      try {
+        var v = document.createElement('video');
+        v.preload = 'metadata';
+        v.muted = true;
+        var url = URL.createObjectURL(file);
+        var done = function (seg) { try { URL.revokeObjectURL(url); } catch(e){} resolve(seg); };
+        v.onloadedmetadata = function () { done(v.duration || 0); };
+        v.onerror = function () { done(0); };
+        // Safety net: metadados podem travar em conexões ruins.
+        setTimeout(function () { done(v.duration || 0); }, 8000);
+        v.src = url;
+      } catch (e) { resolve(0); }
+    });
+  }
+
+  // Upload de VÍDEO do anúncio (Pro). Diferente da foto: não há como
+  // recomprimir no browser, então validamos duração (<= 20s) e tamanho
+  // (<= 30MB) antes de subir. Assina com tipo:'video' e envia para
+  // o endpoint /video/upload do Cloudinary.
+  async function uploadVideoAnuncio(file, statusEl) {
+    if (!file) return null;
+    statusEl.textContent = '⏳ Verificando vídeo...';
+    statusEl.style.color = 'var(--muted)';
+    var seg = await _duracaoVideo(file);
+    if (seg && seg > 20 + 0.5) {
+      statusEl.textContent = '❌ Vídeo muito longo (máx 20s). O seu tem ' + Math.round(seg) + 's.';
+      statusEl.style.color = 'var(--red)';
+      return null;
+    }
+    if (file.size > 30 * 1024 * 1024) {
+      statusEl.textContent = '❌ Vídeo muito pesado (máx 30MB).';
+      statusEl.style.color = 'var(--red)';
+      return null;
+    }
+    try {
+      statusEl.textContent = '⏳ Preparando envio...';
+      var sigParams = new URLSearchParams();
+      sigParams.append('payload', JSON.stringify({ action: 'cloudinaryAssinar', token: _lojaToken, tipo: 'video' }));
+      var sigResp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:sigParams, signal:AbortSignal.timeout(30000) });
+      var sigJson = await sigResp.json();
+      if (sigJson.status !== 'ok') throw new Error(sigJson.msg || 'Erro ao assinar upload');
+      var d = sigJson.data;
+      statusEl.textContent = '⏳ Enviando vídeo...';
+      var fd = new FormData();
+      fd.append('file', file);
+      fd.append('api_key', d.apiKey);
+      fd.append('timestamp', d.timestamp);
+      fd.append('folder', d.folder);
+      fd.append('signature', d.signature);
+      // Vídeo pode demorar no 4G: timeout generoso.
+      var upResp = await fetch('https://api.cloudinary.com/v1_1/' + d.cloud + '/video/upload',
+        { method:'POST', body:fd, signal:AbortSignal.timeout(120000) });
+      var upJson = await upResp.json();
+      if (upJson.secure_url) {
+        statusEl.textContent = '✅ Vídeo enviado!';
+        statusEl.style.color = 'var(--green)';
+        return upJson.secure_url;
+      }
+      throw new Error((upJson.error && upJson.error.message) || 'Falha no upload do vídeo');
+    } catch (err) {
+      statusEl.textContent = '❌ Erro: ' + err.message;
+      statusEl.style.color = 'var(--red)';
+      return null;
+    }
+  }
+
   function initImageUpload(fileInputId, hiddenId, previewImgId, previewWrapId, statusId) {
     const fileInput  = document.getElementById(fileInputId);
     const hiddenUrl  = document.getElementById(hiddenId);
@@ -8283,35 +8385,74 @@ ${urlCard}`)}`;
   ══════════════════════════════════════════════════════════════ */
   let _anuncioEmojiSelecionado = '🎯';
   let _anuncioImagemUrl = ''; // URL final após upload (Pro)
+  let _anuncioMidiaTipo = 'foto'; // 'foto' | 'video' — tipo da mídia selecionada (Pro)
   let _anuncioTimerInterval = null; // Item 17: handle do setInterval do contador de expiração
+
+  // Garante um <video> de preview ao lado do <img> de preview. Criado sob
+  // demanda para não mexer no HTML. Reutiliza o mesmo espaço visual.
+  function _mlAnuncioVideoPreviewEl() {
+    var v = document.getElementById('ml-anuncio-video-nova');
+    if (v) return v;
+    var img = document.getElementById('ml-anuncio-img-nova');
+    if (!img || !img.parentNode) return null;
+    v = document.createElement('video');
+    v.id = 'ml-anuncio-video-nova';
+    v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', '');
+    v.muted = true; v.loop = true; v.controls = true; v.preload = 'metadata';
+    v.style.cssText = 'display:none;width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-top:8px;border:1px solid var(--border);';
+    img.parentNode.insertBefore(v, img.nextSibling);
+    return v;
+  }
 
   function mlAnuncioPreviewImagem(input) {
     const file = input.files[0];
     if (!file) return;
     const imgNova   = document.getElementById('ml-anuncio-img-nova');
+    const vidNova   = _mlAnuncioVideoPreviewEl();
     const labelTxt  = document.getElementById('ml-anuncio-img-label-txt');
     const removerBtn= document.getElementById('ml-anuncio-img-remover');
     const statusEl  = document.getElementById('ml-anuncio-img-status');
-    const reader = new FileReader();
-    reader.onload = e => {
-      if (imgNova) { imgNova.src = e.target.result; imgNova.style.display = ''; }
-      if (labelTxt) labelTxt.textContent = file.name;
+    const ehVideo   = /^video\//.test(file.type);
+    _anuncioMidiaTipo = ehVideo ? 'video' : 'foto';
+    if (ehVideo) {
+      // Preview de vídeo via object URL (base64 de vídeo estoura memória).
+      if (imgNova) { imgNova.style.display = 'none'; imgNova.src = ''; }
+      if (vidNova) {
+        try { if (vidNova.dataset.objurl) URL.revokeObjectURL(vidNova.dataset.objurl); } catch(e){}
+        var u = URL.createObjectURL(file);
+        vidNova.dataset.objurl = u;
+        vidNova.src = u; vidNova.style.display = '';
+      }
+      if (labelTxt) labelTxt.textContent = file.name + ' (vídeo)';
       if (removerBtn) removerBtn.style.display = '';
       if (statusEl) statusEl.textContent = '';
-    };
-    reader.readAsDataURL(file);
+    } else {
+      if (vidNova) { vidNova.style.display = 'none'; vidNova.removeAttribute('src'); }
+      const reader = new FileReader();
+      reader.onload = e => {
+        if (imgNova) { imgNova.src = e.target.result; imgNova.style.display = ''; }
+        if (labelTxt) labelTxt.textContent = file.name;
+        if (removerBtn) removerBtn.style.display = '';
+        if (statusEl) statusEl.textContent = '';
+      };
+      reader.readAsDataURL(file);
+    }
     _anuncioImagemUrl = ''; // Resetar URL — será gerado no publicar
   }
 
   function mlAnuncioRemoverImagem() {
     _anuncioImagemUrl = '';
+    _anuncioMidiaTipo = 'foto';
     const imgNova   = document.getElementById('ml-anuncio-img-nova');
+    const vidNova   = document.getElementById('ml-anuncio-video-nova');
     const labelTxt  = document.getElementById('ml-anuncio-img-label-txt');
     const removerBtn= document.getElementById('ml-anuncio-img-remover');
     const statusEl  = document.getElementById('ml-anuncio-img-status');
     const input     = document.getElementById('ml-anuncio-img-input');
     if (imgNova)    { imgNova.src = ''; imgNova.style.display = 'none'; }
-    if (labelTxt)   labelTxt.textContent = 'Toque para escolher uma foto';
+    if (vidNova)    { try { if (vidNova.dataset.objurl) URL.revokeObjectURL(vidNova.dataset.objurl); } catch(e){}
+                      vidNova.removeAttribute('src'); vidNova.style.display = 'none'; }
+    if (labelTxt)   labelTxt.textContent = 'Toque para escolher foto ou vídeo';
     if (removerBtn) removerBtn.style.display = 'none';
     if (statusEl)   statusEl.textContent = '';
     if (input)      input.value = '';
@@ -8351,15 +8492,30 @@ ${urlCard}`)}`;
       _txtPrev.style.display = anuncio.texto ? '' : 'none';
     }
 
-    // Imagem do anúncio (só Pro)
+    // Mídia do anúncio (só Pro): foto no <img> existente; vídeo num <video>
+    // criado sob demanda ao lado (mesmo espaço visual).
     const imgPreview = document.getElementById('ml-anuncio-img-preview');
-    if (imgPreview) {
-      if (anuncio.imagemUrl) {
-        imgPreview.src = anuncio.imagemUrl;
-        imgPreview.style.display = '';
+    const _ehVideoAtivo = String(anuncio.midiaTipo || 'foto') === 'video';
+    let vidPreview = document.getElementById('ml-anuncio-video-preview');
+    if (_ehVideoAtivo && anuncio.imagemUrl && imgPreview && imgPreview.parentNode && !vidPreview) {
+      vidPreview = document.createElement('video');
+      vidPreview.id = 'ml-anuncio-video-preview';
+      vidPreview.setAttribute('playsinline', ''); vidPreview.setAttribute('webkit-playsinline', '');
+      vidPreview.muted = true; vidPreview.loop = true; vidPreview.controls = true; vidPreview.preload = 'metadata';
+      vidPreview.style.cssText = 'display:none;width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:8px;';
+      imgPreview.parentNode.insertBefore(vidPreview, imgPreview.nextSibling);
+    }
+    if (anuncio.imagemUrl) {
+      if (_ehVideoAtivo) {
+        if (imgPreview) imgPreview.style.display = 'none';
+        if (vidPreview) { vidPreview.src = anuncio.imagemUrl; vidPreview.style.display = ''; }
       } else {
-        imgPreview.style.display = 'none';
+        if (vidPreview) { vidPreview.style.display = 'none'; vidPreview.removeAttribute('src'); }
+        if (imgPreview) { imgPreview.src = anuncio.imagemUrl; imgPreview.style.display = ''; }
       }
+    } else {
+      if (imgPreview) imgPreview.style.display = 'none';
+      if (vidPreview) vidPreview.style.display = 'none';
     }
 
     // Timer de expiração — Item 17: atualiza a cada 60s (antes era calculado uma
@@ -8384,15 +8540,25 @@ ${urlCard}`)}`;
     const emojiBtn = document.querySelector(`.anuncio-emoji-btn[data-emoji="${anuncio.emoji}"]`);
     if (emojiBtn) mlSelectEmoji(emojiBtn);
 
-    // Guarda URL da imagem atual para caso o usuário reedite
+    // Guarda URL da mídia atual para caso o usuário reedite
     if (anuncio.imagemUrl) {
       _anuncioImagemUrl = anuncio.imagemUrl;
+      _anuncioMidiaTipo = _ehVideoAtivo ? 'video' : 'foto';
       const imgNova    = document.getElementById('ml-anuncio-img-nova');
       const labelTxt   = document.getElementById('ml-anuncio-img-label-txt');
       const removerBtn = document.getElementById('ml-anuncio-img-remover');
-      if (imgNova)    { imgNova.src = anuncio.imagemUrl; imgNova.style.display = ''; }
-      if (labelTxt)   labelTxt.textContent = 'Foto atual (toque para trocar)';
+      if (_ehVideoAtivo) {
+        const vidNova = _mlAnuncioVideoPreviewEl();
+        if (imgNova) imgNova.style.display = 'none';
+        if (vidNova) { vidNova.src = anuncio.imagemUrl; vidNova.style.display = ''; }
+        if (labelTxt) labelTxt.textContent = 'Vídeo atual (toque para trocar)';
+      } else {
+        const vidNova = document.getElementById('ml-anuncio-video-nova');
+        if (vidNova) { vidNova.style.display = 'none'; vidNova.removeAttribute('src'); }
+        if (imgNova)    { imgNova.src = anuncio.imagemUrl; imgNova.style.display = ''; }
+        if (labelTxt)   labelTxt.textContent = 'Foto atual (toque para trocar)';
       if (removerBtn) removerBtn.style.display = '';
+      }
     }
   }
 
@@ -8439,24 +8605,27 @@ ${urlCard}`)}`;
 
       if (imgInput && imgInput.files[0]) {
         const imgFile = imgInput.files[0];
-        // Item 13: sem barreira antecipada de 5MB — uploadImagem() reduz antes de validar.
-        if (statusEl) { statusEl.textContent = '📤 Enviando foto...'; statusEl.style.color = 'var(--muted)'; }
-        // Upload via proxy — chave ImgBB nunca exposta no JS
-        const uploadedUrl = await uploadImagem(imgFile, statusEl || { textContent: '', style: {} });
+        const _ehVideoUp = /^video\//.test(imgFile.type) || _anuncioMidiaTipo === 'video';
+        const _dst = statusEl || { textContent: '', style: {} };
+        // Vídeo e foto têm caminhos de upload distintos (endpoint e validação).
+        const uploadedUrl = _ehVideoUp
+          ? await uploadVideoAnuncio(imgFile, _dst)
+          : await uploadImagem(imgFile, _dst);
         if (uploadedUrl) {
           imagemUrl = uploadedUrl;
           _anuncioImagemUrl = imagemUrl;
+          _anuncioMidiaTipo = _ehVideoUp ? 'video' : 'foto';
         } else {
-          // uploadImagem já exibiu o erro no statusEl
+          // uploadImagem/uploadVideoAnuncio já exibiu o erro no statusEl
           btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
           btn.disabled = false;
           return;
         }
       }
 
-      // Exige pelo menos texto OU foto (foto sozinha vale para PRO)
+      // Exige pelo menos texto OU mídia (mídia sozinha vale para PRO)
       if (!texto && !imagemUrl) {
-        mlToast('Escreva um texto ou escolha uma foto para o anúncio.', 'erro');
+        mlToast('Escreva um texto ou escolha uma foto/vídeo para o anúncio.', 'erro');
         btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
         btn.disabled = false;
         return;
@@ -8469,12 +8638,13 @@ ${urlCard}`)}`;
         emoji:     _anuncioEmojiSelecionado,
         texto,
         imagemUrl: imagemUrl || '',
+        midiaTipo: imagemUrl ? _anuncioMidiaTipo : 'foto',
       }));
       const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
       const json = await resp.json();
 
       if (json.status === 'ok') {
-        mlExibirAnuncioAtivo({ emoji: _anuncioEmojiSelecionado, texto, expira: json.data?.expira, imagemUrl: imagemUrl || '' });
+        mlExibirAnuncioAtivo({ emoji: _anuncioEmojiSelecionado, texto, expira: json.data?.expira, imagemUrl: imagemUrl || '', midiaTipo: imagemUrl ? _anuncioMidiaTipo : 'foto' });
         // form já foi ocultado por mlExibirAnuncioAtivo; reabilita btn para quando reaparecer
         btn.innerHTML = '<i class="fa fa-bullhorn"></i> Publicar';
         btn.disabled = false;

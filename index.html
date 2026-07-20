@@ -1351,11 +1351,11 @@
                 </div>
                 <textarea id="ml-anuncio-texto" maxlength="80" rows="2" placeholder="Ex: Hoje 10% off em troca de óleo! Venha nos visitar." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;font-family:var(--font-b);line-height:1.5;"></textarea>
                 <div id="ml-anuncio-img-section" style="display:none;margin-top:8px;">
-                  <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">📷 Foto do anúncio <span style="opacity:.6;">(opcional)</span></div>
+                  <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">📷 Foto ou vídeo do anúncio <span style="opacity:.6;">(opcional · vídeo até 20s)</span></div>
                   <label id="ml-anuncio-img-label" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px;cursor:pointer;">
                     <i class="fa fa-image" style="color:var(--muted);font-size:14px;"></i>
-                    <span id="ml-anuncio-img-label-txt" style="font-size:11px;color:var(--muted);">Toque para escolher uma foto</span>
-                    <input type="file" id="ml-anuncio-img-input" accept="image/*" style="display:none;" onchange="mlAnuncioPreviewImagem(this)" />
+                    <span id="ml-anuncio-img-label-txt" style="font-size:11px;color:var(--muted);">Toque para escolher foto ou vídeo</span>
+                    <input type="file" id="ml-anuncio-img-input" accept="image/*,video/mp4,video/quicktime,video/webm" style="display:none;" onchange="mlAnuncioPreviewImagem(this)" />
                   </label>
                   <img id="ml-anuncio-img-nova" src="" alt="" style="display:none;width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-top:8px;border:1px solid var(--border);" />
                   <button id="ml-anuncio-img-remover" onclick="mlAnuncioRemoverImagem()" style="display:none;font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;margin-top:4px;padding:0;">✕ Remover foto</button>

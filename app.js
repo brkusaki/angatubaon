@@ -1070,6 +1070,60 @@
   // A chave inclui uma assinatura do conteúdo (texto+imagem), então se o
   // lojista publicar um anúncio novo, o ring reaparece — igual ao WhatsApp.
   const _ANUNCIO_VISTOS_KEY = 'angatuba_anuncios_vistos';
+  // Fase 2: visto POR STORY (estilo WhatsApp). Guarda um mapa { storyKey: 1 }.
+  // Ao abrir, começamos no primeiro story ainda não visto; os já vistos são
+  // pulados. Chave por story = hash de id+mídia+texto, então editar um story
+  // o torna "não visto" de novo (conta como novo, igual post novo no zap).
+  const _STORY_VISTOS_KEY = 'angatuba_story_vistos';
+
+  function _carregarStoryVistos() {
+    try {
+      const raw = localStorage.getItem(_STORY_VISTOS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+
+  // Chave estável de um story individual (djb2 sobre id+mídia+texto).
+  function _storyKey(st) {
+    var base = (st.id || '') + '~' + (st.imagemUrl || '') + '~' + (st.texto || '');
+    var h = 5381;
+    for (var i = 0; i < base.length; i++) h = ((h << 5) + h + base.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36);
+  }
+
+  function _storyJaVisto(st) {
+    return !!_carregarStoryVistos()[_storyKey(st)];
+  }
+
+  function _marcarStoryVisto(st) {
+    try {
+      var v = _carregarStoryVistos();
+      v[_storyKey(st)] = 1;
+      // Poda simples: mantém no máx ~500 chaves para não crescer sem fim.
+      var ks = Object.keys(v);
+      if (ks.length > 500) { for (var i = 0; i < ks.length - 500; i++) delete v[ks[i]]; }
+      localStorage.setItem(_STORY_VISTOS_KEY, JSON.stringify(v));
+    } catch (e) {}
+  }
+
+  // Índice do primeiro story não visto. Se todos vistos, volta 0 (reabre do início).
+  function _primeiroNaoVisto(stories) {
+    var vistos = _carregarStoryVistos();
+    for (var i = 0; i < stories.length; i++) {
+      if (!vistos[_storyKey(stories[i])]) return i;
+    }
+    return 0;
+  }
+
+  // True se a loja tem ALGUM story não visto (para o anel ficar "aceso").
+  function _lojaTemStoryNaoVisto(stories) {
+    if (!stories || !stories.length) return false;
+    var vistos = _carregarStoryVistos();
+    for (var i = 0; i < stories.length; i++) {
+      if (!vistos[_storyKey(stories[i])]) return true;
+    }
+    return false;
+  }
 
   function _carregarVistos() {
     try {
@@ -1444,10 +1498,15 @@
       document.removeEventListener('visibilitychange', onVis);
       window._fecharAnuncioLightbox = null;
       if (lojaId != null) {
+        // Mantém a assinatura antiga por compat, mas o estado do anel agora vem
+        // do visto POR STORY. Só apaga o anel se TODOS os stories foram vistos
+        // (o usuário pode ter fechado no meio — aí o anel segue aceso).
         _marcarAnuncioVisto(lojaId, assinatura);
-        document.querySelectorAll('.anuncio-ring').forEach(function(el){
-          if (el.getAttribute('data-loja-id') === String(lojaId)) el.classList.add('ring-visto');
-        });
+        if (!_lojaTemStoryNaoVisto(stories)) {
+          document.querySelectorAll('.anuncio-ring').forEach(function(el){
+            if (el.getAttribute('data-loja-id') === String(lojaId)) el.classList.add('ring-visto');
+          });
+        }
       }
       if (!viaPopstate && history.state && history.state.modal === 'anuncio-foto') history.back();
       lb.classList.remove('lb-visible');
@@ -1464,6 +1523,7 @@
       if (idx < 0) idx = 0;
       if (_timer) { clearTimeout(_timer); _timer = null; }
       var st = stories[idx];
+      _marcarStoryVisto(st); // visto individual (estilo WhatsApp)
       var ehVideo = String(st.midiaTipo || 'foto') === 'video';
       _pintarSegsAntes();
       // limpa slot
@@ -1591,7 +1651,9 @@
     var onKey = function(e){ if (e.key==='Escape') fechar(); else if (e.key==='ArrowRight') avancar(); else if (e.key==='ArrowLeft') voltar(); };
     document.addEventListener('keydown', onKey);
 
-    render(0);
+    // Começa no primeiro story ainda não visto (estilo WhatsApp). Se todos já
+    // foram vistos, reabre do início.
+    render(_primeiroNaoVisto(stories));
   }
   window.abrirStories = abrirStories;
 
@@ -1645,7 +1707,9 @@
       && _storiesArr.some(function(st){ return st.imagemUrl; });
     const lojaId = loja.id || loja.wpp || loja.nome;
     const assinatura = temFotoAnuncio ? _assinaturaAnuncio(loja) : '';
-    const jaVisto = temFotoAnuncio && anuncioJaVisto(loja, lojaId);
+    // Anel "aceso" (não visto) enquanto houver QUALQUER story não visto — igual
+    // ao zap. Vira apagado só quando todos os stories foram vistos.
+    const jaVisto = temFotoAnuncio && !_lojaTemStoryNaoVisto(_storiesArr);
     // Guarda os stories desta loja num registro global, endereçado pelo lojaId,
     // para o clique do anel abrir a sequência (data-* não comporta um array).
     if (temFotoAnuncio) { try { (window._STORIES_REG = window._STORIES_REG || {})[String(lojaId)] = _storiesArr; } catch(e){} }

@@ -1138,6 +1138,9 @@
             <i class="ti ti-x"></i>
           </button>
           <span id="anuncio-lightbox-titulo">${escHTML(nomeAnuncio || '')}</span>
+          ${_ehVideo ? `<button id="anuncio-lightbox-som" aria-label="Ativar som" title="Ativar som">
+            <i class="ti ti-volume-off"></i>
+          </button>` : ''}
         </div>
         <div id="anuncio-lightbox-imgwrap">
           <div id="anuncio-lightbox-spinner" aria-hidden="true"></div>
@@ -1248,6 +1251,28 @@
 
     lb.querySelector('#anuncio-lightbox-close').onclick = (e) => { e.stopPropagation(); fechar(); };
     lb.querySelector('#anuncio-lightbox-bg').onclick = () => fechar();
+
+    // Botão de som (só vídeo). O vídeo começa MUDO porque o navegador bloqueia
+    // autoplay com áudio; o cliente toca aqui para ativar. stopPropagation em
+    // todos os eventos de ponteiro para não fechar/pausar o story ao tocar.
+    const _somBtn = lb.querySelector('#anuncio-lightbox-som');
+    if (_somBtn && _ehVideo && _videoEl) {
+      const _stop = (e) => { e.stopPropagation(); };
+      _somBtn.addEventListener('touchstart', _stop, { passive: true });
+      _somBtn.addEventListener('touchend', _stop, { passive: true });
+      _somBtn.addEventListener('mousedown', _stop);
+      _somBtn.addEventListener('mouseup', _stop);
+      _somBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _videoEl.muted = !_videoEl.muted;
+        // Ao ativar o som, garante volume audível e que o vídeo está tocando.
+        if (!_videoEl.muted) { _videoEl.volume = 1; try { _videoEl.play(); } catch(err){} }
+        const ic = _somBtn.querySelector('i');
+        if (ic) ic.className = _videoEl.muted ? 'ti ti-volume-off' : 'ti ti-volume';
+        _somBtn.setAttribute('aria-label', _videoEl.muted ? 'Ativar som' : 'Silenciar');
+        _somBtn.setAttribute('title', _videoEl.muted ? 'Ativar som' : 'Silenciar');
+      });
+    }
 
     // Se a aba perde foco/volta, garante estado coerente do progresso.
     const onVisibility = () => {

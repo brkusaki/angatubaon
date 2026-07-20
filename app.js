@@ -1831,7 +1831,7 @@
       starsHTML = `<div class="store-stars">
         <span style="color:#f59e0b;letter-spacing:1px;font-size:10px;">${estrelasHTML}</span>
         <span style="font-weight:700;font-size:11px;color:#f59e0b;">${mediaFmt}</span>
-        <span style="font-size:10px;color:var(--muted);">· ${avals.length} avaliação${avals.length > 1 ? 'ões' : ''}</span>
+        <span style="font-size:10px;color:var(--muted);">· ${avals.length} avaliaç${avals.length > 1 ? 'ões' : 'ão'}</span>
       </div>`;
     }
 
@@ -6375,19 +6375,19 @@
                       const cor = s <= Math.round(mediaAval) ? '#f59e0b' : 'rgba(255,255,255,0.15)';
                       return `<span style="color:${cor};font-size:14px;">★</span>`;
                     }).join('')}</div>
-                    <div style="font-size:10px;color:var(--muted);">${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''}</div>
+                    <div style="font-size:10px;color:var(--muted);">${avaliacoes.length} avaliaç${avaliacoes.length>1?'ões':'ão'}</div>
                   </div>
                   ${trofeuHTML}
                 </div>`
              : `<div style="font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px;">
-                  <span style="color:#f59e0b;">★</span> ${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''} · a média aparece a partir de ${AVAL_MIN_MEDIA}
+                  <span style="color:#f59e0b;">★</span> ${avaliacoes.length} avaliaç${avaliacoes.length>1?'ões':'ão'} · a média aparece a partir de ${AVAL_MIN_MEDIA}
                 </div>`}
            <button type="button" id="aval-toggle-${idx}" onclick="avalToggleLista(${idx})"
              style="width:100%;margin-top:10px;padding:9px;border-radius:9px;cursor:pointer;
                     background:var(--surface2);border:1px solid var(--border);color:var(--text);
                     font-family:var(--font-b);font-size:12.5px;font-weight:600;
                     display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent;">
-             <span class="aval-toggle-txt">Ver ${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''}</span>
+             <span class="aval-toggle-txt">Ver ${avaliacoes.length} avaliaç${avaliacoes.length>1?'ões':'ão'}</span>
              <span class="aval-toggle-chev" style="transition:transform 0.25s;">⌄</span>
            </button>
          </div>`
@@ -9288,7 +9288,7 @@ ${urlCard}`)}`;
       lista.style.maxHeight = '0px';
       const loja = LOJAS[idx];
       const n = loja && loja.avaliacoes ? loja.avaliacoes.length : 0;
-      if (txt) txt.textContent = 'Ver ' + n + ' avaliação' + (n > 1 ? 'ões' : '');
+      if (txt) txt.textContent = 'Ver ' + n + ' avaliaç' + (n > 1 ? 'ões' : 'ão');
     }
   };
 

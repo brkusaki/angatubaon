@@ -9893,12 +9893,23 @@ ${urlCard}`)}`;
     lista.innerHTML = ordemCats.map(cat => {
       const aberto = _cardapioGruposFechados[cat] === true; // padrão: fechado — lojista expande
       const itens = grupos[cat].map(mlCardapioItemHTML).join('');
+      // Quantos itens do grupo ainda estão sem foto — alimenta o badge do botão
+      const semFoto = grupos[cat].filter(i => !i.foto).length;
       return `
         <div class="ml-cardapio-grupo">
-          <button type="button" class="ml-cardapio-grupo-head" onclick="mlCardapioToggleGrupo('${escAttr(cat)}')">
-            <span><i class="fa fa-chevron-${aberto ? 'down' : 'right'}" style="font-size:9px;margin-right:6px;opacity:.7;"></i>${escHTML(cat)}</span>
-            <span class="ml-cardapio-grupo-count">${grupos[cat].length}</span>
-          </button>
+          <div class="ml-cardapio-grupo-row">
+            <button type="button" class="ml-cardapio-grupo-head" onclick="mlCardapioToggleGrupo('${escAttr(cat)}')">
+              <span><i class="fa fa-chevron-${aberto ? 'down' : 'right'}" style="font-size:9px;margin-right:6px;opacity:.7;"></i>${escHTML(cat)}</span>
+              <span class="ml-cardapio-grupo-count">${grupos[cat].length}</span>
+            </button>
+            <button type="button" class="ml-cardapio-grupo-foto"
+              title="Aplicar uma foto a todos os itens de ${escAttr(cat)}"
+              aria-label="Aplicar foto a todos os itens de ${escAttr(cat)}"
+              onclick="mlCardapioFotoLoteAbrir('${escAttr(cat)}')">
+              <i class="fa fa-camera"></i>
+              ${semFoto ? `<span class="ml-cardapio-grupo-foto-badge">${semFoto}</span>` : ''}
+            </button>
+          </div>
           <div class="ml-cardapio-grupo-body" style="display:${aberto ? 'flex' : 'none'};">${itens}</div>
         </div>`;
     }).join('');
@@ -9910,7 +9921,7 @@ ${urlCard}`)}`;
       <div class="ml-cardapio-item">
         ${item.foto
           ? `<img loading="lazy" decoding="async" src="${item.foto}" class="ml-cardapio-item-foto" onerror="this.style.display='none'">`
-          : `<div class="ml-cardapio-item-foto" style="display:flex;align-items:center;justify-content:center;font-size:1.2rem;">🍽️</div>`}
+          : `<div class="ml-cardapio-item-foto" style="display:flex;align-items:center;justify-content:center;font-size:1.2rem;">${_ccEmojiItem(item, '🍽️')}</div>`}
         <div style="flex:1;min-width:0;">
           <div style="font-family:var(--font-h);font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHTML(item.nome)}</div>
           ${item.categoria ? `<div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:1px;">${escHTML(item.categoria)}</div>` : ''}
@@ -9997,6 +10008,101 @@ ${urlCard}`)}`;
   function mlCardapioFecharForm() {
     document.getElementById('ml-cardapio-form').style.display = 'none';
   }
+
+  /* ─────────────────────────────────────────────────────
+     FOTO EM LOTE — uma imagem para todos os itens de uma categoria
+     Fluxo: escolhe arquivo → 1 upload no Cloudinary → 1 POST no GAS
+     que grava a mesma URL em todas as linhas da categoria.
+     Sem isso, aplicar foto em 19 itens seriam 19 requisições.
+  ───────────────────────────────────────────────────── */
+  let _fotoLoteCategoria = null;
+
+  function mlCardapioFotoLoteAbrir(cat) {
+    // Recurso de plano pago — igual à foto unitária.
+    if (_cardapioPlano !== 'PRO' && _cardapioPlano !== 'PLUS') {
+      mlAviso('Recurso do plano Plus', 'Fotos nos itens do cardápio fazem parte dos planos Plus e Pro.', '/webp/owl-tip.webp');
+      return;
+    }
+    _fotoLoteCategoria = cat;
+    const input = document.getElementById('ml-cardapio-lote-input');
+    if (!input) return;
+    input.value = ''; // permite reescolher o mesmo arquivo
+    input.click();
+  }
+
+  async function mlCardapioFotoLoteSelecionado(input) {
+    const file = input.files && input.files[0];
+    const cat  = _fotoLoteCategoria;
+    if (!file || cat === null || cat === undefined) return;
+
+    const itensCat = _cardapioItens.filter(i =>
+      i.ativo !== 'NAO' &&
+      ((i.categoria || '').trim() || 'Sem categoria') === cat
+    );
+    if (!itensCat.length) return;
+
+    const comFoto = itensCat.filter(i => i.foto).length;
+    const total   = itensCat.length;
+
+    // Se alguns já têm foto, pergunta se sobrescreve — evita apagar
+    // trabalho que o lojista já teve.
+    let somenteSemFoto = false;
+    if (comFoto > 0) {
+      const manter = await mlConfirmar(
+        'Alguns itens já têm foto',
+        `${comFoto} de ${total} itens de "${cat}" já têm foto própria.\n\nQuer manter essas fotos e preencher só os ${total - comFoto} que estão sem?`,
+        { okLabel: 'Manter as existentes', cancelLabel: 'Substituir todas', owlSrc: '/webp/owl-tip.webp' }
+      );
+      somenteSemFoto = !!manter;
+      if (somenteSemFoto && total - comFoto === 0) return;
+    }
+
+    const msgEl = document.getElementById('ml-cardapio-lote-msg');
+    const alvo  = somenteSemFoto ? (total - comFoto) : total;
+    if (msgEl) {
+      msgEl.style.display = '';
+      msgEl.style.color = 'var(--muted)';
+      msgEl.textContent = '\u23F3 Otimizando imagem...';
+    }
+
+    _cardapioUploadEmAndamento = true;
+    try {
+      // 1 upload só — a mesma URL é reaproveitada em todos os itens
+      const url = await uploadImagem(file, msgEl || { textContent: '', style: {} });
+      if (!url) return;
+
+      if (msgEl) msgEl.textContent = `\u23F3 Aplicando em ${alvo} item(ns)...`;
+
+      const json = await apiPost('lojaCardapioFotoLote', {
+        token: _lojaToken,
+        categoria: cat === 'Sem categoria' ? '' : cat,
+        foto: url,
+        somenteSemFoto: somenteSemFoto ? 'SIM' : 'NAO',
+      }, { timeout: 30000 });
+
+      if (json.status !== 'ok') throw new Error(json.msg || 'Erro ao aplicar foto');
+
+      await mlCardapioCarregar(_cardapioPlano);
+      if (msgEl) {
+        msgEl.style.color = 'var(--green)';
+        msgEl.textContent = '\u2705 ' + (json.data && json.data.msg ? json.data.msg : 'Foto aplicada!');
+        setTimeout(() => { msgEl.textContent = ''; msgEl.style.display = 'none'; }, 3000);
+      }
+    } catch (e) {
+      if (e.message === 'UNAUTHORIZED') return;
+      if (msgEl) {
+        msgEl.style.color = 'var(--red)';
+        msgEl.textContent = '\u274C ' + e.message;
+      }
+    } finally {
+      _cardapioUploadEmAndamento = false;
+      _fotoLoteCategoria = null;
+      input.value = '';
+    }
+  }
+
+  window.mlCardapioFotoLoteAbrir      = mlCardapioFotoLoteAbrir;
+  window.mlCardapioFotoLoteSelecionado = mlCardapioFotoLoteSelecionado;
 
   async function mlCardapioFotoPreview(input) {
     const file = input.files[0];
@@ -10615,6 +10721,90 @@ ${urlCard}`)}`;
     'japonesa':'🍱','italiana':'🍝','marmita':'🍱','doceria':'🍰','bancario':'🏦',
   };
 
+  // ── Emoji inferido pelo PRÓPRIO ITEM (nome + categoria) ──────────────────
+  // Antes o placeholder era fixo pela categoria da LOJA: uma pizzaria mostrava
+  // 🍕 em cima de "Dog Costela" e "Ferreira Burguer". Aqui a gente deduz pelo
+  // texto do item; só cai no emoji da loja quando nada casa.
+  // Ordem importa: termos mais específicos primeiro ("hot dog" antes de "dog",
+  // "milk shake" antes de "shake"). Match por palavra/substring normalizada.
+  const _CC_ITEM_EMOJI_REGRAS = [
+    // Lanches e salgados
+    ['\uD83C\uDF2D', ['hot dog','hotdog','cachorro quente','cachorro-quente','dogao','dog ']],
+    ['\uD83C\uDF54', ['hamburguer','hamburgue','burguer','burger','xburguer','x-burguer','xis','cheeseburguer','cheese burguer','xsalada','x-salada','xtudo','x-tudo','xbacon','x-bacon','lanche','sanduiche','sanduba','misto quente','bauru']],
+    // 'porcao de calabresa' e churrasco, nao pizza: precisa vir antes da regra de pizza
+    ['\uD83E\uDD69', ['porcao de calabresa','porcao calabresa','espeto de calabresa','calabresa acebolada']],
+    ['\uD83C\uDF55', ['pizza','calabresa','marguerita','margherita','portuguesa','mussarela','muçarela','brotinho','esfiha','esfirra']],
+    ['\uD83C\uDF2E', ['taco','burrito','tortilla','nachos','guacamole','quesadilla']],
+    ['\uD83E\uDD53', ['bacon','tapioca','crepe','panqueca','omelete','ovo ']],
+    ['\uD83C\uDF57', ['frango','galeto','coxinha','asinha','tulipa','nugget','strogonoff','franguinho']],
+    ['\uD83E\uDD69', ['picanha','carne','churrasco','costela','maminha','alcatra','fraldinha','contra file','contrafile','file mignon','bife','espetinho','espeto','churrasquinho','linguica','linguiça','cupim','panceta','matambre','pernil']],
+    ['\uD83C\uDF5F', ['batata frita','fritas','batata','porcao de batata','onion rings','polenta frita','mandioca frita','aipim frito']],
+    ['\uD83E\uDD57', ['salada','alface','rucula','caesar','salad','vegano','vegetariano','verdura']],
+    ['\uD83C\uDF5D', ['macarrao','massa','espaguete','spaghetti','lasanha','nhoque','talharim','penne','fettuccine','ravioli','capeletti','panqueca de']],
+    ['\uD83C\uDF5B', ['marmita','marmitex','prato feito','pf ','quentinha','executivo','self service','refeicao','almoco','buffet','arroz','feijoada','feijao','tutu','virado','parmegiana','parmigiana','file de']],
+    ['\uD83C\uDF71', ['sushi','sashimi','temaki','yakisoba','japones','combo japones','hot roll','uramaki','niguiri','harumaki','gyoza']],
+    ['\uD83C\uDF5C', ['sopa','caldo','canja','caldinho','creme de']],
+    ['\uD83D\uDC1F', ['peixe','tilapia','salmao','bacalhau','camarao','frutos do mar','pescado','moqueca','isca de peixe']],
+    ['\uD83E\uDD59', ['pastel','pastelzinho','esfiha aberta','kibe','quibe','risole','risoles','empada','empadao','enroladinho','salgado','salgadinho','pao de queijo','folhado','croissant','bolinho']],
+    // Doces, padaria e sobremesas
+    ['\uD83C\uDF66', ['sorvete','acai','açaí','picole','sundae','casquinha','gelato','frozen','milk shake','milkshake','shake','copao','copão']],
+    ['\uD83C\uDF70', ['bolo','torta','fatia','cheesecake','pave','pavê','mousse','sobremesa','doce','pudim','brigadeiro','brownie','petit gateau','cupcake','tortinha','banoffee']],
+    ['\uD83C\uDF69', ['donut','rosquinha','sonho','churros']],
+    ['\uD83C\uDF6B', ['chocolate','bombom','trufa','ovo de pascoa','kitkat','nutella']],
+    ['\uD83E\uDD50', ['pao','pão','baguete','ciabatta','broa','rosca','bisnaguinha','padaria','frances']],
+    // Bebidas
+    ['\uD83E\uDD64', ['refrigerante','refri','coca','guarana','guaraná','fanta','sprite','pepsi','soda','suco','sucos','vitamina','agua','água','h2o','isotonico','energetico','red bull','cha gelado','chá gelado','limonada']],
+    ['\uD83C\uDF7A', ['cerveja','chopp','chope','brahma','skol','heineken','budweiser','antarctica','original','long neck','litrao','litrão','breja','ipa','puro malte']],
+    ['\uD83C\uDF77', ['vinho','espumante','prosecco','tinto','branco seco','sangria']],
+    ['\uD83C\uDF78', ['drink','caipirinha','caipiroska','vodka','whisky','gin','tequila','rum','cachaca','cachaça','pinga','licor','coquetel','batida','aperitivo','dose']],
+    ['\u2615', ['cafe','café','cappuccino','expresso','espresso','pingado','media','chá','cha ','cha de','mate','capuccino','latte','mocha']],
+    // Mercado / conveniência
+    ['\uD83E\uDDC0', ['queijo','mussarela fatiada','requeijao','catupiry','provolone','parmesao']],
+    ['\uD83E\uDD5B', ['leite','iogurte','achocolatado','danone','manteiga','creme de leite','leite condensado']],
+    ['\uD83C\uDF4E', ['fruta','maca','maçã','banana','laranja','uva','melancia','abacaxi','manga','morango','limao','limão','mamao','mamão','verdura','legume','tomate','cebola','batata inglesa','cenoura']],
+    ['\uD83E\uDDF9', ['limpeza','detergente','sabao','sabão','desinfetante','amaciante','agua sanitaria','veja','cloro','esponja','vassoura','rodo','alvejante']],
+    ['\uD83E\uDDFB', ['papel higienico','papel higiênico','guardanapo','toalha de papel','fralda','absorvente','lenco']],
+    ['\uD83E\uDDF4', ['shampoo','condicionador','sabonete','creme dental','pasta de dente','desodorante','hidratante','perfume','higiene']],
+    ['\uD83D\uDC8A', ['remedio','remédio','dipirona','paracetamol','ibuprofeno','antibiotico','comprimido','xarope','pomada','vitamina c','suplemento','whey','creatina']],
+    ['\uD83D\uDEBE', ['gas','gás','botijao','botijão','p13','galao','galão','agua mineral','20l']],
+    // Serviços
+    ['\uD83D\uDC88', ['corte','cabelo','barba','degrade','degradê','navalha','pezinho','sobrancelha','platinado','luzes','progressiva','escova','hidratacao capilar','penteado','coloracao']],
+    ['\uD83D\uDC85', ['unha','manicure','pedicure','esmaltacao','alongamento','gel','fibra','cutilagem','spa dos pes']],
+    ['\uD83D\uDD27', ['revisao','revisão','troca de oleo','troca de óleo','alinhamento','balanceamento','suspensao','freio','embreagem','motor','injecao','injeção','diagnostico','manutencao','conserto','reparo','instalacao']],
+    ['\uD83D\uDE97', ['lavagem','lava rapido','polimento','higienizacao','enceramento','cristalizacao','pneu','roda','borracharia']],
+    ['\uD83D\uDCAA', ['musculacao','treino','personal','aula de','crossfit','pilates','funcional','avaliacao fisica']],
+    ['\uD83E\uDE7A', ['consulta','exame','avaliacao','sessao','terapia','fisioterapia','massagem','drenagem','limpeza de pele','botox','preenchimento']],
+  ];
+
+  // Normaliza para casar sem acento/caixa
+  function _ccNorm(s) {
+    return String(s || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Emoji do item: tenta nome, depois categoria do item, depois cai no fallback
+  // (emoji da loja). Cache simples porque roda por item em lista longa.
+  const _ccEmojiCache = Object.create(null);
+  function _ccEmojiItem(item, fallback) {
+    const chave = (item && (item.nome || '')) + '|' + (item && (item.categoria || ''));
+    if (_ccEmojiCache[chave] !== undefined) return _ccEmojiCache[chave] || fallback;
+    const alvo = _ccNorm((item && item.nome) || '') + ' ' + _ccNorm((item && item.categoria) || '');
+    let achado = '';
+    for (let r = 0; r < _CC_ITEM_EMOJI_REGRAS.length && !achado; r++) {
+      const emoji = _CC_ITEM_EMOJI_REGRAS[r][0];
+      const termos = _CC_ITEM_EMOJI_REGRAS[r][1];
+      for (let t = 0; t < termos.length; t++) {
+        if (alvo.indexOf(termos[t]) !== -1) { achado = emoji; break; }
+      }
+    }
+    _ccEmojiCache[chave] = achado;
+    return achado || fallback;
+  }
+
   // Define o MODO de exibição do cardápio conforme o tipo de negócio.
   //   'produto' → card em lista, tap adiciona ao carrinho (comida, mercado, farmácia…)
   //   'servico' → card em lista, botão "Agendar" abre WhatsApp (barbearia, mecânica, clínica…)
@@ -10679,11 +10869,12 @@ ${urlCard}`)}`;
     }
 
     // Escolhe o renderizador de item conforme o modo
+    // placeholderEmoji vira apenas o FALLBACK: cada item deduz o seu.
     const renderItem = modo === 'vitrine'
-      ? (item) => _ccItemVitrineHTML(item, placeholderEmoji)
+      ? (item) => _ccItemVitrineHTML(item, _ccEmojiItem(item, placeholderEmoji))
       : modo === 'servico'
-        ? (item) => _ccItemServicoHTML(item, placeholderEmoji)
-        : (item) => _ccItemProdutoHTML(item, placeholderEmoji);
+        ? (item) => _ccItemServicoHTML(item, _ccEmojiItem(item, placeholderEmoji))
+        : (item) => _ccItemProdutoHTML(item, _ccEmojiItem(item, placeholderEmoji));
 
     // Vitrine embrulha os itens numa grade 2-colunas; os demais empilham.
     wrap.innerHTML = Object.entries(grupos).map(([cat, itens]) => `

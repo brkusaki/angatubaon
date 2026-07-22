@@ -2647,6 +2647,35 @@
       background: var(--surface2); border: 1px solid var(--border);
       border-radius: 20px; padding: 1px 8px; min-width: 18px; text-align: center;
     }
+    /* Foto em lote — linha do cabecalho: toggle + botao de camera */
+    .ml-cardapio-grupo-row {
+      display: flex; align-items: stretch; gap: 6px; margin-bottom: 6px;
+    }
+    .ml-cardapio-grupo-row .ml-cardapio-grupo-head { margin-bottom: 0; flex: 1; min-width: 0; }
+    .ml-cardapio-grupo-foto {
+      position: relative; flex-shrink: 0;
+      width: 40px; border-radius: 9px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--muted); font-size: 13px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: color .15s, border-color .15s, background .15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ml-cardapio-grupo-foto:hover,
+    .ml-cardapio-grupo-foto:focus-visible {
+      color: var(--green); border-color: var(--green);
+      background: rgba(16, 185, 129, 0.08);
+    }
+    .ml-cardapio-grupo-foto:active { transform: scale(0.94); }
+    /* Badge = quantos itens do grupo ainda estao sem foto */
+    .ml-cardapio-grupo-foto-badge {
+      position: absolute; top: -5px; right: -5px;
+      min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
+      border-radius: 20px; background: var(--orange, #f59e0b); color: #000;
+      font-family: var(--font-b, inherit);
+      font-size: 9px; font-weight: 800; line-height: 16px; text-align: center;
+    }
+
     .ml-cardapio-grupo-body { flex-direction: column; gap: 8px; padding-left: 4px; }
 
     /* ════════════════════════════════════════════

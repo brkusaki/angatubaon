@@ -10821,6 +10821,21 @@ ${urlCard}`)}`;
     return Array.isArray(item && item.grupos) && item.grupos.length > 0;
   }
 
+  // Exige passar pela tela de personalizacao? So quando ha grupo obrigatorio
+  // (min>=1), como Tamanho. Grupos 100% opcionais (acrescimos) NAO obrigam:
+  // o '+' adiciona direto no padrao e quem quiser personalizar toca no card.
+  function _ccItemExigePersonalizar(item) {
+    return (item && item.grupos || []).some(g => (g.min || 0) >= 1);
+  }
+
+  // Escolhas padrao de um item: vazio para grupos opcionais. Usado quando o
+  // cliente adiciona direto pelo '+', sem abrir a personalizacao.
+  function _ccEscolhasPadrao(item) {
+    const out = {};
+    (item.grupos || []).forEach(g => { out[g.id] = []; });
+    return out;
+  }
+
   // Preco unitario de uma configuracao. Regra:
   //  - grupo ABSOLUTO: a opcao escolhida SUBSTITUI o preco base (tamanho).
   //    Se houver mais de um grupo absoluto, o ultimo escolhido vence a base;
@@ -11289,16 +11304,26 @@ ${urlCard}`)}`;
   function _ccItemProdutoHTML(item, placeholderEmoji) {
     const temFoto = !!item.foto;
     const temGrupos = _ccItemTemGrupos(item);
-    // Item com grupos: preco base vira 'a partir de' e o card abre a personalizacao.
+    const exigePers = _ccItemExigePersonalizar(item);
     const precoBase = parseFloat(item.preco) || 0;
-    const precoHTML = temGrupos
+    // 'A partir de' so faz sentido quando o preco final DEPENDE de uma escolha
+    // obrigatoria (ex.: tamanho). Com acrescimos opcionais, o preco base ja e
+    // o preco real de venda — mostrar 'a partir de' so confunde.
+    const precoHTML = exigePers
       ? `<div class="cc-item-preco"><span style="font-size:9px;font-weight:600;color:var(--muted);text-transform:uppercase;">a partir de</span> R$ ${precoBase.toFixed(2).replace('.',',')}</div>`
       : `<div class="cc-item-preco">R$ ${precoBase.toFixed(2).replace('.',',')}</div>`;
-    // O botao: item simples usa '+', item com grupos usa um icone de personalizar.
-    const btnHTML = temGrupos
-      ? `<button class="cc-item-add cc-item-personalizar" aria-label="Personalizar ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAbrirPersonalizacao('${item.id}')"><i class="fa fa-sliders"></i></button>`
+    // Botao: so vira 'personalizar' (roxo) quando ha escolha obrigatoria.
+    // Caso contrario e o '+' normal, que adiciona direto no padrao.
+    const btnHTML = exigePers
+      ? `<button class="cc-item-add cc-item-personalizar" aria-label="Escolher opções de ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAbrirPersonalizacao('${item.id}')"><i class="fa fa-sliders"></i></button>`
       : `<button class="cc-item-add" aria-label="Adicionar ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>`;
+    // Toque no card: abre personalizacao se o item tem opcoes (obrigatorias ou
+    // nao); senao, adiciona direto como sempre foi.
     const clickAttr = temGrupos ? `onclick="ccAbrirPersonalizacao('${item.id}')"` : `onclick="ccCardClick(event,'${item.id}')"`;
+    // Dica sutil: avisa que da pra personalizar sem obrigar ninguem a isso.
+    const dicaHTML = (temGrupos && !exigePers)
+      ? '<div class="cc-item-dica"><i class="fa fa-sliders"></i> toque para adicionar acréscimos</div>'
+      : '';
     return `
       <div class="cc-item-card cc-item-clickable" id="cc-card-${item.id}" role="button" tabindex="0" ${clickAttr} style="margin-bottom:8px;cursor:pointer;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
         ${temFoto
@@ -11314,6 +11339,7 @@ ${urlCard}`)}`;
           </div>
           ${item.descricao ? `<div class="cc-item-desc">${escHTML(item.descricao)}</div>` : ''}
           ${precoHTML}
+          ${dicaHTML}
         </div>
         <div class="cc-qty-ctrl" id="cc-qty-${item.id}" onclick="event.stopPropagation()">
           ${btnHTML}
@@ -11395,21 +11421,33 @@ ${urlCard}`)}`;
     const item = loja.cardapio.find(i => i.id === itemId);
     if (!item) return;
 
-    // Item com grupos: sempre passa pela personalizacao (nunca soma direto).
-    if (_ccItemTemGrupos(item)) { ccAbrirPersonalizacao(itemId); return; }
+    // So obriga a personalizar quando ha escolha obrigatoria (ex.: tamanho).
+    // Com acrescimos opcionais, o '+' adiciona direto no padrao.
+    if (_ccItemExigePersonalizar(item)) { ccAbrirPersonalizacao(itemId); return; }
 
-    if (!_ccCarrinho[itemId]) {
-      _ccCarrinho[itemId] = { item, qty: 0, escolhas: null, precoUnit: parseFloat(item.preco) || 0 };
+    // Item com grupos opcionais: entra como linha 'padrao' (sem acrescimos).
+    // A chave inclui as escolhas vazias, entao se depois o cliente montar um
+    // com bacon, vira outra linha — e nao mistura com este.
+    const escolhasPadrao = _ccItemTemGrupos(item) ? _ccEscolhasPadrao(item) : null;
+    const chave = escolhasPadrao ? _ccLineKey(item, escolhasPadrao) : itemId;
+    if (!_ccCarrinho[chave]) {
+      _ccCarrinho[chave] = {
+        item, qty: 0,
+        escolhas: escolhasPadrao,
+        precoUnit: escolhasPadrao ? _ccPrecoUnitario(item, escolhasPadrao) : (parseFloat(item.preco) || 0),
+      };
     }
-    _ccCarrinho[itemId].qty++;
+    _ccCarrinho[chave].qty++;
 
-    // Troca botão "+" por controles de quantidade
+    // Troca botão "+" por controles de quantidade (usa a chave da linha, que
+    // para item com grupos opcionais nao e igual ao itemId).
     const qtyEl = document.getElementById(`cc-qty-${itemId}`);
     if (qtyEl) {
+      const kEsc = String(chave).replace(/'/g, "\\'");
       qtyEl.innerHTML = `
-        <button class="cc-qty-btn" onclick="event.stopPropagation();ccAlterarQty('${itemId}',-1)">−</button>
-        <span class="cc-qty-num">${_ccCarrinho[itemId].qty}</span>
-        <button class="cc-qty-btn" onclick="event.stopPropagation();ccAlterarQty('${itemId}',+1)" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;">+</button>
+        <button class="cc-qty-btn" onclick="event.stopPropagation();ccAlterarQty('${kEsc}',-1)">−</button>
+        <span class="cc-qty-num">${_ccCarrinho[chave].qty}</span>
+        <button class="cc-qty-btn" onclick="event.stopPropagation();ccAlterarQty('${kEsc}',+1)" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;">+</button>
       `;
     }
     ccAtualizarCarrinho();
@@ -11515,6 +11553,32 @@ ${urlCard}`)}`;
   }
 
   // Confirma a personalizacao: adiciona (ou incrementa) a linha no carrinho.
+  // Redesenha o controle de quantidade do card de um item, refletindo o
+  // carrinho. Como um item pode ter varias linhas (configuracoes diferentes),
+  // o card mostra a linha PADRAO (sem acrescimos) — que e a que o '+' cria.
+  // Se ela nao existe, volta ao botao original do card.
+  function _ccSincronizarCard(item) {
+    if (!item) return;
+    const qtyEl = document.getElementById(`cc-qty-${item.id}`);
+    if (!qtyEl) return;
+    const chavePadrao = _ccItemTemGrupos(item)
+      ? _ccLineKey(item, _ccEscolhasPadrao(item))
+      : item.id;
+    const linha = _ccCarrinho[chavePadrao];
+    if (linha && linha.qty > 0) {
+      const kEsc = String(chavePadrao).replace(/'/g, "\\'");
+      qtyEl.innerHTML = `
+        <button class="cc-qty-btn" onclick="event.stopPropagation();ccAlterarQty('${kEsc}',-1)">−</button>
+        <span class="cc-qty-num">${linha.qty}</span>
+        <button class="cc-qty-btn" onclick="event.stopPropagation();ccAlterarQty('${kEsc}',+1)" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;">+</button>
+      `;
+    } else {
+      qtyEl.innerHTML = _ccItemExigePersonalizar(item)
+        ? `<button class="cc-item-add cc-item-personalizar" onclick="event.stopPropagation();ccAbrirPersonalizacao('${item.id}')"><i class="fa fa-sliders"></i></button>`
+        : `<button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>`;
+    }
+  }
+
   window.ccPersConfirmar = function() {
     const item = _ccPersItem; if (!item) return;
     const erro = _ccValidarEscolhas(item, _ccPersEscolhas);
@@ -11527,24 +11591,37 @@ ${urlCard}`)}`;
     }
     _ccCarrinho[key].qty++;
     _ccCarrinho[key].precoUnit = precoUnit; // reafirma (caso preco tenha mudado)
+    _ccSincronizarCard(item);
     ccFecharPersonalizacao();
     ccAtualizarCarrinho();
     // Abre o carrinho pra dar feedback de que entrou.
     _ccCartExpanded = true; ccAplicarEstadoCarrinho();
   };
 
-  window.ccAlterarQty = function(itemId, delta) {
-    if (!_ccCarrinho[itemId]) return;
-    _ccCarrinho[itemId].qty += delta;
-    if (_ccCarrinho[itemId].qty <= 0) {
-      delete _ccCarrinho[itemId];
-      // Volta para botão "+"
+  // Recebe a CHAVE da linha do carrinho (que pode ser 'itemId|grupo:opcao').
+  window.ccAlterarQty = function(chave, delta) {
+    const linha = _ccCarrinho[chave];
+    if (!linha) return;
+    // O card na tela e identificado pelo id do item, nao pela chave da linha.
+    const itemId = (linha.item && linha.item.id) || String(chave).split('|')[0];
+    linha.qty += delta;
+    if (linha.qty <= 0) {
+      delete _ccCarrinho[chave];
+      // Volta para o botao original do card (respeitando se exige personalizar).
       const qtyEl = document.getElementById(`cc-qty-${itemId}`);
-      if (qtyEl) qtyEl.innerHTML = `<button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${itemId}')">+</button>`;
+      if (qtyEl) {
+        const it = linha.item;
+        qtyEl.innerHTML = (it && _ccItemExigePersonalizar(it))
+          ? `<button class="cc-item-add cc-item-personalizar" onclick="event.stopPropagation();ccAbrirPersonalizacao('${itemId}')"><i class="fa fa-sliders"></i></button>`
+          : `<button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${itemId}')">+</button>`;
+      }
     } else {
       const qtyEl = document.getElementById(`cc-qty-${itemId}`);
-      if (qtyEl) qtyEl.querySelector('.cc-qty-num').textContent = _ccCarrinho[itemId].qty;
+      const numEl = qtyEl && qtyEl.querySelector('.cc-qty-num');
+      if (numEl) numEl.textContent = linha.qty;
     }
+    // Garante que o card reflita a linha padrao (pode ter mexido em outra).
+    _ccSincronizarCard(linha.item);
     ccAtualizarCarrinho();
   };
 

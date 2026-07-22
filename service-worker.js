@@ -1,4 +1,4 @@
-const CACHE = 'angatubaon-v103';
+const CACHE = 'angatubaon-v104';
 const STATIC = [
   '/',
   '/index.html',

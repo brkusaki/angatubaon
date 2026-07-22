@@ -2647,6 +2647,28 @@
       background: var(--surface2); border: 1px solid var(--border);
       border-radius: 20px; padding: 1px 8px; min-width: 18px; text-align: center;
     }
+    /* Acoes da categoria: mover para cima/baixo e renomear */
+    .ml-cardapio-grupo-acoes {
+      display: flex; gap: 6px; align-items: center;
+      margin: -2px 0 8px; padding-left: 2px;
+    }
+    .ml-cat-acao {
+      min-height: 28px; padding: 0 9px; border-radius: 7px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--muted); font-family: var(--font-b, inherit);
+      font-size: 10px; font-weight: 700; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 5px;
+      -webkit-tap-highlight-color: transparent;
+      transition: color .15s, border-color .15s;
+    }
+    .ml-cat-acao:hover:not(:disabled),
+    .ml-cat-acao:focus-visible:not(:disabled) {
+      color: var(--green); border-color: var(--green);
+    }
+    .ml-cat-acao:active:not(:disabled) { transform: scale(0.95); }
+    .ml-cat-acao:disabled { opacity: .3; cursor: default; }
+    .ml-cat-acao-txt { margin-left: auto; }
+
     /* Foto em lote — linha do cabecalho: toggle + botao de camera */
     .ml-cardapio-grupo-row {
       display: flex; align-items: stretch; gap: 6px; margin-bottom: 6px;

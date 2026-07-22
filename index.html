@@ -222,6 +222,24 @@
     </div>
   </div>
 
+  <!-- Prompt de texto no tema dark (usado para renomear categoria).
+       Espelha o ml-confirm-overlay, com um input no lugar do parágrafo. -->
+  <div id="ml-prompt-overlay" role="dialog" aria-modal="true" aria-labelledby="ml-prompt-titulo" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:24px;">
+    <div style="width:100%;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:22px 20px 18px;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+        <img id="ml-prompt-owl" src="/webp/owl-tip.webp" alt="" style="width:44px;height:44px;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'" />
+        <strong id="ml-prompt-titulo" style="font-family:var(--font-h);font-size:1.15rem;font-weight:800;color:var(--text);line-height:1.15;">Editar</strong>
+      </div>
+      <p id="ml-prompt-msg" style="font-size:13.5px;color:var(--muted);line-height:1.45;margin:0 0 12px;"></p>
+      <input id="ml-prompt-input" type="text" autocomplete="off" style="width:100%;box-sizing:border-box;min-height:46px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:var(--font-b);font-size:15px;padding:0 12px;margin-bottom:8px;outline:none;" />
+      <div id="ml-prompt-erro" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button id="ml-prompt-cancel" style="flex:1;min-height:46px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font-b);font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">Cancelar</button>
+        <button id="ml-prompt-ok" style="flex:1;min-height:46px;border-radius:12px;border:none;background:var(--green);color:#000;font-family:var(--font-b);font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;">Salvar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══════════════════════════════ HEADER -->
   <header class="header">
     <div class="header-top">

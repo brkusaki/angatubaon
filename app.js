@@ -2206,6 +2206,59 @@
     try { console.log('[toast]', mensagem); } catch(e) {}
   }
 
+  // Prompt de texto no tema dark. Retorna Promise<string|null> — null = cancelou.
+  // Existe porque o prompt() nativo abre com fundo branco e mostra o domínio
+  // no iOS, quebrando o visual do painel (mesmo motivo do mlConfirmar).
+  function mlPrompt(titulo, mensagem, opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+      var ov  = document.getElementById('ml-prompt-overlay');
+      var tEl = document.getElementById('ml-prompt-titulo');
+      var mEl = document.getElementById('ml-prompt-msg');
+      var inp = document.getElementById('ml-prompt-input');
+      var okB = document.getElementById('ml-prompt-ok');
+      var cnB = document.getElementById('ml-prompt-cancel');
+      var erE = document.getElementById('ml-prompt-erro');
+      var owl = document.getElementById('ml-prompt-owl');
+      if (!ov || !inp || !okB || !cnB) {
+        var r = window.prompt((titulo ? titulo + '\n\n' : '') + (mensagem || ''), opts.valor || '');
+        resolve(r === null ? null : String(r));
+        return;
+      }
+      if (tEl) tEl.textContent = titulo || 'Editar';
+      if (mEl) { mEl.textContent = mensagem || ''; mEl.style.display = mensagem ? '' : 'none'; }
+      if (erE) erE.textContent = '';
+      if (owl && opts.owlSrc) owl.src = opts.owlSrc;
+      okB.textContent = opts.okLabel || 'Salvar';
+      cnB.textContent = opts.cancelLabel || 'Cancelar';
+      inp.value = opts.valor || '';
+      inp.placeholder = opts.placeholder || '';
+      if (opts.maxlength) inp.maxLength = opts.maxlength; else inp.removeAttribute('maxlength');
+
+      var fechar = function (val) {
+        ov.style.display = 'none';
+        okB.onclick = null; cnB.onclick = null; ov.onclick = null; inp.onkeydown = null;
+        document.removeEventListener('keydown', onKey);
+        resolve(val);
+      };
+      var confirmar = function () {
+        var v = String(inp.value || '').trim();
+        if (!v) { if (erE) erE.textContent = 'Digite um nome.'; inp.focus(); return; }
+        fechar(v);
+      };
+      var onKey = function (e) { if (e.key === 'Escape') fechar(null); };
+      inp.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); confirmar(); } };
+      okB.onclick = confirmar;
+      cnB.onclick = function () { fechar(null); };
+      ov.onclick = function (e) { if (e.target === ov) fechar(null); };
+      document.addEventListener('keydown', onKey);
+      ov.style.display = 'flex';
+      // Delay curto: no mobile, focar antes da pintura às vezes não abre o teclado.
+      setTimeout(function () { try { inp.focus(); inp.select(); } catch (e) {} }, 60);
+    });
+  }
+  window.mlPrompt = mlPrompt;
+
   // Item 11: modal de confirmacao no tema dark. Retorna Promise<boolean>.
   // Substitui o confirm() nativo (fundo branco + dominio no iOS).
   function mlConfirmar(titulo, mensagem, opts) {
@@ -9881,16 +9934,30 @@ ${urlCard}`)}`;
       return;
     }
 
-    // Agrupa por categoria preservando ordem de aparição
+    // Agrupa por categoria. A ordem espelha exatamente a do cardápio público:
+    // catOrdem primeiro, ordem de aparição como desempate/legado.
     const grupos = {};
-    const ordemCats = [];
-    visiveis.forEach(item => {
+    const ordemDef = {};   // categoria -> menor catOrdem
+    const apareceu = {};   // categoria -> índice de primeira aparição
+    visiveis.forEach((item, i) => {
       const cat = (item.categoria || '').trim() || 'Sem categoria';
-      if (!grupos[cat]) { grupos[cat] = []; ordemCats.push(cat); }
+      if (!grupos[cat]) { grupos[cat] = []; apareceu[cat] = i; }
       grupos[cat].push(item);
+      const o = parseInt(item.catOrdem, 10) || 0;
+      if (o > 0 && (ordemDef[cat] === undefined || o < ordemDef[cat])) ordemDef[cat] = o;
     });
+    const ordemCats = Object.keys(grupos).sort((a, b) => {
+      const oa = ordemDef[a] || 0, ob = ordemDef[b] || 0;
+      if (oa && ob) return oa - ob;
+      if (oa) return -1;
+      if (ob) return 1;
+      return apareceu[a] - apareceu[b];
+    });
+    // Guarda a ordem corrente para as setas ↑/↓ saberem quem troca com quem.
+    _cardapioOrdemAtual = ordemCats.slice();
 
-    lista.innerHTML = ordemCats.map(cat => {
+    const totalCats = ordemCats.length;
+    lista.innerHTML = ordemCats.map((cat, idx) => {
       const aberto = _cardapioGruposFechados[cat] === true; // padrão: fechado — lojista expande
       const itens = grupos[cat].map(mlCardapioItemHTML).join('');
       // Quantos itens do grupo ainda estão sem foto — alimenta o badge do botão
@@ -9908,6 +9975,23 @@ ${urlCard}`)}`;
               onclick="mlCardapioFotoLoteAbrir('${escAttr(cat)}')">
               <i class="fa fa-camera"></i>
               ${semFoto ? `<span class="ml-cardapio-grupo-foto-badge">${semFoto}</span>` : ''}
+            </button>
+          </div>
+          <div class="ml-cardapio-grupo-acoes">
+            <button type="button" class="ml-cat-acao" ${idx === 0 ? 'disabled' : ''}
+              title="Mover para cima" aria-label="Mover ${escAttr(cat)} para cima"
+              onclick="mlCategoriaMover('${escAttr(cat)}',-1)">
+              <i class="fa fa-arrow-up"></i>
+            </button>
+            <button type="button" class="ml-cat-acao" ${idx === totalCats - 1 ? 'disabled' : ''}
+              title="Mover para baixo" aria-label="Mover ${escAttr(cat)} para baixo"
+              onclick="mlCategoriaMover('${escAttr(cat)}',1)">
+              <i class="fa fa-arrow-down"></i>
+            </button>
+            <button type="button" class="ml-cat-acao ml-cat-acao-txt"
+              title="Renomear categoria" aria-label="Renomear ${escAttr(cat)}"
+              onclick="mlCategoriaRenomear('${escAttr(cat)}')">
+              <i class="fa fa-pencil"></i> Renomear
             </button>
           </div>
           <div class="ml-cardapio-grupo-body" style="display:${aberto ? 'flex' : 'none'};">${itens}</div>
@@ -10008,6 +10092,102 @@ ${urlCard}`)}`;
   function mlCardapioFecharForm() {
     document.getElementById('ml-cardapio-form').style.display = 'none';
   }
+
+  /* ─────────────────────────────────────────────────────
+     CATEGORIAS — renomear e reordenar
+     Categoria não é entidade própria: é o texto da coluna
+     Categoria repetido em cada item. Por isso renomear é
+     uma operação em lote no backend, e a ordem mora numa
+     coluna (CatOrdem) replicada nos itens da categoria.
+  ───────────────────────────────────────────────────── */
+  let _cardapioOrdemAtual = [];
+  let _catOperacaoEmAndamento = false;
+
+  // Envia a ordem corrente inteira; o backend grava o índice de cada
+  // categoria em todos os itens dela.
+  async function _mlCategoriasSalvarOrdem(ordem) {
+    const json = await apiPost('lojaCategoriasReordenar', {
+      token: _lojaToken,
+      ordem: ordem.filter(c => c !== 'Sem categoria').join('|||'),
+    }, { timeout: 30000 });
+    if (json.status !== 'ok') throw new Error(json.msg || 'Erro ao salvar ordem');
+    return json;
+  }
+
+  async function mlCategoriaMover(cat, delta) {
+    if (_catOperacaoEmAndamento) return;
+    const ordem = _cardapioOrdemAtual.slice();
+    const i = ordem.indexOf(cat);
+    const j = i + delta;
+    if (i === -1 || j < 0 || j >= ordem.length) return;
+    // Troca as duas posições
+    const tmp = ordem[i]; ordem[i] = ordem[j]; ordem[j] = tmp;
+
+    _catOperacaoEmAndamento = true;
+    // Otimista: reordena na tela antes da resposta para o toque parecer
+    // instantâneo. Se o servidor recusar, mlCardapioCarregar restaura.
+    _cardapioOrdemAtual = ordem;
+    try {
+      await _mlCategoriasSalvarOrdem(ordem);
+      await mlCardapioCarregar(_cardapioPlano);
+    } catch (e) {
+      if (e.message !== 'UNAUTHORIZED') {
+        mlToast('Não foi possível salvar a ordem: ' + e.message, 'erro');
+        await mlCardapioCarregar(_cardapioPlano);
+      }
+    } finally {
+      _catOperacaoEmAndamento = false;
+    }
+  }
+
+  async function mlCategoriaRenomear(cat) {
+    if (_catOperacaoEmAndamento) return;
+    if (cat === 'Sem categoria') {
+      mlAviso('Categoria automática',
+        'Os itens sem categoria aparecem juntos aqui. Para nomear esse grupo, edite os itens e preencha o campo Categoria.',
+        '/webp/owl-tip.webp');
+      return;
+    }
+    const qtd = (_cardapioItens || []).filter(i =>
+      i.ativo !== 'NAO' && ((i.categoria || '').trim() || 'Sem categoria') === cat).length;
+
+    const novo = await mlPrompt('Renomear categoria',
+      `O novo nome será aplicado aos ${qtd} item(ns) de "${cat}".`,
+      { valor: cat, maxlength: 40, okLabel: 'Renomear', placeholder: 'Nome da categoria' });
+    if (novo === null) return;                 // cancelou
+    const limpo = String(novo).trim();
+    if (!limpo || limpo === cat) return;       // vazio ou sem mudança
+
+    _catOperacaoEmAndamento = true;
+    try {
+      const json = await apiPost('lojaCategoriaRenomear', {
+        token: _lojaToken, de: cat, para: limpo,
+      }, { timeout: 30000 });
+      if (json.status !== 'ok') throw new Error(json.msg || 'Erro ao renomear');
+      // O estado de expandido/colapsado é indexado pelo nome: migra a chave
+      // para o nome novo, senão a categoria renomeada volta fechada.
+      if (_cardapioGruposFechados[cat] !== undefined) {
+        _cardapioGruposFechados[limpo] = _cardapioGruposFechados[cat];
+        delete _cardapioGruposFechados[cat];
+      }
+      // A ordem é gravada por nome; reenvia com o nome novo no mesmo lugar.
+      const idx = _cardapioOrdemAtual.indexOf(cat);
+      if (idx !== -1) {
+        const ordem = _cardapioOrdemAtual.slice();
+        ordem[idx] = limpo;
+        try { await _mlCategoriasSalvarOrdem(ordem); } catch (e) { /* ordem é secundária */ }
+      }
+      await mlCardapioCarregar(_cardapioPlano);
+      mlToast(json.data && json.data.msg ? json.data.msg : 'Categoria renomeada', 'ok');
+    } catch (e) {
+      if (e.message !== 'UNAUTHORIZED') mlToast('Erro: ' + e.message, 'erro');
+    } finally {
+      _catOperacaoEmAndamento = false;
+    }
+  }
+
+  window.mlCategoriaMover    = mlCategoriaMover;
+  window.mlCategoriaRenomear = mlCategoriaRenomear;
 
   /* ─────────────────────────────────────────────────────
      FOTO EM LOTE — uma imagem para todos os itens de uma categoria
@@ -10673,20 +10853,73 @@ ${urlCard}`)}`;
     if (todosBtn && typeof setCat === 'function') setCat('todos', todosBtn);
   };
 
+  // Marca uma tab como ativa e a traz para o campo de visão da barra de tabs.
+  function _ccMarcarTab(id) {
+    let ativa = null;
+    document.querySelectorAll('.cc-tab-pill').forEach(b => {
+      const on = b.dataset.catId === id;
+      b.classList.toggle('active', on);
+      if (on) ativa = b;
+    });
+    // Com muitas categorias a tab ativa pode estar fora da tela na barra
+    // horizontal; traz ela para perto sem mexer no scroll vertical da página.
+    if (ativa && ativa.parentNode && ativa.parentNode.scrollWidth > ativa.parentNode.clientWidth) {
+      const barra = ativa.parentNode;
+      const alvo = ativa.offsetLeft - (barra.clientWidth / 2) + (ativa.offsetWidth / 2);
+      barra.scrollTo({ left: Math.max(0, alvo), behavior: 'smooth' });
+    }
+  }
+
+  // Enquanto o scroll suave do clique está em curso, o spy precisa ficar
+  // calado: senão as seções que passam no caminho roubam a marcação e as
+  // tabs "piscam" entre a origem e o destino.
+  let _ccSpyTravadoAte = 0;
+  let _ccSpyHandler = null;
+
   window.ccScrollTocat = function(id) {
     const el = document.getElementById(id);
     const wrap = document.getElementById('cc-itens-wrap');
     if (!el || !wrap) return;
-    // scroll suave dentro do wrapper do cardápio
+    _ccSpyTravadoAte = Date.now() + 700; // ~duração do smooth scroll
     const offset = el.offsetTop - 8;
     wrap.scrollTo({ top: offset, behavior: 'smooth' });
-    // marca tab ativa — #11: comparação exata via data-cat-id, não mais
-    // substring do onclick (quebrava com categorias-prefixo, ex. "Bebidas"
-    // dentro de "Bebidas Quentes").
-    document.querySelectorAll('.cc-tab-pill').forEach(b => {
-      b.classList.toggle('active', b.dataset.catId === id);
-    });
+    _ccMarcarTab(id);
   };
+
+  // Scrollspy: durante a rolagem manual, ativa a tab da seção que está
+  // cruzando o topo da área visível. Antes disso a marcação só mudava no
+  // clique (ccScrollTocat), então rolar com o dedo mantinha a tab errada.
+  function _ccScrollspyLigar() {
+    const wrap = document.getElementById('cc-itens-wrap');
+    if (!wrap) return;
+    if (_ccSpyHandler) wrap.removeEventListener('scroll', _ccSpyHandler);
+
+    let agendado = false;
+    _ccSpyHandler = function() {
+      if (agendado) return;
+      agendado = true;
+      requestAnimationFrame(function() {
+        agendado = false;
+        if (Date.now() < _ccSpyTravadoAte) return; // clique em andamento
+        const labels = wrap.querySelectorAll('.cc-cat-label');
+        if (!labels.length) return;
+        // Última seção cujo topo já passou da linha de leitura (topo + 12px).
+        const linha = wrap.scrollTop + 12;
+        let atual = labels[0].id;
+        for (let i = 0; i < labels.length; i++) {
+          if (labels[i].offsetTop - 8 <= linha) atual = labels[i].id;
+          else break;
+        }
+        // No fim da lista, a última categoria pode nunca alcançar a linha
+        // (seção curta); força ela quando o scroll chega ao fundo.
+        if (wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 4) {
+          atual = labels[labels.length - 1].id;
+        }
+        _ccMarcarTab(atual);
+      });
+    };
+    wrap.addEventListener('scroll', _ccSpyHandler, { passive: true });
+  }
 
   window.fecharCardapioCliente = function(viaPopstate) {
     // Se o lightbox de foto estiver aberto, fecha junto (evita ficar órfão sobre a home)
@@ -10838,6 +11071,20 @@ ${urlCard}`)}`;
     return 'produto';
   }
 
+  // ID de âncora seguro para uma categoria. O nome é digitado pelo lojista,
+  // então pode conter acento, '#', '&', aspas — tudo que estraga um seletor
+  // CSS ou um atributo onclick. O índice no fim garante unicidade.
+  function _ccCatId(cat, idx) {
+    const slug = String(cat || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 32);
+    return 'cc-cat-' + (slug || 'cat') + '-' + idx;
+  }
+
   function ccRenderItens(loja) {
     const wrap  = document.getElementById('cc-itens-wrap');
     const isPro = (loja.plano || '').toUpperCase() === 'PRO';
@@ -10846,23 +11093,39 @@ ${urlCard}`)}`;
 
     const placeholderEmoji = emojiLoja(loja) || _ccCatEmoji[(loja.categoria||'').toLowerCase()] || '🏪';
 
-    // Agrupa por categoria
+    // Agrupa por categoria, guardando a ordem definida pelo lojista (catOrdem)
+    // e a ordem de aparição como desempate/legado.
     const grupos = {};
-    loja.cardapio.forEach(item => {
+    const ordemCat = {};   // categoria -> menor catOrdem vista
+    const apareceu = {};   // categoria -> índice de primeira aparição
+    loja.cardapio.forEach((item, i) => {
       const cat = (isPro && item.categoria) ? item.categoria : 'Itens';
-      if (!grupos[cat]) grupos[cat] = [];
+      if (!grupos[cat]) { grupos[cat] = []; apareceu[cat] = i; }
       grupos[cat].push(item);
+      const o = parseInt(item.catOrdem, 10) || 0;
+      if (o > 0 && (ordemCat[cat] === undefined || o < ordemCat[cat])) ordemCat[cat] = o;
+    });
+
+    // Categorias COM ordem definida vêm primeiro (ordenadas); as sem ordem
+    // mantêm o comportamento antigo (ordem de inserção) logo depois.
+    const catsOrdenadas = Object.keys(grupos).sort((a, b) => {
+      const oa = ordemCat[a] || 0, ob = ordemCat[b] || 0;
+      if (oa && ob) return oa - ob;
+      if (oa) return -1;
+      if (ob) return 1;
+      return apareceu[a] - apareceu[b];
     });
 
     // ── Sticky category tabs ──────────────────────────────────────────────
     const tabsEl = document.getElementById('cc-cat-tabs');
-    const cats = Object.keys(grupos);
+    const cats = catsOrdenadas;
     if (tabsEl) {
       if (cats.length > 1) {
         tabsEl.style.display = '';
-        tabsEl.innerHTML = cats.map((cat, i) =>
-          `<button class="cc-tab-pill${i===0?' active':''}" data-cat-id="cc-cat-${escAttr(cat.replace(/\s+/g,'-'))}" onclick="ccScrollTocat('cc-cat-${cat.replace(/\s+/g,'-')}')">${escHTML(cat)}</button>`
-        ).join('');
+        tabsEl.innerHTML = cats.map((cat, i) => {
+          const cid = _ccCatId(cat, i);
+          return `<button class="cc-tab-pill${i===0?' active':''}" data-cat-id="${escAttr(cid)}" onclick="ccScrollTocat('${escAttr(cid)}')">${escHTML(cat)}</button>`;
+        }).join('');
       } else {
         tabsEl.style.display = 'none';
       }
@@ -10877,12 +11140,15 @@ ${urlCard}`)}`;
         : (item) => _ccItemProdutoHTML(item, _ccEmojiItem(item, placeholderEmoji));
 
     // Vitrine embrulha os itens numa grade 2-colunas; os demais empilham.
-    wrap.innerHTML = Object.entries(grupos).map(([cat, itens]) => `
-      <div class="cc-cat-label" id="cc-cat-${cat.replace(/\s+/g,'-')}">${escHTML(cat)}</div>
+    wrap.innerHTML = cats.map((cat, i) => `
+      <div class="cc-cat-label" id="${escAttr(_ccCatId(cat, i))}">${escHTML(cat)}</div>
       ${modo === 'vitrine'
-        ? `<div class="cc-vitrine-grid">${itens.map(renderItem).join('')}</div>`
-        : itens.map(renderItem).join('')}
+        ? `<div class="cc-vitrine-grid">${grupos[cat].map(renderItem).join('')}</div>`
+        : grupos[cat].map(renderItem).join('')}
     `).join('');
+
+    // (re)liga o scrollspy sempre que a lista é redesenhada
+    _ccScrollspyLigar();
   }
 
   // ── MODO PRODUTO: card em lista, tap adiciona ao carrinho ─────────────────

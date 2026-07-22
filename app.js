@@ -11317,12 +11317,15 @@ ${urlCard}`)}`;
     const btnHTML = exigePers
       ? `<button class="cc-item-add cc-item-personalizar" aria-label="Escolher opções de ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAbrirPersonalizacao('${item.id}')"><i class="fa fa-sliders"></i></button>`
       : `<button class="cc-item-add" aria-label="Adicionar ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>`;
-    // Toque no card: abre personalizacao se o item tem opcoes (obrigatorias ou
-    // nao); senao, adiciona direto como sempre foi.
-    const clickAttr = temGrupos ? `onclick="ccAbrirPersonalizacao('${item.id}')"` : `onclick="ccCardClick(event,'${item.id}')"`;
-    // Dica sutil: avisa que da pra personalizar sem obrigar ninguem a isso.
+    // Toque no card = adicionar +1 (comportamento de sempre). Item que exige
+    // escolha (tamanho) abre a personalizacao, porque nao da pra adicionar sem.
+    const clickAttr = exigePers
+      ? `onclick="ccAbrirPersonalizacao('${item.id}')"`
+      : `onclick="ccCardClick(event,'${item.id}')"`;
+    // Acrescimos opcionais: um botao proprio, so ele abre a personalizacao.
+    // Assim o resto do card continua adicionando +1 com um toque.
     const dicaHTML = (temGrupos && !exigePers)
-      ? '<div class="cc-item-dica"><i class="fa fa-sliders"></i> toque para adicionar acréscimos</div>'
+      ? `<button type="button" class="cc-item-dica" onclick="event.stopPropagation();ccDicaClick(event,'${item.id}')"><i class="fa fa-sliders"></i> Adicionar acréscimos</button>`
       : '';
     return `
       <div class="cc-item-card cc-item-clickable" id="cc-card-${item.id}" role="button" tabindex="0" ${clickAttr} style="margin-bottom:8px;cursor:pointer;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
@@ -11402,8 +11405,10 @@ ${urlCard}`)}`;
   // Guarda anti-scroll: se o dedo se moveu (rolagem), não conta como clique.
   let _ccTouchY = null, _ccTouchMoved = false;
   document.addEventListener('touchstart', function(e) {
-    const card = e.target.closest && e.target.closest('.cc-item-clickable');
-    if (card) { _ccTouchY = e.touches[0].clientY; _ccTouchMoved = false; }
+    // Arma a guarda para o card inteiro E para o botao de acrescimos, que
+    // fica dentro do card mas tem handler proprio.
+    const alvo = e.target.closest && e.target.closest('.cc-item-clickable, .cc-item-dica');
+    if (alvo) { _ccTouchY = e.touches[0].clientY; _ccTouchMoved = false; }
   }, { passive: true });
   document.addEventListener('touchmove', function(e) {
     if (_ccTouchY !== null && Math.abs(e.touches[0].clientY - _ccTouchY) > 8) _ccTouchMoved = true;
@@ -11414,6 +11419,14 @@ ${urlCard}`)}`;
     if (_ccTouchMoved) { _ccTouchMoved = false; _ccTouchY = null; return; }
     _ccTouchY = null;
     ccAdicionarItem(itemId);
+  };
+
+  // Botao 'Adicionar acrescimos': mesma guarda anti-rolagem do card, senao
+  // rolar a lista com o dedo em cima dele abriria a personalizacao sem querer.
+  window.ccDicaClick = function(event, itemId) {
+    if (_ccTouchMoved) { _ccTouchMoved = false; _ccTouchY = null; return; }
+    _ccTouchY = null;
+    ccAbrirPersonalizacao(itemId);
   };
 
   window.ccAdicionarItem = function(itemId) {

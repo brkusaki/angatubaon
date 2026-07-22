@@ -2504,7 +2504,7 @@
     .cc-foto-wrap { position: relative; flex-shrink: 0; width: 60px; height: 60px; }
     .cc-foto-wrap .cc-item-foto { width: 100%; height: 100%; }
     .cc-foto-zoom {
-      position: absolute; top: 2px; left: 2px;
+      position: absolute; bottom: 2px; right: 2px;
       width: 20px; height: 20px; border-radius: 6px;
       background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2);
       color: #fff; font-size: 10px; line-height: 1; cursor: pointer;
@@ -4314,11 +4314,22 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   opacity: 0.45; cursor: not-allowed;
 }
 
-/* Dica sutil no card: item tem acréscimos opcionais */
+/* Botão de acréscimos no card: só ele abre a personalização.
+   O resto do card continua adicionando +1 num toque. */
 .cc-item-dica {
-  font-size: 9px; color: #a855f7; font-weight: 700;
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 5px; padding: 5px 9px 5px 7px;
+  background: rgba(168,85,247,0.1);
+  border: 1px solid rgba(168,85,247,0.28);
+  border-radius: 7px;
+  color: #a855f7; font-family: inherit;
+  font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .02em;
-  margin-top: 3px; display: flex; align-items: center; gap: 4px;
-  opacity: .85;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s, transform 0.1s;
 }
-.cc-item-dica i { font-size: 9px; }
+.cc-item-dica:active {
+  background: rgba(168,85,247,0.22);
+  transform: scale(0.96);
+}
+.cc-item-dica i { font-size: 10px; }

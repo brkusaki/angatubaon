@@ -1831,7 +1831,7 @@
       starsHTML = `<div class="store-stars">
         <span style="color:#f59e0b;letter-spacing:1px;font-size:10px;">${estrelasHTML}</span>
         <span style="font-weight:700;font-size:11px;color:#f59e0b;">${mediaFmt}</span>
-        <span style="font-size:10px;color:var(--muted);">· ${avals.length} avaliaç${avals.length > 1 ? 'ões' : 'ão'}</span>
+        <span style="font-size:10px;color:var(--muted);">· ${avals.length} avaliação${avals.length > 1 ? 'ões' : ''}</span>
       </div>`;
     }
 
@@ -6375,19 +6375,19 @@
                       const cor = s <= Math.round(mediaAval) ? '#f59e0b' : 'rgba(255,255,255,0.15)';
                       return `<span style="color:${cor};font-size:14px;">★</span>`;
                     }).join('')}</div>
-                    <div style="font-size:10px;color:var(--muted);">${avaliacoes.length} avaliaç${avaliacoes.length>1?'ões':'ão'}</div>
+                    <div style="font-size:10px;color:var(--muted);">${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''}</div>
                   </div>
                   ${trofeuHTML}
                 </div>`
              : `<div style="font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px;">
-                  <span style="color:#f59e0b;">★</span> ${avaliacoes.length} avaliaç${avaliacoes.length>1?'ões':'ão'} · a média aparece a partir de ${AVAL_MIN_MEDIA}
+                  <span style="color:#f59e0b;">★</span> ${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''} · a média aparece a partir de ${AVAL_MIN_MEDIA}
                 </div>`}
            <button type="button" id="aval-toggle-${idx}" onclick="avalToggleLista(${idx})"
              style="width:100%;margin-top:10px;padding:9px;border-radius:9px;cursor:pointer;
                     background:var(--surface2);border:1px solid var(--border);color:var(--text);
                     font-family:var(--font-b);font-size:12.5px;font-weight:600;
                     display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent;">
-             <span class="aval-toggle-txt">Ver ${avaliacoes.length} avaliaç${avaliacoes.length>1?'ões':'ão'}</span>
+             <span class="aval-toggle-txt">Ver ${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''}</span>
              <span class="aval-toggle-chev" style="transition:transform 0.25s;">⌄</span>
            </button>
          </div>`
@@ -8285,6 +8285,19 @@
     if (hdr)  hdr.setAttribute('aria-expanded', abrir ? 'true' : 'false');
   };
 
+  // Acordeao da secao de grupos de opcoes (mesmo padrao da secao de infos).
+  window.mlToggleGruposSection = function (forcar) {
+    const body = document.getElementById('ml-grupos-body');
+    const chev = document.getElementById('ml-grupos-chev');
+    const hdr  = document.getElementById('ml-grupos-header');
+    if (!body) return;
+    const estaAberto = body.style.display !== 'none';
+    const abrir = (typeof forcar === 'boolean') ? forcar : !estaAberto;
+    body.style.display = abrir ? '' : 'none';
+    if (chev) chev.style.transform = abrir ? 'rotate(180deg)' : 'rotate(0deg)';
+    if (hdr)  hdr.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+  };
+
   })(); // ── fim initMlInfoEditor ──────────────────────────────────
 
   /* ── INIT ────────────────────────────────────────────────── */
@@ -9288,7 +9301,7 @@ ${urlCard}`)}`;
       lista.style.maxHeight = '0px';
       const loja = LOJAS[idx];
       const n = loja && loja.avaliacoes ? loja.avaliacoes.length : 0;
-      if (txt) txt.textContent = 'Ver ' + n + ' avaliaç' + (n > 1 ? 'ões' : 'ão');
+      if (txt) txt.textContent = 'Ver ' + n + ' avaliação' + (n > 1 ? 'ões' : '');
     }
   };
 
@@ -9514,6 +9527,8 @@ ${urlCard}`)}`;
   let _cardapioLojaWpp = null;
   let _cardapioLojaInfo = null;
   let _cardapioUploadEmAndamento = false; // Fix #22: bloqueia salvar durante upload de foto
+  let _mlGrupos = [];            // grupos de opcoes da loja (PRO). [{id,nome,tipo,min,max,precoModo,ativo,opcoes:[...]}]
+  let _mlGrupoEditId = null;     // grupo aberto no editor de opcoes, ou null
 
   async function mlCardapioCarregar(plano) {
     _cardapioPlano = plano;
@@ -9526,6 +9541,9 @@ ${urlCard}`)}`;
     const section = document.getElementById('ml-cardapio-section');
     if (!section) return;
     section.style.display = (isPro || isPlus) ? '' : 'none';
+    // Grupos de opcoes: PRO-only. Aparece logo abaixo do cardapio.
+    const gruposSection = document.getElementById('ml-grupos-section');
+    if (gruposSection) gruposSection.style.display = isPro ? '' : 'none';
     // Acordeão de infos: loja paga (com cardápio no topo) começa fechada;
     // loja Grátis (sem cardápio) começa aberta — senão a aba abriria vazia.
     if (typeof window.mlToggleInfoSection === 'function') {
@@ -9563,6 +9581,245 @@ ${urlCard}`)}`;
         mlCardapioRenderLista();
       }
     } catch(e) { console.warn('[Cardapio] Erro ao carregar:', e.message); }
+    // Grupos de opcoes sao PRO-only; carrega em paralelo (nao bloqueia o cardapio).
+    if (isPro) { mlGruposCarregar(); }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     GRUPOS DE OPCOES — painel do lojista (PRO)
+  ═══════════════════════════════════════════════════════════ */
+  async function mlGruposCarregar() {
+    try {
+      const json = await apiPost('lojaOpcoesListar', { token: _lojaToken }, { timeout: 12000, ignoreUnauthorized: true });
+      if (json.status === 'ok') {
+        _mlGrupos = json.data.grupos || [];
+        mlGruposRenderLista();
+      }
+    } catch(e) { console.warn('[Grupos] Erro ao carregar:', e.message); }
+  }
+
+  function mlGruposRenderLista() {
+    const lista = document.getElementById('ml-grupos-lista');
+    if (!lista) return;
+    if (!_mlGrupos.length) {
+      lista.innerHTML = `<div style="text-align:center;padding:18px 12px;color:var(--muted);font-size:11px;line-height:1.5;">
+        Nenhum grupo ainda. Crie grupos como <strong>Tamanho</strong>, <strong>Acréscimos</strong> ou <strong>Borda</strong><br>e depois vincule aos itens do cardápio.
+      </div>`;
+      return;
+    }
+    lista.innerHTML = _mlGrupos.map(g => {
+      const tipoTxt = g.tipo === 'UNICA' ? 'Escolha única' : 'Múltipla';
+      const modoTxt = g.precoModo === 'ABSOLUTO' ? 'preço final' : 'acréscimo';
+      const nOps = (g.opcoes || []).length;
+      return `<div class="ml-grupo-card">
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:var(--font-h);font-size:12px;font-weight:800;">${escHTML(g.nome)}</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px;">${tipoTxt} · ${modoTxt} · ${nOps} opção${nOps!==1?'ões':''}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button onclick="mlGrupoAbrirOpcoes('${g.id}')" style="padding:6px 10px;border-radius:7px;background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);color:#7c3aed;font-size:10px;font-weight:700;cursor:pointer;"><i class="fa fa-list"></i> Opções</button>
+          <button onclick="mlGrupoAbrirForm('${g.id}')" style="padding:6px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:10px;font-weight:700;cursor:pointer;"><i class="fa fa-pencil"></i></button>
+          <button onclick="mlGrupoRemover('${g.id}','${escAttr(g.nome)}')" style="padding:6px 10px;border-radius:7px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.2);color:var(--red);font-size:10px;font-weight:700;cursor:pointer;"><i class="fa fa-trash"></i></button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  window.mlGrupoAbrirForm = function(editId) {
+    const form = document.getElementById('ml-grupo-form');
+    if (!form) return;
+    form.style.display = '';
+    document.getElementById('ml-grupo-form-msg').textContent = '';
+    const g = editId ? _mlGrupos.find(x => x.id === editId) : null;
+    document.getElementById('ml-grupo-form-title').textContent = g ? 'Editar grupo' : 'Novo grupo';
+    document.getElementById('ml-grupo-edit-id').value = editId || '';
+    document.getElementById('ml-grupo-nome').value = g ? g.nome : '';
+    document.getElementById('ml-grupo-tipo').value = g ? g.tipo : 'MULTIPLA';
+    document.getElementById('ml-grupo-modo').value = g ? g.precoModo : 'DELTA';
+    document.getElementById('ml-grupo-min').value = g ? g.min : 0;
+    document.getElementById('ml-grupo-max').value = g ? g.max : 0;
+    mlGrupoSyncTipo();
+    form.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  };
+
+  window.mlGrupoFecharForm = function() {
+    document.getElementById('ml-grupo-form').style.display = 'none';
+  };
+
+  // Ajusta os campos min/max conforme o tipo: UNICA esconde max (sempre 1) e
+  // troca min por um checkbox 'obrigatorio'. Mantem a UI simples pro lojista.
+  window.mlGrupoSyncTipo = function() {
+    const tipo = document.getElementById('ml-grupo-tipo').value;
+    const maxWrap = document.getElementById('ml-grupo-max-wrap');
+    const minLabel = document.getElementById('ml-grupo-min-label');
+    const hint = document.getElementById('ml-grupo-tipo-hint');
+    if (tipo === 'UNICA') {
+      if (maxWrap) maxWrap.style.display = 'none';
+      if (minLabel) minLabel.textContent = 'Obrigatório escolher? (0 = opcional, 1 = sim)';
+      if (hint) hint.textContent = 'Ex.: Tamanho (Broto/Grande) ou Borda (nenhuma/catupiry).';
+    } else {
+      if (maxWrap) maxWrap.style.display = '';
+      if (minLabel) minLabel.textContent = 'Mínimo de escolhas (0 = livre)';
+      if (hint) hint.textContent = 'Ex.: Acréscimos (bacon, cheddar...). Máx 0 = sem limite.';
+    }
+  };
+
+  window.mlGrupoSalvar = async function() {
+    const nome = document.getElementById('ml-grupo-nome').value.trim();
+    const msg  = document.getElementById('ml-grupo-form-msg');
+    if (!nome) { msg.textContent = '❌ Informe o nome do grupo.'; msg.style.color = 'var(--red)'; return; }
+    const tipo = document.getElementById('ml-grupo-tipo').value;
+    const modo = document.getElementById('ml-grupo-modo').value;
+    let min = parseInt(document.getElementById('ml-grupo-min').value, 10) || 0;
+    let max = parseInt(document.getElementById('ml-grupo-max').value, 10) || 0;
+    const btn = document.getElementById('ml-grupo-salvar-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...'; }
+    try {
+      const json = await apiPost('lojaGrupoSalvar', {
+        token: _lojaToken,
+        id: document.getElementById('ml-grupo-edit-id').value,
+        nome, tipo, precoModo: modo, min, max,
+      }, { timeout: 15000, ignoreUnauthorized: true });
+      if (json.status !== 'ok') throw new Error(json.msg || 'Erro');
+      mlGrupoFecharForm();
+      await mlGruposCarregar();
+      mlToast('Grupo salvo!', 'ok');
+    } catch(e) {
+      if (e.message === 'UNAUTHORIZED') return;
+      msg.textContent = '❌ ' + e.message; msg.style.color = 'var(--red)';
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-check"></i> Salvar grupo'; }
+    }
+  };
+
+  window.mlGrupoRemover = async function(id, nome) {
+    const ok = await mlConfirmar('Remover grupo?', `“${nome}” e suas opções serão removidos, e desvinculados de todos os itens.`, { okLabel: 'Remover', owlSrc: '/webp/owl-sign.webp' });
+    if (!ok) return;
+    try {
+      const json = await apiPost('lojaGrupoRemover', { token: _lojaToken, id }, { timeout: 15000, ignoreUnauthorized: true });
+      if (json.status !== 'ok') { mlToast('Erro: ' + (json.msg || 'tente de novo.'), 'erro'); return; }
+      if (_mlGrupoEditId === id) { _mlGrupoEditId = null; const ed = document.getElementById('ml-opcoes-editor'); if (ed) ed.style.display = 'none'; }
+      await mlGruposCarregar();
+      await mlCardapioCarregar(_cardapioPlano); // vinculos podem ter mudado
+    } catch(e) {
+      if (e.message === 'UNAUTHORIZED') return;
+      mlToast('Erro: ' + e.message, 'erro');
+    }
+  };
+
+  // ── Editor de opcoes de um grupo ──
+  window.mlGrupoAbrirOpcoes = function(grupoId) {
+    _mlGrupoEditId = grupoId;
+    const g = _mlGrupos.find(x => x.id === grupoId);
+    const ed = document.getElementById('ml-opcoes-editor');
+    if (!g || !ed) return;
+    document.getElementById('ml-opcoes-grupo-nome').textContent = g.nome;
+    ed.style.display = '';
+    mlOpcoesRenderLista();
+    // limpa o form de nova opcao
+    const nome = document.getElementById('ml-opcao-nome'); if (nome) nome.value = '';
+    const preco = document.getElementById('ml-opcao-preco'); if (preco) preco.value = '';
+    ed.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  };
+
+  window.mlOpcoesFechar = function() {
+    _mlGrupoEditId = null;
+    const ed = document.getElementById('ml-opcoes-editor');
+    if (ed) ed.style.display = 'none';
+  };
+
+  function mlOpcoesRenderLista() {
+    const g = _mlGrupos.find(x => x.id === _mlGrupoEditId);
+    const lista = document.getElementById('ml-opcoes-lista');
+    if (!g || !lista) return;
+    const modoAbs = g.precoModo === 'ABSOLUTO';
+    const label = document.getElementById('ml-opcao-preco-label');
+    if (label) label.textContent = modoAbs ? 'Preço final (R$)' : 'Acréscimo (R$, 0 = grátis)';
+    if (!g.opcoes.length) {
+      lista.innerHTML = `<div style="text-align:center;padding:12px;color:var(--muted);font-size:11px;">Nenhuma opção. Adicione abaixo.</div>`;
+      return;
+    }
+    lista.innerHTML = g.opcoes.map(op => {
+      const p = parseFloat(op.preco) || 0;
+      const precoTxt = modoAbs ? 'R$ ' + p.toFixed(2).replace('.',',') : (p > 0 ? '+ R$ ' + p.toFixed(2).replace('.',',') : 'grátis');
+      return `<div class="ml-opcao-row">
+        <span style="flex:1;font-size:12px;font-weight:600;">${escHTML(op.nome)}</span>
+        <span style="font-size:11px;color:var(--green);font-weight:700;margin-right:6px;">${precoTxt}</span>
+        <button onclick="mlOpcaoRemover('${op.id}','${escAttr(op.nome)}')" style="padding:4px 8px;border-radius:6px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.2);color:var(--red);font-size:10px;cursor:pointer;"><i class="fa fa-trash"></i></button>
+      </div>`;
+    }).join('');
+  }
+
+  window.mlOpcaoSalvar = async function() {
+    const g = _mlGrupos.find(x => x.id === _mlGrupoEditId);
+    if (!g) return;
+    const nome = document.getElementById('ml-opcao-nome').value.trim();
+    const precoRaw = document.getElementById('ml-opcao-preco').value;
+    const msg = document.getElementById('ml-opcao-form-msg');
+    if (!nome) { if (msg) { msg.textContent = '❌ Informe o nome.'; msg.style.color = 'var(--red)'; } return; }
+    const preco = parseFloat(String(precoRaw).replace(/[^\d,.-]/g,'').replace(',','.'));
+    if (isNaN(preco) || preco < 0) { if (msg) { msg.textContent = '❌ Preço inválido.'; msg.style.color = 'var(--red)'; } return; }
+    const btn = document.getElementById('ml-opcao-add-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>'; }
+    try {
+      const json = await apiPost('lojaOpcaoSalvar', {
+        token: _lojaToken, grupoId: g.id, nome, preco,
+        ordem: (g.opcoes.length + 1),
+      }, { timeout: 15000, ignoreUnauthorized: true });
+      if (json.status !== 'ok') throw new Error(json.msg || 'Erro');
+      document.getElementById('ml-opcao-nome').value = '';
+      document.getElementById('ml-opcao-preco').value = '';
+      if (msg) msg.textContent = '';
+      await mlGruposCarregar();
+      // reabre o editor no mesmo grupo (dados atualizados)
+      mlOpcoesRenderLista();
+      setTimeout(() => document.getElementById('ml-opcao-nome')?.focus(), 60);
+    } catch(e) {
+      if (e.message === 'UNAUTHORIZED') return;
+      if (msg) { msg.textContent = '❌ ' + e.message; msg.style.color = 'var(--red)'; }
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-plus"></i> Adicionar'; }
+    }
+  };
+
+  window.mlOpcaoRemover = async function(id, nome) {
+    const ok = await mlConfirmar('Remover opção?', `“${nome}” será removida do grupo.`, { okLabel: 'Remover', owlSrc: '/webp/owl-sign.webp' });
+    if (!ok) return;
+    try {
+      const json = await apiPost('lojaOpcaoRemover', { token: _lojaToken, id }, { timeout: 15000, ignoreUnauthorized: true });
+      if (json.status !== 'ok') { mlToast('Erro: ' + (json.msg || 'tente de novo.'), 'erro'); return; }
+      await mlGruposCarregar();
+      mlOpcoesRenderLista();
+    } catch(e) {
+      if (e.message === 'UNAUTHORIZED') return;
+      mlToast('Erro: ' + e.message, 'erro');
+    }
+  };
+
+  // ── Vinculo item -> grupos (checkboxes no form do item) ──
+  // Renderiza a lista de grupos disponiveis com o estado atual do item.
+  function mlRenderVinculoGrupos(item) {
+    const wrap = document.getElementById('ml-cardapio-grupos-wrap');
+    const lista = document.getElementById('ml-cardapio-grupos-lista');
+    if (!wrap || !lista) return;
+    // So faz sentido no PRO e se ha grupos criados.
+    if (_cardapioPlano !== 'PRO' || !_mlGrupos.length) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    const vinculados = (item && Array.isArray(item.grupos)) ? item.grupos.map(g => g.id) : [];
+    lista.innerHTML = _mlGrupos.map(g => {
+      const on = vinculados.indexOf(g.id) >= 0;
+      return `<label class="ml-vinculo-chip${on?' on':''}">
+        <input type="checkbox" value="${g.id}" ${on?'checked':''} style="display:none;" onchange="this.parentNode.classList.toggle('on', this.checked)">
+        <i class="fa fa-${on?'check-':''}circle"></i> ${escHTML(g.nome)}
+      </label>`;
+    }).join('');
+  }
+
+  // Le os checkboxes marcados no form do item.
+  function mlLerVinculoGrupos() {
+    const lista = document.getElementById('ml-cardapio-grupos-lista');
+    if (!lista) return [];
+    return Array.from(lista.querySelectorAll('input[type=checkbox]:checked')).map(c => c.value);
   }
 
   function mlCardapioRenderLista() {
@@ -9719,6 +9976,7 @@ ${urlCard}`)}`;
       if (prev) prev.innerHTML = item.foto
         ? `<img src="${item.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">`
         : '<i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>';
+      mlRenderVinculoGrupos(item);
     } else {
       document.getElementById('ml-cardapio-form-title').textContent = 'Novo item';
       document.getElementById('ml-cardapio-edit-id').value = '';
@@ -9731,6 +9989,7 @@ ${urlCard}`)}`;
       if (destaqueChkN) destaqueChkN.checked = false;
       const prev = document.getElementById('ml-cardapio-foto-preview');
       if (prev) prev.innerHTML = '<i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>';
+      mlRenderVinculoGrupos(null);
     }
     form.scrollIntoView({ behavior:'smooth', block:'nearest' });
   }
@@ -9877,6 +10136,16 @@ ${urlCard}`)}`;
       const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(30000) });
       const json = await resp.json();
       if (json.status === 'ok') {
+        // Vincula grupos ao item (PRO). Usa o id retornado (novo) ou o edit-id.
+        if (_cardapioPlano === 'PRO') {
+          const itemIdFinal = (json.data && json.data.id) || document.getElementById('ml-cardapio-edit-id').value;
+          const gruposSel = mlLerVinculoGrupos();
+          if (itemIdFinal) {
+            try {
+              await apiPost('lojaItemVincularGrupos', { token: _lojaToken, itemId: itemIdFinal, grupos: gruposSel.join(',') }, { timeout: 12000, ignoreUnauthorized: true });
+            } catch(eV) { if (eV.message !== 'UNAUTHORIZED') console.warn('[Vinculo] ' + eV.message); }
+          }
+        }
         // Atualiza a lista sem fechar o form quando manterAberto=true
         await mlCardapioCarregar(_cardapioPlano);
 
@@ -9927,6 +10196,7 @@ ${urlCard}`)}`;
   window.mlCardapioFecharForm = mlCardapioFecharForm;
   window.mlCardapioSalvar     = mlCardapioSalvar;
   window.mlCardapioRemover    = mlCardapioRemover;
+  window.mlGruposCarregar     = mlGruposCarregar;
   window.mlSalvarInstagram    = mlSalvarInstagram;
 
   window.mlToggleEntrega = async function() {
@@ -10116,6 +10386,94 @@ ${urlCard}`)}`;
   let _ccCarrinho  = {}; // { itemId: { item, qty } }
   let _ccCartExpanded = false; // estado do carrinho colapsável
   let _ccModoAtual = 'produto'; // 'produto' | 'servico' | 'vitrine
+
+  /* ─── MODIFICADORES (grupos de opções) no cliente ───────────────
+     item.grupos vem do payload publico. Cada grupo:
+       { id, nome, tipo:'UNICA'|'MULTIPLA', min, max, precoModo:'DELTA'|'ABSOLUTO', opcoes:[{id,nome,preco}] }
+     Carrinho passa a ser chaveado por lineKey (item + escolhas), pois
+     'Pizza Grande' e 'Pizza Broto' sao linhas distintas do mesmo item. */
+
+  // Estado da tela de personalizacao em aberto.
+  let _ccPersItem = null;      // item sendo personalizado
+  let _ccPersEscolhas = {};    // { grupoId: [opcaoId, ...] }
+
+  function _ccItemTemGrupos(item) {
+    return Array.isArray(item && item.grupos) && item.grupos.length > 0;
+  }
+
+  // Preco unitario de uma configuracao. Regra:
+  //  - grupo ABSOLUTO: a opcao escolhida SUBSTITUI o preco base (tamanho).
+  //    Se houver mais de um grupo absoluto, o ultimo escolhido vence a base;
+  //    na pratica so ha um (tamanho). Grupos sem escolha nao mexem na base.
+  //  - grupo DELTA: cada opcao escolhida SOMA seu preco.
+  function _ccPrecoUnitario(item, escolhas) {
+    let base = parseFloat(item.preco) || 0;
+    let somaDelta = 0;
+    (item.grupos || []).forEach(g => {
+      const sel = (escolhas && escolhas[g.id]) || [];
+      if (!sel.length) return;
+      if (g.precoModo === 'ABSOLUTO') {
+        // A escolha define a base. UNICA => 1 opcao; pega a primeira selecionada.
+        const op = g.opcoes.find(o => o.id === sel[0]);
+        if (op) base = parseFloat(op.preco) || 0;
+      } else {
+        sel.forEach(oid => {
+          const op = g.opcoes.find(o => o.id === oid);
+          if (op) somaDelta += parseFloat(op.preco) || 0;
+        });
+      }
+    });
+    return base + somaDelta;
+  }
+
+  // Chave estavel de linha: itemId + escolhas ordenadas. Mesma config => mesma
+  // linha (agrupa qty); config diferente => linha separada.
+  function _ccLineKey(item, escolhas) {
+    if (!_ccItemTemGrupos(item)) return item.id;
+    const partes = [];
+    (item.grupos || []).forEach(g => {
+      const sel = ((escolhas && escolhas[g.id]) || []).slice().sort();
+      if (sel.length) partes.push(g.id + ':' + sel.join('+'));
+    });
+    return item.id + '|' + partes.join('|');
+  }
+
+  // Texto curto das escolhas, p/ exibir no carrinho e na mensagem.
+  function _ccResumoEscolhas(item, escolhas) {
+    const linhas = [];
+    (item.grupos || []).forEach(g => {
+      const sel = (escolhas && escolhas[g.id]) || [];
+      sel.forEach(oid => {
+        const op = g.opcoes.find(o => o.id === oid);
+        if (!op) return;
+        const p = parseFloat(op.preco) || 0;
+        if (g.precoModo === 'ABSOLUTO') {
+          linhas.push(op.nome);
+        } else {
+          linhas.push(op.nome + (p > 0 ? ' (+' + p.toFixed(2).replace('.',',') + ')' : ''));
+        }
+      });
+    });
+    return linhas;
+  }
+
+  // Valida min/max de cada grupo. Retorna '' se ok, ou mensagem do 1o erro.
+  function _ccValidarEscolhas(item, escolhas) {
+    const gs = item.grupos || [];
+    for (let i = 0; i < gs.length; i++) {
+      const g = gs[i];
+      const n = ((escolhas && escolhas[g.id]) || []).length;
+      if (g.min > 0 && n < g.min) {
+        return g.tipo === 'UNICA'
+          ? 'Escolha uma opção em “' + g.nome + '”'
+          : 'Escolha ao menos ' + g.min + ' em “' + g.nome + '”';
+      }
+      if (g.max > 0 && n > g.max) {
+        return 'Máximo de ' + g.max + ' em “' + g.nome + '”';
+      }
+    }
+    return '';
+  }
 
   window.abrirCardapioCliente = function(idx) {
     const loja = LOJAS[idx];
@@ -10339,8 +10697,19 @@ ${urlCard}`)}`;
   // ── MODO PRODUTO: card em lista, tap adiciona ao carrinho ─────────────────
   function _ccItemProdutoHTML(item, placeholderEmoji) {
     const temFoto = !!item.foto;
+    const temGrupos = _ccItemTemGrupos(item);
+    // Item com grupos: preco base vira 'a partir de' e o card abre a personalizacao.
+    const precoBase = parseFloat(item.preco) || 0;
+    const precoHTML = temGrupos
+      ? `<div class="cc-item-preco"><span style="font-size:9px;font-weight:600;color:var(--muted);text-transform:uppercase;">a partir de</span> R$ ${precoBase.toFixed(2).replace('.',',')}</div>`
+      : `<div class="cc-item-preco">R$ ${precoBase.toFixed(2).replace('.',',')}</div>`;
+    // O botao: item simples usa '+', item com grupos usa um icone de personalizar.
+    const btnHTML = temGrupos
+      ? `<button class="cc-item-add cc-item-personalizar" aria-label="Personalizar ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAbrirPersonalizacao('${item.id}')"><i class="fa fa-sliders"></i></button>`
+      : `<button class="cc-item-add" aria-label="Adicionar ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>`;
+    const clickAttr = temGrupos ? `onclick="ccAbrirPersonalizacao('${item.id}')"` : `onclick="ccCardClick(event,'${item.id}')"`;
     return `
-      <div class="cc-item-card cc-item-clickable" id="cc-card-${item.id}" role="button" tabindex="0" onclick="ccCardClick(event,'${item.id}')" style="margin-bottom:8px;cursor:pointer;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
+      <div class="cc-item-card cc-item-clickable" id="cc-card-${item.id}" role="button" tabindex="0" ${clickAttr} style="margin-bottom:8px;cursor:pointer;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
         ${temFoto
           ? `<div class="cc-foto-wrap">
                <img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" onerror="this.parentNode.style.display='none'">
@@ -10353,10 +10722,10 @@ ${urlCard}`)}`;
             ${escHTML(item.nome)}
           </div>
           ${item.descricao ? `<div class="cc-item-desc">${escHTML(item.descricao)}</div>` : ''}
-          <div class="cc-item-preco">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}</div>
+          ${precoHTML}
         </div>
         <div class="cc-qty-ctrl" id="cc-qty-${item.id}" onclick="event.stopPropagation()">
-          <button class="cc-item-add" aria-label="Adicionar ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>
+          ${btnHTML}
         </div>
       </div>`;
   }
@@ -10435,8 +10804,11 @@ ${urlCard}`)}`;
     const item = loja.cardapio.find(i => i.id === itemId);
     if (!item) return;
 
+    // Item com grupos: sempre passa pela personalizacao (nunca soma direto).
+    if (_ccItemTemGrupos(item)) { ccAbrirPersonalizacao(itemId); return; }
+
     if (!_ccCarrinho[itemId]) {
-      _ccCarrinho[itemId] = { item, qty: 0 };
+      _ccCarrinho[itemId] = { item, qty: 0, escolhas: null, precoUnit: parseFloat(item.preco) || 0 };
     }
     _ccCarrinho[itemId].qty++;
 
@@ -10450,6 +10822,124 @@ ${urlCard}`)}`;
       `;
     }
     ccAtualizarCarrinho();
+  };
+
+  /* ─── Tela de personalizacao (item com grupos) ─────────────── */
+  window.ccAbrirPersonalizacao = function(itemId) {
+    const loja = LOJAS[_ccLojaIdx];
+    const item = loja.cardapio.find(i => i.id === itemId);
+    if (!item || !_ccItemTemGrupos(item)) return;
+    _ccPersItem = item;
+    _ccPersEscolhas = {};
+    // Pre-seleciona a 1a opcao de grupos UNICA obrigatorios (min>=1), p/ nunca
+    // deixar o cliente com um estado invalido de largada (ex.: tamanho).
+    (item.grupos || []).forEach(g => {
+      if (g.tipo === 'UNICA' && g.min >= 1 && g.opcoes.length) {
+        _ccPersEscolhas[g.id] = [g.opcoes[0].id];
+      } else {
+        _ccPersEscolhas[g.id] = [];
+      }
+    });
+    _ccRenderPersonalizacao();
+    const modal = document.getElementById('modal-cc-pers');
+    if (modal) { modal.style.display = 'flex'; requestAnimationFrame(() => modal.classList.add('aberto')); }
+  };
+
+  window.ccFecharPersonalizacao = function() {
+    const modal = document.getElementById('modal-cc-pers');
+    if (modal) { modal.classList.remove('aberto'); setTimeout(() => { modal.style.display = 'none'; }, 200); }
+    _ccPersItem = null; _ccPersEscolhas = {};
+  };
+
+  // Marca/desmarca uma opcao respeitando o tipo do grupo.
+  window.ccPersToggle = function(grupoId, opcaoId) {
+    const item = _ccPersItem; if (!item) return;
+    const g = (item.grupos || []).find(x => x.id === grupoId); if (!g) return;
+    const atual = _ccPersEscolhas[grupoId] || [];
+    if (g.tipo === 'UNICA') {
+      // Radio: se ja marcada e o grupo e opcional (min 0), desmarca; senao troca.
+      if (atual.length === 1 && atual[0] === opcaoId && g.min === 0) _ccPersEscolhas[grupoId] = [];
+      else _ccPersEscolhas[grupoId] = [opcaoId];
+    } else {
+      // Checkbox: alterna, respeitando o teto max (se >0).
+      const idx = atual.indexOf(opcaoId);
+      if (idx >= 0) { atual.splice(idx, 1); }
+      else {
+        if (g.max > 0 && atual.length >= g.max) { mlToast('Máximo de ' + g.max + ' em ' + g.nome, 'erro'); return; }
+        atual.push(opcaoId);
+      }
+      _ccPersEscolhas[grupoId] = atual;
+    }
+    _ccRenderPersonalizacao();
+  };
+
+  function _ccRenderPersonalizacao() {
+    const item = _ccPersItem; if (!item) return;
+    const cont = document.getElementById('cc-pers-corpo');
+    const tituloEl = document.getElementById('cc-pers-titulo');
+    if (tituloEl) tituloEl.textContent = item.nome;
+    if (!cont) return;
+
+    const gruposHTML = (item.grupos || []).map(g => {
+      const sel = _ccPersEscolhas[g.id] || [];
+      const obrig = g.min > 0;
+      const regra = g.tipo === 'UNICA'
+        ? (obrig ? 'Escolha 1' : 'Opcional')
+        : (g.max > 0 ? ('Ate ' + g.max) : 'Quantos quiser');
+      const opcoesHTML = g.opcoes.map(op => {
+        const marcada = sel.indexOf(op.id) >= 0;
+        const p = parseFloat(op.preco) || 0;
+        const precoTxt = g.precoModo === 'ABSOLUTO'
+          ? 'R$ ' + p.toFixed(2).replace('.',',')
+          : (p > 0 ? '+ R$ ' + p.toFixed(2).replace('.',',') : '');
+        const marca = g.tipo === 'UNICA'
+          ? `<span class="cc-pers-radio${marcada?' on':''}"></span>`
+          : `<span class="cc-pers-check${marcada?' on':''}"><i class="fa fa-check"></i></span>`;
+        return `<button type="button" class="cc-pers-opcao${marcada?' sel':''}" onclick="ccPersToggle('${g.id}','${op.id}')">
+            ${marca}
+            <span class="cc-pers-opcao-nome">${escHTML(op.nome)}</span>
+            ${precoTxt ? `<span class="cc-pers-opcao-preco">${precoTxt}</span>` : ''}
+          </button>`;
+      }).join('');
+      return `<div class="cc-pers-grupo">
+          <div class="cc-pers-grupo-head">
+            <span class="cc-pers-grupo-nome">${escHTML(g.nome)}${obrig?'<span class="cc-pers-obrig">obrigatório</span>':''}</span>
+            <span class="cc-pers-grupo-regra">${regra}</span>
+          </div>
+          ${opcoesHTML}
+        </div>`;
+    }).join('');
+    cont.innerHTML = gruposHTML;
+
+    // Rodape: preco unitario ao vivo + estado do botao.
+    const precoUnit = _ccPrecoUnitario(item, _ccPersEscolhas);
+    const erro = _ccValidarEscolhas(item, _ccPersEscolhas);
+    const btn = document.getElementById('cc-pers-add-btn');
+    const precoEl = document.getElementById('cc-pers-preco');
+    if (precoEl) precoEl.textContent = 'R$ ' + precoUnit.toFixed(2).replace('.',',');
+    if (btn) {
+      btn.disabled = !!erro;
+      btn.querySelector('.cc-pers-add-label').textContent = erro || 'Adicionar ao pedido';
+    }
+  }
+
+  // Confirma a personalizacao: adiciona (ou incrementa) a linha no carrinho.
+  window.ccPersConfirmar = function() {
+    const item = _ccPersItem; if (!item) return;
+    const erro = _ccValidarEscolhas(item, _ccPersEscolhas);
+    if (erro) { mlToast(erro, 'erro'); return; }
+    const escolhas = JSON.parse(JSON.stringify(_ccPersEscolhas));
+    const key = _ccLineKey(item, escolhas);
+    const precoUnit = _ccPrecoUnitario(item, escolhas);
+    if (!_ccCarrinho[key]) {
+      _ccCarrinho[key] = { item, qty: 0, escolhas, precoUnit };
+    }
+    _ccCarrinho[key].qty++;
+    _ccCarrinho[key].precoUnit = precoUnit; // reafirma (caso preco tenha mudado)
+    ccFecharPersonalizacao();
+    ccAtualizarCarrinho();
+    // Abre o carrinho pra dar feedback de que entrou.
+    _ccCartExpanded = true; ccAplicarEstadoCarrinho();
   };
 
   window.ccAlterarQty = function(itemId, delta) {
@@ -10560,17 +11050,28 @@ ${urlCard}`)}`;
     }
 
     let subtotal = 0, totalQty = 0;
+    // Preco por linha = precoUnit (ja inclui modificadores) * qty. Itens antigos
+    // sem precoUnit caem no preco base do item (retrocompat).
+    const _precoLinha = (linha) => {
+      const unit = (linha.precoUnit != null) ? linha.precoUnit : (parseFloat(linha.item.preco) || 0);
+      return unit * linha.qty;
+    };
     if (lista) {
-      lista.innerHTML = itens.map(({ item, qty }) => {
-        const sub = (parseFloat(item.preco) || 0) * qty;
+      lista.innerHTML = itens.map((linha) => {
+        const { item, qty, escolhas } = linha;
+        const sub = _precoLinha(linha);
         subtotal += sub; totalQty += qty;
-        return `<div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;">
-          <span style="flex:1;color:var(--text);">${qty}× ${escHTML(item.nome)}</span>
+        const extras = escolhas ? _ccResumoEscolhas(item, escolhas) : [];
+        const extrasHTML = extras.length
+          ? `<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:1px;">${extras.map(e => '+ ' + escHTML(e)).join('<br>')}</div>`
+          : '';
+        return `<div style="display:flex;align-items:flex-start;justify-content:space-between;font-size:12px;gap:8px;">
+          <span style="flex:1;color:var(--text);">${qty}× ${escHTML(item.nome)}${extrasHTML}</span>
           <span style="color:var(--green);font-weight:700;flex-shrink:0;">R$ ${sub.toFixed(2).replace('.',',')}</span>
         </div>`;
       }).join('');
     } else {
-      itens.forEach(({ item, qty }) => { subtotal += (parseFloat(item.preco) || 0) * qty; totalQty += qty; });
+      itens.forEach((linha) => { subtotal += _precoLinha(linha); totalQty += linha.qty; });
     }
 
     // ── Taxa de entrega: só entra no cálculo se a loja faz entrega ──
@@ -10676,10 +11177,14 @@ ${urlCard}`)}`;
     }
 
     let subtotal = 0;
-    const linhas = itens.map(({ item, qty }) => {
-      const sub = (parseFloat(item.preco) || 0) * qty;
+    const linhas = itens.map((linha) => {
+      const { item, qty, escolhas } = linha;
+      const unit = (linha.precoUnit != null) ? linha.precoUnit : (parseFloat(item.preco) || 0);
+      const sub = unit * qty;
       subtotal += sub;
-      return `• ${qty}× ${item.nome} — R$ ${sub.toFixed(2).replace('.',',')}`;
+      const extras = escolhas ? _ccResumoEscolhas(item, escolhas) : [];
+      const extrasTxt = extras.length ? extras.map(e => '\n   + ' + e).join('') : '';
+      return `• ${qty}× ${item.nome}${extrasTxt} — R$ ${sub.toFixed(2).replace('.',',')}`;
     });
 
     const obsEl = document.getElementById('cc-obs-input');

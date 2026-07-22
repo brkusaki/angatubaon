@@ -1449,6 +1449,11 @@
                     <span style="font-size:12px;font-weight:700;color:var(--text);">⭐ Item em destaque</span>
                     <span style="font-size:10px;color:var(--muted);">(aparece no topo do cardápio)</span>
                   </label>
+                  <!-- Vínculo de grupos de opções (PRO) — só aparece se houver grupos criados -->
+                  <div id="ml-cardapio-grupos-wrap" style="display:none;margin-top:4px;">
+                    <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Opções deste item <span style="opacity:0.5;">(tamanho, acréscimos...)</span></div>
+                    <div id="ml-cardapio-grupos-lista" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+                  </div>
                 </div>
                 <div style="display:flex;gap:8px;margin-top:12px;">
                   <button onclick="mlCardapioFecharForm()" style="flex:1;padding:10px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;">Cancelar</button>
@@ -1460,6 +1465,82 @@
                   <i class="fa fa-plus"></i> Salvar e adicionar próximo
                 </button>
                 <div id="ml-cardapio-form-msg" role="status" aria-live="polite" style="font-size:11px;text-align:center;margin-top:8px;min-height:14px;"></div>
+              </div>
+            </div>
+
+            <!-- ═══ GRUPOS DE OPÇÕES (PRO) ═══ -->
+            <div id="ml-grupos-section" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <button type="button" id="ml-grupos-header" onclick="mlToggleGruposSection()" aria-expanded="false" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:none;border:none;padding:0;cursor:pointer;color:var(--text);-webkit-tap-highlight-color:transparent;text-align:left;">
+                <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">🎛️ Grupos de opções <span style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:8px;padding:2px 5px;border-radius:5px;margin-left:4px;">PRO</span></span>
+                <span id="ml-grupos-chev" style="font-size:13px;color:var(--muted);transition:transform .25s ease;">⌄</span>
+              </button>
+              <div id="ml-grupos-body" style="display:none;">
+                <div style="font-size:10px;color:var(--muted);margin:10px 0 12px;line-height:1.5;">Crie opções como <strong>Tamanho</strong> (broto/grande), <strong>Acréscimos</strong> (bacon, cheddar...) ou <strong>Borda</strong>, e vincule aos itens do cardápio. O cliente escolhe na hora do pedido.</div>
+                <div id="ml-grupos-lista" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+                <button onclick="mlGrupoAbrirForm(null)" style="width:100%;padding:10px;border-radius:8px;background:rgba(124,58,237,0.1);border:1px dashed rgba(124,58,237,0.4);color:#7c3aed;font-family:var(--font-h);font-size:12px;font-weight:800;cursor:pointer;"><i class="fa fa-plus"></i> Novo grupo</button>
+
+                <!-- Form de grupo -->
+                <div id="ml-grupo-form" style="display:none;margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;">
+                  <div id="ml-grupo-form-title" style="font-family:var(--font-h);font-size:13px;font-weight:800;margin-bottom:10px;">Novo grupo</div>
+                  <input type="hidden" id="ml-grupo-edit-id" value="">
+                  <div style="margin-bottom:10px;">
+                    <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Nome do grupo</div>
+                    <input id="ml-grupo-nome" type="text" maxlength="60" placeholder="Ex: Tamanho, Acréscimos, Borda" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                  </div>
+                  <div style="display:flex;gap:8px;margin-bottom:10px;">
+                    <div style="flex:1;">
+                      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Tipo</div>
+                      <select id="ml-grupo-tipo" onchange="mlGrupoSyncTipo()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                        <option value="MULTIPLA">Múltipla escolha</option>
+                        <option value="UNICA">Escolha única</option>
+                      </select>
+                    </div>
+                    <div style="flex:1;">
+                      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Preço da opção</div>
+                      <select id="ml-grupo-modo" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                        <option value="DELTA">Acréscimo (soma)</option>
+                        <option value="ABSOLUTO">Preço final (substitui)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div id="ml-grupo-tipo-hint" style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.4;">Ex.: Acréscimos (bacon, cheddar...). Máx 0 = sem limite.</div>
+                  <div style="display:flex;gap:8px;margin-bottom:10px;">
+                    <div style="flex:1;">
+                      <div id="ml-grupo-min-label" style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Mínimo de escolhas (0 = livre)</div>
+                      <input id="ml-grupo-min" type="number" min="0" max="20" value="0" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1;" id="ml-grupo-max-wrap">
+                      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Máximo (0 = sem limite)</div>
+                      <input id="ml-grupo-max" type="number" min="0" max="20" value="0" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:8px;">
+                    <button onclick="mlGrupoFecharForm()" style="flex:1;padding:10px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;">Cancelar</button>
+                    <button onclick="mlGrupoSalvar()" id="ml-grupo-salvar-btn" style="flex:2;padding:10px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;"><i class="fa fa-check"></i> Salvar grupo</button>
+                  </div>
+                  <div id="ml-grupo-form-msg" role="status" aria-live="polite" style="font-size:11px;text-align:center;margin-top:8px;min-height:14px;"></div>
+                </div>
+
+                <!-- Editor de opções de um grupo -->
+                <div id="ml-opcoes-editor" style="display:none;margin-top:12px;background:var(--surface);border:1px solid rgba(124,58,237,0.3);border-radius:12px;padding:12px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <div style="font-family:var(--font-h);font-size:13px;font-weight:800;">Opções de <span id="ml-opcoes-grupo-nome" style="color:#7c3aed;"></span></div>
+                    <button onclick="mlOpcoesFechar()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1;">×</button>
+                  </div>
+                  <div id="ml-opcoes-lista" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
+                  <div style="display:flex;gap:8px;align-items:flex-end;">
+                    <div style="flex:2;">
+                      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Nome da opção</div>
+                      <input id="ml-opcao-nome" type="text" maxlength="60" placeholder="Ex: Bacon, Grande..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1;">
+                      <div id="ml-opcao-preco-label" style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Preço (R$)</div>
+                      <input id="ml-opcao-preco" type="text" inputmode="decimal" placeholder="0,00" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                    </div>
+                  </div>
+                  <button onclick="mlOpcaoSalvar()" id="ml-opcao-add-btn" style="width:100%;margin-top:8px;padding:9px;border-radius:8px;background:rgba(124,58,237,0.1);border:1px dashed rgba(124,58,237,0.4);color:#7c3aed;font-family:var(--font-h);font-size:12px;font-weight:800;cursor:pointer;"><i class="fa fa-plus"></i> Adicionar</button>
+                  <div id="ml-opcao-form-msg" role="status" aria-live="polite" style="font-size:11px;text-align:center;margin-top:6px;min-height:12px;"></div>
+                </div>
               </div>
             </div>
 
@@ -1708,6 +1789,29 @@
   </div>
 
   <!-- ══════════════════════════════ MODAL CARDÁPIO CLIENTE -->
+  <!-- ═══ MODAL DE PERSONALIZAÇÃO (item com grupos de opções) ═══ -->
+  <div class="cc-pers-overlay" id="modal-cc-pers" style="display:none;">
+    <div class="cc-pers-sheet">
+      <div class="cc-pers-header">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Personalizar</div>
+          <div class="cc-pers-titulo" id="cc-pers-titulo">Item</div>
+        </div>
+        <button onclick="ccFecharPersonalizacao()" aria-label="Fechar" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1;flex-shrink:0;">×</button>
+      </div>
+      <div class="cc-pers-corpo" id="cc-pers-corpo"></div>
+      <div class="cc-pers-rodape">
+        <div style="display:flex;flex-direction:column;">
+          <span style="font-size:10px;color:var(--muted);text-transform:uppercase;">Total</span>
+          <span class="cc-pers-preco" id="cc-pers-preco">R$ 0,00</span>
+        </div>
+        <button id="cc-pers-add-btn" onclick="ccPersConfirmar()" class="cc-pers-add">
+          <span class="cc-pers-add-label">Adicionar ao pedido</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="detail-overlay" id="modal-cardapio-cliente" role="dialog" aria-modal="true" style="z-index:1100;">
     <div class="detail-sheet" style="max-height:92vh;display:flex;flex-direction:column;">
 

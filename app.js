@@ -9670,6 +9670,7 @@ ${urlCard}`)}`;
           <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px;">${tipoTxt} · ${modoTxt} · ${nOps} opção${nOps!==1?'ões':''}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button onclick="mlGrupoAbrirAplicar('${g.id}')" style="padding:6px 10px;border-radius:7px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10b981;font-size:10px;font-weight:700;cursor:pointer;"><i class="fa fa-layer-group"></i> Aplicar</button>
           <button onclick="mlGrupoAbrirOpcoes('${g.id}')" style="padding:6px 10px;border-radius:7px;background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);color:#7c3aed;font-size:10px;font-weight:700;cursor:pointer;"><i class="fa fa-list"></i> Opções</button>
           <button onclick="mlGrupoAbrirForm('${g.id}')" style="padding:6px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:10px;font-weight:700;cursor:pointer;"><i class="fa fa-pencil"></i></button>
           <button onclick="mlGrupoRemover('${g.id}','${escAttr(g.nome)}')" style="padding:6px 10px;border-radius:7px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.2);color:var(--red);font-size:10px;font-weight:700;cursor:pointer;"><i class="fa fa-trash"></i></button>
@@ -9752,6 +9753,7 @@ ${urlCard}`)}`;
       const json = await apiPost('lojaGrupoRemover', { token: _lojaToken, id }, { timeout: 15000, ignoreUnauthorized: true });
       if (json.status !== 'ok') { mlToast('Erro: ' + (json.msg || 'tente de novo.'), 'erro'); return; }
       if (_mlGrupoEditId === id) { _mlGrupoEditId = null; const ed = document.getElementById('ml-opcoes-editor'); if (ed) ed.style.display = 'none'; }
+      if (_mlAplicarGrupoId === id) { mlAplicarFechar(); }
       await mlGruposCarregar();
       await mlCardapioCarregar(_cardapioPlano); // vinculos podem ter mudado
     } catch(e) {
@@ -9775,6 +9777,138 @@ ${urlCard}`)}`;
     ed.scrollIntoView({ behavior:'smooth', block:'nearest' });
   };
 
+  /* ─── Aplicar grupo em massa (por categoria) ─────────────────
+     Resolve o caso real: cardapio ja montado com dezenas de itens.
+     Em vez de abrir item por item, o lojista escolhe as categorias.
+     O vinculo continua morando no item (coluna K) — isto e so um
+     atalho de preenchimento, entao da pra ajustar item a item depois. */
+  let _mlAplicarGrupoId = null;
+
+  window.mlGrupoAbrirAplicar = function(grupoId) {
+    _mlAplicarGrupoId = grupoId;
+    const g = _mlGrupos.find(x => x.id === grupoId);
+    const painel = document.getElementById('ml-aplicar-painel');
+    if (!g || !painel) return;
+    const nomeEl = document.getElementById('ml-aplicar-grupo-nome');
+    if (nomeEl) nomeEl.textContent = g.nome;
+    painel.style.display = '';
+    mlAplicarRenderCategorias();
+    painel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  };
+
+  window.mlAplicarFechar = function() {
+    _mlAplicarGrupoId = null;
+    const p = document.getElementById('ml-aplicar-painel');
+    if (p) p.style.display = 'none';
+  };
+
+  // Monta a lista de categorias com contagem total e quantos ja tem o grupo.
+  function mlAplicarRenderCategorias() {
+    const lista = document.getElementById('ml-aplicar-cats');
+    const gid = _mlAplicarGrupoId;
+    if (!lista || !gid) return;
+
+    const ativos = _cardapioItens.filter(i => i.ativo !== 'NAO');
+    if (!ativos.length) {
+      lista.innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:10px;">Nenhum item no cardápio ainda.</div>';
+      return;
+    }
+
+    // Agrupa por categoria preservando ordem de aparicao (igual a lista principal).
+    const porCat = {}; const ordem = [];
+    ativos.forEach(item => {
+      const cat = (item.categoria || '').trim() || 'Sem categoria';
+      if (!porCat[cat]) { porCat[cat] = []; ordem.push(cat); }
+      porCat[cat].push(item);
+    });
+
+    lista.innerHTML = ordem.map(cat => {
+      const itens = porCat[cat];
+      // Quantos itens desta categoria ja tem o grupo vinculado.
+      const jaTem = itens.filter(it => Array.isArray(it.grupos) && it.grupos.some(gg => gg.id === gid)).length;
+      const total = itens.length;
+      const todos = jaTem === total;
+      const status = jaTem === 0 ? ''
+        : (todos ? '<span style="color:#10b981;font-weight:700;">todos já têm</span>'
+                 : `<span style="color:#f59e0b;font-weight:700;">${jaTem} de ${total} já têm</span>`);
+      return `<label class="ml-aplicar-cat">
+        <input type="checkbox" value="${escAttr(cat)}" data-total="${total}" onchange="this.closest('.ml-aplicar-cat').classList.toggle('on', this.checked);mlAplicarAtualizarResumo()">
+        <span style="flex:1;min-width:0;">
+          <span style="font-family:var(--font-h);font-size:12px;font-weight:800;display:block;">${escHTML(cat)}</span>
+          <span style="font-size:9px;color:var(--muted);">${total} item${total!==1?'s':''} ${status ? '· ' + status : ''}</span>
+        </span>
+      </label>`;
+    }).join('');
+    mlAplicarAtualizarResumo();
+  }
+
+  // Atualiza o contador do botao conforme as categorias marcadas.
+  window.mlAplicarAtualizarResumo = function() {
+    const lista = document.getElementById('ml-aplicar-cats');
+    const btn   = document.getElementById('ml-aplicar-btn');
+    const btnR  = document.getElementById('ml-aplicar-btn-remover');
+    if (!lista || !btn) return;
+    const marcadas = Array.from(lista.querySelectorAll('input[type=checkbox]:checked'));
+    const totalItens = marcadas.reduce((s, c) => s + (parseInt(c.dataset.total, 10) || 0), 0);
+    btn.disabled = marcadas.length === 0;
+    if (btnR) btnR.disabled = marcadas.length === 0;
+    btn.innerHTML = marcadas.length
+      ? `<i class="fa fa-check"></i> Aplicar a ${totalItens} item${totalItens!==1?'s':''}`
+      : '<i class="fa fa-check"></i> Selecione as categorias';
+  };
+
+  // Envia a aplicacao (ou remocao) em lote.
+  async function _mlAplicarExecutar(modo) {
+    const gid = _mlAplicarGrupoId;
+    const lista = document.getElementById('ml-aplicar-cats');
+    const msg = document.getElementById('ml-aplicar-msg');
+    if (!gid || !lista) return;
+    const marcadas = Array.from(lista.querySelectorAll('input[type=checkbox]:checked')).map(c => c.value);
+    if (!marcadas.length) return;
+
+    const g = _mlGrupos.find(x => x.id === gid);
+    const nomeGrupo = g ? g.nome : 'grupo';
+    if (modo === 'REMOVER') {
+      const ok = await mlConfirmar('Remover dos itens?', `“${nomeGrupo}” será desvinculado dos itens dessas categorias.`, { okLabel: 'Remover', owlSrc: '/webp/owl-sign.webp' });
+      if (!ok) return;
+    }
+
+    const btn  = document.getElementById('ml-aplicar-btn');
+    const btnR = document.getElementById('ml-aplicar-btn-remover');
+    if (btn)  btn.disabled = true;
+    if (btnR) btnR.disabled = true;
+    if (msg) { msg.textContent = '⏳ Aplicando...'; msg.style.color = 'var(--muted)'; }
+
+    try {
+      // Separador |~| porque nome de categoria pode conter virgula.
+      const json = await apiPost('lojaGrupoAplicarEmMassa', {
+        token: _lojaToken,
+        grupoId: gid,
+        categorias: marcadas.join('|~|'),
+        modo: modo,
+      }, { timeout: 30000, ignoreUnauthorized: true });
+      if (json.status !== 'ok') throw new Error(json.msg || 'Erro');
+      const n = (json.data && json.data.afetados) || 0;
+      if (msg) {
+        msg.textContent = n > 0
+          ? `✅ ${n} item${n!==1?'s':''} atualizado${n!==1?'s':''}!`
+          : 'ℹ️ Nada mudou (os itens já estavam assim).';
+        msg.style.color = n > 0 ? 'var(--green)' : 'var(--muted)';
+      }
+      // Recarrega o cardapio para refletir os novos vinculos nos contadores.
+      await mlCardapioCarregar(_cardapioPlano);
+      mlAplicarRenderCategorias();
+      setTimeout(() => { if (msg) msg.textContent = ''; }, 4000);
+    } catch(e) {
+      if (e.message === 'UNAUTHORIZED') return;
+      if (msg) { msg.textContent = '❌ ' + e.message; msg.style.color = 'var(--red)'; }
+    } finally {
+      mlAplicarAtualizarResumo();
+    }
+  }
+
+  window.mlAplicarConfirmar = function() { _mlAplicarExecutar('ADICIONAR'); };
+  window.mlAplicarRemover   = function() { _mlAplicarExecutar('REMOVER'); };
   window.mlOpcoesFechar = function() {
     _mlGrupoEditId = null;
     const ed = document.getElementById('ml-opcoes-editor');

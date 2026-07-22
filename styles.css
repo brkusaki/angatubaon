@@ -4293,3 +4293,23 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   color: #7c3aed;
 }
 .ml-vinculo-chip i { font-size: 11px; }
+
+/* Aplicação em massa: linha de categoria selecionável */
+.ml-aplicar-cat {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 9px; padding: 10px 11px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.12s, background 0.12s;
+}
+.ml-aplicar-cat.on {
+  border-color: rgba(16,185,129,0.45);
+  background: rgba(16,185,129,0.07);
+}
+.ml-aplicar-cat input[type=checkbox] {
+  width: 17px; height: 17px; flex-shrink: 0;
+  accent-color: #10b981; cursor: pointer;
+}
+#ml-aplicar-btn:disabled, #ml-aplicar-btn-remover:disabled {
+  opacity: 0.45; cursor: not-allowed;
+}

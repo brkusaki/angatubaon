@@ -11723,17 +11723,10 @@ ${urlCard}`)}`;
     }
     _ccCarrinho[chave].qty++;
 
-    // Troca botão "+" por controles de quantidade (usa a chave da linha, que
-    // para item com grupos opcionais nao e igual ao itemId).
-    const qtyEl = document.getElementById(`cc-qty-${itemId}`);
-    if (qtyEl) {
-      const kEsc = String(chave).replace(/'/g, "\\'");
-      qtyEl.innerHTML = `
-        <button class="cc-qty-btn" onclick="event.stopPropagation();ccAlterarQty('${kEsc}',-1)">−</button>
-        <span class="cc-qty-num">${_ccCarrinho[chave].qty}</span>
-        <button class="cc-qty-btn" onclick="event.stopPropagation();ccAlterarQty('${kEsc}',+1)" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;">+</button>
-      `;
-    }
+    // Troca botão "+" por controles de quantidade. Delegado a
+    // _ccSincronizarCard para manter uma unica fonte de verdade do card e
+    // evitar redesenho desnecessario (causa da piscada).
+    _ccSincronizarCard(item);
     ccAtualizarCarrinho();
   };
 
@@ -11899,6 +11892,17 @@ ${urlCard}`)}`;
       : item.id;
     const linha = _ccCarrinho[chavePadrao];
     if (linha && linha.qty > 0) {
+      // Ja esta em modo quantidade? So atualiza o numero. Reescrever o
+      // innerHTML aqui destruiria o botao que o dedo esta tocando (mata o
+      // :active no meio do toque) e forcaria layout/paint => piscada.
+      const numExistente = qtyEl.querySelector('.cc-qty-num');
+      if (numExistente) {
+        if (numExistente.textContent !== String(linha.qty)) {
+          numExistente.textContent = linha.qty;
+        }
+        return;
+      }
+      // Transicao botao '+' -> controles de quantidade: ai sim redesenha.
       const kEsc = String(chavePadrao).replace(/'/g, "\\'");
       qtyEl.innerHTML = `
         <button class="cc-qty-btn" onclick="event.stopPropagation();ccAlterarQty('${kEsc}',-1)">−</button>
@@ -11906,6 +11910,8 @@ ${urlCard}`)}`;
         <button class="cc-qty-btn" onclick="event.stopPropagation();ccAlterarQty('${kEsc}',+1)" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;">+</button>
       `;
     } else {
+      // Ja esta em modo botao '+'? Nao mexe no DOM.
+      if (qtyEl.querySelector('.cc-item-add')) return;
       qtyEl.innerHTML = _ccItemExigePersonalizar(item)
         ? `<button class="cc-item-add cc-item-personalizar" onclick="event.stopPropagation();ccAbrirPersonalizacao('${item.id}')">+</button>`
         : `<button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>`;
@@ -11940,20 +11946,10 @@ ${urlCard}`)}`;
     linha.qty += delta;
     if (linha.qty <= 0) {
       delete _ccCarrinho[chave];
-      // Volta para o botao original do card (respeitando se exige personalizar).
-      const qtyEl = document.getElementById(`cc-qty-${itemId}`);
-      if (qtyEl) {
-        const it = linha.item;
-        qtyEl.innerHTML = (it && _ccItemExigePersonalizar(it))
-          ? `<button class="cc-item-add cc-item-personalizar" onclick="event.stopPropagation();ccAbrirPersonalizacao('${itemId}')">+</button>`
-          : `<button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${itemId}')">+</button>`;
-      }
-    } else {
-      const qtyEl = document.getElementById(`cc-qty-${itemId}`);
-      const numEl = qtyEl && qtyEl.querySelector('.cc-qty-num');
-      if (numEl) numEl.textContent = linha.qty;
     }
-    // Garante que o card reflita a linha padrao (pode ter mexido em outra).
+    // Fonte unica de verdade do card: _ccSincronizarCard decide sozinha se
+    // troca o innerHTML (mudanca de estado) ou so atualiza o numero. Antes
+    // havia atualizacao duplicada aqui, imediatamente desfeita abaixo.
     _ccSincronizarCard(linha.item);
     ccAtualizarCarrinho();
   };

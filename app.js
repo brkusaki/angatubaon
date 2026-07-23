@@ -9582,6 +9582,10 @@ ${urlCard}`)}`;
   let _cardapioUploadEmAndamento = false; // Fix #22: bloqueia salvar durante upload de foto
   let _mlGrupos = [];            // grupos de opcoes da loja (PRO). [{id,nome,tipo,min,max,precoModo,ativo,opcoes:[...]}]
   let _mlGrupoEditId = null;     // grupo aberto no editor de opcoes, ou null
+  // ID da opcao em edicao. null = form de opcao esta no modo 'criar nova'.
+  // Declarado aqui (junto do estado irmao) porque mlGrupoAbrirOpcoes e
+  // mlOpcoesFechar referenciam esta variavel antes deste ponto no arquivo.
+  let _mlOpcaoEditId = null;
 
   async function mlCardapioCarregar(plano) {
     _cardapioPlano = plano;
@@ -9770,10 +9774,15 @@ ${urlCard}`)}`;
     if (!g || !ed) return;
     document.getElementById('ml-opcoes-grupo-nome').textContent = g.nome;
     ed.style.display = '';
+    // Abrir outro grupo cancela qualquer edicao pendente: o id em _mlOpcaoEditId
+    // pertence ao grupo anterior e salvaria no lugar errado.
+    _mlOpcaoEditId = null;
     mlOpcoesRenderLista();
     // limpa o form de nova opcao
     const nome = document.getElementById('ml-opcao-nome'); if (nome) nome.value = '';
     const preco = document.getElementById('ml-opcao-preco'); if (preco) preco.value = '';
+    const qmax = document.getElementById('ml-opcao-qtdmax'); if (qmax) qmax.value = '';
+    _mlOpcaoSyncBotoes();
     ed.scrollIntoView({ behavior:'smooth', block:'nearest' });
   };
 
@@ -9910,6 +9919,9 @@ ${urlCard}`)}`;
   window.mlAplicarConfirmar = function() { _mlAplicarExecutar('ADICIONAR'); };
   window.mlAplicarRemover   = function() { _mlAplicarExecutar('REMOVER'); };
   window.mlOpcoesFechar = function() {
+    // Fechar o painel tambem encerra a edicao em andamento.
+    _mlOpcaoEditId = null;
+    _mlOpcaoSyncBotoes();
     _mlGrupoEditId = null;
     const ed = document.getElementById('ml-opcoes-editor');
     if (ed) ed.style.display = 'none';
@@ -9940,13 +9952,66 @@ ${urlCard}`)}`;
       const qBadge = (podeRepetir && qMax > 1)
         ? `<span style="font-size:9px;font-weight:800;color:#7c3aed;background:rgba(124,58,237,0.12);border-radius:5px;padding:2px 5px;margin-right:6px;">até ${qMax}x</span>`
         : '';
-      return `<div class="ml-opcao-row">
+      // Linha em edicao ganha borda roxa, p/ o lojista saber o que o form edita.
+      const emEdicao = (_mlOpcaoEditId === op.id);
+      return `<div class="ml-opcao-row${emEdicao ? ' editando' : ''}">
         <span style="flex:1;font-size:12px;font-weight:600;">${escHTML(op.nome)}</span>
         ${qBadge}
         <span style="font-size:11px;color:var(--green);font-weight:700;margin-right:6px;">${precoTxt}</span>
+        <button onclick="mlOpcaoEditar('${op.id}')" aria-label="Editar ${escAttr(op.nome)}" style="padding:4px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:10px;cursor:pointer;"><i class="fa fa-pencil"></i></button>
         <button onclick="mlOpcaoRemover('${op.id}','${escAttr(op.nome)}')" style="padding:4px 8px;border-radius:6px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.2);color:var(--red);font-size:10px;cursor:pointer;"><i class="fa fa-trash"></i></button>
       </div>`;
     }).join('');
+  }
+
+  // Carrega uma opcao existente no form, que passa a operar em modo edicao.
+  // Reusa o mesmo form da criacao — so muda o rotulo do botao e o estado.
+  window.mlOpcaoEditar = function(opcaoId) {
+    const g = _mlGrupos.find(x => x.id === _mlGrupoEditId); if (!g) return;
+    const op = (g.opcoes || []).find(o => o.id === opcaoId); if (!op) return;
+    _mlOpcaoEditId = opcaoId;
+    const nomeEl  = document.getElementById('ml-opcao-nome');
+    const precoEl = document.getElementById('ml-opcao-preco');
+    const qtdEl   = document.getElementById('ml-opcao-qtdmax');
+    if (nomeEl)  nomeEl.value  = op.nome || '';
+    // Preco vem numerico do backend; exibe no formato brasileiro pra edicao.
+    if (precoEl) precoEl.value = (parseFloat(op.preco) || 0).toFixed(2).replace('.', ',');
+    if (qtdEl) {
+      const q = parseInt(op.qtdMax, 10) || 0;
+      qtdEl.value = q > 1 ? String(q) : '';
+    }
+    const msg = document.getElementById('ml-opcao-form-msg');
+    if (msg) msg.textContent = '';
+    mlOpcoesRenderLista();   // redesenha p/ marcar a linha em edicao
+    _mlOpcaoSyncBotoes();
+    setTimeout(() => nomeEl?.focus(), 60);
+  };
+
+  // Volta o form para o modo 'criar nova opcao'.
+  window.mlOpcaoCancelarEdicao = function() {
+    _mlOpcaoEditId = null;
+    const nomeEl  = document.getElementById('ml-opcao-nome');
+    const precoEl = document.getElementById('ml-opcao-preco');
+    const qtdEl   = document.getElementById('ml-opcao-qtdmax');
+    if (nomeEl)  nomeEl.value  = '';
+    if (precoEl) precoEl.value = '';
+    if (qtdEl)   qtdEl.value   = '';
+    const msg = document.getElementById('ml-opcao-form-msg');
+    if (msg) msg.textContent = '';
+    mlOpcoesRenderLista();
+    _mlOpcaoSyncBotoes();
+  };
+
+  // Ajusta rotulo do botao principal e visibilidade do 'Cancelar' conforme
+  // o modo (criar x editar). Chamado sempre que _mlOpcaoEditId muda.
+  function _mlOpcaoSyncBotoes() {
+    const btn = document.getElementById('ml-opcao-add-btn');
+    const cancelar = document.getElementById('ml-opcao-cancelar-btn');
+    const editando = !!_mlOpcaoEditId;
+    if (btn) btn.innerHTML = editando
+      ? '<i class="fa fa-check"></i> Salvar alteração'
+      : '<i class="fa fa-plus"></i> Adicionar';
+    if (cancelar) cancelar.style.display = editando ? '' : 'none';
   }
 
   window.mlOpcaoSalvar = async function() {
@@ -9973,25 +10038,43 @@ ${urlCard}`)}`;
     }
     const btn = document.getElementById('ml-opcao-add-btn');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>'; }
+    // Em edicao envia o id (backend faz update) e PRESERVA a ordem atual —
+    // recalcular como length+1 jogaria a opcao editada para o fim da lista.
+    const editandoId = _mlOpcaoEditId;
+    const opAtual = editandoId ? (g.opcoes || []).find(o => o.id === editandoId) : null;
+    const ordemEnviar = editandoId
+      ? (parseInt(opAtual && opAtual.ordem, 10) || 0)
+      : (g.opcoes.length + 1);
     try {
       const json = await apiPost('lojaOpcaoSalvar', {
         token: _lojaToken, grupoId: g.id, nome, preco, qtdMax,
-        ordem: (g.opcoes.length + 1),
+        id: editandoId || '',
+        ordem: ordemEnviar,
       }, { timeout: 15000, ignoreUnauthorized: true });
       if (json.status !== 'ok') throw new Error(json.msg || 'Erro');
       document.getElementById('ml-opcao-nome').value = '';
       document.getElementById('ml-opcao-preco').value = '';
       const _qi = document.getElementById('ml-opcao-qtdmax'); if (_qi) _qi.value = '';
-      if (msg) msg.textContent = '';
+      // Sai do modo edicao ANTES de redesenhar, senao a linha continua marcada.
+      _mlOpcaoEditId = null;
+      if (msg) {
+        msg.textContent = editandoId ? '✅ Opção atualizada.' : '';
+        msg.style.color = 'var(--green)';
+        if (editandoId) setTimeout(() => { if (msg) msg.textContent = ''; }, 2500);
+      }
       await mlGruposCarregar();
       // reabre o editor no mesmo grupo (dados atualizados)
       mlOpcoesRenderLista();
+      _mlOpcaoSyncBotoes();
       setTimeout(() => document.getElementById('ml-opcao-nome')?.focus(), 60);
     } catch(e) {
       if (e.message === 'UNAUTHORIZED') return;
       if (msg) { msg.textContent = '❌ ' + e.message; msg.style.color = 'var(--red)'; }
     } finally {
-      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa fa-plus"></i> Adicionar'; }
+      // _mlOpcaoSyncBotoes decide o rotulo: se o salvamento falhou continuamos
+      // em edicao e o botao precisa voltar como 'Salvar alteração'.
+      if (btn) btn.disabled = false;
+      _mlOpcaoSyncBotoes();
     }
   };
 
@@ -10001,8 +10084,17 @@ ${urlCard}`)}`;
     try {
       const json = await apiPost('lojaOpcaoRemover', { token: _lojaToken, id }, { timeout: 15000, ignoreUnauthorized: true });
       if (json.status !== 'ok') { mlToast('Erro: ' + (json.msg || 'tente de novo.'), 'erro'); return; }
+      // Se a opcao removida era a que estava no form, sai do modo edicao —
+      // senao 'Salvar alteração' apontaria para um id que nao existe mais.
+      if (_mlOpcaoEditId === id) {
+        _mlOpcaoEditId = null;
+        const _n = document.getElementById('ml-opcao-nome');   if (_n) _n.value = '';
+        const _p = document.getElementById('ml-opcao-preco');  if (_p) _p.value = '';
+        const _q = document.getElementById('ml-opcao-qtdmax'); if (_q) _q.value = '';
+      }
       await mlGruposCarregar();
       mlOpcoesRenderLista();
+      _mlOpcaoSyncBotoes();
     } catch(e) {
       if (e.message === 'UNAUTHORIZED') return;
       mlToast('Erro: ' + e.message, 'erro');

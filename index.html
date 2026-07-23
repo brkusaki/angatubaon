@@ -1572,6 +1572,9 @@
                     </div>
                   </div>
                   <button onclick="mlOpcaoSalvar()" id="ml-opcao-add-btn" style="width:100%;margin-top:8px;padding:9px;border-radius:8px;background:rgba(124,58,237,0.1);border:1px dashed rgba(124,58,237,0.4);color:#7c3aed;font-family:var(--font-h);font-size:12px;font-weight:800;cursor:pointer;"><i class="fa fa-plus"></i> Adicionar</button>
+                  <!-- Só aparece em modo edição (mlOpcaoEditar). O padrão é
+                       display:none para o form nascer no modo "criar nova". -->
+                  <button onclick="mlOpcaoCancelarEdicao()" id="ml-opcao-cancelar-btn" style="display:none;width:100%;margin-top:6px;padding:8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-family:var(--font-h);font-size:11px;font-weight:700;cursor:pointer;"><i class="fa fa-times"></i> Cancelar edição</button>
                   <div id="ml-opcao-form-msg" role="status" aria-live="polite" style="font-size:11px;text-align:center;margin-top:6px;min-height:12px;"></div>
                 </div>
 

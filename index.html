@@ -1561,6 +1561,16 @@
                       <input id="ml-opcao-preco" type="text" inputmode="decimal" placeholder="0,00" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px;font-size:13px;color:var(--text);box-sizing:border-box;">
                     </div>
                   </div>
+                  <!-- Repeticao por opcao: so faz sentido em grupo de multipla
+                       escolha com preco por acrescimo. mlOpcoesRenderLista
+                       esconde este bloco nos demais casos. -->
+                  <div id="ml-opcao-qtdmax-wrap" style="margin-top:8px;">
+                    <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Repetir até (0 = 1x)</div>
+                    <input id="ml-opcao-qtdmax" type="number" min="0" max="99" step="1" inputmode="numeric" placeholder="0" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px;font-size:13px;color:var(--text);box-sizing:border-box;">
+                    <div style="font-size:10px;color:var(--muted);margin-top:4px;line-height:1.4;">
+                      Deixe 0 para opção simples (marca uma vez). Use 3 para o cliente poder pedir até 3x o mesmo acréscimo.
+                    </div>
+                  </div>
                   <button onclick="mlOpcaoSalvar()" id="ml-opcao-add-btn" style="width:100%;margin-top:8px;padding:9px;border-radius:8px;background:rgba(124,58,237,0.1);border:1px dashed rgba(124,58,237,0.4);color:#7c3aed;font-family:var(--font-h);font-size:12px;font-weight:800;cursor:pointer;"><i class="fa fa-plus"></i> Adicionar</button>
                   <div id="ml-opcao-form-msg" role="status" aria-live="polite" style="font-size:11px;text-align:center;margin-top:6px;min-height:12px;"></div>
                 </div>

@@ -9922,6 +9922,12 @@ ${urlCard}`)}`;
     const modoAbs = g.precoModo === 'ABSOLUTO';
     const label = document.getElementById('ml-opcao-preco-label');
     if (label) label.textContent = modoAbs ? 'Preço final (R$)' : 'Acréscimo (R$, 0 = grátis)';
+    // Repetir a mesma opcao so faz sentido em MULTIPLA + DELTA: em UNICA a
+    // escolha e exclusiva e em ABSOLUTO o preco substitui a base do item.
+    const podeRepetir = !modoAbs && g.tipo !== 'UNICA';
+    const qtdWrap = document.getElementById('ml-opcao-qtdmax-wrap');
+    if (qtdWrap) qtdWrap.style.display = podeRepetir ? '' : 'none';
+    if (!podeRepetir) { const qi = document.getElementById('ml-opcao-qtdmax'); if (qi) qi.value = ''; }
     if (!g.opcoes.length) {
       lista.innerHTML = `<div style="text-align:center;padding:12px;color:var(--muted);font-size:11px;">Nenhuma opção. Adicione abaixo.</div>`;
       return;
@@ -9929,8 +9935,14 @@ ${urlCard}`)}`;
     lista.innerHTML = g.opcoes.map(op => {
       const p = parseFloat(op.preco) || 0;
       const precoTxt = modoAbs ? 'R$ ' + p.toFixed(2).replace('.',',') : (p > 0 ? '+ R$ ' + p.toFixed(2).replace('.',',') : 'grátis');
+      // Badge so aparece quando a opcao realmente repete (qtdMax > 1).
+      const qMax = parseInt(op.qtdMax, 10) || 0;
+      const qBadge = (podeRepetir && qMax > 1)
+        ? `<span style="font-size:9px;font-weight:800;color:#7c3aed;background:rgba(124,58,237,0.12);border-radius:5px;padding:2px 5px;margin-right:6px;">até ${qMax}x</span>`
+        : '';
       return `<div class="ml-opcao-row">
         <span style="flex:1;font-size:12px;font-weight:600;">${escHTML(op.nome)}</span>
+        ${qBadge}
         <span style="font-size:11px;color:var(--green);font-weight:700;margin-right:6px;">${precoTxt}</span>
         <button onclick="mlOpcaoRemover('${op.id}','${escAttr(op.nome)}')" style="padding:4px 8px;border-radius:6px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.2);color:var(--red);font-size:10px;cursor:pointer;"><i class="fa fa-trash"></i></button>
       </div>`;
@@ -9946,16 +9958,30 @@ ${urlCard}`)}`;
     if (!nome) { if (msg) { msg.textContent = '❌ Informe o nome.'; msg.style.color = 'var(--red)'; } return; }
     const preco = parseFloat(String(precoRaw).replace(/[^\d,.-]/g,'').replace(',','.'));
     if (isNaN(preco) || preco < 0) { if (msg) { msg.textContent = '❌ Preço inválido.'; msg.style.color = 'var(--red)'; } return; }
+    // Repeticao: vazio/0/1 = opcao simples. Só vale em MULTIPLA + DELTA.
+    const podeRepetir = g.precoModo !== 'ABSOLUTO' && g.tipo !== 'UNICA';
+    let qtdMax = 0;
+    if (podeRepetir) {
+      const qRaw = String(document.getElementById('ml-opcao-qtdmax')?.value || '').trim();
+      if (qRaw) {
+        qtdMax = parseInt(qRaw, 10);
+        if (isNaN(qtdMax) || qtdMax < 0 || qtdMax > 99) {
+          if (msg) { msg.textContent = '❌ Repetição inválida (0 a 99).'; msg.style.color = 'var(--red)'; }
+          return;
+        }
+      }
+    }
     const btn = document.getElementById('ml-opcao-add-btn');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>'; }
     try {
       const json = await apiPost('lojaOpcaoSalvar', {
-        token: _lojaToken, grupoId: g.id, nome, preco,
+        token: _lojaToken, grupoId: g.id, nome, preco, qtdMax,
         ordem: (g.opcoes.length + 1),
       }, { timeout: 15000, ignoreUnauthorized: true });
       if (json.status !== 'ok') throw new Error(json.msg || 'Erro');
       document.getElementById('ml-opcao-nome').value = '';
       document.getElementById('ml-opcao-preco').value = '';
+      const _qi = document.getElementById('ml-opcao-qtdmax'); if (_qi) _qi.value = '';
       if (msg) msg.textContent = '';
       await mlGruposCarregar();
       // reabre o editor no mesmo grupo (dados atualizados)
@@ -10809,13 +10835,34 @@ ${urlCard}`)}`;
 
   /* ─── MODIFICADORES (grupos de opções) no cliente ───────────────
      item.grupos vem do payload publico. Cada grupo:
-       { id, nome, tipo:'UNICA'|'MULTIPLA', min, max, precoModo:'DELTA'|'ABSOLUTO', opcoes:[{id,nome,preco}] }
+       { id, nome, tipo:'UNICA'|'MULTIPLA', min, max, precoModo:'DELTA'|'ABSOLUTO',
+         opcoes:[{id,nome,preco,qtdMax}] }
+     qtdMax por opcao: 0/1 = opcao simples (marca 1x, checkbox). >1 = repetivel
+     ate N (stepper). As escolhas continuam sendo um ARRAY DE IDs, e a repeticao
+     e representada repetindo o id: ['op1','op1','op1'] = 3x. Assim _ccPrecoUnitario
+     (que soma por id) e _ccLineKey (que ordena e junta) seguem corretos sem mudanca.
      Carrinho passa a ser chaveado por lineKey (item + escolhas), pois
      'Pizza Grande' e 'Pizza Broto' sao linhas distintas do mesmo item. */
 
   // Estado da tela de personalizacao em aberto.
   let _ccPersItem = null;      // item sendo personalizado
   let _ccPersEscolhas = {};    // { grupoId: [opcaoId, ...] }
+
+  // Quantas vezes uma opcao esta escolhida (array pode repetir o mesmo id).
+  function _ccQtdOpcao(sel, opcaoId) {
+    let n = 0;
+    for (let i = 0; i < sel.length; i++) if (sel[i] === opcaoId) n++;
+    return n;
+  }
+
+  // Teto de repeticao de uma opcao. So vale em grupo MULTIPLA + DELTA: em
+  // UNICA a escolha e exclusiva e em ABSOLUTO o preco substitui a base
+  // (repetir nao faria sentido). Fora disso, 1 = comportamento historico.
+  function _ccOpcaoQtdMax(g, op) {
+    if (!g || g.tipo === 'UNICA' || g.precoModo === 'ABSOLUTO') return 1;
+    const n = parseInt(op && op.qtdMax, 10) || 0;
+    return n > 1 ? Math.min(99, n) : 1;
+  }
 
   function _ccItemTemGrupos(item) {
     return Array.isArray(item && item.grupos) && item.grupos.length > 0;
@@ -10878,14 +10925,22 @@ ${urlCard}`)}`;
     const linhas = [];
     (item.grupos || []).forEach(g => {
       const sel = (escolhas && escolhas[g.id]) || [];
-      sel.forEach(oid => {
+      // Agrupa ids repetidos preservando a ordem de 1a aparicao, para virar
+      // '3x Salsicha' em vez de tres linhas iguais no carrinho e no WhatsApp.
+      const vistos = [];
+      sel.forEach(oid => { if (vistos.indexOf(oid) < 0) vistos.push(oid); });
+      vistos.forEach(oid => {
         const op = g.opcoes.find(o => o.id === oid);
         if (!op) return;
+        const qtd = _ccQtdOpcao(sel, oid);
         const p = parseFloat(op.preco) || 0;
         if (g.precoModo === 'ABSOLUTO') {
           linhas.push(op.nome);
         } else {
-          linhas.push(op.nome + (p > 0 ? ' (+' + p.toFixed(2).replace('.',',') + ')' : ''));
+          // O valor mostrado e o total da opcao (preco x quantidade).
+          const tot = p * qtd;
+          const pref = qtd > 1 ? (qtd + 'x ') : '';
+          linhas.push(pref + op.nome + (tot > 0 ? ' (+' + tot.toFixed(2).replace('.',',') + ')' : ''));
         }
       });
     });
@@ -10897,6 +10952,8 @@ ${urlCard}`)}`;
     const gs = item.grupos || [];
     for (let i = 0; i < gs.length; i++) {
       const g = gs[i];
+      // n conta UNIDADES: 3 salsichas + 1 alface = 4. E o que o lojista espera
+      // de 'maximo de acrescimos'. Como o array repete ids, .length ja e isso.
       const n = ((escolhas && escolhas[g.id]) || []).length;
       if (g.min > 0 && n < g.min) {
         return g.tipo === 'UNICA'
@@ -11503,7 +11560,8 @@ ${urlCard}`)}`;
       if (atual.length === 1 && atual[0] === opcaoId && g.min === 0) _ccPersEscolhas[grupoId] = [];
       else _ccPersEscolhas[grupoId] = [opcaoId];
     } else {
-      // Checkbox: alterna, respeitando o teto max (se >0).
+      // Checkbox: alterna, respeitando o teto max (se >0). Opcoes repetiveis
+      // (qtdMax>1) nao passam por aqui — usam ccPersQtd (stepper).
       const idx = atual.indexOf(opcaoId);
       if (idx >= 0) { atual.splice(idx, 1); }
       else {
@@ -11512,6 +11570,29 @@ ${urlCard}`)}`;
       }
       _ccPersEscolhas[grupoId] = atual;
     }
+    _ccRenderPersonalizacao();
+  };
+
+  // Stepper de opcao repetivel: soma/subtrai UMA unidade do id no array.
+  // Barra em dois tetos: o qtdMax da propria opcao e o max do grupo (unidades).
+  window.ccPersQtd = function(grupoId, opcaoId, delta) {
+    const item = _ccPersItem; if (!item) return;
+    const g = (item.grupos || []).find(x => x.id === grupoId); if (!g) return;
+    const op = (g.opcoes || []).find(o => o.id === opcaoId); if (!op) return;
+    const atual = _ccPersEscolhas[grupoId] || [];
+    const qtd = _ccQtdOpcao(atual, opcaoId);
+
+    if (delta > 0) {
+      const teto = _ccOpcaoQtdMax(g, op);
+      if (qtd >= teto) { mlToast('Máximo de ' + teto + 'x ' + op.nome, 'erro'); return; }
+      if (g.max > 0 && atual.length >= g.max) { mlToast('Máximo de ' + g.max + ' em ' + g.nome, 'erro'); return; }
+      atual.push(opcaoId);
+    } else {
+      const idx = atual.indexOf(opcaoId);
+      if (idx < 0) return;
+      atual.splice(idx, 1);
+    }
+    _ccPersEscolhas[grupoId] = atual;
     _ccRenderPersonalizacao();
   };
 
@@ -11525,15 +11606,40 @@ ${urlCard}`)}`;
     const gruposHTML = (item.grupos || []).map(g => {
       const sel = _ccPersEscolhas[g.id] || [];
       const obrig = g.min > 0;
+      // Com opcoes repetiveis o teto do grupo conta UNIDADES (3 salsichas = 3),
+      // entao o texto precisa dizer 'itens' para nao parecer que conta opcoes.
+      const _temRepetivel = (g.opcoes || []).some(o => _ccOpcaoQtdMax(g, o) > 1);
       const regra = g.tipo === 'UNICA'
         ? (obrig ? 'Escolha 1' : 'Opcional')
-        : (g.max > 0 ? ('Ate ' + g.max) : 'Quantos quiser');
+        : (g.max > 0 ? ('Ate ' + g.max + (_temRepetivel ? ' itens' : '')) : 'Quantos quiser');
       const opcoesHTML = g.opcoes.map(op => {
-        const marcada = sel.indexOf(op.id) >= 0;
+        const qtd = _ccQtdOpcao(sel, op.id);
+        const marcada = qtd > 0;
         const p = parseFloat(op.preco) || 0;
         const precoTxt = g.precoModo === 'ABSOLUTO'
           ? 'R$ ' + p.toFixed(2).replace('.',',')
           : (p > 0 ? '+ R$ ' + p.toFixed(2).replace('.',',') : '');
+        const teto = _ccOpcaoQtdMax(g, op);
+
+        // Opcao repetivel: stepper no lugar do checkbox. Precisa ser <div> —
+        // botao dentro de botao e HTML invalido e quebra o clique no Android.
+        if (teto > 1) {
+          const noTeto = qtd >= teto;
+          return `<div class="cc-pers-opcao cc-pers-opcao-qtd${marcada?' sel':''}">
+              <span class="cc-pers-opcao-nome">${escHTML(op.nome)}</span>
+              ${precoTxt ? `<span class="cc-pers-opcao-preco">${precoTxt}</span>` : ''}
+              <span class="cc-pers-stepper">
+                <button type="button" class="cc-pers-step-btn" ${qtd<=0?'disabled':''}
+                  aria-label="Menos um ${escAttr(op.nome)}"
+                  onclick="ccPersQtd('${g.id}','${op.id}',-1)">&minus;</button>
+                <span class="cc-pers-step-num${marcada?' on':''}">${qtd}</span>
+                <button type="button" class="cc-pers-step-btn mais" ${noTeto?'disabled':''}
+                  aria-label="Mais um ${escAttr(op.nome)}"
+                  onclick="ccPersQtd('${g.id}','${op.id}',1)">+</button>
+              </span>
+            </div>`;
+        }
+
         const marca = g.tipo === 'UNICA'
           ? `<span class="cc-pers-radio${marcada?' on':''}"></span>`
           : `<span class="cc-pers-check${marcada?' on':''}"><i class="fa fa-check"></i></span>`;

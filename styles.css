@@ -4245,6 +4245,37 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .cc-pers-check i { opacity: 0; transition: opacity 0.1s; }
 .cc-pers-check.on i { opacity: 1; }
 
+/* Opção repetível (ex.: até 3x salsicha). É uma <div>, não <button>:
+   o clique acontece nos botões do stepper, não na linha inteira. */
+.cc-pers-opcao-qtd { cursor: default; }
+.cc-pers-opcao-qtd:active { transform: none; }
+.cc-pers-stepper {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.cc-pers-step-btn {
+  width: 30px; height: 30px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 9px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text);
+  font-size: 16px; font-weight: 700; line-height: 1; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s, border-color 0.12s, opacity 0.12s;
+}
+.cc-pers-step-btn:active { transform: scale(0.94); }
+.cc-pers-step-btn.mais {
+  border-color: rgba(124,58,237,0.45);
+  background: rgba(124,58,237,0.12); color: #a78bfa;
+}
+.cc-pers-step-btn:disabled {
+  opacity: 0.32; cursor: default; transform: none;
+}
+.cc-pers-step-num {
+  min-width: 18px; text-align: center;
+  font-size: 14px; font-weight: 800; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cc-pers-step-num.on { color: var(--text); }
+
 /* Rodapé com preço ao vivo + botão adicionar */
 .cc-pers-rodape {
   flex-shrink: 0; display: flex; align-items: center; gap: 12px;

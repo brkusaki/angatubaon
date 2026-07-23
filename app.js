@@ -10788,14 +10788,33 @@ ${urlCard}`)}`;
         await mlCardapioCarregar(_cardapioPlano);
 
         if (manterAberto) {
-          // Modo rápido: limpa o form e deixa pronto para o próximo item
-          // Mantém a categoria preenchida para agilizar quando os itens são da mesma categoria
-          const catAtual = document.getElementById('ml-cardapio-cat').value;
+          // Modo rápido: limpa o form e deixa pronto para o próximo item.
+          // Preserva o que normalmente se REPETE entre itens seguidos da mesma
+          // leva: categoria, preço, grupos vinculados e preços por tamanho.
+          // Ex.: cadastrar as 13 pizzas de R$42 vira só digitar nome+descrição.
+          const catAtual    = document.getElementById('ml-cardapio-cat').value;
+          const precoAtual  = document.getElementById('ml-cardapio-preco').value;
+          const gruposAtual = mlLerVinculoGrupos();
+          const precosAtual = mlLerPrecosPorItem();
+
           mlCardapioAbrirForm(null); // reseta form para novo item
-          document.getElementById('ml-cardapio-cat').value = catAtual; // mantém a categoria
-          msgEl.textContent = '✅ Salvo! Preencha o próximo.';
+
+          document.getElementById('ml-cardapio-cat').value   = catAtual;
+          document.getElementById('ml-cardapio-preco').value = precoAtual;
+          // Remarca os chips dos mesmos grupos e repõe os preços por tamanho.
+          mlRenderVinculoGrupos({ grupos: gruposAtual.map(id => ({ id })) });
+          mlRenderPrecosPorItem({ precosOpcao: precosAtual });
+
+          // Avisa o que foi mantido, para não parecer que o form não limpou.
+          const mantidos = [];
+          if (catAtual)   mantidos.push('categoria');
+          if (precoAtual) mantidos.push('preço');
+          if (Object.keys(precosAtual).length) mantidos.push('tamanhos');
+          msgEl.textContent = mantidos.length
+            ? '✅ Salvo! Mantive ' + mantidos.join(', ') + ' para o próximo.'
+            : '✅ Salvo! Preencha o próximo.';
           msgEl.style.color = 'var(--green)';
-          setTimeout(() => { msgEl.textContent = ''; }, 2500);
+          setTimeout(() => { msgEl.textContent = ''; }, 3500);
           // Auto-foco no nome para digitação imediata
           setTimeout(() => document.getElementById('ml-cardapio-nome')?.focus(), 100);
         } else {

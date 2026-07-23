@@ -11586,7 +11586,7 @@ ${urlCard}`)}`;
     // Botao: so vira 'personalizar' (roxo) quando ha escolha obrigatoria.
     // Caso contrario e o '+' normal, que adiciona direto no padrao.
     const btnHTML = exigePers
-      ? `<button class="cc-item-add cc-item-personalizar" aria-label="Escolher opções de ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAbrirPersonalizacao('${item.id}')"><i class="fa fa-sliders"></i></button>`
+      ? `<button class="cc-item-add cc-item-personalizar" aria-label="Escolher opções de ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAbrirPersonalizacao('${item.id}')">+</button>`
       : `<button class="cc-item-add" aria-label="Adicionar ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>`;
     // Toque no card = adicionar +1 (comportamento de sempre). Item que exige
     // escolha (tamanho) abre a personalizacao, porque nao da pra adicionar sem.
@@ -11907,7 +11907,7 @@ ${urlCard}`)}`;
       `;
     } else {
       qtyEl.innerHTML = _ccItemExigePersonalizar(item)
-        ? `<button class="cc-item-add cc-item-personalizar" onclick="event.stopPropagation();ccAbrirPersonalizacao('${item.id}')"><i class="fa fa-sliders"></i></button>`
+        ? `<button class="cc-item-add cc-item-personalizar" onclick="event.stopPropagation();ccAbrirPersonalizacao('${item.id}')">+</button>`
         : `<button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>`;
     }
   }
@@ -11945,7 +11945,7 @@ ${urlCard}`)}`;
       if (qtyEl) {
         const it = linha.item;
         qtyEl.innerHTML = (it && _ccItemExigePersonalizar(it))
-          ? `<button class="cc-item-add cc-item-personalizar" onclick="event.stopPropagation();ccAbrirPersonalizacao('${itemId}')"><i class="fa fa-sliders"></i></button>`
+          ? `<button class="cc-item-add cc-item-personalizar" onclick="event.stopPropagation();ccAbrirPersonalizacao('${itemId}')">+</button>`
           : `<button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${itemId}')">+</button>`;
       }
     } else {

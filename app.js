@@ -12031,7 +12031,7 @@ ${urlCard}`)}`;
     if (itens.length === 0) {
       if (bar) bar.style.display = 'none';
       _ccCartExpanded = false;
-      ccAplicarEstadoCarrinho();
+      ccAplicarEstadoCarrinho(false);
       return;
     }
 
@@ -12040,10 +12040,13 @@ ${urlCard}`)}`;
     if (bar) bar.style.display = '';
     if (estavaOculto && bar && !_ccCartExpanded) {
       bar.classList.remove('cc-cart-pulse');
-      // força reflow para reiniciar a animação
-      void bar.offsetWidth;
-      bar.classList.add('cc-cart-pulse');
-      setTimeout(() => bar.classList.remove('cc-cart-pulse'), 600);
+      // Reinicia a animacao no proximo frame. Antes usava `void
+      // bar.offsetWidth`, que forca um reflow SINCRONO da pagina inteira —
+      // caro com o cardapio todo no DOM.
+      requestAnimationFrame(function () {
+        bar.classList.add('cc-cart-pulse');
+        setTimeout(function () { bar.classList.remove('cc-cart-pulse'); }, 600);
+      });
     }
 
     let subtotal = 0, totalQty = 0;
@@ -12124,32 +12127,60 @@ ${urlCard}`)}`;
     if (totalHeadEl) totalHeadEl.textContent = totalStr;
     if (countEl) countEl.textContent = `${totalQty} ${totalQty === 1 ? 'item' : 'itens'}`;
 
-    // Se o carrinho está aberto, recalcula a altura (conteúdo mudou)
-    if (_ccCartExpanded) ccAplicarEstadoCarrinho();
+    // Se o carrinho está aberto, recalcula a altura (conteúdo mudou).
+    // Sem animacao (o usuario nao pediu toggle) e no proximo frame, para nao
+    // ler geometria logo apos a escrita do innerHTML acima (layout thrashing).
+    if (_ccCartExpanded) {
+      requestAnimationFrame(function () { ccAplicarEstadoCarrinho(false); });
+    }
   }
 
   // Estado de expansão do carrinho colapsável
 
-  function ccAplicarEstadoCarrinho() {
+  // `animar`: true quando o proprio usuario abriu/fechou o carrinho (queremos
+  // a transicao). false quando so o CONTEUDO mudou (clique em +/-): nesse caso
+  // a transition e desligada durante a escrita, senao cada clique reinicia uma
+  // animacao de max-height de 280ms — que forca relayout a cada frame e e a
+  // causa da piscada no cardapio.
+  function ccAplicarEstadoCarrinho(animar) {
     const body    = document.getElementById('cc-cart-body');
     const head    = document.getElementById('cc-cart-head');
     const chevron = document.getElementById('cc-cart-chevron');
     const action  = document.getElementById('cc-cart-action-text');
     if (!body) return;
+    const semAnimacao = (animar === false);
+    let transicaoAnterior = null;
+    if (semAnimacao) {
+      transicaoAnterior = body.style.transition;
+      body.style.transition = 'none';
+    }
     if (_ccCartExpanded) {
       // limita a metade da altura do sheet para nunca cobrir a lista toda
       const max = Math.round(window.innerHeight * 0.5);
-      body.style.maxHeight = Math.min(body.scrollHeight, max) + 'px';
-      body.style.overflowY = body.scrollHeight > max ? 'auto' : 'hidden';
+      // Le a geometria UMA vez so (antes eram duas leituras = dois reflows).
+      const alturaConteudo = body.scrollHeight;
+      const alvo = Math.min(alturaConteudo, max) + 'px';
+      // So escreve se mudou de verdade — escrever o mesmo valor ainda assim
+      // invalida o layout no Chrome/Android.
+      if (body.style.maxHeight !== alvo) body.style.maxHeight = alvo;
+      const ovf = alturaConteudo > max ? 'auto' : 'hidden';
+      if (body.style.overflowY !== ovf) body.style.overflowY = ovf;
       if (chevron) chevron.style.transform = 'rotate(180deg)';
       if (action)  action.textContent = 'Recolher pedido';
       if (head) head.setAttribute('aria-expanded', 'true');
     } else {
-      body.style.maxHeight = '0px';
-      body.style.overflowY = 'hidden';
+      if (body.style.maxHeight !== '0px') body.style.maxHeight = '0px';
+      if (body.style.overflowY !== 'hidden') body.style.overflowY = 'hidden';
       if (chevron) chevron.style.transform = '';
       if (action)  action.textContent = 'Ver pedido e finalizar';
       if (head) head.setAttribute('aria-expanded', 'false');
+    }
+    if (semAnimacao) {
+      // Restaura a transition no proximo frame, para que o toggle manual do
+      // usuario continue animando normalmente.
+      requestAnimationFrame(function () {
+        body.style.transition = transicaoAnterior || '';
+      });
     }
   }
 

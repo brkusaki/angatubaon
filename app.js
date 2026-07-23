@@ -11585,8 +11585,12 @@ ${urlCard}`)}`;
       : `<div class="cc-item-preco">R$ ${precoBase.toFixed(2).replace('.',',')}</div>`;
     // Botao: so vira 'personalizar' (roxo) quando ha escolha obrigatoria.
     // Caso contrario e o '+' normal, que adiciona direto no padrao.
+    // Quando exigePers, o CARD INTEIRO ja abre a personalizacao (ver
+    // clickAttr abaixo). O botao roxo aqui e apenas afordancia visual: ele
+    // deixa o clique subir para o card em vez de chamar a funcao de novo —
+    // chamar duas vezes era o que fazia o sheet 'levantar dois'.
     const btnHTML = exigePers
-      ? `<button class="cc-item-add cc-item-personalizar" aria-label="Escolher opções de ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAbrirPersonalizacao('${item.id}')">+</button>`
+      ? `<button class="cc-item-add cc-item-personalizar" aria-label="Escolher opções de ${escAttr(item.nome)}" onclick="ccAbrirPersonalizacao('${item.id}')">+</button>`
       : `<button class="cc-item-add" aria-label="Adicionar ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>`;
     // Toque no card = adicionar +1 (comportamento de sempre). Item que exige
     // escolha (tamanho) abre a personalizacao, porque nao da pra adicionar sem.
@@ -11615,7 +11619,7 @@ ${urlCard}`)}`;
           ${precoHTML}
           ${dicaHTML}
         </div>
-        <div class="cc-qty-ctrl" id="cc-qty-${item.id}" onclick="event.stopPropagation()">
+        <div class="cc-qty-ctrl" id="cc-qty-${item.id}"${exigePers ? '' : ' onclick="event.stopPropagation()"'}>
           ${btnHTML}
         </div>
       </div>`;
@@ -11731,7 +11735,19 @@ ${urlCard}`)}`;
   };
 
   /* ─── Tela de personalizacao (item com grupos) ─────────────── */
+  // Guarda contra abertura DUPLA. Para item que exige escolha, o card
+  // inteiro e o botao roxo apontam para esta mesma funcao; no Android o par
+  // touch->click pode disparar os dois caminhos. Sem esta guarda, a segunda
+  // chamada reexecuta a animacao de entrada e o sheet parece 'levantar dois'.
+  let _ccPersAbrindoEm = 0;
   window.ccAbrirPersonalizacao = function(itemId) {
+    const modalJa = document.getElementById('modal-cc-pers');
+    // Ja esta aberta/abrindo? Ignora — inclusive para outro item, porque o
+    // usuario precisa fechar a atual antes.
+    if (modalJa && modalJa.style.display === 'flex') return;
+    const agora = Date.now();
+    if (agora - _ccPersAbrindoEm < 250) return;   // duplo disparo touch/click
+    _ccPersAbrindoEm = agora;
     const loja = LOJAS[_ccLojaIdx];
     const item = loja.cardapio.find(i => i.id === itemId);
     if (!item || !_ccItemTemGrupos(item)) return;
@@ -11752,6 +11768,7 @@ ${urlCard}`)}`;
   };
 
   window.ccFecharPersonalizacao = function() {
+    _ccPersAbrindoEm = 0;   // libera a guarda de abertura dupla
     const modal = document.getElementById('modal-cc-pers');
     if (modal) { modal.classList.remove('aberto'); setTimeout(() => { modal.style.display = 'none'; }, 200); }
     _ccPersItem = null; _ccPersEscolhas = {};

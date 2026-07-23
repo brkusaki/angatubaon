@@ -4156,9 +4156,14 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 /* Overlay + sheet do modal de personalização */
 .cc-pers-overlay {
   position: fixed; inset: 0; z-index: 1200;
-  background: rgba(0,0,0,0.55); backdrop-filter: blur(2px);
+  /* SEM backdrop-filter: animar opacity sobre um backdrop-filter obriga o
+     compositor do Chrome/Android a recriar a camada de TODO o cardapio a
+     cada frame — era a causa da piscada de tela inteira. O fundo escuro
+     abaixo ja da a separacao visual necessaria. */
+  background: rgba(0,0,0,0.62);
   display: flex; align-items: flex-end; justify-content: center;
   opacity: 0; transition: opacity 0.2s ease;
+  will-change: opacity;
 }
 .cc-pers-overlay.aberto { opacity: 1; }
 .cc-pers-sheet {

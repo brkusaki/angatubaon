@@ -9706,6 +9706,20 @@ ${urlCard}`)}`;
 
   // Ajusta os campos min/max conforme o tipo: UNICA esconde max (sempre 1) e
   // troca min por um checkbox 'obrigatorio'. Mantem a UI simples pro lojista.
+  // Mostra/esconde o aviso do modo POR_ITEM no form do grupo.
+  window.mlGrupoSyncModo = function() {
+    const modo = document.getElementById('ml-grupo-modo').value;
+    const aviso = document.getElementById('ml-grupo-modo-aviso');
+    if (!aviso) return;
+    if (modo === 'POR_ITEM') {
+      aviso.style.display = '';
+      aviso.innerHTML = '\uD83D\uDCA1 As op\u00e7\u00f5es aqui s\u00e3o s\u00f3 os <strong>nomes</strong> dos tamanhos. '
+                      + 'O <strong>pre\u00e7o de cada tamanho</strong> voc\u00ea define em cada item do card\u00e1pio.';
+    } else {
+      aviso.style.display = 'none';
+    }
+  };
+
   window.mlGrupoSyncTipo = function() {
     const tipo = document.getElementById('ml-grupo-tipo').value;
     const maxWrap = document.getElementById('ml-grupo-max-wrap');
@@ -9932,8 +9946,20 @@ ${urlCard}`)}`;
     const lista = document.getElementById('ml-opcoes-lista');
     if (!g || !lista) return;
     const modoAbs = g.precoModo === 'ABSOLUTO';
+    const modoPorItem = g.precoModo === 'POR_ITEM';
     const label = document.getElementById('ml-opcao-preco-label');
-    if (label) label.textContent = modoAbs ? 'Preço final (R$)' : 'Acréscimo (R$, 0 = grátis)';
+    if (label) {
+      label.textContent = modoPorItem ? 'Preço padrão (opcional)'
+                        : modoAbs      ? 'Preço final (R$)'
+                                       : 'Acréscimo (R$, 0 = grátis)';
+    }
+    // No modo POR_ITEM o preco de verdade vem do item; explica isso na lista.
+    const dicaEl = document.getElementById('ml-opcoes-dica');
+    if (dicaEl) {
+      dicaEl.style.display = modoPorItem ? '' : 'none';
+      dicaEl.textContent = 'Cada item do cardápio define o preço destes tamanhos. '
+                         + 'Edite um item para preencher.';
+    }
     // Repetir a mesma opcao so faz sentido em MULTIPLA + DELTA: em UNICA a
     // escolha e exclusiva e em ABSOLUTO o preco substitui a base do item.
     const podeRepetir = !modoAbs && g.tipo !== 'UNICA';
@@ -9946,7 +9972,9 @@ ${urlCard}`)}`;
     }
     lista.innerHTML = g.opcoes.map(op => {
       const p = parseFloat(op.preco) || 0;
-      const precoTxt = modoAbs ? 'R$ ' + p.toFixed(2).replace('.',',') : (p > 0 ? '+ R$ ' + p.toFixed(2).replace('.',',') : 'grátis');
+      const precoTxt = modoPorItem ? 'definido no item'
+                     : modoAbs      ? 'R$ ' + p.toFixed(2).replace('.',',')
+                     : (p > 0 ? '+ R$ ' + p.toFixed(2).replace('.',',') : 'grátis');
       // Badge so aparece quando a opcao realmente repete (qtdMax > 1).
       const qMax = parseInt(op.qtdMax, 10) || 0;
       const qBadge = (podeRepetir && qMax > 1)
@@ -10114,10 +10142,74 @@ ${urlCard}`)}`;
     lista.innerHTML = _mlGrupos.map(g => {
       const on = vinculados.indexOf(g.id) >= 0;
       return `<label class="ml-vinculo-chip${on?' on':''}">
-        <input type="checkbox" value="${g.id}" ${on?'checked':''} style="display:none;" onchange="this.parentNode.classList.toggle('on', this.checked)">
+        <input type="checkbox" value="${g.id}" ${on?'checked':''} style="display:none;" onchange="this.parentNode.classList.toggle('on', this.checked);mlSyncPrecosPorItem()">
         <i class="fa fa-${on?'check-':''}circle"></i> ${escHTML(g.nome)}
       </label>`;
     }).join('');
+  }
+
+  // Chamada pelo onchange dos chips: re-renderiza os campos de preco
+  // preservando o que ja foi digitado (para nao perder valores ao marcar
+  // outro grupo antes de salvar).
+  window.mlSyncPrecosPorItem = function() {
+    const atuais = mlLerPrecosPorItem();
+    const editId = document.getElementById('ml-cardapio-edit-id').value;
+    const itemSalvo = editId ? _cardapioItens.find(i => i.id === editId) : null;
+    // Mescla: o que esta na tela vence o que estava salvo.
+    const merged = Object.assign({}, (itemSalvo && itemSalvo.precosOpcao) || {}, atuais);
+    mlRenderPrecosPorItem({ precosOpcao: merged });
+  };
+
+  // Campos de preco por tamanho (grupos POR_ITEM vinculados ao item).
+  // Aparecem no form do item logo abaixo dos chips de vinculo.
+  function mlRenderPrecosPorItem(item) {
+    const wrap  = document.getElementById('ml-cardapio-precos-wrap');
+    const lista = document.getElementById('ml-cardapio-precos-lista');
+    if (!wrap || !lista) return;
+
+    // Quais grupos POR_ITEM estao vinculados a este item? Usa os chips
+    // marcados (estado atual da tela), nao o item salvo — assim o lojista
+    // marca 'Tamanho' e os campos aparecem na hora.
+    const vinculados = mlLerVinculoGrupos();
+    const gruposPI = _mlGrupos.filter(g => g.precoModo === 'POR_ITEM' && vinculados.indexOf(g.id) >= 0);
+    if (!gruposPI.length) { wrap.style.display = 'none'; lista.innerHTML = ''; return; }
+
+    const precos = (item && item.precosOpcao) || {};
+    wrap.style.display = '';
+    lista.innerHTML = gruposPI.map(g => {
+      const campos = (g.opcoes || []).map(op => {
+        const v = (precos[op.id] != null) ? precos[op.id] : '';
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span style="flex:1;font-size:12px;font-weight:600;color:var(--text);">${escHTML(op.nome)}</span>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="font-size:11px;color:var(--muted);">R$</span>
+              <input type="text" inputmode="decimal" class="ml-preco-opcao"
+                data-opcao-id="${escAttr(op.id)}" value="${escAttr(String(v).replace('.',','))}"
+                placeholder="0,00"
+                style="width:82px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px;font-size:13px;color:var(--text);text-align:right;">
+            </div>
+          </div>`;
+      }).join('');
+      return `<div style="margin-bottom:8px;">
+          <div style="font-size:10px;font-weight:700;color:#7c3aed;text-transform:uppercase;margin-bottom:5px;">${escHTML(g.nome)}</div>
+          ${campos}
+        </div>`;
+    }).join('');
+  }
+
+  // Le os campos de preco por tamanho. Vazio = nao definido (cai no base).
+  function mlLerPrecosPorItem() {
+    const lista = document.getElementById('ml-cardapio-precos-lista');
+    if (!lista) return {};
+    const out = {};
+    lista.querySelectorAll('.ml-preco-opcao').forEach(inp => {
+      const id = inp.dataset.opcaoId;
+      const raw = String(inp.value || '').trim();
+      if (!id || !raw) return;
+      const v = parseFloat(raw.replace(/[^\d,.-]/g,'').replace(',','.'));
+      if (!isNaN(v) && v >= 0) out[id] = v;
+    });
+    return out;
   }
 
   // Le os checkboxes marcados no form do item.
@@ -10324,6 +10416,7 @@ ${urlCard}`)}`;
         ? `<img src="${item.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">`
         : '<i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>';
       mlRenderVinculoGrupos(item);
+      mlRenderPrecosPorItem(item);
     } else {
       document.getElementById('ml-cardapio-form-title').textContent = 'Novo item';
       document.getElementById('ml-cardapio-edit-id').value = '';
@@ -10337,6 +10430,7 @@ ${urlCard}`)}`;
       const prev = document.getElementById('ml-cardapio-foto-preview');
       if (prev) prev.innerHTML = '<i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>';
       mlRenderVinculoGrupos(null);
+      mlRenderPrecosPorItem(null);
     }
     form.scrollIntoView({ behavior:'smooth', block:'nearest' });
   }
@@ -10682,6 +10776,12 @@ ${urlCard}`)}`;
             try {
               await apiPost('lojaItemVincularGrupos', { token: _lojaToken, itemId: itemIdFinal, grupos: gruposSel.join(',') }, { timeout: 12000, ignoreUnauthorized: true });
             } catch(eV) { if (eV.message !== 'UNAUTHORIZED') console.warn('[Vinculo] ' + eV.message); }
+            // Precos por tamanho (grupos POR_ITEM). Enviado sempre: objeto
+            // vazio limpa os precos do item (volta ao preco base).
+            try {
+              const precosPI = mlLerPrecosPorItem();
+              await apiPost('lojaItemPrecosSalvar', { token: _lojaToken, itemId: itemIdFinal, precos: JSON.stringify(precosPI) }, { timeout: 12000, ignoreUnauthorized: true });
+            } catch(eP) { if (eP.message !== 'UNAUTHORIZED') console.warn('[Precos] ' + eP.message); }
           }
         }
         // Atualiza a lista sem fechar o form quando manterAberto=true
@@ -10986,8 +11086,10 @@ ${urlCard}`)}`;
     (item.grupos || []).forEach(g => {
       const sel = (escolhas && escolhas[g.id]) || [];
       if (!sel.length) return;
-      if (g.precoModo === 'ABSOLUTO') {
+      if (g.precoModo === 'ABSOLUTO' || g.precoModo === 'POR_ITEM') {
         // A escolha define a base. UNICA => 1 opcao; pega a primeira selecionada.
+        // POR_ITEM: o backend ja injetou o preco DESTE item em op.preco
+        // (ou o preco base, quando o lojista nao preencheu aquele tamanho).
         const op = g.opcoes.find(o => o.id === sel[0]);
         if (op) base = parseFloat(op.preco) || 0;
       } else {
@@ -11026,7 +11128,8 @@ ${urlCard}`)}`;
         if (!op) return;
         const qtd = _ccQtdOpcao(sel, oid);
         const p = parseFloat(op.preco) || 0;
-        if (g.precoModo === 'ABSOLUTO') {
+        if (g.precoModo === 'ABSOLUTO' || g.precoModo === 'POR_ITEM') {
+          // Tamanho nao e 'acrescimo': mostra so o nome, sem '+R$'.
           linhas.push(op.nome);
         } else {
           // O valor mostrado e o total da opcao (preco x quantidade).
@@ -11708,7 +11811,7 @@ ${urlCard}`)}`;
         const qtd = _ccQtdOpcao(sel, op.id);
         const marcada = qtd > 0;
         const p = parseFloat(op.preco) || 0;
-        const precoTxt = g.precoModo === 'ABSOLUTO'
+        const precoTxt = (g.precoModo === 'ABSOLUTO' || g.precoModo === 'POR_ITEM')
           ? 'R$ ' + p.toFixed(2).replace('.',',')
           : (p > 0 ? '+ R$ ' + p.toFixed(2).replace('.',',') : '');
         const teto = _ccOpcaoQtdMax(g, op);

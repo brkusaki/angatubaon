@@ -92,6 +92,11 @@
         display: flex; flex-direction: column;
         align-items: center; justify-content: center;
         overflow: hidden;
+        /* compensa as barras do sistema (status no topo, navegacao no rodape):
+           sem isso o conjunto fica visualmente acima do centro */
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4vh);
+        box-sizing: border-box;
       }
       #splash-screen.splash-saindo {
         transition: opacity 0.6s ease;
@@ -112,7 +117,7 @@
         border: 2.5px solid #2e3238;
         border-radius: 8px;
         display: flex; align-items: center; justify-content: center;
-        margin-bottom: -4px;
+        margin-bottom: 14px;
         transition: border-color .18s ease, box-shadow .18s ease;
       }
       /* hastes de suspensao */

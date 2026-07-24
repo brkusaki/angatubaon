@@ -377,7 +377,7 @@
      Tempo mínimo: 1.8s. Máximo: 5s (failsafe).
   ══════════════════════════════════════════════════════════════ */
   const _splashInicio = Date.now();
-  const _SPLASH_MIN   = 2100;
+  const _SPLASH_MIN   = 1900;
   const _SPLASH_MAX   = 5000;
   let   _splashOculta = false;
 
@@ -392,7 +392,7 @@
 
     // Sequência do letreiro: a coruja aperta o botão (~0.9s),
     // o neon pisca 2x e acende de vez.
-    const T_PISCA_1 = 900, T_PISCA_2 = 1080, T_ACESO = 1240, T_CIDADE = 1500;
+    const T_PISCA_1 = 780, T_PISCA_2 = 940, T_ACESO = 1090, T_CIDADE = 1330;
     function _acenderLetreiro() {
       if (!letreiro) return;
       const on  = () => letreiro.classList.add('aceso');

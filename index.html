@@ -153,15 +153,15 @@
         width: 100%; height: auto; display: block;
         opacity: 0;
         transition: opacity 0.35s ease;
-        /* funde as bordas do quadro com o fundo preto do splash */
-        -webkit-mask-image: radial-gradient(ellipse 74% 78% at 50% 46%, #000 62%, transparent 100%);
-                mask-image: radial-gradient(ellipse 74% 78% at 50% 46%, #000 62%, transparent 100%);
+        /* funde as bordas laterais do quadro com o fundo preto do splash */
+        -webkit-mask-image: radial-gradient(ellipse 78% 88% at 50% 50%, #000 68%, transparent 100%);
+                mask-image: radial-gradient(ellipse 78% 88% at 50% 50%, #000 68%, transparent 100%);
       }
       #spl-video.pronto { opacity: 1; }
       /* Cidade — a marca agora e o proprio letreiro */
       #spl-texto {
-        position: absolute; bottom: 15%;
-        left: 0; right: 0; text-align: center;
+        margin-top: 26px;
+        text-align: center;
         opacity: 0; pointer-events: none;
         transition: opacity 0.5s ease;
       }

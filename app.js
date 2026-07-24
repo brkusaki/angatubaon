@@ -377,29 +377,48 @@
      Tempo mínimo: 1.8s. Máximo: 5s (failsafe).
   ══════════════════════════════════════════════════════════════ */
   const _splashInicio = Date.now();
-  const _SPLASH_MIN   = 1800;
+  const _SPLASH_MIN   = 2100;
   const _SPLASH_MAX   = 5000;
   let   _splashOculta = false;
 
-  // Inicia lógica do vídeo — só mostra se já estiver no cache (carrega < 400ms)
+  // Vídeo da coruja + letreiro CSS — só mostra se já estiver no cache (carrega < 400ms)
   (function _initSplashVideo() {
     const vid      = document.getElementById('spl-video');
+    const palco    = document.getElementById('spl-palco');
+    const letreiro = document.getElementById('spl-letreiro');
     const fallback = document.getElementById('spl-fallback');
     const texto    = document.getElementById('spl-texto');
     if (!vid) return;
 
+    // Sequência do letreiro: a coruja aperta o botão (~0.9s),
+    // o neon pisca 2x e acende de vez.
+    const T_PISCA_1 = 900, T_PISCA_2 = 1080, T_ACESO = 1240, T_CIDADE = 1500;
+    function _acenderLetreiro() {
+      if (!letreiro) return;
+      const on  = () => letreiro.classList.add('aceso');
+      const off = () => letreiro.classList.remove('aceso');
+      setTimeout(on,  T_PISCA_1);
+      setTimeout(off, T_PISCA_1 + 70);
+      setTimeout(on,  T_PISCA_2);
+      setTimeout(off, T_PISCA_2 + 55);
+      setTimeout(on,  T_ACESO);
+      setTimeout(() => { if (texto) texto.classList.add('visivel'); }, T_CIDADE);
+    }
+
     const t0 = Date.now();
     vid.addEventListener('canplay', () => {
       if (Date.now() - t0 > 400) return; // demorou: não estava cacheado, mantém fallback
-      // Vídeo cacheado: troca fallback pelo vídeo
+      // Vídeo cacheado: troca fallback pelo palco (letreiro + coruja)
       if (fallback) fallback.classList.add('oculto');
+      if (palco) palco.classList.remove('oculto');
       vid.classList.add('pronto');
-      if (texto) texto.classList.add('visivel');
       vid.play().catch(() => {});
+      _acenderLetreiro();
     }, { once: true });
 
     // Se o vídeo não estiver disponível, garante que o fallback aparece limpo
     vid.addEventListener('error', () => {
+      if (palco) palco.classList.add('oculto');
       if (fallback) fallback.classList.remove('oculto');
     }, { once: true });
   })();

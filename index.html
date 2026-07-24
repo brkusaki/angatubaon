@@ -1401,6 +1401,79 @@
                   </button>
                 </div>
               </div>
+
+              <!-- Fase 3: agendamento automático de stories (Pro-only) -->
+              <div id="ml-agenda-section" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                  <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">
+                    ⏰ Postagem automática
+                    <span style="font-size:9px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PRO</span>
+                  </div>
+                  <button onclick="mlAgendaToggleForm()" id="ml-agenda-abrir" style="font-size:10px;color:var(--zap);background:none;border:1px solid rgba(245,158,11,0.3);border-radius:6px;cursor:pointer;padding:3px 9px;">+ Agendar</button>
+                </div>
+                <div style="font-size:10px;color:var(--muted);margin-bottom:8px;line-height:1.5;">Suba a foto ou vídeo uma vez e escolha o horário. O sistema publica sozinho, todo dia.</div>
+                <div id="ml-agenda-lista"></div>
+
+                <div id="ml-agenda-form" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:8px;">
+                  <input type="hidden" id="ml-agenda-id" value="" />
+                  <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;" id="ml-agenda-emojis">
+                    <button class="anuncio-emoji-btn active" data-emoji="🎯" onclick="mlAgendaSelectEmoji(this)">🎯</button>
+                    <button class="anuncio-emoji-btn" data-emoji="🔥" onclick="mlAgendaSelectEmoji(this)">🔥</button>
+                    <button class="anuncio-emoji-btn" data-emoji="💥" onclick="mlAgendaSelectEmoji(this)">💥</button>
+                    <button class="anuncio-emoji-btn" data-emoji="🏷️" onclick="mlAgendaSelectEmoji(this)">🏷️</button>
+                    <button class="anuncio-emoji-btn" data-emoji="⚡" onclick="mlAgendaSelectEmoji(this)">⚡</button>
+                    <button class="anuncio-emoji-btn" data-emoji="🎁" onclick="mlAgendaSelectEmoji(this)">🎁</button>
+                  </div>
+                  <textarea id="ml-agenda-texto" maxlength="80" rows="2" placeholder="Ex: Açaí fresquinho a partir das 18h!" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;font-family:var(--font-b);line-height:1.5;"></textarea>
+
+                  <div style="margin-top:8px;">
+                    <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">📷 Foto ou vídeo <span style="opacity:.6;">(opcional · vídeo até 20s)</span></div>
+                    <label id="ml-agenda-img-label" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px dashed var(--border);border-radius:8px;cursor:pointer;">
+                      <i class="fa fa-image" style="color:var(--muted);font-size:14px;"></i>
+                      <span id="ml-agenda-img-label-txt" style="font-size:11px;color:var(--muted);">Toque para escolher foto ou vídeo</span>
+                      <input type="file" id="ml-agenda-img-input" accept="image/*,video/mp4,video/quicktime,video/webm" style="display:none;" onchange="mlAgendaPreviewImagem(this)" />
+                    </label>
+                    <img id="ml-agenda-img-nova" src="" alt="" style="display:none;width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-top:8px;border:1px solid var(--border);" />
+                    <button id="ml-agenda-img-remover" onclick="mlAgendaRemoverImagem()" style="display:none;font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;margin-top:4px;padding:0;">✕ Remover mídia</button>
+                    <div id="ml-agenda-img-status" style="font-size:10px;margin-top:4px;"></div>
+                  </div>
+
+                  <div style="display:flex;align-items:center;gap:8px;margin-top:10px;">
+                    <div style="flex:1;">
+                      <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Horário</div>
+                      <input type="time" id="ml-agenda-hora" value="18:00" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:12px;color:var(--text);box-sizing:border-box;font-family:var(--font-b);" />
+                    </div>
+                    <div style="flex:1;">
+                      <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;">Repetir</div>
+                      <select id="ml-agenda-recorrencia" onchange="mlAgendaRecorrenciaChange()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:12px;color:var(--text);box-sizing:border-box;font-family:var(--font-b);">
+                        <option value="diario">Todo dia</option>
+                        <option value="dias">Dias da semana</option>
+                        <option value="unico">Uma vez só</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div id="ml-agenda-dias" style="display:none;margin-top:8px;">
+                    <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">Escolha os dias</div>
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;" id="ml-agenda-dias-btns">
+                      <button class="ml-dia-btn" data-dia="seg" onclick="mlAgendaToggleDia(this)">Seg</button>
+                      <button class="ml-dia-btn" data-dia="ter" onclick="mlAgendaToggleDia(this)">Ter</button>
+                      <button class="ml-dia-btn" data-dia="qua" onclick="mlAgendaToggleDia(this)">Qua</button>
+                      <button class="ml-dia-btn" data-dia="qui" onclick="mlAgendaToggleDia(this)">Qui</button>
+                      <button class="ml-dia-btn" data-dia="sex" onclick="mlAgendaToggleDia(this)">Sex</button>
+                      <button class="ml-dia-btn" data-dia="sab" onclick="mlAgendaToggleDia(this)">Sáb</button>
+                      <button class="ml-dia-btn" data-dia="dom" onclick="mlAgendaToggleDia(this)">Dom</button>
+                    </div>
+                  </div>
+
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;gap:8px;">
+                    <button onclick="mlAgendaCancelar()" style="font-size:11px;color:var(--muted);background:none;border:1px solid var(--border);border-radius:8px;cursor:pointer;padding:8px 12px;">Cancelar</button>
+                    <button onclick="mlAgendaSalvar()" id="ml-agenda-btn" style="padding:8px 16px;border-radius:8px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                      <i class="fa fa-clock"></i> Salvar agendamento
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- CTA upgrade contextual -->

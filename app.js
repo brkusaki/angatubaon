@@ -4347,6 +4347,10 @@
         if (_lst) _lst.style.display = '';
         if (_cnt) _cnt.style.display = '';
         mlStoriesCarregar();
+        // Fase 3: agendamento automático — só Pro.
+        var _ag = document.getElementById('ml-agenda-section');
+        if (_ag) _ag.style.display = '';
+        mlAgendaCarregar();
       } else if (temAnuncio && metJson && metJson.status === 'ok') {
         // PLUS: comportamento Fase 1 (anúncio único de texto).
         if (metJson.data.anuncio) {
@@ -8818,6 +8822,13 @@ ${urlCard}`)}`;
   let _anuncioImagemUrl = ''; // URL final após upload (Pro)
   let _anuncioMidiaTipo = 'foto'; // 'foto' | 'video' — tipo da mídia selecionada (Pro)
   let _mlStoriesCache = []; // Fase 2: stories atuais do painel (Pro)
+  // Fase 3: estado do agendamento automático (Pro).
+  let _mlAgendaCache = [];
+  let _agendaImagemUrl = '';
+  let _agendaMidiaTipo = 'foto';
+  let _agendaEmojiSelecionado = '\ud83c\udfaf';
+  let _agendaDiasSel = [];
+
   let _anuncioTimerInterval = null; // Item 17: handle do setInterval do contador de expiração
 
   // Garante um <video> de preview ao lado do <img> de preview. Criado sob
@@ -9186,6 +9197,235 @@ ${urlCard}`)}`;
     finally { if (btn){ btn.innerHTML='<i class="fa fa-bullhorn"></i> Publicar'; btn.disabled=false; } }
   }
   window.mlStoryAdicionar = mlStoryAdicionar;
+
+  // ══════════════════════════════════════════════════════════
+  //  FASE 3 — AGENDAMENTO AUTOMÁTICO DE STORIES (Pro)
+  // ══════════════════════════════════════════════════════════
+
+  function mlAgendaSelectEmoji(btn) {
+    var pais = document.getElementById('ml-agenda-emojis');
+    if (pais) Array.prototype.forEach.call(pais.querySelectorAll('.anuncio-emoji-btn'), function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    _agendaEmojiSelecionado = btn.getAttribute('data-emoji') || '\ud83c\udfaf';
+  }
+  window.mlAgendaSelectEmoji = mlAgendaSelectEmoji;
+
+  function mlAgendaToggleDia(btn) {
+    var dia = btn.getAttribute('data-dia');
+    if (!dia) return;
+    var i = _agendaDiasSel.indexOf(dia);
+    if (i === -1) { _agendaDiasSel.push(dia); btn.classList.add('active'); }
+    else { _agendaDiasSel.splice(i, 1); btn.classList.remove('active'); }
+  }
+  window.mlAgendaToggleDia = mlAgendaToggleDia;
+
+  function mlAgendaRecorrenciaChange() {
+    var sel = document.getElementById('ml-agenda-recorrencia');
+    var box = document.getElementById('ml-agenda-dias');
+    if (box) box.style.display = (sel && sel.value === 'dias') ? '' : 'none';
+  }
+  window.mlAgendaRecorrenciaChange = mlAgendaRecorrenciaChange;
+
+  function mlAgendaPreviewImagem(input) {
+    var f = input && input.files && input.files[0];
+    if (!f) return;
+    var ehVid = /^video\//.test(f.type);
+    _agendaMidiaTipo = ehVid ? 'video' : 'foto';
+    var lbl = document.getElementById('ml-agenda-img-label-txt');
+    if (lbl) lbl.textContent = (ehVid ? '\ud83c\udfac ' : '\ud83d\uddbc\ufe0f ') + f.name;
+    var img = document.getElementById('ml-agenda-img-nova');
+    var rem = document.getElementById('ml-agenda-img-remover');
+    if (rem) rem.style.display = '';
+    if (img) {
+      if (ehVid) { img.style.display = 'none'; }
+      else {
+        var r = new FileReader();
+        r.onload = function(ev){ img.src = ev.target.result; img.style.display = ''; };
+        r.readAsDataURL(f);
+      }
+    }
+  }
+  window.mlAgendaPreviewImagem = mlAgendaPreviewImagem;
+
+  function mlAgendaRemoverImagem() {
+    _agendaImagemUrl = ''; _agendaMidiaTipo = 'foto';
+    var inp = document.getElementById('ml-agenda-img-input'); if (inp) inp.value = '';
+    var img = document.getElementById('ml-agenda-img-nova'); if (img) { img.src = ''; img.style.display = 'none'; }
+    var rem = document.getElementById('ml-agenda-img-remover'); if (rem) rem.style.display = 'none';
+    var lbl = document.getElementById('ml-agenda-img-label-txt'); if (lbl) lbl.textContent = 'Toque para escolher foto ou v\u00eddeo';
+    var st = document.getElementById('ml-agenda-img-status'); if (st) st.textContent = '';
+  }
+  window.mlAgendaRemoverImagem = mlAgendaRemoverImagem;
+
+  function _mlAgendaLimparForm() {
+    var id = document.getElementById('ml-agenda-id'); if (id) id.value = '';
+    var t = document.getElementById('ml-agenda-texto'); if (t) t.value = '';
+    var h = document.getElementById('ml-agenda-hora'); if (h) h.value = '18:00';
+    var r = document.getElementById('ml-agenda-recorrencia'); if (r) r.value = 'diario';
+    _agendaDiasSel = [];
+    var btns = document.getElementById('ml-agenda-dias-btns');
+    if (btns) Array.prototype.forEach.call(btns.querySelectorAll('.ml-dia-btn'), function(b){ b.classList.remove('active'); });
+    mlAgendaRecorrenciaChange();
+    mlAgendaRemoverImagem();
+    var pais = document.getElementById('ml-agenda-emojis');
+    if (pais) {
+      Array.prototype.forEach.call(pais.querySelectorAll('.anuncio-emoji-btn'), function(b, idx){
+        if (idx === 0) b.classList.add('active'); else b.classList.remove('active');
+      });
+    }
+    _agendaEmojiSelecionado = '\ud83c\udfaf';
+  }
+
+  function mlAgendaToggleForm() {
+    var f = document.getElementById('ml-agenda-form');
+    if (!f) return;
+    var abrindo = f.style.display === 'none';
+    if (abrindo) _mlAgendaLimparForm();
+    f.style.display = abrindo ? '' : 'none';
+  }
+  window.mlAgendaToggleForm = mlAgendaToggleForm;
+
+  function mlAgendaCancelar() {
+    var f = document.getElementById('ml-agenda-form');
+    if (f) f.style.display = 'none';
+    _mlAgendaLimparForm();
+  }
+  window.mlAgendaCancelar = mlAgendaCancelar;
+
+  // Texto legível da recorrência para o card da lista.
+  function _mlAgendaLabelRec(rec) {
+    var r = String(rec || '').toLowerCase();
+    if (r === 'diario') return 'Todo dia';
+    if (r === 'unico') return 'Uma vez';
+    var mapa = { dom:'Dom', seg:'Seg', ter:'Ter', qua:'Qua', qui:'Qui', sex:'Sex', sab:'S\u00e1b' };
+    return r.split(',').map(function(d){ return mapa[d.trim()] || d; }).join(', ');
+  }
+
+  async function mlAgendaCarregar() {
+    var lst = document.getElementById('ml-agenda-lista');
+    if (!lst) return;
+    try {
+      var params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action:'lojaStoryAgendaListar', token:_lojaToken }));
+      var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      var json = await resp.json();
+      if (json.status !== 'ok') { lst.innerHTML = ''; return; }
+      var ags = json.data.agendamentos || [];
+      var limite = json.data.limite || 5;
+      _mlAgendaCache = ags;
+      if (!ags.length) {
+        lst.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 2px;">Nenhuma postagem autom\u00e1tica ainda.</div>';
+      } else {
+        lst.innerHTML = ags.map(function(g){
+          var ehVideo = String(g.midiaTipo||'foto') === 'video';
+          var thumb = g.imagemUrl
+            ? (ehVideo
+                ? '<div style="width:40px;height:40px;border-radius:8px;background:#000;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="ti ti-player-play" style="color:#fff;font-size:15px;"></i></div>'
+                : '<img src="' + escAttr(g.imagemUrl) + '" style="width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0;" />')
+            : '<div style="width:40px;height:40px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.1rem;">' + escHTML(g.emoji||'\ud83c\udfaf') + '</div>';
+          var txt = g.texto ? escHTML(g.texto) : '<span style="opacity:.5;">(sem texto)</span>';
+          var meta = escHTML(g.horaPost || '--:--') + ' \u00b7 ' + escHTML(_mlAgendaLabelRec(g.recorrencia));
+          var pausado = g.ativo ? '' : ' pausado';
+          var icone = g.ativo ? 'ti-player-pause' : 'ti-player-play';
+          var titulo = g.ativo ? 'Pausar' : 'Ativar';
+          return '<div class="ml-agenda-card' + pausado + '">' +
+            thumb +
+            '<div style="flex:1;min-width:0;">' +
+              '<div style="font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + txt + '</div>' +
+              '<div style="font-size:9px;color:var(--muted);margin-top:2px;"><i class="ti ti-clock"></i> ' + meta + (g.ativo ? '' : ' \u00b7 PAUSADO') + '</div>' +
+            '</div>' +
+            '<button onclick="mlAgendaToggleAtivo(\'' + escAttr(g.id) + '\')" title="' + titulo + '" style="font-size:11px;color:var(--muted);background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;padding:4px 7px;flex-shrink:0;"><i class="ti ' + icone + '"></i></button>' +
+            '<button onclick="mlAgendaRemover(\'' + escAttr(g.id) + '\')" style="font-size:10px;color:var(--red);background:none;border:1px solid rgba(255,68,68,0.3);border-radius:6px;cursor:pointer;padding:4px 8px;flex-shrink:0;">Excluir</button>' +
+          '</div>';
+        }).join('');
+      }
+      var btnAbrir = document.getElementById('ml-agenda-abrir');
+      if (btnAbrir) {
+        if (ags.length >= limite) { btnAbrir.disabled = true; btnAbrir.style.opacity = '.5'; btnAbrir.title = 'Limite de ' + limite + ' agendamentos'; }
+        else { btnAbrir.disabled = false; btnAbrir.style.opacity = ''; btnAbrir.title = ''; }
+      }
+    } catch(e) { lst.innerHTML = '<div style="font-size:11px;color:var(--red);">Erro ao carregar agendamentos.</div>'; }
+  }
+  window.mlAgendaCarregar = mlAgendaCarregar;
+
+  async function mlAgendaSalvar() {
+    var btn = document.getElementById('ml-agenda-btn');
+    var texto = (document.getElementById('ml-agenda-texto')||{}).value;
+    texto = (texto || '').trim();
+    var hora = (document.getElementById('ml-agenda-hora')||{}).value || '';
+    var recSel = (document.getElementById('ml-agenda-recorrencia')||{}).value || 'diario';
+    var agId = (document.getElementById('ml-agenda-id')||{}).value || '';
+
+    if (!hora) { mlToast('Escolha um hor\u00e1rio.', 'erro'); return; }
+    var recorrencia = recSel;
+    if (recSel === 'dias') {
+      if (!_agendaDiasSel.length) { mlToast('Escolha pelo menos um dia da semana.', 'erro'); return; }
+      recorrencia = _agendaDiasSel.join(',');
+    }
+
+    if (btn) { btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Salvando...'; btn.disabled = true; }
+    try {
+      var inp = document.getElementById('ml-agenda-img-input');
+      var statusEl = document.getElementById('ml-agenda-img-status');
+      var imagemUrl = _agendaImagemUrl;
+      var midiaTipo = _agendaMidiaTipo;
+      if (inp && inp.files[0]) {
+        var f = inp.files[0];
+        var ehVid = /^video\//.test(f.type) || _agendaMidiaTipo === 'video';
+        var dst = statusEl || { textContent:'', style:{} };
+        var url = ehVid ? await uploadVideoAnuncio(f, dst) : await uploadImagem(f, dst);
+        if (!url) { if (btn){ btn.innerHTML='<i class="fa fa-clock"></i> Salvar agendamento'; btn.disabled=false; } return; }
+        imagemUrl = url; midiaTipo = ehVid ? 'video' : 'foto';
+      }
+      if (!texto && !imagemUrl) {
+        mlToast('Escreva um texto ou escolha uma foto/v\u00eddeo.', 'erro');
+        if (btn){ btn.innerHTML='<i class="fa fa-clock"></i> Salvar agendamento'; btn.disabled=false; } return;
+      }
+      var params = new URLSearchParams();
+      params.append('payload', JSON.stringify({
+        action:'lojaStoryAgendaSalvar', token:_lojaToken, id: agId,
+        emoji:_agendaEmojiSelecionado, texto:texto,
+        imagemUrl: imagemUrl || '', midiaTipo: imagemUrl ? midiaTipo : 'foto',
+        horaPost: hora, recorrencia: recorrencia,
+      }));
+      var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(15000) });
+      var json = await resp.json();
+      if (json.status === 'ok') {
+        mlToast('Agendamento salvo! Vai postar sozinho \u00e0s ' + hora + '.', 'ok');
+        mlAgendaCancelar();
+        await mlAgendaCarregar();
+      } else { throw new Error(json.msg || 'Erro'); }
+    } catch(e) { mlToast('Erro ao salvar: ' + e.message, 'erro'); }
+    finally { if (btn){ btn.innerHTML='<i class="fa fa-clock"></i> Salvar agendamento'; btn.disabled=false; } }
+  }
+  window.mlAgendaSalvar = mlAgendaSalvar;
+
+  async function mlAgendaToggleAtivo(id) {
+    if (!id) return;
+    try {
+      var params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action:'lojaStoryAgendaToggle', token:_lojaToken, id:id }));
+      var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      var json = await resp.json();
+      if (json.status === 'ok') { mlToast(json.msg || 'Atualizado.', 'ok'); await mlAgendaCarregar(); }
+      else { mlToast('Erro: ' + (json.msg||''), 'erro'); }
+    } catch(e) { mlToast('Erro ao atualizar.', 'erro'); }
+  }
+  window.mlAgendaToggleAtivo = mlAgendaToggleAtivo;
+
+  async function mlAgendaRemover(id) {
+    if (!id) return;
+    if (!confirm('Excluir esta postagem autom\u00e1tica?')) return;
+    try {
+      var params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action:'lojaStoryAgendaRemover', token:_lojaToken, id:id }));
+      var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
+      var json = await resp.json();
+      if (json.status === 'ok') { mlToast('Agendamento removido.', 'ok'); await mlAgendaCarregar(); }
+      else { mlToast('Erro ao remover: ' + (json.msg||''), 'erro'); }
+    } catch(e) { mlToast('Erro ao remover.', 'erro'); }
+  }
+  window.mlAgendaRemover = mlAgendaRemover;
 
   async function mlStoryRemover(id) {
     if (!id) return;

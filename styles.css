@@ -2357,6 +2357,27 @@
     }
     .anuncio-emoji-btn:active { transform:scale(0.9); }
 
+    /* Fase 3: botões de dia da semana do agendamento */
+    .ml-dia-btn {
+      padding:5px 9px;border-radius:7px;font-size:10px;font-weight:700;
+      background:var(--surface2);border:1.5px solid var(--border);color:var(--muted);
+      cursor:pointer;transition:border-color 0.15s,background 0.15s,color 0.15s;
+      -webkit-tap-highlight-color:transparent;font-family:var(--font-b);
+    }
+    .ml-dia-btn.active {
+      border-color:#8b5cf6;background:rgba(139,92,246,0.12);color:#a78bfa;
+    }
+    .ml-dia-btn:active { transform:scale(0.93); }
+
+    /* Card de agendamento na lista */
+    .ml-agenda-card {
+      display:flex;align-items:center;gap:9px;padding:8px;
+      background:var(--surface);border:1px solid var(--border);
+      border-left:3px solid #8b5cf6;border-radius:9px;margin-bottom:6px;
+    }
+    .ml-agenda-card.pausado { opacity:.55;border-left-color:var(--muted); }
+
+
     /* Badge anúncio no card da loja (lista principal) */
     .store-anuncio-badge {
       display:flex;align-items:center;gap:5px;

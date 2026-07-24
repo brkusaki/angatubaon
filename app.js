@@ -1431,6 +1431,43 @@
   //  avança ao terminar, fecha no último. Tap direita=próximo,
   //  esquerda=anterior, long-press=pausa, swipe-down=fecha.
   // ══════════════════════════════════════════════════════════════
+  // Busca { hoje, ontem } e injeta um badge discreto no topo do lightbox.
+  // Falha silenciosa: badge é acessório, nunca quebra o viewer.
+  async function _mostrarBadgeViewsStory() {
+    try {
+      var params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action:'lojaAnuncioViews', token:_lojaToken }));
+      var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(8000) });
+      var json = await resp.json();
+      if (json.status !== 'ok') return;
+      var lb = document.getElementById('anuncio-lightbox');
+      if (!lb) return; // já fechou
+      var hoje  = parseInt(json.data.hoje, 10)  || 0;
+      var ontem = parseInt(json.data.ontem, 10) || 0;
+
+      var comp = '';
+      if (ontem > 0) {
+        if (hoje > ontem)      comp = ' \u00b7 ontem ' + ontem + ' \u2191';
+        else if (hoje < ontem) comp = ' \u00b7 ontem ' + ontem + ' \u2193';
+        else                   comp = ' \u00b7 igual a ontem';
+      } else if (hoje > 0) {
+        comp = ' \u00b7 1\u00ba do dia';
+      }
+
+      var el = document.createElement('div');
+      el.id = 'story-views-badge';
+      el.style.cssText = 'position:absolute;top:52px;left:50%;transform:translateX(-50%);' +
+        'z-index:12;background:rgba(0,0,0,.62);backdrop-filter:blur(6px);' +
+        'color:#fff;font-size:11px;font-weight:600;padding:5px 11px;border-radius:20px;' +
+        'display:flex;align-items:center;gap:5px;pointer-events:none;white-space:nowrap;' +
+        'font-family:var(--font-b);border:1px solid rgba(255,255,255,.14);';
+      el.innerHTML = '<i class="ti ti-eye" style="font-size:13px;"></i>' +
+                     '<span>' + hoje + (hoje === 1 ? ' pessoa hoje' : ' pessoas hoje') + '</span>' +
+                     '<span style="opacity:.7;font-weight:400;">' + comp + '</span>';
+      lb.appendChild(el);
+    } catch (e) { /* badge é acessório */ }
+  }
+
   function abrirStories(stories, nomeLoja, lojaId, assinatura, planoLoja, categoriaLoja) {
     stories = (stories || []).filter(function(st){ return st && (st.texto || st.imagemUrl); });
     if (!stories.length) return;
@@ -1441,8 +1478,18 @@
     try {
       var jaCont = false;
       if (lojaId != null && assinatura) { var v = _carregarVistos(); jaCont = (v[lojaId] === assinatura); }
-      if (nomeLoja && !jaCont) registrarClique(nomeLoja, 'anuncio', planoLoja || 'PRO', categoriaLoja || '');
+      // storyId do 1º story do conjunto — é o que a pessoa vê ao abrir.
+      var _sid = (stories[0] && stories[0].id) ? String(stories[0].id) : '';
+      if (nomeLoja && !jaCont) registrarClique(nomeLoja, 'anuncio', planoLoja || 'PRO', categoriaLoja || '', _sid);
     } catch (e) {}
+
+    // Badge de alcance: só aparece se ESTA loja está logada no painel.
+    // Número do dia + comparação com ontem — nunca acumula.
+    try {
+      if (_lojaToken && _lojaNome && nomeLoja === _lojaNome) {
+        _mostrarBadgeViewsStory();
+      }
+    } catch (eB) {}
 
     var idx = 0; // story atual
     var _fechado = false;
@@ -2390,7 +2437,7 @@
   /* ── Métricas de clique ──────────────────────────────────────── */
   // Fire-and-forget: registra na planilha sem bloquear a ação do usuário.
   // Chamado apenas em botões de lojas ABERTAS (wpp/tel ativos).
-  function registrarClique(nome, tipo, plano, categoria) {
+  function registrarClique(nome, tipo, plano, categoria, storyId) {
     // Registra a visita para o "nudge" de avaliação (só contatos diretos)
     if (tipo === 'wpp' || tipo === 'tel') {
       registrarVisitaParaAvaliar(nome);
@@ -2402,6 +2449,7 @@
       tipo:      tipo,       // 'wpp' ou 'tel'
       plano:     plano,
       categoria: categoria,
+      storyId:   storyId || '',  // só usado quando tipo==='anuncio'
     }));
     fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: params })
       .catch(() => {}); // falha silenciosa — nunca interrompe o usuário
@@ -4639,18 +4687,68 @@
       visRow.style.display = 'flex';
     }
 
-    // ── Viram anúncio (só aparece quando há registros) ──
-    const anuncios = m.anuncios ?? 0;
+    // ── Viram anúncio — HOJE, não acumulado ──────────────────
+    //  O total de 90 dias não dizia nada: com story diário, a view de
+    //  ontem somava com a de hoje e o número só crescia. Agora mostra o
+    //  número do dia com comparação, que é o que responde 'tá indo bem?'.
+    const anunHoje  = m.anunHoje  ?? 0;
+    const anunOntem = m.anunOntem ?? 0;
+    const anun7d    = m.anun7d    ?? 0;
     const anuncioCard = document.getElementById('ml-m-anuncio-card');
     const elAnuncio = document.getElementById('ml-m-anuncio');
     if (anuncioCard && elAnuncio) {
-      if (anuncios > 0) {
-        elAnuncio.textContent = anuncios;
+      if (anunHoje > 0 || anun7d > 0) {
+        elAnuncio.textContent = anunHoje;
+        // Sublegenda: comparação com ontem.
+        var subEl = document.getElementById('ml-m-anuncio-sub');
+        if (subEl) {
+          var txt = '';
+          if (anunOntem > 0) {
+            var dif = anunHoje - anunOntem;
+            if (dif > 0)      txt = '\u2191 ' + dif + ' a mais que ontem';
+            else if (dif < 0) txt = '\u2193 ' + Math.abs(dif) + ' a menos que ontem';
+            else              txt = 'igual a ontem (' + anunOntem + ')';
+          } else if (anunHoje > 0) {
+            txt = 'primeiro dia com views';
+          } else {
+            txt = 'ontem foram ' + anunOntem;
+          }
+          subEl.textContent = txt;
+        }
+        // Total dos 7 dias — contexto sem poluir o número principal.
+        var sem = document.getElementById('ml-m-anuncio-7d');
+        if (sem) sem.textContent = anun7d + ' nos últimos 7 dias';
         anuncioCard.style.display = '';
       } else {
         anuncioCard.style.display = 'none';
       }
     }
+
+    // ── Qual story rendeu mais (7 dias) ─────────────────────
+    try {
+      var porStory = m.anunPorStory || {};
+      var boxTop = document.getElementById('ml-m-anuncio-top');
+      if (boxTop) {
+        var chaves = Object.keys(porStory);
+        if (chaves.length >= 2) {
+          chaves.sort(function(x, y){ return porStory[y] - porStory[x]; });
+          var melhorId = chaves[0];
+          // Casa o ID com o texto do story, se ele ainda existir na lista.
+          var achado = null;
+          try {
+            achado = (_mlStoriesCache || []).filter(function(s){ return s.id === melhorId; })[0];
+          } catch(eS) {}
+          var rotulo = achado && achado.texto
+            ? '"' + escHTML(achado.texto.substring(0, 34)) + '"'
+            : 'um anúncio anterior';
+          boxTop.innerHTML = '<i class="ti ti-trophy" style="color:var(--zap);"></i> ' +
+            'O que mais funcionou: ' + rotulo + ' \u2014 ' + porStory[melhorId] + ' views';
+          boxTop.style.display = '';
+        } else {
+          boxTop.style.display = 'none';
+        }
+      }
+    } catch (eTop) {}
 
     // ── Taxa de conversão (views → cliques de contato) ──
     const taxaBox = document.getElementById('ml-taxaconv-box');

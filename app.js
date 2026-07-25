@@ -10023,7 +10023,7 @@ ${urlCard}`)}`;
     }
     lista.innerHTML = _mlGrupos.map(g => {
       const tipoTxt = g.tipo === 'UNICA' ? 'Escolha única' : 'Múltipla';
-      const modoTxt = g.precoModo === 'ABSOLUTO' ? 'preço final' : 'acréscimo';
+      const modoTxt = g.precoModo === 'ABSOLUTO' ? 'preço final' : g.precoModo === 'POR_ITEM' ? 'preço por item' : 'acréscimo';
       const nOps = (g.opcoes || []).length;
       return `<div class="ml-grupo-card">
         <div style="flex:1;min-width:0;">
@@ -10429,7 +10429,7 @@ ${urlCard}`)}`;
     const opAtual = editandoId ? (g.opcoes || []).find(o => o.id === editandoId) : null;
     const ordemEnviar = editandoId
       ? (parseInt(opAtual && opAtual.ordem, 10) || 0)
-      : (g.opcoes.length + 1);
+      : ((g.opcoes || []).reduce((mx, o) => Math.max(mx, parseInt(o.ordem, 10) || 0), 0) + 1);
     try {
       const json = await apiPost('lojaOpcaoSalvar', {
         token: _lojaToken, grupoId: g.id, nome, preco, qtdMax,
@@ -10705,7 +10705,7 @@ ${urlCard}`)}`;
     return `
       <div class="ml-cardapio-item">
         ${item.foto
-          ? `<img loading="lazy" decoding="async" src="${item.foto}" class="ml-cardapio-item-foto" onerror="this.style.display='none'">`
+          ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="ml-cardapio-item-foto" onerror="this.style.display='none'">`
           : `<div class="ml-cardapio-item-foto" style="display:flex;align-items:center;justify-content:center;font-size:1.2rem;">${_ccEmojiItem(item, '🍽️')}</div>`}
         <div style="flex:1;min-width:0;">
           <div style="font-family:var(--font-h);font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHTML(item.nome)}</div>
@@ -10713,11 +10713,11 @@ ${urlCard}`)}`;
           <div style="font-size:12px;font-weight:700;color:var(--green);margin-top:3px;">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
-          <button onclick="mlCardapioAbrirForm('${item.id}')"
+          <button onclick="mlCardapioAbrirForm('${escAttr(item.id)}')"
             style="padding:6px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:10px;font-weight:700;cursor:pointer;">
             <i class="fa fa-pencil"></i>
           </button>
-          <button onclick="mlCardapioRemover('${item.id}','${escAttr(item.nome)}')"
+          <button onclick="mlCardapioRemover('${escAttr(item.id)}','${escAttr(item.nome)}')"
             style="padding:6px 10px;border-radius:7px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.2);color:var(--red);font-size:10px;font-weight:700;cursor:pointer;">
             <i class="fa fa-trash"></i>
           </button>
@@ -10770,7 +10770,7 @@ ${urlCard}`)}`;
       if (destaqueChk) destaqueChk.checked = item.destaque === 'SIM';
       const prev = document.getElementById('ml-cardapio-foto-preview');
       if (prev) prev.innerHTML = item.foto
-        ? `<img src="${item.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">`
+        ? `<img src="${escAttr(item.foto)}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">`
         : '<i class="fa fa-image" style="color:var(--muted);font-size:1.2rem;"></i>';
       mlRenderVinculoGrupos(item);
       mlRenderPrecosPorItem(item);
@@ -11633,6 +11633,9 @@ ${urlCard}`)}`;
   // Estado da tela de personalizacao em aberto.
   let _ccPersItem = null;      // item sendo personalizado
   let _ccPersEscolhas = {};    // { grupoId: [opcaoId, ...] }
+  // Quando != null, a personalizacao esta EDITANDO uma linha ja no carrinho
+  // (guarda a chave da linha). Ao confirmar, a linha antiga e substituida.
+  let _ccPersEditKey = null;
 
   // Quantas vezes uma opcao esta escolhida (array pode repetir o mesmo id).
   function _ccQtdOpcao(sel, opcaoId) {
@@ -11790,14 +11793,14 @@ ${urlCard}`)}`;
       'tattoo':'Portfólio', 'spa':'Serviços', 'academia':'Planos',
       // Automotivo — Serviços específicos
       'mecanica':'Serviços', 'borracharia':'Serviços', 'funilaria':'Serviços',
-      'lava-rapido':'Serviços', 'posto':'Combustíveis', 'autopecas':'Produtos',
+      'lava-rapido':'Serviços', 'posto':'Combustíveis',
       'bicicletaria':'Serviços',
       // Casa — Serviços/Produtos
-      'construcao':'Produtos', 'vidracaria':'Serviços', 'serralheria':'Serviços',
+      'vidracaria':'Serviços', 'serralheria':'Serviços',
       'refrigeracao':'Serviços', 'consertos':'Serviços', 'eletricista':'Serviços',
       'encanamento':'Serviços', 'pintura':'Serviços',
       // Tecnologia — Serviços
-      'grafica':'Serviços', 'informatica':'Produtos', 'celular':'Produtos',
+      'grafica':'Serviços',
       // Profissionais — Serviços específicos
       'advocacia':'Serviços', 'contabilidade':'Serviços', 'fotografia':'Portfólio',
       'imobiliaria':'Imóveis', 'viagens':'Pacotes', 'seguros':'Planos',
@@ -12165,24 +12168,24 @@ ${urlCard}`)}`;
     // deixa o clique subir para o card em vez de chamar a funcao de novo —
     // chamar duas vezes era o que fazia o sheet 'levantar dois'.
     const btnHTML = exigePers
-      ? `<button class="cc-item-add cc-item-personalizar" aria-label="Escolher opções de ${escAttr(item.nome)}" onclick="ccAbrirPersonalizacao('${item.id}')">+</button>`
-      : `<button class="cc-item-add" aria-label="Adicionar ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>`;
+      ? `<button class="cc-item-add cc-item-personalizar" aria-label="Escolher opções de ${escAttr(item.nome)}" onclick="ccAbrirPersonalizacao('${escAttr(item.id)}')">+</button>`
+      : `<button class="cc-item-add" aria-label="Adicionar ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAdicionarItem('${escAttr(item.id)}')">+</button>`;
     // Toque no card = adicionar +1 (comportamento de sempre). Item que exige
     // escolha (tamanho) abre a personalizacao, porque nao da pra adicionar sem.
     const clickAttr = exigePers
-      ? `onclick="ccAbrirPersonalizacao('${item.id}')"`
-      : `onclick="ccCardClick(event,'${item.id}')"`;
+      ? `onclick="ccAbrirPersonalizacao('${escAttr(item.id)}')"`
+      : `onclick="ccCardClick(event,'${escAttr(item.id)}')"`;
     // Acrescimos opcionais: um botao proprio, so ele abre a personalizacao.
     // Assim o resto do card continua adicionando +1 com um toque.
     const dicaHTML = (temGrupos && !exigePers)
-      ? `<button type="button" class="cc-item-dica" onclick="event.stopPropagation();ccDicaClick(event,'${item.id}')"><i class="fa fa-sliders"></i> Adicionar acréscimos</button>`
+      ? `<button type="button" class="cc-item-dica" onclick="event.stopPropagation();ccDicaClick(event,'${escAttr(item.id)}')"><i class="fa fa-sliders"></i> Adicionar acréscimos</button>`
       : '';
     return `
       <div class="cc-item-card cc-item-clickable" id="cc-card-${item.id}" role="button" tabindex="0" ${clickAttr} style="margin-bottom:8px;cursor:pointer;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
         ${temFoto
           ? `<div class="cc-foto-wrap">
                <img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" onerror="this.parentNode.style.display='none'">
-               <button class="cc-foto-zoom" aria-label="Ver foto de ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAbrirFoto('${item.id}')">🔍</button>
+               <button class="cc-foto-zoom" aria-label="Ver foto de ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAbrirFoto('${escAttr(item.id)}')">🔍</button>
              </div>`
           : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
         <div class="cc-item-info">
@@ -12207,7 +12210,7 @@ ${urlCard}`)}`;
     return `
       <div class="cc-item-card cc-servico-card" id="cc-card-${item.id}" style="margin-bottom:8px;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
         ${temFoto
-          ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" onclick="ccAbrirFoto('${item.id}')" style="cursor:zoom-in;" onerror="this.style.display='none'">`
+          ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" onclick="ccAbrirFoto('${escAttr(item.id)}')" style="cursor:zoom-in;" onerror="this.style.display='none'">`
           : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
         <div class="cc-item-info">
           <div class="cc-item-nome">
@@ -12230,7 +12233,7 @@ ${urlCard}`)}`;
     // Placeholder fica sempre no fundo do wrap; a foto (se houver) cobre por cima.
     // Se a foto falhar, onerror apenas esconde a <img> e o placeholder reaparece,
     // sem destruir o badge de destaque (bug antigo: innerHTML apagava a estrela).
-    const zoomAttr = temFoto ? ` onclick="ccAbrirFoto('${item.id}')" style="cursor:zoom-in;"` : '';
+    const zoomAttr = temFoto ? ` onclick="ccAbrirFoto('${escAttr(item.id)}')" style="cursor:zoom-in;"` : '';
     return `
       <div class="cc-vitrine-card" id="cc-card-${item.id}">
         <div class="cc-vitrine-foto-wrap"${zoomAttr}>
@@ -12327,6 +12330,7 @@ ${urlCard}`)}`;
     const item = loja.cardapio.find(i => i.id === itemId);
     if (!item || !_ccItemTemGrupos(item)) return;
     _ccPersItem = item;
+    _ccPersEditKey = null;   // abertura normal = item novo (nao edita linha)
     _ccPersEscolhas = {};
     // Pre-seleciona a 1a opcao de grupos UNICA obrigatorios (min>=1), p/ nunca
     // deixar o cliente com um estado invalido de largada (ex.: tamanho).
@@ -12346,7 +12350,31 @@ ${urlCard}`)}`;
     _ccPersAbrindoEm = 0;   // libera a guarda de abertura dupla
     const modal = document.getElementById('modal-cc-pers');
     if (modal) { modal.classList.remove('aberto'); setTimeout(() => { modal.style.display = 'none'; }, 200); }
-    _ccPersItem = null; _ccPersEscolhas = {};
+    _ccPersItem = null; _ccPersEscolhas = {}; _ccPersEditKey = null;
+  };
+
+  // Reabre a personalizacao para EDITAR uma linha ja no carrinho. Pre-preenche
+  // as escolhas atuais e marca a linha (via _ccPersEditKey) para que confirmar
+  // substitua a linha antiga em vez de criar outra.
+  window.ccEditarLinhaCarrinho = function(chave) {
+    const linha = _ccCarrinho[chave];
+    if (!linha || !linha.item) return;
+    const item = linha.item;
+    if (!_ccItemTemGrupos(item)) return;
+    const modalJa = document.getElementById('modal-cc-pers');
+    if (modalJa && modalJa.style.display === 'flex') return;
+    const agora = Date.now();
+    if (agora - _ccPersAbrindoEm < 250) return;
+    _ccPersAbrindoEm = agora;
+    _ccPersItem = item;
+    _ccPersEditKey = chave;
+    // Clona as escolhas da linha; grupos sem escolha entram vazios para a UI.
+    const base = linha.escolhas ? JSON.parse(JSON.stringify(linha.escolhas)) : {};
+    _ccPersEscolhas = {};
+    (item.grupos || []).forEach(g => { _ccPersEscolhas[g.id] = Array.isArray(base[g.id]) ? base[g.id].slice() : []; });
+    _ccRenderPersonalizacao();
+    const modal = document.getElementById('modal-cc-pers');
+    if (modal) { modal.style.display = 'flex'; requestAnimationFrame(() => modal.classList.add('aberto')); }
   };
 
   // Marca/desmarca uma opcao respeitando o tipo do grupo.
@@ -12505,8 +12533,8 @@ ${urlCard}`)}`;
       // Ja esta em modo botao '+'? Nao mexe no DOM.
       if (qtyEl.querySelector('.cc-item-add')) return;
       qtyEl.innerHTML = _ccItemExigePersonalizar(item)
-        ? `<button class="cc-item-add cc-item-personalizar" onclick="event.stopPropagation();ccAbrirPersonalizacao('${item.id}')">+</button>`
-        : `<button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${item.id}')">+</button>`;
+        ? `<button class="cc-item-add cc-item-personalizar" onclick="event.stopPropagation();ccAbrirPersonalizacao('${escAttr(item.id)}')">+</button>`
+        : `<button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${escAttr(item.id)}')">+</button>`;
     }
   }
 
@@ -12517,10 +12545,21 @@ ${urlCard}`)}`;
     const escolhas = JSON.parse(JSON.stringify(_ccPersEscolhas));
     const key = _ccLineKey(item, escolhas);
     const precoUnit = _ccPrecoUnitario(item, escolhas);
+    // Modo edicao: transfere a quantidade da linha antiga para a nova config e
+    // remove a antiga. Se a nova config coincidir com uma linha ja existente,
+    // as quantidades somam naturalmente (mesma chave).
+    const editKey = _ccPersEditKey;
+    let qtdTransferir = 1;
+    if (editKey && _ccCarrinho[editKey]) {
+      qtdTransferir = _ccCarrinho[editKey].qty || 1;
+      if (editKey !== key) delete _ccCarrinho[editKey];
+      else qtdTransferir = 0; // mesma chave: nao duplica, so reafirma abaixo
+    }
     if (!_ccCarrinho[key]) {
       _ccCarrinho[key] = { item, qty: 0, escolhas, precoUnit };
     }
-    _ccCarrinho[key].qty++;
+    _ccCarrinho[key].qty += qtdTransferir;
+    if (_ccCarrinho[key].qty <= 0) _ccCarrinho[key].qty = 1;
     _ccCarrinho[key].precoUnit = precoUnit; // reafirma (caso preco tenha mudado)
     _ccSincronizarCard(item);
     ccFecharPersonalizacao();
@@ -12618,7 +12657,9 @@ ${urlCard}`)}`;
     const totalEl = document.getElementById('cc-total');
     const totalHeadEl = document.getElementById('cc-total-head');
     const countEl = document.getElementById('cc-cart-count');
-    const itens  = Object.values(_ccCarrinho);
+    // Object.entries para cada linha carregar sua CHAVE (necessaria p/ os
+    // controles de +/-/editar por linha). itens = [ [chave, linha], ... ].
+    const itens  = Object.entries(_ccCarrinho);
 
     if (itens.length === 0) {
       if (bar) bar.style.display = 'none';
@@ -12649,21 +12690,38 @@ ${urlCard}`)}`;
       return unit * linha.qty;
     };
     if (lista) {
-      lista.innerHTML = itens.map((linha) => {
+      lista.innerHTML = itens.map(([chave, linha]) => {
         const { item, qty, escolhas } = linha;
         const sub = _precoLinha(linha);
         subtotal += sub; totalQty += qty;
         const extras = escolhas ? _ccResumoEscolhas(item, escolhas) : [];
         const extrasHTML = extras.length
-          ? `<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:1px;">${extras.map(e => '+ ' + escHTML(e)).join('<br>')}</div>`
+          ? `<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:2px;">${extras.map(e => '+ ' + escHTML(e)).join('<br>')}</div>`
           : '';
-        return `<div style="display:flex;align-items:flex-start;justify-content:space-between;font-size:12px;gap:8px;">
-          <span style="flex:1;color:var(--text);">${qty}× ${escHTML(item.nome)}${extrasHTML}</span>
-          <span style="color:var(--green);font-weight:700;flex-shrink:0;">R$ ${sub.toFixed(2).replace('.',',')}</span>
+        const kEsc = escAttr(String(chave));
+        // Item com escolhas ganha um botao 'editar' que reabre a personalizacao
+        // ja preenchida; itens simples nao precisam (o +/- basta).
+        const temEscolhas = !!(escolhas && Object.keys(escolhas).some(gid => (escolhas[gid] || []).length));
+        const editarBtn = temEscolhas
+          ? `<button type="button" class="cc-cl-edit" aria-label="Editar ${escAttr(item.nome)}" onclick="ccEditarLinhaCarrinho('${kEsc}')"><i class="fa fa-pen"></i></button>`
+          : '';
+        return `<div class="cc-cart-linha">
+          <div class="cc-cl-info">
+            <div class="cc-cl-nome">${escHTML(item.nome)}${editarBtn}</div>
+            ${extrasHTML}
+          </div>
+          <div class="cc-cl-dir">
+            <div class="cc-cl-stepper">
+              <button type="button" class="cc-cl-btn" aria-label="Menos um" onclick="ccAlterarQty('${kEsc}',-1)">−</button>
+              <span class="cc-cl-qty">${qty}</span>
+              <button type="button" class="cc-cl-btn mais" aria-label="Mais um" onclick="ccAlterarQty('${kEsc}',1)">+</button>
+            </div>
+            <span class="cc-cl-preco">R$ ${sub.toFixed(2).replace('.',',')}</span>
+          </div>
         </div>`;
       }).join('');
     } else {
-      itens.forEach((linha) => { subtotal += _precoLinha(linha); totalQty += linha.qty; });
+      itens.forEach(([, linha]) => { subtotal += _precoLinha(linha); totalQty += linha.qty; });
     }
 
     // ── Taxa de entrega: só entra no cálculo se a loja faz entrega ──

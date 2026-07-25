@@ -2465,7 +2465,7 @@
       display: flex; align-items: center; gap: 6px; flex-shrink: 0;
     }
     .cc-qty-btn {
-      width: 28px; height: 28px; border-radius: 50%;
+      width: 32px; height: 32px; border-radius: 50%;
       border: 1px solid var(--border); background: var(--surface);
       color: var(--text); font-size: 1rem; font-weight: 800;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -2482,6 +2482,56 @@
     }
     #cc-cart-head { transition: transform 0.1s; }
     #cc-cart-head:active { transform: scale(0.99); }
+
+    /* ── Linha do carrinho: info + stepper (-/qty/+) + preco ── */
+    .cc-cart-linha {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 10px; padding: 2px 0;
+    }
+    .cc-cl-info { flex: 1; min-width: 0; }
+    .cc-cl-nome {
+      font-size: 12px; font-weight: 600; color: var(--text);
+      display: flex; align-items: center; gap: 6px; line-height: 1.3;
+    }
+    .cc-cl-edit {
+      width: 24px; height: 24px; flex-shrink: 0; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 7px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted);
+      font-size: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s, color 0.12s, transform 0.1s;
+    }
+    .cc-cl-edit:active { transform: scale(0.9); }
+    .cc-cl-edit:hover { color: #a78bfa; border-color: rgba(124,58,237,0.4); }
+    .cc-cl-dir {
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+    .cc-cl-stepper {
+      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+    }
+    .cc-cl-btn {
+      width: 26px; height: 26px; flex-shrink: 0; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text);
+      font-size: 15px; font-weight: 800; line-height: 1; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s, border-color 0.12s, transform 0.1s;
+    }
+    .cc-cl-btn:active { transform: scale(0.9); }
+    .cc-cl-btn.mais {
+      border-color: rgba(16,185,129,0.45);
+      background: rgba(16,185,129,0.12); color: #34d399;
+    }
+    .cc-cl-qty {
+      min-width: 18px; text-align: center;
+      font-family: var(--font-h); font-size: 13px; font-weight: 800; color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .cc-cl-preco {
+      color: var(--green); font-weight: 700; flex-shrink: 0;
+      font-size: 12px; min-width: 58px; text-align: right;
+    }
 
     /* Pulse de atenção ao adicionar o primeiro item */
     @keyframes ccCartPulse {
@@ -4279,7 +4329,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   display: flex; align-items: center; gap: 8px; flex-shrink: 0;
 }
 .cc-pers-step-btn {
-  width: 30px; height: 30px; flex-shrink: 0;
+  width: 34px; height: 34px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   border-radius: 9px; border: 1px solid var(--border);
   background: var(--surface); color: var(--text);

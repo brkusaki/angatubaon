@@ -11086,6 +11086,187 @@ ${urlCard}`)}`;
     }
   };
 
+  /* ─────────────────────────────────────────────────────
+     FILA DE ITENS (lote otimista) — só PRO.
+     O lojista salva um item e já digita o próximo; o envio real
+     (item + vínculo de grupos + preços) roda em segundo plano, um
+     de cada vez (preserva a ordem e não martela o Sheets). Falhas
+     ficam listadas com botão de reenvio, e ao esvaziar a fila o
+     cardápio recarrega UMA vez só.
+  ───────────────────────────────────────────────────── */
+  let _filaItens    = [];    // snapshots pendentes
+  let _filaEnviando = false;
+  let _filaOk       = 0;     // enviados nesta leva
+  let _filaTotal    = 0;     // total desta leva (ok + em curso + pendentes)
+  let _filaFalhas   = [];    // { snap, erro }
+  let _filaAtual    = null;  // nome do item em envio agora
+  let _filaWaiters  = [];    // resolves aguardando o fim da fila
+  let _filaUnloadArmado = false;
+
+  function _filaArmarUnload() {
+    if (_filaUnloadArmado) return;
+    _filaUnloadArmado = true;
+    window.addEventListener('beforeunload', function(ev) {
+      if (_filaEnviando || _filaItens.length) { ev.preventDefault(); ev.returnValue = ''; }
+    });
+  }
+
+  function mlFilaEnfileirar(snap) {
+    _filaArmarUnload();
+    _filaItens.push(snap);
+    _filaTotal++;
+    mlFilaRenderStrip();
+    mlFilaProcessar(); // idempotente: não reentra se já rodando
+  }
+
+  async function mlFilaProcessar() {
+    if (_filaEnviando) return;
+    _filaEnviando = true;
+    mlFilaRenderStrip();
+    while (_filaItens.length) {
+      const snap = _filaItens.shift();
+      _filaAtual = snap.nome;
+      mlFilaRenderStrip();
+      try {
+        await mlEnviarItemSnap(snap);
+        _filaOk++;
+      } catch (e) {
+        if (e && e.message === 'UNAUTHORIZED') {
+          // Sessão caiu: devolve o item e para (o login já foi disparado).
+          _filaItens.unshift(snap);
+          _filaEnviando = false; _filaAtual = null;
+          mlFilaRenderStrip();
+          return;
+        }
+        _filaFalhas.push({ snap, erro: (e && e.message) || 'falha' });
+        _filaTotal--; // sai da contagem "/N" e passa a contar como falha
+      }
+      _filaAtual = null;
+      mlFilaRenderStrip();
+    }
+    _filaEnviando = false;
+    mlFilaRenderStrip();
+
+    // Recarrega uma única vez quando tudo drenou.
+    try { await mlCardapioCarregar(_cardapioPlano); } catch (_) {}
+
+    // Acorda quem esperava o fim (saída final / fechamento).
+    const ws = _filaWaiters; _filaWaiters = [];
+    ws.forEach(fn => { try { fn(); } catch (_) {} });
+
+    // Sem falhas: some com a barra depois de um tempo.
+    if (!_filaFalhas.length) {
+      setTimeout(() => {
+        if (!_filaEnviando && !_filaItens.length && !_filaFalhas.length) {
+          _filaOk = 0; _filaTotal = 0; mlFilaRenderStrip();
+        }
+      }, 4000);
+    }
+  }
+
+  // Envia UM item: cria no cardápio e, se houver, vincula grupos e grava preços.
+  async function mlEnviarItemSnap(snap) {
+    const json = await apiPost('lojaCardapioSalvar', {
+      token:     _lojaToken,
+      id:        '',
+      nome:      snap.nome,
+      descricao: snap.descricao,
+      preco:     snap.preco,
+      foto:      snap.foto,
+      categoria: snap.categoria,
+      destaque:  snap.destaque,
+    }, { timeout: 30000 });
+    if (!json || json.status !== 'ok') throw new Error((json && json.msg) || 'Erro ao salvar');
+
+    const itemId = json.data && json.data.id;
+    if (itemId) {
+      try {
+        await apiPost('lojaItemVincularGrupos',
+          { token: _lojaToken, itemId, grupos: (snap.grupos || []).join(',') },
+          { timeout: 12000, ignoreUnauthorized: true });
+      } catch (eV) { if (eV.message === 'UNAUTHORIZED') throw eV; console.warn('[Vinculo] ' + eV.message); }
+      try {
+        await apiPost('lojaItemPrecosSalvar',
+          { token: _lojaToken, itemId, precos: JSON.stringify(snap.precos || {}) },
+          { timeout: 12000, ignoreUnauthorized: true });
+      } catch (eP) { if (eP.message === 'UNAUTHORIZED') throw eP; console.warn('[Precos] ' + eP.message); }
+    }
+    return itemId;
+  }
+
+  // Promise que resolve quando a fila esvazia (usado na saída final/fechamento).
+  function mlFilaAguardarFim() {
+    if (!_filaEnviando && !_filaItens.length) return Promise.resolve();
+    return new Promise(res => { _filaWaiters.push(res); });
+  }
+
+  window.mlFilaRetry = function(idx) {
+    const f = _filaFalhas[idx];
+    if (!f) return;
+    _filaFalhas.splice(idx, 1);
+    _filaTotal++;
+    _filaItens.push(f.snap);
+    mlFilaRenderStrip();
+    mlFilaProcessar();
+  };
+  window.mlFilaRetryTodos = function() {
+    if (!_filaFalhas.length) return;
+    const pend = _filaFalhas.map(f => f.snap);
+    _filaFalhas = [];
+    _filaTotal += pend.length;
+    pend.forEach(s => _filaItens.push(s));
+    mlFilaRenderStrip();
+    mlFilaProcessar();
+  };
+  window.mlFilaDescartarFalhas = function() {
+    _filaFalhas = [];
+    if (!_filaEnviando && !_filaItens.length) { _filaOk = 0; _filaTotal = 0; }
+    mlFilaRenderStrip();
+  };
+
+  function mlFilaRenderStrip() {
+    const el = document.getElementById('ml-cardapio-fila');
+    if (!el) return;
+    const temAlgo = _filaEnviando || _filaItens.length || _filaFalhas.length || (_filaOk && _filaTotal);
+    if (!temAlgo) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = '';
+
+    let html = '';
+    if (_filaEnviando || _filaItens.length) {
+      const feitos = _filaOk, total = _filaTotal;
+      const pct = total > 0 ? Math.round((feitos / total) * 100) : 0;
+      const atual = _filaAtual ? (' · ' + escHTML(_filaAtual)) : '';
+      html += '<div style="display:flex;align-items:center;gap:8px;">'
+        + '<i class="fa fa-spinner fa-spin" style="color:#10b981;"></i>'
+        + '<span style="font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;">Enviando ' + feitos + '/' + total + '</span>'
+        + '<span style="font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + atual + '</span>'
+        + '</div>'
+        + '<div style="height:4px;border-radius:3px;background:rgba(255,255,255,0.08);margin-top:6px;overflow:hidden;">'
+        + '<div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,#10b981,#059669);transition:width .3s ease;"></div>'
+        + '</div>';
+    } else if (_filaOk && !_filaFalhas.length) {
+      html += '<div style="font-size:11px;font-weight:700;color:#10b981;">\u2705 ' + _filaOk + ' item(ns) enviados</div>';
+    }
+
+    if (_filaFalhas.length) {
+      html += '<div style="margin-top:' + ((_filaEnviando || _filaItens.length) ? '8px' : '0') + ';">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">'
+        + '<span style="font-size:11px;font-weight:700;color:#f59e0b;">\u26A0\uFE0F ' + _filaFalhas.length + ' não enviaram</span>'
+        + '<span style="display:flex;gap:6px;flex-shrink:0;">'
+        + '<button onclick="mlFilaRetryTodos()" style="font-size:10px;font-weight:700;color:#10b981;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.35);border-radius:6px;padding:3px 8px;cursor:pointer;">Tentar todos</button>'
+        + '<button onclick="mlFilaDescartarFalhas()" style="font-size:10px;font-weight:700;color:var(--muted);background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;cursor:pointer;">Descartar</button>'
+        + '</span></div>';
+      _filaFalhas.forEach((f, i) => {
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid var(--border);">'
+          + '<span style="font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHTML(f.snap.nome) + '</span>'
+          + '<button onclick="mlFilaRetry(' + i + ')" style="font-size:10px;font-weight:700;color:#10b981;background:none;border:1px solid rgba(16,185,129,0.35);border-radius:6px;padding:3px 8px;cursor:pointer;flex-shrink:0;">Tentar de novo</button>'
+          + '</div>';
+      });
+      html += '</div>';
+    }
+    el.innerHTML = html;
+  }
+
   async function mlCardapioSalvar(manterAberto = false) {
     const nome  = document.getElementById('ml-cardapio-nome').value.trim();
     const preco = document.getElementById('ml-cardapio-preco').value;
@@ -11100,6 +11281,43 @@ ${urlCard}`)}`;
       msgEl.textContent = '⏳ Aguarde o upload da foto terminar antes de salvar.';
       msgEl.style.color = 'var(--muted)';
       return;
+    }
+
+    // ── Modo lote otimista (só PRO, item novo): libera o próximo NA HORA.
+    //    Tira um retrato do form, reseta preservando o que se repete e
+    //    envia em segundo plano via fila. Não trava esperando a rede.
+    const _editIdAtual = document.getElementById('ml-cardapio-edit-id').value;
+    if (manterAberto && _cardapioPlano === 'PRO' && !_editIdAtual) {
+      const snap = {
+        nome,
+        descricao: document.getElementById('ml-cardapio-desc').value.trim(),
+        preco:     precoNum,
+        foto:      document.getElementById('ml-cardapio-foto-url').value,
+        categoria: document.getElementById('ml-cardapio-cat').value.trim(),
+        destaque:  document.getElementById('ml-cardapio-destaque')?.checked ? 'SIM' : 'NAO',
+        grupos:    mlLerVinculoGrupos(),
+        precos:    mlLerPrecosPorItem(),
+      };
+      // Preserva categoria/preço/grupos/tamanhos e reseta o form imediatamente.
+      const catAtual   = document.getElementById('ml-cardapio-cat').value;
+      const precoAtual = document.getElementById('ml-cardapio-preco').value;
+      mlCardapioAbrirForm(null);
+      document.getElementById('ml-cardapio-cat').value   = catAtual;
+      document.getElementById('ml-cardapio-preco').value = precoAtual;
+      mlRenderVinculoGrupos({ grupos: snap.grupos.map(id => ({ id })) });
+      mlRenderPrecosPorItem({ precosOpcao: snap.precos });
+      setTimeout(() => document.getElementById('ml-cardapio-nome')?.focus(), 60);
+
+      mlFilaEnfileirar(snap);
+      msgEl.textContent = '';
+      return;
+    }
+    // Saída final (ou edição) com fila ainda enviando: espera esvaziar para
+    // não perder itens nem embaralhar a ordem no Sheets.
+    if (!manterAberto && (_filaEnviando || _filaItens.length)) {
+      msgEl.textContent = '\u23F3 Terminando de enviar a fila...';
+      msgEl.style.color = 'var(--muted)';
+      await mlFilaAguardarFim();
     }
 
     const btn      = document.getElementById('ml-cardapio-salvar-btn');

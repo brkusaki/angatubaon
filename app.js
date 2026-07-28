@@ -1144,6 +1144,20 @@
     return false;
   }
 
+  // Badge no ícone do app (PWA instalado): nº de lojas com story não visto.
+  // navigator.setAppBadge só existe em navegadores compatíveis; falha silenciosa.
+  function _atualizarBadgeApp() {
+    try {
+      if (!('setAppBadge' in navigator)) return;
+      var n = 0;
+      for (var i = 0; i < LOJAS.length; i++) {
+        if (_lojaTemStoryNaoVisto(LOJAS[i] && LOJAS[i].stories)) n++;
+      }
+      if (n > 0) navigator.setAppBadge(n).catch(function(){});
+      else navigator.clearAppBadge().catch(function(){});
+    } catch (e) {}
+  }
+
   function _carregarVistos() {
     try {
       const raw = localStorage.getItem(_ANUNCIO_VISTOS_KEY);
@@ -8593,6 +8607,8 @@
 
   // Também resolve ao navegar pelo histórico (botão voltar/avançar)
   window.addEventListener('hashchange', _resolverDeepLink);
+  // Atualiza o badge do app assim que as lojas estiverem carregadas.
+  try { _atualizarBadgeApp(); } catch (e) {}
 
   // Back button Android no PWA — fecha o modal ativo em vez de sair do app
   // Handler único de popstate (botão voltar Android). Ordem importa:
@@ -12304,6 +12320,7 @@ ${urlCard}`)}`;
       };
     }
     _ccCarrinho[chave].qty++;
+    try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
 
     // Troca botão "+" por controles de quantidade. Delegado a
     // _ccSincronizarCard para manter uma unica fonte de verdade do card e

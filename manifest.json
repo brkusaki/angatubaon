@@ -8,7 +8,11 @@
   "orientation": "portrait",
   "background_color": "#0d0d0d",
   "theme_color": "#0d0d0d",
-  "categories": ["business", "shopping", "lifestyle"],
+  "categories": [
+    "business",
+    "shopping",
+    "lifestyle"
+  ],
   "lang": "pt-BR",
   "icons": [
     {
@@ -57,6 +61,56 @@
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Veja horários, localização e cardápio de cada estabelecimento"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Buscar loja",
+      "short_name": "Buscar",
+      "description": "Encontre lojas abertas agora",
+      "url": "/?atalho=busca",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Meu painel",
+      "short_name": "Painel",
+      "description": "Gerencie sua loja",
+      "url": "/?atalho=painel",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Favoritos",
+      "short_name": "Favoritos",
+      "description": "Suas lojas favoritas",
+      "url": "/?atalho=favoritos",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Stories",
+      "short_name": "Stories",
+      "description": "Novidades das lojas",
+      "url": "/?atalho=stories",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

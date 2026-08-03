@@ -3233,73 +3233,131 @@
 .onb-cta:active { transform: scale(0.98); }
 
 /* ════════════════════════════════════════════════════════════
-   ONBOARDING DO CLIENTE — 3 telas de boas-vindas (morador)
+   ONBOARDING DO CLIENTE — tour guiado (spotlight) para o morador
+   Máscara com recorte no elemento real + balão explicativo.
 ════════════════════════════════════════════════════════════ */
 #cliente-onb-overlay {
   position: fixed; inset: 0; z-index: 10001;
-  background: rgba(0,0,0,0.78);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px; opacity: 0; transition: opacity 0.3s ease;
-}
-#cliente-onb-overlay.open { opacity: 1; }
-#cliente-onb-overlay .conb-card {
-  position: relative; width: 100%; max-width: 380px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 26px; padding: 32px 24px 24px; text-align: center;
-  box-shadow: 0 24px 70px rgba(0,0,0,0.65);
-  transform: translateY(18px) scale(0.96);
-  transition: transform 0.34s cubic-bezier(0.32,0.72,0,1);
-}
-#cliente-onb-overlay.open .conb-card { transform: translateY(0) scale(1); }
-.conb-skip {
-  position: absolute; top: 14px; right: 16px;
-  background: none; border: none; color: var(--muted);
-  font-family: var(--font-b); font-size: 13px; font-weight: 600;
-  cursor: pointer; padding: 4px 8px; transition: color .2s;
+  opacity: 0; transition: opacity 0.3s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.conb-skip:hover { color: var(--text); }
+#cliente-onb-overlay.open { opacity: 1; }
+
+/* Máscara escura em 4 painéis que emolduram o furo. */
+.conb-mask { position: absolute; inset: 0; pointer-events: none; }
+.conb-mask-pane {
+  position: absolute; background: rgba(0,0,0,0.80);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  pointer-events: auto;
+  transition: top .32s cubic-bezier(0.32,0.72,0,1),
+              left .32s cubic-bezier(0.32,0.72,0,1),
+              width .32s cubic-bezier(0.32,0.72,0,1),
+              height .32s cubic-bezier(0.32,0.72,0,1);
+}
+/* No hero o blur cobre tudo com um respiro maior. */
+#cliente-onb-overlay.is-hero .conb-mask-pane { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+/* Anel destacando o elemento em foco. */
+.conb-ring {
+  position: absolute; display: none; pointer-events: none;
+  border-radius: 14px;
+  box-shadow: 0 0 0 2px var(--zap), 0 0 0 6px rgba(245,158,11,0.28);
+  transition: all .32s cubic-bezier(0.32,0.72,0,1);
+  animation: conbRingPulse 1.8s ease-in-out infinite;
+}
+@keyframes conbRingPulse {
+  0%,100% { box-shadow: 0 0 0 2px var(--zap), 0 0 0 6px rgba(245,158,11,0.28); }
+  50%     { box-shadow: 0 0 0 2px var(--zap), 0 0 0 10px rgba(245,158,11,0.12); }
+}
+
+/* Botão pular — fixo no topo o tour inteiro. */
+.conb-skip {
+  position: absolute; top: max(14px, env(safe-area-inset-top)); right: 16px;
+  z-index: 3; background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.18); border-radius: 999px;
+  color: #fff; font-family: var(--font-b); font-size: 13px; font-weight: 600;
+  cursor: pointer; padding: 7px 16px; transition: background .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.conb-skip:hover { background: rgba(0,0,0,0.7); }
+
+/* Balão explicativo. */
+.conb-pop {
+  position: absolute; z-index: 2; width: min(340px, calc(100vw - 24px));
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 22px; padding: 20px 20px 16px; text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  transition: left .3s cubic-bezier(0.32,0.72,0,1),
+              top .3s cubic-bezier(0.32,0.72,0,1);
+  animation: conbPopIn .34s cubic-bezier(0.32,0.72,0,1);
+}
+@keyframes conbPopIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Hero: balão centralizado, maior. */
+.conb-pop.centered {
+  left: 50% !important; top: 50% !important;
+  transform: translate(-50%, -50%);
+  width: min(380px, calc(100vw - 40px)); padding: 30px 24px 22px;
+}
+.conb-pop.centered .conb-owl-wrap { height: 128px; }
+.conb-pop.centered .conb-owl { width: 128px; height: 128px; }
+
+/* Seta do balão apontando para o alvo. */
+.conb-pop-arrow { position: absolute; width: 0; height: 0; display: none; }
+.conb-pop-arrow.up {
+  top: -9px; border-left: 9px solid transparent; border-right: 9px solid transparent;
+  border-bottom: 9px solid var(--surface); filter: drop-shadow(0 -1px 0 var(--border));
+}
+.conb-pop-arrow.down {
+  bottom: -9px; border-left: 9px solid transparent; border-right: 9px solid transparent;
+  border-top: 9px solid var(--surface); filter: drop-shadow(0 1px 0 var(--border));
+}
+
 .conb-owl-wrap {
-  height: 130px; display: flex; align-items: center; justify-content: center;
-  margin-bottom: 4px;
+  height: 78px; display: flex; align-items: center; justify-content: center;
+  margin-bottom: 2px;
 }
 .conb-owl {
-  width: 130px; height: 130px; object-fit: contain;
+  width: 78px; height: 78px; object-fit: contain;
   animation: conbOwlIn 0.4s ease;
 }
 @keyframes conbOwlIn {
   from { opacity: 0; transform: scale(0.8) translateY(8px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
-.conb-icon { font-size: 1.8rem; margin-bottom: 4px; }
+.conb-icon { font-size: 1.5rem; margin-bottom: 2px; }
 .conb-title {
   font-family: var(--font-h); font-weight: 800;
-  font-size: 1.5rem; line-height: 1.15; color: var(--text);
-  margin-bottom: 10px;
+  font-size: 1.25rem; line-height: 1.15; color: var(--text);
+  margin-bottom: 7px;
 }
 .conb-text {
-  font-family: var(--font-b); font-size: 14px; line-height: 1.55;
-  color: var(--muted); margin-bottom: 22px; min-height: 66px;
+  font-family: var(--font-b); font-size: 13.5px; line-height: 1.5;
+  color: var(--muted); margin-bottom: 16px;
 }
 .conb-text strong { color: var(--text); font-weight: 700; }
-.conb-dots {
-  display: flex; gap: 7px; justify-content: center; margin-bottom: 20px;
-}
+.conb-foot { display: flex; align-items: center; gap: 12px; }
+.conb-dots { display: flex; gap: 6px; flex: 1; justify-content: flex-start; }
 .conb-dot {
-  width: 7px; height: 7px; border-radius: 999px;
+  width: 6px; height: 6px; border-radius: 999px;
   background: var(--border); transition: all .25s;
 }
-.conb-dot.active { width: 22px; background: var(--zap); }
+.conb-dot.active { width: 18px; background: var(--zap); }
 .conb-cta {
-  width: 100%; padding: 14px; border-radius: 14px;
+  padding: 11px 22px; border-radius: 12px;
   background: linear-gradient(135deg,#f59e0b,#d97706); color: #1a1206;
-  font-family: var(--font-h); font-size: 15px; font-weight: 800;
+  font-family: var(--font-h); font-size: 14px; font-weight: 800;
   border: none; cursor: pointer; transition: opacity .2s, transform .1s;
-  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap; -webkit-tap-highlight-color: transparent;
 }
 .conb-cta:hover { opacity: 0.93; }
 .conb-cta:active { transform: scale(0.98); }
+/* No hero o rodapé empilha (dots em cima, botão largo embaixo). */
+.conb-pop.centered .conb-foot { flex-direction: column; gap: 16px; }
+.conb-pop.centered .conb-dots { justify-content: center; }
+.conb-pop.centered .conb-cta { width: 100%; padding: 14px; }
 
 /* ════════════════════════════════════════════════════════════
    NUDGE DE AVALIAÇÃO — card flutuante convidando a avaliar

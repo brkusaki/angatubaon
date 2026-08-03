@@ -4949,28 +4949,70 @@
      Este explica ao morador como usar: buscar, filtrar, contatar.
      Aparece só 1x (flag em localStorage) e pode ser pulado.
   ══════════════════════════════════════════════════════════════ */
-  const CLIENTE_ONB_KEY = 'angatuba_cliente_onboarded';
-  const CLIENTE_ONB_SLIDES = [
+  /* ══════════════════════════════════════════════════════════════
+     ONBOARDING DO CLIENTE — tour guiado (spotlight) no 1º acesso
+     ----------------------------------------------------------
+     Diferente do onboarding do lojista (boas-vindas ao painel).
+     1 card de boas-vindas + destaques ancorados nos elementos reais
+     do cabeçalho (busca, filtros, favoritos, tema). Um recorte escuro
+     ("furo") destaca cada elemento e um balão explica o que faz, ali
+     no contexto — em vez de telas genéricas soltas.
+     Aparece só 1x (flag versionada em localStorage) e pode ser pulado.
+     Só ancora em elementos ESTÁTICOS do header, então não depende do
+     carregamento das lojas (GAS) para funcionar.
+  ══════════════════════════════════════════════════════════════ */
+  // Versionada: bump o sufixo (_v2 -> _v3) para relançar o tour quando
+  // adicionar uma feature nova, sem remostrar a versão antiga a quem já viu.
+  const CLIENTE_ONB_KEY = 'angatuba_cliente_onboarded_v2';
+  // Passos do tour. O passo 0 é o card de boas-vindas central (sem alvo).
+  // Os demais apontam para um elemento real via seletor CSS. Se o alvo não
+  // existir na tela, o passo é pulado automaticamente.
+  const CLIENTE_ONB_STEPS = [
     {
+      hero: true,
+      owl: '/webp/owl-wave.webp',
+      icon: '👋',
+      titulo: 'Bem-vindo ao AngatubaON',
+      texto: 'Oi! Sou a coruja daqui. Deixa eu te mostrar em alguns toques como achar tudo na cidade.'
+    },
+    {
+      sel: '.search-wrap',
       owl: '/webp/owl-search.webp',
       icon: '🔎',
-      titulo: 'Ache tudo em Angatuba',
-      texto: 'Busque por nome ou tipo — pizza, farmácia, mercado — ou navegue pelas categorias. As lojas da cidade num só lugar.'
+      titulo: 'Busque o que quiser',
+      texto: 'Digite o <strong>nome</strong> ou o <strong>tipo</strong> — pizza, farmácia, mercado. As lojas de Angatuba num só lugar.'
     },
     {
+      sel: '.pill-btn[data-filter="open"]',
       owl: '/webp/owl-point.webp',
       icon: '🎯',
-      titulo: 'Filtre do seu jeito',
-      texto: 'Veja só o que está <strong>aberto agora</strong>, quem <strong>faz entrega</strong>, ou filtre pelo <strong>seu bairro</strong>. Menos rolagem, mais praticidade.'
+      titulo: 'Só o que está aberto',
+      texto: 'Toque aqui pra ver <strong>só quem está aberto agora</strong>. Menos rolagem, mais praticidade.'
     },
     {
+      sel: '.pill-btn[data-filter="delivery"]',
+      owl: '/webp/owl-point.webp',
+      icon: '🛵',
+      titulo: 'Quem faz entrega',
+      texto: 'Filtre por <strong>quem entrega</strong> e receba sem sair de casa.'
+    },
+    {
+      sel: '.pill-fav-btn',
       owl: '/webp/owl-love.webp',
-      icon: '💬',
-      titulo: 'Fale e favorite',
-      texto: 'Chame a loja direto no <strong>WhatsApp</strong> com um toque, e salve suas preferidas no <strong>❤️</strong> para achar rapidinho depois.'
+      icon: '❤️',
+      titulo: 'Salve suas favoritas',
+      texto: 'Toque no <strong>❤️</strong> da loja pra salvar. Depois é só abrir aqui os <strong>Favoritos</strong> pra achar rapidinho.'
+    },
+    {
+      sel: '#theme-toggle-btn',
+      owl: '/webp/owl-idea.webp',
+      icon: '🌙',
+      titulo: 'Claro ou escuro',
+      texto: 'Troque o tema quando quiser — ele também acompanha o dia e a noite sozinho.'
     }
   ];
   let _clienteOnbIdx = 0;
+  let _clienteOnbReposHandler = null;
 
   function clienteJaViuOnboarding() {
     try { return localStorage.getItem(CLIENTE_ONB_KEY) === '1'; } catch (e) { return true; }
@@ -4979,10 +5021,23 @@
     try { localStorage.setItem(CLIENTE_ONB_KEY, '1'); } catch (e) {}
   }
 
+  // Retorna o índice do próximo passo cujo alvo existe (ou é hero), a partir
+  // de "from" inclusive, na direção "dir" (+1 avançar / -1 nunca usado aqui).
+  // Passos com alvo ausente são ignorados para o furo nunca apontar pro vazio.
+  function _clienteOnbProxValido(from) {
+    for (let i = from; i < CLIENTE_ONB_STEPS.length; i++) {
+      const st = CLIENTE_ONB_STEPS[i];
+      if (st.hero) return i;
+      if (st.sel && document.querySelector(st.sel)) return i;
+    }
+    return -1;
+  }
+
   function mostrarOnboardingCliente() {
     if (clienteJaViuOnboarding()) return;
     if (document.getElementById('cliente-onb-overlay')) return;
-    _clienteOnbIdx = 0;
+    _clienteOnbIdx = _clienteOnbProxValido(0);
+    if (_clienteOnbIdx < 0) { marcarClienteOnboarding(); return; }
 
     const ov = document.createElement('div');
     ov.id = 'cliente-onb-overlay';
@@ -4990,25 +5045,48 @@
     ov.setAttribute('aria-modal', 'true');
     ov.setAttribute('aria-label', 'Bem-vindo ao AngatubaON');
     ov.innerHTML =
-      '<div class="conb-card">' +
-        '<button type="button" class="conb-skip" onclick="pularOnboardingCliente()">Pular</button>' +
+      // Camada de recorte: 4 painéis escuros que emolduram o alvo, deixando
+      // um "furo" transparente no meio. No passo hero eles cobrem tudo.
+      '<div class="conb-mask" id="conb-mask">' +
+        '<div class="conb-mask-pane" data-p="top"></div>' +
+        '<div class="conb-mask-pane" data-p="right"></div>' +
+        '<div class="conb-mask-pane" data-p="bottom"></div>' +
+        '<div class="conb-mask-pane" data-p="left"></div>' +
+      '</div>' +
+      // Anel destacando o alvo.
+      '<div class="conb-ring" id="conb-ring"></div>' +
+      // Botão pular (fixo o tour inteiro).
+      '<button type="button" class="conb-skip" id="conb-skip" onclick="pularOnboardingCliente()">Pular</button>' +
+      // Balão explicativo (reposicionado por JS conforme o alvo).
+      '<div class="conb-pop" id="conb-pop" role="document">' +
+        '<div class="conb-pop-arrow" id="conb-pop-arrow"></div>' +
         '<div class="conb-owl-wrap"><img class="conb-owl" id="conb-owl" src="" alt="" ' +
           'onerror="if(!this.dataset.f){this.dataset.f=1;this.style.display=\'none\';}" /></div>' +
         '<div class="conb-icon" id="conb-icon"></div>' +
         '<div class="conb-title" id="conb-title"></div>' +
         '<div class="conb-text" id="conb-text"></div>' +
-        '<div class="conb-dots" id="conb-dots"></div>' +
-        '<button type="button" class="conb-cta" id="conb-cta" onclick="avancarOnboardingCliente()">Próximo</button>' +
+        '<div class="conb-foot">' +
+          '<div class="conb-dots" id="conb-dots"></div>' +
+          '<button type="button" class="conb-cta" id="conb-cta" onclick="avancarOnboardingCliente()">Próximo</button>' +
+        '</div>' +
       '</div>';
     document.body.appendChild(ov);
     document.body.style.overflow = 'hidden';
     requestAnimationFrame(function () { ov.classList.add('open'); });
-    renderOnboardingClienteSlide();
+
+    // Reposiciona no scroll/resize/rotação para o furo seguir o alvo.
+    _clienteOnbReposHandler = function () { posicionarOnboardingCliente(); };
+    window.addEventListener('resize', _clienteOnbReposHandler, { passive: true });
+    window.addEventListener('scroll', _clienteOnbReposHandler, { passive: true, capture: true });
+    window.addEventListener('orientationchange', _clienteOnbReposHandler, { passive: true });
+
+    renderOnboardingClienteStep();
     _focusTrapAtivar(ov);
   }
 
-  function renderOnboardingClienteSlide() {
-    const s = CLIENTE_ONB_SLIDES[_clienteOnbIdx];
+  // Preenche o conteúdo do passo atual e chama o posicionamento.
+  function renderOnboardingClienteStep() {
+    const s = CLIENTE_ONB_STEPS[_clienteOnbIdx];
     if (!s) return;
     const owl = document.getElementById('conb-owl');
     const icon = document.getElementById('conb-icon');
@@ -5016,22 +5094,116 @@
     const texto = document.getElementById('conb-text');
     const dots = document.getElementById('conb-dots');
     const cta = document.getElementById('conb-cta');
-    if (owl) { owl.dataset.f = ''; owl.style.display = ''; owl.src = s.owl; }
-    if (icon) icon.textContent = s.icon;
-    if (titulo) titulo.textContent = s.titulo;
-    if (texto) texto.innerHTML = s.texto;
+    if (owl) { owl.dataset.f = ''; owl.style.display = ''; owl.src = s.owl || ''; }
+    if (icon) icon.textContent = s.icon || '';
+    if (titulo) titulo.textContent = s.titulo || '';
+    if (texto) texto.innerHTML = s.texto || '';
     if (dots) {
-      dots.innerHTML = CLIENTE_ONB_SLIDES.map(function (_, i) {
+      dots.innerHTML = CLIENTE_ONB_STEPS.map(function (_, i) {
         return '<span class="conb-dot' + (i === _clienteOnbIdx ? ' active' : '') + '"></span>';
       }).join('');
     }
-    if (cta) cta.textContent = (_clienteOnbIdx === CLIENTE_ONB_SLIDES.length - 1) ? 'Começar a explorar 🚀' : 'Próximo';
+    if (cta) cta.textContent = (_clienteOnbIdx === CLIENTE_ONB_STEPS.length - 1) ? 'Entendi! 🚀' : 'Próximo';
+    posicionarOnboardingCliente();
+  }
+
+  // Calcula o retângulo do alvo e posiciona máscara, anel e balão.
+  // Passo hero: máscara cobre tudo e o balão fica centralizado.
+  function posicionarOnboardingCliente() {
+    const ov = document.getElementById('cliente-onb-overlay');
+    if (!ov) return;
+    const s = CLIENTE_ONB_STEPS[_clienteOnbIdx];
+    const pop = document.getElementById('conb-pop');
+    const ring = document.getElementById('conb-ring');
+    const arrow = document.getElementById('conb-pop-arrow');
+    const mask = document.getElementById('conb-mask');
+    const panes = {
+      top: mask.querySelector('[data-p="top"]'),
+      right: mask.querySelector('[data-p="right"]'),
+      bottom: mask.querySelector('[data-p="bottom"]'),
+      left: mask.querySelector('[data-p="left"]')
+    };
+    const vw = window.innerWidth, vh = window.innerHeight;
+
+    // HERO: sem alvo. Escurece tudo, esconde anel/seta, centraliza o balão.
+    if (s.hero || !s.sel) {
+      ov.classList.add('is-hero');
+      if (ring) ring.style.display = 'none';
+      if (arrow) arrow.style.display = 'none';
+      // Painel "top" cobre a tela inteira; os outros zerados.
+      panes.top.style.cssText = 'top:0;left:0;width:100%;height:100%;';
+      panes.right.style.cssText = 'width:0;height:0;';
+      panes.bottom.style.cssText = 'width:0;height:0;';
+      panes.left.style.cssText = 'width:0;height:0;';
+      if (pop) {
+        pop.classList.add('centered');
+        pop.style.left = ''; pop.style.top = '';
+      }
+      return;
+    }
+
+    const el = document.querySelector(s.sel);
+    if (!el) { avancarOnboardingCliente(); return; }
+    ov.classList.remove('is-hero');
+    if (pop) pop.classList.remove('centered');
+
+    const r = el.getBoundingClientRect();
+    const pad = 8; // respiro em volta do alvo
+    const hx = Math.max(0, r.left - pad);
+    const hy = Math.max(0, r.top - pad);
+    const hw = Math.min(vw, r.right + pad) - hx;
+    const hh = Math.min(vh, r.bottom + pad) - hy;
+
+    // Molduras (4 retângulos escuros ao redor do furo).
+    panes.top.style.cssText = 'top:0;left:0;width:100%;height:' + hy + 'px;';
+    panes.bottom.style.cssText = 'top:' + (hy + hh) + 'px;left:0;width:100%;height:' + Math.max(0, vh - (hy + hh)) + 'px;';
+    panes.left.style.cssText = 'top:' + hy + 'px;left:0;width:' + hx + 'px;height:' + hh + 'px;';
+    panes.right.style.cssText = 'top:' + hy + 'px;left:' + (hx + hw) + 'px;width:' + Math.max(0, vw - (hx + hw)) + 'px;height:' + hh + 'px;';
+
+    // Anel no alvo.
+    if (ring) {
+      ring.style.display = 'block';
+      ring.style.left = hx + 'px';
+      ring.style.top = hy + 'px';
+      ring.style.width = hw + 'px';
+      ring.style.height = hh + 'px';
+    }
+
+    // Balão: por padrão abaixo do alvo; se não couber, acima.
+    if (pop) {
+      // Mede o balão fora da tela para saber a altura antes de posicionar.
+      pop.style.left = '-9999px'; pop.style.top = '0px';
+      const pw = pop.offsetWidth || 320;
+      const ph = pop.offsetHeight || 200;
+      const gap = 16;
+      const belowTop = hy + hh + gap;
+      const fitsBelow = (belowTop + ph) <= (vh - 12);
+      let popTop, arrowUp;
+      if (fitsBelow) { popTop = belowTop; arrowUp = true; }
+      else { popTop = Math.max(12, hy - gap - ph); arrowUp = false; }
+      // Centraliza horizontalmente no alvo, preso às margens da tela.
+      const targetCx = hx + hw / 2;
+      let popLeft = targetCx - pw / 2;
+      popLeft = Math.max(12, Math.min(popLeft, vw - pw - 12));
+      pop.style.left = popLeft + 'px';
+      pop.style.top = popTop + 'px';
+      // Seta apontando pro centro do alvo.
+      if (arrow) {
+        arrow.style.display = 'block';
+        arrow.classList.toggle('up', arrowUp);
+        arrow.classList.toggle('down', !arrowUp);
+        let ax = targetCx - popLeft;
+        ax = Math.max(18, Math.min(ax, pw - 18));
+        arrow.style.left = ax + 'px';
+      }
+    }
   }
 
   window.avancarOnboardingCliente = function () {
-    if (_clienteOnbIdx < CLIENTE_ONB_SLIDES.length - 1) {
-      _clienteOnbIdx++;
-      renderOnboardingClienteSlide();
+    const prox = _clienteOnbProxValido(_clienteOnbIdx + 1);
+    if (prox >= 0) {
+      _clienteOnbIdx = prox;
+      renderOnboardingClienteStep();
     } else {
       fecharOnboardingCliente();
     }
@@ -5041,6 +5213,12 @@
   function fecharOnboardingCliente() {
     marcarClienteOnboarding();
     const ov = document.getElementById('cliente-onb-overlay');
+    if (_clienteOnbReposHandler) {
+      window.removeEventListener('resize', _clienteOnbReposHandler);
+      window.removeEventListener('scroll', _clienteOnbReposHandler, { capture: true });
+      window.removeEventListener('orientationchange', _clienteOnbReposHandler);
+      _clienteOnbReposHandler = null;
+    }
     if (!ov) return;
     ov.classList.remove('open');
     document.body.style.overflow = '';

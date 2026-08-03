@@ -2430,7 +2430,7 @@
     const claro = _temaClaroResolvido(_lerModoTema());
     document.body.classList.toggle('light-mode', claro);
     const meta = document.getElementById('meta-theme-color');
-    if (meta) meta.setAttribute('content', claro ? '#d2ddef' : '#0d0d0d');
+    if (meta) meta.setAttribute('content', claro ? '#c2cddd' : '#0d0d0d');
     aplicarIconeTema();
   }
   window.aplicarTema = aplicarTema;

@@ -92,7 +92,7 @@
     /* Tema DIA: gradiente da foto clareia p/ fundir com o fundo azul-céu */
     body.light-mode .header-top.htop-dia {
       background:
-        linear-gradient(to bottom, rgba(150,185,230,0.15) 0%, rgba(210,221,239,0.90) 100%),
+        linear-gradient(to bottom, rgba(120,150,195,0.10) 0%, rgba(194,205,221,0.94) 100%),
         url('/img/igreja-dia.jpg') center 35% / cover no-repeat;
     }
     /* Sobre a foto clara, o logo escurece p/ manter contraste */
@@ -2465,7 +2465,7 @@
       display: flex; align-items: center; gap: 6px; flex-shrink: 0;
     }
     .cc-qty-btn {
-      width: 32px; height: 32px; border-radius: 50%;
+      width: 28px; height: 28px; border-radius: 50%;
       border: 1px solid var(--border); background: var(--surface);
       color: var(--text); font-size: 1rem; font-weight: 800;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -2482,56 +2482,6 @@
     }
     #cc-cart-head { transition: transform 0.1s; }
     #cc-cart-head:active { transform: scale(0.99); }
-
-    /* ── Linha do carrinho: info + stepper (-/qty/+) + preco ── */
-    .cc-cart-linha {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      gap: 10px; padding: 2px 0;
-    }
-    .cc-cl-info { flex: 1; min-width: 0; }
-    .cc-cl-nome {
-      font-size: 12px; font-weight: 600; color: var(--text);
-      display: flex; align-items: center; gap: 6px; line-height: 1.3;
-    }
-    .cc-cl-edit {
-      width: 24px; height: 24px; flex-shrink: 0; padding: 0;
-      display: inline-flex; align-items: center; justify-content: center;
-      border-radius: 7px; border: 1px solid var(--border);
-      background: var(--surface); color: var(--muted);
-      font-size: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s, color 0.12s, transform 0.1s;
-    }
-    .cc-cl-edit:active { transform: scale(0.9); }
-    .cc-cl-edit:hover { color: #a78bfa; border-color: rgba(124,58,237,0.4); }
-    .cc-cl-dir {
-      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
-    }
-    .cc-cl-stepper {
-      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
-    }
-    .cc-cl-btn {
-      width: 26px; height: 26px; flex-shrink: 0; padding: 0;
-      display: flex; align-items: center; justify-content: center;
-      border-radius: 50%; border: 1px solid var(--border);
-      background: var(--surface); color: var(--text);
-      font-size: 15px; font-weight: 800; line-height: 1; cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s, border-color 0.12s, transform 0.1s;
-    }
-    .cc-cl-btn:active { transform: scale(0.9); }
-    .cc-cl-btn.mais {
-      border-color: rgba(16,185,129,0.45);
-      background: rgba(16,185,129,0.12); color: #34d399;
-    }
-    .cc-cl-qty {
-      min-width: 18px; text-align: center;
-      font-family: var(--font-h); font-size: 13px; font-weight: 800; color: var(--text);
-      font-variant-numeric: tabular-nums;
-    }
-    .cc-cl-preco {
-      color: var(--green); font-weight: 700; flex-shrink: 0;
-      font-size: 12px; min-width: 58px; text-align: right;
-    }
 
     /* Pulse de atenção ao adicionar o primeiro item */
     @keyframes ccCartPulse {
@@ -2838,39 +2788,44 @@
        Fundo periwinkle claro, surfaces brancas com leve tom frio,
        bordas/texto azul-acinzentados. Acentos neon seguem legíveis. */
     body.light-mode {
-      --bg:       #d2ddef;
+      /* Fundo cinza-azulado DENSO (nao mais ceu lavado) p/ os cards
+         brancos descolarem de verdade. Contraste real, legivel. */
+      --bg:       #c2cddd;
       --surface:  #ffffff;
-      --surface2: #e3ebf8;
-      --border:   rgba(30,58,95,0.12);
-      --text:     #16233a;
-      --muted:    #5b6a82; /* ~5:1 AA sobre as surfaces claras */
+      --surface2: #dbe3f0;
+      --border:   rgba(30,58,95,0.20);
+      --text:     #0f1a2e;
+      --muted:    #4a586e; /* ~6.5:1 AA sobre as surfaces claras */
       /* skeleton tokens claros (levemente azulados) */
-      --sk-base:  #d3ddec;
-      --sk-shine: #e4ebf6;
+      --sk-base:  #c8d3e3;
+      --sk-shine: #dde5f1;
     }
-    body.light-mode .header       { background: rgba(210,221,239,0.74); }
+    body.light-mode .header       { background: rgba(194,205,221,0.86); }
     body.light-mode .filter-pills { background: transparent; }
     body.light-mode .categories   { background: transparent; }
     body.light-mode .main         { background: var(--bg); }
-    body.light-mode .store-card   { background: var(--surface); }
+    body.light-mode .store-card   {
+      background: var(--surface);
+      box-shadow: 0 2px 10px rgba(15,26,46,0.12), 0 1px 3px rgba(15,26,46,0.08);
+    }
     /* ── Cards por tier no tema DIA ──────────────────────────────
        No claro, o fundo branco puro "some" no azul-céu e o Plus perdia
        a cor. Aqui damos profundidade sem virar branco chapado. */
 
     /* GRÁTIS: off-white levemente frio + borda azul sutil p/ descolar do fundo */
     body.light-mode .store-card.plano-gratis {
-      background: #fbfcfe;
-      border-color: rgba(30,58,95,0.14);
-      box-shadow: 0 1px 4px rgba(30,58,95,0.06);
+      background: #ffffff;
+      border-color: rgba(30,58,95,0.22);
+      box-shadow: 0 2px 10px rgba(15,26,46,0.12), 0 1px 3px rgba(15,26,46,0.08);
     }
 
     /* PLUS: recupera a identidade roxa — leve lavanda + borda/realce roxo */
     body.light-mode .store-card.plano-plus {
-      background: linear-gradient(135deg,#f3f2fd,#eceafb);
-      border-color: rgba(99,102,241,0.45);
+      background: linear-gradient(135deg,#eeecfc,#e4e1f9);
+      border-color: rgba(99,102,241,0.55);
       box-shadow:
-        0 0 0 1px rgba(99,102,241,0.18) inset,
-        0 2px 14px rgba(99,102,241,0.14);
+        0 0 0 1px rgba(99,102,241,0.22) inset,
+        0 3px 16px rgba(99,102,241,0.20);
     }
     body.light-mode .skeleton-card { background: var(--surface); }
     body.light-mode .skeleton-line,
@@ -4329,7 +4284,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   display: flex; align-items: center; gap: 8px; flex-shrink: 0;
 }
 .cc-pers-step-btn {
-  width: 34px; height: 34px; flex-shrink: 0;
+  width: 30px; height: 30px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   border-radius: 9px; border: 1px solid var(--border);
   background: var(--surface); color: var(--text);

@@ -74,7 +74,7 @@
        Modos: 'auto' (segue o relógio, dia 5h-18h = claro), 'light', 'dark'.
        A janela do dia é a mesma da foto da Igreja (htop-dia) no app.js. */
     try {
-      var _m = localStorage.getItem('angatuba_theme') || 'auto';
+      var _m = localStorage.getItem('angatuba_theme') || 'dark';
       var _h = new Date().getHours();
       var _claro = _m === 'light' || (_m !== 'dark' && _h >= 5 && _h < 18);
       if (_claro) document.body.classList.add('light-mode');

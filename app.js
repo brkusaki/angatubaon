@@ -2395,7 +2395,7 @@
       const m = localStorage.getItem('angatuba_theme');
       if (m === 'light' || m === 'dark' || m === 'auto') return m;
     } catch(e) {}
-    return 'auto';
+    return 'dark'; // padrao: escuro (usuario troca no botao se quiser)
   }
 
   // Resolve o modo atual para claro(true)/escuro(false).

@@ -3236,12 +3236,16 @@
    ONBOARDING DO CLIENTE — tour guiado (spotlight) para o morador
    Máscara com recorte no elemento real + balão explicativo.
 ════════════════════════════════════════════════════════════ */
-#cliente-onb-overlay {
+#cliente-onb-overlay,
+#lojista-onb-overlay {
   position: fixed; inset: 0; z-index: 10001;
   opacity: 0; transition: opacity 0.3s ease;
   -webkit-tap-highlight-color: transparent;
 }
-#cliente-onb-overlay.open { opacity: 1; }
+/* Tour do painel: acima do modal da loja (z 2000). */
+#lojista-onb-overlay { z-index: 10002; }
+#cliente-onb-overlay.open,
+#lojista-onb-overlay.open { opacity: 1; }
 
 /* Máscara escura em 4 painéis que emolduram o furo. */
 .conb-mask { position: absolute; inset: 0; pointer-events: none; }
@@ -3255,7 +3259,8 @@
               height .32s cubic-bezier(0.32,0.72,0,1);
 }
 /* No hero o blur cobre tudo com um respiro maior. */
-#cliente-onb-overlay.is-hero .conb-mask-pane { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+#cliente-onb-overlay.is-hero .conb-mask-pane,
+#lojista-onb-overlay.is-hero .conb-mask-pane { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 
 /* Anel destacando o elemento em foco. */
 .conb-ring {

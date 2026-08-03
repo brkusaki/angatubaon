@@ -4880,19 +4880,107 @@
   }
   window.mlProximaDica = mlProximaDica;
 
-  // ══════════════════════════════════════════════════════════
-  //  ONBOARDING — tela de boas-vindas no 1º acesso ao painel
+  //  ONBOARDING — tour guiado (spotlight) no 1º acesso ao painel
   //  Aparece uma única vez por loja. A chave usa o WhatsApp NORMALIZADO
   //  (DDI 55) para que login e aprovação gerem a mesma flag — sem isso,
   //  conta nova (fluxo de aprovação) não casava com a flag e reaparecia
   //  ou (no caso atual) o número vazio fazia a flag virar 'angatuba_onboarded_'.
-  //  Coruja owl-wave. Overlay criado via JS (sem tocar no index.html).
+  //  Substitui a antiga tela de boas-vindas estática por destaques ancorados
+  //  nos elementos reais do painel (status, cardápio, métricas...). Cada passo
+  //  troca de aba automaticamente (mlSwitchTab) e rola o alvo pra dentro da tela
+  //  antes de medir. Passos de features de plano superior (stories/agenda) são
+  //  pulados sozinhos quando o elemento está oculto para o plano atual — então
+  //  o mesmo tour serve free, Plus e Pro sem duplicar código.
+  //  Reaproveita o CSS .conb-* do tour do cliente (mesmo visual).
   // ══════════════════════════════════════════════════════════
+  // Versionada por loja: bump o sufixo (v2 -> v3) para relançar quando
+  // adicionar features novas ao painel.
+  const LOJISTA_ONB_VER = 'v2';
   function _wppFlagOnb() {
     let n = String(_lojaWpp || localStorage.getItem('angatuba_loja_wpp') || '').replace(/\D/g, '');
     if (n && !n.startsWith('55')) n = '55' + n;
     return n;
   }
+  // Passos do tour. `tab` = aba onde o alvo vive (o tour troca sozinho).
+  // `sel` = seletor do elemento real. `plano` (opcional) = só faz sentido a
+  // partir deste plano, mas a decisão real de mostrar/pular é por VISIBILIDADE
+  // (offsetParent), então mesmo sem `plano` um alvo oculto é ignorado.
+  const LOJISTA_ONB_STEPS = [
+    {
+      hero: true, tab: 'hoje',
+      owl: '/webp/owl-wave.webp', icon: '👋',
+      titulo: '', // preenchido com o nome da loja em runtime
+      texto: 'Sua loja está no ar! Deixa eu te mostrar rapidinho o que dá pra fazer aqui no painel.'
+    },
+    {
+      tab: 'hoje', sel: '.toggle-status-btn[data-status="ABERTO"]',
+      owl: '/webp/owl-thumbsup.webp', icon: '⚡',
+      titulo: 'Abra e feche na hora',
+      texto: 'Toque aqui pra mudar seu status <strong>na hora</strong>. O cliente vê Aberto, Já voltamos ou Fechado na mesma hora.'
+    },
+    {
+      tab: 'hoje', sel: '#ml-anuncio-section',
+      owl: '/webp/owl-sign.webp', icon: '📣',
+      titulo: 'Anúncios e stories',
+      texto: 'Publique o <strong>anúncio do dia</strong> ou stories pra aparecer em destaque pros clientes.'
+    },
+    {
+      tab: 'hoje', sel: '#ml-agenda-section',
+      owl: '/webp/owl-idea.webp', icon: '🗓️',
+      titulo: 'Agende seus posts',
+      texto: 'Programe stories pra publicarem <strong>sozinhos</strong> na hora que você marcar. Deixe tudo pronto de uma vez.'
+    },
+    {
+      tab: 'loja', sel: '#ml-cardapio-add-btn',
+      owl: '/webp/owl-point.webp', icon: '🍔',
+      titulo: 'Monte seu cardápio',
+      texto: 'Adicione seus <strong>produtos, preços e fotos</strong>. É o cardápio digital que o cliente abre e pede no WhatsApp.'
+    },
+    {
+      tab: 'loja', sel: '#ml-info-section',
+      owl: '/webp/owl-tip.webp', icon: '✏️',
+      titulo: 'Dados da loja',
+      texto: 'Atualize <strong>horário, endereço, bairro e contatos</strong> quando quiser.'
+    },
+    {
+      tab: 'loja', sel: '#ml-share-section',
+      owl: '/webp/owl-phone.webp', icon: '🔗',
+      titulo: 'Divulgue sua loja',
+      texto: 'Copie o <strong>link direto</strong> da sua loja e mande no WhatsApp, Instagram, onde quiser.'
+    },
+    {
+      tab: 'metricas', sel: '#ml-metricas-wrap',
+      owl: '/webp/owl-badge.webp', icon: '📊',
+      titulo: 'Acompanhe os acessos',
+      texto: 'Veja <strong>quantas pessoas viram</strong> sua loja e <strong>clicaram no WhatsApp</strong>. Saiba o que está dando certo.'
+    }
+  ];
+  let _lojistaOnbIdx = 0;
+  let _lojistaOnbFlag = '';
+  let _lojistaOnbReposHandler = null;
+
+  // Elemento existe E está visível (não display:none, dentro de aba ativa).
+  // offsetParent é null quando o elemento (ou um ancestral) está display:none.
+  function _lojistaOnbVisivel(sel) {
+    if (!sel) return false;
+    const el = document.querySelector(sel);
+    if (!el) return false;
+    if (el.offsetParent === null && el.getClientRects().length === 0) return false;
+    return true;
+  }
+
+  // Próximo passo "servível" a partir de `from`. Como o alvo pode estar em
+  // outra aba (oculto agora), a visibilidade é checada APÓS trocar de aba —
+  // ver avancarOnboardingLojista. Aqui só filtramos hero e existência no DOM.
+  function _lojistaOnbProx(from) {
+    for (let i = from; i < LOJISTA_ONB_STEPS.length; i++) {
+      const st = LOJISTA_ONB_STEPS[i];
+      if (st.hero) return i;
+      if (st.sel && document.querySelector(st.sel)) return i;
+    }
+    return -1;
+  }
+
   function mostrarOnboarding(_tentativa) {
     const wppN = _wppFlagOnb();
     // Sem WhatsApp resolvido ainda (token via cache, dados a caminho): tenta de novo
@@ -4902,45 +4990,214 @@
       if (t <= 3) { setTimeout(() => mostrarOnboarding(t), 500); }
       return;
     }
-    const flag = 'angatuba_onboarded_' + wppN;
-    try { if (localStorage.getItem(flag) === '1') return; } catch(e) { return; }
-    if (document.getElementById('onboarding-overlay')) return;
+    _lojistaOnbFlag = 'angatuba_onboarded_' + LOJISTA_ONB_VER + '_' + wppN;
+    try { if (localStorage.getItem(_lojistaOnbFlag) === '1') return; } catch(e) { return; }
+    if (document.getElementById('lojista-onb-overlay')) return;
 
     const nome = (_lojaNome || localStorage.getItem('angatuba_loja_nome') || '').trim();
     const primeiroNome = nome ? nome.split(' ')[0] : '';
-    const saud = primeiroNome ? ('Bem-vindo, ' + escHTML(primeiroNome) + '!') : 'Bem-vindo!';
+    LOJISTA_ONB_STEPS[0].titulo = primeiroNome ? ('Bem-vindo, ' + primeiroNome + '! 🎉') : 'Bem-vindo! 🎉';
+
+    _lojistaOnbIdx = _lojistaOnbProx(0);
+    if (_lojistaOnbIdx < 0) { try { localStorage.setItem(_lojistaOnbFlag, '1'); } catch(e) {} return; }
 
     const ov = document.createElement('div');
-    ov.id = 'onboarding-overlay';
+    ov.id = 'lojista-onb-overlay';
     ov.setAttribute('role', 'dialog');
     ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-label', 'Tour do painel da loja');
     ov.innerHTML =
-      '<div class="onb-card">' +
-        '<button type="button" class="onb-close" aria-label="Fechar" onclick="fecharOnboarding()">&times;</button>' +
-        '<img class="onb-owl" src="/webp/owl-wave.webp" alt="" onerror="if(!this.dataset.f){this.dataset.f=1;this.style.display=\'none\';}" />' +
-        '<div class="onb-title">' + saud + ' <span>\uD83C\uDF89</span></div>' +
-        '<div class="onb-sub">Sua loja está no ar! Veja o que você pode fazer por aqui:</div>' +
-        '<div class="onb-steps">' +
-          '<div class="onb-step"><div class="onb-ico"><i class="ti ti-pencil"></i></div>' +
-            '<div class="onb-step-txt"><strong>Edite sua loja</strong>Atualize horários, endereço, fotos e contatos quando quiser.</div></div>' +
-          '<div class="onb-step"><div class="onb-ico"><i class="ti ti-tools-kitchen-2"></i></div>' +
-            '<div class="onb-step-txt"><strong>Monte seu cardápio</strong>Adicione seus produtos e preços para os clientes verem.</div></div>' +
-          '<div class="onb-step"><div class="onb-ico"><i class="ti ti-chart-bar"></i></div>' +
-            '<div class="onb-step-txt"><strong>Acompanhe os acessos</strong>Veja quantas pessoas viram sua loja e clicaram no WhatsApp.</div></div>' +
+      '<div class="conb-mask" id="lonb-mask">' +
+        '<div class="conb-mask-pane" data-p="top"></div>' +
+        '<div class="conb-mask-pane" data-p="right"></div>' +
+        '<div class="conb-mask-pane" data-p="bottom"></div>' +
+        '<div class="conb-mask-pane" data-p="left"></div>' +
+      '</div>' +
+      '<div class="conb-ring" id="lonb-ring"></div>' +
+      '<button type="button" class="conb-skip" id="lonb-skip" onclick="pularOnboardingLojista()">Pular</button>' +
+      '<div class="conb-pop" id="lonb-pop" role="document">' +
+        '<div class="conb-pop-arrow" id="lonb-pop-arrow"></div>' +
+        '<div class="conb-owl-wrap"><img class="conb-owl" id="lonb-owl" src="" alt="" ' +
+          'onerror="if(!this.dataset.f){this.dataset.f=1;this.style.display=\'none\';}" /></div>' +
+        '<div class="conb-icon" id="lonb-icon"></div>' +
+        '<div class="conb-title" id="lonb-title"></div>' +
+        '<div class="conb-text" id="lonb-text"></div>' +
+        '<div class="conb-foot">' +
+          '<div class="conb-dots" id="lonb-dots"></div>' +
+          '<button type="button" class="conb-cta" id="lonb-cta" onclick="avancarOnboardingLojista()">Próximo</button>' +
         '</div>' +
-        '<button type="button" class="onb-cta" onclick="fecharOnboarding()">Bora começar \u2192</button>' +
       '</div>';
+    // Anexa dentro do modal do painel para ficar por cima do conteúdo dele,
+    // mas ainda respeitando o container (z-index alto no CSS garante o topo).
     document.body.appendChild(ov);
-    requestAnimationFrame(() => ov.classList.add('open'));
-    try { localStorage.setItem(flag, '1'); } catch(e) {}
+    requestAnimationFrame(function () { ov.classList.add('open'); });
+
+    _lojistaOnbReposHandler = function () { posicionarOnboardingLojista(); };
+    window.addEventListener('resize', _lojistaOnbReposHandler, { passive: true });
+    window.addEventListener('scroll', _lojistaOnbReposHandler, { passive: true, capture: true });
+    window.addEventListener('orientationchange', _lojistaOnbReposHandler, { passive: true });
+
+    aplicarPassoLojista();
+    if (typeof _focusTrapAtivar === 'function') _focusTrapAtivar(ov);
+    try { localStorage.setItem(_lojistaOnbFlag, '1'); } catch(e) {}
   }
-  function fecharOnboarding() {
-    const ov = document.getElementById('onboarding-overlay');
+
+  // Troca pra aba do passo, rola o alvo pra dentro da tela, pinta o conteúdo
+  // e posiciona. Feito com pequenos delays pra dar tempo do layout assentar
+  // (troca de aba mexe em display; scroll precisa de um frame).
+  function aplicarPassoLojista() {
+    const s = LOJISTA_ONB_STEPS[_lojistaOnbIdx];
+    if (!s) return;
+    // 1) Aba certa.
+    if (s.tab && typeof mlSwitchTab === 'function') {
+      try { mlSwitchTab(s.tab); } catch(e) {}
+    }
+    // 2) Conteúdo do balão.
+    const owl = document.getElementById('lonb-owl');
+    const icon = document.getElementById('lonb-icon');
+    const titulo = document.getElementById('lonb-title');
+    const texto = document.getElementById('lonb-text');
+    const dots = document.getElementById('lonb-dots');
+    const cta = document.getElementById('lonb-cta');
+    if (owl) { owl.dataset.f = ''; owl.style.display = ''; owl.src = s.owl || ''; }
+    if (icon) icon.textContent = s.icon || '';
+    if (titulo) titulo.textContent = s.titulo || '';
+    if (texto) texto.innerHTML = s.texto || '';
+    if (dots) {
+      dots.innerHTML = LOJISTA_ONB_STEPS.map(function (_, i) {
+        return '<span class="conb-dot' + (i === _lojistaOnbIdx ? ' active' : '') + '"></span>';
+      }).join('');
+    }
+    if (cta) cta.textContent = (_lojistaOnbIdx === LOJISTA_ONB_STEPS.length - 1) ? 'Entendi! 🚀' : 'Próximo';
+    // 3) Rola o alvo pra dentro da área visível, depois posiciona.
+    if (!s.hero && s.sel) {
+      const el = document.querySelector(s.sel);
+      if (el && el.scrollIntoView) {
+        try { el.scrollIntoView({ block: 'center', behavior: 'auto' }); } catch(e) {}
+      }
+    }
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { posicionarOnboardingLojista(); });
+    });
+  }
+
+  function posicionarOnboardingLojista() {
+    const ov = document.getElementById('lojista-onb-overlay');
+    if (!ov) return;
+    const s = LOJISTA_ONB_STEPS[_lojistaOnbIdx];
+    const pop = document.getElementById('lonb-pop');
+    const ring = document.getElementById('lonb-ring');
+    const arrow = document.getElementById('lonb-pop-arrow');
+    const mask = document.getElementById('lonb-mask');
+    if (!mask) return;
+    const panes = {
+      top: mask.querySelector('[data-p="top"]'),
+      right: mask.querySelector('[data-p="right"]'),
+      bottom: mask.querySelector('[data-p="bottom"]'),
+      left: mask.querySelector('[data-p="left"]')
+    };
+    const vw = window.innerWidth, vh = window.innerHeight;
+
+    if (s.hero || !s.sel) {
+      ov.classList.add('is-hero');
+      if (ring) ring.style.display = 'none';
+      if (arrow) arrow.style.display = 'none';
+      panes.top.style.cssText = 'top:0;left:0;width:100%;height:100%;';
+      panes.right.style.cssText = 'width:0;height:0;';
+      panes.bottom.style.cssText = 'width:0;height:0;';
+      panes.left.style.cssText = 'width:0;height:0;';
+      if (pop) { pop.classList.add('centered'); pop.style.left = ''; pop.style.top = ''; }
+      return;
+    }
+
+    const el = document.querySelector(s.sel);
+    // Alvo ausente OU oculto (feature de plano superior): pula sozinho.
+    // Faz o "salto" no próximo tick para não crescer a pilha quando vários
+    // passos seguidos estão ocultos (ex.: free pula anúncio E agenda).
+    if (!el || (el.offsetParent === null && el.getClientRects().length === 0)) {
+      setTimeout(avancarOnboardingLojista, 0);
+      return;
+    }
+    ov.classList.remove('is-hero');
+    if (pop) pop.classList.remove('centered');
+
+    const r = el.getBoundingClientRect();
+    const pad = 8;
+    const hx = Math.max(0, r.left - pad);
+    const hy = Math.max(0, r.top - pad);
+    const hw = Math.min(vw, r.right + pad) - hx;
+    const hh = Math.min(vh, r.bottom + pad) - hy;
+
+    panes.top.style.cssText = 'top:0;left:0;width:100%;height:' + hy + 'px;';
+    panes.bottom.style.cssText = 'top:' + (hy + hh) + 'px;left:0;width:100%;height:' + Math.max(0, vh - (hy + hh)) + 'px;';
+    panes.left.style.cssText = 'top:' + hy + 'px;left:0;width:' + hx + 'px;height:' + hh + 'px;';
+    panes.right.style.cssText = 'top:' + hy + 'px;left:' + (hx + hw) + 'px;width:' + Math.max(0, vw - (hx + hw)) + 'px;height:' + hh + 'px;';
+
+    if (ring) {
+      ring.style.display = 'block';
+      ring.style.left = hx + 'px'; ring.style.top = hy + 'px';
+      ring.style.width = hw + 'px'; ring.style.height = hh + 'px';
+    }
+
+    if (pop) {
+      pop.style.left = '-9999px'; pop.style.top = '0px';
+      const pw = pop.offsetWidth || 320;
+      const ph = pop.offsetHeight || 200;
+      const gap = 16;
+      const belowTop = hy + hh + gap;
+      const fitsBelow = (belowTop + ph) <= (vh - 12);
+      let popTop, arrowUp;
+      if (fitsBelow) { popTop = belowTop; arrowUp = true; }
+      else { popTop = Math.max(12, hy - gap - ph); arrowUp = false; }
+      const targetCx = hx + hw / 2;
+      let popLeft = targetCx - pw / 2;
+      popLeft = Math.max(12, Math.min(popLeft, vw - pw - 12));
+      pop.style.left = popLeft + 'px';
+      pop.style.top = popTop + 'px';
+      if (arrow) {
+        arrow.style.display = 'block';
+        arrow.classList.toggle('up', arrowUp);
+        arrow.classList.toggle('down', !arrowUp);
+        let ax = targetCx - popLeft;
+        ax = Math.max(18, Math.min(ax, pw - 18));
+        arrow.style.left = ax + 'px';
+      }
+    }
+  }
+
+  window.avancarOnboardingLojista = function () {
+    const prox = _lojistaOnbProx(_lojistaOnbIdx + 1);
+    if (prox >= 0) {
+      _lojistaOnbIdx = prox;
+      aplicarPassoLojista();
+    } else {
+      fecharOnboardingLojista();
+    }
+  };
+  window.pularOnboardingLojista = function () { fecharOnboardingLojista(); };
+
+  function fecharOnboardingLojista() {
+    if (_lojistaOnbFlag) { try { localStorage.setItem(_lojistaOnbFlag, '1'); } catch(e) {} }
+    const ov = document.getElementById('lojista-onb-overlay');
+    if (_lojistaOnbReposHandler) {
+      window.removeEventListener('resize', _lojistaOnbReposHandler);
+      window.removeEventListener('scroll', _lojistaOnbReposHandler, { capture: true });
+      window.removeEventListener('orientationchange', _lojistaOnbReposHandler);
+      _lojistaOnbReposHandler = null;
+    }
+    // Volta pra aba inicial pra loja começar na visão "Hoje".
+    if (typeof mlSwitchTab === 'function') { try { mlSwitchTab('hoje'); } catch(e) {} }
     if (!ov) return;
     ov.classList.remove('open');
-    setTimeout(() => { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 300);
+    if (typeof _focusTrapDesativar === 'function') _focusTrapDesativar();
+    setTimeout(function () { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 300);
   }
+  // Compat: nome antigo ainda referenciado em algum lugar aponta pro novo fluxo.
+  function fecharOnboarding() { fecharOnboardingLojista(); }
   window.fecharOnboarding = fecharOnboarding;
+  // Exposto para permitir re-disparar manualmente (QA) e paridade com o tour
+  // do cliente. O gate de flag continua valendo — só mostra se ainda não viu.
+  window.mostrarOnboarding = mostrarOnboarding;
 
   /* ══════════════════════════════════════════════════════════════
      ONBOARDING DO CLIENTE — 3 telas na primeira vez que abre o app

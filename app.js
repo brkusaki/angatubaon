@@ -364,7 +364,10 @@
      #dica-coruja. Rotação determinística por data: mesma dica o dia todo,
      troca no dia seguinte. Falha silenciosa — se a API não responder ou a
      aba não existir, o card fica escondido e nada quebra. */
-  async function _carregarDicaCoruja() {
+  // _tentativa: 0 na primeira chamada. Em caso de falha (timeout/rede),
+  // agenda 1 retry único após 3s — cobre o cold-start do Apps Script.
+  async function _carregarDicaCoruja(_tentativa) {
+    _tentativa = _tentativa || 0;
     const card = document.getElementById('dica-coruja');
     if (!card) return;
     try {
@@ -381,7 +384,10 @@
       const txtEl = card.querySelector('.dica-coruja-txt');
       if (txtEl) txtEl.textContent = texto;
       card.style.display = 'block';
-    } catch(e) { /* silencioso: card fica escondido */ }
+    } catch(e) {
+      // Falha (ex.: cold-start do GAS): 1 retry após 3s. Depois desiste em silêncio.
+      if (_tentativa < 1) setTimeout(function(){ _carregarDicaCoruja(_tentativa + 1); }, 3000);
+    }
   }
 
   /* ── Máscara de WhatsApp progressiva: (15) 9 9999-9999 ──────────
@@ -9004,11 +9010,13 @@
   // sem precisar recarregar a página.
   setInterval(atualizarSaudacaoNoturna, 60_000);
 
+  // Dica da Coruja: dispara em paralelo, independente das lojas. Se o
+  // carregamento das lojas der timeout, a dica ainda carrega por conta própria.
+  _carregarDicaCoruja();
+
   carregarLojas().then(() => {
     // Deep link: abre detalhes de loja pelo hash da URL (ex: /#mr-centro-automotivo)
     _resolverDeepLink();
-    // Dica da Coruja: carrega em segundo plano, sem bloquear o boot.
-    _carregarDicaCoruja();
   });
 
   /* ══════════════════════════════════════════════════════════════

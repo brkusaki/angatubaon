@@ -359,6 +359,31 @@
     return json;
   }
 
+  /* ── Dica da Coruja — curiosidade da cidade no rodapé ─────
+     Busca a lista de dicas ativas na API e mostra UMA por dia no card
+     #dica-coruja. Rotação determinística por data: mesma dica o dia todo,
+     troca no dia seguinte. Falha silenciosa — se a API não responder ou a
+     aba não existir, o card fica escondido e nada quebra. */
+  async function _carregarDicaCoruja() {
+    const card = document.getElementById('dica-coruja');
+    if (!card) return;
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action: 'dicasCoruja' }));
+      const resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(8000) });
+      const json = await resp.json();
+      const dicas = (json && json.status === 'ok' && Array.isArray(json.data)) ? json.data : [];
+      if (!dicas.length) return; // sem dicas: card continua escondido
+      // Índice do dia: dias desde epoch % total. Determinístico, sem random.
+      const diaEpoch = Math.floor(Date.now() / 86400000);
+      const texto = dicas[diaEpoch % dicas.length];
+      if (!texto) return;
+      const txtEl = card.querySelector('.dica-coruja-txt');
+      if (txtEl) txtEl.textContent = texto;
+      card.style.display = 'block';
+    } catch(e) { /* silencioso: card fica escondido */ }
+  }
+
   /* ── Máscara de WhatsApp progressiva: (15) 9 9999-9999 ──────────
      Fonte única usada tanto no cadastro quanto no login de loja. */
   function mascararWppBR(valorBruto) {
@@ -8982,6 +9007,8 @@
   carregarLojas().then(() => {
     // Deep link: abre detalhes de loja pelo hash da URL (ex: /#mr-centro-automotivo)
     _resolverDeepLink();
+    // Dica da Coruja: carrega em segundo plano, sem bloquear o boot.
+    _carregarDicaCoruja();
   });
 
   /* ══════════════════════════════════════════════════════════════

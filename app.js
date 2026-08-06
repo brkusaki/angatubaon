@@ -527,23 +527,12 @@
     var siga = document.getElementById('bloco-siga');
     if (siga) siga.style.display = 'none';
     hub.style.display = 'block';
+    _voltarAoMenu(); // sempre abre mostrando o menu de jogos
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0,0); }
-    if (!_quizJaCarregado) {
-      _quizJaCarregado = true;
-      _carregarQuizCoruja();
-      setTimeout(function(){
-        var ld = document.getElementById('games-loading');
-        var qz = document.getElementById('quiz-coruja');
-        if (ld && qz && qz.style.display !== 'none') ld.style.display = 'none';
-      }, 1200);
-      setTimeout(function(){ var ld = document.getElementById('games-loading'); if (ld) ld.style.display = 'none'; }, 12000);
-    } else {
-      var ld = document.getElementById('games-loading');
-      if (ld) ld.style.display = 'none';
-    }
   }
 
   function _fecharGamesHub() {
+    _stParar(); // garante que o Speed Tap para se estava rodando
     var hub = document.getElementById('games-hub');
     if (!hub) return;
     hub.style.display = 'none';
@@ -559,6 +548,177 @@
     var hub = document.getElementById('games-hub');
     return !!(hub && hub.style.display !== 'none' && hub.style.display !== '');
   }
+
+  /* -- Roteador de jogos: menu <-> tela de cada jogo -- */
+  var _quizJaCarregadoNaTela = false; // lazy-load do quiz s\xc3\xb3 quando abre a tela dele
+
+  function _voltarAoMenu() {
+    _stParar();
+    var menu = document.getElementById('games-menu');
+    var telas = document.querySelectorAll('.jogo-tela');
+    for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
+    if (menu) menu.style.display = 'block';
+  }
+
+  function _abrirJogo(nome) {
+    var menu = document.getElementById('games-menu');
+    if (menu) menu.style.display = 'none';
+    var telas = document.querySelectorAll('.jogo-tela');
+    for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
+    var tela = document.getElementById('jogo-' + nome);
+    if (tela) tela.style.display = 'block';
+    if (nome === 'quiz') {
+      // Lazy-load do quiz na primeira abertura da tela.
+      if (!_quizJaCarregadoNaTela) {
+        _quizJaCarregadoNaTela = true;
+        _carregarQuizCoruja();
+        setTimeout(function(){
+          var ld = document.getElementById('games-loading');
+          var qz = document.getElementById('quiz-coruja');
+          if (ld && qz && qz.style.display !== 'none') ld.style.display = 'none';
+        }, 1200);
+        setTimeout(function(){ var ld = document.getElementById('games-loading'); if (ld) ld.style.display = 'none'; }, 12000);
+      }
+    } else if (nome === 'speedtap') {
+      _stPreparar();
+    }
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
+  }
+  window._abrirJogo = _abrirJogo;
+  window._voltarAoMenu = _voltarAoMenu;
+
+  /* -- Speed Tap: "Pega a Coruja" -- */
+  var _ST_DURACAO = 20;     // segundos por partida
+  var _ST_OWL = '/webp/owl-portrait.webp'; // coruja-alvo
+  var _stTempo = 0, _stPontos = 0;
+  var _stTimerRelogio = null, _stTimerPulo = null, _stRodando = false;
+
+  function _stRecordeGet() {
+    try { return Number(localStorage.getItem('angatuba_speedtap_rec')) || 0; } catch(e) { return 0; }
+  }
+  function _stRecordeSet(v) {
+    try { localStorage.setItem('angatuba_speedtap_rec', String(v)); } catch(e) {}
+  }
+
+  // Prepara a tela (estado inicial, mostra recorde). N\xc3\xa3o inicia o jogo ainda.
+  function _stPreparar() {
+    _stParar();
+    var recEl = document.getElementById('st-recorde');
+    if (recEl) recEl.textContent = _stRecordeGet();
+    var pEl = document.getElementById('st-pontos'); if (pEl) pEl.textContent = '0';
+    var tEl = document.getElementById('st-tempo');  if (tEl) tEl.textContent = _ST_DURACAO;
+    var inicio = document.getElementById('st-inicio');
+    var fim = document.getElementById('st-fim');
+    if (inicio) inicio.style.display = 'flex';
+    if (fim) fim.style.display = 'none';
+    // Remove qualquer alvo residual.
+    var arena = document.getElementById('st-arena');
+    if (arena) { var a = arena.querySelector('.st-alvo'); if (a) a.remove(); }
+  }
+
+  // Para tudo (timers, alvo). Seguro chamar a qualquer momento.
+  function _stParar() {
+    _stRodando = false;
+    if (_stTimerRelogio) { clearInterval(_stTimerRelogio); _stTimerRelogio = null; }
+    if (_stTimerPulo) { clearTimeout(_stTimerPulo); _stTimerPulo = null; }
+    var arena = document.getElementById('st-arena');
+    if (arena) { var a = arena.querySelector('.st-alvo'); if (a) a.remove(); }
+  }
+
+  // Move a coruja-alvo pra uma posi\xc3\xa7\xc3\xa3o aleat\xc3\xb3ria dentro da arena.
+  function _stMoverAlvo(alvo, arena) {
+    var w = arena.clientWidth, h = arena.clientHeight;
+    var margem = 40;
+    var x = margem + Math.random() * (w - margem * 2);
+    var y = margem + Math.random() * (h - margem * 2);
+    alvo.style.left = x + 'px';
+    alvo.style.top = y + 'px';
+  }
+
+  function _stComecar() {
+    var arena = document.getElementById('st-arena');
+    if (!arena) return;
+    _stParar();
+    _stPontos = 0;
+    _stTempo = _ST_DURACAO;
+    var pEl = document.getElementById('st-pontos'); if (pEl) pEl.textContent = '0';
+    var tEl = document.getElementById('st-tempo');  if (tEl) tEl.textContent = _stTempo;
+    var inicio = document.getElementById('st-inicio'); if (inicio) inicio.style.display = 'none';
+    var fim = document.getElementById('st-fim'); if (fim) fim.style.display = 'none';
+    var recEl = document.getElementById('st-recorde');
+    if (recEl) { recEl.textContent = _stRecordeGet(); recEl.classList.remove('st-recorde-novo'); }
+
+    // Cria a coruja-alvo.
+    var alvo = document.createElement('button');
+    alvo.type = 'button';
+    alvo.className = 'st-alvo';
+    var img = document.createElement('img');
+    img.src = _ST_OWL; img.alt = 'coruja';
+    img.onerror = function(){ this.style.display = 'none'; };
+    alvo.appendChild(img);
+    arena.appendChild(alvo);
+    _stMoverAlvo(alvo, arena);
+
+    _stRodando = true;
+
+    // Handler de toque na coruja.
+    alvo.addEventListener('click', function(ev){
+      if (!_stRodando) return;
+      _stPontos++;
+      if (pEl) pEl.textContent = _stPontos;
+      if (navigator.vibrate) { try { navigator.vibrate(15); } catch(e) {} }
+      // Efeito +1 flutuante.
+      var mais = document.createElement('div');
+      mais.className = 'st-mais'; mais.textContent = '+1';
+      mais.style.left = alvo.style.left; mais.style.top = alvo.style.top;
+      arena.appendChild(mais);
+      setTimeout(function(){ if (mais.parentNode) mais.remove(); }, 600);
+      // Pop e pula pra outro lugar.
+      alvo.classList.remove('st-pop'); void alvo.offsetWidth; alvo.classList.add('st-pop');
+      _stMoverAlvo(alvo, arena);
+    });
+
+    // Rel\xc3\xb3gio regressivo.
+    _stTimerRelogio = setInterval(function(){
+      _stTempo--;
+      if (tEl) tEl.textContent = _stTempo;
+      if (_stTempo <= 0) { _stFim(); }
+    }, 1000);
+  }
+
+  function _stFim() {
+    _stRodando = false;
+    if (_stTimerRelogio) { clearInterval(_stTimerRelogio); _stTimerRelogio = null; }
+    var arena = document.getElementById('st-arena');
+    if (arena) { var a = arena.querySelector('.st-alvo'); if (a) a.remove(); }
+
+    // Recorde?
+    var rec = _stRecordeGet();
+    var bateuRecorde = _stPontos > rec;
+    if (bateuRecorde) { _stRecordeSet(_stPontos); }
+
+    var fim = document.getElementById('st-fim');
+    var fimOwl = document.getElementById('st-fim-owl');
+    var fimPontos = document.getElementById('st-fim-pontos');
+    var fimMsg = document.getElementById('st-fim-msg');
+    var recEl = document.getElementById('st-recorde');
+    if (recEl) recEl.textContent = _stRecordeGet();
+
+    if (fimOwl) {
+      fimOwl.src = bateuRecorde ? '/webp/owl-celebrate-pro.webp' : '/webp/owl-thumbsup.webp';
+      fimOwl.style.display = '';
+    }
+    if (fimPontos) fimPontos.innerHTML = '<b>' + _stPontos + '</b> ' + (_stPontos === 1 ? 'ponto' : 'pontos');
+    if (fimMsg) {
+      if (bateuRecorde) fimMsg.textContent = 'Novo recorde! Voc\xc3\xaa \xc3\xa9 r\xc3\xa1pido! \xf0\x9f\x8f\x86';
+      else if (_stPontos >= 20) fimMsg.textContent = 'Mandou muito bem! \xf0\x9f\x94\xa5';
+      else fimMsg.textContent = 'Boa! Tenta de novo pra bater o recorde! \xf0\x9f\xa6\x89';
+    }
+    if (bateuRecorde && recEl) recEl.classList.add('st-recorde-novo');
+    if (fim) fim.style.display = 'flex';
+  }
+
+  window._stComecar = _stComecar;
 
   /* ── Máscara de WhatsApp progressiva: (15) 9 9999-9999 ──────────
      Fonte única usada tanto no cadastro quanto no login de loja. */

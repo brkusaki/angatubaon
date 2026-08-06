@@ -550,7 +550,7 @@
   }
 
   /* -- Roteador de jogos: menu <-> tela de cada jogo -- */
-  var _quizJaCarregadoNaTela = false; // lazy-load do quiz s\xc3\xb3 quando abre a tela dele
+  var _quizJaCarregadoNaTela = false; // lazy-load do quiz só quando abre a tela dele
 
   function _voltarAoMenu() {
     _stParar();
@@ -600,7 +600,7 @@
     try { localStorage.setItem('angatuba_speedtap_rec', String(v)); } catch(e) {}
   }
 
-  // Prepara a tela (estado inicial, mostra recorde). N\xc3\xa3o inicia o jogo ainda.
+  // Prepara a tela (estado inicial, mostra recorde). Não inicia o jogo ainda.
   function _stPreparar() {
     _stParar();
     var recEl = document.getElementById('st-recorde');
@@ -625,7 +625,7 @@
     if (arena) { var a = arena.querySelector('.st-alvo'); if (a) a.remove(); }
   }
 
-  // Move a coruja-alvo pra uma posi\xc3\xa7\xc3\xa3o aleat\xc3\xb3ria dentro da arena.
+  // Move a coruja-alvo pra uma posição aleatória dentro da arena.
   function _stMoverAlvo(alvo, arena) {
     var w = arena.clientWidth, h = arena.clientHeight;
     var margem = 40;
@@ -678,7 +678,7 @@
       _stMoverAlvo(alvo, arena);
     });
 
-    // Rel\xc3\xb3gio regressivo.
+    // Relógio regressivo.
     _stTimerRelogio = setInterval(function(){
       _stTempo--;
       if (tEl) tEl.textContent = _stTempo;
@@ -710,9 +710,9 @@
     }
     if (fimPontos) fimPontos.innerHTML = '<b>' + _stPontos + '</b> ' + (_stPontos === 1 ? 'ponto' : 'pontos');
     if (fimMsg) {
-      if (bateuRecorde) fimMsg.textContent = 'Novo recorde! Voc\xc3\xaa \xc3\xa9 r\xc3\xa1pido! \xf0\x9f\x8f\x86';
-      else if (_stPontos >= 20) fimMsg.textContent = 'Mandou muito bem! \xf0\x9f\x94\xa5';
-      else fimMsg.textContent = 'Boa! Tenta de novo pra bater o recorde! \xf0\x9f\xa6\x89';
+      if (bateuRecorde) fimMsg.textContent = 'Novo recorde! Você é rápido! 🏆';
+      else if (_stPontos >= 20) fimMsg.textContent = 'Mandou muito bem! 🔥';
+      else fimMsg.textContent = 'Boa! Tenta de novo pra bater o recorde! 🦉';
     }
     if (bateuRecorde && recEl) recEl.classList.add('st-recorde-novo');
     if (fim) fim.style.display = 'flex';

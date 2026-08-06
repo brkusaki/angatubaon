@@ -359,34 +359,147 @@
     return json;
   }
 
-  /* ── Dica da Coruja — curiosidade da cidade no rodapé ─────
-     Busca a lista de dicas ativas na API e mostra UMA por dia no card
-     #dica-coruja. Rotação determinística por data: mesma dica o dia todo,
-     troca no dia seguinte. Falha silenciosa — se a API não responder ou a
-     aba não existir, o card fica escondido e nada quebra. */
+  /* ── Quiz da Coruja — pergunta do dia sobre a cidade ───────
+     Carrega perguntas ativas da API e mostra UMA por dia (rotação por data,
+     determinística). Fundo do card acompanha a Igreja Matriz dia/noite, igual
+     ao header. Ao responder: marca certa/errada, mostra a coruja + mensagem, e
+     trava até o dia seguinte (localStorage). Falha silenciosa — se a API não
+     responder ou a aba não existir, o card fica escondido e nada quebra. */
+
+  // Corujas usadas no resultado (caminho real do site: /webp/ com hífen).
+  var _QUIZ_OWL_ACERTO = ['/webp/owl-celebrate-pro.webp','/webp/owl-tada.webp','/webp/owl-thumbsup.webp','/webp/owl-approved.webp'];
+  var _QUIZ_OWL_ERRO   = '/webp/owl-idea.webp';
+  // Frases de acerto (varia por dia pra não repetir sempre a mesma).
+  var _QUIZ_MSG_ACERTO = [
+    'Acertou! Você manja de Angatuba! 🎉',
+    'Isso aí! Conhecimento de quem é da terra! 🦉',
+    'Mandou bem! Você é fera na cidade! ⭐',
+    'Certssimo! Não passa nada por você! 🏆',
+  ];
+
+  // Chave do dia pra travar: 'quiz_YYYY_DDD' (dias desde epoch).
+  function _quizChaveDia() { return 'angatuba_quiz_' + Math.floor(Date.now() / 86400000); }
+
+  // Aplica a classe de tema (dia/noite/neutro) ao card, igual ao header-top.
+  // Dia 5h-18h | Noite 22h-5h | Entardecer 18h-22h = neutro (sem foto).
+  function _quizAplicarTema(card) {
+    var h = new Date().getHours();
+    var ehDia   = (h >= 5 && h < 18);
+    var ehNoite = (h >= 22 || h < 5);
+    card.classList.toggle('qz-dia',    ehDia);
+    card.classList.toggle('qz-noite',  ehNoite);
+    card.classList.toggle('qz-neutro', !ehDia && !ehNoite);
+  }
+
+  // Mostra o card já no estado 'respondido' (quando o usuário volta no mesmo dia).
+  function _quizMostrarRespondido(card, pergunta, escolha) {
+    var acertou = (escolha === pergunta.correta);
+    var opcoesEl = document.getElementById('quiz-opcoes');
+    var botoes = opcoesEl ? opcoesEl.querySelectorAll('.quiz-opt') : [];
+    var letras = ['A','B','C'];
+    for (var i = 0; i < botoes.length; i++) {
+      botoes[i].disabled = true;
+      if (letras[i] === pergunta.correta) botoes[i].classList.add('qz-certa');
+      else if (letras[i] === escolha)     botoes[i].classList.add('qz-errada');
+    }
+    _quizMostrarResultado(acertou, pergunta.correta);
+  }
+
+  // Preenche a área de resultado (coruja + mensagem).
+  function _quizMostrarResultado(acertou, letraCorreta) {
+    var resEl = document.getElementById('quiz-resultado');
+    var imgEl = document.getElementById('quiz-resultado-img');
+    var txtEl = document.getElementById('quiz-resultado-txt');
+    if (!resEl || !imgEl || !txtEl) return;
+    var diaEpoch = Math.floor(Date.now() / 86400000);
+    if (acertou) {
+      imgEl.src = _QUIZ_OWL_ACERTO[diaEpoch % _QUIZ_OWL_ACERTO.length];
+      imgEl.style.display = '';
+      txtEl.innerHTML = _QUIZ_MSG_ACERTO[diaEpoch % _QUIZ_MSG_ACERTO.length];
+      resEl.classList.add('qz-acerto');
+    } else {
+      imgEl.src = _QUIZ_OWL_ERRO;
+      imgEl.style.display = '';
+      txtEl.innerHTML = 'Quase! A resposta certa era a <b>' + letraCorreta + '</b>. Volta amanhã pra próxima! 🦉';
+      resEl.classList.remove('qz-acerto');
+    }
+    resEl.classList.add('show');
+  }
+
+  // Renderiza os 3 botões e liga o clique.
+  function _quizRenderOpcoes(card, pergunta) {
+    var opcoesEl = document.getElementById('quiz-opcoes');
+    if (!opcoesEl) return;
+    var letras = ['A','B','C'];
+    opcoesEl.innerHTML = '';
+    for (var i = 0; i < 3; i++) {
+      (function(idx){
+        var btn = document.createElement('button');
+        btn.className = 'quiz-opt';
+        btn.type = 'button';
+        var span = document.createElement('span');
+        span.className = 'quiz-opt-letra';
+        span.textContent = letras[idx];
+        var txt = document.createElement('span');
+        txt.textContent = pergunta.opcoes[idx];
+        btn.appendChild(span);
+        btn.appendChild(txt);
+        btn.addEventListener('click', function(){ _quizResponder(card, pergunta, letras[idx]); });
+        opcoesEl.appendChild(btn);
+      })(i);
+    }
+  }
+
+  // Trata a resposta do usuário: marca visual, salva no localStorage, mostra resultado.
+  function _quizResponder(card, pergunta, escolha) {
+    var acertou = (escolha === pergunta.correta);
+    var opcoesEl = document.getElementById('quiz-opcoes');
+    var botoes = opcoesEl ? opcoesEl.querySelectorAll('.quiz-opt') : [];
+    var letras = ['A','B','C'];
+    for (var i = 0; i < botoes.length; i++) {
+      botoes[i].disabled = true;
+      if (letras[i] === pergunta.correta) botoes[i].classList.add('qz-certa');
+      else if (letras[i] === escolha)     botoes[i].classList.add('qz-errada');
+    }
+    // Trava por dia: guarda a escolha pra restaurar o estado se voltar hoje.
+    try { localStorage.setItem(_quizChaveDia(), escolha); } catch(e) {}
+    // Vibração sutil no acerto (se suportado).
+    if (acertou && navigator.vibrate) { try { navigator.vibrate(40); } catch(e) {} }
+    _quizMostrarResultado(acertou, pergunta.correta);
+  }
+
   // _tentativa: 0 na primeira chamada. Em caso de falha (timeout/rede),
   // agenda 1 retry único após 3s — cobre o cold-start do Apps Script.
-  async function _carregarDicaCoruja(_tentativa) {
+  async function _carregarQuizCoruja(_tentativa) {
     _tentativa = _tentativa || 0;
-    const card = document.getElementById('dica-coruja');
+    var card = document.getElementById('quiz-coruja');
     if (!card) return;
     try {
-      const params = new URLSearchParams();
-      params.append('payload', JSON.stringify({ action: 'dicasCoruja' }));
-      const resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(8000) });
-      const json = await resp.json();
-      const dicas = (json && json.status === 'ok' && Array.isArray(json.data)) ? json.data : [];
-      if (!dicas.length) return; // sem dicas: card continua escondido
-      // Índice do dia: dias desde epoch % total. Determinístico, sem random.
-      const diaEpoch = Math.floor(Date.now() / 86400000);
-      const texto = dicas[diaEpoch % dicas.length];
-      if (!texto) return;
-      const txtEl = card.querySelector('.dica-coruja-txt');
-      if (txtEl) txtEl.textContent = texto;
+      var params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action: 'quizCoruja' }));
+      var resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(8000) });
+      var json = await resp.json();
+      var perguntas = (json && json.status === 'ok' && Array.isArray(json.data)) ? json.data : [];
+      if (!perguntas.length) return; // sem perguntas: card continua escondido
+      // Pergunta do dia: dias desde epoch % total. Determinístico, sem random.
+      var diaEpoch = Math.floor(Date.now() / 86400000);
+      var pergunta = perguntas[diaEpoch % perguntas.length];
+      if (!pergunta || !pergunta.pergunta) return;
+      // Monta o card.
+      _quizAplicarTema(card);
+      var perguntaEl = document.getElementById('quiz-pergunta');
+      if (perguntaEl) perguntaEl.textContent = pergunta.pergunta;
+      _quizRenderOpcoes(card, pergunta);
       card.style.display = 'block';
+      // Já respondeu hoje? Restaura o estado travado.
+      var jaRespondeu = null;
+      try { jaRespondeu = localStorage.getItem(_quizChaveDia()); } catch(e) {}
+      if (jaRespondeu === 'A' || jaRespondeu === 'B' || jaRespondeu === 'C') {
+        _quizMostrarRespondido(card, pergunta, jaRespondeu);
+      }
     } catch(e) {
       // Falha (ex.: cold-start do GAS): 1 retry após 3s. Depois desiste em silêncio.
-      if (_tentativa < 1) setTimeout(function(){ _carregarDicaCoruja(_tentativa + 1); }, 3000);
+      if (_tentativa < 1) setTimeout(function(){ _carregarQuizCoruja(_tentativa + 1); }, 3000);
     }
   }
 
@@ -9012,7 +9125,7 @@
 
   // Dica da Coruja: dispara em paralelo, independente das lojas. Se o
   // carregamento das lojas der timeout, a dica ainda carrega por conta própria.
-  _carregarDicaCoruja();
+  _carregarQuizCoruja();
 
   carregarLojas().then(() => {
     // Deep link: abre detalhes de loja pelo hash da URL (ex: /#mr-centro-automotivo)

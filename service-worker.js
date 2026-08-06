@@ -1,4 +1,4 @@
-const CACHE = 'angatubaon-v128';
+const CACHE = 'angatubaon-v129';
 const STATIC = [
   '/',
   '/index.html',
@@ -6,6 +6,7 @@ const STATIC = [
   '/styles.css',
   '/app_min.js',
   '/img/igreja-noite.jpg',
+  '/img/igreja-dia.jpg',
   '/webp/owl-badge.webp',
   '/webp/owl-celebrate-gratis.webp',
   '/webp/owl-celebrate-plus.webp',

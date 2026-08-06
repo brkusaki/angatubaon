@@ -4604,3 +4604,46 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   50% { transform: translateY(0) rotate(0); }
   75% { transform: translateY(-4px) rotate(4deg); }
 }
+
+/* ═════ Hub de Mini-Games (aba Joguinhos) ══ */
+.pill-games-btn.active {
+  background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(255,68,68,0.15));
+  border-color: rgba(168,85,247,0.5);
+  color: #fff;
+}
+#games-hub { animation: qzFade .3s ease; }
+.games-hub-head { margin-bottom: 16px; }
+.games-hub-title {
+  font-family: var(--font-h); font-size: 1.15rem; font-weight: 800;
+  color: var(--text); display: flex; align-items: center; gap: 8px;
+  margin: 0 0 4px;
+}
+.games-hub-title i { color: #a855f7; }
+.games-hub-sub { font-size: 13px; color: var(--muted); margin: 0; }
+/* Cards de jogos futuros (em breve) */
+.game-soon {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px; margin-bottom: 10px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  opacity: .62;
+}
+.game-soon-ico {
+  flex-shrink: 0; width: 46px; height: 46px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 12px; background: var(--surface2);
+  font-size: 20px; color: var(--muted);
+}
+.game-soon-title {
+  font-family: var(--font-h); font-weight: 800; font-size: 15px;
+  color: var(--text); display: flex; align-items: center; gap: 8px;
+  margin-bottom: 2px;
+}
+.game-soon-badge {
+  font-size: 9px; font-weight: 800; letter-spacing: .05em;
+  padding: 2px 7px; border-radius: 999px;
+  background: rgba(168,85,247,0.2); color: #c084fc;
+  border: 1px solid rgba(168,85,247,0.35);
+}
+.game-soon-desc { font-size: 12px; color: var(--muted); }

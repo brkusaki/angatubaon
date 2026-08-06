@@ -512,6 +512,54 @@
     }
   }
 
+  /* ── Hub de Mini-Games (aba Joguinhos) ───────────
+     Troca a view: esconde a lista de lojas + rodapé e mostra o hub de jogos.
+     O quiz só é buscado da API na PRIMEIRA vez que o hub abre (lazy). */
+  var _quizJaCarregado = false;
+
+  function _abrirGamesHub() {
+    var hub = document.getElementById('games-hub');
+    if (!hub) return;
+    var secao = document.querySelector('main.main > section');
+    var footer = document.querySelector('main.main .footer');
+    if (secao)  secao.style.display = 'none';
+    if (footer) footer.style.display = 'none';
+    var siga = document.getElementById('bloco-siga');
+    if (siga) siga.style.display = 'none';
+    hub.style.display = 'block';
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0,0); }
+    if (!_quizJaCarregado) {
+      _quizJaCarregado = true;
+      _carregarQuizCoruja();
+      setTimeout(function(){
+        var ld = document.getElementById('games-loading');
+        var qz = document.getElementById('quiz-coruja');
+        if (ld && qz && qz.style.display !== 'none') ld.style.display = 'none';
+      }, 1200);
+      setTimeout(function(){ var ld = document.getElementById('games-loading'); if (ld) ld.style.display = 'none'; }, 12000);
+    } else {
+      var ld = document.getElementById('games-loading');
+      if (ld) ld.style.display = 'none';
+    }
+  }
+
+  function _fecharGamesHub() {
+    var hub = document.getElementById('games-hub');
+    if (!hub) return;
+    hub.style.display = 'none';
+    var secao = document.querySelector('main.main > section');
+    var footer = document.querySelector('main.main .footer');
+    if (secao)  secao.style.display = '';
+    if (footer) footer.style.display = '';
+    var siga = document.getElementById('bloco-siga');
+    if (siga) siga.style.display = '';
+  }
+
+  function _gamesHubAberto() {
+    var hub = document.getElementById('games-hub');
+    return !!(hub && hub.style.display !== 'none' && hub.style.display !== '');
+  }
+
   /* ── Máscara de WhatsApp progressiva: (15) 9 9999-9999 ──────────
      Fonte única usada tanto no cadastro quanto no login de loja. */
   function mascararWppBR(valorBruto) {
@@ -2325,6 +2373,10 @@
 
   /* ── Troca categoria ─────────────────────────────────────── */
   function setCat(cat, btn) {
+    // Se o hub de jogos estava aberto, fecha e volta pra lista de lojas.
+    if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) {
+      _fecharGamesHub();
+    }
     activeCat    = cat;
     searchQuery  = '';  // limpa busca ao trocar categoria
     const searchEl = document.getElementById('main-search');
@@ -2633,6 +2685,12 @@
   const handleSearch = debounce(function(e) {
     // #14: busca não reseta mais categoria/pill ativos — refina dentro do
     // filtro já escolhido, em vez de descartá-lo silenciosamente a cada tecla.
+    // Se o hub de jogos estava aberto, fecha pra mostrar os resultados.
+    if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) {
+      _fecharGamesHub();
+      const gp = document.getElementById('pill-games-btn');
+      if (gp) gp.classList.remove('active');
+    }
     searchQuery = e.target.value.trim();
     renderLojas();
   }, 300);
@@ -6240,6 +6298,25 @@
   /* ── Pill filter events ──────────────────────────────────── */
   document.querySelectorAll('.pill-btn:not(.pill-bairro-btn)').forEach(btn => {
     btn.addEventListener('click', () => {
+      // Pill Joguinhos: não filtra lojas — abre/fecha o hub de mini-games.
+      if (btn.dataset.filter === 'games') {
+        const jaAtiva = btn.classList.contains('active');
+        document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+        if (jaAtiva) {
+          // Clicar de novo fecha o hub e volta pra lista.
+          _fecharGamesHub();
+          activePillFilter = 'all';
+          renderLojas();
+        } else {
+          btn.classList.add('active');
+          _abrirGamesHub();
+        }
+        return;
+      }
+      // Qualquer outra pill: se o hub estava aberto, fecha e volta pra lista.
+      if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) {
+        _fecharGamesHub();
+      }
       // #12: clicar de novo na pill já ativa desliga o filtro (toggle-off),
       // em vez de reaplicar o mesmo filtro sem dar jeito de "limpar" pela pill.
       const isTogglingOff = btn.classList.contains('active') && activePillFilter === btn.dataset.filter;
@@ -6269,6 +6346,10 @@
     if (!btn || !overlay) return;
 
     function abrirSheet() {
+      // Se o hub de jogos estava aberto, fecha antes de abrir o filtro de bairro.
+      if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) {
+        _fecharGamesHub();
+      }
       overlay.classList.add('open');
       overlay.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
@@ -9132,9 +9213,9 @@
   // sem precisar recarregar a página.
   setInterval(atualizarSaudacaoNoturna, 60_000);
 
-  // Dica da Coruja: dispara em paralelo, independente das lojas. Se o
-  // carregamento das lojas der timeout, a dica ainda carrega por conta própria.
-  _carregarQuizCoruja();
+  // Quiz da Coruja: NÃO carrega no boot. Só quando o usuário abre a aba
+  // Joguinhos (lazy) — ver _abrirGamesHub(). Evita fetch desnecessário e
+  // tira o quiz do rodapé de todas as categorias.
 
   carregarLojas().then(() => {
     // Deep link: abre detalhes de loja pelo hash da URL (ex: /#mr-centro-automotivo)

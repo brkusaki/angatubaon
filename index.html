@@ -347,29 +347,45 @@
 
       <!-- MENU: grade de jogos -->
       <div id="games-menu">
-        <button type="button" class="game-card" onclick="_abrirJogo('quiz')">
-          <div class="game-card-ico game-card-ico-quiz"><i class="fa fa-brain"></i></div>
-          <div class="game-card-info">
-            <div class="game-card-title">Quiz da Coruja</div>
-            <div class="game-card-desc">5 perguntas por dia sobre Angatuba.</div>
+        <button type="button" class="game-card gc-quiz" onclick="_abrirJogo('quiz')">
+          <div class="gc-inner">
+            <div class="gc-owl">
+              <span class="gc-owl-glow"></span>
+              <img src="/webp/owl-idea.webp" alt="" loading="lazy">
+            </div>
+            <div class="gc-info">
+              <div class="gc-title">Quiz da Coruja</div>
+              <div class="gc-desc">5 perguntas por dia sobre Angatuba.</div>
+              <span class="gc-cta">Jogar agora</span>
+            </div>
           </div>
-          <i class="fa fa-chevron-right game-card-arrow"></i>
+          <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
 
-        <button type="button" class="game-card" onclick="_abrirJogo('speedtap')">
-          <div class="game-card-ico game-card-ico-speed"><i class="fa fa-bolt"></i></div>
-          <div class="game-card-info">
-            <div class="game-card-title">Pega a Coruja</div>
-            <div class="game-card-desc">Toque o mais rápido que conseguir em 20s!</div>
+        <button type="button" class="game-card gc-speed" onclick="_abrirJogo('speedtap')">
+          <div class="gc-inner">
+            <div class="gc-owl">
+              <span class="gc-owl-glow"></span>
+              <img src="/webp/owl-tada.webp" alt="" loading="lazy">
+            </div>
+            <div class="gc-info">
+              <div class="gc-title">Pega a Coruja</div>
+              <div class="gc-desc">Toque o mais rápido que conseguir em 20s!</div>
+              <span class="gc-cta">Desafiar</span>
+            </div>
           </div>
-          <i class="fa fa-chevron-right game-card-arrow"></i>
+          <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
 
-        <div class="game-soon">
-          <div class="game-soon-ico"><i class="fa fa-clone"></i></div>
-          <div class="game-soon-txt">
-            <div class="game-soon-title">Jogo da Memória <span class="game-soon-badge">EM BREVE</span></div>
-            <div class="game-soon-desc">Ache os pares com fotos de Angatuba.</div>
+        <div class="game-card gc-soon">
+          <div class="gc-inner">
+            <div class="gc-owl">
+              <img src="/webp/owl-search.webp" alt="" loading="lazy">
+            </div>
+            <div class="gc-info">
+              <div class="gc-title">Jogo da Memória <span class="gc-badge-soon">EM BREVE</span></div>
+              <div class="gc-desc">Ache os pares com fotos de Angatuba.</div>
+            </div>
           </div>
         </div>
       </div>

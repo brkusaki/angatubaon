@@ -4620,61 +4620,78 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 }
 .games-hub-title i { color: #a855f7; }
 .games-hub-sub { font-size: 13px; color: var(--muted); margin: 0; }
-/* Cards de jogos futuros (em breve) */
-.game-soon {
-  display: flex; align-items: center; gap: 14px;
-  padding: 16px; margin-bottom: 10px;
-  border-radius: 14px;
-  background: var(--surface);
-  border: 1px dashed var(--border);
-  opacity: .62;
-}
-.game-soon-ico {
-  flex-shrink: 0; width: 46px; height: 46px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 12px; background: var(--surface2);
-  font-size: 20px; color: var(--muted);
-}
-.game-soon-title {
-  font-family: var(--font-h); font-weight: 800; font-size: 15px;
-  color: var(--text); display: flex; align-items: center; gap: 8px;
-  margin-bottom: 2px;
-}
-.game-soon-badge {
-  font-size: 9px; font-weight: 800; letter-spacing: .05em;
-  padding: 2px 7px; border-radius: 999px;
-  background: rgba(168,85,247,0.2); color: #c084fc;
-  border: 1px solid rgba(168,85,247,0.35);
-}
-.game-soon-desc { font-size: 12px; color: var(--muted); }
-
-/* ═════ Menu de jogos (cards clicáveis) ══ */
+/* ═════ Menu de jogos — cards com foto de fundo + coruja-logo ══ */
 .game-card {
-  display: flex; align-items: center; gap: 14px;
-  width: 100%; text-align: left;
-  padding: 16px; margin-bottom: 10px;
-  border-radius: 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  position: relative; display: block; width: 100%; text-align: left;
+  border: none; padding: 0; margin-bottom: 14px;
+  border-radius: 18px; overflow: hidden;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
-  transition: transform .12s, border-color .15s, background .15s;
+  min-height: 116px;
+  background-size: cover; background-position: center;
+  box-shadow: 0 4px 18px rgba(0,0,0,.42);
+  transition: transform .14s ease, box-shadow .2s ease;
 }
-.game-card:active { transform: scale(0.98); }
-.game-card:hover { border-color: rgba(168,85,247,0.4); background: var(--surface2); }
-.game-card-ico {
-  flex-shrink: 0; width: 50px; height: 50px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 13px; font-size: 22px; color: #fff;
+.game-card:active { transform: scale(.985); }
+/* foto de fundo por jogo (Igreja Matriz) */
+.gc-quiz  { background-image: url('/img/igreja-noite.jpg'); }
+.gc-speed { background-image: url('/img/igreja-dia.jpg'); }
+.gc-soon  { background-image: url('/img/igreja-noite.jpg'); }
+/* overlay escuro degradê p/ legibilidade */
+.game-card::before {
+  content: ''; position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(90deg, rgba(8,8,12,.93) 0%, rgba(8,8,12,.8) 42%, rgba(8,8,12,.34) 100%);
 }
-.game-card-ico-quiz  { background: linear-gradient(135deg, #a855f7, #6d28d9); }
-.game-card-ico-speed { background: linear-gradient(135deg, #f59e0b, #ef4444); }
-.game-card-info { flex: 1; min-width: 0; }
-.game-card-title {
-  font-family: var(--font-h); font-weight: 800; font-size: 16px;
-  color: var(--text); margin-bottom: 2px;
+/* faixa de cor lateral (accent do jogo) */
+.game-card::after {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; z-index: 3;
 }
-.game-card-desc { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
-.game-card-arrow { color: var(--muted); font-size: 13px; flex-shrink: 0; }
+.gc-quiz::after  { background: linear-gradient(#c084fc, #7c3aed); }
+.gc-speed::after { background: linear-gradient(#fbbf24, #ef4444); }
+.gc-soon::after  { background: linear-gradient(#71717a, #3f3f46); }
+
+.gc-inner {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; gap: 16px;
+  padding: 18px 44px 18px 20px;
+}
+.gc-owl {
+  flex-shrink: 0; width: 76px; height: 76px; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center; position: relative;
+}
+.gc-owl-glow {
+  position: absolute; inset: -2px; border-radius: 18px; z-index: 0;
+  filter: blur(9px); opacity: .55;
+}
+.gc-quiz  .gc-owl-glow { background: radial-gradient(circle, #a855f7, transparent 70%); }
+.gc-speed .gc-owl-glow { background: radial-gradient(circle, #f97316, transparent 70%); }
+.gc-owl img {
+  width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,.5));
+}
+.gc-info { flex: 1; min-width: 0; }
+.gc-title {
+  font-family: var(--font-h); letter-spacing: .5px; font-weight: 800;
+  font-size: 23px; line-height: 1; color: var(--text); margin-bottom: 5px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.gc-desc { font-size: 12.5px; color: #d4d4d8; line-height: 1.35; }
+.gc-cta {
+  display: inline-flex; align-items: center; margin-top: 9px;
+  font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+  padding: 4px 11px; border-radius: 999px;
+}
+.gc-quiz  .gc-cta { background: rgba(168,85,247,.22); color: #d8b4fe; border: 1px solid rgba(168,85,247,.4); }
+.gc-speed .gc-cta { background: rgba(249,115,22,.2); color: #fdba74; border: 1px solid rgba(249,115,22,.42); }
+.gc-arrow {
+  position: absolute; right: 16px; top: 50%; transform: translateY(-50%); z-index: 3;
+  color: rgba(255,255,255,.5); font-size: 15px;
+}
+.gc-badge-soon {
+  font-size: 9px; font-weight: 800; letter-spacing: .05em;
+  padding: 2px 8px; border-radius: 999px;
+  background: rgba(168,85,247,.2); color: #c084fc; border: 1px solid rgba(168,85,247,.35);
+}
+.gc-soon { opacity: .5; cursor: default; filter: grayscale(.4); }
 /* Tela de jogo em foco + botão voltar */
 .jogo-tela { animation: qzFade .3s ease; }
 .jogo-voltar {

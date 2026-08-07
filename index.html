@@ -377,17 +377,20 @@
           <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
 
-        <div class="game-card gc-soon">
+        <button type="button" class="game-card gc-seq" onclick="_abrirJogo('sequencia')">
           <div class="gc-inner">
             <div class="gc-owl">
+              <span class="gc-owl-glow"></span>
               <img src="/webp/owl-search.webp" alt="" loading="lazy">
             </div>
             <div class="gc-info">
-              <div class="gc-title">Jogo da Memória <span class="gc-badge-soon">EM BREVE</span></div>
-              <div class="gc-desc">Ache os pares com fotos de Angatuba.</div>
+              <div class="gc-title">Sequência da Coruja</div>
+              <div class="gc-desc">Memorize e repita a ordem das corujas.</div>
+              <span class="gc-cta">Testar memória</span>
             </div>
           </div>
-        </div>
+          <i class="fa fa-chevron-right gc-arrow"></i>
+        </button>
       </div>
 
       <!-- TELA: Quiz da Coruja -->
@@ -424,15 +427,17 @@
         <div class="st-card">
           <div class="st-hud">
             <div class="st-hud-item"><span class="st-hud-label">Pontos</span><span class="st-hud-valor" id="st-pontos">0</span></div>
-            <div class="st-hud-item"><span class="st-hud-label">Tempo</span><span class="st-hud-valor" id="st-tempo">20</span></div>
+            <div class="st-hud-item"><span class="st-hud-label">Nível</span><span class="st-hud-valor" id="st-nivel">1</span></div>
+            <div class="st-hud-item"><span class="st-hud-label">Tempo</span><span class="st-hud-valor" id="st-tempo">25</span></div>
             <div class="st-hud-item"><span class="st-hud-label">Recorde</span><span class="st-hud-valor" id="st-recorde">0</span></div>
           </div>
           <div class="st-arena" id="st-arena">
+            <div class="st-combo-badge" id="st-combo" style="display:none;"></div>
             <!-- Estado inicial: botão começar -->
             <div class="st-inicio" id="st-inicio">
               <img src="/webp/owl-wave.webp" alt="" class="st-inicio-owl" onerror="this.style.display='none'">
               <div class="st-inicio-titulo">Pega a Coruja!</div>
-              <div class="st-inicio-desc">Toque na coruja o máximo de vezes em 20 segundos.</div>
+              <div class="st-inicio-desc">Toque nas corujas boas 🦉 e fuja das bravas 😠. Acertos seguidos fazem combo e o jogo acelera!</div>
               <button type="button" class="st-btn" onclick="_stComecar()">Começar</button>
             </div>
             <!-- A coruja-alvo é injetada aqui durante o jogo -->
@@ -443,6 +448,38 @@
               <div class="st-fim-msg" id="st-fim-msg"></div>
               <button type="button" class="st-btn" onclick="_stComecar()">Jogar de novo</button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TELA: Sequência da Coruja (Simon/Genius) -->
+      <div id="jogo-sequencia" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div class="sq-card">
+          <div class="sq-hud">
+            <div class="sq-hud-item"><span class="sq-hud-label">Rodada</span><span class="sq-hud-valor" id="sq-rodada">0</span></div>
+            <div class="sq-hud-item"><span class="sq-hud-label">Recorde</span><span class="sq-hud-valor" id="sq-recorde">0</span></div>
+          </div>
+          <div class="sq-status" id="sq-status">Memorize a sequência!</div>
+          <div class="sq-grade" id="sq-grade">
+            <button type="button" class="sq-btn sq-btn-0" data-idx="0" aria-label="coruja 1"><img src="/webp/owl-portrait.webp" alt="" onerror="this.style.display='none'"></button>
+            <button type="button" class="sq-btn sq-btn-1" data-idx="1" aria-label="coruja 2"><img src="/webp/owl-portrait.webp" alt="" onerror="this.style.display='none'"></button>
+            <button type="button" class="sq-btn sq-btn-2" data-idx="2" aria-label="coruja 3"><img src="/webp/owl-portrait.webp" alt="" onerror="this.style.display='none'"></button>
+            <button type="button" class="sq-btn sq-btn-3" data-idx="3" aria-label="coruja 4"><img src="/webp/owl-portrait.webp" alt="" onerror="this.style.display='none'"></button>
+          </div>
+          <!-- Tela inicial -->
+          <div class="sq-overlay" id="sq-inicio">
+            <img src="/webp/owl-idea.webp" alt="" class="sq-overlay-owl" onerror="this.style.display='none'">
+            <div class="sq-overlay-titulo">Sequência da Coruja</div>
+            <div class="sq-overlay-desc">As corujas piscam numa ordem. Repita tocando na mesma sequência. A cada rodada, uma coruja a mais!</div>
+            <button type="button" class="sq-play" onclick="_sqComecar()">Começar</button>
+          </div>
+          <!-- Tela de fim -->
+          <div class="sq-overlay" id="sq-fim" style="display:none;">
+            <img src="" alt="" class="sq-overlay-owl" id="sq-fim-owl" onerror="this.style.display='none'">
+            <div class="sq-overlay-titulo" id="sq-fim-titulo">Ops!</div>
+            <div class="sq-overlay-desc" id="sq-fim-msg"></div>
+            <button type="button" class="sq-play" onclick="_sqComecar()">Tentar de novo</button>
           </div>
         </div>
       </div>

@@ -868,8 +868,17 @@
     _sqTimers = [];
   }
 
+  // Apaga a luz de TODAS as corujas (evita botão aceso preso ao reiniciar).
+  function _sqApagarTodos() {
+    var grade = document.getElementById('sq-grade');
+    if (!grade) return;
+    var btns = grade.querySelectorAll('.sq-btn');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.remove('sq-on');
+  }
+
   function _sqPreparar() {
     _sqLimparTimers();
+    _sqApagarTodos();
     _sqSeq = []; _sqPasso = 0; _sqRodada = 0;
     _sqAceitando = false; _sqTocando = false;
     var rEl = document.getElementById('sq-rodada'); if (rEl) rEl.textContent = '0';
@@ -900,6 +909,7 @@
   function _sqPlayback() {
     _sqAceitando = false;
     _sqTocando = true;
+    _sqApagarTodos();
     var st = document.getElementById('sq-status');
     if (st) st.textContent = 'Observe… 👀';
     _sqLimparTimers();
@@ -967,6 +977,7 @@
     _sqAceitando = false;
     _sqTocando = false;
     _sqLimparTimers();
+    _sqApagarTodos();
     if (navigator.vibrate) { try { navigator.vibrate(200); } catch(e) {} }
     var grade = document.getElementById('sq-grade');
     if (grade) { grade.classList.remove('sq-erro'); void grade.offsetWidth; grade.classList.add('sq-erro'); }
@@ -1001,6 +1012,7 @@
 
   function _sqComecar() {
     _sqLimparTimers();
+    _sqApagarTodos();
     _sqSeq = []; _sqPasso = 0; _sqRodada = 0;
     _sqAceitando = false; _sqTocando = false;
     var inicio = document.getElementById('sq-inicio'); if (inicio) inicio.style.display = 'none';

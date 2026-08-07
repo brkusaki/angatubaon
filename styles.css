@@ -4626,7 +4626,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   border: none; padding: 0; margin-bottom: 14px;
   border-radius: 18px; overflow: hidden;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
-  min-height: 116px;
+  min-height: 122px;
   background-size: cover; background-position: center;
   box-shadow: 0 4px 18px rgba(0,0,0,.42);
   transition: transform .14s ease, box-shadow .2s ease;
@@ -4635,7 +4635,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 /* foto de fundo por jogo (Igreja Matriz) */
 .gc-quiz  { background-image: url('/img/igreja-noite.jpg'); }
 .gc-speed { background-image: url('/img/igreja-dia.jpg'); }
-.gc-soon  { background-image: url('/img/igreja-noite.jpg'); }
+.gc-seq   { background-image: url('/img/igreja-noite.jpg'); }
 /* overlay escuro degradê p/ legibilidade */
 .game-card::before {
   content: ''; position: absolute; inset: 0; z-index: 1;
@@ -4647,7 +4647,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 }
 .gc-quiz::after  { background: linear-gradient(#c084fc, #7c3aed); }
 .gc-speed::after { background: linear-gradient(#fbbf24, #ef4444); }
-.gc-soon::after  { background: linear-gradient(#71717a, #3f3f46); }
+.gc-seq::after   { background: linear-gradient(#4ade80, #3b82f6); }
 
 .gc-inner {
   position: relative; z-index: 2;
@@ -4664,6 +4664,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 }
 .gc-quiz  .gc-owl-glow { background: radial-gradient(circle, #a855f7, transparent 70%); }
 .gc-speed .gc-owl-glow { background: radial-gradient(circle, #f97316, transparent 70%); }
+.gc-seq   .gc-owl-glow { background: radial-gradient(circle, #3b82f6, transparent 70%); }
 .gc-owl img {
   width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1;
   filter: drop-shadow(0 3px 6px rgba(0,0,0,.5));
@@ -4671,7 +4672,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .gc-info { flex: 1; min-width: 0; }
 .gc-title {
   font-family: var(--font-h); letter-spacing: .5px; font-weight: 800;
-  font-size: 23px; line-height: 1; color: var(--text); margin-bottom: 5px;
+  font-size: 21px; line-height: 1.05; color: var(--text); margin-bottom: 5px;
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
 .gc-desc { font-size: 12.5px; color: #d4d4d8; line-height: 1.35; }
@@ -4682,6 +4683,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 }
 .gc-quiz  .gc-cta { background: rgba(168,85,247,.22); color: #d8b4fe; border: 1px solid rgba(168,85,247,.4); }
 .gc-speed .gc-cta { background: rgba(249,115,22,.2); color: #fdba74; border: 1px solid rgba(249,115,22,.42); }
+.gc-seq   .gc-cta { background: rgba(59,130,246,.2); color: #93c5fd; border: 1px solid rgba(59,130,246,.42); }
 .gc-arrow {
   position: absolute; right: 16px; top: 50%; transform: translateY(-50%); z-index: 3;
   color: rgba(255,255,255,.5); font-size: 15px;
@@ -4691,7 +4693,6 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   padding: 2px 8px; border-radius: 999px;
   background: rgba(168,85,247,.2); color: #c084fc; border: 1px solid rgba(168,85,247,.35);
 }
-.gc-soon { opacity: .5; cursor: default; filter: grayscale(.4); }
 /* Tela de jogo em foco + botão voltar */
 .jogo-tela { animation: qzFade .3s ease; }
 .jogo-voltar {

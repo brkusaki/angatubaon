@@ -14703,16 +14703,15 @@ ${urlCard}`)}`;
       // (ele reaparece dentro do painel).
       const nome = _cliApelido || _cliUser.displayName || 'Você';
       const inicial = (nome.trim()[0] || '?').toUpperCase();
-      const foto = _cliUser.photoURL || '';
-
+      // Usamos sempre a INICIAL no círculo (limpo, sempre funciona, combina
+      // com a identidade). Fotos do Google (lh3.googleusercontent.com) falham
+      // com frequência por política de referência/CORS e deixam img quebrada;
+      // não vale o risco na fundação. Foto pode virar feature futura, com
+      // rehospedagem própria da imagem.
       slot.innerHTML =
         '<button class="cli-avatar-btn" id="cli-avatar-btn" ' +
         'onclick="cliAbrirPainelConta()" aria-label="Minha conta" title="Minha conta">' +
-        (foto
-          ? '<img src="' + foto + '" alt="" class="cli-avatar-img" ' +
-            'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"/>' +
-            '<span class="cli-avatar-ini" style="display:none">' + inicial + '</span>'
-          : '<span class="cli-avatar-ini">' + inicial + '</span>') +
+        '<span class="cli-avatar-ini">' + inicial + '</span>' +
         '</button>';
       slot.style.display = '';
       if (themeBtn) themeBtn.style.display = 'none';

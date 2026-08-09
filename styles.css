@@ -5108,3 +5108,165 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 }
 .rl-play:active { transform: scale(0.96); }
 .rl-play:hover { filter: brightness(1.08); }
+
+    /* ════════════════════════════════════════════
+       AUTENTICAÇÃO DE CLIENTE (Firebase)
+       Avatar no header + modais de login e de conta.
+       Reusa os tokens do app (--surface, --red, --font-h…).
+    ════════════════════════════════════════════ */
+
+    /* Slot do avatar no header (some quando deslogado) */
+    #cli-account-slot { display: none; }
+
+    .cli-avatar-btn {
+      width: 34px; height: 34px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, var(--red), #b91c1c);
+      border: 1.5px solid rgba(255,255,255,0.22);
+      color: #fff; cursor: pointer; overflow: hidden;
+      transition: transform 0.15s, box-shadow 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      flex-shrink: 0; padding: 0;
+      box-shadow: 0 2px 8px rgba(255,68,68,0.35);
+    }
+    .cli-avatar-btn:active { transform: scale(0.9); }
+    .cli-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+    .cli-avatar-ini {
+      font-family: var(--font-h); font-weight: 800; font-size: 15px;
+      line-height: 1; color: #fff;
+    }
+
+    /* ── Botões grandes de método de login ── */
+    .cli-method-btn {
+      width: 100%;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 14px 16px; border-radius: var(--r-md);
+      font-family: var(--font-h); font-weight: 700; font-size: 15px;
+      cursor: pointer; border: 1px solid var(--border);
+      transition: transform 0.15s, opacity 0.2s, background 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-method-btn:active { transform: scale(0.98); }
+    .cli-method-btn.is-loading { opacity: 0.6; pointer-events: none; }
+
+    .cli-method-google {
+      background: #fff; color: #1f1f1f; border-color: #fff;
+    }
+    .cli-method-google svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+    .cli-method-email {
+      background: var(--surface2); color: var(--text);
+    }
+    .cli-method-email i { font-size: 16px; }
+
+    /* Divisor "ou" */
+    .cli-ou {
+      display: flex; align-items: center; gap: 12px;
+      margin: 4px 0; color: var(--muted); font-size: 12px;
+    }
+    .cli-ou::before, .cli-ou::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* ── Campos ── */
+    .cli-field { margin-bottom: 12px; }
+    .cli-field label {
+      display: block; font-size: 12px; font-weight: 600;
+      color: var(--muted); margin-bottom: 6px;
+    }
+    .cli-field input {
+      width: 100%; padding: 12px 14px; border-radius: var(--r-md);
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); font-size: 15px; font-family: var(--font-b);
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    .cli-field input:focus {
+      outline: none; border-color: var(--red);
+    }
+    .cli-field input::placeholder { color: var(--muted); opacity: 0.7; }
+
+    .cli-field-err {
+      display: none; color: var(--red); font-size: 12px;
+      margin-top: 6px; line-height: 1.3;
+    }
+    .cli-field-err.show { display: block; }
+
+    /* Botão primário de submit (reusa lógica visual do modal-submit) */
+    .cli-submit {
+      width: 100%; padding: 14px; border-radius: var(--r-md);
+      background: var(--red); color: #fff; border: none;
+      font-family: var(--font-h); font-weight: 700; font-size: 15px;
+      cursor: pointer; margin-top: 4px;
+      transition: transform 0.15s, opacity 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-submit:active { transform: scale(0.98); opacity: 0.92; }
+    .cli-submit.is-loading { opacity: 0.6; pointer-events: none; }
+
+    /* Link de troca login<->cadastro */
+    .cli-switch-link {
+      text-align: center; font-size: 13px; color: var(--muted);
+      margin-top: 14px;
+    }
+    .cli-switch-link button {
+      background: none; border: none; color: var(--red);
+      font-weight: 700; font-family: var(--font-h); cursor: pointer;
+      font-size: 13px; padding: 0;
+    }
+
+    /* Botão "voltar" nos sub-passos */
+    .cli-back-btn {
+      background: none; border: none; color: var(--muted);
+      font-size: 13px; cursor: pointer; padding: 0;
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-bottom: 4px; font-family: var(--font-b);
+    }
+    .cli-back-btn i { font-size: 12px; }
+
+    /* Coruja no topo do modal de login */
+    .cli-login-owl {
+      width: 72px; height: 72px; object-fit: contain;
+      display: block; margin: 4px auto -4px;
+    }
+
+    /* ── Painel de conta ── */
+    .cli-conta-head {
+      display: flex; align-items: center; gap: 14px;
+      padding: 4px 0 16px;
+    }
+    .cli-conta-avatar {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--red), #b91c1c);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-h); font-weight: 800; font-size: 24px;
+      color: #fff; flex-shrink: 0;
+      box-shadow: 0 2px 10px rgba(255,68,68,0.35);
+    }
+    .cli-conta-info { min-width: 0; flex: 1; }
+    .cli-conta-info .nome {
+      font-family: var(--font-h); font-weight: 800; font-size: 17px;
+      color: var(--text); white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cli-conta-info .email {
+      font-size: 12px; color: var(--muted); margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* Linhas de ação no painel de conta */
+    .cli-conta-row {
+      width: 100%;
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 4px; border: none; background: none;
+      color: var(--text); font-size: 15px; cursor: pointer;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-b); text-align: left;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-conta-row:active { opacity: 0.6; }
+    .cli-conta-row i { width: 22px; text-align: center; font-size: 16px; color: var(--muted); }
+    .cli-conta-row .row-label { flex: 1; }
+    .cli-conta-row .row-value { font-size: 13px; color: var(--muted); }
+    .cli-conta-row.danger { color: var(--red); }
+    .cli-conta-row.danger i { color: var(--red); }

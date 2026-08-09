@@ -7146,6 +7146,8 @@
 
   /* ── Inicializa nav ──────────────────────────────────────── */
   atualizarNav();
+  // Inicializa auth de cliente (Firebase). Isolado do login de loja.
+  if (typeof cliAuthInit === 'function') cliAuthInit();
   // Se tem token de loja na session, valida silenciosamente ao carregar
   if (_lojaToken) {
     const _validParams = new URLSearchParams();
@@ -10130,6 +10132,14 @@
   // cardápio → detalhes → minha-loja → cadastro. Cada return encerra o handler,
   // então um único "voltar" fecha apenas o modal do topo da pilha.
   window.addEventListener('popstate', function() {
+    // Painel de conta do cliente (pode estar sobre tudo)
+    if (document.getElementById('modal-cli-conta')?.classList.contains('open')) {
+      if (typeof cliFecharPainelConta === 'function') cliFecharPainelConta(true); return;
+    }
+    // Login do cliente
+    if (document.getElementById('modal-cli-login')?.classList.contains('open')) {
+      if (typeof cliFecharLogin === 'function') cliFecharLogin(true); return;
+    }
     // Lightbox do anúncio (status) vem primeiro: pode estar sobre detalhes/lista
     if (typeof window._fecharAnuncioLightbox === 'function') {
       window._fecharAnuncioLightbox(true); return;
@@ -14618,3 +14628,361 @@ ${urlCard}`)}`;
     document.addEventListener('mousemove', e => { if (active) move(e.clientY); });
     document.addEventListener('mouseup', end);
   })();
+
+  /* ══════════════════════════════════════════════════════════════
+     AUTENTICAÇÃO DE CLIENTE (Firebase Auth)
+     — Camada 1 (Forma A): login/cadastro + estado logado no header.
+     — NÃO envia nada ao GAS ainda. Rank e porteiro virão nas próximas
+       camadas. Identidade fica 100% no Firebase; aqui só refletimos o
+       estado de sessão na UI.
+     — Isolado de propósito: o sistema de LOJISTA (WhatsApp+código) é
+       intocado. Este módulo só cuida do CLIENTE (morador).
+  ══════════════════════════════════════════════════════════════ */
+
+  // Estado local do cliente logado (espelho leve do Firebase user).
+  // Guardamos só o mínimo para a UI; a fonte da verdade é o Firebase.
+  var _cliUser = null;              // objeto Firebase user, ou null
+  var _cliApelido = null;          // nome/apelido de exibição escolhido
+
+  // Chave local só para lembrar o apelido preferido entre reloads antes
+  // de o Firebase reidratar o usuário (evita "piscar" sem nome).
+  var CLI_APELIDO_KEY = 'angatuba_cli_apelido';
+
+  /* ── Inicialização do Firebase ──────────────────────────────
+     firebase (namespace compat) é carregado via <script> no index.html
+     ANTES do app_min.js, então já existe aqui. Guardamos referência ao
+     auth uma vez. Se por algum motivo o SDK não carregou (offline no
+     primeiro load, bloqueio de rede), degradamos com elegância: o app
+     inteiro continua funcionando, só o login fica indisponível. */
+  var _fbAuth = null;
+  function _cliFirebaseAuth() {
+    if (_fbAuth) return _fbAuth;
+    if (typeof firebase === 'undefined' || !firebase.auth) return null;
+    try { _fbAuth = firebase.auth(); } catch (e) { _fbAuth = null; }
+    return _fbAuth;
+  }
+
+  // Chamado no boot. Liga o "ouvinte" de estado de auth do Firebase:
+  // sempre que alguém loga/desloga (inclusive reidratação silenciosa ao
+  // reabrir o app), este callback roda e sincroniza a UI.
+  function cliAuthInit() {
+    const auth = _cliFirebaseAuth();
+    _cliApelido = localStorage.getItem(CLI_APELIDO_KEY) || null;
+    if (!auth) {
+      // SDK indisponível: mantém UI deslogada, sem quebrar nada.
+      cliAtualizarHeader();
+      return;
+    }
+    // Persistência local: mantém o cliente logado entre sessões (é o
+    // padrão do Firebase web, mas deixamos explícito).
+    try { auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
+
+    auth.onAuthStateChanged(function (user) {
+      _cliUser = user || null;
+      if (user) {
+        // Preferimos o displayName do Firebase; se não houver (ex.: e-mail
+        // sem nome ainda), caímos no apelido salvo localmente.
+        _cliApelido = user.displayName || _cliApelido || null;
+        if (_cliApelido) localStorage.setItem(CLI_APELIDO_KEY, _cliApelido);
+      }
+      cliAtualizarHeader();
+    });
+  }
+
+  /* ── Header: avatar quando logado, nada quando deslogado ────
+     Regra de produto (login sob demanda): deslogado → header limpo
+     (logo + botão de tema). Logado → avatar do cliente aparece; o
+     controle de tema migra para DENTRO do painel do avatar. */
+  function cliAtualizarHeader() {
+    const slot = document.getElementById('cli-account-slot');
+    const themeBtn = document.getElementById('theme-toggle-btn');
+    if (!slot) return;
+
+    if (_cliUser) {
+      // Logado: monta/mostra o avatar; esconde o botão de tema do header
+      // (ele reaparece dentro do painel).
+      const nome = _cliApelido || _cliUser.displayName || 'Você';
+      const inicial = (nome.trim()[0] || '?').toUpperCase();
+      const foto = _cliUser.photoURL || '';
+
+      slot.innerHTML =
+        '<button class="cli-avatar-btn" id="cli-avatar-btn" ' +
+        'onclick="cliAbrirPainelConta()" aria-label="Minha conta" title="Minha conta">' +
+        (foto
+          ? '<img src="' + foto + '" alt="" class="cli-avatar-img" ' +
+            'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"/>' +
+            '<span class="cli-avatar-ini" style="display:none">' + inicial + '</span>'
+          : '<span class="cli-avatar-ini">' + inicial + '</span>') +
+        '</button>';
+      slot.style.display = '';
+      if (themeBtn) themeBtn.style.display = 'none';
+    } else {
+      // Deslogado: sem avatar; botão de tema volta ao header.
+      slot.innerHTML = '';
+      slot.style.display = 'none';
+      if (themeBtn) themeBtn.style.display = '';
+    }
+  }
+
+  /* ── Abrir a tela de login/cadastro do cliente ──────────────
+     ponto de entrada único. `motivo` é um texto opcional para explicar
+     por que o login está sendo pedido (ex.: vindo do rank no futuro). */
+  function cliAbrirLogin(motivo) {
+    const overlay = document.getElementById('modal-cli-login');
+    if (!overlay) return;
+    cliLoginStep('escolha');
+    // Mensagem contextual (só aparece quando há motivo).
+    const sub = document.getElementById('cli-login-sub');
+    if (sub) {
+      sub.textContent = motivo ||
+        'Entre para salvar sua pontuação e aparecer no ranking da cidade.';
+    }
+    // Limpa campos de sessões anteriores.
+    ['cli-email', 'cli-senha', 'cli-apelido', 'cli-email-cad', 'cli-senha-cad']
+      .forEach(function (id) { const el = document.getElementById(id); if (el) el.value = ''; });
+    _cliLimparErros();
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    if (history.state?.modal !== 'cli-login') history.pushState({ modal: 'cli-login' }, '');
+  }
+
+  function cliFecharLogin(viaPopstate) {
+    const overlay = document.getElementById('modal-cli-login');
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    if (!viaPopstate && history.state?.modal === 'cli-login') history.back();
+  }
+
+  // Alterna entre as três telas do modal: escolha inicial, form de
+  // login por e-mail, e form de cadastro por e-mail.
+  function cliLoginStep(step) {
+    const mapa = {
+      escolha: 'cli-step-escolha',
+      login: 'cli-step-login',
+      cadastro: 'cli-step-cadastro'
+    };
+    Object.keys(mapa).forEach(function (k) {
+      const el = document.getElementById(mapa[k]);
+      if (el) el.style.display = (k === step) ? 'flex' : 'none';
+    });
+    _cliLimparErros();
+  }
+
+  function _cliLimparErros() {
+    document.querySelectorAll('.cli-field-err').forEach(function (e) {
+      e.textContent = ''; e.classList.remove('show');
+    });
+  }
+
+  function _cliMostrarErro(id, msg) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = msg; el.classList.add('show'); }
+  }
+
+  // Traduz os códigos de erro do Firebase para PT-BR amigável.
+  // Mensagens no registro da interface: dizem o que houve e o que fazer,
+  // sem jargão técnico.
+  function _cliErroFirebasePt(code) {
+    switch (code) {
+      case 'auth/invalid-email':          return 'E-mail inválido. Confira e tente de novo.';
+      case 'auth/user-disabled':          return 'Esta conta foi desativada.';
+      case 'auth/user-not-found':         return 'Não achamos uma conta com esse e-mail.';
+      case 'auth/wrong-password':
+      case 'auth/invalid-credential':     return 'E-mail ou senha incorretos.';
+      case 'auth/email-already-in-use':   return 'Este e-mail já tem conta. Tente entrar.';
+      case 'auth/weak-password':          return 'A senha precisa de pelo menos 6 caracteres.';
+      case 'auth/too-many-requests':      return 'Muitas tentativas. Espere um pouco e tente de novo.';
+      case 'auth/network-request-failed': return 'Sem conexão. Verifique a internet e tente de novo.';
+      case 'auth/popup-closed-by-user':   return 'Janela do Google fechada antes de concluir.';
+      case 'auth/popup-blocked':          return 'O navegador bloqueou a janela do Google.';
+      case 'auth/account-exists-with-different-credential':
+        return 'Este e-mail já tem conta por outro método. Tente entrar com e-mail e senha.';
+      default:                            return 'Algo deu errado. Tente de novo em instantes.';
+    }
+  }
+
+  /* ── Entrar com Google ──────────────────────────────────────
+     Usa popup no desktop; em alguns WebViews de celular o popup falha,
+     então caímos para redirect automaticamente. */
+  function cliEntrarGoogle() {
+    const auth = _cliFirebaseAuth();
+    if (!auth) { _cliMostrarErro('cli-erro-escolha', 'Login indisponível agora. Tente recarregar o app.'); return; }
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const btn = document.getElementById('cli-btn-google');
+    if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
+
+    auth.signInWithPopup(provider)
+      .then(function (result) {
+        // displayName do Google já vira o apelido inicial (a pessoa pode
+        // trocar depois no painel da conta).
+        const u = result.user;
+        if (u && u.displayName) {
+          _cliApelido = u.displayName;
+          localStorage.setItem(CLI_APELIDO_KEY, u.displayName);
+        }
+        cliFecharLogin();
+        if (typeof showToastSimples === 'function') {
+          showToastSimples('Bem-vindo, ' + (u.displayName || 'você') + '!', '/webp/owl-wave.webp');
+        }
+      })
+      .catch(function (err) {
+        // Popup bloqueado/fechado → tenta redirect como plano B.
+        if (err && (err.code === 'auth/popup-blocked')) {
+          try { auth.signInWithRedirect(provider); return; } catch (e) {}
+        }
+        _cliMostrarErro('cli-erro-escolha', _cliErroFirebasePt(err && err.code));
+      })
+      .finally(function () {
+        if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); }
+      });
+  }
+
+  /* ── Entrar com e-mail + senha ──────────────────────────────*/
+  function cliEntrarEmail() {
+    const auth = _cliFirebaseAuth();
+    if (!auth) { _cliMostrarErro('cli-erro-login', 'Login indisponível agora. Tente recarregar o app.'); return; }
+    const email = (document.getElementById('cli-email').value || '').trim();
+    const senha = document.getElementById('cli-senha').value || '';
+    _cliLimparErros();
+    if (!email) { _cliMostrarErro('cli-erro-login', 'Digite seu e-mail.'); return; }
+    if (!senha) { _cliMostrarErro('cli-erro-login', 'Digite sua senha.'); return; }
+
+    const btn = document.getElementById('cli-btn-entrar-email');
+    if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
+
+    auth.signInWithEmailAndPassword(email, senha)
+      .then(function () {
+        cliFecharLogin();
+        if (typeof showToastSimples === 'function') {
+          showToastSimples('Bem-vindo de volta!', '/webp/owl-wave.webp');
+        }
+      })
+      .catch(function (err) {
+        _cliMostrarErro('cli-erro-login', _cliErroFirebasePt(err && err.code));
+      })
+      .finally(function () {
+        if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); }
+      });
+  }
+
+  /* ── Criar conta com e-mail + senha + apelido ───────────────
+     Depois de criar, gravamos o apelido como displayName no perfil
+     Firebase (updateProfile), para o rank futuro já ter nome pronto. */
+  function cliCriarConta() {
+    const auth = _cliFirebaseAuth();
+    if (!auth) { _cliMostrarErro('cli-erro-cadastro', 'Cadastro indisponível agora. Tente recarregar o app.'); return; }
+    const apelido = (document.getElementById('cli-apelido').value || '').trim();
+    const email   = (document.getElementById('cli-email-cad').value || '').trim();
+    const senha   = document.getElementById('cli-senha-cad').value || '';
+    _cliLimparErros();
+
+    if (!apelido)             { _cliMostrarErro('cli-erro-cadastro', 'Escolha um nome ou apelido para aparecer no ranking.'); return; }
+    if (apelido.length < 2)   { _cliMostrarErro('cli-erro-cadastro', 'O nome precisa de pelo menos 2 letras.'); return; }
+    if (apelido.length > 20)  { _cliMostrarErro('cli-erro-cadastro', 'O nome pode ter no máximo 20 caracteres.'); return; }
+    if (!email)               { _cliMostrarErro('cli-erro-cadastro', 'Digite seu e-mail.'); return; }
+    if (senha.length < 6)     { _cliMostrarErro('cli-erro-cadastro', 'A senha precisa de pelo menos 6 caracteres.'); return; }
+
+    const btn = document.getElementById('cli-btn-criar');
+    if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
+
+    auth.createUserWithEmailAndPassword(email, senha)
+      .then(function (cred) {
+        _cliApelido = apelido;
+        localStorage.setItem(CLI_APELIDO_KEY, apelido);
+        // Grava o apelido no perfil Firebase (não bloqueia o sucesso se falhar).
+        if (cred.user && cred.user.updateProfile) {
+          cred.user.updateProfile({ displayName: apelido }).catch(function () {});
+        }
+        cliFecharLogin();
+        if (typeof showToastSimples === 'function') {
+          showToastSimples('Conta criada! Bem-vindo, ' + apelido + '!', '/webp/owl-celebrategratis.webp');
+        }
+      })
+      .catch(function (err) {
+        _cliMostrarErro('cli-erro-cadastro', _cliErroFirebasePt(err && err.code));
+      })
+      .finally(function () {
+        if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); }
+      });
+  }
+
+  /* ── Painel da conta (abre ao tocar no avatar) ──────────────
+     Contém: saudação, controle de TEMA (migrado do header) e sair.
+     Reusa o modal-overlay padrão para consistência visual. */
+  function cliAbrirPainelConta() {
+    const overlay = document.getElementById('modal-cli-conta');
+    if (!overlay) return;
+    const nome = _cliApelido || (_cliUser && _cliUser.displayName) || 'Você';
+    const email = (_cliUser && _cliUser.email) || '';
+    const nomeEl = document.getElementById('cli-conta-nome');
+    const emailEl = document.getElementById('cli-conta-email');
+    if (nomeEl) nomeEl.textContent = nome;
+    if (emailEl) emailEl.textContent = email;
+    const iniEl = document.getElementById('cli-conta-avatar-ini');
+    if (iniEl) iniEl.textContent = (nome.trim()[0] || '?').toUpperCase();
+    // Sincroniza o rótulo do botão de tema dentro do painel com o estado atual.
+    if (typeof cliSincronizarTemaLabel === 'function') cliSincronizarTemaLabel();
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    if (history.state?.modal !== 'cli-conta') history.pushState({ modal: 'cli-conta' }, '');
+  }
+
+  function cliFecharPainelConta(viaPopstate) {
+    const overlay = document.getElementById('modal-cli-conta');
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    if (!viaPopstate && history.state?.modal === 'cli-conta') history.back();
+  }
+
+  // Botão de tema DENTRO do painel: chama o mesmo toggleTheme() de sempre
+  // e reflete o novo estado no rótulo, sem duplicar lógica de tema.
+  function cliTrocarTema() {
+    if (typeof toggleTheme === 'function') toggleTheme();
+    if (typeof cliSincronizarTemaLabel === 'function') cliSincronizarTemaLabel();
+  }
+
+  // Atualiza o texto do botão de tema no painel (Dia / Noite / Automático).
+  function cliSincronizarTemaLabel() {
+    const el = document.getElementById('cli-conta-tema-label');
+    if (!el) return;
+    let modo = 'auto';
+    try { modo = (typeof _lerModoTema === 'function') ? _lerModoTema() : 'auto'; } catch (e) {}
+    const isLight = document.body.classList.contains('light-mode');
+    el.textContent = (modo === 'auto')
+      ? (isLight ? 'Automático (dia)' : 'Automático (noite)')
+      : (isLight ? 'Tema dia' : 'Tema noite');
+  }
+
+  /* ── Sair da conta ──────────────────────────────────────────*/
+  function cliSair() {
+    const auth = _cliFirebaseAuth();
+    cliFecharPainelConta();
+    if (!auth) { _cliUser = null; cliAtualizarHeader(); return; }
+    auth.signOut()
+      .then(function () {
+        _cliUser = null;
+        if (typeof showToastSimples === 'function') {
+          showToastSimples('Você saiu da conta.', '/webp/owl-wave.webp');
+        }
+      })
+      .catch(function () {
+        // Mesmo se falhar remotamente, refletimos deslogado na UI.
+        _cliUser = null; cliAtualizarHeader();
+      });
+  }
+
+  // Expor no window as funções usadas por onclick no HTML dinâmico/estático.
+  // (Em script clássico as declarações já viram window.*, mas deixamos
+  //  explícito as que são chamadas de fora para robustez pós-minify.)
+  window.cliAbrirLogin        = cliAbrirLogin;
+  window.cliFecharLogin       = cliFecharLogin;
+  window.cliLoginStep         = cliLoginStep;
+  window.cliEntrarGoogle      = cliEntrarGoogle;
+  window.cliEntrarEmail       = cliEntrarEmail;
+  window.cliCriarConta        = cliCriarConta;
+  window.cliAbrirPainelConta  = cliAbrirPainelConta;
+  window.cliFecharPainelConta = cliFecharPainelConta;
+  window.cliTrocarTema        = cliTrocarTema;
+  window.cliSair              = cliSair;

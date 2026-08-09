@@ -247,6 +247,7 @@
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <img src="/webp/owl-badge.webp" alt="AngatubaON ao vivo" class="owl-badge-anim" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
+        <div id="cli-account-slot"></div>
         <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()" aria-label="Alternar tema">
           <i class="fa fa-moon" id="theme-toggle-icon"></i>
         </button>
@@ -2331,6 +2332,145 @@
     }
   </style>
 
+
+  <!-- ══════════════════════════════ MODAL LOGIN/CADASTRO CLIENTE -->
+  <div class="modal-overlay" id="modal-cli-login" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Entrar no <span>AngatubaON</span></div>
+          <div class="modal-subtitle" id="cli-login-sub">Entre para salvar sua pontuação e aparecer no ranking da cidade.</div>
+        </div>
+        <button class="modal-close" onclick="cliFecharLogin()" aria-label="Fechar">✕</button>
+      </div>
+
+      <!-- Passo: escolha do método -->
+      <div class="modal-body" id="cli-step-escolha" style="display:flex;flex-direction:column;gap:12px;">
+        <img class="cli-login-owl" src="/webp/owl-wave.webp" alt=""
+          onerror="if(!this.dataset.f){this.dataset.f=1;this.style.display='none';}"/>
+        <button class="cli-method-btn cli-method-google" id="cli-btn-google" onclick="cliEntrarGoogle()">
+          <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          </svg>
+          Entrar com Google
+        </button>
+        <button class="cli-method-btn cli-method-email" onclick="cliLoginStep('login')">
+          <i class="fa fa-envelope"></i> Entrar com e-mail
+        </button>
+        <p class="cli-field-err" id="cli-erro-escolha"></p>
+        <div class="cli-switch-link">
+          Ainda não tem conta?
+          <button onclick="cliLoginStep('cadastro')">Criar conta</button>
+        </div>
+      </div>
+
+      <!-- Passo: login por e-mail -->
+      <div class="modal-body" id="cli-step-login" style="display:none;flex-direction:column;">
+        <button class="cli-back-btn" onclick="cliLoginStep('escolha')"><i class="fa fa-chevron-left"></i> Voltar</button>
+        <div class="cli-field">
+          <label for="cli-email">E-mail</label>
+          <input id="cli-email" type="email" inputmode="email" autocomplete="email"
+            placeholder="seu@email.com"
+            onkeydown="if(event.key==='Enter')cliEntrarEmail()"/>
+        </div>
+        <div class="cli-field">
+          <label for="cli-senha">Senha</label>
+          <input id="cli-senha" type="password" autocomplete="current-password"
+            placeholder="Sua senha"
+            onkeydown="if(event.key==='Enter')cliEntrarEmail()"/>
+        </div>
+        <p class="cli-field-err" id="cli-erro-login"></p>
+        <button class="cli-submit" id="cli-btn-entrar-email" onclick="cliEntrarEmail()">Entrar</button>
+        <div class="cli-switch-link">
+          Não tem conta?
+          <button onclick="cliLoginStep('cadastro')">Criar conta</button>
+        </div>
+      </div>
+
+      <!-- Passo: cadastro por e-mail -->
+      <div class="modal-body" id="cli-step-cadastro" style="display:none;flex-direction:column;">
+        <button class="cli-back-btn" onclick="cliLoginStep('escolha')"><i class="fa fa-chevron-left"></i> Voltar</button>
+        <div class="cli-field">
+          <label for="cli-apelido">Nome ou apelido <span style="color:var(--red)">*</span></label>
+          <input id="cli-apelido" type="text" maxlength="20" autocomplete="nickname"
+            placeholder="Como você quer aparecer no ranking"/>
+        </div>
+        <div class="cli-field">
+          <label for="cli-email-cad">E-mail</label>
+          <input id="cli-email-cad" type="email" inputmode="email" autocomplete="email"
+            placeholder="seu@email.com"/>
+        </div>
+        <div class="cli-field">
+          <label for="cli-senha-cad">Senha <span style="color:var(--muted);font-weight:400">(mín. 6 caracteres)</span></label>
+          <input id="cli-senha-cad" type="password" autocomplete="new-password"
+            placeholder="Crie uma senha"
+            onkeydown="if(event.key==='Enter')cliCriarConta()"/>
+        </div>
+        <p class="cli-field-err" id="cli-erro-cadastro"></p>
+        <button class="cli-submit" id="cli-btn-criar" onclick="cliCriarConta()">Criar conta</button>
+        <div class="cli-switch-link">
+          Já tem conta?
+          <button onclick="cliLoginStep('login')">Entrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════ MODAL CONTA DO CLIENTE -->
+  <div class="modal-overlay" id="modal-cli-conta" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Minha <span>conta</span></div>
+        </div>
+        <button class="modal-close" onclick="cliFecharPainelConta()" aria-label="Fechar">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;">
+        <div class="cli-conta-head">
+          <div class="cli-conta-avatar" id="cli-conta-avatar-ini">?</div>
+          <div class="cli-conta-info">
+            <div class="nome" id="cli-conta-nome">—</div>
+            <div class="email" id="cli-conta-email"></div>
+          </div>
+        </div>
+
+        <!-- Tema (migrado do header) -->
+        <button class="cli-conta-row" onclick="cliTrocarTema()">
+          <i class="fa fa-circle-half-stroke"></i>
+          <span class="row-label">Tema</span>
+          <span class="row-value" id="cli-conta-tema-label">Automático</span>
+        </button>
+
+        <!-- Sair -->
+        <button class="cli-conta-row danger" onclick="cliSair()">
+          <i class="fa fa-right-from-bracket"></i>
+          <span class="row-label">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase Auth (compat) — carregado ANTES do app_min.js para que firebase.auth() exista no boot -->
+  <script src="https://www.gstatic.com/firebasejs/12.17.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.17.1/firebase-auth-compat.js"></script>
+  <script>
+    // Config do projeto Firebase (valores públicos por design).
+    var firebaseConfig = {
+      apiKey: "AIzaSyClKx3gSCgM1O6X6SMh3VyJLthp-oYnx3k",
+      authDomain: "angatubaon-cd333.firebaseapp.com",
+      projectId: "angatubaon-cd333",
+      storageBucket: "angatubaon-cd333.firebasestorage.app",
+      messagingSenderId: "559185630365",
+      appId: "1:559185630365:web:a2e7fc4cc9d26bfea67074"
+    };
+    try { if (window.firebase && firebase.initializeApp) firebase.initializeApp(firebaseConfig); }
+    catch (e) { console.warn("[Firebase] init falhou:", e); }
+  </script>
   <script src="/app_min.js"></script>
   <script>
     /* ── Empty state: limpar filtros ── */

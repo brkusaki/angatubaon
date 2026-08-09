@@ -5116,7 +5116,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     ════════════════════════════════════════════ */
 
     /* Slot do avatar no header (some quando deslogado) */
-    #cli-account-slot { display: none; }
+    #cli-account-slot { display: none; align-items: center; }
 
     .cli-avatar-btn {
       width: 34px; height: 34px; border-radius: 50%;

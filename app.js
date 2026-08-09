@@ -512,6 +512,95 @@
     }
   }
 
+  /* ── Ofensiva (streak diário) ───────────
+     Conta dias seguidos em que a pessoa jogou QUALQUER jogo. 100% local.
+     Guarda { dias, ultimoDia } onde ultimoDia é o epoch em dias (Date.now/86400000).
+     Regras ao registrar atividade:
+       - mesmo dia  -> mantém (não conta de novo)
+       - dia seguinte -> incrementa
+       - pulou 1+ dia -> reseta para 1
+     A faixa aparece no topo do hub quando dias >= 1. */
+  function _streakDiaAtual() { return Math.floor(Date.now() / 86400000); }
+
+  var _streakAumentouAgora = false; // true se o streak subiu ao abrir o último jogo
+
+  function _streakLer() {
+    try {
+      var raw = localStorage.getItem('angatuba_streak');
+      if (!raw) return { dias: 0, ultimoDia: 0 };
+      var obj = JSON.parse(raw);
+      return { dias: Number(obj.dias) || 0, ultimoDia: Number(obj.ultimoDia) || 0 };
+    } catch (e) { return { dias: 0, ultimoDia: 0 }; }
+  }
+
+  function _streakSalvar(dias, ultimoDia) {
+    try { localStorage.setItem('angatuba_streak', JSON.stringify({ dias: dias, ultimoDia: ultimoDia })); } catch (e) {}
+  }
+
+  // Chamado quando a pessoa começa a jogar. Atualiza o streak conforme a data.
+  // Retorna true se o streak AUMENTOU nesta chamada (pra dar feedback visual).
+  function _streakRegistrar() {
+    var hoje = _streakDiaAtual();
+    var s = _streakLer();
+    if (s.ultimoDia === hoje) {
+      return false; // já contou hoje
+    }
+    if (s.ultimoDia === hoje - 1) {
+      s.dias = s.dias + 1; // dia seguinte: continua a ofensiva
+    } else {
+      s.dias = 1; // primeiro dia ou quebrou a sequência
+    }
+    s.ultimoDia = hoje;
+    _streakSalvar(s.dias, s.ultimoDia);
+    return true;
+  }
+
+  // Próximo marco de dias (3, 7, 14, 30, 60, 100...) acima do valor atual.
+  function _streakProxMarco(dias) {
+    var marcos = [3, 7, 14, 30, 60, 100, 200, 365];
+    for (var i = 0; i < marcos.length; i++) { if (marcos[i] > dias) return marcos[i]; }
+    return null;
+  }
+
+  // Atualiza a faixa visual no hub conforme o estado do streak.
+  function _streakAtualizarFaixa(comAnimacao) {
+    var faixa = document.getElementById('streak-faixa');
+    if (!faixa) return;
+    var s = _streakLer();
+    var hoje = _streakDiaAtual();
+
+    // Streak "vivo" = jogou hoje ou ontem. 2+ dias sem jogar = ofensiva esfriou.
+    var vivo = (s.ultimoDia === hoje || s.ultimoDia === hoje - 1);
+
+    if (s.dias <= 0) { faixa.style.display = 'none'; return; }
+
+    var numEl = document.getElementById('streak-num');
+    var subEl = document.getElementById('streak-sub');
+    var chamaEl = document.getElementById('streak-chama');
+
+    faixa.style.display = 'flex';
+    faixa.classList.toggle('streak-apagada', !vivo);
+
+    if (numEl) numEl.textContent = s.dias + (s.dias === 1 ? ' dia' : ' dias');
+
+    if (subEl) {
+      if (!vivo) {
+        subEl.textContent = 'Sua ofensiva esfriou! Jogue pra reacender 🔥';
+      } else if (s.ultimoDia === hoje) {
+        var proxMarco = _streakProxMarco(s.dias);
+        subEl.textContent = proxMarco
+          ? ('Voltou hoje! Faltam ' + (proxMarco - s.dias) + ' pra ' + proxMarco + ' dias 🎯')
+          : 'Você está on fire! 🔥';
+      } else {
+        subEl.textContent = 'Jogue hoje pra manter a ofensiva!';
+      }
+    }
+
+    if (comAnimacao && chamaEl) {
+      chamaEl.classList.remove('streak-chama-pop'); void chamaEl.offsetWidth; chamaEl.classList.add('streak-chama-pop');
+    }
+  }
+
   /* ── Hub de Mini-Games (aba Joguinhos) ───────────
      Troca a view: esconde a lista de lojas + rodapé e mostra o hub de jogos.
      O quiz só é buscado da API na PRIMEIRA vez que o hub abre (lazy). */
@@ -528,6 +617,7 @@
     if (siga) siga.style.display = 'none';
     hub.style.display = 'block';
     _voltarAoMenu(); // sempre abre mostrando o menu de jogos
+    _streakAtualizarFaixa(false); // mostra a ofensiva atual (sem animar)
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0,0); }
   }
 
@@ -560,9 +650,15 @@
     var telas = document.querySelectorAll('.jogo-tela');
     for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
     if (menu) menu.style.display = 'block';
+    // Atualiza a faixa de ofensiva; anima a chama se subiu nesta visita.
+    _streakAtualizarFaixa(_streakAumentouAgora);
+    _streakAumentouAgora = false;
   }
 
   function _abrirJogo(nome) {
+    // Registra a ofensiva do dia (qualquer jogo conta). Guarda se aumentou
+    // pra animar a chama quando a pessoa voltar ao menu de jogos.
+    _streakAumentouAgora = _streakRegistrar();
     var menu = document.getElementById('games-menu');
     if (menu) menu.style.display = 'none';
     var telas = document.querySelectorAll('.jogo-tela');

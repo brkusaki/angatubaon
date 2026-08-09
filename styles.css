@@ -4620,6 +4620,40 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 }
 .games-hub-title i { color: #a855f7; }
 .games-hub-sub { font-size: 13px; color: var(--muted); margin: 0; }
+
+/* ═════ Faixa de ofensiva (streak diário) ══ */
+.streak-faixa {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; margin-bottom: 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(249,115,22,0.18), rgba(239,68,68,0.12));
+  border: 1px solid rgba(249,115,22,0.35);
+  box-shadow: 0 4px 16px rgba(249,115,22,0.15);
+}
+.streak-chama {
+  font-size: 34px; line-height: 1; flex-shrink: 0;
+  filter: drop-shadow(0 2px 6px rgba(249,115,22,0.5));
+}
+.streak-chama.streak-chama-pop { animation: streakPop .6s ease; }
+@keyframes streakPop {
+  0% { transform: scale(1) rotate(0); }
+  30% { transform: scale(1.4) rotate(-8deg); }
+  60% { transform: scale(1.15) rotate(6deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.streak-txt { flex: 1; min-width: 0; }
+.streak-num {
+  font-family: var(--font-h); font-weight: 800; font-size: 22px;
+  color: #fb923c; line-height: 1.1;
+}
+.streak-sub { font-size: 12px; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+/* Ofensiva esfriada: tons apagados/cinza */
+.streak-faixa.streak-apagada {
+  background: var(--surface); border-color: var(--border);
+  box-shadow: none; opacity: .8;
+}
+.streak-faixa.streak-apagada .streak-chama { filter: grayscale(.7) brightness(.8); }
+.streak-faixa.streak-apagada .streak-num { color: var(--muted); }
 /* ═════ Menu de jogos — cards com foto de fundo + coruja-logo ══ */
 .game-card {
   position: relative; display: block; width: 100%; text-align: left;

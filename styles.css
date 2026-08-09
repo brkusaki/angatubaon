@@ -4817,6 +4817,19 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 }
 .st-btn:active { transform: scale(0.96); }
 .st-btn:hover { filter: brightness(1.08); }
+
+/* Botões de escolha de modo (Clássico / Sobrevivência) */
+.st-modos { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; margin-top: 14px; }
+.st-btn-modo {
+  margin-top: 0; padding: 12px 18px; border-radius: 14px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+}
+.st-btn-modo-surv { background: linear-gradient(135deg, #ec4899, #be123c); box-shadow: 0 4px 14px rgba(190,18,60,0.35); }
+.st-btn-modo-tit { font-family: var(--font-h); font-weight: 800; font-size: 16px; letter-spacing: .3px; }
+.st-btn-modo-sub { font-size: 11px; font-weight: 600; opacity: .92; font-family: 'DM Sans', system-ui, sans-serif; letter-spacing: 0; }
+/* Corações de vida no HUD (modo sobrevivência) */
+.st-vidas { font-size: 15px; letter-spacing: 1px; }
 /* Badge de +1 que flutua ao tocar */
 .st-mais {
   position: absolute; pointer-events: none;
@@ -4934,6 +4947,14 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
   padding: 16px; max-width: 340px; margin: 0 auto;
 }
+/* Modo 6 corujas: grade 3 colunas (3x2) */
+.sq-grade.sq-grade-6 { grid-template-columns: 1fr 1fr 1fr; max-width: 420px; }
+.sq-grade.sq-expandiu { animation: sqExpandiu .6s ease; }
+@keyframes sqExpandiu {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
 .sq-grade.sq-erro { animation: sqErro .4s ease; }
 @keyframes sqErro {
   0%,100% { transform: translateX(0); }
@@ -4963,6 +4984,8 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .sq-btn-1 { --sqc: #f59e0b; }
 .sq-btn-2 { --sqc: #4ade80; }
 .sq-btn-3 { --sqc: #3b82f6; }
+.sq-btn-4 { --sqc: #ec4899; }
+.sq-btn-5 { --sqc: #14b8a6; }
 /* Estado aceso: cor viva, brilho, coruja em destaque */
 .sq-btn.sq-on {
   opacity: 1;
@@ -5003,3 +5026,85 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 }
 .sq-play:active { transform: scale(0.96); }
 .sq-play:hover { filter: brightness(1.08); }
+
+/* ═════ Modo Relâmpago (quiz de treino com timer) ══ */
+/* Botão que leva ao Relâmpago, na tela de placar do quiz */
+.quiz-relampago-btn {
+  margin-top: 16px;
+  font-family: var(--font-h); font-weight: 800; font-size: 14px; letter-spacing: .3px;
+  color: #fff; cursor: pointer;
+  padding: 11px 24px; border-radius: 999px; border: none;
+  background: linear-gradient(135deg, #eab308, #f59e0b);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .1s, filter .15s;
+  box-shadow: 0 4px 14px rgba(234,179,8,0.35);
+}
+.quiz-relampago-btn:active { transform: scale(0.96); }
+.quiz-relampago-btn:hover { filter: brightness(1.08); }
+
+.rl-card {
+  border-radius: 16px; overflow: hidden; position: relative;
+  border: 1px solid var(--border); background: var(--surface);
+  min-height: 360px;
+}
+.rl-hud {
+  display: flex; justify-content: space-around; padding: 14px 12px;
+  background: linear-gradient(135deg, rgba(234,179,8,0.14), rgba(245,158,11,0.08));
+  border-bottom: 1px solid var(--border);
+}
+.rl-hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.rl-hud-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
+.rl-hud-valor { font-family: var(--font-h); font-weight: 800; font-size: 22px; color: var(--text); }
+.rl-hud-valor.rl-recorde-novo { color: #f59e0b; animation: stGlow .5s ease 3; }
+/* Barra de tempo por pergunta */
+.rl-timer-wrap { height: 6px; background: var(--surface2); overflow: hidden; }
+.rl-timer-fill {
+  height: 100%; width: 100%;
+  background: linear-gradient(90deg, #eab308, #f59e0b);
+  transition: width .06s linear;
+}
+.rl-timer-fill.rl-timer-critico { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.rl-fase { padding: 20px 16px; }
+.rl-pergunta {
+  font-family: var(--font-h); font-weight: 800; font-size: 20px; line-height: 1.2;
+  color: var(--text); text-align: center; margin-bottom: 18px; min-height: 48px;
+}
+.rl-pergunta.rl-fade { animation: qzFade .3s ease; }
+.rl-opcoes { display: flex; flex-direction: column; gap: 10px; }
+.rl-opt {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 14px 16px; border-radius: 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); font-size: 14px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .08s, border-color .15s, background .15s;
+}
+.rl-opt:active { transform: scale(0.98); }
+.rl-opt-letra {
+  flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(234,179,8,0.2); color: #fbbf24;
+  font-family: var(--font-h); font-weight: 800; font-size: 14px;
+}
+.rl-opt.rl-certa { background: rgba(74,222,128,0.15); border-color: #4ade80; }
+.rl-opt.rl-certa .rl-opt-letra { background: #4ade80; color: #052e16; }
+.rl-opt.rl-errada { background: rgba(239,68,68,0.15); border-color: #ef4444; }
+.rl-opt.rl-errada .rl-opt-letra { background: #ef4444; color: #450a0a; }
+/* Overlays início/fim */
+.rl-overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center;
+  padding: 24px; gap: 8px; background: rgba(10,10,12,.94); backdrop-filter: blur(3px); z-index: 6;
+}
+.rl-overlay-owl { width: 76px; height: 76px; object-fit: contain; margin-bottom: 4px; }
+.rl-overlay-titulo { font-family: var(--font-h); font-weight: 800; font-size: 24px; color: var(--text); }
+.rl-overlay-desc { font-size: 13px; color: var(--muted); line-height: 1.45; max-width: 270px; }
+.rl-play {
+  margin-top: 14px; font-family: var(--font-h); font-weight: 800; font-size: 15px;
+  color: #fff; cursor: pointer; padding: 12px 34px; border-radius: 999px; border: none;
+  background: linear-gradient(135deg, #eab308, #f59e0b);
+  -webkit-tap-highlight-color: transparent; transition: transform .1s, filter .15s;
+  box-shadow: 0 4px 14px rgba(234,179,8,0.4);
+}
+.rl-play:active { transform: scale(0.96); }
+.rl-play:hover { filter: brightness(1.08); }

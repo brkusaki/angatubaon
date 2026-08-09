@@ -421,12 +421,45 @@
               <div class="quiz-placar-nota" id="quiz-placar-nota"></div>
               <div class="quiz-placar-msg" id="quiz-placar-msg"></div>
               <div class="quiz-placar-sub">Volta amanhã pra um novo quiz! 🦉</div>
+              <button type="button" class="quiz-relampago-btn" onclick="_rlAbrir()">⚡ Treinar no Modo Relâmpago</button>
             </div>
           </div>
         </div>
         <div id="games-loading" style="text-align:center;padding:30px 20px;color:var(--muted);">
           <img src="/webp/owl-search.webp" alt="" style="width:56px;height:56px;object-fit:contain;opacity:.7;" onerror="this.style.display='none'">
           <div style="margin-top:8px;font-size:13px;">Carregando o quiz…</div>
+        </div>
+      </div>
+
+      <!-- TELA: Modo Relâmpago (quiz de treino com timer) -->
+      <div id="jogo-relampago" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div class="rl-card">
+          <div class="rl-hud">
+            <div class="rl-hud-item"><span class="rl-hud-label">Pontos</span><span class="rl-hud-valor" id="rl-pontos">0</span></div>
+            <div class="rl-hud-item"><span class="rl-hud-label">Acertos</span><span class="rl-hud-valor" id="rl-acertos">0</span></div>
+            <div class="rl-hud-item"><span class="rl-hud-label">Recorde</span><span class="rl-hud-valor" id="rl-recorde">0</span></div>
+          </div>
+          <!-- barra de tempo por pergunta -->
+          <div class="rl-timer-wrap"><div class="rl-timer-fill" id="rl-timer-fill"></div></div>
+          <div class="rl-fase" id="rl-fase">
+            <div class="rl-pergunta" id="rl-pergunta"></div>
+            <div class="rl-opcoes" id="rl-opcoes"></div>
+          </div>
+          <!-- Tela inicial -->
+          <div class="rl-overlay" id="rl-inicio">
+            <img src="/webp/owl-idea.webp" alt="" class="rl-overlay-owl" onerror="this.style.display='none'">
+            <div class="rl-overlay-titulo">⚡ Modo Relâmpago</div>
+            <div class="rl-overlay-desc">Responda o mais rápido que conseguir! Quanto mais rápido acertar, mais pontos. Erro ou tempo esgotado encerra o jogo.</div>
+            <button type="button" class="rl-play" onclick="_rlComecar()">Começar</button>
+          </div>
+          <!-- Tela de fim -->
+          <div class="rl-overlay" id="rl-fim" style="display:none;">
+            <img src="" alt="" class="rl-overlay-owl" id="rl-fim-owl" onerror="this.style.display='none'">
+            <div class="rl-overlay-titulo" id="rl-fim-titulo">Fim!</div>
+            <div class="rl-overlay-desc" id="rl-fim-msg"></div>
+            <button type="button" class="rl-play" onclick="_rlComecar()">Jogar de novo</button>
+          </div>
         </div>
       </div>
 
@@ -437,17 +470,26 @@
           <div class="st-hud">
             <div class="st-hud-item"><span class="st-hud-label">Pontos</span><span class="st-hud-valor" id="st-pontos">0</span></div>
             <div class="st-hud-item"><span class="st-hud-label">Nível</span><span class="st-hud-valor" id="st-nivel">1</span></div>
-            <div class="st-hud-item"><span class="st-hud-label">Tempo</span><span class="st-hud-valor" id="st-tempo">25</span></div>
+            <div class="st-hud-item"><span class="st-hud-label" id="st-slot-label">Tempo</span><span class="st-hud-valor" id="st-tempo">25</span></div>
             <div class="st-hud-item"><span class="st-hud-label">Recorde</span><span class="st-hud-valor" id="st-recorde">0</span></div>
           </div>
           <div class="st-arena" id="st-arena">
             <div class="st-combo-badge" id="st-combo" style="display:none;"></div>
-            <!-- Estado inicial: botão começar -->
+            <!-- Estado inicial: escolha de modo -->
             <div class="st-inicio" id="st-inicio">
               <img src="/webp/owl-wave.webp" alt="" class="st-inicio-owl" onerror="this.style.display='none'">
               <div class="st-inicio-titulo">Pega a Coruja!</div>
-              <div class="st-inicio-desc">Toque nas corujas boas 🦉 e fuja das bravas 😠. Acertos seguidos fazem combo e o jogo acelera!</div>
-              <button type="button" class="st-btn" onclick="_stComecar()">Começar</button>
+              <div class="st-inicio-desc">Toque nas corujas boas 🦉 e fuja das bravas 😠. Acertos seguidos fazem combo!</div>
+              <div class="st-modos">
+                <button type="button" class="st-btn st-btn-modo" onclick="_stComecar('classico')">
+                  <span class="st-btn-modo-tit">⏱️ Clássico</span>
+                  <span class="st-btn-modo-sub">Máximo de pontos em 25s</span>
+                </button>
+                <button type="button" class="st-btn st-btn-modo st-btn-modo-surv" onclick="_stComecar('sobrevivencia')">
+                  <span class="st-btn-modo-tit">❤️ Sobrevivência</span>
+                  <span class="st-btn-modo-sub">Acaba se errar 3 corujas bravas</span>
+                </button>
+              </div>
             </div>
             <!-- A coruja-alvo é injetada aqui durante o jogo -->
             <!-- Tela de fim -->
@@ -475,6 +517,8 @@
             <button type="button" class="sq-btn sq-btn-1" data-idx="1" aria-label="coruja 2"><img src="/webp/owl-portrait.webp" alt="" onerror="this.style.display='none'"></button>
             <button type="button" class="sq-btn sq-btn-2" data-idx="2" aria-label="coruja 3"><img src="/webp/owl-portrait.webp" alt="" onerror="this.style.display='none'"></button>
             <button type="button" class="sq-btn sq-btn-3" data-idx="3" aria-label="coruja 4"><img src="/webp/owl-portrait.webp" alt="" onerror="this.style.display='none'"></button>
+            <button type="button" class="sq-btn sq-btn-4" data-idx="4" aria-label="coruja 5" style="display:none;"><img src="/webp/owl-portrait.webp" alt="" onerror="this.style.display='none'"></button>
+            <button type="button" class="sq-btn sq-btn-5" data-idx="5" aria-label="coruja 6" style="display:none;"><img src="/webp/owl-portrait.webp" alt="" onerror="this.style.display='none'"></button>
           </div>
           <!-- Tela inicial -->
           <div class="sq-overlay" id="sq-inicio">

@@ -367,6 +367,7 @@
 
   var _QUIZ_POR_DIA = 5; // quantas perguntas no mini-quiz de cada dia.
   var _quizEstado = null; // estado da sessão atual (perguntas do dia, índice, acertos).
+  var _quizBancoCompleto = []; // banco inteiro de perguntas (reusado pelo Relâmpago).
 
   // Corujas por faixa de acerto no placar (caminho real: /webp/ com hífen).
   var _QUIZ_OWL = {
@@ -493,6 +494,7 @@
       var json = await resp.json();
       var banco = (json && json.status === 'ok' && Array.isArray(json.data)) ? json.data : [];
       if (!banco.length) return; // sem perguntas: card escondido
+      _quizBancoCompleto = banco; // guarda pra o Modo Relâmpago reutilizar
       _quizAplicarTema(card);
       var bloco = _quizBlocoDoDia(banco);
       _quizEstado = { perguntas: bloco, idx: 0, acertos: 0, travado: false };
@@ -511,6 +513,194 @@
       if (_tentativa < 1) setTimeout(function(){ _carregarQuizCoruja(_tentativa + 1); }, 3000);
     }
   }
+
+
+  /* -- Modo Relâmpago: quiz de treino com timer por pergunta -- */
+  var _RL_TEMPO = 6000;   // ms por pergunta
+  var _RL_MAX = 20;       // máx de perguntas por partida (pra não ser infinito)
+  var _rlFila = [];       // perguntas embaralhadas da partida
+  var _rlIdx = 0;
+  var _rlPontos = 0, _rlAcertos = 0;
+  var _rlTravado = false;
+  var _rlTimerBarra = null, _rlTimerFim = null, _rlInicioPergunta = 0;
+
+  function _rlRecordeGet() {
+    try { return Number(localStorage.getItem('angatuba_relampago_rec')) || 0; } catch(e) { return 0; }
+  }
+  function _rlRecordeSet(v) {
+    try { localStorage.setItem('angatuba_relampago_rec', String(v)); } catch(e) {}
+  }
+
+  function _rlLimparTimers() {
+    if (_rlTimerBarra) { clearInterval(_rlTimerBarra); _rlTimerBarra = null; }
+    if (_rlTimerFim)   { clearTimeout(_rlTimerFim);    _rlTimerFim = null; }
+  }
+
+  // Embaralha uma cópia do array (Fisher-Yates).
+  function _rlEmbaralhar(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  // Abre a tela do Relâmpago (a partir do botão no placar do quiz).
+  function _rlAbrir() {
+    // Precisa do banco carregado (vem do quiz). Se vazio, tenta usar o que houver.
+    if (!_quizBancoCompleto || !_quizBancoCompleto.length) {
+      alert('O banco de perguntas ainda está carregando. Abra o Quiz da Coruja primeiro. 🦉');
+      return;
+    }
+    var menu = document.getElementById('games-menu');
+    if (menu) menu.style.display = 'none';
+    var telas = document.querySelectorAll('.jogo-tela');
+    for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
+    var tela = document.getElementById('jogo-relampago');
+    if (tela) tela.style.display = 'block';
+    _rlPreparar();
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
+  }
+
+  function _rlPreparar() {
+    _rlLimparTimers();
+    _rlTravado = false;
+    var pEl = document.getElementById('rl-pontos'); if (pEl) pEl.textContent = '0';
+    var aEl = document.getElementById('rl-acertos'); if (aEl) aEl.textContent = '0';
+    var recEl = document.getElementById('rl-recorde'); if (recEl) recEl.textContent = _rlRecordeGet();
+    var fill = document.getElementById('rl-timer-fill'); if (fill) fill.style.width = '100%';
+    var inicio = document.getElementById('rl-inicio'); if (inicio) inicio.style.display = 'flex';
+    var fim = document.getElementById('rl-fim'); if (fim) fim.style.display = 'none';
+  }
+
+  function _rlComecar() {
+    _rlLimparTimers();
+    _rlFila = _rlEmbaralhar(_quizBancoCompleto).slice(0, _RL_MAX);
+    _rlIdx = 0; _rlPontos = 0; _rlAcertos = 0; _rlTravado = false;
+    var pEl = document.getElementById('rl-pontos'); if (pEl) pEl.textContent = '0';
+    var aEl = document.getElementById('rl-acertos'); if (aEl) aEl.textContent = '0';
+    var recEl = document.getElementById('rl-recorde'); if (recEl) { recEl.textContent = _rlRecordeGet(); recEl.classList.remove('rl-recorde-novo'); }
+    var inicio = document.getElementById('rl-inicio'); if (inicio) inicio.style.display = 'none';
+    var fim = document.getElementById('rl-fim'); if (fim) fim.style.display = 'none';
+    _rlRenderPergunta();
+  }
+
+  function _rlRenderPergunta() {
+    if (_rlIdx >= _rlFila.length) { _rlFim(true); return; } // acabou o banco: vitória
+    _rlTravado = false;
+    var pergunta = _rlFila[_rlIdx];
+    var pergEl = document.getElementById('rl-pergunta');
+    var opcoesEl = document.getElementById('rl-opcoes');
+    if (!pergEl || !opcoesEl) return;
+    pergEl.textContent = pergunta.pergunta;
+    pergEl.classList.remove('rl-fade'); void pergEl.offsetWidth; pergEl.classList.add('rl-fade');
+    var letras = ['A','B','C'];
+    opcoesEl.innerHTML = '';
+    for (var i = 0; i < 3; i++) {
+      (function(li){
+        var btn = document.createElement('button');
+        btn.className = 'rl-opt'; btn.type = 'button';
+        var span = document.createElement('span');
+        span.className = 'rl-opt-letra'; span.textContent = letras[li];
+        var txt = document.createElement('span');
+        txt.textContent = pergunta.opcoes[li];
+        btn.appendChild(span); btn.appendChild(txt);
+        btn.addEventListener('click', function(){ _rlResponder(letras[li]); });
+        opcoesEl.appendChild(btn);
+      })(i);
+    }
+    _rlIniciarTimer();
+  }
+
+  // Barra de tempo regressiva + timeout que encerra por tempo esgotado.
+  function _rlIniciarTimer() {
+    _rlLimparTimers();
+    _rlInicioPergunta = Date.now();
+    var fill = document.getElementById('rl-timer-fill');
+    if (fill) { fill.style.width = '100%'; }
+    _rlTimerBarra = setInterval(function(){
+      var passou = Date.now() - _rlInicioPergunta;
+      var restante = Math.max(0, 1 - passou / _RL_TEMPO);
+      if (fill) fill.style.width = (restante * 100) + '%';
+      if (fill) fill.classList.toggle('rl-timer-critico', restante < 0.3);
+    }, 60);
+    _rlTimerFim = setTimeout(function(){
+      if (_rlTravado) return;
+      _rlTravado = true;
+      _rlRevelarErro(null); // ninguém respondeu: mostra a certa e encerra
+    }, _RL_TEMPO);
+  }
+
+  function _rlResponder(escolha) {
+    if (_rlTravado) return;
+    _rlTravado = true;
+    _rlLimparTimers();
+    var pergunta = _rlFila[_rlIdx];
+    var acertou = (escolha === pergunta.correta);
+    var opcoesEl = document.getElementById('rl-opcoes');
+    var botoes = opcoesEl ? opcoesEl.querySelectorAll('.rl-opt') : [];
+    var letras = ['A','B','C'];
+    for (var i = 0; i < botoes.length; i++) {
+      botoes[i].disabled = true;
+      if (letras[i] === pergunta.correta) botoes[i].classList.add('rl-certa');
+      else if (letras[i] === escolha) botoes[i].classList.add('rl-errada');
+    }
+    if (acertou) {
+      // Pontos por rapidez: 100 base + até 100 de bônus pelo tempo restante.
+      var passou = Date.now() - _rlInicioPergunta;
+      var restante = Math.max(0, 1 - passou / _RL_TEMPO);
+      var ganho = 100 + Math.round(restante * 100);
+      _rlPontos += ganho;
+      _rlAcertos++;
+      var pEl = document.getElementById('rl-pontos'); if (pEl) pEl.textContent = _rlPontos;
+      var aEl = document.getElementById('rl-acertos'); if (aEl) aEl.textContent = _rlAcertos;
+      if (navigator.vibrate) { try { navigator.vibrate(30); } catch(e) {} }
+      setTimeout(function(){ _rlIdx++; _rlRenderPergunta(); }, 700);
+    } else {
+      if (navigator.vibrate) { try { navigator.vibrate(150); } catch(e) {} }
+      setTimeout(function(){ _rlFim(false); }, 900);
+    }
+  }
+
+  // Chamado no timeout (sem resposta): revela a certa e encerra.
+  function _rlRevelarErro() {
+    var pergunta = _rlFila[_rlIdx];
+    var opcoesEl = document.getElementById('rl-opcoes');
+    var botoes = opcoesEl ? opcoesEl.querySelectorAll('.rl-opt') : [];
+    var letras = ['A','B','C'];
+    for (var i = 0; i < botoes.length; i++) {
+      botoes[i].disabled = true;
+      if (letras[i] === pergunta.correta) botoes[i].classList.add('rl-certa');
+    }
+    if (navigator.vibrate) { try { navigator.vibrate(150); } catch(e) {} }
+    setTimeout(function(){ _rlFim(false); }, 900);
+  }
+
+  function _rlFim(venceuBanco) {
+    _rlLimparTimers();
+    _rlTravado = true;
+    var rec = _rlRecordeGet();
+    var bateu = _rlPontos > rec;
+    if (bateu) _rlRecordeSet(_rlPontos);
+    var recEl = document.getElementById('rl-recorde'); if (recEl) recEl.textContent = _rlRecordeGet();
+    var fim = document.getElementById('rl-fim');
+    var fimOwl = document.getElementById('rl-fim-owl');
+    var fimTit = document.getElementById('rl-fim-titulo');
+    var fimMsg = document.getElementById('rl-fim-msg');
+    if (fimOwl) { fimOwl.src = bateu ? '/webp/owl-celebrate-pro.webp' : '/webp/owl-thumbsup.webp'; fimOwl.style.display = ''; }
+    if (fimTit) fimTit.textContent = bateu ? 'Novo recorde! 🏆' : (venceuBanco ? 'Você zerou o banco! 🎓' : 'Fim de jogo ⚡');
+    if (fimMsg) {
+      var base = _rlAcertos + (_rlAcertos === 1 ? ' acerto' : ' acertos') + ' • ' + _rlPontos + ' pontos';
+      if (bateu) fimMsg.textContent = base + '. Melhor marca!';
+      else fimMsg.textContent = base + '.';
+    }
+    if (bateu && recEl) recEl.classList.add('rl-recorde-novo');
+    if (fim) fim.style.display = 'flex';
+  }
+
+  window._rlAbrir = _rlAbrir;
+  window._rlComecar = _rlComecar;
 
   /* ── Ofensiva (streak diário) ───────────
      Conta dias seguidos em que a pessoa jogou QUALQUER jogo. 100% local.
@@ -624,6 +814,7 @@
   function _fecharGamesHub() {
     _stParar(); // garante que o Speed Tap para se estava rodando
     if (typeof _sqLimparTimers === 'function') _sqLimparTimers();
+    if (typeof _rlLimparTimers === 'function') _rlLimparTimers();
     var hub = document.getElementById('games-hub');
     if (!hub) return;
     hub.style.display = 'none';
@@ -646,6 +837,7 @@
   function _voltarAoMenu() {
     _stParar();
     if (typeof _sqLimparTimers === 'function') _sqLimparTimers();
+    if (typeof _rlLimparTimers === 'function') _rlLimparTimers();
     var menu = document.getElementById('games-menu');
     var telas = document.querySelectorAll('.jogo-tela');
     for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
@@ -688,21 +880,27 @@
   window._abrirJogo = _abrirJogo;
   window._voltarAoMenu = _voltarAoMenu;
 
-  /* -- Speed Tap: "Pega a Coruja" (com níveis, combo e coruja fake) -- */
-  var _ST_DURACAO = 25;                        // segundos por partida
+  /* -- Speed Tap: "Pega a Coruja" (com níveis, combo, coruja fake e 2 modos) -- */
+  var _ST_DURACAO = 25;                        // segundos por partida (modo clássico)
+  var _ST_VIDAS   = 3;                          // fakes que pode errar (modo sobrevivência)
   var _ST_OWL     = '/webp/owl-portrait.webp'; // coruja boa (vale ponto)
   var _ST_FAKE    = '/webp/owl-angry.webp';    // coruja fake (não pode tocar!)
   var _ST_BONUS   = '/webp/owl-trophy.webp';   // coruja bônus dourada (+5)
 
+  var _stModo = 'classico';                     // 'classico' | 'sobrevivencia'
   var _stTempo = 0, _stPontos = 0, _stCombo = 0, _stComboMax = 0;
-  var _stNivel = 1, _stAcertos = 0;
+  var _stNivel = 1, _stAcertos = 0, _stVidas = 0;
   var _stTimerRelogio = null, _stTimerCiclo = null, _stRodando = false;
 
+  // Recordes separados por modo.
+  function _stRecChave() {
+    return _stModo === 'sobrevivencia' ? 'angatuba_speedtap_surv_rec' : 'angatuba_speedtap_rec';
+  }
   function _stRecordeGet() {
-    try { return Number(localStorage.getItem('angatuba_speedtap_rec')) || 0; } catch(e) { return 0; }
+    try { return Number(localStorage.getItem(_stRecChave())) || 0; } catch(e) { return 0; }
   }
   function _stRecordeSet(v) {
-    try { localStorage.setItem('angatuba_speedtap_rec', String(v)); } catch(e) {}
+    try { localStorage.setItem(_stRecChave(), String(v)); } catch(e) {}
   }
 
   // Config de cada nível: intervalo de troca (ms), tamanho da coruja (px),
@@ -713,6 +911,11 @@
     var tamanho   = Math.max(40, 66 - (nivel - 1) * 3);
     var chanceFake = Math.min(0.42, 0.10 + (nivel - 1) * 0.05);
     var chanceBonus = nivel >= 3 ? 0.12 : 0;
+    // No modo sobrevivência as fakes precisam aparecer com frequência (senão
+    // é impossível perder). Garante um piso maior de fakes.
+    if (_stModo === 'sobrevivencia') {
+      chanceFake = Math.min(0.5, 0.22 + (nivel - 1) * 0.045);
+    }
     return { intervalo: intervalo, tamanho: tamanho, chanceFake: chanceFake, chanceBonus: chanceBonus };
   }
 
@@ -751,13 +954,33 @@
     }
   }
 
+  // Mostra o slot de "Tempo" ou "Vidas" conforme o modo, e atualiza o valor.
+  function _stAtualizarSlotTempoVidas() {
+    var labelEl = document.getElementById('st-slot-label');
+    var valEl = document.getElementById('st-tempo');
+    if (_stModo === 'sobrevivencia') {
+      if (labelEl) labelEl.textContent = 'Vidas';
+      if (valEl) {
+        var cheias = '', vazias = '';
+        for (var i = 0; i < _stVidas; i++) cheias += '❤️';
+        for (var j = 0; j < (_ST_VIDAS - _stVidas); j++) vazias += '🖤';
+        valEl.innerHTML = '<span class="st-vidas">' + cheias + vazias + '</span>';
+        valEl.classList.remove('st-tempo-baixo');
+      }
+    } else {
+      if (labelEl) labelEl.textContent = 'Tempo';
+      if (valEl) valEl.textContent = _stTempo;
+    }
+  }
+
   // Prepara a tela (estado inicial, mostra recorde). Não inicia o jogo ainda.
   function _stPreparar() {
     _stParar();
     var recEl = document.getElementById('st-recorde');
     if (recEl) recEl.textContent = _stRecordeGet();
     var pEl = document.getElementById('st-pontos'); if (pEl) pEl.textContent = '0';
-    var tEl = document.getElementById('st-tempo');  if (tEl) tEl.textContent = _ST_DURACAO;
+    var labelEl = document.getElementById('st-slot-label'); if (labelEl) labelEl.textContent = 'Tempo';
+    var tEl = document.getElementById('st-tempo');  if (tEl) { tEl.textContent = _ST_DURACAO; tEl.classList.remove('st-tempo-baixo'); }
     var nEl = document.getElementById('st-nivel');  if (nEl) nEl.textContent = '1';
     var cEl = document.getElementById('st-combo');  if (cEl) cEl.style.display = 'none';
     var inicio = document.getElementById('st-inicio');
@@ -835,7 +1058,22 @@
     var pEl = document.getElementById('st-pontos');
 
     if (tipo === 'fake') {
-      // Tocou na errada: perde 2 pontos, zera combo, treme.
+      if (_stModo === 'sobrevivencia') {
+        // Perde 1 vida. Combo zera. Se acabaram as vidas, fim de jogo.
+        _stVidas = Math.max(0, _stVidas - 1);
+        _stCombo = 0;
+        _stComboMostrar();
+        _stAtualizarSlotTempoVidas();
+        _stFlutuante('-1 ❤️', alvo, arena, 'st-menos');
+        if (navigator.vibrate) { try { navigator.vibrate(160); } catch(e) {} }
+        var arS = document.getElementById('st-arena');
+        if (arS) { arS.classList.remove('st-shake'); void arS.offsetWidth; arS.classList.add('st-shake'); }
+        if (_stTimerCiclo) { clearTimeout(_stTimerCiclo); _stTimerCiclo = null; }
+        if (_stVidas <= 0) { _stFim(); return; }
+        _stProximaCoruja();
+        return;
+      }
+      // Modo clássico: tocou na errada, perde 2 pontos, zera combo, treme.
       _stPontos = Math.max(0, _stPontos - 2);
       _stCombo = 0;
       if (pEl) pEl.textContent = _stPontos;
@@ -879,17 +1117,20 @@
     setTimeout(function(){ if (el.parentNode) el.remove(); }, 600);
   }
 
-  function _stComecar() {
+  function _stComecar(modo) {
     var arena = document.getElementById('st-arena');
     if (!arena) return;
     _stParar();
+    // Define o modo (default: mantém o atual, ou clássico se indefinido).
+    if (modo === 'classico' || modo === 'sobrevivencia') _stModo = modo;
     _stPontos = 0; _stCombo = 0; _stComboMax = 0;
     _stNivel = 1; _stAcertos = 0;
+    _stVidas = _ST_VIDAS;
     _stTempo = _ST_DURACAO;
     var pEl = document.getElementById('st-pontos'); if (pEl) pEl.textContent = '0';
-    var tEl = document.getElementById('st-tempo');  if (tEl) tEl.textContent = _stTempo;
     var nEl = document.getElementById('st-nivel');  if (nEl) nEl.textContent = '1';
     var cEl = document.getElementById('st-combo');  if (cEl) cEl.style.display = 'none';
+    _stAtualizarSlotTempoVidas();
     var inicio = document.getElementById('st-inicio'); if (inicio) inicio.style.display = 'none';
     var fim = document.getElementById('st-fim'); if (fim) fim.style.display = 'none';
     var recEl = document.getElementById('st-recorde');
@@ -898,12 +1139,16 @@
     _stRodando = true;
     _stProximaCoruja();
 
-    _stTimerRelogio = setInterval(function(){
-      _stTempo--;
-      if (tEl) tEl.textContent = _stTempo;
-      if (_stTempo <= 5 && tEl) { tEl.classList.add('st-tempo-baixo'); }
-      if (_stTempo <= 0) { _stFim(); }
-    }, 1000);
+    // Contagem regressiva só no modo clássico. Sobrevivência não tem relógio.
+    if (_stModo === 'classico') {
+      var tEl = document.getElementById('st-tempo');
+      _stTimerRelogio = setInterval(function(){
+        _stTempo--;
+        if (tEl) tEl.textContent = _stTempo;
+        if (_stTempo <= 5 && tEl) { tEl.classList.add('st-tempo-baixo'); }
+        if (_stTempo <= 0) { _stFim(); }
+      }, 1000);
+    }
   }
 
   function _stFim() {
@@ -933,9 +1178,15 @@
     if (fimPontos) fimPontos.innerHTML = '<b>' + _stPontos + '</b> ' + (_stPontos === 1 ? 'ponto' : 'pontos');
     if (fimMsg) {
       var extra = _stComboMax >= 3 ? ' (combo máx. x' + _stComboMax + ')' : '';
-      if (bateuRecorde) fimMsg.textContent = 'Novo recorde! Você é rápido! 🏆' + extra;
-      else if (_stPontos >= 40) fimMsg.textContent = 'Mandou muito bem! 🔥' + extra;
-      else fimMsg.textContent = 'Boa! Tenta de novo pra bater o recorde! 🦉' + extra;
+      if (_stModo === 'sobrevivencia') {
+        if (bateuRecorde) fimMsg.textContent = 'Novo recorde de sobrevivência! 🏆' + extra;
+        else if (_stPontos >= 30) fimMsg.textContent = 'Resistiu bravamente! 🛡️' + extra;
+        else fimMsg.textContent = 'As corujas bravas venceram dessa vez! 😠' + extra;
+      } else {
+        if (bateuRecorde) fimMsg.textContent = 'Novo recorde! Você é rápido! 🏆' + extra;
+        else if (_stPontos >= 40) fimMsg.textContent = 'Mandou muito bem! 🔥' + extra;
+        else fimMsg.textContent = 'Boa! Tenta de novo pra bater o recorde! 🦉' + extra;
+      }
     }
     if (bateuRecorde && recEl) recEl.classList.add('st-recorde-novo');
     if (fim) fim.style.display = 'flex';
@@ -964,6 +1215,24 @@
     _sqTimers = [];
   }
 
+  // Quantas corujas ficam ativas conforme a rodada. Começa com 4 (grade 2x2)
+  // e expande para 6 (grade 3x2) a partir da rodada 6, deixando o jogo mais
+  // difícil naturalmente para quem avança.
+  function _sqCorujasAtivas(rodada) {
+    return rodada >= 6 ? 6 : 4;
+  }
+
+  // Mostra/esconde os 2 botões extras e ajusta a grade (2x2 <-> 3x2).
+  function _sqAjustarGrade(ativas) {
+    var grade = document.getElementById('sq-grade');
+    if (!grade) return;
+    grade.classList.toggle('sq-grade-6', ativas === 6);
+    var btns = grade.querySelectorAll('.sq-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].style.display = (i < ativas) ? '' : 'none';
+    }
+  }
+
   // Apaga a luz de TODAS as corujas (evita botão aceso preso ao reiniciar).
   function _sqApagarTodos() {
     var grade = document.getElementById('sq-grade');
@@ -975,6 +1244,7 @@
   function _sqPreparar() {
     _sqLimparTimers();
     _sqApagarTodos();
+    _sqAjustarGrade(4); // sempre começa com 4 corujas (2x2)
     _sqSeq = []; _sqPasso = 0; _sqRodada = 0;
     _sqAceitando = false; _sqTocando = false;
     var rEl = document.getElementById('sq-rodada'); if (rEl) rEl.textContent = '0';
@@ -1041,8 +1311,24 @@
       rEl.textContent = _sqRodada;
       rEl.classList.remove('sq-rodada-up'); void rEl.offsetWidth; rEl.classList.add('sq-rodada-up');
     }
-    _sqSeq.push(Math.floor(Math.random() * 4));
-    var t = setTimeout(_sqPlayback, 600);
+
+    // Ajusta quantas corujas estão em jogo. Se acabou de expandir para 6,
+    // mostra um aviso pra pessoa notar as novas corujas.
+    var ativas = _sqCorujasAtivas(_sqRodada);
+    var antesAtivas = _sqCorujasAtivas(_sqRodada - 1);
+    _sqAjustarGrade(ativas);
+    if (ativas > antesAtivas) {
+      var st = document.getElementById('sq-status');
+      if (st) st.textContent = 'Mais corujas! Agora são ' + ativas + ' 🔥';
+      var grade = document.getElementById('sq-grade');
+      if (grade) { grade.classList.remove('sq-expandiu'); void grade.offsetWidth; grade.classList.add('sq-expandiu'); }
+      if (navigator.vibrate) { try { navigator.vibrate([30, 50, 30]); } catch(e) {} }
+    }
+
+    _sqSeq.push(Math.floor(Math.random() * ativas));
+    // Dá um tempinho a mais na rodada que expande, pra pessoa perceber.
+    var espera = (ativas > antesAtivas) ? 1100 : 600;
+    var t = setTimeout(_sqPlayback, espera);
     _sqTimers.push(t);
   }
 

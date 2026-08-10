@@ -14934,13 +14934,278 @@ ${urlCard}`)}`;
     const emailEl = document.getElementById('cli-conta-email');
     if (nomeEl) nomeEl.textContent = nome;
     if (emailEl) emailEl.textContent = email;
-    const iniEl = document.getElementById('cli-conta-avatar-ini');
-    if (iniEl) iniEl.textContent = (nome.trim()[0] || '?').toUpperCase();
+    // Avatar do painel: foto do usuário se houver, senão a inicial.
+    cliPintarAvatarPainel(nome);
     // Sincroniza o rótulo do botão de tema dentro do painel com o estado atual.
     if (typeof cliSincronizarTemaLabel === 'function') cliSincronizarTemaLabel();
+    // Preenche recordes dos jogos e lojas favoritas (assíncrono, sem travar a abertura).
+    cliRenderRecordes();
+    cliRenderFavoritos();
+    // Garante o binding do seletor de foto (idempotente).
+    cliBindFotoInput();
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
     if (history.state?.modal !== 'cli-conta') history.pushState({ modal: 'cli-conta' }, '');
+  }
+
+  /* ── Avatar do painel (foto ou inicial) ───────────────
+     Preenche o bloco de avatar grande do painel. Se o Firebase user tem
+     photoURL, mostra a imagem (com fallback pra inicial em caso de erro).
+     Senão, mostra a inicial. */
+  function cliPintarAvatarPainel(nome) {
+    const wrap = document.getElementById('cli-conta-avatar');
+    if (!wrap) return;
+    const inicial = ((nome || '').trim()[0] || '?').toUpperCase();
+    const foto = (_cliUser && _cliUser.photoURL) || '';
+    if (foto) {
+      wrap.innerHTML =
+        '<img src="' + foto + '" alt="" class="cli-conta-avatar-img" ' +
+        'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"/>' +
+        '<span class="cli-conta-avatar-ini2" style="display:none">' + inicial + '</span>';
+    } else {
+      wrap.innerHTML = '<span class="cli-conta-avatar-ini2">' + inicial + '</span>';
+    }
+    // Badge de câmera sempre por cima (troca de foto).
+    wrap.innerHTML +=
+      '<button type="button" class="cli-conta-avatar-cam" onclick="cliEscolherFoto()" ' +
+      'aria-label="Trocar foto" title="Trocar foto"><i class="fa fa-camera"></i></button>';
+  }
+
+  /* ── Trocar apelido/nome ──────────────────────
+     Abre um prompt inline simples (reusa o campo do painel). Atualiza o
+     displayName no Firebase e o espelho local. Client-side puro. */
+  function cliEditarApelido() {
+    const row = document.getElementById('cli-conta-apelido-edit');
+    const view = document.getElementById('cli-conta-apelido-view');
+    const inp = document.getElementById('cli-conta-apelido-input');
+    if (!row || !view || !inp) return;
+    view.style.display = 'none';
+    row.style.display = 'flex';
+    inp.value = _cliApelido || (_cliUser && _cliUser.displayName) || '';
+    try { inp.focus(); inp.select(); } catch (e) {}
+  }
+
+  function cliCancelarApelido() {
+    const row = document.getElementById('cli-conta-apelido-edit');
+    const view = document.getElementById('cli-conta-apelido-view');
+    if (row) row.style.display = 'none';
+    if (view) view.style.display = 'flex';
+  }
+
+  function cliSalvarApelido() {
+    const inp = document.getElementById('cli-conta-apelido-input');
+    if (!inp) return;
+    const novo = String(inp.value || '').trim().slice(0, 20);
+    if (!novo) {
+      if (typeof showToastSimples === 'function') showToastSimples('Escolha um apelido.', '/webp/owl-idea.webp');
+      return;
+    }
+    const btn = document.getElementById('cli-conta-apelido-salvar');
+    if (btn) btn.disabled = true;
+    const finalizar = function () {
+      _cliApelido = novo;
+      try { localStorage.setItem(CLI_APELIDO_KEY, novo); } catch (e) {}
+      const nomeEl = document.getElementById('cli-conta-nome');
+      if (nomeEl) nomeEl.textContent = novo;
+      cliPintarAvatarPainel(novo);
+      cliAtualizarHeader();
+      cliCancelarApelido();
+      if (btn) btn.disabled = false;
+      if (typeof showToastSimples === 'function') showToastSimples('Apelido atualizado!', '/webp/owl-thumbsup.webp');
+    };
+    const user = _cliUser;
+    if (user && typeof user.updateProfile === 'function') {
+      user.updateProfile({ displayName: novo }).then(finalizar).catch(function () {
+        // Mesmo se o Firebase falhar, guardamos localmente para não perder.
+        finalizar();
+      });
+    } else {
+      finalizar();
+    }
+  }
+
+  /* ── Foto de perfil (Cloudinary unsigned → photoURL do Firebase) ─
+     Fluxo (mesma filosofia da Opção D: sem GAS):
+       1. usuário escolhe imagem (input file)
+       2. comprime no browser (reusa _mlRedimensionarImagem se existir)
+       3. sobe direto pro Cloudinary com preset unsigned 'perfil_cliente'
+       4. grava secure_url no photoURL via updateProfile
+     Segurança fica nas travas do preset no painel do Cloudinary. */
+  var CLI_CLOUD_NAME = 'dpzhxyfsh';
+  var CLI_UPLOAD_PRESET = 'perfil_cliente';
+  var _cliFotoBindOk = false;
+
+  function cliBindFotoInput() {
+    if (_cliFotoBindOk) return;
+    const inp = document.getElementById('cli-conta-foto-input');
+    if (!inp) return;
+    inp.addEventListener('change', function () {
+      const file = inp.files && inp.files[0];
+      if (file) cliUploadFoto(file);
+      inp.value = '';
+    });
+    _cliFotoBindOk = true;
+  }
+
+  function cliEscolherFoto() {
+    cliBindFotoInput();
+    const inp = document.getElementById('cli-conta-foto-input');
+    if (inp) inp.click();
+  }
+
+  function _cliSetStatusFoto(txt, cor) {
+    const el = document.getElementById('cli-conta-foto-status');
+    if (!el) return;
+    el.textContent = txt || '';
+    el.style.color = cor || 'var(--muted)';
+    el.style.display = txt ? 'block' : 'none';
+  }
+
+  async function cliUploadFoto(file) {
+    if (!file || !/^image\//.test(file.type)) {
+      _cliSetStatusFoto('Escolha uma imagem.', 'var(--red)');
+      return;
+    }
+    _cliSetStatusFoto('⏳ Otimizando...', 'var(--muted)');
+    try {
+      // Reusa a compressão do fluxo de loja se disponível (avatar ~512px basta).
+      if (typeof _mlRedimensionarImagem === 'function') {
+        file = await _mlRedimensionarImagem(file, 512, 0.85);
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        _cliSetStatusFoto('Imagem muito grande (máx 5MB).', 'var(--red)');
+        return;
+      }
+      _cliSetStatusFoto('⏳ Enviando...', 'var(--muted)');
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('upload_preset', CLI_UPLOAD_PRESET);
+      const resp = await fetch(
+        'https://api.cloudinary.com/v1_1/' + CLI_CLOUD_NAME + '/image/upload',
+        { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) }
+      );
+      const json = await resp.json();
+      if (!json || !json.secure_url) {
+        throw new Error((json && json.error && json.error.message) || 'Falha no upload');
+      }
+      const url = json.secure_url;
+      const finalizar = function () {
+        // Atualiza a UI imediatamente (o photoURL local do objeto também).
+        try { if (_cliUser) _cliUser.photoURL = url; } catch (e) {}
+        cliPintarAvatarPainel(_cliApelido || (_cliUser && _cliUser.displayName) || 'Você');
+        cliAtualizarHeader();
+        _cliSetStatusFoto('', null);
+        if (typeof showToastSimples === 'function') showToastSimples('Foto atualizada!', '/webp/owl-celebrate-gratis.webp');
+      };
+      const user = _cliUser;
+      if (user && typeof user.updateProfile === 'function') {
+        user.updateProfile({ photoURL: url }).then(finalizar).catch(finalizar);
+      } else {
+        finalizar();
+      }
+    } catch (err) {
+      _cliSetStatusFoto('Erro: ' + (err && err.message ? err.message : 'tente de novo'), 'var(--red)');
+    }
+  }
+
+  /* ── Recordes dos jogos ─────────────────────
+     Mostra a melhor pontuação de cada jogo. Preferimos o recorde do
+     Firestore (rankMinhaPontuacao) quando logado; se vier vazio, caímos
+     no recorde local (localStorage). Cada jogo tem sua chave local. */
+  function _cliRecordeLocal(jogoKey) {
+    var mapa = {
+      pegacoruja:      'angatuba_speedtap_rec',
+      pegacoruja_surv: 'angatuba_speedtap_surv_rec',
+      relampago:       'angatuba_relampago_rec',
+      sequencia:       'angatuba_seq_rec'
+    };
+    try { return Number(localStorage.getItem(mapa[jogoKey])) || 0; } catch (e) { return 0; }
+  }
+
+  function cliRenderRecordes() {
+    var wrap = document.getElementById('cli-conta-recordes');
+    if (!wrap) return;
+    var jogos = [
+      { key: 'pegacoruja',      nome: 'Pega a Coruja',   sub: 'Clássico' },
+      { key: 'pegacoruja_surv', nome: 'Pega a Coruja',   sub: 'Sobrevivência' },
+      { key: 'relampago',       nome: 'Modo Relâmpago', sub: '' },
+      { key: 'sequencia',       nome: 'Sequência',      sub: '' }
+    ];
+    // Render inicial com o recorde local (instantâneo, sem esperar rede).
+    wrap.innerHTML = jogos.map(function (j) {
+      var v = _cliRecordeLocal(j.key);
+      var sub = j.sub ? ' <span class="cli-rec-sub">' + j.sub + '</span>' : '';
+      return '<div class="cli-rec-item" data-jogo="' + j.key + '">' +
+        '<span class="cli-rec-nome">' + j.nome + sub + '</span>' +
+        '<span class="cli-rec-val">' + v + '</span></div>';
+    }).join('');
+    // Se logado e o Firestore responde, prevalece o recorde do servidor
+    // (fonte da verdade do ranking) quando for maior.
+    if (_cliUser && typeof rankMinhaPontuacao === 'function') {
+      jogos.forEach(function (j) {
+        rankMinhaPontuacao(j.key).then(function (s) {
+          if (s == null) return;
+          var item = wrap.querySelector('.cli-rec-item[data-jogo="' + j.key + '"] .cli-rec-val');
+          if (!item) return;
+          var atual = Number(item.textContent) || 0;
+          if (s > atual) item.textContent = s;
+        }).catch(function () {});
+      });
+    }
+  }
+
+  /* ── Lojas favoritas ───────────────────────
+     Lista as lojas favoritadas (localStorage). Casa cada id favorito com
+     a loja em LOJAS para exibir nome/logo e abrir o modal ao tocar. */
+  function cliRenderFavoritos() {
+    var wrap = document.getElementById('cli-conta-favoritos');
+    var vazio = document.getElementById('cli-conta-favoritos-vazio');
+    if (!wrap) return;
+    var ids = (typeof _favoritos !== 'undefined' && Array.isArray(_favoritos)) ? _favoritos : [];
+    var lojas = (typeof LOJAS !== 'undefined' && Array.isArray(LOJAS)) ? LOJAS : [];
+    var itens = [];
+    ids.forEach(function (idFav) {
+      var idx = -1, loja = null;
+      for (var i = 0; i < lojas.length; i++) {
+        var l = lojas[i];
+        var lid = (typeof favIdDeLoja === 'function') ? favIdDeLoja(l)
+                 : String((l && (l.id || l.wpp || l.nome)) || '').trim().toLowerCase();
+        var lnome = String((l && l.nome) || '').trim().toLowerCase();
+        if (lid === idFav || lnome === idFav) { idx = i; loja = l; break; }
+      }
+      if (loja) itens.push({ idx: idx, loja: loja });
+    });
+    if (!itens.length) {
+      wrap.innerHTML = '';
+      if (vazio) vazio.style.display = 'block';
+      return;
+    }
+    if (vazio) vazio.style.display = 'none';
+    wrap.innerHTML = itens.map(function (it) {
+      var l = it.loja;
+      var nome = String(l.nome || 'Loja');
+      var logo = (l.logo && String(l.logo).trim()) ? String(l.logo).trim() : '';
+      var ini = (nome.trim()[0] || '?').toUpperCase();
+      var thumb = logo
+        ? '<img src="' + logo + '" alt="" class="cli-fav-logo" loading="lazy" ' +
+          'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"/>' +
+          '<span class="cli-fav-ini" style="display:none">' + ini + '</span>'
+        : '<span class="cli-fav-ini">' + ini + '</span>';
+      var onclick = (it.idx >= 0)
+        ? ' onclick="cliAbrirLojaFav(' + it.idx + ')" role="button" tabindex="0"'
+        : '';
+      return '<div class="cli-fav-item"' + onclick + '>' +
+        '<span class="cli-fav-thumb">' + thumb + '</span>' +
+        '<span class="cli-fav-nome">' + nome + '</span>' +
+        '<i class="fa fa-chevron-right cli-fav-seta"></i></div>';
+    }).join('');
+  }
+
+  function cliAbrirLojaFav(idx) {
+    cliFecharPainelConta();
+    if (typeof abrirDetalhes === 'function') {
+      setTimeout(function () { try { abrirDetalhes(idx); } catch (e) {} }, 220);
+    }
   }
 
   function cliFecharPainelConta(viaPopstate) {
@@ -15001,6 +15266,11 @@ ${urlCard}`)}`;
   window.cliFecharPainelConta = cliFecharPainelConta;
   window.cliTrocarTema        = cliTrocarTema;
   window.cliSair              = cliSair;
+  window.cliEditarApelido     = cliEditarApelido;
+  window.cliCancelarApelido   = cliCancelarApelido;
+  window.cliSalvarApelido     = cliSalvarApelido;
+  window.cliEscolherFoto      = cliEscolherFoto;
+  window.cliAbrirLojaFav      = cliAbrirLojaFav;
 
   /* ══════════════════════════════════════════════════════════════
      RANKING DOS JOGOS (Cloud Firestore)

@@ -2464,13 +2464,49 @@
         <button class="modal-close" onclick="cliFecharPainelConta()" aria-label="Fechar">✕</button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;">
+        <!-- Cabeçalho: avatar grande (foto ou inicial) + nome/email -->
         <div class="cli-conta-head">
-          <div class="cli-conta-avatar" id="cli-conta-avatar-ini">?</div>
+          <div class="cli-conta-avatar" id="cli-conta-avatar">
+            <span class="cli-conta-avatar-ini2" id="cli-conta-avatar-ini">?</span>
+          </div>
           <div class="cli-conta-info">
-            <div class="nome" id="cli-conta-nome">—</div>
+            <!-- Nome (modo visualização) -->
+            <div class="cli-conta-apelido-view" id="cli-conta-apelido-view">
+              <div class="nome" id="cli-conta-nome">—</div>
+              <button type="button" class="cli-conta-apelido-btn" onclick="cliEditarApelido()" aria-label="Editar apelido" title="Editar apelido">
+                <i class="fa fa-pen"></i>
+              </button>
+            </div>
+            <!-- Nome (modo edição) -->
+            <div class="cli-conta-apelido-edit" id="cli-conta-apelido-edit" style="display:none;">
+              <input type="text" id="cli-conta-apelido-input" class="cli-conta-apelido-input" maxlength="20" placeholder="Seu apelido" autocomplete="off" />
+              <button type="button" class="cli-conta-apelido-ok" id="cli-conta-apelido-salvar" onclick="cliSalvarApelido()" aria-label="Salvar"><i class="fa fa-check"></i></button>
+              <button type="button" class="cli-conta-apelido-cancel" onclick="cliCancelarApelido()" aria-label="Cancelar"><i class="fa fa-xmark"></i></button>
+            </div>
             <div class="email" id="cli-conta-email"></div>
           </div>
         </div>
+
+        <!-- input de arquivo oculto para a foto -->
+        <input type="file" id="cli-conta-foto-input" accept="image/*" style="display:none;" />
+        <div class="cli-conta-foto-status" id="cli-conta-foto-status" style="display:none;"></div>
+
+        <!-- Recordes dos jogos -->
+        <div class="cli-conta-secao">
+          <div class="cli-conta-secao-tit"><i class="fa fa-trophy"></i> Meus recordes</div>
+          <div class="cli-conta-recordes" id="cli-conta-recordes"></div>
+        </div>
+
+        <!-- Lojas favoritas -->
+        <div class="cli-conta-secao">
+          <div class="cli-conta-secao-tit"><i class="fa fa-heart"></i> Minhas lojas</div>
+          <div class="cli-conta-favoritos" id="cli-conta-favoritos"></div>
+          <div class="cli-conta-fav-vazio" id="cli-conta-favoritos-vazio" style="display:none;">
+            Você ainda não favoritou nenhuma loja. Toque no coração das lojas que curtir.
+          </div>
+        </div>
+
+        <div class="cli-conta-divisor"></div>
 
         <!-- Tema (migrado do header) -->
         <button class="cli-conta-row" onclick="cliTrocarTema()">

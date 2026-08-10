@@ -5271,6 +5271,117 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     .cli-conta-row.danger { color: var(--red); }
     .cli-conta-row.danger i { color: var(--red); }
 
+    /* ── Avatar grande com foto + botão de câmera ── */
+    .cli-conta-avatar { position: relative; overflow: visible; }
+    .cli-conta-avatar-img {
+      width: 100%; height: 100%; border-radius: 50%;
+      object-fit: cover; display: block;
+    }
+    .cli-conta-avatar-ini2 {
+      width: 100%; height: 100%; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-h); font-weight: 800; font-size: 24px; color: #fff;
+    }
+    .cli-conta-avatar-cam {
+      position: absolute; right: -2px; bottom: -2px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--surface); border: 2px solid var(--bg);
+      color: var(--text); font-size: 10px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      -webkit-tap-highlight-color: transparent; padding: 0;
+    }
+    .cli-conta-avatar-cam:active { transform: scale(0.9); }
+    .cli-conta-avatar-cam i { color: var(--text); width: auto; font-size: 10px; }
+    .cli-conta-foto-status { font-size: 12px; margin: -6px 0 8px; text-align: left; }
+
+    /* ── Apelido: view + edit ── */
+    .cli-conta-apelido-view { display: flex; align-items: center; gap: 8px; }
+    .cli-conta-apelido-btn {
+      border: none; background: none; color: var(--muted);
+      font-size: 12px; cursor: pointer; padding: 2px; flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-conta-apelido-btn:active { opacity: 0.6; }
+    .cli-conta-apelido-edit { display: flex; align-items: center; gap: 6px; }
+    .cli-conta-apelido-input {
+      flex: 1; min-width: 0; padding: 6px 10px;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: var(--bg); color: var(--text);
+      font-family: var(--font-h); font-weight: 700; font-size: 15px;
+    }
+    .cli-conta-apelido-input:focus { outline: none; border-color: var(--red); }
+    .cli-conta-apelido-ok, .cli-conta-apelido-cancel {
+      width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+      border: 1px solid var(--border); background: var(--bg);
+      cursor: pointer; font-size: 13px; display: flex;
+      align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-conta-apelido-ok { color: var(--green); border-color: rgba(0,208,132,0.4); }
+    .cli-conta-apelido-cancel { color: var(--muted); }
+    .cli-conta-apelido-ok:active, .cli-conta-apelido-cancel:active { opacity: 0.6; }
+    .cli-conta-apelido-ok:disabled { opacity: 0.5; cursor: default; }
+
+    /* ── Seções (recordes / favoritas) ── */
+    .cli-conta-secao { padding: 12px 0 4px; border-top: 1px solid var(--border); }
+    .cli-conta-secao-tit {
+      font-family: var(--font-h); font-weight: 800; font-size: 13px;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--muted); margin-bottom: 10px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .cli-conta-secao-tit i { color: var(--red); font-size: 13px; }
+    .cli-conta-divisor { height: 4px; }
+
+    /* ── Recordes ── */
+    .cli-conta-recordes { display: flex; flex-direction: column; gap: 6px; }
+    .cli-rec-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; border-radius: 10px;
+      background: var(--bg); border: 1px solid var(--border);
+    }
+    .cli-rec-nome { font-size: 14px; color: var(--text); font-weight: 600; }
+    .cli-rec-sub {
+      font-size: 11px; color: var(--muted); font-weight: 500;
+      margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+    }
+    .cli-rec-val {
+      font-family: var(--font-h); font-weight: 800; font-size: 16px;
+      color: var(--red); flex-shrink: 0; margin-left: 12px;
+    }
+
+    /* ── Favoritas ── */
+    .cli-conta-favoritos { display: flex; flex-direction: column; gap: 6px; }
+    .cli-fav-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border-radius: 10px; cursor: pointer;
+      background: var(--bg); border: 1px solid var(--border);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-fav-item:active { opacity: 0.7; }
+    .cli-fav-thumb {
+      width: 38px; height: 38px; border-radius: 9px; flex-shrink: 0;
+      overflow: hidden; display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, var(--red), #b91c1c);
+    }
+    .cli-fav-logo { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .cli-fav-ini {
+      width: 100%; height: 100%; display: flex; align-items: center;
+      justify-content: center; color: #fff; font-family: var(--font-h);
+      font-weight: 800; font-size: 15px;
+    }
+    .cli-fav-nome {
+      flex: 1; min-width: 0; font-size: 14px; color: var(--text); font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .cli-fav-seta { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+    .cli-conta-fav-vazio {
+      font-size: 13px; color: var(--muted); line-height: 1.5;
+      padding: 8px 2px;
+    }
+
     /* ════════════════════════════════════════════
        RANKING DOS JOGOS (Camada 2.4)
     ════════════════════════════════════════════ */

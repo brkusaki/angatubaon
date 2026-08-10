@@ -355,6 +355,16 @@
         </div>
       </div>
 
+      <!-- Botão de Ranking da cidade -->
+      <button type="button" class="rank-abrir-btn" onclick="rankAbrirPainel()">
+        <span class="rank-abrir-ico">🏆</span>
+        <span class="rank-abrir-txt">
+          <span class="rank-abrir-titulo">Ranking de Angatuba</span>
+          <span class="rank-abrir-sub">Veja quem manda nos jogos!</span>
+        </span>
+        <i class="fa fa-chevron-right rank-abrir-seta"></i>
+      </button>
+
       <!-- MENU: grade de jogos -->
       <div id="games-menu">
         <button type="button" class="game-card gc-quiz" onclick="_abrirJogo('quiz')">
@@ -459,6 +469,7 @@
             <img src="" alt="" class="rl-overlay-owl" id="rl-fim-owl" onerror="this.style.display='none'">
             <div class="rl-overlay-titulo" id="rl-fim-titulo">Fim!</div>
             <div class="rl-overlay-desc" id="rl-fim-msg"></div>
+            <div class="rank-slot" id="rl-rank-slot" style="display:none;"></div>
             <button type="button" class="rl-play" onclick="_rlComecar()">Jogar de novo</button>
           </div>
         </div>
@@ -498,6 +509,7 @@
               <img src="" alt="" class="st-fim-owl" id="st-fim-owl" onerror="this.style.display='none'">
               <div class="st-fim-pontos" id="st-fim-pontos">0 pontos</div>
               <div class="st-fim-msg" id="st-fim-msg"></div>
+              <div class="rank-slot" id="st-rank-slot" style="display:none;"></div>
               <button type="button" class="st-btn" onclick="_stComecar()">Jogar de novo</button>
             </div>
           </div>
@@ -533,6 +545,7 @@
             <img src="" alt="" class="sq-overlay-owl" id="sq-fim-owl" onerror="this.style.display='none'">
             <div class="sq-overlay-titulo" id="sq-fim-titulo">Ops!</div>
             <div class="sq-overlay-desc" id="sq-fim-msg"></div>
+            <div class="rank-slot" id="sq-rank-slot" style="display:none;"></div>
             <button type="button" class="sq-play" onclick="_sqComecar()">Tentar de novo</button>
           </div>
         </div>
@@ -2332,6 +2345,26 @@
     }
   </style>
 
+
+  <!-- ══════════════════════════════ MODAL RANKING -->
+  <div class="modal-overlay" id="modal-rank" role="dialog" aria-modal="true">
+    <div class="modal-sheet modal-sheet-tall">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">🏆 Ranking de <span>Angatuba</span></div>
+          <div class="modal-subtitle">Os melhores jogadores da cidade</div>
+        </div>
+        <button class="modal-close" onclick="rankFecharPainel()" aria-label="Fechar">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;padding-top:0;">
+        <div class="rank-abas" id="rank-abas"></div>
+        <div class="rank-lista" id="rank-lista">
+          <div class="rank-loading">Carregando ranking…</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ══════════════════════════════ MODAL LOGIN/CADASTRO CLIENTE -->
   <div class="modal-overlay" id="modal-cli-login" role="dialog" aria-modal="true">

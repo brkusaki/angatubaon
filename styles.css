@@ -5270,3 +5270,135 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     .cli-conta-row .row-value { font-size: 13px; color: var(--muted); }
     .cli-conta-row.danger { color: var(--red); }
     .cli-conta-row.danger i { color: var(--red); }
+
+    /* ════════════════════════════════════════════
+       RANKING DOS JOGOS (Camada 2.4)
+    ════════════════════════════════════════════ */
+
+    /* Botão de abrir ranking na hub de Joguinhos */
+    .rank-abrir-btn {
+      width: 100%;
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px; margin-bottom: 16px;
+      border-radius: var(--r-md); cursor: pointer;
+      background: linear-gradient(135deg, rgba(255,68,68,0.15), rgba(255,180,0,0.12));
+      border: 1px solid rgba(255,180,0,0.35);
+      transition: transform 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rank-abrir-btn:active { transform: scale(0.98); }
+    .rank-abrir-ico { font-size: 28px; flex-shrink: 0; }
+    .rank-abrir-txt { flex: 1; text-align: left; display: flex; flex-direction: column; gap: 2px; }
+    .rank-abrir-titulo {
+      font-family: var(--font-h); font-weight: 800; font-size: 16px; color: var(--text);
+    }
+    .rank-abrir-sub { font-size: 12px; color: var(--muted); }
+    .rank-abrir-seta { color: var(--muted); font-size: 14px; }
+
+    /* Modal alto (o rank pode ter muitos itens) */
+    .modal-sheet-tall { max-height: 85vh; }
+
+    /* Abas dos 4 rankings */
+    .rank-abas {
+      display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 14px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .rank-abas::-webkit-scrollbar { display: none; }
+    .rank-aba {
+      flex-shrink: 0; padding: 8px 14px; border-radius: 999px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--muted); font-size: 13px; font-weight: 600;
+      font-family: var(--font-b); cursor: pointer; white-space: nowrap;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rank-aba-ativa {
+      background: var(--red); color: #fff; border-color: var(--red);
+    }
+
+    /* Lista do ranking */
+    .rank-lista {
+      display: flex; flex-direction: column; gap: 8px;
+      overflow-y: auto; padding-bottom: 8px;
+    }
+    .rank-linha {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border-radius: var(--r-md);
+      background: var(--surface2); border: 1px solid var(--border);
+    }
+    .rank-linha-eu {
+      background: linear-gradient(135deg, rgba(255,68,68,0.14), rgba(255,68,68,0.06));
+      border-color: rgba(255,68,68,0.4);
+    }
+    .rank-linha-fora {
+      margin-top: 8px; border-style: dashed;
+    }
+    .rank-medal {
+      width: 32px; text-align: center; font-size: 20px; flex-shrink: 0;
+    }
+    .rank-pos {
+      font-family: var(--font-h); font-weight: 800; font-size: 15px;
+      color: var(--muted);
+    }
+    .rank-nome {
+      flex: 1; font-weight: 600; font-size: 15px; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .rank-voce { color: var(--red); font-size: 12px; font-weight: 700; }
+    .rank-score {
+      font-family: var(--font-h); font-weight: 800; font-size: 18px;
+      color: var(--text); flex-shrink: 0;
+    }
+
+    .rank-loading, .rank-vazio {
+      text-align: center; padding: 40px 20px; color: var(--muted);
+      font-size: 14px; line-height: 1.5;
+    }
+    .rank-vazio { font-size: 15px; }
+
+    /* ── Mini-rank no fim de jogo ── */
+    .rank-slot {
+      width: 100%; margin: 14px 0 4px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .rank-fim-titulo {
+      font-family: var(--font-h); font-weight: 800; font-size: 14px;
+      color: var(--text); text-align: center; margin-bottom: 4px;
+    }
+    .rank-linha-mini {
+      padding: 8px 12px; gap: 10px;
+    }
+    .rank-linha-mini .rank-medal { width: 24px; font-size: 16px; }
+    .rank-linha-mini .rank-nome { font-size: 14px; }
+    .rank-linha-mini .rank-score { font-size: 15px; }
+    .rank-vazio-mini {
+      text-align: center; color: var(--muted); font-size: 13px; padding: 12px;
+    }
+    .rank-fim-vertudo {
+      width: 100%; padding: 10px; margin-top: 6px;
+      background: none; border: 1px solid var(--border);
+      border-radius: var(--r-md); color: var(--text);
+      font-family: var(--font-h); font-weight: 700; font-size: 13px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .rank-fim-vertudo:active { opacity: 0.7; }
+
+    /* ── Convite pós-jogo (deslogado) ── */
+    .rank-fim-convite {
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      padding: 16px; border-radius: var(--r-md);
+      background: linear-gradient(135deg, rgba(255,68,68,0.14), rgba(255,180,0,0.10));
+      border: 1px solid rgba(255,180,0,0.35);
+    }
+    .rank-fim-owl { width: 48px; height: 48px; object-fit: contain; }
+    .rank-fim-txt {
+      text-align: center; font-size: 14px; color: var(--text); line-height: 1.4;
+    }
+    .rank-fim-btn {
+      width: 100%; padding: 12px; border-radius: var(--r-md);
+      background: var(--red); color: #fff; border: none;
+      font-family: var(--font-h); font-weight: 700; font-size: 14px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: transform 0.15s;
+    }
+    .rank-fim-btn:active { transform: scale(0.98); }

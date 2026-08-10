@@ -698,6 +698,7 @@
     }
     if (bateu && recEl) recEl.classList.add('rl-recorde-novo');
     if (fim) fim.style.display = 'flex';
+    if (typeof rankFimDeJogo === 'function') rankFimDeJogo('relampago', 'rl-rank-slot', _rlPontos);
   }
 
   window._rlAbrir = _rlAbrir;
@@ -1195,6 +1196,7 @@
     }
     if (bateuRecorde && recEl) recEl.classList.add('st-recorde-novo');
     if (fim) fim.style.display = 'flex';
+    if (typeof rankFimDeJogo === 'function') rankFimDeJogo(_stModo === 'sobrevivencia' ? 'pegacoruja_surv' : 'pegacoruja', 'st-rank-slot', _stPontos);
   }
 
   window._stComecar = _stComecar;
@@ -1394,7 +1396,10 @@
     }
     var st = document.getElementById('sq-status');
     if (st) st.textContent = 'Fim de jogo';
-    var t = setTimeout(function(){ if (fim) fim.style.display = 'flex'; }, 500);
+    var t = setTimeout(function(){
+      if (fim) fim.style.display = 'flex';
+      if (typeof rankFimDeJogo === 'function') rankFimDeJogo('sequencia', 'sq-rank-slot', alcancado);
+    }, 500);
     _sqTimers.push(t);
   }
 
@@ -10138,6 +10143,10 @@
   // cardápio → detalhes → minha-loja → cadastro. Cada return encerra o handler,
   // então um único "voltar" fecha apenas o modal do topo da pilha.
   window.addEventListener('popstate', function() {
+    // Painel de ranking (pode estar sobre a hub de jogos)
+    if (document.getElementById('modal-rank')?.classList.contains('open')) {
+      if (typeof rankFecharPainel === 'function') rankFecharPainel(true); return;
+    }
     // Painel de conta do cliente (pode estar sobre tudo)
     if (document.getElementById('modal-cli-conta')?.classList.contains('open')) {
       if (typeof cliFecharPainelConta === 'function') cliFecharPainelConta(true); return;
@@ -15117,3 +15126,170 @@ ${urlCard}`)}`;
   window.rankSubmeter       = rankSubmeter;
   window.rankLerTop         = rankLerTop;
   window.rankMinhaPontuacao = rankMinhaPontuacao;
+
+  /* ══════════════════════════════════════════════════════════════
+     UI DO RANKING (Camada 2.4)
+     — Renderiza o rank na tela de Joguinhos (lar do rank: 4 rankings
+       com abas) e o mini-rank no fim de cada jogo (Opção 3).
+     — Usa rankLerTop/rankMinhaPontuacao (módulo da 2.3).
+     — Convite pós-jogo: se o jogador NÃO está logado ao terminar,
+       mostra um convite para entrar (liga o login sob demanda da
+       camada 1).
+  ══════════════════════════════════════════════════════════════ */
+
+  // Metadados dos 4 rankings (rótulo amigável + coleção).
+  var RANK_INFO = {
+    pegacoruja:      { label: 'Pega a Coruja', sub: 'Clássico' },
+    pegacoruja_surv: { label: 'Pega a Coruja', sub: 'Sobrevivência' },
+    relampago:       { label: 'Relâmpago',      sub: '' },
+    sequencia:       { label: 'Sequência',      sub: '' }
+  };
+
+  var _rankAbaAtual = 'pegacoruja';
+
+  // Escapa texto do usuário para evitar HTML injection ao montar a lista.
+  function _rankEsc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* ── Abrir o painel de ranking completo (em Joguinhos) ──────*/
+  function rankAbrirPainel(jogoKey) {
+    var overlay = document.getElementById('modal-rank');
+    if (!overlay) return;
+    _rankAbaAtual = jogoKey || _rankAbaAtual || 'pegacoruja';
+    rankRenderAbas();
+    rankCarregarAba(_rankAbaAtual);
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    if (history.state?.modal !== 'rank') history.pushState({ modal: 'rank' }, '');
+  }
+
+  function rankFecharPainel(viaPopstate) {
+    var overlay = document.getElementById('modal-rank');
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    if (!viaPopstate && history.state?.modal === 'rank') history.back();
+  }
+
+  // Monta os botões de aba (os 4 rankings).
+  function rankRenderAbas() {
+    var wrap = document.getElementById('rank-abas');
+    if (!wrap) return;
+    var html = '';
+    Object.keys(RANK_INFO).forEach(function (k) {
+      var info = RANK_INFO[k];
+      var nome = info.label + (info.sub ? ' · ' + info.sub : '');
+      var ativa = (k === _rankAbaAtual) ? ' rank-aba-ativa' : '';
+      html += '<button class="rank-aba' + ativa + '" onclick="rankCarregarAba(\'' + k + '\')">' +
+              _rankEsc(nome) + '</button>';
+    });
+    wrap.innerHTML = html;
+  }
+
+  // Carrega e mostra um ranking específico.
+  function rankCarregarAba(jogoKey) {
+    _rankAbaAtual = jogoKey;
+    rankRenderAbas();
+    var lista = document.getElementById('rank-lista');
+    if (lista) lista.innerHTML = '<div class="rank-loading">Carregando ranking…</div>';
+
+    if (typeof rankLerTop !== 'function') {
+      if (lista) lista.innerHTML = '<div class="rank-vazio">Ranking indisponível agora.</div>';
+      return;
+    }
+
+    var meuUid = (typeof _cliUser !== 'undefined' && _cliUser) ? _cliUser.uid : null;
+
+    rankLerTop(jogoKey, 20).then(function (top) {
+      if (!lista) return;
+      if (!top || !top.length) {
+        lista.innerHTML = '<div class="rank-vazio">🦉 Ninguém no ranking ainda.<br>Seja o primeiro a pontuar!</div>';
+        return;
+      }
+      var html = '';
+      top.forEach(function (item, i) {
+        var pos = i + 1;
+        var medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : ('<span class="rank-pos">' + pos + '</span>');
+        var eu = (meuUid && item.uid === meuUid) ? ' rank-linha-eu' : '';
+        html += '<div class="rank-linha' + eu + '">' +
+                  '<div class="rank-medal">' + medal + '</div>' +
+                  '<div class="rank-nome">' + _rankEsc(item.nome) + (eu ? ' <span class="rank-voce">(você)</span>' : '') + '</div>' +
+                  '<div class="rank-score">' + item.score + '</div>' +
+                '</div>';
+      });
+      lista.innerHTML = html;
+
+      // Se o jogador está logado mas fora do top, mostra a posição dele embaixo.
+      if (meuUid) {
+        var estaNoTop = top.some(function (t) { return t.uid === meuUid; });
+        if (!estaNoTop && typeof rankMinhaPontuacao === 'function') {
+          rankMinhaPontuacao(jogoKey).then(function (minha) {
+            if (minha != null && lista) {
+              lista.innerHTML += '<div class="rank-linha rank-linha-eu rank-linha-fora">' +
+                '<div class="rank-medal"><span class="rank-pos">•</span></div>' +
+                '<div class="rank-nome">Você <span class="rank-voce">(fora do top 20)</span></div>' +
+                '<div class="rank-score">' + minha + '</div></div>';
+            }
+          });
+        }
+      }
+    });
+  }
+
+  /* ── Mini-rank no fim de jogo (Opção 3) ─────────────────────
+     Preenche o slot de rank dentro da tela de fim do jogo com o
+     top 5 + a posição do jogador. Se deslogado, mostra o convite. */
+  function rankFimDeJogo(jogoKey, slotId, scoreObtido) {
+    var slot = document.getElementById(slotId);
+    if (!slot) return;
+
+    var logado = (typeof _cliUser !== 'undefined' && !!_cliUser);
+
+    // Deslogado: convite para entrar (liga o login sob demanda).
+    if (!logado) {
+      slot.innerHTML =
+        '<div class="rank-fim-convite">' +
+          '<img src="/webp/owl-trophy.webp" alt="" class="rank-fim-owl" onerror="this.style.display=\'none\'">' +
+          '<div class="rank-fim-txt">Entre para salvar <b>' + (scoreObtido || 0) + '</b> no ranking da cidade!</div>' +
+          '<button class="rank-fim-btn" onclick="cliAbrirLogin(\'Entre para aparecer no ranking de Angatuba!\')">Entrar e competir</button>' +
+        '</div>';
+      slot.style.display = '';
+      return;
+    }
+
+    // Logado: mostra o top 5 do jogo.
+    if (typeof rankLerTop !== 'function') { slot.style.display = 'none'; return; }
+    slot.innerHTML = '<div class="rank-loading">Carregando ranking…</div>';
+    slot.style.display = '';
+
+    var meuUid = _cliUser.uid;
+    rankLerTop(jogoKey, 5).then(function (top) {
+      if (!top || !top.length) {
+        slot.innerHTML = '<div class="rank-fim-titulo">🏆 Ranking</div>' +
+                         '<div class="rank-vazio-mini">Você é o primeiro! 🦉</div>';
+        return;
+      }
+      var html = '<div class="rank-fim-titulo">🏆 Top 5 · ' + _rankEsc(RANK_INFO[jogoKey] ? RANK_INFO[jogoKey].label : 'Ranking') + '</div>';
+      top.forEach(function (item, i) {
+        var pos = i + 1;
+        var medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : pos;
+        var eu = (item.uid === meuUid) ? ' rank-linha-eu' : '';
+        html += '<div class="rank-linha rank-linha-mini' + eu + '">' +
+                  '<div class="rank-medal">' + medal + '</div>' +
+                  '<div class="rank-nome">' + _rankEsc(item.nome) + (eu ? ' <span class="rank-voce">(você)</span>' : '') + '</div>' +
+                  '<div class="rank-score">' + item.score + '</div>' +
+                '</div>';
+      });
+      html += '<button class="rank-fim-vertudo" onclick="rankAbrirPainel(\'' + jogoKey + '\')">Ver ranking completo</button>';
+      slot.innerHTML = html;
+    });
+  }
+
+  window.rankAbrirPainel  = rankAbrirPainel;
+  window.rankFecharPainel = rankFecharPainel;
+  window.rankCarregarAba  = rankCarregarAba;
+  window.rankFimDeJogo    = rankFimDeJogo;
+

@@ -683,6 +683,7 @@
     var rec = _rlRecordeGet();
     var bateu = _rlPontos > rec;
     if (bateu) _rlRecordeSet(_rlPontos);
+    if (typeof rankSubmeter === 'function') rankSubmeter('relampago', _rlPontos);
     var recEl = document.getElementById('rl-recorde'); if (recEl) recEl.textContent = _rlRecordeGet();
     var fim = document.getElementById('rl-fim');
     var fimOwl = document.getElementById('rl-fim-owl');
@@ -1163,6 +1164,10 @@
     var rec = _stRecordeGet();
     var bateuRecorde = _stPontos > rec;
     if (bateuRecorde) { _stRecordeSet(_stPontos); }
+    // Ranking: submete ao Firestore (se logado). Modo define a coleção.
+    if (typeof rankSubmeter === 'function') {
+      rankSubmeter(_stModo === 'sobrevivencia' ? 'pegacoruja_surv' : 'pegacoruja', _stPontos);
+    }
 
     var fim = document.getElementById('st-fim');
     var fimOwl = document.getElementById('st-fim-owl');
@@ -1369,6 +1374,7 @@
     var rec = _sqRecordeGet();
     var bateu = alcancado > rec;
     if (bateu) _sqRecordeSet(alcancado);
+    if (typeof rankSubmeter === 'function') rankSubmeter('sequencia', alcancado);
 
     var recEl = document.getElementById('sq-recorde');
     if (recEl) recEl.textContent = _sqRecordeGet();
@@ -14986,3 +14992,128 @@ ${urlCard}`)}`;
   window.cliFecharPainelConta = cliFecharPainelConta;
   window.cliTrocarTema        = cliTrocarTema;
   window.cliSair              = cliSair;
+
+  /* ══════════════════════════════════════════════════════════════
+     RANKING DOS JOGOS (Cloud Firestore)
+     — Camada 2: grava a pontuação quando o cliente logado bate
+       recorde, e lê o rank para exibir.
+     — Depende da camada 1 (cliente-auth). Se o cliente NÃO estiver
+       logado, rankSubmeter() é um no-op silencioso: o jogo livre
+       continua idêntico ao de hoje (recorde local no localStorage).
+     — Segurança: as regras do Firestore garantem que só o dono grava
+       o próprio doc, só recorde (score maior) passa, e há teto por
+       jogo. O cliente NÃO precisa confiar em nada disso; é o servidor
+       (Firebase) que aplica.
+  ══════════════════════════════════════════════════════════════ */
+
+  // Referência ao Firestore (compat). Carregado via <script> no index
+  // ANTES do app_min.js, junto com app/auth. Degradação graciosa se
+  // o SDK não carregou: ranking fica indisponível, jogo segue normal.
+  var _fbDb = null;
+  function _rankDb() {
+    if (_fbDb) return _fbDb;
+    if (typeof firebase === 'undefined' || !firebase.firestore) return null;
+    try { _fbDb = firebase.firestore(); } catch (e) { _fbDb = null; }
+    return _fbDb;
+  }
+
+  // Mapa jogo -> coleção no Firestore. Mantém os nomes das regras.
+  var RANK_COLECOES = {
+    pegacoruja:      'ranking_pegacoruja',
+    pegacoruja_surv: 'ranking_pegacoruja_surv',
+    relampago:       'ranking_relampago',
+    sequencia:       'ranking_sequencia'
+  };
+
+  /* ── Submeter uma pontuação ─────────────────────────────────
+     Chamada nos pontos de "bateu recorde" de cada jogo.
+     - jogoKey: chave de RANK_COLECOES (ex.: 'pegacoruja')
+     - score: número inteiro da pontuação
+     Comportamento:
+     - Sem login → não faz nada (silencioso). Jogo livre preservado.
+     - Com login → grava/atualiza o doc do próprio uid. A regra do
+       Firestore só aceita se for recorde (score maior que o atual)
+       e dentro do teto; então não precisamos checar aqui — mas
+       tratamos o erro com discrição (sem quebrar o fim de jogo).
+     Usa merge/set no doc de id = uid. */
+  function rankSubmeter(jogoKey, score) {
+    // Só faz sentido se houver cliente logado (camada 1).
+    if (typeof _cliUser === 'undefined' || !_cliUser) return;
+    var db = _rankDb();
+    if (!db) return;
+    var colecao = RANK_COLECOES[jogoKey];
+    if (!colecao) return;
+
+    var uid = _cliUser.uid;
+    var nome = (_cliApelido || _cliUser.displayName || 'Jogador').trim().slice(0, 20);
+    var val = Math.max(0, Math.round(Number(score) || 0));
+
+    try {
+      db.collection(colecao).doc(uid).set({
+        uid: uid,
+        nome: nome,
+        score: val,
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).catch(function (err) {
+        // Erro esperado e benigno quando NÃO é recorde: a regra de
+        // update exige score > atual, então repetir/piorar dá
+        // permission-denied. Isso é normal; não polui a UX.
+        if (err && err.code === 'permission-denied') {
+          if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] não é recorde ou fora do teto:', colecao, val);
+        } else if (typeof DEBUG !== 'undefined' && DEBUG) {
+          console.log('[rank] falha ao gravar:', err && err.message);
+        }
+      });
+    } catch (e) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] exceção:', e && e.message);
+    }
+  }
+
+  /* ── Ler o top de um ranking ────────────────────────────────
+     Retorna uma Promise com array [{uid, nome, score}], ordenado
+     do maior pro menor, limitado a `limite` (default 20).
+     Leitura é pública (regra allow read: true), funciona logado ou
+     não. */
+  function rankLerTop(jogoKey, limite) {
+    var db = _rankDb();
+    var colecao = RANK_COLECOES[jogoKey];
+    if (!db || !colecao) return Promise.resolve([]);
+    var n = limite || 20;
+    return db.collection(colecao)
+      .orderBy('score', 'desc')
+      .limit(n)
+      .get()
+      .then(function (snap) {
+        var out = [];
+        snap.forEach(function (doc) {
+          var d = doc.data() || {};
+          out.push({ uid: d.uid || doc.id, nome: d.nome || 'Jogador', score: d.score || 0 });
+        });
+        return out;
+      })
+      .catch(function (err) {
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] erro ao ler:', err && err.message);
+        return [];
+      });
+  }
+
+  /* ── Ler a própria posição/pontuação num ranking ────────────
+     Útil para mostrar "sua melhor: X" mesmo que fora do top.
+     Retorna Promise<number|null>. */
+  function rankMinhaPontuacao(jogoKey) {
+    if (typeof _cliUser === 'undefined' || !_cliUser) return Promise.resolve(null);
+    var db = _rankDb();
+    var colecao = RANK_COLECOES[jogoKey];
+    if (!db || !colecao) return Promise.resolve(null);
+    return db.collection(colecao).doc(_cliUser.uid).get()
+      .then(function (doc) {
+        if (!doc.exists) return null;
+        var d = doc.data() || {};
+        return typeof d.score === 'number' ? d.score : null;
+      })
+      .catch(function () { return null; });
+  }
+
+  window.rankSubmeter       = rankSubmeter;
+  window.rankLerTop         = rankLerTop;
+  window.rankMinhaPontuacao = rankMinhaPontuacao;

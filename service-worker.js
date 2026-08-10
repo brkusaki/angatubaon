@@ -1,4 +1,4 @@
-const CACHE = 'angatubaon-v143';
+const CACHE = 'angatubaon-v144';
 const STATIC = [
   '/',
   '/index.html',
@@ -30,6 +30,7 @@ const STATIC = [
   '/webp/owl-phone.webp',
   '/webp/owl-sign.webp',
   '/webp/owl-portrait.webp',
+  '/webp/owl-flying.webp',
   '/webp/owl-angry.webp',
   '/icons/icon-192.png',
   '/icons/icon-512.png',

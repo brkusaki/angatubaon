@@ -953,22 +953,39 @@
   function _vooOwlH()  { return _vooOwlW() * (_vooImgOk ? _vooImgRatio : 1); }
 
   // Gap vertical entre plataformas, cresce com a pontuação (mais difícil).
+  // Alcance seguro de um pulo (altura máxima), em px, com margem.
+  // hMax = v^2 / (2g). Usamos 82% dele como teto de gap pra sempre
+  // sobrar folga de controle horizontal.
+  function _vooAlcance() {
+    var v = Math.abs(_vooJump());
+    var g = _vooGrav();
+    return (v * v) / (2 * g);
+  }
+
+  // Gap efetivo entre plataformas ALCANÇÁVEIS (normais/móveis), sempre
+  // <= teto seguro. Cresce com o score, mas nunca além do que o pulo
+  // vence. (Independe de resolução: tudo em px do H atual.)
   function _vooGap() {
+    var teto = _vooAlcance() * 0.82;
     var t = Math.min(1, _vooScore / 4000);
-    var min = (0.115 + 0.045 * t) * _vooH;
-    var max = (0.150 + 0.040 * t) * _vooH;
+    var min = teto * (0.58 + 0.12 * t);
+    var max = teto * (0.74 + 0.14 * t);
+    if (max > teto) max = teto;
     return min + Math.random() * (max - min);
   }
 
-  function _vooNovaPlat(y) {
+  // Cria UMA plataforma num y dado. 'forcarNormal' garante que ela seja
+  // pisável (usado logo acima de uma quebrável, pra nunca formar beco).
+  function _vooNovaPlat(y, forcarNormal) {
     var w = _vooPlatW();
     var x = Math.random() * (_vooW - w);
     var tipo = 'normal';
-    var r = Math.random();
-    // Móveis a partir de 300 pts; quebráveis a partir de 700.
-    if (_vooScore >= 700 && r < 0.18)      tipo = 'break';
-    else if (_vooScore >= 300 && r < 0.42) tipo = 'move';
-    // Trampolim (boost) em ~7% das plataformas normais.
+    if (!forcarNormal) {
+      var r = Math.random();
+      if (_vooScore >= 700 && r < 0.18)      tipo = 'break';
+      else if (_vooScore >= 300 && r < 0.42) tipo = 'move';
+    }
+    // Trampolim só em plataforma normal.
     var boost = (tipo === 'normal' && Math.random() < 0.07);
     var vx = 0;
     if (tipo === 'move') {
@@ -978,13 +995,31 @@
     return { x: x, y: y, w: w, tipo: tipo, boost: boost, vx: vx, usada: false };
   }
 
-  // Garante plataformas preenchidas acima da câmera.
+  // Garante plataformas preenchidas acima da câmera, SEMPRE com caminho
+  // alcançável: cada passo sobe no máximo _vooGap() (<= alcance do pulo),
+  // e nunca gera não-normal imediatamente acima de uma quebrável.
   function _vooGerarAcima() {
-    var topo = _vooCamY - 0.2 * _vooH;   // um pouco acima do topo visível
-    var maisAlta = _vooPlats.length ? _vooPlats[_vooPlats.length - 1].y : _vooStartY;
-    while (maisAlta > topo) {
-      maisAlta -= _vooGap();
-      _vooPlats.push(_vooNovaPlat(maisAlta));
+    var topo = _vooCamY - 0.2 * _vooH;
+    var maisAlta = _vooPlats.length ? _vooPlats[_vooPlats.length - 1] : null;
+    var yAtual = maisAlta ? maisAlta.y : _vooStartY;
+    var tipoAnterior = maisAlta ? maisAlta.tipo : 'normal';
+    while (yAtual > topo) {
+      // Regra de jogabilidade: nunca duas plataformas NÃO-NORMAIS seguidas.
+      // Uma não-normal (quebrável some após o pulo; móvel pode estar longe
+      // no eixo X) não é apoio confiável pra um segundo salto. Forçando uma
+      // NORMAL logo acima de qualquer não-normal, garantimos que entre dois
+      // apoios confiáveis (normais) há no máximo uma não-normal.
+      var anteriorRuim = (tipoAnterior !== 'normal');
+      // Quando a anterior é não-normal, encurtamos ESTE gap: assim o salto
+      // que possivelmente ignora a não-normal (normal->normal) ainda cabe
+      // dentro de um único pulo. gap normal->normal <= gap1*0.6 + gap2 onde
+      // gap2 (este) é reduzido a 55%.
+      var g = _vooGap();
+      if (anteriorRuim) g *= 0.35;
+      yAtual -= g;
+      var nova = _vooNovaPlat(yAtual, anteriorRuim);   // força normal se anterior ruim
+      _vooPlats.push(nova);
+      tipoAnterior = nova.tipo;
     }
   }
 
@@ -1007,9 +1042,18 @@
       dir: 1                          // 1 direita, -1 esquerda (p/ espelhar)
     };
 
-    // Sobe as plataformas iniciais.
+    // Sobe as plataformas iniciais (mesma proteção do _vooGerarAcima:
+    // nunca duas não-normais seguidas; encurta gap após não-normal).
     var y = baseY;
-    while (y > _vooCamY - 0.2 * _vooH) { y -= _vooGap(); _vooPlats.push(_vooNovaPlat(y)); }
+    var tAnt = 'normal';
+    while (y > _vooCamY - 0.2 * _vooH) {
+      var ruim = (tAnt !== 'normal');
+      var gg = _vooGap(); if (ruim) gg *= 0.35;
+      y -= gg;
+      var np = _vooNovaPlat(y, ruim);
+      _vooPlats.push(np);
+      tAnt = np.tipo;
+    }
 
     // Nuvens de parallax (decorativas).
     _vooNuvens = [];
@@ -1070,12 +1114,13 @@
         var dentroX = (o.x > pl.x - hw * 0.4) && (o.x < pl.x + pl.w + hw * 0.4);
         var cruzou = (feet >= pl.y) && (feet <= pl.y + ph + Math.abs(o.vy) * dt);
         if (dentroX && cruzou) {
-          if (pl.tipo === 'break') {
-            pl.usada = true;                 // quebra: não impulsiona, some
-          } else {
-            o.vy = _vooJump() * (pl.boost ? 1.7 : 1);
-            o.y = pl.y - owlH / 2;           // encosta em cima
-          }
+          // Impulsiona SEMPRE (inclusive quebrável) — assim nenhuma
+          // plataforma vira beco sem saída. A quebrável dá o pulo e
+          // só então some (nega a 2ª vez naquele ponto, como no
+          // Doodle Jump clássico).
+          o.vy = _vooJump() * (pl.boost ? 1.7 : 1);
+          o.y = pl.y - owlH / 2;           // encosta em cima
+          if (pl.tipo === 'break') pl.usada = true;  // quebra após impulsionar
           break;
         }
       }
@@ -16010,4 +16055,3 @@ ${urlCard}`)}`;
   window.rankFecharPainel = rankFecharPainel;
   window.rankCarregarAba  = rankCarregarAba;
   window.rankFimDeJogo    = rankFimDeJogo;
-

@@ -862,7 +862,7 @@
      com { preparar, comecar, parar }.
   ══════════════════════════════════════════════════════════════ */
   var JOGOS_EXTERNOS = {
-    voo: { js: '/jogos/voo.min.js', css: '/jogos/voo.css', global: 'VooGame' }
+    voo: { js: '/Jogos/voo.min.js', css: '/Jogos/voo.css', global: 'VooGame' }
   };
   var _jogosCarregados = {};   // nome -> true quando js+css já injetados
 
@@ -981,7 +981,7 @@
   window._abrirJogo = _abrirJogo;
   window._voltarAoMenu = _voltarAoMenu;
 
-  /* ── Voo da Coruja: EXTRAÍDO para /jogos/voo.js (lazy load) ──
+  /* ── Voo da Coruja: EXTRAÍDO para /Jogos/voo.js (lazy load) ──
      O jogo agora é um módulo carregado sob demanda pelo _jogoLoader
      quando o usuário abre a tela. Fala com o app via window.AngatubaGames.
   */
@@ -15728,5 +15728,5 @@ ${urlCard}`)}`;
       if (typeof _voltarAoMenu === 'function') return _voltarAoMenu();
     },
     // Caminho base dos assets de jogos (imagens, sons).
-    assetsBase: '/jogos/assets/'
+    assetsBase: '/Jogos/assets/'
   };

@@ -424,6 +424,15 @@
     _vooMostrarOverlay('inicio');
     _vooDimensionar();
     _vooDrawIdle();
+    // Blindagem de timing: em tela cheia o layout pode ainda nao ter
+    // assentado quando medimos acima (arena 0px = tela preta). Remede no
+    // proximo frame, quando o CSS de tela cheia ja aplicou a altura real.
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(function () {
+        _vooDimensionar();
+        if (_vooEstado !== 'jogando') _vooDrawIdle();
+      });
+    }
   }
 
   // Desenha um quadro parado (fundo + plataformas de amostra) atrás do overlay.

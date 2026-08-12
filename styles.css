@@ -5521,7 +5521,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
    barras dinâmicas do navegador no celular. O body ganha .games-fs-open
    (via JS) pra travar o scroll de fundo enquanto joga.
    ═════════════════════════════════════════════════════════════ */
-body.games-fs-open { overflow: hidden; touch-action: none; }
+body.games-fs-open { overflow: hidden; }
 
 body.games-fs-open #games-hub {
   position: fixed;
@@ -5549,10 +5549,12 @@ body.games-fs-open #games-menu     { padding: 0 16px 24px; }
 /* Cada tela de jogo ocupa a altura toda, em coluna: botão voltar no topo,
    HUD logo abaixo (fixos), arena preenchendo o resto. */
 body.games-fs-open .jogo-tela {
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;          /* altura FIXA: referencia pro flex da arena */
   display: flex;
   flex-direction: column;
   padding: 0;
+  overflow: hidden;
 }
 body.games-fs-open .jogo-voltar {
   position: sticky; top: 0; z-index: 5;
@@ -5592,10 +5594,12 @@ body.games-fs-open .vo-hud {
 /* Arenas preenchem o espaço vertical restante */
 body.games-fs-open .st-arena,
 body.games-fs-open .vo-arena {
-  flex: 1;
+  flex: 1 1 auto;
   max-height: none;
-  aspect-ratio: auto;      /* deixa a arena preencher a tela, não travar em 9/16 */
-  min-height: 0;
+  aspect-ratio: auto;
+  min-height: 60vh;        /* piso: garante altura mesmo se flex nao resolver */
+  touch-action: none;      /* bloqueia scroll SO na arena, nao no body */
+  position: relative;
 }
 body.games-fs-open .sq-grade { margin: auto 0; }
 

@@ -1,0 +1,124 @@
+/* ═══════════════════════════════════════════════════════════════
+   SEQUÊNCIA DA CORUJA (Simon/Genius) — estilos do jogo (lazy-loaded)
+   Injetado sob demanda pelo _jogoLoader ao abrir o jogo.
+   Só o CSS específico do jogo. As regras de tela cheia
+   (body.games-fs-open .sq-card / .sq-hud / .sq-grade) permanecem em
+   styles.css. Este bloco é autocontido (keyframes próprios).
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ═════ Sequência da Coruja (Simon/Genius) ══ */
+.sq-card {
+  border-radius: 16px; overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  position: relative;
+}
+.sq-hud {
+  display: flex; justify-content: space-around;
+  padding: 14px 12px;
+  background: linear-gradient(135deg, rgba(168,85,247,0.12), rgba(59,130,246,0.08));
+  border-bottom: 1px solid var(--border);
+}
+.sq-hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.sq-hud-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); font-weight: 700;
+}
+.sq-hud-valor {
+  font-family: var(--font-h); font-weight: 800; font-size: 22px; color: var(--text);
+}
+.sq-hud-valor.sq-rodada-up { animation: sqRodadaUp .45s ease; }
+@keyframes sqRodadaUp {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.35); color: #4ade80; }
+  100% { transform: scale(1); }
+}
+.sq-status {
+  text-align: center; padding: 14px 16px 4px;
+  font-family: var(--font-h); font-weight: 800; font-size: 18px; color: var(--text);
+  min-height: 24px;
+}
+/* Grade 2x2 das corujas */
+.sq-grade {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  padding: 16px; max-width: 340px; margin: 0 auto;
+}
+/* Modo 6 corujas: grade 3 colunas (3x2) */
+.sq-grade.sq-grade-6 { grid-template-columns: 1fr 1fr 1fr; max-width: 420px; }
+.sq-grade.sq-expandiu { animation: sqExpandiu .6s ease; }
+@keyframes sqExpandiu {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+.sq-grade.sq-erro { animation: sqErro .4s ease; }
+@keyframes sqErro {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-10px); }
+  40% { transform: translateX(10px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+.sq-btn {
+  position: relative; aspect-ratio: 1 / 1;
+  border: 2px solid var(--border); border-radius: 18px;
+  background: var(--surface2);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .08s, box-shadow .15s, filter .15s;
+  overflow: hidden; opacity: .55;
+}
+.sq-btn img {
+  width: 62%; height: 62%; object-fit: contain;
+  filter: grayscale(.5) brightness(.8);
+  transition: filter .15s, transform .12s;
+  pointer-events: none;
+}
+.sq-btn:active { transform: scale(.95); }
+/* Cada coruja tem sua cor de fundo/glow quando acende */
+.sq-btn-0 { --sqc: #a855f7; }
+.sq-btn-1 { --sqc: #f59e0b; }
+.sq-btn-2 { --sqc: #4ade80; }
+.sq-btn-3 { --sqc: #3b82f6; }
+.sq-btn-4 { --sqc: #ec4899; }
+.sq-btn-5 { --sqc: #14b8a6; }
+/* Estado aceso: cor viva, brilho, coruja em destaque */
+.sq-btn.sq-on {
+  opacity: 1;
+  border-color: var(--sqc);
+  background: radial-gradient(circle at 50% 45%, var(--sqc), transparent 75%), var(--surface2);
+  box-shadow: 0 0 22px var(--sqc), inset 0 0 18px rgba(255,255,255,.12);
+  transform: scale(1.04);
+}
+.sq-btn.sq-on img {
+  filter: grayscale(0) brightness(1.15) drop-shadow(0 2px 6px rgba(0,0,0,.5));
+  transform: scale(1.08);
+}
+/* Overlays de início/fim */
+.sq-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 24px; gap: 8px;
+  background: rgba(10,10,12,.94); backdrop-filter: blur(3px);
+  z-index: 6;
+}
+.sq-overlay-owl { width: 76px; height: 76px; object-fit: contain; margin-bottom: 4px; }
+.sq-overlay-titulo {
+  font-family: var(--font-h); font-weight: 800; font-size: 24px; color: var(--text);
+}
+.sq-overlay-desc {
+  font-size: 13px; color: var(--muted); line-height: 1.45; max-width: 260px;
+}
+.sq-play {
+  margin-top: 14px;
+  font-family: var(--font-h); font-weight: 800; font-size: 15px;
+  color: #fff; cursor: pointer;
+  padding: 12px 34px; border-radius: 999px; border: none;
+  background: linear-gradient(135deg, #a855f7, #6d28d9);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .1s, filter .15s;
+  box-shadow: 0 4px 14px rgba(168,85,247,0.4);
+}
+.sq-play:active { transform: scale(0.96); }
+.sq-play:hover { filter: brightness(1.08); }

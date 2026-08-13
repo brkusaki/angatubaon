@@ -815,10 +815,8 @@
   }
 
   function _fecharGamesHub() {
-    _stParar(); // garante que o Speed Tap para se estava rodando
-    if (typeof _sqLimparTimers === 'function') _sqLimparTimers();
+    _pararJogosExternos(); // para Speed Tap / Sequência / Voo se estavam rodando
     if (typeof _rlLimparTimers === 'function') _rlLimparTimers();
-    if (window.VooGame && typeof window.VooGame.parar === 'function') window.VooGame.parar();
     var hub = document.getElementById('games-hub');
     if (!hub) return;
     hub.style.display = 'none';
@@ -835,15 +833,24 @@
     var hub = document.getElementById('games-hub');
     return !!(hub && hub.style.display !== 'none' && hub.style.display !== '');
   }
+  // Exposto pra os módulos de jogo externos (ex.: voo.js) checarem se o
+  // hub ainda está aberto antes de reagir a resize/timers.
+  window._gamesHubAberto = _gamesHubAberto;
+
+  // Para todos os jogos externos que possam estar rodando. Cada módulo
+  // só existe depois de carregado sob demanda; por isso o guard typeof.
+  function _pararJogosExternos() {
+    if (window.SpeedTapGame  && typeof window.SpeedTapGame.parar  === 'function') window.SpeedTapGame.parar();
+    if (window.SequenciaGame && typeof window.SequenciaGame.parar === 'function') window.SequenciaGame.parar();
+    if (window.VooGame       && typeof window.VooGame.parar       === 'function') window.VooGame.parar();
+  }
 
   /* -- Roteador de jogos: menu <-> tela de cada jogo -- */
   var _quizJaCarregadoNaTela = false; // lazy-load do quiz só quando abre a tela dele
 
   function _voltarAoMenu() {
-    _stParar();
-    if (typeof _sqLimparTimers === 'function') _sqLimparTimers();
+    _pararJogosExternos();
     if (typeof _rlLimparTimers === 'function') _rlLimparTimers();
-    if (window.VooGame && typeof window.VooGame.parar === 'function') window.VooGame.parar();
     var menu = document.getElementById('games-menu');
     var telas = document.querySelectorAll('.jogo-tela');
     for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
@@ -862,7 +869,9 @@
      com { preparar, comecar, parar }.
   ══════════════════════════════════════════════════════════════ */
   var JOGOS_EXTERNOS = {
-    voo: { js: '/Jogos/voo.min.js', css: '/Jogos/voo.css', global: 'VooGame' }
+    voo: { js: '/Jogos/voo.min.js', css: '/Jogos/voo.css', global: 'VooGame' },
+    speedtap: { js: '/Jogos/speedtap.min.js', css: '/Jogos/speedtap.css', global: 'SpeedTapGame' },
+    sequencia: { js: '/Jogos/sequencia.min.js', css: '/Jogos/sequencia.css', global: 'SequenciaGame' }
   };
   var _jogosCarregados = {};   // nome -> true quando js+css já injetados
 
@@ -965,14 +974,9 @@
         }, 1200);
         setTimeout(function(){ var ld = document.getElementById('games-loading'); if (ld) ld.style.display = 'none'; }, 12000);
       }
-    } else if (nome === 'speedtap') {
-      _stPreparar();
-    } else if (nome === 'sequencia') {
-      _sqLigarBotoes();
-      _sqPreparar();
-    } else if (nome === 'voo') {
-      // Jogo externo: carrega sob demanda e prepara quando pronto.
-      _jogoLoader('voo').then(function (api) {
+    } else if (nome === 'speedtap' || nome === 'sequencia' || nome === 'voo') {
+      // Jogos externos: carrega sob demanda e prepara quando pronto.
+      _jogoLoader(nome).then(function (api) {
         if (api && typeof api.preparar === 'function') api.preparar();
       }).catch(function () {});
     }
@@ -981,561 +985,15 @@
   window._abrirJogo = _abrirJogo;
   window._voltarAoMenu = _voltarAoMenu;
 
-  /* ── Voo da Coruja: EXTRAÍDO para /Jogos/voo.js (lazy load) ──
-     O jogo agora é um módulo carregado sob demanda pelo _jogoLoader
-     quando o usuário abre a tela. Fala com o app via window.AngatubaGames.
+  /* ── Jogos extraídos para /Jogos/ (lazy load) ───────────────────
+     Voo da Coruja      → /Jogos/voo.js        (window.VooGame)
+     Pega a Coruja      → /Jogos/speedtap.js   (window.SpeedTapGame)
+     Sequência da Coruja→ /Jogos/sequencia.js  (window.SequenciaGame)
+     Cada jogo é um módulo carregado sob demanda pelo _jogoLoader
+     quando o usuário abre a tela. Fala com o app só via a ponte
+     window.AngatubaGames. Quiz e Modo Relâmpago seguem inline
+     abaixo (compartilham o banco de perguntas do dia).
   */
-
-
-  /* -- Speed Tap: "Pega a Coruja" (com níveis, combo, coruja fake e 2 modos) -- */
-  var _ST_DURACAO = 25;                        // segundos por partida (modo clássico)
-  var _ST_VIDAS   = 3;                          // fakes que pode errar (modo sobrevivência)
-  var _ST_OWL     = '/webp/owl-portrait.webp'; // coruja boa (vale ponto)
-  var _ST_FAKE    = '/webp/owl-angry.webp';    // coruja fake (não pode tocar!)
-  var _ST_BONUS   = '/webp/owl-trophy.webp';   // coruja bônus dourada (+5)
-
-  var _stModo = 'classico';                     // 'classico' | 'sobrevivencia'
-  var _stTempo = 0, _stPontos = 0, _stCombo = 0, _stComboMax = 0;
-  var _stNivel = 1, _stAcertos = 0, _stVidas = 0;
-  var _stTimerRelogio = null, _stTimerCiclo = null, _stRodando = false;
-
-  // Recordes separados por modo.
-  function _stRecChave() {
-    return _stModo === 'sobrevivencia' ? 'angatuba_speedtap_surv_rec' : 'angatuba_speedtap_rec';
-  }
-  function _stRecordeGet() {
-    try { return Number(localStorage.getItem(_stRecChave())) || 0; } catch(e) { return 0; }
-  }
-  function _stRecordeSet(v) {
-    try { localStorage.setItem(_stRecChave(), String(v)); } catch(e) {}
-  }
-
-  // Config de cada nível: intervalo de troca (ms), tamanho da coruja (px),
-  // chance de a coruja ser fake (0-1) e chance de bônus dourado.
-  function _stNivelCfg(nivel) {
-    // Vai ficando mais rápido, menor e com mais fakes conforme sobe.
-    var intervalo = Math.max(560, 1100 - (nivel - 1) * 90);
-    var tamanho   = Math.max(40, 66 - (nivel - 1) * 3);
-    var chanceFake = Math.min(0.42, 0.10 + (nivel - 1) * 0.05);
-    var chanceBonus = nivel >= 3 ? 0.12 : 0;
-    // No modo sobrevivência as fakes precisam aparecer com frequência (senão
-    // é impossível perder). Garante um piso maior de fakes.
-    if (_stModo === 'sobrevivencia') {
-      chanceFake = Math.min(0.5, 0.22 + (nivel - 1) * 0.045);
-    }
-    return { intervalo: intervalo, tamanho: tamanho, chanceFake: chanceFake, chanceBonus: chanceBonus };
-  }
-
-  // A cada X acertos, sobe de nível (até 6).
-  function _stAtualizarNivel() {
-    var novoNivel = Math.min(6, 1 + Math.floor(_stAcertos / 6));
-    if (novoNivel !== _stNivel) {
-      _stNivel = novoNivel;
-      var nEl = document.getElementById('st-nivel');
-      if (nEl) {
-        nEl.textContent = _stNivel;
-        nEl.classList.remove('st-nivel-up'); void nEl.offsetWidth; nEl.classList.add('st-nivel-up');
-      }
-      // Aviso visual de "Nível X!"
-      var arena = document.getElementById('st-arena');
-      if (arena) {
-        var aviso = document.createElement('div');
-        aviso.className = 'st-nivelup-aviso';
-        aviso.textContent = 'Nível ' + _stNivel + '! 🚀';
-        arena.appendChild(aviso);
-        setTimeout(function(){ if (aviso.parentNode) aviso.remove(); }, 900);
-      }
-      if (navigator.vibrate) { try { navigator.vibrate([20, 40, 20]); } catch(e) {} }
-    }
-  }
-
-  function _stComboMostrar() {
-    var cEl = document.getElementById('st-combo');
-    if (!cEl) return;
-    if (_stCombo >= 2) {
-      cEl.textContent = 'Combo x' + _stCombo;
-      cEl.style.display = '';
-      cEl.classList.remove('st-combo-pulse'); void cEl.offsetWidth; cEl.classList.add('st-combo-pulse');
-    } else {
-      cEl.style.display = 'none';
-    }
-  }
-
-  // Mostra o slot de "Tempo" ou "Vidas" conforme o modo, e atualiza o valor.
-  function _stAtualizarSlotTempoVidas() {
-    var labelEl = document.getElementById('st-slot-label');
-    var valEl = document.getElementById('st-tempo');
-    if (_stModo === 'sobrevivencia') {
-      if (labelEl) labelEl.textContent = 'Vidas';
-      if (valEl) {
-        var cheias = '', vazias = '';
-        for (var i = 0; i < _stVidas; i++) cheias += '❤️';
-        for (var j = 0; j < (_ST_VIDAS - _stVidas); j++) vazias += '🖤';
-        valEl.innerHTML = '<span class="st-vidas">' + cheias + vazias + '</span>';
-        valEl.classList.remove('st-tempo-baixo');
-      }
-    } else {
-      if (labelEl) labelEl.textContent = 'Tempo';
-      if (valEl) valEl.textContent = _stTempo;
-    }
-  }
-
-  // Prepara a tela (estado inicial, mostra recorde). Não inicia o jogo ainda.
-  function _stPreparar() {
-    _stParar();
-    var recEl = document.getElementById('st-recorde');
-    if (recEl) recEl.textContent = _stRecordeGet();
-    var pEl = document.getElementById('st-pontos'); if (pEl) pEl.textContent = '0';
-    var labelEl = document.getElementById('st-slot-label'); if (labelEl) labelEl.textContent = 'Tempo';
-    var tEl = document.getElementById('st-tempo');  if (tEl) { tEl.textContent = _ST_DURACAO; tEl.classList.remove('st-tempo-baixo'); }
-    var nEl = document.getElementById('st-nivel');  if (nEl) nEl.textContent = '1';
-    var cEl = document.getElementById('st-combo');  if (cEl) cEl.style.display = 'none';
-    var inicio = document.getElementById('st-inicio');
-    var fim = document.getElementById('st-fim');
-    if (inicio) inicio.style.display = 'flex';
-    if (fim) fim.style.display = 'none';
-    var arena = document.getElementById('st-arena');
-    if (arena) { var a = arena.querySelector('.st-alvo'); if (a) a.remove(); }
-  }
-
-  // Para tudo (timers, alvo). Seguro chamar a qualquer momento.
-  function _stParar() {
-    _stRodando = false;
-    if (_stTimerRelogio) { clearInterval(_stTimerRelogio); _stTimerRelogio = null; }
-    if (_stTimerCiclo)   { clearTimeout(_stTimerCiclo);   _stTimerCiclo = null; }
-    var arena = document.getElementById('st-arena');
-    if (arena) { var a = arena.querySelector('.st-alvo'); if (a) a.remove(); }
-  }
-
-  // Posiciona a coruja-alvo num ponto aleatório da arena.
-  function _stPosicionar(alvo, arena, tamanho) {
-    var w = arena.clientWidth, h = arena.clientHeight;
-    var margem = tamanho * 0.7 + 8;
-    var x = margem + Math.random() * Math.max(1, (w - margem * 2));
-    var y = margem + Math.random() * Math.max(1, (h - margem * 2));
-    alvo.style.left = x + 'px';
-    alvo.style.top = y + 'px';
-  }
-
-  // Decide o tipo da próxima coruja e a mostra. Chamado em ciclo.
-  function _stProximaCoruja() {
-    if (!_stRodando) return;
-    var arena = document.getElementById('st-arena');
-    if (!arena) return;
-    var cfg = _stNivelCfg(_stNivel);
-
-    // Remove a anterior.
-    var antiga = arena.querySelector('.st-alvo');
-    if (antiga) antiga.remove();
-
-    // Sorteia o tipo: bônus > fake > boa.
-    var r = Math.random();
-    var tipo = 'boa';
-    if (r < cfg.chanceBonus) tipo = 'bonus';
-    else if (r < cfg.chanceBonus + cfg.chanceFake) tipo = 'fake';
-
-    var alvo = document.createElement('button');
-    alvo.type = 'button';
-    alvo.className = 'st-alvo st-' + tipo;
-    alvo.style.width = cfg.tamanho + 'px';
-    alvo.style.height = cfg.tamanho + 'px';
-    var img = document.createElement('img');
-    img.src = tipo === 'fake' ? _ST_FAKE : (tipo === 'bonus' ? _ST_BONUS : _ST_OWL);
-    img.alt = 'coruja';
-    img.onerror = function(){ this.style.visibility = 'hidden'; };
-    alvo.appendChild(img);
-    arena.appendChild(alvo);
-    _stPosicionar(alvo, arena, cfg.tamanho);
-
-    alvo.addEventListener('click', function(){
-      if (!_stRodando) return;
-      _stTocarCoruja(tipo, alvo, arena);
-    });
-
-    // Agenda a próxima troca. Se o jogador não tocar, a coruja "some" e troca.
-    _stTimerCiclo = setTimeout(function(){
-      // Perder a coruja boa por inação zera o combo (mas não tira ponto).
-      if (tipo === 'boa') { _stCombo = 0; _stComboMostrar(); }
-      _stProximaCoruja();
-    }, cfg.intervalo);
-  }
-
-  // Trata o toque conforme o tipo de coruja.
-  function _stTocarCoruja(tipo, alvo, arena) {
-    var pEl = document.getElementById('st-pontos');
-
-    if (tipo === 'fake') {
-      if (_stModo === 'sobrevivencia') {
-        // Perde 1 vida. Combo zera. Se acabaram as vidas, fim de jogo.
-        _stVidas = Math.max(0, _stVidas - 1);
-        _stCombo = 0;
-        _stComboMostrar();
-        _stAtualizarSlotTempoVidas();
-        _stFlutuante('-1 ❤️', alvo, arena, 'st-menos');
-        if (navigator.vibrate) { try { navigator.vibrate(160); } catch(e) {} }
-        var arS = document.getElementById('st-arena');
-        if (arS) { arS.classList.remove('st-shake'); void arS.offsetWidth; arS.classList.add('st-shake'); }
-        if (_stTimerCiclo) { clearTimeout(_stTimerCiclo); _stTimerCiclo = null; }
-        if (_stVidas <= 0) { _stFim(); return; }
-        _stProximaCoruja();
-        return;
-      }
-      // Modo clássico: tocou na errada, perde 2 pontos, zera combo, treme.
-      _stPontos = Math.max(0, _stPontos - 2);
-      _stCombo = 0;
-      if (pEl) pEl.textContent = _stPontos;
-      _stComboMostrar();
-      _stFlutuante('-2', alvo, arena, 'st-menos');
-      if (navigator.vibrate) { try { navigator.vibrate(120); } catch(e) {} }
-      var ar = document.getElementById('st-arena');
-      if (ar) { ar.classList.remove('st-shake'); void ar.offsetWidth; ar.classList.add('st-shake'); }
-      if (_stTimerCiclo) { clearTimeout(_stTimerCiclo); _stTimerCiclo = null; }
-      _stProximaCoruja();
-      return;
-    }
-
-    // Coruja boa ou bônus: pontua com multiplicador de combo.
-    _stCombo++;
-    if (_stCombo > _stComboMax) _stComboMax = _stCombo;
-    _stAcertos++;
-    var mult = _stCombo >= 6 ? 3 : (_stCombo >= 3 ? 2 : 1);
-    var base = tipo === 'bonus' ? 5 : 1;
-    var ganho = base * mult;
-    _stPontos += ganho;
-    if (pEl) pEl.textContent = _stPontos;
-
-    _stComboMostrar();
-    _stFlutuante('+' + ganho, alvo, arena, tipo === 'bonus' ? 'st-bonus-txt' : (mult > 1 ? 'st-mult-txt' : ''));
-    if (navigator.vibrate) { try { navigator.vibrate(tipo === 'bonus' ? [15,30,15] : 15); } catch(e) {} }
-    alvo.classList.remove('st-pop'); void alvo.offsetWidth; alvo.classList.add('st-pop');
-
-    _stAtualizarNivel();
-    if (_stTimerCiclo) { clearTimeout(_stTimerCiclo); _stTimerCiclo = null; }
-    _stProximaCoruja();
-  }
-
-  // Badge de texto flutuante (+N / -N) na posição da coruja.
-  function _stFlutuante(txt, alvo, arena, classe) {
-    var el = document.createElement('div');
-    el.className = 'st-mais' + (classe ? ' ' + classe : '');
-    el.textContent = txt;
-    el.style.left = alvo.style.left; el.style.top = alvo.style.top;
-    arena.appendChild(el);
-    setTimeout(function(){ if (el.parentNode) el.remove(); }, 600);
-  }
-
-  function _stComecar(modo) {
-    var arena = document.getElementById('st-arena');
-    if (!arena) return;
-    _stParar();
-    // Define o modo (default: mantém o atual, ou clássico se indefinido).
-    if (modo === 'classico' || modo === 'sobrevivencia') _stModo = modo;
-    _stPontos = 0; _stCombo = 0; _stComboMax = 0;
-    _stNivel = 1; _stAcertos = 0;
-    _stVidas = _ST_VIDAS;
-    _stTempo = _ST_DURACAO;
-    var pEl = document.getElementById('st-pontos'); if (pEl) pEl.textContent = '0';
-    var nEl = document.getElementById('st-nivel');  if (nEl) nEl.textContent = '1';
-    var cEl = document.getElementById('st-combo');  if (cEl) cEl.style.display = 'none';
-    _stAtualizarSlotTempoVidas();
-    var inicio = document.getElementById('st-inicio'); if (inicio) inicio.style.display = 'none';
-    var fim = document.getElementById('st-fim'); if (fim) fim.style.display = 'none';
-    var recEl = document.getElementById('st-recorde');
-    if (recEl) { recEl.textContent = _stRecordeGet(); recEl.classList.remove('st-recorde-novo'); }
-
-    _stRodando = true;
-    _stProximaCoruja();
-
-    // Contagem regressiva só no modo clássico. Sobrevivência não tem relógio.
-    if (_stModo === 'classico') {
-      var tEl = document.getElementById('st-tempo');
-      _stTimerRelogio = setInterval(function(){
-        _stTempo--;
-        if (tEl) tEl.textContent = _stTempo;
-        if (_stTempo <= 5 && tEl) { tEl.classList.add('st-tempo-baixo'); }
-        if (_stTempo <= 0) { _stFim(); }
-      }, 1000);
-    }
-  }
-
-  function _stFim() {
-    _stRodando = false;
-    if (_stTimerRelogio) { clearInterval(_stTimerRelogio); _stTimerRelogio = null; }
-    if (_stTimerCiclo)   { clearTimeout(_stTimerCiclo);   _stTimerCiclo = null; }
-    var arena = document.getElementById('st-arena');
-    if (arena) { var a = arena.querySelector('.st-alvo'); if (a) a.remove(); }
-    var tEl = document.getElementById('st-tempo'); if (tEl) tEl.classList.remove('st-tempo-baixo');
-    var cEl = document.getElementById('st-combo'); if (cEl) cEl.style.display = 'none';
-
-    var rec = _stRecordeGet();
-    var bateuRecorde = _stPontos > rec;
-    if (bateuRecorde) { _stRecordeSet(_stPontos); }
-    // Ranking: submete ao Firestore (se logado). Modo define a coleção.
-    if (typeof rankSubmeter === 'function') {
-      rankSubmeter(_stModo === 'sobrevivencia' ? 'pegacoruja_surv' : 'pegacoruja', _stPontos);
-    }
-
-    var fim = document.getElementById('st-fim');
-    var fimOwl = document.getElementById('st-fim-owl');
-    var fimPontos = document.getElementById('st-fim-pontos');
-    var fimMsg = document.getElementById('st-fim-msg');
-    var recEl = document.getElementById('st-recorde');
-    if (recEl) recEl.textContent = _stRecordeGet();
-
-    if (fimOwl) {
-      fimOwl.src = bateuRecorde ? '/webp/owl-celebrate-pro.webp' : '/webp/owl-thumbsup.webp';
-      fimOwl.style.display = '';
-    }
-    if (fimPontos) fimPontos.innerHTML = '<b>' + _stPontos + '</b> ' + (_stPontos === 1 ? 'ponto' : 'pontos');
-    if (fimMsg) {
-      var extra = _stComboMax >= 3 ? ' (combo máx. x' + _stComboMax + ')' : '';
-      if (_stModo === 'sobrevivencia') {
-        if (bateuRecorde) fimMsg.textContent = 'Novo recorde de sobrevivência! 🏆' + extra;
-        else if (_stPontos >= 30) fimMsg.textContent = 'Resistiu bravamente! 🛡️' + extra;
-        else fimMsg.textContent = 'As corujas bravas venceram dessa vez! 😠' + extra;
-      } else {
-        if (bateuRecorde) fimMsg.textContent = 'Novo recorde! Você é rápido! 🏆' + extra;
-        else if (_stPontos >= 40) fimMsg.textContent = 'Mandou muito bem! 🔥' + extra;
-        else fimMsg.textContent = 'Boa! Tenta de novo pra bater o recorde! 🦉' + extra;
-      }
-    }
-    if (bateuRecorde && recEl) recEl.classList.add('st-recorde-novo');
-    if (fim) fim.style.display = 'flex';
-    if (typeof rankFimDeJogo === 'function') rankFimDeJogo(_stModo === 'sobrevivencia' ? 'pegacoruja_surv' : 'pegacoruja', 'st-rank-slot', _stPontos);
-  }
-
-  window._stComecar = _stComecar;
-
-  /* -- Sequência da Coruja (estilo Simon/Genius) -- */
-  var _SQ_CORES = ['#a855f7', '#f59e0b', '#4ade80', '#3b82f6']; // 4 corujas
-  var _sqSeq = [];          // sequência sorteada
-  var _sqPasso = 0;         // posição atual na repetição do jogador
-  var _sqRodada = 0;        // rodada atual = tamanho da sequência
-  var _sqAceitando = false; // true quando é a vez do jogador
-  var _sqTocando = false;   // true durante o playback
-  var _sqTimers = [];       // timeouts do playback (pra limpar)
-
-  function _sqRecordeGet() {
-    try { return Number(localStorage.getItem('angatuba_seq_rec')) || 0; } catch(e) { return 0; }
-  }
-  function _sqRecordeSet(v) {
-    try { localStorage.setItem('angatuba_seq_rec', String(v)); } catch(e) {}
-  }
-
-  function _sqLimparTimers() {
-    for (var i = 0; i < _sqTimers.length; i++) clearTimeout(_sqTimers[i]);
-    _sqTimers = [];
-  }
-
-  // Quantas corujas ficam ativas conforme a rodada. Começa com 4 (grade 2x2)
-  // e expande para 6 (grade 3x2) a partir da rodada 6, deixando o jogo mais
-  // difícil naturalmente para quem avança.
-  function _sqCorujasAtivas(rodada) {
-    return rodada >= 6 ? 6 : 4;
-  }
-
-  // Mostra/esconde os 2 botões extras e ajusta a grade (2x2 <-> 3x2).
-  function _sqAjustarGrade(ativas) {
-    var grade = document.getElementById('sq-grade');
-    if (!grade) return;
-    grade.classList.toggle('sq-grade-6', ativas === 6);
-    var btns = grade.querySelectorAll('.sq-btn');
-    for (var i = 0; i < btns.length; i++) {
-      btns[i].style.display = (i < ativas) ? '' : 'none';
-    }
-  }
-
-  // Apaga a luz de TODAS as corujas (evita botão aceso preso ao reiniciar).
-  function _sqApagarTodos() {
-    var grade = document.getElementById('sq-grade');
-    if (!grade) return;
-    var btns = grade.querySelectorAll('.sq-btn');
-    for (var i = 0; i < btns.length; i++) btns[i].classList.remove('sq-on');
-  }
-
-  function _sqPreparar() {
-    _sqLimparTimers();
-    _sqApagarTodos();
-    _sqAjustarGrade(4); // sempre começa com 4 corujas (2x2)
-    _sqSeq = []; _sqPasso = 0; _sqRodada = 0;
-    _sqAceitando = false; _sqTocando = false;
-    var rEl = document.getElementById('sq-rodada'); if (rEl) rEl.textContent = '0';
-    var recEl = document.getElementById('sq-recorde'); if (recEl) recEl.textContent = _sqRecordeGet();
-    var inicio = document.getElementById('sq-inicio'); if (inicio) inicio.style.display = 'flex';
-    var fim = document.getElementById('sq-fim'); if (fim) fim.style.display = 'none';
-    var st = document.getElementById('sq-status'); if (st) st.textContent = 'Memorize a sequência!';
-  }
-
-  function _sqBotoes() {
-    var grade = document.getElementById('sq-grade');
-    if (!grade) return [];
-    return grade.querySelectorAll('.sq-btn');
-  }
-
-  // Acende uma coruja (visual + vibração leve).
-  function _sqAcender(idx, dur) {
-    var btns = _sqBotoes();
-    if (!btns[idx]) return;
-    var b = btns[idx];
-    b.classList.add('sq-on');
-    if (navigator.vibrate) { try { navigator.vibrate(12); } catch(e) {} }
-    var t = setTimeout(function(){ b.classList.remove('sq-on'); }, dur || 380);
-    _sqTimers.push(t);
-  }
-
-  // Toca a sequência inteira pro jogador ver.
-  function _sqPlayback() {
-    _sqAceitando = false;
-    _sqTocando = true;
-    _sqApagarTodos();
-    var st = document.getElementById('sq-status');
-    if (st) st.textContent = 'Observe… 👀';
-    _sqLimparTimers();
-
-    // velocidade aumenta levemente conforme avança
-    var vel = Math.max(320, 620 - _sqRodada * 25);
-    var i = 0;
-    function passo() {
-      if (i >= _sqSeq.length) {
-        // fim do playback: passa a vez ao jogador
-        var t = setTimeout(function(){
-          _sqTocando = false;
-          _sqAceitando = true;
-          _sqPasso = 0;
-          if (st) st.textContent = 'Sua vez! Repita 🦉';
-        }, 250);
-        _sqTimers.push(t);
-        return;
-      }
-      _sqAcender(_sqSeq[i], vel * 0.6);
-      i++;
-      var t = setTimeout(passo, vel);
-      _sqTimers.push(t);
-    }
-    passo();
-  }
-
-  // Avança pra próxima rodada: adiciona 1 coruja e toca o playback.
-  function _sqProximaRodada() {
-    _sqRodada++;
-    var rEl = document.getElementById('sq-rodada');
-    if (rEl) {
-      rEl.textContent = _sqRodada;
-      rEl.classList.remove('sq-rodada-up'); void rEl.offsetWidth; rEl.classList.add('sq-rodada-up');
-    }
-
-    // Ajusta quantas corujas estão em jogo. Se acabou de expandir para 6,
-    // mostra um aviso pra pessoa notar as novas corujas.
-    var ativas = _sqCorujasAtivas(_sqRodada);
-    var antesAtivas = _sqCorujasAtivas(_sqRodada - 1);
-    _sqAjustarGrade(ativas);
-    if (ativas > antesAtivas) {
-      var st = document.getElementById('sq-status');
-      if (st) st.textContent = 'Mais corujas! Agora são ' + ativas + ' 🔥';
-      var grade = document.getElementById('sq-grade');
-      if (grade) { grade.classList.remove('sq-expandiu'); void grade.offsetWidth; grade.classList.add('sq-expandiu'); }
-      if (navigator.vibrate) { try { navigator.vibrate([30, 50, 30]); } catch(e) {} }
-    }
-
-    _sqSeq.push(Math.floor(Math.random() * ativas));
-    // Dá um tempinho a mais na rodada que expande, pra pessoa perceber.
-    var espera = (ativas > antesAtivas) ? 1100 : 600;
-    var t = setTimeout(_sqPlayback, espera);
-    _sqTimers.push(t);
-  }
-
-  // Jogador tocou numa coruja.
-  function _sqTocar(idx) {
-    if (!_sqAceitando) return;
-    _sqAcender(idx, 260);
-
-    if (idx === _sqSeq[_sqPasso]) {
-      // acertou este passo
-      _sqPasso++;
-      if (_sqPasso >= _sqSeq.length) {
-        // completou a rodada!
-        _sqAceitando = false;
-        var st = document.getElementById('sq-status');
-        if (st) st.textContent = 'Acertou! 🎉';
-        if (navigator.vibrate) { try { navigator.vibrate([15, 40, 15]); } catch(e) {} }
-        var t = setTimeout(_sqProximaRodada, 700);
-        _sqTimers.push(t);
-      }
-    } else {
-      // errou: fim de jogo
-      _sqErrou();
-    }
-  }
-
-  function _sqErrou() {
-    _sqAceitando = false;
-    _sqTocando = false;
-    _sqLimparTimers();
-    _sqApagarTodos();
-    if (navigator.vibrate) { try { navigator.vibrate(200); } catch(e) {} }
-    var grade = document.getElementById('sq-grade');
-    if (grade) { grade.classList.remove('sq-erro'); void grade.offsetWidth; grade.classList.add('sq-erro'); }
-
-    // a rodada alcançada é _sqRodada; pontuação = rodadas completas = _sqRodada - 1
-    var alcancado = _sqRodada - 1;
-    var rec = _sqRecordeGet();
-    var bateu = alcancado > rec;
-    if (bateu) _sqRecordeSet(alcancado);
-    if (typeof rankSubmeter === 'function') rankSubmeter('sequencia', alcancado);
-
-    var recEl = document.getElementById('sq-recorde');
-    if (recEl) recEl.textContent = _sqRecordeGet();
-
-    var fim = document.getElementById('sq-fim');
-    var fimOwl = document.getElementById('sq-fim-owl');
-    var fimTit = document.getElementById('sq-fim-titulo');
-    var fimMsg = document.getElementById('sq-fim-msg');
-    if (fimOwl) {
-      fimOwl.src = bateu ? '/webp/owl-celebrate-pro.webp' : '/webp/owl-thumbsup.webp';
-      fimOwl.style.display = '';
-    }
-    if (fimTit) fimTit.textContent = bateu ? 'Novo recorde! 🏆' : 'Ops! Errou 🦉';
-    if (fimMsg) {
-      if (alcancado <= 0) fimMsg.textContent = 'Você chegou na rodada 1. Bora tentar de novo!';
-      else fimMsg.textContent = 'Você memorizou ' + alcancado + (alcancado === 1 ? ' rodada' : ' rodadas') + '!' + (bateu ? ' Melhor marca!' : '');
-    }
-    var st = document.getElementById('sq-status');
-    if (st) st.textContent = 'Fim de jogo';
-    var t = setTimeout(function(){
-      if (fim) fim.style.display = 'flex';
-      if (typeof rankFimDeJogo === 'function') rankFimDeJogo('sequencia', 'sq-rank-slot', alcancado);
-    }, 500);
-    _sqTimers.push(t);
-  }
-
-  function _sqComecar() {
-    _sqLimparTimers();
-    _sqApagarTodos();
-    _sqSeq = []; _sqPasso = 0; _sqRodada = 0;
-    _sqAceitando = false; _sqTocando = false;
-    var inicio = document.getElementById('sq-inicio'); if (inicio) inicio.style.display = 'none';
-    var fim = document.getElementById('sq-fim'); if (fim) fim.style.display = 'none';
-    var recEl = document.getElementById('sq-recorde'); if (recEl) recEl.textContent = _sqRecordeGet();
-    _sqProximaRodada();
-  }
-
-  // Liga os cliques nos botões uma única vez (delegação simples).
-  function _sqLigarBotoes() {
-    var grade = document.getElementById('sq-grade');
-    if (!grade || grade._sqLigado) return;
-    grade._sqLigado = true;
-    var btns = grade.querySelectorAll('.sq-btn');
-    for (var i = 0; i < btns.length; i++) {
-      (function(b){
-        b.addEventListener('click', function(){
-          var idx = Number(b.getAttribute('data-idx'));
-          _sqTocar(idx);
-        });
-      })(btns[i]);
-    }
-  }
-
-  window._sqComecar = _sqComecar;
 
   /* ── Máscara de WhatsApp progressiva: (15) 9 9999-9999 ──────────
      Fonte única usada tanto no cadastro quanto no login de loja. */

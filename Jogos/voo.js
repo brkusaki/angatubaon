@@ -20,6 +20,81 @@
   ══════════════════════════════════════════════════════════════ */
   var _VOO_OWL_SRC = '/webp/owl-flying.webp';
   var _vooImg = null, _vooImgOk = false, _vooImgRatio = 1;   // ratio = h/w
+
+  /* ══════════════════════════════════════════════════════════════
+     SISTEMA DE ASSETS (plataformas + decoração de fundo)
+     — Cada asset é OPCIONAL: se o arquivo não existe/falha, o jogo
+       degrada pro desenho vetorial (fallback). Assim dá pra ir
+       criando as imagens aos poucos e elas "acendem" sozinhas.
+     — Base dos assets: /Jogos/assets/ (pasta com J maiúsculo; o
+       GitHub Pages é case-sensitive). O SW faz cache-first de
+       imagens do próprio domínio, então cada asset é cacheado no
+       1º fetch sem precisar listar no precache.
+     — Plataformas: matriz TIPO × FAIXA de altitude. Faixas:
+       'ceu' (baixo), 'atm' (atmosfera/meio), 'esp' (espaço).
+       Tipos: 'normal' | 'move' | 'break'. (Trampolim é a mola,
+       desenhada por cima em vetor — continua vetorial.)
+     — Decoração: elementos que cruzam o fundo em parallax, cada um
+       restrito à(s) faixa(s) de altitude onde faz sentido.
+  ══════════════════════════════════════════════════════════════ */
+  var _VOO_ASSET_BASE = '/Jogos/assets/';
+
+  // Cache de imagens já pedidas: nome -> { img, ok }. 'ok' vira true no
+  // onload; se falhar, fica false pra sempre (usa fallback vetorial).
+  var _vooAssets = {};
+
+  // Pede um asset pelo nome de arquivo (idempotente). Não bloqueia nada:
+  // devolve o registro na hora; o desenho checa .ok antes de usar.
+  function _vooAsset(nome) {
+    if (_vooAssets[nome]) return _vooAssets[nome];
+    var reg = { img: null, ok: false, w: 0, h: 0 };
+    _vooAssets[nome] = reg;
+    try {
+      var im = new Image();
+      im.onload = function () {
+        reg.ok = true;
+        reg.w = im.naturalWidth || 0;
+        reg.h = im.naturalHeight || 0;
+      };
+      im.onerror = function () { reg.ok = false; };
+      im.src = _VOO_ASSET_BASE + nome;
+      reg.img = im;
+    } catch (e) { reg.ok = false; }
+    return reg;
+  }
+
+  // Nome do arquivo de plataforma pra (tipo, faixa). Convenção:
+  //   plat-<tipo>-<faixa>.webp   ex.: plat-normal-ceu.webp
+  // Faixa por altitude: <0.4 = ceu, <0.75 = atm, senão = esp.
+  function _vooFaixa(alt) {
+    if (alt < 0.4) return 'ceu';
+    if (alt < 0.75) return 'atm';
+    return 'esp';
+  }
+  function _vooPlatAssetNome(tipo, faixa) {
+    var t = (tipo === 'move' || tipo === 'break') ? tipo : 'normal';
+    return 'plat-' + t + '-' + faixa + '.webp';
+  }
+
+  // ── Registro de DECORAÇÃO de fundo ──────────────────────────
+  // Cada entrada: nome do arquivo, faixa(s) de altitude onde surge
+  // (min/max em 0..1), tamanho relativo à largura (frac de _vooW),
+  // faixa de velocidade horizontal (em frac de _vooW por segundo),
+  // camada de parallax (0 = colado no fundo/lento; 1 = perto/rápido),
+  // e se cruza a tela na horizontal ('cruza') ou paira/gira no lugar
+  // ('flutua', ex.: buraco negro). Tudo puramente decorativo.
+  var _VOO_DECOR = [
+    // Baixa altitude (céu): pássaros e balões/pipas.
+    { nome: 'passaro.webp',    kind: 'passaro', min: 0.00, max: 0.45, tam: 0.10, vmin: 0.10, vmax: 0.22, camada: 0.55, modo: 'cruza' },
+    { nome: 'balao.webp',      kind: 'balao',   min: 0.00, max: 0.40, tam: 0.15, vmin: 0.02, vmax: 0.06, camada: 0.35, modo: 'sobe'  },
+    // Média (atmosfera): aviões.
+    { nome: 'aviao.webp',      kind: 'aviao',   min: 0.30, max: 0.72, tam: 0.22, vmin: 0.16, vmax: 0.30, camada: 0.70, modo: 'cruza' },
+    // Transição/alta: foguetes (sobem).
+    { nome: 'foguete.webp',    kind: 'foguete', min: 0.45, max: 0.90, tam: 0.13, vmin: 0.20, vmax: 0.36, camada: 0.80, modo: 'sobe'  },
+    // Espaço: OVNIs e buracos negros.
+    { nome: 'ovni.webp',       kind: 'ovni',    min: 0.72, max: 1.00, tam: 0.18, vmin: 0.10, vmax: 0.26, camada: 0.60, modo: 'cruza' },
+    { nome: 'buraconegro.webp',kind: 'buraco',  min: 0.80, max: 1.00, tam: 0.34, vmin: 0.00, vmax: 0.00, camada: 0.25, modo: 'flutua'}
+  ];
   var _vooCanvas = null, _vooCtx = null;
   var _vooW = 0, _vooH = 0, _vooDpr = 1;
   var _vooRAF = 0, _vooLast = 0, _vooEstado = 'inicio';       // 'inicio'|'jogando'|'fim'
@@ -35,10 +110,16 @@
   var _vooSquash = 0;           // 0 = neutro; >0 estica (pulo), <0 achata (impacto)
   var _vooTempo = 0;            // relógio do jogo (s) p/ cintilar estrelas/asas
   var _vooAlt = 0;              // altitude normalizada 0→1 (0 = solo, 1 = espaço)
+  var _vooDecor = [];          // objetos decorativos ativos cruzando o fundo
+  var _vooDecorTimer = 0;      // tempo até tentar spawnar o próximo decor (s)
 
   // Altitude de "climb" (px) que corresponde a atingir o espaço (alt=1).
-  // ~2600px de subida — várias telas — pra transição durar a partida toda.
-  function _vooAltMax() { return 26 * _vooH; }
+  // Calibrado pra ser ALCANÇÁVEL numa partida boa: score = climb/H*100,
+  // então alt=1 acontece por volta de score ~420. Assim o gradiente
+  // amanhecer→espaço e as faixas de asset ficam visíveis de verdade
+  // (atmosfera ~score 120, espaço ~score 300), sem exigir um recorde
+  // absurdo. Ajuste fino aqui muda todo o ritmo visual da subida.
+  function _vooAltMax() { return 4.2 * _vooH; }
 
   // Paleta do céu por altitude: amanhecer → dia → crepúsculo → espaço.
   // Cada parada tem cor de topo e de base do gradiente vertical.
@@ -252,6 +333,96 @@
     _vooSquash = 0;
     _vooTempo = 0;
     _vooAlt = 0;
+    _vooDecor = [];
+    _vooDecorTimer = 1.2;      // primeiro decor aparece logo no começo
+
+    // Pré-carrega (best-effort) os assets de plataforma da faixa baixa e
+    // as decorações de céu — os que aparecem primeiro. Os demais são
+    // pedidos sob demanda; o SW cacheia no 1º fetch. Se não existirem,
+    // ficam .ok=false e o jogo usa o fallback vetorial sem travar.
+    _vooAsset(_vooPlatAssetNome('normal', 'ceu'));
+    _vooAsset(_vooPlatAssetNome('move', 'ceu'));
+    _vooAsset(_vooPlatAssetNome('break', 'ceu'));
+  }
+
+  // Atualiza a decoração de fundo: move os objetos ativos e, de tempos
+  // em tempos, tenta spawnar um novo compatível com a altitude atual.
+  // Objetos que saem de cena são descartados. Nada aqui colide com a
+  // coruja — é puramente visual.
+  function _vooAtualizarDecor(dt) {
+    // Move / envelhece os ativos.
+    for (var i = _vooDecor.length - 1; i >= 0; i--) {
+      var d = _vooDecor[i];
+      d.idade += dt;
+      if (d.modo === 'cruza') {
+        d.x += d.vx * dt;                       // atravessa horizontalmente
+      } else if (d.modo === 'sobe') {
+        d.y -= d.vsobe * dt;                    // sobe (foguete/balão)
+        d.x += d.vx * dt;                       // leve deriva lateral
+      } else if (d.modo === 'flutua') {
+        d.giro += dt * 0.4;                     // buraco negro: gira devagar
+      }
+      // Descarte quando sai bem fora da tela (com folga).
+      var margem = d.tam * _vooW;
+      var foraX = (d.x < -margem * 1.5) || (d.x > _vooW + margem * 1.5);
+      var foraY = (d.y < -margem * 1.5) || (d.y > _vooH + margem * 1.5);
+      var venceuFlutua = (d.modo === 'flutua' && d.idade > 9);   // some após um tempo
+      if (foraX || foraY || venceuFlutua) _vooDecor.splice(i, 1);
+    }
+
+    // Spawn temporizado. Ritmo depende de quantos já estão em cena
+    // (limita a poluição visual) e um pouco da altitude.
+    _vooDecorTimer -= dt;
+    if (_vooDecorTimer <= 0 && _vooDecor.length < 3) {
+      _vooDecorTimer = 2.4 + Math.random() * 3.2;   // próximo em ~2.4–5.6s
+      _vooSpawnDecor();
+    }
+  }
+
+  // Cria um objeto decorativo elegível pra altitude atual. Escolhe entre
+  // os candidatos do registro cuja faixa [min,max] contém _vooAlt. Se não
+  // houver candidato (ou o sorteio falhar), simplesmente não faz nada.
+  function _vooSpawnDecor() {
+    var alt = _vooAlt;
+    var cands = [];
+    for (var i = 0; i < _VOO_DECOR.length; i++) {
+      var c = _VOO_DECOR[i];
+      if (alt >= c.min && alt <= c.max) cands.push(c);
+    }
+    if (!cands.length) return;
+    var def = cands[(Math.random() * cands.length) | 0];
+
+    // Pede o asset (idempotente). Mesmo sem ele, criamos o objeto: o
+    // desenho tem fallback vetorial por 'kind'.
+    _vooAsset(def.nome);
+
+    var tam = def.tam;
+    var vel = (def.vmin + Math.random() * (def.vmax - def.vmin)) * _vooW;
+    var d = {
+      def: def, kind: def.kind, nome: def.nome,
+      tam: tam, camada: def.camada, modo: def.modo,
+      idade: 0, giro: 0,
+      x: 0, y: 0, vx: 0, vsobe: 0, dir: 1
+    };
+
+    if (def.modo === 'cruza') {
+      // Entra por um lado, sai pelo outro; y numa faixa média da tela.
+      var daEsq = Math.random() < 0.5;
+      d.dir = daEsq ? 1 : -1;
+      d.vx = vel * d.dir;
+      d.x = daEsq ? -tam * _vooW : _vooW + tam * _vooW;
+      d.y = (0.12 + Math.random() * 0.5) * _vooH;
+    } else if (def.modo === 'sobe') {
+      // Sobe de baixo pra cima; leve deriva.
+      d.x = (0.1 + Math.random() * 0.8) * _vooW;
+      d.y = _vooH + tam * _vooW;
+      d.vsobe = vel;
+      d.vx = (Math.random() - 0.5) * 0.04 * _vooW;
+    } else { // flutua (buraco negro)
+      d.x = (0.2 + Math.random() * 0.6) * _vooW;
+      d.y = (0.15 + Math.random() * 0.45) * _vooH;
+    }
+    _vooDecor.push(d);
   }
 
   function _vooAtualizarScore() {
@@ -357,6 +528,9 @@
     var altAlvo = Math.max(0, Math.min(1, _vooMaxClimb / _vooAltMax()));
     _vooAlt += (altAlvo - _vooAlt) * Math.min(1, dt * 3);
 
+    // Decoração de fundo (spawn + movimento), depende da altitude atual.
+    _vooAtualizarDecor(dt);
+
     // Rastro: registra a posição em coord. de MUNDO (y absoluto), pra
     // desenhar já compensando a câmera. Limita o comprimento.
     _vooTrail.push({ x: o.x, y: o.y });
@@ -373,6 +547,9 @@
     var W = _vooW, H = _vooH;
 
     _vooDesenharCeu(ctx, W, H, _vooAlt);
+
+    // Decoração de fundo (atrás das plataformas e da coruja).
+    _vooDesenharDecor(ctx);
 
     // Coruja por último (sobre tudo).
     var o = _vooOwl;
@@ -446,6 +623,131 @@
     }
   }
 
+  // ── Camada 1.5: decoração de fundo (asset se houver; senão vetor) ──
+  function _vooDesenharDecor(ctx) {
+    for (var i = 0; i < _vooDecor.length; i++) {
+      var d = _vooDecor[i];
+      var w = d.tam * _vooW;
+      var reg = _vooAssets[d.nome];
+      // Fade suave na entrada/saída pra não "piscar" na borda.
+      var op = 1;
+      if (d.idade < 0.6) op = d.idade / 0.6;
+      if (d.modo === 'flutua') {
+        // buraco negro: aparece, fica, some (janela de 9s).
+        var vida = d.idade;
+        op = Math.min(1, vida / 0.8) * Math.min(1, Math.max(0, (9 - vida) / 1.2));
+      }
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, op)) * (0.55 + 0.45 * d.camada);
+      ctx.translate(d.x, d.y);
+      if (reg && reg.ok && reg.img) {
+        // Proporção real do asset; espelha se estiver indo pra esquerda.
+        var ratio = (reg.w > 0 && reg.h > 0) ? reg.h / reg.w : 1;
+        var h = w * ratio;
+        if (d.modo === 'cruza' && d.dir < 0) ctx.scale(-1, 1);
+        if (d.modo === 'flutua') ctx.rotate(d.giro);
+        try { ctx.drawImage(reg.img, -w / 2, -h / 2, w, h); }
+        catch (e) { _vooDecorFallback(ctx, d, w); }
+      } else {
+        if (d.modo === 'cruza' && d.dir < 0) ctx.scale(-1, 1);
+        _vooDecorFallback(ctx, d, w);
+      }
+      ctx.restore();
+    }
+  }
+
+  // Fallback vetorial por tipo de decoração (silhuetas reconhecíveis).
+  // Centrado em (0,0); o caller já aplicou translate/scale/alpha.
+  function _vooDecorFallback(ctx, d, w) {
+    var k = d.kind, h = w;
+    switch (k) {
+      case 'passaro': {
+        // "M" de gaivota (duas curvas).
+        ctx.strokeStyle = 'rgba(40,50,70,0.75)';
+        ctx.lineWidth = Math.max(2, w * 0.06);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.5, 0);
+        ctx.quadraticCurveTo(-w * 0.25, -w * 0.28, 0, 0);
+        ctx.quadraticCurveTo(w * 0.25, -w * 0.28, w * 0.5, 0);
+        ctx.stroke();
+        break;
+      }
+      case 'balao': {
+        // Balão (círculo) + cestinha.
+        var r = w * 0.42;
+        var g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.2, 0, 0, r);
+        g.addColorStop(0, '#ff8fa3'); g.addColorStop(1, '#e23e5c');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0, -r * 0.2, r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = Math.max(1, w * 0.02);
+        ctx.beginPath(); ctx.moveTo(0, -r * 0.2 + r); ctx.lineTo(0, r * 0.55); ctx.stroke();
+        ctx.fillStyle = '#8a5a2b';
+        _vooRoundRect(ctx, -r * 0.22, r * 0.55, r * 0.44, r * 0.3, r * 0.08); ctx.fill();
+        break;
+      }
+      case 'aviao': {
+        // Fuselagem + asas + cauda (silhueta lateral).
+        ctx.fillStyle = 'rgba(214,224,240,0.92)';
+        _vooRoundRect(ctx, -w * 0.5, -h * 0.09, w, h * 0.18, h * 0.09); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.05, 0); ctx.lineTo(w * 0.12, -h * 0.32);
+        ctx.lineTo(w * 0.22, -h * 0.30); ctx.lineTo(w * 0.1, 0); ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.42, 0); ctx.lineTo(-w * 0.52, -h * 0.24);
+        ctx.lineTo(-w * 0.44, -h * 0.24); ctx.lineTo(-w * 0.34, 0); ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'foguete': {
+        // Corpo + bico + aletas + chama.
+        ctx.fillStyle = '#eef2f8';
+        _vooRoundRect(ctx, -w * 0.16, -h * 0.42, w * 0.32, h * 0.7, w * 0.14); ctx.fill();
+        ctx.fillStyle = '#ff5a77';
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.16, -h * 0.32); ctx.lineTo(0, -h * 0.62);
+        ctx.lineTo(w * 0.16, -h * 0.32); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ff9d33';
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.12, h * 0.28); ctx.lineTo(0, h * 0.55);
+        ctx.lineTo(w * 0.12, h * 0.28); ctx.closePath(); ctx.fill();
+        break;
+      }
+      case 'ovni': {
+        // Cúpula + disco + luzes.
+        ctx.fillStyle = 'rgba(120,240,200,0.5)';
+        ctx.beginPath(); ctx.ellipse(0, 0, w * 0.5, h * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#b8c4d8';
+        ctx.beginPath(); ctx.ellipse(0, 0, w * 0.4, h * 0.13, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(180,230,255,0.9)';
+        ctx.beginPath(); ctx.arc(0, -h * 0.06, w * 0.18, Math.PI, 0); ctx.fill();
+        ctx.fillStyle = '#7CF0C8';
+        for (var li = -2; li <= 2; li++) {
+          ctx.beginPath(); ctx.arc(li * w * 0.14, h * 0.02, w * 0.03, 0, Math.PI * 2); ctx.fill();
+        }
+        break;
+      }
+      case 'buraco': {
+        // Disco de acreção: anéis concêntricos + centro preto.
+        var R = w * 0.5;
+        var g2 = ctx.createRadialGradient(0, 0, R * 0.28, 0, 0, R);
+        g2.addColorStop(0, 'rgba(0,0,0,1)');
+        g2.addColorStop(0.42, 'rgba(0,0,0,1)');
+        g2.addColorStop(0.5, 'rgba(150,90,255,0.85)');
+        g2.addColorStop(0.62, 'rgba(90,140,255,0.55)');
+        g2.addColorStop(1, 'rgba(90,140,255,0)');
+        ctx.fillStyle = g2;
+        ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
+      default: {
+        ctx.fillStyle = 'rgba(200,200,220,0.4)';
+        ctx.beginPath(); ctx.arc(0, 0, w * 0.4, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  }
+
   // ── Rastro da coruja: bolinhas que somem (mais recente = maior/opaco) ──
   function _vooDesenharRastro(ctx) {
     var m = _vooTrail.length;
@@ -464,46 +766,83 @@
     ctx.globalAlpha = 1;
   }
 
-  // ── Plataformas: sombra + corpo com highlight superior + brilho neon ──
+  // ── Plataformas: usa asset (tipo × faixa de altitude) se existir;
+  //    senão, desenho vetorial (sombra + corpo + highlight + glow). A
+  //    mola do trampolim é sempre vetorial, por cima. ──
   function _vooDesenharPlataformas(ctx, W, H) {
     var ph = _vooPlatH();
+    var faixa = _vooFaixa(_vooAlt);
     for (var i = 0; i < _vooPlats.length; i++) {
       var p = _vooPlats[i];
       if (p.usada) continue;
       var y = p.y - _vooCamY;
       if (y < -ph * 2 || y > H + ph * 2) continue;
 
-      var corBase, corTopo, corGlow;
-      if (p.tipo === 'move')       { corBase = '#2b7fd6'; corTopo = '#6fc0ff'; corGlow = 'rgba(73,167,255,0.55)'; }
-      else if (p.tipo === 'break') { corBase = '#c46a24'; corTopo = '#ffb066'; corGlow = 'rgba(240,145,62,0.5)'; }
-      else                         { corBase = '#1f9e68'; corTopo = '#54e6a2'; corGlow = 'rgba(47,212,138,0.5)'; }
+      // Tenta o asset da faixa atual pra este tipo.
+      var nome = _vooPlatAssetNome(p.tipo, faixa);
+      var reg = _vooAsset(nome);
+      if (reg && reg.ok && reg.img) {
+        _vooDesenharPlatImg(ctx, p, y, ph, reg);
+      } else {
+        _vooPlatVetor(ctx, p, y, ph);
+      }
 
-      // Sombra projetada (deslocada pra baixo/direita).
-      ctx.fillStyle = 'rgba(0,0,0,0.28)';
-      _vooRoundRect(ctx, p.x + ph * 0.18, y + ph * 0.5, p.w, ph, ph / 2);
-      ctx.fill();
-
-      // Glow neon por trás (mais forte no espaço, onde o fundo é escuro).
-      ctx.save();
-      ctx.shadowColor = corGlow;
-      ctx.shadowBlur = ph * (1.2 + _vooAlt * 2.2);
-      // Corpo (gradiente vertical: topo claro → base).
-      var gP = ctx.createLinearGradient(0, y, 0, y + ph);
-      gP.addColorStop(0, corTopo);
-      gP.addColorStop(1, corBase);
-      _vooRoundRect(ctx, p.x, y, p.w, ph, ph / 2);
-      ctx.fillStyle = gP;
-      ctx.fill();
-      ctx.restore();
-
-      // Faixa de brilho no topo (highlight fininho).
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      _vooRoundRect(ctx, p.x + ph * 0.3, y + ph * 0.16, p.w - ph * 0.6, ph * 0.24, ph * 0.12);
-      ctx.fill();
-
-      // Trampolim: mola vermelha em zigue-zague sobre a plataforma.
+      // Trampolim: mola vermelha por cima (sempre vetorial).
       if (p.boost) _vooDesenharMola(ctx, p, y, ph);
     }
+  }
+
+  // Desenha a plataforma a partir de uma imagem. A imagem é encaixada na
+  // LARGURA da plataforma (p.w); a altura segue o ratio do asset, mas é
+  // "ancorada" pela superfície de colisão (topo da imagem ~ p.y), pra que
+  // a arte possa ter volume abaixo sem bagunçar a física.
+  function _vooDesenharPlatImg(ctx, p, y, ph, reg) {
+    var ratio = (reg.w > 0 && reg.h > 0) ? reg.h / reg.w : 0.4;
+    var iw = p.w * 1.18;                       // leve sangria lateral
+    var ih = iw * ratio;
+    var ix = p.x - (iw - p.w) / 2;
+    // Superfície pisável fica perto do topo da arte (12% de folga).
+    var iy = y - ih * 0.12;
+    ctx.save();
+    // Glow sutil por trás no espaço (destaca a plataforma no fundo escuro).
+    if (_vooAlt > 0.5) {
+      ctx.shadowColor = 'rgba(120,160,255,0.35)';
+      ctx.shadowBlur = ph * (_vooAlt * 2.2);
+    }
+    try { ctx.drawImage(reg.img, ix, iy, iw, ih); }
+    catch (e) { ctx.restore(); _vooPlatVetor(ctx, p, y, ph); return; }
+    ctx.restore();
+  }
+
+  // Desenho vetorial da plataforma (fallback / faixas sem asset).
+  function _vooPlatVetor(ctx, p, y, ph) {
+    var corBase, corTopo, corGlow;
+    if (p.tipo === 'move')       { corBase = '#2b7fd6'; corTopo = '#6fc0ff'; corGlow = 'rgba(73,167,255,0.55)'; }
+    else if (p.tipo === 'break') { corBase = '#c46a24'; corTopo = '#ffb066'; corGlow = 'rgba(240,145,62,0.5)'; }
+    else                         { corBase = '#1f9e68'; corTopo = '#54e6a2'; corGlow = 'rgba(47,212,138,0.5)'; }
+
+    // Sombra projetada (deslocada pra baixo/direita).
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    _vooRoundRect(ctx, p.x + ph * 0.18, y + ph * 0.5, p.w, ph, ph / 2);
+    ctx.fill();
+
+    // Glow neon por trás (mais forte no espaço, onde o fundo é escuro).
+    ctx.save();
+    ctx.shadowColor = corGlow;
+    ctx.shadowBlur = ph * (1.2 + _vooAlt * 2.2);
+    // Corpo (gradiente vertical: topo claro → base).
+    var gP = ctx.createLinearGradient(0, y, 0, y + ph);
+    gP.addColorStop(0, corTopo);
+    gP.addColorStop(1, corBase);
+    _vooRoundRect(ctx, p.x, y, p.w, ph, ph / 2);
+    ctx.fillStyle = gP;
+    ctx.fill();
+    ctx.restore();
+
+    // Faixa de brilho no topo (highlight fininho).
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    _vooRoundRect(ctx, p.x + ph * 0.3, y + ph * 0.16, p.w - ph * 0.6, ph * 0.24, ph * 0.12);
+    ctx.fill();
   }
 
   // Mola do trampolim (desenho vetorial simples, neon vermelho).

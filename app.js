@@ -811,8 +811,70 @@
     document.body.classList.add('games-fs-open');   // trava scroll do body (tela cheia)
     _voltarAoMenu(); // sempre abre mostrando o menu de jogos
     _streakAtualizarFaixa(false); // mostra a ofensiva atual (sem animar)
+    _carregarAssetsJogos();  // som + efeitos (uma vez, sob demanda)
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0,0); }
   }
+
+  /* ── Assets compartilhados dos jogos (som + efeitos visuais) ──
+     Carregados uma única vez quando o hub abre. São leves e
+     usados por vários jogos + pelo botão de som do hub, então não
+     valem um lazy-load por jogo. O SW cacheia no 1º fetch.
+     iOS: o AudioContext só acorda dentro de um gesto; por isso
+     destravamos o áudio no 1º toque em qualquer lugar do hub. */
+  var _assetsJogosCarregados = false;
+  function _carregarAssetsJogos() {
+    if (_assetsJogosCarregados) { _sincronizarBotaoSom(); return; }
+    _assetsJogosCarregados = true;
+    Promise.all([
+      _injetarScript('/Jogos/assets/som.min.js'),
+      _injetarScript('/Jogos/assets/efeitos.min.js')
+    ]).then(function () {
+      _sincronizarBotaoSom();
+    }).catch(function () { /* silencioso: jogos funcionam sem som */ });
+    _ligarDestravarAudio();
+  }
+
+  // Destrava o áudio no primeiro gesto do usuário dentro do hub.
+  // Um único listener 'once' basta (o AudioContext fica acordado
+  // depois disso na sessão).
+  function _ligarDestravarAudio() {
+    var hub = document.getElementById('games-hub');
+    if (!hub || hub._audioLig) return;
+    hub._audioLig = true;
+    var destravar = function () {
+      if (window.AngatubaSom && typeof window.AngatubaSom._destravar === 'function') {
+        window.AngatubaSom._destravar();
+      }
+    };
+    hub.addEventListener('pointerdown', destravar);
+    hub.addEventListener('touchstart', destravar, { passive: true });
+  }
+
+  // Atualiza o ícone/estado do botão de som do hub conforme a
+  // preferência atual. Chamado ao carregar os assets e ao alternar.
+  function _sincronizarBotaoSom() {
+    var btn = document.getElementById('games-som-btn');
+    if (!btn) return;
+    var ativo = !!(window.AngatubaSom && window.AngatubaSom.ativo());
+    var ic = btn.querySelector('i');
+    if (ic) ic.className = ativo ? 'fa fa-volume-high' : 'fa fa-volume-xmark';
+    btn.setAttribute('aria-label', ativo ? 'Desligar som dos jogos' : 'Ligar som dos jogos');
+    btn.setAttribute('title', ativo ? 'Som ligado' : 'Som desligado');
+    btn.classList.toggle('games-som-off', !ativo);
+  }
+
+  // Liga/desliga o som dos jogos (botão do hub). Toca um bip curto
+  // ao LIGAR pra dar retorno imediato (e já destrava dentro do gesto).
+  function _alternarSomJogos() {
+    if (!window.AngatubaSom) return;
+    var agoraAtivo = window.AngatubaSom.alternar();
+    _sincronizarBotaoSom();
+    if (agoraAtivo && typeof window.AngatubaSom.toque === 'function') {
+      window.AngatubaSom._destravar();
+      window.AngatubaSom.toque();
+    }
+  }
+  window._alternarSomJogos = _alternarSomJogos;
 
   function _fecharGamesHub() {
     _pararJogosExternos(); // para Speed Tap / Sequência / Voo se estavam rodando
@@ -15186,5 +15248,38 @@ ${urlCard}`)}`;
       if (typeof _voltarAoMenu === 'function') return _voltarAoMenu();
     },
     // Caminho base dos assets de jogos (imagens, sons).
-    assetsBase: '/Jogos/assets/'
+    assetsBase: '/Jogos/assets/',
+
+    // ── Som (Web Audio sintetizado) ─────────────────────────
+    // Fachada segura: se o módulo de som ainda não carregou (ou
+    // o usuário deixou mudo), cada chamada vira no-op. Assim os
+    // jogos chamam som.acerto() etc. sem checar existência.
+    som: (function () {
+      function chamar(m, args) {
+        var S = window.AngatubaSom;
+        if (S && typeof S[m] === 'function') { try { return S[m].apply(S, args); } catch (e) {} }
+      }
+      return {
+        toque:   function ()   { return chamar('toque', []); },
+        acerto:  function ()   { return chamar('acerto', []); },
+        combo:   function (n)  { return chamar('combo', [n]); },
+        bonus:   function ()   { return chamar('bonus', []); },
+        erro:    function ()   { return chamar('erro', []); },
+        dano:    function ()   { return chamar('dano', []); },
+        nota:    function (i)  { return chamar('nota', [i]); },
+        nivelUp: function ()   { return chamar('nivelUp', []); },
+        pulo:    function ()   { return chamar('pulo', []); },
+        mola:    function ()   { return chamar('mola', []); },
+        fim:     function (v)  { return chamar('fim', [v]); },
+        ativo:   function ()   { var S = window.AngatubaSom; return S ? S.ativo() : false; }
+      };
+    })(),
+
+    // ── Efeitos visuais (partículas em canvas) ──────────────
+    // Mesma fachada segura: no-op se o módulo não carregou.
+    efeitos: {
+      confete:  function (alvo, qtd) { var E = window.AngatubaEfeitos; if (E) { try { E.confete(alvo, qtd); } catch (e) {} } },
+      estrelas: function (x, y, qtd) { var E = window.AngatubaEfeitos; if (E) { try { E.estrelas(x, y, qtd); } catch (e) {} } },
+      brilho:   function (alvo)      { var E = window.AngatubaEfeitos; if (E) { try { E.brilho(alvo); } catch (e) {} } }
+    }
   };

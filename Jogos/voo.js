@@ -30,6 +30,50 @@
   var _vooMaxClimb = 0, _vooScore = 0, _vooScoreShown = -1;
   var _vooDragging = false, _vooLastPX = 0, _vooKeyDir = 0;
   var _vooNuvens = [];
+  var _vooEstrelas = [];        // campo de estrelas (parallax lento, surge na subida)
+  var _vooTrail = [];           // rastro da coruja (posições recentes p/ fade)
+  var _vooSquash = 0;           // 0 = neutro; >0 estica (pulo), <0 achata (impacto)
+  var _vooTempo = 0;            // relógio do jogo (s) p/ cintilar estrelas/asas
+  var _vooAlt = 0;              // altitude normalizada 0→1 (0 = solo, 1 = espaço)
+
+  // Altitude de "climb" (px) que corresponde a atingir o espaço (alt=1).
+  // ~2600px de subida — várias telas — pra transição durar a partida toda.
+  function _vooAltMax() { return 26 * _vooH; }
+
+  // Paleta do céu por altitude: amanhecer → dia → crepúsculo → espaço.
+  // Cada parada tem cor de topo e de base do gradiente vertical.
+  var _VOO_CEU = [
+    { a: 0.00, topo: [255, 176, 122], base: [255, 214, 170] }, // amanhecer quente
+    { a: 0.22, topo: [122, 178, 240], base: [196, 224, 255] }, // dia claro
+    { a: 0.52, topo: [ 74,  96, 176], base: [138, 120, 210] }, // fim de tarde / roxo
+    { a: 0.78, topo: [ 26,  30,  68], base: [ 58,  40, 104] }, // crepúsculo profundo
+    { a: 1.00, topo: [  5,   7,  18], base: [ 14,  18,  40] }  // espaço
+  ];
+
+  // Interpola a paleta do céu para uma altitude 'a' (0→1), devolvendo
+  // [topoRGB, baseRGB]. Clampa nas pontas.
+  function _vooCorCeu(a) {
+    if (a <= _VOO_CEU[0].a) return [_VOO_CEU[0].topo, _VOO_CEU[0].base];
+    var n = _VOO_CEU.length;
+    if (a >= _VOO_CEU[n - 1].a) return [_VOO_CEU[n - 1].topo, _VOO_CEU[n - 1].base];
+    for (var i = 0; i < n - 1; i++) {
+      var p0 = _VOO_CEU[i], p1 = _VOO_CEU[i + 1];
+      if (a >= p0.a && a <= p1.a) {
+        var t = (a - p0.a) / (p1.a - p0.a);
+        return [_vooMix(p0.topo, p1.topo, t), _vooMix(p0.base, p1.base, t)];
+      }
+    }
+    return [_VOO_CEU[0].topo, _VOO_CEU[0].base];
+  }
+  function _vooMix(c0, c1, t) {
+    return [
+      Math.round(c0[0] + (c1[0] - c0[0]) * t),
+      Math.round(c0[1] + (c1[1] - c0[1]) * t),
+      Math.round(c0[2] + (c1[2] - c0[2]) * t)
+    ];
+  }
+  function _vooRgb(c)      { return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')'; }
+  function _vooRgba(c, a)  { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
 
   function _vooRec() {
     try { return Number(localStorage.getItem('angatuba_voo_rec')) || 0; } catch (e) { return 0; }
@@ -177,15 +221,37 @@
       tAnt = np.tipo;
     }
 
-    // Nuvens de parallax (decorativas).
+    // Nuvens de parallax (decorativas). Guardam uma "faixa" de altitude
+    // própria pra recliclar dentro das camadas baixas do céu.
     _vooNuvens = [];
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < 6; i++) {
       _vooNuvens.push({
         x: Math.random() * _vooW,
-        y: _vooStartY - Math.random() * 2 * _vooH,
-        r: (0.10 + Math.random() * 0.10) * _vooW
+        y: _vooStartY - Math.random() * 3 * _vooH,
+        r: (0.14 + Math.random() * 0.16) * _vooW,
+        op: 0.5 + Math.random() * 0.5
       });
     }
+
+    // Campo de estrelas: coordenadas em espaço de tela (recicladas no
+    // parallax). Só ficam visíveis conforme a altitude sobe. Guardamos
+    // fase de cintilação individual.
+    _vooEstrelas = [];
+    var nEst = 70;
+    for (var s = 0; s < nEst; s++) {
+      _vooEstrelas.push({
+        x: Math.random() * _vooW,
+        y: Math.random() * _vooH,
+        r: 0.5 + Math.random() * 1.6,
+        f: Math.random() * Math.PI * 2,        // fase da cintilação
+        v: 0.15 + Math.random() * 0.5          // camada de parallax (0..~0.65)
+      });
+    }
+
+    _vooTrail = [];
+    _vooSquash = 0;
+    _vooTempo = 0;
+    _vooAlt = 0;
   }
 
   function _vooAtualizarScore() {
@@ -203,12 +269,21 @@
     var o = _vooOwl;
     var g = _vooGrav();
 
+    _vooTempo += dt;
+
     // Movimento horizontal por teclado (desktop); o arraste mexe direto em o.x.
     if (_vooKeyDir !== 0) { o.x += _vooKeyDir * 0.9 * _vooW * dt; }
 
     // Física vertical
     o.vy += g * dt;
     o.y += o.vy * dt;
+
+    // Squash & stretch relaxa suavemente de volta ao neutro (~8/s).
+    if (_vooSquash !== 0) {
+      var relax = _vooSquash * Math.min(1, dt * 8);
+      _vooSquash -= relax;
+      if (Math.abs(_vooSquash) < 0.004) _vooSquash = 0;
+    }
 
     // Wrap horizontal (sai de um lado, entra no outro)
     var hw = _vooOwlW() / 2;
@@ -242,6 +317,21 @@
           // Doodle Jump clássico).
           o.vy = _vooJump() * (pl.boost ? 1.7 : 1);
           o.y = pl.y - owlH / 2;           // encosta em cima
+          // Feedback: achata no impacto e dispara som (mola no trampolim).
+          _vooSquash = pl.boost ? -0.42 : -0.26;
+          if (window.AngatubaGames && window.AngatubaGames.som) {
+            if (pl.boost) window.AngatubaGames.som.mola();
+            else          window.AngatubaGames.som.pulo();
+          }
+          // Faíscas no ponto de contato (trampolim reforça).
+          if (pl.boost && window.AngatubaGames && window.AngatubaGames.efeitos && _vooCanvas) {
+            var rC = _vooCanvas.getBoundingClientRect();
+            window.AngatubaGames.efeitos.estrelas(
+              rC.left + (o.x / _vooW) * rC.width,
+              rC.top + ((pl.y - _vooCamY) / _vooH) * rC.height,
+              10
+            );
+          }
           if (pl.tipo === 'break') pl.usada = true;  // quebra após impulsionar
           break;
         }
@@ -262,6 +352,16 @@
 
     _vooAtualizarScore();
 
+    // Altitude normalizada (0 solo → 1 espaço), suavizada pra transição
+    // de céu não "pinotear" quando a coruja oscila.
+    var altAlvo = Math.max(0, Math.min(1, _vooMaxClimb / _vooAltMax()));
+    _vooAlt += (altAlvo - _vooAlt) * Math.min(1, dt * 3);
+
+    // Rastro: registra a posição em coord. de MUNDO (y absoluto), pra
+    // desenhar já compensando a câmera. Limita o comprimento.
+    _vooTrail.push({ x: o.x, y: o.y });
+    if (_vooTrail.length > 14) _vooTrail.shift();
+
     // Morte: caiu abaixo da tela
     if (o.y - _vooCamY > _vooH + _vooOwlH()) { _vooFim(); return false; }
     return true;
@@ -272,56 +372,184 @@
     if (!ctx) return;
     var W = _vooW, H = _vooH;
 
-    // Fundo (gradiente escuro do tema)
+    _vooDesenharCeu(ctx, W, H, _vooAlt);
+
+    // Coruja por último (sobre tudo).
+    var o = _vooOwl;
+    _vooDesenharRastro(ctx);
+    _vooDesenharPlataformas(ctx, W, H);
+    _vooDesenharCoruja(ctx, o);
+  }
+
+  // ── Camada 1: céu (gradiente por altitude) + astro + estrelas + nuvens ──
+  function _vooDesenharCeu(ctx, W, H, alt) {
+    var par = _vooCorCeu(alt);
+    var topo = par[0], base = par[1];
     var grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, '#0d1420');
-    grad.addColorStop(1, '#131b2b');
+    grad.addColorStop(0, _vooRgb(topo));
+    grad.addColorStop(1, _vooRgb(base));
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    // Nuvens parallax (recicladas conforme sobe)
-    ctx.save();
-    ctx.globalAlpha = 0.06;
-    ctx.fillStyle = '#9fb4d6';
-    for (var n = 0; n < _vooNuvens.length; n++) {
-      var c = _vooNuvens[n];
-      var sy = (c.y - _vooCamY * 0.5);              // metade da velocidade
-      if (sy > H + c.r) { c.y = _vooCamY * 0.5 - c.r - Math.random() * H; c.x = Math.random() * W; }
+    // Sol/lua: um disco que sobe pra fora de cena e esfria de cor
+    // conforme ganhamos altitude (some no espaço). Parallax bem lento.
+    var astroOp = Math.max(0, 1 - alt * 1.7);
+    if (astroOp > 0.02) {
+      var ax = W * 0.74;
+      var ay = H * (0.16 + alt * 0.9);            // desce na tela = sobe no mundo
+      var ar = W * 0.14;
+      var qCor = alt < 0.35
+        ? [255, 236, 180]                          // sol quente (manhã)
+        : _vooMix([255, 236, 180], [214, 224, 255], Math.min(1, (alt - 0.35) / 0.4)); // esfria p/ lua
+      var gA = ctx.createRadialGradient(ax, ay, ar * 0.2, ax, ay, ar * 2.4);
+      gA.addColorStop(0, _vooRgba(qCor, 0.9 * astroOp));
+      gA.addColorStop(0.4, _vooRgba(qCor, 0.35 * astroOp));
+      gA.addColorStop(1, _vooRgba(qCor, 0));
+      ctx.fillStyle = gA;
+      ctx.beginPath(); ctx.arc(ax, ay, ar * 2.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = _vooRgba(qCor, astroOp);
+      ctx.beginPath(); ctx.arc(ax, ay, ar, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Estrelas: aparecem gradualmente (fade-in a partir de ~alt 0.3) com
+    // parallax individual e cintilação suave. Recicladas verticalmente.
+    var estOp = Math.max(0, (alt - 0.28) / 0.55);
+    if (estOp > 0.02) {
+      if (estOp > 1) estOp = 1;
+      for (var s = 0; s < _vooEstrelas.length; s++) {
+        var st = _vooEstrelas[s];
+        var sy = ((st.y - _vooCamY * st.v) % H + H) % H;   // wrap suave
+        var tw = 0.55 + 0.45 * Math.sin(_vooTempo * 2.2 + st.f); // cintila
+        ctx.fillStyle = 'rgba(255,255,255,' + (estOp * tw).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(st.x, sy, st.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Nuvens: densas embaixo, somem conforme sobe (opacidade cai com alt).
+    var nuvOp = Math.max(0, 1 - alt * 1.5);
+    if (nuvOp > 0.02) {
+      for (var n = 0; n < _vooNuvens.length; n++) {
+        var c = _vooNuvens[n];
+        var cy = (c.y - _vooCamY * 0.5);                  // metade da velocidade
+        if (cy > H + c.r) { c.y = _vooCamY * 0.5 - c.r - Math.random() * H; c.x = Math.random() * W; }
+        ctx.globalAlpha = 0.16 * c.op * nuvOp;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(c.x, cy, c.r, 0, Math.PI * 2);
+        ctx.arc(c.x + c.r * 0.7, cy + c.r * 0.15, c.r * 0.72, 0, Math.PI * 2);
+        ctx.arc(c.x - c.r * 0.7, cy + c.r * 0.18, c.r * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ── Rastro da coruja: bolinhas que somem (mais recente = maior/opaco) ──
+  function _vooDesenharRastro(ctx) {
+    var m = _vooTrail.length;
+    if (m < 2) return;
+    var ow = _vooOwlW();
+    for (var i = 0; i < m; i++) {
+      var t = _vooTrail[i];
+      var f = (i + 1) / m;                     // 0→1 (fim = coruja atual)
+      var rr = ow * 0.30 * f;
+      ctx.globalAlpha = 0.30 * f * f;
+      ctx.fillStyle = '#ff3355';
       ctx.beginPath();
-      ctx.arc(c.x, sy, c.r, 0, Math.PI * 2);
-      ctx.arc(c.x + c.r * 0.7, sy + c.r * 0.2, c.r * 0.7, 0, Math.PI * 2);
+      ctx.arc(t.x, t.y - _vooCamY, rr, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
 
-    // Plataformas
+  // ── Plataformas: sombra + corpo com highlight superior + brilho neon ──
+  function _vooDesenharPlataformas(ctx, W, H) {
     var ph = _vooPlatH();
     for (var i = 0; i < _vooPlats.length; i++) {
       var p = _vooPlats[i];
       if (p.usada) continue;
       var y = p.y - _vooCamY;
-      if (y < -ph || y > H + ph) continue;
-      var cor = '#2fd48a';                            // normal: verde-água
-      if (p.tipo === 'move') cor = '#49a7ff';         // móvel: azul
-      else if (p.tipo === 'break') cor = '#f0913e';   // quebrável: laranja
-      _vooRoundRect(ctx, p.x, y, p.w, ph, ph / 2);
-      ctx.fillStyle = cor;
-      ctx.fill();
-      // Trampolim: marquinha neon vermelha
-      if (p.boost) {
-        ctx.fillStyle = '#ff3355';
-        var bw = p.w * 0.34, bx = p.x + (p.w - bw) / 2, by = y - ph * 0.9;
-        _vooRoundRect(ctx, bx, by, bw, ph * 0.9, ph * 0.35);
-        ctx.fill();
-      }
-    }
+      if (y < -ph * 2 || y > H + ph * 2) continue;
 
-    // Coruja
-    var o = _vooOwl;
+      var corBase, corTopo, corGlow;
+      if (p.tipo === 'move')       { corBase = '#2b7fd6'; corTopo = '#6fc0ff'; corGlow = 'rgba(73,167,255,0.55)'; }
+      else if (p.tipo === 'break') { corBase = '#c46a24'; corTopo = '#ffb066'; corGlow = 'rgba(240,145,62,0.5)'; }
+      else                         { corBase = '#1f9e68'; corTopo = '#54e6a2'; corGlow = 'rgba(47,212,138,0.5)'; }
+
+      // Sombra projetada (deslocada pra baixo/direita).
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      _vooRoundRect(ctx, p.x + ph * 0.18, y + ph * 0.5, p.w, ph, ph / 2);
+      ctx.fill();
+
+      // Glow neon por trás (mais forte no espaço, onde o fundo é escuro).
+      ctx.save();
+      ctx.shadowColor = corGlow;
+      ctx.shadowBlur = ph * (1.2 + _vooAlt * 2.2);
+      // Corpo (gradiente vertical: topo claro → base).
+      var gP = ctx.createLinearGradient(0, y, 0, y + ph);
+      gP.addColorStop(0, corTopo);
+      gP.addColorStop(1, corBase);
+      _vooRoundRect(ctx, p.x, y, p.w, ph, ph / 2);
+      ctx.fillStyle = gP;
+      ctx.fill();
+      ctx.restore();
+
+      // Faixa de brilho no topo (highlight fininho).
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      _vooRoundRect(ctx, p.x + ph * 0.3, y + ph * 0.16, p.w - ph * 0.6, ph * 0.24, ph * 0.12);
+      ctx.fill();
+
+      // Trampolim: mola vermelha em zigue-zague sobre a plataforma.
+      if (p.boost) _vooDesenharMola(ctx, p, y, ph);
+    }
+  }
+
+  // Mola do trampolim (desenho vetorial simples, neon vermelho).
+  function _vooDesenharMola(ctx, p, y, ph) {
+    var bw = p.w * 0.30;
+    var bx = p.x + (p.w - bw) / 2;
+    var topY = y - ph * 1.6;
+    ctx.save();
+    ctx.strokeStyle = '#ff3355';
+    ctx.lineWidth = Math.max(2, ph * 0.28);
+    ctx.lineCap = 'round';
+    ctx.shadowColor = 'rgba(255,51,85,0.7)';
+    ctx.shadowBlur = ph * 1.4;
+    ctx.beginPath();
+    ctx.moveTo(bx, y);
+    ctx.lineTo(bx + bw, topY + ph * 1.1);
+    ctx.lineTo(bx, topY + ph * 0.55);
+    ctx.lineTo(bx + bw, topY);
+    ctx.stroke();
+    // Plaquinha no topo da mola.
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ff5a77';
+    _vooRoundRect(ctx, bx - ph * 0.15, topY - ph * 0.5, bw + ph * 0.3, ph * 0.5, ph * 0.2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ── Coruja: rotação pela velocidade + squash & stretch + espelho ──
+  function _vooDesenharCoruja(ctx, o) {
     var ow = _vooOwlW(), oh = _vooOwlH();
+
+    // Inclinação: sobe → nariz p/ cima; cai → mergulha. Mapeia vy.
+    var vNorm = Math.max(-1, Math.min(1, o.vy / (Math.abs(_vooJump()) * 1.1)));
+    var ang = vNorm * 0.28;                 // rad (~16°)
+
+    // Squash: _vooSquash<0 achata (impacto), tende a 0. Converte em escalas
+    // que preservam volume aproximado.
+    var sq = _vooSquash;
+    var sx = 1 - sq * 0.5;                   // impacto (sq<0) → mais largo
+    var sy = 1 + sq * 0.5;                   // impacto (sq<0) → mais baixo
+
     ctx.save();
     ctx.translate(o.x, (o.y - _vooCamY));
     if (o.dir < 0) ctx.scale(-1, 1);
+    ctx.rotate(o.dir < 0 ? -ang : ang);
+    ctx.scale(sx, sy);
     if (_vooImgOk && _vooImg) {
       try { ctx.drawImage(_vooImg, -ow / 2, -oh / 2, ow, oh); }
       catch (e) { _vooDrawFallback(ctx, ow); }
@@ -435,14 +663,22 @@
     }
   }
 
-  // Desenha um quadro parado (fundo + plataformas de amostra) atrás do overlay.
+  // Desenha um quadro parado (céu de amanhecer) atrás do overlay.
   function _vooDrawIdle() {
     if (!_vooCtx) return;
     _vooDimensionar();
     var ctx = _vooCtx, W = _vooW, H = _vooH;
+    var par = _vooCorCeu(0);
     var grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, '#0d1420'); grad.addColorStop(1, '#131b2b');
+    grad.addColorStop(0, _vooRgb(par[0]));
+    grad.addColorStop(1, _vooRgb(par[1]));
     ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+    // Sol quente da manhã, canto superior.
+    var ax = W * 0.74, ay = H * 0.2, ar = W * 0.14, q = [255, 236, 180];
+    var gA = ctx.createRadialGradient(ax, ay, ar * 0.2, ax, ay, ar * 2.4);
+    gA.addColorStop(0, _vooRgba(q, 0.9)); gA.addColorStop(0.4, _vooRgba(q, 0.35)); gA.addColorStop(1, _vooRgba(q, 0));
+    ctx.fillStyle = gA; ctx.beginPath(); ctx.arc(ax, ay, ar * 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = _vooRgba(q, 1); ctx.beginPath(); ctx.arc(ax, ay, ar, 0, Math.PI * 2); ctx.fill();
   }
 
   function _vooComecar() {
@@ -472,6 +708,9 @@
     var recorde = score > rec;
     if (recorde) { _vooRecSet(score); var r = document.getElementById('vo-recorde'); if (r) r.textContent = score; }
 
+    // Som de fim (vitória se bateu recorde, senão neutro).
+    if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.fim(recorde);
+
     // Rank (silencioso se deslogado; o Firestore aplica recorde/teto)
     if (window.AngatubaGames) window.AngatubaGames.rankSubmeter('voo', score);
 
@@ -489,6 +728,11 @@
         : (rec > 0 ? 'Seu recorde: ' + rec + '. Bora de novo?' : 'Arraste pra desviar e suba o máximo que puder!');
     }
     _vooMostrarOverlay('fim');
+
+    // Confete sobre a tela de fim quando bateu recorde.
+    if (recorde && window.AngatubaGames && window.AngatubaGames.efeitos) {
+      window.AngatubaGames.efeitos.confete('vo-fim', 90);
+    }
 
     if (window.AngatubaGames) window.AngatubaGames.rankFimDeJogo('voo', 'vo-rank-slot', score);
   }

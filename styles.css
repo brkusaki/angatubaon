@@ -5354,9 +5354,91 @@ body.games-fs-open .sq-grade { margin: auto 0; }
 #games-hub.jogo-ativo .jogo-voltar { top: 0; }
 body.games-fs-open #games-hub.jogo-ativo .st-hud,
 body.games-fs-open #games-hub.jogo-ativo .sq-hud,
-body.games-fs-open #games-hub.jogo-ativo .rl-hud,
-body.games-fs-open #games-hub.jogo-ativo .vo-hud {
+body.games-fs-open #games-hub.jogo-ativo .rl-hud {
   top: 44px;   /* logo abaixo do botão voltar sticky */
+}
+
+/* ── VOO: arena ocupando a TELA INTEIRA ──────────────────────────
+   O Voo é imersivo: a arena preenche 100% da tela (sem cartão, sem
+   bordas), e o HUD (Altura/Recorde) + botão Voltar viram overlays
+   FLUTUANTES por cima do canvas. Assim o jogo pega tudo e o score
+   aparece dentro do próprio jogo. */
+body.games-fs-open #games-hub.jogo-ativo #jogo-voo {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+}
+/* Card do Voo vira contêiner sem moldura, preenchendo tudo */
+body.games-fs-open #games-hub.jogo-ativo #jogo-voo .vo-card {
+  flex: 1 1 auto;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+/* Arena colada nas quatro bordas: SEM aspect-ratio, SEM max-height */
+body.games-fs-open #games-hub.jogo-ativo #jogo-voo .vo-arena {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  min-height: 0;
+  aspect-ratio: auto;
+  margin: 0;
+  border-radius: 0;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-voo .vo-arena #vo-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* Botão Voltar flutua no canto superior esquerdo, por cima do jogo */
+body.games-fs-open #games-hub.jogo-ativo #jogo-voo .jogo-voltar {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 8px;
+  z-index: 6;
+  margin: 0;
+  padding: 8px 12px;
+  background: rgba(9, 14, 22, 0.55);
+  border-radius: 999px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 13px;
+}
+/* HUD (Altura/Recorde) flutua no topo à direita, compacto e translúcido */
+body.games-fs-open #games-hub.jogo-ativo #jogo-voo .vo-hud {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  right: 10px;
+  left: auto;
+  z-index: 6;
+  margin: 0;
+  padding: 0;
+  gap: 6px;
+  background: transparent;
+  justify-content: flex-end;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-voo .vo-hud-item {
+  background: rgba(9, 14, 22, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 5px 12px;
+  min-width: 0;
+  border-radius: 12px;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-voo .vo-hud-label {
+  font-size: 9px;
+  opacity: 0.85;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-voo .vo-hud-valor {
+  font-size: 17px;
 }
 
 /* Elemento em tela cheia NATIVA (Fullscreen API): o navegador dá 100%

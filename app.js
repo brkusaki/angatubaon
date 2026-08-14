@@ -953,6 +953,19 @@
     if (siga) siga.style.display = '';
   }
 
+  // Sai por completo do hub de jogos e volta pra tela inicial (lista de
+  // lojas). Fecha o hub, desmarca a pill "Joguinhos" e re-renderiza a
+  // lista — o mesmo efeito de clicar de novo na pill, mas acessível de
+  // dentro do próprio hub (botão no topo do menu de jogos).
+  function _sairDosJogos() {
+    _fecharGamesHub();
+    try { document.querySelectorAll('.pill-btn').forEach(function (b) { b.classList.remove('active'); }); } catch (e) {}
+    if (typeof activePillFilter !== 'undefined') activePillFilter = 'all';
+    if (typeof renderLojas === 'function') renderLojas();
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
+  }
+  window._sairDosJogos = _sairDosJogos;
+
   function _gamesHubAberto() {
     var hub = document.getElementById('games-hub');
     return !!(hub && hub.style.display !== 'none' && hub.style.display !== '');
@@ -14394,12 +14407,24 @@ ${urlCard}`)}`;
     try { auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
 
     auth.onAuthStateChanged(function (user) {
+      var estavaDeslogado = !_cliUser;
       _cliUser = user || null;
       if (user) {
         // Preferimos o displayName do Firebase; se não houver (ex.: e-mail
         // sem nome ainda), caímos no apelido salvo localmente.
         _cliApelido = user.displayName || _cliApelido || null;
         if (_cliApelido) localStorage.setItem(CLI_APELIDO_KEY, _cliApelido);
+        // Acabou de logar e havia uma pontuação feita deslogado? Submete
+        // agora (o Firestore aplica recorde/teto) e atualiza a tela de fim
+        // pra mostrar o ranking em vez do convite de login.
+        if (estavaDeslogado && _rankPendente) {
+          var pend = _rankPendente;
+          _rankPendente = null;
+          if (typeof rankSubmeter === 'function') rankSubmeter(pend.jogo, pend.score);
+          if (typeof _rankAtualizarSlotAposLogin === 'function') {
+            setTimeout(function () { _rankAtualizarSlotAposLogin(pend.jogo, pend.score); }, 600);
+          }
+        }
       }
       cliAtualizarHeader();
     });
@@ -14990,6 +15015,26 @@ ${urlCard}`)}`;
   // ANTES do app_min.js, junto com app/auth. Degradação graciosa se
   // o SDK não carregou: ranking fica indisponível, jogo segue normal.
   var _fbDb = null;
+  // Guarda a última pontuação feita DESLOGADO ({jogo, score}), pra ser
+  // re-submetida automaticamente assim que o cliente logar. Zerada após
+  // enviar. Sem isso, um recorde jogado sem login se perdia ao entrar.
+  var _rankPendente = null;
+
+  // Pedido de login vindo de dentro de um jogo (botão "Entrar e competir"
+  // na tela de fim). O jogo roda em tela cheia NATIVA num elemento; um
+  // modal fora desse elemento não é exibido pelo navegador. Então saímos
+  // da tela cheia ANTES de abrir o login. Um pequeno atraso deixa o layout
+  // reassentar antes do modal aparecer.
+  function rankPedirLogin() {
+    var estavaFs = (typeof _fsAtivo === 'function' && _fsAtivo());
+    if (typeof _sairTelaCheia === 'function') _sairTelaCheia();
+    var abrir = function () {
+      if (typeof cliAbrirLogin === 'function') cliAbrirLogin('Entre para aparecer no ranking de Angatuba!');
+    };
+    if (estavaFs) setTimeout(abrir, 220); else abrir();
+  }
+  window.rankPedirLogin = rankPedirLogin;
+
   function _rankDb() {
     if (_fbDb) return _fbDb;
     if (typeof firebase === 'undefined' || !firebase.firestore) return null;
@@ -15223,11 +15268,15 @@ ${urlCard}`)}`;
 
     // Deslogado: convite para entrar (liga o login sob demanda).
     if (!logado) {
+      // Guarda a pontuação recém-feita pra re-submeter automaticamente
+      // assim que a pessoa logar (senão o recorde jogado deslogado se
+      // perdia — rankSubmeter só grava se já houver usuário no fim de jogo).
+      _rankPendente = { jogo: jogoKey, score: Math.max(0, Math.round(Number(scoreObtido) || 0)) };
       slot.innerHTML =
         '<div class="rank-fim-convite">' +
           '<img src="/webp/owl-trophy.webp" alt="" class="rank-fim-owl" onerror="this.style.display=\'none\'">' +
           '<div class="rank-fim-txt">Entre para salvar <b>' + (scoreObtido || 0) + '</b> no ranking da cidade!</div>' +
-          '<button class="rank-fim-btn" onclick="cliAbrirLogin(\'Entre para aparecer no ranking de Angatuba!\')">Entrar e competir</button>' +
+          '<button class="rank-fim-btn" onclick="rankPedirLogin()">Entrar e competir</button>' +
         '</div>';
       slot.style.display = '';
       return;
@@ -15259,6 +15308,25 @@ ${urlCard}`)}`;
       html += '<button class="rank-fim-vertudo" onclick="rankAbrirPainel(\'' + jogoKey + '\')">Ver ranking completo</button>';
       slot.innerHTML = html;
     });
+  }
+
+  // Slot de cada jogo na tela de fim (pra re-renderizar após login).
+  var RANK_SLOTS = {
+    pegacoruja:      'st-rank-slot',
+    pegacoruja_surv: 'st-rank-slot',
+    relampago:       'rl-rank-slot',
+    sequencia:       'sq-rank-slot',
+    voo:             'vo-rank-slot'
+  };
+  // Depois que a pessoa loga a partir da tela de fim, troca o convite de
+  // login pelo ranking (top 5), já contabilizando a pontuação re-submetida.
+  function _rankAtualizarSlotAposLogin(jogoKey, score) {
+    var slotId = RANK_SLOTS[jogoKey];
+    if (!slotId) return;
+    var slot = document.getElementById(slotId);
+    // Só atualiza se o slot ainda está visível (a tela de fim continua aberta).
+    if (!slot || slot.style.display === 'none') return;
+    if (typeof rankFimDeJogo === 'function') rankFimDeJogo(jogoKey, slotId, score);
   }
 
   window.rankAbrirPainel  = rankAbrirPainel;

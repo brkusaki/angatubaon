@@ -4627,13 +4627,26 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .games-som-btn:hover { filter: brightness(1.1); }
 /* Estado mudo: ícone apagado (cinza) pra deixar claro que está off */
 .games-som-btn.games-som-off { color: var(--muted); border-color: var(--border); }
+/* Botão de voltar pra tela inicial (canto esquerdo do cabeçalho do hub) */
+.games-sair-btn {
+  position: absolute; top: 0; left: 0;
+  width: 40px; height: 40px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: var(--surface2);
+  color: var(--text); cursor: pointer; font-size: 16px;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .12s, filter .15s;
+}
+.games-sair-btn:active { transform: scale(0.92); }
+.games-sair-btn:hover { filter: brightness(1.1); }
 .games-hub-title {
   font-family: var(--font-h); font-size: 1.15rem; font-weight: 800;
   color: var(--text); display: flex; align-items: center; gap: 8px;
-  margin: 0 0 4px;
+  margin: 0 0 4px; padding: 0 48px;
+  justify-content: center; text-align: center;
 }
 .games-hub-title i { color: #a855f7; }
-.games-hub-sub { font-size: 13px; color: var(--muted); margin: 0; }
+.games-hub-sub { font-size: 13px; color: var(--muted); margin: 0; text-align: center; }
 
 /* ═════ Faixa de ofensiva (streak diário) ══ */
 .streak-faixa {

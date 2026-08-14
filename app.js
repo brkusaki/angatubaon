@@ -14415,17 +14415,17 @@ ${urlCard}`)}`;
         _cliApelido = user.displayName || _cliApelido || null;
         if (_cliApelido) localStorage.setItem(CLI_APELIDO_KEY, _cliApelido);
         // Acabou de logar e havia uma pontuação feita deslogado? Submete
-        // agora o MAIOR entre a partida que acabou e o recorde local já
-        // salvo (senão o recorde histórico feito deslogado nunca subia —
-        // só a última partida). O Firestore aplica recorde/teto.
+        // agora. O rankSubmeter já reconcilia com o recorde local do
+        // dispositivo (sobe o maior entre a partida e o recorde salvo),
+        // então o recorde histórico feito deslogado sobe aqui. O Firestore
+        // aplica recorde/teto.
         if (estavaDeslogado && _rankPendente) {
           var pend = _rankPendente;
           _rankPendente = null;
-          var melhor = Math.max(pend.score || 0, _rankRecordeLocal(pend.jogo));
-          if (typeof rankSubmeter === 'function') rankSubmeter(pend.jogo, melhor);
+          if (typeof rankSubmeter === 'function') rankSubmeter(pend.jogo, pend.score);
           // Relê o ranking após a escrita propagar e atualiza a tela de fim.
           if (typeof _rankAtualizarSlotAposLogin === 'function') {
-            setTimeout(function () { _rankAtualizarSlotAposLogin(pend.jogo, melhor); }, 1100);
+            setTimeout(function () { _rankAtualizarSlotAposLogin(pend.jogo, pend.score); }, 1100);
           }
         }
       }
@@ -15093,7 +15093,13 @@ ${urlCard}`)}`;
 
     var uid = _cliUser.uid;
     var nome = (_cliApelido || _cliUser.displayName || 'Jogador').trim().slice(0, 20);
-    var val = Math.max(0, Math.round(Number(score) || 0));
+    // Garante nome válido pras regras do Firestore (mín. 2 caracteres).
+    if (nome.length < 2) nome = 'Jogador';
+    // Reconcilia com o recorde LOCAL do dispositivo: sempre tentamos subir
+    // o MAIOR entre a pontuação da partida e o melhor recorde já salvo no
+    // localStorage. Assim, um recorde feito DESLOGADO sobe sozinho na
+    // primeira partida jogada logado — sem depender do fluxo de login.
+    var val = Math.max(0, Math.round(Number(score) || 0), _rankRecordeLocal(jogoKey));
 
     // Read-before-write: lê o score atual do próprio doc e só grava se o
     // novo for MAIOR. Isso garante o comportamento correto mesmo que as

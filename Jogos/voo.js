@@ -214,7 +214,7 @@
 
   // Constantes de física em função de H (mesma sensação em qualquer tela).
   function _vooGrav()  { return 2.3 * _vooH; }     // px/s²
-  function _vooJump()  { return -0.68 * _vooH; }   // px/s (impulso p/ cima; menor = subida mais lenta/controlada)
+  function _vooJump()  { return -1.0 * _vooH; }    // px/s (impulso p/ cima; equilíbrio entre espaçamento de plataformas e ritmo)
   function _vooPlatW() { return 0.28 * _vooW; }
   function _vooPlatH() { return Math.max(8, 0.028 * _vooH); }
   function _vooOwlW()  { return 0.15 * _vooW; }

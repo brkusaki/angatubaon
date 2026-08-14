@@ -14415,14 +14415,17 @@ ${urlCard}`)}`;
         _cliApelido = user.displayName || _cliApelido || null;
         if (_cliApelido) localStorage.setItem(CLI_APELIDO_KEY, _cliApelido);
         // Acabou de logar e havia uma pontuação feita deslogado? Submete
-        // agora (o Firestore aplica recorde/teto) e atualiza a tela de fim
-        // pra mostrar o ranking em vez do convite de login.
+        // agora o MAIOR entre a partida que acabou e o recorde local já
+        // salvo (senão o recorde histórico feito deslogado nunca subia —
+        // só a última partida). O Firestore aplica recorde/teto.
         if (estavaDeslogado && _rankPendente) {
           var pend = _rankPendente;
           _rankPendente = null;
-          if (typeof rankSubmeter === 'function') rankSubmeter(pend.jogo, pend.score);
+          var melhor = Math.max(pend.score || 0, _rankRecordeLocal(pend.jogo));
+          if (typeof rankSubmeter === 'function') rankSubmeter(pend.jogo, melhor);
+          // Relê o ranking após a escrita propagar e atualiza a tela de fim.
           if (typeof _rankAtualizarSlotAposLogin === 'function') {
-            setTimeout(function () { _rankAtualizarSlotAposLogin(pend.jogo, pend.score); }, 600);
+            setTimeout(function () { _rankAtualizarSlotAposLogin(pend.jogo, melhor); }, 1100);
           }
         }
       }
@@ -15051,6 +15054,24 @@ ${urlCard}`)}`;
     voo:             'ranking_voo'
   };
 
+  // Chave do recorde LOCAL (localStorage) de cada jogo. Usada para, ao
+  // logar, subir também o melhor recorde já feito DESLOGADO — não só a
+  // pontuação da partida que acabou. Mantém em sincronia com as chaves
+  // definidas dentro de cada módulo de jogo.
+  var RANK_REC_LOCAL = {
+    pegacoruja:      'angatuba_speedtap_rec',
+    pegacoruja_surv: 'angatuba_speedtap_surv_rec',
+    relampago:       'angatuba_relampago_rec',
+    sequencia:       'angatuba_seq_rec',
+    voo:             'angatuba_voo_rec'
+  };
+  function _rankRecordeLocal(jogoKey) {
+    var chave = RANK_REC_LOCAL[jogoKey];
+    if (!chave) return 0;
+    try { return Math.max(0, Math.round(Number(localStorage.getItem(chave)) || 0)); }
+    catch (e) { return 0; }
+  }
+
   /* ── Submeter uma pontuação ─────────────────────────────────
      Chamada nos pontos de "bateu recorde" de cada jogo.
      - jogoKey: chave de RANK_COLECOES (ex.: 'pegacoruja')
@@ -15074,25 +15095,40 @@ ${urlCard}`)}`;
     var nome = (_cliApelido || _cliUser.displayName || 'Jogador').trim().slice(0, 20);
     var val = Math.max(0, Math.round(Number(score) || 0));
 
-    try {
-      db.collection(colecao).doc(uid).set({
+    // Read-before-write: lê o score atual do próprio doc e só grava se o
+    // novo for MAIOR. Isso garante o comportamento correto mesmo que as
+    // regras do Firestore não estejam barrando downgrade — uma partida
+    // pior nunca sobrescreve o recorde. (A regra do servidor continua
+    // sendo a defesa final; aqui é a defesa do cliente.)
+    var ref = db.collection(colecao).doc(uid);
+    ref.get().then(function (doc) {
+      var atual = 0;
+      if (doc && doc.exists) {
+        var d = doc.data() || {};
+        atual = (typeof d.score === 'number') ? d.score : 0;
+      }
+      // Não é recorde: não grava (evita downgrade e escrita desnecessária).
+      if (val <= atual) {
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] não é recorde (' + val + ' <= ' + atual + '):', colecao);
+        return;
+      }
+      ref.set({
         uid: uid,
         nome: nome,
         score: val,
         atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true }).catch(function (err) {
-        // Erro esperado e benigno quando NÃO é recorde: a regra de
-        // update exige score > atual, então repetir/piorar dá
-        // permission-denied. Isso é normal; não polui a UX.
-        if (err && err.code === 'permission-denied') {
-          if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] não é recorde ou fora do teto:', colecao, val);
-        } else if (typeof DEBUG !== 'undefined' && DEBUG) {
-          console.log('[rank] falha ao gravar:', err && err.message);
+        // permission-denied aqui = regra do servidor rejeitou (ex.: teto
+        // por jogo nas security rules do Firestore menor que o score).
+        // Se um recorde legítimo não sobe, é o teto do servidor que precisa
+        // ser revisto no console do Firebase — não há o que fazer no cliente.
+        if (typeof DEBUG !== 'undefined' && DEBUG) {
+          console.log('[rank] servidor rejeitou gravação (verifique teto nas regras do Firestore):', colecao, val, err && err.code);
         }
       });
-    } catch (e) {
-      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] exceção:', e && e.message);
-    }
+    }).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] falha ao ler antes de gravar:', err && err.message);
+    });
   }
 
   /* ── Ler o top de um ranking ────────────────────────────────
@@ -15176,12 +15212,21 @@ ${urlCard}`)}`;
   function rankAbrirPainel(jogoKey) {
     var overlay = document.getElementById('modal-rank');
     if (!overlay) return;
-    _rankAbaAtual = jogoKey || _rankAbaAtual || 'pegacoruja';
-    rankRenderAbas();
-    rankCarregarAba(_rankAbaAtual);
-    overlay.classList.add('open');
-    document.body.style.overflow = 'hidden';
-    if (history.state?.modal !== 'rank') history.pushState({ modal: 'rank' }, '');
+    // Se um jogo está em tela cheia NATIVA, um modal fora do elemento
+    // fullscreen não é exibido pelo navegador. Saímos da tela cheia e
+    // abrimos o painel após o layout reassentar. (Mesmo motivo do login.)
+    var estavaFs = (typeof _fsAtivo === 'function' && _fsAtivo());
+    if (typeof _sairTelaCheia === 'function') _sairTelaCheia();
+    var abrir = function () {
+      _rankAbaAtual = jogoKey || _rankAbaAtual || 'pegacoruja';
+      rankRenderAbas();
+      rankCarregarAba(_rankAbaAtual);
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      if (history.state && history.state.modal !== 'rank') history.pushState({ modal: 'rank' }, '');
+      else if (!history.state) history.pushState({ modal: 'rank' }, '');
+    };
+    if (estavaFs) setTimeout(abrir, 220); else abrir();
   }
 
   function rankFecharPainel(viaPopstate) {

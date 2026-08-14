@@ -124,14 +124,13 @@
   // A altitude NÃO é linear no climb: passa por uma curva côncava
   // (_vooCurvaAlt) que faz as faixas iniciais (céu/atmosfera) durarem
   // MUITO mais tempo antes de o espaço aparecer. Com estes valores:
-  //   • céu       (alt<0.55): dura até ~score 385
-  //   • atmosfera (alt<0.82): dura até ~score 775
-  //   • espaço    (alt>=0.82): só a partir de ~score 775
-  // Assim a pessoa passa a partida quase toda subindo pelo céu/atmosfera
-  // (recorde típico ~350 fica todo no céu) e o espaço vira conquista de
-  // jogo excepcional. Ajuste este multiplicador + o expoente da curva
-  // pra mudar todo o ritmo visual da subida.
-  function _vooAltMax() { return 11 * _vooH; }
+  //   • céu       (alt<0.55): dura até ~score 2300
+  //   • atmosfera (alt<0.82): dura até ~score 4650
+  //   • espaço    (alt>=0.82): só a partir de ~score 4650
+  // Áreas iniciais LONGAS: a pessoa passa a maior parte da partida no
+  // céu/atmosfera; o espaço é conquista de jogo muito bom (pleno ~6600).
+  // Ajuste este multiplicador + o expoente da curva pra mudar o ritmo.
+  function _vooAltMax() { return 66 * _vooH; }
 
   // Curva de altitude: recebe a fração linear (climb/altMax, 0..1) e
   // devolve a altitude PERCEBIDA (0..1). Expoente <1 = côncava: sobe
@@ -231,14 +230,21 @@
   }
 
   // Gap efetivo entre plataformas ALCANÇÁVEIS (normais/móveis), sempre
-  // <= teto seguro. Cresce com o score, mas nunca além do que o pulo
-  // vence. (Independe de resolução: tudo em px do H atual.)
+  // <= teto seguro. Cresce com o score pra dificultar de forma GRADUAL:
+  // no começo (céu) fica folgado e casual; lá no alto aperta de verdade,
+  // chegando perto do teto do pulo. A escala vai até score ~6000, então
+  // a subida da dificuldade acompanha as áreas longas.
   function _vooGap() {
     var teto = _vooAlcance() * 0.82;
-    var t = Math.min(1, _vooScore / 4000);
-    var min = teto * (0.58 + 0.12 * t);
-    var max = teto * (0.74 + 0.14 * t);
+    // Arranque suave (t²): gaps folgados no comecinho, apertando de verdade
+    // só conforme a altura sobe. Escala até score ~6000.
+    var tl = Math.min(1, _vooScore / 6000);
+    var t = tl * tl;
+    // min: 55% → 80% do teto | max: 72% → 98% do teto (quase no limite).
+    var min = teto * (0.55 + 0.25 * t);
+    var max = teto * (0.72 + 0.26 * t);
     if (max > teto) max = teto;
+    if (min > max) min = max;
     return min + Math.random() * (max - min);
   }
 
@@ -249,18 +255,47 @@
     var x = Math.random() * (_vooW - w);
     var tipo = 'normal';
     if (!forcarNormal) {
+      // Dificuldade progressiva: quanto mais alto, mais plataformas móveis
+      // e quebráveis. Escala até score ~6000 pra acompanhar as áreas longas.
+      // Usamos uma curva que ARRANCA suave (quase tudo normal no comecinho
+      // do céu) e sobe de verdade conforme ganha altura — 't' ao quadrado
+      // deixa o início leve e o topo pesado.
+      var tl = Math.min(1, _vooScore / 6000);
+      var t = tl * tl;                                // arranque suave
+      var chanceBreak = 0.02 + 0.23 * t;             // ~2% → 25%
+      var chanceMove  = chanceBreak + 0.14 + 0.46 * t; // móvel ~14% → 60%
       var r = Math.random();
-      if (_vooScore >= 700 && r < 0.18)      tipo = 'break';
-      else if (_vooScore >= 300 && r < 0.42) tipo = 'move';
+      if (r < chanceBreak)      tipo = 'break';
+      else if (r < chanceMove)  tipo = 'move';
     }
     // Trampolim só em plataforma normal.
     var boost = (tipo === 'normal' && Math.random() < 0.07);
     var vx = 0;
     if (tipo === 'move') {
-      var spd = (0.10 + 0.10 * Math.min(1, _vooScore / 3000)) * _vooW;
+      // Móveis ficam mais rápidas com o score (0.10 → 0.32 · W/s).
+      var spd = (0.10 + 0.22 * Math.min(1, _vooScore / 6000)) * _vooW;
       vx = (Math.random() < 0.5 ? -1 : 1) * spd;
     }
-    return { x: x, y: y, w: w, tipo: tipo, boost: boost, vx: vx, usada: false };
+    // FAIXA FIXA da plataforma: definida pela altitude DELA (onde ela
+    // está), não pela altitude atual da coruja. Assim uma plataforma que
+    // nasceu no céu continua sendo céu pra sempre, mesmo depois que a
+    // coruja subiu pro espaço — a transição de paisagem vira gradual (você
+    // encontra plataformas da área nova conforme sobe) em vez de todas
+    // trocarem de textura de uma vez.
+    var faixa = _vooFaixaDeY(y);
+    return { x: x, y: y, w: w, tipo: tipo, boost: boost, vx: vx, usada: false, faixa: faixa };
+  }
+
+  // Altitude normalizada (0..1) de um ponto y no mundo, usando a MESMA
+  // curva do progresso da coruja. Serve pra decidir a faixa de cada
+  // plataforma pela posição dela.
+  function _vooAltDeY(y) {
+    var climb = _vooStartY - y;
+    if (climb < 0) climb = 0;
+    return _vooCurvaAlt(Math.min(1, climb / _vooAltMax()));
+  }
+  function _vooFaixaDeY(y) {
+    return _vooFaixa(_vooAltDeY(y));
   }
 
   // Garante plataformas preenchidas acima da câmera, SEMPRE com caminho
@@ -800,14 +835,16 @@
   //    mola do trampolim é sempre vetorial, por cima. ──
   function _vooDesenharPlataformas(ctx, W, H) {
     var ph = _vooPlatH();
-    var faixa = _vooFaixa(_vooAlt);
     for (var i = 0; i < _vooPlats.length; i++) {
       var p = _vooPlats[i];
       if (p.usada) continue;
       var y = p.y - _vooCamY;
       if (y < -ph * 2 || y > H + ph * 2) continue;
 
-      // Tenta o asset da faixa atual pra este tipo.
+      // Faixa FIXA da própria plataforma (definida no nascimento pela
+      // altitude dela). Fallback pra faixa da coruja se por acaso faltar
+      // (plataformas antigas de antes desta mudança).
+      var faixa = p.faixa || _vooFaixaDeY(p.y);
       var nome = _vooPlatAssetNome(p.tipo, faixa);
       var reg = _vooAsset(nome);
       if (reg && reg.ok && reg.img) {

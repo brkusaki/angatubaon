@@ -390,7 +390,7 @@
     _vooTempo = 0;
     _vooAlt = 0;
     _vooDecor = [];
-    _vooDecorTimer = 1.2;      // primeiro decor aparece logo no começo
+    _vooDecorTimer = 4;        // primeiro decor aparece após alguns segundos
 
     // Pré-carrega (best-effort) os assets de plataforma da faixa baixa e
     // as decorações de céu — os que aparecem primeiro. Os demais são
@@ -435,8 +435,8 @@
     // Spawn temporizado. Ritmo depende de quantos já estão em cena
     // (limita a poluição visual) e um pouco da altitude.
     _vooDecorTimer -= dt;
-    if (_vooDecorTimer <= 0 && _vooDecor.length < 3) {
-      _vooDecorTimer = 2.4 + Math.random() * 3.2;   // próximo em ~2.4–5.6s
+    if (_vooDecorTimer <= 0 && _vooDecor.length < 1) {
+      _vooDecorTimer = 6 + Math.random() * 5;   // próximo em ~6–11s
       _vooSpawnDecor();
     }
   }

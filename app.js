@@ -980,6 +980,7 @@
     if (window.SpeedTapGame  && typeof window.SpeedTapGame.parar  === 'function') window.SpeedTapGame.parar();
     if (window.SequenciaGame && typeof window.SequenciaGame.parar === 'function') window.SequenciaGame.parar();
     if (window.VooGame       && typeof window.VooGame.parar       === 'function') window.VooGame.parar();
+    if (window.CorridaGame   && typeof window.CorridaGame.parar   === 'function') window.CorridaGame.parar();
   }
 
   /* -- Roteador de jogos: menu <-> tela de cada jogo -- */
@@ -1014,7 +1015,8 @@
   var JOGOS_EXTERNOS = {
     voo: { js: '/Jogos/voo.min.js', css: '/Jogos/voo.css', global: 'VooGame' },
     speedtap: { js: '/Jogos/speedtap.min.js', css: '/Jogos/speedtap.css', global: 'SpeedTapGame' },
-    sequencia: { js: '/Jogos/sequencia.min.js', css: '/Jogos/sequencia.css', global: 'SequenciaGame' }
+    sequencia: { js: '/Jogos/sequencia.min.js', css: '/Jogos/sequencia.css', global: 'SequenciaGame' },
+    corrida: { js: '/Jogos/corrida.min.js', css: '/Jogos/corrida.css', global: 'CorridaGame' }
   };
   var _jogosCarregados = {};   // nome -> true quando js+css já injetados
 
@@ -1125,7 +1127,7 @@
         }, 1200);
         setTimeout(function(){ var ld = document.getElementById('games-loading'); if (ld) ld.style.display = 'none'; }, 12000);
       }
-    } else if (nome === 'speedtap' || nome === 'sequencia' || nome === 'voo') {
+    } else if (nome === 'speedtap' || nome === 'sequencia' || nome === 'voo' || nome === 'corrida') {
       // Jogos externos: carrega sob demanda e prepara quando pronto.
       _jogoLoader(nome).then(function (api) {
         if (api && typeof api.preparar === 'function') api.preparar();
@@ -15051,7 +15053,8 @@ ${urlCard}`)}`;
     pegacoruja_surv: 'ranking_pegacoruja_surv',
     relampago:       'ranking_relampago',
     sequencia:       'ranking_sequencia',
-    voo:             'ranking_voo'
+    voo:             'ranking_voo',
+    corrida:         'ranking_corrida'
   };
 
   // Chave do recorde LOCAL (localStorage) de cada jogo. Usada para, ao
@@ -15063,7 +15066,8 @@ ${urlCard}`)}`;
     pegacoruja_surv: 'angatuba_speedtap_surv_rec',
     relampago:       'angatuba_relampago_rec',
     sequencia:       'angatuba_seq_rec',
-    voo:             'angatuba_voo_rec'
+    voo:             'angatuba_voo_rec',
+    corrida:         'angatuba_corrida_rec'
   };
   function _rankRecordeLocal(jogoKey) {
     var chave = RANK_REC_LOCAL[jogoKey];
@@ -15202,7 +15206,8 @@ ${urlCard}`)}`;
     pegacoruja_surv: { label: 'Pega a Coruja', sub: 'Sobrevivência' },
     relampago:       { label: 'Relâmpago',      sub: '' },
     sequencia:       { label: 'Sequência',      sub: '' },
-    voo:             { label: 'Voo da Coruja',   sub: '' }
+    voo:             { label: 'Voo da Coruja',   sub: '' },
+    corrida:         { label: 'Corrida da Coruja', sub: '' }
   };
 
   var _rankAbaAtual = 'pegacoruja';
@@ -15367,7 +15372,8 @@ ${urlCard}`)}`;
     pegacoruja_surv: 'st-rank-slot',
     relampago:       'rl-rank-slot',
     sequencia:       'sq-rank-slot',
-    voo:             'vo-rank-slot'
+    voo:             'vo-rank-slot',
+    corrida:         'cor-rank-slot'
   };
   // Depois que a pessoa loga a partir da tela de fim, troca o convite de
   // login pelo ranking (top 5), já contabilizando a pontuação re-submetida.

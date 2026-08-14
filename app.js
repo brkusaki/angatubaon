@@ -793,10 +793,70 @@
     }
   }
 
-  /* ── Hub de Mini-Games (aba Joguinhos) ───────────
-     Troca a view: esconde a lista de lojas + rodapé e mostra o hub de jogos.
-     O quiz só é buscado da API na PRIMEIRA vez que o hub abre (lazy). */
-  var _quizJaCarregado = false;
+  /* ── Tela cheia NATIVA dos jogos ─────────────────────────────
+     Usa a Fullscreen API do navegador pra colocar o hub de jogos em
+     tela cheia de verdade: some a barra de status/URL do navegador e a
+     navbar do app. Só funciona dentro de um gesto do usuário (por isso
+     chamamos no toque que abre o jogo). Degrada em silêncio se a API
+     não existir ou o navegador recusar (ex.: alguns iOS) — aí vale o
+     fallback CSS games-fs-open, que já cobre a viewport.
+     Prefixos: padrão + webkit (Safari/iOS antigos). */
+  function _fsElemento() {
+    return document.getElementById('games-hub') || document.documentElement;
+  }
+  function _fsAtivo() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  function _entrarTelaCheia() {
+    if (_fsAtivo()) return;
+    var el = _fsElemento();
+    if (!el) return;
+    try {
+      var p = null;
+      if (el.requestFullscreen)            p = el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) p = el.webkitRequestFullscreen();
+      // A promessa pode rejeitar (gesto expirado, permissão); engolimos.
+      if (p && typeof p.catch === 'function') p.catch(function () {});
+    } catch (e) { /* fallback CSS cobre */ }
+  }
+  function _sairTelaCheia() {
+    if (!_fsAtivo()) return;
+    try {
+      if (document.exitFullscreen)            document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } catch (e) {}
+  }
+  // Quando o estado de tela cheia muda, o tamanho útil da tela muda também;
+  // reavisamos os jogos ativos pra redimensionar o canvas na hora (senão a
+  // arena fica com o tamanho antigo até um resize manual).
+  var _fsListenerOn = false;
+  function _ligarFsListener() {
+    if (_fsListenerOn) return;
+    _fsListenerOn = true;
+    var aoMudar = function () {
+      // Se o usuário SAIU da tela cheia por gesto do sistema (back/ESC/swipe)
+      // enquanto um jogo estava ativo, voltamos pro menu — senão o jogo
+      // ficaria rodando num layout meia-boca. (_fsAtivo false + jogo aberto.)
+      var hubEl = document.getElementById('games-hub');
+      var jogoAberto = hubEl && hubEl.classList.contains('jogo-ativo');
+      if (!_fsAtivo() && jogoAberto) {
+        // Evita loop: _voltarAoMenu chama _sairTelaCheia, que é no-op aqui.
+        _voltarAoMenu();
+      }
+      // Deixa o layout assentar antes de medir (dois frames).
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { window.dispatchEvent(new Event('resize')); });
+        });
+      } else {
+        setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 60);
+      }
+    };
+    document.addEventListener('fullscreenchange', aoMudar);
+    document.addEventListener('webkitfullscreenchange', aoMudar);
+  }
+
+
 
   function _abrirGamesHub() {
     var hub = document.getElementById('games-hub');
@@ -809,6 +869,7 @@
     if (siga) siga.style.display = 'none';
     hub.style.display = 'block';
     document.body.classList.add('games-fs-open');   // trava scroll do body (tela cheia)
+    _ligarFsListener();                              // redimensiona ao entrar/sair da tela cheia nativa
     _voltarAoMenu(); // sempre abre mostrando o menu de jogos
     _streakAtualizarFaixa(false); // mostra a ofensiva atual (sem animar)
     _carregarAssetsJogos();  // som + efeitos (uma vez, sob demanda)
@@ -878,6 +939,7 @@
 
   function _fecharGamesHub() {
     _pararJogosExternos(); // para Speed Tap / Sequência / Voo se estavam rodando
+    _sairTelaCheia();      // garante sair da tela cheia nativa
     if (typeof _rlLimparTimers === 'function') _rlLimparTimers();
     var hub = document.getElementById('games-hub');
     if (!hub) return;
@@ -912,6 +974,12 @@
 
   function _voltarAoMenu() {
     _pararJogosExternos();
+    // Sai da tela cheia nativa ao voltar pro menu de jogos (o menu rola e
+    // não precisa/quer tela cheia travada).
+    _sairTelaCheia();
+    // Volta a mostrar o cabeçalho/ranking do hub (sai do estado "jogo ativo").
+    var hubEl = document.getElementById('games-hub');
+    if (hubEl) hubEl.classList.remove('jogo-ativo');
     if (typeof _rlLimparTimers === 'function') _rlLimparTimers();
     var menu = document.getElementById('games-menu');
     var telas = document.querySelectorAll('.jogo-tela');
@@ -1018,6 +1086,14 @@
     // Registra a ofensiva do dia (qualquer jogo conta). Guarda se aumentou
     // pra animar a chama quando a pessoa voltar ao menu de jogos.
     _streakAumentouAgora = _streakRegistrar();
+    // Tela cheia NATIVA: estamos dentro do gesto de toque no card do jogo,
+    // então o navegador aceita. (No menu não pedimos — só ao abrir um jogo.)
+    _entrarTelaCheia();
+    // Marca o hub como "jogo ativo" pra o CSS esconder o cabeçalho, a
+    // faixa de ofensiva e o botão de ranking — tela cheia de verdade só
+    // com a arena do jogo.
+    var hubEl = document.getElementById('games-hub');
+    if (hubEl) hubEl.classList.add('jogo-ativo');
     var menu = document.getElementById('games-menu');
     if (menu) menu.style.display = 'none';
     var telas = document.querySelectorAll('.jogo-tela');

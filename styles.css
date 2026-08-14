@@ -5340,6 +5340,45 @@ body.games-fs-open .vo-arena {
 }
 body.games-fs-open .sq-grade { margin: auto 0; }
 
+/* ── TELA CHEIA DE VERDADE (jogo ativo) ──────────────────────────
+   Quando um jogo está aberto, o hub ganha .jogo-ativo (via JS). Aí
+   escondemos o cabeçalho, a faixa de ofensiva e o botão de ranking:
+   sobra só a arena + HUD + botão voltar, ocupando a tela inteira. */
+#games-hub.jogo-ativo .games-hub-head,
+#games-hub.jogo-ativo .streak-faixa,
+#games-hub.jogo-ativo .rank-abrir-btn {
+  display: none !important;
+}
+/* Com o cabeçalho fora, a tela do jogo cola no topo e o HUD sobe pro
+   lugar antes ocupado pelo botão voltar. */
+#games-hub.jogo-ativo .jogo-voltar { top: 0; }
+body.games-fs-open #games-hub.jogo-ativo .st-hud,
+body.games-fs-open #games-hub.jogo-ativo .sq-hud,
+body.games-fs-open #games-hub.jogo-ativo .rl-hud,
+body.games-fs-open #games-hub.jogo-ativo .vo-hud {
+  top: 44px;   /* logo abaixo do botão voltar sticky */
+}
+
+/* Elemento em tela cheia NATIVA (Fullscreen API): o navegador dá 100%
+   da tela ao #games-hub. Garantimos preenchimento total e fundo opaco,
+   independente do fallback games-fs-open. */
+#games-hub:fullscreen,
+#games-hub:-webkit-full-screen {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  margin: 0;
+  overflow-y: auto;
+  background: var(--bg, #0b0f17);
+}
+/* Em tela cheia nativa não há barra do navegador comendo a base, então
+   a arena pode usar toda a altura disponível. */
+#games-hub:fullscreen.jogo-ativo .jogo-tela,
+#games-hub:-webkit-full-screen.jogo-ativo .jogo-tela {
+  height: 100vh;
+  height: 100dvh;
+}
+
 /* ── Loader de jogos sob demanda ─────────────────────────────── */
 .jogo-loading-lazy {
   display: none;

@@ -65,10 +65,12 @@
 
   // Nome do arquivo de plataforma pra (tipo, faixa). Convenção:
   //   plat-<tipo>-<faixa>.webp   ex.: plat-normal-ceu.webp
-  // Faixa por altitude: <0.4 = ceu, <0.75 = atm, senão = esp.
+  // Faixa por altitude: <0.55 = ceu, <0.82 = atm, senão = esp.
+  // Céu e atmosfera ficam LONGOS de propósito (a subida real leva minutos
+  // pra sair deles); o espaço é o "prêmio" bem lá no alto.
   function _vooFaixa(alt) {
-    if (alt < 0.4) return 'ceu';
-    if (alt < 0.75) return 'atm';
+    if (alt < 0.55) return 'ceu';
+    if (alt < 0.82) return 'atm';
     return 'esp';
   }
   function _vooPlatAssetNome(tipo, faixa) {
@@ -83,17 +85,22 @@
   // camada de parallax (0 = colado no fundo/lento; 1 = perto/rápido),
   // e se cruza a tela na horizontal ('cruza') ou paira/gira no lugar
   // ('flutua', ex.: buraco negro). Tudo puramente decorativo.
+  // IMPORTANTE: [min,max] é a faixa de altitude onde o objeto pode
+  // SURGIR *e* permanecer. Quando a coruja sobe além de 'max' (com uma
+  // folga), o objeto é descartado — é o que impede o balão de continuar
+  // aparecendo lá no espaço. Faixas casadas com _vooFaixa():
+  //   céu <0.55 · atmosfera <0.82 · espaço >=0.82.
   var _VOO_DECOR = [
-    // Baixa altitude (céu): pássaros e balões/pipas.
-    { nome: 'passaro.webp',    kind: 'passaro', min: 0.00, max: 0.45, tam: 0.10, vmin: 0.10, vmax: 0.22, camada: 0.55, modo: 'cruza' },
-    { nome: 'balao.webp',      kind: 'balao',   min: 0.00, max: 0.40, tam: 0.15, vmin: 0.02, vmax: 0.06, camada: 0.35, modo: 'sobe'  },
-    // Média (atmosfera): aviões.
-    { nome: 'aviao.webp',      kind: 'aviao',   min: 0.30, max: 0.72, tam: 0.22, vmin: 0.16, vmax: 0.30, camada: 0.70, modo: 'cruza' },
-    // Transição/alta: foguetes (sobem).
-    { nome: 'foguete.webp',    kind: 'foguete', min: 0.45, max: 0.90, tam: 0.13, vmin: 0.20, vmax: 0.36, camada: 0.80, modo: 'sobe'  },
-    // Espaço: OVNIs e buracos negros.
-    { nome: 'ovni.webp',       kind: 'ovni',    min: 0.72, max: 1.00, tam: 0.18, vmin: 0.10, vmax: 0.26, camada: 0.60, modo: 'cruza' },
-    { nome: 'buraconegro.webp',kind: 'buraco',  min: 0.80, max: 1.00, tam: 0.34, vmin: 0.00, vmax: 0.00, camada: 0.25, modo: 'flutua'}
+    // Céu (baixa/média-baixa): pássaros e balões. Ficam só no azul do dia.
+    { nome: 'passaro.webp',    kind: 'passaro', min: 0.00, max: 0.50, tam: 0.10, vmin: 0.10, vmax: 0.22, camada: 0.55, modo: 'cruza' },
+    { nome: 'balao.webp',      kind: 'balao',   min: 0.00, max: 0.45, tam: 0.15, vmin: 0.02, vmax: 0.06, camada: 0.35, modo: 'sobe'  },
+    // Atmosfera (meio): aviões cruzam o céu mais alto.
+    { nome: 'aviao.webp',      kind: 'aviao',   min: 0.40, max: 0.78, tam: 0.22, vmin: 0.16, vmax: 0.30, camada: 0.70, modo: 'cruza' },
+    // Transição atmosfera→espaço: foguetes sobem.
+    { nome: 'foguete.webp',    kind: 'foguete', min: 0.68, max: 0.92, tam: 0.13, vmin: 0.20, vmax: 0.36, camada: 0.80, modo: 'sobe'  },
+    // Espaço (alto): OVNIs e buracos negros — nada de balão/avião aqui.
+    { nome: 'ovni.webp',       kind: 'ovni',    min: 0.84, max: 1.01, tam: 0.18, vmin: 0.10, vmax: 0.26, camada: 0.60, modo: 'cruza' },
+    { nome: 'buraconegro.webp',kind: 'buraco',  min: 0.88, max: 1.01, tam: 0.34, vmin: 0.00, vmax: 0.00, camada: 0.25, modo: 'flutua'}
   ];
   var _vooCanvas = null, _vooCtx = null;
   var _vooW = 0, _vooH = 0, _vooDpr = 1;
@@ -113,13 +120,27 @@
   var _vooDecor = [];          // objetos decorativos ativos cruzando o fundo
   var _vooDecorTimer = 0;      // tempo até tentar spawnar o próximo decor (s)
 
-  // Altitude de "climb" (px) que corresponde a atingir o espaço (alt=1).
-  // Calibrado pra ser ALCANÇÁVEL numa partida boa: score = climb/H*100,
-  // então alt=1 acontece por volta de score ~420. Assim o gradiente
-  // amanhecer→espaço e as faixas de asset ficam visíveis de verdade
-  // (atmosfera ~score 120, espaço ~score 300), sem exigir um recorde
-  // absurdo. Ajuste fino aqui muda todo o ritmo visual da subida.
-  function _vooAltMax() { return 4.2 * _vooH; }
+  // Altitude de "climb" (px) que corresponde a alt=1 (espaço pleno).
+  // A altitude NÃO é linear no climb: passa por uma curva côncava
+  // (_vooCurvaAlt) que faz as faixas iniciais (céu/atmosfera) durarem
+  // MUITO mais tempo antes de o espaço aparecer. Com estes valores:
+  //   • céu       (alt<0.55): dura até ~score 385
+  //   • atmosfera (alt<0.82): dura até ~score 775
+  //   • espaço    (alt>=0.82): só a partir de ~score 775
+  // Assim a pessoa passa a partida quase toda subindo pelo céu/atmosfera
+  // (recorde típico ~350 fica todo no céu) e o espaço vira conquista de
+  // jogo excepcional. Ajuste este multiplicador + o expoente da curva
+  // pra mudar todo o ritmo visual da subida.
+  function _vooAltMax() { return 11 * _vooH; }
+
+  // Curva de altitude: recebe a fração linear (climb/altMax, 0..1) e
+  // devolve a altitude PERCEBIDA (0..1). Expoente <1 = côncava: sobe
+  // rápido no comecinho e depois "segura", esticando as faixas de baixo.
+  function _vooCurvaAlt(fr) {
+    if (fr <= 0) return 0;
+    if (fr >= 1) return 1;
+    return Math.pow(fr, 0.57);
+  }
 
   // Paleta do céu por altitude: amanhecer → dia → crepúsculo → espaço.
   // Cada parada tem cor de topo e de base do gradiente vertical.
@@ -193,7 +214,7 @@
 
   // Constantes de física em função de H (mesma sensação em qualquer tela).
   function _vooGrav()  { return 2.3 * _vooH; }     // px/s²
-  function _vooJump()  { return -1.02 * _vooH; }   // px/s (impulso p/ cima)
+  function _vooJump()  { return -0.68 * _vooH; }   // px/s (impulso p/ cima; menor = subida mais lenta/controlada)
   function _vooPlatW() { return 0.28 * _vooW; }
   function _vooPlatH() { return Math.max(8, 0.028 * _vooH); }
   function _vooOwlW()  { return 0.15 * _vooW; }
@@ -367,7 +388,13 @@
       var foraX = (d.x < -margem * 1.5) || (d.x > _vooW + margem * 1.5);
       var foraY = (d.y < -margem * 1.5) || (d.y > _vooH + margem * 1.5);
       var venceuFlutua = (d.modo === 'flutua' && d.idade > 9);   // some após um tempo
-      if (foraX || foraY || venceuFlutua) _vooDecor.splice(i, 1);
+      // Descarte por ALTITUDE: se a coruja já subiu bem acima da faixa
+      // deste objeto, ele não pertence mais ao cenário atual (era o bug do
+      // balão aparecendo no espaço). Damos uma folga de 0.08 pra não sumir
+      // bruscamente na borda da faixa.
+      var d0 = d.def || {};
+      var foraFaixa = (typeof d0.max === 'number') && (_vooAlt > d0.max + 0.08);
+      if (foraX || foraY || venceuFlutua || foraFaixa) _vooDecor.splice(i, 1);
     }
 
     // Spawn temporizado. Ritmo depende de quantos já estão em cena
@@ -524,8 +551,10 @@
     _vooAtualizarScore();
 
     // Altitude normalizada (0 solo → 1 espaço), suavizada pra transição
-    // de céu não "pinotear" quando a coruja oscila.
-    var altAlvo = Math.max(0, Math.min(1, _vooMaxClimb / _vooAltMax()));
+    // de céu não "pinotear" quando a coruja oscila. A fração linear passa
+    // pela curva côncava pra esticar as faixas iniciais (ver _vooCurvaAlt).
+    var frac = Math.max(0, Math.min(1, _vooMaxClimb / _vooAltMax()));
+    var altAlvo = _vooCurvaAlt(frac);
     _vooAlt += (altAlvo - _vooAlt) * Math.min(1, dt * 3);
 
     // Decoração de fundo (spawn + movimento), depende da altitude atual.

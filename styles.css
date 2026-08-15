@@ -5458,6 +5458,86 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-voo .vo-hud-valor {
   font-size: 17px;
 }
 
+/* ── CORRIDA: arena ocupando a TELA INTEIRA (1a pessoa, landscape) ──
+   Mesma filosofia do Voo: a arena preenche 100% da tela, HUD e botão
+   Voltar viram overlays flutuantes. Diferença: a Corrida é landscape,
+   então o HUD flutua na horizontal no topo e o palco IGNORA aspect-ratio
+   pra colar nas quatro bordas (o wrapper .cor-rot é girado 90° pelo JS
+   quando o celular está em pé). */
+body.games-fs-open #games-hub.jogo-ativo #jogo-corrida {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-corrida .cor-card {
+  flex: 1 1 auto;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+/* Palco colado nas quatro bordas: SEM aspect-ratio, SEM max-height.
+   Sobrepõe a media query de orientação do corrida.css. */
+body.games-fs-open #games-hub.jogo-ativo #jogo-corrida .cor-palco {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  min-height: 0;
+  aspect-ratio: auto;
+  margin: 0;
+  border-radius: 0;
+}
+/* Botão Voltar flutua no canto superior esquerdo */
+body.games-fs-open #games-hub.jogo-ativo #jogo-corrida .jogo-voltar {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 8px;
+  z-index: 6;
+  margin: 0;
+  padding: 8px 12px;
+  background: rgba(9, 14, 22, 0.55);
+  border-radius: 999px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 13px;
+}
+/* HUD (Distância/Munição/Recorde) flutua no topo à direita, horizontal
+   e compacto, por cima do jogo. */
+body.games-fs-open #games-hub.jogo-ativo #jogo-corrida .cor-hud {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  right: 10px;
+  left: auto;
+  z-index: 6;
+  margin: 0;
+  padding: 0;
+  gap: 6px;
+  background: transparent;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-corrida .cor-hud-item {
+  background: rgba(9, 14, 22, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 5px 12px;
+  min-width: 0;
+  border-radius: 12px;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-corrida .cor-hud-label {
+  font-size: 9px;
+  opacity: 0.85;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-corrida .cor-hud-valor {
+  font-size: 17px;
+}
+
 /* Elemento em tela cheia NATIVA (Fullscreen API): o navegador dá 100%
    da tela ao #games-hub. Garantimos preenchimento total e fundo opaco,
    independente do fallback games-fs-open. */

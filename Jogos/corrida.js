@@ -753,6 +753,37 @@
   }
 
   /* ══════════════════════════════════════════════════════════════
+     ORIENTAÇÃO NATIVA — pede ao sistema pra girar pra landscape (só
+     funciona se o manifest tiver "orientation":"any" e no APK/instalado).
+     Quando o lock nativo PEGA, o próprio SO gira a tela: o palco já vira
+     paisagem e NÃO devemos rotacionar por CSS (senão gira 2x). A flag
+     _corLockNativo indica se o lock foi aceito.
+  ══════════════════════════════════════════════════════════════ */
+  var _corLockNativo = false;
+  function _corTravarLandscape() {
+    try {
+      if (screen && screen.orientation && screen.orientation.lock) {
+        var p = screen.orientation.lock('landscape');
+        if (p && p.then) {
+          p.then(function () {
+            _corLockNativo = true;
+            _corAplicarOrientacao();
+            if (_corEstado !== 'jogando') _corDrawIdle();
+          }).catch(function () {
+            _corLockNativo = false;   // navegador comum recusa → usa CSS
+          });
+        }
+      }
+    } catch (e) { _corLockNativo = false; }
+  }
+  function _corDestravarOrientacao() {
+    try {
+      if (screen && screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+    } catch (e) {}
+    _corLockNativo = false;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
      ORIENTAÇÃO — rotaciona a arena por CSS quando o device está em
      retrato (data-rot=1) e mostra a dica "gire o celular". Reavalia
      em resize/orientationchange.
@@ -762,6 +793,16 @@
     var palco = document.getElementById('cor-palco');
     var dica = document.getElementById('cor-gire');
     if (!rot) return;
+    // Se o lock NATIVO pegou, o SO já girou a tela pra paisagem: NÃO
+    // rotacionamos por CSS (seria girar 2x) e escondemos a dica.
+    if (_corLockNativo) {
+      rot.setAttribute('data-rot', '0');
+      rot.style.width = ''; rot.style.height = ''; rot.style.top = ''; rot.style.left = '';
+      if (dica) dica.style.display = 'none';
+      _corDimensionar();
+      if (_corEstado !== 'jogando') _corDrawIdle();
+      return;
+    }
     // Detecta retrato pelas dimensões REAIS do palco (mais confiável em
     // fullscreen PWA que window.innerWidth/Height, que às vezes vêm errados).
     // Fallback pro window se o palco ainda não tiver dimensões.
@@ -821,6 +862,9 @@
     _corAssetAnimado('zumbi-normal.webp');
     _corAssetAnimado('zumbi-rapido.webp');
     _corAssetAnimado('zumbi-forte.webp');
+    // Pede ao sistema pra girar pra landscape (APK/instalado com manifest
+    // "any"). No navegador comum é recusado e caímos na rotação CSS.
+    _corTravarLandscape();
     _corMostrarOverlay('inicio');
     _corAplicarOrientacaoRepetido();
     _corDrawIdle();
@@ -876,6 +920,7 @@
     if (!_corCtx) _corCtx = _corCanvas.getContext('2d');
     _corLigarControles();
     _corMostrarOverlay(null);
+    _corTravarLandscape();
     _corAplicarOrientacaoRepetido();
     _corReset();
     _corEstado = 'jogando'; _corLast = 0;
@@ -887,6 +932,7 @@
     if (_corRAF) { cancelAnimationFrame(_corRAF); _corRAF = 0; }
     if (_corEstado === 'jogando') _corEstado = 'inicio';
     _corDrag = false;
+    _corDestravarOrientacao();     // volta a orientação do sistema ao normal
   }
 
   function _corMostrarOverlay(qual) {

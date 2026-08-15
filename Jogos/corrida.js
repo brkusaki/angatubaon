@@ -203,8 +203,22 @@
   ══════════════════════════════════════════════════════════════ */
   function _corDimensionar() {
     if (!_corCanvas) return;
-    var cssW = _corCanvas.offsetWidth || 640;
-    var cssH = _corCanvas.offsetHeight || 360;
+    var cssW, cssH;
+    // Com lock nativo (APK girado), o offsetWidth do canvas pode demorar a
+    // refletir o giro. Medimos preferencialmente pelo PALCO (que é o container
+    // real e já está com o tamanho da tela girada); se falhar, viewport; por
+    // último, offsetWidth do canvas.
+    var palco = document.getElementById('cor-palco');
+    if (_corLockNativo && palco) {
+      var pr = palco.getBoundingClientRect();
+      cssW = Math.round(pr.width) || _corCanvas.offsetWidth || 640;
+      cssH = Math.round(pr.height) || _corCanvas.offsetHeight || 360;
+    } else {
+      cssW = _corCanvas.offsetWidth || 640;
+      cssH = _corCanvas.offsetHeight || 360;
+    }
+    if (cssW < 2) cssW = 640;
+    if (cssH < 2) cssH = 360;
     _corDpr = Math.min(2, window.devicePixelRatio || 1);
     _corCanvas.width = Math.round(cssW * _corDpr);
     _corCanvas.height = Math.round(cssH * _corDpr);
@@ -588,15 +602,16 @@
 
     var asset = _corAsset('arma.webp');
     if (asset && asset.ok && asset.img) {
-      // Arma FPS empunhada: ancoramos pela LARGURA (~105% da tela) pra as
-      // asas transbordarem pras bordas laterais — a cara de "segurando a
-      // arma" que o Into the Dead tem. A altura vem da proporção; o centro
-      // da tela (onde vêm os zumbis) cai na fenda entre as asas, acima do
-      // rifle. A imagem deve vir recortada em paisagem larga (~2.2:1) —
-      // é o que faz a arma preencher a base sem virar um item flutuante.
+      // Arma FPS empunhada na base. Ancoramos pela largura pra as asas
+      // transbordarem, MAS com TETO de altura pra não cobrir a tela em
+      // telas landscape largas (celular deitado tem proporção ~2.2:1, então
+      // largura×105% daria altura maior que a tela). O teto garante que a
+      // arma ocupe no máx ~52% da altura, deixando o campo de visão livre.
       var ratio = (asset.h && asset.w) ? (asset.w / asset.h) : 2.2;  // w/h
       var aw = W * 1.05;
       var ah = aw / ratio;
+      var ahMax = H * 0.52;
+      if (ah > ahMax) { ah = ahMax; aw = ah * ratio; }
       ctx.drawImage(asset.img, cx - aw / 2, baseY - ah, aw, ah);
       return;
     }
@@ -847,10 +862,27 @@
     _corLigarControles();
     if (!_corResizeOn) {
       var reaval = function () {
-        if (window._gamesHubAberto && window._gamesHubAberto()) _corAplicarOrientacao();
+        if (window._gamesHubAberto && window._gamesHubAberto()) {
+          _corAplicarOrientacao();
+          if (_corEstado !== 'jogando') _corDrawIdle();
+        }
       };
       window.addEventListener('resize', reaval);
       window.addEventListener('orientationchange', reaval);
+      // O giro do lock nativo dispara 'change' no screen.orientation QUANDO
+      // a tela realmente terminou de girar (o .then do lock resolve antes
+      // disso). Aqui remedimos o canvas com as dimensões finais.
+      try {
+        if (screen && screen.orientation && screen.orientation.addEventListener) {
+          screen.orientation.addEventListener('change', function () {
+            // Várias remedições porque o layout assenta em passos.
+            reaval();
+            setTimeout(reaval, 60);
+            setTimeout(reaval, 200);
+            setTimeout(reaval, 450);
+          });
+        }
+      } catch (e) {}
       _corResizeOn = true;
     }
     _corEstado = 'inicio';

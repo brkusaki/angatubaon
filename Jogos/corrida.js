@@ -34,9 +34,16 @@
   ══════════════════════════════════════════════════════════════ */
   var _COR_ASSET_BASE = '/Jogos/assets/';
   var _corAssets = {};
+
+  // Asset registry. Para estáticos: reg.img (Image). Para animados: reg.frames
+  // (array de ImageBitmap) + reg.durs (duração ms de cada frame) + reg.total.
+  // Um webp ANIMADO desenhado via drawImage num canvas congela no 1º frame —
+  // o navegador não avança a animação dentro do canvas. Por isso extraímos os
+  // frames com ImageDecoder (nativo no Chrome/Android, o público dominante) e
+  // o motor escolhe o frame por tempo. Sem ImageDecoder, cai no vetor.
   function _corAsset(nome) {
     if (_corAssets[nome]) return _corAssets[nome];
-    var reg = { img: null, ok: false, w: 0, h: 0 };
+    var reg = { img: null, ok: false, w: 0, h: 0, frames: null, durs: null, total: 0, animado: false };
     _corAssets[nome] = reg;
     try {
       var im = new Image();
@@ -48,12 +55,75 @@
     return reg;
   }
 
+  // Prepara um asset ANIMADO: baixa o webp e decodifica todos os frames em
+  // ImageBitmaps. Popula reg.frames/durs/total. Idempotente.
+  function _corAssetAnimado(nome) {
+    var reg = _corAssets[nome];
+    if (!reg) { reg = { img: null, ok: false, w: 0, h: 0, frames: null, durs: null, total: 0, animado: false, _tentou: false }; _corAssets[nome] = reg; }
+    if (reg._tentouAnim) return reg;
+    reg._tentouAnim = true;
+    // Só tenta se ImageDecoder existe; senão o fallback estático/vetor cobre.
+    if (typeof window.ImageDecoder === 'undefined') return reg;
+    try {
+      fetch(_COR_ASSET_BASE + nome).then(function (r) {
+        if (!r.ok) throw 0; return r.arrayBuffer();
+      }).then(function (buf) {
+        var dec = new window.ImageDecoder({ data: buf, type: 'image/webp' });
+        return dec.tracks.ready.then(function () {
+          var track = dec.tracks.selectedTrack;
+          var count = (track && track.frameCount) ? track.frameCount : 1;
+          var frames = new Array(count);
+          var durs = new Array(count);
+          var pend = [];
+          for (var i = 0; i < count; i++) {
+            (function (idx) {
+              pend.push(dec.decode({ frameIndex: idx }).then(function (res) {
+                var vf = res.image;
+                durs[idx] = (vf.duration ? vf.duration / 1000 : 100); // µs→ms
+                // Converte VideoFrame em ImageBitmap pra drawImage rápido.
+                return createImageBitmap(vf).then(function (bm) {
+                  frames[idx] = bm;
+                  try { vf.close(); } catch (e) {}
+                });
+              }));
+            })(i);
+          }
+          return Promise.all(pend).then(function () {
+            reg.frames = frames;
+            reg.durs = durs;
+            reg.total = 0;
+            for (var k = 0; k < durs.length; k++) reg.total += (durs[k] || 100);
+            reg.w = frames[0] ? frames[0].width : 0;
+            reg.h = frames[0] ? frames[0].height : 0;
+            reg.animado = true;
+            reg.ok = true;
+          });
+        });
+      }).catch(function () { /* fica no fallback estático/vetor */ });
+    } catch (e) { /* idem */ }
+    return reg;
+  }
+
+  // Devolve o ImageBitmap do frame atual de um asset animado, dado o tempo
+  // global (ms). Retorna null se ainda não decodificou.
+  function _corFrameAtual(reg, tMs) {
+    if (!reg || !reg.frames || !reg.total) return null;
+    var t = tMs % reg.total;
+    var acc = 0;
+    for (var i = 0; i < reg.frames.length; i++) {
+      acc += (reg.durs[i] || 100);
+      if (t < acc) return reg.frames[i] || reg.frames[0];
+    }
+    return reg.frames[reg.frames.length - 1];;
+  }
+
   /* ── Estado / canvas ──────────────────────────────────────────── */
   var _corCanvas = null, _corCtx = null;
   var _corW = 640, _corH = 360, _corDpr = 1;
   var _corEstado = 'inicio';
   var _corRAF = 0, _corLast = 0;
   var _corListenersOn = false, _corResizeOn = false;
+  var _corRelogio = 0;    // tempo global (ms) p/ escolher frame das animações
 
   /* ── Config do mundo pseudo-3D (1a pessoa) ────────────────────── */
   var _COR_Z_FAR = 1.0;
@@ -446,11 +516,20 @@
     if (zb.morto) { var q = _corClamp(zb.cai / 0.6, 0, 1); mortAlpha = 1 - q; mortScale = 1 - q * 0.4; mortRot = q * 0.9; }
     ctx.globalAlpha = mortAlpha;
 
-    var asset = _corAsset('zumbi-' + zb.tipo + '.webp');
-    if (asset && asset.ok && asset.img) {
-      var aw = wpx * 2.4 * mortScale, ah = hpx * 2.0 * mortScale;
+    var reg = _corAssetAnimado('zumbi-' + zb.tipo + '.webp');
+    var frame = _corFrameAtual(reg, _corRelogio);
+    var aw, ah;
+    if (frame) {
+      // Animado: usa proporção real do frame pra não distorcer.
+      var fr = (reg.w && reg.h) ? (reg.w / reg.h) : 0.7;
+      ah = hpx * 2.0 * mortScale; aw = ah * fr;
       ctx.save(); ctx.translate(p.x, p.y - hpx + bob); ctx.rotate(mortRot);
-      ctx.drawImage(asset.img, -aw / 2, -ah, aw, ah); ctx.restore();
+      ctx.drawImage(frame, -aw / 2, -ah, aw, ah); ctx.restore();
+    } else if (reg && reg.ok && reg.img) {
+      // Fallback estático (webp não-animado ou sem ImageDecoder).
+      aw = wpx * 2.4 * mortScale; ah = hpx * 2.0 * mortScale;
+      ctx.save(); ctx.translate(p.x, p.y - hpx + bob); ctx.rotate(mortRot);
+      ctx.drawImage(reg.img, -aw / 2, -ah, aw, ah); ctx.restore();
     } else {
       _corVetorZumbi(ctx, p.x, p.y + bob, wpx * mortScale, hpx * mortScale, def, mortRot);
     }
@@ -573,6 +652,7 @@
     if (!_corLast) _corLast = ts;
     var dt = (ts - _corLast) / 1000; _corLast = ts;
     if (dt > 0.05) dt = 0.05;
+    _corRelogio = ts;                 // relógio p/ animação dos webp
     _corUpdate(dt);
     if (_corEstado === 'jogando') { _corDraw(); _corRAF = requestAnimationFrame(_corLoop); }
   }
@@ -682,14 +762,20 @@
     var palco = document.getElementById('cor-palco');
     var dica = document.getElementById('cor-gire');
     if (!rot) return;
-    var retrato = (window.innerHeight >= window.innerWidth);
-    if (retrato && palco) {
-      // Mede o palco (que em retrato está alto, ~9/16) e dimensiona o
-      // wrapper com os eixos TROCADOS: largura do wrapper = altura do
-      // palco, altura = largura do palco. Depois o CSS gira 90°, virando
-      // paisagem que preenche exatamente o palco. Pixels explícitos —
-      // sem depender de :has() nem de aspect-ratio do wrapper.
-      var pr = palco.getBoundingClientRect();
+    // Detecta retrato pelas dimensões REAIS do palco (mais confiável em
+    // fullscreen PWA que window.innerWidth/Height, que às vezes vêm errados).
+    // Fallback pro window se o palco ainda não tiver dimensões.
+    var retrato;
+    var pr = palco ? palco.getBoundingClientRect() : null;
+    if (pr && pr.width > 2 && pr.height > 2) {
+      retrato = (pr.height >= pr.width);
+    } else {
+      retrato = (window.innerHeight >= window.innerWidth);
+    }
+    if (retrato && palco && pr) {
+      // Mede o palco (em retrato, alto) e dimensiona o wrapper com os eixos
+      // TROCADOS: largura do wrapper = altura do palco, altura = largura.
+      // O CSS gira 90°, virando paisagem que preenche o palco.
       var pw = Math.max(1, Math.round(pr.width));
       var ph = Math.max(1, Math.round(pr.height));
       rot.setAttribute('data-rot', '1');
@@ -730,11 +816,35 @@
     var rec = document.getElementById('cor-recorde'); if (rec) rec.textContent = _corRec() + 'm';
     var d = document.getElementById('cor-dist'); if (d) d.textContent = '0m';
     var m = document.getElementById('cor-mun'); if (m) m.textContent = _COR_MUN_INI;
+    // Dispara a decodificação dos zumbis animados desde já (baixa + extrai
+    // frames em background; o fallback vetor cobre enquanto não chega).
+    _corAssetAnimado('zumbi-normal.webp');
+    _corAssetAnimado('zumbi-rapido.webp');
+    _corAssetAnimado('zumbi-forte.webp');
     _corMostrarOverlay('inicio');
-    _corAplicarOrientacao();
+    _corAplicarOrientacaoRepetido();
     _corDrawIdle();
+  }
+
+  // O fullscreen do celular muda o tamanho do palco de forma ASSÍNCRONA e em
+  // tempo variável (às vezes 300ms). Reaplicamos a orientação várias vezes
+  // após abrir, pra garantir que a rotação use as dimensões finais do palco.
+  function _corAplicarOrientacaoRepetido() {
+    _corAplicarOrientacao();
+    var atrasos = [50, 150, 300, 500, 800];
+    for (var i = 0; i < atrasos.length; i++) {
+      setTimeout(function () {
+        if (window._gamesHubAberto && window._gamesHubAberto()) {
+          _corAplicarOrientacao();
+          if (_corEstado !== 'jogando') _corDrawIdle();
+        }
+      }, atrasos[i]);
+    }
     if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(function () { _corAplicarOrientacao(); if (_corEstado !== 'jogando') _corDrawIdle(); });
+      requestAnimationFrame(function () {
+        _corAplicarOrientacao();
+        if (_corEstado !== 'jogando') _corDrawIdle();
+      });
     }
   }
 
@@ -766,7 +876,7 @@
     if (!_corCtx) _corCtx = _corCanvas.getContext('2d');
     _corLigarControles();
     _corMostrarOverlay(null);
-    _corAplicarOrientacao();
+    _corAplicarOrientacaoRepetido();
     _corReset();
     _corEstado = 'jogando'; _corLast = 0;
     if (_corRAF) cancelAnimationFrame(_corRAF);

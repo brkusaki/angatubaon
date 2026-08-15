@@ -509,7 +509,15 @@
 
     var asset = _corAsset('arma.webp');
     if (asset && asset.ok && asset.img) {
-      var aw = W * 0.5, ah = aw * (asset.h && asset.w ? asset.h / asset.w : 0.7);
+      // Arma FPS empunhada: ancoramos pela LARGURA (~105% da tela) pra as
+      // asas transbordarem pras bordas laterais — a cara de "segurando a
+      // arma" que o Into the Dead tem. A altura vem da proporção; o centro
+      // da tela (onde vêm os zumbis) cai na fenda entre as asas, acima do
+      // rifle. A imagem deve vir recortada em paisagem larga (~2.2:1) —
+      // é o que faz a arma preencher a base sem virar um item flutuante.
+      var ratio = (asset.h && asset.w) ? (asset.w / asset.h) : 2.2;  // w/h
+      var aw = W * 1.05;
+      var ah = aw / ratio;
       ctx.drawImage(asset.img, cx - aw / 2, baseY - ah, aw, ah);
       return;
     }

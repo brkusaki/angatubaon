@@ -61,6 +61,15 @@
   var _corCamX = 0, _corCamVX = 0;
   var _COR_CAM_LIM = 1.0;
 
+  /* ── Head-bob / passada (sensação de correr, estilo Into the Dead) ─
+     A passada avança proporcional à velocidade. Dela derivamos:
+       bobY  = câmera sobe/desce (2 passos por ciclo → freq dobrada)
+       swayX = micro-inclinação lateral, 1 por passo (freq simples)
+     Mantido SUTIL pra não enjoar. */
+  var _corPasso = 0;            // fase acumulada da passada
+  var _corBobY = 0;            // deslocamento vertical corrente (px, calc no draw)
+  var _corSwayX = 0;           // deslocamento lateral corrente (px, calc no draw)
+
   /* ── Corrida / dificuldade ────────────────────────────────────── */
   var _corDist = 0;
   var _corVel = 0;
@@ -103,14 +112,16 @@
   function _corProj(z, faixa) {
     var W = _corW, H = _corH;
     var zc = _corClamp(z, 0, _COR_Z_FAR) / _COR_Z_FAR;
-    var horizonY = H * _COR_HORIZ;
-    var baseY = H * 1.06;
+    // Head-bob empurra o horizonte pra baixo quando a câmera "sobe" no
+    // passo (a cena inteira sobe/desce junto). Sway empurra lateral.
+    var horizonY = H * _COR_HORIZ + _corBobY * H;
+    var baseY = H * 1.06 + _corBobY * H;
     var t = 1 - zc;
     var tt = t * t;
     var y = horizonY + (baseY - horizonY) * tt;
     var s = 0.14 + 0.95 * tt;
     var espalhar = 0.08 + 0.92 * tt;
-    var cx = W * 0.5 - _corCamX * (W * 0.42) * espalhar;
+    var cx = W * 0.5 - _corCamX * (W * 0.42) * espalhar + _corSwayX * W * espalhar;
     var x = cx + faixa * (W * 0.42) * espalhar;
     return { x: x, y: y, s: s, t: t };
   }
@@ -222,6 +233,17 @@
     _corVel = Math.min(_COR_VEL_MAX, _corVel + _COR_VEL_ACC * dt);
     _corDist += _corVel * dt * 34;
 
+    // Passada: avança com a velocidade. ~2.4 passos/seg em vel baixa,
+    // acelerando com a corrida. Deriva head-bob e micro-sway.
+    _corPasso += dt * (2.6 + _corVel * 1.6) * Math.PI;
+    // bobY: 2 subidas por ciclo de passada (pé esq + pé dir). Amplitude
+    // pequena, cresce um tico com a velocidade. Valor em fração de H.
+    var ampBob = 0.014 + _corVel * 0.004;
+    _corBobY = Math.abs(Math.sin(_corPasso)) * ampBob;      // sempre >=0 (só sobe)
+    // swayX: 1 balanço por passo, alterna lados. Bem sutil.
+    var ampSway = 0.010 + _corVel * 0.003;
+    _corSwayX = Math.sin(_corPasso * 0.5) * ampSway;
+
     if (_corTiroT > 0) _corTiroT -= dt;
     if (_corFlashT > 0) _corFlashT -= dt;
     if (_corRecuo > 0) _corRecuo = Math.max(0, _corRecuo - dt * 6);
@@ -282,7 +304,7 @@
   ══════════════════════════════════════════════════════════════ */
   function _corDraw() {
     if (!_corCtx) return;
-    var ctx = _corCtx, W = _corW, H = _corH, horizonY = H * _COR_HORIZ;
+    var ctx = _corCtx, W = _corW, H = _corH, horizonY = H * _COR_HORIZ + _corBobY * H;
 
     var gCeu = ctx.createLinearGradient(0, 0, 0, horizonY);
     gCeu.addColorStop(0, '#2a1c18'); gCeu.addColorStop(0.6, '#4a2f22'); gCeu.addColorStop(1, '#6b4130');
@@ -377,7 +399,8 @@
       var xt = fugaX + fa * topHalf, xb = cxBot + fa * botHalf;
       ctx.beginPath(); ctx.moveTo(xt, horizonY); ctx.lineTo(xb, H); ctx.stroke();
     }
-    var run = (_corDist * 0.9) % 60;
+    // Tracejado central "correndo" — bem mais rápido pra sensação de corrida.
+    var run = (_corDist * 2.4) % 60;
     ctx.strokeStyle = 'rgba(210,200,160,0.16)';
     for (var d = 0; d < 8; d++) {
       var tt = (d * 60 + run) / (8 * 60); var t2 = tt * tt;
@@ -387,6 +410,23 @@
       var cx = W * 0.5 - _corCamX * (W * 0.42) * (0.08 + 0.92 * t2);
       ctx.lineWidth = 1 + 5 * t2;
       ctx.beginPath(); ctx.moveTo(cx, y1); ctx.lineTo(cx, y2); ctx.stroke();
+    }
+    // Marcas laterais no chão (rachaduras/texturas) subindo rápido em
+    // direção à câmera — reforça MUITO a percepção de velocidade.
+    var run2 = (_corDist * 3.0) % 40;
+    ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+    for (var m = 0; m < 10; m++) {
+      var mt = (m * 40 + run2) / (10 * 40); var mt2 = mt * mt;
+      var my = horizonY + (H - horizonY) * mt2;
+      var half = (topHalf + (botHalf - topHalf) * mt2);
+      var mcx = W * 0.5 - _corCamX * (W * 0.42) * (0.08 + 0.92 * mt2);
+      var lw = Math.max(1, 3 * mt2);
+      ctx.lineWidth = lw;
+      // duas marcas curtas, uma de cada lado da estrada
+      ctx.beginPath();
+      ctx.moveTo(mcx - half * 0.7, my); ctx.lineTo(mcx - half * 0.4, my);
+      ctx.moveTo(mcx + half * 0.4, my); ctx.lineTo(mcx + half * 0.7, my);
+      ctx.stroke();
     }
   }
 
@@ -461,8 +501,9 @@
 
   function _corDrawArma(ctx, W, H) {
     var kick = _corRecuo * H * 0.05;
-    var swayX = Math.sin(_corDist * 0.18) * W * 0.006;
-    var swayY = Math.abs(Math.cos(_corDist * 0.18)) * H * 0.01;
+    // Arma balança em contrafase leve com a passada (sincronizada ao bob).
+    var swayX = Math.sin(_corPasso * 0.5) * W * 0.012;
+    var swayY = Math.abs(Math.sin(_corPasso)) * H * 0.016;
     var baseY = H + kick + swayY;
     var cx = W * 0.5 + swayX;
 

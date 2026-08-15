@@ -35,15 +35,20 @@
   var _COR_ASSET_BASE = '/Jogos/assets/';
   var _corAssets = {};
 
-  // Asset registry. Para estáticos: reg.img (Image). Para animados: reg.frames
-  // (array de ImageBitmap) + reg.durs (duração ms de cada frame) + reg.total.
-  // Um webp ANIMADO desenhado via drawImage num canvas congela no 1º frame —
-  // o navegador não avança a animação dentro do canvas. Por isso extraímos os
-  // frames com ImageDecoder (nativo no Chrome/Android, o público dominante) e
-  // o motor escolhe o frame por tempo. Sem ImageDecoder, cai no vetor.
+  // Metadados dos spritesheets animados (zumbis). Cada sheet é UMA imagem com
+  // os frames lado a lado na horizontal. Animamos desenhando o recorte do
+  // frame certo por tempo — 100% compatível com qualquer canvas/WebView, sem
+  // depender de ImageDecoder (que falha em WebViews antigos do APK).
+  var _COR_SHEETS = {
+    'zumbi-normal': { arquivo: 'zumbi-normal-sheet.webp', frames: 12, fps: 10 },
+    'zumbi-rapido': { arquivo: 'zumbi-rapido-sheet.webp', frames: 12, fps: 12 },
+    'zumbi-forte':  { arquivo: 'zumbi-forte-sheet.webp',  frames: 12, fps: 8 }
+  };
+
+  // Carrega uma imagem estática simples (arma, munição, ou um spritesheet).
   function _corAsset(nome) {
     if (_corAssets[nome]) return _corAssets[nome];
-    var reg = { img: null, ok: false, w: 0, h: 0, frames: null, durs: null, total: 0, animado: false };
+    var reg = { img: null, ok: false, w: 0, h: 0 };
     _corAssets[nome] = reg;
     try {
       var im = new Image();
@@ -55,66 +60,46 @@
     return reg;
   }
 
-  // Prepara um asset ANIMADO: baixa o webp e decodifica todos os frames em
-  // ImageBitmaps. Popula reg.frames/durs/total. Idempotente.
-  function _corAssetAnimado(nome) {
-    var reg = _corAssets[nome];
-    if (!reg) { reg = { img: null, ok: false, w: 0, h: 0, frames: null, durs: null, total: 0, animado: false, _tentou: false }; _corAssets[nome] = reg; }
-    if (reg._tentouAnim) return reg;
-    reg._tentouAnim = true;
-    // Só tenta se ImageDecoder existe; senão o fallback estático/vetor cobre.
-    if (typeof window.ImageDecoder === 'undefined') return reg;
-    try {
-      fetch(_COR_ASSET_BASE + nome).then(function (r) {
-        if (!r.ok) throw 0; return r.arrayBuffer();
-      }).then(function (buf) {
-        var dec = new window.ImageDecoder({ data: buf, type: 'image/webp' });
-        return dec.tracks.ready.then(function () {
-          var track = dec.tracks.selectedTrack;
-          var count = (track && track.frameCount) ? track.frameCount : 1;
-          var frames = new Array(count);
-          var durs = new Array(count);
-          var pend = [];
-          for (var i = 0; i < count; i++) {
-            (function (idx) {
-              pend.push(dec.decode({ frameIndex: idx }).then(function (res) {
-                var vf = res.image;
-                durs[idx] = (vf.duration ? vf.duration / 1000 : 100); // µs→ms
-                // Converte VideoFrame em ImageBitmap pra drawImage rápido.
-                return createImageBitmap(vf).then(function (bm) {
-                  frames[idx] = bm;
-                  try { vf.close(); } catch (e) {}
-                });
-              }));
-            })(i);
-          }
-          return Promise.all(pend).then(function () {
-            reg.frames = frames;
-            reg.durs = durs;
-            reg.total = 0;
-            for (var k = 0; k < durs.length; k++) reg.total += (durs[k] || 100);
-            reg.w = frames[0] ? frames[0].width : 0;
-            reg.h = frames[0] ? frames[0].height : 0;
-            reg.animado = true;
-            reg.ok = true;
-          });
-        });
-      }).catch(function () { /* fica no fallback estático/vetor */ });
-    } catch (e) { /* idem */ }
+  // Prepara o spritesheet de um zumbi (carrega a imagem única). Idempotente.
+  // reg.sheet = registro do _corAsset da imagem; reg.n/fw/fh/durFrame = meta.
+  function _corSheet(tipoKey) {
+    var chave = '__sheet_' + tipoKey;
+    if (_corAssets[chave]) return _corAssets[chave];
+    var meta = _COR_SHEETS[tipoKey];
+    var reg = { sheet: null, n: 0, fw: 0, fh: 0, durFrame: 100, ok: false };
+    _corAssets[chave] = reg;
+    if (!meta) return reg;
+    reg.n = meta.frames;
+    reg.durFrame = 1000 / (meta.fps || 10);
+    reg.sheet = _corAsset(meta.arquivo);   // carrega a imagem do sheet
     return reg;
   }
 
-  // Devolve o ImageBitmap do frame atual de um asset animado, dado o tempo
-  // global (ms). Retorna null se ainda não decodificou.
-  function _corFrameAtual(reg, tMs) {
-    if (!reg || !reg.frames || !reg.total) return null;
-    var t = tMs % reg.total;
-    var acc = 0;
-    for (var i = 0; i < reg.frames.length; i++) {
-      acc += (reg.durs[i] || 100);
-      if (t < acc) return reg.frames[i] || reg.frames[0];
-    }
-    return reg.frames[reg.frames.length - 1];;
+  // Desenha o frame animado atual de um spritesheet no contexto. Retorna true
+  // se desenhou (sheet pronto), false se ainda não carregou (usar fallback).
+  // (dx,dy) = canto sup-esq do destino; (dw,dh) = tamanho no destino.
+  function _corDrawSheetFrame(ctx, tipoKey, tMs, dx, dy, dw, dh) {
+    var reg = _corSheet(tipoKey);
+    if (!reg || !reg.sheet || !reg.sheet.ok || !reg.sheet.img || !reg.n) return false;
+    var img = reg.sheet.img;
+    // Largura de cada frame na imagem = largura total / nº de frames.
+    var fw = (img.naturalWidth || img.width) / reg.n;
+    var fh = (img.naturalHeight || img.height);
+    var total = reg.n * reg.durFrame;
+    var idx = Math.floor((tMs % total) / reg.durFrame);
+    if (idx < 0) idx = 0; if (idx >= reg.n) idx = reg.n - 1;
+    ctx.drawImage(img, idx * fw, 0, fw, fh, dx, dy, dw, dh);
+    return true;
+  }
+
+  // Proporção (w/h) de um frame do sheet, pra não distorcer.
+  function _corSheetRatio(tipoKey) {
+    var reg = _corSheet(tipoKey);
+    if (!reg || !reg.sheet || !reg.sheet.ok || !reg.sheet.img || !reg.n) return 0.7;
+    var img = reg.sheet.img;
+    var fw = (img.naturalWidth || img.width) / reg.n;
+    var fh = (img.naturalHeight || img.height);
+    return fh ? (fw / fh) : 0.7;
   }
 
   /* ── Estado / canvas ──────────────────────────────────────────── */
@@ -530,21 +515,14 @@
     if (zb.morto) { var q = _corClamp(zb.cai / 0.6, 0, 1); mortAlpha = 1 - q; mortScale = 1 - q * 0.4; mortRot = q * 0.9; }
     ctx.globalAlpha = mortAlpha;
 
-    var reg = _corAssetAnimado('zumbi-' + zb.tipo + '.webp');
-    var frame = _corFrameAtual(reg, _corRelogio);
-    var aw, ah;
-    if (frame) {
-      // Animado: usa proporção real do frame pra não distorcer.
-      var fr = (reg.w && reg.h) ? (reg.w / reg.h) : 0.7;
-      ah = hpx * 2.0 * mortScale; aw = ah * fr;
-      ctx.save(); ctx.translate(p.x, p.y - hpx + bob); ctx.rotate(mortRot);
-      ctx.drawImage(frame, -aw / 2, -ah, aw, ah); ctx.restore();
-    } else if (reg && reg.ok && reg.img) {
-      // Fallback estático (webp não-animado ou sem ImageDecoder).
-      aw = wpx * 2.4 * mortScale; ah = hpx * 2.0 * mortScale;
-      ctx.save(); ctx.translate(p.x, p.y - hpx + bob); ctx.rotate(mortRot);
-      ctx.drawImage(reg.img, -aw / 2, -ah, aw, ah); ctx.restore();
-    } else {
+    // Spritesheet animado (universal). Proporção real do frame pra não esticar.
+    var fr = _corSheetRatio(zb.tipo);
+    var ah = hpx * 2.0 * mortScale, aw = ah * fr;
+    ctx.save(); ctx.translate(p.x, p.y - hpx + bob); ctx.rotate(mortRot);
+    var desenhou = _corDrawSheetFrame(ctx, zb.tipo, _corRelogio, -aw / 2, -ah, aw, ah);
+    ctx.restore();
+    if (!desenhou) {
+      // Sheet ainda não carregou → boneco vetorial enquanto isso.
       _corVetorZumbi(ctx, p.x, p.y + bob, wpx * mortScale, hpx * mortScale, def, mortRot);
     }
     ctx.globalAlpha = 1;
@@ -891,9 +869,11 @@
     var m = document.getElementById('cor-mun'); if (m) m.textContent = _COR_MUN_INI;
     // Dispara a decodificação dos zumbis animados desde já (baixa + extrai
     // frames em background; o fallback vetor cobre enquanto não chega).
-    _corAssetAnimado('zumbi-normal.webp');
-    _corAssetAnimado('zumbi-rapido.webp');
-    _corAssetAnimado('zumbi-forte.webp');
+    // Pré-carrega os spritesheets dos zumbis (imagens únicas; o fallback
+    // vetor cobre enquanto não chegam).
+    _corSheet('zumbi-normal');
+    _corSheet('zumbi-rapido');
+    _corSheet('zumbi-forte');
     // Pede ao sistema pra girar pra landscape (APK/instalado com manifest
     // "any"). No navegador comum é recusado e caímos na rotação CSS.
     _corTravarLandscape();

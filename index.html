@@ -441,7 +441,7 @@
             </div>
             <div class="gc-info">
               <div class="gc-title">Corrida da Coruja</div>
-              <div class="gc-desc">Corra pela cidade, desvie dos zumbis e atire!</div>
+              <div class="gc-desc">Sobreviva aos zumbis em 1ª pessoa. Vire o celular!</div>
               <span class="gc-cta">Correr</span>
             </div>
           </div>
@@ -617,7 +617,7 @@
         </div>
       </div>
 
-      <!-- TELA: Corrida da Coruja -->
+      <!-- TELA: Corrida da Coruja (1ª pessoa, landscape) -->
       <div id="jogo-corrida" class="jogo-tela" style="display:none;">
         <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
         <div class="cor-card">
@@ -626,13 +626,20 @@
             <div class="cor-hud-item cor-hud-mun"><span class="cor-hud-label">Munição</span><span class="cor-hud-valor" id="cor-mun">12</span></div>
             <div class="cor-hud-item"><span class="cor-hud-label">Recorde</span><span class="cor-hud-valor" id="cor-recorde">0m</span></div>
           </div>
-          <div class="cor-arena" id="cor-arena">
-            <canvas id="cor-canvas"></canvas>
+          <div class="cor-palco" id="cor-palco">
+            <!-- Wrapper que o JS gira 90° quando o celular está em pé -->
+            <div class="cor-rot" id="cor-rot" data-rot="0">
+              <canvas id="cor-canvas"></canvas>
+            </div>
+            <!-- Dica pra virar o celular (só aparece em retrato) -->
+            <div class="cor-gire" id="cor-gire" style="display:none;">
+              <span><i class="fa fa-mobile-screen-button"></i> Vire o celular pra jogar deitado</span>
+            </div>
             <!-- Tela inicial -->
             <div class="cor-overlay" id="cor-inicio">
               <img src="/webp/owl-flying.webp" alt="" class="cor-overlay-owl" onerror="this.style.display='none'">
               <div class="cor-overlay-titulo">🧟 Corrida da Coruja</div>
-              <div class="cor-overlay-desc">A coruja corre sozinha por uma Angatuba tomada por zumbis. <b>Arraste o dedo</b> pra desviar e <b>toque</b> pra atirar. A munição é limitada — pegue as caixas no caminho!</div>
+              <div class="cor-overlay-desc">Em <b>primeira pessoa</b>, corra por uma Angatuba tomada por zumbis. <b>Arraste</b> pra desviar e <b>toque</b> pra atirar no que estiver na mira. Munição limitada — pegue as caixas! Melhor jogado com o <b>celular deitado</b>.</div>
               <div class="cor-dica">
                 <span class="cor-dica-item"><i class="fa fa-arrows-left-right"></i> Arraste pra desviar</span>
                 <span class="cor-dica-item"><i class="fa fa-crosshairs"></i> Toque pra atirar</span>

@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   CORRIDA DA CORUJA — módulo de jogo (lazy-loaded) — v3 PRIMEIRA PESSOA
+   CORRIDA DA CORUJA — módulo de jogo (lazy-loaded) — v4 PRIMEIRA PESSOA
    Endless runner estilo "Into the Dead" em PRIMEIRA PESSOA e LANDSCAPE:
    a câmera são os olhos do sobrevivente correndo pra frente por uma
    Angatuba tomada por zumbis. Você NÃO se vê — vê a arma na base da
@@ -20,6 +20,23 @@
    de tela, convergindo pro ponto de fuga no horizonte. Colisão = zumbi
    chega em z~0 perto do centro da visão. Mira = ponto central fixo;
    o tiro acerta o zumbi mais próximo cujo x projetado esteja sob a mira.
+
+   ─── MUDANÇAS DA v4 ────────────────────────────────────────────
+   0) O BUG DE VERDADE — CHAVE TROCADA: _COR_SHEETS era indexado por
+      'zumbi-normal' | 'zumbi-rapido' | 'zumbi-forte', mas o desenho
+      procurava o sheet por zb.tipo, que vale 'normal' | 'rapido' |
+      'forte'. Resultado: _COR_SHEETS['normal'] === undefined, o registro
+      voltava vazio, _corDrawSheetFrame devolvia false e o jogo caía no
+      boneco vetorial SEMPRE — mesmo com os arquivos no ar e baixados
+      (o preload usava a chave longa, então as imagens até chegavam;
+      só nunca eram desenhadas). Agora as chaves são as MESMAS de
+      _COR_TIPOS e o diag percorre _COR_TIPOS, pra essa divergência não
+      poder mais se esconder.
+   0b) FUNDO CHAPADO: os sheets exportados do render 3D vêm com fundo
+      cinza claro opaco, o que colocaria um retângulo claro em volta de
+      cada zumbi no campo escuro. Na carga, o fundo é apagado por flood
+      fill a partir das bordas — o que preserva os brancos internos
+      (olhos). Feito uma vez só, adiantado na tela inicial.
 
    ─── MUDANÇAS DA v3 ────────────────────────────────────────────
    1) ZUMBI INVISÍVEL (o bug): o sprite era ancorado em (p.y - hpx) e
@@ -65,10 +82,17 @@
   // se a proporção da imagem não bater com uma tira de N frames, o
   // _corLayoutSheet corrige sozinho (inclusive tratando o arquivo como
   // uma imagem única). Isso evita o zumbi virar uma tirinha invisível.
+  // ATENÇÃO: as chaves aqui têm que ser EXATAMENTE as mesmas de _COR_TIPOS
+  // ('normal' | 'rapido' | 'forte'), porque o desenho procura o sheet por
+  // zb.tipo. Era justamente essa divergência (chave 'zumbi-normal' aqui
+  // contra tipo 'normal' lá) que fazia o sheet NUNCA ser usado: o preload
+  // baixava os arquivos com a chave longa e, na hora de desenhar, o jogo
+  // procurava por 'normal', achava undefined e caía no boneco vetorial
+  // pra sempre. O nome do arquivo mora em "arquivo".
   var _COR_SHEETS = {
-    'zumbi-normal': { arquivo: 'zumbi-normal-sheet.webp', frames: 12, fps: 10 },
-    'zumbi-rapido': { arquivo: 'zumbi-rapido-sheet.webp', frames: 12, fps: 12 },
-    'zumbi-forte':  { arquivo: 'zumbi-forte-sheet.webp',  frames: 12, fps: 8 }
+    normal: { arquivo: 'zumbi-normal-sheet.webp', frames: 12, fps: 10 },
+    rapido: { arquivo: 'zumbi-rapido-sheet.webp', frames: 12, fps: 12 },
+    forte:  { arquivo: 'zumbi-forte-sheet.webp',  frames: 12, fps: 8 }
   };
 
   // Carrega uma imagem, tentando VÁRIOS nomes em cascata. Isso torna o jogo
@@ -114,6 +138,83 @@
   // já tentando as variantes de nome.
   function _corAsset(nome) {
     return _corAssetMulti(_corVariantes(nome));
+  }
+
+  /* ── Fundo chapado → transparente ───────────────────────────────
+     Vários sheets exportados de render 3D vêm com o fundo CHAPADO
+     (cinza claro/branco) em vez de alfa. Desenhados no campo escuro,
+     viram um retângulo claro em volta do zumbi — fica horrível.
+
+     Aqui, UMA ÚNICA VEZ no carregamento, copiamos a imagem pra um
+     canvas e apagamos o fundo por preenchimento a partir das BORDAS
+     (flood fill). Usar as bordas — e não "toda cor clara" — preserva
+     os brancos de DENTRO do desenho: os olhos do zumbi continuam lá.
+
+     Só age quando os quatro cantos são opacos E da mesma cor (sinal
+     claro de fundo chapado). Se o arquivo já tiver alfa, ou se o
+     canvas falhar por qualquer motivo, devolve null e o jogo usa a
+     imagem original — nunca fica pior do que estava.
+  ─────────────────────────────────────────────────────────────── */
+  function _corSemFundo(img) {
+    try {
+      var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      if (!w || !h || w * h > 4194304) return null;   // >4MP: não vale o custo
+      var cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      var c = cv.getContext('2d');
+      if (!c) return null;
+      c.drawImage(img, 0, 0);
+      var id = c.getImageData(0, 0, w, h);
+      var d = id.data, N = w * h;
+      // Os quatro cantos: se algum já é transparente, o arquivo está certo.
+      var cantos = [0, (w - 1) * 4, (N - w) * 4, (N - 1) * 4];
+      var i, o;
+      for (i = 0; i < 4; i++) if (d[cantos[i] + 3] < 250) return null;
+      var r0 = d[0], g0 = d[1], b0 = d[2];
+      var TOL = 46 * 46;
+      for (i = 1; i < 4; i++) {
+        o = cantos[i];
+        var ar = d[o] - r0, ag = d[o + 1] - g0, ab = d[o + 2] - b0;
+        if (ar * ar + ag * ag + ab * ab > TOL) return null;   // cantos diferentes
+      }
+      var vis = new Uint8Array(N);
+      var fila = new Int32Array(N);
+      var ini = 0, fim = 0;
+      function por(px) {
+        if (px < 0 || px >= N || vis[px]) return;
+        var q = px * 4;
+        var dr = d[q] - r0, dg = d[q + 1] - g0, db = d[q + 2] - b0;
+        if (dr * dr + dg * dg + db * db > TOL) return;
+        vis[px] = 1; fila[fim++] = px;
+      }
+      var x, y;
+      for (x = 0; x < w; x++) { por(x); por((h - 1) * w + x); }
+      for (y = 0; y < h; y++) { por(y * w); por(y * w + w - 1); }
+      while (ini < fim) {
+        var p = fila[ini++];
+        d[p * 4 + 3] = 0;
+        x = p % w; y = (p / w) | 0;
+        if (x > 0) por(p - 1);
+        if (x < w - 1) por(p + 1);
+        if (y > 0) por(p - w);
+        if (y < h - 1) por(p + w);
+      }
+      if (!fim) return null;
+      c.putImageData(id, 0, 0);
+      return cv;
+    } catch (e) { return null; }   // canvas "tainted" ou memória: segue com a original
+  }
+
+  // Fonte de pixels de um asset: o canvas com fundo removido, se deu certo,
+  // senão a própria imagem. Resolvido preguiçosamente na 1a vez que desenha.
+  function _corFonte(reg) {
+    if (!reg || !reg.ok || !reg.img) return null;
+    if (reg.fonte === undefined) {
+      var limpo = _corSemFundo(reg.img);
+      reg.fonte = limpo || reg.img;
+      reg.fundoRemovido = !!limpo;
+    }
+    return reg.fonte;
   }
 
   /* ── Descoberta do LAYOUT do spritesheet ────────────────────────
@@ -196,7 +297,9 @@
       if (idx < 0) idx = 0; if (idx >= lay.n) idx = lay.n - 1;
     }
     var col = idx % lay.c, lin = (idx / lay.c) | 0;
-    ctx.drawImage(reg.sheet.img, col * lay.fw, lin * lay.fh, lay.fw, lay.fh, dx, dy, dw, dh);
+    var fonte = _corFonte(reg.sheet);
+    if (!fonte) return false;
+    ctx.drawImage(fonte, col * lay.fw, lin * lay.fh, lay.fw, lay.fh, dx, dy, dw, dh);
     return true;
   }
 
@@ -890,9 +993,10 @@
     if (!desenhou) {
       // 2ª opção: o webp estático antigo (imagem real, sem animar).
       var est = _corAsset('zumbi-' + zb.tipo + '.webp');
-      if (est && est.ok && est.img && est.w && est.h) {
+      var fonteEst = _corFonte(est);
+      if (fonteEst && est.w && est.h) {
         var eaw = ah * (est.w / est.h);
-        ctx.drawImage(est.img, -eaw / 2, -ah, eaw, ah);
+        ctx.drawImage(fonteEst, -eaw / 2, -ah, eaw, ah);
         desenhou = true;
       }
     }
@@ -964,10 +1068,10 @@
     ctx.globalAlpha = 0.3 * (0.4 + s); ctx.fillStyle = '#000';
     ctx.beginPath(); ctx.ellipse(p.x, p.y, sz * 0.9, sz * 0.3, 0, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
-    var asset = _corAsset('municao.webp');
-    if (asset && asset.ok && asset.img) {
+    var fonteMun = _corFonte(_corAsset('municao.webp'));
+    if (fonteMun) {
       var aw = sz * 2.4, ah = sz * 2.4;
-      ctx.drawImage(asset.img, p.x - aw / 2, p.y - ah + bob, aw, ah);
+      ctx.drawImage(fonteMun, p.x - aw / 2, p.y - ah + bob, aw, ah);
     } else {
       ctx.save(); ctx.translate(p.x, p.y - sz + bob);
       ctx.fillStyle = '#3e5a2e'; ctx.fillRect(-sz, -sz * 0.7, sz * 2, sz * 1.4);
@@ -990,7 +1094,8 @@
     var cx = W * 0.5 + swayX;
 
     var asset = _corAsset('arma.webp');
-    if (asset && asset.ok && asset.img) {
+    var fonteArma = _corFonte(asset);
+    if (fonteArma) {
       // Arma FPS empunhada na base. Ancoramos pela largura pra as asas
       // transbordarem, MAS com TETO de altura pra não cobrir a tela em
       // telas landscape largas (celular deitado tem proporção ~2.2:1, então
@@ -1001,7 +1106,7 @@
       var ah = aw / ratio;
       var ahMax = H * 0.52;
       if (ah > ahMax) { ah = ahMax; aw = ah * ratio; }
-      ctx.drawImage(asset.img, cx - aw / 2, baseY - ah, aw, ah);
+      ctx.drawImage(fonteArma, cx - aw / 2, baseY - ah, aw, ah);
       return;
     }
     ctx.save(); ctx.translate(cx, baseY);
@@ -1285,15 +1390,36 @@
     _corAtualizarHUD(true);
     // Pré-carrega os spritesheets dos zumbis (imagens únicas; o fallback
     // vetor cobre enquanto não chegam).
-    _corSheet('zumbi-normal');
-    _corSheet('zumbi-rapido');
-    _corSheet('zumbi-forte');
+    _corSheet('normal');
+    _corSheet('rapido');
+    _corSheet('forte');
+    _corPrepararFontes();
     // Pede ao sistema pra girar pra landscape (APK/instalado com manifest
     // "any"). No navegador comum é recusado e caímos na rotação CSS.
     _corTravarLandscape();
     _corMostrarOverlay('inicio');
     _corAplicarOrientacaoRepetido();
     _corDrawIdle();
+  }
+
+  /* Adianta o trabalho pesado de tirar o fundo chapado dos sprites (flood
+     fill num canvas do tamanho da imagem) enquanto o jogador ainda está na
+     tela inicial lendo as instruções. Se isso rodasse na primeira vez que
+     cada zumbi aparece, daria um engasgo no meio da corrida. Tentamos
+     algumas vezes porque as imagens chegam da rede em tempos diferentes. */
+  function _corPrepararFontes() {
+    var tentativas = 0;
+    var t = setInterval(function () {
+      var faltou = false;
+      for (var tipo in _COR_TIPOS) {
+        if (!_COR_TIPOS.hasOwnProperty(tipo)) continue;
+        var reg = _corSheetPronto(tipo);
+        if (reg) _corFonte(reg.sheet); else faltou = true;
+      }
+      _corFonte(_corAsset('arma.webp'));
+      _corFonte(_corAsset('municao.webp'));
+      if (!faltou || ++tentativas > 20) clearInterval(t);
+    }, 400);
   }
 
   // O fullscreen do celular muda o tamanho do palco de forma ASSÍNCRONA e em
@@ -1385,22 +1511,36 @@
      reexporte como tira horizontal de 12 quadros lado a lado. */
   function _corDiag() {
     var out = {};
-    for (var k in _COR_SHEETS) {
-      if (!_COR_SHEETS.hasOwnProperty(k)) continue;
-      var reg = _corSheet(k), s = reg.sheet;
-      var pronto = _corSheetPronto(k);
-      out[k] = {
-        arquivo: _COR_SHEETS[k].arquivo,
+    // Percorre por _COR_TIPOS (a chave que o DESENHO usa), não por
+    // _COR_SHEETS. Assim, se as duas tabelas voltarem a divergir, o diag
+    // acusa "semSheet" em vez de dizer que está tudo certo — foi esse
+    // ponto cego que escondeu o bug das chaves por duas versões.
+    for (var tipo in _COR_TIPOS) {
+      if (!_COR_TIPOS.hasOwnProperty(tipo)) continue;
+      var meta = _COR_SHEETS[tipo];
+      if (!meta) { out[tipo] = { erro: 'sem entrada em _COR_SHEETS para o tipo "' + tipo + '"' }; continue; }
+      var reg = _corSheet(tipo), s = reg.sheet;
+      var pronto = _corSheetPronto(tipo);
+      if (pronto) _corFonte(s);   // força resolver o fundo pra reportar abaixo
+      out[tipo] = {
+        arquivo: meta.arquivo,
         carregou: !!(s && s.ok),
         nomeQueFuncionou: s ? s.nomeOk : null,
         imagem: s && s.ok ? (s.w + '×' + s.h) : null,
         frames: pronto ? pronto.lay.n : 0,
         grade: pronto ? (pronto.lay.c + '×' + pronto.lay.r) : null,
-        frameProporcao: pronto ? +(pronto.lay.fw / pronto.lay.fh).toFixed(3) : null
+        frameProporcao: pronto ? +(pronto.lay.fw / pronto.lay.fh).toFixed(3) : null,
+        fundoChapadoRemovido: s ? !!s.fundoRemovido : false,
+        usandoSprite: !!pronto
       };
     }
-    out.arma = (function () { var a = _corAsset('arma.webp'); return { carregou: a.ok, imagem: a.ok ? a.w + '×' + a.h : null }; })();
-    out.municao = (function () { var a = _corAsset('municao.webp'); return { carregou: a.ok, imagem: a.ok ? a.w + '×' + a.h : null }; })();
+    function estat(nome) {
+      var a = _corAsset(nome);
+      _corFonte(a);
+      return { carregou: a.ok, imagem: a.ok ? a.w + '×' + a.h : null, fundoChapadoRemovido: !!a.fundoRemovido };
+    }
+    out.arma = estat('arma.webp');
+    out.municao = estat('municao.webp');
     out.audio = _corAC ? _corAC.state : 'não criado';
     return out;
   }

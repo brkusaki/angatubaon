@@ -8,6 +8,11 @@
 (function () {
   'use strict';
 
+  // Atalho pra fachada de som da ponte (no-op quando mudo ou não carregou).
+  function _som() {
+    return (window.AngatubaGames && window.AngatubaGames.som) || null;
+  }
+
   /* -- Sequência da Coruja (estilo Simon/Genius) -- */
   var _SQ_CORES = ['#a855f7', '#f59e0b', '#4ade80', '#3b82f6']; // 4 corujas
   var _sqSeq = [];          // sequência sorteada
@@ -30,20 +35,27 @@
   }
 
   // Quantas corujas ficam ativas conforme a rodada. Começa com 4 (grade 2x2)
-  // e expande para 6 (grade 3x2) a partir da rodada 6, deixando o jogo mais
+  // e expande para 6 (2x3) a partir da rodada 6, deixando o jogo mais
   // difícil naturalmente para quem avança.
   function _sqCorujasAtivas(rodada) {
     return rodada >= 6 ? 6 : 4;
   }
 
-  // Mostra/esconde os 2 botões extras e ajusta a grade (2x2 <-> 3x2).
+  // Trava/destrava as casas extras. Os SEIS lugares ficam sempre na tela
+  // (2 colunas × 3 linhas): as casas que ainda não entraram em jogo viram
+  // slots travados, com cadeado e sem clique. Antes elas eram escondidas
+  // com display:none e a grade virava 3 colunas ao expandir — as corujas
+  // trocavam de lugar e parecia que outro jogo tinha começado.
   function _sqAjustarGrade(ativas) {
     var grade = document.getElementById('sq-grade');
     if (!grade) return;
     grade.classList.toggle('sq-grade-6', ativas === 6);
     var btns = grade.querySelectorAll('.sq-btn');
     for (var i = 0; i < btns.length; i++) {
-      btns[i].style.display = (i < ativas) ? '' : 'none';
+      // limpa o display:none que os dois últimos trazem do index.html
+      btns[i].style.display = '';
+      btns[i].classList.toggle('sq-travada', i >= ativas);
+      btns[i].setAttribute('aria-disabled', i >= ativas ? 'true' : 'false');
     }
   }
 
@@ -52,7 +64,10 @@
     var grade = document.getElementById('sq-grade');
     if (!grade) return;
     var btns = grade.querySelectorAll('.sq-btn');
-    for (var i = 0; i < btns.length; i++) btns[i].classList.remove('sq-on');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.remove('sq-on');
+      btns[i].classList.remove('sq-nova');
+    }
   }
 
   function _sqPreparar() {
@@ -81,8 +96,24 @@
     var b = btns[idx];
     b.classList.add('sq-on');
     if (navigator.vibrate) { try { navigator.vibrate(12); } catch(e) {} }
+    if (_som()) _som().nota(idx);   // cada coruja tem sua nota musical
     var t = setTimeout(function(){ b.classList.remove('sq-on'); }, dur || 380);
     _sqTimers.push(t);
+  }
+
+  // Dá o pop de entrada nas corujas que acabaram de aparecer. Como as
+  // antigas ficam paradas no mesmo lugar, só as novas precisam chamar
+  // atenção (antes a grade inteira dava um scale, o que reforçava a
+  // impressão de que o jogo tinha recomeçado).
+  function _sqDestacarNovas(de, ate) {
+    var btns = _sqBotoes();
+    for (var i = de; i < ate; i++) {
+      var b = btns[i];
+      if (!b) continue;
+      b.classList.remove('sq-nova');
+      void b.offsetWidth;
+      b.classList.add('sq-nova');
+    }
   }
 
   // Toca a sequência inteira pro jogador ver.
@@ -127,21 +158,22 @@
     }
 
     // Ajusta quantas corujas estão em jogo. Se acabou de expandir para 6,
-    // mostra um aviso pra pessoa notar as novas corujas.
+    // avisa e anima SÓ as duas novas — a sequência já vista continua nos
+    // mesmos botões, então a pessoa não perde a referência.
     var ativas = _sqCorujasAtivas(_sqRodada);
     var antesAtivas = _sqCorujasAtivas(_sqRodada - 1);
     _sqAjustarGrade(ativas);
     if (ativas > antesAtivas) {
       var st = document.getElementById('sq-status');
-      if (st) st.textContent = 'Mais corujas! Agora são ' + ativas + ' 🔥';
-      var grade = document.getElementById('sq-grade');
-      if (grade) { grade.classList.remove('sq-expandiu'); void grade.offsetWidth; grade.classList.add('sq-expandiu'); }
+      if (st) st.textContent = 'Destravaram 2 corujas! Agora são 6 🔥';
+      _sqDestacarNovas(antesAtivas, ativas);
       if (navigator.vibrate) { try { navigator.vibrate([30, 50, 30]); } catch(e) {} }
+      if (_som()) _som().nivelUp();
     }
 
     _sqSeq.push(Math.floor(Math.random() * ativas));
     // Dá um tempinho a mais na rodada que expande, pra pessoa perceber.
-    var espera = (ativas > antesAtivas) ? 1100 : 600;
+    var espera = (ativas > antesAtivas) ? 1300 : 600;
     var t = setTimeout(_sqPlayback, espera);
     _sqTimers.push(t);
   }
@@ -149,6 +181,9 @@
   // Jogador tocou numa coruja.
   function _sqTocar(idx) {
     if (!_sqAceitando) return;
+    // casa ainda travada não conta (o CSS já bloqueia o clique; isto é a
+    // rede de segurança caso o sequencia.css não tenha carregado)
+    if (idx >= _sqCorujasAtivas(_sqRodada)) return;
     _sqAcender(idx, 260);
 
     if (idx === _sqSeq[_sqPasso]) {
@@ -160,6 +195,7 @@
         var st = document.getElementById('sq-status');
         if (st) st.textContent = 'Acertou! 🎉';
         if (navigator.vibrate) { try { navigator.vibrate([15, 40, 15]); } catch(e) {} }
+        if (_som()) _som().acerto();
         var t = setTimeout(_sqProximaRodada, 700);
         _sqTimers.push(t);
       }
@@ -184,6 +220,10 @@
     var bateu = alcancado > rec;
     if (bateu) _sqRecordeSet(alcancado);
     if (window.AngatubaGames) window.AngatubaGames.rankSubmeter('sequencia', alcancado);
+    if (_som()) { if (bateu) _som().fim(true); else _som().erro(); }
+    if (bateu && window.AngatubaGames && window.AngatubaGames.efeitos) {
+      window.AngatubaGames.efeitos.confete('sq-card');
+    }
 
     var recEl = document.getElementById('sq-recorde');
     if (recEl) recEl.textContent = _sqRecordeGet();
@@ -213,6 +253,7 @@
   function _sqComecar() {
     _sqLimparTimers();
     _sqApagarTodos();
+    _sqAjustarGrade(4); // recomeça sempre na grade 2x2
     _sqSeq = []; _sqPasso = 0; _sqRodada = 0;
     _sqAceitando = false; _sqTocando = false;
     var inicio = document.getElementById('sq-inicio'); if (inicio) inicio.style.display = 'none';

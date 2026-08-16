@@ -4,28 +4,47 @@
    Só o CSS específico do jogo. As regras de tela cheia
    (body.games-fs-open .sq-card / .sq-hud / .sq-grade) permanecem em
    styles.css. Este bloco é autocontido (keyframes próprios).
+
+   IMPORTANTE — layout da grade:
+   os SEIS lugares existem desde a rodada 1 (2 colunas × 3 linhas). As
+   duas casas extras ficam como slots travados (cadeado) até a rodada 6,
+   quando destravam com um pop. Nada muda de coluna, de tamanho ou de
+   posição no meio do jogo — antes a grade virava 3 colunas ao expandir
+   e tudo se remanejava, dando a sensação de que outro jogo começou.
    ═══════════════════════════════════════════════════════════════ */
 
 /* ═════ Sequência da Coruja (Simon/Genius) ══ */
 .sq-card {
-  border-radius: 16px; overflow: hidden;
+  border-radius: 18px; overflow: hidden;
   border: 1px solid var(--border);
-  background: var(--surface);
+  background:
+    radial-gradient(130% 90% at 50% -20%, rgba(168,85,247,0.18), transparent 62%),
+    linear-gradient(180deg, var(--surface), var(--bg));
   position: relative;
 }
+
+/* ── HUD: cada número vira uma pílula com leve profundidade ── */
 .sq-hud {
-  display: flex; justify-content: space-around;
+  display: flex; justify-content: center; gap: 10px;
   padding: 14px 12px;
   background: linear-gradient(135deg, rgba(168,85,247,0.12), rgba(59,130,246,0.08));
   border-bottom: 1px solid var(--border);
 }
-.sq-hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.sq-hud-item {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  min-width: 108px; padding: 7px 16px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.09);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
 .sq-hud-label {
-  font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
-  color: var(--muted); font-weight: 700;
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted); font-weight: 800;
 }
 .sq-hud-valor {
-  font-family: var(--font-h); font-weight: 800; font-size: 22px; color: var(--text);
+  font-family: var(--font-h); font-weight: 800; font-size: 23px; color: var(--text);
+  font-variant-numeric: tabular-nums; line-height: 1.1;
 }
 .sq-hud-valor.sq-rodada-up { animation: sqRodadaUp .45s ease; }
 @keyframes sqRodadaUp {
@@ -33,24 +52,54 @@
   50% { transform: scale(1.35); color: #4ade80; }
   100% { transform: scale(1); }
 }
+
+/* Em tela cheia o styles.css deixa o HUD "sticky" (top: 44px). A tela da
+   Sequência não rola — ela cabe inteira na viewport —, e essa âncora só
+   empurrava o HUD 44px para baixo, fazendo o bloco opaco dele cobrir o
+   texto de status logo abaixo. Aqui ele volta a ser um elemento normal. */
+body.games-fs-open .sq-hud { position: static; top: auto; }
+
+/* ── Status: pílula centralizada, some no fundo em vez de flutuar solto ── */
 .sq-status {
-  text-align: center; padding: 14px 16px 4px;
-  font-family: var(--font-h); font-weight: 800; font-size: 18px; color: var(--text);
-  min-height: 24px;
+  width: fit-content; max-width: calc(100% - 32px);
+  margin: 13px auto 2px; padding: 7px 18px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.10);
+  font-family: var(--font-h); font-weight: 800; font-size: 14.5px;
+  color: var(--text); text-align: center; line-height: 1.35;
+  min-height: 22px;
+  transition: background .2s, border-color .2s, color .2s;
 }
-/* Grade 2x2 das corujas */
+
+/* ── Grade das corujas: painel do "console" ──
+   Sempre 2 colunas × 3 linhas, com os 6 lugares presentes desde o
+   começo (ver nota do topo). A classe .sq-grade-6 é só um marcador de
+   estado — de propósito ela NÃO mexe em tamanho nem em colunas. */
 .sq-grade {
   display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-  padding: 16px; max-width: 340px; margin: 0 auto;
+  padding: 14px; max-width: 336px; margin: 14px auto;
+  border-radius: 26px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,0.055), transparent 72%),
+    linear-gradient(180deg, rgba(18,18,24,0.92), rgba(9,9,13,0.92));
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 22px 44px -22px rgba(0,0,0,0.95);
 }
-/* Modo 6 corujas: grade 3 colunas (3x2) */
-.sq-grade.sq-grade-6 { grid-template-columns: 1fr 1fr 1fr; max-width: 420px; }
-.sq-grade.sq-expandiu { animation: sqExpandiu .6s ease; }
-@keyframes sqExpandiu {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+/* Em tela cheia o hub manda "margin: auto 0" (só centraliza na vertical) e a
+   grade encostava na esquerda. Aqui devolvemos a centralização nos dois eixos
+   e limitamos a largura pela ALTURA disponível, para as três linhas caberem
+   em telas curtas — o cálculo não depende de quantas corujas estão ativas,
+   então o tamanho dos botões nunca muda no meio da partida.
+   (Mesmo peso de seletor, e este CSS é injetado depois do styles.css.) */
+body.games-fs-open .sq-grade {
+  margin: auto;
+  max-width: min(336px, calc((100vh - 244px) / 1.5 + 40px));
+  max-width: min(336px, calc((100dvh - 244px) / 1.5 + 40px));
 }
+
 .sq-grade.sq-erro { animation: sqErro .4s ease; }
 @keyframes sqErro {
   0%,100% { transform: translateX(0); }
@@ -59,66 +108,164 @@
   60% { transform: translateX(-6px); }
   80% { transform: translateX(6px); }
 }
+
+/* ── Botão-coruja: cada um já nasce com a SUA cor (apagada) ──
+   Antes eram quatro quadrados cinzas idênticos — a cor só existia no
+   instante em que acendia. Agora a grade tem identidade parada. */
 .sq-btn {
   position: relative; aspect-ratio: 1 / 1;
-  border: 2px solid var(--border); border-radius: 18px;
-  background: var(--surface2);
+  border: 1.5px solid color-mix(in srgb, var(--sqc) 34%, transparent);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--sqc) 26%, transparent) 0%, transparent 68%),
+    linear-gradient(180deg, rgba(255,255,255,0.055), rgba(0,0,0,0.30));
   cursor: pointer; -webkit-tap-highlight-color: transparent;
   display: flex; align-items: center; justify-content: center;
-  transition: transform .08s, box-shadow .15s, filter .15s;
-  overflow: hidden; opacity: .55;
+  overflow: hidden; padding: 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.10),
+    inset 0 -10px 18px -12px rgba(0,0,0,0.9),
+    0 6px 14px -8px rgba(0,0,0,0.9);
+  transition: transform .1s ease, box-shadow .18s ease,
+              border-color .18s ease, filter .18s ease;
+}
+/* Núcleo da "lâmpada": fica invisível e explode quando a coruja acende. */
+.sq-btn::after {
+  content: ''; position: absolute; inset: 0; z-index: 0;
+  border-radius: inherit; pointer-events: none;
+  background: radial-gradient(circle at 50% 44%,
+    #fff 0%,
+    color-mix(in srgb, var(--sqc) 92%, #fff) 22%,
+    var(--sqc) 44%,
+    transparent 76%);
+  opacity: 0; transform: scale(.72);
+  transition: opacity .16s ease, transform .16s ease;
 }
 .sq-btn img {
-  width: 62%; height: 62%; object-fit: contain;
-  filter: grayscale(.5) brightness(.8);
-  transition: filter .15s, transform .12s;
+  width: 60%; height: 60%; object-fit: contain;
+  position: relative; z-index: 1;   /* fica ACIMA do núcleo de luz */
+  opacity: .72;
+  filter: grayscale(.35) brightness(.85);
+  transition: filter .16s ease, transform .14s ease, opacity .16s ease;
   pointer-events: none;
 }
-.sq-btn:active { transform: scale(.95); }
-/* Cada coruja tem sua cor de fundo/glow quando acende */
+.sq-btn:active { transform: scale(.94); }
+
+/* Cada coruja tem sua cor (usada na borda, no fundo e no brilho) */
 .sq-btn-0 { --sqc: #a855f7; }
 .sq-btn-1 { --sqc: #f59e0b; }
 .sq-btn-2 { --sqc: #4ade80; }
 .sq-btn-3 { --sqc: #3b82f6; }
 .sq-btn-4 { --sqc: #ec4899; }
 .sq-btn-5 { --sqc: #14b8a6; }
-/* Estado aceso: cor viva, brilho, coruja em destaque */
+
+/* Estado aceso: lâmpada ligada — cor viva, halo e a coruja em destaque */
 .sq-btn.sq-on {
-  opacity: 1;
-  border-color: var(--sqc);
-  background: radial-gradient(circle at 50% 45%, var(--sqc), transparent 75%), var(--surface2);
-  box-shadow: 0 0 22px var(--sqc), inset 0 0 18px rgba(255,255,255,.12);
-  transform: scale(1.04);
+  border-color: color-mix(in srgb, var(--sqc) 92%, #fff);
+  transform: scale(1.035);
+  filter: saturate(1.15);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--sqc) 60%, transparent),
+    0 0 30px 4px color-mix(in srgb, var(--sqc) 55%, transparent),
+    inset 0 0 26px rgba(255,255,255,0.28);
 }
+.sq-btn.sq-on::after { opacity: 1; transform: scale(1); }
 .sq-btn.sq-on img {
-  filter: grayscale(0) brightness(1.15) drop-shadow(0 2px 6px rgba(0,0,0,.5));
+  opacity: 1;
+  filter: grayscale(0) brightness(1.12) drop-shadow(0 2px 8px rgba(0,0,0,.65));
   transform: scale(1.08);
 }
-/* Overlays de início/fim */
+
+/* Slot travado: a casa já existe (e por isso nada se move quando ela
+   entra em jogo), mas está apagada, com cadeado e sem clique. */
+.sq-btn.sq-travada {
+  border-style: dashed;
+  border-color: rgba(255,255,255,0.13);
+  background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(0,0,0,0.28));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  cursor: default; pointer-events: none;
+}
+.sq-btn.sq-travada::before {
+  content: '🔒';
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; opacity: .38;
+}
+.sq-btn.sq-travada::after { opacity: 0; }
+.sq-btn.sq-travada img { opacity: 0; }
+
+/* Corujas que acabaram de entrar em jogo (rodada 6): entram com pop.
+   Antes a grade INTEIRA dava um scale — o que reforçava a sensação de
+   que o jogo tinha recomeçado. Agora só as novas se mexem. */
+.sq-btn.sq-nova { animation: sqNova .62s cubic-bezier(.32,.72,0,1) both; }
+@keyframes sqNova {
+  0%   { opacity: 0; transform: scale(.35) rotate(-10deg);
+         box-shadow: 0 0 0 0 color-mix(in srgb, var(--sqc) 70%, transparent); }
+  55%  { opacity: 1; transform: scale(1.10) rotate(3deg);
+         box-shadow: 0 0 26px 6px color-mix(in srgb, var(--sqc) 60%, transparent); }
+  100% { opacity: 1; transform: scale(1) rotate(0);
+         box-shadow: inset 0 1px 0 rgba(255,255,255,0.10),
+                     inset 0 -10px 18px -12px rgba(0,0,0,0.9),
+                     0 6px 14px -8px rgba(0,0,0,0.9); }
+}
+
+/* ── Overlays de início/fim ── */
 .sq-overlay {
   position: absolute; inset: 0;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   text-align: center; padding: 24px; gap: 8px;
-  background: rgba(10,10,12,.94); backdrop-filter: blur(3px);
+  background:
+    radial-gradient(120% 80% at 50% 12%, rgba(168,85,247,0.20), transparent 60%),
+    rgba(8,8,11,.95);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   z-index: 6;
 }
-.sq-overlay-owl { width: 76px; height: 76px; object-fit: contain; margin-bottom: 4px; }
+.sq-overlay-owl {
+  width: 92px; height: 92px; object-fit: contain; margin-bottom: 2px;
+  filter: drop-shadow(0 8px 20px rgba(0,0,0,.6));
+  animation: sqFlutua 3.4s ease-in-out infinite;
+}
+@keyframes sqFlutua {
+  0%,100% { transform: translateY(0); }
+  50%     { transform: translateY(-7px); }
+}
 .sq-overlay-titulo {
-  font-family: var(--font-h); font-weight: 800; font-size: 24px; color: var(--text);
+  font-family: var(--font-h); font-weight: 800; font-size: 25px;
+  color: #fff; line-height: 1.15;
 }
 .sq-overlay-desc {
-  font-size: 13px; color: var(--muted); line-height: 1.45; max-width: 260px;
+  font-size: 13px; color: rgba(235,235,245,.72); line-height: 1.5; max-width: 272px;
 }
 .sq-play {
-  margin-top: 14px;
+  margin-top: 16px;
   font-family: var(--font-h); font-weight: 800; font-size: 15px;
   color: #fff; cursor: pointer;
-  padding: 12px 34px; border-radius: 999px; border: none;
+  padding: 13px 36px; border-radius: 999px; border: none;
   background: linear-gradient(135deg, #a855f7, #6d28d9);
   -webkit-tap-highlight-color: transparent;
   transition: transform .1s, filter .15s;
-  box-shadow: 0 4px 14px rgba(168,85,247,0.4);
+  box-shadow: 0 6px 20px rgba(168,85,247,0.42);
 }
 .sq-play:active { transform: scale(0.96); }
 .sq-play:hover { filter: brightness(1.08); }
+
+/* ── Tema DIA: pílulas precisam de contraste invertido ── */
+body.light-mode .sq-hud-item {
+  background: rgba(15,26,46,0.05);
+  border-color: rgba(15,26,46,0.14);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+body.light-mode .sq-status {
+  background: rgba(15,26,46,0.05);
+  border-color: rgba(15,26,46,0.14);
+}
+
+/* ── Quem prefere menos movimento ── */
+@media (prefers-reduced-motion: reduce) {
+  .sq-grade { transition: none; }
+  .sq-grade.sq-erro,
+  .sq-btn.sq-nova,
+  .sq-overlay-owl,
+  .sq-hud-valor.sq-rodada-up { animation: none; }
+}

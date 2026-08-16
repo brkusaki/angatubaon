@@ -53,6 +53,15 @@
   100% { transform: scale(1); }
 }
 
+/* O app abre a tela do jogo com style="display:block" inline (em _abrirJogo),
+   e isso ANULA o "display:flex" que o styles.css dá ao .jogo-tela em tela
+   cheia. Sem o flex, o "flex: 1" do cartão não vale nada: ele parava na
+   altura do conteúdo e o resto da tela ficava preto — era a faixa cortada
+   embaixo da tela inicial. Como o .jogo-tela tem altura definida (100dvh),
+   um min-height em % resolve certinho mesmo em layout de bloco.
+   Os 44px descontados são o botão "Voltar aos jogos" no topo. */
+body.games-fs-open #jogo-sequencia .sq-card { min-height: calc(100% - 44px); }
+
 /* Em tela cheia o styles.css deixa o HUD "sticky" (top: 44px). A tela da
    Sequência não rola — ela cabe inteira na viewport —, e essa âncora só
    empurrava o HUD 44px para baixo, fazendo o bloco opaco dele cobrir o
@@ -96,8 +105,8 @@ body.games-fs-open .sq-hud { position: static; top: auto; }
    (Mesmo peso de seletor, e este CSS é injetado depois do styles.css.) */
 body.games-fs-open .sq-grade {
   margin: auto;
-  max-width: min(336px, calc((100vh - 244px) / 1.5 + 40px));
-  max-width: min(336px, calc((100dvh - 244px) / 1.5 + 40px));
+  max-width: min(336px, calc((100vh - 260px) / 1.5 + 40px));
+  max-width: min(336px, calc((100dvh - 260px) / 1.5 + 40px));
 }
 
 .sq-grade.sq-erro { animation: sqErro .4s ease; }
@@ -216,8 +225,8 @@ body.games-fs-open .sq-grade {
   align-items: center; justify-content: center;
   text-align: center; padding: 24px; gap: 8px;
   background:
-    radial-gradient(120% 80% at 50% 12%, rgba(168,85,247,0.20), transparent 60%),
-    rgba(8,8,11,.95);
+    radial-gradient(90% 46% at 50% 44%, rgba(168,85,247,0.22), transparent 68%),
+    rgba(8,8,11,.96);
   backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   z-index: 6;
 }

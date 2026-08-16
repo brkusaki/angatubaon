@@ -342,13 +342,15 @@
     <!-- ═══ HUB DE MINI-GAMES (aba Joguinhos) — escondido até abrir a pill ══ -->
     <div id="games-hub" style="display:none;">
       <div class="games-hub-head">
-        <button type="button" id="games-sair-btn" class="games-sair-btn" onclick="_sairDosJogos()" aria-label="Voltar para a tela inicial" title="Voltar ao início">
-          <i class="fa fa-chevron-left"></i>
-        </button>
-        <button type="button" id="games-som-btn" class="games-som-btn" onclick="_alternarSomJogos()" aria-label="Ligar ou desligar som dos jogos" title="Som">
-          <i class="fa fa-volume-high"></i>
-        </button>
-        <h2 class="games-hub-title"><i class="fa fa-gamepad"></i> Joguinhos de Angatuba</h2>
+        <div class="games-hub-bar">
+          <button type="button" id="games-sair-btn" class="games-sair-btn" onclick="_sairDosJogos()" aria-label="Voltar para a tela inicial" title="Voltar ao início">
+            <i class="fa fa-chevron-left"></i>
+          </button>
+          <button type="button" id="games-som-btn" class="games-som-btn" onclick="_alternarSomJogos()" aria-label="Ligar ou desligar som dos jogos" title="Som">
+            <i class="fa fa-volume-high"></i>
+          </button>
+        </div>
+        <h2 class="games-hub-title">Joguinhos de <span>Angatuba</span></h2>
         <p class="games-hub-sub">Escolha um jogo e divirta-se! 🦉</p>
       </div>
 
@@ -437,7 +439,8 @@
           <div class="gc-inner">
             <div class="gc-owl">
               <span class="gc-owl-glow"></span>
-              <img src="/webp/owl-flying.webp" alt="" loading="lazy">
+              <img src="/webp/owl-angry.webp" alt="" loading="lazy"
+                   onerror="this.onerror=null;this.src='/webp/owl-flying.webp';">
             </div>
             <div class="gc-info">
               <div class="gc-title">Corrida da Coruja</div>

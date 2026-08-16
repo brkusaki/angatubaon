@@ -4612,54 +4612,50 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   color: #fff;
 }
 #games-hub { animation: qzFade .3s ease; }
-.games-hub-head { margin-bottom: 16px; position: relative; }
-/* Botão de liga/desliga som dos jogos (canto do cabeçalho do hub) */
-.games-som-btn {
-  position: absolute; top: 0; right: 0;
-  width: 40px; height: 40px; border-radius: 999px;
+/* ═════ Cabeçalho do hub de jogos ══════════════════════════════
+   Barra superior em FLUXO (voltar · som). Antes os botões
+   eram position:absolute e o título tinha padding lateral de 48px:
+   quando o título quebrava em duas linhas, o ícone de controle
+   ficava "solto" à esquerda. Agora o título usa a largura toda. */
+.games-hub-head { margin-bottom: 14px; position: relative; }
+.games-hub-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 12px;
+}
+.games-som-btn, .games-sair-btn {
+  flex-shrink: 0;
+  width: 38px; height: 38px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
   border: 1px solid var(--border); background: var(--surface2);
-  color: var(--text); cursor: pointer; font-size: 16px;
+  color: var(--text); cursor: pointer; font-size: 15px;
   -webkit-tap-highlight-color: transparent;
   transition: transform .12s, filter .15s, color .15s, border-color .15s;
 }
-.games-som-btn:active { transform: scale(0.92); }
-.games-som-btn:hover { filter: brightness(1.1); }
+.games-som-btn:active, .games-sair-btn:active { transform: scale(0.92); }
+.games-som-btn:hover,  .games-sair-btn:hover  { filter: brightness(1.1); }
 /* Estado mudo: ícone apagado (cinza) pra deixar claro que está off */
 .games-som-btn.games-som-off { color: var(--muted); border-color: var(--border); }
-/* Botão de voltar pra tela inicial (canto esquerdo do cabeçalho do hub) */
-.games-sair-btn {
-  position: absolute; top: 0; left: 0;
-  width: 40px; height: 40px; border-radius: 999px;
-  display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--border); background: var(--surface2);
-  color: var(--text); cursor: pointer; font-size: 16px;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform .12s, filter .15s;
-}
-.games-sair-btn:active { transform: scale(0.92); }
-.games-sair-btn:hover { filter: brightness(1.1); }
 .games-hub-title {
-  font-family: var(--font-h); font-size: 1.15rem; font-weight: 800;
-  color: var(--text); display: flex; align-items: center; gap: 8px;
-  margin: 0 0 4px; padding: 0 48px;
-  justify-content: center; text-align: center;
+  font-family: var(--font-h); font-size: 1.45rem; font-weight: 800;
+  letter-spacing: -.01em; line-height: 1.12;
+  color: var(--text); margin: 0 0 5px; text-align: center;
 }
-.games-hub-title i { color: #a855f7; }
-.games-hub-sub { font-size: 13px; color: var(--muted); margin: 0; text-align: center; }
+/* Mesmo tratamento do título do painel de Ranking: cidade em vermelho */
+.games-hub-title span { color: var(--red); }
+.games-hub-sub { font-size: 12.5px; color: var(--muted); margin: 0; text-align: center; }
 
-/* ═════ Faixa de ofensiva (streak diário) ══ */
+/* ═════ Faixa de ofensiva (streak diário) ══════════════════════
+   Compacta de propósito: no hub o elemento "alto" é o Ranking. */
 .streak-faixa {
-  display: flex; align-items: center; gap: 14px;
-  padding: 14px 16px; margin-bottom: 16px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(249,115,22,0.18), rgba(239,68,68,0.12));
-  border: 1px solid rgba(249,115,22,0.35);
-  box-shadow: 0 4px 16px rgba(249,115,22,0.15);
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; margin-bottom: 10px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(249,115,22,0.16), rgba(239,68,68,0.06));
+  border: 1px solid rgba(249,115,22,0.28);
 }
 .streak-chama {
-  font-size: 34px; line-height: 1; flex-shrink: 0;
-  filter: drop-shadow(0 2px 6px rgba(249,115,22,0.5));
+  font-size: 26px; line-height: 1; flex-shrink: 0;
+  filter: drop-shadow(0 2px 6px rgba(249,115,22,0.45));
 }
 .streak-chama.streak-chama-pop { animation: streakPop .6s ease; }
 @keyframes streakPop {
@@ -4670,10 +4666,10 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 }
 .streak-txt { flex: 1; min-width: 0; }
 .streak-num {
-  font-family: var(--font-h); font-weight: 800; font-size: 22px;
-  color: #fb923c; line-height: 1.1;
+  font-family: var(--font-h); font-weight: 800; font-size: 17px;
+  color: #fb923c; line-height: 1.15;
 }
-.streak-sub { font-size: 12px; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+.streak-sub { font-size: 11.5px; color: var(--muted); line-height: 1.3; margin-top: 1px; }
 /* Ofensiva esfriada: tons apagados/cinza */
 .streak-faixa.streak-apagada {
   background: var(--surface); border-color: var(--border);
@@ -4681,82 +4677,90 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 }
 .streak-faixa.streak-apagada .streak-chama { filter: grayscale(.7) brightness(.8); }
 .streak-faixa.streak-apagada .streak-num { color: var(--muted); }
-/* ═════ Menu de jogos — cards com foto de fundo + coruja-logo ══ */
+
+/* ═════ Menu de jogos — "prateleira de cartuchos" ══════════════
+   Cada jogo tem UMA cor, declarada uma única vez em variáveis, e
+   ela aparece em 4 lugares coordenados: fio lateral, aura, ladrilho
+   da coruja e pílula de ação. Antes cada propriedade tinha sua
+   própria regra por jogo — e por isso o .gc-voo (adicionado depois)
+   ficou sem fio, sem aura e com o botão "VOAR" invisível.
+   As fotos de fundo (Igreja Matriz repetida em 4 cards, uma delas
+   de DIA) saíram: brigavam com a arte da coruja e com o texto. */
 .game-card {
+  --gc:   #a855f7;                 /* cor viva  — texto/fio        */
+  --gc-2: #7c3aed;                 /* 2º ponto do degradê do fio   */
+  --gc-a: rgba(168,85,247,.16);    /* preenchimento suave          */
+  --gc-b: rgba(168,85,247,.34);    /* borda                        */
   position: relative; display: block; width: 100%; text-align: left;
-  border: none; padding: 0; margin-bottom: 14px;
-  border-radius: 18px; overflow: hidden;
+  padding: 0; margin-bottom: 10px;
+  border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+  background: var(--surface);
   cursor: pointer; -webkit-tap-highlight-color: transparent;
-  min-height: 122px;
-  background-size: cover; background-position: center;
-  box-shadow: 0 4px 18px rgba(0,0,0,.42);
-  transition: transform .14s ease, box-shadow .2s ease;
+  transition: transform .14s ease, border-color .18s ease;
 }
-.game-card:active { transform: scale(.985); }
-/* foto de fundo por jogo (Igreja Matriz) */
-.gc-quiz  { background-image: url('/img/igreja-noite.jpg'); }
-.gc-speed { background-image: url('/img/igreja-dia.jpg'); }
-.gc-seq   { background-image: url('/img/igreja-noite.jpg'); }
-.gc-corrida { background-image: url('/img/igreja-noite.jpg'); }
-/* overlay escuro degradê p/ legibilidade */
+.gc-quiz    { --gc:#c084fc; --gc-2:#7c3aed; --gc-a:rgba(168,85,247,.16); --gc-b:rgba(168,85,247,.34); }
+.gc-speed   { --gc:#fbbf24; --gc-2:#ef4444; --gc-a:rgba(245,158,11,.16);  --gc-b:rgba(245,158,11,.34); }
+.gc-seq     { --gc:#34d399; --gc-2:#0d9488; --gc-a:rgba(16,185,129,.16);  --gc-b:rgba(16,185,129,.34); }
+.gc-voo     { --gc:#38bdf8; --gc-2:#4f46e5; --gc-a:rgba(56,189,248,.16);  --gc-b:rgba(56,189,248,.34); }
+.gc-corrida { --gc:#a3e635; --gc-2:#dc2626; --gc-a:rgba(132,204,22,.16);  --gc-b:rgba(132,204,22,.34); }
+
+/* aura da cor do jogo, atrás da coruja */
 .game-card::before {
-  content: ''; position: absolute; inset: 0; z-index: 1;
-  background: linear-gradient(90deg, rgba(8,8,12,.93) 0%, rgba(8,8,12,.8) 42%, rgba(8,8,12,.34) 100%);
+  content: ''; position: absolute; z-index: 0; pointer-events: none;
+  left: -34px; top: 50%; width: 200px; height: 200px;
+  transform: translateY(-50%); border-radius: 50%;
+  background: radial-gradient(circle, var(--gc-a) 0%, transparent 68%);
 }
-/* faixa de cor lateral (accent do jogo) */
+/* fio de luz na borda esquerda (eco das linhas neon da coruja) */
 .game-card::after {
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; z-index: 3;
+  content: ''; position: absolute; left: 0; top: 12%; bottom: 12%; width: 3px;
+  border-radius: 0 3px 3px 0; z-index: 3;
+  background: linear-gradient(180deg, var(--gc), var(--gc-2));
 }
-.gc-quiz::after  { background: linear-gradient(#c084fc, #7c3aed); }
-.gc-speed::after { background: linear-gradient(#fbbf24, #ef4444); }
-.gc-seq::after   { background: linear-gradient(#4ade80, #3b82f6); }
-.gc-corrida::after { background: linear-gradient(#84cc16, #dc2626); }
+.game-card:active { transform: scale(.985); border-color: var(--gc-b); }
+.game-card:focus-visible { outline: 2px solid var(--gc); outline-offset: 2px; }
 
 .gc-inner {
   position: relative; z-index: 2;
-  display: flex; align-items: center; gap: 16px;
-  padding: 18px 44px 18px 20px;
+  display: flex; align-items: center; gap: 14px;
+  padding: 13px 38px 13px 15px;
 }
+/* Ladrilho da coruja: dá moldura pra arte de fundo transparente */
 .gc-owl {
-  flex-shrink: 0; width: 76px; height: 76px; border-radius: 16px;
+  flex-shrink: 0; width: 62px; height: 62px; border-radius: 15px;
   display: flex; align-items: center; justify-content: center; position: relative;
+  background: var(--gc-a); border: 1px solid var(--gc-b);
 }
 .gc-owl-glow {
-  position: absolute; inset: -2px; border-radius: 18px; z-index: 0;
-  filter: blur(9px); opacity: .55;
+  position: absolute; inset: -5px; border-radius: 19px; z-index: 0;
+  background: radial-gradient(circle, var(--gc-a), transparent 70%);
+  filter: blur(8px);
 }
-.gc-quiz  .gc-owl-glow { background: radial-gradient(circle, #a855f7, transparent 70%); }
-.gc-speed .gc-owl-glow { background: radial-gradient(circle, #f97316, transparent 70%); }
-.gc-seq   .gc-owl-glow { background: radial-gradient(circle, #3b82f6, transparent 70%); }
-.gc-corrida .gc-owl-glow { background: radial-gradient(circle, #84cc16, transparent 70%); }
 .gc-owl img {
-  width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1;
-  filter: drop-shadow(0 3px 6px rgba(0,0,0,.5));
+  width: 86%; height: 86%; object-fit: contain; position: relative; z-index: 1;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,.55));
 }
 .gc-info { flex: 1; min-width: 0; }
 .gc-title {
-  font-family: var(--font-h); letter-spacing: .5px; font-weight: 800;
-  font-size: 21px; line-height: 1.05; color: var(--text); margin-bottom: 5px;
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-family: var(--font-h); letter-spacing: .1px; font-weight: 800;
+  font-size: 17px; line-height: 1.15; color: var(--text); margin-bottom: 3px;
 }
-.gc-desc { font-size: 12.5px; color: #d4d4d8; line-height: 1.35; }
+.gc-desc { font-size: 12px; color: #b9b9bf; line-height: 1.35; }
 .gc-cta {
-  display: inline-flex; align-items: center; margin-top: 9px;
-  font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+  display: inline-flex; align-items: center; margin-top: 8px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
   padding: 4px 11px; border-radius: 999px;
+  background: var(--gc-a); color: var(--gc); border: 1px solid var(--gc-b);
 }
-.gc-quiz  .gc-cta { background: rgba(168,85,247,.22); color: #d8b4fe; border: 1px solid rgba(168,85,247,.4); }
-.gc-speed .gc-cta { background: rgba(249,115,22,.2); color: #fdba74; border: 1px solid rgba(249,115,22,.42); }
-.gc-seq   .gc-cta { background: rgba(59,130,246,.2); color: #93c5fd; border: 1px solid rgba(59,130,246,.42); }
-.gc-corrida .gc-cta { background: rgba(132,204,22,.2); color: #bef264; border: 1px solid rgba(132,204,22,.42); }
 .gc-arrow {
-  position: absolute; right: 16px; top: 50%; transform: translateY(-50%); z-index: 3;
-  color: rgba(255,255,255,.5); font-size: 15px;
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%); z-index: 3;
+  color: rgba(255,255,255,.32); font-size: 14px;
 }
 .gc-badge-soon {
+  display: inline-block; margin-left: 7px; vertical-align: 2px;
   font-size: 9px; font-weight: 800; letter-spacing: .05em;
   padding: 2px 8px; border-radius: 999px;
-  background: rgba(168,85,247,.2); color: #c084fc; border: 1px solid rgba(168,85,247,.35);
+  background: var(--gc-a); color: var(--gc); border: 1px solid var(--gc-b);
 }
 /* Tela de jogo em foco + botão voltar */
 .jogo-tela { animation: qzFade .3s ease; }
@@ -4776,7 +4780,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
    Injetados sob demanda pelo _jogoLoader. Ficam AQUI apenas:
    (1) keyframes compartilhados com jogos que seguem inline —
        stGlow é usado pelo Modo Relâmpago (.rl-recorde-novo);
-   (2) as regras body.games-fs-open .st-*/.sq-* (mais abaixo),
+   (2) as regras body.games-fs-open .st-... e .sq-... (mais abaixo),
        que pertencem ao shell de tela cheia do hub.
 ═══════════════════════════════════════════════════════════════ */
 @keyframes stGlow { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
@@ -5140,25 +5144,30 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
        RANKING DOS JOGOS (Camada 2.4)
     ════════════════════════════════════════════ */
 
-    /* Botão de abrir ranking na hub de Joguinhos */
+    /* Botão de abrir ranking na hub de Joguinhos — é o elemento
+       "alto" da tela: tudo em volta ficou quieto de propósito. */
     .rank-abrir-btn {
       width: 100%;
-      display: flex; align-items: center; gap: 14px;
-      padding: 16px; margin-bottom: 16px;
-      border-radius: var(--r-md); cursor: pointer;
-      background: linear-gradient(135deg, rgba(255,68,68,0.15), rgba(255,180,0,0.12));
-      border: 1px solid rgba(255,180,0,0.35);
+      display: flex; align-items: center; gap: 13px;
+      padding: 13px 14px; margin-bottom: 18px;
+      border-radius: 14px; cursor: pointer;
+      background: linear-gradient(135deg, rgba(255,180,0,0.16), rgba(255,68,68,0.09));
+      border: 1px solid rgba(255,180,0,0.38);
       transition: transform 0.15s;
       -webkit-tap-highlight-color: transparent;
     }
     .rank-abrir-btn:active { transform: scale(0.98); }
-    .rank-abrir-ico { font-size: 28px; flex-shrink: 0; }
-    .rank-abrir-txt { flex: 1; text-align: left; display: flex; flex-direction: column; gap: 2px; }
-    .rank-abrir-titulo {
-      font-family: var(--font-h); font-weight: 800; font-size: 16px; color: var(--text);
+    .rank-abrir-ico {
+      flex-shrink: 0; width: 38px; height: 38px; border-radius: 11px;
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+      background: rgba(255,180,0,.13); border: 1px solid rgba(255,180,0,.3);
     }
-    .rank-abrir-sub { font-size: 12px; color: var(--muted); }
-    .rank-abrir-seta { color: var(--muted); font-size: 14px; }
+    .rank-abrir-txt { flex: 1; min-width: 0; text-align: left; display: flex; flex-direction: column; gap: 1px; }
+    .rank-abrir-titulo {
+      font-family: var(--font-h); font-weight: 800; font-size: 15px; color: var(--text);
+    }
+    .rank-abrir-sub { font-size: 11.5px; color: var(--muted); }
+    .rank-abrir-seta { color: rgba(255,180,0,.7); font-size: 13px; flex-shrink: 0; }
 
     /* Modal alto (o rank pode ter muitos itens) */
     .modal-sheet-tall { max-height: 85vh; }
@@ -5297,7 +5306,7 @@ body.games-fs-open #games-hub {
 
 /* Cabeçalho do hub e faixa de ofensiva ganham respiro do topo em tela cheia */
 body.games-fs-open .games-hub-head { padding: 14px 16px 0; }
-body.games-fs-open .streak-faixa   { margin: 12px 16px; }
+body.games-fs-open .streak-faixa   { margin: 0 16px 10px; }
 body.games-fs-open #games-menu     { padding: 0 16px 24px; }
 
 /* Cada tela de jogo ocupa a altura toda, em coluna: botão voltar no topo,

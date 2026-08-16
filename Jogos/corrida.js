@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   CORRIDA DA CORUJA — módulo de jogo (lazy-loaded) — v2 PRIMEIRA PESSOA
+   CORRIDA DA CORUJA — módulo de jogo (lazy-loaded) — v3 PRIMEIRA PESSOA
    Endless runner estilo "Into the Dead" em PRIMEIRA PESSOA e LANDSCAPE:
    a câmera são os olhos do sobrevivente correndo pra frente por uma
    Angatuba tomada por zumbis. Você NÃO se vê — vê a arma na base da
@@ -20,6 +20,32 @@
    de tela, convergindo pro ponto de fuga no horizonte. Colisão = zumbi
    chega em z~0 perto do centro da visão. Mira = ponto central fixo;
    o tiro acerta o zumbi mais próximo cujo x projetado esteja sob a mira.
+
+   ─── MUDANÇAS DA v3 ────────────────────────────────────────────
+   1) ZUMBI INVISÍVEL (o bug): o sprite era ancorado em (p.y - hpx) e
+      desenhado com altura 2*hpx. Resultado: os pés ficavam grudados na
+      linha do horizonte e o corpo crescia PRA CIMA, saindo pelo topo da
+      tela conforme o zumbi se aproximava — ou seja, ele nunca "descia"
+      pro chão e sumia de vista. Agora o pé é ancorado exatamente em
+      p.y (o ponto de contato com o solo), igual ao fallback vetorial.
+   2) SHEET INTERPRETADO ERRADO: o código assumia CEGAMENTE 12 frames
+      lado a lado. Se o arquivo não for uma tira horizontal de 12 (por
+      ex.: um webp animado, uma imagem única ou uma grade 4×3), ele
+      recortava 1/12 da largura e esticava — virava uma tirinha fina
+      e ilegível. Agora _corLayoutSheet olha a proporção real da imagem
+      e descobre sozinho o arranjo (tira horizontal, tira vertical,
+      grade ou imagem única). Use CorridaGame.diag() no console pra ver
+      o que ele detectou em cada arquivo.
+   3) SOM PRÓPRIO: o tiro usava som.acerto() (um blip de acerto genérico
+      dos outros jogos, que soava errado). Agora o jogo tem seu próprio
+      naipe sintetizado em Web Audio — estampido do tiro, impacto na
+      carne, clique seco de pente vazio, passos e rosnado na morte.
+      Continua respeitando o botão de mudo global (AngatubaSom.ativo()).
+   4) PERFORMANCE: o HUD era reescrito no DOM 3× por frame (60fps × 3
+      textContent + 3 getElementById + 1 leitura de localStorage). Agora
+      só escreve quando o valor muda, com os elementos e o recorde em
+      cache. A mira e o tiro também reaproveitam a projeção já calculada
+      no desenho, em vez de reprojetar todos os zumbis de novo.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -27,7 +53,7 @@
   /* ══════════════════════════════════════════════════════════════
      ASSETS opcionais (o jogo funciona 100% em vetor). Base:
      /Jogos/assets/ (J maiúsculo; GitHub Pages é case-sensitive).
-       zumbi-normal.webp | zumbi-rapido.webp | zumbi-forte.webp
+       zumbi-normal-sheet.webp | zumbi-rapido-sheet.webp | zumbi-forte-sheet.webp
        municao.webp   → caixa de recarga no chão
        arma.webp      → sprite da arma em 1a pessoa (base da tela)
      Se faltar/falhar, usa fallback vetorial.
@@ -35,10 +61,10 @@
   var _COR_ASSET_BASE = '/Jogos/assets/';
   var _corAssets = {};
 
-  // Metadados dos spritesheets animados (zumbis). Cada sheet é UMA imagem com
-  // os frames lado a lado na horizontal. Animamos desenhando o recorte do
-  // frame certo por tempo — 100% compatível com qualquer canvas/WebView, sem
-  // depender de ImageDecoder (que falha em WebViews antigos do APK).
+  // Metadados dos spritesheets animados (zumbis). "frames" é só um PALPITE:
+  // se a proporção da imagem não bater com uma tira de N frames, o
+  // _corLayoutSheet corrige sozinho (inclusive tratando o arquivo como
+  // uma imagem única). Isso evita o zumbi virar uma tirinha invisível.
   var _COR_SHEETS = {
     'zumbi-normal': { arquivo: 'zumbi-normal-sheet.webp', frames: 12, fps: 10 },
     'zumbi-rapido': { arquivo: 'zumbi-rapido-sheet.webp', frames: 12, fps: 12 },
@@ -52,11 +78,11 @@
   function _corAssetMulti(nomes) {
     var chave = nomes.join('|');
     if (_corAssets[chave]) return _corAssets[chave];
-    var reg = { img: null, ok: false, w: 0, h: 0, nomeOk: null };
+    var reg = { img: null, ok: false, w: 0, h: 0, nomeOk: null, erro: null };
     _corAssets[chave] = reg;
     var i = 0;
     function tentar() {
-      if (i >= nomes.length) { reg.ok = false; return; }
+      if (i >= nomes.length) { reg.ok = false; reg.erro = '404 em todos os nomes'; return; }
       var nome = nomes[i++];
       try {
         var im = new Image();
@@ -90,18 +116,69 @@
     return _corAssetMulti(_corVariantes(nome));
   }
 
+  /* ── Descoberta do LAYOUT do spritesheet ────────────────────────
+     Recebe as dimensões reais da imagem carregada e quantos frames o
+     metadado DIZ que existem, e devolve como os frames estão arrumados:
+       { c: colunas, r: linhas, n: total de frames }
+     Testa os arranjos plausíveis (tira horizontal, tira vertical, grades
+     c×r com c*r = n) e também a hipótese "não é sheet nenhum, é uma
+     imagem só" (1×1). Vence o arranjo cujo FRAME fique com a proporção
+     mais parecida com a de uma pessoa em pé (~0.55 de largura/altura).
+
+     Por que isso importa: se o arquivo for um webp ANIMADO (o canvas só
+     enxerga o primeiro quadro) ou uma imagem única, dividir a largura
+     por 12 recorta uma fatia estreitíssima e o zumbi some da tela. Com a
+     detecção, o pior caso vira "aparece parado" em vez de "não aparece".
+  ─────────────────────────────────────────────────────────────── */
+  var _COR_AR_ALVO = 0.55;   // largura/altura típica de um humanoide em pé
+  function _corLayoutSheet(w, h, nDeclarado) {
+    var melhor = { c: 1, r: 1, n: 1, erro: 1e9 };
+    if (!w || !h) return melhor;
+    function testar(c, r, quantos, peso) {
+      var ar = (w / c) / (h / r);
+      if (!isFinite(ar) || ar <= 0) return;
+      var erro = Math.abs(Math.log(ar / _COR_AR_ALVO)) * peso;
+      if (erro < melhor.erro) melhor = { c: c, r: r, n: quantos, erro: erro };
+    }
+    testar(1, 1, 1, 1.0);                     // hipótese "imagem única"
+    var n = Math.max(1, nDeclarado | 0);
+    for (var c = 1; c <= n; c++) {
+      if (n % c) continue;                    // só grades exatas
+      testar(c, n / c, n, 0.85);              // leve preferência pelo sheet
+    }
+    return melhor;
+  }
+
   // Prepara o spritesheet de um zumbi (carrega a imagem única). Idempotente.
-  // reg.sheet = registro do _corAsset da imagem; reg.n/fw/fh/durFrame = meta.
+  // O layout só é resolvido DEPOIS que a imagem carrega (precisa das
+  // dimensões reais), por isso _corSheetPronto() faz a resolução preguiçosa.
   function _corSheet(tipoKey) {
     var chave = '__sheet_' + tipoKey;
     if (_corAssets[chave]) return _corAssets[chave];
     var meta = _COR_SHEETS[tipoKey];
-    var reg = { sheet: null, n: 0, fw: 0, fh: 0, durFrame: 100, ok: false };
+    var reg = { sheet: null, decl: 0, lay: null, durFrame: 100, ok: false };
     _corAssets[chave] = reg;
     if (!meta) return reg;
-    reg.n = meta.frames;
+    reg.decl = meta.frames;
     reg.durFrame = 1000 / (meta.fps || 10);
     reg.sheet = _corAsset(meta.arquivo);   // carrega a imagem do sheet
+    return reg;
+  }
+
+  // Devolve o registro do sheet SÓ se ele estiver pronto pra desenhar
+  // (imagem carregada + layout já deduzido). Senão devolve null.
+  function _corSheetPronto(tipoKey) {
+    var reg = _corSheet(tipoKey);
+    if (!reg || !reg.sheet || !reg.sheet.ok || !reg.sheet.img) return null;
+    if (!reg.lay) {
+      var img = reg.sheet.img;
+      var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      if (!w || !h) return null;
+      reg.lay = _corLayoutSheet(w, h, reg.decl);
+      reg.lay.fw = w / reg.lay.c;
+      reg.lay.fh = h / reg.lay.r;
+      reg.ok = true;
+    }
     return reg;
   }
 
@@ -109,27 +186,159 @@
   // se desenhou (sheet pronto), false se ainda não carregou (usar fallback).
   // (dx,dy) = canto sup-esq do destino; (dw,dh) = tamanho no destino.
   function _corDrawSheetFrame(ctx, tipoKey, tMs, dx, dy, dw, dh) {
-    var reg = _corSheet(tipoKey);
-    if (!reg || !reg.sheet || !reg.sheet.ok || !reg.sheet.img || !reg.n) return false;
-    var img = reg.sheet.img;
-    // Largura de cada frame na imagem = largura total / nº de frames.
-    var fw = (img.naturalWidth || img.width) / reg.n;
-    var fh = (img.naturalHeight || img.height);
-    var total = reg.n * reg.durFrame;
-    var idx = Math.floor((tMs % total) / reg.durFrame);
-    if (idx < 0) idx = 0; if (idx >= reg.n) idx = reg.n - 1;
-    ctx.drawImage(img, idx * fw, 0, fw, fh, dx, dy, dw, dh);
+    var reg = _corSheetPronto(tipoKey);
+    if (!reg) return false;
+    var lay = reg.lay;
+    var idx = 0;
+    if (lay.n > 1) {
+      var total = lay.n * reg.durFrame;
+      idx = Math.floor(((tMs % total) + total) % total / reg.durFrame);
+      if (idx < 0) idx = 0; if (idx >= lay.n) idx = lay.n - 1;
+    }
+    var col = idx % lay.c, lin = (idx / lay.c) | 0;
+    ctx.drawImage(reg.sheet.img, col * lay.fw, lin * lay.fh, lay.fw, lay.fh, dx, dy, dw, dh);
     return true;
   }
 
   // Proporção (w/h) de um frame do sheet, pra não distorcer.
   function _corSheetRatio(tipoKey) {
-    var reg = _corSheet(tipoKey);
-    if (!reg || !reg.sheet || !reg.sheet.ok || !reg.sheet.img || !reg.n) return 0.7;
-    var img = reg.sheet.img;
-    var fw = (img.naturalWidth || img.width) / reg.n;
-    var fh = (img.naturalHeight || img.height);
-    return fh ? (fw / fh) : 0.7;
+    var reg = _corSheetPronto(tipoKey);
+    if (!reg || !reg.lay.fh) return _COR_AR_ALVO;
+    return reg.lay.fw / reg.lay.fh;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     SOM DO JOGO (Web Audio sintetizado, sem baixar nenhum arquivo).
+     Os outros jogos usam AngatubaSom (blips alegres de acerto/erro).
+     Num shooter de zumbi isso soa errado: aqui o tiro precisa de
+     estampido. Então a Corrida tem seu próprio naipe, gerado na hora:
+       tiro     → ruído branco filtrado (o "crack") + seno grave
+                  despencando (o "soco" no peito) + cauda curta
+       impacto  → thud abafado; se matou, ganha um estalo mais grave
+       vazio    → dois cliques metálicos secos (gatilho sem munição)
+       passo    → sopro curtíssimo e baixinho, no ritmo da passada
+       recarga  → duas notas subindo (pegou a caixa)
+       morte    → rosnado grave descendo
+     Respeita o mudo global: se AngatubaSom existir e estiver desligado,
+     tudo aqui vira no-op. O AudioContext é criado preguiçosamente e
+     acordado no primeiro toque (exigência do iOS/Android).
+  ══════════════════════════════════════════════════════════════ */
+  var _corAC = null, _corMaster = null, _corRuidoBuf = null;
+
+  function _corSomLigado() {
+    var S = window.AngatubaSom;
+    if (S && typeof S.ativo === 'function') { try { return !!S.ativo(); } catch (e) { return true; } }
+    return true;   // sem o módulo global carregado, o jogo toca normalmente
+  }
+  function _corAudio() {
+    if (_corAC) return _corAC;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      _corAC = new AC();
+      _corMaster = _corAC.createGain();
+      _corMaster.gain.value = 0.85;
+      _corMaster.connect(_corAC.destination);
+    } catch (e) { _corAC = null; }
+    return _corAC;
+  }
+  // Chamado dentro de um gesto do usuário (toque/clique). Sem isso o
+  // contexto nasce "suspended" e nenhum som sai.
+  function _corAudioDestravar() {
+    var ac = _corAudio();
+    if (ac && ac.state === 'suspended') { try { ac.resume(); } catch (e) {} }
+  }
+  // 1 segundo de ruído branco, gerado uma vez e reaproveitado em todos
+  // os disparos (criar buffer por tiro cansaria o GC no Android fraco).
+  function _corRuido(ac) {
+    if (_corRuidoBuf) return _corRuidoBuf;
+    var n = Math.floor(ac.sampleRate * 1.0);
+    var buf = ac.createBuffer(1, n, ac.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    _corRuidoBuf = buf;
+    return buf;
+  }
+  // Helper: dispara um trecho de ruído passando por passa-baixa + ganho.
+  function _corSopro(ac, t, dur, fIni, fFim, vol, hpF) {
+    var src = ac.createBufferSource();
+    src.buffer = _corRuido(ac);
+    src.playbackRate.value = 1;
+    var lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(fIni, t);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(60, fFim), t + dur);
+    var no = lp;
+    if (hpF) {
+      var hp = ac.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = hpF;
+      lp.connect(hp); no = hp;
+    }
+    var g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(lp); no.connect(g); g.connect(_corMaster);
+    // Começa num ponto aleatório do buffer: dois tiros seguidos nunca
+    // soam exatamente iguais.
+    src.start(t, Math.random() * 0.8, dur + 0.05);
+    src.stop(t + dur + 0.06);
+  }
+  // Helper: um oscilador com envelope de ataque rápido e queda.
+  function _corTom(ac, t, tipo, f0, f1, dur, vol) {
+    var o = ac.createOscillator();
+    o.type = tipo;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+    var g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(_corMaster);
+    o.start(t); o.stop(t + dur + 0.04);
+  }
+
+  function _corSomTiro() {
+    if (!_corSomLigado()) return;
+    var ac = _corAudio(); if (!ac) return;
+    var t = ac.currentTime;
+    _corSopro(ac, t, 0.18, 5600, 300, 0.80, 170);   // estampido
+    _corTom(ac, t, 'sine', 170, 40, 0.14, 0.55);    // corpo grave
+    _corSopro(ac, t + 0.05, 0.26, 1100, 160, 0.14); // cauda/eco no campo
+  }
+  function _corSomImpacto(matou) {
+    if (!_corSomLigado()) return;
+    var ac = _corAudio(); if (!ac) return;
+    var t = ac.currentTime + 0.02;
+    _corSopro(ac, t, 0.09, 900, 200, 0.34);
+    _corTom(ac, t, 'triangle', matou ? 120 : 190, matou ? 45 : 110, matou ? 0.20 : 0.08, 0.30);
+  }
+  function _corSomVazio() {
+    if (!_corSomLigado()) return;
+    var ac = _corAudio(); if (!ac) return;
+    var t = ac.currentTime;
+    _corSopro(ac, t, 0.035, 4200, 1800, 0.30, 900);
+    _corSopro(ac, t + 0.07, 0.03, 3400, 1500, 0.20, 900);
+  }
+  function _corSomPasso() {
+    if (!_corSomLigado()) return;
+    var ac = _corAudio(); if (!ac || ac.state !== 'running') return;
+    var t = ac.currentTime;
+    _corSopro(ac, t, 0.07, 620 + Math.random() * 180, 120, 0.085);
+  }
+  function _corSomRecarga() {
+    if (!_corSomLigado()) return;
+    var ac = _corAudio(); if (!ac) return;
+    var t = ac.currentTime;
+    _corTom(ac, t, 'square', 520, 520, 0.06, 0.16);
+    _corTom(ac, t + 0.08, 'square', 780, 780, 0.09, 0.16);
+  }
+  function _corSomMorte() {
+    if (!_corSomLigado()) return;
+    var ac = _corAudio(); if (!ac) return;
+    var t = ac.currentTime;
+    _corTom(ac, t, 'sawtooth', 210, 42, 0.55, 0.30);
+    _corSopro(ac, t, 0.45, 1400, 130, 0.30);
   }
 
   /* ── Estado / canvas ──────────────────────────────────────────── */
@@ -153,6 +362,7 @@
        swayX = micro-inclinação lateral, 1 por passo (freq simples)
      Mantido SUTIL pra não enjoar. */
   var _corPasso = 0;            // fase acumulada da passada
+  var _corPassoUlt = 0;         // último meio-ciclo tocado (som do pé no chão)
   var _corBobY = 0;            // deslocamento vertical corrente (px, calc no draw)
   var _corSwayX = 0;           // deslocamento lateral corrente (px, calc no draw)
 
@@ -191,18 +401,24 @@
 
   /* ── Persistência ─────────────────────────────────────────────── */
   var _COR_REC_KEY = 'angatuba_corrida_rec';
+  var _corRecCache = null;      // evita ler localStorage a cada frame
   function _corRec() {
-    try { return Math.max(0, Math.round(Number(localStorage.getItem(_COR_REC_KEY)) || 0)); }
-    catch (e) { return 0; }
+    if (_corRecCache !== null) return _corRecCache;
+    try { _corRecCache = Math.max(0, Math.round(Number(localStorage.getItem(_COR_REC_KEY)) || 0)); }
+    catch (e) { _corRecCache = 0; }
+    return _corRecCache;
   }
-  function _corRecSet(v) { try { localStorage.setItem(_COR_REC_KEY, String(Math.round(v))); } catch (e) {} }
+  function _corRecSet(v) {
+    _corRecCache = Math.round(v);
+    try { localStorage.setItem(_COR_REC_KEY, String(_corRecCache)); } catch (e) {}
+  }
 
   /* ── Utils ────────────────────────────────────────────────────── */
   function _corClamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function _corRand(a, b) { return a + Math.random() * (b - a); }
-  function _corEscolha(arr) { return arr[(Math.random() * arr.length) | 0]; }
 
   // Projeção pseudo-3D em 1a pessoa. z:0(perto)..1(longe); faixa:-1..1.
+  // Devolve o ponto onde a entidade TOCA O CHÃO (x,y) e a escala s.
   function _corProj(z, faixa) {
     var W = _corW, H = _corH;
     var zc = _corClamp(z, 0, _COR_Z_FAR) / _COR_Z_FAR;
@@ -258,14 +474,29 @@
     _corMun = _COR_MUN_INI;
     _corTiroT = 0; _corFlashT = 0; _corRecuo = 0;
     _corCamX = 0; _corCamVX = 0;
+    _corPasso = 0; _corPassoUlt = 0;
     _corZumbis.length = 0; _corItens.length = 0; _corSangue.length = 0;
     _corSpawnT = 0.9; _corItemT = 4.5;
-    _corAtualizarHUD();
+    _corAtualizarHUD(true);
   }
-  function _corAtualizarHUD() {
-    var d = document.getElementById('cor-dist'); if (d) d.textContent = Math.floor(_corDist) + 'm';
-    var m = document.getElementById('cor-mun'); if (m) m.textContent = _corMun;
-    var r = document.getElementById('cor-recorde'); if (r) r.textContent = _corRec() + 'm';
+
+  /* HUD — antes isto rodava 3 getElementById + 3 textContent + 1
+     localStorage.getItem A CADA FRAME (180 escritas de DOM por segundo).
+     Em Android fraco isso sozinho já engasgava o loop. Agora os elementos
+     ficam em cache e só escrevemos quando o valor realmente muda. */
+  var _corElDist = null, _corElMun = null, _corElRec = null;
+  var _corHudUlt = { d: -1, m: -1, r: -1 };
+  function _corAtualizarHUD(forcar) {
+    if (forcar || !_corElDist) {
+      _corElDist = document.getElementById('cor-dist');
+      _corElMun  = document.getElementById('cor-mun');
+      _corElRec  = document.getElementById('cor-recorde');
+    }
+    var dv = Math.floor(_corDist);
+    if (_corElDist && (forcar || dv !== _corHudUlt.d)) { _corElDist.textContent = dv + 'm'; _corHudUlt.d = dv; }
+    if (_corElMun && (forcar || _corMun !== _corHudUlt.m)) { _corElMun.textContent = _corMun; _corHudUlt.m = _corMun; }
+    var rv = _corRec();
+    if (_corElRec && (forcar || rv !== _corHudUlt.r)) { _corElRec.textContent = rv + 'm'; _corHudUlt.r = rv; }
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -288,11 +519,17 @@
     _corZumbis.push({
       z: z, faixa: faixa, tipo: tipo,
       hp: def.hp, morto: false, cai: 0, bob: Math.random() * Math.PI * 2,
+      // defasagem da animação: sem isso a horda inteira dá o mesmo passo
+      // no mesmo instante e parece um só zumbi clonado.
+      fase: Math.random() * 4000,
       // deriva lateral lenta (cambaleio pelo campo)
       swayA: (tipo === 'forte') ? _corRand(0.01, 0.03) : _corRand(0.03, 0.08),
       swayF: _corRand(0.8, 1.8), swayP: Math.random() * Math.PI * 2,
       // cada zumbi tem uma leve variação de velocidade individual
-      velVar: _corRand(0.85, 1.15)
+      velVar: _corRand(0.85, 1.15),
+      // projeção do último frame desenhado (reaproveitada pela mira e
+      // pelo tiro — o que você VÊ é exatamente o que você acerta)
+      _px: 0, _py: 0, _ps: 0, _vis: false
     });
   }
   function _corSpawnItem() {
@@ -302,27 +539,24 @@
   }
 
   /* ══════════════════════════════════════════════════════════════
-     TIRO — mira central fixa.
+     TIRO — mira central fixa. Usa a projeção do último frame (a que o
+     jogador está vendo na tela), em vez de reprojetar tudo de novo.
   ══════════════════════════════════════════════════════════════ */
   function _corAtirar() {
     if (_corEstado !== 'jogando') return;
     if (_corTiroT > 0) return;
-    if (_corMun <= 0) {
-      if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.erro();
-      return;
-    }
+    if (_corMun <= 0) { _corSomVazio(); return; }
     _corMun--; _corTiroT = _COR_TIRO_CD; _corFlashT = 0.09; _corRecuo = 1;
-    if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.acerto();
+    _corSomTiro();
 
     var miraX = _corW * 0.5;
     var tolBase = _corW * 0.08;
     var alvo = null, melhorZ = 1e9;
     for (var i = 0; i < _corZumbis.length; i++) {
       var zb = _corZumbis[i];
-      if (zb.morto) continue;
-      var p = _corProj(zb.z, zb.faixa + zb.swayA * Math.sin(zb.swayP));
-      var tol = tolBase + _COR_TIPOS[zb.tipo].w * _corW * 0.5 * p.s;
-      if (Math.abs(p.x - miraX) > tol) continue;
+      if (zb.morto || !zb._vis) continue;
+      var tol = tolBase + _COR_TIPOS[zb.tipo].w * _corW * 0.5 * zb._ps;
+      if (Math.abs(zb._px - miraX) > tol) continue;
       if (zb.z < melhorZ) { melhorZ = zb.z; alvo = zb; }
     }
 
@@ -330,17 +564,18 @@
       alvo.hp--;
       if (alvo.hp <= 0) {
         alvo.morto = true; alvo.cai = 0.001;
-        var pp = _corProj(alvo.z, alvo.faixa);
         for (var k = 0; k < 7; k++) {
           _corSangue.push({
-            x: pp.x + _corRand(-16, 16), y: pp.y - _corRand(6, 40) * pp.s,
-            r: _corRand(2, 7) * (0.6 + pp.s), life: 0.5, max: 0.5
+            x: alvo._px + _corRand(-16, 16), y: alvo._py - _corRand(6, 40) * alvo._ps,
+            r: _corRand(2, 7) * (0.6 + alvo._ps), life: 0.5, max: 0.5
           });
         }
-        if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.dano();
-      } else if (window.AngatubaGames && window.AngatubaGames.efeitos) {
-        var pe = _corProj(alvo.z, alvo.faixa);
-        window.AngatubaGames.efeitos.estrelas(pe.x, pe.y - 20 * pe.s, 4);
+        _corSomImpacto(true);
+      } else {
+        _corSomImpacto(false);
+        if (window.AngatubaGames && window.AngatubaGames.efeitos) {
+          window.AngatubaGames.efeitos.estrelas(alvo._px, alvo._py - 20 * alvo._ps, 4);
+        }
       }
     }
     _corAtualizarHUD();
@@ -366,6 +601,9 @@
     // swayX: 1 balanço por passo, alterna lados. Bem sutil.
     var ampSway = 0.010 + _corVel * 0.003;
     _corSwayX = Math.sin(_corPasso * 0.5) * ampSway;
+    // Som do pé no chão: cada meio-ciclo de _corPasso é uma pisada.
+    var meioCiclo = Math.floor(_corPasso / Math.PI);
+    if (meioCiclo !== _corPassoUlt) { _corPassoUlt = meioCiclo; _corSomPasso(); }
 
     if (_corTiroT > 0) _corTiroT -= dt;
     if (_corFlashT > 0) _corFlashT -= dt;
@@ -420,12 +658,11 @@
       if (it.z <= 0.07) {
         if (Math.abs(it.faixa - _corCamX) < 0.32) {
           _corMun = Math.min(99, _corMun + 6);
-          if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.combo(2);
+          _corSomRecarga();
           if (window.AngatubaGames && window.AngatubaGames.efeitos) {
             var pit = _corProj(it.z, it.faixa);
             window.AngatubaGames.efeitos.estrelas(pit.x, pit.y - 16, 8);
           }
-          _corAtualizarHUD();
         }
         _corItens.splice(i, 1);
       }
@@ -607,6 +844,19 @@
     ctx.restore();
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     ZUMBI — o desenho.
+     ANCORAGEM: p.y é o ponto em que o zumbi PISA no chão. Tanto o
+     spritesheet quanto o vetor são desenhados de p.y pra CIMA. (Era
+     exatamente isto que estava errado antes: o sprite era ancorado em
+     p.y - hpx, então ele "flutuava" e, quando o zumbi chegava perto,
+     o corpo inteiro subia pra fora da tela — o famoso "zumbi que não
+     aparece".)
+     ALTURA: _COR_ALT_MUL × hpx, calibrado pra bater com a altura total
+     do boneco vetorial (~1.32 × hpx), pra a troca sprite↔vetor não dar
+     salto de tamanho.
+  ══════════════════════════════════════════════════════════════ */
+  var _COR_ALT_MUL = 1.32;
 
   function _corDrawZumbi(ctx, zb) {
     var def = _COR_TIPOS[zb.tipo];
@@ -618,6 +868,10 @@
     var wpx = hpx * 0.62 * (def.w / 0.16);   // normaliza pela largura-base do tipo
     var bob = Math.sin(zb.bob) * hpx * 0.03;
 
+    // Guarda a projeção pra mira e tiro reaproveitarem neste frame.
+    zb._px = p.x; zb._py = p.y; zb._ps = p.s; zb._vis = true;
+
+    // Sombra no chão, no ponto de contato.
     ctx.globalAlpha = 0.35 * (0.4 + p.s); ctx.fillStyle = '#000';
     ctx.beginPath(); ctx.ellipse(p.x, p.y, wpx * 0.6, wpx * 0.2, 0, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
@@ -626,44 +880,81 @@
     if (zb.morto) { var q = _corClamp(zb.cai / 0.6, 0, 1); mortAlpha = 1 - q; mortScale = 1 - q * 0.4; mortRot = q * 0.9; }
     ctx.globalAlpha = mortAlpha;
 
-    // Spritesheet animado (universal). Proporção real do frame pra não esticar.
-    var fr = _corSheetRatio(zb.tipo);
-    var ah = hpx * 2.0 * mortScale, aw = ah * fr;
-    ctx.save(); ctx.translate(p.x, p.y - hpx + bob); ctx.rotate(mortRot);
-    var desenhou = _corDrawSheetFrame(ctx, zb.tipo, _corRelogio, -aw / 2, -ah, aw, ah);
-    ctx.restore();
+    // 1ª opção: spritesheet animado. Pés em p.y, corpo pra cima.
+    var ah = hpx * _COR_ALT_MUL * mortScale;
+    var aw = ah * _corSheetRatio(zb.tipo);
+    ctx.save();
+    ctx.translate(p.x, p.y + bob);
+    if (mortRot) ctx.rotate(mortRot);
+    var desenhou = _corDrawSheetFrame(ctx, zb.tipo, _corRelogio + zb.fase, -aw / 2, -ah, aw, ah);
     if (!desenhou) {
-      // Sheet não carregou. Tenta o webp estático antigo (imagem real, sem
-      // animar) — melhor que o vetor. Só cai no vetor se nem isso existir.
+      // 2ª opção: o webp estático antigo (imagem real, sem animar).
       var est = _corAsset('zumbi-' + zb.tipo + '.webp');
       if (est && est.ok && est.img && est.w && est.h) {
-        var er = est.w / est.h;
-        var eah = hpx * 2.0 * mortScale, eaw = eah * er;
-        ctx.save(); ctx.translate(p.x, p.y - hpx + bob); ctx.rotate(mortRot);
-        ctx.drawImage(est.img, -eaw / 2, -eah, eaw, eah); ctx.restore();
-      } else {
-        _corVetorZumbi(ctx, p.x, p.y + bob, wpx * mortScale, hpx * mortScale, def, mortRot);
+        var eaw = ah * (est.w / est.h);
+        ctx.drawImage(est.img, -eaw / 2, -ah, eaw, ah);
+        desenhou = true;
       }
+    }
+    ctx.restore();
+    // 3ª opção: boneco vetorial com ciclo de caminhada (sempre funciona).
+    if (!desenhou) {
+      _corVetorZumbi(ctx, p.x, p.y + bob, wpx * mortScale, hpx * mortScale, def, mortRot, zb.bob);
     }
     ctx.globalAlpha = 1;
   }
 
-  function _corVetorZumbi(ctx, cx, footY, w, h, def, rot) {
+  /* Fallback vetorial — silhueta cambaleante com ciclo de passada:
+     pernas alternando, braços esticados pra frente e cabeça pendendo.
+     Desenhado a partir do PÉ (0,0 = chão), altura total ~1.32×h. */
+  function _corVetorZumbi(ctx, cx, footY, w, h, def, rot, fase) {
     ctx.save(); ctx.translate(cx, footY); if (rot) ctx.rotate(rot);
+    var sw = Math.sin(fase), sw2 = Math.sin(fase + Math.PI);
+    var lw = Math.max(1.6, w * 0.26);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+    // Pernas alternando (o passo arrastado do zumbi).
+    ctx.strokeStyle = def.corEsc; ctx.lineWidth = lw * 1.15;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.14, -h * 0.52); ctx.lineTo(-w * 0.14 + sw * w * 0.30, 0);
+    ctx.moveTo(w * 0.14, -h * 0.52);  ctx.lineTo(w * 0.14 + sw2 * w * 0.30, 0);
+    ctx.stroke();
+
+    // Tronco (roupa rasgada).
     ctx.fillStyle = def.cor;
     ctx.beginPath();
-    ctx.moveTo(-w * 0.5, 0); ctx.lineTo(w * 0.5, 0);
-    ctx.lineTo(w * 0.42, -h * 1.1); ctx.lineTo(-w * 0.42, -h * 1.1);
+    ctx.moveTo(-w * 0.30, -h * 0.46);
+    ctx.lineTo(w * 0.30, -h * 0.46);
+    ctx.lineTo(w * 0.40, -h * 1.00);
+    ctx.lineTo(-w * 0.40, -h * 1.00);
     ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = def.corEsc; ctx.lineWidth = Math.max(2, w * 0.22); ctx.lineCap = 'round';
+    ctx.fillStyle = def.corEsc;
     ctx.beginPath();
-    ctx.moveTo(-w * 0.3, -h * 0.95); ctx.lineTo(-w * 0.78, -h * 0.66);
-    ctx.moveTo(w * 0.3, -h * 0.95); ctx.lineTo(w * 0.78, -h * 0.68);
+    ctx.moveTo(-w * 0.30, -h * 0.46); ctx.lineTo(-w * 0.10, -h * 0.40);
+    ctx.lineTo(w * 0.05, -h * 0.48);  ctx.lineTo(w * 0.20, -h * 0.38);
+    ctx.lineTo(w * 0.30, -h * 0.46);  ctx.closePath(); ctx.fill();
+
+    // Braços esticados pra frente, balançando de leve.
+    ctx.strokeStyle = def.cor; ctx.lineWidth = lw;
+    var by1 = -h * (0.70 + sw * 0.05), by2 = -h * (0.70 + sw2 * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.36, -h * 0.93); ctx.lineTo(-w * 0.70, by1);
+    ctx.moveTo(w * 0.36, -h * 0.93);  ctx.lineTo(w * 0.70, by2);
     ctx.stroke();
-    ctx.fillStyle = def.cor; ctx.beginPath(); ctx.arc(0, -h * 1.28, w * 0.34, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(220,220,200,0.85)';
-    ctx.beginPath(); ctx.arc(-w * 0.12, -h * 1.30, w * 0.07, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(w * 0.12, -h * 1.30, w * 0.07, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = def.cor;
+    ctx.beginPath(); ctx.arc(-w * 0.70, by1, lw * 0.60, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(w * 0.70, by2, lw * 0.60, 0, Math.PI * 2); ctx.fill();
+
+    // Cabeça pendendo pro lado no ritmo do passo.
+    ctx.save(); ctx.translate(0, -h * 1.00); ctx.rotate(sw * 0.10);
+    ctx.fillStyle = def.cor;
+    ctx.beginPath(); ctx.arc(0, -h * 0.19, w * 0.30, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(228,228,205,0.9)';
+    var olho = Math.max(1, w * 0.065);
+    ctx.beginPath(); ctx.arc(-w * 0.11, -h * 0.21, olho, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(w * 0.11, -h * 0.21, olho, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
     ctx.restore();
   }
 
@@ -736,14 +1027,16 @@
     ctx.restore();
   }
 
+  // Mira: reaproveita a projeção guardada no desenho dos zumbis (o loop
+  // antigo reprojetava todos de novo, dobrando a conta por frame).
   function _corDrawMira(ctx, W, H) {
     var cx = W * 0.5, cy = H * (_COR_HORIZ + 0.14);
     var sobAlvo = false;
     for (var i = 0; i < _corZumbis.length; i++) {
-      var zb = _corZumbis[i]; if (zb.morto) continue;
-      var p = _corProj(zb.z, zb.faixa + zb.swayA * Math.sin(zb.swayP));
-      var tol = W * 0.08 + _COR_TIPOS[zb.tipo].w * W * 0.5 * p.s;
-      if (Math.abs(p.x - cx) < tol && p.y < cy + H * 0.2 && p.y > cy - H * 0.3) { sobAlvo = true; break; }
+      var zb = _corZumbis[i];
+      if (zb.morto || !zb._vis) continue;
+      var tol = W * 0.08 + _COR_TIPOS[zb.tipo].w * W * 0.5 * zb._ps;
+      if (Math.abs(zb._px - cx) < tol && zb._py < cy + H * 0.2 && zb._py > cy - H * 0.3) { sobAlvo = true; break; }
     }
     var cor = sobAlvo ? 'rgba(255,70,70,0.9)' : 'rgba(255,255,255,0.55)';
     ctx.strokeStyle = cor; ctx.lineWidth = 2; ctx.lineCap = 'round';
@@ -779,6 +1072,7 @@
     var score = Math.floor(_corDist), rec = _corRec(), recorde = score > rec;
     if (recorde) _corRecSet(score);
     _corDraw();
+    _corSomMorte();
     if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.fim(recorde);
     if (window.AngatubaGames) window.AngatubaGames.rankSubmeter('corrida', score);
 
@@ -792,6 +1086,7 @@
     if (msgEl) msgEl.textContent = recorde ? 'Você correu mais longe que nunca! 🦉'
       : (rec > 0 ? 'Seu recorde: ' + rec + 'm. Bora de novo?' : 'Arraste pra desviar, toque pra atirar!');
     _corMostrarOverlay('fim');
+    _corAtualizarHUD(true);
     if (recorde && window.AngatubaGames && window.AngatubaGames.efeitos) window.AngatubaGames.efeitos.confete('cor-fim', 90);
     if (window.AngatubaGames) window.AngatubaGames.rankFimDeJogo('corrida', 'cor-rank-slot', score);
   }
@@ -815,6 +1110,8 @@
   var _corDrag = false, _corLast2 = null, _corDownXY = null, _corDownT = 0, _corMoveu = false;
 
   function _corPointerDown(e) {
+    // O AudioContext só acorda dentro de um gesto — este é o gesto.
+    _corAudioDestravar();
     if (_corEstado !== 'jogando') return;
     _corDrag = true;
     _corLast2 = _corXY(e); _corDownXY = _corLast2; _corDownT = (e.timeStamp || Date.now()); _corMoveu = false;
@@ -847,7 +1144,7 @@
   function _corKey(down, e) {
     if (e.key === 'ArrowLeft') { if (down) { _corCamX = _corClamp(_corCamX - 0.08, -_COR_CAM_LIM, _COR_CAM_LIM); } }
     else if (e.key === 'ArrowRight') { if (down) { _corCamX = _corClamp(_corCamX + 0.08, -_COR_CAM_LIM, _COR_CAM_LIM); } }
-    else if (down && (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'Enter')) { _corAtirar(); if (e.preventDefault) e.preventDefault(); }
+    else if (down && (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'Enter')) { _corAudioDestravar(); _corAtirar(); if (e.preventDefault) e.preventDefault(); }
   }
   function _corLigarControles() {
     if (_corListenersOn || !_corCanvas) return;
@@ -984,11 +1281,8 @@
       _corResizeOn = true;
     }
     _corEstado = 'inicio';
-    var rec = document.getElementById('cor-recorde'); if (rec) rec.textContent = _corRec() + 'm';
-    var d = document.getElementById('cor-dist'); if (d) d.textContent = '0m';
-    var m = document.getElementById('cor-mun'); if (m) m.textContent = _COR_MUN_INI;
-    // Dispara a decodificação dos zumbis animados desde já (baixa + extrai
-    // frames em background; o fallback vetor cobre enquanto não chega).
+    _corDist = 0; _corMun = _COR_MUN_INI;
+    _corAtualizarHUD(true);
     // Pré-carrega os spritesheets dos zumbis (imagens únicas; o fallback
     // vetor cobre enquanto não chegam).
     _corSheet('zumbi-normal');
@@ -1057,6 +1351,7 @@
     _corCanvas = document.getElementById('cor-canvas');
     if (!_corCanvas) return;
     if (!_corCtx) _corCtx = _corCanvas.getContext('2d');
+    _corAudioDestravar();          // veio de um clique no botão: acorda o áudio
     _corLigarControles();
     _corMostrarOverlay(null);
     _corTravarLandscape();
@@ -1081,7 +1376,36 @@
     if (fim) fim.style.display = (qual === 'fim') ? '' : 'none';
   }
 
+  /* Diagnóstico de assets. No console do celular/desktop:
+       CorridaGame.diag()
+     Mostra, pra cada zumbi, se o arquivo carregou, com que nome, o
+     tamanho real da imagem e como o layout de frames foi interpretado.
+     Se "frames" vier 1 num arquivo que deveria ser sheet, o arquivo não
+     é uma tira de frames (provavelmente é um webp animado) — nesse caso
+     reexporte como tira horizontal de 12 quadros lado a lado. */
+  function _corDiag() {
+    var out = {};
+    for (var k in _COR_SHEETS) {
+      if (!_COR_SHEETS.hasOwnProperty(k)) continue;
+      var reg = _corSheet(k), s = reg.sheet;
+      var pronto = _corSheetPronto(k);
+      out[k] = {
+        arquivo: _COR_SHEETS[k].arquivo,
+        carregou: !!(s && s.ok),
+        nomeQueFuncionou: s ? s.nomeOk : null,
+        imagem: s && s.ok ? (s.w + '×' + s.h) : null,
+        frames: pronto ? pronto.lay.n : 0,
+        grade: pronto ? (pronto.lay.c + '×' + pronto.lay.r) : null,
+        frameProporcao: pronto ? +(pronto.lay.fw / pronto.lay.fh).toFixed(3) : null
+      };
+    }
+    out.arma = (function () { var a = _corAsset('arma.webp'); return { carregou: a.ok, imagem: a.ok ? a.w + '×' + a.h : null }; })();
+    out.municao = (function () { var a = _corAsset('municao.webp'); return { carregou: a.ok, imagem: a.ok ? a.w + '×' + a.h : null }; })();
+    out.audio = _corAC ? _corAC.state : 'não criado';
+    return out;
+  }
+
   /* ── Exposição pública ────────────────────────────────────────── */
   window._corComecar = _corComecar;
-  window.CorridaGame = { preparar: _corPreparar, comecar: _corComecar, parar: _corParar };
+  window.CorridaGame = { preparar: _corPreparar, comecar: _corComecar, parar: _corParar, diag: _corDiag };
 })();

@@ -128,7 +128,9 @@
   /* ── Corrida / dificuldade ────────────────────────────────────── */
   var _corDist = 0;
   var _corVel = 0;
-  var _COR_VEL_INI = 0.85, _COR_VEL_MAX = 2.3, _COR_VEL_ACC = 0.02;
+  // MUITO mais lento que antes (estilo Into the Dead: zumbis se aproximam
+  // devagar, dá tempo de reagir e desviar).
+  var _COR_VEL_INI = 0.34, _COR_VEL_MAX = 0.62, _COR_VEL_ACC = 0.006;
 
   /* ── Munição / tiro ───────────────────────────────────────────── */
   var _COR_MUN_INI = 12;
@@ -142,12 +144,17 @@
   var _corSangue = [];
   var _corSpawnT = 0, _corItemT = 0;
 
-  var _COR_FAIXAS = [-1, -0.5, 0, 0.5, 1];
+  // Campo ABERTO: os zumbis nascem em qualquer x lateral contínuo dentro
+  // deste range (em unidades de faixa; -1.6..1.6 cobre além das bordas pra
+  // eles entrarem/saírem de campo naturalmente). Sem faixas discretas.
+  var _COR_CAMPO_LAT = 1.6;
+  // População alvo de zumbis vivos na tela (mantém 3-6 visíveis).
+  var _COR_POP_MIN = 4, _COR_POP_MAX = 7;
 
   var _COR_TIPOS = {
     normal: { hp: 1, w: 0.16, cor: '#6f7d5a', corEsc: '#4b5640', vel: 1.00 },
-    rapido: { hp: 1, w: 0.13, cor: '#8a6f3a', corEsc: '#5e4b26', vel: 1.55 },
-    forte:  { hp: 3, w: 0.24, cor: '#5a6f6b', corEsc: '#3c4b48', vel: 0.78 }
+    rapido: { hp: 1, w: 0.13, cor: '#8a6f3a', corEsc: '#5e4b26', vel: 1.35 },
+    forte:  { hp: 3, w: 0.24, cor: '#5a6f6b', corEsc: '#3c4b48', vel: 0.80 }
   };
 
   /* ── Persistência ─────────────────────────────────────────────── */
@@ -234,20 +241,28 @@
   ══════════════════════════════════════════════════════════════ */
   function _corSpawnZumbi() {
     var d = _corDist;
-    var pRapido = _corClamp(0.10 + d / 2600, 0.10, 0.42);
-    var pForte  = _corClamp(0.04 + d / 4200, 0.04, 0.30);
+    var pRapido = _corClamp(0.08 + d / 3000, 0.08, 0.36);
+    var pForte  = _corClamp(0.04 + d / 4600, 0.04, 0.28);
     var r = Math.random();
     var tipo = (r < pForte) ? 'forte' : ((r < pForte + pRapido) ? 'rapido' : 'normal');
     var def = _COR_TIPOS[tipo];
+    // Campo aberto: posição lateral CONTÍNUA em qualquer ponto do campo.
+    var faixa = _corRand(-_COR_CAMPO_LAT, _COR_CAMPO_LAT);
+    // z inicial variado (perto de Z_FAR, mas escalonado) pra não nascerem
+    // todos na mesma linha de profundidade.
+    var z = _COR_Z_FAR - _corRand(0, 0.18);
     _corZumbis.push({
-      z: _COR_Z_FAR, faixa: _corEscolha(_COR_FAIXAS), tipo: tipo,
+      z: z, faixa: faixa, tipo: tipo,
       hp: def.hp, morto: false, cai: 0, bob: Math.random() * Math.PI * 2,
-      swayA: (tipo === 'forte') ? 0 : _corRand(0.02, 0.06),
-      swayF: _corRand(1.4, 2.6), swayP: Math.random() * Math.PI * 2
+      // deriva lateral lenta (cambaleio pelo campo)
+      swayA: (tipo === 'forte') ? _corRand(0.01, 0.03) : _corRand(0.03, 0.08),
+      swayF: _corRand(0.8, 1.8), swayP: Math.random() * Math.PI * 2,
+      // cada zumbi tem uma leve variação de velocidade individual
+      velVar: _corRand(0.85, 1.15)
     });
   }
   function _corSpawnItem() {
-    _corItens.push({ z: _COR_Z_FAR, faixa: _corEscolha(_COR_FAIXAS), bob: Math.random() * Math.PI * 2 });
+    _corItens.push({ z: _COR_Z_FAR, faixa: _corRand(-1.0, 1.0), bob: Math.random() * Math.PI * 2 });
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -318,9 +333,26 @@
     if (_corRecuo > 0) _corRecuo = Math.max(0, _corRecuo - dt * 6);
     _corCamVX *= Math.max(0, 1 - dt * 10);
 
-    var intervalo = _corClamp(1.15 - _corDist / 3800, 0.42, 1.15);
+    // Spawn por POPULAÇÃO: mantém entre POP_MIN e POP_MAX zumbis vivos na
+    // tela (campo aberto cheio, estilo Into the Dead). Conta os vivos.
+    var vivos = 0;
+    for (var vi = 0; vi < _corZumbis.length; vi++) if (!_corZumbis[vi].morto) vivos++;
     _corSpawnT -= dt;
-    if (_corSpawnT <= 0) { _corSpawnZumbi(); _corSpawnT = intervalo * _corRand(0.75, 1.25); }
+    if (_corSpawnT <= 0) {
+      if (vivos < _COR_POP_MIN) {
+        // Abaixo do mínimo: repõe rápido (spawna 1-2 de uma vez).
+        _corSpawnZumbi();
+        if (vivos < _COR_POP_MIN - 1) _corSpawnZumbi();
+        _corSpawnT = _corRand(0.25, 0.6);
+      } else if (vivos < _COR_POP_MAX) {
+        // Entre min e max: spawna esporádico.
+        _corSpawnZumbi();
+        _corSpawnT = _corRand(0.8, 1.6);
+      } else {
+        // Cheio: espera esvaziar um pouco.
+        _corSpawnT = _corRand(0.5, 1.0);
+      }
+    }
     _corItemT -= dt;
     if (_corItemT <= 0) { _corSpawnItem(); _corItemT = _corRand(6, 11); }
 
@@ -332,11 +364,11 @@
         if (zb.cai > 0.6) _corZumbis.splice(i, 1);
         continue;
       }
-      zb.z -= _corVel * (_COR_TIPOS[zb.tipo].vel) * dt;
-      zb.bob += dt * 6;
+      zb.z -= _corVel * (_COR_TIPOS[zb.tipo].vel) * (zb.velVar || 1) * dt;
+      zb.bob += dt * 4;
       zb.swayP += dt * zb.swayF;
       if (zb.z <= 0.05) {
-        var meia = (_COR_TIPOS[zb.tipo].w * 0.5) + 0.22;
+        var meia = (_COR_TIPOS[zb.tipo].w * 0.5) + 0.20;
         if (Math.abs(zb.faixa - _corCamX) < meia) { _corGameOver(); return; }
         else { _corZumbis.splice(i, 1); continue; }
       }
@@ -375,24 +407,31 @@
     if (!_corCtx) return;
     var ctx = _corCtx, W = _corW, H = _corH, horizonY = H * _COR_HORIZ + _corBobY * H;
 
+    // ── Céu sombrio (cinza-esverdeado apocalíptico) ──
     var gCeu = ctx.createLinearGradient(0, 0, 0, horizonY);
-    gCeu.addColorStop(0, '#2a1c18'); gCeu.addColorStop(0.6, '#4a2f22'); gCeu.addColorStop(1, '#6b4130');
+    gCeu.addColorStop(0, '#3a4048'); gCeu.addColorStop(0.55, '#4c5259'); gCeu.addColorStop(1, '#5f6560');
     ctx.fillStyle = gCeu; ctx.fillRect(0, 0, W, horizonY);
 
-    var lx = W * 0.7, ly = horizonY * 0.4, lr = H * 0.16;
-    var gL = ctx.createRadialGradient(lx, ly, lr * 0.2, lx, ly, lr * 2.2);
-    gL.addColorStop(0, 'rgba(230,190,150,0.5)'); gL.addColorStop(0.5, 'rgba(200,150,110,0.16)'); gL.addColorStop(1, 'rgba(200,150,110,0)');
-    ctx.fillStyle = gL; ctx.beginPath(); ctx.arc(lx, ly, lr * 2.2, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(220,180,140,0.55)'; ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.fill();
+    // Lua/sol pálido velado, alto no céu.
+    var lx = W * 0.74, ly = horizonY * 0.36, lr = H * 0.14;
+    var gL = ctx.createRadialGradient(lx, ly, lr * 0.2, lx, ly, lr * 2.4);
+    gL.addColorStop(0, 'rgba(210,205,195,0.45)'); gL.addColorStop(0.5, 'rgba(180,175,165,0.14)'); gL.addColorStop(1, 'rgba(180,175,165,0)');
+    ctx.fillStyle = gL; ctx.beginPath(); ctx.arc(lx, ly, lr * 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(205,200,188,0.5)'; ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.fill();
 
-    _corDrawSkyline(ctx, W, horizonY);
+    // ── Floresta de silhuetas no horizonte (parallax pelo strafe) ──
+    _corDrawFloresta(ctx, W, horizonY);
 
+    // ── Chão (campo) — do horizonte pra baixo, tom escuro esverdeado ──
     var gCh = ctx.createLinearGradient(0, horizonY, 0, H);
-    gCh.addColorStop(0, '#20241c'); gCh.addColorStop(1, '#0e120c');
+    gCh.addColorStop(0, '#2f3830'); gCh.addColorStop(0.5, '#232a24'); gCh.addColorStop(1, '#141813');
     ctx.fillStyle = gCh; ctx.fillRect(0, horizonY, W, H - horizonY);
 
-    _corDrawEstrada(ctx, W, H, horizonY);
+    // Textura sutil do campo correndo (linhas de perspectiva suaves, campo
+    // aberto — sem estrada estreita).
+    _corDrawCampo(ctx, W, H, horizonY);
 
+    // ── Entidades (zumbis + itens) do fundo pra frente ──
     var render = [];
     var i;
     for (i = 0; i < _corItens.length; i++) render.push({ k: 'item', o: _corItens[i], z: _corItens[i].z });
@@ -403,18 +442,25 @@
       else _corDrawItem(ctx, render[i].o);
     }
 
-    var gFog = ctx.createLinearGradient(0, horizonY - H * 0.05, 0, horizonY + H * 0.34);
-    gFog.addColorStop(0, 'rgba(60,52,44,0.94)'); gFog.addColorStop(0.5, 'rgba(60,52,44,0.4)'); gFog.addColorStop(1, 'rgba(60,52,44,0)');
-    ctx.fillStyle = gFog; ctx.fillRect(0, horizonY - H * 0.05, W, H * 0.45);
+    // ── Névoa densa na faixa do horizonte (esconde o spawn) ──
+    var gFog = ctx.createLinearGradient(0, horizonY - H * 0.08, 0, horizonY + H * 0.30);
+    gFog.addColorStop(0, 'rgba(150,155,150,0.55)'); gFog.addColorStop(0.45, 'rgba(140,148,142,0.28)'); gFog.addColorStop(1, 'rgba(140,148,142,0)');
+    ctx.fillStyle = gFog; ctx.fillRect(0, horizonY - H * 0.08, W, H * 0.4);
 
+    // ── Respingos de sangue ──
     for (i = 0; i < _corSangue.length; i++) {
       var sg = _corSangue[i];
       ctx.globalAlpha = _corClamp(sg.life / sg.max, 0, 1) * 0.8;
-      ctx.fillStyle = '#7a1216';
+      ctx.fillStyle = '#6a2812';
       ctx.beginPath(); ctx.arc(sg.x, sg.y, sg.r, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
 
+    // ── Mato em PRIMEIRO PLANO (silhuetas de grama na base, como Into the
+    // Dead) — desenhado ANTES da arma, atrás dela. ──
+    _corDrawMato(ctx, W, H);
+
+    // ── Arma + mira ──
     _corDrawArma(ctx, W, H);
     _corDrawMira(ctx, W, H);
 
@@ -427,84 +473,110 @@
       ctx.globalAlpha = 1;
     }
 
-    var gV = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.3, W * 0.5, H * 0.5, H * 0.85);
-    gV.addColorStop(0, 'rgba(0,0,0,0)'); gV.addColorStop(1, 'rgba(0,0,0,0.5)');
+    // Vinheta escura (clima sombrio, mais forte que antes).
+    var gV = ctx.createRadialGradient(W * 0.5, H * 0.48, H * 0.28, W * 0.5, H * 0.5, H * 0.9);
+    gV.addColorStop(0, 'rgba(0,0,0,0)'); gV.addColorStop(1, 'rgba(0,0,0,0.62)');
     ctx.fillStyle = gV; ctx.fillRect(0, 0, W, H);
   }
 
-  function _corDrawSkyline(ctx, W, horizonY) {
+  // Floresta de pinheiros (silhuetas serrilhadas) no horizonte.
+  function _corDrawFloresta(ctx, W, horizonY) {
     ctx.save();
-    ctx.fillStyle = '#1a1512';
-    var base = horizonY;
-    var off = (-_corCamX * (W * 0.10)) % 90;
+    ctx.fillStyle = '#181d18';
+    var base = horizonY + 2;
+    var off = (-_corCamX * (W * 0.08)) % 40;
+    var x = -40 - off, seed = 13;
     ctx.beginPath(); ctx.moveTo(-40, base);
-    var x = -40 - off, seed = 7;
     while (x < W + 40) {
       seed = (seed * 9301 + 49297) % 233280;
-      var hh = horizonY * (0.08 + (seed / 233280) * 0.22);
-      var ww = 30 + ((seed >> 3) % 26);
-      ctx.lineTo(x, base - hh); ctx.lineTo(x + ww, base - hh);
-      x += ww + 7;
+      var hh = horizonY * (0.06 + (seed / 233280) * 0.14);   // altura da árvore
+      var ww = 8 + ((seed >> 4) % 10);                        // largura
+      // pinheiro triangular
+      ctx.lineTo(x, base);
+      ctx.lineTo(x + ww * 0.5, base - hh);
+      ctx.lineTo(x + ww, base);
+      x += ww * 0.7;
     }
     ctx.lineTo(W + 40, base); ctx.closePath(); ctx.fill();
+    // segunda fileira mais clara/distante atrás
+    ctx.fillStyle = 'rgba(40,46,44,0.6)';
+    var off2 = (-_corCamX * (W * 0.05)) % 30;
+    x = -40 - off2; seed = 29;
+    ctx.beginPath(); ctx.moveTo(-40, base - horizonY * 0.02);
+    while (x < W + 40) {
+      seed = (seed * 9301 + 49297) % 233280;
+      var hh2 = horizonY * (0.04 + (seed / 233280) * 0.10);
+      var ww2 = 7 + ((seed >> 4) % 8);
+      ctx.lineTo(x, base - horizonY * 0.02);
+      ctx.lineTo(x + ww2 * 0.5, base - horizonY * 0.02 - hh2);
+      ctx.lineTo(x + ww2, base - horizonY * 0.02);
+      x += ww2 * 0.7;
+    }
+    ctx.lineTo(W + 40, base - horizonY * 0.02); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
 
-  function _corDrawEstrada(ctx, W, H, horizonY) {
-    var fugaX = W * 0.5 - _corCamX * (W * 0.42) * 0.08;
-    var cxBot = W * 0.5 - _corCamX * (W * 0.42);
-    var topHalf = W * 0.04, botHalf = W * 0.46;
-    ctx.fillStyle = '#2b2f24';
-    ctx.beginPath();
-    ctx.moveTo(fugaX - topHalf, horizonY);
-    ctx.lineTo(fugaX + topHalf, horizonY);
-    ctx.lineTo(cxBot + botHalf, H);
-    ctx.lineTo(cxBot - botHalf, H);
-    ctx.closePath(); ctx.fill();
-
-    ctx.strokeStyle = 'rgba(180,170,140,0.10)'; ctx.lineWidth = 1;
-    for (var f = 0; f < _COR_FAIXAS.length; f++) {
-      var fa = _COR_FAIXAS[f];
-      var xt = fugaX + fa * topHalf, xb = cxBot + fa * botHalf;
-      ctx.beginPath(); ctx.moveTo(xt, horizonY); ctx.lineTo(xb, H); ctx.stroke();
+  // Campo aberto: linhas de perspectiva MUITO suaves convergindo pro fuga,
+  // dando noção de movimento sem a "estrada" estreita. Ocupa a largura toda.
+  function _corDrawCampo(ctx, W, H, horizonY) {
+    var fugaX = W * 0.5 - _corCamX * (W * 0.30) * 0.1;
+    // Linhas radiais suaves saindo do ponto de fuga pra base (campo inteiro).
+    ctx.strokeStyle = 'rgba(120,130,115,0.05)';
+    ctx.lineWidth = 1;
+    for (var k = -6; k <= 6; k++) {
+      var xb = W * 0.5 + k * (W * 0.16) - _corCamX * (W * 0.30);
+      ctx.beginPath(); ctx.moveTo(fugaX, horizonY); ctx.lineTo(xb, H); ctx.stroke();
     }
-    // Tracejado central "correndo" — bem mais rápido pra sensação de corrida.
-    var run = (_corDist * 2.4) % 60;
-    ctx.strokeStyle = 'rgba(210,200,160,0.16)';
-    for (var d = 0; d < 8; d++) {
-      var tt = (d * 60 + run) / (8 * 60); var t2 = tt * tt;
-      var y1 = horizonY + (H - horizonY) * t2;
-      var t2b = Math.min(1, tt + 0.04);
-      var y2 = horizonY + (H - horizonY) * (t2b * t2b);
-      var cx = W * 0.5 - _corCamX * (W * 0.42) * (0.08 + 0.92 * t2);
-      ctx.lineWidth = 1 + 5 * t2;
-      ctx.beginPath(); ctx.moveTo(cx, y1); ctx.lineTo(cx, y2); ctx.stroke();
-    }
-    // Marcas laterais no chão (rachaduras/texturas) subindo rápido em
-    // direção à câmera — reforça MUITO a percepção de velocidade.
-    var run2 = (_corDist * 3.0) % 40;
-    ctx.strokeStyle = 'rgba(0,0,0,0.22)';
-    for (var m = 0; m < 10; m++) {
-      var mt = (m * 40 + run2) / (10 * 40); var mt2 = mt * mt;
-      var my = horizonY + (H - horizonY) * mt2;
-      var half = (topHalf + (botHalf - topHalf) * mt2);
-      var mcx = W * 0.5 - _corCamX * (W * 0.42) * (0.08 + 0.92 * mt2);
-      var lw = Math.max(1, 3 * mt2);
-      ctx.lineWidth = lw;
-      // duas marcas curtas, uma de cada lado da estrada
-      ctx.beginPath();
-      ctx.moveTo(mcx - half * 0.7, my); ctx.lineTo(mcx - half * 0.4, my);
-      ctx.moveTo(mcx + half * 0.4, my); ctx.lineTo(mcx + half * 0.7, my);
-      ctx.stroke();
+    // "Ondas" horizontais correndo em direção à câmera (textura do chão).
+    var run = (_corDist * 1.6) % 100;
+    ctx.strokeStyle = 'rgba(90,100,85,0.06)';
+    for (var d = 0; d < 10; d++) {
+      var tt = (d * 100 + run) / (10 * 100); var t2 = tt * tt;
+      var y = horizonY + (H - horizonY) * t2;
+      ctx.lineWidth = 1 + 3 * t2;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
     }
   }
+
+  // Mato em primeiro plano: tufos de grama escura na base da tela, com leve
+  // balanço pela passada. Duas camadas (atrás mais clara, frente preta).
+  function _corDrawMato(ctx, W, H) {
+    var swayG = Math.sin(_corPasso * 0.5) * W * 0.008;
+    // camada de trás (mais clara, tufos menores)
+    _corDrawTufos(ctx, W, H, H * 0.82, W * 0.045, 'rgba(20,26,20,0.75)', swayG * 0.5, 17);
+    // camada da frente (preta, tufos maiores, cobre a base)
+    _corDrawTufos(ctx, W, H, H * 0.90, W * 0.075, 'rgba(6,9,6,0.96)', swayG, 11);
+  }
+  function _corDrawTufos(ctx, W, H, topY, larg, cor, sway, seedBase) {
+    ctx.save();
+    ctx.fillStyle = cor;
+    var seed = seedBase;
+    var x = -larg;
+    while (x < W + larg) {
+      seed = (seed * 9301 + 49297) % 233280;
+      var altura = (H - topY) * (0.55 + (seed / 233280) * 0.7);
+      var lw = larg * (0.6 + (seed / 233280));
+      var cx = x + sway * (0.5 + (seed / 233280));
+      // tufo = triângulo pontudo pra cima
+      ctx.beginPath();
+      ctx.moveTo(cx - lw * 0.5, H);
+      ctx.quadraticCurveTo(cx - lw * 0.15, H - altura * 0.7, cx, H - altura);
+      ctx.quadraticCurveTo(cx + lw * 0.15, H - altura * 0.7, cx + lw * 0.5, H);
+      ctx.closePath(); ctx.fill();
+      x += larg * 0.55;
+    }
+    ctx.restore();
+  }
+
 
   function _corDrawZumbi(ctx, zb) {
     var def = _COR_TIPOS[zb.tipo];
     var faixaAnim = zb.faixa + zb.swayA * Math.sin(zb.swayP);
     var p = _corProj(zb.z, faixaAnim);
     var hpx = 0.5 * _corH * p.s * 0.94;
-    var wpx = def.w * _corW * p.s * 1.5;
+    // Largura derivada da ALTURA (proporção consistente em qualquer tela).
+    // Antes usava _corW, que em landscape inflava demais e deformava o vetor.
+    var wpx = hpx * 0.62 * (def.w / 0.16);   // normaliza pela largura-base do tipo
     var bob = Math.sin(zb.bob) * hpx * 0.03;
 
     ctx.globalAlpha = 0.35 * (0.4 + p.s); ctx.fillStyle = '#000';
@@ -522,8 +594,17 @@
     var desenhou = _corDrawSheetFrame(ctx, zb.tipo, _corRelogio, -aw / 2, -ah, aw, ah);
     ctx.restore();
     if (!desenhou) {
-      // Sheet ainda não carregou → boneco vetorial enquanto isso.
-      _corVetorZumbi(ctx, p.x, p.y + bob, wpx * mortScale, hpx * mortScale, def, mortRot);
+      // Sheet não carregou. Tenta o webp estático antigo (imagem real, sem
+      // animar) — melhor que o vetor. Só cai no vetor se nem isso existir.
+      var est = _corAsset('zumbi-' + zb.tipo + '.webp');
+      if (est && est.ok && est.img && est.w && est.h) {
+        var er = est.w / est.h;
+        var eah = hpx * 2.0 * mortScale, eaw = eah * er;
+        ctx.save(); ctx.translate(p.x, p.y - hpx + bob); ctx.rotate(mortRot);
+        ctx.drawImage(est.img, -eaw / 2, -eah, eaw, eah); ctx.restore();
+      } else {
+        _corVetorZumbi(ctx, p.x, p.y + bob, wpx * mortScale, hpx * mortScale, def, mortRot);
+      }
     }
     ctx.globalAlpha = 1;
   }
@@ -909,20 +990,27 @@
     _corDimensionar();
     var ctx = _corCtx, W = _corW, H = _corH, horizonY = H * _COR_HORIZ;
     var gCeu = ctx.createLinearGradient(0, 0, 0, horizonY);
-    gCeu.addColorStop(0, '#2a1c18'); gCeu.addColorStop(0.6, '#4a2f22'); gCeu.addColorStop(1, '#6b4130');
+    gCeu.addColorStop(0, '#3a4048'); gCeu.addColorStop(0.55, '#4c5259'); gCeu.addColorStop(1, '#5f6560');
     ctx.fillStyle = gCeu; ctx.fillRect(0, 0, W, horizonY);
-    _corDrawSkyline(ctx, W, horizonY);
+    // lua
+    var lx = W * 0.74, ly = horizonY * 0.36, lr = H * 0.14;
+    var gL = ctx.createRadialGradient(lx, ly, lr * 0.2, lx, ly, lr * 2.4);
+    gL.addColorStop(0, 'rgba(210,205,195,0.45)'); gL.addColorStop(1, 'rgba(180,175,165,0)');
+    ctx.fillStyle = gL; ctx.beginPath(); ctx.arc(lx, ly, lr * 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(205,200,188,0.5)'; ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.fill();
+    _corDrawFloresta(ctx, W, horizonY);
     var gCh = ctx.createLinearGradient(0, horizonY, 0, H);
-    gCh.addColorStop(0, '#20241c'); gCh.addColorStop(1, '#0e120c');
+    gCh.addColorStop(0, '#2f3830'); gCh.addColorStop(0.5, '#232a24'); gCh.addColorStop(1, '#141813');
     ctx.fillStyle = gCh; ctx.fillRect(0, horizonY, W, H - horizonY);
-    _corDrawEstrada(ctx, W, H, horizonY);
-    var gFog = ctx.createLinearGradient(0, horizonY - H * 0.05, 0, horizonY + H * 0.34);
-    gFog.addColorStop(0, 'rgba(60,52,44,0.9)'); gFog.addColorStop(1, 'rgba(60,52,44,0)');
-    ctx.fillStyle = gFog; ctx.fillRect(0, horizonY - H * 0.05, W, H * 0.45);
+    _corDrawCampo(ctx, W, H, horizonY);
+    var gFog = ctx.createLinearGradient(0, horizonY - H * 0.08, 0, horizonY + H * 0.3);
+    gFog.addColorStop(0, 'rgba(150,155,150,0.55)'); gFog.addColorStop(1, 'rgba(140,148,142,0)');
+    ctx.fillStyle = gFog; ctx.fillRect(0, horizonY - H * 0.08, W, H * 0.4);
+    _corDrawMato(ctx, W, H);
     _corDrawArma(ctx, W, H);
     _corDrawMira(ctx, W, H);
-    var gV = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.3, W * 0.5, H * 0.5, H * 0.85);
-    gV.addColorStop(0, 'rgba(0,0,0,0)'); gV.addColorStop(1, 'rgba(0,0,0,0.5)');
+    var gV = ctx.createRadialGradient(W * 0.5, H * 0.48, H * 0.28, W * 0.5, H * 0.5, H * 0.9);
+    gV.addColorStop(0, 'rgba(0,0,0,0)'); gV.addColorStop(1, 'rgba(0,0,0,0.62)');
     ctx.fillStyle = gV; ctx.fillRect(0, 0, W, H);
   }
 

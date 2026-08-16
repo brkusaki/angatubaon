@@ -450,6 +450,22 @@
           </div>
           <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
+
+        <button type="button" class="game-card gc-piano" onclick="_abrirJogo('piano')">
+          <div class="gc-inner">
+            <div class="gc-owl">
+              <span class="gc-owl-glow"></span>
+              <img src="/webp/owl-highlight.webp" alt="" loading="lazy"
+                   onerror="this.onerror=null;this.src='/webp/owl-tada.webp';">
+            </div>
+            <div class="gc-info">
+              <div class="gc-title">Piano da Coruja</div>
+              <div class="gc-desc">Toque os azulejos no ritmo e não deixe nenhum passar!</div>
+              <span class="gc-cta">Tocar</span>
+            </div>
+          </div>
+          <i class="fa fa-chevron-right gc-arrow"></i>
+        </button>
       </div>
 
       <!-- TELA: Quiz da Coruja -->
@@ -657,6 +673,38 @@
               <div class="cor-overlay-desc" id="cor-fim-msg"></div>
               <div class="rank-slot" id="cor-rank-slot" style="display:none;"></div>
               <button type="button" class="cor-play" onclick="_corComecar()">Correr de novo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TELA: Piano da Coruja (Piano Tiles) -->
+      <div id="jogo-piano" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div class="pn-card">
+          <div class="pn-hud">
+            <div class="pn-hud-item"><span class="pn-hud-label">Notas</span><span class="pn-hud-valor" id="pn-pontos">0</span></div>
+            <div class="pn-hud-item"><span class="pn-hud-label">Recorde</span><span class="pn-hud-valor" id="pn-recorde">0</span></div>
+          </div>
+          <div class="pn-musica">&#127925; <span class="pn-musica-nome" id="pn-musica">&mdash;</span></div>
+          <div class="pn-arena" id="pn-arena">
+            <canvas id="pn-canvas"></canvas>
+            <!-- Tela inicial -->
+            <div class="pn-overlay" id="pn-inicio">
+              <img src="/webp/owl-highlight.webp" alt="" class="pn-overlay-owl" onerror="this.style.display='none'">
+              <div class="pn-overlay-titulo">&#127929; Piano da Coruja</div>
+              <div class="pn-overlay-desc">Toque sempre no <b>azulejo mais baixo</b> &mdash; o que está marcado. Errar a coluna ou deixar um passar encerra a partida, e quanto mais notas você emenda, mais rápido fica.</div>
+              <div class="pn-creditos">Melodias de domínio público (Beethoven, Mozart, Pachelbel e tradicionais), tocadas ao vivo pelo próprio app.</div>
+              <button type="button" class="pn-play" onclick="_pnComecar()">Começar</button>
+            </div>
+            <!-- Tela de fim -->
+            <div class="pn-overlay" id="pn-fim" style="display:none;">
+              <img src="" alt="" class="pn-overlay-owl" id="pn-fim-owl" onerror="this.style.display='none'">
+              <div class="pn-overlay-titulo" id="pn-fim-titulo">Nota errada!</div>
+              <div class="pn-overlay-pontos" id="pn-fim-pontos">0 notas</div>
+              <div class="pn-overlay-desc" id="pn-fim-msg"></div>
+              <div class="rank-slot" id="pn-rank-slot" style="display:none;"></div>
+              <button type="button" class="pn-play" onclick="_pnComecar()">Tocar de novo</button>
             </div>
           </div>
         </div>

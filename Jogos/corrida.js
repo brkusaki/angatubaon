@@ -45,19 +45,49 @@
     'zumbi-forte':  { arquivo: 'zumbi-forte-sheet.webp',  frames: 12, fps: 8 }
   };
 
-  // Carrega uma imagem estática simples (arma, munição, ou um spritesheet).
-  function _corAsset(nome) {
-    if (_corAssets[nome]) return _corAssets[nome];
-    var reg = { img: null, ok: false, w: 0, h: 0 };
-    _corAssets[nome] = reg;
-    try {
-      var im = new Image();
-      im.onload = function () { reg.ok = true; reg.w = im.naturalWidth || 0; reg.h = im.naturalHeight || 0; };
-      im.onerror = function () { reg.ok = false; };
-      im.src = _COR_ASSET_BASE + nome;
-      reg.img = im;
-    } catch (e) { reg.ok = false; }
+  // Carrega uma imagem, tentando VÁRIOS nomes em cascata. Isso torna o jogo
+  // tolerante a arquivos que subiram com o nome normalizado (sem hífens) —
+  // GitHub Pages é case- e hífen-sensitive, então um nome errado dá 404 e o
+  // asset nunca aparece. Passamos as variantes e a primeira que carregar vence.
+  function _corAssetMulti(nomes) {
+    var chave = nomes.join('|');
+    if (_corAssets[chave]) return _corAssets[chave];
+    var reg = { img: null, ok: false, w: 0, h: 0, nomeOk: null };
+    _corAssets[chave] = reg;
+    var i = 0;
+    function tentar() {
+      if (i >= nomes.length) { reg.ok = false; return; }
+      var nome = nomes[i++];
+      try {
+        var im = new Image();
+        im.onload = function () {
+          reg.ok = true; reg.img = im; reg.nomeOk = nome;
+          reg.w = im.naturalWidth || 0; reg.h = im.naturalHeight || 0;
+        };
+        im.onerror = function () { tentar(); };   // 404 → tenta o próximo nome
+        im.src = _COR_ASSET_BASE + nome;
+        if (!reg.img) reg.img = im;               // provisório até carregar
+      } catch (e) { tentar(); }
+    }
+    tentar();
     return reg;
+  }
+
+  // Gera as variantes de nome de um arquivo: com hífen (original) e sem
+  // separadores (caso o upload tenha normalizado).
+  function _corVariantes(nome) {
+    var v = [nome];
+    var semHifen = nome.replace(/-/g, '');
+    if (semHifen !== nome) v.push(semHifen);
+    var comUnderscore = nome.replace(/-/g, '_');
+    if (comUnderscore !== nome) v.push(comUnderscore);
+    return v;
+  }
+
+  // Carrega uma imagem estática simples (arma, munição, ou um spritesheet),
+  // já tentando as variantes de nome.
+  function _corAsset(nome) {
+    return _corAssetMulti(_corVariantes(nome));
   }
 
   // Prepara o spritesheet de um zumbi (carrega a imagem única). Idempotente.
@@ -114,7 +144,8 @@
   var _COR_Z_FAR = 1.0;
   var _COR_HORIZ = 0.46;
   var _corCamX = 0, _corCamVX = 0;
-  var _COR_CAM_LIM = 1.0;
+  var _COR_CAM_LIM = 6.0;   // bem largo: sensação de campo livre (zumbis
+                            // nascem relativos à câmera, então nunca "acaba")
 
   /* ── Head-bob / passada (sensação de correr, estilo Into the Dead) ─
      A passada avança proporcional à velocidade. Dela derivamos:
@@ -128,9 +159,10 @@
   /* ── Corrida / dificuldade ────────────────────────────────────── */
   var _corDist = 0;
   var _corVel = 0;
-  // MUITO mais lento que antes (estilo Into the Dead: zumbis se aproximam
-  // devagar, dá tempo de reagir e desviar).
-  var _COR_VEL_INI = 0.34, _COR_VEL_MAX = 0.62, _COR_VEL_ACC = 0.006;
+  // Calibrado pra dar TEMPO DE VER E DESVIAR (Into the Dead):
+  //   início  → zumbi normal leva ~9s do horizonte até você
+  //   máximo  → ~5s (ainda confortável), atingido bem devagar
+  var _COR_VEL_INI = 0.105, _COR_VEL_MAX = 0.19, _COR_VEL_ACC = 0.0012;
 
   /* ── Munição / tiro ───────────────────────────────────────────── */
   var _COR_MUN_INI = 12;
@@ -246,8 +278,10 @@
     var r = Math.random();
     var tipo = (r < pForte) ? 'forte' : ((r < pForte + pRapido) ? 'rapido' : 'normal');
     var def = _COR_TIPOS[tipo];
-    // Campo aberto: posição lateral CONTÍNUA em qualquer ponto do campo.
-    var faixa = _corRand(-_COR_CAMPO_LAT, _COR_CAMPO_LAT);
+    // Campo aberto: zumbis nascem RELATIVOS à posição da câmera (sempre no
+    // teu campo de visão atual), pra o campo nunca "acabar" quando você anda
+    // muito pro lado. Espalhados numa faixa de ±1.6 ao redor de onde olha.
+    var faixa = _corCamX + _corRand(-_COR_CAMPO_LAT, _COR_CAMPO_LAT);
     // z inicial variado (perto de Z_FAR, mas escalonado) pra não nascerem
     // todos na mesma linha de profundidade.
     var z = _COR_Z_FAR - _corRand(0, 0.18);
@@ -262,7 +296,9 @@
     });
   }
   function _corSpawnItem() {
-    _corItens.push({ z: _COR_Z_FAR, faixa: _corRand(-1.0, 1.0), bob: Math.random() * Math.PI * 2 });
+    // Relativo à câmera, como os zumbis — senão você anda pro lado e nunca
+    // mais encontra munição.
+    _corItens.push({ z: _COR_Z_FAR, faixa: _corCamX + _corRand(-1.0, 1.0), bob: Math.random() * Math.PI * 2 });
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -315,7 +351,10 @@
   ══════════════════════════════════════════════════════════════ */
   function _corUpdate(dt) {
     _corVel = Math.min(_COR_VEL_MAX, _corVel + _COR_VEL_ACC * dt);
-    _corDist += _corVel * dt * 34;
+    // Distância em "metros": fator reduzido pra dar ritmo de pessoa correndo,
+    // não de veículo. Com vel~0.16-0.34 e fator 16, ~5-9 m/s (18-32 km/h no
+    // pico), mas começa devagar e a sensação casa com o passo.
+    _corDist += _corVel * dt * 16;
 
     // Passada: avança com a velocidade. ~2.4 passos/seg em vel baixa,
     // acelerando com a corrida. Deriva head-bob e micro-sway.

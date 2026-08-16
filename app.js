@@ -9859,8 +9859,8 @@
   // cardápio → detalhes → minha-loja → cadastro. Cada return encerra o handler,
   // então um único "voltar" fecha apenas o modal do topo da pilha.
   window.addEventListener('popstate', function() {
-    // Painel de ranking (pode estar sobre a hub de jogos)
-    if (document.getElementById('modal-rank')?.classList.contains('open')) {
+    // Tela de ranking (dentro da hub de jogos)
+    if (document.getElementById('jogo-ranking')?.classList.contains('rank-open')) {
       if (typeof rankFecharPainel === 'function') rankFecharPainel(true); return;
     }
     // Painel de conta do cliente (pode estar sobre tudo)
@@ -15202,12 +15202,12 @@ ${urlCard}`)}`;
 
   // Metadados dos 4 rankings (rótulo amigável + coleção).
   var RANK_INFO = {
-    pegacoruja:      { label: 'Pega a Coruja', sub: 'Clássico' },
-    pegacoruja_surv: { label: 'Pega a Coruja', sub: 'Sobrevivência' },
-    relampago:       { label: 'Relâmpago',      sub: '' },
-    sequencia:       { label: 'Sequência',      sub: '' },
-    voo:             { label: 'Voo da Coruja',   sub: '' },
-    corrida:         { label: 'Corrida da Coruja', sub: '' }
+    pegacoruja:      { label: 'Pega a Coruja', sub: 'Clássico',      ico: '🦉' },
+    pegacoruja_surv: { label: 'Pega a Coruja', sub: 'Sobrevivência', ico: '❤️' },
+    relampago:       { label: 'Relâmpago',      sub: '',             ico: '⚡' },
+    sequencia:       { label: 'Sequência',      sub: '',             ico: '🧠' },
+    voo:             { label: 'Voo da Coruja',   sub: '',            ico: '☁️' },
+    corrida:         { label: 'Corrida da Coruja', sub: '',          ico: '🧟' }
   };
 
   var _rankAbaAtual = 'pegacoruja';
@@ -15219,48 +15219,132 @@ ${urlCard}`)}`;
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  /* ── Abrir o painel de ranking completo (em Joguinhos) ──────*/
+  /* ── Abrir o Ranking (tela cheia dentro do hub de Joguinhos) ─
+     Antes era um bottom-sheet (modal-rank) por cima do hub. Sobre a
+     tela cheia dos jogos aquilo virava "janela colada na janela".
+     Agora o ranking é uma TELA do hub, irmã das telas de jogo: mesma
+     moldura, mesmo botão voltar, sem overlay — e, vindo do fim de um
+     jogo, nem precisa sair da tela cheia nativa. */
   function rankAbrirPainel(jogoKey) {
-    var overlay = document.getElementById('modal-rank');
-    if (!overlay) return;
-    // Se um jogo está em tela cheia NATIVA, um modal fora do elemento
-    // fullscreen não é exibido pelo navegador. Saímos da tela cheia e
-    // abrimos o painel após o layout reassentar. (Mesmo motivo do login.)
-    var estavaFs = (typeof _fsAtivo === 'function' && _fsAtivo());
-    if (typeof _sairTelaCheia === 'function') _sairTelaCheia();
-    var abrir = function () {
-      _rankAbaAtual = jogoKey || _rankAbaAtual || 'pegacoruja';
-      rankRenderAbas();
-      rankCarregarAba(_rankAbaAtual);
-      overlay.classList.add('open');
-      document.body.style.overflow = 'hidden';
-      if (history.state && history.state.modal !== 'rank') history.pushState({ modal: 'rank' }, '');
-      else if (!history.state) history.pushState({ modal: 'rank' }, '');
-    };
-    if (estavaFs) setTimeout(abrir, 220); else abrir();
+    var tela = document.getElementById('jogo-ranking');
+    if (!tela) return;
+    // Chamado de fora do hub (ponte/deep link): abre o hub antes.
+    if (typeof _gamesHubAberto === 'function' && !_gamesHubAberto()) {
+      if (typeof _abrirGamesHub === 'function') _abrirGamesHub();
+    }
+    if (typeof _pararJogosExternos === 'function') _pararJogosExternos();
+    if (typeof _rlLimparTimers === 'function') _rlLimparTimers();
+
+    // Esconde o menu e as telas de jogo; só o ranking fica visível.
+    var menu = document.getElementById('games-menu');
+    if (menu) menu.style.display = 'none';
+    var telas = document.querySelectorAll('.jogo-tela');
+    for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
+    // flex (não block): o layout da tela é herói + abas + lista rolável
+    // + barra "você" no rodapé, em coluna.
+    tela.style.display = 'flex';
+    tela.classList.add('rank-open');
+
+    // Mesmo estado das telas de jogo: esconde cabeçalho do hub, ofensiva
+    // e o próprio botão de ranking. Mantém a tela cheia nativa se já ativa.
+    var hubEl = document.getElementById('games-hub');
+    if (hubEl) hubEl.classList.add('jogo-ativo');
+
+    _rankAbaAtual = jogoKey || _rankAbaAtual || 'pegacoruja';
+    rankRenderAbas();
+    rankCarregarAba(_rankAbaAtual);
+
+    if (history.state && history.state.modal !== 'rank') history.pushState({ modal: 'rank' }, '');
+    else if (!history.state) history.pushState({ modal: 'rank' }, '');
   }
 
   function rankFecharPainel(viaPopstate) {
-    var overlay = document.getElementById('modal-rank');
-    if (!overlay) return;
-    overlay.classList.remove('open');
-    document.body.style.overflow = '';
+    var tela = document.getElementById('jogo-ranking');
+    if (tela) tela.classList.remove('rank-open');
+    // Volta pro menu de jogos (esconde todas as .jogo-tela, incl. esta).
+    if (typeof _voltarAoMenu === 'function') _voltarAoMenu();
     if (!viaPopstate && history.state?.modal === 'rank') history.back();
   }
 
-  // Monta os botões de aba (os 4 rankings).
+  // Monta as abas (uma por ranking), com ícone do jogo.
   function rankRenderAbas() {
     var wrap = document.getElementById('rank-abas');
     if (!wrap) return;
     var html = '';
     Object.keys(RANK_INFO).forEach(function (k) {
       var info = RANK_INFO[k];
-      var nome = info.label + (info.sub ? ' · ' + info.sub : '');
       var ativa = (k === _rankAbaAtual) ? ' rank-aba-ativa' : '';
       html += '<button class="rank-aba' + ativa + '" onclick="rankCarregarAba(\'' + k + '\')">' +
-              _rankEsc(nome) + '</button>';
+                '<span class="rank-aba-ico" aria-hidden="true">' + info.ico + '</span>' +
+                '<span class="rank-aba-txt">' + _rankEsc(info.label) +
+                  (info.sub ? '<span class="rank-aba-sub">' + _rankEsc(info.sub) + '</span>' : '') +
+                '</span>' +
+              '</button>';
     });
     wrap.innerHTML = html;
+    // Deixa a aba ativa visível na faixa rolável (ex.: ao abrir vindo
+    // do fim de um jogo que está lá no fim da lista).
+    var at = wrap.querySelector('.rank-aba-ativa');
+    if (at && at.scrollIntoView) {
+      try { at.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }); } catch (e) {}
+    }
+  }
+
+  /* ── Avatar do jogador ───────────────────────────────────────
+     O documento do ranking guarda só {uid, nome, score} — não há foto.
+     Então geramos um avatar de iniciais com cor derivada do uid: a
+     mesma pessoa tem sempre a mesma cor, sem custo de leitura extra.
+     Para o próprio usuário, se houver photoURL, usamos a foto real. */
+  function _rankCorUid(uid) {
+    var s = String(uid || ''), h = 2166136261;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = (h * 16777619) >>> 0;   // FNV-1a: espalha bem mesmo em uids parecidos
+    }
+    return h % 360;
+  }
+  function _rankIniciais(nome) {
+    var p = String(nome || '?').trim().split(/\s+/);
+    var a = p[0] ? p[0].charAt(0) : '?';
+    var b = (p.length > 1 && p[p.length - 1]) ? p[p.length - 1].charAt(0) : '';
+    return (a + b).toUpperCase();
+  }
+  function _rankAvatar(item, cls) {
+    var souEu = (typeof _cliUser !== 'undefined' && _cliUser && item.uid === _cliUser.uid);
+    var foto  = souEu ? (_cliUser.photoURL || '') : '';
+    var h     = _rankCorUid(item.uid);
+    var bg    = 'background:linear-gradient(135deg,hsl(' + h + ',62%,44%),hsl(' + ((h + 42) % 360) + ',58%,28%));';
+    if (foto) {
+      return '<span class="' + cls + '" style="' + bg + '">' +
+               '<img src="' + _rankEsc(foto) + '" alt="" onerror="this.style.display=\'none\'">' +
+             '</span>';
+    }
+    return '<span class="' + cls + '" style="' + bg + '">' + _rankEsc(_rankIniciais(item.nome)) + '</span>';
+  }
+
+  /* ── Pódio do top 3 ──────────────────────────────────────────
+     Ordem VISUAL 2º · 1º · 3º (o campeão no meio, mais alto), que é
+     como as pessoas leem pódio. Com 1 ou 2 jogadores os degraus que
+     faltam simplesmente não são desenhados. */
+  function _rankPodio(top, meuUid) {
+    var ordemVisual = [1, 0, 2];
+    var html = '<div class="rank-podio">';
+    ordemVisual.forEach(function (i) {
+      var it = top[i];
+      if (!it) return;
+      var pos = i + 1;
+      var eu  = (meuUid && it.uid === meuUid);
+      var coroa = pos === 1 ? '👑' : (pos === 2 ? '🥈' : '🥉');
+      html += '<div class="rank-pod rank-pod-' + pos + (eu ? ' rank-pod-eu' : '') + '">' +
+                '<div class="rank-pod-coroa" aria-hidden="true">' + coroa + '</div>' +
+                _rankAvatar(it, 'rank-pod-av') +
+                '<div class="rank-pod-nome">' + _rankEsc(it.nome) + '</div>' +
+                '<div class="rank-pod-tag">' + (eu ? 'você' : '') + '</div>' +
+                '<div class="rank-pod-score">' + it.score + '</div>' +
+                '<div class="rank-pod-base"><span class="rank-pod-pos">' + pos + 'º</span></div>' +
+              '</div>';
+    });
+    return html + '</div>';
   }
 
   // Carrega e mostra um ranking específico.
@@ -15268,10 +15352,13 @@ ${urlCard}`)}`;
     _rankAbaAtual = jogoKey;
     rankRenderAbas();
     var lista = document.getElementById('rank-lista');
-    if (lista) lista.innerHTML = '<div class="rank-loading">Carregando ranking…</div>';
+    var barra = document.getElementById('rank-eu-barra');
+    if (barra) { barra.innerHTML = ''; barra.style.display = 'none'; }
+    if (lista) lista.innerHTML = '<div class="rank-loading"><span class="rank-spin"></span>Carregando ranking…</div>';
 
     if (typeof rankLerTop !== 'function') {
-      if (lista) lista.innerHTML = '<div class="rank-vazio">Ranking indisponível agora.</div>';
+      if (lista) lista.innerHTML = '<div class="rank-vazio"><div class="rank-vazio-tit">Ranking indisponível agora</div>' +
+                                   '<div class="rank-vazio-sub">Verifique sua conexão e tente de novo.</div></div>';
       return;
     }
 
@@ -15279,34 +15366,52 @@ ${urlCard}`)}`;
 
     rankLerTop(jogoKey, 20).then(function (top) {
       if (!lista) return;
+      // Trocou de aba enquanto carregava: descarta o resultado atrasado.
+      if (jogoKey !== _rankAbaAtual) return;
       if (!top || !top.length) {
-        lista.innerHTML = '<div class="rank-vazio">🦉 Ninguém no ranking ainda.<br>Seja o primeiro a pontuar!</div>';
+        lista.innerHTML = '<div class="rank-vazio">' +
+            '<img src="/webp/owl-trophy.webp" alt="" class="rank-vazio-owl" onerror="this.style.display=\'none\'">' +
+            '<div class="rank-vazio-tit">Ninguém pontuou ainda</div>' +
+            '<div class="rank-vazio-sub">Jogue agora e seja o primeiro do ranking! 🦉</div>' +
+          '</div>';
         return;
       }
-      var html = '';
-      top.forEach(function (item, i) {
-        var pos = i + 1;
-        var medal = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : ('<span class="rank-pos">' + pos + '</span>');
-        var eu = (meuUid && item.uid === meuUid) ? ' rank-linha-eu' : '';
-        html += '<div class="rank-linha' + eu + '">' +
-                  '<div class="rank-medal">' + medal + '</div>' +
-                  '<div class="rank-nome">' + _rankEsc(item.nome) + (eu ? ' <span class="rank-voce">(você)</span>' : '') + '</div>' +
-                  '<div class="rank-score">' + item.score + '</div>' +
-                '</div>';
-      });
+
+      var html = _rankPodio(top, meuUid);
+      if (top.length > 3) {
+        html += '<div class="rank-lista-resto">';
+        for (var i = 3; i < top.length; i++) {
+          var it = top[i], pos = i + 1;
+          var eu = (meuUid && it.uid === meuUid) ? ' rank-linha-eu' : '';
+          html += '<div class="rank-linha' + eu + '">' +
+                    '<div class="rank-pos-num">' + pos + '</div>' +
+                    _rankAvatar(it, 'rank-av') +
+                    '<div class="rank-nome">' + _rankEsc(it.nome) +
+                      (eu ? ' <span class="rank-voce">(você)</span>' : '') + '</div>' +
+                    '<div class="rank-score">' + it.score + '</div>' +
+                  '</div>';
+        }
+        html += '</div>';
+      }
       lista.innerHTML = html;
 
-      // Se o jogador está logado mas fora do top, mostra a posição dele embaixo.
+      // Logado e fora do top 20: a própria posição vira uma barra
+      // grudada no rodapé, sempre visível enquanto rola a lista.
       if (meuUid) {
         var estaNoTop = top.some(function (t) { return t.uid === meuUid; });
         if (!estaNoTop && typeof rankMinhaPontuacao === 'function') {
           rankMinhaPontuacao(jogoKey).then(function (minha) {
-            if (minha != null && lista) {
-              lista.innerHTML += '<div class="rank-linha rank-linha-eu rank-linha-fora">' +
-                '<div class="rank-medal"><span class="rank-pos">•</span></div>' +
-                '<div class="rank-nome">Você <span class="rank-voce">(fora do top 20)</span></div>' +
-                '<div class="rank-score">' + minha + '</div></div>';
-            }
+            if (minha == null || !barra || jogoKey !== _rankAbaAtual) return;
+            var meuNome = (typeof _cliApelido !== 'undefined' && _cliApelido) ||
+                          (_cliUser && _cliUser.displayName) || 'Você';
+            var rotulo = (top.length >= 20) ? '(fora do top 20)' : '(sua marca)';
+            barra.innerHTML = '<div class="rank-linha rank-linha-eu">' +
+                '<div class="rank-pos-num">—</div>' +
+                _rankAvatar({ uid: meuUid, nome: meuNome }, 'rank-av') +
+                '<div class="rank-nome">Você <span class="rank-voce">' + rotulo + '</span></div>' +
+                '<div class="rank-score">' + minha + '</div>' +
+              '</div>';
+            barra.style.display = 'block';
           });
         }
       }

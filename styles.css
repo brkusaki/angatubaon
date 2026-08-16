@@ -5169,53 +5169,192 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     .rank-abrir-sub { font-size: 11.5px; color: var(--muted); }
     .rank-abrir-seta { color: rgba(255,180,0,.7); font-size: 13px; flex-shrink: 0; }
 
-    /* Modal alto (o rank pode ter muitos itens) */
-    .modal-sheet-tall { max-height: 85vh; }
+    /* ════════════════════════════════════════════
+       RANKING — TELA CHEIA DENTRO DO HUB
+       Era um bottom-sheet por cima do hub em tela cheia (janela sobre
+       janela — a causa do visual "colado"). Agora é uma tela irmã das
+       telas de jogo: herói → abas → pódio + lista rolável → barra
+       "você" grudada no rodapé.
+    ════════════════════════════════════════════ */
+    .rank-tela { display: flex; flex-direction: column; }
 
-    /* Abas dos 4 rankings */
+    /* Herói: cartão escuro próprio — legível nos dois temas */
+    .rank-hero {
+      position: relative; flex-shrink: 0; overflow: hidden;
+      display: flex; align-items: center; gap: 14px;
+      margin: 0 14px 12px; padding: 15px 16px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #2b1a08 0%, #1a1512 55%, #120e0b 100%);
+      border: 1px solid rgba(255,180,0,0.30);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+    .rank-hero::before {
+      content: ''; position: absolute; top: -70px; right: -50px;
+      width: 190px; height: 190px; border-radius: 50%; pointer-events: none;
+      background: radial-gradient(circle, rgba(255,180,0,0.26), transparent 68%);
+    }
+    .rank-hero-owl {
+      position: relative; width: 62px; height: 62px; object-fit: contain; flex-shrink: 0;
+      filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55));
+      animation: rankFlutua 3.4s ease-in-out infinite;
+    }
+    @keyframes rankFlutua { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+    .rank-hero-txt { position: relative; min-width: 0; }
+    .rank-hero-eyebrow {
+      font-family: var(--font-b); font-size: 10px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: .09em; color: #fbbf24;
+    }
+    .rank-hero-titulo {
+      font-family: var(--font-h); font-size: 1.3rem; font-weight: 800;
+      line-height: 1.12; color: #fff; margin: 3px 0 0;
+    }
+    .rank-hero-titulo span { color: var(--red); }
+    .rank-hero-sub { font-size: 11.5px; color: rgba(255,255,255,0.55); margin-top: 4px; }
+
+    /* Abas (uma por ranking) — faixa rolável com o ícone do jogo */
     .rank-abas {
-      display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 14px;
-      -webkit-overflow-scrolling: touch;
+      display: flex; gap: 8px; flex-shrink: 0;
+      overflow-x: auto; scrollbar-width: none;
+      padding: 2px 14px 12px; -webkit-overflow-scrolling: touch;
     }
     .rank-abas::-webkit-scrollbar { display: none; }
     .rank-aba {
-      flex-shrink: 0; padding: 8px 14px; border-radius: 999px;
+      flex-shrink: 0; display: flex; align-items: center; gap: 7px;
+      min-height: 42px; padding: 8px 14px; border-radius: 999px;
       background: var(--surface2); border: 1px solid var(--border);
-      color: var(--muted); font-size: 13px; font-weight: 600;
-      font-family: var(--font-b); cursor: pointer; white-space: nowrap;
-      transition: all 0.15s;
+      color: var(--muted); font-family: var(--font-b); cursor: pointer;
       -webkit-tap-highlight-color: transparent;
+      transition: background .18s, color .18s, border-color .18s, transform .12s, box-shadow .18s;
     }
+    .rank-aba:active { transform: scale(0.95); }
+    .rank-aba-ico { font-size: 15px; line-height: 1; }
+    .rank-aba-txt {
+      display: flex; flex-direction: column; align-items: flex-start;
+      font-size: 12.5px; font-weight: 700; line-height: 1.1; white-space: nowrap;
+    }
+    .rank-aba-sub { font-size: 9.5px; font-weight: 600; opacity: .75; margin-top: 2px; }
     .rank-aba-ativa {
-      background: var(--red); color: #fff; border-color: var(--red);
+      background: linear-gradient(135deg, #ff4d4d, #c81e1e);
+      color: #fff; border-color: transparent;
+      box-shadow: 0 4px 16px rgba(255,68,68,0.30);
     }
 
-    /* Lista do ranking */
-    .rank-lista {
-      display: flex; flex-direction: column; gap: 8px;
-      overflow-y: auto; padding-bottom: 8px;
+    /* Corpo rolável (pódio + lista) */
+    .rank-corpo {
+      flex: 1 1 auto; min-height: 0;
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 2px 14px 14px; scrollbar-width: none;
     }
+    .rank-corpo::-webkit-scrollbar { display: none; }
+
+    /* ── Pódio do top 3 (ordem visual 2º · 1º · 3º) ── */
+    .rank-podio {
+      display: flex; align-items: flex-end; justify-content: center;
+      gap: 8px; margin: 6px 0 16px;
+      border-bottom: 1px solid var(--border);   /* o "chão" onde os degraus pisam */
+    }
+    .rank-pod {
+      flex: 1 1 0; min-width: 0; max-width: 128px;
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+      animation: rankPodio .42s cubic-bezier(0.32,0.72,0,1) both;
+    }
+    .rank-pod-2 { animation-delay: .02s; }
+    .rank-pod-1 { animation-delay: .08s; }
+    .rank-pod-3 { animation-delay: .14s; }
+    @keyframes rankPodio {
+      from { opacity: 0; transform: translateY(16px) scale(0.94); }
+      to   { opacity: 1; transform: none; }
+    }
+    .rank-pod-coroa {
+      font-size: 17px; line-height: 1; margin-bottom: 5px;
+      filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5));
+    }
+    .rank-pod-1 .rank-pod-coroa { font-size: 24px; animation: rankCoroa 2.8s ease-in-out infinite; }
+    @keyframes rankCoroa {
+      0%,100% { transform: translateY(0) rotate(-5deg); }
+      50%     { transform: translateY(-4px) rotate(5deg); }
+    }
+    .rank-pod-av {
+      width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
+      font-family: var(--font-h); font-weight: 800; font-size: 18px; color: #fff;
+      border: 2.5px solid rgba(255,255,255,0.18);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    }
+    .rank-pod-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .rank-pod-1 .rank-pod-av {
+      width: 70px; height: 70px; font-size: 23px; border-color: #fbbf24;
+      box-shadow: 0 0 0 4px rgba(251,191,36,0.16), 0 8px 22px rgba(0,0,0,0.5);
+    }
+    .rank-pod-2 .rank-pod-av { border-color: #cbd5e1; }
+    .rank-pod-3 .rank-pod-av { border-color: #d08a54; }
+    .rank-pod-nome {
+      margin-top: 8px; max-width: 100%;
+      font-size: 12px; font-weight: 700; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    /* Linha reservada pro selo "você" — existe vazia nas outras colunas
+       para os placares dos três degraus ficarem na mesma altura. */
+    .rank-pod-tag {
+      min-height: 13px; line-height: 13px; margin-top: 1px;
+      font-size: 10px; font-weight: 800; color: var(--red);
+    }
+    .rank-pod-score {
+      font-family: var(--font-h); font-weight: 800; font-size: 17px;
+      color: #fbbf24; line-height: 1.15; margin-top: 2px;
+    }
+    .rank-pod-1 .rank-pod-score { font-size: 21px; }
+    .rank-pod-base {
+      margin-top: 9px; width: 100%;
+      display: flex; align-items: flex-start; justify-content: center; padding-top: 7px;
+      border-radius: 12px 12px 0 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.02));
+      border: 1px solid var(--border); border-bottom: none;
+    }
+    .rank-pod-1 .rank-pod-base {
+      height: 62px;
+      background: linear-gradient(180deg, rgba(251,191,36,0.30), rgba(251,191,36,0.04));
+      border-color: rgba(251,191,36,0.40);
+    }
+    .rank-pod-2 .rank-pod-base { height: 44px; }
+    .rank-pod-3 .rank-pod-base { height: 34px; }
+    .rank-pod-pos {
+      font-family: var(--font-h); font-weight: 800; font-size: 15px;
+      color: rgba(255,255,255,0.72);
+    }
+    .rank-pod-1 .rank-pod-pos { color: #fde68a; }
+
+    /* ── Lista do 4º em diante ── */
+    .rank-lista-resto { display: flex; flex-direction: column; gap: 7px; }
     .rank-linha {
-      display: flex; align-items: center; gap: 12px;
-      padding: 12px 14px; border-radius: var(--r-md);
+      display: flex; align-items: center; gap: 11px;
+      padding: 9px 12px; border-radius: 14px;
       background: var(--surface2); border: 1px solid var(--border);
     }
     .rank-linha-eu {
       background: linear-gradient(135deg, rgba(255,68,68,0.14), rgba(255,68,68,0.06));
       border-color: rgba(255,68,68,0.4);
     }
-    .rank-linha-fora {
-      margin-top: 8px; border-style: dashed;
+    .rank-linha-fora { margin-top: 8px; border-style: dashed; }
+    .rank-pos-num {
+      width: 22px; flex-shrink: 0; text-align: center;
+      font-family: var(--font-h); font-weight: 800; font-size: 13px; color: var(--muted);
     }
-    .rank-medal {
-      width: 32px; text-align: center; font-size: 20px; flex-shrink: 0;
+    .rank-av {
+      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
+      font-family: var(--font-h); font-weight: 800; font-size: 13px; color: #fff;
+      border: 1.5px solid rgba(255,255,255,0.14);
     }
+    .rank-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    /* .rank-medal / .rank-pos seguem vivos: são do mini-rank de fim de jogo */
+    .rank-medal { width: 32px; text-align: center; font-size: 20px; flex-shrink: 0; }
     .rank-pos {
       font-family: var(--font-h); font-weight: 800; font-size: 15px;
       color: var(--muted);
     }
     .rank-nome {
-      flex: 1; font-weight: 600; font-size: 15px; color: var(--text);
+      flex: 1; min-width: 0; font-weight: 600; font-size: 14.5px; color: var(--text);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .rank-voce { color: var(--red); font-size: 12px; font-weight: 700; }
@@ -5224,11 +5363,51 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
       color: var(--text); flex-shrink: 0;
     }
 
-    .rank-loading, .rank-vazio {
-      text-align: center; padding: 40px 20px; color: var(--muted);
-      font-size: 14px; line-height: 1.5;
+    /* Barra "você" no rodapé — só quando está fora do top 20 */
+    .rank-eu-barra {
+      flex-shrink: 0; padding: 8px 14px calc(12px + env(safe-area-inset-bottom));
+      background: linear-gradient(to top, var(--bg) 64%, transparent);
     }
-    .rank-vazio { font-size: 15px; }
+
+    /* Estados de carga / vazio */
+    .rank-loading {
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      padding: 44px 20px; color: var(--muted); font-size: 13.5px; line-height: 1.5;
+    }
+    .rank-spin {
+      width: 26px; height: 26px; border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.14); border-top-color: var(--red);
+      animation: spin 0.8s linear infinite;
+    }
+    .rank-vazio {
+      text-align: center; padding: 34px 20px; color: var(--muted);
+      font-size: 13px; line-height: 1.5;
+    }
+    .rank-vazio-owl {
+      width: 88px; height: 88px; object-fit: contain; display: block;
+      margin: 0 auto 10px; animation: rankFlutua 3.4s ease-in-out infinite;
+    }
+    .rank-vazio-tit {
+      font-family: var(--font-h); font-weight: 800; font-size: 1rem;
+      color: var(--text); margin-bottom: 4px;
+    }
+    .rank-vazio-sub { font-size: 12.5px; }
+
+    /* Tema DIA: pódio e spinner precisam do contraste invertido */
+    body.light-mode .rank-pod-base {
+      background: linear-gradient(180deg, rgba(15,26,46,0.14), rgba(15,26,46,0.02));
+    }
+    body.light-mode .rank-pod-pos { color: rgba(15,26,46,0.72); }
+    body.light-mode .rank-pod-score { color: #b45309; }
+    body.light-mode .rank-linha { background: var(--surface); }
+    body.light-mode .rank-spin { border-color: rgba(15,26,46,0.15); border-top-color: var(--red); }
+    body.light-mode .rank-av,
+    body.light-mode .rank-pod-av { border-color: rgba(15,26,46,0.12); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .rank-hero-owl, .rank-vazio-owl,
+      .rank-pod-1 .rank-pod-coroa, .rank-pod { animation: none; }
+    }
 
     /* ── Mini-rank no fim de jogo ── */
     .rank-slot {

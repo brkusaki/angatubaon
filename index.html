@@ -661,6 +661,24 @@
           </div>
         </div>
       </div>
+
+      <!-- TELA: Ranking da cidade (antes era o modal-rank; virou tela do hub) -->
+      <div id="jogo-ranking" class="jogo-tela rank-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="rankFecharPainel()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div class="rank-hero">
+          <img src="/webp/owl-trophy.webp" alt="" class="rank-hero-owl" onerror="this.style.display='none'">
+          <div class="rank-hero-txt">
+            <div class="rank-hero-eyebrow">🏆 Ranking da cidade</div>
+            <h2 class="rank-hero-titulo">Quem manda em <span>Angatuba</span></h2>
+            <div class="rank-hero-sub">Top 20 de cada jogo · atualiza a cada partida</div>
+          </div>
+        </div>
+        <div class="rank-abas" id="rank-abas"></div>
+        <div class="rank-corpo" id="rank-lista">
+          <div class="rank-loading"><span class="rank-spin"></span>Carregando ranking…</div>
+        </div>
+        <div class="rank-eu-barra" id="rank-eu-barra" style="display:none;"></div>
+      </div>
     </div>
 
 
@@ -2456,26 +2474,6 @@
     }
   </style>
 
-
-  <!-- ══════════════════════════════ MODAL RANKING -->
-  <div class="modal-overlay" id="modal-rank" role="dialog" aria-modal="true">
-    <div class="modal-sheet modal-sheet-tall">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <div>
-          <div class="modal-title">🏆 Ranking de <span>Angatuba</span></div>
-          <div class="modal-subtitle">Os melhores jogadores da cidade</div>
-        </div>
-        <button class="modal-close" onclick="rankFecharPainel()" aria-label="Fechar">✕</button>
-      </div>
-      <div class="modal-body" style="display:flex;flex-direction:column;padding-top:0;">
-        <div class="rank-abas" id="rank-abas"></div>
-        <div class="rank-lista" id="rank-lista">
-          <div class="rank-loading">Carregando ranking…</div>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- ══════════════════════════════ MODAL LOGIN/CADASTRO CLIENTE -->
   <div class="modal-overlay" id="modal-cli-login" role="dialog" aria-modal="true">

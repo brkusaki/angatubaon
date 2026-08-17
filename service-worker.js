@@ -1,4 +1,4 @@
-const CACHE = 'angatubaon-v178';
+const CACHE = 'angatubaon-v179';
 const STATIC = [
   '/',
   '/index.html',
@@ -111,6 +111,14 @@ self.addEventListener('fetch', e => {
     // JS/CSS: stale-while-revalidate — serve do cache na hora (boot instantâneo),
     // revalida em background e atualiza o cache. Como o app versiona via CACHE name
     // e o HTML vem network-first, a próxima carga já pega o bundle novo.
+    //
+    // Fix: offline sem cache, o fallback NÃO pode ser o offline.html.
+    // Devolver a página de offline para um .js/.css entrega HTML com status 200:
+    // o <script> "carrega" (dispara onload, não onerror), o navegador tenta
+    // parsear HTML como JS e o app cai num erro genérico ("módulo não expôs
+    // window.X") em vez do erro tratado. Response.error() falha como erro de
+    // rede de verdade, então o onerror do loader roda e a mensagem certa
+    // ("Não foi possível carregar... verifique a conexão") aparece.
     e.respondWith(
       caches.match(e.request).then(cached => {
         const net = fetch(e.request)
@@ -119,7 +127,7 @@ self.addEventListener('fetch', e => {
             caches.open(CACHE).then(c => c.put(e.request, clone));
             return r;
           })
-          .catch(() => cached || caches.match('/offline.html'));
+          .catch(() => cached || Response.error());
         return cached || net;
       })
     );

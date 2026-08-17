@@ -33,6 +33,21 @@
      Tiles original, quem dita o andamento é a velocidade da queda,
      então cada azulejo toca a próxima nota da lista. Quando a
      lista acaba, ela recomeça.
+
+     SOBRE AS BRASILEIRAS: no Brasil a obra cai em domínio público
+     70 anos depois da morte do autor (Lei 9.610/98, contados do 1º
+     de janeiro do ano seguinte), e cantiga de autor desconhecido já
+     nasce em domínio público. Chiquinha Gonzaga morreu em 1935, o
+     que libera "Ó Abre Alas" desde 2006; as cantigas de roda não
+     têm autor conhecido. Não há ECAD a pagar e, como a execução é
+     sintetizada aqui, também não existe gravação de terceiro no
+     meio — só a melodia, num arranjo nosso.
+
+     As notas das brasileiras foram transcritas de cifra melódica
+     publicada, não de memória. Cada uma anota a fonte, porque
+     esses sites invertem a convenção de oitava entre si (num deles
+     MAIÚSCULA é o registro grave, no outro é o agudo) e a leitura
+     foi resolvida pelo desenho da melodia.
   ══════════════════════════════════════════════════════════════ */
   var _PN_MELODIAS = [
     { nome: 'Für Elise', notas: [
@@ -58,6 +73,64 @@
       60,60,67,67,69,69,67,65,65,64,64,62,62,60,
       67,67,65,65,64,64,62,67,67,65,65,64,64,62,
       60,60,67,67,69,69,67,65,65,64,64,62,62,60
+    ] },
+
+    /* ── Brasileiras ──────────────────────────────────────────── */
+
+    // Chiquinha Gonzaga, 1899 — a primeira marchinha de carnaval.
+    // Fonte: cifra melódica (cifrasstudio), onde MAIÚSCULA é o
+    // registro a partir do dó agudo. A 1ª frase repete, como no
+    // original. Cheia de cromatismo descendente — é o que dá o
+    // gingado de marchinha.
+    { nome: 'Ó Abre Alas', notas: [
+      73,73,72,72,70,73,72,70,69,70,
+      73,73,72,72,70,73,72,70,69,70,
+      70,70,68,68,66,70,68,68,66,65,
+      65,69,72,77,75,77,75,73,72,70
+    ] },
+
+    // Cantiga de roda, autor desconhecido. Fonte: cifra melódica
+    // (joanir), onde MAIÚSCULA é o registro grave. Em fá maior.
+    { nome: 'Ciranda, Cirandinha', notas: [
+      60,65,65,69,69,72,72,
+      70,69,67,72,69,67,65,
+      69,72,70,69,67,65,64,60,
+      70,67,69,65,67,64,65
+    ] },
+
+    // Cantiga de roda, autor desconhecido. Fonte: cifra melódica
+    // (joanir). Em dó maior, termina no tônica grave.
+    { nome: 'O Cravo e a Rosa', notas: [
+      67,67,64,72,71,69,67,65,
+      69,69,65,72,71,69,67,67,
+      67,72,72,72,74,72,71,69,
+      69,67,71,67,65,62,60,60
+    ] },
+
+    // Cantiga de roda, autor desconhecido. Fonte: cifra melódica
+    // (cifrasstudio). Em fá maior — o si bemol (70) é da armadura.
+    { nome: 'Marcha Soldado', notas: [
+      72,72,69,65,65,
+      69,72,72,72,69,67,
+      67,70,70,70,70,67,72,
+      72,74,72,70,69,67,65,
+      65,69,72,
+      72,69,65,65,
+      69,72,72,72,69,67,
+      69,70,70,70,67,72,72,
+      74,72,70,69,67,65
+    ] },
+
+    // Cantiga de roda, autor desconhecido. Fonte: cifra melódica
+    // (cifrasstudio) — essa entrada vem sem marca de oitava, então
+    // o refrão ("como poderei viver") foi colocado uma oitava acima
+    // do verso, que é onde ele cai quando se canta. Se soar
+    // estranho, é este trecho que se mexe.
+    { nome: 'Peixe Vivo', notas: [
+      64,67,67,65,65,69,69,67,
+      64,67,67,65,62,65,65,64,
+      72,72,69,71,72,71,69,67,72,72,
+      69,71,72
     ] }
   ];
 
@@ -121,6 +194,140 @@
     _pnOsc(ac, lp, t, 'triangle', f, 0.42, 1.15);        // corpo
     _pnOsc(ac, lp, t, 'sine', f * 2, 0.14, 0.60);        // oitava (brilho)
     _pnOsc(ac, lp, t, 'sine', f * 4, 0.05, 0.09);        // martelo do ataque
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     BATIDA — bumbo, caixa e chimbal sintetizados, rodando por
+     baixo das notas. É percussão pura, sem nota afinada, de
+     propósito: assim ela combina com qualquer uma das melodias sem
+     brigar com a tonalidade (as dez estão em tons diferentes).
+
+     O andamento acompanha o jogo, mas NÃO na mesma proporção: a
+     esteira vai de 1,8 a 7,5 linhas/s, e amarrar a batida nisso
+     daria 450 BPM no fim. Em vez disso mapeamos o progresso da
+     velocidade para 100-160 BPM, que é faixa de música de verdade.
+
+     O disparo é feito no loop de vídeo (requestAnimationFrame), não
+     por agendamento no relógio do áudio. Dá um jitter de ~16ms, que
+     seria inaceitável numa base de ritmo, mas aqui é percussão de
+     fundo e o custo é bem menor que manter um agendador com fila.
+  ══════════════════════════════════════════════════════════════ */
+  var _PN_BAT_KEY = 'angatuba_piano_batida';
+  var _PN_BPM_MIN = 100, _PN_BPM_MAX = 160;
+  var _pnBatOn = null;                  // null = ainda não lido do storage
+  var _pnBatMaster = null, _pnRuidoBuf = null;
+  var _pnBatFase = 0, _pnBatStep = -1;
+
+  function _pnBatidaAtiva() {
+    if (_pnBatOn === null) {
+      try { _pnBatOn = localStorage.getItem(_PN_BAT_KEY) !== '0'; }
+      catch (e) { _pnBatOn = true; }
+    }
+    return _pnBatOn;
+  }
+  function _pnBatidaBotao() {
+    var b = document.getElementById('pn-batida-btn');
+    if (!b) return;
+    var on = _pnBatidaAtiva();
+    if (on) b.classList.remove('off'); else b.classList.add('off');
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+  function _pnAlternarBatida() {
+    _pnBatOn = !_pnBatidaAtiva();
+    try { localStorage.setItem(_PN_BAT_KEY, _pnBatOn ? '1' : '0'); } catch (e) {}
+    if (_pnBatOn) _pnAudioDestravar();
+    _pnBatidaBotao();
+  }
+
+  // Saída própria da percussão, mais baixa que o piano: a melodia
+  // é a protagonista, a batida só empurra.
+  function _pnBatSaida(ac) {
+    if (!_pnBatMaster) {
+      _pnBatMaster = ac.createGain();
+      _pnBatMaster.gain.value = 0.32;
+      _pnBatMaster.connect(ac.destination);
+    }
+    return _pnBatMaster;
+  }
+  // Meio segundo de ruído branco, gerado uma vez e reaproveitado —
+  // criar buffer a cada chimbal cansaria o GC no Android fraco.
+  function _pnRuido(ac) {
+    if (_pnRuidoBuf) return _pnRuidoBuf;
+    var n = Math.floor(ac.sampleRate * 0.5);
+    var buf = ac.createBuffer(1, n, ac.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    _pnRuidoBuf = buf;
+    return buf;
+  }
+  function _pnPercussao(ac, t, dur, vol, tipoFiltro, freq, q) {
+    var src = ac.createBufferSource();
+    src.buffer = _pnRuido(ac);
+    var f = ac.createBiquadFilter();
+    f.type = tipoFiltro; f.frequency.value = freq;
+    if (q) f.Q.value = q;
+    var g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(_pnBatSaida(ac));
+    src.start(t, Math.random() * 0.4, dur + 0.03);
+    src.stop(t + dur + 0.04);
+  }
+  function _pnBumbo(ac, t) {
+    var o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(45, t + 0.10);
+    var g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.95, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    o.connect(g); g.connect(_pnBatSaida(ac));
+    o.start(t); o.stop(t + 0.25);
+  }
+  function _pnCaixa(ac, t) {
+    _pnPercussao(ac, t, 0.14, 0.55, 'bandpass', 1900, 0.8);
+    var o = ac.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(190, t);
+    var g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.30, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    o.connect(g); g.connect(_pnBatSaida(ac));
+    o.start(t); o.stop(t + 0.11);
+  }
+  function _pnChimbal(ac, t, aberto) {
+    _pnPercussao(ac, t, aberto ? 0.22 : 0.045, aberto ? 0.20 : 0.26, 'highpass', 7200);
+  }
+
+  // Grade de 16 semicolcheias: bumbo nos quatro tempos, caixa em 2
+  // e 4, chimbal no contratempo (o "tss" entre os bumbos) e um
+  // chimbal aberto no fim do compasso pra puxar o próximo.
+  function _pnBaterStep(ac, t, passo) {
+    if (passo % 4 === 0) _pnBumbo(ac, t);
+    if (passo === 4 || passo === 12) _pnCaixa(ac, t);
+    if (passo % 4 === 2) _pnChimbal(ac, t, passo === 14);
+  }
+
+  function _pnBatidaPasso(dt) {
+    if (!_pnBatidaAtiva() || !_pnSomLigado()) return;
+    var ac = _pnAudio();
+    if (!ac || ac.state !== 'running') return;
+    var prog = (_pnVel - _PN_VEL_INI) / (_PN_VEL_MAX - _PN_VEL_INI);
+    if (prog < 0) prog = 0; else if (prog > 1) prog = 1;
+    var bpm = _PN_BPM_MIN + (_PN_BPM_MAX - _PN_BPM_MIN) * prog;
+    _pnBatFase += dt * (bpm / 60) * 4;
+    // O teto de 8 evita rajada de percussão quando a aba volta do
+    // segundo plano com um dt gigante acumulado.
+    var guarda = 0;
+    while (_pnBatFase >= 1 && guarda++ < 8) {
+      _pnBatFase -= 1;
+      _pnBatStep = (_pnBatStep + 1) % 16;
+      _pnBaterStep(ac, ac.currentTime, _pnBatStep);
+    }
+    if (_pnBatFase >= 1) _pnBatFase = 0;
   }
 
   function _pnSomErro() {
@@ -236,6 +443,7 @@
     _pnVel = _PN_VEL_INI;
     _pnMovendo = false;
     _pnNotaIdx = 0;
+    _pnBatFase = 0; _pnBatStep = -1;   // próximo passo será o 0 (bumbo)
     _pnMelodia = _PN_MELODIAS[(Math.random() * _PN_MELODIAS.length) | 0];
     // Preenche a tela de baixo pra cima + uma folga acima do topo.
     for (var i = 0; i < _PN_LINHAS_TELA + 2; i++) {
@@ -309,6 +517,7 @@
       if (_pnOndas[i].t > 0.4) _pnOndas.splice(i, 1);
     }
     if (!_pnMovendo) return;
+    _pnBatidaPasso(dt);   // só toca depois do 1º acerto, junto com a queda
 
     var avanco = _pnVel * dt;
     for (i = 0; i < _pnAzulejos.length; i++) _pnAzulejos[i].y += avanco;
@@ -537,6 +746,7 @@
     _pnPontos = 0;
     if (!_pnMelodia) _pnMelodia = _PN_MELODIAS[(Math.random() * _PN_MELODIAS.length) | 0];
     _pnAtualizarHUD(true);
+    _pnBatidaBotao();
     _pnMostrarOverlay('inicio');
     _pnDrawIdle();
   }
@@ -563,5 +773,6 @@
 
   /* ── Exposição pública ────────────────────────────────────────── */
   window._pnComecar = _pnComecar;
+  window._pnAlternarBatida = _pnAlternarBatida;
   window.PianoGame = { preparar: _pnPreparar, comecar: _pnComecar, parar: _pnParar };
 })();

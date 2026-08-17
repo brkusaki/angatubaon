@@ -11,6 +11,11 @@
    não cabe numa caixinha de número sem quebrar o alinhamento. */
 .pn-musica{display:flex;align-items:center;justify-content:center;gap:6px;margin:-4px 0 10px;font-size:12px;color:var(--muted,#8794a8);}
 .pn-musica-nome{color:#fff;font-weight:700;}
+/* Liga/desliga a batida. Some pra 35% quando desligada em vez de
+   trocar de ícone: o estado fica óbvio sem precisar de legenda. */
+.pn-batida-btn{margin-left:4px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:3px 9px;font-size:13px;line-height:1;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:opacity .15s,background .15s;}
+.pn-batida-btn.off{opacity:.35;}
+.pn-batida-btn:active{background:rgba(255,255,255,.14);}
 .pn-arena{position:relative;width:100%;aspect-ratio:9/16;max-height:72vh;margin:0 auto;border-radius:14px;overflow:hidden;background:#0d1420;touch-action:none;}
 .pn-arena #pn-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
 .pn-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;background:rgba(9,14,22,.82);backdrop-filter:blur(3px);z-index:2;}

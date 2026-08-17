@@ -90,18 +90,28 @@
   // folga), o objeto é descartado — é o que impede o balão de continuar
   // aparecendo lá no espaço. Faixas casadas com _vooFaixa():
   //   céu <0.55 · atmosfera <0.82 · espaço >=0.82.
+  // 'maxN' = quantos objetos DESTE tipo podem estar em cena ao mesmo tempo.
+  // O buraco negro é evento raro: 1 por vez e com cooldown longo entre
+  // aparições (_VOO_BURACO_CD) — antes ele dividia o sorteio do espaço
+  // meio a meio com o OVNI e dava pra ter três na tela de uma vez.
   var _VOO_DECOR = [
     // Céu (baixa/média-baixa): pássaros e balões. Ficam só no azul do dia.
-    { nome: 'passaro.webp',    kind: 'passaro', min: 0.00, max: 0.50, tam: 0.10, vmin: 0.10, vmax: 0.22, camada: 0.55, modo: 'cruza' },
-    { nome: 'balao.webp',      kind: 'balao',   min: 0.00, max: 0.45, tam: 0.15, vmin: 0.02, vmax: 0.06, camada: 0.35, modo: 'sobe'  },
+    { nome: 'passaro.webp',    kind: 'passaro', min: 0.00, max: 0.50, tam: 0.10, vmin: 0.10, vmax: 0.22, camada: 0.55, modo: 'cruza', maxN: 2 },
+    { nome: 'balao.webp',      kind: 'balao',   min: 0.00, max: 0.45, tam: 0.15, vmin: 0.02, vmax: 0.06, camada: 0.35, modo: 'sobe' , maxN: 2 },
     // Atmosfera (meio): aviões cruzam o céu mais alto.
-    { nome: 'aviao.webp',      kind: 'aviao',   min: 0.40, max: 0.78, tam: 0.22, vmin: 0.16, vmax: 0.30, camada: 0.70, modo: 'cruza' },
+    { nome: 'aviao.webp',      kind: 'aviao',   min: 0.40, max: 0.78, tam: 0.22, vmin: 0.16, vmax: 0.30, camada: 0.70, modo: 'cruza', maxN: 2 },
     // Transição atmosfera→espaço: foguetes sobem.
-    { nome: 'foguete.webp',    kind: 'foguete', min: 0.68, max: 0.92, tam: 0.13, vmin: 0.20, vmax: 0.36, camada: 0.80, modo: 'sobe'  },
+    { nome: 'foguete.webp',    kind: 'foguete', min: 0.68, max: 0.92, tam: 0.13, vmin: 0.20, vmax: 0.36, camada: 0.80, modo: 'sobe' , maxN: 2 },
     // Espaço (alto): OVNIs e buracos negros — nada de balão/avião aqui.
-    { nome: 'ovni.webp',       kind: 'ovni',    min: 0.84, max: 1.01, tam: 0.18, vmin: 0.10, vmax: 0.26, camada: 0.60, modo: 'cruza' },
-    { nome: 'buraconegro.webp',kind: 'buraco',  min: 0.88, max: 1.01, tam: 0.34, vmin: 0.00, vmax: 0.00, camada: 0.25, modo: 'flutua'}
+    { nome: 'ovni.webp',       kind: 'ovni',    min: 0.84, max: 1.01, tam: 0.18, vmin: 0.10, vmax: 0.26, camada: 0.60, modo: 'cruza', maxN: 2 },
+    { nome: 'buraconegro.webp',kind: 'buraco',  min: 0.88, max: 1.01, tam: 0.34, vmin: 0.00, vmax: 0.00, camada: 0.25, modo: 'flutua', maxN: 1 }
   ];
+
+  // Espera (s) antes do PRIMEIRO buraco negro depois de entrar no espaço e
+  // entre um e outro. Ele dura ~9s em cena, então isso deixa a aparição
+  // rara de verdade em vez de constante.
+  var _VOO_BURACO_CD_INI = 18;
+  function _vooBuracoCdNovo() { return 55 + Math.random() * 35; }
   var _vooCanvas = null, _vooCtx = null;
   var _vooW = 0, _vooH = 0, _vooDpr = 1;
   var _vooRAF = 0, _vooLast = 0, _vooEstado = 'inicio';       // 'inicio'|'jogando'|'fim'
@@ -113,12 +123,59 @@
   var _vooDragging = false, _vooLastPX = 0, _vooKeyDir = 0;
   var _vooNuvens = [];
   var _vooEstrelas = [];        // campo de estrelas (parallax lento, surge na subida)
-  var _vooTrail = [];           // rastro da coruja (posições recentes p/ fade)
+  var _vooTrail = [];           // rastro da coruja (buffer circular, sem alocar por frame)
+  var _VOO_TRAIL_N = 14;        // tamanho do rastro
+  var _vooTrailI = 0;           // próxima posição a escrever no buffer
+  var _vooTrailLen = 0;         // quantos pontos válidos há no buffer
   var _vooSquash = 0;           // 0 = neutro; >0 estica (pulo), <0 achata (impacto)
   var _vooTempo = 0;            // relógio do jogo (s) p/ cintilar estrelas/asas
   var _vooAlt = 0;              // altitude normalizada 0→1 (0 = solo, 1 = espaço)
   var _vooDecor = [];          // objetos decorativos ativos cruzando o fundo
   var _vooDecorTimer = 0;      // tempo até tentar spawnar o próximo decor (s)
+  var _vooBuracoCd = 0;        // cooldown (s) até um buraco negro poder surgir
+
+  /* ── Caches de desenho (performance) ────────────────────────────
+     O gargalo do jogo era redesenhar TUDO do zero a cada frame: cada
+     plataforma criava um gradiente novo e passava por um ctx.shadowBlur
+     (a operação mais cara do canvas 2D), com o raio do blur crescendo
+     junto com a altitude — por isso engasgava mais no espaço. Agora cada
+     combinação (tipo × faixa × trampolim) é desenhada UMA vez num canvas
+     offscreen e o loop só faz drawImage. Mesma aparência, uma fração do
+     custo. O cache é jogado fora quando o canvas muda de tamanho. ── */
+  var _vooSprites = {};        // chave -> { cv, padX, padTop, w, h }
+  var _vooCeuGrad = null;      // gradiente do céu reaproveitado entre frames
+  var _vooCeuGradAlt = -1;     // altitude com que _vooCeuGrad foi montado
+  var _vooCeuGradH = -1;       // altura com que _vooCeuGrad foi montado
+  var _vooAstroGrad = null;    // halo do sol/lua, também reaproveitado
+  var _vooAstroFill = '';      // cor do disco do sol/lua
+  var _vooAstroY = 0, _vooAstroAlt = -1, _vooAstroH = -1;
+  var _vooRect = null;         // getBoundingClientRect do canvas (cacheado)
+  var _vooFaiscaCd = 0;        // throttle do burst de estrelinhas do trampolim
+
+  // Paleta pré-montada das estrelas: evita criar uma string 'rgba(...)'
+  // por estrela por frame (eram ~4 mil strings/s só pra cintilar).
+  var _VOO_EST_PAL = (function () {
+    var p = [];
+    for (var i = 0; i < 24; i++) p.push('rgba(255,255,255,' + ((i + 1) / 24).toFixed(3) + ')');
+    return p;
+  })();
+
+  function _vooSpriteInvalidar() {
+    _vooSprites = {};
+    _vooCeuGrad = null; _vooCeuGradAlt = -1; _vooCeuGradH = -1;
+    _vooAstroGrad = null; _vooAstroAlt = -1; _vooAstroH = -1;
+  }
+
+  // Intensidade do glow por faixa da plataforma. Antes era
+  // ph * (1.2 + _vooAlt * 2.2), recalculado a cada frame; como agora o
+  // sprite é fixo, o glow acompanha a FAIXA da plataforma (que já é fixa
+  // desde o nascimento dela). Os valores são a média de cada faixa, então
+  // o resultado visual é praticamente o mesmo.
+  function _vooGlowFaixa(faixa) {
+    if (faixa === 'esp') return 3.2;
+    if (faixa === 'atm') return 2.7;
+    return 1.8;
+  }
 
   // Altitude de "climb" (px) que corresponde a alt=1 (espaço pleno).
   // A altitude NÃO é linear no climb: passa por uma curva côncava
@@ -202,13 +259,16 @@
   function _vooDimensionar() {
     if (!_vooCanvas) return;
     var rect = _vooCanvas.getBoundingClientRect();
+    _vooRect = rect;                               // cacheado p/ não medir no loop
     var cssW = Math.max(1, Math.round(rect.width));
     var cssH = Math.max(1, Math.round(rect.height));
+    var mudou = (cssW !== _vooW || cssH !== _vooH);
     _vooDpr = Math.min(2, (window.devicePixelRatio || 1));
     _vooCanvas.width = Math.round(cssW * _vooDpr);
     _vooCanvas.height = Math.round(cssH * _vooDpr);
     _vooW = cssW; _vooH = cssH;
     if (_vooCtx) _vooCtx.setTransform(_vooDpr, 0, 0, _vooDpr, 0, 0);
+    if (mudou) _vooSpriteInvalidar();              // sprites dependem do tamanho
   }
 
   // Constantes de física em função de H (mesma sensação em qualquer tela).
@@ -385,12 +445,20 @@
       });
     }
 
+    // Rastro em buffer circular: os 14 pontos são criados uma vez e
+    // reescritos no lugar, em vez de alocar/descartar um objeto por frame
+    // (isso alimentava o coletor de lixo e causava engasgo periódico).
     _vooTrail = [];
+    for (var tI = 0; tI < _VOO_TRAIL_N; tI++) _vooTrail.push({ x: 0, y: 0 });
+    _vooTrailI = 0; _vooTrailLen = 0;
+
     _vooSquash = 0;
     _vooTempo = 0;
     _vooAlt = 0;
     _vooDecor = [];
-    _vooDecorTimer = 4;        // primeiro decor aparece após alguns segundos
+    _vooDecorTimer = 1.2;      // primeiro decor aparece logo no começo
+    _vooBuracoCd = _VOO_BURACO_CD_INI;
+    _vooFaiscaCd = 0;
 
     // Pré-carrega (best-effort) os assets de plataforma da faixa baixa e
     // as decorações de céu — os que aparecem primeiro. Os demais são
@@ -432,13 +500,24 @@
       if (foraX || foraY || venceuFlutua || foraFaixa) _vooDecor.splice(i, 1);
     }
 
+    // Cooldown do buraco negro corre sempre (inclusive enquanto um está
+    // em cena), pra ele voltar a ser possível só bem depois.
+    if (_vooBuracoCd > 0) _vooBuracoCd -= dt;
+
     // Spawn temporizado. Ritmo depende de quantos já estão em cena
     // (limita a poluição visual) e um pouco da altitude.
     _vooDecorTimer -= dt;
-    if (_vooDecorTimer <= 0 && _vooDecor.length < 1) {
-      _vooDecorTimer = 6 + Math.random() * 5;   // próximo em ~6–11s
+    if (_vooDecorTimer <= 0 && _vooDecor.length < 3) {
+      _vooDecorTimer = 2.4 + Math.random() * 3.2;   // próximo em ~2.4–5.6s
       _vooSpawnDecor();
     }
+  }
+
+  // Quantos objetos de um dado tipo estão em cena agora.
+  function _vooContaKind(kind) {
+    var n = 0;
+    for (var i = 0; i < _vooDecor.length; i++) if (_vooDecor[i].kind === kind) n++;
+    return n;
   }
 
   // Cria um objeto decorativo elegível pra altitude atual. Escolhe entre
@@ -449,10 +528,16 @@
     var cands = [];
     for (var i = 0; i < _VOO_DECOR.length; i++) {
       var c = _VOO_DECOR[i];
-      if (alt >= c.min && alt <= c.max) cands.push(c);
+      if (alt < c.min || alt > c.max) continue;
+      // Teto por tipo: nunca repete demais o mesmo objeto na tela.
+      if (_vooContaKind(c.kind) >= (c.maxN || 2)) continue;
+      // Buraco negro só depois do cooldown (evento raro).
+      if (c.kind === 'buraco' && _vooBuracoCd > 0) continue;
+      cands.push(c);
     }
     if (!cands.length) return;
     var def = cands[(Math.random() * cands.length) | 0];
+    if (def.kind === 'buraco') _vooBuracoCd = _vooBuracoCdNovo();
 
     // Pede o asset (idempotente). Mesmo sem ele, criamos o objeto: o
     // desenho tem fallback vetorial por 'kind'.
@@ -503,6 +588,7 @@
     var g = _vooGrav();
 
     _vooTempo += dt;
+    if (_vooFaiscaCd > 0) _vooFaiscaCd -= dt;
 
     // Movimento horizontal por teclado (desktop); o arraste mexe direto em o.x.
     if (_vooKeyDir !== 0) { o.x += _vooKeyDir * 0.9 * _vooW * dt; }
@@ -556,9 +642,16 @@
             if (pl.boost) window.AngatubaGames.som.mola();
             else          window.AngatubaGames.som.pulo();
           }
-          // Faíscas no ponto de contato (trampolim reforça).
-          if (pl.boost && window.AngatubaGames && window.AngatubaGames.efeitos && _vooCanvas) {
-            var rC = _vooCanvas.getBoundingClientRect();
+          // Faíscas no ponto de contato (só no trampolim). Duas travas:
+          //  • usa o rect CACHEADO do canvas — medir aqui dentro forçava
+          //    o navegador a recalcular layout no meio do frame;
+          //  • throttle de 0.9s — cada burst cria um canvas do tamanho da
+          //    tela com loop próprio, e trampolins em sequência empilhavam
+          //    vários ao mesmo tempo.
+          if (pl.boost && _vooFaiscaCd <= 0 && _vooRect &&
+              window.AngatubaGames && window.AngatubaGames.efeitos) {
+            _vooFaiscaCd = 0.9;
+            var rC = _vooRect;
             window.AngatubaGames.efeitos.estrelas(
               rC.left + (o.x / _vooW) * rC.width,
               rC.top + ((pl.y - _vooCamY) / _vooH) * rC.height,
@@ -580,8 +673,15 @@
 
     // Gera acima e descarta plataformas bem abaixo
     _vooGerarAcima();
+    // Compacta no lugar em vez de filter(): o filter criava um array novo
+    // (e uma closure) a cada frame, só pra alimentar o coletor de lixo.
     var limiteBaixo = _vooCamY + _vooH + 0.3 * _vooH;
-    _vooPlats = _vooPlats.filter(function (p) { return p.y < limiteBaixo; });
+    var k = 0;
+    for (var fi = 0; fi < _vooPlats.length; fi++) {
+      var pf = _vooPlats[fi];
+      if (pf.y < limiteBaixo) _vooPlats[k++] = pf;
+    }
+    _vooPlats.length = k;
 
     _vooAtualizarScore();
 
@@ -597,8 +697,12 @@
 
     // Rastro: registra a posição em coord. de MUNDO (y absoluto), pra
     // desenhar já compensando a câmera. Limita o comprimento.
-    _vooTrail.push({ x: o.x, y: o.y });
-    if (_vooTrail.length > 14) _vooTrail.shift();
+    if (_vooTrail.length === _VOO_TRAIL_N) {
+      var tp = _vooTrail[_vooTrailI];
+      tp.x = o.x; tp.y = o.y;
+      _vooTrailI = (_vooTrailI + 1) % _VOO_TRAIL_N;
+      if (_vooTrailLen < _VOO_TRAIL_N) _vooTrailLen++;
+    }
 
     // Morte: caiu abaixo da tela
     if (o.y - _vooCamY > _vooH + _vooOwlH()) { _vooFim(); return false; }
@@ -624,12 +728,18 @@
 
   // ── Camada 1: céu (gradiente por altitude) + astro + estrelas + nuvens ──
   function _vooDesenharCeu(ctx, W, H, alt) {
-    var par = _vooCorCeu(alt);
-    var topo = par[0], base = par[1];
-    var grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, _vooRgb(topo));
-    grad.addColorStop(1, _vooRgb(base));
-    ctx.fillStyle = grad;
+    // Gradiente do céu reaproveitado: a altitude muda devagar, então não
+    // faz sentido montar um gradiente novo (com interpolação de paleta)
+    // a cada frame. Refaz só quando a cor realmente mudaria.
+    if (!_vooCeuGrad || _vooCeuGradH !== H || Math.abs(alt - _vooCeuGradAlt) > 0.004) {
+      var par = _vooCorCeu(alt);
+      _vooCeuGrad = ctx.createLinearGradient(0, 0, 0, H);
+      _vooCeuGrad.addColorStop(0, _vooRgb(par[0]));
+      _vooCeuGrad.addColorStop(1, _vooRgb(par[1]));
+      _vooCeuGradAlt = alt;
+      _vooCeuGradH = H;
+    }
+    ctx.fillStyle = _vooCeuGrad;
     ctx.fillRect(0, 0, W, H);
 
     // Sol/lua: um disco que sobe pra fora de cena e esfria de cor
@@ -637,18 +747,27 @@
     var astroOp = Math.max(0, 1 - alt * 1.7);
     if (astroOp > 0.02) {
       var ax = W * 0.74;
-      var ay = H * (0.16 + alt * 0.9);            // desce na tela = sobe no mundo
       var ar = W * 0.14;
-      var qCor = alt < 0.35
-        ? [255, 236, 180]                          // sol quente (manhã)
-        : _vooMix([255, 236, 180], [214, 224, 255], Math.min(1, (alt - 0.35) / 0.4)); // esfria p/ lua
-      var gA = ctx.createRadialGradient(ax, ay, ar * 0.2, ax, ay, ar * 2.4);
-      gA.addColorStop(0, _vooRgba(qCor, 0.9 * astroOp));
-      gA.addColorStop(0.4, _vooRgba(qCor, 0.35 * astroOp));
-      gA.addColorStop(1, _vooRgba(qCor, 0));
-      ctx.fillStyle = gA;
+      // Mesma ideia do gradiente do céu: o halo do sol/lua só muda quando
+      // a altitude muda de verdade, então guardamos ele entre frames.
+      if (!_vooAstroGrad || _vooAstroH !== H || Math.abs(alt - _vooAstroAlt) > 0.004) {
+        var ayN = H * (0.16 + alt * 0.9);          // desce na tela = sobe no mundo
+        var qCor = alt < 0.35
+          ? [255, 236, 180]                        // sol quente (manhã)
+          : _vooMix([255, 236, 180], [214, 224, 255], Math.min(1, (alt - 0.35) / 0.4)); // esfria p/ lua
+        _vooAstroGrad = ctx.createRadialGradient(ax, ayN, ar * 0.2, ax, ayN, ar * 2.4);
+        _vooAstroGrad.addColorStop(0, _vooRgba(qCor, 0.9 * astroOp));
+        _vooAstroGrad.addColorStop(0.4, _vooRgba(qCor, 0.35 * astroOp));
+        _vooAstroGrad.addColorStop(1, _vooRgba(qCor, 0));
+        _vooAstroFill = _vooRgba(qCor, astroOp);
+        _vooAstroY = ayN;
+        _vooAstroAlt = alt;
+        _vooAstroH = H;
+      }
+      var ay = _vooAstroY;
+      ctx.fillStyle = _vooAstroGrad;
       ctx.beginPath(); ctx.arc(ax, ay, ar * 2.4, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = _vooRgba(qCor, astroOp);
+      ctx.fillStyle = _vooAstroFill;
       ctx.beginPath(); ctx.arc(ax, ay, ar, 0, Math.PI * 2); ctx.fill();
     }
 
@@ -657,14 +776,20 @@
     var estOp = Math.max(0, (alt - 0.28) / 0.55);
     if (estOp > 0.02) {
       if (estOp > 1) estOp = 1;
+      // Pontinhos com fillRect + paleta pré-montada: com 70 estrelas, o
+      // arc()+fill() e a string 'rgba(...)' por estrela por frame somavam
+      // ~4 mil alocações por segundo. Nesse tamanho (1–4px) o quadradinho
+      // é visualmente idêntico ao círculo.
       for (var s = 0; s < _vooEstrelas.length; s++) {
         var st = _vooEstrelas[s];
         var sy = ((st.y - _vooCamY * st.v) % H + H) % H;   // wrap suave
         var tw = 0.55 + 0.45 * Math.sin(_vooTempo * 2.2 + st.f); // cintila
-        ctx.fillStyle = 'rgba(255,255,255,' + (estOp * tw).toFixed(3) + ')';
-        ctx.beginPath();
-        ctx.arc(st.x, sy, st.r, 0, Math.PI * 2);
-        ctx.fill();
+        var iP = (estOp * tw * 24) | 0;
+        if (iP > 23) iP = 23; else if (iP < 0) iP = 0;
+        ctx.fillStyle = _VOO_EST_PAL[iP];
+        // Lado 1.8·r ≈ mesma área do círculo de raio r, pra estrela não
+        // ficar mais "gorda" que no desenho anterior.
+        ctx.fillRect(st.x - st.r * 0.9, sy - st.r * 0.9, st.r * 1.8, st.r * 1.8);
       }
     }
 
@@ -814,11 +939,12 @@
 
   // ── Rastro da coruja: bolinhas que somem (mais recente = maior/opaco) ──
   function _vooDesenharRastro(ctx) {
-    var m = _vooTrail.length;
+    var m = _vooTrailLen;
     if (m < 2) return;
     var ow = _vooOwlW();
+    var base = (_vooTrailI - m + _VOO_TRAIL_N) % _VOO_TRAIL_N;   // ponto mais antigo
     for (var i = 0; i < m; i++) {
-      var t = _vooTrail[i];
+      var t = _vooTrail[(base + i) % _VOO_TRAIL_N];
       var f = (i + 1) / m;                     // 0→1 (fim = coruja atual)
       var rr = ow * 0.30 * f;
       ctx.globalAlpha = 0.30 * f * f;
@@ -830,92 +956,122 @@
     ctx.globalAlpha = 1;
   }
 
-  // ── Plataformas: usa asset (tipo × faixa de altitude) se existir;
-  //    senão, desenho vetorial (sombra + corpo + highlight + glow). A
-  //    mola do trampolim é sempre vetorial, por cima. ──
+  // ── Plataformas: cada combinação (tipo × faixa × trampolim) vira um
+  //    sprite pré-renderizado uma única vez; o loop só faz drawImage.
+  //    Antes, cada plataforma refazia sombra + gradiente + shadowBlur a
+  //    cada frame — com ~14 plataformas na tela isso era o principal
+  //    motivo de o jogo engasgar quanto mais alto a coruja subia. ──
   function _vooDesenharPlataformas(ctx, W, H) {
-    var ph = _vooPlatH();
     for (var i = 0; i < _vooPlats.length; i++) {
       var p = _vooPlats[i];
       if (p.usada) continue;
       var y = p.y - _vooCamY;
-      if (y < -ph * 2 || y > H + ph * 2) continue;
+      if (y < -H * 0.5 || y > H * 1.5) continue;     // bem fora da tela
 
       // Faixa FIXA da própria plataforma (definida no nascimento pela
       // altitude dela). Fallback pra faixa da coruja se por acaso faltar
       // (plataformas antigas de antes desta mudança).
       var faixa = p.faixa || _vooFaixaDeY(p.y);
-      var nome = _vooPlatAssetNome(p.tipo, faixa);
-      var reg = _vooAsset(nome);
-      if (reg && reg.ok && reg.img) {
-        _vooDesenharPlatImg(ctx, p, y, ph, reg);
-      } else {
-        _vooPlatVetor(ctx, p, y, ph);
-      }
-
-      // Trampolim: mola vermelha por cima (sempre vetorial).
-      if (p.boost) _vooDesenharMola(ctx, p, y, ph);
+      var sp = _vooPlatSprite(p.tipo, faixa, !!p.boost, p.w);
+      if (!sp) continue;
+      ctx.drawImage(sp.cv, p.x - sp.padX, y - sp.padTop, sp.w, sp.h);
     }
   }
 
-  // Desenha a plataforma a partir de uma imagem. A imagem é encaixada na
-  // LARGURA da plataforma (p.w); a altura segue o ratio do asset, mas é
-  // "ancorada" pela superfície de colisão (topo da imagem ~ p.y), pra que
-  // a arte possa ter volume abaixo sem bagunçar a física.
-  function _vooDesenharPlatImg(ctx, p, y, ph, reg) {
-    var ratio = (reg.w > 0 && reg.h > 0) ? reg.h / reg.w : 0.4;
-    var iw = p.w * 1.18;                       // leve sangria lateral
-    var ih = iw * ratio;
-    var ix = p.x - (iw - p.w) / 2;
-    // Superfície pisável fica perto do topo da arte (12% de folga).
-    var iy = y - ih * 0.12;
-    ctx.save();
-    // Glow sutil por trás no espaço (destaca a plataforma no fundo escuro).
-    if (_vooAlt > 0.5) {
-      ctx.shadowColor = 'rgba(120,160,255,0.35)';
-      ctx.shadowBlur = ph * (_vooAlt * 2.2);
+  // Monta (ou reaproveita) o sprite de uma plataforma. A origem interna
+  // do sprite é o canto superior esquerdo da SUPERFÍCIE de colisão, e
+  // padX/padTop dizem quanta folga foi reservada em volta pro glow, pra
+  // sombra projetada e pra mola do trampolim. Assim a física continua
+  // exatamente onde estava — só o desenho mudou de lugar.
+  function _vooPlatSprite(tipo, faixa, boost, largura) {
+    var w = largura || _vooPlatW(), ph = _vooPlatH();
+    if (!(w > 0) || !(ph > 0)) return null;
+    var reg = _vooAsset(_vooPlatAssetNome(tipo, faixa));
+    var temImg = !!(reg && reg.ok && reg.img);
+    var chave = tipo + '|' + faixa + '|' + (boost ? 'B' : '-') + (temImg ? 'I' : 'V') +
+                '|' + Math.round(w) + 'x' + Math.round(ph);
+    var sp = _vooSprites[chave];
+    if (sp) return sp;
+
+    var blur = ph * _vooGlowFaixa(faixa);
+    var ratio = (temImg && reg.w > 0 && reg.h > 0) ? (reg.h / reg.w) : 0.4;
+    var iw = w * 1.18, ih = iw * ratio;             // arte com leve sangria lateral
+
+    var padX   = blur + w * 0.10 + 2;
+    var padTop = Math.max(blur, boost ? ph * 3.5 : 0) + 2;
+    var padBot = Math.max(blur + ph * 1.5, temImg ? (ih * 0.9 + blur) : 0) + 2;
+    var sw = Math.ceil(w + padX * 2);
+    var sh = Math.ceil(padTop + ph + padBot);
+
+    var cv, c;
+    try {
+      cv = document.createElement('canvas');
+      cv.width  = Math.max(1, Math.round(sw * _vooDpr));
+      cv.height = Math.max(1, Math.round(sh * _vooDpr));
+      c = cv.getContext('2d');
+      if (!c) return null;
+    } catch (e) { return null; }
+    c.setTransform(_vooDpr, 0, 0, _vooDpr, 0, 0);
+    c.translate(padX, padTop);
+
+    var desenhou = false;
+    if (temImg) {
+      // Glow sutil por trás só da atmosfera pra cima (destaca a arte no
+      // fundo escuro); no céu claro a imagem vai limpa, como antes.
+      c.save();
+      if (faixa !== 'ceu') {
+        c.shadowColor = 'rgba(120,160,255,0.35)';
+        c.shadowBlur = blur;
+      }
+      try { c.drawImage(reg.img, -(iw - w) / 2, -ih * 0.12, iw, ih); desenhou = true; }
+      catch (e) {}
+      c.restore();
     }
-    try { ctx.drawImage(reg.img, ix, iy, iw, ih); }
-    catch (e) { ctx.restore(); _vooPlatVetor(ctx, p, y, ph); return; }
-    ctx.restore();
+    if (!desenhou) _vooPlatVetor(c, tipo, w, ph, blur);
+    if (boost) _vooDesenharMola(c, w, ph);
+
+    sp = { cv: cv, padX: padX, padTop: padTop, w: sw, h: sh };
+    _vooSprites[chave] = sp;
+    return sp;
   }
 
   // Desenho vetorial da plataforma (fallback / faixas sem asset).
-  function _vooPlatVetor(ctx, p, y, ph) {
+  // Coordenadas locais do sprite: (0,0) = canto sup. esq. da superfície.
+  function _vooPlatVetor(ctx, tipo, w, ph, blur) {
     var corBase, corTopo, corGlow;
-    if (p.tipo === 'move')       { corBase = '#2b7fd6'; corTopo = '#6fc0ff'; corGlow = 'rgba(73,167,255,0.55)'; }
-    else if (p.tipo === 'break') { corBase = '#c46a24'; corTopo = '#ffb066'; corGlow = 'rgba(240,145,62,0.5)'; }
-    else                         { corBase = '#1f9e68'; corTopo = '#54e6a2'; corGlow = 'rgba(47,212,138,0.5)'; }
+    if (tipo === 'move')       { corBase = '#2b7fd6'; corTopo = '#6fc0ff'; corGlow = 'rgba(73,167,255,0.55)'; }
+    else if (tipo === 'break') { corBase = '#c46a24'; corTopo = '#ffb066'; corGlow = 'rgba(240,145,62,0.5)'; }
+    else                       { corBase = '#1f9e68'; corTopo = '#54e6a2'; corGlow = 'rgba(47,212,138,0.5)'; }
 
     // Sombra projetada (deslocada pra baixo/direita).
     ctx.fillStyle = 'rgba(0,0,0,0.28)';
-    _vooRoundRect(ctx, p.x + ph * 0.18, y + ph * 0.5, p.w, ph, ph / 2);
+    _vooRoundRect(ctx, ph * 0.18, ph * 0.5, w, ph, ph / 2);
     ctx.fill();
 
-    // Glow neon por trás (mais forte no espaço, onde o fundo é escuro).
+    // Glow neon por trás (mais forte nas faixas altas, de fundo escuro).
     ctx.save();
     ctx.shadowColor = corGlow;
-    ctx.shadowBlur = ph * (1.2 + _vooAlt * 2.2);
+    ctx.shadowBlur = blur;
     // Corpo (gradiente vertical: topo claro → base).
-    var gP = ctx.createLinearGradient(0, y, 0, y + ph);
+    var gP = ctx.createLinearGradient(0, 0, 0, ph);
     gP.addColorStop(0, corTopo);
     gP.addColorStop(1, corBase);
-    _vooRoundRect(ctx, p.x, y, p.w, ph, ph / 2);
+    _vooRoundRect(ctx, 0, 0, w, ph, ph / 2);
     ctx.fillStyle = gP;
     ctx.fill();
     ctx.restore();
 
     // Faixa de brilho no topo (highlight fininho).
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    _vooRoundRect(ctx, p.x + ph * 0.3, y + ph * 0.16, p.w - ph * 0.6, ph * 0.24, ph * 0.12);
+    _vooRoundRect(ctx, ph * 0.3, ph * 0.16, w - ph * 0.6, ph * 0.24, ph * 0.12);
     ctx.fill();
   }
 
-  // Mola do trampolim (desenho vetorial simples, neon vermelho).
-  function _vooDesenharMola(ctx, p, y, ph) {
-    var bw = p.w * 0.30;
-    var bx = p.x + (p.w - bw) / 2;
-    var topY = y - ph * 1.6;
+  // Mola do trampolim (vetorial, neon vermelho), em coordenadas locais.
+  function _vooDesenharMola(ctx, w, ph) {
+    var bw = w * 0.30;
+    var bx = (w - bw) / 2;
+    var topY = -ph * 1.6;
     ctx.save();
     ctx.strokeStyle = '#ff3355';
     ctx.lineWidth = Math.max(2, ph * 0.28);
@@ -923,7 +1079,7 @@
     ctx.shadowColor = 'rgba(255,51,85,0.7)';
     ctx.shadowBlur = ph * 1.4;
     ctx.beginPath();
-    ctx.moveTo(bx, y);
+    ctx.moveTo(bx, 0);
     ctx.lineTo(bx + bw, topY + ph * 1.1);
     ctx.lineTo(bx, topY + ph * 0.55);
     ctx.lineTo(bx + bw, topY);

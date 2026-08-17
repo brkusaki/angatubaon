@@ -684,7 +684,7 @@
         <div class="pn-card">
           <div class="pn-hud">
             <div class="pn-hud-item"><span class="pn-hud-label">Notas</span><span class="pn-hud-valor" id="pn-pontos">0</span></div>
-            <div class="pn-hud-item"><span class="pn-hud-label">Recorde</span><span class="pn-hud-valor" id="pn-recorde">0</span></div>
+            <div class="pn-hud-item"><span class="pn-hud-label" id="pn-rotulo2">Recorde</span><span class="pn-hud-valor" id="pn-recorde">0</span></div>
           </div>
           <div class="pn-musica">&#127925; <span class="pn-musica-nome" id="pn-musica">&mdash;</span><button type="button" class="pn-batida-btn" id="pn-batida-btn" onclick="_pnAlternarBatida()" aria-pressed="true" aria-label="Ligar ou desligar a batida" title="Batida">&#129345;</button></div>
           <div class="pn-arena" id="pn-arena">
@@ -693,9 +693,21 @@
             <div class="pn-overlay" id="pn-inicio">
               <img src="/webp/owl-highlight.webp" alt="" class="pn-overlay-owl" onerror="this.style.display='none'">
               <div class="pn-overlay-titulo">&#127929; Piano da Coruja</div>
-              <div class="pn-overlay-desc">Toque sempre no <b>azulejo mais baixo</b> &mdash; o que está marcado. Errar a coluna ou deixar um passar encerra a partida, e quanto mais notas você emenda, mais rápido fica.</div>
-              <div class="pn-creditos">Melodias de domínio público (Beethoven, Mozart, Pachelbel e tradicionais), tocadas ao vivo pelo próprio app.</div>
-              <button type="button" class="pn-play" onclick="_pnComecar()">Começar</button>
+              <div class="pn-overlay-desc">Toque sempre no <b>azulejo mais baixo</b> &mdash; o que está marcado.</div>
+              <label class="pn-sel-wrap" for="pn-musica-sel">Música
+                <select class="pn-sel" id="pn-musica-sel"></select>
+              </label>
+              <div class="pn-modos">
+                <button type="button" class="pn-btn-modo" onclick="_pnComecar('normal')">
+                  <span class="pn-btn-modo-tit">&#127925; Normal</span>
+                  <span class="pn-btn-modo-sub">A música inteira, no seu tempo</span>
+                </button>
+                <button type="button" class="pn-btn-modo pn-btn-modo-surv" onclick="_pnComecar('sobrevivencia')">
+                  <span class="pn-btn-modo-tit">&#128293; Sobrevivência</span>
+                  <span class="pn-btn-modo-sub">Acelera sem parar &middot; vale ranking</span>
+                </button>
+              </div>
+              <div class="pn-creditos">Melodias de domínio público &mdash; Chiquinha Gonzaga, cantigas de roda, Beethoven, Mozart e Pachelbel &mdash; tocadas ao vivo pelo próprio app.</div>
             </div>
             <!-- Tela de fim -->
             <div class="pn-overlay" id="pn-fim" style="display:none;">
@@ -705,6 +717,7 @@
               <div class="pn-overlay-desc" id="pn-fim-msg"></div>
               <div class="rank-slot" id="pn-rank-slot" style="display:none;"></div>
               <button type="button" class="pn-play" onclick="_pnComecar()">Tocar de novo</button>
+              <button type="button" class="pn-link" onclick="_pnVoltarInicio()">Trocar música ou modo</button>
             </div>
           </div>
         </div>

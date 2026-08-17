@@ -368,8 +368,31 @@
   var _pnPontos = 0;
   var _pnVel = 0;            // em linhas por segundo
   var _PN_VEL_INI = 1.8, _PN_VEL_MAX = 7.5, _PN_VEL_ACC = 0.045;
-  var _pnMelodia = null, _pnNotaIdx = 0;
+  var _pnMelodia = null;
   var _pnOndas = [];         // ripples do toque certo
+
+  /* ══════════════════════════════════════════════════════════════
+     MODOS
+       'sobrevivencia' — o original: acelera sem parar, errar a
+         coluna ou deixar passar encerra. É o que vale ranking.
+       'normal' — a música do começo ao fim num ritmo fixo e
+         confortável. Errar não encerra: conta como erro e segue.
+         A partida acaba quando a melodia termina, e o resultado é
+         quantas notas você acertou de quantas. Não vai pro ranking
+         de propósito — num modo onde não dá pra perder, tabela de
+         recorde não significa nada (todo mundo empataria no total
+         de notas da música).
+     A nota de cada azulejo é decidida no NASCIMENTO dele, não na
+     hora do toque. Sem isso, uma nota perdida no modo Normal
+     empurraria a melodia inteira pra trás e a música sairia torta.
+  ══════════════════════════════════════════════════════════════ */
+  var _PN_VEL_NORMAL = 2.2;      // ritmo fixo do modo Normal
+  var _PN_MIN_AZULEJOS = 48;     // piso de partida: melodia curta repete
+  var _pnModo = 'sobrevivencia';
+  var _pnTotalAzulejos = 0;      // 0 = fila infinita (sobrevivência)
+  var _pnCriados = 0;            // quantos já nasceram = índice da nota
+  var _pnErros = 0, _pnPerdidas = 0;
+  var _pnFlashErro = 0, _pnColErro = -1;   // brilho vermelho ao errar
 
   /* ── Persistência ─────────────────────────────────────────────
      Cacheado em memória: o HUD lia localStorage a cada frame nos
@@ -388,17 +411,24 @@
   }
 
   /* ── HUD (só escreve quando o valor muda) ─────────────────────── */
-  var _pnElPontos = null, _pnElRec = null, _pnElMusica = null;
-  var _pnHudUlt = { p: -1, r: -1, m: '' };
+  var _pnElPontos = null, _pnElRec = null, _pnElRot = null, _pnElMusica = null;
+  var _pnHudUlt = { p: -1, r: -1, rot: '', m: '' };
   function _pnAtualizarHUD(forcar) {
     if (forcar || !_pnElPontos) {
       _pnElPontos = document.getElementById('pn-pontos');
       _pnElRec    = document.getElementById('pn-recorde');
+      _pnElRot    = document.getElementById('pn-rotulo2');
       _pnElMusica = document.getElementById('pn-musica');
     }
     if (_pnElPontos && (forcar || _pnPontos !== _pnHudUlt.p)) { _pnElPontos.textContent = _pnPontos; _pnHudUlt.p = _pnPontos; }
-    var rv = _pnRec();
+    // O segundo quadro troca de sentido conforme o modo: mostrar
+    // recorde de sobrevivência durante uma partida tranquila só
+    // confunde, porque não é isso que está em jogo ali.
+    var normal = (_pnModo === 'normal');
+    var rv  = normal ? _pnErros : _pnRec();
+    var rot = normal ? 'Erros' : 'Recorde';
     if (_pnElRec && (forcar || rv !== _pnHudUlt.r)) { _pnElRec.textContent = rv; _pnHudUlt.r = rv; }
+    if (_pnElRot && (forcar || rot !== _pnHudUlt.rot)) { _pnElRot.textContent = rot; _pnHudUlt.rot = rot; }
     var mn = _pnMelodia ? _pnMelodia.nome : '—';
     if (_pnElMusica && (forcar || mn !== _pnHudUlt.m)) { _pnElMusica.textContent = mn; _pnHudUlt.m = mn; }
   }
@@ -432,21 +462,45 @@
     return col;
   }
   function _pnNovoAzulejo(y) {
-    return { col: _pnSortearCol(), y: y, tocada: false, flash: 0 };
+    return { col: _pnSortearCol(), y: y, tocada: false, flash: 0, nota: _pnCriados++ };
+  }
+  // Ainda cabe mais um na fila? No Normal a fila tem fim (o tamanho
+  // da música); na Sobrevivência, não.
+  function _pnCabeMais() {
+    return !_pnTotalAzulejos || _pnCriados < _pnTotalAzulejos;
+  }
+
+  // Melodia da partida: a escolhida no seletor, ou sorteada.
+  function _pnEscolherMelodia() {
+    var sel = document.getElementById('pn-musica-sel');
+    var i = sel ? parseInt(sel.value, 10) : -1;
+    if (!(i >= 0 && i < _PN_MELODIAS.length)) i = (Math.random() * _PN_MELODIAS.length) | 0;
+    return _PN_MELODIAS[i];
   }
 
   /* ── Reset ────────────────────────────────────────────────────── */
-  function _pnReset() {
+  function _pnReset(modo) {
+    _pnModo = (modo === 'normal') ? 'normal' : 'sobrevivencia';
     _pnAzulejos.length = 0;
     _pnOndas.length = 0;
-    _pnPontos = 0;
-    _pnVel = _PN_VEL_INI;
+    _pnPontos = 0; _pnErros = 0; _pnPerdidas = 0;
+    _pnCriados = 0;
+    _pnFlashErro = 0; _pnColErro = -1;
     _pnMovendo = false;
-    _pnNotaIdx = 0;
     _pnBatFase = 0; _pnBatStep = -1;   // próximo passo será o 0 (bumbo)
-    _pnMelodia = _PN_MELODIAS[(Math.random() * _PN_MELODIAS.length) | 0];
+    _pnMelodia = _pnEscolherMelodia();
+    if (_pnModo === 'normal') {
+      _pnVel = _PN_VEL_NORMAL;
+      // Melodia curta repete até dar uma partida de duração decente —
+      // Für Elise com 34 notas acabaria em 15 segundos.
+      var n = _pnMelodia.notas.length;
+      _pnTotalAzulejos = n * Math.max(1, Math.ceil(_PN_MIN_AZULEJOS / n));
+    } else {
+      _pnVel = _PN_VEL_INI;
+      _pnTotalAzulejos = 0;
+    }
     // Preenche a tela de baixo pra cima + uma folga acima do topo.
-    for (var i = 0; i < _PN_LINHAS_TELA + 2; i++) {
+    for (var i = 0; i < _PN_LINHAS_TELA + 2 && _pnCabeMais(); i++) {
       _pnAzulejos.push(_pnNovoAzulejo(_PN_LINHAS_TELA - 1 - i));
     }
     _pnAtualizarHUD(true);
@@ -485,17 +539,30 @@
     var alvo = _pnAlvo();
     if (!alvo) return;
 
-    if (col !== alvo.col) { _pnGameOver('errou'); return; }
+    if (col !== alvo.col) {
+      // No Normal errar não encerra: marca o erro, pisca a coluna e
+      // o azulejo continua lá esperando o toque certo.
+      if (_pnModo === 'normal') {
+        _pnErros++;
+        _pnFlashErro = 1; _pnColErro = col;
+        _pnSomErro();
+        _pnAtualizarHUD();
+        return;
+      }
+      _pnGameOver('errou');
+      return;
+    }
 
     alvo.tocada = true;
     alvo.flash = 1;
     _pnPontos++;
     _pnMovendo = true;                 // a queda só começa no 1º acerto
-    _pnVel = Math.min(_PN_VEL_MAX, _PN_VEL_INI + _pnPontos * _PN_VEL_ACC);
+    if (_pnModo !== 'normal') {
+      _pnVel = Math.min(_PN_VEL_MAX, _PN_VEL_INI + _pnPontos * _PN_VEL_ACC);
+    }
 
     var notas = _pnMelodia.notas;
-    _pnTocarNota(notas[_pnNotaIdx % notas.length]);
-    _pnNotaIdx++;
+    _pnTocarNota(notas[alvo.nota % notas.length]);
 
     var lh = _pnLinhaH(), cw = _pnColW();
     _pnOndas.push({
@@ -512,6 +579,7 @@
     for (i = 0; i < _pnAzulejos.length; i++) {
       if (_pnAzulejos[i].flash > 0) _pnAzulejos[i].flash = Math.max(0, _pnAzulejos[i].flash - dt * 4);
     }
+    if (_pnFlashErro > 0) _pnFlashErro = Math.max(0, _pnFlashErro - dt * 3);
     for (i = _pnOndas.length - 1; i >= 0; i--) {
       _pnOndas[i].t += dt;
       if (_pnOndas[i].t > 0.4) _pnOndas.splice(i, 1);
@@ -523,16 +591,25 @@
     for (i = 0; i < _pnAzulejos.length; i++) _pnAzulejos[i].y += avanco;
     for (i = 0; i < _pnOndas.length; i++) _pnOndas[i].y += avanco * _pnLinhaH();
 
-    // Saiu por baixo? Se não foi tocado, acabou o jogo.
+    // Saiu por baixo? Na Sobrevivência isso encerra; no Normal só
+    // conta como nota perdida e a música segue.
     while (_pnAzulejos.length && _pnAzulejos[0].y >= _PN_LINHAS_TELA) {
-      if (!_pnAzulejos[0].tocada) { _pnGameOver('passou'); return; }
+      if (!_pnAzulejos[0].tocada) {
+        if (_pnModo !== 'normal') { _pnGameOver('passou'); return; }
+        _pnPerdidas++;
+      }
       _pnAzulejos.shift();
     }
-    // Repõe em cima pra fila nunca acabar.
+    // Repõe em cima. Na Sobrevivência a fila nunca acaba; no Normal
+    // ela para quando a música termina — e quando o último azulejo
+    // sai da tela, a partida acabou.
     var topo = _pnAzulejos.length ? _pnAzulejos[_pnAzulejos.length - 1].y : 0;
-    while (topo > -2) {
+    while (topo > -2 && _pnCabeMais()) {
       topo -= 1;
       _pnAzulejos.push(_pnNovoAzulejo(topo));
+    }
+    if (_pnModo === 'normal' && !_pnAzulejos.length && !_pnCabeMais()) {
+      _pnGameOver('completou');
     }
   }
 
@@ -604,6 +681,13 @@
       }
     }
 
+    // Coluna que o jogador errou (só acontece no Normal, onde errar
+    // não encerra — precisa de um retorno visual no lugar do fim).
+    if (_pnFlashErro > 0 && _pnColErro >= 0) {
+      ctx.fillStyle = 'rgba(255,60,80,' + (_pnFlashErro * 0.20) + ')';
+      ctx.fillRect(_pnColErro * cw, 0, cw, H);
+    }
+
     // Ondas do acerto
     for (i = 0; i < _pnOndas.length; i++) {
       var on = _pnOndas[i];
@@ -642,17 +726,42 @@
     if (_pnRAF) { cancelAnimationFrame(_pnRAF); _pnRAF = 0; }
     _pnEstado = 'fim';
     _pnMovendo = false;
-    var score = _pnPontos, rec = _pnRec(), recorde = score > rec;
-    if (recorde) _pnRecSet(score);
     _pnDraw();
-    _pnSomErro();
-    if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.fim(recorde);
-    if (window.AngatubaGames) window.AngatubaGames.rankSubmeter('piano', score);
 
     var owlEl = document.getElementById('pn-fim-owl');
     var titEl = document.getElementById('pn-fim-titulo');
     var ptsEl = document.getElementById('pn-fim-pontos');
     var msgEl = document.getElementById('pn-fim-msg');
+    var slot  = document.getElementById('pn-rank-slot');
+
+    /* ── Modo Normal: fim de música, não fim de jogo ──────────────
+       Nada de recorde local, nada de ranking e nada de som de erro:
+       o jogador chegou ao fim da música, isso não é derrota. */
+    if (_pnModo === 'normal') {
+      var total = _pnPontos + _pnPerdidas;
+      var perfeito = (_pnPerdidas === 0 && _pnErros === 0);
+      if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.fim(perfeito);
+      if (owlEl) { owlEl.src = perfeito ? '/webp/owl-celebrate-flying.webp' : '/webp/owl-thumbsup.webp'; owlEl.style.display = ''; }
+      if (titEl) titEl.textContent = perfeito ? '🎵 Tocou sem errar!' : '🎵 Fim da música!';
+      if (ptsEl) ptsEl.textContent = _pnPontos + ' de ' + total + ' notas';
+      if (msgEl) msgEl.textContent = perfeito
+        ? (_pnMelodia.nome + ' inteirinha, nota por nota. 🦉')
+        : (_pnErros > 0 ? 'Você tocou ' + _pnMelodia.nome + ' com ' + _pnErros + (_pnErros === 1 ? ' erro' : ' erros') + '. Sem pressa, tenta de novo!'
+                        : 'Você tocou ' + _pnMelodia.nome + '. Sem pressa, tenta de novo!');
+      if (slot) { slot.style.display = 'none'; slot.innerHTML = ''; }
+      _pnMostrarOverlay('fim');
+      _pnAtualizarHUD(true);
+      if (perfeito && window.AngatubaGames && window.AngatubaGames.efeitos) window.AngatubaGames.efeitos.confete('pn-fim', 90);
+      return;
+    }
+
+    /* ── Sobrevivência: é aqui que vale recorde e ranking ─────────── */
+    var score = _pnPontos, rec = _pnRec(), recorde = score > rec;
+    if (recorde) _pnRecSet(score);
+    _pnSomErro();
+    if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.fim(recorde);
+    if (window.AngatubaGames) window.AngatubaGames.rankSubmeter('piano', score);
+
     if (owlEl) { owlEl.src = recorde ? '/webp/owl-celebrate-flying.webp' : '/webp/owl-surprised.webp'; owlEl.style.display = ''; }
     if (titEl) titEl.textContent = recorde ? '🎉 Novo recorde!' : (motivo === 'passou' ? 'Deixou passar!' : 'Nota errada!');
     if (ptsEl) ptsEl.textContent = score + (score === 1 ? ' nota' : ' notas');
@@ -745,13 +854,27 @@
     _pnEstado = 'inicio';
     _pnPontos = 0;
     if (!_pnMelodia) _pnMelodia = _PN_MELODIAS[(Math.random() * _PN_MELODIAS.length) | 0];
+    _pnMontarSeletor();
     _pnAtualizarHUD(true);
     _pnBatidaBotao();
     _pnMostrarOverlay('inicio');
     _pnDrawIdle();
   }
 
-  function _pnComecar() {
+  // Preenche o seletor de música a partir da própria lista de
+  // melodias — assim acrescentar uma nota nova no array já a coloca
+  // no seletor, sem tocar no HTML.
+  function _pnMontarSeletor() {
+    var sel = document.getElementById('pn-musica-sel');
+    if (!sel || sel.options.length) return;
+    var h = '<option value="-1">🎲 Sortear</option>';
+    for (var i = 0; i < _PN_MELODIAS.length; i++) {
+      h += '<option value="' + i + '">' + _PN_MELODIAS[i].nome + '</option>';
+    }
+    sel.innerHTML = h;
+  }
+
+  function _pnComecar(modo) {
     _pnCanvas = document.getElementById('pn-canvas');
     if (!_pnCanvas) return;
     if (!_pnCtx) _pnCtx = _pnCanvas.getContext('2d');
@@ -759,10 +882,20 @@
     _pnLigarControles();
     _pnMostrarOverlay(null);
     _pnDimensionar();
-    _pnReset();
+    // Sem argumento (ponte do hub ou "jogar de novo"), repete o
+    // último modo jogado.
+    _pnReset(modo || _pnModo);
     _pnEstado = 'jogando'; _pnLast = 0;
     if (_pnRAF) cancelAnimationFrame(_pnRAF);
     _pnRAF = requestAnimationFrame(_pnLoop);
+  }
+
+  // Volta pra tela de escolha (modo + música) sem sair do jogo.
+  function _pnVoltarInicio() {
+    _pnParar();
+    _pnEstado = 'inicio';
+    _pnMostrarOverlay('inicio');
+    _pnDrawIdle();
   }
 
   function _pnParar() {
@@ -774,5 +907,6 @@
   /* ── Exposição pública ────────────────────────────────────────── */
   window._pnComecar = _pnComecar;
   window._pnAlternarBatida = _pnAlternarBatida;
+  window._pnVoltarInicio = _pnVoltarInicio;
   window.PianoGame = { preparar: _pnPreparar, comecar: _pnComecar, parar: _pnParar };
 })();

@@ -31,3 +31,20 @@
 .pn-play{background:var(--red,#ff3355);color:#fff;border:none;border-radius:999px;padding:12px 34px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(255,51,85,.35);transition:transform .12s ease,filter .12s ease;}
 .pn-play:hover{filter:brightness(1.08);}
 .pn-play:active{transform:scale(.96);}
+/* Ação secundária da tela de fim (voltar pra escolha de modo). */
+.pn-link{margin-top:10px;background:none;border:none;color:rgba(199,209,224,.7);font-size:12.5px;font-weight:600;text-decoration:underline;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.pn-link:active{color:#fff;}
+
+/* ── Escolha de música e de modo (tela inicial) ─────────────────
+   Os dois modos ficam empilhados e com subtítulo porque a
+   diferença entre eles não é óbvia pelo nome: um acaba quando a
+   música acaba, o outro só acaba quando você erra. */
+.pn-sel-wrap{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:12px;color:var(--muted,#8794a8);}
+.pn-sel{max-width:190px;background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:7px 9px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;}
+.pn-sel option{background:#131b28;color:#fff;}
+.pn-modos{display:flex;flex-direction:column;gap:9px;width:100%;max-width:290px;margin-bottom:16px;}
+.pn-btn-modo{display:flex;flex-direction:column;gap:2px;width:100%;padding:11px 14px;border-radius:14px;border:1px solid rgba(45,212,150,.35);background:rgba(45,212,150,.10);color:#fff;cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent;transition:transform .12s ease,filter .12s ease;}
+.pn-btn-modo:active{transform:scale(.97);}
+.pn-btn-modo-surv{border-color:rgba(255,77,99,.40);background:rgba(255,77,99,.12);}
+.pn-btn-modo-tit{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;}
+.pn-btn-modo-sub{font-size:11.5px;color:rgba(199,209,224,.75);font-weight:500;}

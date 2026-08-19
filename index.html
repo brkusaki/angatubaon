@@ -476,7 +476,7 @@
             </div>
             <div class="gc-info">
               <div class="gc-title">Ping Pong da Coruja</div>
-              <div class="gc-desc">Desafie um amigo em tempo real! Só as raquetes, em 1ª pessoa.</div>
+              <div class="gc-desc">Sozinho contra a CPU ou 1x1 com um amigo em tempo real. Só as raquetes, em 1ª pessoa.</div>
               <span class="gc-cta">Jogar com um amigo</span>
             </div>
           </div>
@@ -761,11 +761,12 @@
             <div class="pp-overlay" id="pp-menu">
               <img src="/webp/owl-point.webp" alt="" class="pp-overlay-owl" onerror="this.style.display='none'">
               <div class="pp-overlay-titulo">🏓 Ping Pong da Coruja</div>
-              <div class="pp-overlay-desc">Jogo 1x1 em tempo real. Crie uma sala e chame um amigo, ou entre com o código que ele te mandar.</div>
+              <div class="pp-overlay-desc">Jogue sozinho contra a CPU, ou desafie um amigo em tempo real criando uma sala.</div>
               <div class="pp-opcoes">
-                <button type="button" class="pp-btn-opcao" id="pp-btn-criar" onclick="_ppCriarSala()">Criar sala</button>
+                <button type="button" class="pp-btn-opcao" onclick="_ppJogarSozinho()">Jogar sozinho</button>
+                <button type="button" class="pp-btn-opcao pp-btn-opcao-alt" id="pp-btn-criar" onclick="_ppCriarSala()">Criar sala (com um amigo)</button>
               </div>
-              <div class="pp-divisor">ou</div>
+              <div class="pp-divisor">ou entrar numa sala existente</div>
               <div class="pp-entrar-wrap">
                 <input type="text" class="pp-codigo-input" id="pp-codigo-input" placeholder="CÓDIGO" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
                 <button type="button" class="pp-btn-entrar-mini" id="pp-btn-entrar" onclick="_ppEntrarSala()">Entrar</button>

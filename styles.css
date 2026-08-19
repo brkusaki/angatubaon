@@ -5465,6 +5465,14 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
    ═════════════════════════════════════════════════════════════ */
 body.games-fs-open { overflow: hidden; }
 
+/* A bottom-nav é fixed com o MESMO z-index (1000) do #games-hub e vem
+   depois dele no HTML — por empate de z-index, quem ganha é quem está
+   depois no DOM. Resultado: a barra ficava por CIMA do ranking/jogos em
+   tela cheia, capturando o toque nos ~70px finais da tela e travando o
+   scroll da lista bem antes do fim (ex.: ranking parava no 13º lugar,
+   por baixo da barra, mesmo tendo mais gente no top 20). */
+body.games-fs-open .bottom-nav { display: none; }
+
 body.games-fs-open #games-hub {
   position: fixed;
   inset: 0;

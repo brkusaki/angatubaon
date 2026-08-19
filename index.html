@@ -2698,6 +2698,8 @@
   <script src="https://www.gstatic.com/firebasejs/12.17.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.17.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore-compat.js"></script>
+  <!-- Realtime Database (compat) — usado só como sinalização do multiplayer (Jogos/multiplayer.js), não pelo ranking -->
+  <script src="https://www.gstatic.com/firebasejs/12.17.1/firebase-database-compat.js"></script>
   <script>
     // Config do projeto Firebase (valores públicos por design).
     var firebaseConfig = {
@@ -2706,12 +2708,21 @@
       projectId: "angatubaon-cd333",
       storageBucket: "angatubaon-cd333.firebasestorage.app",
       messagingSenderId: "559185630365",
-      appId: "1:559185630365:web:a2e7fc4cc9d26bfea67074"
+      appId: "1:559185630365:web:a2e7fc4cc9d26bfea67074",
+      // Preencher depois de criar o Realtime Database no console do Firebase
+      // (Build > Realtime Database > Criar banco de dados). A URL aparece
+      // no topo da tela de dados, algo como:
+      // "https://angatubaon-cd333-default-rtdb.firebaseio.com" ou com um
+      // sufixo de região (ex.: "...-default-rtdb.southamerica-east1.firebasedatabase.app").
+      // Enquanto ficar vazio, o multiplayer degrada com elegância (fica indisponível, sem quebrar o app).
+      databaseURL: "https://angatubaon-cd333-default-rtdb.firebaseio.com"
     };
     try { if (window.firebase && firebase.initializeApp) firebase.initializeApp(firebaseConfig); }
     catch (e) { console.warn("[Firebase] init falhou:", e); }
   </script>
   <script src="/app_min.js"></script>
+  <!-- Multiplayer Core (sala + sinalização WebRTC) — infraestrutura reutilizável para jogos 1x1 em tempo real -->
+  <script src="/Jogos/multiplayer.min.js"></script>
   <script>
     /* ── Empty state: limpar filtros ── */
     window.limparFiltros = function() {

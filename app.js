@@ -15164,7 +15164,7 @@ ${urlCard}`)}`;
         var out = [];
         snap.forEach(function (doc) {
           var d = doc.data() || {};
-          out.push({ uid: d.uid || doc.id, nome: d.nome || 'Jogador', score: d.score || 0 });
+          out.push({ uid: d.uid || doc.id, nome: d.nome || 'Jogador', score: d.score || 0, photoURL: d.photoURL || '' });
         });
         return out;
       })

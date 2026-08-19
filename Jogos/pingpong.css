@@ -1,0 +1,50 @@
+/* ═══════════════════════════════════════════════════════════════
+   PING PONG DA CORUJA — estilos do módulo (carregado sob demanda)
+   ═══════════════════════════════════════════════════════════════ */
+.gc-pingpong .gc-owl-glow{background:radial-gradient(circle,rgba(56,189,248,.55),transparent 70%);}
+
+.pp-card{background:var(--card,#151d2b);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:12px;}
+
+/* HUD durante a partida: meu placar à esquerda, do adversário à direita */
+.pp-hud{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;}
+.pp-hud-lado{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.04);border-radius:12px;padding:6px 18px;min-width:78px;}
+.pp-hud-lado-label{font-size:10.5px;color:var(--muted,#8794a8);text-transform:uppercase;letter-spacing:.04em;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pp-hud-lado-valor{font-size:24px;font-weight:800;color:#fff;font-family:'Syne',sans-serif;}
+.pp-hud-x{font-size:13px;color:rgba(255,255,255,.35);font-weight:700;}
+
+.pp-arena{position:relative;width:100%;aspect-ratio:9/16;max-height:72vh;margin:0 auto;border-radius:14px;overflow:hidden;background:#0a0f1a;touch-action:none;}
+.pp-arena #pp-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
+
+.pp-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;background:rgba(9,14,22,.86);backdrop-filter:blur(3px);z-index:2;overflow-y:auto;}
+.pp-overlay-owl{width:92px;height:92px;object-fit:contain;margin-bottom:12px;filter:drop-shadow(0 6px 18px rgba(0,0,0,.5));}
+.pp-overlay-titulo{font-size:21px;font-weight:800;color:#fff;font-family:'Syne',sans-serif;margin-bottom:8px;}
+.pp-overlay-desc{font-size:13.5px;line-height:1.5;color:#c7d1e0;max-width:290px;margin-bottom:14px;}
+
+/* Tela inicial: criar sala ou entrar com código */
+.pp-opcoes{display:flex;flex-direction:column;gap:10px;width:100%;max-width:290px;}
+.pp-btn-opcao{width:100%;padding:13px 16px;border-radius:14px;border:1px solid rgba(56,189,248,.35);background:rgba(56,189,248,.10);color:#fff;font-family:'Syne',sans-serif;font-size:15px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s ease,filter .12s ease;}
+.pp-btn-opcao:active{transform:scale(.97);}
+.pp-btn-opcao:disabled{opacity:.5;pointer-events:none;}
+.pp-divisor{display:flex;align-items:center;gap:10px;width:100%;max-width:290px;margin:4px 0;color:rgba(199,209,224,.5);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;}
+.pp-divisor::before,.pp-divisor::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.10);}
+.pp-entrar-wrap{display:flex;gap:8px;width:100%;max-width:290px;}
+.pp-codigo-input{flex:1;min-width:0;background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:11px 12px;font-size:18px;font-weight:800;letter-spacing:.18em;text-align:center;text-transform:uppercase;font-family:'Syne',sans-serif;}
+.pp-codigo-input::placeholder{color:rgba(255,255,255,.3);letter-spacing:.1em;}
+.pp-btn-entrar-mini{flex-shrink:0;padding:0 18px;border-radius:10px;border:1px solid rgba(56,189,248,.4);background:rgba(56,189,248,.16);color:#38bdf8;font-weight:800;font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.pp-btn-entrar-mini:disabled{opacity:.5;pointer-events:none;}
+.pp-menu-erro{margin-top:12px;font-size:12.5px;color:#ff6b81;max-width:290px;}
+
+/* Tela de sala: aguardando adversário OU conectando */
+.pp-sala-codigo{font-family:'Syne',sans-serif;font-size:44px;font-weight:900;letter-spacing:.14em;color:var(--red,#ff3355);margin:6px 0 16px;}
+.pp-sala-spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#38bdf8;animation:ppGirar .8s linear infinite;margin-bottom:16px;}
+@keyframes ppGirar{to{transform:rotate(360deg);}}
+.pp-btn-copiar{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:999px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;margin-bottom:14px;}
+.pp-link{margin-top:6px;background:none;border:none;color:rgba(199,209,224,.7);font-size:12.5px;font-weight:600;text-decoration:underline;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.pp-link:active{color:#fff;}
+
+/* Tela de fim: resultado ou desconexão */
+.pp-fim-placar{font-family:'Syne',sans-serif;font-size:32px;font-weight:900;color:#fff;margin-bottom:8px;}
+.pp-play{background:var(--red,#ff3355);color:#fff;border:none;border-radius:999px;padding:12px 34px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(255,51,85,.35);transition:transform .12s ease,filter .12s ease;margin-top:4px;}
+.pp-play:hover{filter:brightness(1.08);}
+.pp-play:active{transform:scale(.96);}
+.pp-play:disabled{opacity:.5;pointer-events:none;}

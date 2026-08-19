@@ -15130,6 +15130,7 @@ ${urlCard}`)}`;
         uid: uid,
         nome: nome,
         score: val,
+        photoURL: (_cliUser.photoURL || ''),
         atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true }).catch(function (err) {
         // permission-denied aqui = regra do servidor rejeitou (ex.: teto
@@ -15316,7 +15317,7 @@ ${urlCard}`)}`;
   }
   function _rankAvatar(item, cls) {
     var souEu = (typeof _cliUser !== 'undefined' && _cliUser && item.uid === _cliUser.uid);
-    var foto  = souEu ? (_cliUser.photoURL || '') : '';
+    var foto  = (souEu && _cliUser.photoURL) ? _cliUser.photoURL : (item.photoURL || '');
     var h     = _rankCorUid(item.uid);
     var bg    = 'background:linear-gradient(135deg,hsl(' + h + ',62%,44%),hsl(' + ((h + 42) % 360) + ',58%,28%));';
     if (foto) {

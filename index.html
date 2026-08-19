@@ -466,6 +466,22 @@
           </div>
           <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
+
+        <button type="button" class="game-card gc-pingpong" onclick="_abrirJogo('pingpong')">
+          <div class="gc-inner">
+            <div class="gc-owl">
+              <span class="gc-owl-glow"></span>
+              <img src="/webp/owl-point.webp" alt="" loading="lazy"
+                   onerror="this.onerror=null;this.src='/webp/owl-tada.webp';">
+            </div>
+            <div class="gc-info">
+              <div class="gc-title">Ping Pong da Coruja</div>
+              <div class="gc-desc">Desafie um amigo em tempo real! Só as raquetes, em 1ª pessoa.</div>
+              <span class="gc-cta">Jogar com um amigo</span>
+            </div>
+          </div>
+          <i class="fa fa-chevron-right gc-arrow"></i>
+        </button>
       </div>
 
       <!-- TELA: Quiz da Coruja -->
@@ -718,6 +734,64 @@
               <div class="rank-slot" id="pn-rank-slot" style="display:none;"></div>
               <button type="button" class="pn-play" onclick="_pnComecar()">Tocar de novo</button>
               <button type="button" class="pn-link" onclick="_pnVoltarInicio()">Trocar música ou modo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TELA: Ping Pong da Coruja (multiplayer 1x1 em tempo real, via Jogos/multiplayer.js) -->
+      <div id="jogo-pingpong" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div class="pp-card">
+          <div class="pp-hud" id="pp-hud" style="display:none;">
+            <div class="pp-hud-lado">
+              <span class="pp-hud-lado-label">Você</span>
+              <span class="pp-hud-lado-valor" id="pp-hud-meu">0</span>
+            </div>
+            <span class="pp-hud-x">×</span>
+            <div class="pp-hud-lado">
+              <span class="pp-hud-lado-label" id="pp-hud-nome-adversario">Adversário</span>
+              <span class="pp-hud-lado-valor" id="pp-hud-dele">0</span>
+            </div>
+          </div>
+          <div class="pp-arena" id="pp-arena">
+            <canvas id="pp-canvas"></canvas>
+
+            <!-- Tela inicial: criar sala ou entrar com código -->
+            <div class="pp-overlay" id="pp-menu">
+              <img src="/webp/owl-point.webp" alt="" class="pp-overlay-owl" onerror="this.style.display='none'">
+              <div class="pp-overlay-titulo">🏓 Ping Pong da Coruja</div>
+              <div class="pp-overlay-desc">Jogo 1x1 em tempo real. Crie uma sala e chame um amigo, ou entre com o código que ele te mandar.</div>
+              <div class="pp-opcoes">
+                <button type="button" class="pp-btn-opcao" id="pp-btn-criar" onclick="_ppCriarSala()">Criar sala</button>
+              </div>
+              <div class="pp-divisor">ou</div>
+              <div class="pp-entrar-wrap">
+                <input type="text" class="pp-codigo-input" id="pp-codigo-input" placeholder="CÓDIGO" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
+                <button type="button" class="pp-btn-entrar-mini" id="pp-btn-entrar" onclick="_ppEntrarSala()">Entrar</button>
+              </div>
+              <div class="pp-menu-erro" id="pp-menu-erro" style="display:none;"></div>
+            </div>
+
+            <!-- Tela de sala: aguardando adversário OU conectando -->
+            <div class="pp-overlay" id="pp-sala" style="display:none;">
+              <img src="/webp/owl-wave.webp" alt="" class="pp-overlay-owl" onerror="this.style.display='none'">
+              <div class="pp-overlay-titulo" id="pp-sala-titulo">Chame um amigo!</div>
+              <div class="pp-overlay-desc" id="pp-sala-desc"></div>
+              <div class="pp-sala-codigo" id="pp-sala-codigo" style="display:none;"></div>
+              <div class="pp-sala-spinner"></div>
+              <button type="button" class="pp-btn-copiar" id="pp-btn-copiar" onclick="_ppCopiarCodigo()">Copiar código</button>
+              <button type="button" class="pp-link" onclick="_ppVoltarMenu()">Cancelar</button>
+            </div>
+
+            <!-- Tela de fim: resultado ou desconexão -->
+            <div class="pp-overlay" id="pp-fim" style="display:none;">
+              <img src="" alt="" class="pp-overlay-owl" id="pp-fim-owl" onerror="this.style.display='none'">
+              <div class="pp-overlay-titulo" id="pp-fim-titulo">Fim de jogo</div>
+              <div class="pp-fim-placar" id="pp-fim-placar"></div>
+              <div class="pp-overlay-desc" id="pp-fim-msg"></div>
+              <button type="button" class="pp-play" id="pp-btn-revanche" onclick="_ppPedirRevanche()">Jogar de novo</button>
+              <button type="button" class="pp-link" onclick="_ppVoltarMenu()">Voltar ao início</button>
             </div>
           </div>
         </div>

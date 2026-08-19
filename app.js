@@ -982,6 +982,7 @@
     if (window.VooGame       && typeof window.VooGame.parar       === 'function') window.VooGame.parar();
     if (window.CorridaGame   && typeof window.CorridaGame.parar   === 'function') window.CorridaGame.parar();
     if (window.PianoGame     && typeof window.PianoGame.parar     === 'function') window.PianoGame.parar();
+    if (window.PingPongGame  && typeof window.PingPongGame.parar  === 'function') window.PingPongGame.parar();
   }
 
   /* -- Roteador de jogos: menu <-> tela de cada jogo -- */
@@ -1018,7 +1019,11 @@
     speedtap: { js: '/Jogos/speedtap.min.js', css: '/Jogos/speedtap.css', global: 'SpeedTapGame' },
     sequencia: { js: '/Jogos/sequencia.min.js', css: '/Jogos/sequencia.css', global: 'SequenciaGame' },
     corrida: { js: '/Jogos/corrida.min.js', css: '/Jogos/corrida.css', global: 'CorridaGame' },
-    piano: { js: '/Jogos/piano.min.js', css: '/Jogos/piano.css', global: 'PianoGame' }
+    piano: { js: '/Jogos/piano.min.js', css: '/Jogos/piano.css', global: 'PianoGame' },
+    // Ping Pong depende de Jogos/multiplayer.js (AngatubaMP), que já é
+    // carregado direto no index.html (ver <script> depois do app_min.js)
+    // por ser infraestrutura leve e compartilhável com futuros jogos.
+    pingpong: { js: '/Jogos/pingpong.min.js', css: '/Jogos/pingpong.css', global: 'PingPongGame' }
   };
   var _jogosCarregados = {};   // nome -> true quando js+css já injetados
 
@@ -1129,7 +1134,7 @@
         }, 1200);
         setTimeout(function(){ var ld = document.getElementById('games-loading'); if (ld) ld.style.display = 'none'; }, 12000);
       }
-    } else if (nome === 'speedtap' || nome === 'sequencia' || nome === 'voo' || nome === 'corrida' || nome === 'piano') {
+    } else if (nome === 'speedtap' || nome === 'sequencia' || nome === 'voo' || nome === 'corrida' || nome === 'piano' || nome === 'pingpong') {
       // Jogos externos: carrega sob demanda e prepara quando pronto.
       _jogoLoader(nome).then(function (api) {
         if (api && typeof api.preparar === 'function') api.preparar();

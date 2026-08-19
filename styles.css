@@ -4703,6 +4703,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .gc-seq     { --gc:#34d399; --gc-2:#0d9488; --gc-a:rgba(16,185,129,.16);  --gc-b:rgba(16,185,129,.34); }
 .gc-voo     { --gc:#38bdf8; --gc-2:#4f46e5; --gc-a:rgba(56,189,248,.16);  --gc-b:rgba(56,189,248,.34); }
 .gc-corrida { --gc:#a3e635; --gc-2:#dc2626; --gc-a:rgba(132,204,22,.16);  --gc-b:rgba(132,204,22,.34); }
+.gc-pingpong { --gc:#38bdf8; --gc-2:#0ea5e9; --gc-a:rgba(56,189,248,.16); --gc-b:rgba(56,189,248,.34); }
 
 /* aura da cor do jogo, atrás da coruja */
 .game-card::before {
@@ -5843,6 +5844,66 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-musica-nome {
   max-width: 34vw;
   display: inline-block;
   vertical-align: middle;
+}
+
+/* Ping Pong da Coruja — mesmo tratamento: arena colada nas bordas,
+   HUD (placar) flutuando translúcido no topo, botão Voltar no canto. */
+body.games-fs-open #games-hub.jogo-ativo #jogo-pingpong .pp-arena {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  min-height: 0;
+  aspect-ratio: auto;
+  margin: 0;
+  border-radius: 0;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-pingpong .pp-arena #pp-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-pingpong .jogo-voltar {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 8px;
+  z-index: 6;
+  margin: 0;
+  padding: 8px 12px;
+  background: rgba(9, 14, 22, 0.55);
+  border-radius: 999px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 13px;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-pingpong .pp-hud {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  right: 10px;
+  left: auto;
+  z-index: 6;
+  margin: 0;
+  padding: 0;
+  gap: 8px;
+  background: transparent;
+  justify-content: flex-end;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-pingpong .pp-hud-lado {
+  background: rgba(9, 14, 22, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 5px 12px;
+  min-width: 0;
+  border-radius: 12px;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-pingpong .pp-hud-lado-label {
+  font-size: 9px;
+  opacity: 0.85;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-pingpong .pp-hud-lado-valor {
+  font-size: 17px;
 }
 
 /* Elemento em tela cheia NATIVA (Fullscreen API): o navegador dá 100%

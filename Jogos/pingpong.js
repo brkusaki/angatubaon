@@ -2,26 +2,39 @@
    PING PONG DA CORUJA — módulo de jogo (lazy-loaded)
    1x1 em tempo real, em 1ª pessoa: a câmera fica atrás da sua
    raquete olhando pra mesa, só as raquetes aparecem (sem bonecos).
-   Multiplayer de verdade via Jogos/multiplayer.js (AngatubaMP) —
-   sala por código de 4 letras, dados trafegando P2P (WebRTC).
+   Dois modos: sozinho contra a CPU, ou multiplayer de verdade via
+   Jogos/multiplayer.js (AngatubaMP) — sala por código de 4 letras,
+   dados trafegando P2P (WebRTC).
+
+   FÍSICA DA BOLA: gravidade + quique na mesa de verdade (não é um
+   arco decorativo fixo). A bola tem altura própria (h), a raquete
+   também — você arrasta pra cima/baixo pra levantar a raquete e
+   pega a bola em alturas diferentes, e a altura em que você rebate
+   define o quanto a bola sai empinada (rebater baixo = tacada
+   rasteira/rápida; rebater alto = bola mais alta/lenta). Arrastar
+   de lado rápido no instante da rebatida soma um "efeito" extra na
+   trajetória lateral.
 
    MODELO DE REDE (host-autoritativo, o jeito mais simples de
    acertar num jogo 1x1 casual sem servidor):
      - Quem CRIA a sala (anfitrião) simula a bola sozinho e manda o
-       estado (posição da bola + placar) pro adversário a cada
-       quadro. O adversário só desenha o que recebe.
-     - Quem ENTRA na sala (convidado) só manda a posição da PRÓPRIA
-       raquete; nunca decide o que a bola faz.
+       estado (posição/altura da bola + placar) pro adversário a
+       cada quadro. O adversário só desenha o que recebe.
+     - Quem ENTRA na sala (convidado) só manda a posição/altura da
+       PRÓPRIA raquete; nunca decide o que a bola faz.
      - Isso evita o problema clássico de física duplicada/dessincro-
        nizada entre os dois lados — só existe UMA simulação, a do
-       anfitrião, e o resto é sincronia de tela.
+       anfitrião, e o resto é sincronia de tela. No modo sozinho não
+       tem rede nenhuma: o próprio jogador simula tudo, e a raquete
+       "adversária" é movida pela CPU (ver _ppAtualizarIA).
 
-   COORDENADAS (compartilhadas entre os dois, geradas pelo
-   anfitrião): x em [-1,1] (lateral, não é espelhado — os dois lados
+   COORDENADAS (compartilhadas entre os dois, geradas por quem
+   simula): x em [-1,1] (lateral, não é espelhado — os dois lados
    enxergam "esquerda" do mesmo jeito, é um jogo estilizado, não uma
    simulação física da mesa real) · d em [0,1] (profundidade: d=0 é
-   o fundo do ANFITRIÃO, d=1 é o fundo do CONVIDADO). Cada tela
-   converte d pra "perto de mim" na hora de desenhar — ver _ppRenderD.
+   o fundo de QUEM SIMULA, d=1 é o fundo do outro lado) · h em [0,∞)
+   (altura acima da mesa). Cada tela converte d pra "perto de mim"
+   na hora de desenhar — ver _ppDesenhar.
 
    Fala com o app só via window.AngatubaGames (a ponte) e com a rede
    só via window.AngatubaMP (Jogos/multiplayer.js). Expõe
@@ -31,25 +44,29 @@
   'use strict';
 
   /* ── Ajustes do jogo ─────────────────────────────────────────── */
-  var PP_PONTOS_VITORIA   = 7;      // primeiro a chegar aqui vence
-  var PP_RAQUETE_MEIA_LARG = 0.22;  // metade da largura da raquete, em x (-1..1)
-  var PP_VEL_D_INICIAL    = 1.05;   // "unidades de profundidade" por segundo
-  var PP_VEL_D_INCREMENTO = 1.035;  // acelera um pouco a cada rebatida
-  var PP_VEL_D_MAX        = 2.3;
-  var PP_VEL_X_MAX        = 1.6;
-  var PP_EFEITO_TOQUE     = 2.4;    // o quanto tocar fora do centro da raquete desvia a bola
-  var PP_ARCO_ALTURA      = 0.32;   // altura visual do arco da bola (curva pra cima no meio)
-  var PP_IA_VELOCIDADE    = 1.15;   // velocidade máxima da raquete da CPU (modo 1 jogador)
-  var PP_IA_ERRO          = 0.10;   // imprecisão da CPU, pra não jogar perfeito demais
-  var PP_REDE_ALTURA      = 0.16;   // altura visual da rede (só decorativa, sem física própria)
+  var PP_PONTOS_VITORIA    = 7;      // primeiro a chegar aqui vence
+  var PP_RAQUETE_MEIA_LARG = 0.24;   // metade da largura da raquete, em x (-1..1)
+  var PP_RAQUETE_ALCANCE_H = 0.24;   // o quanto a altura da raquete pode diferir da bola e ainda acertar
+  var PP_RAQUETE_ALTURA_MAX = 0.6;   // até onde dá pra levantar a raquete arrastando
+  var PP_VEL_D_INICIAL      = 0.92;  // "unidades de profundidade" por segundo
+  var PP_VEL_D_INCREMENTO   = 1.022; // acelera aos poucos a cada rebatida — bem mais suave que antes
+  var PP_VEL_D_MAX          = 1.75;  // teto de velocidade — não sai mais impossível de rebater
+  var PP_VEL_X_MAX          = 1.5;
+  var PP_EFEITO_TOQUE       = 2.2;   // o quanto tocar fora do centro da raquete desvia a bola
+  var PP_EFEITO_ARRASTO     = 0.55;  // "efeito": arrastar rápido de lado ao rebater desvia mais ainda
+  var PP_GRAVIDADE          = 3.4;   // puxa a bola pra baixo — física de verdade, não um arco fixo
+  var PP_RESTITUICAO        = 0.68;  // quanto da velocidade vertical sobra depois de quicar na mesa
+  var PP_LIFT_BASE          = 0.85;  // impulso vertical mínimo de toda rebatida
+  var PP_LIFT_POR_ALTURA    = 1.7;   // rebater com a raquete mais alta empina mais a bola
 
   /* ── Perspectiva (projeção falsa-3D em canvas 2D) ────────────── */
-  var PP_Y_PERTO   = 0.90;  // fração da altura da tela onde fica o fundo PERTO (embaixo)
-  var PP_Y_LONGE   = 0.16;  // fração da altura da tela onde fica o fundo LONGE (em cima)
-  var PP_LARG_PERTO = 0.46; // meia-largura da mesa PERTO, fração da largura da tela
-  var PP_LARG_LONGE = 0.15; // meia-largura da mesa LONGE, fração da largura da tela
+  var PP_Y_PERTO   = 0.88;  // fração da altura da tela onde fica o fundo PERTO (embaixo)
+  var PP_Y_LONGE   = 0.40;  // fração da altura da tela onde fica o fundo LONGE (em cima) — mesa curta, não corredor
+  var PP_LARG_PERTO = 0.44; // meia-largura da mesa PERTO, fração da largura da tela
+  var PP_LARG_LONGE = 0.25; // meia-largura da mesa LONGE, fração da largura da tela
   var PP_ESCALA_PERTO = 1.0;
-  var PP_ESCALA_LONGE = 0.34;
+  var PP_ESCALA_LONGE = 0.52;
+  var PP_REDE_ALTURA  = 0.16; // altura visual da rede (só decorativa, sem física própria)
 
   var _ppCanvas = null, _ppCtx = null, _ppW = 0, _ppH = 0, _ppDpr = 1;
   var _ppRAF = 0, _ppUltimoTs = 0;
@@ -58,19 +75,23 @@
   var _ppSouAnfitriao = false;
   var _ppEventosLigados = false;
 
-  // Estado da partida (referencial do ANFITRIÃO; só ele escreve nele).
-  var _ppBola = { x: 0, d: 0.5, vx: 0, vd: 0 };
+  // Estado da bola (referencial de quem simula; só quem simula escreve nele).
+  // h/vh = altura acima da mesa e velocidade vertical — física de
+  // gravidade de verdade, não um arco decorativo.
+  var _ppBola = { x: 0, d: 0.5, h: 0, vx: 0, vd: 0, vh: 0 };
   var _ppVelD = PP_VEL_D_INICIAL;
   var _ppPlacarAnfitriao = 0, _ppPlacarConvidado = 0;
 
-  // Raquetes (x em -1..1). A própria é controlada por toque; a do
-  // adversário só é atualizada pela rede.
-  var _ppMinhaRaqueteX = 0;
-  var _ppRaqueteAdversarioX = 0; // no anfitrião: última posição recebida do convidado
-                                  // no convidado: última posição recebida do anfitrião (via estado 'e')
+  // Raquetes: x (lateral, -1..1) e altura (0..PP_RAQUETE_ALTURA_MAX,
+  // controlada arrastando o dedo pra cima/baixo). A própria é
+  // controlada por toque; a do adversário só é atualizada pela rede
+  // (ou pela IA, no modo sozinho). *VX guarda uma velocidade lateral
+  // suavizada, usada só pro "efeito" (curva extra) na rebatida.
+  var _ppMinhaRaqueteX = 0, _ppMinhaRaqueteH = 0, _ppMinhaRaqueteVX = 0;
+  var _ppRaqueteAdversarioX = 0, _ppRaqueteAdversarioH = 0, _ppRaqueteAdversarioVX = 0;
+  var _ppArrastoAnterior = null; // { x, clientY, ts } — pra calcular velocidade do arraste
 
   var _ppApelidoAdversario = '';
-  var _ppArrastando = false;
   var _ppSaindoVoluntariamente = false; // true durante um sair() pedido pelo próprio jogador
 
   /* ── Ponte com o app (fachada segura — no-op se não existir) ──── */
@@ -115,7 +136,7 @@
   window.PingPongGame = { preparar: _ppPreparar, comecar: _ppComecar, parar: _ppParar };
 
   /* ── Telas (overlays) ─────────────────────────────────────────
-     3 overlays fixos no HTML: pp-menu (criar/entrar), pp-sala
+     3 overlays fixos no HTML: pp-menu (sozinho/criar/entrar), pp-sala
      (aguardando ou conectando) e pp-fim (resultado/erro). Durante
      'jogando' nenhum aparece — só o HUD + canvas. */
   function _ppMostrarTela(qual) {
@@ -145,6 +166,7 @@
     _ppSouAnfitriao = true;
     _ppApelidoAdversario = 'Computador';
     _ppRaqueteAdversarioX = 0;
+    _ppRaqueteAdversarioH = 0;
     _ppReiniciarPartida();
     _ppComecarPartida();
   }
@@ -277,13 +299,17 @@
         _ppApelidoAdversario = String(dado.nome || 'Adversário').slice(0, 20);
         _ppAtualizarHUD();
         break;
-      case 'p': // convidado -> anfitrião: posição da raquete do convidado
-        if (_ppSouAnfitriao && typeof dado.x === 'number') _ppRaqueteAdversarioX = _ppClamp(dado.x, -1, 1);
+      case 'p': // convidado -> anfitrião: posição/altura/velocidade da raquete do convidado
+        if (_ppSouAnfitriao) {
+          if (typeof dado.x === 'number') _ppRaqueteAdversarioX = _ppClamp(dado.x, -1, 1);
+          if (typeof dado.h === 'number') _ppRaqueteAdversarioH = _ppClamp(dado.h, 0, PP_RAQUETE_ALTURA_MAX);
+          if (typeof dado.v === 'number') _ppRaqueteAdversarioVX = dado.v;
+        }
         break;
       case 'e': // anfitrião -> convidado: estado da bola + placar
         if (!_ppSouAnfitriao) {
-          _ppBola.x = dado.bx; _ppBola.d = dado.bd;
-          _ppRaqueteAdversarioX = dado.hx;
+          _ppBola.x = dado.bx; _ppBola.d = dado.bd; _ppBola.h = dado.bh;
+          _ppRaqueteAdversarioX = dado.hx; _ppRaqueteAdversarioH = dado.hh;
           _ppPlacarAnfitriao = dado.sh; _ppPlacarConvidado = dado.sg;
           _ppAtualizarHUD();
           if (dado.fim) _ppMostrarFim('fim');
@@ -302,34 +328,58 @@
     if (_ppModo === 'multiplayer' && window.AngatubaMP) window.AngatubaMP.enviar({ t: 'rr' });
   }
 
-  /* ── Controles (arrastar a própria raquete) ─────────────────────
+  /* ── Controles (arrastar a própria raquete em x E em altura) ────
      Pointer Events cobrem toque e mouse com a mesma API; captura o
      ponteiro pra continuar recebendo o arraste mesmo se o dedo sair
-     da área do canvas. */
-  function _ppXDoEvento(clientX) {
+     da área do canvas. Horizontal = posição lateral; vertical = o
+     quanto a raquete sobe da mesa (arrastar pra cima levanta a
+     raquete, pra baixo volta pro nível da mesa) — assim dá pra
+     escolher em que altura interceptar a bola. */
+  function _ppPosicaoDoEvento(clientX, clientY) {
     var r = _ppCanvas.getBoundingClientRect();
-    var frac = (clientX - r.left) / (r.width || 1);
-    return _ppClamp(frac * 2 - 1, -1, 1);
+    var fracX = (clientX - r.left) / (r.width || 1);
+    var x = _ppClamp(fracX * 2 - 1, -1, 1);
+    // Minha raquete sempre desenha em renderD=0 (escala/chão fixos),
+    // então a conversão de pixel pra altura é a inversa exata de
+    // _ppProjetar com renderD=0.
+    var perto = _ppProjetar(0, 0, 0);
+    var yTela = (clientY - r.top) * (_ppH / (r.height || 1));
+    var h = (perto.chaoY - yTela) / (PP_ESCALA_PERTO * (_ppH * 0.5));
+    return { x: x, h: _ppClamp(h, 0, PP_RAQUETE_ALTURA_MAX) };
+  }
+  function _ppAplicarArrasto(clientX, clientY) {
+    var pos = _ppPosicaoDoEvento(clientX, clientY);
+    var agora = performance.now();
+    if (_ppArrastoAnterior) {
+      var dt = (agora - _ppArrastoAnterior.ts) / 1000;
+      if (dt > 0.001) _ppMinhaRaqueteVX = _ppClamp((pos.x - _ppArrastoAnterior.x) / dt, -6, 6);
+    }
+    _ppArrastoAnterior = { x: pos.x, ts: agora };
+    _ppMinhaRaqueteX = pos.x;
+    _ppMinhaRaqueteH = pos.h;
+    _ppEnviarMinhaRaquete();
   }
   function _ppPointerDown(e) {
     if (_ppEstado !== 'jogando') return;
-    _ppArrastando = true;
     try { _ppCanvas.setPointerCapture(e.pointerId); } catch (err) {}
-    _ppMinhaRaqueteX = _ppXDoEvento(e.clientX);
-    _ppEnviarMinhaRaquete();
+    _ppArrastoAnterior = null;
+    _ppAplicarArrasto(e.clientX, e.clientY);
     if (e.cancelable) e.preventDefault();
   }
   function _ppPointerMove(e) {
-    if (!_ppArrastando || _ppEstado !== 'jogando') return;
-    _ppMinhaRaqueteX = _ppXDoEvento(e.clientX);
-    _ppEnviarMinhaRaquete();
+    if (_ppEstado !== 'jogando' || e.buttons === 0 && e.pointerType === 'mouse') {
+      // (sem botão pressionado no mouse: ignora — só arrasta com o botão preso ou por toque)
+    }
+    if (_ppEstado !== 'jogando') return;
+    if (e.pointerType === 'mouse' && !(e.buttons & 1)) return;
+    _ppAplicarArrasto(e.clientX, e.clientY);
     if (e.cancelable) e.preventDefault();
   }
-  function _ppPointerUp() { _ppArrastando = false; }
+  function _ppPointerUp() { _ppArrastoAnterior = null; _ppMinhaRaqueteVX = 0; }
   function _ppEnviarMinhaRaquete() {
     if (_ppModo !== 'multiplayer' || !window.AngatubaMP) return;
     if (_ppSouAnfitriao) return; // o anfitrião já tem a própria posição local; só o convidado precisa mandar
-    window.AngatubaMP.enviar({ t: 'p', x: _ppMinhaRaqueteX });
+    window.AngatubaMP.enviar({ t: 'p', x: _ppMinhaRaqueteX, h: _ppMinhaRaqueteH, v: _ppMinhaRaqueteVX });
   }
   var _ppControlesOn = false;
   function _ppLigarControles() {
@@ -358,9 +408,10 @@
   function _ppClamp(v, min, max) { return v < min ? min : (v > max ? max : v); }
 
   /* ── Partida ──────────────────────────────────────────────────
-     Só o ANFITRIÃO chama _ppSimular/_ppLoop de verdade calculando
-     física; o CONVIDADO só redesenha o que chega pela rede — mas os
-     dois compartilham o mesmo _ppLoop (requestAnimationFrame) pra
+     Só QUEM SIMULA (o anfitrião no multiplayer, ou o único jogador
+     no modo solo) chama _ppSimular de verdade calculando física; o
+     convidado só redesenha o que chega pela rede — mas os dois
+     compartilham o mesmo _ppLoop (requestAnimationFrame) pra
      desenhar a cada quadro. */
   function _ppReiniciarPartida() {
     _ppPlacarAnfitriao = 0; _ppPlacarConvidado = 0;
@@ -371,9 +422,11 @@
   function _ppServir(paraD) {
     _ppBola.x = 0;
     _ppBola.d = paraD; // sai do fundo de quem tomou o ponto (ou sorteado no saque inicial)
+    _ppBola.h = 0.3;
     var sentido = paraD === 0 ? 1 : -1;
     _ppBola.vd = sentido * _ppVelD;
     _ppBola.vx = (Math.random() * 0.6 - 0.3);
+    _ppBola.vh = 0.5;
   }
   function _ppComecarPartida() {
     _ppMostrarTela('jogando');
@@ -391,22 +444,33 @@
     _ppRAF = requestAnimationFrame(_ppLoop);
   }
 
-  // Modo 1 jogador: move a raquete da CPU até a bola, com velocidade
-  // limitada e um pouco de erro — assim dá pra vencer, mas exige atenção.
+  // Modo 1 jogador: move a raquete da CPU até a bola (x e altura),
+  // com velocidade limitada e um pouco de erro — assim dá pra
+  // vencer, mas exige atenção.
   function _ppAtualizarIA(dt) {
-    var alvo = _ppClamp(_ppBola.x + Math.sin(performance.now() * 0.0017) * PP_IA_ERRO, -1, 1);
-    var passo = PP_IA_VELOCIDADE * dt;
-    var delta = alvo - _ppRaqueteAdversarioX;
-    if (Math.abs(delta) <= passo) _ppRaqueteAdversarioX = alvo;
-    else _ppRaqueteAdversarioX += (delta > 0 ? 1 : -1) * passo;
+    var erro = Math.sin(performance.now() * 0.0017) * 0.10;
+    var alvoX = _ppClamp(_ppBola.x + erro, -1, 1);
+    var alvoH = _ppClamp(_ppBola.h, 0, PP_RAQUETE_ALTURA_MAX);
+    var passoX = 1.15 * dt, passoH = 1.4 * dt;
+    var dx = alvoX - _ppRaqueteAdversarioX, dh = alvoH - _ppRaqueteAdversarioH;
+    _ppRaqueteAdversarioVX = Math.abs(dx) <= passoX ? 0 : (dx > 0 ? 1 : -1) * (passoX / dt);
+    _ppRaqueteAdversarioX += Math.abs(dx) <= passoX ? dx : (dx > 0 ? passoX : -passoX);
+    _ppRaqueteAdversarioH += Math.abs(dh) <= passoH ? dh : (dh > 0 ? passoH : -passoH);
   }
 
-  // Só roda em quem simula (o anfitrião no multiplayer, ou o único
-  // jogador no modo solo): move a bola, checa colisão com as duas
-  // raquetes e paredes, e manda o estado pro convidado (se houver).
+  // Só roda em quem simula: aplica gravidade/quique na bola, move
+  // em x/d, checa colisão com as duas raquetes (posição E altura) e
+  // paredes, e manda o estado pro outro lado (se for multiplayer).
   function _ppSimular(dt) {
     if (!dt) { _ppEnviarEstado(false); return; }
     if (_ppModo === 'solo') _ppAtualizarIA(dt);
+
+    _ppBola.vh -= PP_GRAVIDADE * dt;
+    _ppBola.h += _ppBola.vh * dt;
+    if (_ppBola.h <= 0) {
+      _ppBola.h = 0;
+      if (_ppBola.vh < 0) _ppBola.vh = -_ppBola.vh * PP_RESTITUICAO;
+    }
     _ppBola.d += _ppBola.vd * dt;
     _ppBola.x += _ppBola.vx * dt;
     if (_ppBola.x > 1) { _ppBola.x = 1; _ppBola.vx = -Math.abs(_ppBola.vx); }
@@ -415,14 +479,16 @@
     var fimDePonto = null; // 'anfitriao' | 'convidado' — quem MARCOU o ponto
 
     if (_ppBola.d <= 0) {
-      if (Math.abs(_ppBola.x - _ppMinhaRaqueteX) <= PP_RAQUETE_MEIA_LARG) {
-        _ppRebater(_ppMinhaRaqueteX, 1);
+      if (Math.abs(_ppBola.x - _ppMinhaRaqueteX) <= PP_RAQUETE_MEIA_LARG &&
+          Math.abs(_ppBola.h - _ppMinhaRaqueteH) <= PP_RAQUETE_ALCANCE_H) {
+        _ppRebater(_ppMinhaRaqueteX, _ppMinhaRaqueteH, _ppMinhaRaqueteVX, 1);
       } else {
         fimDePonto = 'convidado';
       }
     } else if (_ppBola.d >= 1) {
-      if (Math.abs(_ppBola.x - _ppRaqueteAdversarioX) <= PP_RAQUETE_MEIA_LARG) {
-        _ppRebater(_ppRaqueteAdversarioX, -1);
+      if (Math.abs(_ppBola.x - _ppRaqueteAdversarioX) <= PP_RAQUETE_MEIA_LARG &&
+          Math.abs(_ppBola.h - _ppRaqueteAdversarioH) <= PP_RAQUETE_ALCANCE_H) {
+        _ppRebater(_ppRaqueteAdversarioX, _ppRaqueteAdversarioH, _ppRaqueteAdversarioVX, -1);
       } else {
         fimDePonto = 'anfitriao';
       }
@@ -446,10 +512,16 @@
     _ppEnviarEstado(false);
   }
 
-  function _ppRebater(raqueteX, novoSentidoVd) {
+  function _ppRebater(raqueteX, raqueteH, raqueteVX, novoSentidoVd) {
     _ppVelD = Math.min(PP_VEL_D_MAX, _ppVelD * PP_VEL_D_INCREMENTO);
     _ppBola.vd = novoSentidoVd * _ppVelD;
-    _ppBola.vx = _ppClamp(_ppBola.vx + (_ppBola.x - raqueteX) * PP_EFEITO_TOQUE, -PP_VEL_X_MAX, PP_VEL_X_MAX);
+    _ppBola.vx = _ppClamp(
+      _ppBola.vx + (_ppBola.x - raqueteX) * PP_EFEITO_TOQUE + (raqueteVX || 0) * PP_EFEITO_ARRASTO,
+      -PP_VEL_X_MAX, PP_VEL_X_MAX
+    );
+    // Rebater com a raquete mais alta empina mais a bola (defensiva/
+    // lenta); mais baixa sai mais rasteira e rápida.
+    _ppBola.vh = PP_LIFT_BASE + raqueteH * PP_LIFT_POR_ALTURA;
     _ppBola.d = _ppClamp(_ppBola.d, 0, 1);
   }
 
@@ -461,7 +533,8 @@
     if (!fim && (agora - _ppUltimoEnvio) < 33) return;
     _ppUltimoEnvio = agora;
     window.AngatubaMP.enviar({
-      t: 'e', bx: _ppBola.x, bd: _ppBola.d, hx: _ppMinhaRaqueteX,
+      t: 'e', bx: _ppBola.x, bd: _ppBola.d, bh: _ppBola.h,
+      hx: _ppMinhaRaqueteX, hh: _ppMinhaRaqueteH,
       sh: _ppPlacarAnfitriao, sg: _ppPlacarConvidado, fim: !!fim
     });
   }
@@ -513,9 +586,9 @@
      'renderD' é sempre "distância de mim" (0 = perto/embaixo, 1 =
      longe/em cima) do ponto de vista de QUEM ESTÁ OLHANDO a tela —
      é por isso que a bola precisa inverter a profundidade quando
-     quem desenha é o convidado (ver a chamada abaixo). As raquetes
-     não precisam inverter nada: a minha é sempre "perto", a do
-     adversário é sempre "longe". */
+     quem desenha não é quem simula (ver a chamada abaixo). As
+     raquetes não precisam inverter nada: a minha é sempre "perto",
+     a do adversário é sempre "longe". */
   function _ppProjetar(x, renderD, altura) {
     var t = _ppClamp(renderD, 0, 1);
     var fracY = PP_Y_PERTO - (PP_Y_PERTO - PP_Y_LONGE) * t;
@@ -537,8 +610,8 @@
     ctx.clearRect(0, 0, _ppW, _ppH);
 
     // Fundo: arena escura com um brilho suave atrás da mesa.
-    var fundo = ctx.createRadialGradient(_ppW / 2, _ppH * 0.32, _ppH * 0.08, _ppW / 2, _ppH * 0.32, _ppH * 0.95);
-    fundo.addColorStop(0, '#15243a');
+    var fundo = ctx.createRadialGradient(_ppW / 2, _ppH * 0.28, _ppH * 0.06, _ppW / 2, _ppH * 0.28, _ppH * 0.85);
+    fundo.addColorStop(0, '#182a44');
     fundo.addColorStop(1, '#05070c');
     ctx.fillStyle = fundo;
     ctx.fillRect(0, 0, _ppW, _ppH);
@@ -551,11 +624,11 @@
     // Ordem de desenho por profundidade (a rede fica sempre em d=0.5):
     // a raquete do adversário é sempre mais longe que a rede, a minha
     // é sempre mais perto — só a bola muda de lado.
-    _ppDesenharRaquete(_ppRaqueteAdversarioX, 1, '#ff5470');
+    _ppDesenharRaquete(_ppRaqueteAdversarioX, _ppRaqueteAdversarioH, 1, '#ff5470');
     if (jogando && renderDBola < 0.5) _ppDesenharBola(renderDBola);
     _ppDesenharRede();
     if (jogando && renderDBola >= 0.5) _ppDesenharBola(renderDBola);
-    _ppDesenharRaquete(_ppMinhaRaqueteX, 0, '#38bdf8');
+    _ppDesenharRaquete(_ppMinhaRaqueteX, _ppMinhaRaqueteH, 0, '#38bdf8');
   }
 
   // Tampo + friso branco + aba lateral (dá espessura) + piso embaixo,
@@ -597,8 +670,9 @@
   }
 
   // Rede decorativa em d=0.5 (mesmo ponto pros dois lados — 0.5 não
-  // muda ao inverter profundidade). Sem física própria: a bola passa
-  // por cima já que o arco dela é mais alto que a rede.
+  // muda ao inverter profundidade). Não é física de verdade — é só
+  // desenhada na frente ou atrás da bola conforme a profundidade
+  // dela em _ppDesenhar.
   function _ppDesenharRede() {
     var ctx = _ppCtx;
     var baseE = _ppProjetar(-1, 0.5, 0), baseD = _ppProjetar(1, 0.5, 0);
@@ -640,8 +714,7 @@
   function _ppDesenharBola(renderD) {
     var ctx = _ppCtx;
     var chaoBola = _ppProjetar(_ppBola.x, renderD, 0);
-    var arco = Math.sin(_ppClamp(_ppBola.d, 0, 1) * Math.PI) * PP_ARCO_ALTURA;
-    var bola = _ppProjetar(_ppBola.x, renderD, arco);
+    var bola = _ppProjetar(_ppBola.x, renderD, _ppBola.h);
 
     ctx.beginPath();
     ctx.ellipse(chaoBola.x, chaoBola.chaoY, 7 * chaoBola.escala, 2.5 * chaoBola.escala, 0, 0, Math.PI * 2);
@@ -657,11 +730,12 @@
     ctx.shadowBlur = 0;
   }
 
-  // Raquete estilizada (naipe + cabo), sem braço/boneco — só a peça.
+  // Raquete estilizada (naipe + cabo), sem braço/boneco — só a peça,
+  // desenhada na altura em que o jogador (ou a CPU) a está segurando.
   // O cabo sempre aponta pra "fora da rede": pra baixo/perto na
   // minha (renderD perto de 0), pra cima/longe na do adversário.
-  function _ppDesenharRaquete(x, renderD, cor) {
-    var p = _ppProjetar(x, renderD, 0);
+  function _ppDesenharRaquete(x, altura, renderD, cor) {
+    var p = _ppProjetar(x, renderD, altura);
     var raio = 21 * p.escala;
     var caboComp = 15 * p.escala, caboLarg = 8 * p.escala;
     var paraFora = (renderD < 0.5) ? 1 : -1;
@@ -669,7 +743,7 @@
     var ctx = _ppCtx;
 
     ctx.save();
-    ctx.translate(p.x, p.chaoY);
+    ctx.translate(p.x, p.y);
 
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(-caboLarg / 2, caboY, caboLarg, caboComp, caboLarg / 2);
@@ -696,6 +770,16 @@
     ctx.fillStyle = brilho;
     ctx.fill();
 
+    // Sombra no chão embaixo da raquete — reforça a leitura de altura.
+    if (altura > 0.02) {
+      var chao = _ppProjetar(x, renderD, 0);
+      ctx.restore();
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(chao.x, chao.chaoY, raio * 0.7, raio * 0.22, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.35, 0.12 + altura * 0.3) + ')';
+      ctx.fill();
+    }
     ctx.restore();
   }
 })();

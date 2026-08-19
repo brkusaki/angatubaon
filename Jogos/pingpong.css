@@ -25,6 +25,9 @@
 .pp-btn-opcao{width:100%;padding:13px 16px;border-radius:14px;border:1px solid rgba(56,189,248,.35);background:rgba(56,189,248,.10);color:#fff;font-family:'Syne',sans-serif;font-size:15px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s ease,filter .12s ease;}
 .pp-btn-opcao:active{transform:scale(.97);}
 .pp-btn-opcao:disabled{opacity:.5;pointer-events:none;}
+/* Variante secundária (criar sala): mesma forma, mais discreta — o
+   modo solo é a ação de menor fricção, então fica em destaque. */
+.pp-btn-opcao-alt{border-color:rgba(255,255,255,.14);background:rgba(255,255,255,.05);}
 .pp-divisor{display:flex;align-items:center;gap:10px;width:100%;max-width:290px;margin:4px 0;color:rgba(199,209,224,.5);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;}
 .pp-divisor::before,.pp-divisor::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.10);}
 .pp-entrar-wrap{display:flex;gap:8px;width:100%;max-width:290px;}

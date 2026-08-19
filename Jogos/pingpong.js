@@ -39,6 +39,9 @@
   var PP_VEL_X_MAX        = 1.6;
   var PP_EFEITO_TOQUE     = 2.4;    // o quanto tocar fora do centro da raquete desvia a bola
   var PP_ARCO_ALTURA      = 0.32;   // altura visual do arco da bola (curva pra cima no meio)
+  var PP_IA_VELOCIDADE    = 1.15;   // velocidade máxima da raquete da CPU (modo 1 jogador)
+  var PP_IA_ERRO          = 0.10;   // imprecisão da CPU, pra não jogar perfeito demais
+  var PP_REDE_ALTURA      = 0.16;   // altura visual da rede (só decorativa, sem física própria)
 
   /* ── Perspectiva (projeção falsa-3D em canvas 2D) ────────────── */
   var PP_Y_PERTO   = 0.90;  // fração da altura da tela onde fica o fundo PERTO (embaixo)
@@ -51,6 +54,7 @@
   var _ppCanvas = null, _ppCtx = null, _ppW = 0, _ppH = 0, _ppDpr = 1;
   var _ppRAF = 0, _ppUltimoTs = 0;
   var _ppEstado = 'inicio';   // inicio | sala | jogando | fim
+  var _ppModo = null;         // 'solo' (contra a CPU) | 'multiplayer' (via AngatubaMP)
   var _ppSouAnfitriao = false;
   var _ppEventosLigados = false;
 
@@ -103,6 +107,7 @@
     if (_ppRAF) { cancelAnimationFrame(_ppRAF); _ppRAF = 0; }
     if (window.AngatubaMP) { _ppSaindoVoluntariamente = true; window.AngatubaMP.sair(); }
     _ppEstado = 'inicio';
+    _ppModo = null;
     _ppSouAnfitriao = false;
   }
 
@@ -132,6 +137,18 @@
   function _ppLimparErroMenu() { _ppErroMenu(''); }
 
   /* ── Ações do menu inicial ───────────────────────────────────── */
+  // Modo 1 jogador: sem rede nenhuma, a raquete "adversária" é
+  // controlada pela CPU (ver _ppAtualizarIA, chamada de dentro de
+  // _ppSimular quando _ppModo === 'solo').
+  function _ppJogarSozinho() {
+    _ppModo = 'solo';
+    _ppSouAnfitriao = true;
+    _ppApelidoAdversario = 'Computador';
+    _ppRaqueteAdversarioX = 0;
+    _ppReiniciarPartida();
+    _ppComecarPartida();
+  }
+
   function _ppCriarSala() {
     if (!window.AngatubaMP || !window.AngatubaMP.disponivel()) {
       _ppErroMenu('Multiplayer indisponível neste navegador.');
@@ -141,6 +158,7 @@
     var btn = document.getElementById('pp-btn-criar');
     if (btn) btn.disabled = true;
     window.AngatubaMP.criarSala().then(function (codigo) {
+      _ppModo = 'multiplayer';
       _ppSouAnfitriao = true;
       _ppMostrarSala('aguardando', codigo);
     }).catch(function (err) {
@@ -160,6 +178,7 @@
     var btn = document.getElementById('pp-btn-entrar');
     if (btn) btn.disabled = true;
     window.AngatubaMP.entrarSala(codigo).then(function () {
+      _ppModo = 'multiplayer';
       _ppSouAnfitriao = false;
       _ppMostrarSala('conectando', codigo);
     }).catch(function (err) {
@@ -200,6 +219,7 @@
   function _ppVoltarMenu() {
     if (_ppRAF) { cancelAnimationFrame(_ppRAF); _ppRAF = 0; }
     if (window.AngatubaMP) { _ppSaindoVoluntariamente = true; window.AngatubaMP.sair(); }
+    _ppModo = null;
     _ppSouAnfitriao = false;
     var btnC = document.getElementById('pp-btn-criar');
     var btnE = document.getElementById('pp-btn-entrar');
@@ -208,12 +228,14 @@
     _ppMostrarTela('inicio');
   }
 
+  window._ppJogarSozinho = _ppJogarSozinho;
   window._ppCriarSala  = _ppCriarSala;
   window._ppEntrarSala = _ppEntrarSala;
   window._ppCopiarCodigo = _ppCopiarCodigo;
   window._ppVoltarMenu = _ppVoltarMenu;
   window._ppPedirRevanche = function () {
-    if (_ppSouAnfitriao) { _ppReiniciarPartida(); _ppEnviarReinicio(); _ppComecarPartida(); }
+    if (_ppModo === 'solo') { _ppReiniciarPartida(); _ppComecarPartida(); }
+    else if (_ppSouAnfitriao) { _ppReiniciarPartida(); _ppEnviarReinicio(); _ppComecarPartida(); }
     else if (window.AngatubaMP) window.AngatubaMP.enviar({ t: 'pr' });
     var btn = document.getElementById('pp-btn-revanche');
     if (btn) btn.disabled = true;
@@ -277,7 +299,7 @@
   }
 
   function _ppEnviarReinicio() {
-    if (window.AngatubaMP) window.AngatubaMP.enviar({ t: 'rr' });
+    if (_ppModo === 'multiplayer' && window.AngatubaMP) window.AngatubaMP.enviar({ t: 'rr' });
   }
 
   /* ── Controles (arrastar a própria raquete) ─────────────────────
@@ -305,7 +327,7 @@
   }
   function _ppPointerUp() { _ppArrastando = false; }
   function _ppEnviarMinhaRaquete() {
-    if (!window.AngatubaMP) return;
+    if (_ppModo !== 'multiplayer' || !window.AngatubaMP) return;
     if (_ppSouAnfitriao) return; // o anfitrião já tem a própria posição local; só o convidado precisa mandar
     window.AngatubaMP.enviar({ t: 'p', x: _ppMinhaRaqueteX });
   }
@@ -369,10 +391,22 @@
     _ppRAF = requestAnimationFrame(_ppLoop);
   }
 
-  // Só roda no anfitrião: move a bola, checa colisão com as duas
-  // raquetes e paredes, e manda o estado pro convidado.
+  // Modo 1 jogador: move a raquete da CPU até a bola, com velocidade
+  // limitada e um pouco de erro — assim dá pra vencer, mas exige atenção.
+  function _ppAtualizarIA(dt) {
+    var alvo = _ppClamp(_ppBola.x + Math.sin(performance.now() * 0.0017) * PP_IA_ERRO, -1, 1);
+    var passo = PP_IA_VELOCIDADE * dt;
+    var delta = alvo - _ppRaqueteAdversarioX;
+    if (Math.abs(delta) <= passo) _ppRaqueteAdversarioX = alvo;
+    else _ppRaqueteAdversarioX += (delta > 0 ? 1 : -1) * passo;
+  }
+
+  // Só roda em quem simula (o anfitrião no multiplayer, ou o único
+  // jogador no modo solo): move a bola, checa colisão com as duas
+  // raquetes e paredes, e manda o estado pro convidado (se houver).
   function _ppSimular(dt) {
     if (!dt) { _ppEnviarEstado(false); return; }
+    if (_ppModo === 'solo') _ppAtualizarIA(dt);
     _ppBola.d += _ppBola.vd * dt;
     _ppBola.x += _ppBola.vx * dt;
     if (_ppBola.x > 1) { _ppBola.x = 1; _ppBola.vx = -Math.abs(_ppBola.vx); }
@@ -421,7 +455,7 @@
 
   var _ppUltimoEnvio = 0;
   function _ppEnviarEstado(fim) {
-    if (!window.AngatubaMP) return;
+    if (_ppModo !== 'multiplayer' || !window.AngatubaMP) return;
     // ~30 msgs/s é de sobra pra um jogo casual e não sobrecarrega o canal.
     var agora = performance.now();
     if (!fim && (agora - _ppUltimoEnvio) < 33) return;
@@ -493,84 +527,175 @@
     return { x: px, y: py, chaoY: chaoY, escala: escala, largMesa: largFrac * _ppW };
   }
 
+  var PP_MESA_COR_PERTO = '#2f7fe0';
+  var PP_MESA_COR_LONGE = '#123863';
+  var PP_APRON_COR      = '#081527';
+
   function _ppDesenhar() {
     if (!_ppCtx || !_ppW || !_ppH) return;
     var ctx = _ppCtx;
     ctx.clearRect(0, 0, _ppW, _ppH);
 
-    // Fundo
-    var grad = ctx.createLinearGradient(0, 0, 0, _ppH);
-    grad.addColorStop(0, '#0a0f1a');
-    grad.addColorStop(1, '#0d1626');
-    ctx.fillStyle = grad;
+    // Fundo: arena escura com um brilho suave atrás da mesa.
+    var fundo = ctx.createRadialGradient(_ppW / 2, _ppH * 0.32, _ppH * 0.08, _ppW / 2, _ppH * 0.32, _ppH * 0.95);
+    fundo.addColorStop(0, '#15243a');
+    fundo.addColorStop(1, '#05070c');
+    ctx.fillStyle = fundo;
     ctx.fillRect(0, 0, _ppW, _ppH);
 
-    // Mesa (trapézio em perspectiva)
+    _ppDesenharMesa();
+
+    var jogando = (_ppEstado === 'jogando');
+    var renderDBola = _ppSouAnfitriao ? _ppBola.d : (1 - _ppBola.d);
+
+    // Ordem de desenho por profundidade (a rede fica sempre em d=0.5):
+    // a raquete do adversário é sempre mais longe que a rede, a minha
+    // é sempre mais perto — só a bola muda de lado.
+    _ppDesenharRaquete(_ppRaqueteAdversarioX, 1, '#ff5470');
+    if (jogando && renderDBola < 0.5) _ppDesenharBola(renderDBola);
+    _ppDesenharRede();
+    if (jogando && renderDBola >= 0.5) _ppDesenharBola(renderDBola);
+    _ppDesenharRaquete(_ppMinhaRaqueteX, 0, '#38bdf8');
+  }
+
+  // Tampo + friso branco + aba lateral (dá espessura) + piso embaixo,
+  // pra mesa não parecer um adesivo flutuando no vazio.
+  function _ppDesenharMesa() {
+    var ctx = _ppCtx;
     var perto = _ppProjetar(0, 0, 0), longe = _ppProjetar(0, 1, 0);
+
+    var piso = ctx.createLinearGradient(0, perto.chaoY, 0, _ppH);
+    piso.addColorStop(0, '#0a1120');
+    piso.addColorStop(1, '#04060a');
+    ctx.fillStyle = piso;
+    ctx.fillRect(0, perto.chaoY, _ppW, Math.max(0, _ppH - perto.chaoY));
+
+    var tampo = ctx.createLinearGradient(0, longe.chaoY, 0, perto.chaoY);
+    tampo.addColorStop(0, PP_MESA_COR_LONGE);
+    tampo.addColorStop(1, PP_MESA_COR_PERTO);
     ctx.beginPath();
     ctx.moveTo(_ppW / 2 - perto.largMesa, perto.chaoY);
     ctx.lineTo(_ppW / 2 + perto.largMesa, perto.chaoY);
     ctx.lineTo(_ppW / 2 + longe.largMesa, longe.chaoY);
     ctx.lineTo(_ppW / 2 - longe.largMesa, longe.chaoY);
     ctx.closePath();
-    ctx.fillStyle = 'rgba(45, 212, 150, 0.10)';
+    ctx.fillStyle = tampo;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(45, 212, 150, 0.45)';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
     ctx.stroke();
-    // Linha central (rede) — só decorativa, sem física de rede.
-    var meio = _ppProjetar(0, 0.5, 0);
-    var meioLarg = meio.largMesa;
+
+    var apronAltura = 15 * perto.escala;
     ctx.beginPath();
-    ctx.moveTo(_ppW / 2 - meioLarg, meio.chaoY);
-    ctx.lineTo(_ppW / 2 + meioLarg, meio.chaoY);
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    if (_ppEstado === 'jogando') {
-      // Sombra + bola
-      var renderDBola = _ppSouAnfitriao ? _ppBola.d : (1 - _ppBola.d);
-      var chaoBola = _ppProjetar(_ppBola.x, renderDBola, 0);
-      var arco = Math.sin(_ppClamp(_ppBola.d, 0, 1) * Math.PI) * PP_ARCO_ALTURA;
-      var bola = _ppProjetar(_ppBola.x, renderDBola, arco);
-
-      ctx.beginPath();
-      ctx.ellipse(chaoBola.x, chaoBola.chaoY, 7 * chaoBola.escala, 2.5 * chaoBola.escala, 0, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(bola.x, bola.y, Math.max(2, 6 * bola.escala), 0, Math.PI * 2);
-      ctx.fillStyle = '#fff';
-      ctx.shadowColor = 'rgba(255,255,255,0.6)';
-      ctx.shadowBlur = 8;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    }
-
-    // Raquete do adversário (longe, em cima)
-    _ppDesenharRaquete(_ppRaqueteAdversarioX, 1, '#ff6b81');
-    // Minha raquete (perto, embaixo)
-    _ppDesenharRaquete(_ppMinhaRaqueteX, 0, '#38bdf8');
+    ctx.moveTo(_ppW / 2 - perto.largMesa, perto.chaoY);
+    ctx.lineTo(_ppW / 2 + perto.largMesa, perto.chaoY);
+    ctx.lineTo(_ppW / 2 + perto.largMesa, perto.chaoY + apronAltura);
+    ctx.lineTo(_ppW / 2 - perto.largMesa, perto.chaoY + apronAltura);
+    ctx.closePath();
+    ctx.fillStyle = PP_APRON_COR;
+    ctx.fill();
   }
 
-  function _ppDesenharRaquete(x, renderD, cor) {
-    var p = _ppProjetar(x, renderD, 0);
-    var largura = 46 * p.escala, altura = 14 * p.escala;
+  // Rede decorativa em d=0.5 (mesmo ponto pros dois lados — 0.5 não
+  // muda ao inverter profundidade). Sem física própria: a bola passa
+  // por cima já que o arco dela é mais alto que a rede.
+  function _ppDesenharRede() {
     var ctx = _ppCtx;
-    ctx.save();
-    ctx.translate(p.x, p.chaoY);
+    var baseE = _ppProjetar(-1, 0.5, 0), baseD = _ppProjetar(1, 0.5, 0);
+    var topoE = _ppProjetar(-1, 0.5, PP_REDE_ALTURA), topoD = _ppProjetar(1, 0.5, PP_REDE_ALTURA);
+
     ctx.beginPath();
-    ctx.ellipse(0, 0, largura / 2, altura / 2, 0, 0, Math.PI * 2);
-    ctx.fillStyle = cor;
-    ctx.shadowColor = cor;
-    ctx.shadowBlur = 10 * p.escala;
+    ctx.moveTo(baseE.x, baseE.chaoY);
+    ctx.lineTo(baseD.x, baseD.chaoY);
+    ctx.lineTo(topoD.x, topoD.y);
+    ctx.lineTo(topoE.x, topoE.y);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(230,238,245,0.5)';
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    for (var i = 1; i <= 2; i++) {
+      var f = i / 3;
+      var e = _ppProjetar(-1, 0.5, PP_REDE_ALTURA * f);
+      var d = _ppProjetar(1, 0.5, PP_REDE_ALTURA * f);
+      ctx.beginPath();
+      ctx.moveTo(e.x, e.y);
+      ctx.lineTo(d.x, d.y);
+      ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(topoE.x, topoE.y);
+    ctx.lineTo(topoD.x, topoD.y);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = Math.max(1.5, 2.5 * baseE.escala);
+    ctx.stroke();
+
+    ctx.fillStyle = '#1c1c22';
+    ctx.fillRect(baseE.x - 1.5, topoE.y, 3, Math.max(0, baseE.chaoY - topoE.y));
+    ctx.fillRect(baseD.x - 1.5, topoD.y, 3, Math.max(0, baseD.chaoY - topoD.y));
+  }
+
+  function _ppDesenharBola(renderD) {
+    var ctx = _ppCtx;
+    var chaoBola = _ppProjetar(_ppBola.x, renderD, 0);
+    var arco = Math.sin(_ppClamp(_ppBola.d, 0, 1) * Math.PI) * PP_ARCO_ALTURA;
+    var bola = _ppProjetar(_ppBola.x, renderD, arco);
+
+    ctx.beginPath();
+    ctx.ellipse(chaoBola.x, chaoBola.chaoY, 7 * chaoBola.escala, 2.5 * chaoBola.escala, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(bola.x, bola.y, Math.max(2, 6 * bola.escala), 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.shadowColor = 'rgba(255,255,255,0.6)';
+    ctx.shadowBlur = 8;
     ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-    ctx.lineWidth = 1.5;
+  }
+
+  // Raquete estilizada (naipe + cabo), sem braço/boneco — só a peça.
+  // O cabo sempre aponta pra "fora da rede": pra baixo/perto na
+  // minha (renderD perto de 0), pra cima/longe na do adversário.
+  function _ppDesenharRaquete(x, renderD, cor) {
+    var p = _ppProjetar(x, renderD, 0);
+    var raio = 21 * p.escala;
+    var caboComp = 15 * p.escala, caboLarg = 8 * p.escala;
+    var paraFora = (renderD < 0.5) ? 1 : -1;
+    var caboY = paraFora > 0 ? raio * 0.55 : -(raio * 0.55 + caboComp);
+    var ctx = _ppCtx;
+
+    ctx.save();
+    ctx.translate(p.x, p.chaoY);
+
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(-caboLarg / 2, caboY, caboLarg, caboComp, caboLarg / 2);
+    else ctx.rect(-caboLarg / 2, caboY, caboLarg, caboComp);
+    ctx.fillStyle = '#3a2a1a';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.ellipse(0, 0, raio, raio * 0.82, 0, 0, Math.PI * 2);
+    ctx.fillStyle = cor;
+    ctx.shadowColor = cor;
+    ctx.shadowBlur = 12 * p.escala;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = Math.max(1, 2 * p.escala);
     ctx.stroke();
+
+    var brilho = ctx.createRadialGradient(-raio * 0.3, -raio * 0.3, 1, 0, 0, raio * 1.15);
+    brilho.addColorStop(0, 'rgba(255,255,255,0.35)');
+    brilho.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath();
+    ctx.ellipse(0, 0, raio, raio * 0.82, 0, 0, Math.PI * 2);
+    ctx.fillStyle = brilho;
+    ctx.fill();
+
     ctx.restore();
   }
 })();

@@ -660,18 +660,19 @@
       var bx = x + pad, by = y + pad, bw = cw - pad * 2, bh = lh - pad * 2;
 
       if (az.tocada) {
-        // Tocado: esverdeado, esmaecendo conforme desce.
+        // Tocado: esverdeado, esmaecendo conforme desce. Cor sólida
+        // (sem gradiente) — com ~8 azulejos visíveis, criar um
+        // CanvasGradient por azulejo A CADA FRAME (60x/s) gera muito
+        // lixo de memória e engasga o jogo periodicamente (GC) em
+        // Android mais fraco. Uma cor só, recalculada por número, é
+        // igual de viva no efeito de flash e não aloca nada extra.
         var f = az.flash;
-        var g = ctx.createLinearGradient(0, by, 0, by + bh);
-        g.addColorStop(0, 'rgba(45,212,150,' + (0.16 + f * 0.55) + ')');
-        g.addColorStop(1, 'rgba(20,120,95,' + (0.10 + f * 0.40) + ')');
-        ctx.fillStyle = g;
+        ctx.fillStyle = 'rgba(33,166,123,' + (0.13 + f * 0.475) + ')';
         _pnRoundRect(ctx, bx, by, bw, bh, raio); ctx.fill();
       } else {
-        var g2 = ctx.createLinearGradient(0, by, 0, by + bh);
-        g2.addColorStop(0, '#ff4d63');
-        g2.addColorStop(1, '#c81e3c');
-        ctx.fillStyle = g2;
+        // Idem: era gradiente #ff4d63→#c81e3c recriado por azulejo
+        // por frame; agora é o tom médio fixo, sem alocação.
+        ctx.fillStyle = '#e3354f';
         _pnRoundRect(ctx, bx, by, bw, bh, raio); ctx.fill();
         if (az === alvo) {
           ctx.strokeStyle = 'rgba(255,255,255,0.85)';

@@ -15250,9 +15250,53 @@ ${urlCard}`)}`;
       .catch(function () { return null; });
   }
 
+  /* ── Ranking GERAL (agregado dos 7 jogos) ────────────────────
+     Pontuação estilo F1: cada jogo dá pontos pela colocação da
+     pessoa no seu próprio Top 20 (1º = 25, 2º = 18 ... 10º = 1,
+     11º–20º = 1 de participação). Soma os pontos dos 7 jogos.
+     Só enxerga quem está no Top 20 de cada jogo — não faz leitura
+     extra por jogador (mantém o custo igual ao das abas de hoje).
+     Por isso só entra no geral quem aparece no Top 20 de pelo menos
+     RANK_GERAL_MIN_JOGOS jogos diferentes: sem esse piso, alguém
+     ótimo em 1 jogo só ficaria bem colocado no geral sem ter
+     variado de jogo.
+     Retorna Promise<array [{uid, nome, score, photoURL, jogos}]>,
+     já ordenada e limitada a `limite`. */
+  var RANK_GERAL_MIN_JOGOS = 3;
+  var RANK_GERAL_PONTOS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+  function _rankGeralPontos(pos) {
+    if (pos <= RANK_GERAL_PONTOS.length) return RANK_GERAL_PONTOS[pos - 1];
+    return (pos <= 20) ? 1 : 0;
+  }
+  function rankLerGeral(limite) {
+    var chaves = Object.keys(RANK_COLECOES);
+    return Promise.all(chaves.map(function (k) { return rankLerTop(k, 20); }))
+      .then(function (listas) {
+        var mapa = {};
+        listas.forEach(function (top) {
+          top.forEach(function (item, i) {
+            var acc = mapa[item.uid];
+            if (!acc) { acc = mapa[item.uid] = { uid: item.uid, nome: item.nome, photoURL: item.photoURL, score: 0, jogos: 0 }; }
+            acc.score += _rankGeralPontos(i + 1);
+            acc.jogos += 1;
+            acc.nome = item.nome; acc.photoURL = item.photoURL;
+          });
+        });
+        return Object.keys(mapa).map(function (uid) { return mapa[uid]; })
+          .filter(function (p) { return p.jogos >= RANK_GERAL_MIN_JOGOS; })
+          .sort(function (a, b) { return b.score - a.score || b.jogos - a.jogos; })
+          .slice(0, limite || 20);
+      })
+      .catch(function (err) {
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] erro ao calcular geral:', err && err.message);
+        return [];
+      });
+  }
+
   window.rankSubmeter       = rankSubmeter;
   window.rankLerTop         = rankLerTop;
   window.rankMinhaPontuacao = rankMinhaPontuacao;
+  window.rankLerGeral       = rankLerGeral;
 
   /* ══════════════════════════════════════════════════════════════
      UI DO RANKING (Camada 2.4)
@@ -15264,8 +15308,10 @@ ${urlCard}`)}`;
        camada 1).
   ══════════════════════════════════════════════════════════════ */
 
-  // Metadados dos 4 rankings (rótulo amigável + coleção).
+  // Metadados dos rankings (rótulo amigável + coleção). 'geral' não é uma
+  // coleção do Firestore — é o agregado calculado por rankLerGeral().
   var RANK_INFO = {
+    geral:           { label: 'Geral',          sub: '',             ico: '🏆' },
     pegacoruja:      { label: 'Pega a Coruja', sub: 'Clássico',      ico: '🦉' },
     pegacoruja_surv: { label: 'Pega a Coruja', sub: 'Sobrevivência', ico: '❤️' },
     relampago:       { label: 'Relâmpago',      sub: '',             ico: '⚡' },
@@ -15275,7 +15321,7 @@ ${urlCard}`)}`;
     piano:           { label: 'Piano da Coruja',   sub: '',          ico: '🎹' }
   };
 
-  var _rankAbaAtual = 'pegacoruja';
+  var _rankAbaAtual = 'geral';
 
   // Escapa texto do usuário para evitar HTML injection ao montar a lista.
   function _rankEsc(s) {
@@ -15315,7 +15361,7 @@ ${urlCard}`)}`;
     var hubEl = document.getElementById('games-hub');
     if (hubEl) hubEl.classList.add('jogo-ativo');
 
-    _rankAbaAtual = jogoKey || _rankAbaAtual || 'pegacoruja';
+    _rankAbaAtual = jogoKey || _rankAbaAtual || 'geral';
     rankRenderAbas();
     rankCarregarAba(_rankAbaAtual);
 
@@ -15412,7 +15458,9 @@ ${urlCard}`)}`;
     return html + '</div>';
   }
 
-  // Carrega e mostra um ranking específico.
+  // Carrega e mostra um ranking específico. jogoKey === 'geral' é o
+  // agregado dos 7 jogos (rankLerGeral) — mesma renderização de sempre,
+  // só troca a fonte dos dados e mostra "pts" em vez do score bruto.
   function rankCarregarAba(jogoKey) {
     _rankAbaAtual = jogoKey;
     rankRenderAbas();
@@ -15427,9 +15475,11 @@ ${urlCard}`)}`;
       return;
     }
 
+    var ehGeral = (jogoKey === 'geral');
     var meuUid = (typeof _cliUser !== 'undefined' && _cliUser) ? _cliUser.uid : null;
+    var leitura = ehGeral ? rankLerGeral(20) : rankLerTop(jogoKey, 20);
 
-    rankLerTop(jogoKey, 20).then(function (top) {
+    leitura.then(function (top) {
       if (!lista) return;
       // Trocou de aba enquanto carregava: descarta o resultado atrasado.
       if (jogoKey !== _rankAbaAtual) return;
@@ -15437,16 +15487,25 @@ ${urlCard}`)}`;
         lista.innerHTML = '<div class="rank-vazio">' +
             '<img src="/webp/owl-trophy.webp" alt="" class="rank-vazio-owl" onerror="this.style.display=\'none\'">' +
             '<div class="rank-vazio-tit">Ninguém pontuou ainda</div>' +
-            '<div class="rank-vazio-sub">Jogue agora e seja o primeiro do ranking! 🦉</div>' +
+            '<div class="rank-vazio-sub">' + (ehGeral
+              ? 'Jogue pelo menos ' + RANK_GERAL_MIN_JOGOS + ' jogos diferentes pra entrar no geral! 🦉'
+              : 'Jogue agora e seja o primeiro do ranking! 🦉') + '</div>' +
           '</div>';
         return;
       }
 
-      var html = _rankPodio(top, meuUid);
-      if (top.length > 3) {
+      // No geral o número é pontos (soma da colocação em cada jogo), não
+      // uma pontuação bruta — mostramos com sufixo pra não confundir com
+      // metros/notas/etc. dos rankings por jogo.
+      var exibir = ehGeral ? top.map(function (t) {
+        return { uid: t.uid, nome: t.nome, photoURL: t.photoURL, score: t.score + ' pts' };
+      }) : top;
+
+      var html = _rankPodio(exibir, meuUid);
+      if (exibir.length > 3) {
         html += '<div class="rank-lista-resto">';
-        for (var i = 3; i < top.length; i++) {
-          var it = top[i], pos = i + 1;
+        for (var i = 3; i < exibir.length; i++) {
+          var it = exibir[i], pos = i + 1;
           var eu = (meuUid && it.uid === meuUid) ? ' rank-linha-eu' : '';
           html += '<div class="rank-linha' + eu + '">' +
                     '<div class="rank-pos-num">' + pos + '</div>' +
@@ -15462,7 +15521,10 @@ ${urlCard}`)}`;
 
       // Logado e fora do top 20: a própria posição vira uma barra
       // grudada no rodapé, sempre visível enquanto rola a lista.
-      if (meuUid) {
+      // No geral não lemos as coleções inteiras (só o Top 20 de cada
+      // jogo), então não dá pra achar com precisão quem ficou fora do
+      // Top 20 do agregado — a barra fica só pras abas por jogo.
+      if (meuUid && !ehGeral) {
         var estaNoTop = top.some(function (t) { return t.uid === meuUid; });
         if (!estaNoTop && typeof rankMinhaPontuacao === 'function') {
           rankMinhaPontuacao(jogoKey).then(function (minha) {

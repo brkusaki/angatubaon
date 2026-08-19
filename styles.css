@@ -5734,6 +5734,117 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-corrida .cor-hud-valor {
   font-size: 17px;
 }
 
+/* ── PIANO: arena ocupando a TELA INTEIRA ────────────────────────
+   Mesma filosofia do Voo: a arena preenche 100% da tela, HUD e botão
+   Voltar viram overlays flutuantes. Diferença: o Piano tem uma faixa
+   extra entre o HUD e a arena (nome da música + toggle de batida) —
+   ela também flutua, logo abaixo do HUD. Sem isto, o .pn-card ficava
+   com a altura do conteúdo (regra normal, não-imersiva) e sobrava um
+   pedaço preto sem jogo no fim da tela. */
+body.games-fs-open #games-hub.jogo-ativo #jogo-piano {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+}
+/* Card do Piano vira contêiner sem moldura, preenchendo tudo */
+body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-card {
+  flex: 1 1 auto;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+/* Arena colada nas quatro bordas: SEM aspect-ratio, SEM max-height */
+body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-arena {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  min-height: 0;
+  aspect-ratio: auto;
+  margin: 0;
+  border-radius: 0;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-arena #pn-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* Botão Voltar flutua no canto superior esquerdo */
+body.games-fs-open #games-hub.jogo-ativo #jogo-piano .jogo-voltar {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 8px;
+  z-index: 6;
+  margin: 0;
+  padding: 8px 12px;
+  background: rgba(9, 14, 22, 0.55);
+  border-radius: 999px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 13px;
+}
+/* HUD (Notas/Recorde) flutua no topo à direita, compacto e translúcido */
+body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-hud {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  right: 10px;
+  left: auto;
+  z-index: 6;
+  margin: 0;
+  padding: 0;
+  gap: 6px;
+  background: transparent;
+  justify-content: flex-end;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-hud-item {
+  background: rgba(9, 14, 22, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 5px 12px;
+  min-width: 0;
+  border-radius: 12px;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-hud-label {
+  font-size: 9px;
+  opacity: 0.85;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-hud-valor {
+  font-size: 17px;
+}
+/* Faixa da música (nome + toggle de batida): flutua logo abaixo do
+   HUD, mesmo tratamento translúcido — largura limitada pra não
+   invadir a arena quando o nome da música é longo. */
+body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-musica {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 48px);
+  right: 10px;
+  left: auto;
+  z-index: 6;
+  margin: 0;
+  max-width: 62vw;
+  padding: 5px 10px;
+  background: rgba(9, 14, 22, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 999px;
+  font-size: 11px;
+}
+body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-musica-nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 34vw;
+  display: inline-block;
+  vertical-align: middle;
+}
+
 /* Elemento em tela cheia NATIVA (Fullscreen API): o navegador dá 100%
    da tela ao #games-hub. Garantimos preenchimento total e fundo opaco,
    independente do fallback games-fs-open. */

@@ -875,9 +875,6 @@
     _carregarAssetsJogos();  // som + efeitos (uma vez, sob demanda)
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0,0); }
   }
-  // Exposto pro badge da coruja no header (index.html), que abre o hub
-  // direto no clique/toque, sem depender da pill de filtros.
-  window._abrirGamesHub = _abrirGamesHub;
 
   /* ── Assets compartilhados dos jogos (som + efeitos visuais) ──
      Carregados uma única vez quando o hub abre. São leves e
@@ -15271,29 +15268,53 @@ ${urlCard}`)}`;
     if (pos <= RANK_GERAL_PONTOS.length) return RANK_GERAL_PONTOS[pos - 1];
     return (pos <= 20) ? 1 : 0;
   }
+
+  // Lê o Top 20 dos 7 jogos de uma vez (pra montar o geral e, pra quem
+  // abriu o painel, pra ordenar as abas por popularidade — ver
+  // rankRenderAbas). Cache curto: se as duas coisas pedem quase juntas
+  // (abrir o painel dispara ambas), a segunda reaproveita a mesma leitura
+  // em vez de duplicar 7 requisições ao Firestore.
+  var _rankTopsCache = null, _rankTopsCacheEm = 0;
+  function _rankTopsTodosJogos() {
+    var agora = Date.now();
+    if (_rankTopsCache && (agora - _rankTopsCacheEm) < 4000) return _rankTopsCache;
+    _rankTopsCacheEm = agora;
+    _rankTopsCache = Promise.all(Object.keys(RANK_COLECOES).map(function (k) {
+      return rankLerTop(k, 20).then(function (top) { return { jogo: k, top: top }; });
+    }));
+    return _rankTopsCache;
+  }
+
   function rankLerGeral(limite) {
-    var chaves = Object.keys(RANK_COLECOES);
-    return Promise.all(chaves.map(function (k) { return rankLerTop(k, 20); }))
-      .then(function (listas) {
-        var mapa = {};
-        listas.forEach(function (top) {
-          top.forEach(function (item, i) {
-            var acc = mapa[item.uid];
-            if (!acc) { acc = mapa[item.uid] = { uid: item.uid, nome: item.nome, photoURL: item.photoURL, score: 0, jogos: 0 }; }
-            acc.score += _rankGeralPontos(i + 1);
-            acc.jogos += 1;
-            acc.nome = item.nome; acc.photoURL = item.photoURL;
-          });
+    return _rankTopsTodosJogos().then(function (listas) {
+      var mapa = {};
+      listas.forEach(function (entry) {
+        entry.top.forEach(function (item, i) {
+          var acc = mapa[item.uid];
+          if (!acc) { acc = mapa[item.uid] = { uid: item.uid, nome: item.nome, photoURL: item.photoURL, score: 0, jogos: 0 }; }
+          acc.score += _rankGeralPontos(i + 1);
+          acc.jogos += 1;
+          acc.nome = item.nome; acc.photoURL = item.photoURL;
         });
-        return Object.keys(mapa).map(function (uid) { return mapa[uid]; })
-          .filter(function (p) { return p.jogos >= RANK_GERAL_MIN_JOGOS; })
-          .sort(function (a, b) { return b.score - a.score || b.jogos - a.jogos; })
-          .slice(0, limite || 20);
-      })
-      .catch(function (err) {
-        if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] erro ao calcular geral:', err && err.message);
-        return [];
       });
+      return Object.keys(mapa).map(function (uid) { return mapa[uid]; })
+        .filter(function (p) { return p.jogos >= RANK_GERAL_MIN_JOGOS; })
+        .sort(function (a, b) { return b.score - a.score || b.jogos - a.jogos; })
+        .slice(0, limite || 20);
+    }).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] erro ao calcular geral:', err && err.message);
+      return [];
+    });
+  }
+
+  // Ordem das abas por popularidade: quantas pessoas aparecem no Top 20
+  // de cada jogo (proxy de "quem mais joga" sem precisar contar partidas,
+  // que o app não guarda). 'geral' fica sempre primeiro, fixo.
+  function _rankOrdemPorPopularidade() {
+    return _rankTopsTodosJogos().then(function (listas) {
+      var ordenado = listas.slice().sort(function (a, b) { return b.top.length - a.top.length; });
+      return ['geral'].concat(ordenado.map(function (e) { return e.jogo; }));
+    }).catch(function () { return null; });
   }
 
   window.rankSubmeter       = rankSubmeter;
@@ -15325,6 +15346,11 @@ ${urlCard}`)}`;
   };
 
   var _rankAbaAtual = 'geral';
+  // Ordem de exibição das abas: 'geral' sempre primeiro, o resto por
+  // popularidade (calculado em _rankOrdemPorPopularidade). Começa null
+  // e usa a ordem de RANK_INFO como fallback até a primeira leitura
+  // responder — rankAbrirPainel atualiza e re-renderiza em seguida.
+  var _rankOrdemAbas = null;
 
   // Escapa texto do usuário para evitar HTML injection ao montar a lista.
   function _rankEsc(s) {
@@ -15368,6 +15394,17 @@ ${urlCard}`)}`;
     rankRenderAbas();
     rankCarregarAba(_rankAbaAtual);
 
+    // Reordena as abas por popularidade assim que os totais chegarem
+    // (a primeira exibição acima já sai instantânea, com a ordem
+    // anterior ou a de RANK_INFO — sem esperar rede pra abrir a tela).
+    if (typeof _rankOrdemPorPopularidade === 'function') {
+      _rankOrdemPorPopularidade().then(function (ordem) {
+        if (!ordem) return;
+        _rankOrdemAbas = ordem;
+        rankRenderAbas();
+      });
+    }
+
     if (history.state && history.state.modal !== 'rank') history.pushState({ modal: 'rank' }, '');
     else if (!history.state) history.pushState({ modal: 'rank' }, '');
   }
@@ -15380,13 +15417,18 @@ ${urlCard}`)}`;
     if (!viaPopstate && history.state?.modal === 'rank') history.back();
   }
 
-  // Monta as abas (uma por ranking), com ícone do jogo.
+  // Monta as abas (uma por ranking), com ícone do jogo. Ordem: 'geral'
+  // primeiro, depois os jogos do mais pro menos jogado (_rankOrdemAbas,
+  // calculada em rankAbrirPainel); antes da primeira leitura responder,
+  // usa a ordem declarada em RANK_INFO como fallback.
   function rankRenderAbas() {
     var wrap = document.getElementById('rank-abas');
     if (!wrap) return;
     var html = '';
-    Object.keys(RANK_INFO).forEach(function (k) {
+    var chaves = _rankOrdemAbas || Object.keys(RANK_INFO);
+    chaves.forEach(function (k) {
       var info = RANK_INFO[k];
+      if (!info) return;
       var ativa = (k === _rankAbaAtual) ? ' rank-aba-ativa' : '';
       html += '<button class="rank-aba' + ativa + '" onclick="rankCarregarAba(\'' + k + '\')">' +
                 '<span class="rank-aba-ico" aria-hidden="true">' + info.ico + '</span>' +

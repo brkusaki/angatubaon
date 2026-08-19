@@ -14847,50 +14847,103 @@ ${urlCard}`)}`;
   }
 
   /* ── Recordes dos jogos ─────────────────────
-     Mostra a melhor pontuação de cada jogo. Preferimos o recorde do
-     Firestore (rankMinhaPontuacao) quando logado; se vier vazio, caímos
-     no recorde local (localStorage). Cada jogo tem sua chave local. */
-  function _cliRecordeLocal(jogoKey) {
-    var mapa = {
-      pegacoruja:      'angatuba_speedtap_rec',
-      pegacoruja_surv: 'angatuba_speedtap_surv_rec',
-      relampago:       'angatuba_relampago_rec',
-      sequencia:       'angatuba_seq_rec'
-    };
-    try { return Number(localStorage.getItem(mapa[jogoKey])) || 0; } catch (e) { return 0; }
-  }
+     Mostra a melhor pontuação de cada jogo, mas só os que a pessoa já
+     jogou (recorde > 0) — senão a lista fica cheia de zeros à toa.
+     Nomes/ícones vêm de RANK_INFO e a chave local de RANK_REC_LOCAL
+     (ambos já existem no módulo de ranking, Camada 2.4 — aqui só
+     reaproveitamos, sem duplicar a lista de jogos por dois lugares).
+     Acima de CLI_REC_LIMITE itens, o resto fica atrás de "ver mais".
+     Preferimos o recorde do Firestore (rankMinhaPontuacao) quando
+     logado; se vier vazio, caímos no recorde local (localStorage). */
+  var CLI_REC_LIMITE = 4; // itens visíveis antes do "ver mais"
+  var CLI_REC_COR = {
+    pegacoruja:      '#fbbf24',
+    pegacoruja_surv: '#ef4444',
+    relampago:       '#c084fc',
+    sequencia:       '#34d399',
+    voo:             '#38bdf8',
+    corrida:         '#a3e635',
+    piano:           '#f472b6'
+  };
 
   function cliRenderRecordes() {
     var wrap = document.getElementById('cli-conta-recordes');
+    var maisBtn = document.getElementById('cli-conta-recordes-mais');
+    var vazio = document.getElementById('cli-conta-recordes-vazio');
     if (!wrap) return;
-    var jogos = [
-      { key: 'pegacoruja',      nome: 'Pega a Coruja',   sub: 'Clássico' },
-      { key: 'pegacoruja_surv', nome: 'Pega a Coruja',   sub: 'Sobrevivência' },
-      { key: 'relampago',       nome: 'Modo Relâmpago', sub: '' },
-      { key: 'sequencia',       nome: 'Sequência',      sub: '' }
-    ];
+    var RANK = (typeof RANK_INFO !== 'undefined') ? RANK_INFO : {};
+    var ordem = Object.keys(RANK);
+
+    function montar(dados) {
+      var jogados = dados.filter(function (d) { return d.valor > 0; });
+      if (!jogados.length) {
+        wrap.innerHTML = '';
+        wrap.style.display = 'none';
+        if (maisBtn) maisBtn.style.display = 'none';
+        if (vazio) vazio.style.display = 'block';
+        return;
+      }
+      wrap.style.display = '';
+      if (vazio) vazio.style.display = 'none';
+      wrap.innerHTML = jogados.map(function (d, i) {
+        var info = RANK[d.key] || {};
+        var sub = info.sub ? '<span class="cli-rec-sub">' + info.sub + '</span>' : '';
+        var extra = (i >= CLI_REC_LIMITE) ? ' cli-rec-extra' : '';
+        var cor = CLI_REC_COR[d.key] || '';
+        var estilo = cor ? ' style="--rc:' + cor + '"' : '';
+        return '<div class="cli-rec-item' + extra + '"' + estilo + '>' +
+          '<div class="cli-rec-top"><span class="cli-rec-ico">' + (info.ico || '🏆') + '</span>' +
+          '<span class="cli-rec-val">' + d.valor + '</span></div>' +
+          '<span class="cli-rec-nome">' + (info.label || d.key) + sub + '</span></div>';
+      }).join('');
+      if (maisBtn) {
+        var extraQtd = jogados.length - CLI_REC_LIMITE;
+        if (extraQtd > 0) {
+          maisBtn.style.display = 'flex';
+          maisBtn.dataset.extra = extraQtd;
+          var aberto = wrap.classList.contains('aberto');
+          var txt = maisBtn.querySelector('.txt');
+          if (txt) txt.textContent = aberto ? 'Ver menos' : ('Ver mais ' + extraQtd);
+          maisBtn.classList.toggle('aberto', aberto);
+        } else {
+          maisBtn.style.display = 'none';
+          wrap.classList.remove('aberto');
+        }
+      }
+    }
+
     // Render inicial com o recorde local (instantâneo, sem esperar rede).
-    wrap.innerHTML = jogos.map(function (j) {
-      var v = _cliRecordeLocal(j.key);
-      var sub = j.sub ? ' <span class="cli-rec-sub">' + j.sub + '</span>' : '';
-      return '<div class="cli-rec-item" data-jogo="' + j.key + '">' +
-        '<span class="cli-rec-nome">' + j.nome + sub + '</span>' +
-        '<span class="cli-rec-val">' + v + '</span></div>';
-    }).join('');
+    var dados = ordem.map(function (k) { return { key: k, valor: _rankRecordeLocal(k) }; });
+    montar(dados);
     // Se logado e o Firestore responde, prevalece o recorde do servidor
-    // (fonte da verdade do ranking) quando for maior.
+    // (fonte da verdade do ranking) quando for maior. Espera todas as
+    // consultas responderem pra re-renderizar uma vez só (sem "piscar").
     if (_cliUser && typeof rankMinhaPontuacao === 'function') {
-      jogos.forEach(function (j) {
-        rankMinhaPontuacao(j.key).then(function (s) {
-          if (s == null) return;
-          var item = wrap.querySelector('.cli-rec-item[data-jogo="' + j.key + '"] .cli-rec-val');
-          if (!item) return;
-          var atual = Number(item.textContent) || 0;
-          if (s > atual) item.textContent = s;
-        }).catch(function () {});
+      var pendentes = ordem.length;
+      ordem.forEach(function (k, idx) {
+        rankMinhaPontuacao(k).then(function (s) {
+          if (s != null && s > dados[idx].valor) dados[idx].valor = s;
+        }).catch(function () {}).finally(function () {
+          if (--pendentes === 0) montar(dados);
+        });
       });
     }
   }
+
+  /* ── Expandir/recolher a lista de recordes ──────────────
+     Botão "ver mais" só aparece quando há mais jogos jogados do que
+     CLI_REC_LIMITE (ver cliRenderRecordes). */
+  function cliToggleRecordesMais() {
+    var wrap = document.getElementById('cli-conta-recordes');
+    var btn = document.getElementById('cli-conta-recordes-mais');
+    if (!wrap || !btn) return;
+    var aberto = wrap.classList.toggle('aberto');
+    btn.classList.toggle('aberto', aberto);
+    var extra = Number(btn.dataset.extra) || 0;
+    var txt = btn.querySelector('.txt');
+    if (txt) txt.textContent = aberto ? 'Ver menos' : ('Ver mais ' + extra);
+  }
+
 
   /* ── Lojas favoritas ───────────────────────
      Lista as lojas favoritadas (localStorage). Casa cada id favorito com
@@ -15009,6 +15062,7 @@ ${urlCard}`)}`;
   window.cliSalvarApelido     = cliSalvarApelido;
   window.cliEscolherFoto      = cliEscolherFoto;
   window.cliAbrirLojaFav      = cliAbrirLojaFav;
+  window.cliToggleRecordesMais = cliToggleRecordesMais;
 
   /* ══════════════════════════════════════════════════════════════
      RANKING DOS JOGOS (Cloud Firestore)

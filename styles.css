@@ -5093,23 +5093,45 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     .cli-conta-secao-tit i { color: var(--red); font-size: 13px; }
     .cli-conta-divisor { height: 4px; }
 
-    /* ── Recordes ── */
-    .cli-conta-recordes { display: flex; flex-direction: column; gap: 6px; }
+    /* ── Recordes: grade 2 colunas, com "ver mais" pra não virar lista gigante ── */
+    .cli-conta-recordes {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
     .cli-rec-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 12px; border-radius: 10px;
-      background: var(--bg); border: 1px solid var(--border);
+      --rc: var(--red);
+      position: relative; padding: 10px 12px 9px 14px; border-radius: 12px;
+      background: var(--bg); border: 1px solid var(--border); overflow: hidden;
     }
-    .cli-rec-nome { font-size: 14px; color: var(--text); font-weight: 600; }
-    .cli-rec-sub {
-      font-size: 11px; color: var(--muted); font-weight: 500;
-      margin-left: 6px; padding: 1px 7px; border-radius: 999px;
-      background: rgba(255,255,255,0.06);
+    .cli-rec-item::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      background: var(--rc);
     }
+    .cli-rec-item.cli-rec-extra { display: none; }
+    .cli-conta-recordes.aberto .cli-rec-item.cli-rec-extra { display: block; }
+    .cli-rec-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .cli-rec-ico { font-size: 17px; line-height: 1; flex-shrink: 0; }
     .cli-rec-val {
-      font-family: var(--font-h); font-weight: 800; font-size: 16px;
-      color: var(--red); flex-shrink: 0; margin-left: 12px;
+      font-family: var(--font-h); font-weight: 800; font-size: 17px;
+      color: var(--rc); flex-shrink: 0;
     }
+    .cli-rec-nome {
+      display: block; margin-top: 5px; font-size: 12.5px; color: var(--text);
+      font-weight: 600; line-height: 1.3;
+    }
+    .cli-rec-sub {
+      display: block; font-size: 10.5px; color: var(--muted); font-weight: 500;
+      margin-top: 1px;
+    }
+    .cli-conta-recordes-mais {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; margin-top: 8px; padding: 9px; border-radius: 10px;
+      border: 1px dashed var(--border); background: none; color: var(--muted);
+      font-family: var(--font-b); font-size: 12.5px; font-weight: 700; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-conta-recordes-mais:active { opacity: 0.6; }
+    .cli-conta-recordes-mais i { font-size: 10px; transition: transform 0.2s ease; }
+    .cli-conta-recordes-mais.aberto i { transform: rotate(180deg); }
 
     /* ── Favoritas ── */
     .cli-conta-favoritos { display: flex; flex-direction: column; gap: 6px; }
@@ -5136,7 +5158,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .cli-fav-seta { color: var(--muted); font-size: 12px; flex-shrink: 0; }
-    .cli-conta-fav-vazio {
+    .cli-conta-fav-vazio, .cli-conta-recordes-vazio {
       font-size: 13px; color: var(--muted); line-height: 1.5;
       padding: 8px 2px;
     }

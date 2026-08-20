@@ -122,6 +122,30 @@
   var _ppApelidoAdversario = '';
   var _ppSaindoVoluntariamente = false; // true durante um sair() pedido pelo próprio jogador
 
+  /* ── Cenário (fundo): arena de ping pong gerada por IA (arquibancada,
+     holofotes, piso de madeira), desenhada em "cover fit" atrás da mesa —
+     mesmo padrão do cenario-floresta.webp da Corrida (ver corrida.js).
+     Se faltar/falhar, cai no gradiente radial escuro de sempre (nunca
+     fica sem fundo). Base: /Jogos/assets/pingpong/ (P maiúsculo; GitHub
+     Pages é case-sensitive). */
+  var _PP_ASSET_BASE = '/Jogos/assets/pingpong/';
+  var _ppAssets = {};
+  function _ppAsset(nome) {
+    if (_ppAssets[nome]) return _ppAssets[nome];
+    var reg = { img: null, ok: false, w: 0, h: 0 };
+    _ppAssets[nome] = reg;
+    try {
+      var im = new Image();
+      im.onload = function () {
+        reg.ok = true; reg.img = im;
+        reg.w = im.naturalWidth || 0; reg.h = im.naturalHeight || 0;
+      };
+      im.src = _PP_ASSET_BASE + nome;
+      reg.img = im;   // provisório até carregar
+    } catch (e) {}
+    return reg;
+  }
+
   /* ── Ponte com o app (fachada segura — no-op se não existir) ──── */
   function _ppBridge() { return window.AngatubaGames || null; }
 
@@ -144,6 +168,7 @@
       _ppResizeOn = true;
     }
     _ppDimensionar();
+    _ppAsset('cenario-arena.webp');   // dispara o carregamento do fundo cedo
     _ppMostrarTela('inicio');
     _ppLimparErroMenu();
     _ppDesenhar();
@@ -751,13 +776,7 @@
     var ctx = _ppCtx;
     ctx.clearRect(0, 0, _ppW, _ppH);
 
-    // Fundo: arena escura com um brilho suave atrás da mesa.
-    var fundo = ctx.createRadialGradient(_ppW / 2, _ppH * 0.28, _ppH * 0.06, _ppW / 2, _ppH * 0.28, _ppH * 0.85);
-    fundo.addColorStop(0, '#182a44');
-    fundo.addColorStop(1, '#05070c');
-    ctx.fillStyle = fundo;
-    ctx.fillRect(0, 0, _ppW, _ppH);
-
+    _ppDesenharFundo();
     _ppDesenharMesa();
 
     var jogando = (_ppEstado === 'jogando');
@@ -775,18 +794,37 @@
     if (jogando && _ppAguardandoSaque) _ppDesenharPromptSaque();
   }
 
-  // Tampo + friso branco + linha central (padrão de mesa oficial) +
-  // aba lateral (dá espessura) + piso embaixo, pra mesa não parecer
-  // um adesivo flutuando no vazio nem uma pista esticada.
+  // Fundo: imagem da arena (arquibancada, holofotes, piso de madeira) em
+  // "cover fit" cobrindo o canvas inteiro, ancorada na base — mesmo
+  // tratamento do cenario-floresta.webp na Corrida (ver _corDrawCeuFundo
+  // em corrida.js). Sem parallax aqui: a câmera do Ping Pong não se move.
+  // Enquanto a imagem não carrega (ou falha), cai no gradiente radial
+  // escuro de sempre, então o jogo nunca fica sem fundo.
+  function _ppDesenharFundo() {
+    var ctx = _ppCtx;
+    var reg = _ppAsset('cenario-arena.webp');
+    if (reg && reg.ok && reg.img && reg.w && reg.h) {
+      var escala = Math.max(_ppW / reg.w, _ppH / reg.h);
+      var dw = reg.w * escala, dh = reg.h * escala;
+      var dx = (_ppW - dw) / 2;
+      var dy = _ppH - dh;   // ancora a base da imagem no fundo do canvas
+      ctx.drawImage(reg.img, dx, dy, dw, dh);
+      return;
+    }
+    var fundo = ctx.createRadialGradient(_ppW / 2, _ppH * 0.28, _ppH * 0.06, _ppW / 2, _ppH * 0.28, _ppH * 0.85);
+    fundo.addColorStop(0, '#182a44');
+    fundo.addColorStop(1, '#05070c');
+    ctx.fillStyle = fundo;
+    ctx.fillRect(0, 0, _ppW, _ppH);
+  }
+
+  // Tampo + friso branco + linha central (padrão de mesa oficial) + aba
+  // lateral (dá espessura), pra mesa não parecer um adesivo flutuando no
+  // vazio. O piso embaixo agora é o da imagem de fundo (_ppDesenharFundo),
+  // não mais um retângulo escuro por código.
   function _ppDesenharMesa() {
     var ctx = _ppCtx;
     var perto = _ppProjetar(0, 0, 0), longe = _ppProjetar(0, 1, 0);
-
-    var piso = ctx.createLinearGradient(0, perto.chaoY, 0, _ppH);
-    piso.addColorStop(0, '#0a1120');
-    piso.addColorStop(1, '#04060a');
-    ctx.fillStyle = piso;
-    ctx.fillRect(0, perto.chaoY, _ppW, Math.max(0, _ppH - perto.chaoY));
 
     var tampo = ctx.createLinearGradient(0, longe.chaoY, 0, perto.chaoY);
     tampo.addColorStop(0, PP_MESA_COR_LONGE);

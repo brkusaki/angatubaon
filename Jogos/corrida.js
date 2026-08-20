@@ -71,8 +71,11 @@
      ASSETS opcionais (o jogo funciona 100% em vetor). Base:
      /Jogos/assets/corrida/ (J maiúsculo; GitHub Pages é case-sensitive).
        zumbi-normal-sheet.webp | zumbi-rapido-sheet.webp | zumbi-forte-sheet.webp
-       municao.webp   → caixa de recarga no chão
-       arma.webp      → sprite da arma em 1a pessoa (base da tela)
+       municao.webp        → caixa de recarga no chão
+       arma.webp           → sprite da arma em 1a pessoa (base da tela)
+       cenario-floresta.webp → céu/lua/árvores mortas do horizonte (fundo
+                             estático, "cover fit"; SEM remoção de fundo —
+                             é imagem opaca, não sprite recortado)
      Se faltar/falhar, usa fallback vetorial.
   ══════════════════════════════════════════════════════════════ */
   var _COR_ASSET_BASE = '/Jogos/assets/corrida/';
@@ -786,20 +789,9 @@
     if (!_corCtx) return;
     var ctx = _corCtx, W = _corW, H = _corH, horizonY = H * _COR_HORIZ + _corBobY * H;
 
-    // ── Céu sombrio (cinza-esverdeado apocalíptico) ──
-    var gCeu = ctx.createLinearGradient(0, 0, 0, horizonY);
-    gCeu.addColorStop(0, '#3a4048'); gCeu.addColorStop(0.55, '#4c5259'); gCeu.addColorStop(1, '#5f6560');
-    ctx.fillStyle = gCeu; ctx.fillRect(0, 0, W, horizonY);
-
-    // Lua/sol pálido velado, alto no céu.
-    var lx = W * 0.74, ly = horizonY * 0.36, lr = H * 0.14;
-    var gL = ctx.createRadialGradient(lx, ly, lr * 0.2, lx, ly, lr * 2.4);
-    gL.addColorStop(0, 'rgba(210,205,195,0.45)'); gL.addColorStop(0.5, 'rgba(180,175,165,0.14)'); gL.addColorStop(1, 'rgba(180,175,165,0)');
-    ctx.fillStyle = gL; ctx.beginPath(); ctx.arc(lx, ly, lr * 2.4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(205,200,188,0.5)'; ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.fill();
-
-    // ── Floresta de silhuetas no horizonte (parallax pelo strafe) ──
-    _corDrawFloresta(ctx, W, horizonY);
+    // ── Céu/horizonte: imagem do cenário (lua + árvores mortas + névoa),
+    // com fallback vetorial embutido enquanto ela carrega. ──
+    _corDrawCeuFundo(ctx, W, H, horizonY);
 
     // ── Chão (campo) — do horizonte pra baixo, tom escuro esverdeado ──
     var gCh = ctx.createLinearGradient(0, horizonY, 0, H);
@@ -893,6 +885,39 @@
     }
     ctx.lineTo(W + 40, base - horizonY * 0.02); ctx.closePath(); ctx.fill();
     ctx.restore();
+  }
+
+  /* Céu/horizonte: imagem estática (lua + árvores mortas + névoa, gerada
+     uma vez fora do jogo) desenhada em "cover fit" — preenche toda a faixa
+     0..horizonY sem distorcer, cortando sobra por CIMA (a base da imagem
+     fica ancorada na linha do horizonte, que é a parte que mais importa).
+     Leve parallax pelo strafe, na mesma escala usada pela floresta vetorial.
+     SEM _corFonte()/flood-fill aqui: é uma imagem opaca (não sprite recortado)
+     — rodar a remoção de fundo nela trataria o céu como "fundo chapado" e
+     comeria a imagem inteira. Sem a imagem (ainda carregando ou 404), cai no
+     desenho vetorial de sempre (céu gradiente + lua + floresta de silhuetas).
+  ─────────────────────────────────────────────────────────────── */
+  function _corDrawCeuFundo(ctx, W, H, horizonY) {
+    var reg = _corAsset('cenario-floresta.webp');
+    if (reg && reg.ok && reg.img && reg.w && reg.h) {
+      var escala = Math.max(W / reg.w, horizonY / reg.h);
+      var dw = reg.w * escala, dh = reg.h * escala;
+      var parX = -_corCamX * (W * 0.05);
+      var dx = (W - dw) / 2 + parX;
+      var dy = horizonY - dh;   // ancora a base da imagem no horizonte
+      ctx.drawImage(reg.img, dx, dy, dw, dh);
+      return;
+    }
+    // Fallback vetorial (imagem ainda não chegou ou falhou).
+    var gCeu = ctx.createLinearGradient(0, 0, 0, horizonY);
+    gCeu.addColorStop(0, '#3a4048'); gCeu.addColorStop(0.55, '#4c5259'); gCeu.addColorStop(1, '#5f6560');
+    ctx.fillStyle = gCeu; ctx.fillRect(0, 0, W, horizonY);
+    var lx = W * 0.74, ly = horizonY * 0.36, lr = H * 0.14;
+    var gL = ctx.createRadialGradient(lx, ly, lr * 0.2, lx, ly, lr * 2.4);
+    gL.addColorStop(0, 'rgba(210,205,195,0.45)'); gL.addColorStop(0.5, 'rgba(180,175,165,0.14)'); gL.addColorStop(1, 'rgba(180,175,165,0)');
+    ctx.fillStyle = gL; ctx.beginPath(); ctx.arc(lx, ly, lr * 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(205,200,188,0.5)'; ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.fill();
+    _corDrawFloresta(ctx, W, horizonY);
   }
 
   // Campo aberto: linhas de perspectiva MUITO suaves convergindo pro fuga,
@@ -1393,6 +1418,7 @@
     _corSheet('normal');
     _corSheet('rapido');
     _corSheet('forte');
+    _corAsset('cenario-floresta.webp');   // dispara o carregamento do fundo cedo
     _corPrepararFontes();
     // Pede ao sistema pra girar pra landscape (APK/instalado com manifest
     // "any"). No navegador comum é recusado e caímos na rotação CSS.
@@ -1448,16 +1474,7 @@
     if (!_corCtx) return;
     _corDimensionar();
     var ctx = _corCtx, W = _corW, H = _corH, horizonY = H * _COR_HORIZ;
-    var gCeu = ctx.createLinearGradient(0, 0, 0, horizonY);
-    gCeu.addColorStop(0, '#3a4048'); gCeu.addColorStop(0.55, '#4c5259'); gCeu.addColorStop(1, '#5f6560');
-    ctx.fillStyle = gCeu; ctx.fillRect(0, 0, W, horizonY);
-    // lua
-    var lx = W * 0.74, ly = horizonY * 0.36, lr = H * 0.14;
-    var gL = ctx.createRadialGradient(lx, ly, lr * 0.2, lx, ly, lr * 2.4);
-    gL.addColorStop(0, 'rgba(210,205,195,0.45)'); gL.addColorStop(1, 'rgba(180,175,165,0)');
-    ctx.fillStyle = gL; ctx.beginPath(); ctx.arc(lx, ly, lr * 2.4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(205,200,188,0.5)'; ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.fill();
-    _corDrawFloresta(ctx, W, horizonY);
+    _corDrawCeuFundo(ctx, W, H, horizonY);
     var gCh = ctx.createLinearGradient(0, horizonY, 0, H);
     gCh.addColorStop(0, '#2f3830'); gCh.addColorStop(0.5, '#232a24'); gCh.addColorStop(1, '#141813');
     ctx.fillStyle = gCh; ctx.fillRect(0, horizonY, W, H - horizonY);
@@ -1541,6 +1558,12 @@
     }
     out.arma = estat('arma.webp');
     out.municao = estat('municao.webp');
+    // cenario-floresta.webp é imagem opaca (não sprite) — sem _corFonte()
+    // aqui, senão o diag dispararia o flood-fill de remoção de fundo nela.
+    (function () {
+      var a = _corAsset('cenario-floresta.webp');
+      out.cenario = { carregou: a.ok, imagem: a.ok ? (a.w + '×' + a.h) : null };
+    })();
     out.audio = _corAC ? _corAC.state : 'não criado';
     return out;
   }

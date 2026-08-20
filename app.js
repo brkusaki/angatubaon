@@ -837,9 +837,15 @@
       // Se o usuário SAIU da tela cheia por gesto do sistema (back/ESC/swipe)
       // enquanto um jogo estava ativo, voltamos pro menu — senão o jogo
       // ficaria rodando num layout meia-boca. (_fsAtivo false + jogo aberto.)
+      // MAS: se a aba está oculta (document.hidden), quem soltou a tela
+      // cheia foi o PRÓPRIO NAVEGADOR ao perder o foco — ex.: a pessoa saiu
+      // pra colar o código da sala no WhatsApp — não o usuário saindo do
+      // jogo. Só tratamos como saída de verdade com a aba visível; senão
+      // isso derrubava o jogo (e a sala multiplayer) toda vez que alguém
+      // só trocava de app um instante.
       var hubEl = document.getElementById('games-hub');
       var jogoAberto = hubEl && hubEl.classList.contains('jogo-ativo');
-      if (!_fsAtivo() && jogoAberto) {
+      if (!_fsAtivo() && jogoAberto && !document.hidden) {
         // Evita loop: _voltarAoMenu chama _sairTelaCheia, que é no-op aqui.
         _voltarAoMenu();
       }
@@ -854,6 +860,16 @@
     };
     document.addEventListener('fullscreenchange', aoMudar);
     document.addEventListener('webkitfullscreenchange', aoMudar);
+
+    // Ao voltar pro app com um jogo ainda ativo mas sem tela cheia (porque
+    // o navegador soltou sozinho ao ir pro segundo plano), tenta reentrar —
+    // silencioso se o navegador recusar, o fallback CSS já cobre a viewport.
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) return;
+      var hubEl = document.getElementById('games-hub');
+      var jogoAberto = hubEl && hubEl.classList.contains('jogo-ativo');
+      if (jogoAberto && !_fsAtivo()) _entrarTelaCheia();
+    });
   }
 
 

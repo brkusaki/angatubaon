@@ -246,7 +246,7 @@
         <div class="logo-city">Angatuba · SP</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <img src="/webp/owl-badge.webp" alt="AngatubaON ao vivo" class="owl-badge-anim" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
+        <img src="/webp/owl-badge.webp" alt="Abrir Jogos da Coruja" class="owl-badge-anim" role="button" tabindex="0" aria-label="Abrir Jogos da Coruja" onclick="if(typeof _abrirGamesHub==='function')_abrirGamesHub();" onkeydown="if((event.key==='Enter'||event.key===' ')&&typeof _abrirGamesHub==='function'){event.preventDefault();_abrirGamesHub();}" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
         <div id="cli-account-slot"></div>
         <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()" aria-label="Alternar tema">
           <i class="fa fa-moon" id="theme-toggle-icon"></i>
@@ -271,15 +271,15 @@
       <button class="pill-btn" data-filter="featured">
         <i class="fa fa-star" style="font-size:10px;"></i> Destaques
       </button>
-      <button class="pill-btn" data-filter="delivery">
-        <i class="fa fa-motorcycle" style="font-size:10px;"></i> Faz Entrega
+      <button class="pill-btn pill-games-btn" id="pill-games-btn" data-filter="games">
+        <i class="fa fa-gamepad" style="font-size:10px;"></i> Jogos
       </button>
       <button class="pill-btn pill-bairro-btn" id="pill-bairro-btn" data-filter="bairro">
         <i class="fa fa-map-marker-alt" style="font-size:10px;"></i> <span id="pill-bairro-label">Bairro</span>
         <i class="fa fa-chevron-down pill-bairro-caret" style="font-size:8px;margin-left:2px;opacity:.6;"></i>
       </button>
-      <button class="pill-btn pill-games-btn" id="pill-games-btn" data-filter="games">
-        <i class="fa fa-gamepad" style="font-size:10px;"></i> Joguinhos
+      <button class="pill-btn" data-filter="delivery">
+        <i class="fa fa-motorcycle" style="font-size:10px;"></i> Faz Entrega
       </button>
     </div>
   </header>
@@ -339,7 +339,7 @@
       </div>
     </section>
 
-    <!-- ═══ HUB DE MINI-GAMES (aba Joguinhos) — escondido até abrir a pill ══ -->
+    <!-- ═══ HUB DE MINI-GAMES (aba Jogos) — escondido até abrir a pill ══ -->
     <div id="games-hub" style="display:none;">
       <div class="games-hub-head">
         <div class="games-hub-bar">
@@ -350,7 +350,7 @@
             <i class="fa fa-volume-high"></i>
           </button>
         </div>
-        <h2 class="games-hub-title">Joguinhos de <span>Angatuba</span></h2>
+        <h2 class="games-hub-title">Jogos da <span>Coruja</span></h2>
         <p class="games-hub-sub">Escolha um jogo e divirta-se! 🦉</p>
       </div>
 

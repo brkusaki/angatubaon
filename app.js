@@ -891,6 +891,9 @@
     _carregarAssetsJogos();  // som + efeitos (uma vez, sob demanda)
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0,0); }
   }
+  // Exposto pro badge da coruja no header (index.html), que abre o hub
+  // direto no clique/toque, sem depender da pill de filtros.
+  window._abrirGamesHub = _abrirGamesHub;
 
   /* ── Assets compartilhados dos jogos (som + efeitos visuais) ──
      Carregados uma única vez quando o hub abre. São leves e

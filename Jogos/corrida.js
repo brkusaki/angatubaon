@@ -69,13 +69,13 @@
 
   /* ══════════════════════════════════════════════════════════════
      ASSETS opcionais (o jogo funciona 100% em vetor). Base:
-     /Jogos/assets/ (J maiúsculo; GitHub Pages é case-sensitive).
+     /Jogos/assets/corrida/ (J maiúsculo; GitHub Pages é case-sensitive).
        zumbi-normal-sheet.webp | zumbi-rapido-sheet.webp | zumbi-forte-sheet.webp
        municao.webp   → caixa de recarga no chão
        arma.webp      → sprite da arma em 1a pessoa (base da tela)
      Se faltar/falhar, usa fallback vetorial.
   ══════════════════════════════════════════════════════════════ */
-  var _COR_ASSET_BASE = '/Jogos/assets/';
+  var _COR_ASSET_BASE = '/Jogos/assets/corrida/';
   var _corAssets = {};
 
   // Metadados dos spritesheets animados (zumbis). "frames" é só um PALPITE:

@@ -26,7 +26,7 @@
      — Cada asset é OPCIONAL: se o arquivo não existe/falha, o jogo
        degrada pro desenho vetorial (fallback). Assim dá pra ir
        criando as imagens aos poucos e elas "acendem" sozinhas.
-     — Base dos assets: /Jogos/assets/ (pasta com J maiúsculo; o
+     — Base dos assets: /Jogos/assets/voo/ (pasta com J maiúsculo; o
        GitHub Pages é case-sensitive). O SW faz cache-first de
        imagens do próprio domínio, então cada asset é cacheado no
        1º fetch sem precisar listar no precache.
@@ -37,7 +37,7 @@
      — Decoração: elementos que cruzam o fundo em parallax, cada um
        restrito à(s) faixa(s) de altitude onde faz sentido.
   ══════════════════════════════════════════════════════════════ */
-  var _VOO_ASSET_BASE = '/Jogos/assets/';
+  var _VOO_ASSET_BASE = '/Jogos/assets/voo/';
 
   // Cache de imagens já pedidas: nome -> { img, ok }. 'ok' vira true no
   // onload; se falhar, fica false pra sempre (usa fallback vetorial).

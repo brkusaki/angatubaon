@@ -73,9 +73,10 @@
        zumbi-normal-sheet.webp | zumbi-rapido-sheet.webp | zumbi-forte-sheet.webp
        municao.webp        → caixa de recarga no chão
        arma.webp           → sprite da arma em 1a pessoa (base da tela)
-       cenario-floresta.webp → céu/lua/árvores mortas do horizonte (fundo
-                             estático, "cover fit"; SEM remoção de fundo —
-                             é imagem opaca, não sprite recortado)
+       cenario-floresta.webp → cenário inteiro (céu, lua, árvores mortas e
+                             chão/trilha), fundo estático cobrindo o canvas
+                             todo em "cover fit"; SEM remoção de fundo —
+                             é imagem opaca, não sprite recortado
      Se faltar/falhar, usa fallback vetorial.
   ══════════════════════════════════════════════════════════════ */
   var _COR_ASSET_BASE = '/Jogos/assets/corrida/';
@@ -789,11 +790,9 @@
     if (!_corCtx) return;
     var ctx = _corCtx, W = _corW, H = _corH, horizonY = H * _COR_HORIZ + _corBobY * H;
 
-    // ── Céu/horizonte: imagem do cenário (lua + árvores mortas + névoa),
-    // com fallback vetorial embutido enquanto ela carrega. ──
-    _corDrawCeuFundo(ctx, W, H, horizonY);
-
     // ── Chão (campo) — do horizonte pra baixo, tom escuro esverdeado ──
+    // (pintado ANTES do céu/imagem: a imagem desvanece por cima dele perto
+    // do horizonte, ver comentário em _corDrawCeuFundo.)
     var gCh = ctx.createLinearGradient(0, horizonY, 0, H);
     gCh.addColorStop(0, '#2f3830'); gCh.addColorStop(0.5, '#232a24'); gCh.addColorStop(1, '#141813');
     ctx.fillStyle = gCh; ctx.fillRect(0, horizonY, W, H - horizonY);
@@ -801,6 +800,10 @@
     // Textura sutil do campo correndo (linhas de perspectiva suaves, campo
     // aberto — sem estrada estreita).
     _corDrawCampo(ctx, W, H, horizonY);
+
+    // ── Céu/horizonte: imagem do cenário (lua + árvores mortas + névoa),
+    // com fallback vetorial embutido enquanto ela carrega. ──
+    _corDrawCeuFundo(ctx, W, H, horizonY);
 
     // ── Entidades (zumbis + itens) do fundo pra frente ──
     var render = [];
@@ -887,24 +890,33 @@
     ctx.restore();
   }
 
-  /* Céu/horizonte: imagem estática (lua + árvores mortas + névoa, gerada
-     uma vez fora do jogo) desenhada em "cover fit" — preenche toda a faixa
-     0..horizonY sem distorcer, cortando sobra por CIMA (a base da imagem
-     fica ancorada na linha do horizonte, que é a parte que mais importa).
+  /* Cenário: imagem estática (lua + árvores mortas + trilha de terra até o
+     chão, gerada uma vez fora do jogo) desenhada em "cover fit" cobrindo o
+     CANVAS INTEIRO (0..H) — não só o céu. A 2a versão da imagem já vem com
+     o chão pintado nela (a 1a era só céu, recortada no horizonte, e dava
+     uma emenda visível onde encontrava o gradiente do chão desenhado por
+     código). Cobrindo tudo, a base da imagem cai exatamente em H (ancorada
+     embaixo), então nunca sobra gap: sem costura, sem precisar de fade.
      Leve parallax pelo strafe, na mesma escala usada pela floresta vetorial.
-     SEM _corFonte()/flood-fill aqui: é uma imagem opaca (não sprite recortado)
-     — rodar a remoção de fundo nela trataria o céu como "fundo chapado" e
-     comeria a imagem inteira. Sem a imagem (ainda carregando ou 404), cai no
-     desenho vetorial de sempre (céu gradiente + lua + floresta de silhuetas).
+
+     _corDraw/_corDrawIdle continuam desenhando o gradiente do chão e o
+     _corDrawCampo ANTES de chamar isto — não por costura (não tem mais),
+     mas como fallback: se a imagem ainda não carregou, cai no desenho
+     vetorial abaixo (só céu, 0..horizonY) e o chão desenhado por código
+     continua visível por baixo, exatamente como sempre foi.
+
+     SEM _corFonte()/flood-fill aqui: é uma imagem opaca (não sprite
+     recortado) — rodar a remoção de fundo nela trataria a imagem inteira
+     como "fundo chapado" e comeria tudo.
   ─────────────────────────────────────────────────────────────── */
   function _corDrawCeuFundo(ctx, W, H, horizonY) {
     var reg = _corAsset('cenario-floresta.webp');
     if (reg && reg.ok && reg.img && reg.w && reg.h) {
-      var escala = Math.max(W / reg.w, horizonY / reg.h);
+      var escala = Math.max(W / reg.w, H / reg.h);
       var dw = reg.w * escala, dh = reg.h * escala;
       var parX = -_corCamX * (W * 0.05);
       var dx = (W - dw) / 2 + parX;
-      var dy = horizonY - dh;   // ancora a base da imagem no horizonte
+      var dy = H - dh;   // ancora a base da imagem no fundo do canvas
       ctx.drawImage(reg.img, dx, dy, dw, dh);
       return;
     }
@@ -1474,11 +1486,11 @@
     if (!_corCtx) return;
     _corDimensionar();
     var ctx = _corCtx, W = _corW, H = _corH, horizonY = H * _COR_HORIZ;
-    _corDrawCeuFundo(ctx, W, H, horizonY);
     var gCh = ctx.createLinearGradient(0, horizonY, 0, H);
     gCh.addColorStop(0, '#2f3830'); gCh.addColorStop(0.5, '#232a24'); gCh.addColorStop(1, '#141813');
     ctx.fillStyle = gCh; ctx.fillRect(0, horizonY, W, H - horizonY);
     _corDrawCampo(ctx, W, H, horizonY);
+    _corDrawCeuFundo(ctx, W, H, horizonY);
     var gFog = ctx.createLinearGradient(0, horizonY - H * 0.08, 0, horizonY + H * 0.3);
     gFog.addColorStop(0, 'rgba(150,155,150,0.55)'); gFog.addColorStop(1, 'rgba(140,148,142,0)');
     ctx.fillStyle = gFog; ctx.fillRect(0, horizonY - H * 0.08, W, H * 0.4);

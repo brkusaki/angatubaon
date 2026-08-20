@@ -40,6 +40,12 @@
        tem rede nenhuma: o próprio jogador simula tudo, e a raquete
        "adversária" é movida pela CPU (ver _ppAtualizarIA).
 
+   SALAS: criar sala aceita pública (aparece na lista "salas abertas
+   agora", 1 toque pra entrar) ou privada (só quem tem o código
+   entra) — ver _ppCriarSala / o checkbox #pp-privada-check. A lista
+   de salas públicas é mantida viva enquanto a tela inicial estiver
+   visível (_ppIniciarListaSalas/_ppPararListaSalas).
+
    COORDENADAS (compartilhadas entre os dois, geradas por quem
    simula): x em [-1,1] (lateral, não é espelhado — os dois lados
    enxergam "esquerda" do mesmo jeito, é um jogo estilizado, não uma
@@ -88,6 +94,7 @@
   var _ppModo = null;         // 'solo' (contra a CPU) | 'multiplayer' (via AngatubaMP)
   var _ppSouAnfitriao = false;
   var _ppEventosLigados = false;
+  var _ppSalasDesligar = null; // função pra parar de ouvir a lista de salas públicas (ver _ppIniciarListaSalas)
 
   // Estado da bola (referencial de quem simula; só quem simula escreve nele).
   // h/vh = altura acima da mesa e velocidade vertical — física de
@@ -148,6 +155,7 @@
   function _ppParar() {
     if (_ppRAF) { cancelAnimationFrame(_ppRAF); _ppRAF = 0; }
     if (window.AngatubaMP) { _ppSaindoVoluntariamente = true; window.AngatubaMP.sair(); }
+    _ppPararListaSalas();
     _ppEstado = 'inicio';
     _ppModo = null;
     _ppSouAnfitriao = false;
@@ -170,6 +178,18 @@
     if (fim)  fim.style.display  = (qual === 'fim')  ? '' : 'none';
     var hud = document.getElementById('pp-hud');
     if (hud) hud.style.display = (qual === 'jogando') ? '' : 'none';
+    if (qual === 'inicio') {
+      // Blindagem: garante que os botões nunca fiquem travados de uma
+      // tentativa anterior (ex.: o app foi pro segundo plano e voltou no
+      // meio de "Criar sala", sem passar por _ppVoltarMenu).
+      var btnC = document.getElementById('pp-btn-criar');
+      var btnE = document.getElementById('pp-btn-entrar');
+      if (btnC) btnC.disabled = false;
+      if (btnE) btnE.disabled = false;
+      _ppIniciarListaSalas();
+    } else {
+      _ppPararListaSalas();
+    }
   }
 
   function _ppErroMenu(msg) {
@@ -177,6 +197,40 @@
     if (el) { el.textContent = msg || ''; el.style.display = msg ? '' : 'none'; }
   }
   function _ppLimparErroMenu() { _ppErroMenu(''); }
+
+  /* ── Lista de salas públicas abertas agora ───────────────────────
+     Ouve window.AngatubaMP.listarSalas() enquanto a tela inicial
+     estiver visível (ver _ppMostrarTela) — pra não gastar leitura à
+     toa quando o jogador já entrou numa partida. */
+  function _ppIniciarListaSalas() {
+    if (_ppSalasDesligar || !window.AngatubaMP || typeof window.AngatubaMP.listarSalas !== 'function') return;
+    _ppSalasDesligar = window.AngatubaMP.listarSalas(_ppRenderizarSalas);
+  }
+  function _ppPararListaSalas() {
+    if (_ppSalasDesligar) { try { _ppSalasDesligar(); } catch (e) {} _ppSalasDesligar = null; }
+  }
+  function _ppEscaparHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function _ppRenderizarSalas(lista) {
+    var wrap = document.getElementById('pp-lista-salas');
+    if (!wrap) return;
+    if (!lista || !lista.length) {
+      wrap.innerHTML = '<div class="pp-lista-vazia">Nenhuma sala pública aberta agora.</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < lista.length; i++) {
+      var s = lista[i];
+      html += '<div class="pp-sala-item">' +
+                '<span class="pp-sala-item-nome">' + _ppEscaparHtml(s.nome) + '</span>' +
+                '<button type="button" class="pp-sala-item-btn" onclick="_ppEntrarSala(\'' + _ppEscaparHtml(s.codigo) + '\')">Entrar</button>' +
+              '</div>';
+    }
+    wrap.innerHTML = html;
+  }
 
   /* ── Ações do menu inicial ───────────────────────────────────── */
   // Modo 1 jogador: sem rede nenhuma, a raquete "adversária" é
@@ -200,7 +254,9 @@
     _ppLimparErroMenu();
     var btn = document.getElementById('pp-btn-criar');
     if (btn) btn.disabled = true;
-    window.AngatubaMP.criarSala().then(function (codigo) {
+    var chkPrivada = document.getElementById('pp-privada-check');
+    var publica = !(chkPrivada && chkPrivada.checked);
+    window.AngatubaMP.criarSala(publica).then(function (codigo) {
       _ppModo = 'multiplayer';
       _ppSouAnfitriao = true;
       _ppMostrarSala('aguardando', codigo);
@@ -210,13 +266,16 @@
     });
   }
 
-  function _ppEntrarSala() {
+  // codigoForcado: usado pela lista de salas públicas (toque em
+  // "Entrar" já manda o código, sem precisar digitar). Sem argumento,
+  // lê do campo de código manual (fluxo de sala privada).
+  function _ppEntrarSala(codigoForcado) {
     if (!window.AngatubaMP || !window.AngatubaMP.disponivel()) {
       _ppErroMenu('Multiplayer indisponível neste navegador.');
       return;
     }
     var input = document.getElementById('pp-codigo-input');
-    var codigo = input ? input.value : '';
+    var codigo = codigoForcado || (input ? input.value : '');
     _ppLimparErroMenu();
     var btn = document.getElementById('pp-btn-entrar');
     if (btn) btn.disabled = true;

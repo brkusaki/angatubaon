@@ -506,6 +506,14 @@
     forte:  { hp: 3, w: 0.24, cor: '#5a6f6b', corEsc: '#3c4b48', vel: 0.80 }
   };
 
+  // Meia-largura da "pista" que conta como colisão (faixa lateral em que,
+  // se o zumbi chegar em z~0 dentro dela, é GAME OVER). Função só pra não
+  // duplicar a fórmula entre o teste de colisão de verdade e o aviso visual
+  // (_corDrawZumbi) — as duas TÊM que usar exatamente o mesmo número, senão
+  // o aviso mente (acende perigo num zumbi que ia passar reto, ou o
+  // contrário).
+  function _corMeiaColisao(tipo) { return (_COR_TIPOS[tipo].w * 0.5) + 0.20; }
+
   /* ── Persistência ─────────────────────────────────────────────── */
   var _COR_REC_KEY = 'angatuba_corrida_rec';
   var _corRecCache = null;      // evita ler localStorage a cada frame
@@ -611,8 +619,14 @@
   ══════════════════════════════════════════════════════════════ */
   function _corSpawnZumbi() {
     var d = _corDist;
-    var pRapido = _corClamp(0.08 + d / 3000, 0.08, 0.36);
-    var pForte  = _corClamp(0.04 + d / 4600, 0.04, 0.28);
+    // Antes o mix de tipos saturava cedo (~d=840/1100) e ficava parado
+    // dali pra frente — quem sobrevivia mais tempo sentia o jogo "empacar"
+    // em vez de continuar ficando mais difícil. Teto mais alto e rampa
+    // mais longa: continua ficando mais puxado por mais tempo de jogo,
+    // sem mexer no ritmo de corrida em si (isso já era calibrado pra ser
+    // "confortável", ver comentário perto de _COR_VEL_MAX).
+    var pRapido = _corClamp(0.08 + d / 5000, 0.08, 0.42);
+    var pForte  = _corClamp(0.04 + d / 7000, 0.04, 0.34);
     var r = Math.random();
     var tipo = (r < pForte) ? 'forte' : ((r < pForte + pRapido) ? 'rapido' : 'normal');
     var def = _COR_TIPOS[tipo];
@@ -649,6 +663,43 @@
      TIRO — mira central fixa. Usa a projeção do último frame (a que o
      jogador está vendo na tela), em vez de reprojetar tudo de novo.
   ══════════════════════════════════════════════════════════════ */
+  /* Quem está DE FATO sob a mira central, em X e Y — usado tanto pra pintar
+     o reticulo de vermelho (_corDrawMira) quanto pro tiro de verdade
+     (_corAtirar). ANTES cada um tinha sua própria conta e elas divergiam:
+     a mira checava X e Y, o tiro só checava X. Resultado: o tiro acertava
+     zumbi que estava fora da faixa vertical da mira (um lá no horizonte
+     enquanto você mirava embaixo, por exemplo) — o "zumbi que nem tava na
+     reta do tiro e morre". Uma função só pras duas coisas garante que o
+     que acende vermelho é exatamente o que o gatilho acerta.
+
+     JANELA VERTICAL = altura de verdade do sprite (pés até a cabeça, mais
+     uma folga), não um número fixo em fração de H. A versão antiga da mira
+     usava uma faixa fixa (cy±0.2H/0.3H) que parecia razoável mas CORTAVA
+     zumbis muito perto: perto do fim (z→0.05) o pé projetado passa de
+     ~0.80H rapidinho (a projeção manda o zumbi "sair por baixo" da tela
+     conforme ele chega em cima de você), e a faixa fixa não ia longe o
+     bastante — o zumbi mais perigoso, bem na sua cara, virava impossível
+     de acertar. Usando a altura real (mesma conta de _corDrawZumbi) a
+     janela cresce junto com o zumbi conforme ele se aproxima.
+
+     Entre vários zumbis dentro da tolerância, fica com o mais PERTO (menor
+     z) — é o que "está na frente" dos outros, faz mais sentido ser o alvo. */
+  function _corMiraAlvo(W, H) {
+    var cx = W * 0.5, cy = H * (_COR_HORIZ + 0.14);
+    var alvo = null, melhorZ = 1e9;
+    for (var i = 0; i < _corZumbis.length; i++) {
+      var zb = _corZumbis[i];
+      if (zb.morto || !zb._vis) continue;
+      var tolX = W * 0.08 + _COR_TIPOS[zb.tipo].w * W * 0.5 * zb._ps;
+      if (Math.abs(zb._px - cx) > tolX) continue;
+      var hpxZ = 0.5 * H * zb._ps * 0.94;
+      var altura = hpxZ * _COR_ALT_MUL, folga = hpxZ * 0.35;
+      if (cy < zb._py - altura - folga || cy > zb._py + folga) continue;
+      if (zb.z < melhorZ) { melhorZ = zb.z; alvo = zb; }
+    }
+    return alvo;
+  }
+
   function _corAtirar() {
     if (_corEstado !== 'jogando') return;
     if (_corTiroT > 0) return;
@@ -656,16 +707,7 @@
     _corMun--; _corTiroT = _COR_TIRO_CD; _corFlashT = 0.09; _corRecuo = 1;
     _corSomTiro();
 
-    var miraX = _corW * 0.5;
-    var tolBase = _corW * 0.08;
-    var alvo = null, melhorZ = 1e9;
-    for (var i = 0; i < _corZumbis.length; i++) {
-      var zb = _corZumbis[i];
-      if (zb.morto || !zb._vis) continue;
-      var tol = tolBase + _COR_TIPOS[zb.tipo].w * _corW * 0.5 * zb._ps;
-      if (Math.abs(zb._px - miraX) > tol) continue;
-      if (zb.z < melhorZ) { melhorZ = zb.z; alvo = zb; }
-    }
+    var alvo = _corMiraAlvo(_corW, _corH);
 
     if (alvo) {
       alvo.hp--;
@@ -752,7 +794,7 @@
       zb.bob += dt * 4;
       zb.swayP += dt * zb.swayF;
       if (zb.z <= 0.05) {
-        var meia = (_COR_TIPOS[zb.tipo].w * 0.5) + 0.20;
+        var meia = _corMeiaColisao(zb.tipo);
         if (Math.abs(zb.faixa - _corCamX) < meia) { _corGameOver(); return; }
         else { _corZumbis.splice(i, 1); continue; }
       }
@@ -1025,6 +1067,26 @@
     ctx.beginPath(); ctx.ellipse(p.x, p.y, wpx * 0.6, wpx * 0.2, 0, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
 
+    // ── Aviso de perigo: pulso vermelho no chão sob os pés, só quando este
+    // zumbi está DENTRO da faixa que mata (mesma conta de _corMeiaColisao
+    // usada no game over) e já perto o suficiente pra importar. Sem isso
+    // não tem como o jogador saber, olhando pra tela, se aquele zumbi ali
+    // vai te pegar ou passar reto do lado — a "hitbox do próprio corpo"
+    // que não dava pra ver. Não aparece pra zumbi já morto/caindo.
+    if (!zb.morto) {
+      var pertoDemais = _corClamp(1 - zb.z / 0.35, 0, 1);
+      if (pertoDemais > 0 && Math.abs(zb.faixa - _corCamX) < _corMeiaColisao(zb.tipo)) {
+        var pulso = 0.55 + 0.45 * Math.sin(_corRelogio * 0.012);
+        ctx.save();
+        ctx.globalAlpha = pertoDemais * 0.6 * pulso;
+        var gPerigo = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, wpx * 1.3);
+        gPerigo.addColorStop(0, 'rgba(255,40,30,0.85)'); gPerigo.addColorStop(1, 'rgba(255,40,30,0)');
+        ctx.fillStyle = gPerigo;
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, wpx * 1.3, wpx * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+    }
+
     var mortAlpha = 1, mortScale = 1, mortRot = 0;
     if (zb.morto) { var q = _corClamp(zb.cai / 0.6, 0, 1); mortAlpha = 1 - q; mortScale = 1 - q * 0.4; mortRot = q * 0.9; }
     ctx.globalAlpha = mortAlpha;
@@ -1178,17 +1240,11 @@
     ctx.restore();
   }
 
-  // Mira: reaproveita a projeção guardada no desenho dos zumbis (o loop
-  // antigo reprojetava todos de novo, dobrando a conta por frame).
+  // Mira: usa _corMiraAlvo (mesmo cálculo do tiro de verdade — ver
+  // comentário lá) em vez de reprojetar/recalcular por conta própria.
   function _corDrawMira(ctx, W, H) {
     var cx = W * 0.5, cy = H * (_COR_HORIZ + 0.14);
-    var sobAlvo = false;
-    for (var i = 0; i < _corZumbis.length; i++) {
-      var zb = _corZumbis[i];
-      if (zb.morto || !zb._vis) continue;
-      var tol = W * 0.08 + _COR_TIPOS[zb.tipo].w * W * 0.5 * zb._ps;
-      if (Math.abs(zb._px - cx) < tol && zb._py < cy + H * 0.2 && zb._py > cy - H * 0.3) { sobAlvo = true; break; }
-    }
+    var sobAlvo = !!_corMiraAlvo(W, H);
     var cor = sobAlvo ? 'rgba(255,70,70,0.9)' : 'rgba(255,255,255,0.55)';
     ctx.strokeStyle = cor; ctx.lineWidth = 2; ctx.lineCap = 'round';
     var r = H * 0.03, g = H * 0.012;

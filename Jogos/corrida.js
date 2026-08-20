@@ -817,8 +817,11 @@
     }
 
     // ── Névoa densa na faixa do horizonte (esconde o spawn) ──
+    // Degradê em "morro" (sobe de 0 e desce pra 0 nas duas pontas) — com
+    // stop inicial já em 0.55 dava uma linha reta bem visível onde o
+    // fillRect começava (nada de névoa acima, 55% de repente ali embaixo).
     var gFog = ctx.createLinearGradient(0, horizonY - H * 0.08, 0, horizonY + H * 0.30);
-    gFog.addColorStop(0, 'rgba(150,155,150,0.55)'); gFog.addColorStop(0.45, 'rgba(140,148,142,0.28)'); gFog.addColorStop(1, 'rgba(140,148,142,0)');
+    gFog.addColorStop(0, 'rgba(150,155,150,0)'); gFog.addColorStop(0.25, 'rgba(150,155,150,0.55)'); gFog.addColorStop(0.6, 'rgba(140,148,142,0.28)'); gFog.addColorStop(1, 'rgba(140,148,142,0)');
     ctx.fillStyle = gFog; ctx.fillRect(0, horizonY - H * 0.08, W, H * 0.4);
 
     // ── Respingos de sangue ──
@@ -915,7 +918,13 @@
       var escala = Math.max(W / reg.w, H / reg.h);
       var dw = reg.w * escala, dh = reg.h * escala;
       var parX = -_corCamX * (W * 0.05);
-      var dx = (W - dw) / 2 + parX;
+      // _COR_CAM_LIM é bem largo (6.0) pra dar sensação de campo livre —
+      // parX cru podia passar longe da folga que o "cover fit" tem sobre W,
+      // deslocando a imagem de vez e deixando uma borda inteira sem fundo
+      // (canvas vazio/preto). Trava dx no intervalo que garante W sempre
+      // coberto: nunca mostra fundo vazio, só reduz o parallax quando a
+      // folga é pequena (telas mais quadradas).
+      var dx = _corClamp((W - dw) / 2 + parX, W - dw, 0);
       var dy = H - dh;   // ancora a base da imagem no fundo do canvas
       ctx.drawImage(reg.img, dx, dy, dw, dh);
       return;
@@ -1492,7 +1501,7 @@
     _corDrawCampo(ctx, W, H, horizonY);
     _corDrawCeuFundo(ctx, W, H, horizonY);
     var gFog = ctx.createLinearGradient(0, horizonY - H * 0.08, 0, horizonY + H * 0.3);
-    gFog.addColorStop(0, 'rgba(150,155,150,0.55)'); gFog.addColorStop(1, 'rgba(140,148,142,0)');
+    gFog.addColorStop(0, 'rgba(150,155,150,0)'); gFog.addColorStop(0.25, 'rgba(150,155,150,0.55)'); gFog.addColorStop(1, 'rgba(140,148,142,0)');
     ctx.fillStyle = gFog; ctx.fillRect(0, horizonY - H * 0.08, W, H * 0.4);
     _corDrawMato(ctx, W, H);
     _corDrawArma(ctx, W, H);

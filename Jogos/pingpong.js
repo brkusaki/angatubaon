@@ -6,25 +6,29 @@
    Jogos/multiplayer.js (AngatubaMP) — sala por código de 4 letras,
    dados trafegando P2P (WebRTC).
 
-   FÍSICA DA BOLA: gravidade + quique na mesa de verdade (não é um
-   arco decorativo fixo). A bola tem altura própria (h), a raquete
-   também — você arrasta pra cima/baixo pra levantar a raquete e
-   pega a bola em alturas diferentes, e a altura em que você rebate
-   define o quanto a bola sai empinada (rebater baixo = tacada
-   rasteira/rápida; rebater alto = bola mais alta/lenta). Arrastar
-   de lado rápido no instante da rebatida soma um "efeito" extra na
-   trajetória lateral.
+   FÍSICA DA BOLA: gravidade + quique na mesa de verdade, MIRADO — cada
+   tacada (rebatida ou saque) calcula a velocidade vertical exata pra
+   bola cair num ponto-alvo real do lado do adversário (ver
+   _ppVhParaAlvo), não solta uma velocidade qualquer torcendo pra
+   acertar. A bola tem altura própria (h), a raquete também — você
+   arrasta pra cima/baixo pra levantar a raquete e pega a bola em
+   alturas diferentes. Arrastar de lado rápido no instante da rebatida,
+   ou tocar fora do centro da raquete, desvia o ALVO lateral do quique
+   (cruzada/efeito).
 
-   SAQUE: cada ponto começa com a bola parada do lado de quem vai
-   sacar (_ppAguardandoSaque) — o próprio jogador toca a tela pra
-   sacar (dá o respiro que faltava entre os pontos). O saque sai
-   devagar (PP_VEL_D_SAQUE) e, como a gravidade roda o tempo todo,
-   ele quica sozinho ainda do lado de quem sacou antes de cruzar a
-   rede — exatamente como um saque de verdade. Depois desse primeiro
-   quique a bola volta pra velocidade normal de rali. No modo
-   sozinho, quando quem saca é a CPU, ela saca automaticamente após
-   um instante; no multiplayer, quem não é o anfitrião manda um
-   aviso de saque pra quem simula.
+   SAQUE: cada ponto começa com a bola parada num CANTO de quem vai
+   sacar (_ppAguardandoSaque, canto sorteado) — o próprio jogador toca
+   a tela pra sacar (dá o respiro que faltava entre os pontos). O saque
+   tem duas pernas (_ppFaseSaque 1 depois 2): primeiro mira um quique
+   ainda do lado de quem sacou, depois mira o canto OPOSTO do lado do
+   adversário — só depois desse 2º quique a bola vira "viva" e a física
+   normal de rali assume. No modo sozinho, quando quem saca é a CPU,
+   ela saca automaticamente após um instante; no multiplayer, quem não
+   é o anfitrião manda um aviso de saque pra quem simula.
+
+   PONTUAÇÃO: cada SET vai até 11 pontos, com pelo menos 2 de vantagem
+   (deuce em 10x10 — ver _ppSimular). A partida é melhor de 5 sets
+   (PP_SETS_PARA_VENCER = 3).
 
    MODELO DE REDE (host-autoritativo, o jeito mais simples de
    acertar num jogo 1x1 casual sem servidor):
@@ -62,22 +66,29 @@
   'use strict';
 
   /* ── Ajustes do jogo ─────────────────────────────────────────── */
-  var PP_PONTOS_VITORIA    = 7;      // primeiro a chegar aqui vence
+  var PP_PONTOS_SET         = 11;    // pontos pra fechar um set (precisa de 2 de vantagem, ver _ppSimular)
+  var PP_SETS_PARA_VENCER   = 3;     // sets pra vencer a partida — melhor de 5
   var PP_RAQUETE_MEIA_LARG = 0.24;   // metade da largura da raquete, em x (-1..1)
   var PP_RAQUETE_ALCANCE_H = 0.24;   // o quanto a altura da raquete pode diferir da bola e ainda acertar
   var PP_RAQUETE_ALTURA_MAX = 0.6;   // até onde dá pra levantar a raquete arrastando
   var PP_VEL_D_INICIAL      = 0.92;  // "unidades de profundidade" por segundo — velocidade normal de rali
   var PP_VEL_D_INCREMENTO   = 1.022; // acelera aos poucos a cada rebatida — bem mais suave que antes
   var PP_VEL_D_MAX          = 1.75;  // teto de velocidade — não sai mais impossível de rebater
-  var PP_VEL_D_SAQUE        = 0.35;  // velocidade lenta do saque, só até o 1º quique (ver _ppExecutarSaque)
   var PP_VEL_X_MAX          = 2.4;   // teto de velocidade lateral — dá pra mandar uma cruzada de verdade
   var PP_EFEITO_TOQUE       = 3.2;   // o quanto tocar fora do centro da raquete desvia a bola
   var PP_EFEITO_ARRASTO     = 1.1;   // "efeito": arrastar rápido de lado ao rebater desvia mais ainda
   var PP_CARREGO_VX         = 0.25;  // o quanto da direção anterior "sobra" numa rebatida (o resto é a tacada nova)
   var PP_GRAVIDADE          = 3.4;   // puxa a bola pra baixo — física de verdade, não um arco fixo
   var PP_RESTITUICAO        = 0.68;  // quanto da velocidade vertical sobra depois de quicar na mesa
-  var PP_LIFT_BASE          = 0.85;  // impulso vertical mínimo de toda rebatida
-  var PP_LIFT_POR_ALTURA    = 1.7;   // rebater com a raquete mais alta empina mais a bola
+
+  /* ── Saque: sai de um CANTO (não mais do meio) e mira o canto oposto,
+     em diagonal — como um saque de verdade. Duas pernas com alvo exato
+     de onde a bola tem que quicar (ver _ppVhParaAlvo/_ppExecutarSaque):
+     1ª ainda do lado de quem saca, 2ª já do lado do adversário. Só
+     depois do 2º quique a bola vira "viva" (física normal de rali). */
+  var PP_SAQUE_CANTO = 0.62;  // |x| do canto de onde o saque sai
+  var PP_SAQUE_T1     = 0.42; // duração da 1ª perna (toss até quicar do seu lado)
+  var PP_SAQUE_T2     = 0.46; // duração da 2ª perna (até quicar do lado do adversário)
 
   /* ── Perspectiva (projeção falsa-3D em canvas 2D) ────────────── */
   var PP_Y_PERTO   = 0.88;  // fração da altura da tela onde fica o fundo PERTO (embaixo)
@@ -101,14 +112,18 @@
   // gravidade de verdade, não um arco decorativo.
   var _ppBola = { x: 0, d: 0.5, h: 0, vx: 0, vd: 0, vh: 0 };
   var _ppVelD = PP_VEL_D_INICIAL;
-  var _ppPlacarAnfitriao = 0, _ppPlacarConvidado = 0;
+  var _ppPlacarAnfitriao = 0, _ppPlacarConvidado = 0;   // pontos do set atual
+  var _ppSetsAnfitriao = 0, _ppSetsConvidado = 0;       // sets vencidos na partida (melhor de 5)
 
   // Saque: cada ponto começa "parado" do lado de quem vai sacar, à
   // espera de um toque (ver cabeçalho do arquivo). _ppSaquePara usa
   // a mesma convenção de _ppExecutarSaque: 0 = fundo do anfitrião,
-  // 1 = fundo do convidado. _ppFaseSaque marca a bola já lançada mas
-  // ainda "lenta", antes do 1º quique do próprio saque.
-  var _ppAguardandoSaque = false, _ppSaquePara = 0, _ppFaseSaque = false, _ppSaqueTimer = 0;
+  // 1 = fundo do convidado. _ppFaseSaque marca em que perna do saque
+  // a bola está: 0 = não é saque (bola viva/rali normal), 1 = 1ª perna
+  // (ainda não quicou do lado de quem sacou), 2 = 2ª perna (já quicou
+  // do lado de quem sacou, mirando o quique do lado do adversário).
+  var _ppAguardandoSaque = false, _ppSaquePara = 0, _ppFaseSaque = 0, _ppSaqueTimer = 0;
+  var _ppSaqueX = 0, _ppSaqueAlvoX = 0; // canto de onde saiu e canto (oposto) que está mirando
 
   // Raquetes: x (lateral, -1..1) e altura (0..PP_RAQUETE_ALTURA_MAX,
   // controlada arrastando o dedo pra cima/baixo). A própria é
@@ -414,11 +429,12 @@
       case 'saque': // convidado avisa que quer sacar — só o anfitrião decide (é quem simula)
         if (_ppSouAnfitriao && _ppAguardandoSaque && _ppSaquePara === 1) _ppExecutarSaque();
         break;
-      case 'e': // anfitrião -> convidado: estado da bola + placar + saque
+      case 'e': // anfitrião -> convidado: estado da bola + placar + sets + saque
         if (!_ppSouAnfitriao) {
           _ppBola.x = dado.bx; _ppBola.d = dado.bd; _ppBola.h = dado.bh;
           _ppRaqueteAdversarioX = dado.hx; _ppRaqueteAdversarioH = dado.hh;
           _ppPlacarAnfitriao = dado.sh; _ppPlacarConvidado = dado.sg;
+          _ppSetsAnfitriao = dado.sta || 0; _ppSetsConvidado = dado.stg || 0;
           _ppAguardandoSaque = !!dado.ag; _ppSaquePara = dado.qs;
           _ppAtualizarHUD();
           if (dado.fim) _ppMostrarFim('fim');
@@ -535,39 +551,57 @@
      desenhar a cada quadro. */
   function _ppReiniciarPartida() {
     _ppPlacarAnfitriao = 0; _ppPlacarConvidado = 0;
+    _ppSetsAnfitriao = 0; _ppSetsConvidado = 0;
     _ppVelD = PP_VEL_D_INICIAL;
     _ppIniciarAguardoSaque(Math.random() < 0.5 ? 0 : 1);
     _ppAtualizarHUD();
   }
 
-  // Bola "parada" do lado de quem vai sacar, esperando um toque
-  // (ver _ppPointerDown/_ppEhMinhaVezDeSacar) — é o respiro entre um
-  // ponto e outro que faltava (antes a bola já saía sozinha).
+  // Dado um h inicial e uma duração T, devolve a velocidade vertical
+  // (vh) necessária pra bola voltar a h=0 exatamente depois de T
+  // segundos de gravidade — é assim que os quiques (saque e rebatida)
+  // caem num ponto ALVO de verdade, em vez de um lugar aleatório que
+  // dependia só da física solta (era por isso que a bola parecia nunca
+  // tocar a mesa: o quique podia cair longe da mesa, antes ou depois
+  // dela, ou só depois da raquete do adversário).
+  function _ppVhParaAlvo(h0, T) {
+    return (0.5 * PP_GRAVIDADE * T * T - h0) / T;
+  }
+
+  // Bola "parada" no CANTO de quem vai sacar (não mais no meio),
+  // esperando um toque (ver _ppPointerDown/_ppEhMinhaVezDeSacar) — é o
+  // respiro entre um ponto e outro. O canto é sorteado (esquerda ou
+  // direita) e o alvo do saque é o canto OPOSTO, do outro lado da mesa
+  // — um saque cruzado de verdade, não reto pelo meio.
   function _ppIniciarAguardoSaque(paraD) {
     _ppAguardandoSaque = true;
-    _ppFaseSaque = false;
+    _ppFaseSaque = 0;
     _ppSaquePara = paraD;
     _ppSaqueTimer = 0;
-    _ppBola.x = 0; _ppBola.d = paraD; _ppBola.h = 0.05;
+    _ppSaqueX = (Math.random() < 0.5 ? -1 : 1) * PP_SAQUE_CANTO;
+    _ppSaqueAlvoX = -_ppSaqueX * (0.7 + Math.random() * 0.3);
+    _ppBola.x = _ppSaqueX; _ppBola.d = paraD; _ppBola.h = 0.05;
     _ppBola.vx = 0; _ppBola.vd = 0; _ppBola.vh = 0;
   }
 
-  // Lança o saque: toss vertical + velocidade horizontal BEM mais
-  // lenta que o rali (PP_VEL_D_SAQUE) — como a gravidade roda o
-  // tempo todo, a bola quica sozinha ainda do lado de quem sacou
-  // antes de chegar na rede (quique legal de verdade, não decorativo).
-  // Esse 1º quique (tratado em _ppSimular) desliga _ppFaseSaque e
-  // devolve a bola pra velocidade normal de rali.
+  // Lança o saque em DUAS pernas, cada uma mirando um quique de
+  // verdade (ver _ppVhParaAlvo): a 1ª ainda do lado de quem saca
+  // (_ppFaseSaque=1 → quica → vira _ppFaseSaque=2 dentro de
+  // _ppSimular), a 2ª cruzando a rede até quicar no canto oposto do
+  // lado do adversário (_ppFaseSaque=2 → quica → vira 0, bola "viva").
   function _ppExecutarSaque() {
     if (!_ppAguardandoSaque) return;
     _ppAguardandoSaque = false;
-    _ppFaseSaque = true;
     var paraD = _ppSaquePara;
-    var sentido = paraD === 0 ? 1 : -1;
-    _ppBola.x = 0; _ppBola.d = paraD; _ppBola.h = 0.05;
-    _ppBola.vh = 2.0;
-    _ppBola.vd = sentido * PP_VEL_D_SAQUE;
-    _ppBola.vx = (Math.random() * 0.3 - 0.15);
+    _ppFaseSaque = 1;
+    _ppBola.x = _ppSaqueX; _ppBola.d = paraD; _ppBola.h = 0.05;
+    var d1 = (paraD === 0)
+      ? _ppClamp(0.14 + Math.random() * 0.20, 0.14, 0.34)   // anfitrião: quica perto do seu fundo
+      : _ppClamp(0.86 - Math.random() * 0.20, 0.66, 0.86);  // convidado: espelhado
+    var T1 = PP_SAQUE_T1;
+    _ppBola.vd = (d1 - paraD) / T1;
+    _ppBola.vx = 0;   // fica no canto até o 1º quique; a diagonal começa na 2ª perna
+    _ppBola.vh = _ppVhParaAlvo(_ppBola.h, T1);
   }
 
   function _ppComecarPartida() {
@@ -624,12 +658,27 @@
     _ppBola.h += _ppBola.vh * dt;
     if (_ppBola.h <= 0) {
       _ppBola.h = 0;
-      if (_ppBola.vh < 0) _ppBola.vh = -_ppBola.vh * PP_RESTITUICAO;
-      // 1º quique do saque, ainda do lado de quem sacou: acabou a
-      // fase "lenta", a bola volta pra velocidade normal de rali.
-      if (_ppFaseSaque) {
-        _ppFaseSaque = false;
-        _ppBola.vd = (_ppBola.vd < 0 ? -1 : 1) * PP_VEL_D_INICIAL;
+      if (_ppFaseSaque === 1) {
+        // 1º quique do saque (do lado de quem sacou): mira agora o
+        // canto oposto, já do outro lado da rede — 2ª perna do saque.
+        _ppFaseSaque = 2;
+        var d2 = (_ppSaquePara === 0)
+          ? _ppClamp(0.62 + Math.random() * 0.24, 0.62, 0.92)   // quica do lado do convidado
+          : _ppClamp(0.38 - Math.random() * 0.24, 0.08, 0.38);  // quica do lado do anfitrião
+        var T2 = PP_SAQUE_T2;
+        _ppBola.vd = (d2 - _ppBola.d) / T2;
+        _ppBola.vx = (_ppSaqueAlvoX - _ppBola.x) / T2;
+        _ppBola.vh = _ppVhParaAlvo(0, T2);
+      } else if (_ppFaseSaque === 2) {
+        // 2º quique: o saque terminou (já quicou dos dois lados) — a
+        // bola vira "viva", segue em física normal de rali dali pra frente.
+        _ppFaseSaque = 0;
+        if (_ppBola.vh < 0) _ppBola.vh = -_ppBola.vh * PP_RESTITUICAO;
+      } else if (_ppBola.vh < 0) {
+        // Quique normal de rali — a rebatida (_ppRebater) já mirou este
+        // ponto exato no lado do adversário; aqui só sobra a física de
+        // sempre (restituição) pra bola seguir até a raquete de quem recebe.
+        _ppBola.vh = -_ppBola.vh * PP_RESTITUICAO;
       }
     }
     _ppBola.d += _ppBola.vd * dt;
@@ -658,8 +707,19 @@
     var partidaAcabou = false;
     if (fimDePonto) {
       if (fimDePonto === 'anfitriao') _ppPlacarAnfitriao++; else _ppPlacarConvidado++;
+
+      // Set fecha com 11 pontos E pelo menos 2 de vantagem (padrão
+      // oficial — cobre o deuce sozinho: em 10x10 nenhum dos dois lados
+      // bate 2 de vantagem, então o set só fecha depois, tipo 12x10).
+      var pA = _ppPlacarAnfitriao, pG = _ppPlacarConvidado;
+      var setFechou = (pA >= PP_PONTOS_SET || pG >= PP_PONTOS_SET) && Math.abs(pA - pG) >= 2;
+      if (setFechou) {
+        if (pA > pG) _ppSetsAnfitriao++; else _ppSetsConvidado++;
+        _ppPlacarAnfitriao = 0; _ppPlacarConvidado = 0;
+        _ppVelD = PP_VEL_D_INICIAL;   // cada set novo começa no ritmo normal de novo
+        partidaAcabou = (_ppSetsAnfitriao >= PP_SETS_PARA_VENCER || _ppSetsConvidado >= PP_SETS_PARA_VENCER);
+      }
       _ppAtualizarHUD();
-      partidaAcabou = (_ppPlacarAnfitriao >= PP_PONTOS_VITORIA || _ppPlacarConvidado >= PP_PONTOS_VITORIA);
       if (partidaAcabou) {
         _ppEnviarEstado(true);
         _ppMostrarFim('fim');
@@ -672,23 +732,34 @@
     _ppEnviarEstado(false);
   }
 
+  // Rebate MIRANDO um quique de verdade no lado do ADVERSÁRIO (não só
+  // soltando uma velocidade qualquer) — sem isso a bola podia voar
+  // direto de raquete pra raquete sem tocar a mesa em lugar nenhum, ou
+  // quicar ainda do seu próprio lado. O alvo em x (onde a bola bate na
+  // raquete = cruzada; o arrasto lateral = efeito) continua sendo você
+  // quem decide, só que agora vira um PONTO pra mirar, não uma
+  // velocidade crua — o _ppVhParaAlvo calcula a força vertical exata
+  // pra bola cair ali.
   function _ppRebater(raqueteX, raqueteH, raqueteVX, novoSentidoVd) {
     _ppVelD = Math.min(PP_VEL_D_MAX, _ppVelD * PP_VEL_D_INCREMENTO);
-    _ppBola.vd = novoSentidoVd * _ppVelD;
-    // A tacada nova pesa bem mais que o "resto" da trajetória
-    // anterior (PP_CARREGO_VX) — assim a bola realmente vai na
-    // direção que você acabou de rebater, em vez de só desviar um
-    // pouco da rota antiga. Duas fontes de direção: onde a bola bate
-    // na raquete (fora do centro = cruzada) e o quanto você tá
-    // arrastando o dedo de lado no instante da rebatida (efeito).
-    _ppBola.vx = _ppClamp(
+    _ppBola.d = _ppClamp(_ppBola.d, 0, 1);
+
+    var direcaoX = _ppClamp(
       _ppBola.vx * PP_CARREGO_VX + (_ppBola.x - raqueteX) * PP_EFEITO_TOQUE + (raqueteVX || 0) * PP_EFEITO_ARRASTO,
       -PP_VEL_X_MAX, PP_VEL_X_MAX
     );
-    // Rebater com a raquete mais alta empina mais a bola (defensiva/
-    // lenta); mais baixa sai mais rasteira e rápida.
-    _ppBola.vh = PP_LIFT_BASE + raqueteH * PP_LIFT_POR_ALTURA;
-    _ppBola.d = _ppClamp(_ppBola.d, 0, 1);
+    // Alvo do quique: sempre no lado de QUEM VAI RECEBER (nunca no seu
+    // próprio lado), com folga até o fundo pra sobrar "voo livre" até
+    // a raquete do adversário depois do quique.
+    var dAlvo = (novoSentidoVd > 0)
+      ? _ppClamp(0.58 + Math.random() * 0.30, 0.58, 0.92)
+      : _ppClamp(0.42 - Math.random() * 0.30, 0.08, 0.42);
+    var xAlvo = _ppClamp(_ppBola.x + direcaoX * 0.45, -0.92, 0.92);
+    var T = Math.max(0.08, Math.abs(dAlvo - _ppBola.d) / _ppVelD);
+
+    _ppBola.vd = novoSentidoVd * _ppVelD;
+    _ppBola.vx = (xAlvo - _ppBola.x) / T;
+    _ppBola.vh = _ppVhParaAlvo(_ppBola.h, T);
   }
 
   var _ppUltimoEnvio = 0;
@@ -702,6 +773,7 @@
       t: 'e', bx: _ppBola.x, bd: _ppBola.d, bh: _ppBola.h,
       hx: _ppMinhaRaqueteX, hh: _ppMinhaRaqueteH,
       sh: _ppPlacarAnfitriao, sg: _ppPlacarConvidado,
+      sta: _ppSetsAnfitriao, stg: _ppSetsConvidado,
       ag: _ppAguardandoSaque, qs: _ppSaquePara, fim: !!fim
     });
   }
@@ -713,8 +785,10 @@
     var msg = document.getElementById('pp-fim-msg');
     var placar = document.getElementById('pp-fim-placar');
     var owlEl = document.getElementById('pp-fim-owl');
-    var meu = _ppSouAnfitriao ? _ppPlacarAnfitriao : _ppPlacarConvidado;
-    var dele = _ppSouAnfitriao ? _ppPlacarConvidado : _ppPlacarAnfitriao;
+    // Placar final é em SETS (a partida é melhor de 5 sets), não em
+    // pontos do último set.
+    var meu = _ppSouAnfitriao ? _ppSetsAnfitriao : _ppSetsConvidado;
+    var dele = _ppSouAnfitriao ? _ppSetsConvidado : _ppSetsAnfitriao;
     var btnRev = document.getElementById('pp-btn-revanche');
     if (btnRev) btnRev.disabled = false;
 
@@ -741,12 +815,18 @@
   function _ppAtualizarHUD() {
     var meu = _ppSouAnfitriao ? _ppPlacarAnfitriao : _ppPlacarConvidado;
     var dele = _ppSouAnfitriao ? _ppPlacarConvidado : _ppPlacarAnfitriao;
+    var meusSets = _ppSouAnfitriao ? _ppSetsAnfitriao : _ppSetsConvidado;
+    var delesSets = _ppSouAnfitriao ? _ppSetsConvidado : _ppSetsAnfitriao;
     var elMeu = document.getElementById('pp-hud-meu');
     var elDele = document.getElementById('pp-hud-dele');
     var elNome = document.getElementById('pp-hud-nome-adversario');
+    var elMeuSets = document.getElementById('pp-hud-meu-sets');
+    var elDeleSets = document.getElementById('pp-hud-dele-sets');
     if (elMeu) elMeu.textContent = meu;
     if (elDele) elDele.textContent = dele;
     if (elNome) elNome.textContent = _ppApelidoAdversario || 'Adversário';
+    if (elMeuSets) elMeuSets.textContent = meusSets + (meusSets === 1 ? ' set' : ' sets');
+    if (elDeleSets) elDeleSets.textContent = delesSets + (delesSets === 1 ? ' set' : ' sets');
   }
 
   /* ── Desenho (perspectiva falsa-3D em canvas 2D) ─────────────────

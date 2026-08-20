@@ -10,6 +10,7 @@
 .pp-hud-lado{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.04);border-radius:12px;padding:6px 18px;min-width:78px;}
 .pp-hud-lado-label{font-size:10.5px;color:var(--muted,#8794a8);text-transform:uppercase;letter-spacing:.04em;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pp-hud-lado-valor{font-size:24px;font-weight:800;color:#fff;font-family:'Syne',sans-serif;}
+.pp-hud-lado-sets{font-size:9.5px;color:var(--muted,#8794a8);margin-top:1px;letter-spacing:.02em;}
 .pp-hud-x{font-size:13px;color:rgba(255,255,255,.35);font-weight:700;}
 
 .pp-arena{position:relative;width:100%;aspect-ratio:9/16;max-height:72vh;margin:0 auto;border-radius:14px;overflow:hidden;background:#0a0f1a;touch-action:none;}

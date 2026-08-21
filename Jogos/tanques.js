@@ -704,6 +704,12 @@
     var thumb = document.getElementById('tq-joystick-thumb');
     if (base) base.classList.remove('tq-joystick-ativo');
     if (thumb) thumb.style.transform = 'translate(0,0)';
+    // Mesmo caso do joystick: se a rodada/tela mudar com o dedo ainda
+    // em cima da zona de fogo, o pointerup nunca chega — sem isso o
+    // círculo ficaria "preso" no estado pressionado.
+    _tqFireId = null;
+    var fireBtn = document.getElementById('tq-fire-btn');
+    if (fireBtn) fireBtn.classList.remove('tq-fire-btn-ativo');
   }
   function _tqLigarJoystick() {
     var zona = document.getElementById('tq-joy-zona');
@@ -777,14 +783,30 @@
     zona.addEventListener('pointercancel', function (e) { if (_tqJoyId === e.pointerId) soltar(); });
   }
 
+  // Zona de fogo: metade direita inteira atira (não só o círculo
+  // tq-fire-btn, que agora é só o indicador visual) — mesmo padrão
+  // do joystick (zona invisível maior que o círculo que ela controla),
+  // pra não exigir precisão de mirar o dedo num alvo pequeno.
+  var _tqFireId = null;
   function _tqLigarBotaoFogo() {
+    var zona = document.getElementById('tq-fire-zona');
     var btn = document.getElementById('tq-fire-btn');
-    if (!btn || btn._tqLigado) return;
-    btn._tqLigado = true;
-    btn.addEventListener('pointerdown', function (e) {
+    if (!zona || !btn || zona._tqLigado) return;
+    zona._tqLigado = true;
+    zona.addEventListener('pointerdown', function (e) {
+      _tqFireId = e.pointerId;
+      try { zona.setPointerCapture(e.pointerId); } catch (err) {}
+      btn.classList.add('tq-fire-btn-ativo');
       _tqTentarAtirar();
       if (e.cancelable) e.preventDefault();
     });
+    function soltar(e) {
+      if (_tqFireId !== e.pointerId) return;
+      _tqFireId = null;
+      btn.classList.remove('tq-fire-btn-ativo');
+    }
+    zona.addEventListener('pointerup', soltar);
+    zona.addEventListener('pointercancel', soltar);
   }
 
   /* ── Dimensionamento (mesmo padrão dos outros jogos em canvas) ─ */

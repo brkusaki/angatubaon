@@ -37,12 +37,15 @@
 .tq-gire i{animation:tq-rot-hint 1.6s ease-in-out infinite;}
 @keyframes tq-rot-hint{0%,100%{transform:rotate(0deg);}50%{transform:rotate(90deg);}}
 
-/* Controles: joystick FLUTUANTE (esquerda) + botão de fogo (direita),
+/* Controles: joystick FLUTUANTE (esquerda) + zona de fogo (direita),
    sobre a arena durante o jogo.
    tq-joy-zona é a metade esquerda invisível que captura o toque; o
    círculo do joystick (tq-joystick) nasce exatamente onde o dedo
    encostou (posição em left/top via JS) em vez de ficar fixo — evita
    o jogador errar o botão e ter que olhar pro dedo em vez do jogo.
+   tq-fire-zona é o espelho à direita: a metade direita inteira atira,
+   não só o círculo (tq-fire-btn, que agora é só visual/indicador — o
+   toque de verdade é pego pela zona, mesmo padrão do joystick).
    Gira junto com #tq-rot (mesmo data-rot, ver tanques.js) pra
    continuar alinhado com a arena em retrato sem lock nativo. */
 .tq-controles{position:absolute;inset:0;pointer-events:none;z-index:3;}
@@ -51,8 +54,9 @@
 .tq-joystick{position:absolute;left:0;top:0;width:96px;height:96px;margin:-48px 0 0 -48px;border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.18);pointer-events:none;touch-action:none;opacity:0;transition:opacity .12s ease;}
 .tq-joystick.tq-joystick-ativo{opacity:1;}
 .tq-joystick-thumb{position:absolute;left:50%;top:50%;width:42px;height:42px;margin:-21px 0 0 -21px;border-radius:50%;background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.4);transition:transform .04s linear;pointer-events:none;}
-.tq-fire-btn{position:absolute;right:22px;bottom:26px;width:74px;height:74px;border-radius:50%;background:rgba(255,71,87,.22);border:2px solid rgba(255,71,87,.55);color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 18px rgba(255,71,87,.3);}
-.tq-fire-btn:active{transform:scale(.92);background:rgba(255,71,87,.38);}
+.tq-fire-zona{position:absolute;right:0;top:0;bottom:0;width:42%;pointer-events:auto;touch-action:none;}
+.tq-fire-btn{position:absolute;right:22px;bottom:26px;width:74px;height:74px;border-radius:50%;background:rgba(255,71,87,.22);border:2px solid rgba(255,71,87,.55);color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;pointer-events:none;touch-action:none;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 18px rgba(255,71,87,.3);transition:transform .08s ease,background .08s ease;}
+.tq-fire-btn.tq-fire-btn-ativo{transform:scale(.92);background:rgba(255,71,87,.38);}
 
 .tq-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;background:rgba(9,14,22,.86);backdrop-filter:blur(3px);z-index:4;overflow-y:auto;}
 .tq-overlay-owl{width:92px;height:92px;object-fit:contain;margin-bottom:12px;filter:drop-shadow(0 6px 18px rgba(0,0,0,.5));}

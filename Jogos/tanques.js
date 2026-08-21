@@ -99,8 +99,17 @@
    (_tqCamera, ver _tqAtualizarCamera) segue o PRÓPRIO tanque, centralizada
    nele e travada nas bordas do mundo pra nunca mostrar área fora do mapa.
    Todo pixel-por-unidade continua usando _tqH (altura real do canvas)
-   como fator uniforme pros dois eixos — _tqW = _tqH × TQ_VIEWPORT_LARGURA
-   sempre, porque o CSS trava aspect-ratio 16/9 na arena. A câmera é
+   como fator uniforme pros dois eixos. Em tela cheia (body.games-fs-open/
+   :fullscreen) o CSS NÃO trava mais aspect-ratio 16/9 na arena (ela cola
+   nas bordas de verdade, ver styles.css) — em celulares mais largos que
+   16:9 (a maioria hoje) isso deixava uma faixa sem chão/parede desenhados
+   à direita, porque a câmera só mostrava uma fatia fixa de 16/9 mesmo com
+   o canvas mais largo. Por isso a largura do viewport é _tqViewportLargura
+   (>= TQ_VIEWPORT_LARGURA, recalculada em _tqDimensionar a partir de
+   _tqW/_tqH de verdade) em vez da constante fixa — só a JANELA que cada
+   jogador vê se adapta à própria tela; MUNDO_LARGURA (o mapa em si,
+   paredes/spawns/zona) continua fixo pros dois lados, calculado a partir
+   da constante original. A câmera é
    puramente um deslocamento de desenho: um único ctx.translate(-câmera)
    em _tqDesenhar() antes de desenhar chão/rastro/moitas/paredes/caixas/
    tanques — nenhuma dessas funções de desenho precisa saber que a câmera
@@ -422,6 +431,16 @@
   }
 
   var _tqCanvas = null, _tqCtx = null, _tqW = 0, _tqH = 0, _tqDpr = 1;
+  // Largura VISÍVEL do viewport, em unidades de mundo — normalmente
+  // TQ_VIEWPORT_LARGURA (16/9), mas em telas mais largas que 16:9 (comum
+  // em celular moderno na horizontal, tela cheia) cresce pra bater com a
+  // proporção REAL da arena (_tqW/_tqH), senão sobra uma faixa da tela
+  // sem chão/paredes desenhados (a câmera só mostrava uma fatia 16:9 fixa
+  // mesmo em telas mais largas). Recalculada em _tqDimensionar(). MUNDO_
+  // LARGURA continua fixo (mesmo mapa pros dois lados, servidor de
+  // verdade é TQ_VIEWPORT_LARGURA na conta de MUNDO_LARGURA) — só a
+  // JANELA visível de cada jogador se adapta à própria tela.
+  var _tqViewportLargura = TQ_VIEWPORT_LARGURA;
   var _tqRAF = 0, _tqUltimoTs = 0;
   var _tqEstado = 'inicio';   // inicio | sala | jogando | fim
   var _tqModo = null;         // 'solo' | 'multiplayer'
@@ -1147,6 +1166,7 @@
     _tqCanvas.width = Math.round(cssW * _tqDpr);
     _tqCanvas.height = Math.round(cssH * _tqDpr);
     _tqW = cssW; _tqH = cssH;
+    _tqViewportLargura = cssH > 0 ? Math.max(TQ_VIEWPORT_LARGURA, cssW / cssH) : TQ_VIEWPORT_LARGURA;
     if (_tqCtx) _tqCtx.setTransform(_tqDpr, 0, 0, _tqDpr, 0, 0);
   }
 
@@ -1403,7 +1423,7 @@
   // já é um ponto válido).
   function _tqAtualizarCamera() {
     var meu = _tqMeuTanque();
-    _tqCamera.x = _tqClamp(meu.x - TQ_VIEWPORT_LARGURA / 2, 0, MUNDO_LARGURA - TQ_VIEWPORT_LARGURA);
+    _tqCamera.x = _tqClamp(meu.x - _tqViewportLargura / 2, 0, Math.max(0, MUNDO_LARGURA - _tqViewportLargura));
     _tqCamera.y = _tqClamp(meu.y - TQ_VIEWPORT_ALTURA / 2, 0, MUNDO_ALTURA - TQ_VIEWPORT_ALTURA);
   }
 
@@ -2123,16 +2143,16 @@
   function _tqDesenharChao() {
     var ctx = _tqCtx;
     var vx = _tqCamera.x * _tqH - TQ_CHAO_FOLGA_PX, vy = _tqCamera.y * _tqH - TQ_CHAO_FOLGA_PX;
-    var vw = TQ_VIEWPORT_LARGURA * _tqH + TQ_CHAO_FOLGA_PX * 2, vh = TQ_VIEWPORT_ALTURA * _tqH + TQ_CHAO_FOLGA_PX * 2;
+    var vw = _tqViewportLargura * _tqH + TQ_CHAO_FOLGA_PX * 2, vh = TQ_VIEWPORT_ALTURA * _tqH + TQ_CHAO_FOLGA_PX * 2;
     var reg = _tqAsset('chao-arena.webp');
     if (reg && reg.ok && reg.img && reg.w && reg.h) {
       try {
-        if (!_tqChaoPatternCache || _tqChaoPatternCache.img !== reg.img || _tqChaoPatternCache.h !== _tqH) {
+        if (!_tqChaoPatternCache || _tqChaoPatternCache.img !== reg.img || _tqChaoPatternCache.h !== _tqH || _tqChaoPatternCache.vw !== _tqViewportLargura) {
           var pat = ctx.createPattern(reg.img, 'repeat');
           if (pat && pat.setTransform) {
-            var escala = Math.max(TQ_VIEWPORT_LARGURA * _tqH / reg.w, TQ_VIEWPORT_ALTURA * _tqH / reg.h);
+            var escala = Math.max(_tqViewportLargura * _tqH / reg.w, TQ_VIEWPORT_ALTURA * _tqH / reg.h);
             pat.setTransform(new DOMMatrix([escala, 0, 0, escala, 0, 0]));
-            _tqChaoPatternCache = { pat: pat, img: reg.img, h: _tqH };
+            _tqChaoPatternCache = { pat: pat, img: reg.img, h: _tqH, vw: _tqViewportLargura };
           } else {
             _tqChaoPatternCache = null;
           }

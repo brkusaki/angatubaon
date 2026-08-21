@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════
    BATALHA DE TANQUES — módulo de jogo (lazy-loaded)
-   1x1 em tempo real, arena quadrada vista de cima. Cada jogador
-   controla um tanque, precisa girar antes de andar pra frente, e
-   atira nos blocos de tijolo (destrutíveis) e no tanque adversário.
+   1x1 em tempo real, arena widescreen (16:9) vista de cima. Cada
+   jogador controla um tanque, precisa girar antes de andar pra
+   frente, e atira nos blocos de tijolo (destrutíveis) e no tanque
+   adversário.
    Dois modos: sozinho contra a CPU, ou multiplayer de verdade via
    Jogos/multiplayer.js (AngatubaMP) — mesma sala por código de 4
    letras usada pelo Ping Pong, dados trafegando P2P (WebRTC).
@@ -32,9 +33,24 @@
    (não direto pro joystick) — é o que dá a sensação de "gira, depois
    anda" sem precisar de uma máquina de estados separada.
 
-   PAREDES: layout fixo, simétrico (mesmo dos dois lados, sem
-   sincronizar geometria — só o dano). Cada parede aguenta
-   TQ_PAREDE_HP tiros antes de virar escombro (para de bloquear).
+   PAREDES: sorteadas de um POOL de mapas fixos (_TQ_MAPAS) no início
+   de cada PARTIDA (não a cada rodada) — cada mapa é simétrico (metade
+   + espelho 180°, ver _tqMontarMapa). Só o ANFITRIÃO sorteia; o mapa
+   escolhido viaja pro convidado dentro da mensagem 'oi' (conexão) ou
+   'rr' (revanche) — depois disso os dois lados têm a MESMA geometria
+   e só sincronizam o dano (destruída/intacta), igual antes. Cada
+   parede aguenta TQ_PAREDE_HP tiros antes de virar escombro (para de
+   bloquear).
+
+   ARENA E LANDSCAPE: mundo vai de x:0..MUNDO_LARGURA (16/9) e y:0..1
+   — todo pixel-por-unidade usa _tqH (altura real do canvas) como
+   fator uniforme pros dois eixos, porque o CSS trava aspect-ratio:
+   16/9 na arena (_tqW = _tqH × MUNDO_LARGURA sempre). Em celular
+   deitado ou com o lock nativo de tela (screen.orientation.lock), o
+   canvas já nasce nessa proporção; em retrato sem o lock, o wrapper
+   #tq-rot gira 90° por CSS (mesmo padrão da Corrida, ver
+   _tqAplicarOrientacao) — o joystick então precisa converter toque em
+   tela pra espaço local antes de calcular direção (_tqDeltaLocal).
 
    Fala com o app só via window.AngatubaGames (a ponte) e com a rede
    só via window.AngatubaMP (Jogos/multiplayer.js). Expõe
@@ -55,26 +71,61 @@
   var TQ_DEADZONE      = 0.12;       // magnitude mínima do joystick pra contar como "empurrado"
   var TQ_PAUSA_RODADA  = 1.4;        // segundos de pausa mostrando quem venceu a rodada
 
-  /* ── Paredes: layout fixo, gerado a partir de metade + espelho
-     180° (ver cabeçalho) — garante simetria sem risco de erro de
-     conta manual. Coordenadas em fração da arena (0..1, quadrada). */
-  var _TQ_PAREDES_BASE = [
-    { x: 0.08, y: 0.42, w: 0.20, h: 0.07 },
-    { x: 0.36, y: 0.08, w: 0.07, h: 0.18 },
-    { x: 0.30, y: 0.46, w: 0.09, h: 0.09 }
-  ];
-  var _TQ_PAREDES_GEOM = (function () {
-    var lista = _TQ_PAREDES_BASE.slice();
-    for (var i = 0; i < _TQ_PAREDES_BASE.length; i++) {
-      var b = _TQ_PAREDES_BASE[i];
-      lista.push({ x: 1 - b.x - b.w, y: 1 - b.y - b.h, w: b.w, h: b.h });
-    }
-    lista.push({ x: 0.46, y: 0.46, w: 0.08, h: 0.08 }); // bloco central (auto-simétrico)
-    return lista;
-  })();
+  var MUNDO_LARGURA = 16 / 9;   // arena widescreen — x vai de 0..MUNDO_LARGURA, y continua 0..1
+  var TQ_IA_DIST_ENGAJAR = 0.86; // distância (mundo largo) até a IA trocar patrulha por engajar
 
-  var TQ_SPAWN_ANFITRIAO = { x: 0.5, y: 0.88, ang: 0 };          // embaixo, mirando pro norte
-  var TQ_SPAWN_CONVIDADO = { x: 0.5, y: 0.12, ang: Math.PI };    // em cima, mirando pro sul
+  /* ── Pool de mapas: cada um é "metade" + espelho 180° (ver
+     cabeçalho) — garante simetria sem risco de erro de conta manual.
+     Coordenadas em fração da arena: x 0..MUNDO_LARGURA, y 0..1. Um
+     mapa é sorteado por PARTIDA (não por rodada), ver _tqEscolherMapa
+     e o campo "mapa" nas mensagens 'oi'/'rr'. */
+  function _tqMontarMapa(metade, centro) {
+    var lista = metade.slice();
+    for (var i = 0; i < metade.length; i++) {
+      var b = metade[i];
+      lista.push({ x: MUNDO_LARGURA - b.x - b.w, y: 1 - b.y - b.h, w: b.w, h: b.h });
+    }
+    if (centro) lista.push(centro);
+    return lista;
+  }
+  var _TQ_MAPAS = [
+    // 1. Clássico — pilar + bloco, variação do layout original
+    _tqMontarMapa([
+      { x: 0.42, y: 0.10, w: 0.07, h: 0.22 },
+      { x: 0.40, y: 0.66, w: 0.20, h: 0.08 }
+    ], { x: 0.8439, y: 0.46, w: 0.09, h: 0.09 }),
+    // 2. Corredores — paredes verticais formando 2 corredores
+    _tqMontarMapa([
+      { x: 0.50, y: 0.00, w: 0.06, h: 0.30 },
+      { x: 0.50, y: 0.70, w: 0.06, h: 0.30 },
+      { x: 0.78, y: 0.30, w: 0.06, h: 0.40 }
+    ]),
+    // 3. Cantos — blocos protegendo os 4 cantos do centro
+    _tqMontarMapa([
+      { x: 0.34, y: 0.06, w: 0.16, h: 0.09 },
+      { x: 0.34, y: 0.85, w: 0.16, h: 0.09 },
+      { x: 0.66, y: 0.44, w: 0.10, h: 0.12 }
+    ]),
+    // 4. Cruz — pilar vertical no centro + 2 blocos laterais
+    _tqMontarMapa([
+      { x: 0.62, y: 0.42, w: 0.20, h: 0.16 }
+    ], { x: 0.8389, y: 0.10, w: 0.10, h: 0.80 }),
+    // 5. Zigue-zague — blocos escalonados
+    _tqMontarMapa([
+      { x: 0.38, y: 0.06, w: 0.09, h: 0.24 },
+      { x: 0.55, y: 0.38, w: 0.09, h: 0.24 },
+      { x: 0.72, y: 0.70, w: 0.09, h: 0.24 }
+    ]),
+    // 6. Aberto — poucos obstáculos, mapa rápido
+    _tqMontarMapa([
+      { x: 0.55, y: 0.42, w: 0.11, h: 0.16 }
+    ])
+  ];
+  var _tqMapaAtualIdx = 0;
+  function _tqEscolherMapa() { return Math.floor(Math.random() * _TQ_MAPAS.length); }
+
+  var TQ_SPAWN_ANFITRIAO = { x: 0.14, y: 0.5, ang: Math.PI / 2 };                  // esquerda, mirando pro leste
+  var TQ_SPAWN_CONVIDADO = { x: MUNDO_LARGURA - 0.14, y: 0.5, ang: -Math.PI / 2 }; // direita, mirando pro oeste
 
   var _tqCanvas = null, _tqCtx = null, _tqW = 0, _tqH = 0, _tqDpr = 1;
   var _tqRAF = 0, _tqUltimoTs = 0;
@@ -93,7 +144,7 @@
   var _tqTanqueConvidado = { x: TQ_SPAWN_CONVIDADO.x, y: TQ_SPAWN_CONVIDADO.y, ang: TQ_SPAWN_CONVIDADO.ang };
 
   var _tqProjeteis = [];      // { x,y,vx,vy,dono } — dono: 'anfitriao' | 'convidado'
-  var _tqParedes = [];        // { x,y,w,h,hp,destruida } — geometria de _TQ_PAREDES_GEOM + estado
+  var _tqParedes = [];        // { x,y,w,h,hp,destruida } — geometria de _TQ_MAPAS[_tqMapaAtualIdx] + estado
   var _tqPlacarAnfitriao = 0, _tqPlacarConvidado = 0; // rodadas vencidas na partida
   var _tqRodadaEstado = 'jogando'; // 'jogando' | 'pausa'
   var _tqPausaTimer = 0, _tqPausaVencedor = null;
@@ -103,6 +154,23 @@
   // até 1. Atualizado pelo widget DOM (ver _tqLigarJoystick).
   var _tqInputVec = { x: 0, y: 0 };
   var _tqMeuCooldown = 0;
+
+  /* ── Game feel: screen shake, recuo do canhão e rastro de esteira ─
+     Puramente visuais/locais — cada cliente calcula por conta própria
+     a partir do que já está sincronizado (posição, parede destruída,
+     fim de rodada), sem precisar de mensagem nova na rede. */
+  var _tqShakeTimer = 0, _tqShakeDuracaoBase = 0, _tqShakeForcaBase = 0;
+  var TQ_SHAKE_PAREDE_DUR = 0.22, TQ_SHAKE_PAREDE_FORCA = 6;   // parede destruída
+  var TQ_SHAKE_ACERTO_DUR = 0.38, TQ_SHAKE_ACERTO_FORCA = 11;  // fim de rodada (tanque atingido)
+
+  var _tqRecuoAnfitriao = 0, _tqRecuoConvidado = 0; // 0..1, decai a cada quadro
+  var TQ_RECUO_DECAI = 7.5; // por segundo
+
+  var _tqRastro = [];              // { x, y, ang, vida } em espaço 0..1
+  var _tqUltimaPosAnfitriao = null, _tqUltimaPosConvidado = null;
+  var TQ_RASTRO_DIST_MIN = 0.018;  // distância mínima entre marcas
+  var TQ_RASTRO_VIDA     = 2.2;    // segundos até sumir
+  var TQ_RASTRO_MAX      = 220;    // teto de marcas simultâneas (performance)
 
   /* ── IA (modo sozinho) ───────────────────────────────────────── */
   var _tqIATimer = 0, _tqIAModo = 'patrulha', _tqIAAlvoPatrulha = { x: 0.5, y: 0.3 };
@@ -143,13 +211,23 @@
     _tqLigarEventosRede();
     if (!_tqResizeOn) {
       var reaval = function () {
-        if (window._gamesHubAberto && window._gamesHubAberto()) {
-          _tqDimensionar();
-          _tqDesenhar();
-        }
+        if (window._gamesHubAberto && window._gamesHubAberto()) _tqAplicarOrientacao();
       };
       window.addEventListener('resize', reaval);
       window.addEventListener('orientationchange', reaval);
+      // O giro do lock nativo dispara 'change' no screen.orientation
+      // QUANDO a tela termina de girar de verdade (o .then do lock
+      // resolve antes) — remede em passos, o layout assenta aos poucos.
+      try {
+        if (screen && screen.orientation && screen.orientation.addEventListener) {
+          screen.orientation.addEventListener('change', function () {
+            reaval();
+            setTimeout(reaval, 60);
+            setTimeout(reaval, 200);
+            setTimeout(reaval, 450);
+          });
+        }
+      } catch (e) {}
       _tqResizeOn = true;
     }
     _tqDimensionar();
@@ -158,9 +236,13 @@
     _tqAsset('tank-vermelho.webp');
     _tqAsset('parede-tijolo.webp');
     _tqAsset('parede-escombros.webp');
+    // Pede ao sistema pra girar pra landscape (instalado/fullscreen);
+    // em navegador comum é recusado e cai na rotação por CSS.
+    _tqTravarLandscape();
     _tqMostrarTela('inicio');
     _tqLimparErroMenu();
     _tqResetParedes();
+    _tqAplicarOrientacaoRepetido();
     _tqDesenhar();
   }
   var _tqResizeOn = false;
@@ -171,6 +253,7 @@
     if (_tqRAF) { cancelAnimationFrame(_tqRAF); _tqRAF = 0; }
     if (window.AngatubaMP) { _tqSaindoVoluntariamente = true; window.AngatubaMP.sair(); }
     _tqPararListaSalas();
+    _tqDestravarOrientacao();
     _tqEstado = 'inicio';
     _tqModo = null;
     _tqSouAnfitriao = false;
@@ -194,6 +277,7 @@
     if (hud) hud.style.display = (qual === 'jogando') ? '' : 'none';
     var controles = document.getElementById('tq-controles');
     if (controles) controles.style.display = (qual === 'jogando') ? '' : 'none';
+    if (qual !== 'jogando') _tqResetJoystickVisual();
     if (qual === 'inicio') {
       var btnC = document.getElementById('tq-btn-criar');
       var btnE = document.getElementById('tq-btn-entrar');
@@ -354,8 +438,15 @@
     window.AngatubaMP.on('conectado', function () {
       var bridge = _tqBridge();
       var meuNome = (bridge && bridge.apelido && bridge.apelido()) || 'Jogador';
-      window.AngatubaMP.enviar({ t: 'oi', nome: meuNome });
-      if (_tqSouAnfitriao) _tqReiniciarPartida();
+      var msg = { t: 'oi', nome: meuNome };
+      if (_tqSouAnfitriao) {
+        // Anfitrião sorteia o mapa da partida e avisa o convidado dentro
+        // do próprio "oi" — sem isso os dois lados desenhariam paredes
+        // em lugares diferentes (só o dano é sincronizado depois).
+        _tqReiniciarPartida();
+        msg.mapa = _tqMapaAtualIdx;
+      }
+      window.AngatubaMP.enviar(msg);
       _tqComecarPartida();
     });
 
@@ -376,11 +467,18 @@
     switch (dado.t) {
       case 'oi':
         _tqApelidoAdversario = String(dado.nome || 'Adversário').slice(0, 20);
+        // Só o convidado aplica: o mapa que o anfitrião sorteou (ver
+        // 'conectado' acima) — sem isso o convidado ficaria com o mapa
+        // 0 (o default do _tqPreparar), diferente do lado do anfitrião.
+        if (!_tqSouAnfitriao && typeof dado.mapa === 'number' && _TQ_MAPAS[dado.mapa]) {
+          _tqMapaAtualIdx = dado.mapa;
+          _tqResetParedes();
+        }
         _tqAtualizarHUD();
         break;
       case 'p': // convidado -> anfitrião: posição/ângulo do tanque do convidado
         if (_tqSouAnfitriao) {
-          if (typeof dado.x === 'number') _tqTanqueConvidado.x = _tqClamp(dado.x, 0, 1);
+          if (typeof dado.x === 'number') _tqTanqueConvidado.x = _tqClamp(dado.x, 0, MUNDO_LARGURA);
           if (typeof dado.y === 'number') _tqTanqueConvidado.y = _tqClamp(dado.y, 0, 1);
           if (typeof dado.ang === 'number') _tqTanqueConvidado.ang = dado.ang;
         }
@@ -396,18 +494,29 @@
           _tqTanqueAnfitriao.x = dado.hx; _tqTanqueAnfitriao.y = dado.hy; _tqTanqueAnfitriao.ang = dado.hang;
           _tqProjeteis = dado.pj || [];
           if (dado.pd) {
+            // Detecta a TRANSIÇÃO intacta→destruída pra tremer a tela
+            // também do lado do convidado (o anfitrião já treme sozinho
+            // em _tqAtualizarProjeteis, que só roda nele).
             for (var i = 0; i < _tqParedes.length && i < dado.pd.length; i++) {
-              _tqParedes[i].destruida = !!dado.pd[i];
+              var novaDestruida = !!dado.pd[i];
+              if (novaDestruida && !_tqParedes[i].destruida) _tqAcionarShake(TQ_SHAKE_PAREDE_DUR, TQ_SHAKE_PAREDE_FORCA);
+              _tqParedes[i].destruida = novaDestruida;
             }
           }
           _tqPlacarAnfitriao = dado.sa || 0; _tqPlacarConvidado = dado.sg || 0;
+          // Mesma lógica pro tremor de "acertou o tanque": entrou em
+          // pausa agora (não estava antes) = a rodada acabou de terminar.
+          if (dado.re === 'pausa' && _tqRodadaEstado !== 'pausa') _tqAcionarShake(TQ_SHAKE_ACERTO_DUR, TQ_SHAKE_ACERTO_FORCA);
           _tqRodadaEstado = dado.re || 'jogando';
           _tqAtualizarHUD();
           if (dado.fim) _tqMostrarFim('fim');
         }
         break;
       case 'rr':
-        if (!_tqSouAnfitriao) { _tqReiniciarPartida(); _tqComecarPartida(); }
+        // dado.mapa: o anfitrião já sorteou o mapa da revanche (ver
+        // _tqEnviarReinicio) — o convidado usa o MESMO índice, nunca
+        // sorteia por conta própria (senão os lados desincronizam).
+        if (!_tqSouAnfitriao) { _tqReiniciarPartida(dado.mapa); _tqComecarPartida(); }
         break;
       case 'pr':
         if (_tqSouAnfitriao) { _tqReiniciarPartida(); _tqEnviarReinicio(); _tqComecarPartida(); }
@@ -416,28 +525,58 @@
   }
 
   function _tqEnviarReinicio() {
-    if (_tqModo === 'multiplayer' && window.AngatubaMP) window.AngatubaMP.enviar({ t: 'rr' });
+    if (_tqModo === 'multiplayer' && window.AngatubaMP) window.AngatubaMP.enviar({ t: 'rr', mapa: _tqMapaAtualIdx });
   }
 
-  /* ── Controles: joystick (DOM, arraste) + botão de fogo ──────────
+  /* ── Controles: joystick FLUTUANTE (DOM) + botão de fogo ──────────
      Um joystick só: a direção que ele aponta já gira o tanque pra lá
      E avança na direção que o tanque JÁ está apontando (ver cabeçalho
-     do arquivo) — não precisa de controle separado pra girar. */
-  var _tqJoyId = null, _tqJoyRaio = 44;
-  function _tqLigarJoystick() {
+     do arquivo) — não precisa de controle separado pra girar.
+     Flutuante: o círculo (tq-joystick) começa invisível; tq-joy-zona
+     é a metade esquerda invisível da arena que captura o toque, e o
+     círculo nasce exatamente onde o dedo encostou — evita o jogador
+     ter que acertar um alvo fixo e olhar pro dedo em vez do jogo. */
+  var _tqJoyId = null, _tqJoyRaio = 48;
+  var _tqJoyOrigem = { x: 0, y: 0 }; // ponto (client coords) onde o dedo tocou — centro fixo até soltar
+
+  // Girado por CSS (retrato sem lock nativo — ver _tqAplicarOrientacao),
+  // tela e local deixam de ser os mesmos eixos: converte um delta em
+  // coordenadas de TELA pro espaço LOCAL do canvas/controles antes de
+  // calcular a direção do joystick. Sem rotação, é a identidade.
+  function _tqRotacionado() {
+    try {
+      var rot = document.getElementById('tq-rot');
+      if (rot && rot.getAttribute('data-rot') === '1') return true;
+    } catch (e) {}
+    return false;
+  }
+  function _tqDeltaLocal(dxTela, dyTela) {
+    return _tqRotacionado() ? { x: dyTela, y: -dxTela } : { x: dxTela, y: dyTela };
+  }
+  // Chamado ao sair da tela 'jogando' (fim de rodada, desconexão, voltar
+  // ao menu) — evita o círculo ficar "preso" visível/deslocado da
+  // última posição na próxima vez que os controles aparecerem.
+  function _tqResetJoystickVisual() {
+    _tqJoyId = null;
+    _tqInputVec.x = 0; _tqInputVec.y = 0;
     var base = document.getElementById('tq-joystick');
     var thumb = document.getElementById('tq-joystick-thumb');
-    if (!base || !thumb || base._tqLigado) return;
-    base._tqLigado = true;
+    if (base) base.classList.remove('tq-joystick-ativo');
+    if (thumb) thumb.style.transform = 'translate(0,0)';
+  }
+  function _tqLigarJoystick() {
+    var zona = document.getElementById('tq-joy-zona');
+    var base = document.getElementById('tq-joystick');
+    var thumb = document.getElementById('tq-joystick-thumb');
+    if (!zona || !base || !thumb || zona._tqLigado) return;
+    zona._tqLigado = true;
 
     function aplicar(clientX, clientY) {
-      var r = base.getBoundingClientRect();
-      var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-      var dx = clientX - cx, dy = clientY - cy;
-      var raio = r.width / 2 || _tqJoyRaio;
-      var dist = Math.hypot(dx, dy);
+      var d = _tqDeltaLocal(clientX - _tqJoyOrigem.x, clientY - _tqJoyOrigem.y);
+      var raio = _tqJoyRaio;
+      var dist = Math.hypot(d.x, d.y);
       var mag = Math.min(1, dist / raio);
-      var ang = Math.atan2(dy, dx);
+      var ang = Math.atan2(d.y, d.x);
       var nx = Math.cos(ang) * mag, ny = Math.sin(ang) * mag;
       _tqInputVec.x = nx; _tqInputVec.y = ny;
       thumb.style.transform = 'translate(' + (nx * raio * 0.55) + 'px,' + (ny * raio * 0.55) + 'px)';
@@ -446,20 +585,55 @@
       _tqJoyId = null;
       _tqInputVec.x = 0; _tqInputVec.y = 0;
       thumb.style.transform = 'translate(0,0)';
+      base.classList.remove('tq-joystick-ativo');
     }
-    base.addEventListener('pointerdown', function (e) {
+    zona.addEventListener('pointerdown', function (e) {
       _tqJoyId = e.pointerId;
-      try { base.setPointerCapture(e.pointerId); } catch (err) {}
+      try { zona.setPointerCapture(e.pointerId); } catch (err) {}
+      _tqJoyOrigem.x = e.clientX; _tqJoyOrigem.y = e.clientY;
+      var controles = zona.parentElement;
+      var margem = _tqJoyRaio + 4;
+      var localX, localY;
+      if (_tqRotacionado() && controles && _tqRotLocalW && _tqRotLocalH) {
+        // Girado: getBoundingClientRect() já reflete o retângulo visível
+        // NA TELA (o CSS gira .tq-controles inteiro). Pra achar onde o
+        // círculo nasce no espaço LOCAL (pré-rotação, eixos trocados —
+        // ver _tqAplicarOrientacao), medimos o toque relativo ao CENTRO
+        // e desfazemos a rotação com o mesmo _tqDeltaLocal do joystick.
+        var cr = controles.getBoundingClientRect();
+        var centroX = cr.left + cr.width / 2, centroY = cr.top + cr.height / 2;
+        var d = _tqDeltaLocal(e.clientX - centroX, e.clientY - centroY);
+        localX = d.x + _tqRotLocalW / 2;
+        localY = d.y + _tqRotLocalH / 2;
+        localX = Math.max(margem, Math.min(_tqRotLocalW - margem, localX));
+        localY = Math.max(margem, Math.min(_tqRotLocalH - margem, localY));
+      } else {
+        // Sem rotação: posiciona o círculo no ponto tocado, em
+        // coordenadas locais à zona (que cobre left:0/top:0 da
+        // .tq-controles, mesma origem do .tq-joystick). Clampa pra não
+        // desenhar cortado perto das bordas (usa a largura/altura da
+        // própria .tq-controles, maior que a zona).
+        var r = zona.getBoundingClientRect();
+        localX = e.clientX - r.left; localY = e.clientY - r.top;
+        if (controles) {
+          var cr2 = controles.getBoundingClientRect();
+          localX = Math.max(margem, Math.min(cr2.width - margem, localX));
+          localY = Math.max(margem, Math.min(cr2.height - margem, localY));
+        }
+      }
+      base.style.left = localX + 'px';
+      base.style.top = localY + 'px';
+      base.classList.add('tq-joystick-ativo');
       aplicar(e.clientX, e.clientY);
       if (e.cancelable) e.preventDefault();
     });
-    base.addEventListener('pointermove', function (e) {
+    zona.addEventListener('pointermove', function (e) {
       if (_tqJoyId !== e.pointerId) return;
       aplicar(e.clientX, e.clientY);
       if (e.cancelable) e.preventDefault();
     });
-    base.addEventListener('pointerup', function (e) { if (_tqJoyId === e.pointerId) soltar(); });
-    base.addEventListener('pointercancel', function (e) { if (_tqJoyId === e.pointerId) soltar(); });
+    zona.addEventListener('pointerup', function (e) { if (_tqJoyId === e.pointerId) soltar(); });
+    zona.addEventListener('pointercancel', function (e) { if (_tqJoyId === e.pointerId) soltar(); });
   }
 
   function _tqLigarBotaoFogo() {
@@ -475,8 +649,19 @@
   /* ── Dimensionamento (mesmo padrão dos outros jogos em canvas) ─ */
   function _tqDimensionar() {
     if (!_tqCanvas) return;
-    var cssW = _tqCanvas.offsetWidth || 320;
-    var cssH = _tqCanvas.offsetHeight || 320;
+    var cssW, cssH;
+    // Com lock nativo, o offsetWidth do canvas pode demorar a refletir
+    // o giro do SO — medimos preferencialmente pela ARENA (o container
+    // real, já no tamanho da tela girada); mesmo truque da Corrida.
+    var arena = document.getElementById('tq-arena');
+    if (_tqLockNativo && arena) {
+      var ar = arena.getBoundingClientRect();
+      cssW = Math.round(ar.width) || _tqCanvas.offsetWidth || 320;
+      cssH = Math.round(ar.height) || _tqCanvas.offsetHeight || 320;
+    } else {
+      cssW = _tqCanvas.offsetWidth || 320;
+      cssH = _tqCanvas.offsetHeight || 320;
+    }
     if (cssW < 2) cssW = 320;
     if (cssH < 2) cssH = 320;
     _tqDpr = Math.min(2, window.devicePixelRatio || 1);
@@ -486,12 +671,121 @@
     if (_tqCtx) _tqCtx.setTransform(_tqDpr, 0, 0, _tqDpr, 0, 0);
   }
 
+  /* ── Orientação nativa — pede ao sistema pra girar pra landscape (só
+     funciona instalado/fullscreen; navegador comum recusa). Quando o
+     lock nativo PEGA, o próprio SO gira a tela: a arena já nasce
+     paisagem e NÃO rotacionamos por CSS (senão giraria 2x). Mesmo
+     padrão da Corrida (_corTravarLandscape). ── */
+  var _tqLockNativo = false;
+  var _tqRotLocalW = 0, _tqRotLocalH = 0; // dimensões LOCAIS (pré-rotação) de #tq-rot/#tq-controles quando girados
+  function _tqTravarLandscape() {
+    try {
+      if (screen && screen.orientation && screen.orientation.lock) {
+        var p = screen.orientation.lock('landscape');
+        if (p && p.then) {
+          p.then(function () {
+            _tqLockNativo = true;
+            _tqAplicarOrientacao();
+          }).catch(function () {
+            _tqLockNativo = false;   // navegador comum recusa → usa CSS
+          });
+        }
+      }
+    } catch (e) { _tqLockNativo = false; }
+  }
+  function _tqDestravarOrientacao() {
+    try {
+      if (screen && screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+    } catch (e) {}
+    _tqLockNativo = false;
+  }
+
+  /* ── Rotaciona a arena por CSS quando o device está em retrato e o
+     lock nativo não pegou (data-rot=1 em #tq-rot e #tq-controles,
+     dimensionados em px pelo JS — eixos trocados). Reavalia em
+     resize/orientationchange. Mesmo padrão da Corrida
+     (_corAplicarOrientacao). ── */
+  function _tqAplicarOrientacao() {
+    var rot = document.getElementById('tq-rot');
+    var controles = document.getElementById('tq-controles');
+    var arena = document.getElementById('tq-arena');
+    var dica = document.getElementById('tq-gire');
+    if (!rot) return;
+    function limpar(el) {
+      if (!el) return;
+      el.setAttribute('data-rot', '0');
+      el.style.width = ''; el.style.height = ''; el.style.top = ''; el.style.left = '';
+    }
+    if (_tqLockNativo) {
+      limpar(rot); limpar(controles);
+      if (dica) dica.style.display = 'none';
+      _tqRotLocalW = 0; _tqRotLocalH = 0;
+      _tqDimensionar();
+      if (_tqEstado === 'jogando') _tqDesenhar();
+      return;
+    }
+    // Detecta retrato pelas dimensões REAIS da arena (mais confiável em
+    // fullscreen PWA que window.innerWidth/Height). Fallback pro window
+    // se a arena ainda não tiver dimensões.
+    var retrato;
+    var ar = arena ? arena.getBoundingClientRect() : null;
+    if (ar && ar.width > 2 && ar.height > 2) {
+      retrato = (ar.height >= ar.width);
+    } else {
+      retrato = (window.innerHeight >= window.innerWidth);
+    }
+    if (retrato && arena && ar) {
+      var pw = Math.max(1, Math.round(ar.width));
+      var ph = Math.max(1, Math.round(ar.height));
+      [rot, controles].forEach(function (el) {
+        if (!el) return;
+        el.setAttribute('data-rot', '1');
+        el.style.width = ph + 'px'; el.style.height = pw + 'px';
+        el.style.top = '50%'; el.style.left = '50%';
+      });
+      _tqRotLocalW = ph; _tqRotLocalH = pw;
+      if (dica) dica.style.display = '';
+    } else {
+      limpar(rot); limpar(controles);
+      _tqRotLocalW = 0; _tqRotLocalH = 0;
+      if (dica) dica.style.display = 'none';
+    }
+    _tqDimensionar();
+    if (_tqEstado === 'jogando') _tqDesenhar();
+  }
+
+  // O fullscreen do celular muda o tamanho da arena de forma ASSÍNCRONA
+  // e em tempo variável — reaplica a orientação várias vezes após abrir
+  // pra garantir que a rotação use as dimensões finais (mesmo padrão da
+  // Corrida, _corAplicarOrientacaoRepetido).
+  function _tqAplicarOrientacaoRepetido() {
+    _tqAplicarOrientacao();
+    var atrasos = [50, 150, 300, 500, 800];
+    for (var i = 0; i < atrasos.length; i++) {
+      setTimeout(function () {
+        if (window._gamesHubAberto && window._gamesHubAberto()) _tqAplicarOrientacao();
+      }, atrasos[i]);
+    }
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(function () { _tqAplicarOrientacao(); });
+    }
+  }
+
   function _tqClamp(v, min, max) { return v < min ? min : (v > max ? max : v); }
 
-  /* ── Paredes: estado (hp/destruída) — geometria vem de
-     _TQ_PAREDES_GEOM (fixa, nunca muda). */
+  // Dispara/reinicia o tremor de tela. Uma segunda chamada enquanto um
+  // tremor já está em andamento simplesmente substitui pelos novos
+  // valores (o de fim de rodada, mais forte, "vence" um de parede que
+  // esteja tocando ao mesmo tempo — é o comportamento certo).
+  function _tqAcionarShake(duracao, forcaPx) {
+    _tqShakeTimer = duracao; _tqShakeDuracaoBase = duracao; _tqShakeForcaBase = forcaPx;
+  }
+
+  /* ── Paredes: estado (hp/destruída) — geometria vem do mapa
+     sorteado da partida (_TQ_MAPAS[_tqMapaAtualIdx], fixo até o
+     próximo _tqReiniciarPartida). */
   function _tqResetParedes() {
-    _tqParedes = _TQ_PAREDES_GEOM.map(function (g) {
+    _tqParedes = _TQ_MAPAS[_tqMapaAtualIdx].map(function (g) {
       return { x: g.x, y: g.y, w: g.w, h: g.h, hp: TQ_PAREDE_HP, destruida: false };
     });
   }
@@ -512,9 +806,12 @@
     return false;
   }
 
-  /* ── Partida ──────────────────────────────────────────────────*/
-  function _tqReiniciarPartida() {
+  /* ── Partida ──────────────────────────────────────────────────
+     mapaIdx: índice do mapa a usar (sincronizado via rede — ver
+     cabeçalho); omitido = sorteia um novo (anfitrião e modo sozinho). */
+  function _tqReiniciarPartida(mapaIdx) {
     _tqPlacarAnfitriao = 0; _tqPlacarConvidado = 0;
+    _tqMapaAtualIdx = (typeof mapaIdx === 'number' && _TQ_MAPAS[mapaIdx]) ? mapaIdx : _tqEscolherMapa();
     _tqIniciarRodada();
     _tqAtualizarHUD();
   }
@@ -528,10 +825,20 @@
     _tqPausaVencedor = null;
     _tqCooldownAnfitriao = 0; _tqCooldownConvidado = 0;
     _tqIAModo = 'patrulha'; _tqIATimer = 0;
+    // Reset do "game feel" — sem isso um tremor/recuo em andamento ou
+    // marcas de esteira da rodada anterior vazariam pro respawn.
+    _tqShakeTimer = 0;
+    _tqRecuoAnfitriao = 0; _tqRecuoConvidado = 0;
+    _tqRastro = [];
+    _tqUltimaPosAnfitriao = null; _tqUltimaPosConvidado = null;
   }
 
   function _tqComecarPartida() {
     _tqMostrarTela('jogando');
+    // Reforça o pedido de landscape aqui (a tela cheia do hub muitas
+    // vezes só termina de abrir agora) — mesmo padrão da Corrida.
+    _tqTravarLandscape();
+    _tqAplicarOrientacaoRepetido();
     _tqUltimoTs = 0;
     if (_tqRAF) cancelAnimationFrame(_tqRAF);
     _tqRAF = requestAnimationFrame(_tqLoop);
@@ -548,9 +855,38 @@
       if (_tqRodadaEstado === 'jogando') _tqAtualizarTanque(_tqMeuTanque(), _tqInputVec.x, _tqInputVec.y, dt);
       if (_tqSouAnfitriao) _tqSimularMundo(dt);
       else _tqEnviarMeuTanque();
+      _tqAtualizarGameFeel(dt);
     }
     _tqDesenhar();
     _tqRAF = requestAnimationFrame(_tqLoop);
+  }
+
+  // Roda todo quadro (dos dois lados): decai tremor/recuo e registra
+  // marcas de esteira com base no deslocamento OBSERVADO dos tanques —
+  // funciona igual pro tanque local, pra IA e pro tanque remoto (cuja
+  // posição só chega via rede), sem precisar de mensagem nova.
+  function _tqAtualizarGameFeel(dt) {
+    if (_tqShakeTimer > 0) _tqShakeTimer = Math.max(0, _tqShakeTimer - dt);
+    if (_tqRecuoAnfitriao > 0) _tqRecuoAnfitriao = Math.max(0, _tqRecuoAnfitriao - dt * TQ_RECUO_DECAI);
+    if (_tqRecuoConvidado > 0) _tqRecuoConvidado = Math.max(0, _tqRecuoConvidado - dt * TQ_RECUO_DECAI);
+
+    if (_tqRodadaEstado === 'jogando') {
+      _tqUltimaPosAnfitriao = _tqRegistrarRastro(_tqTanqueAnfitriao, _tqUltimaPosAnfitriao);
+      _tqUltimaPosConvidado = _tqRegistrarRastro(_tqTanqueConvidado, _tqUltimaPosConvidado);
+    }
+    for (var i = _tqRastro.length - 1; i >= 0; i--) {
+      _tqRastro[i].vida -= dt;
+      if (_tqRastro[i].vida <= 0) _tqRastro.splice(i, 1);
+    }
+  }
+
+  function _tqRegistrarRastro(t, ultimaPos) {
+    if (!ultimaPos) return { x: t.x, y: t.y };
+    var dx = t.x - ultimaPos.x, dy = t.y - ultimaPos.y;
+    if (Math.hypot(dx, dy) < TQ_RASTRO_DIST_MIN) return ultimaPos;
+    _tqRastro.push({ x: t.x, y: t.y, ang: t.ang, vida: TQ_RASTRO_VIDA });
+    if (_tqRastro.length > TQ_RASTRO_MAX) _tqRastro.shift();
+    return { x: t.x, y: t.y };
   }
 
   // Gira o tanque em direção ao vetor de entrada (limitado por
@@ -569,7 +905,7 @@
     t.ang += diff;
     var v = TQ_VELOCIDADE * mag * dt;
     var dx = Math.sin(t.ang) * v, dy = -Math.cos(t.ang) * v;
-    var novoX = _tqClamp(t.x + dx, TQ_RAIO_TANQUE, 1 - TQ_RAIO_TANQUE);
+    var novoX = _tqClamp(t.x + dx, TQ_RAIO_TANQUE, MUNDO_LARGURA - TQ_RAIO_TANQUE);
     if (!_tqColideParede(novoX, t.y, TQ_RAIO_TANQUE)) t.x = novoX;
     var novoY = _tqClamp(t.y + dy, TQ_RAIO_TANQUE, 1 - TQ_RAIO_TANQUE);
     if (!_tqColideParede(t.x, novoY, TQ_RAIO_TANQUE)) t.y = novoY;
@@ -598,7 +934,7 @@
     for (var i = _tqProjeteis.length - 1; i >= 0; i--) {
       var pr = _tqProjeteis[i];
       pr.x += pr.vx * dt; pr.y += pr.vy * dt;
-      if (pr.x < 0 || pr.x > 1 || pr.y < 0 || pr.y > 1) { _tqProjeteis.splice(i, 1); continue; }
+      if (pr.x < 0 || pr.x > MUNDO_LARGURA || pr.y < 0 || pr.y > 1) { _tqProjeteis.splice(i, 1); continue; }
 
       var atingiuParede = false;
       for (var j = 0; j < _tqParedes.length; j++) {
@@ -606,7 +942,7 @@
         if (p.destruida) continue;
         if (_tqCircRect(pr.x, pr.y, TQ_RAIO_PROJETIL, p)) {
           p.hp--;
-          if (p.hp <= 0) p.destruida = true;
+          if (p.hp <= 0) { p.destruida = true; _tqAcionarShake(TQ_SHAKE_PAREDE_DUR, TQ_SHAKE_PAREDE_FORCA); }
           atingiuParede = true;
           break;
         }
@@ -627,6 +963,7 @@
 
   function _tqFimDeRodada(vencedor) {
     if (vencedor === 'anfitriao') _tqPlacarAnfitriao++; else _tqPlacarConvidado++;
+    _tqAcionarShake(TQ_SHAKE_ACERTO_DUR, TQ_SHAKE_ACERTO_FORCA);
     _tqRodadaEstado = 'pausa';
     _tqPausaTimer = TQ_PAUSA_RODADA;
     _tqPausaVencedor = vencedor;
@@ -651,11 +988,17 @@
       vx: Math.sin(ang) * TQ_VEL_PROJETIL, vy: -Math.cos(ang) * TQ_VEL_PROJETIL,
       dono: dono
     });
+    // Recuo — cobre a IA (modo sozinho) e a visão que o anfitrião tem
+    // do tiro do convidado (autoridade nasce aqui pros dois casos). O
+    // feedback do PRÓPRIO jogador ao apertar fogo já é instantâneo via
+    // _tqTentarAtirar, sem esperar a rede.
+    if (dono === 'anfitriao') _tqRecuoAnfitriao = 1; else _tqRecuoConvidado = 1;
   }
 
   function _tqTentarAtirar() {
     if (_tqEstado !== 'jogando' || _tqRodadaEstado !== 'jogando' || _tqMeuCooldown > 0) return;
     _tqMeuCooldown = TQ_COOLDOWN_TIRO;
+    if (_tqSouAnfitriao) _tqRecuoAnfitriao = 1; else _tqRecuoConvidado = 1;
     var t = _tqMeuTanque();
     if (_tqSouAnfitriao) {
       if (_tqCooldownAnfitriao <= 0) {
@@ -708,11 +1051,11 @@
     if (_tqIATimer <= 0) {
       _tqIATimer = 0.4 + Math.random() * 0.5;
       var dist = Math.hypot(alvo.x - eu.x, alvo.y - eu.y);
-      if (dist < 0.62 && _tqLinhaLivre(eu, alvo)) {
+      if (dist < TQ_IA_DIST_ENGAJAR && _tqLinhaLivre(eu, alvo)) {
         _tqIAModo = 'engajar';
       } else {
         _tqIAModo = 'patrulha';
-        _tqIAAlvoPatrulha = { x: 0.18 + Math.random() * 0.64, y: 0.18 + Math.random() * 0.64 };
+        _tqIAAlvoPatrulha = { x: 0.18 + Math.random() * (MUNDO_LARGURA - 0.36), y: 0.18 + Math.random() * 0.64 };
       }
     }
 
@@ -785,23 +1128,58 @@
     }
   }
 
-  /* ── Desenho (top-down direto, sem perspectiva — arena quadrada) ─ */
+  /* ── Desenho (top-down direto, sem perspectiva — arena widescreen) ─ */
   var TQ_COR_ANFITRIAO = '#3aa0ff';
   var TQ_COR_CONVIDADO = '#ff4757';
 
   function _tqDesenhar() {
     if (!_tqCtx || !_tqW || !_tqH) return;
     var ctx = _tqCtx;
+    // O clear fica FORA do save/translate do tremor — limpa o quadro
+    // inteiro sem deslocamento, senão sobrariam frestas nas bordas.
     ctx.clearRect(0, 0, _tqW, _tqH);
+    ctx.save();
+    if (_tqShakeTimer > 0 && _tqShakeDuracaoBase > 0) {
+      var intensidade = _tqShakeForcaBase * (_tqShakeTimer / _tqShakeDuracaoBase);
+      ctx.translate((Math.random() * 2 - 1) * intensidade, (Math.random() * 2 - 1) * intensidade);
+    }
     _tqDesenharChao();
+    _tqDesenharRastro();
     _tqDesenharParedes();
 
     var jogando = (_tqEstado === 'jogando');
     if (jogando) {
       for (var i = 0; i < _tqProjeteis.length; i++) _tqDesenharProjetil(_tqProjeteis[i]);
-      _tqDesenharTanque(_tqTanqueAnfitriao, 'tank-azul.webp', TQ_COR_ANFITRIAO);
-      _tqDesenharTanque(_tqTanqueConvidado, 'tank-vermelho.webp', TQ_COR_CONVIDADO);
+      _tqDesenharTanque(_tqTanqueAnfitriao, 'tank-azul.webp', TQ_COR_ANFITRIAO, _tqRecuoAnfitriao);
+      _tqDesenharTanque(_tqTanqueConvidado, 'tank-vermelho.webp', TQ_COR_CONVIDADO, _tqRecuoConvidado);
       if (_tqRodadaEstado === 'pausa') _tqDesenharAvisoRodada();
+    }
+    ctx.restore();
+  }
+
+  // Marcas de esteira: um par de tracinhos escuros por marca, girados
+  // pro ângulo do tanque no momento em que passou ali, sumindo aos
+  // poucos (fade por alpha) — desenhadas sobre o chão, embaixo de
+  // paredes/tanques.
+  function _tqDesenharRastro() {
+    if (!_tqRastro.length) return;
+    var ctx = _tqCtx;
+    // _tqH (não _tqW) é o fator uniforme px-por-unidade nos dois eixos —
+    // ver nota "ARENA E LANDSCAPE" no cabeçalho do arquivo.
+    var diametroTela = TQ_RAIO_TANQUE * 2 * _tqH;
+    var afastamento = diametroTela * 0.30;
+    var compr = diametroTela * 0.22, larg = diametroTela * 0.09;
+    for (var i = 0; i < _tqRastro.length; i++) {
+      var m = _tqRastro[i];
+      var alpha = Math.max(0, Math.min(1, m.vida / TQ_RASTRO_VIDA)) * 0.28;
+      if (alpha <= 0.01) continue;
+      ctx.save();
+      ctx.translate(m.x * _tqH, m.y * _tqH);
+      ctx.rotate(m.ang);
+      ctx.fillStyle = 'rgba(0,0,0,' + alpha.toFixed(3) + ')';
+      ctx.fillRect(-afastamento - larg / 2, -compr / 2, larg, compr);
+      ctx.fillRect(afastamento - larg / 2, -compr / 2, larg, compr);
+      ctx.restore();
     }
   }
 
@@ -824,7 +1202,7 @@
     var regEscombro = _tqAsset('parede-escombros.webp');
     for (var i = 0; i < _tqParedes.length; i++) {
       var p = _tqParedes[i];
-      var px = p.x * _tqW, py = p.y * _tqH, pw = p.w * _tqW, ph = p.h * _tqH;
+      var px = p.x * _tqH, py = p.y * _tqH, pw = p.w * _tqH, ph = p.h * _tqH;
       var reg = p.destruida ? regEscombro : regTijolo;
       if (reg && reg.ok && reg.img) {
         ctx.drawImage(reg.img, px, py, pw, ph);
@@ -838,10 +1216,10 @@
   function _tqDesenharProjetil(pr) {
     var ctx = _tqCtx;
     var cor = pr.dono === 'anfitriao' ? TQ_COR_ANFITRIAO : TQ_COR_CONVIDADO;
-    var x = pr.x * _tqW, y = pr.y * _tqH;
+    var x = pr.x * _tqH, y = pr.y * _tqH;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(x, y, TQ_RAIO_PROJETIL * _tqW * 1.1, 0, Math.PI * 2);
+    ctx.arc(x, y, TQ_RAIO_PROJETIL * _tqH * 1.1, 0, Math.PI * 2);
     ctx.fillStyle = '#fff';
     ctx.shadowColor = cor;
     ctx.shadowBlur = 10;
@@ -854,15 +1232,20 @@
   // então giram em torno do CENTRO DO CASCO (não do centro da
   // imagem, que inclui o cano saindo pra cima de forma assimétrica).
   var TQ_PIVO_Y = 0.63;
-  function _tqDesenharTanque(t, arquivo, corFallback) {
+  function _tqDesenharTanque(t, arquivo, corFallback, recuo) {
     var ctx = _tqCtx;
     var reg = _tqAsset(arquivo);
-    var cx = t.x * _tqW, cy = t.y * _tqH;
-    var diametroTela = TQ_RAIO_TANQUE * 2 * _tqW;
+    var cx = t.x * _tqH, cy = t.y * _tqH;
+    var diametroTela = TQ_RAIO_TANQUE * 2 * _tqH;
 
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(t.ang);
+    // Recuo do canhão: empurra o desenho pra TRÁS (oposto de onde
+    // mira) por um instante ao atirar. Local: y positivo já é "atrás"
+    // aqui, porque o sprite é desenhado apontando pro -Y (ver comentário
+    // do pivô abaixo) e t.ang=0 mira pro norte.
+    if (recuo > 0) ctx.translate(0, diametroTela * 0.16 * recuo);
 
     if (reg && reg.ok && reg.img && reg.w && reg.h) {
       var altura = diametroTela / (TQ_PIVO_Y * 1.32); // casco ocupa ~1.32x o raio em altura

@@ -14,14 +14,42 @@
 .tq-pip-cheio{background:#ffb020;border-color:#ffb020;box-shadow:0 0 6px rgba(255,176,32,.6);}
 .tq-hud-x{font-size:13px;color:rgba(255,255,255,.35);font-weight:700;}
 
-/* Arena quadrada — top-down, sem perspectiva */
-.tq-arena{position:relative;width:100%;aspect-ratio:1/1;max-height:72vh;margin:0 auto;border-radius:14px;overflow:hidden;background:#0a0f1a;touch-action:none;}
-.tq-arena #tq-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
+/* Arena widescreen (16:9) — top-down, sem perspectiva. Deitado ou com o
+   lock nativo de tela: 16:9 normal. Em pé sem o lock: fica alta (9:16)
+   pra dar área suficiente pro wrapper #tq-rot girar 90° por dentro e
+   preencher como paisagem (ver _tqAplicarOrientacao em tanques.js,
+   mesmo padrão da Corrida). */
+.tq-arena{position:relative;width:100%;aspect-ratio:16/9;max-height:72vh;margin:0 auto;border-radius:14px;overflow:hidden;background:#0a0f1a;touch-action:none;}
+@media (orientation:portrait){
+  .tq-arena{aspect-ratio:9/16;max-height:80vh;}
+}
 
-/* Controles: joystick (esquerda) + botão de fogo (direita), flutuando
-   sobre a arena durante o jogo. */
+/* Wrapper do canvas. Em paisagem (nativa ou lock pego): 100% da arena.
+   Em retrato sem lock: o JS define largura/altura em px (eixos
+   trocados) e o CSS gira 90° + centraliza. */
+.tq-rot{position:absolute;inset:0;}
+.tq-rot #tq-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
+.tq-rot[data-rot="1"]{inset:auto;transform:translate(-50%,-50%) rotate(90deg);transform-origin:center center;}
+
+/* Dica "gire o celular" (só em retrato sem lock nativo; JS controla display) */
+.tq-gire{position:absolute;left:0;right:0;bottom:10px;z-index:3;display:flex;justify-content:center;pointer-events:none;}
+.tq-gire span{display:inline-flex;align-items:center;gap:8px;background:rgba(0,0,0,.6);color:#ffd24a;font-size:12px;font-weight:700;padding:7px 14px;border-radius:999px;backdrop-filter:blur(2px);}
+.tq-gire i{animation:tq-rot-hint 1.6s ease-in-out infinite;}
+@keyframes tq-rot-hint{0%,100%{transform:rotate(0deg);}50%{transform:rotate(90deg);}}
+
+/* Controles: joystick FLUTUANTE (esquerda) + botão de fogo (direita),
+   sobre a arena durante o jogo.
+   tq-joy-zona é a metade esquerda invisível que captura o toque; o
+   círculo do joystick (tq-joystick) nasce exatamente onde o dedo
+   encostou (posição em left/top via JS) em vez de ficar fixo — evita
+   o jogador errar o botão e ter que olhar pro dedo em vez do jogo.
+   Gira junto com #tq-rot (mesmo data-rot, ver tanques.js) pra
+   continuar alinhado com a arena em retrato sem lock nativo. */
 .tq-controles{position:absolute;inset:0;pointer-events:none;z-index:3;}
-.tq-joystick{position:absolute;left:18px;bottom:18px;width:96px;height:96px;border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.18);pointer-events:auto;touch-action:none;}
+.tq-controles[data-rot="1"]{inset:auto;transform:translate(-50%,-50%) rotate(90deg);transform-origin:center center;}
+.tq-joy-zona{position:absolute;left:0;top:0;bottom:0;width:58%;pointer-events:auto;touch-action:none;}
+.tq-joystick{position:absolute;left:0;top:0;width:96px;height:96px;margin:-48px 0 0 -48px;border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.18);pointer-events:none;touch-action:none;opacity:0;transition:opacity .12s ease;}
+.tq-joystick.tq-joystick-ativo{opacity:1;}
 .tq-joystick-thumb{position:absolute;left:50%;top:50%;width:42px;height:42px;margin:-21px 0 0 -21px;border-radius:50%;background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.4);transition:transform .04s linear;pointer-events:none;}
 .tq-fire-btn{position:absolute;right:22px;bottom:26px;width:74px;height:74px;border-radius:50%;background:rgba(255,71,87,.22);border:2px solid rgba(255,71,87,.55);color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 18px rgba(255,71,87,.3);}
 .tq-fire-btn:active{transform:scale(.92);background:rgba(255,71,87,.38);}

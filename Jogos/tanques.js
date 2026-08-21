@@ -45,7 +45,24 @@
    também tem moitas (não bloqueiam) — escondem o tanque que estiver
    dentro E não tiver atirado nos últimos TQ_MOITA_REVELA_SEG segundos
    (ver _tqEmMoita/_tqEscondido*), tanto do desenho do adversário
-   quanto da mira da IA.
+   quanto da mira da IA. Algumas paredes têm tipo:'metal' (ver
+   _tqMontarMapa/_tqResetParedes) — em vez de levar dano, ricocheteiam
+   o tiro (_tqRefletirEmParede), consumindo o mesmo orçamento de
+   quiques da borda da arena (TQ_RICOCHETE_MAX).
+
+   BARRIS EXPLOSIVOS: pontos fixos por mapa (_TQ_MAPAS[].barris, ver
+   _tqMontarPontos — mesma ideia de _tqMontarMapa, mas pra geometria de
+   PONTO em vez de retângulo), resetados (não-destruídos) a cada
+   RODADA igual as paredes (ver _tqResetBarris). Só o ANFITRIÃO detecta
+   o acerto (mesma autoridade de paredes/projéteis/caixas) — qualquer
+   tiro que encostar detona o barril inteiro (_tqExplodirBarril),
+   aplicando dano de área (TQ_BARRIL_RAIO_EXPLOSAO) nos tanques por
+   perto via a MESMA _tqAplicarDano dos tiros diretos (escudo/HP/
+   Pesado funcionam sem código extra). O estado (destruído) sincroniza
+   pro convidado em 'e' (campo "bd", mesmo padrão do "pd" das paredes);
+   o efeito visual da explosão é local e não sincronizado — cada lado
+   dispara a própria animação ao detectar a transição pra destruído
+   (_tqDispararExplosaoVisual).
 
    CLASSES E PODER-UPS: cada jogador escolhe sua classe (Padrão/Leve/
    Pesado — ver TQ_CLASSES) no menu antes de jogar; a própria já é
@@ -105,7 +122,9 @@
   var TQ_PAREDE_HP     = 2;          // tiros até a parede virar escombro
   var TQ_DEADZONE      = 0.12;       // magnitude mínima do joystick pra contar como "empurrado"
   var TQ_PAUSA_RODADA  = 1.4;        // segundos de pausa mostrando quem venceu a rodada
-  var TQ_RICOCHETE_MAX = 1;          // quantas vezes um tiro pode quicar na borda da arena antes de sumir
+  var TQ_RICOCHETE_MAX = 1;          // quantas vezes um tiro pode quicar na borda da arena (ou em parede metálica) antes de sumir
+  var TQ_BARRIL_RAIO          = 0.05;   // raio de colisão do barril (mesma escala de TQ_RAIO_TANQUE/CAIXA)
+  var TQ_BARRIL_RAIO_EXPLOSAO = 0.34;   // raio de dano em área ao explodir
 
   // Viewport = "janela" que a câmera mostra (mesma proporção/tamanho
   // de sempre); MUNDO_* = mapa inteiro, um múltiplo do viewport — ver
@@ -173,68 +192,98 @@
      mapa tem paredes (bloqueiam e levam dano) e moitas (não bloqueiam
      — escondem o tanque que estiver dentro, ver _tqEmMoita/_tqEscondido*). */
   function _tqMontarMapa(metade, centro) {
-    var e = TQ_MUNDO_ESCALA, lista = [], i, b, bx, by, bw, bh;
+    var e = TQ_MUNDO_ESCALA, lista = [], i, b, bx, by, bw, bh, tipo;
     for (i = 0; i < metade.length; i++) {
       b = metade[i];
       bx = b.x * e; by = b.y * e; bw = b.w * e; bh = b.h * e;
-      lista.push({ x: bx, y: by, w: bw, h: bh });
-      lista.push({ x: MUNDO_LARGURA - bx - bw, y: MUNDO_ALTURA - by - bh, w: bw, h: bh });
+      tipo = b.tipo || 'tijolo';
+      lista.push({ x: bx, y: by, w: bw, h: bh, tipo: tipo });
+      lista.push({ x: MUNDO_LARGURA - bx - bw, y: MUNDO_ALTURA - by - bh, w: bw, h: bh, tipo: tipo });
     }
-    if (centro) lista.push({ x: centro.x * e, y: centro.y * e, w: centro.w * e, h: centro.h * e });
+    if (centro) lista.push({ x: centro.x * e, y: centro.y * e, w: centro.w * e, h: centro.h * e, tipo: centro.tipo || 'tijolo' });
+    return lista;
+  }
+  // Espelha uma lista de PONTOS (não retângulos) pela mesma regra de
+  // simetria 180° de _tqMontarMapa — usado pelos barris, que só têm
+  // x/y (sem w/h).
+  function _tqMontarPontos(metade) {
+    var e = TQ_MUNDO_ESCALA, lista = [], i, p, px, py;
+    for (i = 0; i < metade.length; i++) {
+      p = metade[i];
+      px = p.x * e; py = p.y * e;
+      lista.push({ x: px, y: py });
+      lista.push({ x: MUNDO_LARGURA - px, y: MUNDO_ALTURA - py });
+    }
     return lista;
   }
   var _TQ_MAPAS = [
     // 1. Clássico — pilar + bloco, variação do layout original
+    // (pilar central agora é metálico — ricocheteia em vez de quebrar)
     {
       paredes: _tqMontarMapa([
         { x: 0.42, y: 0.10, w: 0.07, h: 0.22 },
         { x: 0.40, y: 0.66, w: 0.20, h: 0.08 }
-      ], { x: 0.8439, y: 0.46, w: 0.09, h: 0.09 }),
-      moitas: _tqMontarMapa([{ x: 0.26, y: 0.40, w: 0.13, h: 0.18 }])
+      ], { x: 0.8439, y: 0.46, w: 0.09, h: 0.09, tipo: 'metal' }),
+      moitas: _tqMontarMapa([{ x: 0.26, y: 0.40, w: 0.13, h: 0.18 }]),
+      barris: _tqMontarPontos([{ x: 0.60, y: 0.20 }])
     },
     // 2. Corredores — paredes verticais formando 2 corredores
+    // (+ 1 parede metálica perto do centro)
     {
       paredes: _tqMontarMapa([
         { x: 0.50, y: 0.00, w: 0.06, h: 0.30 },
         { x: 0.50, y: 0.70, w: 0.06, h: 0.30 },
-        { x: 0.78, y: 0.30, w: 0.06, h: 0.40 }
+        { x: 0.78, y: 0.30, w: 0.06, h: 0.40 },
+        { x: 0.64, y: 0.44, w: 0.08, h: 0.14, tipo: 'metal' }
       ]),
-      moitas: _tqMontarMapa([{ x: 0.30, y: 0.62, w: 0.14, h: 0.16 }])
+      moitas: _tqMontarMapa([{ x: 0.30, y: 0.62, w: 0.14, h: 0.16 }]),
+      barris: _tqMontarPontos([{ x: 0.30, y: 0.15 }])
     },
     // 3. Cantos — blocos protegendo os 4 cantos do centro
+    // (+ 1 parede metálica na lateral)
     {
       paredes: _tqMontarMapa([
         { x: 0.34, y: 0.06, w: 0.16, h: 0.09 },
         { x: 0.34, y: 0.85, w: 0.16, h: 0.09 },
-        { x: 0.66, y: 0.44, w: 0.10, h: 0.12 }
+        { x: 0.66, y: 0.44, w: 0.10, h: 0.12 },
+        { x: 0.86, y: 0.42, w: 0.08, h: 0.16, tipo: 'metal' }
       ]),
-      moitas: _tqMontarMapa([{ x: 0.28, y: 0.28, w: 0.12, h: 0.14 }])
+      moitas: _tqMontarMapa([{ x: 0.28, y: 0.28, w: 0.12, h: 0.14 }]),
+      barris: _tqMontarPontos([{ x: 0.50, y: 0.75 }])
     },
     // 4. Cruz — pilar vertical no centro + 2 blocos laterais
+    // (pilar central agora é metálico — ricocheteia em vez de quebrar)
     {
       paredes: _tqMontarMapa([
         { x: 0.62, y: 0.42, w: 0.20, h: 0.16 }
-      ], { x: 0.8389, y: 0.10, w: 0.10, h: 0.80 }),
-      moitas: _tqMontarMapa([{ x: 0.32, y: 0.66, w: 0.14, h: 0.16 }])
+      ], { x: 0.8389, y: 0.10, w: 0.10, h: 0.80, tipo: 'metal' }),
+      moitas: _tqMontarMapa([{ x: 0.32, y: 0.66, w: 0.14, h: 0.16 }]),
+      barris: _tqMontarPontos([{ x: 0.30, y: 0.20 }])
     },
     // 5. Zigue-zague — blocos escalonados
+    // (+ 1 parede metálica isolada)
     {
       paredes: _tqMontarMapa([
         { x: 0.38, y: 0.06, w: 0.09, h: 0.24 },
         { x: 0.55, y: 0.38, w: 0.09, h: 0.24 },
-        { x: 0.72, y: 0.70, w: 0.09, h: 0.24 }
+        { x: 0.72, y: 0.70, w: 0.09, h: 0.24 },
+        { x: 1.35, y: 0.10, w: 0.08, h: 0.16, tipo: 'metal' }
       ]),
-      moitas: _tqMontarMapa([{ x: 0.26, y: 0.44, w: 0.12, h: 0.14 }])
+      moitas: _tqMontarMapa([{ x: 0.26, y: 0.44, w: 0.12, h: 0.14 }]),
+      barris: _tqMontarPontos([{ x: 0.20, y: 0.75 }])
     },
     // 6. Aberto — poucos obstáculos, mapa rápido (2 moitas — mais espaço livre)
+    // (+ 1 parede metálica)
     {
       paredes: _tqMontarMapa([
-        { x: 0.55, y: 0.42, w: 0.11, h: 0.16 }
+        { x: 0.55, y: 0.42, w: 0.11, h: 0.16 },
+        { x: 0.90, y: 0.04, w: 0.08, h: 0.14, tipo: 'metal' }
       ]),
       moitas: _tqMontarMapa([
         { x: 0.30, y: 0.20, w: 0.15, h: 0.17 },
         { x: 0.34, y: 0.64, w: 0.13, h: 0.15 }
-      ])
+      ]),
+      barris: _tqMontarPontos([{ x: 0.20, y: 0.55 }])
     }
   ];
   var _tqMapaAtualIdx = 0;
@@ -257,9 +306,14 @@
   var TQ_SPAWN_ANFITRIAO = { x: TQ_SPAWN_MARGEM, y: MUNDO_ALTURA / 2, ang: Math.PI / 2 };
   var TQ_SPAWN_CONVIDADO = { x: MUNDO_LARGURA - TQ_SPAWN_MARGEM, y: MUNDO_ALTURA / 2, ang: -Math.PI / 2 };
   function _tqPontoLivre(x, y, raio) {
-    var paredes = _TQ_MAPAS[_tqMapaAtualIdx].paredes;
+    var mapa = _TQ_MAPAS[_tqMapaAtualIdx];
+    var paredes = mapa.paredes;
     for (var i = 0; i < paredes.length; i++) {
       if (_tqCircRect(x, y, raio, paredes[i])) return false;
+    }
+    var barris = mapa.barris || [];
+    for (var j = 0; j < barris.length; j++) {
+      if (Math.hypot(x - barris[j].x, y - barris[j].y) < raio + TQ_BARRIL_RAIO) return false;
     }
     return true;
   }
@@ -338,7 +392,8 @@
   var _tqCamera = { x: 0, y: 0 };
 
   var _tqProjeteis = [];      // { x,y,vx,vy,dono } — dono: 'anfitriao' | 'convidado'
-  var _tqParedes = [];        // { x,y,w,h,hp,destruida } — geometria de _TQ_MAPAS[_tqMapaAtualIdx] + estado
+  var _tqParedes = [];        // { x,y,w,h,hp,destruida,tipo } — geometria de _TQ_MAPAS[_tqMapaAtualIdx] + estado
+  var _tqBarris = [];         // { x,y,destruido } — geometria de _TQ_MAPAS[_tqMapaAtualIdx].barris + estado
   var _tqPlacarAnfitriao = 0, _tqPlacarConvidado = 0; // rodadas vencidas na partida
   var _tqRodadaEstado = 'jogando'; // 'jogando' | 'pausa'
   var _tqPausaTimer = 0, _tqPausaVencedor = null;
@@ -369,6 +424,7 @@
   var _tqShakeTimer = 0, _tqShakeDuracaoBase = 0, _tqShakeForcaBase = 0;
   var TQ_SHAKE_PAREDE_DUR = 0.22, TQ_SHAKE_PAREDE_FORCA = 6;   // parede destruída
   var TQ_SHAKE_ACERTO_DUR = 0.38, TQ_SHAKE_ACERTO_FORCA = 11;  // fim de rodada (tanque atingido)
+  var TQ_SHAKE_BARRIL_DUR = 0.30, TQ_SHAKE_BARRIL_FORCA = 9;   // barril explodindo
 
   var _tqRecuoAnfitriao = 0, _tqRecuoConvidado = 0; // 0..1, decai a cada quadro
   var TQ_RECUO_DECAI = 7.5; // por segundo
@@ -378,6 +434,9 @@
   var TQ_RASTRO_DIST_MIN = 0.018;  // distância mínima entre marcas
   var TQ_RASTRO_VIDA     = 2.2;    // segundos até sumir
   var TQ_RASTRO_MAX      = 220;    // teto de marcas simultâneas (performance)
+
+  var _tqExplosoes = [];        // { x, y, t } — efeito visual local (não sincronizado) da explosão de barril
+  var TQ_EXPLOSAO_DUR = 0.45;   // segundos até o anel sumir
 
   /* ── IA (modo sozinho) ───────────────────────────────────────── */
   var _tqIATimer = 0, _tqIAModo = 'patrulha', _tqIAAlvoPatrulha = { x: MUNDO_LARGURA / 2, y: MUNDO_ALTURA / 2 };
@@ -449,6 +508,7 @@
     _tqMostrarTela('inicio');
     _tqLimparErroMenu();
     _tqResetParedes();
+    _tqResetBarris();
     _tqAplicarOrientacaoRepetido();
     _tqDesenhar();
   }
@@ -706,6 +766,7 @@
         if (!_tqSouAnfitriao && typeof dado.mapa === 'number' && _TQ_MAPAS[dado.mapa]) {
           _tqMapaAtualIdx = dado.mapa;
           _tqResetParedes();
+          _tqResetBarris();
         }
         // Idem pro spawn: o anfitrião já sorteou (_tqReiniciarPartida
         // rodou antes de mandar o 'oi', ver 'conectado') — o convidado
@@ -762,6 +823,17 @@
               var novaDestruida = !!dado.pd[i];
               if (novaDestruida && !_tqParedes[i].destruida) _tqAcionarShake(TQ_SHAKE_PAREDE_DUR, TQ_SHAKE_PAREDE_FORCA);
               _tqParedes[i].destruida = novaDestruida;
+            }
+          }
+          if (dado.bd) {
+            // Mesmo padrão do "pd" acima: detecta a transição
+            // intacto→destruído pra disparar o efeito visual da
+            // explosão também do lado do convidado (o anfitrião já
+            // dispara sozinho em _tqExplodirBarril, que só roda nele).
+            for (var bi = 0; bi < _tqBarris.length && bi < dado.bd.length; bi++) {
+              var novoDestruido = !!dado.bd[bi];
+              if (novoDestruido && !_tqBarris[bi].destruido) _tqDispararExplosaoVisual(_tqBarris[bi].x, _tqBarris[bi].y);
+              _tqBarris[bi].destruido = novoDestruido;
             }
           }
           _tqPlacarAnfitriao = dado.sa || 0; _tqPlacarConvidado = dado.sg || 0;
@@ -1087,8 +1159,32 @@
      o próximo _tqReiniciarPartida). */
   function _tqResetParedes() {
     _tqParedes = _TQ_MAPAS[_tqMapaAtualIdx].paredes.map(function (g) {
-      return { x: g.x, y: g.y, w: g.w, h: g.h, hp: TQ_PAREDE_HP, destruida: false };
+      return { x: g.x, y: g.y, w: g.w, h: g.h, hp: TQ_PAREDE_HP, destruida: false, tipo: g.tipo || 'tijolo' };
     });
+  }
+
+  // Barris: estado (destruído) — geometria vem do mapa sorteado da
+  // partida (_TQ_MAPAS[_tqMapaAtualIdx].barris, fixo até o próximo
+  // _tqReiniciarPartida). Reseta a cada RODADA, igual às paredes —
+  // nenhum barril continua destruído de uma rodada pra outra.
+  function _tqResetBarris() {
+    _tqBarris = (_TQ_MAPAS[_tqMapaAtualIdx].barris || []).map(function (g) {
+      return { x: g.x, y: g.y, destruido: false };
+    });
+  }
+
+  // Runtime (respeita "destruido") — usado pra bloquear movimento,
+  // linha de visão da IA e posicionamento de caixas. Diferente de
+  // _tqPontoLivre (usada só na escolha de spawn), que consulta a
+  // geometria ESTÁTICA do mapa direto, sem depender de _tqBarris já
+  // estar montado nesse instante.
+  function _tqColideBarril(cx, cy, raio) {
+    for (var i = 0; i < _tqBarris.length; i++) {
+      var b = _tqBarris[i];
+      if (b.destruido) continue;
+      if (Math.hypot(cx - b.x, cy - b.y) < raio + TQ_BARRIL_RAIO) return true;
+    }
+    return false;
   }
 
   // Moitas: não bloqueiam movimento nem tiro — só escondem quem estiver
@@ -1145,6 +1241,7 @@
     _tqTanqueConvidado.hp = TQ_CLASSES[_tqClasseConvidado] ? TQ_CLASSES[_tqClasseConvidado].hpMax : 1;
     _tqProjeteis = [];
     _tqResetParedes();
+    _tqResetBarris();
     _tqRodadaEstado = 'jogando';
     _tqPausaVencedor = null;
     _tqCooldownAnfitriao = 0; _tqCooldownConvidado = 0;
@@ -1154,6 +1251,7 @@
     _tqShakeTimer = 0;
     _tqRecuoAnfitriao = 0; _tqRecuoConvidado = 0;
     _tqRastro = [];
+    _tqExplosoes = [];
     _tqUltimaPosAnfitriao = null; _tqUltimaPosConvidado = null;
     _tqRevelarAnfitriao = 0; _tqRevelarConvidado = 0;
     _tqEscondidoAnfitriao = false; _tqEscondidoConvidado = false;
@@ -1222,6 +1320,12 @@
       _tqRastro[i].vida -= dt;
       if (_tqRastro[i].vida <= 0) _tqRastro.splice(i, 1);
     }
+    // Explosões de barril: só a duração da animação (TQ_EXPLOSAO_DUR),
+    // sem sincronizar nada — cada lado dispara/consome a própria lista.
+    for (var j = _tqExplosoes.length - 1; j >= 0; j--) {
+      _tqExplosoes[j].t += dt;
+      if (_tqExplosoes[j].t >= TQ_EXPLOSAO_DUR) _tqExplosoes.splice(j, 1);
+    }
   }
 
   function _tqRegistrarRastro(t, ultimaPos) {
@@ -1250,9 +1354,9 @@
     var v = TQ_VELOCIDADE * _tqClasseDoTanque(t).velMul * mag * dt;
     var dx = Math.sin(t.ang) * v, dy = -Math.cos(t.ang) * v;
     var novoX = _tqClamp(t.x + dx, TQ_RAIO_TANQUE, MUNDO_LARGURA - TQ_RAIO_TANQUE);
-    if (!_tqColideParede(novoX, t.y, TQ_RAIO_TANQUE)) t.x = novoX;
+    if (!_tqColideParede(novoX, t.y, TQ_RAIO_TANQUE) && !_tqColideBarril(novoX, t.y, TQ_RAIO_TANQUE)) t.x = novoX;
     var novoY = _tqClamp(t.y + dy, TQ_RAIO_TANQUE, MUNDO_ALTURA - TQ_RAIO_TANQUE);
-    if (!_tqColideParede(t.x, novoY, TQ_RAIO_TANQUE)) t.y = novoY;
+    if (!_tqColideParede(t.x, novoY, TQ_RAIO_TANQUE) && !_tqColideBarril(t.x, novoY, TQ_RAIO_TANQUE)) t.y = novoY;
   }
 
   // Só o anfitrião chama: avança a IA (modo sozinho), os projéteis e
@@ -1312,8 +1416,8 @@
       x = TQ_CAIXA_RAIO + Math.random() * (MUNDO_LARGURA - TQ_CAIXA_RAIO * 2);
       y = TQ_CAIXA_RAIO + Math.random() * (MUNDO_ALTURA - TQ_CAIXA_RAIO * 2);
       tentativas++;
-    } while (_tqColideParede(x, y, TQ_CAIXA_RAIO) && tentativas < 12);
-    if (tentativas >= 12 && _tqColideParede(x, y, TQ_CAIXA_RAIO)) return;
+    } while ((_tqColideParede(x, y, TQ_CAIXA_RAIO) || _tqColideBarril(x, y, TQ_CAIXA_RAIO)) && tentativas < 12);
+    if (tentativas >= 12 && (_tqColideParede(x, y, TQ_CAIXA_RAIO) || _tqColideBarril(x, y, TQ_CAIXA_RAIO))) return;
     var tipo = TQ_TIPOS_CAIXA[Math.floor(Math.random() * TQ_TIPOS_CAIXA.length)];
     _tqCaixas.push({ id: _tqProxCaixaId++, x: x, y: y, tipo: tipo });
   }
@@ -1365,6 +1469,16 @@
         var p = _tqParedes[j];
         if (p.destruida) continue;
         if (_tqCircRect(pr.x, pr.y, TQ_RAIO_PROJETIL, p)) {
+          if (p.tipo === 'metal') {
+            // Metálica: ricocheteia em vez de levar dano, consumindo o
+            // MESMO orçamento de quiques da borda da arena (sem
+            // contador novo) — sem quique sobrando, some igual bateu
+            // numa parede normal.
+            if (pr.rebotes >= TQ_RICOCHETE_MAX) { atingiuParede = true; break; }
+            pr.rebotes++;
+            _tqRefletirEmParede(pr, p);
+            break;
+          }
           p.hp--;
           if (p.hp <= 0) { p.destruida = true; _tqAcionarShake(TQ_SHAKE_PAREDE_DUR, TQ_SHAKE_PAREDE_FORCA); }
           atingiuParede = true;
@@ -1372,6 +1486,22 @@
         }
       }
       if (atingiuParede) { _tqProjeteis.splice(i, 1); continue; }
+
+      // Barris explosivos: qualquer projétil que encostar detona o
+      // barril inteiro (dano em área, ver _tqExplodirBarril) — testado
+      // ANTES do tanque pra não acertar os dois no mesmo quadro.
+      var atingiuBarril = false;
+      for (var k = 0; k < _tqBarris.length; k++) {
+        var br = _tqBarris[k];
+        if (br.destruido) continue;
+        if (Math.hypot(pr.x - br.x, pr.y - br.y) < TQ_BARRIL_RAIO + TQ_RAIO_PROJETIL) {
+          atingiuBarril = true;
+          _tqProjeteis.splice(i, 1);
+          if (_tqExplodirBarril(k)) return;
+          break;
+        }
+      }
+      if (atingiuBarril) continue;
 
       // Só pode acertar o tanque do OUTRO lado (não tem "fogo amigo"
       // consigo mesmo — nem faria sentido, o alvo é sempre o rival).
@@ -1409,6 +1539,59 @@
     }
     _tqAcionarShake(TQ_SHAKE_ACERTO_DUR * 0.6, TQ_SHAKE_ACERTO_FORCA * 0.6); // atingido mas sobreviveu (Pesado)
     return false;
+  }
+
+  // Ricochete em parede metálica: acha o ponto mais próximo do centro
+  // do projétil dentro do retângulo (mesma técnica de _tqCircRect) e
+  // inverte a velocidade no eixo em que ele "entrou" mais fundo —
+  // lateral (esquerda/direita) inverte vx, topo/base inverte vy.
+  // Empurra o projétil um pouco pra fora da parede, senão ele
+  // colidiria de novo no quadro seguinte e ficaria preso.
+  function _tqRefletirEmParede(pr, p) {
+    var nx = _tqClamp(pr.x, p.x, p.x + p.w);
+    var ny = _tqClamp(pr.y, p.y, p.y + p.h);
+    var dx = pr.x - nx, dy = pr.y - ny;
+    if (dx === 0 && dy === 0) {
+      // Centro do projétil já dentro do retângulo (colisão de raspão) —
+      // usa a distância até a borda mais próxima pra decidir o eixo.
+      var distEsq = pr.x - p.x, distDir = (p.x + p.w) - pr.x;
+      var distTopo = pr.y - p.y, distBase = (p.y + p.h) - pr.y;
+      var minH = Math.min(distEsq, distDir), minV = Math.min(distTopo, distBase);
+      if (minH < minV) { pr.vx = -pr.vx; pr.x += distEsq < distDir ? -0.01 : 0.01; }
+      else { pr.vy = -pr.vy; pr.y += distTopo < distBase ? -0.01 : 0.01; }
+      return;
+    }
+    if (Math.abs(dx) > Math.abs(dy)) { pr.vx = -pr.vx; pr.x = nx + (dx > 0 ? 0.01 : -0.01); }
+    else { pr.vy = -pr.vy; pr.y = ny + (dy > 0 ? 0.01 : -0.01); }
+  }
+
+  // Efeito visual da explosão (não sincronizado — cada lado dispara a
+  // própria animação ao detectar a transição pra destruído, ver
+  // cabeçalho do arquivo e dado.bd em _tqReceberMensagem).
+  function _tqDispararExplosaoVisual(x, y) {
+    _tqExplosoes.push({ x: x, y: y, t: 0 });
+  }
+
+  // Detona um barril: marca destruído, dispara o tremor de tela e o
+  // efeito visual, e aplica dano de área nos tanques dentro do raio —
+  // reaproveita _tqAplicarDano (escudo/HP/Pesado funcionam automático,
+  // igual tiro direto). Retorna true se algum lado morreu (rodada
+  // acabou), mesmo contrato de _tqAplicarDano, pro chamador parar de
+  // processar o resto dos projéteis do quadro.
+  function _tqExplodirBarril(idx) {
+    var br = _tqBarris[idx];
+    if (!br || br.destruido) return false;
+    br.destruido = true;
+    _tqAcionarShake(TQ_SHAKE_BARRIL_DUR, TQ_SHAKE_BARRIL_FORCA);
+    _tqDispararExplosaoVisual(br.x, br.y);
+    var fatal = false;
+    if (Math.hypot(_tqTanqueAnfitriao.x - br.x, _tqTanqueAnfitriao.y - br.y) < TQ_BARRIL_RAIO_EXPLOSAO) {
+      if (_tqAplicarDano('anfitriao')) fatal = true;
+    }
+    if (!fatal && Math.hypot(_tqTanqueConvidado.x - br.x, _tqTanqueConvidado.y - br.y) < TQ_BARRIL_RAIO_EXPLOSAO) {
+      if (_tqAplicarDano('convidado')) fatal = true;
+    }
+    return fatal;
   }
 
   function _tqFimDeRodada(vencedor) {
@@ -1495,9 +1678,10 @@
     if (!fim && (agora - _tqUltimoEnvioEstado) < 33) return;
     _tqUltimoEnvioEstado = agora;
     var pd = _tqParedes.map(function (p) { return p.destruida ? 1 : 0; });
+    var bd = _tqBarris.map(function (b) { return b.destruido ? 1 : 0; });
     window.AngatubaMP.enviar({
       t: 'e', hx: _tqTanqueAnfitriao.x, hy: _tqTanqueAnfitriao.y, hang: _tqTanqueAnfitriao.ang,
-      pj: _tqProjeteis, pd: pd, ea: _tqEscondidoAnfitriao,
+      pj: _tqProjeteis, pd: pd, bd: bd, ea: _tqEscondidoAnfitriao,
       hhp: _tqTanqueAnfitriao.hp, ghp: _tqTanqueConvidado.hp,
       cx: _tqCaixas, esa: _tqEscudoAnfitriao, esg: _tqEscudoConvidado, rg: _tqRapidoConvidado,
       sa: _tqPlacarAnfitriao, sg: _tqPlacarConvidado, re: _tqRodadaEstado, fim: !!fim,
@@ -1511,7 +1695,7 @@
     for (var i = 1; i < passos; i++) {
       var t = i / passos;
       var x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
-      if (_tqColideParede(x, y, 0.01)) return false;
+      if (_tqColideParede(x, y, 0.01) || _tqColideBarril(x, y, 0.01)) return false;
     }
     return true;
   }
@@ -1628,6 +1812,7 @@
     _tqDesenharMoitas();
     _tqDesenharParedes();
     _tqDesenharCaixas();
+    _tqDesenharBarris();
 
     var jogando = (_tqEstado === 'jogando');
     if (jogando) {
@@ -1638,6 +1823,7 @@
       if (_tqSouAnfitriao || !_tqEscondidoAnfitriao) _tqDesenharTanque(_tqTanqueAnfitriao, 'tank-azul.webp', TQ_COR_ANFITRIAO, _tqRecuoAnfitriao, _tqEscudoAnfitriao);
       if (!_tqSouAnfitriao || !_tqEscondidoConvidado) _tqDesenharTanque(_tqTanqueConvidado, 'tank-vermelho.webp', TQ_COR_CONVIDADO, _tqRecuoConvidado, _tqEscudoConvidado);
     }
+    _tqDesenharExplosoes();
     ctx.restore();
     if (jogando && _tqRodadaEstado === 'pausa') _tqDesenharAvisoRodada();
     ctx.restore();
@@ -1765,6 +1951,20 @@
     for (var i = 0; i < _tqParedes.length; i++) {
       var p = _tqParedes[i];
       var px = p.x * _tqH, py = p.y * _tqH, pw = p.w * _tqH, ph = p.h * _tqH;
+      if (p.tipo === 'metal') {
+        // Metálica: não tem asset (nunca vira escombro, é sempre a
+        // mesma aparência) — vetor cinza-aço com uma faixa clara de
+        // "reflexo", pra diferenciar de longe do tijolo marrom.
+        ctx.fillStyle = '#7a828c';
+        ctx.fillRect(px, py, pw, ph);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        if (pw >= ph) ctx.fillRect(px, py + ph * 0.4, pw, ph * 0.2);
+        else ctx.fillRect(px + pw * 0.4, py, pw * 0.2, ph);
+        ctx.strokeStyle = '#4a4f56';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px, py, pw, ph);
+        continue;
+      }
       var reg = p.destruida ? regEscombro : regTijolo;
       if (reg && reg.ok && reg.img) {
         ctx.drawImage(reg.img, px, py, pw, ph);
@@ -1772,6 +1972,68 @@
         ctx.fillStyle = p.destruida ? 'rgba(120,90,70,0.35)' : '#8a4a3a';
         ctx.fillRect(px, py, pw, ph);
       }
+    }
+  }
+
+  // Barris explosivos: sem asset de imagem — vetor de cilindro escuro
+  // com faixa de perigo. Some sem deixar escombro quando destruído
+  // (a explosão em si é o efeito visual, ver _tqDesenharExplosoes).
+  // Desenhado depois das caixas, antes dos tanques.
+  function _tqDesenharBarris() {
+    if (!_tqBarris.length) return;
+    var ctx = _tqCtx;
+    var r = TQ_BARRIL_RAIO * _tqH;
+    for (var i = 0; i < _tqBarris.length; i++) {
+      var b = _tqBarris[i];
+      if (b.destruido) continue;
+      ctx.save();
+      ctx.translate(b.x * _tqH, b.y * _tqH);
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fillStyle = '#3a2a1a';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#1a1210';
+      ctx.stroke();
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.fillStyle = '#ffb020';
+      ctx.fillRect(-r, -r * 0.28, r * 2, r * 0.56);
+      ctx.restore();
+      ctx.fillStyle = '#ff4757';
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // Explosão de barril: puramente visual e local (não sincronizada —
+  // cada lado dispara a própria via _tqDispararExplosaoVisual, ver
+  // cabeçalho do arquivo) — um anel que cresce e desaparece em
+  // TQ_EXPLOSAO_DUR segundos.
+  function _tqDesenharExplosoes() {
+    if (!_tqExplosoes.length) return;
+    var ctx = _tqCtx;
+    for (var i = 0; i < _tqExplosoes.length; i++) {
+      var ex = _tqExplosoes[i];
+      var prog = Math.min(1, ex.t / TQ_EXPLOSAO_DUR);
+      var raio = TQ_BARRIL_RAIO_EXPLOSAO * prog * _tqH;
+      var alpha = 1 - prog;
+      ctx.save();
+      ctx.translate(ex.x * _tqH, ex.y * _tqH);
+      ctx.beginPath();
+      ctx.arc(0, 0, raio, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,150,40,' + alpha.toFixed(3) + ')';
+      ctx.lineWidth = 5 * (1 - prog * 0.6);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, raio * 0.6, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,80,20,' + (alpha * 0.35).toFixed(3) + ')';
+      ctx.fill();
+      ctx.restore();
     }
   }
 

@@ -40,7 +40,12 @@
    'rr' (revanche) — depois disso os dois lados têm a MESMA geometria
    e só sincronizam o dano (destruída/intacta), igual antes. Cada
    parede aguenta TQ_PAREDE_HP tiros antes de virar escombro (para de
-   bloquear).
+   bloquear). Tiros que saem da arena (borda) quicam UMA vez antes de
+   sumir (ver TQ_RICOCHETE_MAX em _tqAtualizarProjeteis). Cada mapa
+   também tem moitas (não bloqueiam) — escondem o tanque que estiver
+   dentro E não tiver atirado nos últimos TQ_MOITA_REVELA_SEG segundos
+   (ver _tqEmMoita/_tqEscondido*), tanto do desenho do adversário
+   quanto da mira da IA.
 
    ARENA E LANDSCAPE: mundo vai de x:0..MUNDO_LARGURA (16/9) e y:0..1
    — todo pixel-por-unidade usa _tqH (altura real do canvas) como
@@ -70,6 +75,7 @@
   var TQ_PAREDE_HP     = 2;          // tiros até a parede virar escombro
   var TQ_DEADZONE      = 0.12;       // magnitude mínima do joystick pra contar como "empurrado"
   var TQ_PAUSA_RODADA  = 1.4;        // segundos de pausa mostrando quem venceu a rodada
+  var TQ_RICOCHETE_MAX = 1;          // quantas vezes um tiro pode quicar na borda da arena antes de sumir
 
   var MUNDO_LARGURA = 16 / 9;   // arena widescreen — x vai de 0..MUNDO_LARGURA, y continua 0..1
   var TQ_IA_DIST_ENGAJAR = 0.86; // distância (mundo largo) até a IA trocar patrulha por engajar
@@ -78,7 +84,9 @@
      cabeçalho) — garante simetria sem risco de erro de conta manual.
      Coordenadas em fração da arena: x 0..MUNDO_LARGURA, y 0..1. Um
      mapa é sorteado por PARTIDA (não por rodada), ver _tqEscolherMapa
-     e o campo "mapa" nas mensagens 'oi'/'rr'. */
+     e o campo "mapa" nas mensagens 'oi'/'rr'. Cada mapa tem paredes
+     (bloqueiam e levam dano) e moitas (não bloqueiam — escondem o
+     tanque que estiver dentro, ver _tqEmMoita/_tqEscondido*). */
   function _tqMontarMapa(metade, centro) {
     var lista = metade.slice();
     for (var i = 0; i < metade.length; i++) {
@@ -90,36 +98,57 @@
   }
   var _TQ_MAPAS = [
     // 1. Clássico — pilar + bloco, variação do layout original
-    _tqMontarMapa([
-      { x: 0.42, y: 0.10, w: 0.07, h: 0.22 },
-      { x: 0.40, y: 0.66, w: 0.20, h: 0.08 }
-    ], { x: 0.8439, y: 0.46, w: 0.09, h: 0.09 }),
+    {
+      paredes: _tqMontarMapa([
+        { x: 0.42, y: 0.10, w: 0.07, h: 0.22 },
+        { x: 0.40, y: 0.66, w: 0.20, h: 0.08 }
+      ], { x: 0.8439, y: 0.46, w: 0.09, h: 0.09 }),
+      moitas: _tqMontarMapa([{ x: 0.26, y: 0.40, w: 0.13, h: 0.18 }])
+    },
     // 2. Corredores — paredes verticais formando 2 corredores
-    _tqMontarMapa([
-      { x: 0.50, y: 0.00, w: 0.06, h: 0.30 },
-      { x: 0.50, y: 0.70, w: 0.06, h: 0.30 },
-      { x: 0.78, y: 0.30, w: 0.06, h: 0.40 }
-    ]),
+    {
+      paredes: _tqMontarMapa([
+        { x: 0.50, y: 0.00, w: 0.06, h: 0.30 },
+        { x: 0.50, y: 0.70, w: 0.06, h: 0.30 },
+        { x: 0.78, y: 0.30, w: 0.06, h: 0.40 }
+      ]),
+      moitas: _tqMontarMapa([{ x: 0.30, y: 0.62, w: 0.14, h: 0.16 }])
+    },
     // 3. Cantos — blocos protegendo os 4 cantos do centro
-    _tqMontarMapa([
-      { x: 0.34, y: 0.06, w: 0.16, h: 0.09 },
-      { x: 0.34, y: 0.85, w: 0.16, h: 0.09 },
-      { x: 0.66, y: 0.44, w: 0.10, h: 0.12 }
-    ]),
+    {
+      paredes: _tqMontarMapa([
+        { x: 0.34, y: 0.06, w: 0.16, h: 0.09 },
+        { x: 0.34, y: 0.85, w: 0.16, h: 0.09 },
+        { x: 0.66, y: 0.44, w: 0.10, h: 0.12 }
+      ]),
+      moitas: _tqMontarMapa([{ x: 0.28, y: 0.28, w: 0.12, h: 0.14 }])
+    },
     // 4. Cruz — pilar vertical no centro + 2 blocos laterais
-    _tqMontarMapa([
-      { x: 0.62, y: 0.42, w: 0.20, h: 0.16 }
-    ], { x: 0.8389, y: 0.10, w: 0.10, h: 0.80 }),
+    {
+      paredes: _tqMontarMapa([
+        { x: 0.62, y: 0.42, w: 0.20, h: 0.16 }
+      ], { x: 0.8389, y: 0.10, w: 0.10, h: 0.80 }),
+      moitas: _tqMontarMapa([{ x: 0.32, y: 0.66, w: 0.14, h: 0.16 }])
+    },
     // 5. Zigue-zague — blocos escalonados
-    _tqMontarMapa([
-      { x: 0.38, y: 0.06, w: 0.09, h: 0.24 },
-      { x: 0.55, y: 0.38, w: 0.09, h: 0.24 },
-      { x: 0.72, y: 0.70, w: 0.09, h: 0.24 }
-    ]),
-    // 6. Aberto — poucos obstáculos, mapa rápido
-    _tqMontarMapa([
-      { x: 0.55, y: 0.42, w: 0.11, h: 0.16 }
-    ])
+    {
+      paredes: _tqMontarMapa([
+        { x: 0.38, y: 0.06, w: 0.09, h: 0.24 },
+        { x: 0.55, y: 0.38, w: 0.09, h: 0.24 },
+        { x: 0.72, y: 0.70, w: 0.09, h: 0.24 }
+      ]),
+      moitas: _tqMontarMapa([{ x: 0.26, y: 0.44, w: 0.12, h: 0.14 }])
+    },
+    // 6. Aberto — poucos obstáculos, mapa rápido (2 moitas — mais espaço livre)
+    {
+      paredes: _tqMontarMapa([
+        { x: 0.55, y: 0.42, w: 0.11, h: 0.16 }
+      ]),
+      moitas: _tqMontarMapa([
+        { x: 0.30, y: 0.20, w: 0.15, h: 0.17 },
+        { x: 0.34, y: 0.64, w: 0.13, h: 0.15 }
+      ])
+    }
   ];
   var _tqMapaAtualIdx = 0;
   function _tqEscolherMapa() { return Math.floor(Math.random() * _TQ_MAPAS.length); }
@@ -149,6 +178,19 @@
   var _tqRodadaEstado = 'jogando'; // 'jogando' | 'pausa'
   var _tqPausaTimer = 0, _tqPausaVencedor = null;
   var _tqCooldownAnfitriao = 0, _tqCooldownConvidado = 0;
+
+  /* ── Moitas (furtividade): só o ANFITRIÃO calcula (tem as duas
+     posições) — _tqRevelar* conta quanto tempo falta pro tanque parar
+     de ficar "revelado" depois de atirar (mesmo dentro da moita, atirar
+     denuncia a posição por TQ_MOITA_REVELA_SEG). _tqEscondido* é o
+     resultado (dentro da moita E não revelado) — usado pro desenho
+     (não renderiza o tanque escondido do adversário) e pela IA (não
+     mira o que não vê). _tqEscondidoAnfitriao viaja pro convidado via
+     'e' (campo "ea"); _tqEscondidoConvidado só importa pro anfitrião
+     (ele já calcula e desenha os dois lados). */
+  var TQ_MOITA_REVELA_SEG = 1.2;
+  var _tqRevelarAnfitriao = 0, _tqRevelarConvidado = 0;
+  var _tqEscondidoAnfitriao = false, _tqEscondidoConvidado = false;
 
   // Entrada local (joystick) — vetor normalizado -1..1, magnitude
   // até 1. Atualizado pelo widget DOM (ver _tqLigarJoystick).
@@ -493,6 +535,7 @@
         if (!_tqSouAnfitriao) {
           _tqTanqueAnfitriao.x = dado.hx; _tqTanqueAnfitriao.y = dado.hy; _tqTanqueAnfitriao.ang = dado.hang;
           _tqProjeteis = dado.pj || [];
+          _tqEscondidoAnfitriao = !!dado.ea; // o anfitrião já calculou (tem as duas posições) — só aplica
           if (dado.pd) {
             // Detecta a TRANSIÇÃO intacta→destruída pra tremer a tela
             // também do lado do convidado (o anfitrião já treme sozinho
@@ -782,12 +825,24 @@
   }
 
   /* ── Paredes: estado (hp/destruída) — geometria vem do mapa
-     sorteado da partida (_TQ_MAPAS[_tqMapaAtualIdx], fixo até o
-     próximo _tqReiniciarPartida). */
+     sorteado da partida (_TQ_MAPAS[_tqMapaAtualIdx].paredes, fixo até
+     o próximo _tqReiniciarPartida). */
   function _tqResetParedes() {
-    _tqParedes = _TQ_MAPAS[_tqMapaAtualIdx].map(function (g) {
+    _tqParedes = _TQ_MAPAS[_tqMapaAtualIdx].paredes.map(function (g) {
       return { x: g.x, y: g.y, w: g.w, h: g.h, hp: TQ_PAREDE_HP, destruida: false };
     });
+  }
+
+  // Moitas: não bloqueiam movimento nem tiro — só escondem quem estiver
+  // dentro (ver _tqEmMoita/_tqEscondido*, cabeçalho do arquivo). Geometria
+  // fixa do mapa, sem estado próprio (ao contrário das paredes).
+  function _tqEmMoita(t) {
+    var moitas = _TQ_MAPAS[_tqMapaAtualIdx].moitas;
+    for (var i = 0; i < moitas.length; i++) {
+      var m = moitas[i];
+      if (t.x >= m.x && t.x <= m.x + m.w && t.y >= m.y && t.y <= m.y + m.h) return true;
+    }
+    return false;
   }
 
   function _tqCircRect(cx, cy, r, rect) {
@@ -831,6 +886,8 @@
     _tqRecuoAnfitriao = 0; _tqRecuoConvidado = 0;
     _tqRastro = [];
     _tqUltimaPosAnfitriao = null; _tqUltimaPosConvidado = null;
+    _tqRevelarAnfitriao = 0; _tqRevelarConvidado = 0;
+    _tqEscondidoAnfitriao = false; _tqEscondidoConvidado = false;
   }
 
   function _tqComecarPartida() {
@@ -918,6 +975,14 @@
     if (_tqCooldownAnfitriao > 0) _tqCooldownAnfitriao -= dt;
     if (_tqCooldownConvidado > 0) _tqCooldownConvidado -= dt;
 
+    // Moitas: só o anfitrião calcula (tem as duas posições) — decai o
+    // timer de "revelado" e recalcula quem está escondido. Sempre
+    // atualizado (mesmo em pausa) pra já valer no respawn seguinte.
+    if (_tqRevelarAnfitriao > 0) _tqRevelarAnfitriao = Math.max(0, _tqRevelarAnfitriao - dt);
+    if (_tqRevelarConvidado > 0) _tqRevelarConvidado = Math.max(0, _tqRevelarConvidado - dt);
+    _tqEscondidoAnfitriao = _tqRevelarAnfitriao <= 0 && _tqEmMoita(_tqTanqueAnfitriao);
+    _tqEscondidoConvidado = _tqRevelarConvidado <= 0 && _tqEmMoita(_tqTanqueConvidado);
+
     if (_tqRodadaEstado === 'pausa') {
       _tqPausaTimer -= dt;
       if (_tqPausaTimer <= 0) _tqIniciarRodada();
@@ -934,7 +999,19 @@
     for (var i = _tqProjeteis.length - 1; i >= 0; i--) {
       var pr = _tqProjeteis[i];
       pr.x += pr.vx * dt; pr.y += pr.vy * dt;
-      if (pr.x < 0 || pr.x > MUNDO_LARGURA || pr.y < 0 || pr.y > 1) { _tqProjeteis.splice(i, 1); continue; }
+
+      // Ricochete: passou da borda da arena e ainda tem quique sobrando
+      // (rebotes < TQ_RICOCHETE_MAX) — inverte a velocidade do eixo que
+      // estourou e volta a posição pra dentro, em vez de sumir. Sem
+      // quique sobrando, some como antes.
+      var estourouX = pr.x < 0 || pr.x > MUNDO_LARGURA;
+      var estourouY = pr.y < 0 || pr.y > 1;
+      if (estourouX || estourouY) {
+        if (pr.rebotes >= TQ_RICOCHETE_MAX) { _tqProjeteis.splice(i, 1); continue; }
+        pr.rebotes++;
+        if (estourouX) { pr.vx = -pr.vx; pr.x = _tqClamp(pr.x, 0, MUNDO_LARGURA); }
+        if (estourouY) { pr.vy = -pr.vy; pr.y = _tqClamp(pr.y, 0, 1); }
+      }
 
       var atingiuParede = false;
       for (var j = 0; j < _tqParedes.length; j++) {
@@ -986,13 +1063,17 @@
     _tqProjeteis.push({
       x: px, y: py,
       vx: Math.sin(ang) * TQ_VEL_PROJETIL, vy: -Math.cos(ang) * TQ_VEL_PROJETIL,
-      dono: dono
+      dono: dono, rebotes: 0
     });
     // Recuo — cobre a IA (modo sozinho) e a visão que o anfitrião tem
     // do tiro do convidado (autoridade nasce aqui pros dois casos). O
     // feedback do PRÓPRIO jogador ao apertar fogo já é instantâneo via
     // _tqTentarAtirar, sem esperar a rede.
     if (dono === 'anfitriao') _tqRecuoAnfitriao = 1; else _tqRecuoConvidado = 1;
+    // Atirar denuncia a posição mesmo dentro de moita — _tqCriarProjetil
+    // só roda no lado com autoridade (anfitrião), então é o ponto certo
+    // pra marcar os dois lados como "revelados" por um tempo.
+    if (dono === 'anfitriao') _tqRevelarAnfitriao = TQ_MOITA_REVELA_SEG; else _tqRevelarConvidado = TQ_MOITA_REVELA_SEG;
   }
 
   function _tqTentarAtirar() {
@@ -1029,7 +1110,7 @@
     var pd = _tqParedes.map(function (p) { return p.destruida ? 1 : 0; });
     window.AngatubaMP.enviar({
       t: 'e', hx: _tqTanqueAnfitriao.x, hy: _tqTanqueAnfitriao.y, hang: _tqTanqueAnfitriao.ang,
-      pj: _tqProjeteis, pd: pd,
+      pj: _tqProjeteis, pd: pd, ea: _tqEscondidoAnfitriao,
       sa: _tqPlacarAnfitriao, sg: _tqPlacarConvidado, re: _tqRodadaEstado, fim: !!fim
     });
   }
@@ -1051,7 +1132,7 @@
     if (_tqIATimer <= 0) {
       _tqIATimer = 0.4 + Math.random() * 0.5;
       var dist = Math.hypot(alvo.x - eu.x, alvo.y - eu.y);
-      if (dist < TQ_IA_DIST_ENGAJAR && _tqLinhaLivre(eu, alvo)) {
+      if (dist < TQ_IA_DIST_ENGAJAR && !_tqEscondidoAnfitriao && _tqLinhaLivre(eu, alvo)) {
         _tqIAModo = 'engajar';
       } else {
         _tqIAModo = 'patrulha';
@@ -1066,7 +1147,7 @@
       var diff = angMira - eu.ang;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      if (Math.abs(diff) < 0.16 && _tqCooldownConvidado <= 0 && _tqLinhaLivre(eu, alvo)) {
+      if (Math.abs(diff) < 0.16 && !_tqEscondidoAnfitriao && _tqCooldownConvidado <= 0 && _tqLinhaLivre(eu, alvo)) {
         _tqCooldownConvidado = TQ_COOLDOWN_TIRO * (1.1 + Math.random() * 0.6);
         _tqCriarProjetil(eu.x, eu.y, eu.ang, 'convidado');
       }
@@ -1145,13 +1226,16 @@
     }
     _tqDesenharChao();
     _tqDesenharRastro();
+    _tqDesenharMoitas();
     _tqDesenharParedes();
 
     var jogando = (_tqEstado === 'jogando');
     if (jogando) {
       for (var i = 0; i < _tqProjeteis.length; i++) _tqDesenharProjetil(_tqProjeteis[i]);
-      _tqDesenharTanque(_tqTanqueAnfitriao, 'tank-azul.webp', TQ_COR_ANFITRIAO, _tqRecuoAnfitriao);
-      _tqDesenharTanque(_tqTanqueConvidado, 'tank-vermelho.webp', TQ_COR_CONVIDADO, _tqRecuoConvidado);
+      // O PRÓPRIO tanque sempre aparece; o do adversário só se ele não
+      // estiver escondido numa moita (ver _tqEscondido* em _tqSimularMundo).
+      if (_tqSouAnfitriao || !_tqEscondidoAnfitriao) _tqDesenharTanque(_tqTanqueAnfitriao, 'tank-azul.webp', TQ_COR_ANFITRIAO, _tqRecuoAnfitriao);
+      if (!_tqSouAnfitriao || !_tqEscondidoConvidado) _tqDesenharTanque(_tqTanqueConvidado, 'tank-vermelho.webp', TQ_COR_CONVIDADO, _tqRecuoConvidado);
       if (_tqRodadaEstado === 'pausa') _tqDesenharAvisoRodada();
     }
     ctx.restore();
@@ -1194,6 +1278,29 @@
     }
     ctx.fillStyle = '#3a3d42';
     ctx.fillRect(0, 0, _tqW, _tqH);
+  }
+
+  // Moitas: elipse verde translúcida — desenhada depois do rastro e
+  // antes das paredes/tanques (fica no chão, sob quem passa por cima).
+  // Puramente visual: quem esconde é a checagem em _tqEmMoita.
+  function _tqDesenharMoitas() {
+    var moitas = _TQ_MAPAS[_tqMapaAtualIdx].moitas;
+    if (!moitas.length) return;
+    var ctx = _tqCtx;
+    ctx.save();
+    ctx.fillStyle = 'rgba(46,125,50,0.55)';
+    ctx.strokeStyle = 'rgba(27,79,31,0.65)';
+    ctx.lineWidth = 2;
+    for (var i = 0; i < moitas.length; i++) {
+      var m = moitas[i];
+      var cx = (m.x + m.w / 2) * _tqH, cy = (m.y + m.h / 2) * _tqH;
+      var rx = (m.w / 2) * _tqH, ry = (m.h / 2) * _tqH;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function _tqDesenharParedes() {

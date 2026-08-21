@@ -1002,6 +1002,7 @@
     if (window.CorridaGame   && typeof window.CorridaGame.parar   === 'function') window.CorridaGame.parar();
     if (window.PianoGame     && typeof window.PianoGame.parar     === 'function') window.PianoGame.parar();
     if (window.PingPongGame  && typeof window.PingPongGame.parar  === 'function') window.PingPongGame.parar();
+    if (window.TanquesGame   && typeof window.TanquesGame.parar   === 'function') window.TanquesGame.parar();
   }
 
   /* -- Roteador de jogos: menu <-> tela de cada jogo -- */
@@ -1042,7 +1043,10 @@
     // Ping Pong depende de Jogos/multiplayer.js (AngatubaMP), que já é
     // carregado direto no index.html (ver <script> depois do app_min.js)
     // por ser infraestrutura leve e compartilhável com futuros jogos.
-    pingpong: { js: '/Jogos/pingpong.min.js', css: '/Jogos/pingpong.css', global: 'PingPongGame' }
+    pingpong: { js: '/Jogos/pingpong.min.js', css: '/Jogos/pingpong.css', global: 'PingPongGame' },
+    // Batalha de Tanques também depende de Jogos/multiplayer.js (AngatubaMP),
+    // já carregado direto no index.html — mesma infraestrutura do Ping Pong.
+    tanques: { js: '/Jogos/tanques.min.js', css: '/Jogos/tanques.css', global: 'TanquesGame' }
   };
   var _jogosCarregados = {};   // nome -> true quando js+css já injetados
 
@@ -1153,7 +1157,7 @@
         }, 1200);
         setTimeout(function(){ var ld = document.getElementById('games-loading'); if (ld) ld.style.display = 'none'; }, 12000);
       }
-    } else if (nome === 'speedtap' || nome === 'sequencia' || nome === 'voo' || nome === 'corrida' || nome === 'piano' || nome === 'pingpong') {
+    } else if (nome === 'speedtap' || nome === 'sequencia' || nome === 'voo' || nome === 'corrida' || nome === 'piano' || nome === 'pingpong' || nome === 'tanques') {
       // Jogos externos: carrega sob demanda e prepara quando pronto.
       _jogoLoader(nome).then(function (api) {
         if (api && typeof api.preparar === 'function') api.preparar();

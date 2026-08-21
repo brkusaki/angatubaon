@@ -482,6 +482,22 @@
           </div>
           <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
+
+        <button type="button" class="game-card gc-tanques" onclick="_abrirJogo('tanques')">
+          <div class="gc-inner">
+            <div class="gc-owl">
+              <span class="gc-owl-glow"></span>
+              <img src="/webp/owl-angry.webp" alt="" loading="lazy"
+                   onerror="this.onerror=null;this.src='/webp/owl-flying.webp';">
+            </div>
+            <div class="gc-info">
+              <div class="gc-title">Batalha de Tanques</div>
+              <div class="gc-desc">Arena top-down com paredes destrutíveis. Sozinho contra a CPU ou 1x1 com um amigo.</div>
+              <span class="gc-cta">Entrar na arena</span>
+            </div>
+          </div>
+          <i class="fa fa-chevron-right gc-arrow"></i>
+        </button>
       </div>
 
       <!-- TELA: Quiz da Coruja -->
@@ -803,6 +819,85 @@
               <div class="pp-overlay-desc" id="pp-fim-msg"></div>
               <button type="button" class="pp-play" id="pp-btn-revanche" onclick="_ppPedirRevanche()">Jogar de novo</button>
               <button type="button" class="pp-link" onclick="_ppVoltarMenu()">Voltar ao início</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TELA: Batalha de Tanques (multiplayer 1x1 em tempo real, via Jogos/multiplayer.js) -->
+      <div id="jogo-tanques" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div class="tq-card">
+          <div class="tq-hud" id="tq-hud" style="display:none;">
+            <div class="tq-hud-lado">
+              <span class="tq-hud-lado-label">Você</span>
+              <div class="tq-pips" id="tq-hud-meu-pips">
+                <span class="tq-pip"></span><span class="tq-pip"></span>
+              </div>
+            </div>
+            <span class="tq-hud-x">×</span>
+            <div class="tq-hud-lado">
+              <span class="tq-hud-lado-label" id="tq-hud-nome-adversario">Adversário</span>
+              <div class="tq-pips" id="tq-hud-dele-pips">
+                <span class="tq-pip"></span><span class="tq-pip"></span>
+              </div>
+            </div>
+          </div>
+          <div class="tq-arena" id="tq-arena">
+            <canvas id="tq-canvas"></canvas>
+
+            <!-- Controles: joystick + botão de fogo, só aparecem durante a partida -->
+            <div class="tq-controles" id="tq-controles" style="display:none;">
+              <div class="tq-joystick" id="tq-joystick">
+                <div class="tq-joystick-thumb" id="tq-joystick-thumb"></div>
+              </div>
+              <button type="button" class="tq-fire-btn" id="tq-fire-btn" aria-label="Atirar"><i class="fa fa-crosshairs"></i></button>
+            </div>
+
+            <!-- Tela inicial: criar sala ou entrar com código -->
+            <div class="tq-overlay" id="tq-menu">
+              <img src="/webp/owl-angry.webp" alt="" class="tq-overlay-owl" onerror="this.style.display='none'">
+              <div class="tq-overlay-titulo">🎯 Batalha de Tanques</div>
+              <div class="tq-overlay-desc">Esconda-se atrás dos tijolos e acerte o adversário. Melhor de 3 rodadas. Jogue sozinho contra a CPU, ou desafie um amigo em tempo real.</div>
+              <div class="tq-opcoes">
+                <button type="button" class="tq-btn-opcao" onclick="_tqJogarSozinho()">Jogar sozinho</button>
+                <button type="button" class="tq-btn-opcao tq-btn-opcao-alt" id="tq-btn-criar" onclick="_tqCriarSala()">Criar sala (com um amigo)</button>
+                <label class="tq-privada-toggle">
+                  <input type="checkbox" id="tq-privada-check">
+                  <span>🔒 Sala privada (só por código)</span>
+                </label>
+              </div>
+              <div class="tq-divisor">salas abertas agora</div>
+              <div class="tq-lista-salas" id="tq-lista-salas">
+                <div class="tq-lista-vazia">Nenhuma sala pública aberta agora.</div>
+              </div>
+              <div class="tq-divisor">ou entrar com um código</div>
+              <div class="tq-entrar-wrap">
+                <input type="text" class="tq-codigo-input" id="tq-codigo-input" placeholder="CÓDIGO" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
+                <button type="button" class="tq-btn-entrar-mini" id="tq-btn-entrar" onclick="_tqEntrarSala()">Entrar</button>
+              </div>
+              <div class="tq-menu-erro" id="tq-menu-erro" style="display:none;"></div>
+            </div>
+
+            <!-- Tela de sala: aguardando adversário OU conectando -->
+            <div class="tq-overlay" id="tq-sala" style="display:none;">
+              <img src="/webp/owl-wave.webp" alt="" class="tq-overlay-owl" onerror="this.style.display='none'">
+              <div class="tq-overlay-titulo" id="tq-sala-titulo">Chame um amigo!</div>
+              <div class="tq-overlay-desc" id="tq-sala-desc"></div>
+              <div class="tq-sala-codigo" id="tq-sala-codigo" style="display:none;"></div>
+              <div class="tq-sala-spinner"></div>
+              <button type="button" class="tq-btn-copiar" id="tq-btn-copiar" onclick="_tqCopiarCodigo()">Copiar código</button>
+              <button type="button" class="tq-link" onclick="_tqVoltarMenu()">Cancelar</button>
+            </div>
+
+            <!-- Tela de fim: resultado ou desconexão -->
+            <div class="tq-overlay" id="tq-fim" style="display:none;">
+              <img src="" alt="" class="tq-overlay-owl" id="tq-fim-owl" onerror="this.style.display='none'">
+              <div class="tq-overlay-titulo" id="tq-fim-titulo">Fim de jogo</div>
+              <div class="tq-fim-placar" id="tq-fim-placar"></div>
+              <div class="tq-overlay-desc" id="tq-fim-msg"></div>
+              <button type="button" class="tq-play" id="tq-btn-revanche" onclick="_tqPedirRevanche()">Jogar de novo</button>
+              <button type="button" class="tq-link" onclick="_tqVoltarMenu()">Voltar ao início</button>
             </div>
           </div>
         </div>

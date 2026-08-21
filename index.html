@@ -520,12 +520,70 @@
               <div class="quiz-placar-msg" id="quiz-placar-msg"></div>
               <div class="quiz-placar-sub">Volta amanhã pra um novo quiz! 🦉</div>
               <button type="button" class="quiz-relampago-btn" onclick="_rlAbrir()">⚡ Treinar no Modo Relâmpago</button>
+              <button type="button" class="quiz-relampago-btn qt-cta-btn" onclick="_qtAbrirEscolha()">🎯 O quanto você conhece de...?</button>
             </div>
           </div>
         </div>
         <div id="games-loading" style="text-align:center;padding:30px 20px;color:var(--muted);">
           <img src="/webp/owl-search.webp" alt="" style="width:56px;height:56px;object-fit:contain;opacity:.7;" onerror="this.style.display='none'">
           <div style="margin-top:8px;font-size:13px;">Carregando o quiz…</div>
+        </div>
+      </div>
+
+      <!-- TELA: "O quanto você conhece de..." — escolha de tema -->
+      <div id="jogo-tema-escolha" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div class="qt-escolha-card">
+          <div class="qt-escolha-head">
+            <span class="qt-escolha-emoji">🎯</span>
+            <div class="qt-escolha-titulo">O quanto você conhece?</div>
+            <div class="qt-escolha-sub">Escolha um tema e responda 15 perguntas</div>
+          </div>
+          <div class="qt-escolha-grid">
+            <button type="button" class="qt-tema-card" onclick="_qtEscolherTema('futebol')">
+              <span class="qt-tema-emoji">⚽</span>
+              <span class="qt-tema-nome">Futebol</span>
+            </button>
+            <button type="button" class="qt-tema-card" onclick="_qtEscolherTema('musica')">
+              <span class="qt-tema-emoji">🎵</span>
+              <span class="qt-tema-nome">Música</span>
+            </button>
+            <button type="button" class="qt-tema-card" onclick="_qtEscolherTema('series_filmes')">
+              <span class="qt-tema-emoji">🎬</span>
+              <span class="qt-tema-nome">Séries e filmes</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TELA: "O quanto você conhece de..." — perguntas + placar -->
+      <div id="jogo-tema-quiz" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_qtVoltarEscolha()"><i class="fa fa-chevron-left"></i> Escolher outro tema</button>
+        <div id="qt-card" class="quiz-coruja qz-neutro" style="display:none;">
+          <div class="quiz-inner">
+            <div id="qt-fase-perguntas">
+              <div class="quiz-head">
+                <span class="quiz-head-txt" id="qt-head-txt">🎯 Quanto você conhece</span>
+                <span class="quiz-progresso" id="qt-progresso">1/15</span>
+              </div>
+              <div class="quiz-barra"><div class="quiz-barra-fill" id="qt-barra-fill"></div></div>
+              <div class="quiz-pergunta" id="qt-pergunta"></div>
+              <div class="quiz-opcoes" id="qt-opcoes"></div>
+            </div>
+            <div class="quiz-placar" id="qt-placar">
+              <img id="qt-placar-img" src="" alt="" onerror="this.style.display='none'">
+              <div class="quiz-placar-nota" id="qt-placar-nota"></div>
+              <div class="quiz-placar-msg" id="qt-placar-msg"></div>
+              <div class="qt-placar-botoes">
+                <button type="button" class="quiz-relampago-btn" onclick="_qtJogarDeNovo()">🔁 Jogar de novo</button>
+                <button type="button" class="quiz-relampago-btn qt-cta-btn" onclick="_qtVoltarEscolha()">🎯 Trocar de tema</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="qt-loading" style="text-align:center;padding:30px 20px;color:var(--muted);display:none;">
+          <img src="/webp/owl-search.webp" alt="" style="width:56px;height:56px;object-fit:contain;opacity:.7;" onerror="this.style.display='none'">
+          <div style="margin-top:8px;font-size:13px;">Carregando perguntas…</div>
         </div>
       </div>
 
@@ -886,6 +944,20 @@
                   <button type="button" class="tq-classe-btn" data-classe="pesado" onclick="_tqEscolherClasse('pesado')">Pesado</button>
                 </div>
                 <div class="tq-classes-desc" id="tq-classes-desc">Velocidade e tiro padrão.</div>
+              </div>
+              <!-- Modo de jogo: mesma estrutura visual da escolha de classe
+                   acima (reaproveita .tq-classes/.tq-classes-opcoes/
+                   .tq-classes-desc), mas os BOTÕES usam classes próprias
+                   (tq-modo-btn/tq-modo-ativo) pra não interferir na busca
+                   por ".tq-classe-btn" que _tqEscolherClasse já faz. -->
+              <div class="tq-classes" id="tq-modos">
+                <div class="tq-classes-label">Modo de jogo</div>
+                <div class="tq-classes-opcoes">
+                  <button type="button" class="tq-modo-btn tq-modo-ativo" data-modo="classico" onclick="_tqEscolherModo('classico')">Clássico</button>
+                  <button type="button" class="tq-modo-btn" data-modo="rei" onclick="_tqEscolherModo('rei')">Rei do Pedaço</button>
+                  <button type="button" class="tq-modo-btn" data-modo="batata" onclick="_tqEscolherModo('batata')">Batata Quente</button>
+                </div>
+                <div class="tq-classes-desc" id="tq-modos-desc">Destrua o tanque adversário. Melhor de 3 rodadas.</div>
               </div>
               <div class="tq-opcoes">
                 <button type="button" class="tq-btn-opcao" onclick="_tqJogarSozinho()">Jogar sozinho</button>

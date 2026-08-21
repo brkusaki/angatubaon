@@ -489,7 +489,10 @@
     if (!card) return;
     try {
       var params = new URLSearchParams();
-      params.append('payload', JSON.stringify({ action: 'quizCoruja' }));
+      // tema:'angatuba' garante que o desafio diário e o Relâmpago (que reusa
+      // este banco) fiquem só com perguntas da cidade, mesmo com outros temas
+      // ativos na mesma aba Quiz.
+      params.append('payload', JSON.stringify({ action: 'quizCoruja', tema: 'angatuba' }));
       var resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(8000) });
       var json = await resp.json();
       var banco = (json && json.status === 'ok' && Array.isArray(json.data)) ? json.data : [];
@@ -703,6 +706,178 @@
 
   window._rlAbrir = _rlAbrir;
   window._rlComecar = _rlComecar;
+
+  /* -- "Quanto você conhece de..." — quiz temático (15 perguntas, sem timer) --
+     Reaproveita o motor de perguntas do Quiz da Coruja (opções A/B/C, placar
+     com coruja, _rlEmbaralhar pra sortear) só que com o banco filtrado por
+     tema (futebol, música, séries e filmes) e nota em %. Sem trava de dia —
+     dá pra jogar de novo na hora. Tela própria (#jogo-tema-escolha e
+     #jogo-tema-quiz) pra não disputar elementos com o desafio diário. */
+  var _QT_TEMAS = {
+    futebol:       { label: 'Futebol',        emoji: '⚽',
+                      iniciante: 'Só de passagem no futebol ⚽', manja: 'Manja bem de futebol! 👏', expert: 'Lenda da bola! 🏆' },
+    musica:        { label: 'Música',         emoji: '🎵',
+                      iniciante: 'Só ouve no rádio 📻',          manja: 'Manja de música! 🎧',      expert: 'DJ dos hits! 🎤' },
+    series_filmes: { label: 'Séries e Filmes', emoji: '🎬',
+                      iniciante: 'Só vê o trailer 🍿',            manja: 'Manja de cinema! 🎥',      expert: 'Crítico de Hollywood! 🏆' }
+  };
+  var _QT_POR_TEMA = 15; // perguntas por rodada (ou todas, se o banco do tema tiver menos)
+
+  var _qtEstado = null;    // { perguntas, idx, acertos, travado }
+  var _qtTemaAtual = null; // chave do tema em jogo agora (ex.: 'futebol')
+
+  // Abre a tela de escolha de tema (botão no placar do desafio diário).
+  function _qtAbrirEscolha() {
+    var menu = document.getElementById('games-menu');
+    if (menu) menu.style.display = 'none';
+    var telas = document.querySelectorAll('.jogo-tela');
+    for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
+    var tela = document.getElementById('jogo-tema-escolha');
+    if (tela) tela.style.display = 'block';
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
+  }
+  window._qtAbrirEscolha = _qtAbrirEscolha;
+
+  // Da tela de perguntas/placar, volta pra escolha de tema (sem sair do hub).
+  function _qtVoltarEscolha() {
+    var telas = document.querySelectorAll('.jogo-tela');
+    for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
+    var tela = document.getElementById('jogo-tema-escolha');
+    if (tela) tela.style.display = 'block';
+  }
+  window._qtVoltarEscolha = _qtVoltarEscolha;
+
+  // Usuário escolheu um tema: busca o banco daquele tema e começa a rodada.
+  async function _qtEscolherTema(tema) {
+    var cfg = _QT_TEMAS[tema];
+    if (!cfg) return;
+    _qtTemaAtual = tema;
+    var telas = document.querySelectorAll('.jogo-tela');
+    for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
+    var tela = document.getElementById('jogo-tema-quiz');
+    if (tela) tela.style.display = 'block';
+    var card = document.getElementById('qt-card');
+    var fase = document.getElementById('qt-fase-perguntas');
+    var placar = document.getElementById('qt-placar');
+    var loading = document.getElementById('qt-loading');
+    var headTxt = document.getElementById('qt-head-txt');
+    if (placar) placar.classList.remove('show');
+    if (fase) fase.style.display = 'none';
+    if (card) card.style.display = 'none';
+    if (loading) loading.style.display = 'block';
+    if (headTxt) headTxt.textContent = cfg.emoji + ' ' + cfg.label;
+    try {
+      var params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action: 'quizCoruja', tema: tema }));
+      var resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(8000) });
+      var json = await resp.json();
+      var banco = (json && json.status === 'ok' && Array.isArray(json.data)) ? json.data : [];
+      if (loading) loading.style.display = 'none';
+      if (!banco.length) {
+        alert('Não encontrei perguntas desse tema ainda. Volta mais tarde! 🦉');
+        _qtVoltarEscolha();
+        return;
+      }
+      card && (card.style.display = 'block');
+      var qtd = Math.min(_QT_POR_TEMA, banco.length);
+      var perguntas = _rlEmbaralhar(banco).slice(0, qtd);
+      _qtEstado = { perguntas: perguntas, idx: 0, acertos: 0, travado: false };
+      if (fase) fase.style.display = '';
+      _qtRenderPergunta();
+    } catch(e) {
+      if (loading) loading.style.display = 'none';
+      alert('Não deu pra carregar as perguntas agora. Tenta de novo. 🦉');
+      _qtVoltarEscolha();
+    }
+  }
+  window._qtEscolherTema = _qtEscolherTema;
+
+  // Joga de novo o mesmo tema (novo sorteio das perguntas já carregadas).
+  function _qtJogarDeNovo() {
+    if (!_qtTemaAtual) { _qtVoltarEscolha(); return; }
+    _qtEscolherTema(_qtTemaAtual);
+  }
+  window._qtJogarDeNovo = _qtJogarDeNovo;
+
+  // Renderiza a pergunta atual do tema (mesmo padrão do _quizRenderPergunta).
+  function _qtRenderPergunta() {
+    if (!_qtEstado) return;
+    var idx = _qtEstado.idx;
+    var total = _qtEstado.perguntas.length;
+    var pergunta = _qtEstado.perguntas[idx];
+    var perguntaEl = document.getElementById('qt-pergunta');
+    var opcoesEl = document.getElementById('qt-opcoes');
+    var progEl = document.getElementById('qt-progresso');
+    var barraEl = document.getElementById('qt-barra-fill');
+    if (!perguntaEl || !opcoesEl) return;
+    if (progEl) progEl.textContent = (idx + 1) + '/' + total;
+    if (barraEl) barraEl.style.width = Math.round((idx / total) * 100) + '%';
+    perguntaEl.textContent = pergunta.pergunta;
+    perguntaEl.classList.remove('quiz-fade'); void perguntaEl.offsetWidth; perguntaEl.classList.add('quiz-fade');
+    var letras = ['A','B','C'];
+    opcoesEl.innerHTML = '';
+    for (var i = 0; i < 3; i++) {
+      (function(li){
+        var btn = document.createElement('button');
+        btn.className = 'quiz-opt'; btn.type = 'button';
+        var span = document.createElement('span');
+        span.className = 'quiz-opt-letra'; span.textContent = letras[li];
+        var txt = document.createElement('span');
+        txt.textContent = pergunta.opcoes[li];
+        btn.appendChild(span); btn.appendChild(txt);
+        btn.addEventListener('click', function(){ _qtResponder(letras[li]); });
+        opcoesEl.appendChild(btn);
+      })(i);
+    }
+  }
+
+  // Trata a resposta de UMA pergunta do tema (mesmo padrão do _quizResponder).
+  function _qtResponder(escolha) {
+    if (!_qtEstado || _qtEstado.travado) return;
+    _qtEstado.travado = true;
+    var pergunta = _qtEstado.perguntas[_qtEstado.idx];
+    var acertou = (escolha === pergunta.correta);
+    if (acertou) _qtEstado.acertos++;
+    var opcoesEl = document.getElementById('qt-opcoes');
+    var botoes = opcoesEl ? opcoesEl.querySelectorAll('.quiz-opt') : [];
+    var letras = ['A','B','C'];
+    for (var i = 0; i < botoes.length; i++) {
+      botoes[i].disabled = true;
+      if (letras[i] === pergunta.correta) botoes[i].classList.add('qz-certa');
+      else if (letras[i] === escolha) botoes[i].classList.add('qz-errada');
+    }
+    if (acertou && navigator.vibrate) { try { navigator.vibrate(35); } catch(e) {} }
+    setTimeout(function(){
+      _qtEstado.idx++;
+      _qtEstado.travado = false;
+      if (_qtEstado.idx >= _qtEstado.perguntas.length) { _qtMostrarPlacar(); }
+      else { _qtRenderPergunta(); }
+    }, 1100);
+  }
+
+  // Mostra o placar final em % + título de acordo com a faixa de acerto:
+  // 0–40% iniciante, 41–70% manja do assunto, 71–100% expert/lenda.
+  function _qtMostrarPlacar() {
+    var acertos = _qtEstado.acertos;
+    var total = _qtEstado.perguntas.length;
+    var pct = total ? Math.round((acertos / total) * 100) : 0;
+    var cfg = _QT_TEMAS[_qtTemaAtual] || { label: 'isso', iniciante: 'Só de passagem', manja: 'Manja do assunto!', expert: 'Expert!' };
+    var faseEl = document.getElementById('qt-fase-perguntas');
+    var placarEl = document.getElementById('qt-placar');
+    var imgEl = document.getElementById('qt-placar-img');
+    var notaEl = document.getElementById('qt-placar-nota');
+    var msgEl = document.getElementById('qt-placar-msg');
+    if (faseEl) faseEl.style.display = 'none';
+    if (!placarEl || !imgEl || !notaEl || !msgEl) return;
+    var owl, titulo;
+    if (pct >= 71)      { owl = _QUIZ_OWL.otimo; titulo = cfg.expert; }
+    else if (pct >= 41) { owl = _QUIZ_OWL.bom;   titulo = cfg.manja; }
+    else                { owl = _QUIZ_OWL.fraco; titulo = cfg.iniciante; }
+    imgEl.src = owl; imgEl.style.display = '';
+    notaEl.innerHTML = 'Você acertou <b>' + acertos + '</b> de ' + total + '!';
+    msgEl.textContent = 'Você conhece ' + pct + '% de ' + cfg.label + ' — ' + titulo;
+    placarEl.classList.add('show');
+  }
 
   /* ── Ofensiva (streak diário) ───────────
      Conta dias seguidos em que a pessoa jogou QUALQUER jogo. 100% local.

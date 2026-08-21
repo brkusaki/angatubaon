@@ -4868,6 +4868,41 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .rl-play:active { transform: scale(0.96); }
 .rl-play:hover { filter: brightness(1.08); }
 
+/* ═════ "Quanto você conhece de..." (quiz temático, sem timer) ══
+   Reaproveita as classes .quiz-coruja/.quiz-inner/.quiz-head/.quiz-pergunta/
+   .quiz-opcoes/.quiz-placar do Quiz da Coruja (ver acima) — só o essencial
+   próprio da tela de escolha de tema e dos botões extras fica aqui. */
+.qt-cta-btn {
+  background: linear-gradient(135deg, #c084fc, #7c3aed);
+  box-shadow: 0 4px 14px rgba(124,58,237,0.35);
+}
+.qt-escolha-card {
+  border-radius: 16px; padding: 22px 18px;
+  border: 1px solid var(--border); background: var(--surface);
+  text-align: center;
+}
+.qt-escolha-head { margin-bottom: 18px; }
+.qt-escolha-emoji { font-size: 34px; display: block; margin-bottom: 6px; }
+.qt-escolha-titulo {
+  font-family: var(--font-h); font-weight: 800; font-size: 19px; color: var(--text);
+}
+.qt-escolha-sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.qt-escolha-grid { display: flex; flex-direction: column; gap: 10px; }
+.qt-tema-card {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 14px 16px; border-radius: 14px;
+  border: 1px solid var(--border); background: var(--surface2);
+  color: var(--text); cursor: pointer; text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .1s, border-color .15s, background .15s;
+}
+.qt-tema-card:active { transform: scale(0.98); }
+.qt-tema-card:hover { background: rgba(255,255,255,0.06); }
+.qt-tema-emoji { font-size: 26px; flex-shrink: 0; }
+.qt-tema-nome { font-family: var(--font-h); font-weight: 800; font-size: 15px; }
+.qt-placar-botoes { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.qt-placar-botoes .quiz-relampago-btn { margin-top: 12px; }
+
     /* ════════════════════════════════════════════
        AUTENTICAÇÃO DE CLIENTE (Firebase)
        Avatar no header + modais de login e de conta.

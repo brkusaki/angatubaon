@@ -1,0 +1,72 @@
+/* ═══════════════════════════════════════════════════════════════
+   BATALHA DE TANQUES — estilos do módulo (carregado sob demanda)
+   ═══════════════════════════════════════════════════════════════ */
+.gc-tanques .gc-owl-glow{background:radial-gradient(circle,rgba(255,71,87,.5),transparent 70%);}
+
+.tq-card{background:var(--card,#151d2b);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:12px;}
+
+/* HUD durante a partida: placar em losangos (pips), igual ao mockup */
+.tq-hud{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;}
+.tq-hud-lado{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.04);border-radius:12px;padding:6px 16px;min-width:78px;}
+.tq-hud-lado-label{font-size:10.5px;color:var(--muted,#8794a8);text-transform:uppercase;letter-spacing:.04em;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px;}
+.tq-pips{display:flex;gap:5px;}
+.tq-pip{width:11px;height:11px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);transform:rotate(45deg);border-radius:2px;transition:background .15s,border-color .15s;}
+.tq-pip-cheio{background:#ffb020;border-color:#ffb020;box-shadow:0 0 6px rgba(255,176,32,.6);}
+.tq-hud-x{font-size:13px;color:rgba(255,255,255,.35);font-weight:700;}
+
+/* Arena quadrada — top-down, sem perspectiva */
+.tq-arena{position:relative;width:100%;aspect-ratio:1/1;max-height:72vh;margin:0 auto;border-radius:14px;overflow:hidden;background:#0a0f1a;touch-action:none;}
+.tq-arena #tq-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
+
+/* Controles: joystick (esquerda) + botão de fogo (direita), flutuando
+   sobre a arena durante o jogo. */
+.tq-controles{position:absolute;inset:0;pointer-events:none;z-index:3;}
+.tq-joystick{position:absolute;left:18px;bottom:18px;width:96px;height:96px;border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.18);pointer-events:auto;touch-action:none;}
+.tq-joystick-thumb{position:absolute;left:50%;top:50%;width:42px;height:42px;margin:-21px 0 0 -21px;border-radius:50%;background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.4);transition:transform .04s linear;pointer-events:none;}
+.tq-fire-btn{position:absolute;right:22px;bottom:26px;width:74px;height:74px;border-radius:50%;background:rgba(255,71,87,.22);border:2px solid rgba(255,71,87,.55);color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 18px rgba(255,71,87,.3);}
+.tq-fire-btn:active{transform:scale(.92);background:rgba(255,71,87,.38);}
+
+.tq-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;background:rgba(9,14,22,.86);backdrop-filter:blur(3px);z-index:4;overflow-y:auto;}
+.tq-overlay-owl{width:92px;height:92px;object-fit:contain;margin-bottom:12px;filter:drop-shadow(0 6px 18px rgba(0,0,0,.5));}
+.tq-overlay-titulo{font-size:21px;font-weight:800;color:#fff;font-family:'Syne',sans-serif;margin-bottom:8px;}
+.tq-overlay-desc{font-size:13.5px;line-height:1.5;color:#c7d1e0;max-width:290px;margin-bottom:14px;}
+
+/* Tela inicial: sozinho / criar sala / entrar com código */
+.tq-opcoes{display:flex;flex-direction:column;gap:10px;width:100%;max-width:290px;}
+.tq-btn-opcao{width:100%;padding:13px 16px;border-radius:14px;border:1px solid rgba(255,71,87,.35);background:rgba(255,71,87,.10);color:#fff;font-family:'Syne',sans-serif;font-size:15px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s ease,filter .12s ease;}
+.tq-btn-opcao:active{transform:scale(.97);}
+.tq-btn-opcao:disabled{opacity:.5;pointer-events:none;}
+.tq-btn-opcao-alt{border-color:rgba(255,255,255,.14);background:rgba(255,255,255,.05);}
+
+.tq-privada-toggle{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:2px 4px;font-size:12px;color:rgba(199,209,224,.75);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.tq-privada-toggle input{width:15px;height:15px;accent-color:#ff4757;cursor:pointer;}
+
+.tq-divisor{display:flex;align-items:center;gap:10px;width:100%;max-width:290px;margin:4px 0;color:rgba(199,209,224,.5);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;}
+.tq-divisor::before,.tq-divisor::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.10);}
+
+.tq-lista-salas{display:flex;flex-direction:column;gap:7px;width:100%;max-width:290px;max-height:132px;overflow-y:auto;}
+.tq-lista-vazia{font-size:12px;color:rgba(199,209,224,.45);padding:6px 2px;}
+.tq-sala-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:9px 10px 9px 14px;}
+.tq-sala-item-nome{font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.tq-sala-item-btn{flex-shrink:0;padding:6px 14px;border-radius:9px;border:1px solid rgba(255,71,87,.4);background:rgba(255,71,87,.16);color:#ff4757;font-weight:800;font-size:12.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.tq-sala-item-btn:active{transform:scale(.95);}
+
+.tq-entrar-wrap{display:flex;gap:8px;width:100%;max-width:290px;}
+.tq-codigo-input{flex:1;min-width:0;background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:11px 12px;font-size:18px;font-weight:800;letter-spacing:.18em;text-align:center;text-transform:uppercase;font-family:'Syne',sans-serif;}
+.tq-codigo-input::placeholder{color:rgba(255,255,255,.3);letter-spacing:.1em;}
+.tq-btn-entrar-mini{flex-shrink:0;padding:0 18px;border-radius:10px;border:1px solid rgba(255,71,87,.4);background:rgba(255,71,87,.16);color:#ff4757;font-weight:800;font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.tq-btn-entrar-mini:disabled{opacity:.5;pointer-events:none;}
+.tq-menu-erro{margin-top:12px;font-size:12.5px;color:#ff6b81;max-width:290px;}
+
+.tq-sala-codigo{font-family:'Syne',sans-serif;font-size:44px;font-weight:900;letter-spacing:.14em;color:var(--red,#ff3355);margin:6px 0 16px;}
+.tq-sala-spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#ff4757;animation:tqGirar .8s linear infinite;margin-bottom:16px;}
+@keyframes tqGirar{to{transform:rotate(360deg);}}
+.tq-btn-copiar{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:999px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;margin-bottom:14px;}
+.tq-link{margin-top:6px;background:none;border:none;color:rgba(199,209,224,.7);font-size:12.5px;font-weight:600;text-decoration:underline;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.tq-link:active{color:#fff;}
+
+.tq-fim-placar{font-family:'Syne',sans-serif;font-size:32px;font-weight:900;color:#fff;margin-bottom:8px;}
+.tq-play{background:var(--red,#ff3355);color:#fff;border:none;border-radius:999px;padding:12px 34px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(255,51,85,.35);transition:transform .12s ease,filter .12s ease;margin-top:4px;}
+.tq-play:hover{filter:brightness(1.08);}
+.tq-play:active{transform:scale(.96);}
+.tq-play:disabled{opacity:.5;pointer-events:none;}

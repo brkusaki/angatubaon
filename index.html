@@ -874,6 +874,15 @@
               <img src="/webp/owl-angry.webp" alt="" class="tq-overlay-owl" onerror="this.style.display='none'">
               <div class="tq-overlay-titulo">🎯 Batalha de Tanques</div>
               <div class="tq-overlay-desc">Esconda-se atrás dos tijolos e acerte o adversário. Melhor de 3 rodadas. Jogue sozinho contra a CPU, ou desafie um amigo em tempo real.</div>
+              <div class="tq-classes" id="tq-classes">
+                <div class="tq-classes-label">Escolha seu tanque</div>
+                <div class="tq-classes-opcoes">
+                  <button type="button" class="tq-classe-btn tq-classe-ativa" data-classe="padrao" onclick="_tqEscolherClasse('padrao')">Padrão</button>
+                  <button type="button" class="tq-classe-btn" data-classe="leve" onclick="_tqEscolherClasse('leve')">Leve</button>
+                  <button type="button" class="tq-classe-btn" data-classe="pesado" onclick="_tqEscolherClasse('pesado')">Pesado</button>
+                </div>
+                <div class="tq-classes-desc" id="tq-classes-desc">Velocidade e tiro padrão.</div>
+              </div>
               <div class="tq-opcoes">
                 <button type="button" class="tq-btn-opcao" onclick="_tqJogarSozinho()">Jogar sozinho</button>
                 <button type="button" class="tq-btn-opcao tq-btn-opcao-alt" id="tq-btn-criar" onclick="_tqCriarSala()">Criar sala (com um amigo)</button>

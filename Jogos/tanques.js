@@ -47,6 +47,17 @@
    (ver _tqEmMoita/_tqEscondido*), tanto do desenho do adversário
    quanto da mira da IA.
 
+   CLASSES E PODER-UPS: cada jogador escolhe sua classe (Padrão/Leve/
+   Pesado — ver TQ_CLASSES) no menu antes de jogar; a própria já é
+   aplicada na hora, a do adversário chega pela mensagem 'oi'. Só quem
+   é Pesado tem mais de 1 HP (ver t.hp/_tqAplicarDano) — os outros
+   ainda morrem num tiro só. Caixas de suprimento (escudo/tiro rápido/
+   tiro duplo) nascem sozinhas de tempos em tempos; só o ANFITRIÃO
+   sorteia posição/tipo e detecta quem pegou (mesma autoridade das
+   paredes/projéteis) — a lista viaja pro convidado em 'e' (campo
+   "cx"), e o cooldown reduzido do PRÓPRIO convidado também (campo
+   "rg", pro gatilho local não esperar a rede a cada tiro).
+
    ARENA E LANDSCAPE: mundo vai de x:0..MUNDO_LARGURA (16/9) e y:0..1
    — todo pixel-por-unidade usa _tqH (altura real do canvas) como
    fator uniforme pros dois eixos, porque o CSS trava aspect-ratio:
@@ -79,6 +90,49 @@
 
   var MUNDO_LARGURA = 16 / 9;   // arena widescreen — x vai de 0..MUNDO_LARGURA, y continua 0..1
   var TQ_IA_DIST_ENGAJAR = 0.86; // distância (mundo largo) até a IA trocar patrulha por engajar
+
+  /* ── Classes de tanque: escolhida no menu (ver _tqEscolherClasse),
+     aplicada ao PRÓPRIO tanque (_tqMinhaClasse) e sincronizada
+     pro outro lado dentro do 'oi' (campo "classe") — a CPU (modo
+     sozinho) é sempre "padrao". velMul/tiroMul multiplicam
+     TQ_VELOCIDADE/TQ_COOLDOWN_TIRO; hpMax é quantos tiros o tanque
+     aguenta antes da rodada acabar (ver _tqAplicarDano). */
+  var TQ_CLASSES = {
+    padrao: { nome: 'Padrão', velMul: 1,    tiroMul: 1,   hpMax: 1 },
+    leve:   { nome: 'Leve',   velMul: 1.25, tiroMul: 1,   hpMax: 1 },
+    pesado: { nome: 'Pesado', velMul: 0.75, tiroMul: 1.3, hpMax: 3 }
+  };
+  var _tqMinhaClasse = 'padrao';
+  var _tqClasseAnfitriao = 'padrao', _tqClasseConvidado = 'padrao';
+  function _tqClasseDoTanque(t) {
+    var chave = (t === _tqTanqueAnfitriao) ? _tqClasseAnfitriao : _tqClasseConvidado;
+    return TQ_CLASSES[chave] || TQ_CLASSES.padrao;
+  }
+  // Cooldown de tiro efetivo de um lado ('anfitriao'/'convidado'): junta
+  // o multiplicador da classe com o power-up de tiro rápido, se ativo
+  // (ver _tqRapidoAnfitriao/_tqRapidoConvidado, mais abaixo).
+  function _tqCooldownEfetivo(quem) {
+    var classe = TQ_CLASSES[quem === 'anfitriao' ? _tqClasseAnfitriao : _tqClasseConvidado] || TQ_CLASSES.padrao;
+    var rapidoAtivo = quem === 'anfitriao' ? _tqRapidoAnfitriao > 0 : _tqRapidoConvidado > 0;
+    return TQ_COOLDOWN_TIRO * classe.tiroMul * (rapidoAtivo ? TQ_RAPIDO_MUL : 1);
+  }
+
+  /* ── Caixas de suprimento: só o ANFITRIÃO gera e detecta coleta (tem
+     as duas posições) — geometria/estado viajam pro convidado dentro
+     da mensagem 'e' (campo "cx"). 3 tipos: escudo (absorve 1 hit sem
+     gastar HP — ver _tqAplicarDano), tiro rápido (cooldown reduzido)
+     e tiro duplo (2 projéteis por disparo — ver _tqCriarProjetil). */
+  var TQ_CAIXA_RAIO = 0.045;
+  var TQ_CAIXA_INTERVALO_MIN = 9, TQ_CAIXA_INTERVALO_MAX = 16; // segundos entre spawns
+  var TQ_CAIXA_MAX_SIMULTANEAS = 1;
+  var TQ_TIPOS_CAIXA = ['escudo', 'rapido', 'duplo'];
+  var TQ_RAPIDO_MUL = 0.5, TQ_RAPIDO_DUR = 7;   // cooldown pela metade, por 7s
+  var TQ_DUPLO_DUR = 7, TQ_DUPLO_ESPALHAR = 0.09; // 2 tiros, 7s, abertura em rad entre eles
+  var _tqCaixas = [];           // { id, x, y, tipo } — lista atual (host gera/remove)
+  var _tqProximaCaixaEm = 0, _tqProxCaixaId = 1;
+  var _tqEscudoAnfitriao = false, _tqEscudoConvidado = false;
+  var _tqRapidoAnfitriao = 0, _tqRapidoConvidado = 0;   // segundos restantes
+  var _tqDuploAnfitriao = 0, _tqDuploConvidado = 0;     // segundos restantes
 
   /* ── Pool de mapas: cada um é "metade" + espelho 180° (ver
      cabeçalho) — garante simetria sem risco de erro de conta manual.
@@ -169,8 +223,8 @@
   // Tanques: {x,y,ang} em espaço 0..1. O anfitrião é sempre azul, o
   // convidado (ou a CPU) é sempre vermelho — independe de quem
   // "ganhou" a sala, é só uma cor fixa de cada papel.
-  var _tqTanqueAnfitriao = { x: TQ_SPAWN_ANFITRIAO.x, y: TQ_SPAWN_ANFITRIAO.y, ang: TQ_SPAWN_ANFITRIAO.ang };
-  var _tqTanqueConvidado = { x: TQ_SPAWN_CONVIDADO.x, y: TQ_SPAWN_CONVIDADO.y, ang: TQ_SPAWN_CONVIDADO.ang };
+  var _tqTanqueAnfitriao = { x: TQ_SPAWN_ANFITRIAO.x, y: TQ_SPAWN_ANFITRIAO.y, ang: TQ_SPAWN_ANFITRIAO.ang, hp: 1 };
+  var _tqTanqueConvidado = { x: TQ_SPAWN_CONVIDADO.x, y: TQ_SPAWN_CONVIDADO.y, ang: TQ_SPAWN_CONVIDADO.ang, hp: 1 };
 
   var _tqProjeteis = [];      // { x,y,vx,vy,dono } — dono: 'anfitriao' | 'convidado'
   var _tqParedes = [];        // { x,y,w,h,hp,destruida } — geometria de _TQ_MAPAS[_tqMapaAtualIdx] + estado
@@ -374,6 +428,8 @@
     _tqModo = 'solo';
     _tqSouAnfitriao = true;
     _tqApelidoAdversario = 'Computador';
+    _tqClasseAnfitriao = _tqMinhaClasse;
+    _tqClasseConvidado = 'padrao'; // a CPU sempre joga com o tanque padrão
     _tqReiniciarPartida();
     _tqComecarPartida();
   }
@@ -464,6 +520,24 @@
   window._tqEntrarSala = _tqEntrarSala;
   window._tqCopiarCodigo = _tqCopiarCodigo;
   window._tqVoltarMenu = _tqVoltarMenu;
+  // Pills de classe no menu inicial — só troca a escolha local
+  // (_tqMinhaClasse); a aplicação de fato acontece ao começar (solo)
+  // ou ao conectar (multiplayer, ver _tqLigarEventosRede).
+  var TQ_CLASSE_DESC = {
+    padrao: 'Velocidade e tiro padrão.',
+    leve: 'Mais rápido, mas ainda morre num tiro só.',
+    pesado: 'Mais lento e atira mais devagar, mas aguenta 3 tiros pra morrer.'
+  };
+  window._tqEscolherClasse = function (classe) {
+    if (!TQ_CLASSES[classe]) return;
+    _tqMinhaClasse = classe;
+    var btns = document.querySelectorAll('.tq-classe-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('tq-classe-ativa', btns[i].getAttribute('data-classe') === classe);
+    }
+    var desc = document.getElementById('tq-classes-desc');
+    if (desc) desc.textContent = TQ_CLASSE_DESC[classe] || '';
+  };
   window._tqPedirRevanche = function () {
     if (_tqModo === 'solo') { _tqReiniciarPartida(); _tqComecarPartida(); }
     else if (_tqSouAnfitriao) { _tqReiniciarPartida(); _tqEnviarReinicio(); _tqComecarPartida(); }
@@ -480,13 +554,16 @@
     window.AngatubaMP.on('conectado', function () {
       var bridge = _tqBridge();
       var meuNome = (bridge && bridge.apelido && bridge.apelido()) || 'Jogador';
-      var msg = { t: 'oi', nome: meuNome };
+      var msg = { t: 'oi', nome: meuNome, classe: _tqMinhaClasse };
       if (_tqSouAnfitriao) {
+        _tqClasseAnfitriao = _tqMinhaClasse;
         // Anfitrião sorteia o mapa da partida e avisa o convidado dentro
         // do próprio "oi" — sem isso os dois lados desenhariam paredes
         // em lugares diferentes (só o dano é sincronizado depois).
         _tqReiniciarPartida();
         msg.mapa = _tqMapaAtualIdx;
+      } else {
+        _tqClasseConvidado = _tqMinhaClasse;
       }
       window.AngatubaMP.enviar(msg);
       _tqComecarPartida();
@@ -516,6 +593,18 @@
           _tqMapaAtualIdx = dado.mapa;
           _tqResetParedes();
         }
+        // Classe do OUTRO lado (a minha eu já apliquei localmente no
+        // 'conectado', sem depender da rede). No anfitrião, o 'oi' do
+        // convidado pode chegar DEPOIS do _tqReiniciarPartida (que já
+        // rodou com a classe antiga/padrão) — corrige o HP aqui.
+        if (typeof dado.classe === 'string' && TQ_CLASSES[dado.classe]) {
+          if (_tqSouAnfitriao) {
+            _tqClasseConvidado = dado.classe;
+            _tqTanqueConvidado.hp = TQ_CLASSES[_tqClasseConvidado].hpMax;
+          } else {
+            _tqClasseAnfitriao = dado.classe;
+          }
+        }
         _tqAtualizarHUD();
         break;
       case 'p': // convidado -> anfitrião: posição/ângulo do tanque do convidado
@@ -527,15 +616,24 @@
         break;
       case 'tiro': // convidado avisa que atirou — só o anfitrião spawna o projétil (é quem tem autoridade)
         if (_tqSouAnfitriao && _tqRodadaEstado === 'jogando' && _tqCooldownConvidado <= 0) {
-          _tqCooldownConvidado = TQ_COOLDOWN_TIRO;
+          _tqCooldownConvidado = _tqCooldownEfetivo('convidado');
           _tqCriarProjetil(dado.x, dado.y, dado.ang, 'convidado');
         }
         break;
       case 'e': // anfitrião -> convidado: estado do mundo inteiro
         if (!_tqSouAnfitriao) {
           _tqTanqueAnfitriao.x = dado.hx; _tqTanqueAnfitriao.y = dado.hy; _tqTanqueAnfitriao.ang = dado.hang;
+          if (typeof dado.hhp === 'number') _tqTanqueAnfitriao.hp = dado.hhp;
+          if (typeof dado.ghp === 'number') _tqTanqueConvidado.hp = dado.ghp;
           _tqProjeteis = dado.pj || [];
+          _tqCaixas = dado.cx || [];
           _tqEscondidoAnfitriao = !!dado.ea; // o anfitrião já calculou (tem as duas posições) — só aplica
+          _tqEscudoAnfitriao = !!dado.esa; _tqEscudoConvidado = !!dado.esg;
+          // rg (tiro rápido do convidado): o ANFITRIÃO detecta a coleta
+          // (tem as duas posições) — o convidado precisa saber pra usar
+          // o cooldown reduzido no PRÓPRIO gatilho local (_tqTentarAtirar),
+          // sem esperar a rede a cada tiro.
+          if (typeof dado.rg === 'number') _tqRapidoConvidado = dado.rg;
           if (dado.pd) {
             // Detecta a TRANSIÇÃO intacta→destruída pra tremer a tela
             // também do lado do convidado (o anfitrião já treme sozinho
@@ -874,6 +972,9 @@
   function _tqIniciarRodada() {
     _tqTanqueAnfitriao.x = TQ_SPAWN_ANFITRIAO.x; _tqTanqueAnfitriao.y = TQ_SPAWN_ANFITRIAO.y; _tqTanqueAnfitriao.ang = TQ_SPAWN_ANFITRIAO.ang;
     _tqTanqueConvidado.x = TQ_SPAWN_CONVIDADO.x; _tqTanqueConvidado.y = TQ_SPAWN_CONVIDADO.y; _tqTanqueConvidado.ang = TQ_SPAWN_CONVIDADO.ang;
+    // HP de cada lado vem da classe escolhida (Pesado aguenta mais de 1 tiro).
+    _tqTanqueAnfitriao.hp = TQ_CLASSES[_tqClasseAnfitriao] ? TQ_CLASSES[_tqClasseAnfitriao].hpMax : 1;
+    _tqTanqueConvidado.hp = TQ_CLASSES[_tqClasseConvidado] ? TQ_CLASSES[_tqClasseConvidado].hpMax : 1;
     _tqProjeteis = [];
     _tqResetParedes();
     _tqRodadaEstado = 'jogando';
@@ -888,6 +989,12 @@
     _tqUltimaPosAnfitriao = null; _tqUltimaPosConvidado = null;
     _tqRevelarAnfitriao = 0; _tqRevelarConvidado = 0;
     _tqEscondidoAnfitriao = false; _tqEscondidoConvidado = false;
+    // Power-ups: nada carrega de uma rodada pra outra.
+    _tqCaixas = [];
+    _tqProximaCaixaEm = TQ_CAIXA_INTERVALO_MIN + Math.random() * (TQ_CAIXA_INTERVALO_MAX - TQ_CAIXA_INTERVALO_MIN);
+    _tqEscudoAnfitriao = false; _tqEscudoConvidado = false;
+    _tqRapidoAnfitriao = 0; _tqRapidoConvidado = 0;
+    _tqDuploAnfitriao = 0; _tqDuploConvidado = 0;
   }
 
   function _tqComecarPartida() {
@@ -960,7 +1067,7 @@
     var maxDelta = TQ_GIRO_VEL * dt;
     if (diff > maxDelta) diff = maxDelta; else if (diff < -maxDelta) diff = -maxDelta;
     t.ang += diff;
-    var v = TQ_VELOCIDADE * mag * dt;
+    var v = TQ_VELOCIDADE * _tqClasseDoTanque(t).velMul * mag * dt;
     var dx = Math.sin(t.ang) * v, dy = -Math.cos(t.ang) * v;
     var novoX = _tqClamp(t.x + dx, TQ_RAIO_TANQUE, MUNDO_LARGURA - TQ_RAIO_TANQUE);
     if (!_tqColideParede(novoX, t.y, TQ_RAIO_TANQUE)) t.x = novoX;
@@ -983,6 +1090,13 @@
     _tqEscondidoAnfitriao = _tqRevelarAnfitriao <= 0 && _tqEmMoita(_tqTanqueAnfitriao);
     _tqEscondidoConvidado = _tqRevelarConvidado <= 0 && _tqEmMoita(_tqTanqueConvidado);
 
+    // Power-ups: decai tiro rápido/duplo (o escudo não tem timer — dura
+    // até absorver um hit, ver _tqAplicarDano).
+    if (_tqRapidoAnfitriao > 0) _tqRapidoAnfitriao = Math.max(0, _tqRapidoAnfitriao - dt);
+    if (_tqRapidoConvidado > 0) _tqRapidoConvidado = Math.max(0, _tqRapidoConvidado - dt);
+    if (_tqDuploAnfitriao > 0) _tqDuploAnfitriao = Math.max(0, _tqDuploAnfitriao - dt);
+    if (_tqDuploConvidado > 0) _tqDuploConvidado = Math.max(0, _tqDuploConvidado - dt);
+
     if (_tqRodadaEstado === 'pausa') {
       _tqPausaTimer -= dt;
       if (_tqPausaTimer <= 0) _tqIniciarRodada();
@@ -990,9 +1104,57 @@
       return;
     }
 
+    // Caixas de suprimento: sorteia uma nova de tempos em tempos (até o
+    // teto de simultâneas) e checa se algum tanque acabou de pegar uma.
+    _tqProximaCaixaEm -= dt;
+    if (_tqProximaCaixaEm <= 0 && _tqCaixas.length < TQ_CAIXA_MAX_SIMULTANEAS) {
+      _tqSpawnCaixa();
+      _tqProximaCaixaEm = TQ_CAIXA_INTERVALO_MIN + Math.random() * (TQ_CAIXA_INTERVALO_MAX - TQ_CAIXA_INTERVALO_MIN);
+    }
+    _tqChecarColetaCaixas();
+
     if (_tqModo === 'solo') _tqAtualizarIA(dt);
     _tqAtualizarProjeteis(dt);
     _tqEnviarEstado(false);
+  }
+
+  // Sorteia uma posição livre (fora de paredes) pra uma caixa nova, com
+  // tipo aleatório entre os 3. Desiste depois de algumas tentativas
+  // (mapas muito cheios de parede não travam o jogo por isso).
+  function _tqSpawnCaixa() {
+    var tentativas = 0, x, y;
+    do {
+      x = TQ_CAIXA_RAIO + Math.random() * (MUNDO_LARGURA - TQ_CAIXA_RAIO * 2);
+      y = TQ_CAIXA_RAIO + Math.random() * (1 - TQ_CAIXA_RAIO * 2);
+      tentativas++;
+    } while (_tqColideParede(x, y, TQ_CAIXA_RAIO) && tentativas < 12);
+    if (tentativas >= 12 && _tqColideParede(x, y, TQ_CAIXA_RAIO)) return;
+    var tipo = TQ_TIPOS_CAIXA[Math.floor(Math.random() * TQ_TIPOS_CAIXA.length)];
+    _tqCaixas.push({ id: _tqProxCaixaId++, x: x, y: y, tipo: tipo });
+  }
+
+  function _tqChecarColetaCaixas() {
+    if (!_tqCaixas.length) return;
+    for (var i = _tqCaixas.length - 1; i >= 0; i--) {
+      var c = _tqCaixas[i];
+      var pegouAnfitriao = Math.hypot(_tqTanqueAnfitriao.x - c.x, _tqTanqueAnfitriao.y - c.y) < TQ_RAIO_TANQUE + TQ_CAIXA_RAIO;
+      var pegouConvidado = !pegouAnfitriao && Math.hypot(_tqTanqueConvidado.x - c.x, _tqTanqueConvidado.y - c.y) < TQ_RAIO_TANQUE + TQ_CAIXA_RAIO;
+      if (pegouAnfitriao || pegouConvidado) {
+        _tqAplicarPowerUp(pegouAnfitriao ? 'anfitriao' : 'convidado', c.tipo);
+        _tqCaixas.splice(i, 1);
+      }
+    }
+  }
+
+  function _tqAplicarPowerUp(quem, tipo) {
+    var souAnfitriao = quem === 'anfitriao';
+    if (tipo === 'escudo') {
+      if (souAnfitriao) _tqEscudoAnfitriao = true; else _tqEscudoConvidado = true;
+    } else if (tipo === 'rapido') {
+      if (souAnfitriao) _tqRapidoAnfitriao = TQ_RAPIDO_DUR; else _tqRapidoConvidado = TQ_RAPIDO_DUR;
+    } else if (tipo === 'duplo') {
+      if (souAnfitriao) _tqDuploAnfitriao = TQ_DUPLO_DUR; else _tqDuploConvidado = TQ_DUPLO_DUR;
+    }
   }
 
   function _tqAtualizarProjeteis(dt) {
@@ -1028,14 +1190,40 @@
 
       // Só pode acertar o tanque do OUTRO lado (não tem "fogo amigo"
       // consigo mesmo — nem faria sentido, o alvo é sempre o rival).
-      var alvo = (pr.dono === 'anfitriao') ? _tqTanqueConvidado : _tqTanqueAnfitriao;
+      var alvoQuem = (pr.dono === 'anfitriao') ? 'convidado' : 'anfitriao';
+      var alvo = (alvoQuem === 'anfitriao') ? _tqTanqueAnfitriao : _tqTanqueConvidado;
       var dist = Math.hypot(pr.x - alvo.x, pr.y - alvo.y);
       if (dist < TQ_RAIO_TANQUE + TQ_RAIO_PROJETIL) {
         _tqProjeteis.splice(i, 1);
-        _tqFimDeRodada(pr.dono === 'anfitriao' ? 'anfitriao' : 'convidado');
-        return;
+        // Fatal (HP zerou) encerra a rodada — nesse caso para de processar
+        // os outros projéteis do quadro (mesmo comportamento de antes).
+        // Não-fatal (escudo absorveu, ou Pesado ainda tem HP) só remove
+        // esse projétil e segue o loop normalmente.
+        if (_tqAplicarDano(alvoQuem)) return;
+        continue;
       }
     }
+  }
+
+  // Aplica um hit num tanque: escudo absorve inteiro (sem gastar HP);
+  // senão desconta 1 HP e, se zerar, encerra a rodada. Retorna true
+  // quando a rodada terminou (fatal), false caso contrário.
+  function _tqAplicarDano(quem) {
+    var souAnfitriao = quem === 'anfitriao';
+    var temEscudo = souAnfitriao ? _tqEscudoAnfitriao : _tqEscudoConvidado;
+    if (temEscudo) {
+      if (souAnfitriao) _tqEscudoAnfitriao = false; else _tqEscudoConvidado = false;
+      _tqAcionarShake(TQ_SHAKE_PAREDE_DUR, TQ_SHAKE_PAREDE_FORCA); // tremor leve — absorvido, não feriu
+      return false;
+    }
+    var t = souAnfitriao ? _tqTanqueAnfitriao : _tqTanqueConvidado;
+    t.hp = Math.max(0, (typeof t.hp === 'number' ? t.hp : 1) - 1);
+    if (t.hp <= 0) {
+      _tqFimDeRodada(souAnfitriao ? 'convidado' : 'anfitriao');
+      return true;
+    }
+    _tqAcionarShake(TQ_SHAKE_ACERTO_DUR * 0.6, TQ_SHAKE_ACERTO_FORCA * 0.6); // atingido mas sobreviveu (Pesado)
+    return false;
   }
 
   function _tqFimDeRodada(vencedor) {
@@ -1055,9 +1243,10 @@
     _tqEnviarEstado(false);
   }
 
-  function _tqCriarProjetil(x, y, ang, dono) {
-    // nasce um pouco à frente do cano, já fora do próprio corpo do
-    // tanque, senão colidiria com a própria parede/tanque no 1º quadro.
+  // Nasce um projétil sozinho, um pouco à frente do cano (já fora do
+  // próprio corpo do tanque, senão colidiria com a própria parede/tanque
+  // no 1º quadro). Função interna — quem chama de fora é _tqCriarProjetil.
+  function _tqCriarProjetilUnico(x, y, ang, dono) {
     var offset = TQ_RAIO_TANQUE + 0.02;
     var px = x + Math.sin(ang) * offset, py = y - Math.cos(ang) * offset;
     _tqProjeteis.push({
@@ -1065,6 +1254,18 @@
       vx: Math.sin(ang) * TQ_VEL_PROJETIL, vy: -Math.cos(ang) * TQ_VEL_PROJETIL,
       dono: dono, rebotes: 0
     });
+  }
+
+  function _tqCriarProjetil(x, y, ang, dono) {
+    // Tiro duplo (power-up): 2 projéteis com uma pequena abertura entre
+    // eles, em vez de 1 reto. Só quem chamou tem o power-up ativo.
+    var duploAtivo = (dono === 'anfitriao') ? (_tqDuploAnfitriao > 0) : (_tqDuploConvidado > 0);
+    if (duploAtivo) {
+      _tqCriarProjetilUnico(x, y, ang - TQ_DUPLO_ESPALHAR / 2, dono);
+      _tqCriarProjetilUnico(x, y, ang + TQ_DUPLO_ESPALHAR / 2, dono);
+    } else {
+      _tqCriarProjetilUnico(x, y, ang, dono);
+    }
     // Recuo — cobre a IA (modo sozinho) e a visão que o anfitrião tem
     // do tiro do convidado (autoridade nasce aqui pros dois casos). O
     // feedback do PRÓPRIO jogador ao apertar fogo já é instantâneo via
@@ -1078,12 +1279,13 @@
 
   function _tqTentarAtirar() {
     if (_tqEstado !== 'jogando' || _tqRodadaEstado !== 'jogando' || _tqMeuCooldown > 0) return;
-    _tqMeuCooldown = TQ_COOLDOWN_TIRO;
+    var meuPapel = _tqSouAnfitriao ? 'anfitriao' : 'convidado';
+    _tqMeuCooldown = _tqCooldownEfetivo(meuPapel);
     if (_tqSouAnfitriao) _tqRecuoAnfitriao = 1; else _tqRecuoConvidado = 1;
     var t = _tqMeuTanque();
     if (_tqSouAnfitriao) {
       if (_tqCooldownAnfitriao <= 0) {
-        _tqCooldownAnfitriao = TQ_COOLDOWN_TIRO;
+        _tqCooldownAnfitriao = _tqCooldownEfetivo('anfitriao');
         _tqCriarProjetil(t.x, t.y, t.ang, 'anfitriao');
       }
     } else if (window.AngatubaMP) {
@@ -1111,6 +1313,8 @@
     window.AngatubaMP.enviar({
       t: 'e', hx: _tqTanqueAnfitriao.x, hy: _tqTanqueAnfitriao.y, hang: _tqTanqueAnfitriao.ang,
       pj: _tqProjeteis, pd: pd, ea: _tqEscondidoAnfitriao,
+      hhp: _tqTanqueAnfitriao.hp, ghp: _tqTanqueConvidado.hp,
+      cx: _tqCaixas, esa: _tqEscudoAnfitriao, esg: _tqEscudoConvidado, rg: _tqRapidoConvidado,
       sa: _tqPlacarAnfitriao, sg: _tqPlacarConvidado, re: _tqRodadaEstado, fim: !!fim
     });
   }
@@ -1148,7 +1352,7 @@
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       if (Math.abs(diff) < 0.16 && !_tqEscondidoAnfitriao && _tqCooldownConvidado <= 0 && _tqLinhaLivre(eu, alvo)) {
-        _tqCooldownConvidado = TQ_COOLDOWN_TIRO * (1.1 + Math.random() * 0.6);
+        _tqCooldownConvidado = _tqCooldownEfetivo('convidado') * (1.1 + Math.random() * 0.6);
         _tqCriarProjetil(eu.x, eu.y, eu.ang, 'convidado');
       }
     } else {
@@ -1228,17 +1432,55 @@
     _tqDesenharRastro();
     _tqDesenharMoitas();
     _tqDesenharParedes();
+    _tqDesenharCaixas();
 
     var jogando = (_tqEstado === 'jogando');
     if (jogando) {
       for (var i = 0; i < _tqProjeteis.length; i++) _tqDesenharProjetil(_tqProjeteis[i]);
       // O PRÓPRIO tanque sempre aparece; o do adversário só se ele não
       // estiver escondido numa moita (ver _tqEscondido* em _tqSimularMundo).
-      if (_tqSouAnfitriao || !_tqEscondidoAnfitriao) _tqDesenharTanque(_tqTanqueAnfitriao, 'tank-azul.webp', TQ_COR_ANFITRIAO, _tqRecuoAnfitriao);
-      if (!_tqSouAnfitriao || !_tqEscondidoConvidado) _tqDesenharTanque(_tqTanqueConvidado, 'tank-vermelho.webp', TQ_COR_CONVIDADO, _tqRecuoConvidado);
+      if (_tqSouAnfitriao || !_tqEscondidoAnfitriao) _tqDesenharTanque(_tqTanqueAnfitriao, 'tank-azul.webp', TQ_COR_ANFITRIAO, _tqRecuoAnfitriao, _tqEscudoAnfitriao);
+      if (!_tqSouAnfitriao || !_tqEscondidoConvidado) _tqDesenharTanque(_tqTanqueConvidado, 'tank-vermelho.webp', TQ_COR_CONVIDADO, _tqRecuoConvidado, _tqEscudoConvidado);
       if (_tqRodadaEstado === 'pausa') _tqDesenharAvisoRodada();
     }
     ctx.restore();
+  }
+
+  // Caixas de suprimento: círculo escuro com um símbolo por tipo —
+  // escudo (cruz azul), tiro rápido (raio amarelo), tiro duplo (2
+  // bolinhas laranja). Desenhadas sobre as paredes, embaixo dos tanques.
+  var TQ_CAIXA_CORES = { escudo: '#3aa0ff', rapido: '#ffd24a', duplo: '#ff9a3a' };
+  function _tqDesenharCaixas() {
+    if (!_tqCaixas.length) return;
+    var ctx = _tqCtx;
+    var r = TQ_CAIXA_RAIO * _tqH;
+    for (var i = 0; i < _tqCaixas.length; i++) {
+      var c = _tqCaixas[i];
+      ctx.save();
+      ctx.translate(c.x * _tqH, c.y * _tqH);
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(10,15,26,0.85)';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = TQ_CAIXA_CORES[c.tipo] || '#fff';
+      ctx.stroke();
+      ctx.fillStyle = TQ_CAIXA_CORES[c.tipo] || '#fff';
+      if (c.tipo === 'escudo') {
+        ctx.fillRect(-r * 0.09, -r * 0.45, r * 0.18, r * 0.9);
+        ctx.fillRect(-r * 0.45, -r * 0.09, r * 0.9, r * 0.18);
+      } else if (c.tipo === 'rapido') {
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.1, -r * 0.5); ctx.lineTo(r * 0.35, -r * 0.05); ctx.lineTo(r * 0.02, -r * 0.05);
+        ctx.lineTo(r * 0.28, r * 0.5); ctx.lineTo(-r * 0.35, 0); ctx.lineTo(-r * 0.02, 0);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.beginPath(); ctx.arc(-r * 0.22, 0, r * 0.22, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(r * 0.22, 0, r * 0.22, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
   }
 
   // Marcas de esteira: um par de tracinhos escuros por marca, girados
@@ -1339,7 +1581,7 @@
   // então giram em torno do CENTRO DO CASCO (não do centro da
   // imagem, que inclui o cano saindo pra cima de forma assimétrica).
   var TQ_PIVO_Y = 0.63;
-  function _tqDesenharTanque(t, arquivo, corFallback, recuo) {
+  function _tqDesenharTanque(t, arquivo, corFallback, recuo, comEscudo) {
     var ctx = _tqCtx;
     var reg = _tqAsset(arquivo);
     var cx = t.x * _tqH, cy = t.y * _tqH;
@@ -1366,6 +1608,37 @@
       ctx.fillRect(-diametroTela * 0.08, -diametroTela * 0.65, diametroTela * 0.16, diametroTela * 0.6);
     }
     ctx.restore();
+
+    // Escudo (power-up): anel azul ao redor do tanque, fora do save/
+    // rotate acima (é simétrico, não precisa girar com o casco).
+    if (comEscudo) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.beginPath();
+      ctx.arc(0, 0, diametroTela * 0.62, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(58,160,255,0.85)';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = 'rgba(58,160,255,0.8)';
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // HP em pips acima do tanque — só pra classes com mais de 1 HP
+    // (Pesado), pra mostrar quantos tiros ainda aguenta.
+    var classe = _tqClasseDoTanque(t);
+    if (classe.hpMax > 1) {
+      ctx.save();
+      var n = classe.hpMax, espaco = diametroTela * 0.32;
+      var startX = cx - ((n - 1) * espaco) / 2, y = cy - diametroTela * 1.05;
+      for (var i = 0; i < n; i++) {
+        ctx.beginPath();
+        ctx.arc(startX + i * espaco, y, diametroTela * 0.09, 0, Math.PI * 2);
+        ctx.fillStyle = i < t.hp ? '#ffb020' : 'rgba(255,255,255,0.18)';
+        ctx.fill();
+      }
+      ctx.restore();
+    }
   }
 
   function _tqDesenharAvisoRodada() {

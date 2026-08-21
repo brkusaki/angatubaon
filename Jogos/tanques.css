@@ -59,6 +59,14 @@
 .tq-overlay-titulo{font-size:21px;font-weight:800;color:#fff;font-family:'Syne',sans-serif;margin-bottom:8px;}
 .tq-overlay-desc{font-size:13.5px;line-height:1.5;color:#c7d1e0;max-width:290px;margin-bottom:14px;}
 
+/* Escolha de classe do tanque (menu inicial) */
+.tq-classes{width:100%;max-width:290px;margin-bottom:14px;}
+.tq-classes-label{font-size:11.5px;color:rgba(199,209,224,.6);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;text-align:center;}
+.tq-classes-opcoes{display:flex;gap:6px;}
+.tq-classe-btn{flex:1;padding:8px 4px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#c7d1e0;font-family:'Syne',sans-serif;font-size:12.5px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .12s ease;}
+.tq-classe-btn.tq-classe-ativa{border-color:#ff4757;background:rgba(255,71,87,.16);color:#fff;}
+.tq-classes-desc{font-size:11.5px;color:rgba(199,209,224,.55);text-align:center;margin-top:6px;min-height:14px;}
+
 /* Tela inicial: sozinho / criar sala / entrar com código */
 .tq-opcoes{display:flex;flex-direction:column;gap:10px;width:100%;max-width:290px;}
 .tq-btn-opcao{width:100%;padding:13px 16px;border-radius:14px;border:1px solid rgba(255,71,87,.35);background:rgba(255,71,87,.10);color:#fff;font-family:'Syne',sans-serif;font-size:15px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s ease,filter .12s ease;}

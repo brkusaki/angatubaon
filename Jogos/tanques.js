@@ -58,15 +58,34 @@
    "cx"), e o cooldown reduzido do PRÓPRIO convidado também (campo
    "rg", pro gatilho local não esperar a rede a cada tiro).
 
-   ARENA E LANDSCAPE: mundo vai de x:0..MUNDO_LARGURA (16/9) e y:0..1
-   — todo pixel-por-unidade usa _tqH (altura real do canvas) como
-   fator uniforme pros dois eixos, porque o CSS trava aspect-ratio:
-   16/9 na arena (_tqW = _tqH × MUNDO_LARGURA sempre). Em celular
-   deitado ou com o lock nativo de tela (screen.orientation.lock), o
-   canvas já nasce nessa proporção; em retrato sem o lock, o wrapper
-   #tq-rot gira 90° por CSS (mesmo padrão da Corrida, ver
-   _tqAplicarOrientacao) — o joystick então precisa converter toque em
-   tela pra espaço local antes de calcular direção (_tqDeltaLocal).
+   ARENA, MUNDO E CÂMERA: o MUNDO (onde tanques/paredes/moitas vivem)
+   agora é bem maior que a TELA — TQ_VIEWPORT_LARGURA/ALTURA (16/9 × 1,
+   a mesma proporção de sempre) é só a "janela" visível, e MUNDO_LARGURA/
+   ALTURA (viewport × TQ_MUNDO_ESCALA) é o mapa inteiro. Uma câmera
+   (_tqCamera, ver _tqAtualizarCamera) segue o PRÓPRIO tanque, centralizada
+   nele e travada nas bordas do mundo pra nunca mostrar área fora do mapa.
+   Todo pixel-por-unidade continua usando _tqH (altura real do canvas)
+   como fator uniforme pros dois eixos — _tqW = _tqH × TQ_VIEWPORT_LARGURA
+   sempre, porque o CSS trava aspect-ratio 16/9 na arena. A câmera é
+   puramente um deslocamento de desenho: um único ctx.translate(-câmera)
+   em _tqDesenhar() antes de desenhar chão/rastro/moitas/paredes/caixas/
+   tanques — nenhuma dessas funções de desenho precisa saber que a câmera
+   existe. Em celular deitado ou com o lock nativo de tela
+   (screen.orientation.lock), o canvas já nasce nessa proporção; em
+   retrato sem o lock, o wrapper #tq-rot gira 90° por CSS (mesmo padrão
+   da Corrida, ver _tqAplicarOrientacao) — o joystick então precisa
+   converter toque em tela pra espaço local antes de calcular direção
+   (_tqDeltaLocal).
+
+   OCULTAÇÃO POR DISTÂNCIA: como o mapa é grande, o adversário também
+   fica escondido (não desenhado, IA não mira) quando está longe demais
+   (> TQ_VISAO_RAIO), somado à ocultação por moita que já existia — ver
+   _tqEscondido* em _tqSimularMundo.
+
+   SPAWNS INTELIGENTES: no início de cada RODADA, o anfitrião sorteia um
+   par de pontos nas bordas/cantos do mapa com distância mínima de
+   segurança entre si (ver _tqSortearSpawns) — o ponto do convidado
+   viaja pela rede (campo "gsp"/"spg", ver mensagens 'oi'/'rr'/'e').
 
    Fala com o app só via window.AngatubaGames (a ponte) e com a rede
    só via window.AngatubaMP (Jogos/multiplayer.js). Expõe
@@ -77,7 +96,7 @@
 
   /* ── Ajustes do jogo ─────────────────────────────────────────── */
   var TQ_RODADAS_PARA_VENCER = 2;    // melhor de 3 — primeiro a 2 vitórias de rodada
-  var TQ_RAIO_TANQUE   = 0.052;      // raio de colisão do tanque (espaço 0..1)
+  var TQ_RAIO_TANQUE   = 0.052;      // raio de colisão do tanque (unidades de mundo)
   var TQ_RAIO_PROJETIL = 0.010;
   var TQ_VELOCIDADE    = 0.34;       // unidades de arena por segundo, com o joystick no talo
   var TQ_GIRO_VEL       = 4.6;       // rad/s — quão rápido o tanque gira até apontar pro alvo
@@ -88,8 +107,16 @@
   var TQ_PAUSA_RODADA  = 1.4;        // segundos de pausa mostrando quem venceu a rodada
   var TQ_RICOCHETE_MAX = 1;          // quantas vezes um tiro pode quicar na borda da arena antes de sumir
 
-  var MUNDO_LARGURA = 16 / 9;   // arena widescreen — x vai de 0..MUNDO_LARGURA, y continua 0..1
-  var TQ_IA_DIST_ENGAJAR = 0.86; // distância (mundo largo) até a IA trocar patrulha por engajar
+  // Viewport = "janela" que a câmera mostra (mesma proporção/tamanho
+  // de sempre); MUNDO_* = mapa inteiro, um múltiplo do viewport — ver
+  // TQ_MUNDO_ESCALA e o comentário "ARENA, MUNDO E CÂMERA" no topo.
+  var TQ_VIEWPORT_LARGURA = 16 / 9;
+  var TQ_VIEWPORT_ALTURA  = 1;
+  var TQ_MUNDO_ESCALA = 4;      // mundo tem 4× a largura E 4× a altura do viewport (16× a área)
+  var MUNDO_LARGURA = TQ_VIEWPORT_LARGURA * TQ_MUNDO_ESCALA;
+  var MUNDO_ALTURA  = TQ_VIEWPORT_ALTURA * TQ_MUNDO_ESCALA;
+  var TQ_VISAO_RAIO = 1.5;      // distância além da qual o adversário fica escondido (independe de moita)
+  var TQ_IA_DIST_ENGAJAR = 0.86; // distância (mundo largo) até a IA trocar patrulha por engajar — de propósito NÃO escala com o mapa, senão a CPU nunca precisaria caçar
 
   /* ── Classes de tanque: escolhida no menu (ver _tqEscolherClasse),
      aplicada ao PRÓPRIO tanque (_tqMinhaClasse) e sincronizada
@@ -136,18 +163,24 @@
 
   /* ── Pool de mapas: cada um é "metade" + espelho 180° (ver
      cabeçalho) — garante simetria sem risco de erro de conta manual.
-     Coordenadas em fração da arena: x 0..MUNDO_LARGURA, y 0..1. Um
-     mapa é sorteado por PARTIDA (não por rodada), ver _tqEscolherMapa
-     e o campo "mapa" nas mensagens 'oi'/'rr'. Cada mapa tem paredes
-     (bloqueiam e levam dano) e moitas (não bloqueiam — escondem o
-     tanque que estiver dentro, ver _tqEmMoita/_tqEscondido*). */
+     Coordenadas dos literais abaixo são fração do viewport ANTIGO
+     (x 0..16/9, y 0..1, o tamanho do mapa antes de existir mundo maior
+     que a tela) — _tqMontarMapa multiplica tudo (posição E tamanho)
+     por TQ_MUNDO_ESCALA, preservando o layout relativo de cada mapa
+     mas espalhado pelo mundo novo, sem precisar reescrever os 7 mapas
+     à mão. Um mapa é sorteado por PARTIDA (não por rodada), ver
+     _tqEscolherMapa e o campo "mapa" nas mensagens 'oi'/'rr'. Cada
+     mapa tem paredes (bloqueiam e levam dano) e moitas (não bloqueiam
+     — escondem o tanque que estiver dentro, ver _tqEmMoita/_tqEscondido*). */
   function _tqMontarMapa(metade, centro) {
-    var lista = metade.slice();
-    for (var i = 0; i < metade.length; i++) {
-      var b = metade[i];
-      lista.push({ x: MUNDO_LARGURA - b.x - b.w, y: 1 - b.y - b.h, w: b.w, h: b.h });
+    var e = TQ_MUNDO_ESCALA, lista = [], i, b, bx, by, bw, bh;
+    for (i = 0; i < metade.length; i++) {
+      b = metade[i];
+      bx = b.x * e; by = b.y * e; bw = b.w * e; bh = b.h * e;
+      lista.push({ x: bx, y: by, w: bw, h: bh });
+      lista.push({ x: MUNDO_LARGURA - bx - bw, y: MUNDO_ALTURA - by - bh, w: bw, h: bh });
     }
-    if (centro) lista.push(centro);
+    if (centro) lista.push({ x: centro.x * e, y: centro.y * e, w: centro.w * e, h: centro.h * e });
     return lista;
   }
   var _TQ_MAPAS = [
@@ -207,8 +240,79 @@
   var _tqMapaAtualIdx = 0;
   function _tqEscolherMapa() { return Math.floor(Math.random() * _TQ_MAPAS.length); }
 
-  var TQ_SPAWN_ANFITRIAO = { x: 0.14, y: 0.5, ang: Math.PI / 2 };                  // esquerda, mirando pro leste
-  var TQ_SPAWN_CONVIDADO = { x: MUNDO_LARGURA - 0.14, y: 0.5, ang: -Math.PI / 2 }; // direita, mirando pro oeste
+  /* ── Spawns inteligentes: 8 pontos candidatos nas bordas/cantos do
+     mapa (livres de parede); a cada início de RODADA (não só de
+     partida), o ANFITRIÃO sorteia um PAR desses pontos com pelo menos
+     TQ_SPAWN_DIST_MIN de distância entre si — evita nascer perto do
+     adversário logo de cara num mapa grande — e manda um pra cada
+     lado, virado pro centro do mapa. Só o anfitrião sorteia (mesma
+     autoridade do mapa/paredes/power-ups); o ponto do convidado viaja
+     pela rede (campo "gsp"/"spg" — ver 'oi'/'rr'/'e' em
+     _tqReceberMensagem e _tqEnviarEstado/_tqEnviarReinicio). */
+  var TQ_SPAWN_MARGEM = 0.35;
+  var TQ_SPAWN_DIST_MIN = Math.hypot(MUNDO_LARGURA, MUNDO_ALTURA) * 0.55;
+
+  // Valor inicial/fallback (antes do 1º sorteio de spawn de verdade) —
+  // só usado no instante entre o módulo carregar e a 1ª rodada começar.
+  var TQ_SPAWN_ANFITRIAO = { x: TQ_SPAWN_MARGEM, y: MUNDO_ALTURA / 2, ang: Math.PI / 2 };
+  var TQ_SPAWN_CONVIDADO = { x: MUNDO_LARGURA - TQ_SPAWN_MARGEM, y: MUNDO_ALTURA / 2, ang: -Math.PI / 2 };
+  function _tqPontoLivre(x, y, raio) {
+    var paredes = _TQ_MAPAS[_tqMapaAtualIdx].paredes;
+    for (var i = 0; i < paredes.length; i++) {
+      if (_tqCircRect(x, y, raio, paredes[i])) return false;
+    }
+    return true;
+  }
+  function _tqPontosSpawnCandidatos() {
+    var pts = [
+      { x: TQ_SPAWN_MARGEM, y: TQ_SPAWN_MARGEM },
+      { x: MUNDO_LARGURA - TQ_SPAWN_MARGEM, y: TQ_SPAWN_MARGEM },
+      { x: TQ_SPAWN_MARGEM, y: MUNDO_ALTURA - TQ_SPAWN_MARGEM },
+      { x: MUNDO_LARGURA - TQ_SPAWN_MARGEM, y: MUNDO_ALTURA - TQ_SPAWN_MARGEM },
+      { x: MUNDO_LARGURA / 2, y: TQ_SPAWN_MARGEM },
+      { x: MUNDO_LARGURA / 2, y: MUNDO_ALTURA - TQ_SPAWN_MARGEM },
+      { x: TQ_SPAWN_MARGEM, y: MUNDO_ALTURA / 2 },
+      { x: MUNDO_LARGURA - TQ_SPAWN_MARGEM, y: MUNDO_ALTURA / 2 }
+    ];
+    var livres = [];
+    for (var i = 0; i < pts.length; i++) {
+      if (_tqPontoLivre(pts[i].x, pts[i].y, TQ_RAIO_TANQUE)) livres.push(pts[i]);
+    }
+    // Fallback de segurança: se um mapa muito cheio de parede deixar
+    // menos de 2 cantos livres, usa os 8 pontos originais mesmo assim
+    // (não deveria acontecer com os mapas atuais, mas evita travar).
+    return livres.length >= 2 ? livres : pts;
+  }
+  function _tqSortearSpawns() {
+    var pts = _tqPontosSpawnCandidatos();
+    var pares = [], i, j, d;
+    for (i = 0; i < pts.length; i++) {
+      for (j = i + 1; j < pts.length; j++) {
+        d = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+        if (d >= TQ_SPAWN_DIST_MIN) pares.push([pts[i], pts[j]]);
+      }
+    }
+    if (!pares.length) {
+      // Nenhum par bate a distância mínima — usa o par mais distante
+      // disponível em vez de travar.
+      var melhor = [pts[0], pts[1]], melhorD = -1;
+      for (i = 0; i < pts.length; i++) {
+        for (j = i + 1; j < pts.length; j++) {
+          d = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+          if (d > melhorD) { melhorD = d; melhor = [pts[i], pts[j]]; }
+        }
+      }
+      pares.push(melhor);
+    }
+    var par = pares[Math.floor(Math.random() * pares.length)].slice();
+    if (Math.random() < 0.5) par.reverse();
+    var cx = MUNDO_LARGURA / 2, cy = MUNDO_ALTURA / 2;
+    function angParaCentro(p) { return Math.atan2(cx - p.x, -(cy - p.y)); }
+    return {
+      anfitriao: { x: par[0].x, y: par[0].y, ang: angParaCentro(par[0]) },
+      convidado: { x: par[1].x, y: par[1].y, ang: angParaCentro(par[1]) }
+    };
+  }
 
   var _tqCanvas = null, _tqCtx = null, _tqW = 0, _tqH = 0, _tqDpr = 1;
   var _tqRAF = 0, _tqUltimoTs = 0;
@@ -220,11 +324,18 @@
   var _tqSaindoVoluntariamente = false;
   var _tqApelidoAdversario = '';
 
-  // Tanques: {x,y,ang} em espaço 0..1. O anfitrião é sempre azul, o
-  // convidado (ou a CPU) é sempre vermelho — independe de quem
-  // "ganhou" a sala, é só uma cor fixa de cada papel.
+  // Tanques: {x,y,ang} em espaço 0..MUNDO_LARGURA/MUNDO_ALTURA. O
+  // anfitrião é sempre azul, o convidado (ou a CPU) é sempre vermelho —
+  // independe de quem "ganhou" a sala, é só uma cor fixa de cada papel.
   var _tqTanqueAnfitriao = { x: TQ_SPAWN_ANFITRIAO.x, y: TQ_SPAWN_ANFITRIAO.y, ang: TQ_SPAWN_ANFITRIAO.ang, hp: 1 };
   var _tqTanqueConvidado = { x: TQ_SPAWN_CONVIDADO.x, y: TQ_SPAWN_CONVIDADO.y, ang: TQ_SPAWN_CONVIDADO.ang, hp: 1 };
+  // Último spawn do convidado sorteado pelo anfitrião (ver
+  // _tqSortearSpawns) — guardado pra mandar pela rede em 'oi'/'rr'/'e'
+  // (campo "gsp"), já que só o anfitrião sorteia.
+  var _tqUltimoSpawnConvidado = { x: TQ_SPAWN_CONVIDADO.x, y: TQ_SPAWN_CONVIDADO.y, ang: TQ_SPAWN_CONVIDADO.ang };
+  // Câmera: segue o PRÓPRIO tanque, travada nas bordas do mundo (ver
+  // _tqAtualizarCamera, chamada a cada quadro em _tqDesenhar).
+  var _tqCamera = { x: 0, y: 0 };
 
   var _tqProjeteis = [];      // { x,y,vx,vy,dono } — dono: 'anfitriao' | 'convidado'
   var _tqParedes = [];        // { x,y,w,h,hp,destruida } — geometria de _TQ_MAPAS[_tqMapaAtualIdx] + estado
@@ -262,14 +373,14 @@
   var _tqRecuoAnfitriao = 0, _tqRecuoConvidado = 0; // 0..1, decai a cada quadro
   var TQ_RECUO_DECAI = 7.5; // por segundo
 
-  var _tqRastro = [];              // { x, y, ang, vida } em espaço 0..1
+  var _tqRastro = [];              // { x, y, ang, vida } em unidades de mundo
   var _tqUltimaPosAnfitriao = null, _tqUltimaPosConvidado = null;
   var TQ_RASTRO_DIST_MIN = 0.018;  // distância mínima entre marcas
   var TQ_RASTRO_VIDA     = 2.2;    // segundos até sumir
   var TQ_RASTRO_MAX      = 220;    // teto de marcas simultâneas (performance)
 
   /* ── IA (modo sozinho) ───────────────────────────────────────── */
-  var _tqIATimer = 0, _tqIAModo = 'patrulha', _tqIAAlvoPatrulha = { x: 0.5, y: 0.3 };
+  var _tqIATimer = 0, _tqIAModo = 'patrulha', _tqIAAlvoPatrulha = { x: MUNDO_LARGURA / 2, y: MUNDO_ALTURA / 2 };
 
   /* ── Cenário/assets: mesmo padrão do cenario-floresta.webp da
      Corrida e da cenario-arena.webp do Ping Pong — carrega cedo,
@@ -557,11 +668,14 @@
       var msg = { t: 'oi', nome: meuNome, classe: _tqMinhaClasse };
       if (_tqSouAnfitriao) {
         _tqClasseAnfitriao = _tqMinhaClasse;
-        // Anfitrião sorteia o mapa da partida e avisa o convidado dentro
-        // do próprio "oi" — sem isso os dois lados desenhariam paredes
-        // em lugares diferentes (só o dano é sincronizado depois).
+        // Anfitrião sorteia o mapa E os spawns da partida e avisa o
+        // convidado dentro do próprio "oi" — sem isso os dois lados
+        // desenhariam paredes em lugares diferentes, ou o convidado
+        // nasceria fora do ponto sorteado (só o dano é sincronizado
+        // depois).
         _tqReiniciarPartida();
         msg.mapa = _tqMapaAtualIdx;
+        msg.gsp = _tqUltimoSpawnConvidado;
       } else {
         _tqClasseConvidado = _tqMinhaClasse;
       }
@@ -593,6 +707,12 @@
           _tqMapaAtualIdx = dado.mapa;
           _tqResetParedes();
         }
+        // Idem pro spawn: o anfitrião já sorteou (_tqReiniciarPartida
+        // rodou antes de mandar o 'oi', ver 'conectado') — o convidado
+        // aplica o próprio ponto direto, nunca sorteia por conta própria.
+        if (!_tqSouAnfitriao && dado.gsp && typeof dado.gsp.x === 'number') {
+          _tqTanqueConvidado.x = dado.gsp.x; _tqTanqueConvidado.y = dado.gsp.y; _tqTanqueConvidado.ang = dado.gsp.ang;
+        }
         // Classe do OUTRO lado (a minha eu já apliquei localmente no
         // 'conectado', sem depender da rede). No anfitrião, o 'oi' do
         // convidado pode chegar DEPOIS do _tqReiniciarPartida (que já
@@ -610,7 +730,7 @@
       case 'p': // convidado -> anfitrião: posição/ângulo do tanque do convidado
         if (_tqSouAnfitriao) {
           if (typeof dado.x === 'number') _tqTanqueConvidado.x = _tqClamp(dado.x, 0, MUNDO_LARGURA);
-          if (typeof dado.y === 'number') _tqTanqueConvidado.y = _tqClamp(dado.y, 0, 1);
+          if (typeof dado.y === 'number') _tqTanqueConvidado.y = _tqClamp(dado.y, 0, MUNDO_ALTURA);
           if (typeof dado.ang === 'number') _tqTanqueConvidado.ang = dado.ang;
         }
         break;
@@ -648,6 +768,15 @@
           // Mesma lógica pro tremor de "acertou o tanque": entrou em
           // pausa agora (não estava antes) = a rodada acabou de terminar.
           if (dado.re === 'pausa' && _tqRodadaEstado !== 'pausa') _tqAcionarShake(TQ_SHAKE_ACERTO_DUR, TQ_SHAKE_ACERTO_FORCA);
+          // Borda pausa→jogando = uma rodada NOVA acabou de começar no
+          // anfitrião (_tqIniciarRodada rodou e sorteou spawn novo, ver
+          // TQ_SPAWN_DIST_MIN) — só nesse instante aplica o ponto de
+          // nascimento recebido no PRÓPRIO tanque; fora dessa borda o
+          // campo "gsp" é ignorado (senão brigaria com a previsão local
+          // do movimento do convidado durante a rodada).
+          if (dado.re === 'jogando' && _tqRodadaEstado === 'pausa' && dado.gsp && typeof dado.gsp.x === 'number') {
+            _tqTanqueConvidado.x = dado.gsp.x; _tqTanqueConvidado.y = dado.gsp.y; _tqTanqueConvidado.ang = dado.gsp.ang;
+          }
           _tqRodadaEstado = dado.re || 'jogando';
           _tqAtualizarHUD();
           if (dado.fim) _tqMostrarFim('fim');
@@ -657,7 +786,16 @@
         // dado.mapa: o anfitrião já sorteou o mapa da revanche (ver
         // _tqEnviarReinicio) — o convidado usa o MESMO índice, nunca
         // sorteia por conta própria (senão os lados desincronizam).
-        if (!_tqSouAnfitriao) { _tqReiniciarPartida(dado.mapa); _tqComecarPartida(); }
+        // Idem pro spawn (dado.gsp) — _tqReiniciarPartida não sorteia
+        // nada do lado do convidado (ver _tqIniciarRodada), então
+        // aplica o ponto recebido direto, por cima.
+        if (!_tqSouAnfitriao) {
+          _tqReiniciarPartida(dado.mapa);
+          if (dado.gsp && typeof dado.gsp.x === 'number') {
+            _tqTanqueConvidado.x = dado.gsp.x; _tqTanqueConvidado.y = dado.gsp.y; _tqTanqueConvidado.ang = dado.gsp.ang;
+          }
+          _tqComecarPartida();
+        }
         break;
       case 'pr':
         if (_tqSouAnfitriao) { _tqReiniciarPartida(); _tqEnviarReinicio(); _tqComecarPartida(); }
@@ -666,7 +804,7 @@
   }
 
   function _tqEnviarReinicio() {
-    if (_tqModo === 'multiplayer' && window.AngatubaMP) window.AngatubaMP.enviar({ t: 'rr', mapa: _tqMapaAtualIdx });
+    if (_tqModo === 'multiplayer' && window.AngatubaMP) window.AngatubaMP.enviar({ t: 'rr', mapa: _tqMapaAtualIdx, gsp: _tqUltimoSpawnConvidado });
   }
 
   /* ── Controles: joystick FLUTUANTE (DOM) + botão de fogo ──────────
@@ -992,8 +1130,16 @@
   }
 
   function _tqIniciarRodada() {
-    _tqTanqueAnfitriao.x = TQ_SPAWN_ANFITRIAO.x; _tqTanqueAnfitriao.y = TQ_SPAWN_ANFITRIAO.y; _tqTanqueAnfitriao.ang = TQ_SPAWN_ANFITRIAO.ang;
-    _tqTanqueConvidado.x = TQ_SPAWN_CONVIDADO.x; _tqTanqueConvidado.y = TQ_SPAWN_CONVIDADO.y; _tqTanqueConvidado.ang = TQ_SPAWN_CONVIDADO.ang;
+    // Spawns: só quem tem autoridade (anfitrião OU o modo sozinho, que
+    // é sempre _tqSouAnfitriao=true) sorteia — ver _tqSortearSpawns. O
+    // convidado NÃO sorteia o próprio (senão desincroniza do anfitrião);
+    // ele recebe o ponto pela rede e aplica direto (ver 'oi'/'rr'/'e').
+    if (_tqSouAnfitriao) {
+      var spawns = _tqSortearSpawns();
+      _tqTanqueAnfitriao.x = spawns.anfitriao.x; _tqTanqueAnfitriao.y = spawns.anfitriao.y; _tqTanqueAnfitriao.ang = spawns.anfitriao.ang;
+      _tqTanqueConvidado.x = spawns.convidado.x; _tqTanqueConvidado.y = spawns.convidado.y; _tqTanqueConvidado.ang = spawns.convidado.ang;
+      _tqUltimoSpawnConvidado = spawns.convidado;
+    }
     // HP de cada lado vem da classe escolhida (Pesado aguenta mais de 1 tiro).
     _tqTanqueAnfitriao.hp = TQ_CLASSES[_tqClasseAnfitriao] ? TQ_CLASSES[_tqClasseAnfitriao].hpMax : 1;
     _tqTanqueConvidado.hp = TQ_CLASSES[_tqClasseConvidado] ? TQ_CLASSES[_tqClasseConvidado].hpMax : 1;
@@ -1031,6 +1177,18 @@
   }
 
   function _tqMeuTanque() { return _tqSouAnfitriao ? _tqTanqueAnfitriao : _tqTanqueConvidado; }
+
+  // Câmera: centraliza no PRÓPRIO tanque (cada lado segue o seu, sem
+  // precisar sincronizar nada pela rede — é só desenho local) e trava
+  // nas bordas do mundo, garantindo que o viewport (TQ_VIEWPORT_*)
+  // nunca mostre área fora do mapa. Chamada a cada quadro em
+  // _tqDesenhar, mesmo fora de 'jogando' (inofensivo, spawn inicial
+  // já é um ponto válido).
+  function _tqAtualizarCamera() {
+    var meu = _tqMeuTanque();
+    _tqCamera.x = _tqClamp(meu.x - TQ_VIEWPORT_LARGURA / 2, 0, MUNDO_LARGURA - TQ_VIEWPORT_LARGURA);
+    _tqCamera.y = _tqClamp(meu.y - TQ_VIEWPORT_ALTURA / 2, 0, MUNDO_ALTURA - TQ_VIEWPORT_ALTURA);
+  }
 
   function _tqLoop(ts) {
     if (_tqEstado !== 'jogando') return;
@@ -1093,7 +1251,7 @@
     var dx = Math.sin(t.ang) * v, dy = -Math.cos(t.ang) * v;
     var novoX = _tqClamp(t.x + dx, TQ_RAIO_TANQUE, MUNDO_LARGURA - TQ_RAIO_TANQUE);
     if (!_tqColideParede(novoX, t.y, TQ_RAIO_TANQUE)) t.x = novoX;
-    var novoY = _tqClamp(t.y + dy, TQ_RAIO_TANQUE, 1 - TQ_RAIO_TANQUE);
+    var novoY = _tqClamp(t.y + dy, TQ_RAIO_TANQUE, MUNDO_ALTURA - TQ_RAIO_TANQUE);
     if (!_tqColideParede(t.x, novoY, TQ_RAIO_TANQUE)) t.y = novoY;
   }
 
@@ -1104,13 +1262,18 @@
     if (_tqCooldownAnfitriao > 0) _tqCooldownAnfitriao -= dt;
     if (_tqCooldownConvidado > 0) _tqCooldownConvidado -= dt;
 
-    // Moitas: só o anfitrião calcula (tem as duas posições) — decai o
+    // Ocultação: só o anfitrião calcula (tem as duas posições) — decai o
     // timer de "revelado" e recalcula quem está escondido. Sempre
     // atualizado (mesmo em pausa) pra já valer no respawn seguinte.
+    // Dois motivos pra ficar escondido, com "ou" entre eles: dentro de
+    // moita e não revelado (como sempre), OU longe demais um do outro
+    // (TQ_VISAO_RAIO — necessário agora que o mapa é grande, senão dava
+    // pra ver o adversário do outro lado do mundo).
     if (_tqRevelarAnfitriao > 0) _tqRevelarAnfitriao = Math.max(0, _tqRevelarAnfitriao - dt);
     if (_tqRevelarConvidado > 0) _tqRevelarConvidado = Math.max(0, _tqRevelarConvidado - dt);
-    _tqEscondidoAnfitriao = _tqRevelarAnfitriao <= 0 && _tqEmMoita(_tqTanqueAnfitriao);
-    _tqEscondidoConvidado = _tqRevelarConvidado <= 0 && _tqEmMoita(_tqTanqueConvidado);
+    var foraDeAlcance = Math.hypot(_tqTanqueAnfitriao.x - _tqTanqueConvidado.x, _tqTanqueAnfitriao.y - _tqTanqueConvidado.y) > TQ_VISAO_RAIO;
+    _tqEscondidoAnfitriao = foraDeAlcance || (_tqRevelarAnfitriao <= 0 && _tqEmMoita(_tqTanqueAnfitriao));
+    _tqEscondidoConvidado = foraDeAlcance || (_tqRevelarConvidado <= 0 && _tqEmMoita(_tqTanqueConvidado));
 
     // Power-ups: decai tiro rápido/duplo (o escudo não tem timer — dura
     // até absorver um hit, ver _tqAplicarDano).
@@ -1147,7 +1310,7 @@
     var tentativas = 0, x, y;
     do {
       x = TQ_CAIXA_RAIO + Math.random() * (MUNDO_LARGURA - TQ_CAIXA_RAIO * 2);
-      y = TQ_CAIXA_RAIO + Math.random() * (1 - TQ_CAIXA_RAIO * 2);
+      y = TQ_CAIXA_RAIO + Math.random() * (MUNDO_ALTURA - TQ_CAIXA_RAIO * 2);
       tentativas++;
     } while (_tqColideParede(x, y, TQ_CAIXA_RAIO) && tentativas < 12);
     if (tentativas >= 12 && _tqColideParede(x, y, TQ_CAIXA_RAIO)) return;
@@ -1189,12 +1352,12 @@
       // estourou e volta a posição pra dentro, em vez de sumir. Sem
       // quique sobrando, some como antes.
       var estourouX = pr.x < 0 || pr.x > MUNDO_LARGURA;
-      var estourouY = pr.y < 0 || pr.y > 1;
+      var estourouY = pr.y < 0 || pr.y > MUNDO_ALTURA;
       if (estourouX || estourouY) {
         if (pr.rebotes >= TQ_RICOCHETE_MAX) { _tqProjeteis.splice(i, 1); continue; }
         pr.rebotes++;
         if (estourouX) { pr.vx = -pr.vx; pr.x = _tqClamp(pr.x, 0, MUNDO_LARGURA); }
-        if (estourouY) { pr.vy = -pr.vy; pr.y = _tqClamp(pr.y, 0, 1); }
+        if (estourouY) { pr.vy = -pr.vy; pr.y = _tqClamp(pr.y, 0, MUNDO_ALTURA); }
       }
 
       var atingiuParede = false;
@@ -1337,7 +1500,8 @@
       pj: _tqProjeteis, pd: pd, ea: _tqEscondidoAnfitriao,
       hhp: _tqTanqueAnfitriao.hp, ghp: _tqTanqueConvidado.hp,
       cx: _tqCaixas, esa: _tqEscudoAnfitriao, esg: _tqEscudoConvidado, rg: _tqRapidoConvidado,
-      sa: _tqPlacarAnfitriao, sg: _tqPlacarConvidado, re: _tqRodadaEstado, fim: !!fim
+      sa: _tqPlacarAnfitriao, sg: _tqPlacarConvidado, re: _tqRodadaEstado, fim: !!fim,
+      gsp: _tqUltimoSpawnConvidado
     });
   }
 
@@ -1362,7 +1526,7 @@
         _tqIAModo = 'engajar';
       } else {
         _tqIAModo = 'patrulha';
-        _tqIAAlvoPatrulha = { x: 0.18 + Math.random() * (MUNDO_LARGURA - 0.36), y: 0.18 + Math.random() * 0.64 };
+        _tqIAAlvoPatrulha = { x: 0.18 + Math.random() * (MUNDO_LARGURA - 0.36), y: 0.18 + Math.random() * (MUNDO_ALTURA - 0.36) };
       }
     }
 
@@ -1442,6 +1606,7 @@
   function _tqDesenhar() {
     if (!_tqCtx || !_tqW || !_tqH) return;
     var ctx = _tqCtx;
+    _tqAtualizarCamera();
     // O clear fica FORA do save/translate do tremor — limpa o quadro
     // inteiro sem deslocamento, senão sobrariam frestas nas bordas.
     ctx.clearRect(0, 0, _tqW, _tqH);
@@ -1450,6 +1615,14 @@
       var intensidade = _tqShakeForcaBase * (_tqShakeTimer / _tqShakeDuracaoBase);
       ctx.translate((Math.random() * 2 - 1) * intensidade, (Math.random() * 2 - 1) * intensidade);
     }
+    // Câmera: um único translate desloca TUDO que é desenhado em
+    // espaço de MUNDO (chão/rastro/moitas/paredes/caixas/projéteis/
+    // tanques) — nenhuma dessas funções de desenho precisa saber que
+    // a câmera existe, elas continuam usando coordenada×_tqH direto.
+    // Isolado num save/restore próprio porque o aviso de rodada (texto
+    // "você venceu!") é desenhado em espaço de TELA, não de mundo.
+    ctx.save();
+    ctx.translate(-_tqCamera.x * _tqH, -_tqCamera.y * _tqH);
     _tqDesenharChao();
     _tqDesenharRastro();
     _tqDesenharMoitas();
@@ -1460,11 +1633,13 @@
     if (jogando) {
       for (var i = 0; i < _tqProjeteis.length; i++) _tqDesenharProjetil(_tqProjeteis[i]);
       // O PRÓPRIO tanque sempre aparece; o do adversário só se ele não
-      // estiver escondido numa moita (ver _tqEscondido* em _tqSimularMundo).
+      // estiver escondido (moita ou longe demais — ver _tqEscondido*
+      // em _tqSimularMundo).
       if (_tqSouAnfitriao || !_tqEscondidoAnfitriao) _tqDesenharTanque(_tqTanqueAnfitriao, 'tank-azul.webp', TQ_COR_ANFITRIAO, _tqRecuoAnfitriao, _tqEscudoAnfitriao);
       if (!_tqSouAnfitriao || !_tqEscondidoConvidado) _tqDesenharTanque(_tqTanqueConvidado, 'tank-vermelho.webp', TQ_COR_CONVIDADO, _tqRecuoConvidado, _tqEscudoConvidado);
-      if (_tqRodadaEstado === 'pausa') _tqDesenharAvisoRodada();
     }
+    ctx.restore();
+    if (jogando && _tqRodadaEstado === 'pausa') _tqDesenharAvisoRodada();
     ctx.restore();
   }
 
@@ -1513,7 +1688,7 @@
     if (!_tqRastro.length) return;
     var ctx = _tqCtx;
     // _tqH (não _tqW) é o fator uniforme px-por-unidade nos dois eixos —
-    // ver nota "ARENA E LANDSCAPE" no cabeçalho do arquivo.
+    // ver nota "ARENA, MUNDO E CÂMERA" no cabeçalho do arquivo.
     var diametroTela = TQ_RAIO_TANQUE * 2 * _tqH;
     var afastamento = diametroTela * 0.30;
     var compr = diametroTela * 0.22, larg = diametroTela * 0.09;
@@ -1531,17 +1706,33 @@
     }
   }
 
+  // Desenhado dentro do translate da câmera (ver _tqDesenhar) — cobre
+  // o MUNDO inteiro, não só a tela. Ladrilha a imagem em vez de esticar
+  // uma cópia só do tamanho do mundo: com o mundo bem maior que a tela
+  // (TQ_MUNDO_ESCALA), esticar borraria a textura; repetindo, cada
+  // ladrilho fica do mesmo tamanho visual que o chão sempre teve.
   function _tqDesenharChao() {
     var ctx = _tqCtx;
+    var worldW = MUNDO_LARGURA * _tqH, worldH = MUNDO_ALTURA * _tqH;
     var reg = _tqAsset('chao-arena.webp');
     if (reg && reg.ok && reg.img && reg.w && reg.h) {
-      var escala = Math.max(_tqW / reg.w, _tqH / reg.h);
-      var dw = reg.w * escala, dh = reg.h * escala;
-      ctx.drawImage(reg.img, (_tqW - dw) / 2, (_tqH - dh) / 2, dw, dh);
+      try {
+        var pat = ctx.createPattern(reg.img, 'repeat');
+        if (pat && pat.setTransform) {
+          var escala = Math.max(TQ_VIEWPORT_LARGURA * _tqH / reg.w, TQ_VIEWPORT_ALTURA * _tqH / reg.h);
+          pat.setTransform(new DOMMatrix([escala, 0, 0, escala, 0, 0]));
+          ctx.fillStyle = pat;
+          ctx.fillRect(0, 0, worldW, worldH);
+          return;
+        }
+      } catch (e) {}
+      // Sem suporte a pattern.setTransform: cai pra imagem única
+      // esticada cobrindo o mundo (funciona, só fica mais borrada).
+      ctx.drawImage(reg.img, 0, 0, worldW, worldH);
       return;
     }
     ctx.fillStyle = '#3a3d42';
-    ctx.fillRect(0, 0, _tqW, _tqH);
+    ctx.fillRect(0, 0, worldW, worldH);
   }
 
   // Moitas: elipse verde translúcida — desenhada depois do rastro e

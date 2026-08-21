@@ -854,6 +854,9 @@
             <!-- Controles: joystick + botão de fogo, só aparecem durante a partida.
                  tq-joy-zona é a metade esquerda invisível que "pega" o toque —
                  o joystick (tq-joystick) nasce exatamente onde o dedo encostou.
+                 tq-fire-zona é o espelho à direita: atira em qualquer toque
+                 nessa metade, não só em cima do círculo (tq-fire-btn, que
+                 agora só indica visualmente) — mesmo jeito do joystick.
                  Gira junto com tq-rot (mesmo data-rot) pra continuar alinhado
                  com a arena quando o celular está em pé. -->
             <div class="tq-controles" id="tq-controles" data-rot="0" style="display:none;">
@@ -861,6 +864,7 @@
               <div class="tq-joystick" id="tq-joystick">
                 <div class="tq-joystick-thumb" id="tq-joystick-thumb"></div>
               </div>
+              <div class="tq-fire-zona" id="tq-fire-zona"></div>
               <button type="button" class="tq-fire-btn" id="tq-fire-btn" aria-label="Atirar"><i class="fa fa-crosshairs"></i></button>
             </div>
 

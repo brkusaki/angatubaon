@@ -75,6 +75,23 @@
    "cx"), e o cooldown reduzido do PRÓPRIO convidado também (campo
    "rg", pro gatilho local não esperar a rede a cada tiro).
 
+   MODOS DE JOGO: Clássico (padrão), Rei do Pedaço e Batata Quente —
+   escolhido no menu (pill igual a classe, ver _tqEscolherModo), mas é
+   ajuste de PARTIDA (não por jogador): só o ANFITRIÃO decide, o
+   convidado recebe pela mensagem 'oi' (campo "modo", ver TQ_MODOS/
+   _tqModoJogo). Nos dois modos novos o combate normal (atirar, morrer
+   com HP zerado) continua funcionando igual — a vitória por zona/
+   batata é um jeito A MAIS de vencer a rodada. Rei do Pedaço: fica
+   sozinho dentro de "o pedaço" (círculo achado por _tqAcharCentroZona,
+   determinístico a partir do mapa — não precisa viajar pela rede) por
+   TQ_ZONA_TEMPO_VITORIA segundos pra vencer (ver _tqAtualizarZona,
+   só o ANFITRIÃO decide, progresso sincroniza em 'e' pros dois lados
+   verem o mesmo arco). Batata Quente: um lado sorteado começa com a
+   batata (campo "bt", mesma autoridade dos spawns); encostar no
+   adversário passa ela pro outro (com um respiro de imunidade); quem
+   estiver com ela quando o timer estourar perde a rodada (ver
+   _tqAtualizarBatata).
+
    ARENA, MUNDO E CÂMERA: o MUNDO (onde tanques/paredes/moitas vivem)
    agora é bem maior que a TELA — TQ_VIEWPORT_LARGURA/ALTURA (16/9 × 1,
    a mesma proporção de sempre) é só a "janela" visível, e MUNDO_LARGURA/
@@ -162,6 +179,42 @@
     var rapidoAtivo = quem === 'anfitriao' ? _tqRapidoAnfitriao > 0 : _tqRapidoConvidado > 0;
     return TQ_COOLDOWN_TIRO * classe.tiroMul * (rapidoAtivo ? TQ_RAPIDO_MUL : 1);
   }
+
+  /* ── Modos de jogo: Clássico (padrão), Rei do Pedaço (controlar uma
+     zona por tempo) e Batata Quente (passar a bomba antes do tempo
+     acabar) — escolhido no menu (pill igual a classe, ver
+     _tqEscolherModo), mas diferente de classe isso é ajuste de
+     PARTIDA, não por jogador: só o ANFITRIÃO decide (ou o modo
+     sozinho, sempre anfitrião) — o convidado recebe o modo escolhido
+     pela rede ('oi'/'rr', campo "modo") e nunca escolhe o próprio. Nos
+     dois modos novos o combate normal continua funcionando igual
+     (atirar, morrer com HP zerado) — a vitória por zona/batata é um
+     jeito A MAIS de vencer a rodada, não substitui o de sempre. */
+  var TQ_MODOS = {
+    classico: { nome: 'Clássico' },
+    rei: { nome: 'Rei do Pedaço' },
+    batata: { nome: 'Batata Quente' }
+  };
+  var _tqMeuModoEscolhido = 'classico'; // escolha local no menu — só importa se eu virar anfitrião/solo
+  var _tqModoJogo = 'classico';         // modo de fato da PARTIDA atual (autoridade do anfitrião)
+
+  // Rei do Pedaço: TQ_ZONA_RAIO/_tqZonaCentro definem "o pedaço" (ver
+  // _tqAcharCentroZona); _tqZonaTempo* acumula quanto tempo cada lado
+  // ficou sozinho lá dentro nessa rodada (ver _tqAtualizarZona).
+  var TQ_ZONA_RAIO = 0.5;             // raio do pedaço (unidades de mundo)
+  var TQ_ZONA_TEMPO_VITORIA = 10;     // segundos de controle sozinho pra vencer a rodada
+  var _tqZonaCentro = null;                                  // { x, y } — achado por _tqAcharCentroZona quando o modo é 'rei'
+  var _tqZonaTempoAnfitriao = 0, _tqZonaTempoConvidado = 0;  // segundos acumulados de controle nessa rodada
+
+  // Batata Quente: quem está com ela (_tqBatataCom), quanto falta pra
+  // estourar (_tqBatataTimer) e um respiro após receber (imunidade)
+  // pra não ficar repassando na hora (ver _tqAtualizarBatata).
+  var TQ_BATATA_DURACAO = 20;                          // segundos até a batata estourar
+  var TQ_BATATA_IMUNIDADE = 1.2;                        // segundos de imunidade após RECEBER a batata
+  var TQ_BATATA_RAIO_PASSE = TQ_RAIO_TANQUE * 2 + 0.02; // distância pra encostar e passar
+  var _tqBatataCom = null;       // 'anfitriao' | 'convidado' | null
+  var _tqBatataTimer = 0;        // segundos restantes na rodada
+  var _tqBatataImunidade = 0;    // segundos restantes de imunidade de quem acabou de receber
 
   /* ── Caixas de suprimento: só o ANFITRIÃO gera e detecta coleta (tem
      as duas posições) — geometria/estado viajam pro convidado dentro
@@ -396,7 +449,7 @@
   var _tqBarris = [];         // { x,y,destruido } — geometria de _TQ_MAPAS[_tqMapaAtualIdx].barris + estado
   var _tqPlacarAnfitriao = 0, _tqPlacarConvidado = 0; // rodadas vencidas na partida
   var _tqRodadaEstado = 'jogando'; // 'jogando' | 'pausa'
-  var _tqPausaTimer = 0, _tqPausaVencedor = null;
+  var _tqPausaTimer = 0, _tqPausaVencedor = null, _tqPausaMotivo = null; // motivo: 'acerto' | 'zona' | 'batata' (ver _tqFimDeRodada/_tqDesenharAvisoRodada)
   var _tqCooldownAnfitriao = 0, _tqCooldownConvidado = 0;
 
   /* ── Moitas (furtividade): só o ANFITRIÃO calcula (tem as duas
@@ -502,6 +555,9 @@
     _tqAsset('tank-vermelho.webp');
     _tqAsset('parede-tijolo.webp');
     _tqAsset('parede-escombros.webp');
+    _tqAsset('parede-metal.webp');
+    _tqAsset('barril.webp');
+    _tqAsset('mato.webp');
     // Pede ao sistema pra girar pra landscape (instalado/fullscreen);
     // em navegador comum é recusado e cai na rotação por CSS.
     _tqTravarLandscape();
@@ -601,6 +657,7 @@
     _tqApelidoAdversario = 'Computador';
     _tqClasseAnfitriao = _tqMinhaClasse;
     _tqClasseConvidado = 'padrao'; // a CPU sempre joga com o tanque padrão
+    _tqModoJogo = _tqMeuModoEscolhido;
     _tqReiniciarPartida();
     _tqComecarPartida();
   }
@@ -709,6 +766,24 @@
     var desc = document.getElementById('tq-classes-desc');
     if (desc) desc.textContent = TQ_CLASSE_DESC[classe] || '';
   };
+  // Pill de modo de jogo — mesmo padrão da classe, mas classes CSS
+  // próprias (tq-modo-btn/tq-modo-ativo) pra não interferir na busca
+  // por ".tq-classe-btn" de cima.
+  var TQ_MODO_DESC = {
+    classico: 'Destrua o tanque adversário. Melhor de 3 rodadas.',
+    rei: 'Fique sozinho dentro do pedaço por ' + TQ_ZONA_TEMPO_VITORIA + 's pra vencer a rodada (ou destrua o adversário).',
+    batata: 'Um dos dois começa com a batata; encoste no adversário pra passar. Quem estiver com ela quando o tempo acabar perde a rodada.'
+  };
+  window._tqEscolherModo = function (modo) {
+    if (!TQ_MODOS[modo]) return;
+    _tqMeuModoEscolhido = modo;
+    var btns = document.querySelectorAll('.tq-modo-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('tq-modo-ativo', btns[i].getAttribute('data-modo') === modo);
+    }
+    var desc = document.getElementById('tq-modos-desc');
+    if (desc) desc.textContent = TQ_MODO_DESC[modo] || '';
+  };
   window._tqPedirRevanche = function () {
     if (_tqModo === 'solo') { _tqReiniciarPartida(); _tqComecarPartida(); }
     else if (_tqSouAnfitriao) { _tqReiniciarPartida(); _tqEnviarReinicio(); _tqComecarPartida(); }
@@ -728,14 +803,18 @@
       var msg = { t: 'oi', nome: meuNome, classe: _tqMinhaClasse };
       if (_tqSouAnfitriao) {
         _tqClasseAnfitriao = _tqMinhaClasse;
-        // Anfitrião sorteia o mapa E os spawns da partida e avisa o
-        // convidado dentro do próprio "oi" — sem isso os dois lados
-        // desenhariam paredes em lugares diferentes, ou o convidado
-        // nasceria fora do ponto sorteado (só o dano é sincronizado
-        // depois).
+        _tqModoJogo = _tqMeuModoEscolhido;
+        // Anfitrião sorteia o mapa E os spawns da partida (e agora
+        // também fixa o modo de jogo e, se for Batata Quente, quem
+        // começa com ela) e avisa o convidado dentro do próprio "oi"
+        // — sem isso os dois lados desenhariam paredes em lugares
+        // diferentes, ou o convidado nasceria fora do ponto sorteado
+        // (só o dano é sincronizado depois).
         _tqReiniciarPartida();
         msg.mapa = _tqMapaAtualIdx;
         msg.gsp = _tqUltimoSpawnConvidado;
+        msg.modo = _tqModoJogo;
+        msg.bt = _tqBatataCom;
       } else {
         _tqClasseConvidado = _tqMinhaClasse;
       }
@@ -760,6 +839,13 @@
     switch (dado.t) {
       case 'oi':
         _tqApelidoAdversario = String(dado.nome || 'Adversário').slice(0, 20);
+        // Modo de jogo: quem decide é o ANFITRIÃO (ajuste de PARTIDA,
+        // não por jogador — ver TQ_MODOS/_tqModoJogo). Aplica ANTES do
+        // mapa, porque achar o centro do "pedaço" (Rei do Pedaço) já
+        // depende de saber o modo.
+        if (!_tqSouAnfitriao && typeof dado.modo === 'string' && TQ_MODOS[dado.modo]) {
+          _tqModoJogo = dado.modo;
+        }
         // Só o convidado aplica: o mapa que o anfitrião sorteou (ver
         // 'conectado' acima) — sem isso o convidado ficaria com o mapa
         // 0 (o default do _tqPreparar), diferente do lado do anfitrião.
@@ -767,6 +853,7 @@
           _tqMapaAtualIdx = dado.mapa;
           _tqResetParedes();
           _tqResetBarris();
+          if (_tqModoJogo === 'rei') _tqZonaCentro = _tqAcharCentroZona();
         }
         // Idem pro spawn: o anfitrião já sorteou (_tqReiniciarPartida
         // rodou antes de mandar o 'oi', ver 'conectado') — o convidado
@@ -774,6 +861,9 @@
         if (!_tqSouAnfitriao && dado.gsp && typeof dado.gsp.x === 'number') {
           _tqTanqueConvidado.x = dado.gsp.x; _tqTanqueConvidado.y = dado.gsp.y; _tqTanqueConvidado.ang = dado.gsp.ang;
         }
+        // Batata Quente: quem começa com ela — só o anfitrião sorteia
+        // (ver _tqIniciarRodada), o convidado aplica o valor recebido.
+        if (!_tqSouAnfitriao && typeof dado.bt === 'string') _tqBatataCom = dado.bt;
         // Classe do OUTRO lado (a minha eu já apliquei localmente no
         // 'conectado', sem depender da rede). No anfitrião, o 'oi' do
         // convidado pode chegar DEPOIS do _tqReiniciarPartida (que já
@@ -810,6 +900,19 @@
           _tqCaixas = dado.cx || [];
           _tqEscondidoAnfitriao = !!dado.ea; // o anfitrião já calculou (tem as duas posições) — só aplica
           _tqEscudoAnfitriao = !!dado.esa; _tqEscudoConvidado = !!dado.esg;
+          // Rei do Pedaço / Batata Quente: estado sempre sobrescrito
+          // (igual pd/bd) — puramente informativo pro convidado (só o
+          // anfitrião decide o resultado, ver _tqAtualizarZona/Batata).
+          if (typeof dado.za === 'number') _tqZonaTempoAnfitriao = dado.za;
+          if (typeof dado.zg === 'number') _tqZonaTempoConvidado = dado.zg;
+          if (typeof dado.bt === 'string') _tqBatataCom = dado.bt;
+          if (typeof dado.btt === 'number') _tqBatataTimer = dado.btt;
+          // Vencedor/motivo da rodada — o convidado nunca chama
+          // _tqFimDeRodada (só o anfitrião), então sem isso o aviso de
+          // "você venceu a rodada!" nunca sabia quem realmente ganhou
+          // do lado do convidado.
+          if (typeof dado.pv === 'string') _tqPausaVencedor = dado.pv;
+          if (typeof dado.pm === 'string') _tqPausaMotivo = dado.pm;
           // rg (tiro rápido do convidado): o ANFITRIÃO detecta a coleta
           // (tem as duas posições) — o convidado precisa saber pra usar
           // o cooldown reduzido no PRÓPRIO gatilho local (_tqTentarAtirar),
@@ -866,6 +969,9 @@
           if (dado.gsp && typeof dado.gsp.x === 'number') {
             _tqTanqueConvidado.x = dado.gsp.x; _tqTanqueConvidado.y = dado.gsp.y; _tqTanqueConvidado.ang = dado.gsp.ang;
           }
+          // Batata Quente: modo em si não muda na revanche (persiste
+          // do 'oi' original), só quem começa com ela de novo.
+          if (typeof dado.bt === 'string') _tqBatataCom = dado.bt;
           _tqComecarPartida();
         }
         break;
@@ -876,7 +982,7 @@
   }
 
   function _tqEnviarReinicio() {
-    if (_tqModo === 'multiplayer' && window.AngatubaMP) window.AngatubaMP.enviar({ t: 'rr', mapa: _tqMapaAtualIdx, gsp: _tqUltimoSpawnConvidado });
+    if (_tqModo === 'multiplayer' && window.AngatubaMP) window.AngatubaMP.enviar({ t: 'rr', mapa: _tqMapaAtualIdx, gsp: _tqUltimoSpawnConvidado, bt: _tqBatataCom });
   }
 
   /* ── Controles: joystick FLUTUANTE (DOM) + botão de fogo ──────────
@@ -1235,7 +1341,19 @@
       _tqTanqueAnfitriao.x = spawns.anfitriao.x; _tqTanqueAnfitriao.y = spawns.anfitriao.y; _tqTanqueAnfitriao.ang = spawns.anfitriao.ang;
       _tqTanqueConvidado.x = spawns.convidado.x; _tqTanqueConvidado.y = spawns.convidado.y; _tqTanqueConvidado.ang = spawns.convidado.ang;
       _tqUltimoSpawnConvidado = spawns.convidado;
+      // Batata Quente: só o anfitrião sorteia quem começa com ela
+      // (mesma autoridade dos spawns) — o convidado recebe o resultado
+      // pela rede (campo "bt", ver 'oi'/'rr'/'e').
+      if (_tqModoJogo === 'batata') _tqBatataCom = Math.random() < 0.5 ? 'anfitriao' : 'convidado';
     }
+    // Rei do Pedaço: acha o centro do "pedaço" pro mapa atual —
+    // determinístico a partir do mapa (mesma geometria dos dois
+    // lados), então não precisa viajar pela rede, igual as próprias
+    // paredes/moitas/barris.
+    if (_tqModoJogo === 'rei') _tqZonaCentro = _tqAcharCentroZona();
+    _tqZonaTempoAnfitriao = 0; _tqZonaTempoConvidado = 0;
+    _tqBatataTimer = TQ_BATATA_DURACAO;
+    _tqBatataImunidade = 0;
     // HP de cada lado vem da classe escolhida (Pesado aguenta mais de 1 tiro).
     _tqTanqueAnfitriao.hp = TQ_CLASSES[_tqClasseAnfitriao] ? TQ_CLASSES[_tqClasseAnfitriao].hpMax : 1;
     _tqTanqueConvidado.hp = TQ_CLASSES[_tqClasseConvidado] ? TQ_CLASSES[_tqClasseConvidado].hpMax : 1;
@@ -1244,6 +1362,7 @@
     _tqResetBarris();
     _tqRodadaEstado = 'jogando';
     _tqPausaVencedor = null;
+    _tqPausaMotivo = null;
     _tqCooldownAnfitriao = 0; _tqCooldownConvidado = 0;
     _tqIAModo = 'patrulha'; _tqIATimer = 0;
     // Reset do "game feel" — sem isso um tremor/recuo em andamento ou
@@ -1359,6 +1478,64 @@
     if (!_tqColideParede(t.x, novoY, TQ_RAIO_TANQUE) && !_tqColideBarril(t.x, novoY, TQ_RAIO_TANQUE)) t.y = novoY;
   }
 
+  // Rei do Pedaço: acha o ponto livre mais próximo do centro do mundo
+  // pra virar "o pedaço" (testa o centro exato primeiro; se cair em
+  // cima de parede/barril — caso do pilar central do mapa 4 — testa
+  // uma espiral de pontos ao redor até achar um livre). Evita ter que
+  // sortear/autorar um ponto por mapa; funciona pra qualquer mapa
+  // futuro sem dado extra. Determinístico (sem Math.random), então os
+  // dois lados chegam no MESMO ponto só de saberem o mesmo mapa.
+  function _tqAcharCentroZona() {
+    var cx = MUNDO_LARGURA / 2, cy = MUNDO_ALTURA / 2;
+    if (_tqPontoLivre(cx, cy, TQ_ZONA_RAIO)) return { x: cx, y: cy };
+    var passo = 0.15, maxRaio = 2.2;
+    for (var r = passo; r <= maxRaio; r += passo) {
+      var passos = Math.max(8, Math.round(r * 14));
+      for (var i = 0; i < passos; i++) {
+        var ang = (i / passos) * Math.PI * 2;
+        var x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r;
+        if (x - TQ_ZONA_RAIO < 0 || x + TQ_ZONA_RAIO > MUNDO_LARGURA || y - TQ_ZONA_RAIO < 0 || y + TQ_ZONA_RAIO > MUNDO_ALTURA) continue;
+        if (_tqPontoLivre(x, y, TQ_ZONA_RAIO)) return { x: x, y: y };
+      }
+    }
+    return { x: cx, y: cy }; // fallback de segurança (não deveria acontecer)
+  }
+
+  // Rei do Pedaço: quem fica SOZINHO dentro do pedaço acumula tempo de
+  // controle; contestado (os dois dentro) ou vazio (nenhum) não muda
+  // nada. Ao acumular TQ_ZONA_TEMPO_VITORIA segundos, vence a rodada —
+  // reaproveita _tqFimDeRodada, o mesmo caminho de quando o tanque é
+  // destruído (matar o adversário continua valendo normalmente).
+  function _tqAtualizarZona(dt) {
+    var dentroAnfitriao = Math.hypot(_tqTanqueAnfitriao.x - _tqZonaCentro.x, _tqTanqueAnfitriao.y - _tqZonaCentro.y) < TQ_ZONA_RAIO;
+    var dentroConvidado = Math.hypot(_tqTanqueConvidado.x - _tqZonaCentro.x, _tqTanqueConvidado.y - _tqZonaCentro.y) < TQ_ZONA_RAIO;
+    if (dentroAnfitriao && !dentroConvidado) {
+      _tqZonaTempoAnfitriao += dt;
+      if (_tqZonaTempoAnfitriao >= TQ_ZONA_TEMPO_VITORIA) _tqFimDeRodada('anfitriao', 'zona');
+    } else if (dentroConvidado && !dentroAnfitriao) {
+      _tqZonaTempoConvidado += dt;
+      if (_tqZonaTempoConvidado >= TQ_ZONA_TEMPO_VITORIA) _tqFimDeRodada('convidado', 'zona');
+    }
+  }
+
+  // Batata Quente: só o ANFITRIÃO decide (autoridade igual zona/
+  // paredes/caixas) — decrementa o timer da rodada; se estourar com
+  // alguém segurando, esse lado perde. Encostar no adversário passa a
+  // batata (com um respiro de imunidade pra não ficar repassando na
+  // hora).
+  function _tqAtualizarBatata(dt) {
+    if (_tqBatataImunidade > 0) _tqBatataImunidade = Math.max(0, _tqBatataImunidade - dt);
+    var dist = Math.hypot(_tqTanqueAnfitriao.x - _tqTanqueConvidado.x, _tqTanqueAnfitriao.y - _tqTanqueConvidado.y);
+    if (_tqBatataImunidade <= 0 && dist < TQ_BATATA_RAIO_PASSE) {
+      _tqBatataCom = (_tqBatataCom === 'anfitriao') ? 'convidado' : 'anfitriao';
+      _tqBatataImunidade = TQ_BATATA_IMUNIDADE;
+    }
+    _tqBatataTimer -= dt;
+    if (_tqBatataTimer <= 0) {
+      _tqFimDeRodada(_tqBatataCom === 'anfitriao' ? 'convidado' : 'anfitriao', 'batata');
+    }
+  }
+
   // Só o anfitrião chama: avança a IA (modo sozinho), os projéteis e
   // a lógica de rodada/placar, e manda o estado pro convidado (se
   // for multiplayer).
@@ -1403,6 +1580,20 @@
     _tqChecarColetaCaixas();
 
     if (_tqModo === 'solo') _tqAtualizarIA(dt);
+
+    // Modos de jogo novos: um jeito A MAIS de vencer a rodada, além de
+    // matar o adversário (que continua funcionando normal logo abaixo,
+    // em _tqAtualizarProjeteis). Se a zona/batata já encerrou a rodada
+    // nesse quadro, para por aqui — evita processar um tiro fatal no
+    // MESMO quadro e contar a rodada como vencida duas vezes.
+    if (_tqModoJogo === 'rei') {
+      _tqAtualizarZona(dt);
+      if (_tqRodadaEstado === 'pausa') { _tqEnviarEstado(false); return; }
+    } else if (_tqModoJogo === 'batata') {
+      _tqAtualizarBatata(dt);
+      if (_tqRodadaEstado === 'pausa') { _tqEnviarEstado(false); return; }
+    }
+
     _tqAtualizarProjeteis(dt);
     _tqEnviarEstado(false);
   }
@@ -1594,12 +1785,13 @@
     return fatal;
   }
 
-  function _tqFimDeRodada(vencedor) {
+  function _tqFimDeRodada(vencedor, motivo) {
     if (vencedor === 'anfitriao') _tqPlacarAnfitriao++; else _tqPlacarConvidado++;
     _tqAcionarShake(TQ_SHAKE_ACERTO_DUR, TQ_SHAKE_ACERTO_FORCA);
     _tqRodadaEstado = 'pausa';
     _tqPausaTimer = TQ_PAUSA_RODADA;
     _tqPausaVencedor = vencedor;
+    _tqPausaMotivo = motivo || 'acerto'; // 'acerto' (HP zerou) | 'zona' | 'batata' — ver _tqDesenharAvisoRodada
     _tqAtualizarHUD();
 
     var partidaAcabou = (_tqPlacarAnfitriao >= TQ_RODADAS_PARA_VENCER || _tqPlacarConvidado >= TQ_RODADAS_PARA_VENCER);
@@ -1685,7 +1877,10 @@
       hhp: _tqTanqueAnfitriao.hp, ghp: _tqTanqueConvidado.hp,
       cx: _tqCaixas, esa: _tqEscudoAnfitriao, esg: _tqEscudoConvidado, rg: _tqRapidoConvidado,
       sa: _tqPlacarAnfitriao, sg: _tqPlacarConvidado, re: _tqRodadaEstado, fim: !!fim,
-      gsp: _tqUltimoSpawnConvidado
+      gsp: _tqUltimoSpawnConvidado,
+      za: _tqZonaTempoAnfitriao, zg: _tqZonaTempoConvidado,
+      bt: _tqBatataCom, btt: _tqBatataTimer,
+      pv: _tqPausaVencedor, pm: _tqPausaMotivo
     });
   }
 
@@ -1710,7 +1905,13 @@
         _tqIAModo = 'engajar';
       } else {
         _tqIAModo = 'patrulha';
-        _tqIAAlvoPatrulha = { x: 0.18 + Math.random() * (MUNDO_LARGURA - 0.36), y: 0.18 + Math.random() * (MUNDO_ALTURA - 0.36) };
+        // Rei do Pedaço: metade das vezes patrulha em direção ao
+        // pedaço em vez de um ponto aleatório — não é uma IA
+        // estratégica de verdade, só evita que a CPU ignore o pedaço
+        // por completo.
+        _tqIAAlvoPatrulha = (_tqModoJogo === 'rei' && _tqZonaCentro && Math.random() < 0.5)
+          ? { x: _tqZonaCentro.x, y: _tqZonaCentro.y }
+          : { x: 0.18 + Math.random() * (MUNDO_LARGURA - 0.36), y: 0.18 + Math.random() * (MUNDO_ALTURA - 0.36) };
       }
     }
 
@@ -1810,6 +2011,7 @@
     _tqDesenharChao();
     _tqDesenharRastro();
     _tqDesenharMoitas();
+    _tqDesenharZona();
     _tqDesenharParedes();
     _tqDesenharCaixas();
     _tqDesenharBarris();
@@ -1820,11 +2022,20 @@
       // O PRÓPRIO tanque sempre aparece; o do adversário só se ele não
       // estiver escondido (moita ou longe demais — ver _tqEscondido*
       // em _tqSimularMundo).
-      if (_tqSouAnfitriao || !_tqEscondidoAnfitriao) _tqDesenharTanque(_tqTanqueAnfitriao, 'tank-azul.webp', TQ_COR_ANFITRIAO, _tqRecuoAnfitriao, _tqEscudoAnfitriao);
-      if (!_tqSouAnfitriao || !_tqEscondidoConvidado) _tqDesenharTanque(_tqTanqueConvidado, 'tank-vermelho.webp', TQ_COR_CONVIDADO, _tqRecuoConvidado, _tqEscudoConvidado);
+      var anfitriaoVisivel = _tqSouAnfitriao || !_tqEscondidoAnfitriao;
+      var convidadoVisivel = !_tqSouAnfitriao || !_tqEscondidoConvidado;
+      if (anfitriaoVisivel) _tqDesenharTanque(_tqTanqueAnfitriao, 'tank-azul.webp', TQ_COR_ANFITRIAO, _tqRecuoAnfitriao, _tqEscudoAnfitriao);
+      if (convidadoVisivel) _tqDesenharTanque(_tqTanqueConvidado, 'tank-vermelho.webp', TQ_COR_CONVIDADO, _tqRecuoConvidado, _tqEscudoConvidado);
+      // Batata Quente: ícone só sobre um tanque que já foi desenhado
+      // acima (senão entregaria a posição de um tanque escondido).
+      if (_tqModoJogo === 'batata') {
+        if (_tqBatataCom === 'anfitriao' && anfitriaoVisivel) _tqDesenharBatataIcone(_tqTanqueAnfitriao);
+        else if (_tqBatataCom === 'convidado' && convidadoVisivel) _tqDesenharBatataIcone(_tqTanqueConvidado);
+      }
     }
     _tqDesenharExplosoes();
     ctx.restore();
+    if (jogando) _tqDesenharBatataHUD();
     if (jogando && _tqRodadaEstado === 'pausa') _tqDesenharAvisoRodada();
     ctx.restore();
   }
@@ -1892,33 +2103,54 @@
     }
   }
 
-  // Desenhado dentro do translate da câmera (ver _tqDesenhar) — cobre
-  // o MUNDO inteiro, não só a tela. Ladrilha a imagem em vez de esticar
-  // uma cópia só do tamanho do mundo: com o mundo bem maior que a tela
-  // (TQ_MUNDO_ESCALA), esticar borraria a textura; repetindo, cada
-  // ladrilho fica do mesmo tamanho visual que o chão sempre teve.
+  // Desenhado dentro do translate da câmera (ver _tqDesenhar) — ladrilha
+  // a imagem em vez de esticar uma cópia só do tamanho do mundo: com o
+  // mundo bem maior que a tela (TQ_MUNDO_ESCALA), esticar borraria a
+  // textura; repetindo, cada ladrilho fica do mesmo tamanho visual que
+  // o chão sempre teve.
+  //
+  // Duas otimizações (o mundo 16x maior deixou isso lento — sensação de
+  // lag constante, não só em picos):
+  //  1) o CanvasPattern (createPattern + setTransform) era recriado TODO
+  //     quadro — agora só se a imagem ou a escala (_tqH, muda ao
+  //     redimensionar/girar a tela) tiverem mudado desde a última vez.
+  //  2) só pinta a fatia do mundo que a câmera está mostrando agora (+
+  //     uma folga pro tremor de tela), não o mundo inteiro — o resto
+  //     nem aparece na tela, então pintar tudo (16x mais área que antes
+  //     de existir mundo grande) só gastava tempo à toa a cada quadro.
+  var _tqChaoPatternCache = null; // { pat, img, h }
+  var TQ_CHAO_FOLGA_PX = 32; // cobre o deslocamento do screen shake sem deixar fresta na borda
   function _tqDesenharChao() {
     var ctx = _tqCtx;
-    var worldW = MUNDO_LARGURA * _tqH, worldH = MUNDO_ALTURA * _tqH;
+    var vx = _tqCamera.x * _tqH - TQ_CHAO_FOLGA_PX, vy = _tqCamera.y * _tqH - TQ_CHAO_FOLGA_PX;
+    var vw = TQ_VIEWPORT_LARGURA * _tqH + TQ_CHAO_FOLGA_PX * 2, vh = TQ_VIEWPORT_ALTURA * _tqH + TQ_CHAO_FOLGA_PX * 2;
     var reg = _tqAsset('chao-arena.webp');
     if (reg && reg.ok && reg.img && reg.w && reg.h) {
       try {
-        var pat = ctx.createPattern(reg.img, 'repeat');
-        if (pat && pat.setTransform) {
-          var escala = Math.max(TQ_VIEWPORT_LARGURA * _tqH / reg.w, TQ_VIEWPORT_ALTURA * _tqH / reg.h);
-          pat.setTransform(new DOMMatrix([escala, 0, 0, escala, 0, 0]));
-          ctx.fillStyle = pat;
-          ctx.fillRect(0, 0, worldW, worldH);
+        if (!_tqChaoPatternCache || _tqChaoPatternCache.img !== reg.img || _tqChaoPatternCache.h !== _tqH) {
+          var pat = ctx.createPattern(reg.img, 'repeat');
+          if (pat && pat.setTransform) {
+            var escala = Math.max(TQ_VIEWPORT_LARGURA * _tqH / reg.w, TQ_VIEWPORT_ALTURA * _tqH / reg.h);
+            pat.setTransform(new DOMMatrix([escala, 0, 0, escala, 0, 0]));
+            _tqChaoPatternCache = { pat: pat, img: reg.img, h: _tqH };
+          } else {
+            _tqChaoPatternCache = null;
+          }
+        }
+        if (_tqChaoPatternCache) {
+          ctx.fillStyle = _tqChaoPatternCache.pat;
+          ctx.fillRect(vx, vy, vw, vh);
           return;
         }
       } catch (e) {}
-      // Sem suporte a pattern.setTransform: cai pra imagem única
-      // esticada cobrindo o mundo (funciona, só fica mais borrada).
-      ctx.drawImage(reg.img, 0, 0, worldW, worldH);
+      // Sem suporte a pattern.setTransform (raro, browser antigo): cai
+      // pra imagem única esticada cobrindo o mundo inteiro (funciona,
+      // só fica mais borrada) — caminho tão raro que não vale otimizar.
+      ctx.drawImage(reg.img, 0, 0, MUNDO_LARGURA * _tqH, MUNDO_ALTURA * _tqH);
       return;
     }
     ctx.fillStyle = '#3a3d42';
-    ctx.fillRect(0, 0, worldW, worldH);
+    ctx.fillRect(vx, vy, vw, vh);
   }
 
   // Moitas: elipse verde translúcida — desenhada depois do rastro e
@@ -1928,6 +2160,7 @@
     var moitas = _TQ_MAPAS[_tqMapaAtualIdx].moitas;
     if (!moitas.length) return;
     var ctx = _tqCtx;
+    var reg = _tqAsset('mato.webp');
     ctx.save();
     ctx.fillStyle = 'rgba(46,125,50,0.55)';
     ctx.strokeStyle = 'rgba(27,79,31,0.65)';
@@ -1936,10 +2169,14 @@
       var m = moitas[i];
       var cx = (m.x + m.w / 2) * _tqH, cy = (m.y + m.h / 2) * _tqH;
       var rx = (m.w / 2) * _tqH, ry = (m.h / 2) * _tqH;
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      if (reg && reg.ok && reg.img) {
+        ctx.drawImage(reg.img, cx - rx, cy - ry, rx * 2, ry * 2);
+      } else {
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
@@ -1948,21 +2185,26 @@
     var ctx = _tqCtx;
     var regTijolo = _tqAsset('parede-tijolo.webp');
     var regEscombro = _tqAsset('parede-escombros.webp');
+    var regMetal = _tqAsset('parede-metal.webp');
     for (var i = 0; i < _tqParedes.length; i++) {
       var p = _tqParedes[i];
       var px = p.x * _tqH, py = p.y * _tqH, pw = p.w * _tqH, ph = p.h * _tqH;
       if (p.tipo === 'metal') {
-        // Metálica: não tem asset (nunca vira escombro, é sempre a
-        // mesma aparência) — vetor cinza-aço com uma faixa clara de
-        // "reflexo", pra diferenciar de longe do tijolo marrom.
-        ctx.fillStyle = '#7a828c';
-        ctx.fillRect(px, py, pw, ph);
-        ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        if (pw >= ph) ctx.fillRect(px, py + ph * 0.4, pw, ph * 0.2);
-        else ctx.fillRect(px + pw * 0.4, py, pw * 0.2, ph);
-        ctx.strokeStyle = '#4a4f56';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(px, py, pw, ph);
+        // Metálica: nunca vira escombro (é sempre a mesma aparência,
+        // ver comentário no cabeçalho) — mesmo esquema de fallback
+        // vetorial das outras paredes se a imagem faltar/falhar.
+        if (regMetal && regMetal.ok && regMetal.img) {
+          ctx.drawImage(regMetal.img, px, py, pw, ph);
+        } else {
+          ctx.fillStyle = '#7a828c';
+          ctx.fillRect(px, py, pw, ph);
+          ctx.fillStyle = 'rgba(255,255,255,0.35)';
+          if (pw >= ph) ctx.fillRect(px, py + ph * 0.4, pw, ph * 0.2);
+          else ctx.fillRect(px + pw * 0.4, py, pw * 0.2, ph);
+          ctx.strokeStyle = '#4a4f56';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(px, py, pw, ph);
+        }
         continue;
       }
       var reg = p.destruida ? regEscombro : regTijolo;
@@ -1975,37 +2217,45 @@
     }
   }
 
-  // Barris explosivos: sem asset de imagem — vetor de cilindro escuro
-  // com faixa de perigo. Some sem deixar escombro quando destruído
-  // (a explosão em si é o efeito visual, ver _tqDesenharExplosoes).
+  // Barris explosivos: usa barril.webp quando carregado, com o mesmo
+  // fallback vetorial (cilindro escuro + faixa de perigo) de antes se
+  // faltar/falhar. Some sem deixar escombro quando destruído (a
+  // explosão em si é o efeito visual, ver _tqDesenharExplosoes).
   // Desenhado depois das caixas, antes dos tanques.
   function _tqDesenharBarris() {
     if (!_tqBarris.length) return;
     var ctx = _tqCtx;
     var r = TQ_BARRIL_RAIO * _tqH;
+    var reg = _tqAsset('barril.webp');
     for (var i = 0; i < _tqBarris.length; i++) {
       var b = _tqBarris[i];
       if (b.destruido) continue;
       ctx.save();
       ctx.translate(b.x * _tqH, b.y * _tqH);
-      ctx.beginPath();
-      ctx.arc(0, 0, r, 0, Math.PI * 2);
-      ctx.fillStyle = '#3a2a1a';
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#1a1210';
-      ctx.stroke();
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(0, 0, r, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.fillStyle = '#ffb020';
-      ctx.fillRect(-r, -r * 0.28, r * 2, r * 0.56);
-      ctx.restore();
-      ctx.fillStyle = '#ff4757';
-      ctx.beginPath();
-      ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
-      ctx.fill();
+      if (reg && reg.ok && reg.img && reg.w && reg.h) {
+        var largura = r * 2 * 1.3; // um pouco maior que o raio de colisão, mesmo critério do tanque
+        var altura = largura * (reg.h / reg.w);
+        ctx.drawImage(reg.img, -largura / 2, -altura / 2, largura, altura);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fillStyle = '#3a2a1a';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#1a1210';
+        ctx.stroke();
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.fillStyle = '#ffb020';
+        ctx.fillRect(-r, -r * 0.28, r * 2, r * 0.56);
+        ctx.restore();
+        ctx.fillStyle = '#ff4757';
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
     }
   }
@@ -2119,9 +2369,20 @@
   function _tqDesenharAvisoRodada() {
     var ctx = _tqCtx;
     var euGanhei = _tqPausaVencedor === (_tqSouAnfitriao ? 'anfitriao' : 'convidado');
-    var texto = _tqModo === 'solo'
-      ? (euGanhei ? 'Você acertou!' : 'O computador acertou!')
-      : (euGanhei ? 'Você venceu a rodada!' : (_tqApelidoAdversario || 'Adversário') + ' venceu a rodada!');
+    // pv/pm (vencedor/motivo) chegam pela rede pro convidado (ver "e"
+    // em _tqReceberMensagem) — sem isso esse aviso sempre achava que o
+    // convidado tinha perdido, mesmo quando ele venceu.
+    var nomeAdversario = _tqModo === 'solo' ? 'O computador' : (_tqApelidoAdversario || 'Adversário');
+    var texto;
+    if (_tqPausaMotivo === 'zona') {
+      texto = euGanhei ? 'Você controlou o pedaço!' : nomeAdversario + ' controlou o pedaço!';
+    } else if (_tqPausaMotivo === 'batata') {
+      texto = euGanhei ? 'A batata estourou no adversário!' : 'A batata estourou em você!';
+    } else if (_tqModo === 'solo') {
+      texto = euGanhei ? 'Você acertou!' : nomeAdversario + ' acertou!';
+    } else {
+      texto = euGanhei ? 'Você venceu a rodada!' : nomeAdversario + ' venceu a rodada!';
+    }
     ctx.save();
     ctx.font = "700 16px 'Syne', sans-serif";
     ctx.textAlign = 'center';
@@ -2129,6 +2390,72 @@
     ctx.shadowColor = 'rgba(0,0,0,0.7)';
     ctx.shadowBlur = 8;
     ctx.fillText(texto, _tqW / 2, _tqH * 0.5);
+    ctx.restore();
+  }
+
+  // Rei do Pedaço: círculo do "pedaço" no chão + arco de progresso
+  // mostrando quem está mais perto de vencer por controle. Espaço de
+  // MUNDO (translada com a câmera, igual moitas/paredes) — desenhado
+  // antes das paredes, fica no chão sob quem passa por cima.
+  function _tqDesenharZona() {
+    if (_tqModoJogo !== 'rei' || !_tqZonaCentro) return;
+    var ctx = _tqCtx;
+    var cx = _tqZonaCentro.x * _tqH, cy = _tqZonaCentro.y * _tqH, r = TQ_ZONA_RAIO * _tqH;
+    var liderTempo = Math.max(_tqZonaTempoAnfitriao, _tqZonaTempoConvidado);
+    var liderCor = _tqZonaTempoAnfitriao >= _tqZonaTempoConvidado ? TQ_COR_ANFITRIAO : TQ_COR_CONVIDADO;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,208,74,0.12)';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(255,208,74,0.55)';
+    ctx.stroke();
+    if (liderTempo > 0) {
+      var frac = Math.min(1, liderTempo / TQ_ZONA_TEMPO_VITORIA);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r - 5, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+      ctx.strokeStyle = liderCor;
+      ctx.lineWidth = 5;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Batata Quente: ícone pulsante sobre o tanque que está com ela —
+  // espaço de MUNDO (chamado de dentro do translate da câmera, junto
+  // com os tanques).
+  function _tqDesenharBatataIcone(t) {
+    var ctx = _tqCtx;
+    var cx = t.x * _tqH, cy = t.y * _tqH;
+    var diametroTela = TQ_RAIO_TANQUE * 2 * _tqH;
+    var pulso = 1 + 0.12 * Math.sin(performance.now() / 120);
+    ctx.save();
+    ctx.translate(cx, cy - diametroTela * 1.05);
+    ctx.scale(pulso, pulso);
+    ctx.beginPath();
+    ctx.arc(0, 0, diametroTela * 0.16, 0, Math.PI * 2);
+    ctx.fillStyle = '#c9862f';
+    ctx.fill();
+    ctx.strokeStyle = '#7a4d16';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Batata Quente: contagem regressiva no topo da tela — espaço de
+  // TELA (fora do translate da câmera), igual ao aviso de fim de
+  // rodada.
+  function _tqDesenharBatataHUD() {
+    if (_tqModoJogo !== 'batata' || _tqEstado !== 'jogando' || _tqRodadaEstado !== 'jogando') return;
+    var ctx = _tqCtx;
+    ctx.save();
+    ctx.font = "700 15px 'Syne', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.fillStyle = _tqBatataTimer <= 5 ? '#ff4757' : 'rgba(255,255,255,0.92)';
+    ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.shadowBlur = 6;
+    ctx.fillText('🥔 ' + Math.max(0, Math.ceil(_tqBatataTimer)) + 's', _tqW / 2, _tqH * 0.08);
     ctx.restore();
   }
 })();

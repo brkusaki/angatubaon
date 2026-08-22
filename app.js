@@ -1062,6 +1062,7 @@
     document.body.classList.add('games-fs-open');   // trava scroll do body (tela cheia)
     _ligarFsListener();                              // redimensiona ao entrar/sair da tela cheia nativa
     _voltarAoMenu(); // sempre abre mostrando o menu de jogos
+    _gamesLimparFiltros(); // reseta busca/categoria a cada entrada no hub
     _streakAtualizarFaixa(false); // mostra a ofensiva atual (sem animar)
     _carregarAssetsJogos();  // som + efeitos (uma vez, sob demanda)
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0,0); }
@@ -1196,10 +1197,53 @@
     var telas = document.querySelectorAll('.jogo-tela');
     for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
     if (menu) menu.style.display = 'block';
+    _gamesAplicarFiltro();
     // Atualiza a faixa de ofensiva; anima a chama se subiu nesta visita.
     _streakAtualizarFaixa(_streakAumentouAgora);
     _streakAumentouAgora = false;
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     BUSCA + FILTRO DE CATEGORIA (grid de jogos redesenhado)
+     Filtra os cards de #games-menu por texto (data-nome/data-desc)
+     e por categoria (data-cat), combinando os dois critérios.
+  ══════════════════════════════════════════════════════════════ */
+  var _gamesCatAtual = 'todos';
+  function _gamesAplicarFiltro() {
+    var termo = (document.getElementById('games-search-input') || {}).value || '';
+    termo = termo.toLowerCase().trim();
+    var cards = document.querySelectorAll('#games-menu .game-card');
+    var visiveis = 0;
+    cards.forEach(function (c) {
+      var cat = c.getAttribute('data-cat') || '';
+      var nome = c.getAttribute('data-nome') || '';
+      var desc = c.getAttribute('data-desc') || '';
+      var passaCat = (_gamesCatAtual === 'todos' || cat === _gamesCatAtual);
+      var passaBusca = !termo || nome.indexOf(termo) !== -1 || desc.indexOf(termo) !== -1;
+      var mostra = passaCat && passaBusca;
+      c.style.display = mostra ? '' : 'none';
+      if (mostra) visiveis++;
+    });
+    var vazio = document.getElementById('games-empty');
+    if (vazio) vazio.style.display = visiveis === 0 ? 'flex' : 'none';
+  }
+  window._gamesFiltrar = _gamesAplicarFiltro;
+
+  function _gamesFiltrarCat(cat, btn) {
+    _gamesCatAtual = cat;
+    document.querySelectorAll('.games-cat-chip').forEach(function (b) { b.classList.remove('games-cat-ativa'); });
+    if (btn) btn.classList.add('games-cat-ativa');
+    _gamesAplicarFiltro();
+  }
+  window._gamesFiltrarCat = _gamesFiltrarCat;
+
+  function _gamesLimparFiltros() {
+    var input = document.getElementById('games-search-input');
+    if (input) input.value = '';
+    var todosBtn = document.querySelector('.games-cat-chip[data-cat="todos"]');
+    _gamesFiltrarCat('todos', todosBtn);
+  }
+  window._gamesLimparFiltros = _gamesLimparFiltros;
 
   /* ══════════════════════════════════════════════════════════════
      LOADER DE JOGOS SOB DEMANDA (_jogoLoader)

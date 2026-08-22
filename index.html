@@ -373,6 +373,25 @@
         <i class="fa fa-chevron-right rank-abrir-seta"></i>
       </button>
 
+      <!-- Busca + filtro de categoria -->
+      <div class="games-search-row">
+        <div class="games-search-wrap">
+          <i class="fa fa-search games-search-icon"></i>
+          <input type="text" id="games-search-input" class="games-search-input" placeholder="Buscar jogos..."
+            autocomplete="off" autocorrect="off" spellcheck="false" oninput="_gamesFiltrar()" />
+        </div>
+        <button type="button" class="games-filtro-btn" aria-label="Filtros" title="Filtros" onclick="_gamesFiltrar()">
+          <i class="fa fa-sliders"></i>
+        </button>
+      </div>
+      <div class="scroll-x games-cat-chips" id="games-cat-chips">
+        <button type="button" class="games-cat-chip games-cat-ativa" data-cat="todos" onclick="_gamesFiltrarCat('todos', this)">Todos</button>
+        <button type="button" class="games-cat-chip" data-cat="acao" onclick="_gamesFiltrarCat('acao', this)">Ação</button>
+        <button type="button" class="games-cat-chip" data-cat="puzzle" onclick="_gamesFiltrarCat('puzzle', this)">Puzzle</button>
+        <button type="button" class="games-cat-chip" data-cat="multi" onclick="_gamesFiltrarCat('multi', this)">Multijogador</button>
+        <button type="button" class="games-cat-chip" data-cat="memoria" onclick="_gamesFiltrarCat('memoria', this)">Memória</button>
+      </div>
+
       <!-- MENU: grade de jogos -->
       <div id="games-menu">
         <button type="button" class="game-card gc-quiz" onclick="_abrirJogo('quiz')">

@@ -394,129 +394,84 @@
 
       <!-- MENU: grade de jogos -->
       <div id="games-menu">
-        <button type="button" class="game-card gc-quiz" onclick="_abrirJogo('quiz')">
-          <div class="gc-inner">
-            <div class="gc-owl">
-              <span class="gc-owl-glow"></span>
-              <img src="/webp/owl-idea.webp" alt="" loading="lazy">
-            </div>
-            <div class="gc-info">
-              <div class="gc-title">Quiz da Coruja</div>
-              <div class="gc-desc">5 perguntas por dia sobre Angatuba.</div>
-              <span class="gc-cta">Jogar agora</span>
-            </div>
+        <button type="button" class="game-card gc-quiz" data-cat="puzzle" data-nome="quiz da coruja" data-desc="5 perguntas por dia sobre angatuba" onclick="_abrirJogo('quiz')">
+          <div class="gc-media"><img src="/Jogos/assets/card-quiz.webp" alt="" loading="lazy" class="gc-hero-img"></div>
+          <div class="gc-body">
+            <div class="gc-title">Quiz da Coruja</div>
+            <div class="gc-desc">5 perguntas por dia sobre Angatuba.</div>
+            <span class="gc-cta">Jogar</span>
           </div>
-          <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
 
-        <button type="button" class="game-card gc-speed" onclick="_abrirJogo('speedtap')">
-          <div class="gc-inner">
-            <div class="gc-owl">
-              <span class="gc-owl-glow"></span>
-              <img src="/webp/owl-tada.webp" alt="" loading="lazy">
-            </div>
-            <div class="gc-info">
-              <div class="gc-title">Pega a Coruja</div>
-              <div class="gc-desc">Toque o mais rápido que conseguir em 20s!</div>
-              <span class="gc-cta">Desafiar</span>
-            </div>
+        <button type="button" class="game-card gc-speed" data-cat="acao" data-nome="pega a coruja" data-desc="toque o mais rapido que conseguir em 20s" onclick="_abrirJogo('speedtap')">
+          <div class="gc-media"><img src="/Jogos/assets/card-pegacoruja.webp" alt="" loading="lazy" class="gc-hero-img"></div>
+          <div class="gc-body">
+            <div class="gc-title">Pega a Coruja</div>
+            <div class="gc-desc">Toque o mais rápido que conseguir em 20s!</div>
+            <span class="gc-cta">Jogar</span>
           </div>
-          <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
 
-        <button type="button" class="game-card gc-seq" onclick="_abrirJogo('sequencia')">
-          <div class="gc-inner">
-            <div class="gc-owl">
-              <span class="gc-owl-glow"></span>
-              <img src="/webp/owl-search.webp" alt="" loading="lazy">
-            </div>
-            <div class="gc-info">
-              <div class="gc-title">Sequência da Coruja</div>
-              <div class="gc-desc">Memorize e repita a ordem das corujas.</div>
-              <span class="gc-cta">Testar memória</span>
-            </div>
+        <button type="button" class="game-card gc-seq" data-cat="memoria" data-nome="sequencia da coruja" data-desc="memorize e repita a ordem das corujas" onclick="_abrirJogo('sequencia')">
+          <div class="gc-media"><img src="/Jogos/assets/card-sequencia.webp" alt="" loading="lazy" class="gc-hero-img"></div>
+          <div class="gc-body">
+            <div class="gc-title">Sequência da Coruja</div>
+            <div class="gc-desc">Memorize e repita a ordem das corujas.</div>
+            <span class="gc-cta">Jogar</span>
           </div>
-          <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
 
-        <button type="button" class="game-card gc-voo" onclick="_abrirJogo('voo')">
-          <div class="gc-inner">
-            <div class="gc-owl">
-              <span class="gc-owl-glow"></span>
-              <img src="/webp/owl-flying.webp" alt="" loading="lazy">
-            </div>
-            <div class="gc-info">
-              <div class="gc-title">Voo da Coruja</div>
-              <div class="gc-desc">Suba nas nuvens o mais alto que conseguir!</div>
-              <span class="gc-cta">Voar</span>
-            </div>
+        <button type="button" class="game-card gc-voo" data-cat="acao" data-nome="voo da coruja" data-desc="suba nas nuvens o mais alto que conseguir" onclick="_abrirJogo('voo')">
+          <div class="gc-media"><img src="/Jogos/assets/card-voo.webp" alt="" loading="lazy" class="gc-hero-img"></div>
+          <div class="gc-body">
+            <div class="gc-title">Voo da Coruja</div>
+            <div class="gc-desc">Suba nas nuvens o mais alto que conseguir!</div>
+            <span class="gc-cta">Jogar</span>
           </div>
-          <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
 
-        <button type="button" class="game-card gc-corrida" onclick="_abrirJogo('corrida')">
-          <div class="gc-inner">
-            <div class="gc-owl">
-              <span class="gc-owl-glow"></span>
-              <img src="/webp/owl-angry.webp" alt="" loading="lazy"
-                   onerror="this.onerror=null;this.src='/webp/owl-flying.webp';">
-            </div>
-            <div class="gc-info">
-              <div class="gc-title">Corrida da Coruja</div>
-              <div class="gc-desc">Sobreviva aos zumbis em 1ª pessoa. Vire o celular!</div>
-              <span class="gc-cta">Correr</span>
-            </div>
+        <button type="button" class="game-card gc-corrida" data-cat="acao" data-nome="corrida da coruja" data-desc="sobreviva aos zumbis em 1a pessoa vire o celular" onclick="_abrirJogo('corrida')">
+          <div class="gc-media"><img src="/Jogos/assets/card-corrida.webp" alt="" loading="lazy" class="gc-hero-img"></div>
+          <div class="gc-body">
+            <div class="gc-title">Corrida da Coruja</div>
+            <div class="gc-desc">Sobreviva aos zumbis em 1ª pessoa. Vire o celular!</div>
+            <span class="gc-cta">Jogar</span>
           </div>
-          <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
 
-        <button type="button" class="game-card gc-piano" onclick="_abrirJogo('piano')">
-          <div class="gc-inner">
-            <div class="gc-owl">
-              <span class="gc-owl-glow"></span>
-              <img src="/webp/owl-highlight.webp" alt="" loading="lazy"
-                   onerror="this.onerror=null;this.src='/webp/owl-tada.webp';">
-            </div>
-            <div class="gc-info">
-              <div class="gc-title">Piano da Coruja</div>
-              <div class="gc-desc">Toque os azulejos no ritmo e não deixe nenhum passar!</div>
-              <span class="gc-cta">Tocar</span>
-            </div>
+        <button type="button" class="game-card gc-piano" data-cat="puzzle" data-nome="piano da coruja" data-desc="toque os azulejos no ritmo e nao deixe nenhum passar" onclick="_abrirJogo('piano')">
+          <div class="gc-media"><img src="/Jogos/assets/card-piano.webp" alt="" loading="lazy" class="gc-hero-img"></div>
+          <div class="gc-body">
+            <div class="gc-title">Piano da Coruja</div>
+            <div class="gc-desc">Toque os azulejos no ritmo e não deixe nenhum passar!</div>
+            <span class="gc-cta">Jogar</span>
           </div>
-          <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
 
-        <button type="button" class="game-card gc-pingpong" onclick="_abrirJogo('pingpong')">
-          <div class="gc-inner">
-            <div class="gc-owl">
-              <span class="gc-owl-glow"></span>
-              <img src="/webp/owl-point.webp" alt="" loading="lazy"
-                   onerror="this.onerror=null;this.src='/webp/owl-tada.webp';">
-            </div>
-            <div class="gc-info">
-              <div class="gc-title">Ping Pong da Coruja</div>
-              <div class="gc-desc">Sozinho contra a CPU ou 1x1 com um amigo em tempo real. Só as raquetes, em 1ª pessoa.</div>
-              <span class="gc-cta">Jogar com um amigo</span>
-            </div>
+        <button type="button" class="game-card gc-pingpong" data-cat="multi" data-nome="ping pong da coruja" data-desc="sozinho contra a cpu ou 1x1 com um amigo em tempo real" onclick="_abrirJogo('pingpong')">
+          <div class="gc-media"><img src="/Jogos/assets/card-pingpong.webp" alt="" loading="lazy" class="gc-hero-img"></div>
+          <div class="gc-body">
+            <div class="gc-title">Ping Pong da Coruja</div>
+            <div class="gc-desc">Sozinho contra a CPU ou 1x1 com um amigo em tempo real.</div>
+            <span class="gc-cta">Jogar</span>
           </div>
-          <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
 
-        <button type="button" class="game-card gc-tanques" onclick="_abrirJogo('tanques')">
-          <div class="gc-inner">
-            <div class="gc-owl">
-              <span class="gc-owl-glow"></span>
-              <img src="/webp/owl-angry.webp" alt="" loading="lazy"
-                   onerror="this.onerror=null;this.src='/webp/owl-flying.webp';">
-            </div>
-            <div class="gc-info">
-              <div class="gc-title">Batalha de Tanques</div>
-              <div class="gc-desc">Arena top-down com paredes destrutíveis. Sozinho contra a CPU ou 1x1 com um amigo.</div>
-              <span class="gc-cta">Entrar na arena</span>
-            </div>
+        <button type="button" class="game-card gc-tanques" data-cat="multi" data-nome="batalha de tanques" data-desc="arena top down com paredes destrutiveis sozinho contra a cpu ou 1x1 com um amigo" onclick="_abrirJogo('tanques')">
+          <div class="gc-media"><img src="/Jogos/assets/card-tanques.webp" alt="" loading="lazy" class="gc-hero-img"></div>
+          <div class="gc-body">
+            <div class="gc-title">Batalha de Tanques</div>
+            <div class="gc-desc">Arena top-down com paredes destrutíveis. Sozinho ou 1x1.</div>
+            <span class="gc-cta">Jogar</span>
           </div>
-          <i class="fa fa-chevron-right gc-arrow"></i>
         </button>
+      </div>
+
+      <!-- Estado vazio: nenhum jogo bate com a busca/filtro -->
+      <div class="games-empty" id="games-empty">
+        <div class="games-empty-owl">🦉</div>
+        <div class="games-empty-tit">Nenhum jogo encontrado</div>
+        <div class="games-empty-sub">Tenta outra busca ou categoria.</div>
       </div>
 
       <!-- TELA: Quiz da Coruja -->

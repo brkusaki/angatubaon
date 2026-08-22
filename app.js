@@ -1066,6 +1066,10 @@
     _streakAtualizarFaixa(false); // mostra a ofensiva atual (sem animar)
     _carregarAssetsJogos();  // som + efeitos (uma vez, sob demanda)
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0,0); }
+    // Fix: entrada no histórico pro botão "voltar" (Android) fechar o hub e
+    // cair na tela inicial — sem isso, abrir o hub não empilhava nada e o
+    // "voltar" saía direto do PWA.
+    if (history.state?.modal !== 'jogos-hub') history.pushState({ modal: 'jogos-hub' }, '');
   }
   // Exposto pro badge da coruja no header (index.html), que abre o hub
   // direto no clique/toque, sem depender da pill de filtros.
@@ -1132,7 +1136,7 @@
   }
   window._alternarSomJogos = _alternarSomJogos;
 
-  function _fecharGamesHub() {
+  function _fecharGamesHub(viaPopstate) {
     _pararJogosExternos(); // para Speed Tap / Sequência / Voo se estavam rodando
     _sairTelaCheia();      // garante sair da tela cheia nativa
     if (typeof _rlLimparTimers === 'function') _rlLimparTimers();
@@ -1146,14 +1150,18 @@
     if (footer) footer.style.display = '';
     var siga = document.getElementById('bloco-siga');
     if (siga) siga.style.display = '';
+    // Fix: desfaz a entrada do histórico ao fechar manualmente (popstate já
+    // consumiu) — mesmo padrão usado nos outros modais do app.
+    if (!viaPopstate && history.state?.modal === 'jogos-hub') history.back();
   }
 
   // Sai por completo do hub de jogos e volta pra tela inicial (lista de
   // lojas). Fecha o hub, desmarca a pill "Joguinhos" e re-renderiza a
   // lista — o mesmo efeito de clicar de novo na pill, mas acessível de
-  // dentro do próprio hub (botão no topo do menu de jogos).
-  function _sairDosJogos() {
-    _fecharGamesHub();
+  // dentro do próprio hub (botão no topo do menu de jogos) e do botão
+  // "voltar" do Android (viaPopstate=true, ver handler de popstate).
+  function _sairDosJogos(viaPopstate) {
+    _fecharGamesHub(viaPopstate);
     try { document.querySelectorAll('.pill-btn').forEach(function (b) { b.classList.remove('active'); }); } catch (e) {}
     if (typeof activePillFilter !== 'undefined') activePillFilter = 'all';
     if (typeof renderLojas === 'function') renderLojas();
@@ -10111,6 +10119,11 @@
     // Tela de ranking (dentro da hub de jogos)
     if (document.getElementById('jogo-ranking')?.classList.contains('rank-open')) {
       if (typeof rankFecharPainel === 'function') rankFecharPainel(true); return;
+    }
+    // Hub de jogos (menu ou uma tela de jogo aberta) — volta pra tela inicial
+    // em vez de sair do app.
+    if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) {
+      if (typeof _sairDosJogos === 'function') _sairDosJogos(true); return;
     }
     // Painel de conta do cliente (pode estar sobre tudo)
     if (document.getElementById('modal-cli-conta')?.classList.contains('open')) {

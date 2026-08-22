@@ -5639,7 +5639,9 @@ body.games-fs-open .sq-grade { margin: auto 0; }
    sobra só a arena + HUD + botão voltar, ocupando a tela inteira. */
 #games-hub.jogo-ativo .games-hub-head,
 #games-hub.jogo-ativo .streak-faixa,
-#games-hub.jogo-ativo .rank-abrir-btn {
+#games-hub.jogo-ativo .rank-abrir-btn,
+#games-hub.jogo-ativo .games-search-row,
+#games-hub.jogo-ativo .games-cat-chips {
   display: none !important;
 }
 /* Com o cabeçalho fora, a tela do jogo cola no topo e o HUD sobe pro

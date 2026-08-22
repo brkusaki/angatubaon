@@ -1196,7 +1196,7 @@
     var menu = document.getElementById('games-menu');
     var telas = document.querySelectorAll('.jogo-tela');
     for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
-    if (menu) menu.style.display = 'block';
+    if (menu) menu.style.display = '';
     _gamesAplicarFiltro();
     // Atualiza a faixa de ofensiva; anima a chama se subiu nesta visita.
     _streakAtualizarFaixa(_streakAumentouAgora);

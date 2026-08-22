@@ -593,7 +593,10 @@
     _pnPontos++;
     _pnCombo++;
     if (_pnCombo > _pnComboMax) _pnComboMax = _pnCombo;
-    if (_pnCombo >= 5) _pnComboFlash = 1.1;   // mostra o texto por ~1s
+    // Só dispara nos marcos (5, 10, 15...) — não a cada acerto, senão em
+    // combo alto (notas mais rápidas que a duração do flash) o texto
+    // nunca some e fica poluindo a tela o jogo inteiro.
+    if (_pnCombo >= 5 && _pnCombo % 5 === 0) _pnComboFlash = 0.9;
     _pnMovendo = true;                 // a queda só começa no 1º acerto
     if (_pnModo !== 'normal') {
       // Acelera um pouco mais forte em combo alto (retenção)
@@ -743,25 +746,22 @@
     }
     ctx.globalAlpha = 1;
 
-    // Combo na tela (retenção): aparece a partir de 5 e some sozinho
+    // Combo na tela (retenção): pulso curto só nos marcos, menor e mais
+    // pro topo — não pode cobrir os azulejos caindo no meio da tela.
     if (_pnEstado === 'jogando' && _pnComboFlash > 0 && _pnCombo >= 5) {
-      var alpha = Math.min(1, _pnComboFlash * 1.4);
-      var escala = 1 + Math.min(0.35, (_pnCombo - 5) * 0.012);
+      var alpha = Math.min(1, _pnComboFlash * 1.6);
+      var escala = 1 + Math.min(0.2, (_pnCombo - 5) * 0.008);
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      var fs = Math.round(Math.min(W, H) * 0.09 * escala);
+      var fs = Math.round(Math.min(W, H) * 0.055 * escala);
       ctx.font = '800 ' + fs + "px 'Syne','DM Sans',sans-serif";
       ctx.fillStyle = _pnCombo >= 20 ? '#ffd54a' : (_pnCombo >= 10 ? '#8ffdd6' : '#ffffff');
       ctx.shadowColor = 'rgba(0,0,0,0.55)';
-      ctx.shadowBlur = 10;
-      ctx.fillText(_pnCombo + ' COMBO', W / 2, H * 0.22);
-      if (_pnCombo >= 15) {
-        ctx.font = '700 ' + Math.round(fs * 0.38) + "px 'DM Sans',sans-serif";
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
-        ctx.fillText(_pnCombo >= 30 ? 'INSANO 🔥' : (_pnCombo >= 20 ? 'FOGO 🔥' : 'BOA!'), W / 2, H * 0.22 + fs * 0.7);
-      }
+      ctx.shadowBlur = 8;
+      var sufixo = _pnCombo >= 30 ? ' INSANO 🔥' : (_pnCombo >= 20 ? ' FOGO 🔥' : (_pnCombo >= 15 ? ' BOA!' : ''));
+      ctx.fillText(_pnCombo + ' COMBO' + sufixo, W / 2, H * 0.10);
       ctx.restore();
     }
 

@@ -3,22 +3,15 @@
    Piano Tiles clássico: 4 colunas, os azulejos descem e você toca
    sempre no MAIS BAIXO ainda não tocado. Errar a coluna ou deixar
    um azulejo passar pelo rodapé encerra a partida. A velocidade
-   sobe junto com a pontuação.
+   sobe junto com a pontuação + combo.
 
-   MÚSICA — por que é sintetizada e não MP3
-   O jogo NÃO baixa nenhum arquivo de áudio. Cada azulejo tocado
-   dispara a próxima nota da melodia, gerada na hora em Web Audio
-   (dois osciladores + envelope de piano). Isso resolve três coisas
-   de uma vez:
-     1) SINCRONIA — o azulejo É a nota. Não existe latência de
-        decode nem drift entre o áudio e o desenho.
-     2) PESO — zero KB de áudio no cache do Service Worker; o jogo
-        inteiro cabe neste arquivo e funciona offline.
-     3) DIREITO AUTORAL — as melodias são de domínio público
-        (Beethoven, Mozart, Pachelbel, tradicionais) e a "gravação"
-        é gerada pelo próprio navegador, então não há gravação de
-        terceiro envolvida. Faixas de gravadora (inclusive as da
-        NCS) exigiriam licença comercial pra uso em jogo.
+   MÚSICA — sintetizada (Web Audio), zero MP3.
+   - Domínio público (clássicos + brasileiras antigas)
+   - Originais modernas (estilo phonk/funk/eletrônica) — só notas
+     MIDI, sem amostra de terceiros → sem risco de direito autoral.
+
+   Retenção: sistema de combo (visual + leve aceleração), mensagens
+   de fim motivadoras e seletor com músicas atuais.
 
    Fala com o app APENAS via window.AngatubaGames (a ponte).
    Expõe window.PianoGame = { preparar, comecar, parar } e mantém
@@ -28,28 +21,18 @@
   'use strict';
 
   /* ══════════════════════════════════════════════════════════════
-     MELODIAS — todas de domínio público. Cada número é uma nota
-     MIDI (69 = lá central). O ritmo NÃO vem daqui: como no Piano
-     Tiles original, quem dita o andamento é a velocidade da queda,
-     então cada azulejo toca a próxima nota da lista. Quando a
-     lista acaba, ela recomeça.
+     MELODIAS
+     - Domínio público (clássicos + brasileiras antigas)
+     - Originais modernas (estilo phonk / funk / eletrônica)
+       criadas só com sequências de notas MIDI — sem amostra,
+       sem fonograma, sem risco de direito autoral.
 
-     SOBRE AS BRASILEIRAS: no Brasil a obra cai em domínio público
-     70 anos depois da morte do autor (Lei 9.610/98, contados do 1º
-     de janeiro do ano seguinte), e cantiga de autor desconhecido já
-     nasce em domínio público. Chiquinha Gonzaga morreu em 1935, o
-     que libera "Ó Abre Alas" desde 2006; as cantigas de roda não
-     têm autor conhecido. Não há ECAD a pagar e, como a execução é
-     sintetizada aqui, também não existe gravação de terceiro no
-     meio — só a melodia, num arranjo nosso.
-
-     As notas das brasileiras foram transcritas de cifra melódica
-     publicada, não de memória. Cada uma anota a fonte, porque
-     esses sites invertem a convenção de oitava entre si (num deles
-     MAIÚSCULA é o registro grave, no outro é o agudo) e a leitura
-     foi resolvida pelo desenho da melodia.
+     Cada número é nota MIDI (69 = lá central). O ritmo NÃO vem
+     daqui: quem dita o andamento é a velocidade da queda.
+     Quando a lista acaba, ela recomeça.
   ══════════════════════════════════════════════════════════════ */
   var _PN_MELODIAS = [
+    /* ── Clássicos (domínio público) ─────────────────────────── */
     { nome: 'Für Elise', notas: [
       76,75,76,75,76,71,74,72,69,
       60,64,69,71,64,68,71,72,
@@ -75,40 +58,25 @@
       60,60,67,67,69,69,67,65,65,64,64,62,62,60
     ] },
 
-    /* ── Brasileiras ──────────────────────────────────────────── */
-
-    // Chiquinha Gonzaga, 1899 — a primeira marchinha de carnaval.
-    // Fonte: cifra melódica (cifrasstudio), onde MAIÚSCULA é o
-    // registro a partir do dó agudo. A 1ª frase repete, como no
-    // original. Cheia de cromatismo descendente — é o que dá o
-    // gingado de marchinha.
+    /* ── Brasileiras (domínio público) ───────────────────────── */
     { nome: 'Ó Abre Alas', notas: [
       73,73,72,72,70,73,72,70,69,70,
       73,73,72,72,70,73,72,70,69,70,
       70,70,68,68,66,70,68,68,66,65,
       65,69,72,77,75,77,75,73,72,70
     ] },
-
-    // Cantiga de roda, autor desconhecido. Fonte: cifra melódica
-    // (joanir), onde MAIÚSCULA é o registro grave. Em fá maior.
     { nome: 'Ciranda, Cirandinha', notas: [
       60,65,65,69,69,72,72,
       70,69,67,72,69,67,65,
       69,72,70,69,67,65,64,60,
       70,67,69,65,67,64,65
     ] },
-
-    // Cantiga de roda, autor desconhecido. Fonte: cifra melódica
-    // (joanir). Em dó maior, termina no tônica grave.
     { nome: 'O Cravo e a Rosa', notas: [
       67,67,64,72,71,69,67,65,
       69,69,65,72,71,69,67,67,
       67,72,72,72,74,72,71,69,
       69,67,71,67,65,62,60,60
     ] },
-
-    // Cantiga de roda, autor desconhecido. Fonte: cifra melódica
-    // (cifrasstudio). Em fá maior — o si bemol (70) é da armadura.
     { nome: 'Marcha Soldado', notas: [
       72,72,69,65,65,
       69,72,72,72,69,67,
@@ -120,17 +88,79 @@
       69,70,70,70,67,72,72,
       74,72,70,69,67,65
     ] },
-
-    // Cantiga de roda, autor desconhecido. Fonte: cifra melódica
-    // (cifrasstudio) — essa entrada vem sem marca de oitava, então
-    // o refrão ("como poderei viver") foi colocado uma oitava acima
-    // do verso, que é onde ele cai quando se canta. Se soar
-    // estranho, é este trecho que se mexe.
     { nome: 'Peixe Vivo', notas: [
       64,67,67,65,65,69,69,67,
       64,67,67,65,62,65,65,64,
       72,72,69,71,72,71,69,67,72,72,
       69,71,72
+    ] },
+
+    /* ── Originais modernas (estilo phonk / funk / eletrônica) ──
+       Criadas do zero. Só sequência de notas — livre de direito
+       autoral. Feitas pra soar atuais e prender o jogador. */
+    { nome: 'Drift Phonk', notas: [
+      48,48,55,51,48,55,58,55,
+      48,48,55,51,43,48,51,55,
+      51,51,58,55,51,58,60,58,
+      48,48,55,51,48,55,58,55,
+      36,43,48,51,55,51,48,43,
+      48,55,58,60,58,55,51,48
+    ] },
+    { nome: 'Automotivo SP', notas: [
+      45,45,52,48,45,52,57,52,
+      45,45,52,48,40,45,48,52,
+      48,48,55,52,48,55,57,55,
+      45,45,52,48,45,52,57,52,
+      40,45,48,52,55,52,48,45,
+      52,55,57,60,57,55,52,48
+    ] },
+    { nome: 'Night Drive', notas: [
+      50,53,57,50,53,57,60,57,
+      50,53,57,62,60,57,53,50,
+      45,50,53,57,53,50,45,41,
+      50,53,57,50,53,57,60,62,
+      57,60,62,65,62,60,57,53,
+      50,53,57,53,50,45,41,38
+    ] },
+    { nome: 'Bass Drop', notas: [
+      36,36,43,36,48,43,36,43,
+      36,36,43,36,48,51,48,43,
+      38,38,45,38,50,45,38,45,
+      36,36,43,36,48,43,36,31,
+      36,43,48,51,48,43,36,43,
+      48,51,55,51,48,43,36,36
+    ] },
+    { nome: 'Neon Pulse', notas: [
+      60,64,67,60,64,67,72,67,
+      60,64,67,71,67,64,60,55,
+      57,60,64,57,60,64,69,64,
+      60,64,67,72,71,67,64,60,
+      55,60,64,67,64,60,55,52,
+      60,64,67,71,72,71,67,64
+    ] },
+    { nome: 'Shadow Funk', notas: [
+      43,47,50,43,47,50,55,50,
+      43,47,50,53,50,47,43,38,
+      40,43,47,40,43,47,52,47,
+      43,47,50,55,53,50,47,43,
+      38,43,47,50,47,43,38,35,
+      43,47,50,53,55,53,50,47
+    ] },
+    { nome: 'Hyper Run', notas: [
+      62,65,69,62,65,69,74,69,
+      62,65,69,72,69,65,62,57,
+      58,62,65,58,62,65,70,65,
+      62,65,69,74,72,69,65,62,
+      57,62,65,69,65,62,57,53,
+      62,65,69,72,74,72,69,65
+    ] },
+    { nome: 'Low Rider', notas: [
+      41,41,48,45,41,48,53,48,
+      41,41,48,45,36,41,45,48,
+      45,45,52,48,45,52,55,52,
+      41,41,48,45,41,48,53,48,
+      36,41,45,48,52,48,45,41,
+      48,52,55,57,55,52,48,45
     ] }
   ];
 
@@ -367,9 +397,12 @@
   var _pnMovendo = false;    // só anda depois do primeiro toque certo
   var _pnPontos = 0;
   var _pnVel = 0;            // em linhas por segundo
-  var _PN_VEL_INI = 1.8, _PN_VEL_MAX = 7.5, _PN_VEL_ACC = 0.045;
+  var _PN_VEL_INI = 1.8, _PN_VEL_MAX = 7.8, _PN_VEL_ACC = 0.052;
   var _pnMelodia = null;
   var _pnOndas = [];         // ripples do toque certo
+  var _pnCombo = 0;          // acertos seguidos (retenção)
+  var _pnComboMax = 0;       // maior combo da partida
+  var _pnComboFlash = 0;     // tempo restante do texto de combo na tela
 
   /* ══════════════════════════════════════════════════════════════
      MODOS
@@ -486,6 +519,7 @@
     _pnPontos = 0; _pnErros = 0; _pnPerdidas = 0;
     _pnCriados = 0;
     _pnFlashErro = 0; _pnColErro = -1;
+    _pnCombo = 0; _pnComboMax = 0; _pnComboFlash = 0;
     _pnMovendo = false;
     _pnBatFase = 0; _pnBatStep = -1;   // próximo passo será o 0 (bumbo)
     _pnMelodia = _pnEscolherMelodia();
@@ -544,6 +578,7 @@
       // o azulejo continua lá esperando o toque certo.
       if (_pnModo === 'normal') {
         _pnErros++;
+        _pnCombo = 0;
         _pnFlashErro = 1; _pnColErro = col;
         _pnSomErro();
         _pnAtualizarHUD();
@@ -556,9 +591,14 @@
     alvo.tocada = true;
     alvo.flash = 1;
     _pnPontos++;
+    _pnCombo++;
+    if (_pnCombo > _pnComboMax) _pnComboMax = _pnCombo;
+    if (_pnCombo >= 5) _pnComboFlash = 1.1;   // mostra o texto por ~1s
     _pnMovendo = true;                 // a queda só começa no 1º acerto
     if (_pnModo !== 'normal') {
-      _pnVel = Math.min(_PN_VEL_MAX, _PN_VEL_INI + _pnPontos * _PN_VEL_ACC);
+      // Acelera um pouco mais forte em combo alto (retenção)
+      var extra = Math.min(0.8, (_pnCombo / 40) * 0.4);
+      _pnVel = Math.min(_PN_VEL_MAX, _PN_VEL_INI + _pnPontos * _PN_VEL_ACC + extra);
     }
 
     var notas = _pnMelodia.notas;
@@ -580,6 +620,7 @@
       if (_pnAzulejos[i].flash > 0) _pnAzulejos[i].flash = Math.max(0, _pnAzulejos[i].flash - dt * 4);
     }
     if (_pnFlashErro > 0) _pnFlashErro = Math.max(0, _pnFlashErro - dt * 3);
+    if (_pnComboFlash > 0) _pnComboFlash = Math.max(0, _pnComboFlash - dt);
     for (i = _pnOndas.length - 1; i >= 0; i--) {
       _pnOndas[i].t += dt;
       if (_pnOndas[i].t > 0.4) _pnOndas.splice(i, 1);
@@ -702,6 +743,28 @@
     }
     ctx.globalAlpha = 1;
 
+    // Combo na tela (retenção): aparece a partir de 5 e some sozinho
+    if (_pnEstado === 'jogando' && _pnComboFlash > 0 && _pnCombo >= 5) {
+      var alpha = Math.min(1, _pnComboFlash * 1.4);
+      var escala = 1 + Math.min(0.35, (_pnCombo - 5) * 0.012);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var fs = Math.round(Math.min(W, H) * 0.09 * escala);
+      ctx.font = '800 ' + fs + "px 'Syne','DM Sans',sans-serif";
+      ctx.fillStyle = _pnCombo >= 20 ? '#ffd54a' : (_pnCombo >= 10 ? '#8ffdd6' : '#ffffff');
+      ctx.shadowColor = 'rgba(0,0,0,0.55)';
+      ctx.shadowBlur = 10;
+      ctx.fillText(_pnCombo + ' COMBO', W / 2, H * 0.22);
+      if (_pnCombo >= 15) {
+        ctx.font = '700 ' + Math.round(fs * 0.38) + "px 'DM Sans',sans-serif";
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.fillText(_pnCombo >= 30 ? 'INSANO 🔥' : (_pnCombo >= 20 ? 'FOGO 🔥' : 'BOA!'), W / 2, H * 0.22 + fs * 0.7);
+      }
+      ctx.restore();
+    }
+
     // Antes do primeiro toque: dica de onde começar.
     if (_pnEstado === 'jogando' && !_pnMovendo && alvo) {
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
@@ -745,10 +808,11 @@
       if (owlEl) { owlEl.src = perfeito ? '/webp/owl-celebrate-flying.webp' : '/webp/owl-thumbsup.webp'; owlEl.style.display = ''; }
       if (titEl) titEl.textContent = perfeito ? '🎵 Tocou sem errar!' : '🎵 Fim da música!';
       if (ptsEl) ptsEl.textContent = _pnPontos + ' de ' + total + ' notas';
+      var comboExtra = _pnComboMax >= 8 ? ' Combo máximo: ' + _pnComboMax + '.' : '';
       if (msgEl) msgEl.textContent = perfeito
-        ? (_pnMelodia.nome + ' inteirinha, nota por nota. 🦉')
-        : (_pnErros > 0 ? 'Você tocou ' + _pnMelodia.nome + ' com ' + _pnErros + (_pnErros === 1 ? ' erro' : ' erros') + '. Sem pressa, tenta de novo!'
-                        : 'Você tocou ' + _pnMelodia.nome + '. Sem pressa, tenta de novo!');
+        ? (_pnMelodia.nome + ' inteirinha, nota por nota. 🦉' + comboExtra)
+        : (_pnErros > 0 ? 'Você tocou ' + _pnMelodia.nome + ' com ' + _pnErros + (_pnErros === 1 ? ' erro' : ' erros') + '.' + comboExtra + ' Sem pressa, tenta de novo!'
+                        : 'Você tocou ' + _pnMelodia.nome + '.' + comboExtra + ' Sem pressa, tenta de novo!');
       if (slot) { slot.style.display = 'none'; slot.innerHTML = ''; }
       _pnMostrarOverlay('fim');
       _pnAtualizarHUD(true);
@@ -766,8 +830,9 @@
     if (owlEl) { owlEl.src = recorde ? '/webp/owl-celebrate-flying.webp' : '/webp/owl-surprised.webp'; owlEl.style.display = ''; }
     if (titEl) titEl.textContent = recorde ? '🎉 Novo recorde!' : (motivo === 'passou' ? 'Deixou passar!' : 'Nota errada!');
     if (ptsEl) ptsEl.textContent = score + (score === 1 ? ' nota' : ' notas');
-    if (msgEl) msgEl.textContent = recorde ? 'Você nunca tocou tão longe! 🦉'
-      : (rec > 0 ? 'Seu recorde: ' + rec + '. Bora de novo?' : 'Toque sempre no azulejo mais baixo!');
+    var comboTxt = _pnComboMax >= 10 ? ' Melhor combo: ' + _pnComboMax + '!' : '';
+    if (msgEl) msgEl.textContent = recorde ? ('Você nunca tocou tão longe! 🦉' + comboTxt)
+      : (rec > 0 ? 'Seu recorde: ' + rec + '.' + comboTxt + ' Bora de novo?' : 'Toque sempre no azulejo mais baixo!' + comboTxt);
     _pnMostrarOverlay('fim');
     _pnAtualizarHUD(true);
     if (recorde && window.AngatubaGames && window.AngatubaGames.efeitos) window.AngatubaGames.efeitos.confete('pn-fim', 90);

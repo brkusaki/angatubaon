@@ -1187,6 +1187,10 @@
     if (window.PianoGame     && typeof window.PianoGame.parar     === 'function') window.PianoGame.parar();
     if (window.PingPongGame  && typeof window.PingPongGame.parar  === 'function') window.PingPongGame.parar();
     if (window.TanquesGame   && typeof window.TanquesGame.parar   === 'function') window.TanquesGame.parar();
+    // Coruja Party: sem isto, sair da lobby pelo botão genérico (em vez
+    // das telas próprias do Party) não avisava o Firebase — a sala
+    // ficava fantasma na lista pública. Ver PartyGame.parar em party.js.
+    if (window.PartyGame     && typeof window.PartyGame.parar     === 'function') window.PartyGame.parar();
   }
 
   /* -- Roteador de jogos: menu <-> tela de cada jogo -- */

@@ -65,12 +65,15 @@
    transparente), então ganha máscara circular + contorno sutil pra
    parecer um "adesivo" redondo em vez de um retângulo cru — no
    tamanho pequeno do wrap (150px) fica discreto. Escondido/pausado
-   por padrão; só toca durante .pf-tossindo (ver puff.js, _tosse()). */
+   por padrão; só toca durante .pf-tossindo (ver puff.js, _tosse()).
+   O <img> NUNCA fica escondido (puff.js troca o src dele pra
+   coruja-puff-tossindo.webp nesse estado) — o vídeo só entra POR CIMA,
+   na mesma posição/tamanho. Assim, se o vídeo não carregar, quem
+   aparece por baixo já é a pose de tosse certa, não um vazio. */
 .pf-owl-video {
   position: absolute; width: 100%; height: 100%; object-fit: cover;
   border-radius: 50%; pointer-events: none; display: none;
 }
-.pf-owl-wrap.pf-tossindo .pf-owl-img { display: none; }
 .pf-owl-wrap.pf-tossindo .pf-owl-video {
   display: block;
   box-shadow: 0 0 0 2px rgba(255,255,255,.25), 0 4px 14px rgba(0,0,0,.35);

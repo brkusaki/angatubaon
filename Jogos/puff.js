@@ -29,6 +29,8 @@
   var PUFF_LIMITE_PASSO   = 70;   // ms de redução no limite a cada puff válido
   var TOSSE_DURACAO_MS    = 1700; // atordoada, não dá pra puffar
   var BARRA_META          = 16;   // puffs válidos pra encher a barra de fôlego uma vez
+  var IMG_IDLE            = '/Jogos/assets/puff/coruja-puff.webp';
+  var IMG_TOSSINDO        = '/Jogos/assets/puff/coruja-puff-tossindo.webp';
 
   function render(container, opts) {
     if (!container) return;
@@ -58,12 +60,14 @@
         '<div class="pf-arena" id="pf-arena">' +
           '<div class="pf-owl-wrap" id="pf-owl-wrap">' +
             '<span class="pf-owl-emoji" id="pf-owl-emoji">🦉</span>' +
-            '<img class="pf-owl-img" id="pf-owl-img" src="/Jogos/assets/puff/coruja-puff.webp" alt="" draggable="false">' +
+            '<img class="pf-owl-img" id="pf-owl-img" src="' + IMG_IDLE + '" alt="" draggable="false">' +
             // Loop de vídeo da tosse (opcional — ver CORUJA-PARTY-PLANO.md):
-            // fica escondido e pausado o tempo todo, só toca durante o
-            // estado "pf-tossindo" (ver _tosse()). Se o arquivo não
-            // carregar, o onerror esconde o <video> e o CSS/shake da
-            // imagem estática (já existente) cobre o estado sozinho.
+            // fica escondido e pausado o tempo todo, e só aparece por cima
+            // da imagem (mesmo tamanho/posição) durante "pf-tossindo" (ver
+            // _tosse()). A imagem NUNCA fica escondida — ela troca pra
+            // IMG_TOSSINDO nesse estado — então se o vídeo não existir/não
+            // carregar (onerror), quem aparece por baixo já é a pose de
+            // tosse certa, não a pose neutra.
             '<video class="pf-owl-video" id="pf-owl-video" src="/Jogos/assets/puff/coruja-tossindo-loop.webm" muted loop playsinline preload="auto"></video>' +
           '</div>' +
           '<div class="pf-instrucao" id="pf-instrucao">Segure e solte no tempo certo!</div>' +
@@ -81,6 +85,11 @@
     var elInstrucao  = container.querySelector('#pf-instrucao');
 
     elOwlImg.onerror = function () { this.style.visibility = 'hidden'; };
+    // Sem isto, se a troca pra IMG_TOSSINDO falhasse (onerror escondia o
+    // <img>), ele continuaria escondido pra sempre mesmo depois do src
+    // voltar pra IMG_IDLE com sucesso — agora reaparece assim que QUALQUER
+    // imagem carrega de verdade.
+    elOwlImg.onload = function () { this.style.visibility = 'visible'; };
     if (elOwlVideo) elOwlVideo.onerror = function () { this.style.display = 'none'; };
 
     function _som(m, args) {
@@ -145,10 +154,12 @@
       if (timerHold) { clearTimeout(timerHold); timerHold = null; }
       elOwlWrap.classList.remove('pf-inflando');
       elOwlWrap.classList.add('pf-tossindo');
-      // Troca a imagem estática pelo loop de vídeo enquanto durar a tosse
-      // (CSS já esconde/mostra os dois via a classe pf-tossindo — ver
-      // puff.css). Se o vídeo não existir/não carregou, .play() falha
-      // silenciosamente e a imagem estática com o shake do CSS já cobre.
+      // Pose de tosse na hora (troca de src, instantâneo — já deve estar
+      // em cache) + tenta subir o vídeo por cima (CSS mostra o <video> só
+      // durante pf-tossindo — ver puff.css). Se o vídeo não existir/não
+      // carregar, .play() falha silenciosamente e quem fica visível é a
+      // imagem estática de tosse, não a pose neutra.
+      elOwlImg.src = IMG_TOSSINDO;
       if (elOwlVideo) { try { elOwlVideo.currentTime = 0; elOwlVideo.play().catch(function () {}); } catch (e) {} }
       if (elAvisoTosse) { elAvisoTosse.style.display = 'block'; elAvisoTosse.classList.remove('pf-aviso-anim'); void elAvisoTosse.offsetWidth; elAvisoTosse.classList.add('pf-aviso-anim'); }
       _som('dano');
@@ -156,6 +167,7 @@
       timerAtordoada = setTimeout(function () {
         atordoada = false;
         elOwlWrap.classList.remove('pf-tossindo');
+        elOwlImg.src = IMG_IDLE;
         if (elOwlVideo) { try { elOwlVideo.pause(); } catch (e) {} }
         if (elAvisoTosse) elAvisoTosse.style.display = 'none';
       }, TOSSE_DURACAO_MS);

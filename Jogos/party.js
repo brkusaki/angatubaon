@@ -515,17 +515,35 @@
     if (_salaRef) {
       try { _salaRef.onDisconnect().cancel(); } catch (e) {}
       if (_souAnfitriao) {
-        try { _salaRef.remove(); } catch (e) {}
+        // Ordem importa aqui: a regra de segurança de salasPartyPublicas
+        // (database.rules.json) só deixa apagar a entrada enquanto
+        // salasParty/{codigo}/anfitriao ainda existir — é ela que prova
+        // pro Firebase "quem é o anfitrião" dessa sala. Apagar a sala
+        // ANTES do espelho público derrubava essa prova no meio do
+        // caminho: a remoção do espelho era rejeitada pela regra, em
+        // silêncio (o .remove() vira uma Promise rejeitada que ninguém
+        // aguardava) — a sala sumia de verdade, mas a Party ficava
+        // fantasma em "Parties abertas agora" pra sempre, com um
+        // "Entrar" que só dava "Sala não encontrada". Por isso o
+        // espelho sai PRIMEIRO, e só then() é que apaga a sala em si.
+        // Captura a ref AGORA: _limparTudo() (fim desta função) zera
+        // _salaRef de forma síncrona, antes desta Promise resolver — usar
+        // a variável do módulo direto dentro do then() pegaria null.
+        var salaRefAoSair = _salaRef;
+        var limparPublica = Promise.resolve();
         if (_sala && _sala.publica) {
           try {
             var db = _db();
             if (db) {
               var refPublica = db.ref('salasPartyPublicas/' + _codigo);
               refPublica.onDisconnect().cancel();
-              refPublica.remove();
+              limparPublica = refPublica.remove().catch(function () {});
             }
           } catch (e) {}
         }
+        limparPublica.then(function () {
+          try { salaRefAoSair.remove(); } catch (e) {}
+        });
       } else if (_meuUid) {
         try {
           _salaRef.child('jogadores/' + _meuUid).onDisconnect().cancel();

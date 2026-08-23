@@ -976,9 +976,18 @@
     _pnMovendo = false;
   }
 
+  // Teto de tempo do modo Coruja Party (ver Jogos/party.js): sobrevivência
+  // não tem cronômetro próprio (joga até errar), então o Party chama isto
+  // depois de alguns segundos pra fechar a rodada com o score alcançado
+  // até ali. Só age se ainda estiver jogando em modo sobrevivência — reusa
+  // _pnGameOver (já sabe reportar pro Party — ver "Modo Coruja Party" nele).
+  function _pnForcarFimParty() {
+    if (_pnEstado === 'jogando' && _pnModo === 'sobrevivencia') _pnGameOver('tempoParty');
+  }
+
   /* ── Exposição pública ────────────────────────────────────────── */
   window._pnComecar = _pnComecar;
   window._pnAlternarBatida = _pnAlternarBatida;
   window._pnVoltarInicio = _pnVoltarInicio;
-  window.PianoGame = { preparar: _pnPreparar, comecar: _pnComecar, parar: _pnParar };
+  window.PianoGame = { preparar: _pnPreparar, comecar: _pnComecar, parar: _pnParar, forcarFimParty: _pnForcarFimParty };
 })();

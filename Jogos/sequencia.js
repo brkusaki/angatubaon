@@ -294,10 +294,21 @@
 
   window._sqComecar = _sqComecar;
 
+  // Teto de tempo do modo Coruja Party (ver Jogos/party.js): a Sequência
+  // não tem cronômetro próprio (é resistência — joga até errar), então o
+  // Party chama isto depois de alguns segundos pra fechar a rodada com o
+  // que a pessoa alcançou até ali, em vez de deixar os outros esperando
+  // indefinidamente. Só age se o jogo ainda estiver rolando; reusa
+  // _sqErrou (já sabe reportar pro Party — ver "Modo Coruja Party" acima).
+  function _sqForcarFimParty() {
+    if (_sqAceitando || _sqTocando) _sqErrou();
+  }
+
   // API pública consumida pelo loader do app (_jogoLoader).
   window.SequenciaGame = {
     preparar: _sqPrepararTela,
     comecar:  _sqComecar,
-    parar:    _sqLimparTimers
+    parar:    _sqLimparTimers,
+    forcarFimParty: _sqForcarFimParty
   };
 })();

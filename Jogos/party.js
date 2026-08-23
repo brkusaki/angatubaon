@@ -50,22 +50,32 @@
   var FOLGA_SEGURANCA_MS   = 20000; // além da duração estimada do minigame, antes de fechar a rodada com 0 pra quem não reportou
 
   /* ── Pool de minigames da Party ──────────────────────────────── */
+  // "tetoSeg" (só speedtap/sequencia/piano) é um corte de segurança PRÓPRIO
+  // do Party pros jogos de resistência (sem cronômetro): decorrido esse
+  // tempo, a rodada termina com o score alcançado até ali (ver
+  // forcarFimParty em sequencia.js/piano.js). "duracaoSeg" é só a
+  // estimativa usada no timeout de segurança do host (reportar 0 se nem
+  // isso responder) — por isso fica um pouco maior que o tetoSeg.
   var POOL = [
     {
       chave: 'speedtap', nome: 'Pega a Coruja', duracaoSeg: 25,
       iniciar: function () { return _iniciarJogoTela('speedtap', ['classico']); }
     },
     {
-      chave: 'sequencia', nome: 'Sequência da Coruja', duracaoSeg: 45,
-      iniciar: function () { return _iniciarJogoTela('sequencia', []); }
+      chave: 'sequencia', nome: 'Sequência da Coruja', duracaoSeg: 60,
+      iniciar: function () { return _iniciarJogoTela('sequencia', [], 50); }
     },
     {
-      chave: 'piano', nome: 'Piano da Coruja', duracaoSeg: 45,
-      iniciar: function () { return _iniciarJogoTela('piano', ['sobrevivencia']); }
+      chave: 'piano', nome: 'Piano da Coruja', duracaoSeg: 60,
+      iniciar: function () { return _iniciarJogoTela('piano', ['sobrevivencia'], 50); }
     },
     {
       chave: 'puff', nome: 'Puff da Coruja', duracaoSeg: 28,
       iniciar: function () { return _iniciarJogoContainer('puff', 28); }
+    },
+    {
+      chave: 'ervilhas', nome: 'Ervilhas da Coruja', duracaoSeg: 42,
+      iniciar: function () { return _iniciarJogoContainer('ervilhas', 38); }
     }
   ];
   function _poolPorChave(chave) {
@@ -305,9 +315,12 @@
   }
 
   function _contagemRegressiva(n, aoFim) {
-    if (n <= 0) { aoFim(); return; }
+    // Desce até n=0 (emite o "Vai!") antes de chamar aoFim — antes o
+    // contador pulava de "1" direto pro jogo, sem mostrar o "Vai!"
+    // que o handler de countdownTick já esperava (ver party.js/UI).
+    if (n < 0) { aoFim(); return; }
     _emit('countdownTick', n);
-    setTimeout(function () { _contagemRegressiva(n - 1, aoFim); }, 800);
+    setTimeout(function () { _contagemRegressiva(n - 1, aoFim); }, n > 0 ? 800 : 500);
   }
 
   /* ── Mostra a tela cheia de um jogo já existente e chama comecar()
@@ -325,11 +338,20 @@
     if (tela) tela.style.display = 'block';
   }
 
-  function _iniciarJogoTela(nome, comecarArgs) {
+  function _iniciarJogoTela(nome, comecarArgs, tetoSeg) {
     return window._jogoLoader(nome).then(function (api) {
       if (typeof api.preparar === 'function') api.preparar();
       _mostrarTelaJogo(nome);
       if (typeof api.comecar === 'function') api.comecar.apply(api, comecarArgs || []);
+      // Corte de segurança pros jogos de resistência (ver comentário na
+      // POOL). Só dispara se a rodada ainda estiver rolando quando o
+      // tempo vencer — se a pessoa já tiver errado sozinha antes disso,
+      // reportarResultado já rodou e forcarFimParty vira no-op.
+      if (tetoSeg && typeof api.forcarFimParty === 'function') {
+        setTimeout(function () {
+          if (_ativo()) { try { api.forcarFimParty(); } catch (e) {} }
+        }, tetoSeg * 1000);
+      }
       return api;
     });
   }
@@ -690,7 +712,15 @@
   });
   window.AngatubaParty.on('countdownTick', function (n) {
     var numEl = _q('pty-countdown-num');
-    if (numEl) { numEl.textContent = n > 0 ? n : 'Vai!'; numEl.classList.remove('pty-countdown-pulse'); void numEl.offsetWidth; numEl.classList.add('pty-countdown-pulse'); }
+    if (numEl) {
+      numEl.textContent = n > 0 ? n : 'Vai!';
+      numEl.classList.toggle('pty-countdown-vai', n <= 0);
+      numEl.classList.remove('pty-countdown-pulse'); void numEl.offsetWidth; numEl.classList.add('pty-countdown-pulse');
+    }
+    // Som do tique-taque (3-2-1) e um som mais triunfante no "Vai!".
+    if (window.AngatubaGames && window.AngatubaGames.som) {
+      if (n > 0) window.AngatubaGames.som.toque(); else window.AngatubaGames.som.nivelUp();
+    }
   });
   window.AngatubaParty.on('mostrarArena', function () { _mostrarSub('arena'); /* o render() do minigame injeta o jogo em #pty-arena-container */ });
 
@@ -771,7 +801,11 @@
       }).join('');
     }
     var tituloEl = _q('pty-campeao-titulo');
-    if (tituloEl && geral[0]) tituloEl.textContent = '🏆 ' + geral[0].nome + ' venceu a Party!';
+    if (tituloEl && geral[0]) {
+      tituloEl.textContent = '🏆 ' + geral[0].nome + ' venceu a Party!';
+      // Entrada mais festiva do título (mesmo padrão de "pulse" do countdown).
+      tituloEl.classList.remove('pty-campeao-titulo-anim'); void tituloEl.offsetWidth; tituloEl.classList.add('pty-campeao-titulo-anim');
+    }
 
     var btnRev = _q('pty-btn-revanche');
     if (btnRev) btnRev.style.display = window.AngatubaParty.souAnfitriao() ? '' : 'none';
@@ -779,7 +813,12 @@
     document.body.classList.remove('angatuba-party-ativo');
     _mostrarTelaJogo('party');
     _mostrarSub('campeao');
-    if (window.AngatubaGames && window.AngatubaGames.efeitos) window.AngatubaGames.efeitos.confete('pty-campeao-podio');
+    if (window.AngatubaGames && window.AngatubaGames.efeitos) {
+      window.AngatubaGames.efeitos.confete('pty-campeao-podio');
+      // Segunda leva de confete um instante depois — reforça o clima de
+      // comemoração sem exigir nenhum asset ou elemento novo.
+      setTimeout(function () { window.AngatubaGames.efeitos.confete('pty-campeao-podio'); }, 650);
+    }
     if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.fim(true);
   });
 

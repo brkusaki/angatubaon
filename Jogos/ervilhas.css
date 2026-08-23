@@ -1,0 +1,146 @@
+/* ═══════════════════════════════════════════════════════════════
+   ERVILHAS DA CORUJA — estilos do minigame (lazy-loaded)
+   Renderizado dentro de #pty-arena-container pelo Coruja Party (ver
+   Jogos/party.js e Jogos/ervilhas.js — render(container, opts)). Sem
+   tela própria em index.html: todo o markup é criado via JS.
+   Mesmo padrão visual do Puff (ver Jogos/puff.css).
+   ═══════════════════════════════════════════════════════════════ */
+
+.ev-card {
+  width: 100%; height: 100%; min-height: 420px;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+}
+.ev-hud {
+  display: flex; justify-content: space-around;
+  padding: 14px 12px;
+  background: linear-gradient(135deg, rgba(236,72,153,.12), rgba(245,158,11,.08));
+  border-bottom: 1px solid var(--border);
+}
+.ev-hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ev-hud-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
+.ev-hud-valor { font-family: var(--font-h); font-weight: 800; font-size: 24px; color: var(--text); }
+
+.ev-arena {
+  position: relative; flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 18px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(236,72,153,.10), transparent 60%),
+    radial-gradient(circle at 70% 80%, rgba(245,158,11,.10), transparent 60%),
+    var(--surface2, var(--surface));
+  overflow: hidden; touch-action: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Olhão da Coruja-Chefe: indicador de perigo ─────────────────── */
+.ev-olho-wrap {
+  position: relative; width: 74px; height: 74px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(34,197,94,.16), transparent 70%);
+  border: 2px solid rgba(34,197,94,.35);
+  transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+.ev-olho-wrap.ev-olho-aberto {
+  background: radial-gradient(circle, rgba(239,68,68,.22), transparent 70%);
+  border-color: rgba(239,68,68,.6);
+  transform: scale(1.08);
+}
+.ev-olho-emoji {
+  position: absolute; font-size: 38px; line-height: 1; pointer-events: none;
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,.35));
+}
+.ev-olho-img {
+  position: absolute; width: 78%; height: 78%; object-fit: contain;
+  pointer-events: none; visibility: visible;
+}
+.ev-olho-img[src=""] { visibility: hidden; }
+.ev-olho-label {
+  position: absolute; top: 100%; margin-top: 4px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; text-transform: uppercase; letter-spacing: .04em; font-weight: 700;
+  color: var(--muted); white-space: nowrap;
+}
+
+/* ── Prato: grade de sementes ────────────────────────────────────── */
+.ev-prato {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+  width: 100%; max-width: 260px; padding: 12px;
+  background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 16px;
+}
+.ev-semente {
+  width: 22px; height: 22px; border-radius: 50%; justify-self: center;
+  background: radial-gradient(circle at 35% 30%, #a7e08a, #4d9c3f);
+  box-shadow: inset 0 -2px 3px rgba(0,0,0,.25), 0 1px 2px rgba(0,0,0,.3);
+  transition: transform .2s ease, opacity .2s ease;
+}
+.ev-semente.ev-semente-comida {
+  transform: scale(0);
+  opacity: 0;
+}
+
+/* ── Coruja: bico + estados de ação ─────────────────────────────── */
+.ev-owl-wrap {
+  position: relative; width: 120px; height: 120px;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .12s ease;
+}
+.ev-owl-emoji {
+  position: absolute; font-size: 72px; line-height: 1; pointer-events: none;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,.4));
+}
+.ev-owl-img {
+  position: absolute; width: 100%; height: 100%; object-fit: contain;
+  pointer-events: none; visibility: visible;
+}
+.ev-owl-img[src=""] { visibility: hidden; }
+
+/* Espetando: bico avança rápido na direção do prato */
+.ev-owl-wrap.ev-bicando { animation: evBicar .38s ease; }
+@keyframes evBicar {
+  0%   { transform: translateY(0) scale(1); }
+  40%  { transform: translateY(10px) scale(.96); }
+  100% { transform: translateY(0) scale(1); }
+}
+/* Segurando a semente espetada: pequeno tremor de tensão parada */
+.ev-owl-wrap.ev-segurando-semente { animation: evSegurar 1.1s ease-in-out infinite; }
+@keyframes evSegurar {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2px); }
+}
+/* Engolindo */
+.ev-owl-wrap.ev-engolindo { animation: evEngolir .38s ease; }
+@keyframes evEngolir {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.12) translateY(-4px); }
+  100% { transform: scale(1); }
+}
+/* Semente comida com sucesso: estourinho de confirmação */
+.ev-owl-wrap.ev-pop { animation: evPop .28s ease; }
+@keyframes evPop {
+  0%   { transform: scale(1.1); }
+  50%  { transform: scale(.92); }
+  100% { transform: scale(1); }
+}
+/* Flagrada pelo Olhão: assustada, treme e escurece */
+.ev-owl-wrap.ev-flagrado {
+  animation: evFlagrado .5s ease 2;
+  filter: saturate(.5) brightness(.8);
+}
+@keyframes evFlagrado {
+  0%, 100% { transform: translateX(0) scale(1); }
+  25%      { transform: translateX(-9px) scale(.95) rotate(-4deg); }
+  75%      { transform: translateX(9px) scale(.95) rotate(4deg); }
+}
+
+.ev-instrucao { font-size: 13px; color: var(--muted); text-align: center; max-width: 240px; }
+.ev-aviso-flagra {
+  display: none; position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-h); font-weight: 800; font-size: 14px; color: #ff4444;
+  background: rgba(255,68,68,.12); border: 1px solid rgba(255,68,68,.3);
+  padding: 6px 14px; border-radius: 999px; white-space: nowrap;
+}
+.ev-aviso-flagra.ev-aviso-anim { animation: evAvisoIn .3s ease; }
+@keyframes evAvisoIn {
+  0% { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

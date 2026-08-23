@@ -216,6 +216,14 @@
 
     // a rodada alcançada é _sqRodada; pontuação = rodadas completas = _sqRodada - 1
     var alcancado = _sqRodada - 1;
+
+    // ── Modo Coruja Party: reporta o resultado pro anfitrião e pula a
+    // tela de fim solo (o Party cuida da própria tela de resultado). ──
+    if (window.AngatubaGames && window.AngatubaGames.party && window.AngatubaGames.party.ativo()) {
+      window.AngatubaGames.party.reportarResultado(alcancado);
+      return;
+    }
+
     var rec = _sqRecordeGet();
     var bateu = alcancado > rec;
     if (bateu) _sqRecordeSet(alcancado);

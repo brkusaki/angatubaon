@@ -820,6 +820,14 @@
 
     /* ── Sobrevivência: é aqui que vale recorde e ranking ─────────── */
     var score = _pnPontos, rec = _pnRec(), recorde = score > rec;
+
+    // ── Modo Coruja Party: reporta o resultado pro anfitrião e pula a
+    // tela de fim solo (o Party cuida da própria tela de resultado). ──
+    if (window.AngatubaGames && window.AngatubaGames.party && window.AngatubaGames.party.ativo()) {
+      window.AngatubaGames.party.reportarResultado(score);
+      return;
+    }
+
     if (recorde) _pnRecSet(score);
     _pnSomErro();
     if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.fim(recorde);

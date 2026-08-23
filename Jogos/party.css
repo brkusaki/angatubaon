@@ -1,0 +1,176 @@
+/* ═══════════════════════════════════════════════════════════════
+   CORUJA PARTY — estilos do modo 2-4 jogadores (lazy-loaded)
+   Injetado sob demanda pelo _jogoLoader ao abrir o card "Coruja
+   Party". Segue o mesmo padrão visual de pp-* (Ping Pong): telas
+   "overlay" empilhadas dentro de um único card, uma visível por vez
+   (ver _mostrarSub em party.js). Cor do modo: rosa/dourado — ver
+   .gc-party em styles.css (moldura do card no hub).
+   ═══════════════════════════════════════════════════════════════ */
+
+.pty-card {
+  border-radius: 16px; overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  min-height: 420px;
+  display: flex; flex-direction: column;
+}
+
+/* Todas as sub-telas do Party (menu/lobby/countdown/arena/aguardando/
+   resultado/campeao/erro) compartilham este layout — uma por vez,
+   controlada via display:flex/none em party.js (_mostrarSub). */
+.pty-sub {
+  display: none; flex-direction: column; align-items: center;
+  padding: 22px 18px; gap: 10px; text-align: center;
+  min-height: 420px; box-sizing: border-box;
+}
+.pty-owl { width: 68px; height: 68px; object-fit: contain; margin-bottom: 2px; }
+.pty-titulo { font-family: var(--font-h); font-weight: 800; font-size: 21px; color: var(--text); }
+.pty-desc { font-size: 13px; color: var(--muted); line-height: 1.5; max-width: 300px; }
+
+/* Botão principal (gradiente rosa/dourado, mesmo estilo do st-btn) */
+.pty-btn {
+  font-family: var(--font-h); font-weight: 800; font-size: 15px;
+  color: #fff; cursor: pointer;
+  padding: 13px 30px; border-radius: 999px; border: none;
+  background: linear-gradient(135deg, #ec4899, #f59e0b);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .1s, filter .15s, opacity .15s;
+  box-shadow: 0 4px 14px rgba(236,72,153,.35);
+  width: 100%; max-width: 300px;
+}
+.pty-btn:active { transform: scale(.96); }
+.pty-btn:disabled { opacity: .45; filter: grayscale(.3); cursor: not-allowed; }
+.pty-btn-alt {
+  background: var(--surface2, var(--surface));
+  color: var(--text); border: 1px solid var(--border);
+  box-shadow: none;
+}
+.pty-link {
+  margin-top: 2px; background: none; border: none; color: var(--muted);
+  font-size: 12.5px; text-decoration: underline; cursor: pointer; padding: 6px;
+}
+
+/* ── Menu: criar / entrar ─────────────────────────────────────── */
+.pty-opcoes { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; margin-top: 6px; }
+.pty-privada-toggle {
+  display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted);
+  justify-content: center; margin-top: 2px; cursor: pointer;
+}
+.pty-divisor {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+  width: 100%; max-width: 300px; margin-top: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.pty-divisor::before, .pty-divisor::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.pty-lista-salas { width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 6px; max-height: 130px; overflow-y: auto; }
+.pty-lista-vazia { font-size: 12px; color: var(--muted); padding: 8px 0; }
+.pty-sala-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface2, var(--surface)); color: var(--text);
+  font-size: 13px; cursor: pointer;
+}
+.pty-sala-item-cta { font-weight: 800; color: #ec4899; font-size: 12px; }
+.pty-entrar-wrap { display: flex; gap: 8px; width: 100%; max-width: 300px; }
+.pty-codigo-input {
+  flex: 1; text-align: center; letter-spacing: .2em; text-transform: uppercase;
+  font-family: var(--font-h); font-weight: 800; font-size: 16px;
+  padding: 11px 8px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface2, var(--surface)); color: var(--text);
+}
+.pty-btn-entrar-mini {
+  font-family: var(--font-h); font-weight: 800; font-size: 13px; color: #fff;
+  padding: 0 18px; border-radius: 10px; border: none;
+  background: linear-gradient(135deg, #ec4899, #f59e0b); cursor: pointer;
+}
+.pty-menu-erro { font-size: 12.5px; color: #ff4444; }
+
+/* ── Lobby ─────────────────────────────────────────────────────── */
+.pty-lobby-codigo-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 4px 0; }
+.pty-lobby-codigo-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.pty-lobby-codigo {
+  font-family: var(--font-h); font-weight: 800; font-size: 34px; letter-spacing: .15em;
+  color: #ec4899; text-shadow: 0 2px 10px rgba(236,72,153,.35);
+}
+.pty-jogador-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface2, var(--surface)); color: var(--text);
+  font-size: 13px; font-weight: 600;
+}
+.pty-jogador-chip.pty-jogador-pronto { border-color: #4ade80; }
+.pty-badge-anfitriao {
+  font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+  color: #f59e0b; border: 1px solid rgba(245,158,11,.4); border-radius: 999px; padding: 1px 6px;
+}
+#pty-lobby-jogadores { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 320px; }
+.pty-lobby-contador { font-size: 12px; color: var(--muted); }
+.pty-rodadas-escolha { display: flex; flex-direction: column; gap: 6px; align-items: center; margin-top: 4px; }
+.pty-rodadas-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.pty-rodadas-chips { display: flex; gap: 6px; }
+.pty-rodadas-chip {
+  font-family: var(--font-h); font-weight: 800; font-size: 13px;
+  width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface2, var(--surface)); color: var(--text); cursor: pointer;
+}
+.pty-rodadas-chip.pty-rodadas-ativa { background: linear-gradient(135deg, #ec4899, #f59e0b); color: #fff; border-color: transparent; }
+
+/* ── Countdown ─────────────────────────────────────────────────── */
+.pty-countdown-jogo { font-size: 13px; color: var(--muted); }
+.pty-countdown-num {
+  font-family: var(--font-h); font-weight: 800; font-size: 88px; line-height: 1;
+  background: linear-gradient(135deg, #ec4899, #f59e0b);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.pty-countdown-pulse { animation: ptyCountPulse .5s ease; }
+@keyframes ptyCountPulse {
+  0% { transform: scale(.6); opacity: 0; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── Arena (hospeda minigames "container" como o Puff) ───────────── */
+.pty-sub#pty-arena { padding: 0; }
+#pty-arena-container { width: 100%; flex: 1; display: flex; }
+
+/* ── Aguardando outros jogadores ──────────────────────────────── */
+#pty-aguardando-lista { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 320px; }
+.pty-spinner {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 3px solid var(--border); border-top-color: #ec4899;
+  animation: ptySpin 1s linear infinite;
+}
+@keyframes ptySpin { to { transform: rotate(360deg); } }
+
+/* ── Resultado da rodada ──────────────────────────────────────── */
+#pty-resultado-lista { width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 6px; }
+.pty-resultado-item {
+  display: grid; grid-template-columns: 28px 1fr auto auto; gap: 8px; align-items: center;
+  padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface2, var(--surface));
+}
+.pty-resultado-pos { font-size: 16px; text-align: center; }
+.pty-resultado-nome { font-size: 13px; color: var(--text); font-weight: 600; text-align: left; }
+.pty-resultado-score { font-size: 12px; color: var(--muted); }
+.pty-resultado-pts { font-family: var(--font-h); font-weight: 800; font-size: 13px; color: #4ade80; }
+#pty-resultado-geral { width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.pty-geral-item { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); padding: 2px 4px; }
+
+/* ── Campeão / pódio ──────────────────────────────────────────── */
+#pty-campeao-podio { width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 8px; }
+.pty-podio-item {
+  display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center;
+  padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface2, var(--surface));
+}
+.pty-podio-1 { border-color: #f59e0b; background: linear-gradient(135deg, rgba(245,158,11,.14), transparent); }
+.pty-podio-medalha { font-size: 18px; }
+.pty-podio-nome { font-size: 14px; font-weight: 700; color: var(--text); text-align: left; }
+.pty-podio-pts { font-family: var(--font-h); font-weight: 800; font-size: 13px; color: #f59e0b; }
+
+/* Esconde o botão "← Voltar aos jogos" de qualquer jogo da pool
+   enquanto uma rodada de Party está rolando — evita que o jogador
+   fuja da rodada pela navegação normal do jogo solo (ver
+   document.body.classList em party.js: _iniciarRodadaLocal/
+   reportarResultado). Usar a controle própria da Party pra sair. */
+body.angatuba-party-ativo .jogo-voltar { display: none !important; }

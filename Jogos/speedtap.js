@@ -288,6 +288,13 @@
     var tEl = document.getElementById('st-tempo'); if (tEl) tEl.classList.remove('st-tempo-baixo');
     var cEl = document.getElementById('st-combo'); if (cEl) cEl.style.display = 'none';
 
+    // ── Modo Coruja Party: reporta o resultado pro anfitrião e pula a
+    // tela de fim solo (o Party cuida da própria tela de resultado). ──
+    if (window.AngatubaGames && window.AngatubaGames.party && window.AngatubaGames.party.ativo()) {
+      window.AngatubaGames.party.reportarResultado(_stPontos);
+      return;
+    }
+
     var rec = _stRecordeGet();
     var bateuRecorde = _stPontos > rec;
     if (bateuRecorde) { _stRecordeSet(_stPontos); }

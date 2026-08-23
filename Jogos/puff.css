@@ -1,0 +1,104 @@
+/* ═══════════════════════════════════════════════════════════════
+   PUFF DA CORUJA — estilos do minigame (lazy-loaded)
+   Renderizado dentro de #pty-arena-container pelo Coruja Party (ver
+   Jogos/party.js e Jogos/puff.js — render(container, opts)). Sem
+   tela própria em index.html: todo o markup é criado via JS.
+   ═══════════════════════════════════════════════════════════════ */
+
+.pf-card {
+  width: 100%; height: 100%; min-height: 420px;
+  display: flex; flex-direction: column;
+  background: var(--surface);
+}
+.pf-hud {
+  display: flex; justify-content: space-around;
+  padding: 14px 12px;
+  background: linear-gradient(135deg, rgba(236,72,153,.12), rgba(245,158,11,.08));
+  border-bottom: 1px solid var(--border);
+}
+.pf-hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.pf-hud-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
+.pf-hud-valor { font-family: var(--font-h); font-weight: 800; font-size: 24px; color: var(--text); }
+
+/* Barra de fôlego — enche a cada BARRA_META puffs válidos (puff.js) */
+.pf-barra-wrap {
+  height: 10px; margin: 10px 16px 0; border-radius: 999px; overflow: hidden;
+  background: var(--surface2, rgba(255,255,255,.08)); border: 1px solid var(--border);
+}
+.pf-barra {
+  height: 100%; width: 0%; border-radius: 999px;
+  background: linear-gradient(90deg, #ec4899, #f59e0b);
+  transition: width .18s ease;
+}
+
+.pf-arena {
+  position: relative; flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 20px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(236,72,153,.10), transparent 60%),
+    radial-gradient(circle at 70% 80%, rgba(245,158,11,.10), transparent 60%),
+    var(--surface2, var(--surface));
+  overflow: hidden; touch-action: none;
+}
+
+.pf-owl-wrap {
+  position: relative; width: 150px; height: 150px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; cursor: pointer; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  background: radial-gradient(circle, rgba(236,72,153,.14), transparent 70%);
+  transition: transform .12s ease;
+}
+.pf-owl-emoji {
+  position: absolute; font-size: 88px; line-height: 1; pointer-events: none;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,.4));
+}
+.pf-owl-img {
+  position: absolute; width: 100%; height: 100%; object-fit: contain;
+  pointer-events: none; visibility: visible;
+}
+.pf-owl-img[src=""] { visibility: hidden; }
+
+/* Enchendo o peito: cresce suavemente pela duração --pf-dur (ms),
+   definida via JS no momento em que o toque começa (puff.js). */
+.pf-owl-wrap.pf-inflando {
+  animation-name: pfInflar;
+  animation-duration: var(--pf-dur, 2000ms);
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+@keyframes pfInflar {
+  0%   { transform: scale(1); }
+  100% { transform: scale(1.35); }
+}
+/* Puff válido: "estourinho" de confirmação */
+.pf-owl-wrap.pf-pop { animation: pfPop .28s ease; }
+@keyframes pfPop {
+  0%   { transform: scale(1.1); }
+  50%  { transform: scale(.92); }
+  100% { transform: scale(1); }
+}
+/* Tossindo: atordoada, treme e escurece um pouco */
+.pf-owl-wrap.pf-tossindo {
+  animation: pfTosse .5s ease 3;
+  filter: saturate(.6) brightness(.85);
+}
+@keyframes pfTosse {
+  0%, 100% { transform: translateX(0) scale(1); }
+  25%      { transform: translateX(-8px) scale(.96); }
+  75%      { transform: translateX(8px) scale(.96); }
+}
+
+.pf-instrucao { font-size: 13px; color: var(--muted); text-align: center; max-width: 220px; }
+.pf-aviso-tosse {
+  display: none; position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-h); font-weight: 800; font-size: 14px; color: #ff4444;
+  background: rgba(255,68,68,.12); border: 1px solid rgba(255,68,68,.3);
+  padding: 6px 14px; border-radius: 999px; white-space: nowrap;
+}
+.pf-aviso-tosse.pf-aviso-anim { animation: pfAvisoIn .3s ease; }
+@keyframes pfAvisoIn {
+  0% { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

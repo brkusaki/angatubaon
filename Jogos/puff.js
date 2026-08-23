@@ -59,6 +59,12 @@
           '<div class="pf-owl-wrap" id="pf-owl-wrap">' +
             '<span class="pf-owl-emoji" id="pf-owl-emoji">🦉</span>' +
             '<img class="pf-owl-img" id="pf-owl-img" src="/Jogos/assets/puff/coruja-puff.webp" alt="" draggable="false">' +
+            // Loop de vídeo da tosse (opcional — ver CORUJA-PARTY-PLANO.md):
+            // fica escondido e pausado o tempo todo, só toca durante o
+            // estado "pf-tossindo" (ver _tosse()). Se o arquivo não
+            // carregar, o onerror esconde o <video> e o CSS/shake da
+            // imagem estática (já existente) cobre o estado sozinho.
+            '<video class="pf-owl-video" id="pf-owl-video" src="/Jogos/assets/puff/coruja-tossindo-loop.webm" muted loop playsinline preload="auto"></video>' +
           '</div>' +
           '<div class="pf-instrucao" id="pf-instrucao">Segure e solte no tempo certo!</div>' +
           '<div class="pf-aviso-tosse" id="pf-aviso-tosse">Segurou demais! 🤧</div>' +
@@ -70,10 +76,12 @@
     var elBarra   = container.querySelector('#pf-barra');
     var elOwlWrap = container.querySelector('#pf-owl-wrap');
     var elOwlImg  = container.querySelector('#pf-owl-img');
+    var elOwlVideo = container.querySelector('#pf-owl-video');
     var elAvisoTosse = container.querySelector('#pf-aviso-tosse');
     var elInstrucao  = container.querySelector('#pf-instrucao');
 
     elOwlImg.onerror = function () { this.style.visibility = 'hidden'; };
+    if (elOwlVideo) elOwlVideo.onerror = function () { this.style.display = 'none'; };
 
     function _som(m, args) {
       var G = window.AngatubaGames;
@@ -137,12 +145,18 @@
       if (timerHold) { clearTimeout(timerHold); timerHold = null; }
       elOwlWrap.classList.remove('pf-inflando');
       elOwlWrap.classList.add('pf-tossindo');
+      // Troca a imagem estática pelo loop de vídeo enquanto durar a tosse
+      // (CSS já esconde/mostra os dois via a classe pf-tossindo — ver
+      // puff.css). Se o vídeo não existir/não carregou, .play() falha
+      // silenciosamente e a imagem estática com o shake do CSS já cobre.
+      if (elOwlVideo) { try { elOwlVideo.currentTime = 0; elOwlVideo.play().catch(function () {}); } catch (e) {} }
       if (elAvisoTosse) { elAvisoTosse.style.display = 'block'; elAvisoTosse.classList.remove('pf-aviso-anim'); void elAvisoTosse.offsetWidth; elAvisoTosse.classList.add('pf-aviso-anim'); }
       _som('dano');
       _vibrar([40, 60, 40]);
       timerAtordoada = setTimeout(function () {
         atordoada = false;
         elOwlWrap.classList.remove('pf-tossindo');
+        if (elOwlVideo) { try { elOwlVideo.pause(); } catch (e) {} }
         if (elAvisoTosse) elAvisoTosse.style.display = 'none';
       }, TOSSE_DURACAO_MS);
     }
@@ -167,6 +181,7 @@
       if (timerRodada) { clearInterval(timerRodada); timerRodada = null; }
       if (timerHold) { clearTimeout(timerHold); timerHold = null; }
       if (timerAtordoada) { clearTimeout(timerAtordoada); timerAtordoada = null; }
+      if (elOwlVideo) { try { elOwlVideo.pause(); } catch (e) {} }
       elOwlWrap.removeEventListener('pointerdown', _aoPointerDown);
       elOwlWrap.removeEventListener('pointerup', _aoPointerUp);
       _som('fim', [puffs >= BARRA_META]);

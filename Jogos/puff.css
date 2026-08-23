@@ -60,6 +60,22 @@
 }
 .pf-owl-img[src=""] { visibility: hidden; }
 
+/* Loop de vídeo da tosse (opcional — ver CORUJA-PARTY-PLANO.md/B2).
+   Ao contrário dos .webp, o vídeo tem fundo de estúdio (não é
+   transparente), então ganha máscara circular + contorno sutil pra
+   parecer um "adesivo" redondo em vez de um retângulo cru — no
+   tamanho pequeno do wrap (150px) fica discreto. Escondido/pausado
+   por padrão; só toca durante .pf-tossindo (ver puff.js, _tosse()). */
+.pf-owl-video {
+  position: absolute; width: 100%; height: 100%; object-fit: cover;
+  border-radius: 50%; pointer-events: none; display: none;
+}
+.pf-owl-wrap.pf-tossindo .pf-owl-img { display: none; }
+.pf-owl-wrap.pf-tossindo .pf-owl-video {
+  display: block;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.25), 0 4px 14px rgba(0,0,0,.35);
+}
+
 /* Enchendo o peito: cresce suavemente pela duração --pf-dur (ms),
    definida via JS no momento em que o toque começa (puff.js). */
 .pf-owl-wrap.pf-inflando {

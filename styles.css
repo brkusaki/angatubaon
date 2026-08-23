@@ -4712,6 +4712,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .gc-piano    { --gc:#c084fc; --gc-2:#7c3aed; --gc-a:rgba(168,85,247,.16); --gc-b:rgba(168,85,247,.34); }
 .gc-pingpong { --gc:#38bdf8; --gc-2:#0ea5e9; --gc-a:rgba(56,189,248,.16); --gc-b:rgba(56,189,248,.34); }
 .gc-tanques  { --gc:#34d399; --gc-2:#0d9488; --gc-a:rgba(16,185,129,.16); --gc-b:rgba(16,185,129,.34); }
+.gc-party    { --gc:#ec4899; --gc-2:#f59e0b; --gc-a:rgba(236,72,153,.16); --gc-b:rgba(236,72,153,.34); }
 
 .game-card:active { transform: scale(.97); border-color: var(--gc-b); }
 .game-card:focus-visible { outline: 2px solid var(--gc); outline-offset: 2px; }

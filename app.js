@@ -1273,7 +1273,14 @@
     pingpong: { js: '/Jogos/pingpong.min.js', css: '/Jogos/pingpong.css', global: 'PingPongGame' },
     // Batalha de Tanques também depende de Jogos/multiplayer.js (AngatubaMP),
     // já carregado direto no index.html — mesma infraestrutura do Ping Pong.
-    tanques: { js: '/Jogos/tanques.min.js', css: '/Jogos/tanques.css', global: 'TanquesGame' }
+    tanques: { js: '/Jogos/tanques.min.js', css: '/Jogos/tanques.css', global: 'TanquesGame' },
+    // Coruja Party (2-4 jogadores): fala direto com o Firebase Realtime
+    // Database, não usa AngatubaMP (que é só 1x1). Ver Jogos/party.js.
+    party: { js: '/Jogos/party.min.js', css: '/Jogos/party.css', global: 'PartyGame' },
+    // Puff da Coruja: minigame da pool do Coruja Party. Não tem tela
+    // própria (nem card no hub) — é carregado de dentro do party.js via
+    // window._jogoLoader('puff') e desenha tudo em #pty-arena-container.
+    puff: { js: '/Jogos/puff.min.js', css: '/Jogos/puff.css', global: 'PuffGame' }
   };
   var _jogosCarregados = {};   // nome -> true quando js+css já injetados
 
@@ -1384,7 +1391,7 @@
         }, 1200);
         setTimeout(function(){ var ld = document.getElementById('games-loading'); if (ld) ld.style.display = 'none'; }, 12000);
       }
-    } else if (nome === 'speedtap' || nome === 'sequencia' || nome === 'voo' || nome === 'corrida' || nome === 'piano' || nome === 'pingpong' || nome === 'tanques') {
+    } else if (nome === 'speedtap' || nome === 'sequencia' || nome === 'voo' || nome === 'corrida' || nome === 'piano' || nome === 'pingpong' || nome === 'tanques' || nome === 'party') {
       // Jogos externos: carrega sob demanda e prepara quando pronto.
       _jogoLoader(nome).then(function (api) {
         if (api && typeof api.preparar === 'function') api.preparar();
@@ -16014,5 +16021,17 @@ ${urlCard}`)}`;
       confete:  function (alvo, qtd) { var E = window.AngatubaEfeitos; if (E) { try { E.confete(alvo, qtd); } catch (e) {} } },
       estrelas: function (x, y, qtd) { var E = window.AngatubaEfeitos; if (E) { try { E.estrelas(x, y, qtd); } catch (e) {} } },
       brilho:   function (alvo)      { var E = window.AngatubaEfeitos; if (E) { try { E.brilho(alvo); } catch (e) {} } }
+    },
+
+    // ── Coruja Party ─────────────────────────────────────────
+    // Fachada segura sobre window.AngatubaParty (Jogos/party.js), usada
+    // pelos jogos da pool em modo "tela" (speedtap/sequencia/piano) pra
+    // saber se estão rodando dentro de uma rodada de Party e reportar o
+    // resultado pra lá em vez de seguir o fluxo solo normal. Se o Party
+    // ainda não carregou (jogo aberto fora de uma Party), ativo() é
+    // sempre false e o jogo segue o fluxo solo de sempre.
+    party: {
+      ativo: function () { var P = window.AngatubaParty; return !!(P && P.ativo()); },
+      reportarResultado: function (score) { var P = window.AngatubaParty; if (P) { try { P.reportarResultado(score); } catch (e) {} } }
     }
   };

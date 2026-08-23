@@ -477,6 +477,15 @@
             <span class="gc-cta">Jogar</span>
           </div>
         </button>
+
+        <button type="button" class="game-card gc-party" data-cat="multi" data-nome="coruja party" data-desc="2 a 4 jogadores minigames em rodadas e placar geral" onclick="_abrirJogo('party')">
+          <div class="gc-media"><img src="/Jogos/assets/card-party.webp" alt="" loading="lazy" class="gc-hero-img"></div>
+          <div class="gc-body">
+            <div class="gc-title">Coruja Party</div>
+            <div class="gc-desc">2 a 4 jogadores, minigames em rodadas e placar geral. Chame a turma!</div>
+            <span class="gc-cta">Jogar</span>
+          </div>
+        </button>
       </div>
 
       <!-- Estado vazio: nenhum jogo bate com a busca/filtro -->
@@ -986,6 +995,112 @@
               <button type="button" class="tq-link" onclick="_tqVoltarMenu()">Voltar ao início</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- TELA: Coruja Party (2-4 jogadores, via Firebase Realtime Database
+           direto — NÃO usa Jogos/multiplayer.js, que é sinalização WebRTC
+           1x1. Ver Jogos/party.js. Sub-telas empilhadas, uma visível por
+           vez (controlado por _mostrarSub em party.js). -->
+      <div id="jogo-party" class="jogo-tela" style="display:none;">
+        <div class="pty-card">
+
+          <!-- Sub-tela: menu (criar ou entrar numa sala) -->
+          <div class="pty-sub" id="pty-menu" style="display:flex;">
+            <img src="/webp/owl-wave.webp" alt="" class="pty-owl" onerror="this.style.display='none'">
+            <div class="pty-titulo">🦉 Coruja Party</div>
+            <div class="pty-desc">Chame de 2 a 4 amigos pra jogar minigames em rodadas — cada um no próprio celular, placar geral no fim.</div>
+            <div class="pty-opcoes">
+              <button type="button" class="pty-btn" onclick="_ptyCriarSala()">Criar Party</button>
+              <label class="pty-privada-toggle">
+                <input type="checkbox" id="pty-privada-check">
+                <span>🔒 Sala privada (só por código)</span>
+              </label>
+            </div>
+            <div class="pty-divisor">parties abertas agora</div>
+            <div class="pty-lista-salas" id="pty-lista-salas">
+              <div class="pty-lista-vazia">Nenhuma Party pública aberta agora.</div>
+            </div>
+            <div class="pty-divisor">ou entrar com um código</div>
+            <div class="pty-entrar-wrap">
+              <input type="text" class="pty-codigo-input" id="pty-codigo-input" placeholder="CÓDIGO" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
+              <button type="button" class="pty-btn-entrar-mini" onclick="_ptyEntrarSala()">Entrar</button>
+            </div>
+            <div class="pty-menu-erro" id="pty-menu-erro" style="display:none;"></div>
+          </div>
+
+          <!-- Sub-tela: lobby (sala de espera) -->
+          <div class="pty-sub" id="pty-lobby">
+            <div class="pty-lobby-codigo-wrap">
+              <span class="pty-lobby-codigo-label">Código da sala</span>
+              <span class="pty-lobby-codigo" id="pty-lobby-codigo">----</span>
+              <button type="button" class="pty-link" id="pty-btn-copiar" onclick="_ptyCopiarCodigo()">Copiar código</button>
+            </div>
+            <div id="pty-lobby-jogadores"></div>
+            <div class="pty-lobby-contador" id="pty-lobby-contador">1/4 jogadores (mínimo 2 pra começar)</div>
+            <div class="pty-rodadas-escolha" id="pty-rodadas-escolha">
+              <span class="pty-rodadas-label">Rodadas por sessão</span>
+              <div class="pty-rodadas-chips">
+                <button type="button" class="pty-rodadas-chip" onclick="_ptyEscolherRodadas(3, this)">3</button>
+                <button type="button" class="pty-rodadas-chip pty-rodadas-ativa" onclick="_ptyEscolherRodadas(4, this)">4</button>
+                <button type="button" class="pty-rodadas-chip" onclick="_ptyEscolherRodadas(5, this)">5</button>
+                <button type="button" class="pty-rodadas-chip" onclick="_ptyEscolherRodadas(6, this)">6</button>
+              </div>
+            </div>
+            <button type="button" class="pty-btn" id="pty-btn-comecar" onclick="_ptyComecarParty()">Começar Party</button>
+            <div class="pty-desc" id="pty-lobby-espera-anfitriao" style="display:none;">Esperando o anfitrião começar a Party…</div>
+            <button type="button" class="pty-link" onclick="_ptyVoltarMenuLobby()">Sair da sala</button>
+          </div>
+
+          <!-- Sub-tela: contagem regressiva antes da rodada -->
+          <div class="pty-sub" id="pty-countdown">
+            <div class="pty-countdown-jogo" id="pty-countdown-jogo">Minigame surpresa</div>
+            <div class="pty-countdown-num" id="pty-countdown-num">3</div>
+          </div>
+
+          <!-- Sub-tela: arena — hospeda minigames "container" (ex.: Puff),
+               que desenham tudo dentro de #pty-arena-container. Minigames
+               "tela" (speedtap/sequencia/piano) NÃO usam esta sub-tela —
+               eles assumem a tela cheia deles mesmos (ver party.js). -->
+          <div class="pty-sub" id="pty-arena">
+            <div id="pty-arena-container"></div>
+          </div>
+
+          <!-- Sub-tela: aguardando os outros terminarem a rodada -->
+          <div class="pty-sub" id="pty-aguardando">
+            <div class="pty-spinner"></div>
+            <div class="pty-titulo">Aguardando a galera…</div>
+            <div class="pty-desc">Você já jogou! Assim que todo mundo terminar, o placar da rodada aparece aqui.</div>
+            <div id="pty-aguardando-lista"></div>
+          </div>
+
+          <!-- Sub-tela: resultado da rodada -->
+          <div class="pty-sub" id="pty-resultado">
+            <div class="pty-titulo" id="pty-resultado-titulo">Fim da rodada</div>
+            <div id="pty-resultado-lista"></div>
+            <div class="pty-divisor">placar geral</div>
+            <div id="pty-resultado-geral"></div>
+            <button type="button" class="pty-btn" id="pty-btn-proxima-rodada" onclick="_ptyProximaRodada()">Próxima rodada</button>
+            <div class="pty-desc" id="pty-resultado-espera-anfitriao" style="display:none;">Esperando o anfitrião chamar a próxima rodada…</div>
+          </div>
+
+          <!-- Sub-tela: campeão da sessão -->
+          <div class="pty-sub" id="pty-campeao">
+            <img src="/webp/owl-celebrate-flying.webp" alt="" class="pty-owl" onerror="this.style.display='none'">
+            <div class="pty-titulo" id="pty-campeao-titulo">🏆 Fim da Party!</div>
+            <div id="pty-campeao-podio"></div>
+            <button type="button" class="pty-btn" id="pty-btn-revanche" onclick="_ptyRevanche()">Revanchinha</button>
+            <button type="button" class="pty-link" onclick="_ptyVoltarHubFinal()">Voltar ao hub</button>
+          </div>
+
+          <!-- Sub-tela: sala encerrada / erro -->
+          <div class="pty-sub" id="pty-erro">
+            <img src="/webp/owl-surprised.webp" alt="" class="pty-owl" onerror="this.style.display='none'">
+            <div class="pty-titulo">A Party foi encerrada</div>
+            <div class="pty-desc">O anfitrião saiu ou a sala expirou.</div>
+            <button type="button" class="pty-btn" onclick="_ptyVoltarHubFinal()">Voltar ao hub</button>
+          </div>
+
         </div>
       </div>
 

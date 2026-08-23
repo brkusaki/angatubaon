@@ -14,6 +14,28 @@
   min-height: 420px;
   display: flex; flex-direction: column;
 }
+/* Em tela cheia (body.games-fs-open), #jogo-party.jogo-tela ganha
+   height:100dvh do CSS (ver styles.css), mas quem abre a tela
+   (_abrirJogo/_mostrarTelaJogo) seta display:block INLINE no elemento
+   — isso vence o "display:flex" da mesma regra (estilo inline sempre
+   tem prioridade sobre seletor de classe, sem !important em nenhum
+   dos dois lados). Ou seja: na prática vira um bloco comum, não um
+   flex column — "flex:1" sozinho no .pty-card não tem efeito nenhum
+   nesse caso. Por isso a altura vem por height:100% (resolve contra o
+   height explícito do pai, funciona em block OU flex), com flex:1
+   como reforço caso o display real do pai um dia volte a ser flex.
+   Sem isso, o cartão só crescia até o conteúdo e sobrava um vão preto
+   embaixo em telas com pouco conteúdo (ex.: o menu) — parecia que a
+   tela tinha sido "cortada" no meio. overflow-y:auto cobre o caso de
+   conteúdo mais alto que a tela (ex.: lista grande de parties
+   abertas), já que o .jogo-tela pai tem overflow:hidden. */
+body.games-fs-open .pty-card {
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
 
 /* Todas as sub-telas do Party (menu/lobby/countdown/arena/aguardando/
    resultado/campeao/erro) compartilham este layout — uma por vez,

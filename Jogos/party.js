@@ -240,6 +240,11 @@
         var lista = [];
         snap.forEach(function (filho) {
           var v = filho.val() || {};
+          // Defesa extra contra sala "fantasma": se por algum motivo o
+          // onDisconnect não rodou (app fechado sem desconectar limpo,
+          // etc.) e a entrada ficou velha demais, não mostra na lista —
+          // mesmo critério de expiração usado em entrarSala().
+          if (!v.criadoEm || (Date.now() - v.criadoEm) > SALA_EXPIRA_MS) return;
           lista.push({ codigo: filho.key, nome: String(v.nome || 'Jogador').slice(0, 20) });
         });
         callback(lista);
@@ -832,6 +837,17 @@
   // hub chama _abrirJogo('party'), que chama preparar() ao abrir.
   window.PartyGame = {
     preparar: _ptyPreparar,
-    parar: function () { if (_pararListaSalas) { _pararListaSalas(); _pararListaSalas = null; } }
+    // Chamado quando o app fecha a tela do jogo por fora das telas
+    // próprias do Party (botão genérico "← Voltar aos jogos" / troca de
+    // jogo) — ver _pararJogosExternos em app.js. Sem isto, sair da
+    // lobby por esse caminho deixava a sala (e o espelho público) para
+    // trás: o anfitrião "saía" mas o Firebase nunca ficava sabendo, e a
+    // Party ficava fantasma na lista até o navegador desconectar de
+    // verdade. Mesma limpeza do botão "Sair da sala" — chamar sair()
+    // sem sala ativa é no-op seguro (ver AngatubaParty.sair()).
+    parar: function () {
+      if (_pararListaSalas) { _pararListaSalas(); _pararListaSalas = null; }
+      if (window.AngatubaParty && window.AngatubaParty.codigoSala()) window.AngatubaParty.sair();
+    }
   };
 })();

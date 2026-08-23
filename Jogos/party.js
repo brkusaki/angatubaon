@@ -418,23 +418,34 @@
     return escolhido.chave;
   }
 
+  // "Começar Party": só aqui o totalRodadas é (re)calculado — fixa a linha
+  // de chegada da sessão. baseRodada normalmente é 0 (sala nova), mas numa
+  // revanche já vem com o valor da sessão anterior (ver revanche()), então
+  // a numeração de rodada continua subindo em vez de reiniciar do zero.
   function comecarParty() {
     if (!_souAnfitriao || !_sala || !_salaRef) return;
     var qtd = Object.keys(_sala.jogadores || {}).length;
     if (qtd < MIN_JOGADORES) return;
-    _avancarRodada(0);
+    var baseRodada = _sala.rodadaAtual || 0;
+    _salaRef.update({
+      totalRodadas: baseRodada + _totalRodadasEscolhidas,
+      rodadaAtual: baseRodada + 1,
+      jogoAtual: _sortearProximoJogo(),
+      seed: Math.floor(Math.random() * 1e9),
+      status: 'rodada',
+      rodadaIniciadaEm: firebase.database.ServerValue.TIMESTAMP
+    }).catch(function () {});
   }
 
+  // "Próxima rodada" (dentro da MESMA sessão): só avança rodadaAtual em 1.
+  // NÃO mexe em totalRodadas — que already foi fixado no comecarParty() lá
+  // em cima. (Bug corrigido: antes esta função recalculava totalRodadas =
+  // rodadaAtual + N a cada rodada, o que empurrava a linha de chegada pra
+  // frente pra sempre e a Party nunca terminava.)
   function proximaRodada() {
     if (!_souAnfitriao || !_sala || !_salaRef) return;
-    _avancarRodada(_sala.rodadaAtual || 0);
-  }
-
-  function _avancarRodada(baseRodada) {
-    var novoTotal = baseRodada + _totalRodadasEscolhidas;
     _salaRef.update({
-      totalRodadas: novoTotal,
-      rodadaAtual: baseRodada + 1,
+      rodadaAtual: (_sala.rodadaAtual || 0) + 1,
       jogoAtual: _sortearProximoJogo(),
       seed: Math.floor(Math.random() * 1e9),
       status: 'rodada',
@@ -444,7 +455,7 @@
 
   // Revanchinha: zera o placar geral e reabre o lobby — sem apagar
   // nada (rodadaAtual/totalRodadas continuam subindo na próxima
-  // sessão, ver _avancarRodada). Mesma sala, mesmo código, mesma
+  // sessão, ver comecarParty()). Mesma sala, mesmo código, mesma
   // galera.
   function revanche() {
     if (!_souAnfitriao || !_sala || !_salaRef) return;

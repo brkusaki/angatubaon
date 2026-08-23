@@ -1280,7 +1280,10 @@
     // Puff da Coruja: minigame da pool do Coruja Party. Não tem tela
     // própria (nem card no hub) — é carregado de dentro do party.js via
     // window._jogoLoader('puff') e desenha tudo em #pty-arena-container.
-    puff: { js: '/Jogos/puff.min.js', css: '/Jogos/puff.css', global: 'PuffGame' }
+    puff: { js: '/Jogos/puff.min.js', css: '/Jogos/puff.css', global: 'PuffGame' },
+    // Ervilhas da Coruja: mesmo esquema do Puff acima — minigame só da
+    // pool do Coruja Party, carregado via window._jogoLoader('ervilhas').
+    ervilhas: { js: '/Jogos/ervilhas.min.js', css: '/Jogos/ervilhas.css', global: 'ErvilhasGame' }
   };
   var _jogosCarregados = {};   // nome -> true quando js+css já injetados
 

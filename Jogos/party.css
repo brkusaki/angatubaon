@@ -44,6 +44,16 @@ body.games-fs-open .pty-card {
   display: none; flex-direction: column; align-items: center;
   padding: 22px 18px; gap: 10px; text-align: center;
   min-height: 420px; box-sizing: border-box;
+  /* .pty-card agora estica pra preencher a tela (ver comentário lá em
+     cima), mas isso sozinho não bastava: a sub-tela ATIVA (esta regra)
+     não tinha flex-grow nenhum, então continuava do tamanho do
+     conteúdo e ficava "grudada" no topo do cartão, com um vão vazio
+     embaixo dela mesma. flex:1 faz ela ocupar o cartão inteiro;
+     justify-content:center centraliza o conteúdo curto (menu, erro,
+     campeão) no meio desse espaço em vez de empilhar tudo no topo. Não
+     atrapalha a tela de arena: #pty-arena-container tem flex:1 próprio
+     e consome o espaço todo, então não sobra nada pra "centralizar". */
+  flex: 1; justify-content: center; width: 100%;
 }
 .pty-owl { width: 68px; height: 68px; object-fit: contain; margin-bottom: 2px; }
 .pty-titulo { font-family: var(--font-h); font-weight: 800; font-size: 21px; color: var(--text); }

@@ -462,6 +462,21 @@
       status: 'rodada',
       rodadaIniciadaEm: firebase.database.ServerValue.TIMESTAMP
     }).catch(function () {});
+    // A Party começou: não dá mais pra entrar nela (entrarSala rejeita
+    // sala fora do 'lobby'), então some do espelho público na hora —
+    // senão ela ficava visível em "Parties abertas agora" com um
+    // "Entrar" que sempre falhava, até o anfitrião sair de vez ou
+    // desconectar (podia demorar bastante em segundo plano).
+    if (_sala.publica) {
+      try {
+        var db = _db();
+        if (db) {
+          var refPublicaIniciada = db.ref('salasPartyPublicas/' + _codigo);
+          refPublicaIniciada.onDisconnect().cancel();
+          refPublicaIniciada.remove();
+        }
+      } catch (e) {}
+    }
   }
 
   // "Próxima rodada" (dentro da MESMA sessão): só avança rodadaAtual em 1.

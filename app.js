@@ -10105,6 +10105,18 @@
   }
   window._irParaPaginaHome = _irParaPaginaHome;
 
+  // Mostra o botão "abrir sempre..." só na página que NÃO é a preferida
+  // atual (na página já definida como padrão, o botão some — não faz
+  // sentido oferecer pra definir de novo o que já está definido).
+  function _atualizarBotoesPrefHome() {
+    var pref = 0;
+    try { pref = (localStorage.getItem(HOME_PAGINA_PREF_KEY) === '1') ? 1 : 0; } catch (e) {}
+    var b0 = document.getElementById('home-pref-btn-0');
+    var b1 = document.getElementById('home-pref-btn-1');
+    if (b0) b0.style.display = (pref === 0) ? 'none' : '';
+    if (b1) b1.style.display = (pref === 1) ? 'none' : '';
+  }
+
   // Botões discretos "Abrir sempre nas lojas" / "Abrir sempre nesta página".
   function _definirPaginaInicialHome(idx, btn) {
     try { localStorage.setItem(HOME_PAGINA_PREF_KEY, String(idx)); } catch (e) {}
@@ -10115,7 +10127,10 @@
       setTimeout(function () {
         btn.textContent = txtOriginal;
         btn.disabled = false;
-      }, 1800);
+        _atualizarBotoesPrefHome(); // some deste lado, some só o outro fica visível
+      }, 1200);
+    } else {
+      _atualizarBotoesPrefHome();
     }
   }
   window._definirPaginaInicialHome = _definirPaginaInicialHome;
@@ -10157,6 +10172,7 @@
     // anti-flash (sem reanimar) — e dispara o carregamento do clima se a
     // home já abriu direto na página de Utilidades.
     _irParaPaginaHome(_homePaginaAtual, false);
+    _atualizarBotoesPrefHome();
   })();
 
   /* ── Página 2: Previsão do tempo (Open-Meteo — API gratuita, sem
@@ -10170,24 +10186,41 @@
   var WEATHER_CACHE_TS_KEY = 'angatuba_weather_cache_ts';
   var WEATHER_CACHE_MS     = 30 * 60 * 1000;
   var WEATHER_LAT = -23.4886, WEATHER_LON = -48.4159;
+  // ic = ícone Font Awesome (sem o prefixo "fa-"), col = cor do ícone.
+  // dia/noite: só os códigos de céu limpo/poucas nuvens têm variante
+  // noturna (sol vira lua) — o resto do mapa vale pros dois períodos.
   var WMO_MAP = {
-    0:  { ic: '☀️', txt: 'Céu limpo' },
-    1:  { ic: '🌤️', txt: 'Poucas nuvens' },
-    2:  { ic: '⛅', txt: 'Parcialmente nublado' },
-    3:  { ic: '☁️', txt: 'Nublado' },
-    45: { ic: '🌫️', txt: 'Neblina' }, 48: { ic: '🌫️', txt: 'Neblina' },
-    51: { ic: '🌦️', txt: 'Garoa fraca' }, 53: { ic: '🌦️', txt: 'Garoa' }, 55: { ic: '🌦️', txt: 'Garoa forte' },
-    61: { ic: '🌧️', txt: 'Chuva fraca' }, 63: { ic: '🌧️', txt: 'Chuva' }, 65: { ic: '🌧️', txt: 'Chuva forte' },
-    80: { ic: '🌧️', txt: 'Pancadas de chuva' }, 81: { ic: '🌧️', txt: 'Pancadas de chuva' }, 82: { ic: '⛈️', txt: 'Pancadas fortes' },
-    95: { ic: '⛈️', txt: 'Tempestade' }, 96: { ic: '⛈️', txt: 'Tempestade c/ granizo' }, 99: { ic: '⛈️', txt: 'Tempestade c/ granizo' },
+    0:  { icDia: 'fa-sun',        icNoite: 'fa-moon',       txt: 'Céu limpo',            col: '#fbbf24', colNoite: '#c7d2fe' },
+    1:  { icDia: 'fa-cloud-sun',  icNoite: 'fa-cloud-moon', txt: 'Poucas nuvens',         col: '#fbbf24', colNoite: '#c7d2fe' },
+    2:  { icDia: 'fa-cloud-sun',  icNoite: 'fa-cloud-moon', txt: 'Parcialmente nublado',  col: '#e2b45c', colNoite: '#c7d2fe' },
+    3:  { icDia: 'fa-cloud',      txt: 'Nublado',              col: '#94a3b8' },
+    45: { icDia: 'fa-smog',       txt: 'Neblina',               col: '#94a3b8' },
+    48: { icDia: 'fa-smog',       txt: 'Neblina',               col: '#94a3b8' },
+    51: { icDia: 'fa-cloud-rain', txt: 'Garoa fraca',           col: '#60a5fa' },
+    53: { icDia: 'fa-cloud-rain', txt: 'Garoa',                 col: '#60a5fa' },
+    55: { icDia: 'fa-cloud-rain', txt: 'Garoa forte',           col: '#3b82f6' },
+    61: { icDia: 'fa-cloud-rain', txt: 'Chuva fraca',           col: '#60a5fa' },
+    63: { icDia: 'fa-cloud-showers-heavy', txt: 'Chuva',        col: '#3b82f6' },
+    65: { icDia: 'fa-cloud-showers-heavy', txt: 'Chuva forte',  col: '#2563eb' },
+    80: { icDia: 'fa-cloud-rain', txt: 'Pancadas de chuva',     col: '#3b82f6' },
+    81: { icDia: 'fa-cloud-showers-heavy', txt: 'Pancadas de chuva', col: '#3b82f6' },
+    82: { icDia: 'fa-cloud-bolt', txt: 'Pancadas fortes',       col: '#818cf8' },
+    95: { icDia: 'fa-cloud-bolt', txt: 'Tempestade',            col: '#a78bfa' },
+    96: { icDia: 'fa-cloud-bolt', txt: 'Tempestade c/ granizo', col: '#a78bfa' },
+    99: { icDia: 'fa-cloud-bolt', txt: 'Tempestade c/ granizo', col: '#a78bfa' },
   };
-  function _weatherInfo(code) { return WMO_MAP[code] || { ic: '🌡️', txt: '—' }; }
+  function _weatherInfo(code, isDay) {
+    var m = WMO_MAP[code] || { icDia: 'fa-cloud', txt: '—', col: '#94a3b8' };
+    var noite = (isDay === false) && m.icNoite;
+    return { ic: noite ? m.icNoite : m.icDia, txt: m.txt, col: noite ? (m.colNoite || m.col) : m.col };
+  }
 
   function _pintarClima(d) {
     var elTemp = document.getElementById('weather-temp');
     if (!elTemp) return;
-    var info = _weatherInfo(d.code);
-    document.getElementById('weather-icon').textContent = info.ic;
+    var info = _weatherInfo(d.code, d.isDay !== false);
+    var elIcon = document.getElementById('weather-icon');
+    if (elIcon) { elIcon.className = 'fa ' + info.ic + ' weather-icon'; elIcon.style.color = info.col; }
     elTemp.textContent = Math.round(d.temp) + '°';
     document.getElementById('weather-cond').textContent = info.txt;
     document.getElementById('weather-max').textContent  = Math.round(d.max) + '°';
@@ -10195,9 +10228,9 @@
     var extra = document.getElementById('weather-forecast-extra');
     if (extra && Array.isArray(d.dias)) {
       extra.innerHTML = d.dias.map(function (dia) {
-        var i2 = _weatherInfo(dia.code);
+        var i2 = _weatherInfo(dia.code, true); // previsão de dias futuros: sempre ícone "diurno"
         return '<div class="weather-day"><span class="weather-day-nome">' + dia.nome + '</span>' +
-          '<span class="weather-day-ic">' + i2.ic + '</span>' +
+          '<i class="fa ' + i2.ic + ' weather-day-ic" style="color:' + i2.col + '" aria-hidden="true"></i>' +
           '<span class="weather-day-mm">' + Math.round(dia.max) + '° / ' + Math.round(dia.min) + '°</span></div>';
       }).join('');
     }
@@ -10210,7 +10243,7 @@
       if (cache && (Date.now() - ts) < WEATHER_CACHE_MS) { _pintarClima(cache); return; }
     } catch (e) {}
     var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + WEATHER_LAT + '&longitude=' + WEATHER_LON +
-      '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code' +
+      '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,weather_code' +
       '&timezone=America%2FSao_Paulo&forecast_days=4';
     fetch(url).then(function (r) { if (!r.ok) throw new Error('weather http ' + r.status); return r.json(); })
       .then(function (j) {
@@ -10225,11 +10258,12 @@
           };
         });
         var d = {
-          temp: j.current.temperature_2m,
-          code: j.current.weather_code,
-          max:  j.daily.temperature_2m_max[0],
-          min:  j.daily.temperature_2m_min[0],
-          dias: dias,
+          temp:  j.current.temperature_2m,
+          code:  j.current.weather_code,
+          isDay: j.current.is_day !== 0,
+          max:   j.daily.temperature_2m_max[0],
+          min:   j.daily.temperature_2m_min[0],
+          dias:  dias,
         };
         try {
           localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(d));
@@ -10253,15 +10287,23 @@
   }
   window._alternarPrevisaoDetalhada = _alternarPrevisaoDetalhada;
 
-  /* ── Página 2: "Hoje em Angatuba" (avisos/notícias locais) ──
-     MOCK por enquanto. Pronta pra virar dado real: troque
-     AVISOS_HOJE_MOCK por um fetch no GAS (ex.: nova aba "Avisos" na
-     planilha, endpoint ?tipo=avisos) devolvendo um array no mesmo
-     formato {emoji, titulo, texto} e chamando _renderAvisosHoje(lista). */
+  /* ── Página 2: "Hoje em Angatuba" (posts locais: avisos/notícias,
+     com foto(s) ou vídeo opcionais) ──
+     MOCK por enquanto (as duas fotos do 1º item são as fotos da Igreja
+     Matriz que já existem no app, só pra mostrar o carrossel funcionando
+     — troque pelas fotos reais quando tiver). Pronta pra virar dado real:
+     troque AVISOS_HOJE_MOCK por um fetch no GAS (ex.: nova aba "Avisos"
+     na planilha, endpoint ?tipo=avisos) devolvendo um array no formato
+     {emoji, titulo, texto, textoCompleto?, midias?:[{tipo:'foto'|'video', url}]}
+     e chamando _renderAvisosHoje(lista). */
   var AVISOS_HOJE_MOCK = [
-    { emoji: '🎪', titulo: 'Feira Livre no Centro', texto: 'Sábado de manhã, na Praça Rui Barbosa.' },
+    { emoji: '🎪', titulo: 'Feira Livre no Centro', texto: 'Sábado de manhã, na Praça Rui Barbosa.',
+      textoCompleto: 'Sábado de manhã, na Praça Rui Barbosa. Produtos frescos direto do produtor: verduras, frutas, queijos e doces caseiros. Chegue cedo pros melhores produtos!',
+      midias: [ { tipo: 'foto', url: '/img/igreja-dia.jpg' }, { tipo: 'foto', url: '/img/igreja-noite.jpg' } ] },
     { emoji: '💉', titulo: 'Campanha de vacinação', texto: 'Posto de Saúde Central, das 8h às 16h.' },
   ];
+  window._avisosAtuais = AVISOS_HOJE_MOCK;
+
   function _escHtmlAviso(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -10271,16 +10313,128 @@
     var box = document.getElementById('avisos-list');
     if (!box) return;
     var dados = lista || AVISOS_HOJE_MOCK;
+    window._avisosAtuais = dados; // referência usada pelo modal de post (_abrirAvisoPost)
     if (!dados || !dados.length) {
       box.innerHTML = '<div class="avisos-empty">Nenhum aviso por aqui hoje. Volte mais tarde! 🦉</div>';
       return;
     }
-    box.innerHTML = dados.map(function (a) {
-      return '<div class="aviso-card"><span class="aviso-emoji">' + _escHtmlAviso(a.emoji || '📌') + '</span>' +
-        '<div class="aviso-txt"><strong>' + _escHtmlAviso(a.titulo) + '</strong><span>' + _escHtmlAviso(a.texto) + '</span></div></div>';
+    box.innerHTML = dados.map(function (a, i) {
+      var midias = Array.isArray(a.midias) ? a.midias : [];
+      var capa = midias.length && midias[0].tipo !== 'video' ? midias[0].url : (midias.length ? null : null);
+      var mediaHtml = '';
+      if (midias.length) {
+        // Se a 1ª mídia for vídeo, mostra o próprio frame do vídeo como "capa" (sem controles na lista).
+        var primeira = midias[0];
+        var capaBg = primeira.tipo === 'video' ? '' : ('background-image:url(\'' + primeira.url + '\');');
+        mediaHtml = '<div class="aviso-card-media" style="' + capaBg + '">' +
+          (primeira.tipo === 'video' ? '<video src="' + primeira.url + '" muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>' : '') +
+          (midias.length > 1 ? '<span class="aviso-card-media-count"><i class="fa fa-images" aria-hidden="true"></i> ' + midias.length + '</span>' : '') +
+          '</div>';
+      }
+      return '<div class="aviso-card" onclick="_abrirAvisoPost(' + i + ')" role="button" tabindex="0" ' +
+        'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_abrirAvisoPost(' + i + ');}">' +
+        mediaHtml +
+        '<div class="aviso-card-body"><span class="aviso-emoji">' + _escHtmlAviso(a.emoji || '📌') + '</span>' +
+        '<div class="aviso-txt"><strong>' + _escHtmlAviso(a.titulo) + '</strong><span>' + _escHtmlAviso(a.texto) + '</span></div></div></div>';
     }).join('');
   }
   window._renderAvisosHoje = _renderAvisosHoje; // exposto p/ o futuro fetch no GAS chamar direto
+
+  /* ── Modal de post: abre ao tocar num card de "Hoje em Angatuba".
+     Mostra o texto completo e, se houver, um carrossel de fotos/vídeos
+     (mesmo padrão de swipe do carrossel da home). ── */
+  var _avisoPostIdx = 0;
+  var _avisoPostMidias = [];
+
+  function _abrirAvisoPost(idx) {
+    var lista = window._avisosAtuais || AVISOS_HOJE_MOCK;
+    var aviso = lista[idx];
+    var overlay = document.getElementById('aviso-post-overlay');
+    if (!aviso || !overlay) return;
+
+    document.getElementById('aviso-post-emoji').textContent  = aviso.emoji || '📌';
+    document.getElementById('aviso-post-titulo').textContent = aviso.titulo || '';
+    document.getElementById('aviso-post-texto').textContent  = aviso.textoCompleto || aviso.texto || '';
+
+    var mediaWrap = document.getElementById('aviso-post-media-wrap');
+    var track     = document.getElementById('aviso-post-media-track');
+    var dotsBox   = document.getElementById('aviso-post-media-dots');
+    _avisoPostMidias = Array.isArray(aviso.midias) ? aviso.midias : [];
+
+    if (_avisoPostMidias.length) {
+      mediaWrap.style.display = 'block';
+      track.innerHTML = _avisoPostMidias.map(function (m) {
+        return m.tipo === 'video'
+          ? '<div class="aviso-post-slide"><video src="' + m.url + '" controls playsinline></video></div>'
+          : '<div class="aviso-post-slide"><img src="' + m.url + '" alt="" /></div>';
+      }).join('');
+      dotsBox.style.display = _avisoPostMidias.length > 1 ? 'flex' : 'none';
+      dotsBox.innerHTML = _avisoPostMidias.length > 1
+        ? _avisoPostMidias.map(function (_, i) { return '<span class="aviso-post-dot' + (i === 0 ? ' active' : '') + '" data-idx="' + i + '"></span>'; }).join('')
+        : '';
+      _avisoPostIdx = 0;
+      track.style.transition = 'none';
+      track.style.transform  = 'translateX(0%)';
+    } else {
+      mediaWrap.style.display = 'none';
+      track.innerHTML = '';
+    }
+
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    if (history.state?.modal !== 'aviso-post') history.pushState({ modal: 'aviso-post' }, '');
+  }
+  window._abrirAvisoPost = _abrirAvisoPost;
+
+  function _fecharAvisoPost(viaPopstate) {
+    var overlay = document.getElementById('aviso-post-overlay');
+    if (overlay) overlay.style.display = 'none';
+    document.body.style.overflow = '';
+    if (!viaPopstate && history.state?.modal === 'aviso-post') history.back();
+  }
+  window._fecharAvisoPost = _fecharAvisoPost;
+
+  function _irParaMediaPost(idx) {
+    var track = document.getElementById('aviso-post-media-track');
+    if (!track || !_avisoPostMidias.length) return;
+    idx = Math.max(0, Math.min(idx, _avisoPostMidias.length - 1));
+    _avisoPostIdx = idx;
+    track.style.transition = 'transform 0.3s cubic-bezier(0.32,0.72,0,1)';
+    track.style.transform  = 'translateX(-' + (idx * 100) + '%)';
+    document.querySelectorAll('.aviso-post-dot').forEach(function (d, i) {
+      d.classList.toggle('active', i === idx);
+    });
+  }
+
+  (function initAvisoPostSwipe() {
+    var wrap = document.getElementById('aviso-post-media-wrap');
+    if (!wrap) return;
+    var startX = 0, startY = 0, dragging = false, isHoriz = null;
+    wrap.addEventListener('touchstart', function (e) {
+      startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+      dragging = true; isHoriz = null;
+    }, { passive: true });
+    wrap.addEventListener('touchmove', function (e) {
+      if (!dragging) return;
+      var dx = e.touches[0].clientX - startX;
+      var dy = e.touches[0].clientY - startY;
+      if (isHoriz === null) isHoriz = Math.abs(dx) > Math.abs(dy);
+      if (isHoriz) e.preventDefault();
+    }, { passive: false });
+    wrap.addEventListener('touchend', function (e) {
+      if (!dragging || !isHoriz) { dragging = false; return; }
+      var dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 40) {
+        if (dx < 0) _irParaMediaPost(_avisoPostIdx + 1);
+        else        _irParaMediaPost(_avisoPostIdx - 1);
+      }
+      dragging = false;
+    });
+    wrap.addEventListener('click', function (e) {
+      var dot = e.target.closest('.aviso-post-dot');
+      if (dot) _irParaMediaPost(+dot.dataset.idx);
+    });
+  })();
 
   function _carregarUtilidadesHome() {
     if (_utilidadesCarregadas) return;
@@ -10345,6 +10499,10 @@
   // cardápio → detalhes → minha-loja → cadastro. Cada return encerra o handler,
   // então um único "voltar" fecha apenas o modal do topo da pilha.
   window.addEventListener('popstate', function() {
+    // Modal de post ("Hoje em Angatuba")
+    if (document.getElementById('aviso-post-overlay')?.style.display === 'flex') {
+      if (typeof _fecharAvisoPost === 'function') _fecharAvisoPost(true); return;
+    }
     // Tela de ranking (dentro da hub de jogos)
     if (document.getElementById('jogo-ranking')?.classList.contains('rank-open')) {
       if (typeof rankFecharPainel === 'function') rankFecharPainel(true); return;

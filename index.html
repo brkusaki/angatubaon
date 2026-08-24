@@ -348,21 +348,24 @@
               </a>
             </div>
           </section>
-          <button type="button" class="home-pref-btn" onclick="_definirPaginaInicialHome(0,this)">Abrir sempre nas lojas</button>
+          <button type="button" class="home-pref-btn" id="home-pref-btn-0" onclick="_definirPaginaInicialHome(0,this)">Abrir sempre nas lojas</button>
         </div>
 
         <!-- ── Página 2: Utilidades (clima + avisos locais) ── -->
         <div class="home-page" id="home-page-1">
           <div class="weather-card" id="weather-card">
+            <div class="weather-card-head">
+              <span class="weather-card-label"><i class="fa fa-location-dot" aria-hidden="true"></i> Angatuba agora</span>
+            </div>
             <div class="weather-card-main">
-              <span class="weather-icon" id="weather-icon">🌡️</span>
+              <i class="fa fa-cloud weather-icon" id="weather-icon" aria-hidden="true"></i>
               <div class="weather-temp-wrap">
                 <span class="weather-temp" id="weather-temp">--°</span>
                 <span class="weather-cond" id="weather-cond">Carregando previsão...</span>
               </div>
               <div class="weather-minmax">
-                <i class="fa fa-arrow-up" aria-hidden="true"></i> <span id="weather-max">--°</span>
-                <i class="fa fa-arrow-down" aria-hidden="true"></i> <span id="weather-min">--°</span>
+                <span class="weather-minmax-item weather-max"><i class="fa fa-arrow-up" aria-hidden="true"></i><span id="weather-max">--°</span></span>
+                <span class="weather-minmax-item weather-min"><i class="fa fa-arrow-down" aria-hidden="true"></i><span id="weather-min">--°</span></span>
               </div>
             </div>
             <button type="button" class="weather-vermais-btn" id="weather-vermais-btn" onclick="_alternarPrevisaoDetalhada()">
@@ -376,9 +379,27 @@
             </div>
             <div class="avisos-list" id="avisos-list"></div>
           </section>
-          <button type="button" class="home-pref-btn" onclick="_definirPaginaInicialHome(1,this)">Abrir sempre nesta página</button>
+          <button type="button" class="home-pref-btn" id="home-pref-btn-1" onclick="_definirPaginaInicialHome(1,this)">Abrir sempre nesta página</button>
         </div>
 
+      </div>
+    </div>
+
+    <!-- Modal de post: abre ao tocar num card de "Hoje em Angatuba" —
+         carrossel de fotos/vídeos (quando houver) + texto completo. -->
+    <div id="aviso-post-overlay" role="dialog" aria-modal="true" aria-labelledby="aviso-post-titulo" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.72);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);align-items:flex-end;justify-content:center;" onclick="if(event.target===this)_fecharAvisoPost()">
+      <div class="aviso-post-sheet" id="aviso-post-sheet" role="document">
+        <div class="aviso-post-grabber"></div>
+        <button type="button" class="aviso-post-close" onclick="_fecharAvisoPost()" aria-label="Fechar"><i class="fa fa-times"></i></button>
+        <div class="aviso-post-media-wrap" id="aviso-post-media-wrap" style="display:none;">
+          <div class="aviso-post-media-track" id="aviso-post-media-track"></div>
+          <div class="aviso-post-media-dots" id="aviso-post-media-dots"></div>
+        </div>
+        <div class="aviso-post-body">
+          <span class="aviso-post-emoji" id="aviso-post-emoji"></span>
+          <h3 class="aviso-post-titulo" id="aviso-post-titulo"></h3>
+          <p class="aviso-post-texto" id="aviso-post-texto"></p>
+        </div>
       </div>
     </div>
     <script>

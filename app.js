@@ -10144,8 +10144,11 @@
   var _utilidadesCarregadas = false;
   // v2: cardápio de campos mudou (hora a hora + semana + umidade/vento/chuva);
   // troquei a chave pra não reaproveitar um cache antigo com o formato velho.
-  var WEATHER_CACHE_KEY    = 'angatuba_weather_cache_v2';
-  var WEATHER_CACHE_TS_KEY = 'angatuba_weather_cache_v2_ts';
+  // v3: formato do cache mudou (pontosPorDia + umidade por hora) — bump pra
+  // não reaproveitar cache antigo incompatível salvo por usuários antes
+  // dessas mudanças.
+  var WEATHER_CACHE_KEY    = 'angatuba_weather_cache_v3';
+  var WEATHER_CACHE_TS_KEY = 'angatuba_weather_cache_v3_ts';
   var WEATHER_CACHE_MS     = 30 * 60 * 1000;
   var WEATHER_LAT = -23.4886, WEATHER_LON = -48.4159;
   var _climaBruto = null;   // resposta já processada, guardada pro gráfico (abas)
@@ -10210,10 +10213,11 @@
         var h = parseInt(t.slice(11, 13), 10);
         if (horasAlvo.indexOf(h) === -1) return;
         pontosPorDia[diaIdx].push({
-          hora:  _p2(h) + 'h',
-          temp:  j.hourly.temperature_2m[i],
-          chuva: j.hourly.precipitation_probability ? j.hourly.precipitation_probability[i] : 0,
-          vento: j.hourly.wind_speed_10m[i],
+          hora:    _p2(h) + 'h',
+          temp:    j.hourly.temperature_2m[i],
+          chuva:   j.hourly.precipitation_probability ? j.hourly.precipitation_probability[i] : 0,
+          vento:   j.hourly.wind_speed_10m[i],
+          umidade: j.hourly.relative_humidity_2m ? j.hourly.relative_humidity_2m[i] : null,
         });
       });
     }
@@ -10249,33 +10253,64 @@
     };
   }
 
-  function _pintarClima(d) {
+  // Pinta o card grande do topo (ícone, temperatura, condição, máx/mín,
+  // chuva/umidade/vento) para o dia "i" da semana (0 = hoje).
+  // i=0 usa os dados de "agora" de verdade (os únicos com hora exata);
+  // i>0 usa o resumo do dia (máx/mín + ícone) e o ponto de meio-dia (13h)
+  // como amostra de chuva/umidade/vento daquele dia.
+  function _pintarTopoClimaParaDia(i) {
+    if (!_climaBruto) return;
     var elTemp = document.getElementById('weather-temp');
     if (!elTemp) return;
-    var info = _weatherInfo(d.code, d.isDay !== false);
-    var elIcon = document.getElementById('weather-icon');
-    if (elIcon) { elIcon.className = 'fa ' + info.ic + ' weather-icon'; elIcon.style.color = info.col; }
-    elTemp.textContent = Math.round(d.temp) + '°';
-    document.getElementById('weather-cond').textContent = info.txt;
-    document.getElementById('weather-max').textContent  = Math.round(d.max) + '°';
-    document.getElementById('weather-min').textContent  = Math.round(d.min) + '°';
-
+    var elIcon  = document.getElementById('weather-icon');
+    var elCond  = document.getElementById('weather-cond');
+    var elMax   = document.getElementById('weather-max');
+    var elMin   = document.getElementById('weather-min');
     var elChuva = document.getElementById('weather-rain-prob');
-    if (elChuva) elChuva.textContent = (d.chuva != null ? Math.round(d.chuva) : '--') + '%';
-    var elUmid = document.getElementById('weather-humidity');
-    if (elUmid) elUmid.textContent = (d.umidade != null ? Math.round(d.umidade) : '--') + '%';
+    var elUmid  = document.getElementById('weather-humidity');
     var elVento = document.getElementById('weather-wind');
-    if (elVento) elVento.textContent = (d.vento != null ? Math.round(d.vento) : '--') + ' km/h';
 
+    if (i === 0) {
+      var infoAgora = _weatherInfo(_climaBruto.code, _climaBruto.isDay !== false);
+      if (elIcon) { elIcon.className = 'fa ' + infoAgora.ic + ' weather-icon'; elIcon.style.color = infoAgora.col; }
+      elTemp.textContent = Math.round(_climaBruto.temp) + '°';
+      if (elCond)  elCond.textContent  = infoAgora.txt;
+      if (elMax)   elMax.textContent   = Math.round(_climaBruto.max) + '°';
+      if (elMin)   elMin.textContent   = Math.round(_climaBruto.min) + '°';
+      if (elChuva) elChuva.textContent = (_climaBruto.chuva   != null ? Math.round(_climaBruto.chuva)   : '--') + '%';
+      if (elUmid)  elUmid.textContent  = (_climaBruto.umidade != null ? Math.round(_climaBruto.umidade) : '--') + '%';
+      if (elVento) elVento.textContent = (_climaBruto.vento   != null ? Math.round(_climaBruto.vento)   : '--') + ' km/h';
+      return;
+    }
+
+    var dia = _climaBruto.semana && _climaBruto.semana[i];
+    if (!dia) return;
+    var info = _weatherInfo(dia.code, true); // dias futuros: sempre ícone diurno
+    if (elIcon) { elIcon.className = 'fa ' + info.ic + ' weather-icon'; elIcon.style.color = info.col; }
+    elTemp.textContent = Math.round(dia.max) + '°';
+    if (elCond) elCond.textContent = info.txt;
+    if (elMax)  elMax.textContent  = Math.round(dia.max) + '°';
+    if (elMin)  elMin.textContent  = Math.round(dia.min) + '°';
+
+    var pontos  = (_climaBruto.pontosPorDia && _climaBruto.pontosPorDia[i]) || [];
+    var meioDia = pontos[4] || pontos[Math.floor(pontos.length / 2)] || null; // 13h (índice 4 dos 8 pontos)
+    if (elChuva) elChuva.textContent = (meioDia && meioDia.chuva   != null ? Math.round(meioDia.chuva)   : '--') + '%';
+    if (elUmid)  elUmid.textContent  = (meioDia && meioDia.umidade != null ? Math.round(meioDia.umidade) : '--') + '%';
+    if (elVento) elVento.textContent = (meioDia && meioDia.vento  != null ? Math.round(meioDia.vento)   : '--') + ' km/h';
+  }
+
+  function _pintarClima(d) {
+    if (!document.getElementById('weather-temp')) return;
     _climaBruto = d;
     _climaDiaSelecionado = 0; // toda carga nova (ou cache) volta a mostrar "Hoje"
+    _pintarTopoClimaParaDia(0);
     _renderSemanaClima(d.semana);
     _renderGraficoClima(_climaAbaAtual);
   }
 
   // Dia selecionado na tira semanal (índice em semana/pontosPorDia; 0 = hoje).
-  // Clicar num dia troca o gráfico de cima pra mostrar a previsão daquele dia,
-  // igual ao clima do Google.
+  // Clicar num dia troca o card do topo E o gráfico de baixo pra mostrar a
+  // previsão daquele dia, igual ao clima do Google.
   var _climaDiaSelecionado = 0;
   function _selecionarDiaClima(i) {
     if (!_climaBruto || !_climaBruto.pontosPorDia || !_climaBruto.pontosPorDia[i] || !_climaBruto.pontosPorDia[i].length) return;
@@ -10284,6 +10319,7 @@
     document.querySelectorAll('#weather-week-strip .weather-week-day').forEach(function (el, idx) {
       el.classList.toggle('selecionado', idx === i);
     });
+    _pintarTopoClimaParaDia(i);
     _renderGraficoClima(_climaAbaAtual);
   }
   window._selecionarDiaClima = _selecionarDiaClima;
@@ -10357,7 +10393,7 @@
     } catch (e) {}
     var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + WEATHER_LAT + '&longitude=' + WEATHER_LON +
       '&current=temperature_2m,weather_code,is_day,relative_humidity_2m,wind_speed_10m' +
-      '&hourly=temperature_2m,precipitation_probability,wind_speed_10m,weather_code' +
+      '&hourly=temperature_2m,precipitation_probability,wind_speed_10m,weather_code,relative_humidity_2m' +
       '&daily=temperature_2m_max,temperature_2m_min,weather_code' +
       '&timezone=America%2FSao_Paulo&forecast_days=7';
     fetch(url).then(function (r) { if (!r.ok) throw new Error('weather http ' + r.status); return r.json(); })

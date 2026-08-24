@@ -368,10 +368,26 @@
                 <span class="weather-minmax-item weather-min"><i class="fa fa-arrow-down" aria-hidden="true"></i><span id="weather-min">--°</span></span>
               </div>
             </div>
+            <div class="weather-summary-row">
+              <span class="weather-summary-item"><i class="fa fa-cloud-rain" aria-hidden="true"></i> Chuva: <span id="weather-rain-prob">--%</span></span>
+              <span class="weather-summary-item"><i class="fa fa-droplet" aria-hidden="true"></i> Umidade: <span id="weather-humidity">--%</span></span>
+              <span class="weather-summary-item"><i class="fa fa-wind" aria-hidden="true"></i> Vento: <span id="weather-wind">-- km/h</span></span>
+            </div>
             <button type="button" class="weather-vermais-btn" id="weather-vermais-btn" onclick="_alternarPrevisaoDetalhada()">
               Ver mais <i class="fa fa-chevron-down" aria-hidden="true"></i>
             </button>
-            <div class="weather-forecast-extra" id="weather-forecast-extra" style="display:none;"></div>
+            <div class="weather-forecast-extra" id="weather-forecast-extra" style="display:none;">
+              <div class="weather-chart-tabs" id="weather-chart-tabs">
+                <button type="button" class="weather-tab active" data-tab="temp">Temperatura</button>
+                <button type="button" class="weather-tab" data-tab="chuva">Chuva</button>
+                <button type="button" class="weather-tab" data-tab="vento">Vento</button>
+              </div>
+              <div class="weather-chart-wrap">
+                <svg id="weather-chart-svg" class="weather-chart-svg" viewBox="0 0 300 92" preserveAspectRatio="none" aria-hidden="true"></svg>
+              </div>
+              <div class="weather-chart-hours" id="weather-chart-hours"></div>
+              <div class="weather-week-strip scroll-x" id="weather-week-strip"></div>
+            </div>
           </div>
           <section class="avisos-section">
             <div class="section-header">

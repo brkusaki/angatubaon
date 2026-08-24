@@ -1877,6 +1877,19 @@
     .weather-minmax-item i { font-size: 9px; }
     .weather-minmax-item.weather-max i { color: #f87171; }
     .weather-minmax-item.weather-min i { color: #60a5fa; }
+
+    /* Resumo estilo "Chuva: 10% · Umidade: 91% · Vento: 14 km/h" */
+    .weather-summary-row {
+      display: flex; flex-wrap: wrap; gap: 4px 14px;
+      margin-top: 10px;
+    }
+    .weather-summary-item {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 11px; color: var(--muted); white-space: nowrap;
+    }
+    .weather-summary-item i { font-size: 10px; width: 11px; text-align: center; opacity: .85; }
+    .weather-summary-item span { color: var(--text); font-weight: 700; }
+
     .weather-vermais-btn {
       display: flex; align-items: center; justify-content: center; gap: 5px;
       width: 100%; margin-top: 10px; padding: 8px 0 0;
@@ -1887,17 +1900,41 @@
     .weather-vermais-btn i { transition: transform 0.2s; }
     .weather-vermais-btn.aberto i { transform: rotate(180deg); }
     .weather-forecast-extra {
-      display: flex; gap: 6px; margin-top: 10px; padding-top: 10px;
-      border-top: 1px solid var(--border);
+      margin-top: 4px; padding-top: 4px;
     }
-    .weather-day {
-      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
-      font-size: 11px; color: var(--muted); background: var(--surface2);
-      border-radius: 10px; padding: 8px 4px;
+
+    /* Abas Temperatura / Chuva / Vento */
+    .weather-chart-tabs {
+      display: flex; gap: 4px; margin-top: 8px; border-bottom: 1px solid var(--border);
     }
-    .weather-day-nome { font-weight: 800; color: var(--text); text-transform: uppercase; font-size: 10px; letter-spacing: .3px; }
-    .weather-day-ic { font-size: 15px; }
-    .weather-day-mm { font-size: 10.5px; }
+    .weather-tab {
+      flex: 1; background: none; border: none; padding: 8px 0 9px;
+      font-family: var(--font-b); font-size: 11.5px; font-weight: 700; color: var(--muted);
+      cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .weather-tab.active { color: var(--text); border-bottom-color: #fbbf24; }
+
+    /* Gráfico horário (hoje) */
+    .weather-chart-wrap { padding-top: 14px; }
+    .weather-chart-svg { width: 100%; height: 92px; display: block; overflow: visible; }
+    .weather-chart-label { font-size: 8.5px; font-weight: 800; fill: var(--text); font-family: var(--font-b); }
+    .weather-chart-hours { display: flex; margin-top: 2px; }
+    .weather-chart-hours span {
+      flex: 1; text-align: center; font-size: 9.5px; color: var(--muted);
+    }
+
+    /* Tira semanal (7 dias) */
+    .weather-week-strip { gap: 8px; margin-top: 14px; padding-bottom: 2px; }
+    .weather-week-day {
+      flex: 0 0 54px; display: flex; flex-direction: column; align-items: center; gap: 5px;
+      background: var(--surface2); border-radius: 12px; padding: 10px 4px;
+    }
+    .weather-week-day.hoje { background: rgba(251,191,36,0.14); box-shadow: inset 0 0 0 1px rgba(251,191,36,0.35); }
+    .weather-week-day-nome { font-size: 10px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: .2px; }
+    .weather-week-day-ic { font-size: 16px; }
+    .weather-week-day-max { font-size: 11.5px; font-weight: 800; color: var(--text); }
+    .weather-week-day-min { font-size: 10.5px; color: var(--muted); }
 
     /* ── Página 2: "Hoje em Angatuba" (posts locais, ver AVISOS_HOJE_MOCK) ── */
     .avisos-list { display: flex; flex-direction: column; gap: 10px; }

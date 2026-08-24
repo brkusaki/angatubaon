@@ -1052,9 +1052,14 @@
   function _abrirGamesHub() {
     var hub = document.getElementById('games-hub');
     if (!hub) return;
-    var secao = document.querySelector('main.main > section');
+    // Item 12: a lista de lojas agora vive dentro do carrossel horizontal
+    // da home (ver initHomeCarouselSwipe); escondemos o carrossel inteiro
+    // (e as bolinhas do indicador) em vez da <section> isolada.
+    var secao = document.getElementById('home-carousel-wrap');
+    var dots  = document.getElementById('home-dots');
     var footer = document.querySelector('main.main .footer');
     if (secao)  secao.style.display = 'none';
+    if (dots)   dots.style.display = 'none';
     if (footer) footer.style.display = 'none';
     var siga = document.getElementById('bloco-siga');
     if (siga) siga.style.display = 'none';
@@ -1144,9 +1149,11 @@
     if (!hub) return;
     hub.style.display = 'none';
     document.body.classList.remove('games-fs-open');  // destrava scroll do body
-    var secao = document.querySelector('main.main > section');
+    var secao = document.getElementById('home-carousel-wrap');
+    var dots  = document.getElementById('home-dots');
     var footer = document.querySelector('main.main .footer');
     if (secao)  secao.style.display = '';
+    if (dots)   dots.style.display = '';
     if (footer) footer.style.display = '';
     var siga = document.getElementById('bloco-siga');
     if (siga) siga.style.display = '';
@@ -10073,6 +10080,214 @@
   // Fix: reavalia a cada minuto para o banner aparecer/sumir sozinho ao cruzar 22h/05h
   // sem precisar recarregar a página.
   setInterval(atualizarSaudacaoNoturna, 60_000);
+
+  /* ══════════════════════════════════════════════════════════════════
+     Carrossel horizontal da Home: Página 1 (Lojas) / Página 2 (Utilidades)
+     — clima de Angatuba + "Hoje em Angatuba" (avisos locais).
+     Preferência de página inicial salva no localStorage; o valor já foi
+     lido e aplicado ANTES deste script rodar (ver <script> inline logo
+     após o carrossel no index.html, que evita o "pulo" visual).
+     ══════════════════════════════════════════════════════════════════ */
+  var HOME_PAGINA_PREF_KEY = 'angatuba_home_pagina_pref';
+  var _homePaginaAtual = (window._homePaginaInicial === 1) ? 1 : 0;
+
+  function _irParaPaginaHome(idx, animado = true) {
+    var carousel = document.getElementById('home-carousel');
+    if (!carousel) return;
+    idx = Math.max(0, Math.min(idx, 1));
+    _homePaginaAtual = idx;
+    carousel.style.transition = animado ? 'transform 0.32s cubic-bezier(0.32,0.72,0,1)' : 'none';
+    carousel.style.transform  = 'translateX(-' + (idx * 100) + '%)';
+    document.querySelectorAll('.home-dot').forEach(function (d, i) {
+      d.classList.toggle('active', i === idx);
+    });
+    if (idx === 1) _carregarUtilidadesHome();
+  }
+  window._irParaPaginaHome = _irParaPaginaHome;
+
+  // Botões discretos "Abrir sempre nas lojas" / "Abrir sempre nesta página".
+  function _definirPaginaInicialHome(idx, btn) {
+    try { localStorage.setItem(HOME_PAGINA_PREF_KEY, String(idx)); } catch (e) {}
+    if (btn) {
+      var txtOriginal = btn.textContent;
+      btn.textContent = '✓ Página inicial definida';
+      btn.disabled = true;
+      setTimeout(function () {
+        btn.textContent = txtOriginal;
+        btn.disabled = false;
+      }, 1800);
+    }
+  }
+  window._definirPaginaInicialHome = _definirPaginaInicialHome;
+
+  (function initHomeCarouselSwipe() {
+    var wrap = document.getElementById('home-carousel-wrap');
+    if (!wrap) return;
+    var startX = 0, startY = 0, dragging = false, isHoriz = null;
+
+    wrap.addEventListener('touchstart', function (e) {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      dragging = true; isHoriz = null;
+    }, { passive: true });
+
+    wrap.addEventListener('touchmove', function (e) {
+      if (!dragging) return;
+      var dx = e.touches[0].clientX - startX;
+      var dy = e.touches[0].clientY - startY;
+      if (isHoriz === null) isHoriz = Math.abs(dx) > Math.abs(dy);
+      if (isHoriz) e.preventDefault(); // só trava o scroll vertical se o gesto for horizontal
+    }, { passive: false });
+
+    wrap.addEventListener('touchend', function (e) {
+      if (!dragging || !isHoriz) { dragging = false; return; }
+      var dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 40) {
+        if (dx < 0) _irParaPaginaHome(_homePaginaAtual + 1);
+        else        _irParaPaginaHome(_homePaginaAtual - 1);
+      }
+      dragging = false;
+    });
+
+    document.querySelectorAll('.home-dot').forEach(function (dot) {
+      dot.addEventListener('click', function () { _irParaPaginaHome(+dot.dataset.idx); });
+    });
+
+    // Sincroniza o estado JS com a posição já aplicada pelo script inline
+    // anti-flash (sem reanimar) — e dispara o carregamento do clima se a
+    // home já abriu direto na página de Utilidades.
+    _irParaPaginaHome(_homePaginaAtual, false);
+  })();
+
+  /* ── Página 2: Previsão do tempo (Open-Meteo — API gratuita, sem
+     chave, CORS liberado; por isso é chamada direto do client, sem
+     passar pelo GAS). Coordenadas fixas de Angatuba-SP: app hiperlocal
+     de uma cidade só, não precisa pedir geolocalização do usuário.
+     Resultado cacheado 30min no localStorage p/ evitar refetch a cada
+     troca de página. ── */
+  var _utilidadesCarregadas = false;
+  var WEATHER_CACHE_KEY    = 'angatuba_weather_cache';
+  var WEATHER_CACHE_TS_KEY = 'angatuba_weather_cache_ts';
+  var WEATHER_CACHE_MS     = 30 * 60 * 1000;
+  var WEATHER_LAT = -23.4886, WEATHER_LON = -48.4159;
+  var WMO_MAP = {
+    0:  { ic: '☀️', txt: 'Céu limpo' },
+    1:  { ic: '🌤️', txt: 'Poucas nuvens' },
+    2:  { ic: '⛅', txt: 'Parcialmente nublado' },
+    3:  { ic: '☁️', txt: 'Nublado' },
+    45: { ic: '🌫️', txt: 'Neblina' }, 48: { ic: '🌫️', txt: 'Neblina' },
+    51: { ic: '🌦️', txt: 'Garoa fraca' }, 53: { ic: '🌦️', txt: 'Garoa' }, 55: { ic: '🌦️', txt: 'Garoa forte' },
+    61: { ic: '🌧️', txt: 'Chuva fraca' }, 63: { ic: '🌧️', txt: 'Chuva' }, 65: { ic: '🌧️', txt: 'Chuva forte' },
+    80: { ic: '🌧️', txt: 'Pancadas de chuva' }, 81: { ic: '🌧️', txt: 'Pancadas de chuva' }, 82: { ic: '⛈️', txt: 'Pancadas fortes' },
+    95: { ic: '⛈️', txt: 'Tempestade' }, 96: { ic: '⛈️', txt: 'Tempestade c/ granizo' }, 99: { ic: '⛈️', txt: 'Tempestade c/ granizo' },
+  };
+  function _weatherInfo(code) { return WMO_MAP[code] || { ic: '🌡️', txt: '—' }; }
+
+  function _pintarClima(d) {
+    var elTemp = document.getElementById('weather-temp');
+    if (!elTemp) return;
+    var info = _weatherInfo(d.code);
+    document.getElementById('weather-icon').textContent = info.ic;
+    elTemp.textContent = Math.round(d.temp) + '°';
+    document.getElementById('weather-cond').textContent = info.txt;
+    document.getElementById('weather-max').textContent  = Math.round(d.max) + '°';
+    document.getElementById('weather-min').textContent  = Math.round(d.min) + '°';
+    var extra = document.getElementById('weather-forecast-extra');
+    if (extra && Array.isArray(d.dias)) {
+      extra.innerHTML = d.dias.map(function (dia) {
+        var i2 = _weatherInfo(dia.code);
+        return '<div class="weather-day"><span class="weather-day-nome">' + dia.nome + '</span>' +
+          '<span class="weather-day-ic">' + i2.ic + '</span>' +
+          '<span class="weather-day-mm">' + Math.round(dia.max) + '° / ' + Math.round(dia.min) + '°</span></div>';
+      }).join('');
+    }
+  }
+
+  function _carregarClima() {
+    try {
+      var cache = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || 'null');
+      var ts    = parseInt(localStorage.getItem(WEATHER_CACHE_TS_KEY) || '0');
+      if (cache && (Date.now() - ts) < WEATHER_CACHE_MS) { _pintarClima(cache); return; }
+    } catch (e) {}
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + WEATHER_LAT + '&longitude=' + WEATHER_LON +
+      '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code' +
+      '&timezone=America%2FSao_Paulo&forecast_days=4';
+    fetch(url).then(function (r) { if (!r.ok) throw new Error('weather http ' + r.status); return r.json(); })
+      .then(function (j) {
+        var DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+        var dias = (j.daily && j.daily.time || []).slice(1, 4).map(function (dt, i) {
+          var off = i + 1;
+          return {
+            nome: DIAS_SEMANA[new Date(dt + 'T12:00:00').getDay()],
+            max:  j.daily.temperature_2m_max[off],
+            min:  j.daily.temperature_2m_min[off],
+            code: j.daily.weather_code[off],
+          };
+        });
+        var d = {
+          temp: j.current.temperature_2m,
+          code: j.current.weather_code,
+          max:  j.daily.temperature_2m_max[0],
+          min:  j.daily.temperature_2m_min[0],
+          dias: dias,
+        };
+        try {
+          localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(d));
+          localStorage.setItem(WEATHER_CACHE_TS_KEY, String(Date.now()));
+        } catch (e) {}
+        _pintarClima(d);
+      })
+      .catch(function () {
+        var elCond = document.getElementById('weather-cond');
+        if (elCond) elCond.textContent = 'Não foi possível carregar a previsão.';
+      });
+  }
+
+  function _alternarPrevisaoDetalhada() {
+    var extra = document.getElementById('weather-forecast-extra');
+    var btn   = document.getElementById('weather-vermais-btn');
+    if (!extra) return;
+    var aberto = extra.style.display !== 'none';
+    extra.style.display = aberto ? 'none' : 'flex';
+    if (btn) btn.classList.toggle('aberto', !aberto);
+  }
+  window._alternarPrevisaoDetalhada = _alternarPrevisaoDetalhada;
+
+  /* ── Página 2: "Hoje em Angatuba" (avisos/notícias locais) ──
+     MOCK por enquanto. Pronta pra virar dado real: troque
+     AVISOS_HOJE_MOCK por um fetch no GAS (ex.: nova aba "Avisos" na
+     planilha, endpoint ?tipo=avisos) devolvendo um array no mesmo
+     formato {emoji, titulo, texto} e chamando _renderAvisosHoje(lista). */
+  var AVISOS_HOJE_MOCK = [
+    { emoji: '🎪', titulo: 'Feira Livre no Centro', texto: 'Sábado de manhã, na Praça Rui Barbosa.' },
+    { emoji: '💉', titulo: 'Campanha de vacinação', texto: 'Posto de Saúde Central, das 8h às 16h.' },
+  ];
+  function _escHtmlAviso(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function _renderAvisosHoje(lista) {
+    var box = document.getElementById('avisos-list');
+    if (!box) return;
+    var dados = lista || AVISOS_HOJE_MOCK;
+    if (!dados || !dados.length) {
+      box.innerHTML = '<div class="avisos-empty">Nenhum aviso por aqui hoje. Volte mais tarde! 🦉</div>';
+      return;
+    }
+    box.innerHTML = dados.map(function (a) {
+      return '<div class="aviso-card"><span class="aviso-emoji">' + _escHtmlAviso(a.emoji || '📌') + '</span>' +
+        '<div class="aviso-txt"><strong>' + _escHtmlAviso(a.titulo) + '</strong><span>' + _escHtmlAviso(a.texto) + '</span></div></div>';
+    }).join('');
+  }
+  window._renderAvisosHoje = _renderAvisosHoje; // exposto p/ o futuro fetch no GAS chamar direto
+
+  function _carregarUtilidadesHome() {
+    if (_utilidadesCarregadas) return;
+    _utilidadesCarregadas = true;
+    _carregarClima();
+    _renderAvisosHoje();
+  }
 
   // Quiz da Coruja: NÃO carrega no boot. Só quando o usuário abre a aba
   // Joguinhos (lazy) — ver _abrirGamesHub(). Evita fetch desnecessário e

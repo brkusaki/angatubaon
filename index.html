@@ -302,42 +302,102 @@
 
   <!-- ════════════════════════════════ MAIN -->
   <main class="main">
-    <div id="saudacao-noturna" role="button" tabindex="0" onclick="saudacaoNoturnaFiltrar()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();saudacaoNoturnaFiltrar();}" style="display:none;align-items:center;gap:12px;border:1px solid rgba(120,120,200,0.22);border-radius:16px;padding:12px 16px;margin-bottom:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:border-color .15s,transform .1s;position:relative;overflow:hidden;min-height:68px;">
-      <!-- fundo: foto da Igreja Matriz -->
-      <img src="/img/igreja-noite.jpg" alt="" aria-hidden="true"
-           style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;z-index:0;border-radius:16px;"
-           onerror="this.style.display='none'" />
-      <!-- overlay escuro pra legibilidade -->
-      <div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,5,20,0.82) 0%,rgba(5,5,20,0.55) 60%,rgba(5,5,20,0.35) 100%);z-index:1;border-radius:16px;"></div>
-      <!-- conteúdo sobre o fundo -->
-      <img src="/webp/owl-goodnight.webp" alt="" style="width:44px;height:44px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.7));position:relative;z-index:2;" onerror="this.style.display='none'" />
-      <div style="flex:1;min-width:0;position:relative;z-index:2;">
-        <div style="font-family:var(--font-h);font-size:13px;font-weight:800;color:#e0e7ff;text-shadow:0 1px 4px rgba(0,0,0,0.8);">Boa noite, Angatuba 🌙</div>
-        <div style="font-size:11px;color:rgba(200,210,255,0.75);margin-top:1px;text-shadow:0 1px 3px rgba(0,0,0,0.8);" id="saudacao-noturna-sub">Toque para ver quem está aberto agora.</div>
-      </div>
-      <i class="fa fa-chevron-right" style="font-size:12px;color:rgba(180,190,255,0.7);flex-shrink:0;position:relative;z-index:2;" aria-hidden="true"></i>
+    <!-- ═══ CARROSSEL HORIZONTAL DA HOME: Página 1 (Lojas) / Página 2 (Utilidades) ══ -->
+    <div class="home-dots" id="home-dots">
+      <span class="home-dot active" data-idx="0" role="button" tabindex="0" aria-label="Página 1: Lojas"></span>
+      <span class="home-dot" data-idx="1" role="button" tabindex="0" aria-label="Página 2: Utilidades"></span>
     </div>
-    <section>
-      <div class="section-header">
-        <h2 class="section-title" id="list-title">📍 Todas as Lojas</h2>
-        <span class="filter-info" id="filter-info"></span>
+    <div class="home-carousel-wrap" id="home-carousel-wrap">
+      <div class="home-carousel" id="home-carousel">
+
+        <!-- ── Página 1: Lojas ── -->
+        <div class="home-page" id="home-page-0">
+          <div id="saudacao-noturna" role="button" tabindex="0" onclick="saudacaoNoturnaFiltrar()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();saudacaoNoturnaFiltrar();}" style="display:none;align-items:center;gap:12px;border:1px solid rgba(120,120,200,0.22);border-radius:16px;padding:12px 16px;margin-bottom:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:border-color .15s,transform .1s;position:relative;overflow:hidden;min-height:68px;">
+            <!-- fundo: foto da Igreja Matriz -->
+            <img src="/img/igreja-noite.jpg" alt="" aria-hidden="true"
+                 style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;z-index:0;border-radius:16px;"
+                 onerror="this.style.display='none'" />
+            <!-- overlay escuro pra legibilidade -->
+            <div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,5,20,0.82) 0%,rgba(5,5,20,0.55) 60%,rgba(5,5,20,0.35) 100%);z-index:1;border-radius:16px;"></div>
+            <!-- conteúdo sobre o fundo -->
+            <img src="/webp/owl-goodnight.webp" alt="" style="width:44px;height:44px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.7));position:relative;z-index:2;" onerror="this.style.display='none'" />
+            <div style="flex:1;min-width:0;position:relative;z-index:2;">
+              <div style="font-family:var(--font-h);font-size:13px;font-weight:800;color:#e0e7ff;text-shadow:0 1px 4px rgba(0,0,0,0.8);">Boa noite, Angatuba 🌙</div>
+              <div style="font-size:11px;color:rgba(200,210,255,0.75);margin-top:1px;text-shadow:0 1px 3px rgba(0,0,0,0.8);" id="saudacao-noturna-sub">Toque para ver quem está aberto agora.</div>
+            </div>
+            <i class="fa fa-chevron-right" style="font-size:12px;color:rgba(180,190,255,0.7);flex-shrink:0;position:relative;z-index:2;" aria-hidden="true"></i>
+          </div>
+          <section>
+            <div class="section-header">
+              <h2 class="section-title" id="list-title">📍 Todas as Lojas</h2>
+              <span class="filter-info" id="filter-info"></span>
+            </div>
+            <div class="store-list" id="store-list"></div>
+            <div class="empty-state" id="empty-state">
+              <img id="empty-owl" class="empty-owl" src="/webp/owl-search.webp" alt=""
+                   onerror="this.dataset.failed='1';this.style.display='none';var e=document.getElementById('empty-icon');if(e)e.style.display='block';" />
+              <span class="empty-icon" id="empty-icon" style="display:none;">🔍</span>
+              <div class="empty-title" id="empty-title">Nenhuma loja encontrada</div>
+              <p id="empty-msg">Tente outro termo ou selecione outra categoria.</p>
+              <small id="empty-sub"></small>
+              <button class="empty-action" onclick="limparFiltros()">
+                <i class="ti ti-refresh" aria-hidden="true"></i> Ver todas as lojas
+              </button>
+              <a id="empty-indicar" class="empty-indicar" href="#" target="_blank" rel="noopener" style="display:none;">
+                <i class="ti ti-brand-whatsapp" aria-hidden="true"></i> <span id="empty-indicar-label">Indicar um comércio</span>
+              </a>
+            </div>
+          </section>
+          <button type="button" class="home-pref-btn" onclick="_definirPaginaInicialHome(0,this)">Abrir sempre nas lojas</button>
+        </div>
+
+        <!-- ── Página 2: Utilidades (clima + avisos locais) ── -->
+        <div class="home-page" id="home-page-1">
+          <div class="weather-card" id="weather-card">
+            <div class="weather-card-main">
+              <span class="weather-icon" id="weather-icon">🌡️</span>
+              <div class="weather-temp-wrap">
+                <span class="weather-temp" id="weather-temp">--°</span>
+                <span class="weather-cond" id="weather-cond">Carregando previsão...</span>
+              </div>
+              <div class="weather-minmax">
+                <i class="fa fa-arrow-up" aria-hidden="true"></i> <span id="weather-max">--°</span>
+                <i class="fa fa-arrow-down" aria-hidden="true"></i> <span id="weather-min">--°</span>
+              </div>
+            </div>
+            <button type="button" class="weather-vermais-btn" id="weather-vermais-btn" onclick="_alternarPrevisaoDetalhada()">
+              Ver mais <i class="fa fa-chevron-down" aria-hidden="true"></i>
+            </button>
+            <div class="weather-forecast-extra" id="weather-forecast-extra" style="display:none;"></div>
+          </div>
+          <section class="avisos-section">
+            <div class="section-header">
+              <h2 class="section-title">📰 Hoje em Angatuba</h2>
+            </div>
+            <div class="avisos-list" id="avisos-list"></div>
+          </section>
+          <button type="button" class="home-pref-btn" onclick="_definirPaginaInicialHome(1,this)">Abrir sempre nesta página</button>
+        </div>
+
       </div>
-      <div class="store-list" id="store-list"></div>
-      <div class="empty-state" id="empty-state">
-        <img id="empty-owl" class="empty-owl" src="/webp/owl-search.webp" alt=""
-             onerror="this.dataset.failed='1';this.style.display='none';var e=document.getElementById('empty-icon');if(e)e.style.display='block';" />
-        <span class="empty-icon" id="empty-icon" style="display:none;">🔍</span>
-        <div class="empty-title" id="empty-title">Nenhuma loja encontrada</div>
-        <p id="empty-msg">Tente outro termo ou selecione outra categoria.</p>
-        <small id="empty-sub"></small>
-        <button class="empty-action" onclick="limparFiltros()">
-          <i class="ti ti-refresh" aria-hidden="true"></i> Ver todas as lojas
-        </button>
-        <a id="empty-indicar" class="empty-indicar" href="#" target="_blank" rel="noopener" style="display:none;">
-          <i class="ti ti-brand-whatsapp" aria-hidden="true"></i> <span id="empty-indicar-label">Indicar um comércio</span>
-        </a>
-      </div>
-    </section>
+    </div>
+    <script>
+      /* Aplica a página inicial preferida ANTES do app_min.js rodar, pro
+         carrossel já nascer na posição certa (sem "pular" na frente do
+         usuário). Mesmo truque do tema, logo após o <body>. */
+      try {
+        var _hp = localStorage.getItem('angatuba_home_pagina_pref');
+        window._homePaginaInicial = (_hp === '1') ? 1 : 0;
+        if (window._homePaginaInicial === 1) {
+          var _hc = document.getElementById('home-carousel');
+          if (_hc) _hc.style.transform = 'translateX(-100%)';
+          var _hd0 = document.querySelector('.home-dot[data-idx="0"]');
+          var _hd1 = document.querySelector('.home-dot[data-idx="1"]');
+          if (_hd0) _hd0.classList.remove('active');
+          if (_hd1) _hd1.classList.add('active');
+        }
+      } catch (e) {}
+    </script>
 
     <!-- ═══ HUB DE MINI-GAMES (aba Jogos) — escondido até abrir a pill ══ -->
     <div id="games-hub" style="display:none;">

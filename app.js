@@ -10373,13 +10373,10 @@
 
   /* ── Página 2: "Hoje em Angatuba" (posts locais: avisos/notícias,
      com foto(s) ou vídeo opcionais) ──
-     MOCK por enquanto (as duas fotos do 1º item são as fotos da Igreja
-     Matriz que já existem no app, só pra mostrar o carrossel funcionando
-     — troque pelas fotos reais quando tiver). Pronta pra virar dado real:
-     troque AVISOS_HOJE_MOCK por um fetch no GAS (ex.: nova aba "Avisos"
-     na planilha, endpoint ?tipo=avisos) devolvendo um array no formato
-     {emoji, titulo, texto, textoCompleto?, midias?:[{tipo:'foto'|'video', url}]}
-     e chamando _renderAvisosHoje(lista). */
+     Mostra o MOCK abaixo instantaneamente (sem tela vazia) e, em seguida,
+     _carregarAvisosReal() busca os avisos reais na aba "Avisos" do GAS e
+     substitui a lista. Se o GAS falhar/estiver offline, o mock some quando
+     a resposta chega vazia — fica só o "nenhum aviso por aqui hoje". */
   var AVISOS_HOJE_MOCK = [
     { emoji: '🎪', titulo: 'Feira Livre no Centro', texto: 'Sábado de manhã, na Praça Rui Barbosa.',
       textoCompleto: 'Sábado de manhã, na Praça Rui Barbosa. Produtos frescos direto do produtor: verduras, frutas, queijos e doces caseiros. Chegue cedo pros melhores produtos!',
@@ -10387,6 +10384,20 @@
     { emoji: '💉', titulo: 'Campanha de vacinação', texto: 'Posto de Saúde Central, das 8h às 16h.' },
   ];
   window._avisosAtuais = AVISOS_HOJE_MOCK;
+
+  // Busca os avisos reais no GAS (aba "Avisos") e substitui o mock.
+  // Falha silenciosa: se der erro/timeout, mantém o que já está na tela.
+  function _carregarAvisosReal() {
+    var params = new URLSearchParams();
+    params.append('payload', JSON.stringify({ action: 'avisosListar' }));
+    fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(10000) })
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        if (json && json.status === 'ok' && Array.isArray(json.data)) _renderAvisosHoje(json.data);
+      })
+      .catch(function () {});
+  }
+  window._carregarAvisosReal = _carregarAvisosReal;
 
   function _escHtmlAviso(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -10415,9 +10426,17 @@
           (midias.length > 1 ? '<span class="aviso-card-media-count"><i class="fa fa-images" aria-hidden="true"></i> ' + midias.length + '</span>' : '') +
           '</div>';
       }
+      // Editar/apagar só existem para avisos reais (com id do GAS) — os do
+      // mock inicial não têm id, então não mostram esses botões.
+      var adminHtml = a.id
+        ? '<div class="aviso-card-admin" onclick="event.stopPropagation()">' +
+          '<button type="button" class="aviso-card-admin-btn" onclick="event.stopPropagation();_abrirEditorAviso(\'' + a.id + '\')" aria-label="Editar aviso"><i class="fa fa-pen" aria-hidden="true"></i></button>' +
+          '<button type="button" class="aviso-card-admin-btn aviso-card-admin-btn-del" onclick="event.stopPropagation();_apagarAviso(\'' + a.id + '\')" aria-label="Apagar aviso"><i class="fa fa-trash" aria-hidden="true"></i></button>' +
+          '</div>'
+        : '';
       return '<div class="aviso-card" onclick="_abrirAvisoPost(' + i + ')" role="button" tabindex="0" ' +
         'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_abrirAvisoPost(' + i + ');}">' +
-        mediaHtml +
+        mediaHtml + adminHtml +
         '<div class="aviso-card-body"><span class="aviso-emoji">' + _escHtmlAviso(a.emoji || '📌') + '</span>' +
         '<div class="aviso-txt"><strong>' + _escHtmlAviso(a.titulo) + '</strong><span>' + _escHtmlAviso(a.texto) + '</span></div></div></div>';
     }).join('');
@@ -10520,11 +10539,198 @@
     });
   })();
 
+  /* ── Postar em "Hoje em Angatuba" — só quem estiver logado (login de
+     morador, o mesmo dos jogos) com um e-mail autorizado. Isso aqui é só
+     UI (decide se mostra o botão/ícones); quem realmente autoriza é o
+     GAS, que confere o idToken do Firebase de novo no servidor a cada
+     escrita — então mesmo alterando essa lista no console não dá pra
+     postar sem o e-mail estar liberado lá. ── */
+  var AVISOS_ADMIN_EMAILS_UI = ['ukbbze@gmail.com'];
+  function _avisosSouAdmin() {
+    var email = (_cliUser && _cliUser.email) ? String(_cliUser.email).toLowerCase() : '';
+    return !!email && AVISOS_ADMIN_EMAILS_UI.indexOf(email) !== -1;
+  }
+  function _atualizarAdminAvisosUI() {
+    try { document.body.classList.toggle('avisos-is-admin', _avisosSouAdmin()); } catch (e) {}
+  }
+  window._atualizarAdminAvisosUI = _atualizarAdminAvisosUI;
+
+  var _avisoEditorId = null;      // null = criando novo; string = editando esse id
+  var _avisoEditorMidias = [];    // [{tipo:'foto'|'video', url}]
+
+  function _abrirEditorAviso(id) {
+    if (!_avisosSouAdmin()) return;
+    var overlay = document.getElementById('aviso-editor-overlay');
+    if (!overlay) return;
+    var aviso = null;
+    if (id) {
+      var lista = window._avisosAtuais || [];
+      for (var i = 0; i < lista.length; i++) { if (lista[i].id === id) { aviso = lista[i]; break; } }
+    }
+    _avisoEditorId = aviso ? (aviso.id || null) : null;
+    _avisoEditorMidias = (aviso && Array.isArray(aviso.midias)) ? aviso.midias.slice() : [];
+
+    document.getElementById('aviso-editor-heading').textContent = _avisoEditorId ? 'Editar aviso' : 'Novo aviso';
+    document.getElementById('aviso-editor-emoji').value = aviso ? (aviso.emoji || '') : '';
+    document.getElementById('aviso-editor-titulo').value = aviso ? (aviso.titulo || '') : '';
+    document.getElementById('aviso-editor-texto').value = aviso ? (aviso.texto || '') : '';
+    document.getElementById('aviso-editor-texto-completo').value = aviso ? (aviso.textoCompleto || '') : '';
+    document.getElementById('aviso-editor-status').textContent = '';
+    document.getElementById('aviso-editor-salvar-btn').textContent = _avisoEditorId ? 'Salvar' : 'Publicar';
+    _renderMidiasEditor();
+
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    if (history.state?.modal !== 'aviso-editor') history.pushState({ modal: 'aviso-editor' }, '');
+  }
+  window._abrirEditorAviso = _abrirEditorAviso;
+
+  function _fecharEditorAviso(viaPopstate) {
+    var overlay = document.getElementById('aviso-editor-overlay');
+    if (overlay) overlay.style.display = 'none';
+    document.body.style.overflow = '';
+    if (!viaPopstate && history.state?.modal === 'aviso-editor') history.back();
+  }
+  window._fecharEditorAviso = _fecharEditorAviso;
+
+  function _renderMidiasEditor() {
+    var box = document.getElementById('aviso-editor-midias-lista');
+    if (!box) return;
+    box.innerHTML = _avisoEditorMidias.map(function (m, i) {
+      return '<div class="aviso-editor-midia-item">' +
+        (m.tipo === 'video' ? '<video src="' + m.url + '" muted playsinline></video>' : '<img src="' + m.url + '" alt="" />') +
+        '<button type="button" class="aviso-editor-midia-del" onclick="_removerMidiaEditor(' + i + ')" aria-label="Remover mídia"><i class="fa fa-xmark" aria-hidden="true"></i></button>' +
+        '</div>';
+    }).join('');
+  }
+
+  function _removerMidiaEditor(i) {
+    _avisoEditorMidias.splice(i, 1);
+    _renderMidiasEditor();
+  }
+  window._removerMidiaEditor = _removerMidiaEditor;
+
+  // Mesmo fluxo de assinatura+upload direto pro Cloudinary já usado pelas
+  // lojas (uploadImagem/uploadVideoAnuncio), só que assinado com o login
+  // do morador (idToken do Firebase) em vez do token de loja.
+  async function _uploadMidiaAviso(file, tipo) {
+    var statusEl = document.getElementById('aviso-editor-status');
+    if (!_cliUser) { if (statusEl) statusEl.textContent = 'Faça login para postar.'; return null; }
+    try {
+      if (tipo === 'foto' && typeof _mlRedimensionarImagem === 'function') file = await _mlRedimensionarImagem(file, 1280, 0.85);
+      var limite = tipo === 'video' ? 30 * 1024 * 1024 : 5 * 1024 * 1024;
+      if (file.size > limite) {
+        if (statusEl) statusEl.textContent = '❌ Arquivo muito grande (' + (tipo === 'video' ? 'máx 30MB' : 'máx 5MB') + ')';
+        return null;
+      }
+      if (statusEl) statusEl.textContent = '⏳ Preparando envio...';
+      var idToken = await _cliUser.getIdToken();
+      var sigParams = new URLSearchParams();
+      sigParams.append('payload', JSON.stringify({ action: 'avisosCloudinaryAssinar', idToken: idToken, tipo: tipo }));
+      var sigResp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: sigParams, signal: AbortSignal.timeout(30000) });
+      var sigJson = await sigResp.json();
+      if (sigJson.status !== 'ok') throw new Error(sigJson.msg || 'Erro ao assinar upload');
+      var d = sigJson.data;
+
+      if (statusEl) statusEl.textContent = '⏳ Enviando ' + (tipo === 'video' ? 'vídeo' : 'foto') + '...';
+      var fd = new FormData();
+      fd.append('file', file);
+      fd.append('api_key', d.apiKey);
+      fd.append('timestamp', d.timestamp);
+      fd.append('folder', d.folder);
+      fd.append('signature', d.signature);
+      var upResp = await fetch('https://api.cloudinary.com/v1_1/' + d.cloud + '/' + tipo + '/upload',
+        { method: 'POST', body: fd, signal: AbortSignal.timeout(tipo === 'video' ? 120000 : 60000) });
+      var upJson = await upResp.json();
+      if (upJson.secure_url) { if (statusEl) statusEl.textContent = ''; return upJson.secure_url; }
+      throw new Error((upJson.error && upJson.error.message) || 'Falha no upload');
+    } catch (err) {
+      if (statusEl) statusEl.textContent = '❌ ' + err.message;
+      return null;
+    }
+  }
+
+  (function initAvisoEditorUploads() {
+    var inpFoto = document.getElementById('aviso-editor-input-foto');
+    var inpVideo = document.getElementById('aviso-editor-input-video');
+    if (inpFoto) inpFoto.addEventListener('change', async function (e) {
+      var files = Array.prototype.slice.call(e.target.files || []);
+      e.target.value = '';
+      for (var i = 0; i < files.length; i++) {
+        if (_avisoEditorMidias.length >= 10) break;
+        var url = await _uploadMidiaAviso(files[i], 'foto');
+        if (url) { _avisoEditorMidias.push({ tipo: 'foto', url: url }); _renderMidiasEditor(); }
+      }
+    });
+    if (inpVideo) inpVideo.addEventListener('change', async function (e) {
+      var file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file || _avisoEditorMidias.length >= 10) return;
+      var url = await _uploadMidiaAviso(file, 'video');
+      if (url) { _avisoEditorMidias.push({ tipo: 'video', url: url }); _renderMidiasEditor(); }
+    });
+  })();
+
+  async function _salvarAviso() {
+    if (!_cliUser) { mlToast('Faça login para postar.', 'erro'); return; }
+    var titulo = document.getElementById('aviso-editor-titulo').value.trim();
+    var texto  = document.getElementById('aviso-editor-texto').value.trim();
+    if (!titulo && !texto) { mlToast('Preencha ao menos o título ou o resumo.', 'erro'); return; }
+    var btn = document.getElementById('aviso-editor-salvar-btn');
+    btn.disabled = true;
+    try {
+      var idToken = await _cliUser.getIdToken();
+      var payload = {
+        action: _avisoEditorId ? 'avisosEditar' : 'avisosCriar',
+        idToken: idToken,
+        id: _avisoEditorId || '',
+        emoji: document.getElementById('aviso-editor-emoji').value.trim() || '📰',
+        titulo: titulo,
+        texto: texto,
+        textoCompleto: document.getElementById('aviso-editor-texto-completo').value.trim(),
+        midias: _avisoEditorMidias,
+      };
+      var params = new URLSearchParams();
+      params.append('payload', JSON.stringify(payload));
+      var resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(15000) });
+      var json = await resp.json();
+      if (json.status !== 'ok') throw new Error(json.msg || 'Erro ao salvar');
+      mlToast(_avisoEditorId ? 'Aviso atualizado!' : 'Aviso publicado!', 'ok');
+      _fecharEditorAviso();
+      _carregarAvisosReal();
+    } catch (err) {
+      mlToast('Erro: ' + err.message, 'erro');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  window._salvarAviso = _salvarAviso;
+
+  async function _apagarAviso(id) {
+    if (!id || !_cliUser) return;
+    var ok = await mlConfirmar('Apagar aviso?', 'Essa ação não pode ser desfeita.', { okLabel: 'Apagar' });
+    if (!ok) return;
+    try {
+      var idToken = await _cliUser.getIdToken();
+      var params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action: 'avisosApagar', idToken: idToken, id: id }));
+      var resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(15000) });
+      var json = await resp.json();
+      if (json.status !== 'ok') throw new Error(json.msg || 'Erro ao apagar');
+      mlToast('Aviso removido.', 'ok');
+      _carregarAvisosReal();
+    } catch (err) {
+      mlToast('Erro: ' + err.message, 'erro');
+    }
+  }
+  window._apagarAviso = _apagarAviso;
+
   function _carregarUtilidadesHome() {
     if (_utilidadesCarregadas) return;
     _utilidadesCarregadas = true;
     _carregarClima();
     _renderAvisosHoje();
+    _carregarAvisosReal();
   }
 
   // Fix: este IIFE precisa rodar DEPOIS de todo o bloco acima (WMO_MAP,
@@ -10630,6 +10836,10 @@
   // cardápio → detalhes → minha-loja → cadastro. Cada return encerra o handler,
   // então um único "voltar" fecha apenas o modal do topo da pilha.
   window.addEventListener('popstate', function() {
+    // Editor de aviso (admin) — fecha antes do modal de post, que fica por baixo
+    if (document.getElementById('aviso-editor-overlay')?.style.display === 'flex') {
+      if (typeof _fecharEditorAviso === 'function') _fecharEditorAviso(true); return;
+    }
     // Modal de post ("Hoje em Angatuba")
     if (document.getElementById('aviso-post-overlay')?.style.display === 'flex') {
       if (typeof _fecharAvisoPost === 'function') _fecharAvisoPost(true); return;
@@ -15220,6 +15430,7 @@ ${urlCard}`)}`;
      (logo + botão de tema). Logado → avatar do cliente aparece; o
      controle de tema migra para DENTRO do painel do avatar. */
   function cliAtualizarHeader() {
+    if (typeof _atualizarAdminAvisosUI === 'function') _atualizarAdminAvisosUI();
     const slot = document.getElementById('cli-account-slot');
     const themeBtn = document.getElementById('theme-toggle-btn');
     if (!slot) return;

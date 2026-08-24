@@ -392,6 +392,9 @@
           <section class="avisos-section">
             <div class="section-header">
               <h2 class="section-title">📰 Hoje em Angatuba</h2>
+              <button type="button" class="aviso-admin-add-btn" id="aviso-admin-add-btn" onclick="_abrirEditorAviso()" aria-label="Novo aviso" title="Novo aviso">
+                <i class="fa fa-plus" aria-hidden="true"></i>
+              </button>
             </div>
             <div class="avisos-list" id="avisos-list"></div>
           </section>
@@ -415,6 +418,50 @@
           <span class="aviso-post-emoji" id="aviso-post-emoji"></span>
           <h3 class="aviso-post-titulo" id="aviso-post-titulo"></h3>
           <p class="aviso-post-texto" id="aviso-post-texto"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Editor de aviso (admin) — criar/editar um post de "Hoje em Angatuba".
+         Só é aberto pelo botão "+" ou pelos ícones de editar, que só aparecem
+         pra quem está logado com um e-mail autorizado (conferido de novo no
+         GAS a cada gravação). -->
+    <div id="aviso-editor-overlay" role="dialog" aria-modal="true" aria-label="Editor de aviso" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.72);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);align-items:flex-end;justify-content:center;" onclick="if(event.target===this)_fecharEditorAviso()">
+      <div class="aviso-post-sheet aviso-editor-sheet" id="aviso-editor-sheet" role="document">
+        <div class="aviso-post-grabber"></div>
+        <button type="button" class="aviso-post-close" onclick="_fecharEditorAviso()" aria-label="Fechar"><i class="fa fa-times"></i></button>
+        <div class="aviso-editor-body">
+          <h3 class="aviso-editor-heading" id="aviso-editor-heading">Novo aviso</h3>
+          <label class="aviso-editor-label">Emoji
+            <input type="text" id="aviso-editor-emoji" class="aviso-editor-input aviso-editor-emoji-input" maxlength="4" placeholder="📰">
+          </label>
+          <label class="aviso-editor-label">Título
+            <input type="text" id="aviso-editor-titulo" class="aviso-editor-input" maxlength="80" placeholder="Ex.: Feira Livre no Centro">
+          </label>
+          <label class="aviso-editor-label">Resumo (aparece no card)
+            <textarea id="aviso-editor-texto" class="aviso-editor-textarea" maxlength="200" rows="2" placeholder="Resumo curto..."></textarea>
+          </label>
+          <label class="aviso-editor-label">Texto completo (opcional)
+            <textarea id="aviso-editor-texto-completo" class="aviso-editor-textarea" maxlength="4000" rows="4" placeholder="Detalhes completos do aviso..."></textarea>
+          </label>
+          <div class="aviso-editor-midias">
+            <div class="aviso-editor-midias-lista" id="aviso-editor-midias-lista"></div>
+            <div class="aviso-editor-midias-botoes">
+              <label class="aviso-editor-upload-btn">
+                <i class="fa fa-image" aria-hidden="true"></i> Foto
+                <input type="file" accept="image/*" id="aviso-editor-input-foto" style="display:none;" multiple>
+              </label>
+              <label class="aviso-editor-upload-btn">
+                <i class="fa fa-video" aria-hidden="true"></i> Vídeo
+                <input type="file" accept="video/*" id="aviso-editor-input-video" style="display:none;">
+              </label>
+            </div>
+          </div>
+          <div class="aviso-editor-status" id="aviso-editor-status"></div>
+          <div class="aviso-editor-acoes">
+            <button type="button" class="aviso-editor-btn aviso-editor-btn-cancelar" onclick="_fecharEditorAviso()">Cancelar</button>
+            <button type="button" class="aviso-editor-btn aviso-editor-btn-salvar" id="aviso-editor-salvar-btn" onclick="_salvarAviso()">Publicar</button>
+          </div>
         </div>
       </div>
     </div>

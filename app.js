@@ -10135,46 +10135,6 @@
   }
   window._definirPaginaInicialHome = _definirPaginaInicialHome;
 
-  (function initHomeCarouselSwipe() {
-    var wrap = document.getElementById('home-carousel-wrap');
-    if (!wrap) return;
-    var startX = 0, startY = 0, dragging = false, isHoriz = null;
-
-    wrap.addEventListener('touchstart', function (e) {
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      dragging = true; isHoriz = null;
-    }, { passive: true });
-
-    wrap.addEventListener('touchmove', function (e) {
-      if (!dragging) return;
-      var dx = e.touches[0].clientX - startX;
-      var dy = e.touches[0].clientY - startY;
-      if (isHoriz === null) isHoriz = Math.abs(dx) > Math.abs(dy);
-      if (isHoriz) e.preventDefault(); // só trava o scroll vertical se o gesto for horizontal
-    }, { passive: false });
-
-    wrap.addEventListener('touchend', function (e) {
-      if (!dragging || !isHoriz) { dragging = false; return; }
-      var dx = e.changedTouches[0].clientX - startX;
-      if (Math.abs(dx) > 40) {
-        if (dx < 0) _irParaPaginaHome(_homePaginaAtual + 1);
-        else        _irParaPaginaHome(_homePaginaAtual - 1);
-      }
-      dragging = false;
-    });
-
-    document.querySelectorAll('.home-dot').forEach(function (dot) {
-      dot.addEventListener('click', function () { _irParaPaginaHome(+dot.dataset.idx); });
-    });
-
-    // Sincroniza o estado JS com a posição já aplicada pelo script inline
-    // anti-flash (sem reanimar) — e dispara o carregamento do clima se a
-    // home já abriu direto na página de Utilidades.
-    _irParaPaginaHome(_homePaginaAtual, false);
-    _atualizarBotoesPrefHome();
-  })();
-
   /* ── Página 2: Previsão do tempo (Open-Meteo — API gratuita, sem
      chave, CORS liberado; por isso é chamada direto do client, sem
      passar pelo GAS). Coordenadas fixas de Angatuba-SP: app hiperlocal
@@ -10442,6 +10402,53 @@
     _carregarClima();
     _renderAvisosHoje();
   }
+
+  // Fix: este IIFE precisa rodar DEPOIS de todo o bloco acima (WMO_MAP,
+  // AVISOS_HOJE_MOCK, WEATHER_LAT/LON etc.) — ele pode disparar
+  // _irParaPaginaHome(1,...) → _carregarUtilidadesHome() na hora, se a
+  // página preferida salva for "Utilidades". Rodando mais cedo (como
+  // antes), esses "var" ainda não tinham sido atribuídos nessa primeira
+  // passada (ficavam undefined até o script chegar na linha deles), e a
+  // previsão/os avisos apareciam quebrados na primeira abertura.
+  (function initHomeCarouselSwipe() {
+    var wrap = document.getElementById('home-carousel-wrap');
+    if (!wrap) return;
+    var startX = 0, startY = 0, dragging = false, isHoriz = null;
+
+    wrap.addEventListener('touchstart', function (e) {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      dragging = true; isHoriz = null;
+    }, { passive: true });
+
+    wrap.addEventListener('touchmove', function (e) {
+      if (!dragging) return;
+      var dx = e.touches[0].clientX - startX;
+      var dy = e.touches[0].clientY - startY;
+      if (isHoriz === null) isHoriz = Math.abs(dx) > Math.abs(dy);
+      if (isHoriz) e.preventDefault(); // só trava o scroll vertical se o gesto for horizontal
+    }, { passive: false });
+
+    wrap.addEventListener('touchend', function (e) {
+      if (!dragging || !isHoriz) { dragging = false; return; }
+      var dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 40) {
+        if (dx < 0) _irParaPaginaHome(_homePaginaAtual + 1);
+        else        _irParaPaginaHome(_homePaginaAtual - 1);
+      }
+      dragging = false;
+    });
+
+    document.querySelectorAll('.home-dot').forEach(function (dot) {
+      dot.addEventListener('click', function () { _irParaPaginaHome(+dot.dataset.idx); });
+    });
+
+    // Sincroniza o estado JS com a posição já aplicada pelo script inline
+    // anti-flash (sem reanimar) — e dispara o carregamento do clima se a
+    // home já abriu direto na página de Utilidades.
+    _irParaPaginaHome(_homePaginaAtual, false);
+    _atualizarBotoesPrefHome();
+  })();
 
   // Quiz da Coruja: NÃO carrega no boot. Só quando o usuário abre a aba
   // Joguinhos (lazy) — ver _abrirGamesHub(). Evita fetch desnecessário e

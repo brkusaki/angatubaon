@@ -10195,28 +10195,29 @@
 
   // Monta o formato interno usado pela UI a partir da resposta crua da
   // Open-Meteo: condição atual + resumo (chuva/umidade/vento) + os 8
-  // pontos de hoje de 3 em 3h (01h,04h...22h, igual ao Google) + a semana.
+  // pontos de 3 em 3h (01h,04h...22h, igual ao Google) de CADA um dos 7
+  // dias (pontosPorDia) + a semana. O gráfico troca de dia ao clicar na
+  // tira semanal (ver _selecionarDiaClima).
   function _montarDadosClima(j) {
     var DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-    var hojeStr = (j.daily && j.daily.time && j.daily.time[0]) || '';
+    var diasStr = (j.daily && j.daily.time) || [];
     var horasAlvo = [1, 4, 7, 10, 13, 16, 19, 22];
-    var pontosHoje = [];
+    var pontosPorDia = diasStr.map(function () { return []; });
     if (j.hourly && j.hourly.time) {
       j.hourly.time.forEach(function (t, i) {
-        if (hojeStr && t.indexOf(hojeStr) === 0) {
-          var h = parseInt(t.slice(11, 13), 10);
-          if (horasAlvo.indexOf(h) !== -1) {
-            pontosHoje.push({
-              hora:  _p2(h) + 'h',
-              temp:  j.hourly.temperature_2m[i],
-              chuva: j.hourly.precipitation_probability ? j.hourly.precipitation_probability[i] : 0,
-              vento: j.hourly.wind_speed_10m[i],
-            });
-          }
-        }
+        var diaIdx = diasStr.indexOf(t.slice(0, 10));
+        if (diaIdx === -1) return;
+        var h = parseInt(t.slice(11, 13), 10);
+        if (horasAlvo.indexOf(h) === -1) return;
+        pontosPorDia[diaIdx].push({
+          hora:  _p2(h) + 'h',
+          temp:  j.hourly.temperature_2m[i],
+          chuva: j.hourly.precipitation_probability ? j.hourly.precipitation_probability[i] : 0,
+          vento: j.hourly.wind_speed_10m[i],
+        });
       });
     }
-    var semana = (j.daily && j.daily.time || []).slice(0, 7).map(function (dt, i) {
+    var semana = diasStr.slice(0, 7).map(function (dt, i) {
       return {
         nome: i === 0 ? 'Hoje' : DIAS_SEMANA[new Date(dt + 'T12:00:00').getDay()],
         max:  j.daily.temperature_2m_max[i],
@@ -10242,8 +10243,9 @@
       chuva:   chuvaAgora,
       max:     j.daily.temperature_2m_max[0],
       min:     j.daily.temperature_2m_min[0],
-      pontosHoje: pontosHoje,
-      semana:     semana,
+      pontosHoje:   pontosPorDia[0] || [],
+      pontosPorDia: pontosPorDia,
+      semana:       semana,
     };
   }
 
@@ -10266,16 +10268,35 @@
     if (elVento) elVento.textContent = (d.vento != null ? Math.round(d.vento) : '--') + ' km/h';
 
     _climaBruto = d;
+    _climaDiaSelecionado = 0; // toda carga nova (ou cache) volta a mostrar "Hoje"
     _renderSemanaClima(d.semana);
     _renderGraficoClima(_climaAbaAtual);
   }
+
+  // Dia selecionado na tira semanal (índice em semana/pontosPorDia; 0 = hoje).
+  // Clicar num dia troca o gráfico de cima pra mostrar a previsão daquele dia,
+  // igual ao clima do Google.
+  var _climaDiaSelecionado = 0;
+  function _selecionarDiaClima(i) {
+    if (!_climaBruto || !_climaBruto.pontosPorDia || !_climaBruto.pontosPorDia[i] || !_climaBruto.pontosPorDia[i].length) return;
+    if (_climaDiaSelecionado === i) return;
+    _climaDiaSelecionado = i;
+    document.querySelectorAll('#weather-week-strip .weather-week-day').forEach(function (el, idx) {
+      el.classList.toggle('selecionado', idx === i);
+    });
+    _renderGraficoClima(_climaAbaAtual);
+  }
+  window._selecionarDiaClima = _selecionarDiaClima;
 
   function _renderSemanaClima(semana) {
     var box = document.getElementById('weather-week-strip');
     if (!box || !Array.isArray(semana) || !semana.length) return;
     box.innerHTML = semana.map(function (dia, i) {
       var info = _weatherInfo(dia.code, true); // previsão de dias futuros: sempre ícone "diurno"
-      return '<div class="weather-week-day' + (i === 0 ? ' hoje' : '') + '">' +
+      var sel  = i === _climaDiaSelecionado;
+      return '<div class="weather-week-day' + (i === 0 ? ' hoje' : '') + (sel ? ' selecionado' : '') + '" ' +
+        'onclick="_selecionarDiaClima(' + i + ')" role="button" tabindex="0" aria-label="Ver previsão de ' + dia.nome + '" ' +
+        'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_selecionarDiaClima(' + i + ');}">' +
         '<span class="weather-week-day-nome">' + dia.nome + '</span>' +
         '<i class="fa ' + info.ic + ' weather-week-day-ic" style="color:' + info.col + '" aria-hidden="true"></i>' +
         '<span class="weather-week-day-max">' + Math.round(dia.max) + '°</span>' +
@@ -10283,8 +10304,9 @@
     }).join('');
   }
 
-  // Gráfico de linha/área hora a hora (hoje), estilo "Google Clima" —
-  // troca de dado conforme a aba ativa (Temperatura / Chuva / Vento).
+  // Gráfico de linha/área hora a hora do dia selecionado, estilo "Google
+  // Clima" — troca de dado conforme a aba ativa (Temperatura/Chuva/Vento)
+  // e conforme o dia escolhido na tira semanal (_climaDiaSelecionado).
   function _renderGraficoClima(aba) {
     _climaAbaAtual = aba;
     document.querySelectorAll('.weather-tab').forEach(function (t) {
@@ -10292,9 +10314,9 @@
     });
     var svg      = document.getElementById('weather-chart-svg');
     var hoursBox = document.getElementById('weather-chart-hours');
-    if (!svg || !_climaBruto || !_climaBruto.pontosHoje.length) return;
+    var pontos   = (_climaBruto && _climaBruto.pontosPorDia) ? (_climaBruto.pontosPorDia[_climaDiaSelecionado] || []) : [];
+    if (!svg || !pontos.length) return;
     var cfg     = WEATHER_TAB_CFG[aba];
-    var pontos  = _climaBruto.pontosHoje;
     var valores = pontos.map(function (p) { return p[cfg.campo]; });
     var min = Math.min.apply(null, valores), max = Math.max.apply(null, valores);
     if (min === max) { min -= 1; max += 1; }
@@ -10385,8 +10407,9 @@
   ];
   window._avisosAtuais = AVISOS_HOJE_MOCK;
 
-  // Busca os avisos reais no GAS (aba "Avisos") e substitui o mock.
-  // Falha silenciosa: se der erro/timeout, mantém o que já está na tela.
+  // Busca os avisos reais no GAS (aba "Avisos"). Só cai no mock se a busca
+  // falhar de verdade (erro/timeout/offline) — não mostra mais o mock como
+  // "placeholder" que depois some sozinho, pra não parecer bug pro usuário.
   function _carregarAvisosReal() {
     var params = new URLSearchParams();
     params.append('payload', JSON.stringify({ action: 'avisosListar' }));
@@ -10394,8 +10417,9 @@
       .then(function (r) { return r.json(); })
       .then(function (json) {
         if (json && json.status === 'ok' && Array.isArray(json.data)) _renderAvisosHoje(json.data);
+        else _renderAvisosHoje(AVISOS_HOJE_MOCK);
       })
-      .catch(function () {});
+      .catch(function () { _renderAvisosHoje(AVISOS_HOJE_MOCK); });
   }
   window._carregarAvisosReal = _carregarAvisosReal;
 
@@ -10639,7 +10663,10 @@
       fd.append('timestamp', d.timestamp);
       fd.append('folder', d.folder);
       fd.append('signature', d.signature);
-      var upResp = await fetch('https://api.cloudinary.com/v1_1/' + d.cloud + '/' + tipo + '/upload',
+      // Endpoint do Cloudinary usa o tipo de recurso em inglês (image/video),
+      // não o 'foto'/'video' interno do app — por isso o map aqui.
+      var resourceType = tipo === 'video' ? 'video' : 'image';
+      var upResp = await fetch('https://api.cloudinary.com/v1_1/' + d.cloud + '/' + resourceType + '/upload',
         { method: 'POST', body: fd, signal: AbortSignal.timeout(tipo === 'video' ? 120000 : 60000) });
       var upJson = await upResp.json();
       if (upJson.secure_url) { if (statusEl) statusEl.textContent = ''; return upJson.secure_url; }
@@ -10729,7 +10756,8 @@
     if (_utilidadesCarregadas) return;
     _utilidadesCarregadas = true;
     _carregarClima();
-    _renderAvisosHoje();
+    var box = document.getElementById('avisos-list');
+    if (box) box.innerHTML = '<div class="avisos-empty">Carregando avisos...</div>';
     _carregarAvisosReal();
   }
 

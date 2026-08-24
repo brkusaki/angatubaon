@@ -1929,8 +1929,12 @@
     .weather-week-day {
       flex: 0 0 54px; display: flex; flex-direction: column; align-items: center; gap: 5px;
       background: var(--surface2); border-radius: 12px; padding: 10px 4px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: transform 0.15s, box-shadow 0.15s;
     }
+    .weather-week-day:active { transform: scale(0.94); }
     .weather-week-day.hoje { background: rgba(251,191,36,0.14); box-shadow: inset 0 0 0 1px rgba(251,191,36,0.35); }
+    .weather-week-day.selecionado { box-shadow: inset 0 0 0 1.5px var(--green); }
     .weather-week-day-nome { font-size: 10px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: .2px; }
     .weather-week-day-ic { font-size: 16px; }
     .weather-week-day-max { font-size: 11.5px; font-weight: 800; color: var(--text); }

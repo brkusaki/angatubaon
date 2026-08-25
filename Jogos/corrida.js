@@ -1349,6 +1349,11 @@
     _corDrag = false; _corCamVX = 0;
   }
   function _corKey(down, e) {
+    // Os listeners de keydown/keyup ficam presos em window pra sempre (ver
+    // _corLigarControles): sem essa guarda, espaço/Enter continuam sendo
+    // interceptados com preventDefault() em QUALQUER campo de texto do app
+    // depois de abrir a Corrida uma única vez.
+    if (_corEstado !== 'jogando') return;
     if (e.key === 'ArrowLeft') { if (down) { _corCamX = _corClamp(_corCamX - 0.08, -_COR_CAM_LIM, _COR_CAM_LIM); } }
     else if (e.key === 'ArrowRight') { if (down) { _corCamX = _corClamp(_corCamX + 0.08, -_COR_CAM_LIM, _COR_CAM_LIM); } }
     else if (down && (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'Enter')) { _corAudioDestravar(); _corAtirar(); if (e.preventDefault) e.preventDefault(); }

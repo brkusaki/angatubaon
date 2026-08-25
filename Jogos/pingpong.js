@@ -106,6 +106,11 @@
   var _ppSouAnfitriao = false;
   var _ppEventosLigados = false;
   var _ppSalasDesligar = null; // função pra parar de ouvir a lista de salas públicas (ver _ppIniciarListaSalas)
+  var _ppListaListenerOn = false;
+  // Códigos de sala só saem de _codigoAleatorio() (multiplayer.js), que usa
+  // este alfabeto de 4 caracteres. Fora desse formato não veio do fluxo
+  // normal de criarSala() — descarta em vez de renderizar.
+  function _ppCodigoValido(c) { return /^[A-Z0-9]{4}$/.test(c || ''); }
 
   // Estado da bola (referencial de quem simula; só quem simula escreve nele).
   // h/vh = altura acima da mesa e velocidade vertical — física de
@@ -257,16 +262,29 @@
   function _ppRenderizarSalas(lista) {
     var wrap = document.getElementById('pp-lista-salas');
     if (!wrap) return;
-    if (!lista || !lista.length) {
+    if (!_ppListaListenerOn) {
+      // Um único listener delegado, montado uma vez: nada de onclick inline
+      // com o código da sala interpolado na string. _ppEscaparHtml troca só
+      // aspas por entidade, que o parser HTML decodifica antes de o valor do
+      // atributo virar JS — não protege esse contexto (era um XSS estocado,
+      // ver A1.1 na auditoria).
+      wrap.addEventListener('click', function (e) {
+        var btn = e.target.closest && e.target.closest('.pp-sala-item-btn[data-codigo]');
+        if (btn) _ppEntrarSala(btn.getAttribute('data-codigo'));
+      });
+      _ppListaListenerOn = true;
+    }
+    var validas = (lista || []).filter(function (s) { return _ppCodigoValido(s.codigo); });
+    if (!validas.length) {
       wrap.innerHTML = '<div class="pp-lista-vazia">Nenhuma sala pública aberta agora.</div>';
       return;
     }
     var html = '';
-    for (var i = 0; i < lista.length; i++) {
-      var s = lista[i];
+    for (var i = 0; i < validas.length; i++) {
+      var s = validas[i];
       html += '<div class="pp-sala-item">' +
                 '<span class="pp-sala-item-nome">' + _ppEscaparHtml(s.nome) + '</span>' +
-                '<button type="button" class="pp-sala-item-btn" onclick="_ppEntrarSala(\'' + _ppEscaparHtml(s.codigo) + '\')">Entrar</button>' +
+                '<button type="button" class="pp-sala-item-btn" data-codigo="' + s.codigo + '">Entrar</button>' +
               '</div>';
     }
     wrap.innerHTML = html;

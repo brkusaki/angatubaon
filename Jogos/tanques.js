@@ -447,6 +447,11 @@
   var _tqSouAnfitriao = false;
   var _tqEventosLigados = false;
   var _tqSalasDesligar = null;
+  var _tqListaListenerOn = false;
+  // Códigos de sala só saem de _codigoAleatorio() (multiplayer.js), que usa
+  // este alfabeto de 4 caracteres. Fora desse formato não veio do fluxo
+  // normal de criarSala() — descarta em vez de renderizar.
+  function _tqCodigoValido(c) { return /^[A-Z0-9]{4}$/.test(c || ''); }
   var _tqSaindoVoluntariamente = false;
   var _tqApelidoAdversario = '';
 
@@ -654,16 +659,29 @@
   function _tqRenderizarSalas(lista) {
     var wrap = document.getElementById('tq-lista-salas');
     if (!wrap) return;
-    if (!lista || !lista.length) {
+    if (!_tqListaListenerOn) {
+      // Um único listener delegado, montado uma vez: nada de onclick inline
+      // com o código da sala interpolado na string. _tqEscaparHtml troca só
+      // aspas por entidade, que o parser HTML decodifica antes de o valor do
+      // atributo virar JS — não protege esse contexto (era um XSS estocado,
+      // ver A1.1 na auditoria).
+      wrap.addEventListener('click', function (e) {
+        var btn = e.target.closest && e.target.closest('.tq-sala-item-btn[data-codigo]');
+        if (btn) _tqEntrarSala(btn.getAttribute('data-codigo'));
+      });
+      _tqListaListenerOn = true;
+    }
+    var validas = (lista || []).filter(function (s) { return _tqCodigoValido(s.codigo); });
+    if (!validas.length) {
       wrap.innerHTML = '<div class="tq-lista-vazia">Nenhuma sala pública aberta agora.</div>';
       return;
     }
     var html = '';
-    for (var i = 0; i < lista.length; i++) {
-      var s = lista[i];
+    for (var i = 0; i < validas.length; i++) {
+      var s = validas[i];
       html += '<div class="tq-sala-item">' +
                 '<span class="tq-sala-item-nome">' + _tqEscaparHtml(s.nome) + '</span>' +
-                '<button type="button" class="tq-sala-item-btn" onclick="_tqEntrarSala(\'' + _tqEscaparHtml(s.codigo) + '\')">Entrar</button>' +
+                '<button type="button" class="tq-sala-item-btn" data-codigo="' + s.codigo + '">Entrar</button>' +
               '</div>';
     }
     wrap.innerHTML = html;

@@ -613,6 +613,11 @@
   }
 
   var _pararListaSalas = null;
+  var _ptyListaListenerOn = false;
+  // Códigos de sala vêm sempre de _codigoAleatorio() (multiplayer.js), que só
+  // usa este alfabeto de 4 caracteres. Uma chave fora desse formato não pode
+  // ter vindo do fluxo normal de criarSala() — descarta em vez de renderizar.
+  function _ptyCodigoValido(c) { return /^[A-Z0-9]{4}$/.test(c || ''); }
 
   function _ptyPreparar() {
     _erroMenu('');
@@ -625,12 +630,23 @@
   function _renderListaSalas(lista) {
     var wrap = _q('pty-lista-salas');
     if (!wrap) return;
-    if (!lista.length) {
+    if (!_ptyListaListenerOn) {
+      // Um único listener delegado, montado uma vez: nada de onclick inline
+      // com o código da sala interpolado na string (era um XSS estocado —
+      // ver A1.1 na auditoria).
+      wrap.addEventListener('click', function (e) {
+        var btn = e.target.closest && e.target.closest('.pty-sala-item[data-codigo]');
+        if (btn) _ptyEntrarSala(btn.getAttribute('data-codigo'));
+      });
+      _ptyListaListenerOn = true;
+    }
+    var validas = (lista || []).filter(function (s) { return _ptyCodigoValido(s.codigo); });
+    if (!validas.length) {
       wrap.innerHTML = '<div class="pty-lista-vazia">Nenhuma Party pública aberta agora.</div>';
       return;
     }
-    wrap.innerHTML = lista.map(function (s) {
-      return '<button type="button" class="pty-sala-item" onclick="_ptyEntrarSala(\'' + s.codigo + '\')">' +
+    wrap.innerHTML = validas.map(function (s) {
+      return '<button type="button" class="pty-sala-item" data-codigo="' + s.codigo + '">' +
         '<span class="pty-sala-item-nome">🦉 ' + _escHTML(s.nome) + '</span>' +
         '<span class="pty-sala-item-cta">Entrar</span></button>';
     }).join('');

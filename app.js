@@ -3,6 +3,13 @@
   /* Flag de debug — ligue para ver logs no console (window.__ANGATUBA_DEBUG = true) */
   const DEBUG = (typeof window !== 'undefined' && window.__ANGATUBA_DEBUG === true);
 
+  /* Flag consumida pelo handler global de popstate (mais abaixo, no fim do
+     arquivo): setada logo antes de qualquer history.back() disparado por um
+     fechamento manual de modal, pra o próprio handler saber que essa
+     navegação já foi tratada por quem chamou back() e não tentar fechar
+     outro modal por baixo (ver A1.3/A4.1 na auditoria). */
+  let _popstateNosso = false;
+
   /* ══════════════════════════════════════════════════════════════
      CATEGORIAS
   ══════════════════════════════════════════════════════════════ */
@@ -1159,7 +1166,7 @@
     if (siga) siga.style.display = '';
     // Fix: desfaz a entrada do histórico ao fechar manualmente (popstate já
     // consumiu) — mesmo padrão usado nos outros modais do app.
-    if (!viaPopstate && history.state?.modal === 'jogos-hub') history.back();
+    if (!viaPopstate && history.state?.modal === 'jogos-hub') { _popstateNosso = true; history.back(); }
   }
 
   // Sai por completo do hub de jogos e volta pra tela inicial (lista de
@@ -2346,6 +2353,7 @@
       // Fechamento manual (X, tap, swipe, Escape): desfaz a entrada fantasma.
       // Se veio do popstate, o histórico já foi consumido — não mexer.
       if (!viaPopstate && history.state?.modal === 'anuncio-foto') {
+        _popstateNosso = true;
         history.back();
       }
 
@@ -2636,7 +2644,7 @@
           });
         }
       }
-      if (!viaPopstate && history.state && history.state.modal === 'anuncio-foto') history.back();
+      if (!viaPopstate && history.state && history.state.modal === 'anuncio-foto') { _popstateNosso = true; history.back(); }
       lb.classList.remove('lb-visible');
       lb.addEventListener('transitionend', function(){ lb.remove(); }, { once: true });
       setTimeout(function(){ if (lb.parentNode) lb.remove(); }, 400);
@@ -3587,7 +3595,7 @@
     overlay.classList.remove('open');
     document.body.style.overflow = '';
     // Fix #6: desfaz a entrada do histórico ao fechar manualmente (popstate já consumiu)
-    if (!viaPopstate && history.state?.modal === 'cadastro') history.back();
+    if (!viaPopstate && history.state?.modal === 'cadastro') { _popstateNosso = true; history.back(); }
     // Reseta tela de sucesso após fechar (com delay para não piscar)
     setTimeout(() => {
       document.getElementById('cadastro-form').style.display = 'flex';
@@ -6873,7 +6881,7 @@
     document.body.style.overflow = '';
     if (typeof _mlPararTimerAnuncio === 'function') _mlPararTimerAnuncio(); // Item 17: não deixa o interval rodando com o painel fechado
     // Fix #6: desfaz a entrada do histórico ao fechar manualmente (popstate já consumiu)
-    if (!viaPopstate && history.state?.modal === 'minha-loja') history.back();
+    if (!viaPopstate && history.state?.modal === 'minha-loja') { _popstateNosso = true; history.back(); }
   }
 
   document.getElementById('modal-minha-loja').addEventListener('click', function(e) {
@@ -8202,6 +8210,7 @@
       // para evitar que o popstate feche o próximo modal
       if (location.hash) history.replaceState(null, '', location.pathname + location.search);
     } else if (history.state?.modal === 'detalhes') {
+      _popstateNosso = true;
       history.back();
     } else if (location.hash) {
       history.replaceState(null, '', location.pathname + location.search);
@@ -10553,7 +10562,7 @@
     var overlay = document.getElementById('aviso-post-overlay');
     if (overlay) overlay.style.display = 'none';
     document.body.style.overflow = '';
-    if (!viaPopstate && history.state?.modal === 'aviso-post') history.back();
+    if (!viaPopstate && history.state?.modal === 'aviso-post') { _popstateNosso = true; history.back(); }
   }
   window._fecharAvisoPost = _fecharAvisoPost;
 
@@ -10649,7 +10658,7 @@
     var overlay = document.getElementById('aviso-editor-overlay');
     if (overlay) overlay.style.display = 'none';
     document.body.style.overflow = '';
-    if (!viaPopstate && history.state?.modal === 'aviso-editor') history.back();
+    if (!viaPopstate && history.state?.modal === 'aviso-editor') { _popstateNosso = true; history.back(); }
   }
   window._fecharEditorAviso = _fecharEditorAviso;
 
@@ -10900,6 +10909,9 @@
   // cardápio → detalhes → minha-loja → cadastro. Cada return encerra o handler,
   // então um único "voltar" fecha apenas o modal do topo da pilha.
   window.addEventListener('popstate', function() {
+    // Navegação já tratada por quem chamou history.back() manualmente —
+    // não interpretar como "voltar" do usuário (ver A1.3/A4.1).
+    if (_popstateNosso) { _popstateNosso = false; return; }
     // Editor de aviso (admin) — fecha antes do modal de post, que fica por baixo
     if (document.getElementById('aviso-editor-overlay')?.style.display === 'flex') {
       if (typeof _fecharEditorAviso === 'function') _fecharEditorAviso(true); return;
@@ -14252,7 +14264,7 @@ ${urlCard}`)}`;
     document.getElementById('modal-cardapio-cliente').classList.remove('open');
     document.body.style.overflow = '';
     _focusTrapDesativar();
-    if (!viaPopstate && history.state && history.state.modal === 'cardapio') history.back();
+    if (!viaPopstate && history.state && history.state.modal === 'cardapio') { _popstateNosso = true; history.back(); }
     // Reseta tela de sucesso para a próxima abertura
     const sucesso = document.getElementById('cc-pedido-sucesso');
     if (sucesso) sucesso.style.display = 'none';
@@ -15552,7 +15564,7 @@ ${urlCard}`)}`;
     if (!overlay) return;
     overlay.classList.remove('open');
     document.body.style.overflow = '';
-    if (!viaPopstate && history.state?.modal === 'cli-login') history.back();
+    if (!viaPopstate && history.state?.modal === 'cli-login') { _popstateNosso = true; history.back(); }
   }
 
   // Alterna entre as três telas do modal: escolha inicial, form de
@@ -16052,7 +16064,7 @@ ${urlCard}`)}`;
     if (!overlay) return;
     overlay.classList.remove('open');
     document.body.style.overflow = '';
-    if (!viaPopstate && history.state?.modal === 'cli-conta') history.back();
+    if (!viaPopstate && history.state?.modal === 'cli-conta') { _popstateNosso = true; history.back(); }
   }
 
   // Botão de tema DENTRO do painel: chama o mesmo toggleTheme() de sempre
@@ -16462,7 +16474,7 @@ ${urlCard}`)}`;
     if (tela) tela.classList.remove('rank-open');
     // Volta pro menu de jogos (esconde todas as .jogo-tela, incl. esta).
     if (typeof _voltarAoMenu === 'function') _voltarAoMenu();
-    if (!viaPopstate && history.state?.modal === 'rank') history.back();
+    if (!viaPopstate && history.state?.modal === 'rank') { _popstateNosso = true; history.back(); }
   }
 
   // Monta as abas (uma por ranking), com ícone do jogo. Ordem: 'geral'

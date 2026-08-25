@@ -101,6 +101,11 @@
 
   var _ppCanvas = null, _ppCtx = null, _ppW = 0, _ppH = 0, _ppDpr = 1;
   var _ppRAF = 0, _ppUltimoTs = 0;
+  // Watchdog do convidado: modelo é host-autoritativo e o canal WebRTC não
+  // avisa se o anfitrião só parou de simular (app em segundo plano, etc.) —
+  // sem isto a bola congelava no ar sem nenhum aviso (ver A2.5).
+  var _ppUltimoEEm = 0;
+  var PP_CONGELADO_AVISO_MS = 3000, PP_CONGELADO_FIM_MS = 20000;
   var _ppEstado = 'inicio';   // inicio | sala | jogando | fim
   var _ppModo = null;         // 'solo' (contra a CPU) | 'multiplayer' (via AngatubaMP)
   var _ppSouAnfitriao = false;
@@ -410,6 +415,7 @@
       var bridge = _ppBridge();
       var meuNome = (bridge && bridge.apelido && bridge.apelido()) || 'Jogador';
       window.AngatubaMP.enviar({ t: 'oi', nome: meuNome });
+      _ppUltimoEEm = performance.now();
       if (_ppSouAnfitriao) _ppReiniciarPartida();
       _ppComecarPartida();
     });
@@ -449,6 +455,7 @@
         break;
       case 'e': // anfitrião -> convidado: estado da bola + placar + sets + saque
         if (!_ppSouAnfitriao) {
+          _ppUltimoEEm = performance.now();
           _ppBola.x = dado.bx; _ppBola.d = dado.bd; _ppBola.h = dado.bh;
           _ppRaqueteAdversarioX = dado.hx; _ppRaqueteAdversarioH = dado.hh;
           _ppPlacarAnfitriao = dado.sh; _ppPlacarConvidado = dado.sg;
@@ -634,6 +641,10 @@
     var dt = _ppUltimoTs ? Math.min(0.05, (ts - _ppUltimoTs) / 1000) : 0;
     _ppUltimoTs = ts;
     if (_ppSouAnfitriao) _ppSimular(dt);
+    else if (_ppModo === 'multiplayer' && _ppUltimoEEm && (performance.now() - _ppUltimoEEm) > PP_CONGELADO_FIM_MS) {
+      _ppMostrarFim('desconexao');
+      return;
+    }
     _ppDesenhar();
     _ppRAF = requestAnimationFrame(_ppLoop);
   }
@@ -890,6 +901,10 @@
     _ppDesenharRaquete(_ppMinhaRaqueteX, _ppMinhaRaqueteH, 0, '#38bdf8');
 
     if (jogando && _ppAguardandoSaque) _ppDesenharPromptSaque();
+    if (jogando && !_ppSouAnfitriao && _ppModo === 'multiplayer' && _ppUltimoEEm
+        && (performance.now() - _ppUltimoEEm) > PP_CONGELADO_AVISO_MS) {
+      _ppDesenharAvisoCongelado();
+    }
   }
 
   // Fundo: imagem da arena (arquibancada, holofotes, piso de madeira) em
@@ -1074,6 +1089,23 @@
 
   // Aviso central quando a bola está parada esperando o saque — some
   // assim que _ppExecutarSaque roda (local ou pelo estado da rede).
+  // Congelamento sem aviso do convidado quando o anfitrião para de simular
+  // (ver A2.5) — mesmo estilo visual do prompt de saque, sem precisar de
+  // nenhum elemento novo em index.html.
+  function _ppDesenharAvisoCongelado() {
+    var ctx = _ppCtx;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0, 0, _ppW, _ppH);
+    ctx.font = "600 15px 'Syne', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.shadowColor = 'rgba(0,0,0,0.65)';
+    ctx.shadowBlur = 6;
+    ctx.fillText('Aguardando o outro jogador…', _ppW / 2, _ppH * 0.5);
+    ctx.restore();
+  }
+
   function _ppDesenharPromptSaque() {
     var ctx = _ppCtx;
     var minha = _ppEhMinhaVezDeSacar();

@@ -9,10 +9,17 @@
    Como funciona:
    - Dois jogadores trocam "sala" via código de 4 letras (o
      anfitrião cria, manda o código pro amigo por WhatsApp, o
-     amigo digita e entra).
+     amigo digita e entra). Salas podem ser públicas (aparecem
+     numa lista pra qualquer um entrar com 1 toque) ou privadas
+     (só quem tem o código entra) — ver criarSala(publica).
    - O Firebase Realtime Database (NÃO o Firestore, que já é usado
      pro ranking) serve só de "correio" pra combinar a conexão:
      troca oferta/resposta SDP e candidatos ICE do WebRTC.
+   - Salas públicas ganham um espelho leve em salasPublicas/{codigo}
+     (só nome do anfitrião + data) — NUNCA os dados sensíveis da
+     sinalização (oferta/resposta/ICE), que ficam só em salas/{codigo}
+     com leitura restrita a quem já conhece o código. Ver
+     claude/database.rules.json.
    - Depois que a conexão fecha, o jogo em si conversa direto
      entre os dois navegadores (RTCDataChannel), sem passar pelo
      Firebase de novo — sem custo por partida, latência baixa.
@@ -25,9 +32,16 @@
      if (!AngatubaMP.disponivel()) { // esconde o botão de multiplayer }
 
      // Anfitrião:
-     AngatubaMP.criarSala().then(function (codigo) {
-       // mostra "codigo" pro jogador compartilhar
+     AngatubaMP.criarSala(true).then(function (codigo) {
+       // mostra "codigo" pro jogador compartilhar (true = pública,
+       // também aparece na lista; false = só por código)
      }).catch(function (err) { // mostra err.message });
+
+     // Lista de salas públicas abertas agora:
+     var pararDeOuvir = AngatubaMP.listarSalas(function (lista) {
+       // lista = [{ codigo, nome }, ...]
+     });
+     // pararDeOuvir() quando a tela some.
 
      // Convidado:
      AngatubaMP.entrarSala('ABCD').catch(function (err) { ... });
@@ -59,6 +73,7 @@
   var _canal = null;          // RTCDataChannel ativo
   var _salaRef = null;        // referência RTDB da sala atual
   var _souAnfitriao = false;
+  var _salaPublica = false;   // true se a sala atual (quando anfitrião) tem espelho em salasPublicas/
   var _listeners = [];        // { ref, evento, cb } abertos, pra desligar depois
   var _handlers = { conectado: [], mensagem: [], desconectado: [], erro: [] };
 
@@ -166,31 +181,49 @@
     return pc;
   }
 
-  function criarSala() {
+  // publica: true = a sala também ganha um espelho leve em salasPublicas/
+  // (aparece na lista "salas abertas agora"); false/omitido = só por código.
+  function criarSala(publica) {
     if (!disponivel()) return Promise.reject(new Error('Multiplayer indisponível neste navegador.'));
     return _garantirIdentidade().then(function (eu) {
       var db = _db();
       if (!db) return Promise.reject(new Error('Multiplayer indisponível agora.'));
-      return _tentarCriar(db, eu, 0);
+      return _tentarCriar(db, eu, !!publica, 0);
     });
   }
 
-  function _tentarCriar(db, eu, tentativa) {
+  function _tentarCriar(db, eu, publica, tentativa) {
     if (tentativa >= 5) return Promise.reject(new Error('Não consegui abrir uma sala. Tente de novo.'));
     var codigo = _codigoAleatorio();
     var ref = db.ref('salas/' + codigo);
     return ref.get().then(function (snap) {
-      if (snap.exists()) return _tentarCriar(db, eu, tentativa + 1);
+      if (snap.exists()) return _tentarCriar(db, eu, publica, tentativa + 1);
 
       return ref.set({
         anfitriao: { uid: eu.uid, nome: eu.nome },
+        publica: publica,
         criadoEm: firebase.database.ServerValue.TIMESTAMP
       }).then(function () {
         _salaRef = ref;
         _souAnfitriao = true;
+        _salaPublica = publica;
         // Se o anfitrião cair/fechar a aba antes de alguém entrar, a sala
         // some sozinha — evita salas fantasmas acumulando no banco.
         ref.onDisconnect().remove();
+
+        // Sala pública: espelho leve em salasPublicas/ (só nome + data —
+        // nunca oferta/resposta/ICE) pra tela "salas abertas agora" listar
+        // sem precisar ler a sala inteira (essa fica restrita a quem tem
+        // o código). Ver claude/database.rules.json.
+        if (publica) {
+          var refPublica = db.ref('salasPublicas/' + codigo);
+          refPublica.set({ nome: eu.nome, criadoEm: firebase.database.ServerValue.TIMESTAMP }).catch(function () {});
+          refPublica.onDisconnect().remove();
+          // Alguém entrou: a sala deixa de estar "aberta" — some da lista.
+          _escutar(ref.child('convidado'), 'value', function (snapConv) {
+            if (snapConv.exists()) db.ref('salasPublicas/' + codigo).remove().catch(function () {});
+          });
+        }
 
         var pc = _novoPeerConnection(ref, true);
         _pc = pc;
@@ -237,6 +270,10 @@
         _souAnfitriao = false;
 
         return ref.child('convidado').set({ uid: eu.uid, nome: eu.nome }).then(function () {
+          // Sem isto, um convidado que cai (sem passar por sair()) deixa o
+          // nó preso pra sempre: a sala trava porque ninguém mais consegue
+          // entrar (ver A1.5, mesmo padrão já usado em party.js:220).
+          ref.child('convidado').onDisconnect().remove();
           var pc = _novoPeerConnection(ref, false);
           _pc = pc;
           pc.ondatachannel = function (ev) { _configurarCanalDados(ev.channel); };
@@ -254,26 +291,92 @@
     });
   }
 
+  // Lista salas públicas abertas agora (via salasPublicas/, o espelho leve
+  // — ver criarSala). callback recebe um array [{ codigo, nome }, ...] toda
+  // vez que a lista muda. Retorna uma função pra parar de ouvir.
+  function listarSalas(callback) {
+    if (typeof callback !== 'function') callback = function () {};
+    if (!disponivel()) { callback([]); return function () {}; }
+    var cancelado = false;
+    var desligar = function () {};
+    _garantirIdentidade().then(function () {
+      if (cancelado) return;
+      var db = _db();
+      if (!db) { callback([]); return; }
+      // limitToLast: um passivo de salas mortas acumulado não vira uma
+      // lista que só cresce pra sempre (ver A1.8).
+      var ref = db.ref('salasPublicas').limitToLast(30);
+      var handler = function (snap) {
+        var lista = [];
+        snap.forEach(function (filho) {
+          var v = filho.val() || {};
+          // Defesa extra contra sala fantasma (onDisconnect que não rodou,
+          // etc.): mesmo critério de expiração usado em entrarSala() —
+          // mesmo padrão já usado em party.js:247 (ver A1.8).
+          if (!v.criadoEm || (Date.now() - v.criadoEm) > SALA_EXPIRA_MS) return;
+          lista.push({ codigo: filho.key, nome: String(v.nome || 'Jogador').slice(0, 20) });
+        });
+        callback(lista);
+      };
+      ref.on('value', handler);
+      desligar = function () { try { ref.off('value', handler); } catch (e) {} };
+    }).catch(function () { callback([]); });
+    return function () { cancelado = true; desligar(); };
+  }
+
   function enviar(dado) {
     if (!_canal || _canal.readyState !== 'open') return false;
     try { _canal.send(JSON.stringify(dado)); return true; } catch (e) { return false; }
   }
 
   function sair() {
+    // on() nunca some sozinho: sem isto, os handlers de 'mensagem' de um
+    // jogo continuam vivos depois de sair dele. Como Ping Pong e Tanques
+    // usam os mesmos tipos de pacote (oi/p/e/rr/pr), abrir os dois na mesma
+    // sessão faz cada um processar os pacotes do outro (ver A1.2).
+    _handlers = { conectado: [], mensagem: [], desconectado: [], erro: [] };
     _pararListeners();
     _limparPeer();
     if (_salaRef) {
-      try { _salaRef.onDisconnect().cancel(); } catch (e) {}
-      if (_souAnfitriao) { try { _salaRef.remove(); } catch (e) {} }
+      var salaRefAtual = _salaRef;
+      try { salaRefAtual.onDisconnect().cancel(); } catch (e) {}
+      if (_souAnfitriao) {
+        var _apagarSala = function () { try { salaRefAtual.remove(); } catch (e) {} };
+        if (_salaPublica) {
+          // Apaga o espelho ANTES da sala: a regra de escrita de
+          // salasPublicas/$codigo exige provar (lendo salas/$codigo) que
+          // quem apaga ainda é o anfitrião. Apagando a sala primeiro essa
+          // prova some e a remoção do espelho é negada — a sala fica
+          // fantasma na lista pública pra sempre (ver A1.4).
+          try {
+            var db = _db();
+            if (db) {
+              var refPublica = db.ref('salasPublicas/' + salaRefAtual.key);
+              refPublica.onDisconnect().cancel();
+              refPublica.remove().catch(function () {}).then(_apagarSala);
+            } else {
+              _apagarSala();
+            }
+          } catch (e) { _apagarSala(); }
+        } else {
+          _apagarSala();
+        }
+      } else {
+        // Convidado: sem isto o nó fica preso e a sala trava pra quem
+        // ficou (ver A1.5).
+        try { salaRefAtual.child('convidado').remove(); } catch (e) {}
+      }
     }
     _salaRef = null;
     _souAnfitriao = false;
+    _salaPublica = false;
   }
 
   window.AngatubaMP = {
     disponivel: disponivel,
     criarSala: criarSala,
     entrarSala: entrarSala,
+    listarSalas: listarSalas,
     enviar: enviar,
     sair: sair,
     on: on

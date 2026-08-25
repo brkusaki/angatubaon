@@ -442,6 +442,11 @@
   // JANELA visível de cada jogador se adapta à própria tela.
   var _tqViewportLargura = TQ_VIEWPORT_LARGURA;
   var _tqRAF = 0, _tqUltimoTs = 0;
+  // Watchdog do convidado: mesmo problema do Ping Pong — o canal WebRTC
+  // não avisa se o anfitrião só parou de simular, e sem isto o tanque e os
+  // projéteis do adversário congelavam no lugar sem nenhum aviso (ver A2.5).
+  var _tqUltimoEEm = 0;
+  var TQ_CONGELADO_AVISO_MS = 3000, TQ_CONGELADO_FIM_MS = 20000;
   var _tqEstado = 'inicio';   // inicio | sala | jogando | fim
   var _tqModo = null;         // 'solo' | 'multiplayer'
   var _tqSouAnfitriao = false;
@@ -856,6 +861,7 @@
         _tqClasseConvidado = _tqMinhaClasse;
       }
       window.AngatubaMP.enviar(msg);
+      _tqUltimoEEm = performance.now();
       _tqComecarPartida();
     });
 
@@ -930,6 +936,7 @@
         break;
       case 'e': // anfitrião -> convidado: estado do mundo inteiro
         if (!_tqSouAnfitriao) {
+          _tqUltimoEEm = performance.now();
           _tqTanqueAnfitriao.x = dado.hx; _tqTanqueAnfitriao.y = dado.hy; _tqTanqueAnfitriao.ang = dado.hang;
           if (typeof dado.hhp === 'number') _tqTanqueAnfitriao.hp = dado.hhp;
           if (typeof dado.ghp === 'number') _tqTanqueConvidado.hp = dado.ghp;
@@ -1447,6 +1454,11 @@
 
   function _tqLoop(ts) {
     if (_tqEstado !== 'jogando') return;
+    if (!_tqSouAnfitriao && _tqModo === 'multiplayer' && _tqUltimoEEm
+        && (performance.now() - _tqUltimoEEm) > TQ_CONGELADO_FIM_MS) {
+      _tqMostrarFim('desconexao');
+      return;
+    }
     var dt = _tqUltimoTs ? Math.min(0.05, (ts - _tqUltimoTs) / 1000) : 0;
     _tqUltimoTs = ts;
     if (dt) {
@@ -2075,6 +2087,10 @@
     ctx.restore();
     if (jogando) _tqDesenharBatataHUD();
     if (jogando && _tqRodadaEstado === 'pausa') _tqDesenharAvisoRodada();
+    if (jogando && !_tqSouAnfitriao && _tqModo === 'multiplayer' && _tqUltimoEEm
+        && (performance.now() - _tqUltimoEEm) > TQ_CONGELADO_AVISO_MS) {
+      _tqDesenharAvisoCongelado();
+    }
     ctx.restore();
   }
 
@@ -2402,6 +2418,24 @@
       }
       ctx.restore();
     }
+  }
+
+  // Congelamento sem aviso do convidado quando o anfitrião para de simular
+  // (ver A2.5, mesmo tratamento do Ping Pong) — reaproveita o estilo de
+  // _tqDesenharAvisoRodada, sem precisar de nenhum elemento novo em
+  // index.html.
+  function _tqDesenharAvisoCongelado() {
+    var ctx = _tqCtx;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0, 0, _tqW, _tqH);
+    ctx.font = "700 16px 'Syne', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.shadowBlur = 8;
+    ctx.fillText('Aguardando o outro jogador…', _tqW / 2, _tqH * 0.5);
+    ctx.restore();
   }
 
   function _tqDesenharAvisoRodada() {

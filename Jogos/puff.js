@@ -23,6 +23,13 @@
 (function () {
   'use strict';
 
+  // Handle da rodada em andamento (setado por render(), consumido por
+  // parar()). Sem isto, sair do Party no meio da rodada deixava
+  // timerRodada correndo sobre um <div> já descartado — 30s depois ele
+  // chamava onFim() e reportava o placar da rodada abandonada como se
+  // fosse da rodada atual (ver A2.2).
+  var _pararAtual = null;
+
   var PUFF_MIN_MS       = 180;   // hold mais curto que isso não conta (evita "spam de toque")
   var PUFF_LIMITE_INICIAL = 2200; // ms — a partir daqui, tosse (começa mais fácil...)
   var PUFF_LIMITE_MINIMO  = 1300; // ms — ...e vai apertando conforme acerta (mais difícil)
@@ -187,19 +194,37 @@
       if (tempoRestante <= 0) _finalizar();
     }, 1000);
 
-    function _finalizar() {
-      if (acabou) return;
-      acabou = true;
+    function _limpar() {
       if (timerRodada) { clearInterval(timerRodada); timerRodada = null; }
       if (timerHold) { clearTimeout(timerHold); timerHold = null; }
       if (timerAtordoada) { clearTimeout(timerAtordoada); timerAtordoada = null; }
       if (elOwlVideo) { try { elOwlVideo.pause(); } catch (e) {} }
       elOwlWrap.removeEventListener('pointerdown', _aoPointerDown);
       elOwlWrap.removeEventListener('pointerup', _aoPointerUp);
+      if (_pararAtual === _pararExterno) _pararAtual = null;
+    }
+
+    function _finalizar() {
+      if (acabou) return;
+      acabou = true;
+      _limpar();
       _som('fim', [puffs >= BARRA_META]);
       onFim(puffs);
     }
+
+    // Chamado de fora (party.js) quando a rodada é abandonada antes do
+    // tempo — não reporta placar nenhum, só limpa (ver A2.2).
+    function _pararExterno() {
+      if (acabou) return;
+      acabou = true;
+      _limpar();
+    }
+    _pararAtual = _pararExterno;
   }
 
-  window.PuffGame = { render: render };
+  function parar() {
+    if (_pararAtual) _pararAtual();
+  }
+
+  window.PuffGame = { render: render, parar: parar };
 })();

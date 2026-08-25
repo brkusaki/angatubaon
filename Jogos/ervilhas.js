@@ -27,6 +27,13 @@
 (function () {
   'use strict';
 
+  // Handle da rodada em andamento (setado por render(), consumido por
+  // parar()). Sem isto, sair do Party no meio da rodada deixava a cadeia
+  // do olhão (_agendarOlho) se reagendando pra sempre sobre um <div> já
+  // descartado, e o timerRodada acabava reportando o placar da rodada
+  // abandonada como se fosse da rodada atual (ver A2.2).
+  var _pararAtual = null;
+
   var TOTAL_SEMENTES     = 14;   // sementes no prato (sugestão do pedido: 12-15)
   var ESPETAR_MS         = 380;  // duração da animação de espetar
   var ENGOLIR_MS         = 380;  // duração da animação de engolir
@@ -234,14 +241,19 @@
       if (tempoRestante <= 0) _finalizar();
     }, 1000);
 
-    function _finalizar() {
-      if (acabou) return;
-      acabou = true;
+    function _limpar() {
       if (timerRodada) { clearInterval(timerRodada); timerRodada = null; }
       if (timerOlho) { clearTimeout(timerOlho); timerOlho = null; }
       if (timerAnimacao) { clearTimeout(timerAnimacao); timerAnimacao = null; }
       if (timerAssustada) { clearTimeout(timerAssustada); timerAssustada = null; }
       elArena.removeEventListener('pointerdown', _aoTocar);
+      if (_pararAtual === _pararExterno) _pararAtual = null;
+    }
+
+    function _finalizar() {
+      if (acabou) return;
+      acabou = true;
+      _limpar();
 
       var comidas = TOTAL_SEMENTES - sementesRestantes;
       var esvaziou = sementesRestantes <= 0;
@@ -253,8 +265,23 @@
       onFim(score);
     }
 
+    // Chamado de fora (party.js) quando a rodada é abandonada antes do
+    // tempo — não reporta placar nenhum, só limpa (ver A2.2). Sem isto o
+    // _agendarOlho ficaria se reagendando pra sempre (acabou nunca vira
+    // true) mesmo depois de sair da rodada.
+    function _pararExterno() {
+      if (acabou) return;
+      acabou = true;
+      _limpar();
+    }
+    _pararAtual = _pararExterno;
+
     _agendarOlho();
   }
 
-  window.ErvilhasGame = { render: render };
+  function parar() {
+    if (_pararAtual) _pararAtual();
+  }
+
+  window.ErvilhasGame = { render: render, parar: parar };
 })();

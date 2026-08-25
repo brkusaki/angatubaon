@@ -97,6 +97,8 @@
   var _timeoutSeguranca = null;
   var _ultimoJogoUsado = null; // evita repetir o mesmo minigame 2x seguidas
   var _totalRodadasEscolhidas = TOTAL_RODADAS_PADRAO; // ajustável no lobby, só o anfitrião
+  var _apiAtual = null;        // módulo do minigame em andamento — sair() chama .parar() nele (ver A2.2)
+  var _contagemHandle = null;  // setTimeout em andamento de _contagemRegressiva — sair() cancela (ver A2.6)
 
   function disponivel() {
     return typeof firebase !== 'undefined' && !!firebase.database && !!firebase.auth;
@@ -275,6 +277,12 @@
     if (sala.status === 'rodada' && sala.rodadaAtual !== _rodadaVistaEm) {
       _rodadaVistaEm = sala.rodadaAtual;
       _iniciarRodadaLocal(sala);
+    } else if (sala.status === 'rodada' && _souAnfitriao) {
+      // Rechecagem: quando um jogador cai no meio da rodada, o
+      // onDisconnect() muda jogadores/{uid} e ESTA sala é notificada — mas
+      // sozinho isso não fecharia a rodada, porque só o listener de
+      // resultados chamava _anfitriaoChecarFechamentoRodada (ver A2.3).
+      _anfitriaoChecarFechamentoRodada();
     } else if (sala.status === 'resultado') {
       _emit('resultadoRodada', sala);
     } else if (sala.status === 'campeao') {
@@ -308,8 +316,14 @@
     _emit('countdown', { jogo: entry, sala: sala });
 
     _contagemRegressiva(3, function () {
+      // Sair da sala durante o "3...2...1..." cancela a contagem (ver
+      // sair()), mas ainda assim confere aqui: sem isto, o minigame podia
+      // abrir por cima de qualquer tela em que a pessoa estivesse (A2.6).
+      if (!_rodadaEmAndamento) return;
       if (!entry) { reportarResultado(0); return; }
-      entry.iniciar(sala.seed).catch(function () {
+      entry.iniciar(sala.seed).then(function (api) {
+        _apiAtual = api;
+      }).catch(function () {
         reportarResultado(0); // jogo não carregou: não trava a rodada pros outros
       });
       var limiteMs = (entry.duracaoSeg || 30) * 1000 + FOLGA_SEGURANCA_MS;
@@ -323,9 +337,9 @@
     // Desce até n=0 (emite o "Vai!") antes de chamar aoFim — antes o
     // contador pulava de "1" direto pro jogo, sem mostrar o "Vai!"
     // que o handler de countdownTick já esperava (ver party.js/UI).
-    if (n < 0) { aoFim(); return; }
+    if (n < 0) { _contagemHandle = null; aoFim(); return; }
     _emit('countdownTick', n);
-    setTimeout(function () { _contagemRegressiva(n - 1, aoFim); }, n > 0 ? 800 : 500);
+    _contagemHandle = setTimeout(function () { _contagemRegressiva(n - 1, aoFim); }, n > 0 ? 800 : 500);
   }
 
   /* ── Mostra a tela cheia de um jogo já existente e chama comecar()
@@ -511,6 +525,11 @@
   function sair() {
     _pararListeners();
     if (_timeoutSeguranca) { clearTimeout(_timeoutSeguranca); _timeoutSeguranca = null; }
+    if (_contagemHandle) { clearTimeout(_contagemHandle); _contagemHandle = null; }
+    // Sem isto, o minigame em andamento (Puff/Ervilhas sobretudo — os
+    // outros já se auto-limpam por outros caminhos) continuava rodando
+    // timers sobre uma tela já abandonada (ver A2.2).
+    if (_apiAtual && typeof _apiAtual.parar === 'function') { try { _apiAtual.parar(); } catch (e) {} }
     document.body.classList.remove('angatuba-party-ativo');
     if (_salaRef) {
       try { _salaRef.onDisconnect().cancel(); } catch (e) {}
@@ -558,6 +577,7 @@
     _codigo = null; _salaRef = null; _souAnfitriao = false;
     _sala = null; _resultadosCache = {};
     _rodadaEmAndamento = false; _rodadaVistaEm = -1;
+    _apiAtual = null;
   }
 
   function estado() { return _sala; }

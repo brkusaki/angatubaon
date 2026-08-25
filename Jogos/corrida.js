@@ -453,7 +453,9 @@
   var _corW = 640, _corH = 360, _corDpr = 1;
   var _corEstado = 'inicio';
   var _corRAF = 0, _corLast = 0;
+  var _corFontesTimer = 0; // handle do setInterval de _corPrepararFontes (evita duplicar)
   var _corListenersOn = false, _corResizeOn = false;
+  var _corResizeTimers = []; // handles da cascata de remedição pós-rotação (ver A2.22)
   var _corRelogio = 0;    // tempo global (ms) p/ escolher frame das animações
 
   /* ── Config do mundo pseudo-3D (1a pessoa) ────────────────────── */
@@ -1484,9 +1486,9 @@
           screen.orientation.addEventListener('change', function () {
             // Várias remedições porque o layout assenta em passos.
             reaval();
-            setTimeout(reaval, 60);
-            setTimeout(reaval, 200);
-            setTimeout(reaval, 450);
+            _corResizeTimers.push(setTimeout(reaval, 60));
+            _corResizeTimers.push(setTimeout(reaval, 200));
+            _corResizeTimers.push(setTimeout(reaval, 450));
           });
         }
       } catch (e) {}
@@ -1516,8 +1518,12 @@
      cada zumbi aparece, daria um engasgo no meio da corrida. Tentamos
      algumas vezes porque as imagens chegam da rede em tempos diferentes. */
   function _corPrepararFontes() {
+    // Fix A2.18: preparar() roda de novo a cada abertura da Corrida — sem
+    // isso, abrir o jogo várias vezes empilhava um setInterval por vez, todos
+    // fazendo o mesmo trabalho em paralelo.
+    if (_corFontesTimer) clearInterval(_corFontesTimer);
     var tentativas = 0;
-    var t = setInterval(function () {
+    _corFontesTimer = setInterval(function () {
       var faltou = false;
       for (var tipo in _COR_TIPOS) {
         if (!_COR_TIPOS.hasOwnProperty(tipo)) continue;
@@ -1526,7 +1532,7 @@
       }
       _corFonte(_corAsset('arma.webp'));
       _corFonte(_corAsset('municao.webp'));
-      if (!faltou || ++tentativas > 20) clearInterval(t);
+      if (!faltou || ++tentativas > 20) { clearInterval(_corFontesTimer); _corFontesTimer = 0; }
     }, 400);
   }
 
@@ -1592,6 +1598,10 @@
     if (_corEstado === 'jogando') _corEstado = 'inicio';
     _corDrag = false;
     _corDestravarOrientacao();     // volta a orientação do sistema ao normal
+    // Fix A2.22: cancela a cascata de remedição pós-rotação se ainda tiver
+    // algum passo pendente — mesma correção do Tanques.
+    _corResizeTimers.forEach(clearTimeout);
+    _corResizeTimers.length = 0;
   }
 
   function _corMostrarOverlay(qual) {

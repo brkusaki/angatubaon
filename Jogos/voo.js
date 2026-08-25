@@ -1175,6 +1175,11 @@
   }
   function _vooPointerUp() { _vooDragging = false; _vooOwl.vx = 0; }
   function _vooKey(down, e) {
+    // Os listeners de keydown/keyup ficam presos em window pra sempre (ver
+    // _vooLigarControles): sem essa guarda, as setas continuam mexendo em
+    // _vooKeyDir (e no dir da coruja) mesmo com o jogo fechado ou fora da
+    // tela do Voo — mesma correção do A2.1 na Corrida.
+    if (_vooEstado !== 'jogando') return;
     if (e.key === 'ArrowLeft')  { _vooKeyDir = down ? -1 : 0; _vooOwl.dir = -1; }
     else if (e.key === 'ArrowRight') { _vooKeyDir = down ? 1 : 0; _vooOwl.dir = 1; }
   }

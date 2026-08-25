@@ -14,8 +14,9 @@
    de fim motivadoras e seletor com músicas atuais.
 
    Fala com o app APENAS via window.AngatubaGames (a ponte).
-   Expõe window.PianoGame = { preparar, comecar, parar } e mantém
-   window._pnComecar pro onclick inline do botão no HTML.
+   Expõe window.PianoGame = { preparar, comecar, parar, forcarFimParty,
+   suspenderAudio } e mantém window._pnComecar pro onclick inline do
+   botão no HTML.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -195,7 +196,18 @@
   }
   function _pnAudioDestravar() {
     var ac = _pnAudio();
-    if (ac && ac.state === 'suspended') { try { ac.resume(); } catch (e) {} }
+    // Fix A1.20: iOS usa o estado 'interrupted' (chamada telefônica, Siri)
+    // além do 'suspended' padrão — sem tratar os dois, o som nunca mais
+    // voltava depois de uma interrupção.
+    if (ac && (ac.state === 'suspended' || ac.state === 'interrupted')) { try { ac.resume(); } catch (e) {} }
+  }
+  // Fix A1.18: suspende o contexto ao sair do hub — sem isso o indicador de
+  // mídia (e a sessão de áudio) ficava preso ativo mesmo com a pessoa de
+  // volta na lista de lojas. resume() acontece no próximo _pnAudioDestravar().
+  function _pnAudioSuspender() {
+    if (_pnAC && _pnAC.state === 'running' && _pnAC.suspend) {
+      try { _pnAC.suspend(); } catch (e) {}
+    }
   }
   function _pnFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
 
@@ -974,6 +986,10 @@
     if (_pnRAF) { cancelAnimationFrame(_pnRAF); _pnRAF = 0; }
     if (_pnEstado === 'jogando') _pnEstado = 'inicio';
     _pnMovendo = false;
+    // Fix A2.13: sem isto, _pnDrawIdle só gera azulejos novos se a lista
+    // estiver vazia — reabrir o jogo desenhava por cima os da partida
+    // anterior (alguns já "tocada", em posições intermediárias).
+    _pnAzulejos.length = 0;
   }
 
   // Teto de tempo do modo Coruja Party (ver Jogos/party.js): sobrevivência
@@ -989,5 +1005,5 @@
   window._pnComecar = _pnComecar;
   window._pnAlternarBatida = _pnAlternarBatida;
   window._pnVoltarInicio = _pnVoltarInicio;
-  window.PianoGame = { preparar: _pnPreparar, comecar: _pnComecar, parar: _pnParar, forcarFimParty: _pnForcarFimParty };
+  window.PianoGame = { preparar: _pnPreparar, comecar: _pnComecar, parar: _pnParar, forcarFimParty: _pnForcarFimParty, suspenderAudio: _pnAudioSuspender };
 })();

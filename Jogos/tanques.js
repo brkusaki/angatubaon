@@ -570,9 +570,9 @@
         if (screen && screen.orientation && screen.orientation.addEventListener) {
           screen.orientation.addEventListener('change', function () {
             reaval();
-            setTimeout(reaval, 60);
-            setTimeout(reaval, 200);
-            setTimeout(reaval, 450);
+            _tqResizeTimers.push(setTimeout(reaval, 60));
+            _tqResizeTimers.push(setTimeout(reaval, 200));
+            _tqResizeTimers.push(setTimeout(reaval, 450));
           });
         }
       } catch (e) {}
@@ -598,6 +598,7 @@
     _tqDesenhar();
   }
   var _tqResizeOn = false;
+  var _tqResizeTimers = []; // handles da cascata de remedição pós-rotação (ver A2.22)
 
   function _tqComecar() { _tqPreparar(); }
 
@@ -606,6 +607,13 @@
     if (window.AngatubaMP) { _tqSaindoVoluntariamente = true; window.AngatubaMP.sair(); }
     _tqPararListaSalas();
     _tqDestravarOrientacao();
+    // Fix A2.22: cancela a cascata de remedição pós-rotação se ainda tiver
+    // algum passo pendente — sem isso, sair do jogo no meio de uma rotação
+    // deixava o setTimeout disparar depois, chamando _tqAplicarOrientacao
+    // fora de hora (a guarda de _gamesHubAberto() evita efeito visível, mas
+    // o timer ficava rodando à toa).
+    _tqResizeTimers.forEach(clearTimeout);
+    _tqResizeTimers.length = 0;
     _tqEstado = 'inicio';
     _tqModo = null;
     _tqSouAnfitriao = false;
@@ -776,6 +784,10 @@
   function _tqVoltarMenu() {
     if (_tqRAF) { cancelAnimationFrame(_tqRAF); _tqRAF = 0; }
     if (window.AngatubaMP) { _tqSaindoVoluntariamente = true; window.AngatubaMP.sair(); }
+    // Fix A2.10: _tqParar() já libera a trava de orientação, mas voltar ao
+    // menu do Tanques pela tela de fim (sem fechar o jogo) não passava por
+    // ali — a tela ficava presa em paisagem.
+    _tqDestravarOrientacao();
     _tqModo = null;
     _tqSouAnfitriao = false;
     var btnC = document.getElementById('tq-btn-criar');
@@ -898,6 +910,14 @@
           _tqResetBarris();
           if (_tqModoJogo === 'rei') _tqZonaCentro = _tqAcharCentroZona();
         }
+        // Fix A2.19: se o 'oi' chegou sem 'mapa' válido (pacote antigo/
+        // corrompido) o bloco acima não roda e _tqZonaCentro ficaria null no
+        // modo Rei do Pedaço — _tqAtualizarZona acessaria .x de null e
+        // quebraria o jogo inteiro pro convidado. Garante um centro mesmo
+        // nesse caso, usando o mapa que já está carregado.
+        if (!_tqSouAnfitriao && _tqModoJogo === 'rei' && !_tqZonaCentro) {
+          _tqZonaCentro = _tqAcharCentroZona();
+        }
         // Idem pro spawn: o anfitrião já sorteou (_tqReiniciarPartida
         // rodou antes de mandar o 'oi', ver 'conectado') — o convidado
         // aplica o próprio ponto direto, nunca sorteia por conta própria.
@@ -929,7 +949,12 @@
         }
         break;
       case 'tiro': // convidado avisa que atirou — só o anfitrião spawna o projétil (é quem tem autoridade)
-        if (_tqSouAnfitriao && _tqRodadaEstado === 'jogando' && _tqCooldownConvidado <= 0) {
+        // Folga de ~15% do cooldown: o timer local do convidado (que libera
+        // o botão) e o do anfitrião (que decide o tiro) divergem com
+        // latência — sem folga, o convidado vê o recuo do canhão mas o
+        // projétil não nasce, sem nenhum aviso (ver A2.9).
+        if (_tqSouAnfitriao && _tqRodadaEstado === 'jogando'
+            && _tqCooldownConvidado <= _tqCooldownEfetivo('convidado') * 0.15) {
           _tqCooldownConvidado = _tqCooldownEfetivo('convidado');
           _tqCriarProjetil(dado.x, dado.y, dado.ang, 'convidado');
         }

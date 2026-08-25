@@ -1201,6 +1201,12 @@
     if (window.PianoGame     && typeof window.PianoGame.parar     === 'function') window.PianoGame.parar();
     if (window.PingPongGame  && typeof window.PingPongGame.parar  === 'function') window.PingPongGame.parar();
     if (window.TanquesGame   && typeof window.TanquesGame.parar   === 'function') window.TanquesGame.parar();
+    // Puff/Ervilhas só existem dentro de uma rodada de Party (container,
+    // não tela própria) — ver A2.2. PartyGame.parar(), logo abaixo, já
+    // chama isto por conta própria; aqui cobre a saída pelo botão genérico
+    // quando por algum motivo o Party não tiver rodado sua própria limpeza.
+    if (window.PuffGame      && typeof window.PuffGame.parar      === 'function') window.PuffGame.parar();
+    if (window.ErvilhasGame  && typeof window.ErvilhasGame.parar  === 'function') window.ErvilhasGame.parar();
     // Coruja Party: sem isto, sair da lobby pelo botão genérico (em vez
     // das telas próprias do Party) não avisava o Firebase — a sala
     // ficava fantasma na lista pública. Ver PartyGame.parar em party.js.
@@ -2272,6 +2278,11 @@
 
   function abrirFotoAnuncio(url, nomeAnuncio, lojaId, assinatura, nomeLoja, planoLoja, categoriaLoja, midiaTipo) {
     var _ehVideo = String(midiaTipo || 'foto') === 'video';
+    // Fecha de verdade o lightbox anterior (timers/listeners inclusos) em
+    // vez de só remover o nó — sem isto o _timer de 25s do fallback de
+    // vídeo da loja anterior sobrevivia e fechava ESTE lightbox sozinho
+    // minutos depois (ver A4.2).
+    if (typeof window._fecharAnuncioLightbox === 'function') window._fecharAnuncioLightbox(true);
     const oldLb = document.getElementById('anuncio-lightbox');
     if (oldLb) oldLb.remove();
 
@@ -2560,6 +2571,10 @@
   function abrirStories(stories, nomeLoja, lojaId, assinatura, planoLoja, categoriaLoja) {
     stories = (stories || []).filter(function(st){ return st && (st.texto || st.imagemUrl); });
     if (!stories.length) return;
+    // Fecha de verdade o lightbox anterior (timers/listeners inclusos) em
+    // vez de só remover o nó — mesmo problema e mesma correção do A4.2 na
+    // Fase 1 (abrirFotoAnuncio) logo acima.
+    if (typeof window._fecharAnuncioLightbox === 'function') window._fecharAnuncioLightbox(true);
     var oldLb = document.getElementById('anuncio-lightbox');
     if (oldLb) oldLb.remove();
 
@@ -3543,9 +3558,20 @@
       plano:     plano,
       categoria: categoria,
       storyId:   storyId || '',  // só usado quando tipo==='anuncio'
+      sid:       getAvalSid(),   // identifica o DISPOSITIVO pro rate-limit do GAS (ver A4.4)
     }));
-    fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: params })
-      .catch(() => {}); // falha silenciosa — nunca interrompe o usuário
+    // sendBeacon sobrevive à navegação — sem isto, abrir o WhatsApp no mesmo
+    // gesto (comum no Android) podia descartar a página antes do fetch em
+    // voo terminar, perdendo justamente o clique mais valioso (ver A4.3).
+    // keepalive é o fallback pra quando sendBeacon não existe.
+    var _clkEnviouBeacon = false;
+    if (navigator.sendBeacon) {
+      try { _clkEnviouBeacon = navigator.sendBeacon(APPS_SCRIPT_URL, params); } catch (e) {}
+    }
+    if (!_clkEnviouBeacon) {
+      fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: params, keepalive: true })
+        .catch(() => {}); // falha silenciosa — nunca interrompe o usuário
+    }
   }
 
   /* ── Debounce ────────────────────────────────────────────── */
@@ -7415,6 +7441,10 @@
       smartRefresh(); // refresh imediato ao voltar para a aba
       clearInterval(_smartRefreshInterval);
       _smartRefreshInterval = setInterval(smartRefresh, 60_000);
+      // Clima não tinha refresh nenhum dentro da mesma sessão (só ao
+      // recarregar a página) — _carregarClima já respeita o cache de 30min
+      // por conta própria, então chamar de novo aqui é barato (ver A3.3).
+      if (_utilidadesCarregadas && typeof _carregarClima === 'function') _carregarClima();
     }
   }, { passive: true });
 
@@ -10395,9 +10425,10 @@
   window._renderGraficoClima = _renderGraficoClima; // usado pelo clique nas abas (ver initHomeCarouselSwipe)
 
   function _carregarClima() {
+    var cache = null, ts = 0;
     try {
-      var cache = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || 'null');
-      var ts    = parseInt(localStorage.getItem(WEATHER_CACHE_TS_KEY) || '0');
+      cache = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || 'null');
+      ts    = parseInt(localStorage.getItem(WEATHER_CACHE_TS_KEY) || '0');
       if (cache && (Date.now() - ts) < WEATHER_CACHE_MS) { _pintarClima(cache); return; }
     } catch (e) {}
     var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + WEATHER_LAT + '&longitude=' + WEATHER_LON +
@@ -10405,7 +10436,10 @@
       '&hourly=temperature_2m,precipitation_probability,wind_speed_10m,weather_code,relative_humidity_2m' +
       '&daily=temperature_2m_max,temperature_2m_min,weather_code' +
       '&timezone=America%2FSao_Paulo&forecast_days=7';
-    fetch(url).then(function (r) { if (!r.ok) throw new Error('weather http ' + r.status); return r.json(); })
+    // AbortSignal.timeout: era o único fetch do app sem timeout — numa rede
+    // que aceita conexão mas não responde, a promise ficava pendente por
+    // minutos e nem o fallback abaixo entrava em ação (ver A3.2).
+    fetch(url, { signal: AbortSignal.timeout(8000) }).then(function (r) { if (!r.ok) throw new Error('weather http ' + r.status); return r.json(); })
       .then(function (j) {
         var d = _montarDadosClima(j);
         try {
@@ -10415,8 +10449,20 @@
         _pintarClima(d);
       })
       .catch(function () {
-        var elCond = document.getElementById('weather-cond');
-        if (elCond) elCond.textContent = 'Não foi possível carregar a previsão.';
+        // Sem internet (ou Open-Meteo instável) e cache com mais de 30min:
+        // antes o card caía pro "--°" inicial do HTML mesmo tendo dado bom
+        // na mão. Agora usa o cache vencido como fallback (ver A3.1).
+        if (cache) {
+          _pintarClima(cache);
+          var elCond = document.getElementById('weather-cond');
+          if (elCond) {
+            var hora = new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            elCond.textContent = 'Previsão de ' + hora + ' — sem conexão para atualizar';
+          }
+        } else {
+          var elCondVazio = document.getElementById('weather-cond');
+          if (elCondVazio) elCondVazio.textContent = 'Não foi possível carregar a previsão.';
+        }
       });
   }
 

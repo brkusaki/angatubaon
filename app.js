@@ -1077,6 +1077,12 @@
     _gamesLimparFiltros(); // reseta busca/categoria a cada entrada no hub
     _streakAtualizarFaixa(false); // mostra a ofensiva atual (sem animar)
     _carregarAssetsJogos();  // som + efeitos (uma vez, sob demanda)
+    // Fix A1.18/A1.20: se o hub fechou antes suspendeu o áudio (ver
+    // _fecharGamesHub) — reabrir é, ele mesmo, um gesto do usuário, então dá
+    // pra acordar o contexto na hora (cobre 'suspended' e o 'interrupted' do
+    // iOS). Nas primeiras aberturas AngatubaSom ainda não existe (script
+    // carregando); o listener de _ligarDestravarAudio cobre esse caso.
+    if (window.AngatubaSom && typeof window.AngatubaSom._destravar === 'function') window.AngatubaSom._destravar();
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0,0); }
     // Fix: entrada no histórico pro botão "voltar" (Android) fechar o hub e
     // cair na tela inicial — sem isso, abrir o hub não empilhava nada e o
@@ -1096,13 +1102,13 @@
   var _assetsJogosCarregados = false;
   function _carregarAssetsJogos() {
     if (_assetsJogosCarregados) { _sincronizarBotaoSom(); return; }
-    _assetsJogosCarregados = true;
     Promise.all([
       _injetarScript('/Jogos/assets/som.min.js'),
       _injetarScript('/Jogos/assets/efeitos.min.js')
     ]).then(function () {
+      _assetsJogosCarregados = true;
       _sincronizarBotaoSom();
-    }).catch(function () { /* silencioso: jogos funcionam sem som */ });
+    }).catch(function () { _assetsJogosCarregados = false; /* permite nova tentativa na próxima abertura */ });
     _ligarDestravarAudio();
   }
 
@@ -1113,13 +1119,19 @@
     var hub = document.getElementById('games-hub');
     if (!hub || hub._audioLig) return;
     hub._audioLig = true;
+    // Fix A1.16: nem pointerdown nem touchstart tinham { once: true } — em
+    // aparelho com toque os dois disparam no mesmo gesto e ficavam
+    // pendurados no hub pelo resto da vida da página. Agora cada um se
+    // remove sozinho (once) e também remove o irmão dentro do handler.
     var destravar = function () {
       if (window.AngatubaSom && typeof window.AngatubaSom._destravar === 'function') {
         window.AngatubaSom._destravar();
       }
+      hub.removeEventListener('pointerdown', destravar);
+      hub.removeEventListener('touchstart', destravar);
     };
-    hub.addEventListener('pointerdown', destravar);
-    hub.addEventListener('touchstart', destravar, { passive: true });
+    hub.addEventListener('pointerdown', destravar, { once: true });
+    hub.addEventListener('touchstart', destravar, { once: true, passive: true });
   }
 
   // Atualiza o ícone/estado do botão de som do hub conforme a
@@ -1150,6 +1162,11 @@
 
   function _fecharGamesHub(viaPopstate) {
     _pararJogosExternos(); // para Speed Tap / Sequência / Voo se estavam rodando
+    // Fix A1.18: suspende os dois AudioContext (som compartilhado + piano,
+    // que tem o seu próprio) — sem isso o indicador de mídia do navegador
+    // ficava preso ativo com a pessoa já de volta na lista de lojas.
+    if (window.AngatubaSom && typeof window.AngatubaSom._suspender === 'function') window.AngatubaSom._suspender();
+    if (window.PianoGame && typeof window.PianoGame.suspenderAudio === 'function') window.PianoGame.suspenderAudio();
     _sairTelaCheia();      // garante sair da tela cheia nativa
     if (typeof _rlLimparTimers === 'function') _rlLimparTimers();
     var hub = document.getElementById('games-hub');
@@ -1233,6 +1250,10 @@
     // Atualiza a faixa de ofensiva; anima a chama se subiu nesta visita.
     _streakAtualizarFaixa(_streakAumentouAgora);
     _streakAumentouAgora = false;
+    // Fix A1.15: desfaz o pushState({modal:'jogo'}) de _abrirJogo ao sair do
+    // jogo por qualquer caminho que não seja o botão "voltar" do Android
+    // (que já consumiu a entrada sozinho) — mesmo padrão dos outros modais.
+    if (history.state?.modal === 'jogo') { _popstateNosso = true; history.back(); }
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -1418,13 +1439,22 @@
         }, 1200);
         setTimeout(function(){ var ld = document.getElementById('games-loading'); if (ld) ld.style.display = 'none'; }, 12000);
       }
-    } else if (nome === 'speedtap' || nome === 'sequencia' || nome === 'voo' || nome === 'corrida' || nome === 'piano' || nome === 'pingpong' || nome === 'tanques' || nome === 'party') {
+    } else if (JOGOS_EXTERNOS[nome]) {
+      // Fix A1.17: antes a lista vinha duplicada à mão aqui — quem
+      // adicionasse um jogo novo em JOGOS_EXTERNOS e esquecesse esta linha
+      // abria uma tela vazia sem nenhum erro. Puff/Ervilhas não têm tela
+      // própria (só existem dentro de uma rodada do Party) e por isso nunca
+      // entram em JOGOS_EXTERNOS — a checagem já os exclui sozinha.
       // Jogos externos: carrega sob demanda e prepara quando pronto.
       _jogoLoader(nome).then(function (api) {
         if (api && typeof api.preparar === 'function') api.preparar();
       }).catch(function () {});
     }
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
+    // Fix A1.15: empilha uma entrada própria pro jogo — sem isto, o botão
+    // "voltar" do Android saía do hub inteiro em vez de só fechar o jogo
+    // (ver ramo "jogo-ativo" no handler de popstate, mais abaixo).
+    if (history.state?.modal !== 'jogo') history.pushState({ modal: 'jogo' }, '');
   }
   window._abrirJogo = _abrirJogo;
   window._voltarAoMenu = _voltarAoMenu;
@@ -2095,7 +2125,11 @@
   function escAttr(s) {
     // Barra invertida primeiro para nao re-escapar as entidades inseridas depois.
     // Protege onclick inline (registrarClique) contra nomes com \\ ' " e quebra de linha.
-    return String(s)
+    // Fix A4.11: String(undefined) vira a string literal "undefined" — igual
+    // ao escHTML (que já se protege com String(s || '')), null/undefined
+    // agora viram string vazia em vez de vazar pro atributo (ex.:
+    // data-au-img="undefined" -> <img src="undefined"> -> 404).
+    return String(s == null ? '' : s)
       .replace(/\\/g, '&#92;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;')
@@ -2275,6 +2309,10 @@
 
   // Duração do "story" antes de fechar sozinho (ms)
   const _ANUNCIO_STORY_MS = 6000;
+  // Fix A4.12: as duas fases tinham fallbacks de vídeo divergentes (Fase 1:
+  // _ANUNCIO_STORY_MS + 20000 = 26s; Fase 2: 25000 fixo) — mesma constante
+  // pras duas agora, pra nunca mais desalinhar sozinhas.
+  const _ANUNCIO_VIDEO_FALLBACK_MS = 25000;
 
   function abrirFotoAnuncio(url, nomeAnuncio, lojaId, assinatura, nomeLoja, planoLoja, categoriaLoja, midiaTipo) {
     var _ehVideo = String(midiaTipo || 'foto') === 'video';
@@ -2399,7 +2437,7 @@
         if (d && isFinite(d) && _videoEl.currentTime >= d - 0.15) fechar();
       });
       // Fallback: se os metadados não carregarem, fecha no tempo padrão.
-      _autoTimer = setTimeout(() => { if (!_videoEl.duration) fechar(); }, _ANUNCIO_STORY_MS + 20000);
+      _autoTimer = setTimeout(() => { if (!_videoEl.duration) fechar(); }, _ANUNCIO_VIDEO_FALLBACK_MS);
     } else if (fill) {
       fill.style.animationDuration = _ANUNCIO_STORY_MS + 'ms';
       // Auto-fecha ao fim da barra. Fechamento "automático" conta como manual
@@ -2578,21 +2616,25 @@
     var oldLb = document.getElementById('anuncio-lightbox');
     if (oldLb) oldLb.remove();
 
+    // Fix A4.9: decide "sou eu mesmo conferindo o próprio story" ANTES de
+    // contar a view — antes essa checagem só rodava depois do
+    // registrarClique, então o dono somava uma view (e via isso refletido
+    // no próprio badge de alcance) a cada vez que conferia sua publicação.
+    var _souDonoDoStory = !!(_lojaToken && _lojaNome && nomeLoja === _lojaNome);
+
     // Métrica: 1 view por pessoa por versão do conjunto (mesma regra da Fase 1).
     try {
       var jaCont = false;
       if (lojaId != null && assinatura) { var v = _carregarVistos(); jaCont = (v[lojaId] === assinatura); }
       // storyId do 1º story do conjunto — é o que a pessoa vê ao abrir.
       var _sid = (stories[0] && stories[0].id) ? String(stories[0].id) : '';
-      if (nomeLoja && !jaCont) registrarClique(nomeLoja, 'anuncio', planoLoja || 'PRO', categoriaLoja || '', _sid);
+      if (nomeLoja && !jaCont && !_souDonoDoStory) registrarClique(nomeLoja, 'anuncio', planoLoja || 'PRO', categoriaLoja || '', _sid);
     } catch (e) {}
 
     // Badge de alcance: só aparece se ESTA loja está logada no painel.
     // Número do dia + comparação com ontem — nunca acumula.
     try {
-      if (_lojaToken && _lojaNome && nomeLoja === _lojaNome) {
-        _mostrarBadgeViewsStory();
-      }
+      if (_souDonoDoStory) _mostrarBadgeViewsStory();
     } catch (eB) {}
 
     var idx = 0; // story atual
@@ -2716,7 +2758,7 @@
         });
         if (fill) { fill.style.animation = 'none'; fill.style.transform = 'scaleX(0)'; }
         // fallback se metadados não vierem
-        _timer = setTimeout(function(){ if (!vid.duration) avancar(); }, 25000);
+        _timer = setTimeout(function(){ if (!vid.duration) avancar(); }, _ANUNCIO_VIDEO_FALLBACK_MS);
         // botão de som deste story
         somBtn.onclick = function(e){ e.stopPropagation();
           vid.muted = !vid.muted;
@@ -2731,7 +2773,10 @@
           var img = document.createElement('img');
           img.id = 'anuncio-lightbox-img'; img.src = st.imagemUrl; img.draggable = false;
           img.onload = function(){ img.classList.add('carregada'); if (spinner) spinner.style.display='none'; };
-          img.onerror = function(){ if (spinner) spinner.style.display='none'; };
+          // Fix A4.17: antes só apagava o spinner e deixava os 6s do
+          // segmento correndo sobre um espaço vazio — igual ao onerror do
+          // vídeo (acima), agora pula pro próximo story na hora.
+          img.onerror = function(){ if (spinner) spinner.style.display='none'; avancar(); };
           slot.appendChild(img);
         }
         startFillCss(_ANUNCIO_STORY_MS);
@@ -3355,7 +3400,7 @@
   // Reusa a infra visual de #toast (com a coruja) — troca a coruja conforme o tipo.
   function mlToast(mensagem, tipo, owlSrc) {
     var owl = owlSrc || (tipo === 'erro' ? '/webp/owl-sign.webp'
-                       : tipo === 'ok'  ? '/webp/owl-thumbs-up.webp'
+                       : tipo === 'ok'  ? '/webp/owl-thumbsup.webp'
                        : '/webp/owl-tip.webp');
     if (typeof showToastSimples === 'function') { showToastSimples(mensagem, owl); return; }
     try { console.log('[toast]', mensagem); } catch(e) {}
@@ -7901,17 +7946,24 @@
     const hasFoto = isPago && loja.foto && loja.foto.trim();
     const hasLogo = isPago && loja.logo && loja.logo.trim();
 
-    // Tem foto de anuncio? Logo ganha anel animado + abre o story ao tocar.
-    const _mLogoAnuncio = isPro && loja.anuncio && loja.anuncio.imagemUrl;
+    // Tem foto de anuncio? Logo ganha anel animado + abre a sequência de
+    // stories ao tocar. Fix A4.6/A4.7/A4.8: migrado pro mesmo modelo Fase 2
+    // do card (thumbHTML) — antes a ficha usava o modelo Fase 1 (só o
+    // primeiro story, "visto" por assinatura do conjunto inteiro), o que
+    // abria só o 1º story em vez da sequência, divergia do card sobre
+    // visto/não-visto, e escondia o anel quando o 1º story era só texto.
+    const _mStoriesArr = _normalizarStories(loja);
+    const _mLogoAnuncio = isPro && _mStoriesArr.some(function(st){ return st.imagemUrl; });
     const _mLogoId  = loja.id || loja.wpp || loja.nome;
     const _mLogoAss = _mLogoAnuncio ? _assinaturaAnuncio(loja) : '';
-    const _mLogoVisto = _mLogoAnuncio && anuncioJaVisto(loja, _mLogoId);
+    const _mLogoVisto = _mLogoAnuncio && !_lojaTemStoryNaoVisto(_mStoriesArr);
+    if (_mLogoAnuncio) { try { (window._STORIES_REG = window._STORIES_REG || {})[String(_mLogoId)] = _mStoriesArr; } catch(e){} }
     const logoOverlay = hasLogo
       ? (_mLogoAnuncio
         ? `<div class="detail-logo-ring${_mLogoVisto ? ' ring-visto' : ''}"
-             ${_ringAnuncioData(loja, _mLogoId, _mLogoAss)} onclick="abrirFotoAnuncioEl(this)"
-             role="button" tabindex="0" title="Ver foto do anuncio"
-             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();abrirFotoAnuncioEl(this);}">
+             ${_ringAnuncioData(loja, _mLogoId, _mLogoAss)} onclick="abrirStoriesEl(this)"
+             role="button" tabindex="0" title="Ver stories"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();abrirStoriesEl(this);}">
            <div class="detail-logo-inner">
              <img src="${escAttr(loja.logo)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;"
                onerror="this.parentElement.parentElement.style.display='none'" />
@@ -10240,52 +10292,66 @@
   // pontos de 3 em 3h (01h,04h...22h, igual ao Google) de CADA um dos 7
   // dias (pontosPorDia) + a semana. O gráfico troca de dia ao clicar na
   // tira semanal (ver _selecionarDiaClima).
+  // Fix A3.10: coage pra número (ou null) na entrada — hoje não existe
+  // vetor de XSS explorável (tudo já passa por Math.round/parseInt antes de
+  // ir pro innerHTML), mas o objeto monta HTML/SVG por concatenação de
+  // string e é re-hidratado de JSON.parse(localStorage), uma fonte cuja
+  // forma o código não controla. Defesa barata que documenta a intenção.
+  function _climaNum(v) { return (v == null) ? null : Number(v); }
+
   function _montarDadosClima(j) {
+    // Fix A3.5: a Open-Meteo pode devolver 200 com "hourly" parcial (rate
+    // limit) — sem guardas, um índice ausente virava TypeError dentro do
+    // .then e derrubava o card inteiro. Falta de current/daily aborta cedo;
+    // os demais campos ganham fallback pra [] e seguem undefined (os `?`
+    // no template do topo já tratam undefined como "--").
+    if (!j || !j.current || !j.daily) return null;
     var DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     var diasStr = (j.daily && j.daily.time) || [];
     var horasAlvo = [1, 4, 7, 10, 13, 16, 19, 22];
     var pontosPorDia = diasStr.map(function () { return []; });
-    if (j.hourly && j.hourly.time) {
-      j.hourly.time.forEach(function (t, i) {
+    var hourly = j.hourly || {};
+    if (hourly.time) {
+      hourly.time.forEach(function (t, i) {
         var diaIdx = diasStr.indexOf(t.slice(0, 10));
         if (diaIdx === -1) return;
         var h = parseInt(t.slice(11, 13), 10);
         if (horasAlvo.indexOf(h) === -1) return;
         pontosPorDia[diaIdx].push({
           hora:    _p2(h) + 'h',
-          temp:    j.hourly.temperature_2m[i],
-          chuva:   j.hourly.precipitation_probability ? j.hourly.precipitation_probability[i] : 0,
-          vento:   j.hourly.wind_speed_10m[i],
-          umidade: j.hourly.relative_humidity_2m ? j.hourly.relative_humidity_2m[i] : null,
+          temp:    _climaNum((hourly.temperature_2m || [])[i]),
+          chuva:   _climaNum(hourly.precipitation_probability ? hourly.precipitation_probability[i] : 0),
+          vento:   _climaNum((hourly.wind_speed_10m || [])[i]),
+          umidade: _climaNum(hourly.relative_humidity_2m ? hourly.relative_humidity_2m[i] : null),
         });
       });
     }
     var semana = diasStr.slice(0, 7).map(function (dt, i) {
       return {
         nome: i === 0 ? 'Hoje' : DIAS_SEMANA[new Date(dt + 'T12:00:00').getDay()],
-        max:  j.daily.temperature_2m_max[i],
-        min:  j.daily.temperature_2m_min[i],
-        code: j.daily.weather_code[i],
+        max:  _climaNum((j.daily.temperature_2m_max || [])[i]),
+        min:  _climaNum((j.daily.temperature_2m_min || [])[i]),
+        code: (j.daily.weather_code || [])[i],
       };
     });
     // % de chuva "agora": pega a hora corrente na lista de horas (não os
     // 8 pontos de 3 em 3h — a hora exata mais próxima do relógio).
     var chuvaAgora = null;
-    if (j.hourly && j.hourly.time && j.hourly.precipitation_probability) {
+    if (hourly.time && hourly.precipitation_probability) {
       var alvo = _horaLocalStr(new Date());
-      var idx = j.hourly.time.findIndex(function (t) { return t.slice(0, 13) === alvo; });
+      var idx = hourly.time.findIndex(function (t) { return t.slice(0, 13) === alvo; });
       if (idx === -1) idx = 0;
-      chuvaAgora = j.hourly.precipitation_probability[idx];
+      chuvaAgora = _climaNum(hourly.precipitation_probability[idx]);
     }
     return {
-      temp:    j.current.temperature_2m,
+      temp:    _climaNum(j.current.temperature_2m),
       code:    j.current.weather_code,
       isDay:   j.current.is_day !== 0,
-      umidade: j.current.relative_humidity_2m,
-      vento:   j.current.wind_speed_10m,
+      umidade: _climaNum(j.current.relative_humidity_2m),
+      vento:   _climaNum(j.current.wind_speed_10m),
       chuva:   chuvaAgora,
-      max:     j.daily.temperature_2m_max[0],
-      min:     j.daily.temperature_2m_min[0],
+      max:     _climaNum((j.daily.temperature_2m_max || [])[0]),
+      min:     _climaNum((j.daily.temperature_2m_min || [])[0]),
       pontosHoje:   pontosPorDia[0] || [],
       pontosPorDia: pontosPorDia,
       semana:       semana,
@@ -10352,7 +10418,12 @@
   // previsão daquele dia, igual ao clima do Google.
   var _climaDiaSelecionado = 0;
   function _selecionarDiaClima(i) {
-    if (!_climaBruto || !_climaBruto.pontosPorDia || !_climaBruto.pontosPorDia[i] || !_climaBruto.pontosPorDia[i].length) return;
+    // Fix A3.6: antes exigia pontosPorDia[i].length pra sequer trocar de
+    // dia — um dia sem dado hora a hora fazia o toque parecer que não
+    // registrou (chip nem card do topo mudavam). Card do topo só precisa
+    // de semana[i] (máx/mín/código); o gráfico trata a falta de pontos
+    // sozinho (ver _renderGraficoClima).
+    if (!_climaBruto || !_climaBruto.semana || !_climaBruto.semana[i]) return;
     if (_climaDiaSelecionado === i) return;
     _climaDiaSelecionado = i;
     document.querySelectorAll('#weather-week-strip .weather-week-day').forEach(function (el, idx) {
@@ -10370,9 +10441,9 @@
       var info = _weatherInfo(dia.code, true); // previsão de dias futuros: sempre ícone "diurno"
       var sel  = i === _climaDiaSelecionado;
       return '<div class="weather-week-day' + (i === 0 ? ' hoje' : '') + (sel ? ' selecionado' : '') + '" ' +
-        'onclick="_selecionarDiaClima(' + i + ')" role="button" tabindex="0" aria-label="Ver previsão de ' + dia.nome + '" ' +
+        'onclick="_selecionarDiaClima(' + i + ')" role="button" tabindex="0" aria-label="Ver previsão de ' + escHTML(dia.nome) + '" ' +
         'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_selecionarDiaClima(' + i + ');}">' +
-        '<span class="weather-week-day-nome">' + dia.nome + '</span>' +
+        '<span class="weather-week-day-nome">' + escHTML(dia.nome) + '</span>' +
         '<i class="fa ' + info.ic + ' weather-week-day-ic" style="color:' + info.col + '" aria-hidden="true"></i>' +
         '<span class="weather-week-day-max">' + Math.round(dia.max) + '°</span>' +
         '<span class="weather-week-day-min">' + Math.round(dia.min) + '°</span></div>';
@@ -10383,21 +10454,38 @@
   // Clima" — troca de dado conforme a aba ativa (Temperatura/Chuva/Vento)
   // e conforme o dia escolhido na tira semanal (_climaDiaSelecionado).
   function _renderGraficoClima(aba) {
+    // Fix A3.8: valida ANTES de gravar em _climaAbaAtual — como a função é
+    // exposta em window, um valor inválido envenenava o estado permanente-
+    // mente (cfg undefined derrubava esta e toda repintura futura, inclusive
+    // a de _pintarClima).
+    if (!WEATHER_TAB_CFG[aba]) aba = _climaAbaAtual;
     _climaAbaAtual = aba;
     document.querySelectorAll('.weather-tab').forEach(function (t) {
       t.classList.toggle('active', t.dataset.tab === aba);
     });
     var svg      = document.getElementById('weather-chart-svg');
     var hoursBox = document.getElementById('weather-chart-hours');
+    if (!svg) return;
     var pontos   = (_climaBruto && _climaBruto.pontosPorDia) ? (_climaBruto.pontosPorDia[_climaDiaSelecionado] || []) : [];
-    if (!svg || !pontos.length) return;
+    if (!pontos.length) {
+      // Fix A3.6: sem dado hora a hora pra esse dia — some só o gráfico
+      // (em vez de deixar o do dia anterior na tela, parecendo travado).
+      svg.setAttribute('viewBox', '0 0 300 84');
+      svg.innerHTML = '<text x="150" y="42" text-anchor="middle" class="weather-chart-label">Sem dados hora a hora pra esse dia</text>';
+      if (hoursBox) hoursBox.innerHTML = '';
+      return;
+    }
     var cfg     = WEATHER_TAB_CFG[aba];
     var valores = pontos.map(function (p) { return p[cfg.campo]; });
     var min = Math.min.apply(null, valores), max = Math.max.apply(null, valores);
     if (min === max) { min -= 1; max += 1; }
     var W = 300, H = 62, PAD_TOP = 22, n = pontos.length;
+    // Fix A3.7: com n===1, (i/(n-1)) vira 0/0 = NaN e o path some sem erro
+    // no console. Hoje inalcançável (sempre 8 pontos por dia), mas qualquer
+    // mudança na consulta reabre o caso — divisor nunca fica em 0.
+    var divisorX = n > 1 ? (n - 1) : 1;
     var coords = valores.map(function (v, i) {
-      return { x: (i / (n - 1)) * W, y: PAD_TOP + (1 - (v - min) / (max - min)) * H };
+      return { x: (i / divisorX) * W, y: PAD_TOP + (1 - (v - min) / (max - min)) * H };
     });
     var linePath = coords.map(function (c, i) {
       if (i === 0) return 'M' + c.x + ' ' + c.y;
@@ -10429,8 +10517,15 @@
     try {
       cache = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || 'null');
       ts    = parseInt(localStorage.getItem(WEATHER_CACHE_TS_KEY) || '0');
-      if (cache && (Date.now() - ts) < WEATHER_CACHE_MS) { _pintarClima(cache); return; }
     } catch (e) {}
+    // Fix A3.4: stale-while-revalidate de verdade — pinta o cache (fresco
+    // OU vencido) na hora, se existir, e SEMPRE dispara o fetch em seguida
+    // pra revalidar em segundo plano, repintando quando chegar. Antes,
+    // cache fresco pintava e nunca revalidava, e cache vencido não pintava
+    // nada até a rede responder — o card ficava vazio durante a latência.
+    var fresco = cache && (Date.now() - ts) < WEATHER_CACHE_MS;
+    if (cache) _pintarClima(cache);
+    if (fresco) return;
     var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + WEATHER_LAT + '&longitude=' + WEATHER_LON +
       '&current=temperature_2m,weather_code,is_day,relative_humidity_2m,wind_speed_10m' +
       '&hourly=temperature_2m,precipitation_probability,wind_speed_10m,weather_code,relative_humidity_2m' +
@@ -10442,6 +10537,7 @@
     fetch(url, { signal: AbortSignal.timeout(8000) }).then(function (r) { if (!r.ok) throw new Error('weather http ' + r.status); return r.json(); })
       .then(function (j) {
         var d = _montarDadosClima(j);
+        if (!d) throw new Error('weather dados incompletos'); // ver A3.5
         try {
           localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify(d));
           localStorage.setItem(WEATHER_CACHE_TS_KEY, String(Date.now()));
@@ -10449,15 +10545,17 @@
         _pintarClima(d);
       })
       .catch(function () {
-        // Sem internet (ou Open-Meteo instável) e cache com mais de 30min:
-        // antes o card caía pro "--°" inicial do HTML mesmo tendo dado bom
-        // na mão. Agora usa o cache vencido como fallback (ver A3.1).
+        // Sem internet (ou Open-Meteo instável): se já tínhamos cache, ele
+        // já foi pintado acima — só atualiza o aviso quando esse cache
+        // estava vencido (senão o aviso de "sem conexão" apareceria por
+        // cima de um dado que ainda estava fresco, ver A3.1).
         if (cache) {
-          _pintarClima(cache);
-          var elCond = document.getElementById('weather-cond');
-          if (elCond) {
-            var hora = new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            elCond.textContent = 'Previsão de ' + hora + ' — sem conexão para atualizar';
+          if (!fresco) {
+            var elCond = document.getElementById('weather-cond');
+            if (elCond) {
+              var hora = new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+              elCond.textContent = 'Previsão de ' + hora + ' — sem conexão para atualizar';
+            }
           }
         } else {
           var elCondVazio = document.getElementById('weather-cond');
@@ -10970,8 +11068,14 @@
     if (document.getElementById('jogo-ranking')?.classList.contains('rank-open')) {
       if (typeof rankFecharPainel === 'function') rankFecharPainel(true); return;
     }
-    // Hub de jogos (menu ou uma tela de jogo aberta) — volta pra tela inicial
-    // em vez de sair do app.
+    // Jogo aberto dentro do hub (não o menu) — volta só ao menu de jogos,
+    // em vez de sair do hub inteiro (A1.15).
+    var _hubComJogoAtivo = document.getElementById('games-hub');
+    if (_hubComJogoAtivo && _hubComJogoAtivo.classList.contains('jogo-ativo')) {
+      if (typeof _voltarAoMenu === 'function') _voltarAoMenu();
+      return;
+    }
+    // Hub de jogos (menu) — volta pra tela inicial em vez de sair do app.
     if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) {
       if (typeof _sairDosJogos === 'function') _sairDosJogos(true); return;
     }
@@ -15545,6 +15649,19 @@ ${urlCard}`)}`;
       }
       cliAtualizarHeader();
     });
+
+    // Fix A1.21: sem isto, a volta do signInWithRedirect (fallback de
+    // cliEntrarGoogle quando o popup é bloqueado) nunca era processada
+    // explicitamente — o onAuthStateChanged acima acaba resolvendo o login
+    // na maioria dos navegadores, mas o toast de boas-vindas nunca aparecia,
+    // e em navegadores com bloqueio mais estrito de cookies de terceiros o
+    // fluxo podia falhar em silêncio.
+    auth.getRedirectResult().then(function (result) {
+      var u = result && result.user;
+      if (u && typeof showToastSimples === 'function') {
+        showToastSimples('Bem-vindo, ' + (u.displayName || 'você') + '!', '/webp/owl-wave.webp');
+      }
+    }).catch(function () { /* sem redirect pendente, ou falhou — onAuthStateChanged já cobre o caso comum */ });
   }
 
   /* ── Header: avatar quando logado, nada quando deslogado ────
@@ -15755,7 +15872,7 @@ ${urlCard}`)}`;
         }
         cliFecharLogin();
         if (typeof showToastSimples === 'function') {
-          showToastSimples('Conta criada! Bem-vindo, ' + apelido + '!', '/webp/owl-celebrategratis.webp');
+          showToastSimples('Conta criada! Bem-vindo, ' + apelido + '!', '/webp/owl-celebrate-gratis.webp');
         }
       })
       .catch(function (err) {
@@ -16377,13 +16494,14 @@ ${urlCard}`)}`;
 
   // Lê o Top 20 dos 7 jogos de uma vez (pra montar o geral e, pra quem
   // abriu o painel, pra ordenar as abas por popularidade — ver
-  // rankRenderAbas). Cache curto: se as duas coisas pedem quase juntas
-  // (abrir o painel dispara ambas), a segunda reaproveita a mesma leitura
-  // em vez de duplicar 7 requisições ao Firestore.
+  // rankRenderAbas). Cache: 140 leituras do Firestore por abertura do
+  // painel é a operação mais cara do app — 60s (em vez dos 4s originais,
+  // que só cobriam duas chamadas quase simultâneas na mesma abertura) corta
+  // quase tudo pra quem abre o ranking mais de uma vez seguida (ver A1.24).
   var _rankTopsCache = null, _rankTopsCacheEm = 0;
   function _rankTopsTodosJogos() {
     var agora = Date.now();
-    if (_rankTopsCache && (agora - _rankTopsCacheEm) < 4000) return _rankTopsCache;
+    if (_rankTopsCache && (agora - _rankTopsCacheEm) < 60000) return _rankTopsCache;
     _rankTopsCacheEm = agora;
     _rankTopsCache = Promise.all(Object.keys(RANK_COLECOES).map(function (k) {
       return rankLerTop(k, 20).then(function (top) { return { jogo: k, top: top }; });
@@ -16756,7 +16874,8 @@ ${urlCard}`)}`;
     relampago:       'rl-rank-slot',
     sequencia:       'sq-rank-slot',
     voo:             'vo-rank-slot',
-    corrida:         'cor-rank-slot'
+    corrida:         'cor-rank-slot',
+    piano:           'pn-rank-slot'
   };
   // Depois que a pessoa loga a partir da tela de fim, troca o convite de
   // login pelo ranking (top 5), já contabilizando a pontuação re-submetida.

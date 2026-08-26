@@ -1,0 +1,131 @@
+/* ═══════════════════════════════════════════════════════════════
+   BLOCOS DA CORUJA — estilos do jogo (lazy-loaded)
+   Injetado sob demanda pelo _jogoLoader ao abrir o jogo.
+   ═══════════════════════════════════════════════════════════════ */
+
+.bb-card {
+  border-radius: 16px; overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.bb-hud {
+  display: flex; flex-wrap: wrap; justify-content: space-around; gap: 6px;
+  padding: 12px 10px;
+  background: linear-gradient(135deg, rgba(34,211,238,0.12), rgba(37,99,235,0.08));
+  border-bottom: 1px solid var(--border);
+}
+.bb-hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 58px; }
+.bb-hud-objetivo { flex: 1 1 100%; order: -1; }
+.bb-hud-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); font-weight: 700;
+}
+.bb-hud-valor {
+  font-family: var(--font-h); font-weight: 800; font-size: 18px;
+  color: var(--text);
+}
+.bb-hud-obj-txt { font-size: 13px; text-align: center; }
+
+.bb-arena {
+  position: relative;
+  padding: 16px 12px 18px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  background:
+    radial-gradient(circle at 30% 10%, rgba(34,211,238,0.08), transparent 55%),
+    var(--surface2);
+  min-height: 420px;
+}
+
+/* Grade 8×8 */
+.bb-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: 100%; max-width: 340px; aspect-ratio: 1 / 1;
+  gap: 3px;
+  padding: 6px; border-radius: 12px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid var(--border);
+  touch-action: none;
+}
+.bb-cel {
+  border-radius: 5px;
+  background: rgba(255,255,255,0.05);
+  transition: background .08s;
+}
+.bb-cel.bb-cheia {
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,0.22), inset 0 2px 0 rgba(255,255,255,0.28);
+}
+.bb-cel.bb-preview-ok { background: rgba(74,222,128,0.55) !important; }
+.bb-cel.bb-preview-bad { background: rgba(239,68,68,0.45) !important; }
+
+/* Bandeja de peças */
+.bb-tray {
+  display: flex; justify-content: center; gap: 14px;
+  width: 100%; max-width: 340px;
+  min-height: 76px;
+}
+.bb-peca {
+  flex: 1 1 0; max-width: 100px;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 76px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  touch-action: none;
+  cursor: grab;
+}
+.bb-peca.bb-peca-vazia { background: transparent; }
+.bb-peca.bb-peca-arrastando { opacity: .35; }
+.bb-peca-mini {
+  display: grid; gap: 3px;
+  width: 64px; height: 64px;
+}
+.bb-peca-bloco {
+  border-radius: 4px;
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.28);
+}
+
+/* "Fantasma" da peça sendo arrastada (position:fixed, segue o dedo) */
+.bb-ghost {
+  position: fixed;
+  display: grid; gap: 3px;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: .92;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5));
+}
+.bb-ghost-bloco { border-radius: 4px; }
+.bb-ghost.bb-ghost-invalido { opacity: .55; }
+
+/* Telas de início e fim (mesmo padrão dos outros jogos: overlay
+   absoluto sobre a arena) */
+.bb-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 20px; gap: 6px;
+  background: var(--surface2);
+}
+.bb-overlay-owl { width: 72px; height: 72px; object-fit: contain; margin-bottom: 4px; }
+.bb-overlay-titulo { font-family: var(--font-h); font-weight: 800; font-size: 20px; color: var(--text); }
+.bb-overlay-desc { font-size: 13px; color: var(--muted); line-height: 1.4; max-width: 260px; }
+.bb-overlay-fase { font-family: var(--font-h); font-weight: 800; font-size: 16px; color: var(--text); margin-top: 4px; }
+.bb-overlay-rec { font-size: 12.5px; color: var(--muted); }
+
+.bb-btn {
+  margin-top: 10px;
+  font-family: var(--font-h); font-weight: 800; font-size: 15px;
+  color: #fff; cursor: pointer;
+  padding: 12px 32px; border-radius: 999px; border: none;
+  background: linear-gradient(135deg, #22d3ee, #2563eb);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .1s, filter .15s;
+  box-shadow: 0 4px 14px rgba(37,99,235,0.35);
+}
+.bb-btn:active { transform: scale(0.96); }
+.bb-btn:hover { filter: brightness(1.08); }
+.bb-link {
+  margin-top: 2px; background: none; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 700; color: var(--muted);
+  text-decoration: underline; -webkit-tap-highlight-color: transparent;
+}

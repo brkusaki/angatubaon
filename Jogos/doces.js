@@ -201,19 +201,67 @@
     _dcRenderTabuleiro();
   }
 
-  function _dcAplicarGravidade() {
+  // Aplica a gravidade (doces caem, vazios no topo viram doce novo) e
+  // devolve quanto cada um "caiu" (em linhas), pra animar a queda em
+  // vez de só trocar a cor instantaneamente. Doce novo entra vindo de
+  // cima da grade.
+  function _dcAplicarGravidadeComQuedas() {
+    var quedas = []; // { idx: posição final, filas: distância caída }
     for (var c = 0; c < _DC_TAM; c++) {
-      var vals = [];
-      for (var r = _DC_TAM - 1; r >= 0; r--) {
+      var sobreviventes = []; // {origRow, cor}, do topo pra baixo
+      for (var r = 0; r < _DC_TAM; r++) {
         var idx = r * _DC_TAM + c;
-        if (_dcCor[idx] !== 0) vals.push(_dcCor[idx]);
+        if (_dcCor[idx] !== 0) sobreviventes.push({ origRow: r, cor: _dcCor[idx] });
       }
+      var novos = _DC_TAM - sobreviventes.length;
       for (var i = 0; i < _DC_TAM; i++) {
-        var rr = _DC_TAM - 1 - i;
-        var idx2 = rr * _DC_TAM + c;
-        _dcCor[idx2] = (i < vals.length) ? vals[i] : _dcNovaCor();
+        var idx2 = i * _DC_TAM + c;
+        if (i < novos) {
+          _dcCor[idx2] = _dcNovaCor();
+          quedas.push({ idx: idx2, filas: novos - i });
+        } else {
+          var sv = sobreviventes[i - novos];
+          _dcCor[idx2] = sv.cor;
+          var filas = i - sv.origRow;
+          if (filas > 0) quedas.push({ idx: idx2, filas: filas });
+        }
       }
     }
+    return quedas;
+  }
+
+  // Anima os doces "caindo" na vertical: desloca cada célula pra cima
+  // (sem transição) na distância que ela percorreu e solta a transição
+  // pra baixo até a posição real, dando a sensação de queda/gravidade.
+  function _dcAnimarQuedas(quedas) {
+    if (!_dcCelEls || !quedas.length) return;
+    var passo = 43; // altura aproximada de célula + gap, em px (grade 340px/8 + 3px de gap)
+    var celRef = _dcCelEls[0];
+    if (celRef) {
+      var r = celRef.getBoundingClientRect();
+      if (r.height > 0) passo = r.height + 3;
+    }
+    quedas.forEach(function (q) {
+      var el = _dcCelEls[q.idx];
+      if (!el) return;
+      el.style.transition = 'none';
+      el.style.transform = 'translateY(' + (-q.filas * passo) + 'px)';
+    });
+    void document.getElementById('dc-grid').offsetHeight; // força reflow
+    quedas.forEach(function (q) {
+      var el = _dcCelEls[q.idx];
+      if (!el) return;
+      el.style.transition = 'transform .22s cubic-bezier(.34,1.15,.64,1)';
+      el.style.transform = 'translateY(0)';
+    });
+    setTimeout(function () {
+      quedas.forEach(function (q) {
+        var el = _dcCelEls[q.idx];
+        if (!el) return;
+        el.style.transition = '';
+        el.style.transform = '';
+      });
+    }, 240);
   }
 
   // Remove as peças marcadas (pontua, conta combinações da cor-alvo
@@ -373,11 +421,35 @@
         _dcAposCascata();
         return;
       }
-      _dcProcessarMarcados(resultado);
-      _dcAplicarGravidade();
-      _dcRenderTabuleiro();
-      _dcAtualizarHud();
-      setTimeout(passo, 260);
+      // 1) "Explode" as células combinadas antes de sumirem — sem isso a
+      // troca parecia teletransporte (uma cor some, outra já aparece no
+      // lugar sem nenhuma ligação visual entre as duas).
+      var s = _som(); if (s) s.combo();
+      var fx = window.AngatubaGames && window.AngatubaGames.efeitos;
+      resultado.runs.forEach(function (run) {
+        var meio = run.cells[Math.floor(run.cells.length / 2)];
+        var el = _dcCelEls[meio];
+        if (el && fx && fx.estrelas) {
+          var r = el.getBoundingClientRect();
+          fx.estrelas(r.left + r.width / 2, r.top + r.height / 2);
+        }
+      });
+      resultado.marcado.forEach(function (m, idx) {
+        if (m && _dcCelEls[idx]) _dcCelEls[idx].classList.add('dc-explodindo');
+      });
+      setTimeout(function () {
+        resultado.marcado.forEach(function (m, idx) {
+          if (m && _dcCelEls[idx]) _dcCelEls[idx].classList.remove('dc-explodindo');
+        });
+        // 2) só depois da explosão os doces de cima caem no lugar —
+        // com animação de queda em vez de troca instantânea de cor.
+        _dcProcessarMarcados(resultado);
+        var quedas = _dcAplicarGravidadeComQuedas();
+        _dcRenderTabuleiro();
+        _dcAtualizarHud();
+        _dcAnimarQuedas(quedas);
+        setTimeout(passo, 300);
+      }, 200);
     }
     passo();
   }

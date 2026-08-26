@@ -1432,7 +1432,11 @@
     var telas = document.querySelectorAll('.jogo-tela');
     for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
     var tela = document.getElementById('jogo-' + nome);
-    if (tela) tela.style.display = 'block';
+    // Fix: limpa o display inline em vez de forçar 'block' — só assim a
+    // regra de CSS "body.games-fs-open .jogo-tela { display:flex }" (que
+    // faz o cartão do jogo esticar pra tela toda) consegue valer, já que
+    // estilo inline sempre vence regra de classe.
+    if (tela) tela.style.display = '';
     if (nome === 'quiz') {
       // Lazy-load do quiz na primeira abertura da tela.
       if (!_quizJaCarregadoNaTela) {

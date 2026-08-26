@@ -5861,16 +5861,18 @@ body.games-fs-open .streak-faixa   { margin: 0 16px 10px; }
 body.games-fs-open #games-menu     { padding: 0 16px 24px; }
 
 /* Cada tela de jogo ocupa a altura toda, em coluna: botão voltar no topo,
-   HUD logo abaixo (fixos), arena preenchendo o resto. */
+   HUD logo abaixo (fixos), arena preenchendo o resto.
+   IMPORTANTE: isto só funciona porque _abrirJogo() (app.js) agora LIMPA
+   o display inline da tela que está abrindo (style.display = ''), em vez
+   de forçar 'block' — assim esta regra de classe consegue valer sem
+   precisar de !important. NÃO usar !important aqui: um !important nessa
+   regra bateria também o display:none inline que esconde as OUTRAS
+   .jogo-tela (todas casam no mesmo seletor), fazendo todo jogo aparecer
+   empilhado ao mesmo tempo — foi exatamente esse bug que aconteceu antes. */
 body.games-fs-open .jogo-tela {
   height: 100vh;
   height: 100dvh;          /* altura FIXA: referencia pro flex da arena */
-  /* !important necessário: _abrirJogo() (app.js) seta display:block
-     inline em CADA tela de jogo ao abrir, e estilo inline sempre vence
-     regra de classe — sem isto o flex-column abaixo nunca chega a
-     valer e o cartão do jogo (.xx-card) fica do tamanho do conteúdo em
-     vez de esticar pra tela toda, mesmo em tela cheia nativa. */
-  display: flex !important;
+  display: flex;
   flex-direction: column;
   padding: 0;
   overflow: hidden;

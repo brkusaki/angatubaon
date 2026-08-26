@@ -25,6 +25,15 @@
 
   var _DC_TAM = 8; // grade 8×8
   var _dcCores = ['#ef4444', '#a855f7', '#4ade80', '#fbbf24', '#38bdf8'];
+  // Texturas opcionais (mesma ordem de _dcCores); se o arquivo não existir,
+  // a cor sólida acima já fica aplicada como fundo e o visual não quebra.
+  var _dcTexturas = [
+    '/Jogos/assets/doces/doce-vermelho.webp',
+    '/Jogos/assets/doces/doce-roxo.webp',
+    '/Jogos/assets/doces/doce-verde.webp',
+    '/Jogos/assets/doces/doce-amarelo.webp',
+    '/Jogos/assets/doces/doce-azul.webp'
+  ];
   var _dcCoresNome = ['🔴 vermelho', '🟣 roxo', '🟢 verde', '🟡 amarelo', '🔵 azul'];
 
   // ── Estado ────────────────────────────────────────────────
@@ -249,7 +258,17 @@
     if (!_dcCelEls) return;
     for (var i = 0; i < _dcCelEls.length; i++) {
       var el = _dcCelEls[i];
-      el.style.background = _dcCores[_dcCor[i] - 1] || '';
+      var corIdx = _dcCor[i] - 1;
+      el.style.background = _dcCores[corIdx] || '';
+      var tex = _dcTexturas[corIdx];
+      if (tex) {
+        el.style.backgroundImage = 'url(' + tex + ')';
+        el.style.backgroundSize = '72%';
+        el.style.backgroundPosition = 'center';
+        el.style.backgroundRepeat = 'no-repeat';
+      } else {
+        el.style.backgroundImage = '';
+      }
       el.classList.toggle('dc-gelo', _dcGelo[i] > 0);
       el.classList.toggle('dc-gelo-2', _dcGelo[i] === 2);
       el.classList.toggle('dc-selecionada', !!(_dcSelecionado && (_dcSelecionado.r * _DC_TAM + _dcSelecionado.c) === i));

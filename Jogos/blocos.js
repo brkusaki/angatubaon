@@ -28,12 +28,12 @@
   // Texturas opcionais (mesma ordem de _bbCores); se o arquivo não existir,
   // a cor sólida acima já fica aplicada como fundo e o visual não quebra.
   var _bbTexturas = [
-    '/Jogos/assets/bloco-roxo.webp',
-    '/Jogos/assets/bloco-azul.webp',
-    '/Jogos/assets/bloco-verde.webp',
-    '/Jogos/assets/bloco-amarelo.webp',
-    '/Jogos/assets/bloco-rosa.webp',
-    '/Jogos/assets/bloco-ciano.webp'
+    '/Jogos/assets/blocos/bloco-roxo.webp',
+    '/Jogos/assets/blocos/bloco-azul.webp',
+    '/Jogos/assets/blocos/bloco-verde.webp',
+    '/Jogos/assets/blocos/bloco-amarelo.webp',
+    '/Jogos/assets/blocos/bloco-rosa.webp',
+    '/Jogos/assets/blocos/bloco-ciano.webp'
   ];
   function _bbAplicarCor(el, corIdx) {
     el.style.background = _bbCores[corIdx];

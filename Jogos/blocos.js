@@ -25,6 +25,25 @@
 
   var _BB_TAM = 8;                 // grade 8×8
   var _bbCores = ['#a855f7', '#38bdf8', '#34d399', '#fbbf24', '#fb7185', '#22d3ee'];
+  // Texturas opcionais (mesma ordem de _bbCores); se o arquivo não existir,
+  // a cor sólida acima já fica aplicada como fundo e o visual não quebra.
+  var _bbTexturas = [
+    '/Jogos/assets/bloco-roxo.webp',
+    '/Jogos/assets/bloco-azul.webp',
+    '/Jogos/assets/bloco-verde.webp',
+    '/Jogos/assets/bloco-amarelo.webp',
+    '/Jogos/assets/bloco-rosa.webp',
+    '/Jogos/assets/bloco-ciano.webp'
+  ];
+  function _bbAplicarCor(el, corIdx) {
+    el.style.background = _bbCores[corIdx];
+    var tex = _bbTexturas[corIdx];
+    if (tex) {
+      el.style.backgroundImage = 'url(' + tex + ')';
+      el.style.backgroundSize = 'cover';
+      el.style.backgroundPosition = 'center';
+    }
+  }
 
   // ── Formas das peças (offsets [linha,coluna] a partir de [0,0]) ──
   // t = "tier" de dificuldade: 1 pequena, 2 média, 3 grande/incômoda.
@@ -223,8 +242,8 @@
     for (var i = 0; i < _bbCelEls.length; i++) {
       var v = _bbGrid[i], el = _bbCelEls[i];
       el.classList.remove('bb-preview-ok', 'bb-preview-bad');
-      if (v > 0) { el.classList.add('bb-cheia'); el.style.background = _bbCores[v - 1]; }
-      else { el.classList.remove('bb-cheia'); el.style.background = ''; }
+      if (v > 0) { el.classList.add('bb-cheia'); _bbAplicarCor(el, v - 1); }
+      else { el.classList.remove('bb-cheia'); el.style.background = ''; el.style.backgroundImage = ''; }
     }
   }
 
@@ -277,7 +296,7 @@
         b.className = 'bb-peca-bloco';
         b.style.gridColumn = (o[1] + 1);
         b.style.gridRow = (o[0] + 1);
-        b.style.background = _bbCores[peca.cor - 1];
+        _bbAplicarCor(b, peca.cor - 1);
         mini.appendChild(b);
       });
       slot.appendChild(mini);
@@ -314,7 +333,7 @@
       b.className = 'bb-ghost-bloco';
       b.style.gridColumn = (o[1] + 1);
       b.style.gridRow = (o[0] + 1);
-      b.style.background = _bbCores[peca.cor - 1];
+      _bbAplicarCor(b, peca.cor - 1);
       ghost.appendChild(b);
     });
     (document.fullscreenElement || document.body).appendChild(ghost);

@@ -5865,7 +5865,12 @@ body.games-fs-open #games-menu     { padding: 0 16px 24px; }
 body.games-fs-open .jogo-tela {
   height: 100vh;
   height: 100dvh;          /* altura FIXA: referencia pro flex da arena */
-  display: flex;
+  /* !important necessário: _abrirJogo() (app.js) seta display:block
+     inline em CADA tela de jogo ao abrir, e estilo inline sempre vence
+     regra de classe — sem isto o flex-column abaixo nunca chega a
+     valer e o cartão do jogo (.xx-card) fica do tamanho do conteúdo em
+     vez de esticar pra tela toda, mesmo em tela cheia nativa. */
+  display: flex !important;
   flex-direction: column;
   padding: 0;
   overflow: hidden;

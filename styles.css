@@ -4982,6 +4982,8 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .gc-voo      { --gc:#38bdf8; --gc-2:#4f46e5; --gc-a:rgba(56,189,248,.16);  --gc-b:rgba(56,189,248,.34); }
 .gc-corrida  { --gc:#fb923c; --gc-2:#dc2626; --gc-a:rgba(251,146,60,.16);  --gc-b:rgba(251,146,60,.34); }
 .gc-piano    { --gc:#c084fc; --gc-2:#7c3aed; --gc-a:rgba(168,85,247,.16); --gc-b:rgba(168,85,247,.34); }
+.gc-blocos   { --gc:#22d3ee; --gc-2:#2563eb; --gc-a:rgba(34,211,238,.16); --gc-b:rgba(34,211,238,.34); }
+.gc-doces    { --gc:#fb7185; --gc-2:#f97316; --gc-a:rgba(251,113,133,.16); --gc-b:rgba(251,113,133,.34); }
 .gc-pingpong { --gc:#38bdf8; --gc-2:#0ea5e9; --gc-a:rgba(56,189,248,.16); --gc-b:rgba(56,189,248,.34); }
 .gc-tanques  { --gc:#34d399; --gc-2:#0d9488; --gc-a:rgba(16,185,129,.16); --gc-b:rgba(16,185,129,.34); }
 .gc-party    { --gc:#ec4899; --gc-2:#f59e0b; --gc-a:rgba(236,72,153,.16); --gc-b:rgba(236,72,153,.34); }

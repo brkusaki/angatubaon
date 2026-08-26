@@ -604,6 +604,24 @@
           </div>
         </button>
 
+        <button type="button" class="game-card gc-blocos" data-cat="puzzle" data-nome="blocos da coruja" data-desc="encaixe as pecas e complete linhas ou colunas" onclick="_abrirJogo('blocos')">
+          <div class="gc-media"><img src="/Jogos/assets/card-blocos.webp" alt="" loading="lazy" class="gc-hero-img"></div>
+          <div class="gc-body">
+            <div class="gc-title">Blocos da Coruja</div>
+            <div class="gc-desc">Encaixe as peças e complete linhas ou colunas pra pontuar!</div>
+            <span class="gc-cta">Jogar</span>
+          </div>
+        </button>
+
+        <button type="button" class="game-card gc-doces" data-cat="puzzle" data-nome="doces da coruja" data-desc="combine 3 ou mais doces da mesma cor" onclick="_abrirJogo('doces')">
+          <div class="gc-media"><img src="/Jogos/assets/card-doces.webp" alt="" loading="lazy" class="gc-hero-img"></div>
+          <div class="gc-body">
+            <div class="gc-title">Doces da Coruja</div>
+            <div class="gc-desc">Combine 3 ou mais doces da mesma cor antes que os movimentos acabem!</div>
+            <span class="gc-cta">Jogar</span>
+          </div>
+        </button>
+
         <button type="button" class="game-card gc-pingpong" data-cat="multi" data-nome="ping pong da coruja" data-desc="sozinho contra a cpu ou 1x1 com um amigo em tempo real" onclick="_abrirJogo('pingpong')">
           <div class="gc-media"><img src="/Jogos/assets/card-pingpong.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
@@ -947,6 +965,87 @@
               <div class="rank-slot" id="pn-rank-slot" style="display:none;"></div>
               <button type="button" class="pn-play" onclick="_pnComecar()">Tocar de novo</button>
               <button type="button" class="pn-link" onclick="_pnVoltarInicio()">Trocar música ou modo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TELA: Blocos da Coruja (block puzzle estilo Block Blast/1010!) -->
+      <div id="jogo-blocos" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div class="bb-card" id="bb-card">
+          <div class="bb-hud">
+            <div class="bb-hud-item bb-hud-objetivo">
+              <span class="bb-hud-label">Objetivo</span>
+              <span class="bb-hud-valor bb-hud-obj-txt" id="bb-objetivo-texto">—</span>
+            </div>
+            <div class="bb-hud-item"><span class="bb-hud-label">Fase</span><span class="bb-hud-valor" id="bb-fase">1</span></div>
+            <div class="bb-hud-item"><span class="bb-hud-label">Progresso</span><span class="bb-hud-valor" id="bb-objetivo-progresso">0/0</span></div>
+            <div class="bb-hud-item"><span class="bb-hud-label">Pontos</span><span class="bb-hud-valor" id="bb-pontos">0</span></div>
+            <div class="bb-hud-item"><span class="bb-hud-label">Recorde</span><span class="bb-hud-valor" id="bb-recorde">0</span></div>
+          </div>
+          <div class="bb-arena" id="bb-arena">
+            <div class="bb-grid" id="bb-grid"></div>
+            <div class="bb-tray" id="bb-tray"></div>
+
+            <!-- Tela inicial -->
+            <div class="bb-overlay" id="bb-inicio">
+              <img src="/webp/owl-idea.webp" alt="" class="bb-overlay-owl" onerror="this.style.display='none'">
+              <div class="bb-overlay-titulo">🧱 Blocos da Coruja</div>
+              <div class="bb-overlay-desc">Encaixe as peças na grade e complete linhas ou colunas pra pontuar. Cumpra o objetivo antes que o espaço acabe!</div>
+              <div class="bb-overlay-fase">Fase <b id="bb-fase-inicio">1</b></div>
+              <div class="bb-overlay-rec">Recorde: fase <span id="bb-recorde-inicio">0</span></div>
+              <button type="button" class="bb-btn" onclick="_bbComecar()">Jogar</button>
+            </div>
+
+            <!-- Tela de fim (fase concluída OU sem espaço — conteúdo trocado por JS) -->
+            <div class="bb-overlay" id="bb-fim" style="display:none;">
+              <img src="" alt="" class="bb-overlay-owl" id="bb-fim-owl" onerror="this.style.display='none'">
+              <div class="bb-overlay-titulo" id="bb-fim-titulo">Fim</div>
+              <div class="bb-overlay-desc" id="bb-fim-msg"></div>
+              <div class="rank-slot" id="bb-rank-slot" style="display:none;"></div>
+              <button type="button" class="bb-btn" id="bb-fim-btn" onclick="_bbBotaoPrincipal()">Continuar</button>
+              <button type="button" class="bb-link" onclick="_voltarAoMenu()">Voltar aos jogos</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TELA: Doces da Coruja (match-3 estilo Candy Crush simplificado) -->
+      <div id="jogo-doces" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div class="dc-card" id="dc-card">
+          <div class="dc-hud">
+            <div class="dc-hud-item dc-hud-objetivo">
+              <span class="dc-hud-label">Objetivo</span>
+              <span class="dc-hud-valor dc-hud-obj-txt" id="dc-objetivo-texto">—</span>
+            </div>
+            <div class="dc-hud-item"><span class="dc-hud-label">Fase</span><span class="dc-hud-valor" id="dc-fase">1</span></div>
+            <div class="dc-hud-item"><span class="dc-hud-label">Progresso</span><span class="dc-hud-valor" id="dc-objetivo-progresso">0/0</span></div>
+            <div class="dc-hud-item"><span class="dc-hud-label">Movimentos</span><span class="dc-hud-valor" id="dc-movimentos">0</span></div>
+            <div class="dc-hud-item"><span class="dc-hud-label">Recorde</span><span class="dc-hud-valor" id="dc-recorde">0</span></div>
+          </div>
+          <div class="dc-arena" id="dc-arena">
+            <div class="dc-grid" id="dc-grid"></div>
+
+            <!-- Tela inicial -->
+            <div class="dc-overlay" id="dc-inicio">
+              <img src="/webp/owl-idea.webp" alt="" class="dc-overlay-owl" onerror="this.style.display='none'">
+              <div class="dc-overlay-titulo">🍬 Doces da Coruja</div>
+              <div class="dc-overlay-desc">Troque dois doces adjacentes (toque nos dois, ou arraste) pra formar combinações de 3 ou mais. Cumpra o objetivo antes que os movimentos acabem!</div>
+              <div class="dc-overlay-fase">Fase <b id="dc-fase-inicio">1</b></div>
+              <div class="dc-overlay-rec">Recorde: fase <span id="dc-recorde-inicio">0</span></div>
+              <button type="button" class="dc-btn" onclick="_dcComecar()">Jogar</button>
+            </div>
+
+            <!-- Tela de fim (fase concluída OU movimentos esgotados — conteúdo trocado por JS) -->
+            <div class="dc-overlay" id="dc-fim" style="display:none;">
+              <img src="" alt="" class="dc-overlay-owl" id="dc-fim-owl" onerror="this.style.display='none'">
+              <div class="dc-overlay-titulo" id="dc-fim-titulo">Fim</div>
+              <div class="dc-overlay-desc" id="dc-fim-msg"></div>
+              <div class="rank-slot" id="dc-rank-slot" style="display:none;"></div>
+              <button type="button" class="dc-btn" id="dc-fim-btn" onclick="_dcBotaoPrincipal()">Continuar</button>
+              <button type="button" class="dc-link" onclick="_voltarAoMenu()">Voltar aos jogos</button>
             </div>
           </div>
         </div>

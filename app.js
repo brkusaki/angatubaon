@@ -1224,6 +1224,8 @@
     // quando por algum motivo o Party não tiver rodado sua própria limpeza.
     if (window.PuffGame      && typeof window.PuffGame.parar      === 'function') window.PuffGame.parar();
     if (window.ErvilhasGame  && typeof window.ErvilhasGame.parar  === 'function') window.ErvilhasGame.parar();
+    if (window.BlocosGame    && typeof window.BlocosGame.parar    === 'function') window.BlocosGame.parar();
+    if (window.DocesGame     && typeof window.DocesGame.parar     === 'function') window.DocesGame.parar();
     // Coruja Party: sem isto, sair da lobby pelo botão genérico (em vez
     // das telas próprias do Party) não avisava o Firebase — a sala
     // ficava fantasma na lista pública. Ver PartyGame.parar em party.js.
@@ -1328,7 +1330,11 @@
     puff: { js: '/Jogos/puff.min.js', css: '/Jogos/puff.css', global: 'PuffGame' },
     // Ervilhas da Coruja: mesmo esquema do Puff acima — minigame só da
     // pool do Coruja Party, carregado via window._jogoLoader('ervilhas').
-    ervilhas: { js: '/Jogos/ervilhas.min.js', css: '/Jogos/ervilhas.css', global: 'ErvilhasGame' }
+    ervilhas: { js: '/Jogos/ervilhas.min.js', css: '/Jogos/ervilhas.css', global: 'ErvilhasGame' },
+    // Blocos da Coruja e Doces da Coruja: solo com fases (não entram na
+    // pool do Coruja Party). Ranking = maior fase concluída.
+    blocos: { js: '/Jogos/blocos.min.js', css: '/Jogos/blocos.css', global: 'BlocosGame' },
+    doces: { js: '/Jogos/doces.min.js', css: '/Jogos/doces.css', global: 'DocesGame' }
   };
   var _jogosCarregados = {};   // nome -> true quando js+css já injetados
 
@@ -16086,7 +16092,9 @@ ${urlCard}`)}`;
     sequencia:       '#34d399',
     voo:             '#38bdf8',
     corrida:         '#a3e635',
-    piano:           '#f472b6'
+    piano:           '#f472b6',
+    blocos:          '#22d3ee',
+    doces:           '#fb7185'
   };
 
   function cliRenderRecordes() {
@@ -16339,7 +16347,9 @@ ${urlCard}`)}`;
     sequencia:       'ranking_sequencia',
     voo:             'ranking_voo',
     corrida:         'ranking_corrida',
-    piano:           'ranking_piano'
+    piano:           'ranking_piano',
+    blocos:          'ranking_blocos',
+    doces:           'ranking_doces'
   };
 
   // Chave do recorde LOCAL (localStorage) de cada jogo. Usada para, ao
@@ -16353,7 +16363,9 @@ ${urlCard}`)}`;
     sequencia:       'angatuba_seq_rec',
     voo:             'angatuba_voo_rec',
     corrida:         'angatuba_corrida_rec',
-    piano:           'angatuba_piano_rec'
+    piano:           'angatuba_piano_rec',
+    blocos:          'angatuba_blocos_fase',
+    doces:           'angatuba_doces_fase'
   };
   function _rankRecordeLocal(jogoKey) {
     var chave = RANK_REC_LOCAL[jogoKey];
@@ -16566,7 +16578,9 @@ ${urlCard}`)}`;
     sequencia:       { label: 'Sequência',      sub: '',             ico: '🧠' },
     voo:             { label: 'Voo da Coruja',   sub: '',            ico: '☁️' },
     corrida:         { label: 'Corrida da Coruja', sub: '',          ico: '🧟' },
-    piano:           { label: 'Piano da Coruja',   sub: '',          ico: '🎹' }
+    piano:           { label: 'Piano da Coruja',   sub: '',          ico: '🎹' },
+    blocos:          { label: 'Blocos da Coruja',  sub: '',          ico: '🧱' },
+    doces:           { label: 'Doces da Coruja',   sub: '',          ico: '🍬' }
   };
 
   var _rankAbaAtual = 'geral';
@@ -16875,7 +16889,9 @@ ${urlCard}`)}`;
     sequencia:       'sq-rank-slot',
     voo:             'vo-rank-slot',
     corrida:         'cor-rank-slot',
-    piano:           'pn-rank-slot'
+    piano:           'pn-rank-slot',
+    blocos:          'bb-rank-slot',
+    doces:           'dc-rank-slot'
   };
   // Depois que a pessoa loga a partir da tela de fim, troca o convite de
   // login pelo ranking (top 5), já contabilizando a pontuação re-submetida.

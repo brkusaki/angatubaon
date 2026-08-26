@@ -255,10 +255,23 @@
       slot.classList.remove('bb-peca-vazia');
       var maxR = 0, maxC = 0;
       peca.cel.forEach(function (o) { if (o[0] > maxR) maxR = o[0]; if (o[1] > maxC) maxC = o[1]; });
+      var cols = maxC + 1, rows = maxR + 1;
+      // Fix: usava 1fr dentro de uma caixa quadrada fixa (64×64), então uma
+      // peça 1×4 (uma barra EM PÉ) saía esticada em 4 tiras DEITADAS bem
+      // finas — o formato na bandeja não batia com o formato real da peça.
+      // Calcula um tamanho de célula em px que mantém as células quadradas,
+      // escalando a peça inteira (e não cada eixo) dentro de uma caixa máxima.
+      var GAP = 3, MAX_LADO = 58;
+      var maiorDim = Math.max(cols, rows);
+      var cellPx = Math.max(9, Math.floor((MAX_LADO - (maiorDim - 1) * GAP) / maiorDim));
+      var larguraPx = cols * cellPx + (cols - 1) * GAP;
+      var alturaPx = rows * cellPx + (rows - 1) * GAP;
       var mini = document.createElement('div');
       mini.className = 'bb-peca-mini';
-      mini.style.gridTemplateColumns = 'repeat(' + (maxC + 1) + ', 1fr)';
-      mini.style.gridTemplateRows = 'repeat(' + (maxR + 1) + ', 1fr)';
+      mini.style.width = larguraPx + 'px';
+      mini.style.height = alturaPx + 'px';
+      mini.style.gridTemplateColumns = 'repeat(' + cols + ',' + cellPx + 'px)';
+      mini.style.gridTemplateRows = 'repeat(' + rows + ',' + cellPx + 'px)';
       peca.cel.forEach(function (o) {
         var b = document.createElement('div');
         b.className = 'bb-peca-bloco';

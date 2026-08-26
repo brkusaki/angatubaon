@@ -77,8 +77,10 @@
 .bb-peca.bb-peca-vazia { background: transparent; }
 .bb-peca.bb-peca-arrastando { opacity: .35; }
 .bb-peca-mini {
+  /* largura/altura/grid-template vêm do JS (blocos.js), calculados por
+     peça, pra manter as células quadradas mesmo em peças compridas
+     (ex.: uma barra 1×4 fica fina e alta, não esticada e achatada). */
   display: grid; gap: 3px;
-  width: 64px; height: 64px;
 }
 .bb-peca-bloco {
   border-radius: 4px;

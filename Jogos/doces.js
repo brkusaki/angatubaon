@@ -1,9 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════
-   DOCES DA CORUJA (match-3 estilo Candy Crush simplificado) —
-   módulo de jogo (lazy-loaded). Carregado sob demanda por /Jogos/
-   quando o usuário abre o jogo. Comunica-se com o app APENAS via
-   window.AngatubaGames (a ponte). Expõe
-   window.DocesGame = { preparar, comecar, parar }.
+   DOCES DA CORUJA (match-3 estilo Candy Crush) — módulo de jogo
+   (lazy-loaded). Carregado sob demanda por /Jogos/ quando o usuário
+   abre o jogo. Comunica-se com o app APENAS via window.AngatubaGames
+   (a ponte). Expõe window.DocesGame = { preparar, comecar, parar }.
 
    Mecânica: grade 8×8 de doces coloridos. Troca duas peças
    adjacentes (toque em duas, ou arraste/swipe) — se formar uma
@@ -15,6 +14,14 @@
    FASE CONCLUÍDA (inteiro), guardada localmente em
    'angatuba_doces_fase' e reconciliada no Firestore via
    AngatubaGames.rankSubmeter/rankFimDeJogo.
+
+   RENDER: tabuleiro desenhado num único <canvas> (não uma div por
+   célula), com loop de animação via requestAnimationFrame — permite
+   troca deslizando, queda com "bounce" ao pousar, explosão com
+   partícula e gelo com opacidade variável, mais perto do Candy Crush
+   do que CSS/DOM dava. A LÓGICA do jogo (tabuleiro, combinações,
+   gravidade, objetivo, fases, ranking) é a mesma de antes — só a
+   forma de desenhar e captar toque mudou.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -25,8 +32,8 @@
 
   var _DC_TAM = 8; // grade 8×8
   var _dcCores = ['#ef4444', '#a855f7', '#4ade80', '#fbbf24', '#38bdf8'];
-  // Texturas opcionais (mesma ordem de _dcCores); se o arquivo não existir,
-  // a cor sólida acima já fica aplicada como fundo e o visual não quebra.
+  // Texturas opcionais (mesma ordem de _dcCores); se a imagem não
+  // carregar, a cor sólida acima já é usada como fundo do doce.
   var _dcTexturas = [
     '/Jogos/assets/doces/doce-vermelho.webp',
     '/Jogos/assets/doces/doce-roxo.webp',
@@ -34,9 +41,10 @@
     '/Jogos/assets/doces/doce-amarelo.webp',
     '/Jogos/assets/doces/doce-azul.webp'
   ];
+  var _DC_TEX_GELO = '/Jogos/assets/doces/gelo.webp';
   var _dcCoresNome = ['🔴 vermelho', '🟣 roxo', '🟢 verde', '🟡 amarelo', '🔵 azul'];
 
-  // ── Estado ────────────────────────────────────────────────
+  // ── Estado do jogo (igual a antes) ─────────────────────────
   var _dcCor = [];                // 64 posições: 1..5 = cor do doce
   var _dcGelo = [];               // 64 posições: 0 = normal, 1-2 = hits restantes
   var _dcFaseAtual = 1;
@@ -49,9 +57,23 @@
   var _dcRodando = false;
   var _dcAnimando = false;
   var _dcUltimoResultado = null;  // 'venceu' | 'perdeu'
-  var _dcCelEls = null;
   var _dcSelecionado = null;      // { r, c } escolhida por toque
   var _dcArraste = null;
+
+  // ── Estado só do RENDER em canvas ──────────────────────────
+  var _dcCanvas = null, _dcCtx = null;
+  var _dcTelaAberta = false;      // liga/desliga o loop de desenho
+  var _dcImgs = {};               // corIdx(0..4) -> Image carregada; 'gelo' -> Image
+  var _dcImgsPedidas = false;
+  var _DC_PAD = 6, _DC_GAP = 3;   // mesmos valores que eram do CSS (.dc-grid)
+  var _dcQuedaAnim = {};          // idx -> { t0, filas }
+  var _dcPopAnim = {};            // idx -> { t0 }
+  var _dcPousoAnim = {};          // idx -> { t0 } (squash ao pousar da queda)
+  var _dcShakeAnim = {};          // idx -> { t0 } (troca inválida)
+  var _dcTrocaAnim = null;        // { i1, i2, t0, duracao, reversa }
+  var _DC_DUR_POP = 200, _DC_DUR_QUEDA = 220, _DC_DUR_POUSO = 150,
+      _DC_DUR_SHAKE = 300, _DC_DUR_TROCA = 130;
+  var _dcCorBorda = 'rgba(255,255,255,0.08)'; // fallback; lido de --border ao preparar a tela
 
   // ── localStorage: maior fase JÁ CONCLUÍDA ──────────────────
   function _dcRecordeGet() {
@@ -198,7 +220,6 @@
   function _dcEmbaralhar() {
     var tentativas = 0;
     do { _dcGerarTabuleiroInicial(); tentativas++; } while (!_dcExisteMovimentoValido() && tentativas < 6);
-    _dcRenderTabuleiro();
   }
 
   // Aplica a gravidade (doces caem, vazios no topo viram doce novo) e
@@ -230,40 +251,6 @@
     return quedas;
   }
 
-  // Anima os doces "caindo" na vertical: desloca cada célula pra cima
-  // (sem transição) na distância que ela percorreu e solta a transição
-  // pra baixo até a posição real, dando a sensação de queda/gravidade.
-  function _dcAnimarQuedas(quedas) {
-    if (!_dcCelEls || !quedas.length) return;
-    var passo = 43; // altura aproximada de célula + gap, em px (grade 340px/8 + 3px de gap)
-    var celRef = _dcCelEls[0];
-    if (celRef) {
-      var r = celRef.getBoundingClientRect();
-      if (r.height > 0) passo = r.height + 3;
-    }
-    quedas.forEach(function (q) {
-      var el = _dcCelEls[q.idx];
-      if (!el) return;
-      el.style.transition = 'none';
-      el.style.transform = 'translateY(' + (-q.filas * passo) + 'px)';
-    });
-    void document.getElementById('dc-grid').offsetHeight; // força reflow
-    quedas.forEach(function (q) {
-      var el = _dcCelEls[q.idx];
-      if (!el) return;
-      el.style.transition = 'transform .22s cubic-bezier(.34,1.15,.64,1)';
-      el.style.transform = 'translateY(0)';
-    });
-    setTimeout(function () {
-      quedas.forEach(function (q) {
-        var el = _dcCelEls[q.idx];
-        if (!el) return;
-        el.style.transition = '';
-        el.style.transform = '';
-      });
-    }, 240);
-  }
-
   // Remove as peças marcadas (pontua, conta combinações da cor-alvo
   // e "craca" o gelo daquela posição), deixando 0 = vazio pra gravidade.
   function _dcProcessarMarcados(resultado) {
@@ -283,52 +270,226 @@
     });
   }
 
-  // ── DOM ───────────────────────────────────────────────────
-  function _dcCriarTabuleiroDOM() {
-    var grid = document.getElementById('dc-grid');
-    if (!grid || grid._dcPronto) return;
-    grid._dcPronto = true;
-    grid.innerHTML = '';
-    _dcCelEls = [];
+  // ── RENDER em canvas ────────────────────────────────────────
+  // Carrega as imagens uma vez (idempotente); se alguma falhar, o
+  // desenho cai pra cor sólida (_dcCores) sem quebrar nada.
+  function _dcCarregarImagens() {
+    if (_dcImgsPedidas) return;
+    _dcImgsPedidas = true;
+    _dcTexturas.forEach(function (src, i) {
+      var img = new Image();
+      img.onload = function () { _dcImgs[i] = img; };
+      img.src = src;
+    });
+    var imgGelo = new Image();
+    imgGelo.onload = function () { _dcImgs.gelo = imgGelo; };
+    imgGelo.src = _DC_TEX_GELO;
+  }
+
+  // Layout atual do tabuleiro em pixels CSS (depende só da largura
+  // exibida do canvas — ele é sempre quadrado). Recalculado a cada
+  // uso porque o tamanho pode mudar (rotação, tela cheia).
+  function _dcObterLayout() {
+    var rect = _dcCanvas ? _dcCanvas.getBoundingClientRect() : { width: 340, height: 340 };
+    var largura = rect.width || 340;
+    var cellPx = (largura - 2 * _DC_PAD - (_DC_TAM - 1) * _DC_GAP) / _DC_TAM;
+    return { rect: rect, cellPx: cellPx, passo: cellPx + _DC_GAP, pad: _DC_PAD };
+  }
+  // Centro (em px CSS, relativo ao canvas) da célula (r,c).
+  function _dcCentroCelula(layout, r, c) {
+    return {
+      x: layout.pad + c * layout.passo + layout.cellPx / 2,
+      y: layout.pad + r * layout.passo + layout.cellPx / 2
+    };
+  }
+  // Centro em coordenadas de TELA (pra posicionar efeitos externos
+  // como a explosão de estrelinhas, que espera clientX/clientY).
+  function _dcCentroCelulaTela(idx) {
+    if (!_dcCanvas) return null;
+    var layout = _dcObterLayout();
+    var r = Math.floor(idx / _DC_TAM), c = idx % _DC_TAM;
+    var p = _dcCentroCelula(layout, r, c);
+    return { x: layout.rect.left + p.x, y: layout.rect.top + p.y };
+  }
+
+  function _dcAjustarResolucaoCanvas() {
+    if (!_dcCanvas || !_dcCtx) return;
+    var rect = _dcCanvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return; // tela ainda escondida (display:none)
+    var dpr = window.devicePixelRatio || 1;
+    var wPx = Math.round(rect.width * dpr), hPx = Math.round(rect.height * dpr);
+    if (_dcCanvas.width === wPx && _dcCanvas.height === hPx) return;
+    _dcCanvas.width = wPx;
+    _dcCanvas.height = hPx;
+    _dcCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // Curvas de easing usadas nas animações.
+  function _dcEaseOutQuad(t) { return 1 - (1 - t) * (1 - t); }
+  function _dcEaseOutBack(t) {
+    var c1 = 1.70158, c3 = c1 + 1;
+    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+  }
+
+  // Desenha um doce (círculo com gradiente + ícone + gelo por cima
+  // se houver) centrado em (cx, cy), com raio, escala e opacidade
+  // dadas — usado pra idle, queda, pop, seleção, troca, tudo passa
+  // pelos mesmos parâmetros.
+  function _dcDesenharDoce(ctx, cx, cy, raio, corIdx, gelo, escala, alpha, offsetX) {
+    if (!corIdx) return; // 0/undefined = célula vazia (transitório)
+    var r = raio * (escala == null ? 1 : escala);
+    if (r <= 0) return;
+    var x = cx + (offsetX || 0);
+    ctx.save();
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    var cor = _dcCores[corIdx - 1] || '#999';
+    var grad = ctx.createLinearGradient(x, cy - r, x, cy + r);
+    grad.addColorStop(0, _dcClarear(cor, 30));
+    grad.addColorStop(0.55, cor);
+    grad.addColorStop(1, _dcEscurecer(cor, 18));
+    if (gelo) { try { ctx.filter = gelo === 2 ? 'saturate(0.5) brightness(1.05)' : 'saturate(0.3) brightness(1.12)'; } catch (e) {} }
+    ctx.beginPath();
+    ctx.arc(x, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    var img = _dcImgs[corIdx - 1];
+    if (img) {
+      var lado = r * 1.5; // ~72% do diâmetro (2r), igual ao CSS antigo
+      try { ctx.drawImage(img, x - lado / 2, cy - lado / 2, lado, lado); } catch (e) {}
+    }
+    try { ctx.filter = 'none'; } catch (e) {}
+    if (gelo && _dcImgs.gelo) {
+      ctx.globalAlpha = (alpha == null ? 1 : alpha) * (gelo === 2 ? 1 : 0.55);
+      var ladoGelo = r * 1.6;
+      try { ctx.drawImage(_dcImgs.gelo, x - ladoGelo / 2, cy - ladoGelo / 2, ladoGelo, ladoGelo); } catch (e) {}
+    }
+    ctx.restore();
+  }
+  function _dcClarear(hex, pct) { return _dcMisturarComBranco(hex, pct, true); }
+  function _dcEscurecer(hex, pct) { return _dcMisturarComBranco(hex, pct, false); }
+  function _dcMisturarComBranco(hex, pct, clarear) {
+    var m = /^#([0-9a-f]{6})$/i.exec(hex);
+    if (!m) return hex;
+    var n = parseInt(m[1], 16);
+    var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    var alvo = clarear ? 255 : 0;
+    var f = pct / 100;
+    r = Math.round(r + (alvo - r) * f);
+    g = Math.round(g + (alvo - g) * f);
+    b = Math.round(b + (alvo - b) * f);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  function _dcDesenharFrame() {
+    if (!_dcTelaAberta) return;
+    _dcDesenharTabuleiro(performance.now());
+    requestAnimationFrame(_dcDesenharFrame);
+  }
+
+  function _dcDesenharTabuleiro(agora) {
+    if (!_dcCtx || !_dcCanvas) return;
+    var layout = _dcObterLayout();
+    var w = layout.rect.width, h = layout.rect.height;
+    var ctx = _dcCtx;
+    ctx.clearRect(0, 0, w, h);
+    // fundo do tabuleiro (igual ao antigo .dc-grid)
+    _dcCaminhoArredondado(ctx, 0, 0, w, h, 12);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.fill();
+    ctx.strokeStyle = _dcCorBorda;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
     for (var r = 0; r < _DC_TAM; r++) {
       for (var c = 0; c < _DC_TAM; c++) {
-        var el = document.createElement('div');
-        el.className = 'dc-cel';
-        (function (rr, cc) {
-          el.addEventListener('pointerdown', function (e) { _dcPointerDown(e, rr, cc); });
-        })(r, c);
-        grid.appendChild(el);
-        _dcCelEls.push(el);
+        var idx = r * _DC_TAM + c;
+        var p = _dcCentroCelula(layout, r, c);
+        var cx = p.x, cy = p.y;
+        var raio = layout.cellPx / 2;
+        var escala = 1, alpha = 1, offX = 0, offY = 0;
+
+        // troca deslizando (as duas peças cruzam de posição)
+        if (_dcTrocaAnim && (idx === _dcTrocaAnim.i1 || idx === _dcTrocaAnim.i2)) {
+          var ta = _dcTrocaAnim;
+          var t = Math.min(1, (agora - ta.t0) / ta.duracao);
+          var te = _dcEaseOutQuad(t);
+          var proprioIdx = idx, outroIdx = idx === ta.i1 ? ta.i2 : ta.i1;
+          var pProprio = _dcCentroCelula(layout, Math.floor(proprioIdx / _DC_TAM), proprioIdx % _DC_TAM);
+          var pOutro = _dcCentroCelula(layout, Math.floor(outroIdx / _DC_TAM), outroIdx % _DC_TAM);
+          var de = ta.reversa ? pOutro : pProprio, para = ta.reversa ? pProprio : pOutro;
+          cx = de.x + (para.x - de.x) * te;
+          cy = de.y + (para.y - de.y) * te;
+        }
+
+        // queda (entra de cima, com um leve "estica" ao final)
+        var quedaInfo = _dcQuedaAnim[idx];
+        if (quedaInfo) {
+          var tq = Math.min(1, (agora - quedaInfo.t0) / _DC_DUR_QUEDA);
+          var teq = _dcEaseOutBack(tq);
+          offY += -(1 - teq) * quedaInfo.filas * layout.passo;
+          if (tq >= 1) {
+            delete _dcQuedaAnim[idx];
+            _dcPousoAnim[idx] = { t0: agora };
+          }
+        }
+        // squash ao pousar
+        var pousoInfo = _dcPousoAnim[idx];
+        var escalaX = 1, escalaY = 1;
+        if (pousoInfo) {
+          var tp = Math.min(1, (agora - pousoInfo.t0) / _DC_DUR_POUSO);
+          if (tp >= 1) delete _dcPousoAnim[idx];
+          else {
+            var achata = Math.sin(tp * Math.PI) * 0.22;
+            escalaY = 1 - achata; escalaX = 1 + achata * 0.7;
+          }
+        }
+        // pop/explosão
+        var popInfo = _dcPopAnim[idx];
+        if (popInfo) {
+          var tpop = Math.min(1, (agora - popInfo.t0) / _DC_DUR_POP);
+          if (tpop < 0.45) escala = 1 + (tpop / 0.45) * 0.3;
+          else { var tt = (tpop - 0.45) / 0.55; escala = 1.3 - tt * 1.15; alpha = 1 - tt; }
+        }
+        // seleção (encolhe um pouco + anel branco)
+        var selecionada = !!(_dcSelecionado && (_dcSelecionado.r * _DC_TAM + _dcSelecionado.c) === idx);
+        if (selecionada) escala *= 0.86;
+        // troca inválida (tremida horizontal)
+        var shakeInfo = _dcShakeAnim[idx];
+        if (shakeInfo) {
+          var ts = Math.min(1, (agora - shakeInfo.t0) / _DC_DUR_SHAKE);
+          if (ts >= 1) delete _dcShakeAnim[idx];
+          else offX += Math.sin(ts * Math.PI * 4) * 5 * (1 - ts);
+        }
+
+        var raioFinal = raio * escalaX;
+        _dcDesenharDoce(ctx, cx, cy + offY, raio, _dcCor[idx], _dcGelo[idx], escala * (escalaY), alpha, offX);
+        if (selecionada) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(cx + offX, cy + offY, raio * escala + 2, 0, Math.PI * 2);
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+          ctx.restore();
+        }
       }
     }
   }
-  function _dcRenderTabuleiro() {
-    if (!_dcCelEls) return;
-    for (var i = 0; i < _dcCelEls.length; i++) {
-      var el = _dcCelEls[i];
-      var corIdx = _dcCor[i] - 1;
-      el.style.background = _dcCores[corIdx] || '';
-      var tex = _dcTexturas[corIdx];
-      if (tex) {
-        el.style.backgroundImage = 'url(' + tex + ')';
-        el.style.backgroundSize = '72%';
-        el.style.backgroundPosition = 'center';
-        el.style.backgroundRepeat = 'no-repeat';
-      } else {
-        el.style.backgroundImage = '';
-      }
-      el.classList.toggle('dc-gelo', _dcGelo[i] > 0);
-      el.classList.toggle('dc-gelo-2', _dcGelo[i] === 2);
-      el.classList.toggle('dc-selecionada', !!(_dcSelecionado && (_dcSelecionado.r * _DC_TAM + _dcSelecionado.c) === i));
-    }
+  function _dcCaminhoArredondado(ctx, x, y, w, h, raio) {
+    ctx.beginPath();
+    ctx.moveTo(x + raio, y);
+    ctx.arcTo(x + w, y, x + w, y + h, raio);
+    ctx.arcTo(x + w, y + h, x, y + h, raio);
+    ctx.arcTo(x, y + h, x, y, raio);
+    ctx.arcTo(x, y, x + w, y, raio);
+    ctx.closePath();
   }
+
   function _dcFeedbackInvalido(i1, i2) {
     var s = _som(); if (s) s.erro();
-    [i1, i2].forEach(function (idx) {
-      var el = _dcCelEls[idx];
-      if (!el) return;
-      el.classList.remove('dc-shake'); void el.offsetWidth; el.classList.add('dc-shake');
-    });
+    var agora = performance.now();
+    _dcShakeAnim[i1] = { t0: agora };
+    _dcShakeAnim[i2] = { t0: agora };
   }
 
   // ── Seleção/arraste (Pointer Events cobrem mouse e toque) ──
@@ -336,12 +497,10 @@
 
   function _dcSelecionar(r, c) {
     _dcSelecionado = { r: r, c: c };
-    _dcRenderTabuleiro();
     var s = _som(); if (s) s.toque();
   }
   function _dcLimparSelecao() {
     _dcSelecionado = null;
-    _dcRenderTabuleiro();
   }
   function _dcAdjacente(a, b) {
     return (Math.abs(a.r - b.r) + Math.abs(a.c - b.c)) === 1;
@@ -358,12 +517,28 @@
     }
   }
 
-  function _dcPointerDown(e, r, c) {
+  // Converte coordenada de tela (clientX/clientY) em célula (r,c) do
+  // canvas — substitui o listener por-célula que existia quando o
+  // tabuleiro era feito de divs.
+  function _dcCanvasParaCelula(clientX, clientY) {
+    if (!_dcCanvas) return null;
+    var layout = _dcObterLayout();
+    var x = clientX - layout.rect.left - layout.pad;
+    var y = clientY - layout.rect.top - layout.pad;
+    if (x < 0 || y < 0) return null;
+    var c = Math.floor(x / layout.passo), r = Math.floor(y / layout.passo);
+    if (r < 0 || r >= _DC_TAM || c < 0 || c >= _DC_TAM) return null;
+    if ((x - c * layout.passo) > layout.cellPx || (y - r * layout.passo) > layout.cellPx) return null; // caiu no vão entre células
+    return { r: r, c: c };
+  }
+
+  function _dcCanvasPointerDown(e) {
     if (!_dcRodando || _dcAnimando) return;
+    var cel = _dcCanvasParaCelula(e.clientX, e.clientY);
+    if (!cel) return;
     e.preventDefault();
-    var el = e.currentTarget;
-    try { el.setPointerCapture(e.pointerId); } catch (err) {}
-    var estado = { r: r, c: c, x0: e.clientX, y0: e.clientY, resolvido: false };
+    try { _dcCanvas.setPointerCapture(e.pointerId); } catch (err) {}
+    var estado = { r: cel.r, c: cel.c, x0: e.clientX, y0: e.clientY, resolvido: false };
     _dcArraste = estado;
 
     function mover(ev) {
@@ -378,38 +553,52 @@
       _dcTentarTrocar(estado.r, estado.c, estado.r + dr, estado.c + dc);
     }
     function soltar() {
-      el.removeEventListener('pointermove', mover);
-      el.removeEventListener('pointerup', soltar);
-      el.removeEventListener('pointercancel', soltar);
+      _dcCanvas.removeEventListener('pointermove', mover);
+      _dcCanvas.removeEventListener('pointerup', soltar);
+      _dcCanvas.removeEventListener('pointercancel', soltar);
       _dcArraste = null;
       if (!estado.resolvido) _dcTratarTap(estado.r, estado.c);
     }
-    el.addEventListener('pointermove', mover);
-    el.addEventListener('pointerup', soltar);
-    el.addEventListener('pointercancel', soltar);
+    _dcCanvas.addEventListener('pointermove', mover);
+    _dcCanvas.addEventListener('pointerup', soltar);
+    _dcCanvas.addEventListener('pointercancel', soltar);
   }
 
   // ── Troca + cascata ─────────────────────────────────────────
+  // Antes a troca só existia no dado (a tela redesenhava já trocada
+  // ou já desfeita, sem meio-termo visual — "teletransportava"). Agora
+  // anima o deslizar das duas peças ANTES de decidir se formou
+  // combinação; se não formou, desliza de volta (com "reversa") e só
+  // então treme, igual ao Candy Crush.
   function _dcTentarTrocar(r1, c1, r2, c2) {
     if (!_dcRodando || _dcAnimando) return;
     if (r2 < 0 || r2 >= _DC_TAM || c2 < 0 || c2 >= _DC_TAM) return;
     var i1 = r1 * _DC_TAM + c1, i2 = r2 * _DC_TAM + c2;
     if (_dcGelo[i1] > 0 || _dcGelo[i2] > 0) { _dcFeedbackInvalido(i1, i2); return; }
 
-    var tmp = _dcCor[i1]; _dcCor[i1] = _dcCor[i2]; _dcCor[i2] = tmp;
-    var resultado = _dcEncontrarMatches();
-    if (resultado.marcado.indexOf(true) === -1) {
-      // não formou combinação: desfaz sem custar movimento
-      tmp = _dcCor[i1]; _dcCor[i1] = _dcCor[i2]; _dcCor[i2] = tmp;
-      _dcRenderTabuleiro();
-      _dcFeedbackInvalido(i1, i2);
-      return;
-    }
+    _dcAnimando = true;
+    _dcTrocaAnim = { i1: i1, i2: i2, t0: performance.now(), duracao: _DC_DUR_TROCA };
+    setTimeout(function () {
+      _dcTrocaAnim = null;
+      var tmp = _dcCor[i1]; _dcCor[i1] = _dcCor[i2]; _dcCor[i2] = tmp;
+      var resultado = _dcEncontrarMatches();
+      if (resultado.marcado.indexOf(true) === -1) {
+        // não formou combinação: desfaz o dado e desliza de volta
+        tmp = _dcCor[i1]; _dcCor[i1] = _dcCor[i2]; _dcCor[i2] = tmp;
+        _dcTrocaAnim = { i1: i1, i2: i2, t0: performance.now(), duracao: _DC_DUR_TROCA, reversa: true };
+        setTimeout(function () {
+          _dcTrocaAnim = null;
+          _dcAnimando = false;
+          _dcFeedbackInvalido(i1, i2);
+        }, _DC_DUR_TROCA);
+        return;
+      }
 
-    _dcMovimentosRestantes = Math.max(0, _dcMovimentosRestantes - 1);
-    _dcRenderTabuleiro();
-    _dcAtualizarHud();
-    _dcResolverCascata();
+      _dcMovimentosRestantes = Math.max(0, _dcMovimentosRestantes - 1);
+      _dcAtualizarHud();
+      _dcAnimando = false;
+      _dcResolverCascata();
+    }, _DC_DUR_TROCA);
   }
 
   function _dcResolverCascata() {
@@ -426,30 +615,28 @@
       // lugar sem nenhuma ligação visual entre as duas).
       var s = _som(); if (s) s.combo();
       var fx = window.AngatubaGames && window.AngatubaGames.efeitos;
+      var agora = performance.now();
       resultado.runs.forEach(function (run) {
         var meio = run.cells[Math.floor(run.cells.length / 2)];
-        var el = _dcCelEls[meio];
-        if (el && fx && fx.estrelas) {
-          var r = el.getBoundingClientRect();
-          fx.estrelas(r.left + r.width / 2, r.top + r.height / 2);
+        if (fx && fx.estrelas) {
+          var p = _dcCentroCelulaTela(meio);
+          if (p) fx.estrelas(p.x, p.y);
         }
       });
       resultado.marcado.forEach(function (m, idx) {
-        if (m && _dcCelEls[idx]) _dcCelEls[idx].classList.add('dc-explodindo');
+        if (m) _dcPopAnim[idx] = { t0: agora };
       });
       setTimeout(function () {
-        resultado.marcado.forEach(function (m, idx) {
-          if (m && _dcCelEls[idx]) _dcCelEls[idx].classList.remove('dc-explodindo');
-        });
+        resultado.marcado.forEach(function (m, idx) { if (m) delete _dcPopAnim[idx]; });
         // 2) só depois da explosão os doces de cima caem no lugar —
         // com animação de queda em vez de troca instantânea de cor.
         _dcProcessarMarcados(resultado);
         var quedas = _dcAplicarGravidadeComQuedas();
-        _dcRenderTabuleiro();
         _dcAtualizarHud();
-        _dcAnimarQuedas(quedas);
+        var agora2 = performance.now();
+        quedas.forEach(function (q) { _dcQuedaAnim[q.idx] = { t0: agora2, filas: q.filas }; });
         setTimeout(passo, 300);
-      }, 200);
+      }, _DC_DUR_POP);
     }
     passo();
   }
@@ -494,7 +681,7 @@
     _dcRodando = true;
     _dcAnimando = false;
     _dcSelecionado = null;
-    _dcRenderTabuleiro();
+    _dcQuedaAnim = {}; _dcPopAnim = {}; _dcPousoAnim = {}; _dcShakeAnim = {}; _dcTrocaAnim = null;
     _dcAtualizarHud();
   }
 
@@ -549,7 +736,23 @@
 
   // ── Preparação da tela (chamada pelo _jogoLoader ao abrir) ──
   function _dcPrepararTela() {
-    _dcCriarTabuleiroDOM();
+    _dcCanvas = document.getElementById('dc-grid');
+    if (_dcCanvas && !_dcCanvas._dcPronto) {
+      _dcCanvas._dcPronto = true;
+      _dcCtx = _dcCanvas.getContext('2d');
+      _dcCanvas.addEventListener('pointerdown', _dcCanvasPointerDown);
+      window.addEventListener('resize', _dcAjustarResolucaoCanvas);
+    }
+    _dcCarregarImagens();
+    try {
+      var corBorda = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+      if (corBorda) _dcCorBorda = corBorda;
+    } catch (e) {}
+    _dcAjustarResolucaoCanvas();
+    if (!_dcTelaAberta) {
+      _dcTelaAberta = true;
+      requestAnimationFrame(_dcDesenharFrame);
+    }
     _dcRodando = false;
     _dcAnimando = false;
     _dcArraste = null;
@@ -559,11 +762,15 @@
     var recIni = document.getElementById('dc-recorde-inicio'); if (recIni) recIni.textContent = recorde;
     _dcAtualizarHud();
     _dcMostrarOverlay('inicio');
+    // A tela pode ter acabado de virar visível (display:none -> flex)
+    // agora mesmo; um frame depois o tamanho real já está disponível.
+    requestAnimationFrame(_dcAjustarResolucaoCanvas);
   }
   function _dcParar() {
     _dcRodando = false;
     _dcAnimando = false;
     _dcArraste = null;
+    _dcTelaAberta = false; // para o loop de desenho (economiza bateria fora da tela)
   }
 
   window._dcComecar = _dcComecar;

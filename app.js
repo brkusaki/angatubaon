@@ -10288,6 +10288,68 @@
     return { ic: noite ? m.icNoite : m.icDia, txt: m.txt, col: noite ? (m.colNoite || m.col) : m.col };
   }
 
+  // ── Sugestão do dia (card "Sugestão do dia" no topo do clima) ──
+  // Texto 100% local: nenhuma chamada extra de API, só regras simples em
+  // cima do code/temp/chuva que a Open-Meteo já devolveu. Prioridade:
+  // chuva > frio > nublado > quente > ameno (chuva/frio são os que mais
+  // mudam o plano do dia de quem está lendo, por isso vêm primeiro).
+  var CHUVA_WMO_CODES = { 51:1, 53:1, 55:1, 61:1, 63:1, 65:1, 80:1, 81:1, 82:1, 95:1, 96:1, 99:1 };
+  function _calcularSugestaoDoDia(code, temp, chuvaProb, isDay) {
+    var t = (temp == null) ? null : Math.round(temp);
+    var temChuvaCondicao = !!CHUVA_WMO_CODES[code];
+    var temChuvaProvavel = chuvaProb != null && chuvaProb >= 60;
+    var nublado = code === 3 || code === 45 || code === 48;
+    var frio    = t != null && t <= 15;
+    var quente  = t != null && t >= 28;
+
+    if (isDay === false) {
+      if (temChuvaCondicao || temChuvaProvavel) return { ic: 'fa-umbrella', txt: 'Chuva à noite — leve guarda-chuva se for sair.' };
+      if (frio) return { ic: 'fa-mug-hot', txt: 'Noite fria — ótima pra um chocolate quente ou um filme em casa.' };
+      return { ic: 'fa-moon', txt: 'Noite boa pra pedir delivery ou sair com casaco.' };
+    }
+    if (temChuvaCondicao || temChuvaProvavel) return { ic: 'fa-umbrella', txt: 'Leve o guarda-chuva. Evite a feira se estiver chovendo forte.' };
+    if (frio)    return { ic: 'fa-mug-hot',    txt: 'Dia mais frio — ótimo pra um café quente ou almoço caseiro.' };
+    if (nublado) return { ic: 'fa-cloud',      txt: 'Dia nublado — ótimo pra resolver as compras sem o sol forte.' };
+    if (quente)  return { ic: 'fa-sun',        txt: 'Dia quente e ensolarado — boa pra feira, sorvete ou praça.' };
+    return           { ic: 'fa-cloud-sun',  txt: 'Tempo bom pra caminhar no centro ou tomar um café.' };
+  }
+  function _pintarSugestaoDoDia(code, temp, chuvaProb, isDay) {
+    var elTxt = document.getElementById('weather-sugestao-txt');
+    if (!elTxt) return;
+    var s = _calcularSugestaoDoDia(code, temp, chuvaProb, isDay);
+    var elIc = document.getElementById('weather-sugestao-icon');
+    if (elIc) elIc.className = 'fa ' + s.ic;
+    elTxt.textContent = s.txt;
+  }
+
+  // ── Alerta de chuva nas próximas horas (banner discreto no topo do card) ──
+  // Usa os pontos de 3 em 3h de hoje (pontosHoje) já calculados por
+  // _montarDadosClima — não faz nenhuma chamada extra. Olha só os próximos
+  // pontos (ainda não passados) e avisa se algum tiver risco de chuva alto.
+  function _calcularAlertaChuva(pontosHoje, horaAtual) {
+    if (!Array.isArray(pontosHoje) || !pontosHoje.length) return null;
+    var futuros = pontosHoje.filter(function (p) {
+      var h = parseInt(p.hora, 10);
+      return !isNaN(h) && h >= horaAtual;
+    }).slice(0, 3);
+    var risco = null;
+    for (var i = 0; i < futuros.length; i++) {
+      if (futuros[i].chuva != null && futuros[i].chuva >= 60) { risco = futuros[i]; break; }
+    }
+    if (!risco) return null;
+    var diff = parseInt(risco.hora, 10) - horaAtual;
+    if (diff <= 1) return 'Chuva forte possível a qualquer momento — leve o guarda-chuva.';
+    return 'Chuva possível nas próximas ' + diff + ' horas.';
+  }
+  function _pintarAlertaChuva(pontosHoje) {
+    var el = document.getElementById('weather-alerta-chuva');
+    var elTxt = document.getElementById('weather-alerta-chuva-txt');
+    if (!el || !elTxt) return;
+    var msg = _calcularAlertaChuva(pontosHoje, new Date().getHours());
+    if (msg) { elTxt.textContent = msg; el.style.display = 'flex'; }
+    else { el.style.display = 'none'; }
+  }
+
   // Zero-pad simples e string de hora local "yyyy-mm-ddThh" (SEM converter
   // pra UTC) — a API devolve os horários já no fuso de Angatuba porque
   // pedimos timezone=America/Sao_Paulo, então comparamos hora local com
@@ -10395,6 +10457,7 @@
       if (elChuva) elChuva.textContent = (_climaBruto.chuva   != null ? Math.round(_climaBruto.chuva)   : '--') + '%';
       if (elUmid)  elUmid.textContent  = (_climaBruto.umidade != null ? Math.round(_climaBruto.umidade) : '--') + '%';
       if (elVento) elVento.textContent = (_climaBruto.vento   != null ? Math.round(_climaBruto.vento)   : '--') + ' km/h';
+      _pintarSugestaoDoDia(_climaBruto.code, _climaBruto.temp, _climaBruto.chuva, _climaBruto.isDay !== false);
       return;
     }
 
@@ -10412,6 +10475,7 @@
     if (elChuva) elChuva.textContent = (meioDia && meioDia.chuva   != null ? Math.round(meioDia.chuva)   : '--') + '%';
     if (elUmid)  elUmid.textContent  = (meioDia && meioDia.umidade != null ? Math.round(meioDia.umidade) : '--') + '%';
     if (elVento) elVento.textContent = (meioDia && meioDia.vento  != null ? Math.round(meioDia.vento)   : '--') + ' km/h';
+    _pintarSugestaoDoDia(dia.code, dia.max, meioDia && meioDia.chuva, true); // dias futuros: sempre ícone/frase diurna
   }
 
   function _pintarClima(d) {
@@ -10419,6 +10483,7 @@
     _climaBruto = d;
     _climaDiaSelecionado = 0; // toda carga nova (ou cache) volta a mostrar "Hoje"
     _pintarTopoClimaParaDia(0);
+    _pintarAlertaChuva(d.pontosHoje); // sempre relativo a "agora", não ao dia selecionado na tira
     _renderSemanaClima(d.semana);
     _renderGraficoClima(_climaAbaAtual);
   }
@@ -10599,12 +10664,68 @@
      substitui a lista. Se o GAS falhar/estiver offline, o mock some quando
      a resposta chega vazia — fica só o "nenhum aviso por aqui hoje". */
   var AVISOS_HOJE_MOCK = [
-    { emoji: '🎪', titulo: 'Feira Livre no Centro', texto: 'Sábado de manhã, na Praça Rui Barbosa.',
+    { emoji: '🎪', titulo: 'Feira Livre no Centro', tipo: 'feira', texto: 'Sábado de manhã, na Praça Rui Barbosa.',
       textoCompleto: 'Sábado de manhã, na Praça Rui Barbosa. Produtos frescos direto do produtor: verduras, frutas, queijos e doces caseiros. Chegue cedo pros melhores produtos!',
+      criadoEm: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
       midias: [ { tipo: 'foto', url: '/img/igreja-dia.jpg' }, { tipo: 'foto', url: '/img/igreja-noite.jpg' } ] },
-    { emoji: '💉', titulo: 'Campanha de vacinação', texto: 'Posto de Saúde Central, das 8h às 16h.' },
+    { emoji: '💉', titulo: 'Campanha de vacinação', tipo: 'oficial', texto: 'Posto de Saúde Central, das 8h às 16h.',
+      criadoEm: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString() },
   ];
   window._avisosAtuais = AVISOS_HOJE_MOCK;
+
+  // ── Tipos de post (badge no card + no modal de detalhe) ──
+  // Chave sempre sem acento (ex.: "transito") — _normalizarTipoAviso aceita
+  // tanto "trânsito" quanto "transito" vindos do GAS/planilha. tipo vazio ou
+  // não reconhecido simplesmente não mostra badge (mais limpo que "Geral").
+  var TIPOS_AVISO_CFG = {
+    evento:   { label: 'Evento',    cor: '#a78bfa' },
+    promocao: { label: 'Promoção',  cor: '#34d399' },
+    aviso:    { label: 'Aviso',     cor: '#fbbf24' },
+    oficial:  { label: 'Oficial',   cor: '#60a5fa' },
+    transito: { label: 'Trânsito',  cor: '#f87171' },
+    feira:    { label: 'Feira',     cor: '#fb923c' },
+  };
+  function _normalizarTipoAviso(tipo) {
+    var s = String(tipo || '').trim().toLowerCase();
+    return s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s;
+  }
+  function _infoTipoAviso(tipo) {
+    return TIPOS_AVISO_CFG[_normalizarTipoAviso(tipo)] || null;
+  }
+  function _badgeTipoAvisoHtml(tipo) {
+    var info = _infoTipoAviso(tipo);
+    if (!info) return '';
+    return '<span class="aviso-badge" style="color:' + info.cor + ';border-color:' + info.cor + '55;background:' + info.cor + '1f;">' +
+      _escHtmlAviso(info.label) + '</span>';
+  }
+
+  // ── Horário relativo do post ("agora", "há 12 min", "ontem"...) ──
+  function _tempoRelativoAviso(dataStr) {
+    if (!dataStr) return '';
+    var d = new Date(dataStr);
+    if (isNaN(d.getTime())) return '';
+    var agora = new Date();
+    var diffMin = Math.floor((agora - d) / 60000);
+    if (diffMin < 0) diffMin = 0;
+    if (diffMin < 1) return 'agora';
+    if (diffMin < 60) return 'há ' + diffMin + ' min';
+    var diffH = Math.floor(diffMin / 60);
+    if (diffH <= 6) return 'há ' + diffH + ' h';
+    var hojeStr  = _horaLocalStr(agora).slice(0, 10);
+    var dataCiv  = _horaLocalStr(d).slice(0, 10);
+    if (dataCiv === hojeStr) return 'hoje às ' + d.getHours() + 'h';
+    var ontem = new Date(agora); ontem.setDate(ontem.getDate() - 1);
+    if (dataCiv === _horaLocalStr(ontem).slice(0, 10)) return 'ontem';
+    var diffDias = Math.round((new Date(hojeStr) - new Date(dataCiv)) / 86400000);
+    if (diffDias < 7) return 'há ' + diffDias + ' dias';
+    return _p2(d.getDate()) + '/' + _p2(d.getMonth() + 1);
+  }
+  function _dataCompletaAviso(dataStr) {
+    if (!dataStr) return '';
+    var d = new Date(dataStr);
+    if (isNaN(d.getTime())) return '';
+    return _p2(d.getDate()) + '/' + _p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' às ' + _p2(d.getHours()) + 'h' + _p2(d.getMinutes());
+  }
 
   // Busca os avisos reais no GAS (aba "Avisos"). Só cai no mock se a busca
   // falhar de verdade (erro/timeout/offline) — não mostra mais o mock como
@@ -10657,11 +10778,14 @@
           '<button type="button" class="aviso-card-admin-btn aviso-card-admin-btn-del" onclick="event.stopPropagation();_apagarAviso(\'' + a.id + '\')" aria-label="Apagar aviso"><i class="fa fa-trash" aria-hidden="true"></i></button>' +
           '</div>'
         : '';
+      var tempoRel = _tempoRelativoAviso(a.criadoEm || a.data);
       return '<div class="aviso-card" onclick="_abrirAvisoPost(' + i + ')" role="button" tabindex="0" ' +
         'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_abrirAvisoPost(' + i + ');}">' +
         mediaHtml + adminHtml +
         '<div class="aviso-card-body"><span class="aviso-emoji">' + _escHtmlAviso(a.emoji || '📌') + '</span>' +
-        '<div class="aviso-txt"><strong>' + _escHtmlAviso(a.titulo) + '</strong><span>' + _escHtmlAviso(a.texto) + '</span></div></div></div>';
+        '<div class="aviso-txt"><div class="aviso-txt-head"><strong>' + _escHtmlAviso(a.titulo) + '</strong>' + _badgeTipoAvisoHtml(a.tipo) + '</div>' +
+        (tempoRel ? '<span class="aviso-tempo">' + _escHtmlAviso(tempoRel) + '</span>' : '') +
+        '<span class="aviso-desc">' + _escHtmlAviso(a.texto) + '</span></div></div></div>';
     }).join('');
   }
   window._renderAvisosHoje = _renderAvisosHoje; // exposto p/ o futuro fetch no GAS chamar direto
@@ -10681,6 +10805,26 @@
     document.getElementById('aviso-post-emoji').textContent  = aviso.emoji || '📌';
     document.getElementById('aviso-post-titulo').textContent = aviso.titulo || '';
     document.getElementById('aviso-post-texto').textContent  = aviso.textoCompleto || aviso.texto || '';
+
+    var elBadge = document.getElementById('aviso-post-badge');
+    if (elBadge) {
+      var infoTipo = _infoTipoAviso(aviso.tipo);
+      if (infoTipo) {
+        elBadge.textContent = infoTipo.label;
+        elBadge.style.color = infoTipo.cor;
+        elBadge.style.borderColor = infoTipo.cor + '55';
+        elBadge.style.background = infoTipo.cor + '1f';
+        elBadge.style.display = 'inline-flex';
+      } else {
+        elBadge.style.display = 'none';
+      }
+    }
+    var elData = document.getElementById('aviso-post-data');
+    if (elData) {
+      var dataCompleta = _dataCompletaAviso(aviso.criadoEm || aviso.data);
+      elData.textContent = dataCompleta;
+      elData.style.display = dataCompleta ? 'block' : 'none';
+    }
 
     var mediaWrap = document.getElementById('aviso-post-media-wrap');
     var track     = document.getElementById('aviso-post-media-track');
@@ -10795,6 +10939,8 @@
 
     document.getElementById('aviso-editor-heading').textContent = _avisoEditorId ? 'Editar aviso' : 'Novo aviso';
     document.getElementById('aviso-editor-emoji').value = aviso ? (aviso.emoji || '') : '';
+    var tipoNorm = aviso ? _normalizarTipoAviso(aviso.tipo) : '';
+    document.getElementById('aviso-editor-tipo').value = TIPOS_AVISO_CFG[tipoNorm] ? tipoNorm : '';
     document.getElementById('aviso-editor-titulo').value = aviso ? (aviso.titulo || '') : '';
     document.getElementById('aviso-editor-texto').value = aviso ? (aviso.texto || '') : '';
     document.getElementById('aviso-editor-texto-completo').value = aviso ? (aviso.textoCompleto || '') : '';
@@ -10911,6 +11057,7 @@
         idToken: idToken,
         id: _avisoEditorId || '',
         emoji: document.getElementById('aviso-editor-emoji').value.trim() || '📰',
+        tipo: document.getElementById('aviso-editor-tipo').value.trim(),
         titulo: titulo,
         texto: texto,
         textoCompleto: document.getElementById('aviso-editor-texto-completo').value.trim(),

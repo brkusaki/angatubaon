@@ -44,9 +44,34 @@
   var _DC_TEX_GELO = '/Jogos/assets/doces/gelo.webp';
   var _dcCoresNome = ['🔴 vermelho', '🟣 roxo', '🟢 verde', '🟡 amarelo', '🔵 azul'];
 
+  // Formatos de tabuleiro por fase — no Candy Crush de verdade cada fase
+  // tem um layout diferente, não é sempre uma grade 8×8 cheia. Fase 1-2
+  // ficam cheias (tutorial); da 3 em diante alterna entre os formatos
+  // abaixo. Cada função recebe (r,c) 0..7 e diz se a célula é jogável
+  // (célula fora do formato vira um "buraco": nunca tem doce/gelo).
+  var _dcFormatosTabuleiro = [
+    function cheio() { return true; },
+    function diamante(r, c) { return Math.abs(r - 3.5) + Math.abs(c - 3.5) <= 5.5; },
+    function cruz(r, c) { return (r >= 2 && r <= 5) || (c >= 2 && c <= 5); },
+    function anel(r, c) { return !(r >= 3 && r <= 4 && c >= 3 && c <= 4); },
+    function cantos(r, c) { return (r + c) >= 2 && (r + c) <= 12; }
+  ];
+  // Temas de fundo por fase (arena atrás do tabuleiro) — cicla junto
+  // com os formatos pra cada fase parecer mais um "cenário" diferente,
+  // igual ao Candy Crush (lá muda árvore/bolo/fábrica; aqui muda cor).
+  var _dcTemasFundo = [
+    { base1: '#3a1a2e', base2: '#1c0f1c', destaque: 'rgba(251,113,133,0.18)' }, // rosa-doce
+    { base1: '#0f2e26', base2: '#0a1a16', destaque: 'rgba(74,222,128,0.16)' },  // menta
+    { base1: '#2a1240', base2: '#160a24', destaque: 'rgba(168,85,247,0.18)' }, // uva
+    { base1: '#3a2410', base2: '#1e1207', destaque: 'rgba(251,191,36,0.18)' }, // laranja
+    { base1: '#0d2438', base2: '#071420', destaque: 'rgba(56,189,248,0.18)' }, // céu/gelo
+    { base1: '#2b1810', base2: '#160c08', destaque: 'rgba(217,119,6,0.16)' }   // chocolate
+  ];
+
   // ── Estado do jogo (igual a antes) ─────────────────────────
   var _dcCor = [];                // 64 posições: 1..5 = cor do doce
   var _dcGelo = [];               // 64 posições: 0 = normal, 1-2 = hits restantes
+  var _dcFormato = null;          // 64 posições: 1 = jogável, 0 = buraco (sem doce)
   var _dcFaseAtual = 1;
   var _dcObjetivo = null;         // { tipo:'pontos'|'cor'|'obstaculo', meta, corAlvo }
   var _dcMovimentosRestantes = 0;
@@ -72,8 +97,9 @@
   var _dcShakeAnim = {};          // idx -> { t0 } (troca inválida)
   var _dcTrocaAnim = null;        // { i1, i2, t0, duracao, reversa }
   var _DC_DUR_POP = 200, _DC_DUR_QUEDA = 220, _DC_DUR_POUSO = 150,
-      _DC_DUR_SHAKE = 300, _DC_DUR_TROCA = 130;
+      _DC_DUR_SHAKE = 300, _DC_DUR_TROCA = 130, _DC_DUR_COMBO = 900;
   var _dcCorBorda = 'rgba(255,255,255,0.08)'; // fallback; lido de --border ao preparar a tela
+  var _dcComboMsg = null;         // { texto, cor, t0, duracao } — aviso tipo "Delicioso!"
 
   // ── localStorage: maior fase JÁ CONCLUÍDA ──────────────────
   function _dcRecordeGet() {
@@ -131,6 +157,29 @@
     return _dcObstaculosQuebrados >= _dcObjetivo.meta;
   }
 
+  // ── Formato do tabuleiro (buracos) ──────────────────────────
+  function _dcCelulaAtiva(idx) { return !_dcFormato || _dcFormato[idx] === 1; }
+  function _dcFormatoParaFase(fase) {
+    if (fase <= 2) return _dcFormatosTabuleiro[0]; // fases 1-2: sempre cheio (tutorial)
+    return _dcFormatosTabuleiro[1 + ((fase - 3) % (_dcFormatosTabuleiro.length - 1))];
+  }
+  function _dcGerarFormato(fase) {
+    var fn = _dcFormatoParaFase(fase);
+    var formato = new Array(_DC_TAM * _DC_TAM);
+    for (var r = 0; r < _DC_TAM; r++) {
+      for (var c = 0; c < _DC_TAM; c++) formato[r * _DC_TAM + c] = fn(r, c) ? 1 : 0;
+    }
+    return formato;
+  }
+  function _dcAplicarTemaFase(fase) {
+    var arena = document.getElementById('dc-arena');
+    if (!arena) return;
+    var t = _dcTemasFundo[(fase - 1) % _dcTemasFundo.length];
+    arena.style.background =
+      'radial-gradient(circle at 70% 8%, ' + t.destaque + ', transparent 55%), ' +
+      'linear-gradient(160deg, ' + t.base1 + ', ' + t.base2 + ')';
+  }
+
   // ── Tabuleiro ───────────────────────────────────────────────
   // Gera um tabuleiro sem combinações prontas (checa só pra trás,
   // já que as células seguintes ainda não foram preenchidas).
@@ -143,6 +192,7 @@
   function _dcGerarTabuleiroInicial() {
     _dcCor = new Array(_DC_TAM * _DC_TAM);
     for (var i = 0; i < _dcCor.length; i++) {
+      if (!_dcCelulaAtiva(i)) { _dcCor[i] = 0; continue; } // buraco: nunca recebe doce
       var cor, tentativas = 0;
       do { cor = _dcNovaCor(); tentativas++; } while (_dcCriaMatchEm(i, cor) && tentativas < 30);
       _dcCor[i] = cor;
@@ -151,10 +201,10 @@
   function _dcColocarGelo(qtd) {
     _dcGelo = new Array(_DC_TAM * _DC_TAM).fill(0);
     var colocados = 0, tentativas = 0;
-    while (colocados < qtd && tentativas < qtd * 20) {
+    while (colocados < qtd && tentativas < qtd * 40) {
       tentativas++;
       var idx = Math.floor(_dcRng() * _DC_TAM * _DC_TAM);
-      if (_dcGelo[idx] > 0) continue;
+      if (!_dcCelulaAtiva(idx) || _dcGelo[idx] > 0) continue;
       _dcGelo[idx] = 2;
       colocados++;
     }
@@ -201,7 +251,11 @@
   }
 
   function _dcTrocaFormaMatch(i1, i2) {
-    if (_dcGelo[i1] > 0 || _dcGelo[i2] > 0) return false;
+    if (!_dcCelulaAtiva(i1) || !_dcCelulaAtiva(i2)) return false; // buraco: não tem doce pra trocar
+    // O gelo NÃO trava a troca — trava só a peça de sumir do tabuleiro
+    // (ver _dcProcessarMarcados). A cor por baixo do gelo troca normal,
+    // igual ao Candy Crush: sem isso o gelo só quebrava por acaso, via
+    // cascata vinda de outro match na mesma coluna — quase nunca acontecia.
     var tmp = _dcCor[i1]; _dcCor[i1] = _dcCor[i2]; _dcCor[i2] = tmp;
     var achou = _dcEncontrarMatches().marcado.indexOf(true) !== -1;
     tmp = _dcCor[i1]; _dcCor[i1] = _dcCor[i2]; _dcCor[i2] = tmp;
@@ -226,25 +280,38 @@
   // devolve quanto cada um "caiu" (em linhas), pra animar a queda em
   // vez de só trocar a cor instantaneamente. Doce novo entra vindo de
   // cima da grade.
+  // Com tabuleiros de formato variado, um "buraco" no meio de uma coluna
+  // (ex.: o formato "anel") separa a coluna em pedaços independentes —
+  // doces de cima não atravessam o buraco, cada pedaço cai só dentro
+  // dele mesmo, igual peça flutuando sobre um vão no Candy Crush.
   function _dcAplicarGravidadeComQuedas() {
     var quedas = []; // { idx: posição final, filas: distância caída }
     for (var c = 0; c < _DC_TAM; c++) {
-      var sobreviventes = []; // {origRow, cor}, do topo pra baixo
-      for (var r = 0; r < _DC_TAM; r++) {
-        var idx = r * _DC_TAM + c;
-        if (_dcCor[idx] !== 0) sobreviventes.push({ origRow: r, cor: _dcCor[idx] });
-      }
-      var novos = _DC_TAM - sobreviventes.length;
-      for (var i = 0; i < _DC_TAM; i++) {
-        var idx2 = i * _DC_TAM + c;
-        if (i < novos) {
-          _dcCor[idx2] = _dcNovaCor();
-          quedas.push({ idx: idx2, filas: novos - i });
-        } else {
-          var sv = sobreviventes[i - novos];
-          _dcCor[idx2] = sv.cor;
-          var filas = i - sv.origRow;
-          if (filas > 0) quedas.push({ idx: idx2, filas: filas });
+      var r = 0;
+      while (r < _DC_TAM) {
+        if (!_dcCelulaAtiva(r * _DC_TAM + c)) { r++; continue; }
+        var rIni = r;
+        while (r < _DC_TAM && _dcCelulaAtiva(r * _DC_TAM + c)) r++;
+        var rFim = r - 1; // pedaço contíguo jogável: [rIni..rFim]
+        var tamPedaco = rFim - rIni + 1;
+        var sobreviventes = []; // {origRow, cor}, do topo pra baixo, só deste pedaço
+        for (var rr = rIni; rr <= rFim; rr++) {
+          var idxRr = rr * _DC_TAM + c;
+          if (_dcCor[idxRr] !== 0) sobreviventes.push({ origRow: rr, cor: _dcCor[idxRr] });
+        }
+        var novos = tamPedaco - sobreviventes.length;
+        for (var i = 0; i < tamPedaco; i++) {
+          var linhaAtual = rIni + i;
+          var idx2 = linhaAtual * _DC_TAM + c;
+          if (i < novos) {
+            _dcCor[idx2] = _dcNovaCor();
+            quedas.push({ idx: idx2, filas: novos - i });
+          } else {
+            var sv = sobreviventes[i - novos];
+            _dcCor[idx2] = sv.cor;
+            var filas = linhaAtual - sv.origRow;
+            if (filas > 0) quedas.push({ idx: idx2, filas: filas });
+          }
         }
       }
     }
@@ -403,6 +470,18 @@
     for (var r = 0; r < _DC_TAM; r++) {
       for (var c = 0; c < _DC_TAM; c++) {
         var idx = r * _DC_TAM + c;
+        if (!_dcCelulaAtiva(idx)) {
+          // buraco do formato da fase: marca como um vão, sem doce nem interação
+          var pBuraco = _dcCentroCelula(layout, r, c);
+          ctx.save();
+          ctx.globalAlpha = 0.4;
+          ctx.beginPath();
+          ctx.arc(pBuraco.x, pBuraco.y, layout.cellPx * 0.3, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(0,0,0,0.4)';
+          ctx.fill();
+          ctx.restore();
+          continue;
+        }
         var p = _dcCentroCelula(layout, r, c);
         var cx = p.x, cy = p.y;
         var raio = layout.cellPx / 2;
@@ -474,6 +553,32 @@
         }
       }
     }
+
+    // Mensagem de combo ("Delicioso!", "Combo x2!"...) — aparece só em
+    // jogadas grandes, centrada sobre o tabuleiro, com pop-in e fade-out.
+    if (_dcComboMsg) {
+      var tc = (agora - _dcComboMsg.t0) / _dcComboMsg.duracao;
+      if (tc >= 1) {
+        _dcComboMsg = null;
+      } else {
+        var escalaMsg = 1, alphaMsg = 1;
+        if (tc < 0.2) { escalaMsg = Math.max(0.01, _dcEaseOutBack(tc / 0.2)); }
+        else if (tc > 0.7) { alphaMsg = 1 - (tc - 0.7) / 0.3; }
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, alphaMsg);
+        ctx.translate(w / 2, h * 0.4);
+        ctx.scale(escalaMsg, escalaMsg);
+        ctx.font = '800 ' + Math.round(w * 0.095) + 'px system-ui, -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+        ctx.strokeText(_dcComboMsg.texto, 0, 0);
+        ctx.fillStyle = _dcComboMsg.cor || '#fff';
+        ctx.fillText(_dcComboMsg.texto, 0, 0);
+        ctx.restore();
+      }
+    }
   }
   function _dcCaminhoArredondado(ctx, x, y, w, h, raio) {
     ctx.beginPath();
@@ -529,6 +634,7 @@
     var c = Math.floor(x / layout.passo), r = Math.floor(y / layout.passo);
     if (r < 0 || r >= _DC_TAM || c < 0 || c >= _DC_TAM) return null;
     if ((x - c * layout.passo) > layout.cellPx || (y - r * layout.passo) > layout.cellPx) return null; // caiu no vão entre células
+    if (!_dcCelulaAtiva(r * _DC_TAM + c)) return null; // buraco do formato do tabuleiro
     return { r: r, c: c };
   }
 
@@ -574,7 +680,8 @@
     if (!_dcRodando || _dcAnimando) return;
     if (r2 < 0 || r2 >= _DC_TAM || c2 < 0 || c2 >= _DC_TAM) return;
     var i1 = r1 * _DC_TAM + c1, i2 = r2 * _DC_TAM + c2;
-    if (_dcGelo[i1] > 0 || _dcGelo[i2] > 0) { _dcFeedbackInvalido(i1, i2); return; }
+    if (!_dcCelulaAtiva(i1) || !_dcCelulaAtiva(i2)) return; // buraco no tabuleiro: sem doce ali
+    // (gelo não bloqueia mais a troca — ver comentário em _dcTrocaFormaMatch)
 
     _dcAnimando = true;
     _dcTrocaAnim = { i1: i1, i2: i2, t0: performance.now(), duracao: _DC_DUR_TROCA };
@@ -601,15 +708,31 @@
     }, _DC_DUR_TROCA);
   }
 
+  // Mensagens tipo "Delicioso!"/"Combo x2!" — só aparecem em jogadas
+  // grandes (4+ na mesma combinação, ou cascata com 2+ passos seguidos
+  // vindos da mesma troca), pra não virar poluição visual num match
+  // comum de 3.
+  var _DC_MENSAGENS_RUN = { 4: ['Delicioso!', '#4ade80'], 5: ['Sensacional!', '#38bdf8'], 6: ['Incrível!', '#fb7185'] };
+  function _dcMostrarComboMsg(texto, cor) {
+    _dcComboMsg = { texto: texto, cor: cor, t0: performance.now(), duracao: _DC_DUR_COMBO };
+  }
   function _dcResolverCascata() {
     _dcAnimando = true;
+    var passosNestaTroca = 0, maiorRunNestaTroca = 0;
     function passo() {
       var resultado = _dcEncontrarMatches();
       if (resultado.marcado.indexOf(true) === -1) {
         _dcAnimando = false;
+        if (passosNestaTroca >= 2) {
+          _dcMostrarComboMsg('Combo x' + passosNestaTroca + '!', '#fbbf24');
+        } else if (maiorRunNestaTroca >= 4) {
+          var msg = _DC_MENSAGENS_RUN[Math.min(6, maiorRunNestaTroca)];
+          _dcMostrarComboMsg(msg[0], msg[1]);
+        }
         _dcAposCascata();
         return;
       }
+      passosNestaTroca++;
       // 1) "Explode" as células combinadas antes de sumirem — sem isso a
       // troca parecia teletransporte (uma cor some, outra já aparece no
       // lugar sem nenhuma ligação visual entre as duas).
@@ -617,6 +740,7 @@
       var fx = window.AngatubaGames && window.AngatubaGames.efeitos;
       var agora = performance.now();
       resultado.runs.forEach(function (run) {
+        maiorRunNestaTroca = Math.max(maiorRunNestaTroca, run.cells.length);
         var meio = run.cells[Math.floor(run.cells.length / 2)];
         if (fx && fx.estrelas) {
           var p = _dcCentroCelulaTela(meio);
@@ -670,6 +794,9 @@
     _dcMovimentosRestantes = cfg.movimentos;
     _dcPontosFase = 0; _dcMatchesCorFase = 0; _dcObstaculosQuebrados = 0;
     _dcRng = _dcMulberry32(2000 + _dcFaseAtual * 131);
+    _dcFormato = _dcGerarFormato(_dcFaseAtual);
+    _dcAplicarTemaFase(_dcFaseAtual);
+    _dcComboMsg = null;
 
     var tentativas = 0;
     do {
@@ -760,6 +887,7 @@
     var recorde = _dcRecordeGet();
     var faseIni = document.getElementById('dc-fase-inicio'); if (faseIni) faseIni.textContent = (recorde + 1);
     var recIni = document.getElementById('dc-recorde-inicio'); if (recIni) recIni.textContent = recorde;
+    _dcAplicarTemaFase(recorde + 1);
     _dcAtualizarHud();
     _dcMostrarOverlay('inicio');
     // A tela pode ter acabado de virar visível (display:none -> flex)

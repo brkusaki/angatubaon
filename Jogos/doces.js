@@ -68,9 +68,17 @@
     { base1: '#2b1810', base2: '#160c08', destaque: 'rgba(217,119,6,0.16)' }   // chocolate
   ];
 
+  // Doces especiais (criados ao combinar 4+, ativados ao serem
+  // combinados/trocados de novo) — igual ao Candy Crush: listrado limpa
+  // linha/coluna, embrulhado explode uma área 3×3, bomba de cor limpa
+  // toda uma cor do tabuleiro quando trocada com um doce normal.
+  var _DC_TIPO_NORMAL = 0, _DC_TIPO_LISTRA_H = 1, _DC_TIPO_LISTRA_V = 2,
+      _DC_TIPO_EMBRULHADO = 3, _DC_TIPO_BOMBA = 4;
+
   // ── Estado do jogo (igual a antes) ─────────────────────────
   var _dcCor = [];                // 64 posições: 1..5 = cor do doce
   var _dcGelo = [];               // 64 posições: 0 = normal, 1-2 = hits restantes
+  var _dcTipo = [];               // 64 posições: 0 = normal, 1-4 = doce especial (ver _DC_TIPO_*)
   var _dcFormato = null;          // 64 posições: 1 = jogável, 0 = buraco (sem doce)
   var _dcFaseAtual = 1;
   var _dcObjetivo = null;         // { tipo:'pontos'|'cor'|'obstaculo', meta, corAlvo }
@@ -191,6 +199,7 @@
   }
   function _dcGerarTabuleiroInicial() {
     _dcCor = new Array(_DC_TAM * _DC_TAM);
+    _dcTipo = new Array(_DC_TAM * _DC_TAM).fill(0); // tabuleiro novo: nenhum doce especial ainda
     for (var i = 0; i < _dcCor.length; i++) {
       if (!_dcCelulaAtiva(i)) { _dcCor[i] = 0; continue; } // buraco: nunca recebe doce
       var cor, tentativas = 0;
@@ -210,22 +219,33 @@
     }
   }
 
+  // Chave de comparação usada só pra achar combinações — não é a cor real.
+  // Buraco e bomba de cor recebem um valor único por célula (nunca repete),
+  // então nunca "combinam" à toa: buraco não tem doce, e bomba de cor só
+  // ativa por troca direta (ver _dcAtivarEspeciaisSwap), nunca por engano
+  // caindo numa combinação comum de mesma cor.
+  function _dcChaveMatch(idx) {
+    if (!_dcCelulaAtiva(idx)) return -1000 - idx;
+    if (_dcTipo[idx] === _DC_TIPO_BOMBA) return -2000 - idx;
+    return _dcCor[idx];
+  }
+
   // Encontra todas as combinações de 3+ (linhas e colunas). Retorna
-  // { marcado: bool[64], runs: [{cor, cells:[idx,...]}] }.
+  // { marcado: bool[64], runs: [{cor, cells:[idx,...], dir:'h'|'v'}] }.
   function _dcEncontrarMatches() {
     var marcado = new Array(_DC_TAM * _DC_TAM).fill(false);
     var runs = [], r, c, i;
     for (r = 0; r < _DC_TAM; r++) {
       var run = 1;
       for (c = 1; c <= _DC_TAM; c++) {
-        var atual = c < _DC_TAM ? _dcCor[r * _DC_TAM + c] : -1;
-        var anterior = _dcCor[r * _DC_TAM + (c - 1)];
+        var atual = c < _DC_TAM ? _dcChaveMatch(r * _DC_TAM + c) : -1;
+        var anterior = _dcChaveMatch(r * _DC_TAM + (c - 1));
         if (c < _DC_TAM && atual === anterior) { run++; }
         else {
           if (run >= 3) {
             var cells = [];
             for (i = c - run; i < c; i++) { cells.push(r * _DC_TAM + i); marcado[r * _DC_TAM + i] = true; }
-            runs.push({ cor: anterior, cells: cells });
+            runs.push({ cor: _dcCor[r * _DC_TAM + (c - 1)], cells: cells, dir: 'h' });
           }
           run = 1;
         }
@@ -234,14 +254,14 @@
     for (c = 0; c < _DC_TAM; c++) {
       var runV = 1;
       for (r = 1; r <= _DC_TAM; r++) {
-        var atualV = r < _DC_TAM ? _dcCor[r * _DC_TAM + c] : -1;
-        var anteriorV = _dcCor[(r - 1) * _DC_TAM + c];
+        var atualV = r < _DC_TAM ? _dcChaveMatch(r * _DC_TAM + c) : -1;
+        var anteriorV = _dcChaveMatch((r - 1) * _DC_TAM + c);
         if (r < _DC_TAM && atualV === anteriorV) { runV++; }
         else {
           if (runV >= 3) {
             var cellsV = [];
             for (i = r - runV; i < r; i++) { cellsV.push(i * _DC_TAM + c); marcado[i * _DC_TAM + c] = true; }
-            runs.push({ cor: anteriorV, cells: cellsV });
+            runs.push({ cor: _dcCor[(r - 1) * _DC_TAM + c], cells: cellsV, dir: 'v' });
           }
           runV = 1;
         }
@@ -250,6 +270,13 @@
     return { marcado: marcado, runs: runs };
   }
 
+  // Troca cor E tipo juntos (usado na troca real do jogador) — sem isso
+  // o doce especial "ficaria pra trás" quando o jogador arrasta ele pra
+  // outra célula, e a cor normal herdaria o tipo especial por engano.
+  function _dcTrocarCelulas(i1, i2) {
+    var tc = _dcCor[i1]; _dcCor[i1] = _dcCor[i2]; _dcCor[i2] = tc;
+    var tt = _dcTipo[i1]; _dcTipo[i1] = _dcTipo[i2]; _dcTipo[i2] = tt;
+  }
   function _dcTrocaFormaMatch(i1, i2) {
     if (!_dcCelulaAtiva(i1) || !_dcCelulaAtiva(i2)) return false; // buraco: não tem doce pra trocar
     // O gelo NÃO trava a troca — trava só a peça de sumir do tabuleiro
@@ -265,6 +292,18 @@
     for (var r = 0; r < _DC_TAM; r++) {
       for (var c = 0; c < _DC_TAM; c++) {
         var idx = r * _DC_TAM + c;
+        if (!_dcCelulaAtiva(idx)) continue;
+        // Um doce especial SEMPRE tem uma troca válida (ativa o efeito na
+        // hora, mesmo sem formar combinação de cor) — sem este check, o
+        // embaralhamento automático podia apagar um especial que o
+        // jogador tinha acabado de ganhar, achando que o tabuleiro
+        // estava travado.
+        if (_dcTipo[idx] > 0 && (
+          (c + 1 < _DC_TAM && _dcCelulaAtiva(idx + 1)) ||
+          (r + 1 < _DC_TAM && _dcCelulaAtiva(idx + _DC_TAM)) ||
+          (c - 1 >= 0 && _dcCelulaAtiva(idx - 1)) ||
+          (r - 1 >= 0 && _dcCelulaAtiva(idx - _DC_TAM))
+        )) return true;
         if (c + 1 < _DC_TAM && _dcTrocaFormaMatch(idx, idx + 1)) return true;
         if (r + 1 < _DC_TAM && _dcTrocaFormaMatch(idx, idx + _DC_TAM)) return true;
       }
@@ -294,10 +333,10 @@
         while (r < _DC_TAM && _dcCelulaAtiva(r * _DC_TAM + c)) r++;
         var rFim = r - 1; // pedaço contíguo jogável: [rIni..rFim]
         var tamPedaco = rFim - rIni + 1;
-        var sobreviventes = []; // {origRow, cor}, do topo pra baixo, só deste pedaço
+        var sobreviventes = []; // {origRow, cor, tipo}, do topo pra baixo, só deste pedaço
         for (var rr = rIni; rr <= rFim; rr++) {
           var idxRr = rr * _DC_TAM + c;
-          if (_dcCor[idxRr] !== 0) sobreviventes.push({ origRow: rr, cor: _dcCor[idxRr] });
+          if (_dcCor[idxRr] !== 0) sobreviventes.push({ origRow: rr, cor: _dcCor[idxRr], tipo: _dcTipo[idxRr] });
         }
         var novos = tamPedaco - sobreviventes.length;
         for (var i = 0; i < tamPedaco; i++) {
@@ -305,10 +344,12 @@
           var idx2 = linhaAtual * _DC_TAM + c;
           if (i < novos) {
             _dcCor[idx2] = _dcNovaCor();
+            _dcTipo[idx2] = 0; // doce novo: nunca nasce especial
             quedas.push({ idx: idx2, filas: novos - i });
           } else {
             var sv = sobreviventes[i - novos];
             _dcCor[idx2] = sv.cor;
+            _dcTipo[idx2] = sv.tipo;
             var filas = linhaAtual - sv.origRow;
             if (filas > 0) quedas.push({ idx: idx2, filas: filas });
           }
@@ -320,21 +361,159 @@
 
   // Remove as peças marcadas (pontua, conta combinações da cor-alvo
   // e "craca" o gelo daquela posição), deixando 0 = vazio pra gravidade.
-  function _dcProcessarMarcados(resultado) {
+  // `criar` (opcional) é a lista de { idx, tipo, cor } de _dcAnalisarResultado:
+  // em vez de esvaziar essas células, elas viram doces especiais.
+  function _dcProcessarMarcados(resultado, criar) {
+    var emRun = new Array(_dcCor.length).fill(false);
     resultado.runs.forEach(function (run) {
       _dcPontosFase += run.cells.length * 10;
       if (_dcObjetivo && _dcObjetivo.tipo === 'cor' && run.cor === _dcObjetivo.corAlvo) {
         _dcMatchesCorFase++;
       }
+      run.cells.forEach(function (idx) { emRun[idx] = true; });
     });
+    var criarPorIdx = {};
+    (criar || []).forEach(function (cr) { criarPorIdx[cr.idx] = cr; });
     resultado.marcado.forEach(function (m, idx) {
       if (!m) return;
+      // célula limpa só por efeito de um doce especial (nunca fez parte de
+      // uma combinação normal) também pontua — senão o estouro de um
+      // listrado/embrulhado/bomba não valeria nada.
+      if (!emRun[idx] && !criarPorIdx[idx]) _dcPontosFase += 15;
       if (_dcGelo[idx] > 0) {
         _dcGelo[idx]--;
         if (_dcGelo[idx] === 0) _dcObstaculosQuebrados++;
       }
-      _dcCor[idx] = 0;
+      var cr = criarPorIdx[idx];
+      if (cr) {
+        _dcCor[idx] = cr.cor;
+        _dcTipo[idx] = cr.tipo;
+        _dcPontosFase += 40; // bônus por criar um doce especial
+      } else {
+        _dcCor[idx] = 0;
+        _dcTipo[idx] = 0;
+      }
     });
+  }
+
+  // ── Doces especiais: criação e ativação ─────────────────────
+  // Quais células um doce especial afeta ao ser ativado (não inclui a
+  // bomba de cor — ela depende da cor do parceiro na troca, tratada à
+  // parte em _dcAtivarEspeciaisSwap).
+  function _dcCelulasEfeitoEspecial(idx, tipo) {
+    var r = Math.floor(idx / _DC_TAM), c = idx % _DC_TAM, out = [], rr, cc, j;
+    if (tipo === _DC_TIPO_LISTRA_H) { // limpa a LINHA inteira
+      for (cc = 0; cc < _DC_TAM; cc++) { j = r * _DC_TAM + cc; if (_dcCelulaAtiva(j)) out.push(j); }
+    } else if (tipo === _DC_TIPO_LISTRA_V) { // limpa a COLUNA inteira
+      for (rr = 0; rr < _DC_TAM; rr++) { j = rr * _DC_TAM + c; if (_dcCelulaAtiva(j)) out.push(j); }
+    } else if (tipo === _DC_TIPO_EMBRULHADO) { // explode uma área 3×3
+      for (var dr = -1; dr <= 1; dr++) {
+        for (var dc = -1; dc <= 1; dc++) {
+          var rr2 = r + dr, cc2 = c + dc;
+          if (rr2 < 0 || rr2 >= _DC_TAM || cc2 < 0 || cc2 >= _DC_TAM) continue;
+          j = rr2 * _DC_TAM + cc2;
+          if (_dcCelulaAtiva(j)) out.push(j);
+        }
+      }
+    }
+    return out;
+  }
+  // Todas as células ativas de uma cor (usado pela bomba de cor).
+  function _dcCelulasCor(cor) {
+    var out = [];
+    for (var i = 0; i < _dcCor.length; i++) {
+      if (_dcCelulaAtiva(i) && _dcCor[i] === cor && _dcTipo[i] !== _DC_TIPO_BOMBA) out.push(i);
+    }
+    return out;
+  }
+  // Reação em cadeia: se uma célula já marcada (por ter entrado numa
+  // combinação normal) já era um doce especial, seu efeito também dispara
+  // — ex.: um listrado pego no meio de outro match explode a linha dele
+  // inteira, e se essa linha tiver outro especial, o efeito continua.
+  // Bomba de cor NUNCA participa disso (só ativa por troca direta — ver
+  // _dcAtivarEspeciaisSwap): sem isso, ela "combinaria" à toa como uma
+  // cor comum sempre que caísse do lado de doces da mesma cor guardada.
+  function _dcExpandirMarcado(marcado) {
+    var fila = [], vistos = {}, i;
+    for (i = 0; i < marcado.length; i++) {
+      if (marcado[i] && _dcTipo[i] > 0 && _dcTipo[i] !== _DC_TIPO_BOMBA) fila.push(i);
+    }
+    while (fila.length) {
+      var idx = fila.shift();
+      if (vistos[idx]) continue;
+      vistos[idx] = true;
+      var extras = _dcCelulasEfeitoEspecial(idx, _dcTipo[idx]);
+      extras.forEach(function (j) {
+        if (!marcado[j]) marcado[j] = true;
+        if (_dcTipo[j] > 0 && _dcTipo[j] !== _DC_TIPO_BOMBA && !vistos[j]) fila.push(j);
+      });
+    }
+  }
+  // Decide quais células do resultado (das combinações ORIGINAIS, antes
+  // da expansão em cadeia) viram doces especiais em vez de sumir:
+  // - combinação de 4: listrado (orientação = direção da combinação);
+  // - combinação de 5+: bomba de cor;
+  // - duas combinações de 3 (uma horizontal, uma vertical) que se cruzam
+  //   numa célula livre, formando "L"/"T": embrulhado.
+  // `prefCel`, quando informado, é a célula de destino da troca do
+  // jogador — se ela fizer parte da combinação, o especial nasce ali
+  // (igual ao Candy Crush: o doce especial aparece onde você arrastou).
+  function _dcAnalisarResultado(resultado, prefCel) {
+    var criar = [], usados = {};
+    var runsGrandes = resultado.runs.filter(function (rn) { return rn.cells.length >= 4; });
+    var runsTriplas = resultado.runs.filter(function (rn) { return rn.cells.length === 3; });
+
+    runsGrandes.forEach(function (run) {
+      var tipo = run.cells.length >= 5
+        ? _DC_TIPO_BOMBA
+        : (run.dir === 'h' ? _DC_TIPO_LISTRA_H : _DC_TIPO_LISTRA_V);
+      var idx = (prefCel != null && run.cells.indexOf(prefCel) !== -1 && !usados[prefCel])
+        ? prefCel
+        : run.cells.filter(function (i) { return !usados[i]; })[0];
+      if (idx == null) return;
+      usados[idx] = true;
+      criar.push({ idx: idx, tipo: tipo, cor: run.cor });
+    });
+
+    for (var i = 0; i < runsTriplas.length; i++) {
+      if (runsTriplas[i].dir !== 'h') continue;
+      for (var j = 0; j < runsTriplas.length; j++) {
+        if (runsTriplas[j].dir !== 'v') continue;
+        var rh = runsTriplas[i], rv = runsTriplas[j];
+        var comum = rh.cells.filter(function (c) { return rv.cells.indexOf(c) !== -1 && !usados[c]; });
+        if (comum.length) {
+          var idxE = (prefCel != null && comum.indexOf(prefCel) !== -1) ? prefCel : comum[0];
+          usados[idxE] = true;
+          criar.push({ idx: idxE, tipo: _DC_TIPO_EMBRULHADO, cor: rh.cor });
+        }
+      }
+    }
+    return criar;
+  }
+  // Ativa doce(s) especial(is) envolvidos numa troca DIRETA do jogador
+  // (mesmo sem formar uma combinação de cor comum) — devolve o array
+  // marcado[64] com todas as células atingidas, já expandido em cadeia.
+  function _dcAtivarEspeciaisSwap(i1, i2, tipo1, tipo2) {
+    var marcado = new Array(_dcCor.length).fill(false);
+    function marcarLista(lista) { lista.forEach(function (j) { marcado[j] = true; }); }
+    var bomba1 = tipo1 === _DC_TIPO_BOMBA, bomba2 = tipo2 === _DC_TIPO_BOMBA;
+    if (bomba1 && bomba2) {
+      // duas bombas de cor trocadas entre si: limpa o tabuleiro inteiro
+      for (var i = 0; i < _dcCor.length; i++) { if (_dcCelulaAtiva(i)) marcado[i] = true; }
+    } else if (bomba1) {
+      marcarLista(_dcCelulasCor(_dcCor[i2]));
+      marcado[i1] = true;
+    } else if (bomba2) {
+      marcarLista(_dcCelulasCor(_dcCor[i1]));
+      marcado[i2] = true;
+    } else {
+      if (tipo1 > 0) marcarLista(_dcCelulasEfeitoEspecial(i1, tipo1));
+      if (tipo2 > 0) marcarLista(_dcCelulasEfeitoEspecial(i2, tipo2));
+    }
+    _dcExpandirMarcado(marcado);
+    var out = [];
+    marcado.forEach(function (m, idx) { if (m) out.push(idx); });
+    return out;
   }
 
   // ── RENDER em canvas ────────────────────────────────────────
@@ -404,13 +583,36 @@
   // imagem (pirulito, diamante, coração...) ocupando quase a célula
   // inteira, igual ao Candy Crush de verdade — pedido do Bruno pra tirar
   // o "doce dentro de uma bolinha" que a versão anterior tinha.
-  function _dcDesenharDoce(ctx, cx, cy, raio, corIdx, gelo, escala, alpha, offsetX) {
+  function _dcDesenharDoce(ctx, cx, cy, raio, corIdx, tipo, gelo, escala, alpha, offsetX) {
     if (!corIdx) return; // 0/undefined = célula vazia (transitório)
     var r = raio * (escala == null ? 1 : escala);
     if (r <= 0) return;
     var x = cx + (offsetX || 0);
+    var a = alpha == null ? 1 : alpha;
     ctx.save();
-    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    ctx.globalAlpha = a;
+
+    // Bomba de cor: orbe arco-íris no lugar da imagem normal — não fica
+    // "dentro" de gelo nem herda a textura da cor guardada (ela é curinga).
+    if (tipo === _DC_TIPO_BOMBA) {
+      var grad = ctx.createRadialGradient(x, cy, r * 0.1, x, cy, r * 0.95);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.25, '#f87171');
+      grad.addColorStop(0.45, '#fbbf24');
+      grad.addColorStop(0.65, '#4ade80');
+      grad.addColorStop(0.85, '#38bdf8');
+      grad.addColorStop(1, '#a855f7');
+      ctx.beginPath();
+      ctx.arc(x, cy, r * 0.92, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.lineWidth = Math.max(1, r * 0.1);
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
     if (gelo) { try { ctx.filter = gelo === 2 ? 'saturate(0.5) brightness(1.05)' : 'saturate(0.3) brightness(1.12)'; } catch (e) {} }
     var img = _dcImgs[corIdx - 1];
     if (img) {
@@ -425,8 +627,38 @@
       ctx.fill();
     }
     try { ctx.filter = 'none'; } catch (e) {}
+
+    // Overlay do doce especial (listrado/embrulhado) por cima da imagem
+    // normal — sem precisar de nenhum asset novo.
+    if (tipo === _DC_TIPO_LISTRA_H || tipo === _DC_TIPO_LISTRA_V) {
+      ctx.save();
+      ctx.globalAlpha = a * 0.85;
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      var nb = 3, lado2 = r * 1.7, faixa = (lado2 / nb) * 0.42;
+      for (var bi = 0; bi < nb; bi++) {
+        var offB = -lado2 / 2 + bi * (lado2 / nb) + (lado2 / nb - faixa) / 2;
+        if (tipo === _DC_TIPO_LISTRA_H) ctx.fillRect(x - lado2 / 2, cy + offB, lado2, faixa);
+        else ctx.fillRect(x + offB, cy - lado2 / 2, faixa, lado2);
+      }
+      ctx.restore();
+    } else if (tipo === _DC_TIPO_EMBRULHADO) {
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = Math.max(1.5, r * 0.14);
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.8, cy); ctx.lineTo(x + r * 0.8, cy);
+      ctx.moveTo(x, cy - r * 0.8); ctx.lineTo(x, cy + r * 0.8);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, cy, r * 0.26, 0, Math.PI * 2);
+      ctx.fillStyle = '#fbbf24';
+      ctx.fill();
+      ctx.restore();
+    }
+
     if (gelo && _dcImgs.gelo) {
-      ctx.globalAlpha = (alpha == null ? 1 : alpha) * (gelo === 2 ? 1 : 0.55);
+      ctx.globalAlpha = a * (gelo === 2 ? 1 : 0.55);
       var ladoGelo = r * 1.7;
       try { ctx.drawImage(_dcImgs.gelo, x - ladoGelo / 2, cy - ladoGelo / 2, ladoGelo, ladoGelo); } catch (e) {}
     }
@@ -527,7 +759,7 @@
         }
 
         var raioFinal = raio * escalaX;
-        _dcDesenharDoce(ctx, cx, cy + offY, raio, _dcCor[idx], _dcGelo[idx], escala * (escalaY), alpha, offX);
+        _dcDesenharDoce(ctx, cx, cy + offY, raio, _dcCor[idx], _dcTipo[idx], _dcGelo[idx], escala * (escalaY), alpha, offX);
         if (selecionada) {
           ctx.save();
           ctx.beginPath();
@@ -673,11 +905,16 @@
     _dcTrocaAnim = { i1: i1, i2: i2, t0: performance.now(), duracao: _DC_DUR_TROCA };
     setTimeout(function () {
       _dcTrocaAnim = null;
-      var tmp = _dcCor[i1]; _dcCor[i1] = _dcCor[i2]; _dcCor[i2] = tmp;
+      _dcTrocarCelulas(i1, i2);
+      var tipo1 = _dcTipo[i1], tipo2 = _dcTipo[i2];
+      // Trocar um doce especial (mesmo sem formar combinação de cor) SEMPRE
+      // ativa o efeito dele — igual ao Candy Crush: arrastar um listrado ou
+      // uma bomba de cor pra qualquer lado dispara o efeito na hora.
+      var especial = tipo1 > 0 || tipo2 > 0;
       var resultado = _dcEncontrarMatches();
-      if (resultado.marcado.indexOf(true) === -1) {
-        // não formou combinação: desfaz o dado e desliza de volta
-        tmp = _dcCor[i1]; _dcCor[i1] = _dcCor[i2]; _dcCor[i2] = tmp;
+      if (resultado.marcado.indexOf(true) === -1 && !especial) {
+        // não formou combinação nem envolveu especial: desfaz e desliza de volta
+        _dcTrocarCelulas(i1, i2);
         _dcTrocaAnim = { i1: i1, i2: i2, t0: performance.now(), duracao: _DC_DUR_TROCA, reversa: true };
         setTimeout(function () {
           _dcTrocaAnim = null;
@@ -687,10 +924,15 @@
         return;
       }
 
+      if (especial) {
+        var ativados = _dcAtivarEspeciaisSwap(i1, i2, tipo1, tipo2);
+        ativados.forEach(function (idx) { resultado.marcado[idx] = true; });
+      }
+
       _dcMovimentosRestantes = Math.max(0, _dcMovimentosRestantes - 1);
       _dcAtualizarHud();
       _dcAnimando = false;
-      _dcResolverCascata();
+      _dcResolverCascata({ prefCel: i2, resultadoInicial: resultado });
     }, _DC_DUR_TROCA);
   }
 
@@ -699,14 +941,29 @@
   // vindos da mesma troca), pra não virar poluição visual num match
   // comum de 3.
   var _DC_MENSAGENS_RUN = { 4: ['Delicioso!', '#4ade80'], 5: ['Sensacional!', '#38bdf8'], 6: ['Incrível!', '#fb7185'] };
+  // Mensagem mostrada assim que um doce especial nasce numa combinação.
+  var _DC_MENSAGENS_ESPECIAL = {
+    1: ['Listrado!', '#38bdf8'],
+    2: ['Listrado!', '#38bdf8'],
+    3: ['Embrulhado!', '#a855f7'],
+    4: ['Bomba de cor!', '#fb7185']
+  };
   function _dcMostrarComboMsg(texto, cor) {
     _dcComboMsg = { texto: texto, cor: cor, t0: performance.now(), duracao: _DC_DUR_COMBO };
   }
-  function _dcResolverCascata() {
+  // `opts.prefCel` (opcional): célula de destino da troca do jogador, só
+  // usada no 1º passo, pra um doce especial recém-criado nascer onde o
+  // jogador arrastou. `opts.resultadoInicial` (opcional): resultado já
+  // calculado por _dcTentarTrocar (evita recalcular e permite incluir
+  // células ativadas por troca direta com um especial).
+  function _dcResolverCascata(opts) {
     _dcAnimando = true;
     var passosNestaTroca = 0, maiorRunNestaTroca = 0;
+    var prefCel = (opts && opts.prefCel != null) ? opts.prefCel : null;
+    var resultadoForcado = (opts && opts.resultadoInicial) ? opts.resultadoInicial : null;
     function passo() {
-      var resultado = _dcEncontrarMatches();
+      var resultado = resultadoForcado || _dcEncontrarMatches();
+      resultadoForcado = null;
       if (resultado.marcado.indexOf(true) === -1) {
         _dcAnimando = false;
         if (passosNestaTroca >= 2) {
@@ -719,6 +976,17 @@
         return;
       }
       passosNestaTroca++;
+      // Reação em cadeia: especiais já existentes pegos nesta combinação
+      // disparam seu próprio efeito (expande o conjunto marcado).
+      _dcExpandirMarcado(resultado.marcado);
+      // Decide se alguma célula desta combinação vira um doce especial
+      // novo em vez de simplesmente sumir.
+      var criar = _dcAnalisarResultado(resultado, prefCel);
+      prefCel = null;
+      if (criar.length) {
+        var msgEsp = _DC_MENSAGENS_ESPECIAL[criar[criar.length - 1].tipo];
+        if (msgEsp) _dcMostrarComboMsg(msgEsp[0], msgEsp[1]);
+      }
       // 1) "Explode" as células combinadas antes de sumirem — sem isso a
       // troca parecia teletransporte (uma cor some, outra já aparece no
       // lugar sem nenhuma ligação visual entre as duas).
@@ -740,7 +1008,7 @@
         resultado.marcado.forEach(function (m, idx) { if (m) delete _dcPopAnim[idx]; });
         // 2) só depois da explosão os doces de cima caem no lugar —
         // com animação de queda em vez de troca instantânea de cor.
-        _dcProcessarMarcados(resultado);
+        _dcProcessarMarcados(resultado, criar);
         var quedas = _dcAplicarGravidadeComQuedas();
         _dcAtualizarHud();
         var agora2 = performance.now();

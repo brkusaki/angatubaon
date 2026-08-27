@@ -10478,10 +10478,32 @@
     _pintarSugestaoDoDia(dia.code, dia.max, meioDia && meioDia.chuva, true); // dias futuros: sempre ícone/frase diurna
   }
 
+  // Determina a classe CSS de cor do card baseada na condição do tempo
+  function _getWeatherCondClass(code, isDay) {
+    if (code === 0 || code === 1 || code === 2) return isDay !== false ? 'weather-cond-sunny' : 'weather-cond-night';
+    if (code === 3 || code === 45 || code === 48) return 'weather-cond-cloudy';
+    if (code >= 51 && code <= 99) return 'weather-cond-rainy';
+    return isDay !== false ? 'weather-cond-sunny' : 'weather-cond-night';
+  }
+
   function _pintarClima(d) {
     if (!document.getElementById('weather-temp')) return;
     _climaBruto = d;
     _climaDiaSelecionado = 0; // toda carga nova (ou cache) volta a mostrar "Hoje"
+
+    // Hide skeleton, show weather card
+    var elSkeleton = document.getElementById('weather-skeleton');
+    var elCard = document.getElementById('weather-card');
+    if (elSkeleton) elSkeleton.style.display = 'none';
+    if (elCard) elCard.style.display = 'block';
+
+    // Apply dynamic weather-reactive class
+    if (elCard && d.code !== undefined && d.isDay !== undefined) {
+      var weatherClass = _getWeatherCondClass(d.code, d.isDay);
+      elCard.classList.remove('weather-cond-sunny', 'weather-cond-rainy', 'weather-cond-cloudy', 'weather-cond-night');
+      elCard.classList.add(weatherClass);
+    }
+
     _pintarTopoClimaParaDia(0);
     _pintarAlertaChuva(d.pontosHoje); // sempre relativo a "agora", não ao dia selecionado na tira
     _renderSemanaClima(d.semana);
@@ -10750,7 +10772,13 @@
   }
   function _renderAvisosHoje(lista) {
     var box = document.getElementById('avisos-list');
+    var skeleton = document.getElementById('avisos-skeleton');
     if (!box) return;
+
+    // Hide skeleton, show avisos list
+    if (skeleton) skeleton.style.display = 'none';
+    if (box) box.style.display = 'flex';
+
     var dados = lista || AVISOS_HOJE_MOCK;
     window._avisosAtuais = dados; // referência usada pelo modal de post (_abrirAvisoPost)
     if (!dados || !dados.length) {
@@ -11098,13 +11126,61 @@
   }
   window._apagarAviso = _apagarAviso;
 
+  // ── Pull-to-refresh para Page 2 (Utilidades) ──
+  var _pullToRefreshState = { y: 0, down: false, loaded: 0, debounce: 0 };
+  function _initPullToRefresh() {
+    var page = document.getElementById('home-page-1');
+    if (!page) return;
+    var indicator = document.getElementById('pull-refresh-indicator');
+
+    page.addEventListener('touchstart', function (e) {
+      if (e.touches.length === 1) {
+        _pullToRefreshState.y = e.touches[0].clientY;
+        _pullToRefreshState.down = page.scrollTop === 0;
+      }
+    }, { passive: true });
+
+    page.addEventListener('touchmove', function (e) {
+      if (!_pullToRefreshState.down || e.touches.length !== 1) return;
+      var dy = e.touches[0].clientY - _pullToRefreshState.y;
+      if (dy > 0 && dy < 100) {
+        // Apenas deixar o visual do pull acontecer, sem bloquear scroll natural
+        if (indicator && dy > 50) {
+          indicator.classList.add('show');
+        }
+      }
+    }, { passive: true });
+
+    page.addEventListener('touchend', function () {
+      var dy = 0;
+      if (_pullToRefreshState.down) {
+        var elTemp = document.getElementById('weather-temp');
+        if (elTemp) dy = Math.max(0, _pullToRefreshState.y - (Date.now() - _pullToRefreshState.loaded));
+      }
+      if (dy > 50 && !_pullToRefreshState.debounce) {
+        _pullToRefreshState.debounce = 1;
+        if (indicator) indicator.classList.add('show');
+        _carregarClima();
+        _carregarAvisosReal();
+        setTimeout(function () {
+          if (indicator) indicator.classList.remove('show');
+          _pullToRefreshState.debounce = 0;
+        }, 1500);
+      } else {
+        if (indicator) indicator.classList.remove('show');
+      }
+      _pullToRefreshState.down = false;
+    }, { passive: true });
+
+    _pullToRefreshState.loaded = Date.now();
+  }
+
   function _carregarUtilidadesHome() {
     if (_utilidadesCarregadas) return;
     _utilidadesCarregadas = true;
     _carregarClima();
-    var box = document.getElementById('avisos-list');
-    if (box) box.innerHTML = '<div class="avisos-empty">Carregando avisos...</div>';
     _carregarAvisosReal();
+    _initPullToRefresh();
   }
 
   // Fix: este IIFE precisa rodar DEPOIS de todo o bloco acima (WMO_MAP,

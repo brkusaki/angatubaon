@@ -352,8 +352,30 @@
         </div>
 
         <!-- ── Página 2: Utilidades (clima + avisos locais) ── -->
-        <div class="home-page" id="home-page-1">
-          <div class="weather-card" id="weather-card">
+        <div class="home-page" id="home-page-1" style="position: relative;">
+          <!-- Pull-to-refresh indicator -->
+          <div class="pull-refresh-indicator" id="pull-refresh-indicator">
+            <div class="pull-refresh-spinner"></div>
+            <span>Atualizando...</span>
+          </div>
+
+          <!-- Weather card skeleton -->
+          <div class="skeleton-weather skeleton-card" id="weather-skeleton" style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <div class="skeleton-thumb" style="width: 40px; height: 40px;"></div>
+              <div class="skeleton-lines" style="flex: 1;">
+                <div class="skeleton-line xl" style="width: 80%;"></div>
+                <div class="skeleton-line" style="width: 60%;"></div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <div class="skeleton-line" style="flex: 1; height: 10px;"></div>
+              <div class="skeleton-line" style="flex: 1; height: 10px;"></div>
+              <div class="skeleton-line" style="flex: 1; height: 10px;"></div>
+            </div>
+          </div>
+
+          <div class="weather-card" id="weather-card" style="display: none;">
             <div class="weather-card-head">
               <span class="weather-card-label"><i class="fa fa-location-dot" aria-hidden="true"></i> Angatuba agora</span>
             </div>
@@ -404,7 +426,20 @@
                 <i class="fa fa-plus" aria-hidden="true"></i>
               </button>
             </div>
-            <div class="avisos-list" id="avisos-list"></div>
+            <!-- Avisos skeleton loaders -->
+            <div class="avisos-list" id="avisos-skeleton" style="display: flex;">
+              <div class="skeleton-card">
+                <div style="width: 100%; height: 160px; border-radius: 16px;"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="skeleton-lines" style="width: 100%;">
+                  <div class="skeleton-line xl" style="width: 70%;"></div>
+                  <div class="skeleton-line" style="width: 60%;"></div>
+                  <div class="skeleton-line short"></div>
+                </div>
+              </div>
+            </div>
+            <div class="avisos-list" id="avisos-list" style="display: none;"></div>
           </section>
           <button type="button" class="home-pref-btn" id="home-pref-btn-1" onclick="_definirPaginaInicialHome(1,this)">Abrir sempre nesta página</button>
         </div>

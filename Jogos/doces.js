@@ -398,10 +398,12 @@
     return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
   }
 
-  // Desenha um doce (círculo com gradiente + ícone + gelo por cima
-  // se houver) centrado em (cx, cy), com raio, escala e opacidade
-  // dadas — usado pra idle, queda, pop, seleção, troca, tudo passa
-  // pelos mesmos parâmetros.
+  // Desenha um doce centrado em (cx, cy), com raio, escala e opacidade
+  // dadas — usado pra idle, queda, pop, seleção, troca, tudo passa pelos
+  // mesmos parâmetros. Sem bolinha colorida de fundo: o doce é só a
+  // imagem (pirulito, diamante, coração...) ocupando quase a célula
+  // inteira, igual ao Candy Crush de verdade — pedido do Bruno pra tirar
+  // o "doce dentro de uma bolinha" que a versão anterior tinha.
   function _dcDesenharDoce(ctx, cx, cy, raio, corIdx, gelo, escala, alpha, offsetX) {
     if (!corIdx) return; // 0/undefined = célula vazia (transitório)
     var r = raio * (escala == null ? 1 : escala);
@@ -409,42 +411,26 @@
     var x = cx + (offsetX || 0);
     ctx.save();
     ctx.globalAlpha = alpha == null ? 1 : alpha;
-    var cor = _dcCores[corIdx - 1] || '#999';
-    var grad = ctx.createLinearGradient(x, cy - r, x, cy + r);
-    grad.addColorStop(0, _dcClarear(cor, 30));
-    grad.addColorStop(0.55, cor);
-    grad.addColorStop(1, _dcEscurecer(cor, 18));
     if (gelo) { try { ctx.filter = gelo === 2 ? 'saturate(0.5) brightness(1.05)' : 'saturate(0.3) brightness(1.12)'; } catch (e) {} }
-    ctx.beginPath();
-    ctx.arc(x, cy, r, 0, Math.PI * 2);
-    ctx.fillStyle = grad;
-    ctx.fill();
     var img = _dcImgs[corIdx - 1];
     if (img) {
-      var lado = r * 1.5; // ~72% do diâmetro (2r), igual ao CSS antigo
+      var lado = r * 1.9; // quase o diâmetro (2r) inteiro da célula
       try { ctx.drawImage(img, x - lado / 2, cy - lado / 2, lado, lado); } catch (e) {}
+    } else {
+      // imagem ainda carregando (raro, só no primeiro frame): círculo da
+      // cor sólida como placeholder temporário, nunca o visual final.
+      ctx.beginPath();
+      ctx.arc(x, cy, r * 0.75, 0, Math.PI * 2);
+      ctx.fillStyle = _dcCores[corIdx - 1] || '#999';
+      ctx.fill();
     }
     try { ctx.filter = 'none'; } catch (e) {}
     if (gelo && _dcImgs.gelo) {
       ctx.globalAlpha = (alpha == null ? 1 : alpha) * (gelo === 2 ? 1 : 0.55);
-      var ladoGelo = r * 1.6;
+      var ladoGelo = r * 1.7;
       try { ctx.drawImage(_dcImgs.gelo, x - ladoGelo / 2, cy - ladoGelo / 2, ladoGelo, ladoGelo); } catch (e) {}
     }
     ctx.restore();
-  }
-  function _dcClarear(hex, pct) { return _dcMisturarComBranco(hex, pct, true); }
-  function _dcEscurecer(hex, pct) { return _dcMisturarComBranco(hex, pct, false); }
-  function _dcMisturarComBranco(hex, pct, clarear) {
-    var m = /^#([0-9a-f]{6})$/i.exec(hex);
-    if (!m) return hex;
-    var n = parseInt(m[1], 16);
-    var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-    var alvo = clarear ? 255 : 0;
-    var f = pct / 100;
-    r = Math.round(r + (alvo - r) * f);
-    g = Math.round(g + (alvo - g) * f);
-    b = Math.round(b + (alvo - b) * f);
-    return 'rgb(' + r + ',' + g + ',' + b + ')';
   }
 
   function _dcDesenharFrame() {

@@ -5987,7 +5987,8 @@ body.games-fs-open .rl-card,
 body.games-fs-open .vo-card,
 body.games-fs-open .quiz-coruja,
 body.games-fs-open .bb-card,
-body.games-fs-open .dc-card {
+body.games-fs-open .dc-card,
+body.games-fs-open .t48-card {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -6019,11 +6020,12 @@ body.games-fs-open .vo-arena {
   touch-action: none;      /* bloqueia scroll SO na arena, nao no body */
   position: relative;
 }
-/* Blocos/Doces: grade de tamanho fixo (max-width 340px) centralizada
+/* Blocos/Doces/2048: grade de tamanho fixo (max-width 340px) centralizada
    dentro da arena — a arena cresce pra preencher a tela, o conteúdo
    fica centralizado no meio dela em vez de colado no topo. */
 body.games-fs-open .bb-arena,
-body.games-fs-open .dc-arena {
+body.games-fs-open .dc-arena,
+body.games-fs-open .t48-arena {
   flex: 1 1 auto;
   min-height: 60vh;
   justify-content: center;

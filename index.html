@@ -680,6 +680,15 @@
           </div>
         </button>
 
+        <button type="button" class="game-card gc-2048" data-cat="puzzle" data-nome="2048 da coruja" data-desc="deslize e combine as pecas ate chegar ao 2048" onclick="_abrirJogo('2048')">
+          <div class="gc-media"><img src="/Jogos/assets/card-2048.webp" alt="" loading="lazy" class="gc-hero-img"></div>
+          <div class="gc-body">
+            <div class="gc-title">2048 da Coruja</div>
+            <div class="gc-desc">Deslize e combine as peças iguais até chegar ao 2048!</div>
+            <span class="gc-cta">Jogar</span>
+          </div>
+        </button>
+
         <button type="button" class="game-card gc-pingpong" data-cat="multi" data-nome="ping pong da coruja" data-desc="sozinho contra a cpu ou 1x1 com um amigo em tempo real" onclick="_abrirJogo('pingpong')">
           <div class="gc-media"><img src="/Jogos/assets/card-pingpong.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
@@ -1104,6 +1113,45 @@
               <div class="rank-slot" id="dc-rank-slot" style="display:none;"></div>
               <button type="button" class="dc-btn" id="dc-fim-btn" onclick="_dcBotaoPrincipal()">Continuar</button>
               <button type="button" class="dc-link" onclick="_voltarAoMenu()">Voltar aos jogos</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TELA: 2048 da Coruja (clássico deslizar-e-fundir, grade 4×4) -->
+      <div id="jogo-2048" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div class="t48-card" id="t48-card">
+          <div class="t48-hud">
+            <div class="t48-hud-item t48-hud-objetivo">
+              <span class="t48-hud-label">Objetivo</span>
+              <span class="t48-hud-valor t48-hud-obj-txt">Chegue ao 2048!</span>
+            </div>
+            <div class="t48-hud-item"><span class="t48-hud-label">Melhor peça</span><span class="t48-hud-valor" id="t48-objetivo-progresso">0/2048</span></div>
+            <div class="t48-hud-item"><span class="t48-hud-label">Pontos</span><span class="t48-hud-valor" id="t48-pontos">0</span></div>
+            <div class="t48-hud-item"><span class="t48-hud-label">Recorde</span><span class="t48-hud-valor" id="t48-recorde">0</span></div>
+          </div>
+          <div class="t48-arena" id="t48-arena">
+            <div class="t48-grid" id="t48-grid"></div>
+            <div class="t48-toast" id="t48-toast"></div>
+
+            <!-- Tela inicial -->
+            <div class="t48-overlay" id="t48-inicio">
+              <img src="/webp/owl-idea.webp" alt="" class="t48-overlay-owl" onerror="this.style.display='none'">
+              <div class="t48-overlay-titulo">🔢 2048 da Coruja</div>
+              <div class="t48-overlay-desc">Deslize (arraste) as peças pra juntar dois números iguais e formar peças cada vez maiores. Chegue ao 2048 antes que o tabuleiro lote!</div>
+              <div class="t48-overlay-rec">Recorde: <span id="t48-recorde-inicio">0</span> pontos</div>
+              <button type="button" class="t48-btn" onclick="_t48Comecar()">Jogar</button>
+            </div>
+
+            <!-- Tela de fim (chegou ao 2048 OU sem jogadas — conteúdo trocado por JS) -->
+            <div class="t48-overlay" id="t48-fim" style="display:none;">
+              <img src="" alt="" class="t48-overlay-owl" id="t48-fim-owl" onerror="this.style.display='none'">
+              <div class="t48-overlay-titulo" id="t48-fim-titulo">Fim</div>
+              <div class="t48-overlay-desc" id="t48-fim-msg"></div>
+              <div class="rank-slot" id="t48-rank-slot" style="display:none;"></div>
+              <button type="button" class="t48-btn" onclick="_t48Retry()">Tentar de novo</button>
+              <button type="button" class="t48-link" onclick="_voltarAoMenu()">Voltar aos jogos</button>
             </div>
           </div>
         </div>

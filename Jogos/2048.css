@@ -1,0 +1,151 @@
+/* ═══════════════════════════════════════════════════════════════
+   2048 DA CORUJA — estilos do jogo (lazy-loaded)
+   Injetado sob demanda pelo _jogoLoader ao abrir o jogo.
+   ═══════════════════════════════════════════════════════════════ */
+
+.t48-card {
+  border-radius: 16px; overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.t48-hud {
+  display: flex; flex-wrap: wrap; justify-content: space-around; gap: 6px;
+  padding: 12px 10px;
+  background: linear-gradient(135deg, rgba(251,146,60,0.14), rgba(217,119,6,0.08));
+  border-bottom: 1px solid var(--border);
+}
+.t48-hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 58px; }
+.t48-hud-objetivo { flex: 1 1 100%; order: -1; }
+.t48-hud-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); font-weight: 700;
+}
+.t48-hud-valor {
+  font-family: var(--font-h); font-weight: 800; font-size: 18px;
+  color: var(--text);
+}
+.t48-hud-obj-txt { font-size: 13px; text-align: center; }
+
+.t48-arena {
+  position: relative;
+  padding: 16px 12px 18px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  background:
+    radial-gradient(circle at 30% 10%, rgba(251,146,60,0.10), transparent 55%),
+    var(--surface2);
+  min-height: 420px;
+}
+
+/* Grade 4×4 — fundo estático (células) + camada de peças por cima,
+   posicionada em absoluto pra cada peça poder animar via transform
+   sem precisar recriar a grade a cada jogada. */
+.t48-grid {
+  position: relative;
+  width: 100%; max-width: 340px; aspect-ratio: 1 / 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 10px;
+  padding: 8px; border-radius: 12px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid var(--border);
+  touch-action: none;
+}
+.t48-cel {
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+}
+.t48-tiles {
+  position: absolute; inset: 0;
+  pointer-events: none;
+}
+.t48-tile {
+  position: absolute;
+  top: 0; left: 0;
+  transition: transform 110ms ease-in-out;
+  will-change: transform;
+}
+.t48-tile-face {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  font-family: var(--font-h); font-weight: 800;
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,0.16), inset 0 2px 0 rgba(255,255,255,0.25);
+  transition: transform 90ms ease-out;
+}
+
+/* Paleta clássica do 2048, com um leve tom mais quente/coruja nos
+   valores altos (âmbar → dourado) em vez do laranja-avermelhado
+   original — combina com o resto do hub. */
+.t48-tile-v2    { background: #eee4da; color: #6b6055; }
+.t48-tile-v4    { background: #ede0c8; color: #6b6055; }
+.t48-tile-v8    { background: #f2b179; color: #fff7ee; }
+.t48-tile-v16   { background: #f59563; color: #fff7ee; }
+.t48-tile-v32   { background: #f67c5f; color: #fff7ee; }
+.t48-tile-v64   { background: #f65e3b; color: #fff7ee; }
+.t48-tile-v128  { background: #edcf72; color: #fff7ee; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.16), inset 0 2px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.15); }
+.t48-tile-v256  { background: #edcc61; color: #fff7ee; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.16), inset 0 2px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.2); }
+.t48-tile-v512  { background: #edc850; color: #fff7ee; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.16), inset 0 2px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.25); }
+.t48-tile-v1024 { background: #edc53f; color: #fff7ee; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.16), inset 0 2px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.3); }
+.t48-tile-v2048 { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #3a2410; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.2), inset 0 2px 0 rgba(255,255,255,0.4), 0 0 14px rgba(251,191,36,0.55); }
+.t48-tile-vsuper { background: linear-gradient(135deg, #a855f7, #ec4899); color: #fff7ee; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.2), inset 0 2px 0 rgba(255,255,255,0.35), 0 0 14px rgba(168,85,247,0.5); }
+
+/* "Pop" de escala: peça nova nasce pequena e cresce; peça que acaba
+   de se fundir dá um pulinho de tamanho — nunca ao mesmo tempo, cada
+   peça só toca uma das duas por jogada. */
+@keyframes t48-pop-nova { from { transform: scale(0.35); } to { transform: scale(1); } }
+@keyframes t48-pop-fundiu { 0% { transform: scale(1); } 55% { transform: scale(1.16); } 100% { transform: scale(1); } }
+.t48-anim-nova { animation: t48-pop-nova 140ms ease-out; }
+.t48-anim-fundiu { animation: t48-pop-fundiu 140ms ease-out; }
+
+/* Aviso "Você chegou ao 2048!" — badge central com fade, some
+   sozinho (ver setTimeout em 2048.js). O jogo NÃO para: dá pra
+   seguir jogando pra bater um placar ainda maior. */
+.t48-toast {
+  position: absolute;
+  left: 50%; top: 14px;
+  transform: translate(-50%, -12px);
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #3a2410;
+  font-family: var(--font-h); font-weight: 800; font-size: 14px;
+  padding: 8px 18px; border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  transition: opacity .25s, transform .25s;
+  z-index: 5;
+  white-space: nowrap;
+}
+.t48-toast-show { opacity: 1; transform: translate(-50%, 0); }
+
+/* Telas de início e fim (mesmo padrão dos outros jogos: overlay
+   absoluto sobre a arena) */
+.t48-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 20px; gap: 6px;
+  background: var(--surface2);
+}
+.t48-overlay-owl { width: 72px; height: 72px; object-fit: contain; margin-bottom: 4px; }
+.t48-overlay-titulo { font-family: var(--font-h); font-weight: 800; font-size: 20px; color: var(--text); }
+.t48-overlay-desc { font-size: 13px; color: var(--muted); line-height: 1.4; max-width: 260px; }
+.t48-overlay-rec { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+.t48-btn {
+  margin-top: 10px;
+  font-family: var(--font-h); font-weight: 800; font-size: 15px;
+  color: #fff; cursor: pointer;
+  padding: 12px 32px; border-radius: 999px; border: none;
+  background: linear-gradient(135deg, #fbbf24, #ea580c);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .1s, filter .15s;
+  box-shadow: 0 4px 14px rgba(234,88,12,0.35);
+}
+.t48-btn:active { transform: scale(0.96); }
+.t48-btn:hover { filter: brightness(1.08); }
+.t48-link {
+  margin-top: 2px; background: none; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 700; color: var(--muted);
+  text-decoration: underline; -webkit-tap-highlight-color: transparent;
+}

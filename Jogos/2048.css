@@ -48,7 +48,9 @@
   gap: 10px;
   padding: 8px; border-radius: 12px;
   background: rgba(0,0,0,0.18);
-  border: 1px solid var(--border);
+  /* Anel âmbar suave — evoca os olhos da coruja, mesmo tom do HUD/botão. */
+  border: 1px solid rgba(251,191,36,0.35);
+  box-shadow: 0 0 26px rgba(251,146,60,0.14), inset 0 0 0 1px var(--border);
   touch-action: none;
 }
 .t48-cel {
@@ -88,7 +90,11 @@
 .t48-tile-v512  { background: #edc850; color: #fff7ee; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.16), inset 0 2px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.25); }
 .t48-tile-v1024 { background: #edc53f; color: #fff7ee; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.16), inset 0 2px 0 rgba(255,255,255,0.25), 0 0 0 1px rgba(255,255,255,0.3); }
 .t48-tile-v2048 { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #3a2410; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.2), inset 0 2px 0 rgba(255,255,255,0.4), 0 0 14px rgba(251,191,36,0.55); }
-.t48-tile-vsuper { background: linear-gradient(135deg, #a855f7, #ec4899); color: #fff7ee; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.2), inset 0 2px 0 rgba(255,255,255,0.35), 0 0 14px rgba(168,85,247,0.5); }
+/* Acima de 2048 ("super"): sai da paleta genérica e vai pras cores da
+   PRÓPRIA coruja-mascote — penas azul-acinzentadas com o brilho coral
+   das asas (mesmas cores de webp/owl-portrait.webp) — em vez de um
+   roxo/rosa qualquer. */
+.t48-tile-vsuper { background: linear-gradient(135deg, #64748b, #334155); color: #fff7ee; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.25), inset 0 2px 0 rgba(255,255,255,0.3), 0 0 14px rgba(251,113,133,0.5); }
 
 /* "Pop" de escala: peça nova nasce pequena e cresce; peça que acaba
    de se fundir dá um pulinho de tamanho — nunca ao mesmo tempo, cada
@@ -117,6 +123,28 @@
   white-space: nowrap;
 }
 .t48-toast-show { opacity: 1; transform: translate(-50%, 0); }
+
+/* Mascote logo abaixo do tabuleiro, "acompanhando" a partida — mesma
+   coruja do card do hub (webp/owl-portrait.webp), com um balanço leve
+   pra não ficar estática. É um item de fluxo normal (não absoluto) do
+   mesmo flex column da arena: em tela cheia, quando a arena cresce pra
+   preencher a tela toda, o grupo grade+coruja fica centralizado no meio
+   do espaço extra, sem nunca sobrepor o tabuleiro. Fica por trás das
+   telas de início/fim (elas têm fundo sólido cobrindo a arena inteira),
+   então só aparece durante o jogo em si. */
+.t48-mascote {
+  width: 92px;
+  max-width: 26vw;
+  height: auto;
+  opacity: 0.92;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,0.45));
+  animation: t48-mascote-balanco 3.4s ease-in-out infinite;
+}
+@keyframes t48-mascote-balanco {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50%      { transform: translateY(-7px) rotate(1deg); }
+}
 
 /* Telas de início e fim (mesmo padrão dos outros jogos: overlay
    absoluto sobre a arena) */

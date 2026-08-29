@@ -11203,6 +11203,12 @@
 
   var _avisoEditorId = null;      // null = criando novo; string = editando esse id
   var _avisoEditorMidias = [];    // [{tipo:'foto'|'video', url}]
+  // Mídias enviadas pro Cloudinary NESTA sessão de edição e ainda não
+  // confirmadas num aviso salvo — se forem removidas do editor ou o editor
+  // for fechado sem salvar, apagamos elas do Cloudinary (evita lixo órfão).
+  // Mídia que já pertencia ao aviso ANTES de abrir o editor não entra aqui:
+  // essa limpeza continua por conta do diff de avisosEditar, no _salvarAviso.
+  var _avisoEditorMidiasNovas = [];
 
   function _abrirEditorAviso(id) {
     if (!_avisosSouAdmin()) return;
@@ -11215,6 +11221,7 @@
     }
     _avisoEditorId = aviso ? (aviso.id || null) : null;
     _avisoEditorMidias = (aviso && Array.isArray(aviso.midias)) ? aviso.midias.slice() : [];
+    _avisoEditorMidiasNovas = [];
 
     document.getElementById('aviso-editor-heading').textContent = _avisoEditorId ? 'Editar aviso' : 'Novo aviso';
     document.getElementById('aviso-editor-emoji').value = aviso ? (aviso.emoji || '') : '';
@@ -11238,8 +11245,27 @@
     if (overlay) overlay.style.display = 'none';
     document.body.style.overflow = '';
     if (!viaPopstate && history.state?.modal === 'aviso-editor') { _popstateNosso = true; history.back(); }
+    // Fecha sem ter salvo (ou fechou depois de salvar, mas aí a lista já
+    // está vazia — ver _salvarAviso): o que sobrou aqui foi enviado e nunca
+    // usado em nenhum aviso, então pode apagar do Cloudinary.
+    if (_avisoEditorMidiasNovas.length) {
+      _avisoEditorMidiasNovas.forEach(function (url) { _avisoCloudinaryApagarUrl(url); });
+      _avisoEditorMidiasNovas = [];
+    }
   }
   window._fecharEditorAviso = _fecharEditorAviso;
+
+  // Apaga uma mídia órfã do Cloudinary (enviada no editor, nunca publicada) —
+  // best-effort, silenciosa: nunca deve travar o editor por causa disso.
+  async function _avisoCloudinaryApagarUrl(url) {
+    if (!url || !_cliUser) return;
+    try {
+      var idToken = await _cliUser.getIdToken();
+      var params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action: 'avisosCloudinaryApagar', idToken: idToken, url: url }));
+      await fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(15000) });
+    } catch (e) {}
+  }
 
   function _renderMidiasEditor() {
     var box = document.getElementById('aviso-editor-midias-lista');
@@ -11253,7 +11279,15 @@
   }
 
   function _removerMidiaEditor(i) {
+    var removida = _avisoEditorMidias[i];
     _avisoEditorMidias.splice(i, 1);
+    if (removida) {
+      var idxNova = _avisoEditorMidiasNovas.indexOf(removida.url);
+      if (idxNova !== -1) {
+        _avisoEditorMidiasNovas.splice(idxNova, 1);
+        _avisoCloudinaryApagarUrl(removida.url); // órfã: nunca chegou a ser salva
+      }
+    }
     _renderMidiasEditor();
   }
   window._removerMidiaEditor = _removerMidiaEditor;
@@ -11310,7 +11344,7 @@
       for (var i = 0; i < files.length; i++) {
         if (_avisoEditorMidias.length >= 10) break;
         var url = await _uploadMidiaAviso(files[i], 'foto');
-        if (url) { _avisoEditorMidias.push({ tipo: 'foto', url: url }); _renderMidiasEditor(); }
+        if (url) { _avisoEditorMidias.push({ tipo: 'foto', url: url }); _avisoEditorMidiasNovas.push(url); _renderMidiasEditor(); }
       }
     });
     if (inpVideo) inpVideo.addEventListener('change', async function (e) {
@@ -11318,7 +11352,7 @@
       e.target.value = '';
       if (!file || _avisoEditorMidias.length >= 10) return;
       var url = await _uploadMidiaAviso(file, 'video');
-      if (url) { _avisoEditorMidias.push({ tipo: 'video', url: url }); _renderMidiasEditor(); }
+      if (url) { _avisoEditorMidias.push({ tipo: 'video', url: url }); _avisoEditorMidiasNovas.push(url); _renderMidiasEditor(); }
     });
   })();
 
@@ -11347,6 +11381,7 @@
       var resp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(15000) });
       var json = await resp.json();
       if (json.status !== 'ok') throw new Error(json.msg || 'Erro ao salvar');
+      _avisoEditorMidiasNovas = []; // salvou: essas mídias agora pertencem ao aviso, não são mais "órfãs"
       mlToast(_avisoEditorId ? 'Aviso atualizado!' : 'Aviso publicado!', 'ok');
       _fecharEditorAviso();
       _carregarAvisosReal();

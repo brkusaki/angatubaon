@@ -246,7 +246,7 @@
     /* ════════════════════════════════════════════
        MAIN
     ════════════════════════════════════════════ */
-    .main { padding: 16px 16px 20px; }
+    .main { padding: 16px 16px 20px; transition: padding-top 0.25s ease; }
 
     .section-header {
       display: flex; align-items: center;
@@ -451,7 +451,35 @@
       border-top: 1px solid rgba(255,255,255,0.05);
       border-bottom: 1px solid rgba(255,255,255,0.06);
     }
-    .filter-pills::-webkit-scrollbar { display: none; }
+    .filter-pills::-webkit-scrollbar { display: none; }
+    /* ── Modo Feed ("Hoje em Angatuba", pagina 2 do carrossel da home) ──
+       Busca, categorias e pills somem quando body.feed-mode esta ativo
+       (ver _irParaPaginaHome em app.js, que alterna a classe no swipe,
+       nos dots e na preferencia de pagina inicial). Colapsa com
+       max-height + opacity em vez de display:none, pra nao "piscar" ao
+       trocar de pagina; overflow so fica hidden quando escondido, pra
+       nao cortar o glow de foco da busca na pagina de Lojas. ── */
+    .search-wrap,
+    #cat-bar,
+    #filter-pills {
+      max-height: 160px; opacity: 1;
+      transition: max-height 0.28s ease, opacity 0.2s ease,
+                  padding-top 0.28s ease, padding-bottom 0.28s ease,
+                  border-color 0.28s ease;
+    }
+    body.feed-mode .search-wrap,
+    body.feed-mode #cat-bar,
+    body.feed-mode #filter-pills {
+      max-height: 0; opacity: 0;
+      padding-top: 0; padding-bottom: 0;
+      border-color: transparent;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    /* Sem busca/categorias/pills, o carrossel (dots + feed) sobe e cola
+       no header-top -- sem o respiro de 16px pensado pra quando a busca
+       esta visivel. */
+    body.feed-mode .main { padding-top: 8px; }
 
     .pill-btn {
       display: inline-flex;

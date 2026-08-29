@@ -537,6 +537,10 @@
           var _hd1 = document.querySelector('.home-dot[data-idx="1"]');
           if (_hd0) _hd0.classList.remove('active');
           if (_hd1) _hd1.classList.add('active');
+          // Modo Feed ja nasce ativo (sem "pulo") quando a pagina
+          // inicial preferida e a 2 ("Hoje em Angatuba") -- ver
+          // _irParaPaginaHome, que alterna esta classe no swipe/dots.
+          document.body.classList.add('feed-mode');
         }
       } catch (e) {}
     </script>

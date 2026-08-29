@@ -10206,6 +10206,9 @@
     document.querySelectorAll('.home-dot').forEach(function (d, i) {
       d.classList.toggle('active', i === idx);
     });
+    // Modo Feed: na pagina 2 ("Hoje em Angatuba"), busca/categorias/pills
+    // somem via CSS (body.feed-mode) para o feed ocupar a tela toda.
+    document.body.classList.toggle('feed-mode', idx === 1);
     if (idx === 1) _carregarUtilidadesHome();
   }
   window._irParaPaginaHome = _irParaPaginaHome;

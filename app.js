@@ -10798,18 +10798,19 @@
       var capa = midias.length && midias[0].tipo !== 'video' ? midias[0].url : (midias.length ? null : null);
       var mediaHtml = '';
       if (midias.length) {
-        // Se a 1ª mídia for vídeo, mostra o próprio frame do vídeo como "capa" (sem controles na lista).
-        // Toque na mídia: foto não faz nada (estilo Instagram — só o duplo
-        // toque curte); vídeo abre o modal (player maior) no toque simples.
-        // Duplo toque em qualquer uma das duas sempre curte, nunca descurte
-        // (ver _avisoCliqueMedia / _avisoDuploCliqueMedia).
+        // Foto: toque simples não faz nada (estilo Instagram); vídeo: toca
+        // sozinho, mudo, quando entra na tela (ver _avisoInitVideoObserver)
+        // — não precisa de toque nenhum pra começar. Duplo toque em
+        // qualquer uma das duas sempre curte, nunca descurte (ver
+        // _avisoDuploCliqueMedia).
         var primeira = midias[0];
         var ehVideo = primeira.tipo === 'video';
         var capaBg = ehVideo ? '' : ('background-image:url(\'' + primeira.url + '\');');
-        mediaHtml = '<div class="aviso-card-media" onclick="_avisoCliqueMedia(' + i + ', event)" ondblclick="_avisoDuploCliqueMedia(' + i + ', event)"' +
-          (ehVideo ? ' role="button" tabindex="0" aria-label="Abrir vídeo" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_abrirAvisoPost(' + i + ');}"' : '') +
-          ' style="' + capaBg + '">' +
-          (ehVideo ? '<video src="' + primeira.url + '" muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>' : '') +
+        mediaHtml = '<div class="aviso-card-media" ondblclick="_avisoDuploCliqueMedia(' + i + ', event)" style="' + capaBg + '">' +
+          (ehVideo
+            ? '<video class="aviso-card-video" data-aviso-idx="' + i + '" src="' + primeira.url + '" muted playsinline webkit-playsinline loop preload="metadata" style="width:100%;height:100%;object-fit:cover;"></video>' +
+              '<button type="button" class="aviso-video-som-btn" data-aviso-idx="' + i + '" aria-label="Ativar som" onclick="event.stopPropagation();_avisoAlternarSom(' + i + ', event)"><i class="ti ti-volume-off" aria-hidden="true"></i></button>'
+            : '') +
           (midias.length > 1 ? '<span class="aviso-card-media-count"><i class="fa fa-images" aria-hidden="true"></i> ' + midias.length + '</span>' : '') +
           '</div>';
       }
@@ -10846,6 +10847,7 @@
         '<span class="aviso-desc">' + _escHtmlAviso(a.texto) + '</span></div></div>' +
         acoesHtml + '</div>';
     }).join('');
+    _avisoInitVideoObserver();
     _avisoTentarAbrirDeepLink();
   }
   window._renderAvisosHoje = _renderAvisosHoje; // exposto p/ o futuro fetch no GAS chamar direto
@@ -11109,34 +11111,13 @@
   window._avisoCompartilhar = _avisoCompartilhar;
 
   /* ── Toque na mídia do card (estilo Instagram) ──
-     Foto: toque simples não faz nada; vídeo: toque simples abre o modal
-     (player maior). Duplo toque em qualquer um dos dois sempre curte
-     (nunca descurte — descurtir é só pelo botão de coração embaixo), com
-     o coração grande "estourando" no meio da mídia.
-     Disambiguação clássica de clique único x duplo: o 1º clique agenda a
-     ação de toque simples com um pequeno atraso; se um 2º clique chegar
-     antes (o próprio dblclick do navegador), cancela o agendado — assim
-     o toque simples só executa se não virar duplo toque. ── */
-  var _avisoClickTimers = {};
-
-  function _avisoCliqueMedia(idx, ev) {
-    if (ev) ev.stopPropagation();
-    if (_avisoClickTimers[idx]) { clearTimeout(_avisoClickTimers[idx]); _avisoClickTimers[idx] = null; return; }
-    var lista = window._avisosAtuais || AVISOS_HOJE_MOCK;
-    var aviso = lista[idx];
-    var midias = aviso && Array.isArray(aviso.midias) ? aviso.midias : [];
-    var ehVideo = midias.length && midias[0].tipo === 'video';
-    if (!ehVideo) return; // foto: toque simples não expande/abre nada
-    _avisoClickTimers[idx] = setTimeout(function () {
-      _avisoClickTimers[idx] = null;
-      _abrirAvisoPost(idx);
-    }, 260);
-  }
-  window._avisoCliqueMedia = _avisoCliqueMedia;
-
+     Foto: toque simples não faz nada. Vídeo toca sozinho (ver
+     _avisoInitVideoObserver logo abaixo) — não depende de toque nenhum.
+     Duplo toque em qualquer uma das duas sempre curte (nunca descurte —
+     descurtir é só pelo botão de coração embaixo), com o coração grande
+     "estourando" no meio da mídia. ── */
   function _avisoDuploCliqueMedia(idx, ev) {
     if (ev) { ev.stopPropagation(); ev.preventDefault(); }
-    if (_avisoClickTimers[idx]) { clearTimeout(_avisoClickTimers[idx]); _avisoClickTimers[idx] = null; }
     var mediaEl = ev && ev.currentTarget;
     var lista = window._avisosAtuais || AVISOS_HOJE_MOCK;
     var aviso = lista[idx];
@@ -11159,6 +11140,63 @@
       burst.addEventListener('animationend', function () { burst.remove(); });
       setTimeout(function () { if (burst.parentNode) burst.remove(); }, 900);
     } catch (e) {}
+  }
+
+  /* ── Vídeo do feed toca/pausa sozinho conforme entra/sai da tela (estilo
+     Instagram — nunca abre modal pra isso) e só 1 vídeo por vez fica com
+     som. Reobservado a cada _renderAvisosHoje (os <video> são recriados no
+     innerHTML) e ao voltar de uma aba escondida (o pause por
+     visibilitychange não é desfeito sozinho — precisa reobservar pra
+     retomar o que estiver visível). ── */
+  var _avisoVideoObserver = null;
+
+  function _avisoInitVideoObserver() {
+    if (_avisoVideoObserver) _avisoVideoObserver.disconnect();
+    if (typeof IntersectionObserver === 'undefined') return; // navegador sem suporte: vídeo só fica parado no frame, sem quebrar o resto
+    _avisoVideoObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        var video = entry.target;
+        if (document.hidden) return; // aba escondida: quem cuida é o visibilitychange
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+          video.play().catch(function () {}); // autoplay pode ser recusado silenciosamente — sem problema, fica parado
+        } else {
+          video.pause();
+        }
+      });
+    }, { threshold: [0, 0.6, 1] });
+    document.querySelectorAll('.aviso-card-video').forEach(function (v) { _avisoVideoObserver.observe(v); });
+  }
+  window._avisoInitVideoObserver = _avisoInitVideoObserver;
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      document.querySelectorAll('.aviso-card-video').forEach(function (v) { v.pause(); });
+    } else {
+      _avisoInitVideoObserver(); // reobserva: retoma o que estiver visível agora
+    }
+  });
+
+  // Botão de som do vídeo (mesmo ícone/estilo do anúncio de loja). Só um
+  // vídeo do feed toca com som por vez — desmutar um muta todos os outros.
+  function _avisoAlternarSom(idx, ev) {
+    if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+    var video = document.querySelector('.aviso-card-video[data-aviso-idx="' + idx + '"]');
+    if (!video) return;
+    var estavaMudo = video.muted;
+    document.querySelectorAll('.aviso-card-video').forEach(function (v) {
+      if (v !== video && !v.muted) { v.muted = true; _avisoAtualizarIconeSom(v); }
+    });
+    video.muted = !estavaMudo;
+    _avisoAtualizarIconeSom(video);
+  }
+  window._avisoAlternarSom = _avisoAlternarSom;
+
+  function _avisoAtualizarIconeSom(video) {
+    var btn = document.querySelector('.aviso-video-som-btn[data-aviso-idx="' + video.dataset.avisoIdx + '"]');
+    if (!btn) return;
+    var ico = btn.querySelector('i');
+    if (ico) ico.className = video.muted ? 'ti ti-volume-off' : 'ti ti-volume';
+    btn.setAttribute('aria-label', video.muted ? 'Ativar som' : 'Desativar som');
   }
 
   // ── Deep link do post (?post=ID ou #aviso=ID) — abre o modal do post

@@ -2075,6 +2075,20 @@
       cursor: pointer; -webkit-tap-highlight-color: transparent;
     }
     .aviso-card-media:active { opacity: 0.85; }
+    .aviso-card-video { display: block; }
+    /* Botão de som do vídeo do feed — mesmo visual do botão de som do
+       anúncio de loja (#anuncio-lightbox-som), só que fixo no canto da
+       mídia em vez da topbar do lightbox. */
+    .aviso-video-som-btn {
+      position: absolute; top: 10px; right: 10px; z-index: 2;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.18);
+      color: #fff; font-size: 15px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    }
+    .aviso-video-som-btn:active { transform: scale(0.9); }
     /* Coração grande que "estoura" no meio da mídia no duplo toque
        (estilo Instagram) — criado via JS e removido sozinho ao terminar. */
     .aviso-heart-burst {

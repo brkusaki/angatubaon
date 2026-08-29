@@ -10695,10 +10695,10 @@
   var AVISOS_HOJE_MOCK = [
     { emoji: '🎪', titulo: 'Feira Livre no Centro', tipo: 'feira', texto: 'Sábado de manhã, na Praça Rui Barbosa.',
       textoCompleto: 'Sábado de manhã, na Praça Rui Barbosa. Produtos frescos direto do produtor: verduras, frutas, queijos e doces caseiros. Chegue cedo pros melhores produtos!',
-      criadoEm: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      criadoEm: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), likes: 0,
       midias: [ { tipo: 'foto', url: '/img/igreja-dia.jpg' }, { tipo: 'foto', url: '/img/igreja-noite.jpg' } ] },
     { emoji: '💉', titulo: 'Campanha de vacinação', tipo: 'oficial', texto: 'Posto de Saúde Central, das 8h às 16h.',
-      criadoEm: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString() },
+      criadoEm: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(), likes: 0 },
   ];
   window._avisosAtuais = AVISOS_HOJE_MOCK;
 
@@ -10792,6 +10792,7 @@
       box.innerHTML = '<div class="avisos-empty">Nenhum aviso por aqui hoje. Volte mais tarde! 🦉</div>';
       return;
     }
+    var curtidos = _avisosCurtidosGet();
     box.innerHTML = dados.map(function (a, i) {
       var midias = Array.isArray(a.midias) ? a.midias : [];
       var capa = midias.length && midias[0].tipo !== 'video' ? midias[0].url : (midias.length ? null : null);
@@ -10814,14 +10815,25 @@
           '</div>'
         : '';
       var tempoRel = _tempoRelativoAviso(a.criadoEm || a.data);
+      // Curtir/compartilhar — mesmo índice "i" usado no modal, pra manter os
+      // dois em sincronia (ver data-aviso-idx / _avisoAtualizarUiLike).
+      var likes = a.likes || 0;
+      var curtido = curtidos.indexOf(_avisoChaveCurtida(a, i)) !== -1;
+      var acoesHtml = '<div class="aviso-actions" onclick="event.stopPropagation()">' +
+        '<button type="button" class="aviso-like-btn' + (curtido ? ' is-liked' : '') + '" data-aviso-idx="' + i + '" aria-pressed="' + (curtido ? 'true' : 'false') + '" aria-label="Curtir" onclick="_avisoToggleLike(' + i + ', event)"><i class="' + (curtido ? 'fa-solid fa-heart' : 'fa-regular fa-heart') + '" aria-hidden="true"></i></button>' +
+        '<span class="aviso-like-count" data-aviso-idx="' + i + '">' + (likes > 0 ? likes : '') + '</span>' +
+        '<button type="button" class="aviso-share-btn" aria-label="Compartilhar" onclick="_avisoCompartilhar(' + i + ', event)"><i class="fa fa-share-nodes" aria-hidden="true"></i></button>' +
+        '</div>';
       return '<div class="aviso-card' + (midias.length ? ' aviso-card--com-midia' : '') + '" onclick="_abrirAvisoPost(' + i + ')" role="button" tabindex="0" ' +
         'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_abrirAvisoPost(' + i + ');}">' +
         mediaHtml + adminHtml +
         '<div class="aviso-card-body"><span class="aviso-emoji">' + _escHtmlAviso(a.emoji || '📌') + '</span>' +
         '<div class="aviso-txt"><div class="aviso-txt-head"><strong>' + _escHtmlAviso(a.titulo) + '</strong>' + _badgeTipoAvisoHtml(a.tipo) + '</div>' +
         (tempoRel ? '<span class="aviso-tempo">' + _escHtmlAviso(tempoRel) + '</span>' : '') +
-        '<span class="aviso-desc">' + _escHtmlAviso(a.texto) + '</span></div></div></div>';
+        '<span class="aviso-desc">' + _escHtmlAviso(a.texto) + '</span></div></div>' +
+        acoesHtml + '</div>';
     }).join('');
+    _avisoTentarAbrirDeepLink();
   }
   window._renderAvisosHoje = _renderAvisosHoje; // exposto p/ o futuro fetch no GAS chamar direto
 
@@ -10885,6 +10897,24 @@
       track.innerHTML = '';
     }
 
+    var likeBtn   = document.getElementById('aviso-post-like-btn');
+    var likeCount = document.getElementById('aviso-post-like-count');
+    var shareBtn  = document.getElementById('aviso-post-share-btn');
+    var curtidoAtual = _avisosCurtidosGet().indexOf(_avisoChaveCurtida(aviso, idx)) !== -1;
+    if (likeBtn) {
+      likeBtn.dataset.avisoIdx = idx;
+      likeBtn.classList.toggle('is-liked', curtidoAtual);
+      likeBtn.setAttribute('aria-pressed', curtidoAtual ? 'true' : 'false');
+      var icoLikePost = likeBtn.querySelector('i');
+      if (icoLikePost) icoLikePost.className = curtidoAtual ? 'fa-solid fa-heart' : 'fa-regular fa-heart';
+      likeBtn.onclick = function (e) { e.stopPropagation(); _avisoToggleLike(idx, e); };
+    }
+    if (likeCount) {
+      likeCount.dataset.avisoIdx = idx;
+      likeCount.textContent = aviso.likes > 0 ? String(aviso.likes) : '';
+    }
+    if (shareBtn) shareBtn.onclick = function (e) { e.stopPropagation(); _avisoCompartilhar(idx, e); };
+
     overlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
     if (history.state?.modal !== 'aviso-post') history.pushState({ modal: 'aviso-post' }, '');
@@ -10940,6 +10970,154 @@
       if (dot) _irParaMediaPost(+dot.dataset.idx);
     });
   })();
+
+  /* ── Curtidas + compartilhar em "Hoje em Angatuba" ──
+     Sem login: 1 curtida por dispositivo, via um deviceId estável salvo no
+     localStorage (mesmo padrão do sid de avaliações). Otimista na tela
+     (o coração já muda na hora) e confirmado no GAS, que também guarda a
+     lista de deviceIds na planilha (não depende só do localStorage do
+     cliente pra não deixar curtir várias vezes trocando de navegador).
+     Compartilhar usa Web Share API com fallback de copiar link — mesmo
+     padrão do detalhesCompartilhar() das lojas. ── */
+  function _avisoDeviceId() {
+    try {
+      var id = localStorage.getItem('angatuba_device_id');
+      if (!id) {
+        id = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem('angatuba_device_id', id);
+      }
+      return id;
+    } catch (e) { return 'dev_temp_' + Math.random().toString(36).slice(2, 10); }
+  }
+  function _avisosCurtidosGet() {
+    try {
+      var lista = JSON.parse(localStorage.getItem('angatuba_avisos_curtidos') || '[]');
+      return Array.isArray(lista) ? lista : [];
+    } catch (e) { return []; }
+  }
+  function _avisosCurtidosSet(lista) {
+    try { localStorage.setItem('angatuba_avisos_curtidos', JSON.stringify(lista)); } catch (e) {}
+  }
+  // Posts do mock (sem id do GAS) usam o índice como chave local — dá pra
+  // curtir na hora (só não persiste no servidor, não tem o que salvar).
+  function _avisoChaveCurtida(aviso, idx) {
+    return (aviso && aviso.id) ? aviso.id : ('m' + idx);
+  }
+
+  // Atualiza o coração + contador em todo lugar que o post aparece (card da
+  // lista e modal de detalhe), sem precisar re-renderizar a lista inteira.
+  function _avisoAtualizarUiLike(idx, likes, curtido, animar) {
+    document.querySelectorAll('.aviso-like-btn[data-aviso-idx="' + idx + '"]').forEach(function (btn) {
+      btn.classList.toggle('is-liked', curtido);
+      btn.setAttribute('aria-pressed', curtido ? 'true' : 'false');
+      var ico = btn.querySelector('i');
+      if (ico) {
+        ico.className = curtido ? 'fa-solid fa-heart' : 'fa-regular fa-heart';
+        if (animar) {
+          ico.classList.remove('aviso-like-pop');
+          void ico.offsetWidth; // força reflow pra reiniciar a animação
+          ico.classList.add('aviso-like-pop');
+        }
+      }
+    });
+    document.querySelectorAll('.aviso-like-count[data-aviso-idx="' + idx + '"]').forEach(function (el) {
+      el.textContent = likes > 0 ? String(likes) : '';
+    });
+  }
+
+  function _avisoToggleLike(idx, ev) {
+    if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+    var lista = window._avisosAtuais || AVISOS_HOJE_MOCK;
+    var aviso = lista[idx];
+    if (!aviso) return;
+    var chave       = _avisoChaveCurtida(aviso, idx);
+    var curtidos    = _avisosCurtidosGet();
+    var jaCurtiu    = curtidos.indexOf(chave) !== -1;
+    var novoCurtido = !jaCurtiu;
+    var likesAntes  = aviso.likes || 0;
+    var likesNovos  = novoCurtido ? likesAntes + 1 : Math.max(0, likesAntes - 1);
+
+    // Otimista: muda na tela e salva local antes de esperar o servidor.
+    aviso.likes = likesNovos;
+    if (novoCurtido) curtidos.push(chave); else curtidos.splice(curtidos.indexOf(chave), 1);
+    _avisosCurtidosSet(curtidos);
+    _avisoAtualizarUiLike(idx, likesNovos, novoCurtido, true);
+
+    if (!aviso.id) return; // post do mock (sem id) — nada pra persistir no GAS
+
+    var params = new URLSearchParams();
+    params.append('payload', JSON.stringify({ action: 'avisosCurtir', id: aviso.id, deviceId: _avisoDeviceId(), curtir: novoCurtido }));
+    fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(10000) })
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        if (!json || json.status !== 'ok') throw new Error((json && json.msg) || 'Erro ao curtir');
+        // Confirma com o valor real do servidor (evita desalinhar se outro
+        // dispositivo curtiu no mesmo instante).
+        aviso.likes = json.data.likes;
+        _avisoAtualizarUiLike(idx, json.data.likes, novoCurtido, false);
+      })
+      .catch(function () {
+        // Falhou: desfaz o otimismo.
+        aviso.likes = likesAntes;
+        var curtidosAtuais = _avisosCurtidosGet();
+        var i2 = curtidosAtuais.indexOf(chave);
+        if (novoCurtido && i2 !== -1) curtidosAtuais.splice(i2, 1);
+        else if (!novoCurtido && i2 === -1) curtidosAtuais.push(chave);
+        _avisosCurtidosSet(curtidosAtuais);
+        _avisoAtualizarUiLike(idx, likesAntes, jaCurtiu, false);
+        mlToast('Não foi possível curtir agora.', 'erro');
+      });
+  }
+  window._avisoToggleLike = _avisoToggleLike;
+
+  function _avisoCompartilhar(idx, ev) {
+    if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+    var lista = window._avisosAtuais || AVISOS_HOJE_MOCK;
+    var aviso = lista[idx];
+    if (!aviso) return;
+    var url    = aviso.id ? (location.origin + '/?post=' + encodeURIComponent(aviso.id)) : (location.origin + '/');
+    var titulo = aviso.titulo || 'Hoje em Angatuba';
+    var texto  = aviso.texto || aviso.textoCompleto || '';
+
+    if (navigator.share) {
+      navigator.share({ title: titulo, text: texto, url: url }).catch(function () {});
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(function () {
+        var t = document.getElementById('toast');
+        _setToastOwl('/webp/owl-tada.webp');
+        document.getElementById('toast-title').textContent = 'Link copiado!';
+        document.getElementById('toast-msg').textContent   = url;
+        clearTimeout(toastTimer);
+        t.classList.add('show');
+        toastTimer = setTimeout(hideToast, 2500);
+      }).catch(function () {});
+    }
+  }
+  window._avisoCompartilhar = _avisoCompartilhar;
+
+  // ── Deep link do post (?post=ID ou #aviso=ID) — abre o modal do post
+  //    automaticamente assim que ele aparecer na lista carregada do GAS.
+  //    "Consome" o link uma única vez (não reabre de novo em navegações
+  //    seguintes dentro da mesma sessão). ──
+  var _avisoDeepLinkId = (function () {
+    try {
+      var porQuery = new URLSearchParams(location.search).get('post');
+      if (porQuery) return porQuery;
+      var m = /(?:^|[?&#])aviso=([^&]+)/.exec(location.hash || '');
+      return m ? decodeURIComponent(m[1]) : null;
+    } catch (e) { return null; }
+  })();
+  if (_avisoDeepLinkId) _homePaginaAtual = 1; // garante que o carrossel abra no Feed no boot
+
+  function _avisoTentarAbrirDeepLink() {
+    if (!_avisoDeepLinkId) return;
+    var lista = window._avisosAtuais || AVISOS_HOJE_MOCK;
+    var idx = -1;
+    for (var i = 0; i < lista.length; i++) { if (lista[i] && lista[i].id === _avisoDeepLinkId) { idx = i; break; } }
+    if (idx === -1) return; // ainda não achou (pode ser a lista mock) — tenta de novo no próximo render real
+    _avisoDeepLinkId = null; // consome uma única vez
+    setTimeout(function () { _abrirAvisoPost(idx); }, 50);
+  }
 
   /* ── Postar em "Hoje em Angatuba" — só quem estiver logado (login de
      morador, o mesmo dos jogos) com um e-mail autorizado. Isso aqui é só

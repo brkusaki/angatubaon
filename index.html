@@ -465,6 +465,11 @@
           <h3 class="aviso-post-titulo" id="aviso-post-titulo"></h3>
           <span class="aviso-post-data" id="aviso-post-data" style="display:none;"></span>
           <p class="aviso-post-texto" id="aviso-post-texto"></p>
+          <div class="aviso-post-actions" onclick="event.stopPropagation()">
+            <button type="button" class="aviso-like-btn" id="aviso-post-like-btn" aria-pressed="false" aria-label="Curtir"><i class="fa-regular fa-heart" aria-hidden="true"></i></button>
+            <span class="aviso-like-count" id="aviso-post-like-count"></span>
+            <button type="button" class="aviso-share-btn" id="aviso-post-share-btn" aria-label="Compartilhar"><i class="fa fa-share-nodes" aria-hidden="true"></i></button>
+          </div>
         </div>
       </div>
     </div>

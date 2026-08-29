@@ -2098,6 +2098,31 @@
       font-size: 12.5px; color: var(--muted); line-height: 1.45;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
+
+    /* ── Curtir + compartilhar — mesma linha de ícones no card e no modal
+       de detalhe (estilo Instagram, embaixo da foto/conteúdo). Classes
+       compartilhadas (.aviso-like-btn/.aviso-share-btn/.aviso-like-count),
+       só o container muda (.aviso-actions no card, .aviso-post-actions
+       no modal) pra ajustar o respiro em volta. ── */
+    .aviso-actions { display: flex; align-items: center; gap: 2px; padding: 6px 16px 4px; }
+    .aviso-like-btn, .aviso-share-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; margin: 0 -5px;
+      border: none; background: transparent; color: var(--text); font-size: 19px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform 0.1s;
+    }
+    .aviso-like-btn:active, .aviso-share-btn:active { transform: scale(0.86); }
+    .aviso-like-btn.is-liked { color: var(--red); }
+    .aviso-like-count { font-size: 13px; font-weight: 700; color: var(--text); margin-right: auto; }
+    .aviso-share-btn { margin-left: 2px; font-size: 17px; }
+    @keyframes avisoLikePop {
+      0%   { transform: scale(1); }
+      35%  { transform: scale(1.3); }
+      60%  { transform: scale(0.92); }
+      100% { transform: scale(1); }
+    }
+    .aviso-like-pop { animation: avisoLikePop 0.32s ease; }
+
     .avisos-empty { font-size: 12.5px; color: var(--muted); text-align: center; padding: 18px 0; }
 
     /* ── Postar em "Hoje em Angatuba" (admin): botão "+" no cabeçalho da
@@ -2182,6 +2207,7 @@
     .aviso-post-titulo { font-family: var(--font-h); font-size: 1.1rem; font-weight: 800; color: var(--text); margin: 0; line-height: 1.3; }
     .aviso-post-data { font-size: 11.5px; color: var(--muted); font-weight: 500; margin-top: -5px; }
     .aviso-post-texto { font-size: 14px; color: var(--muted); line-height: 1.6; margin: 0; white-space: pre-line; }
+    .aviso-post-actions { display: flex; align-items: center; gap: 2px; margin: 2px -6px 0; }
 
     /* ── Editor de aviso (admin): criar/editar um post ── */
     .aviso-editor-sheet { max-height: 92vh; }

@@ -2122,11 +2122,16 @@
     }
     .aviso-card-admin-btn-del:active { background: var(--red); }
 
-    /* ── Modal de post (abre ao tocar num card de "Hoje em Angatuba") ── */
+    /* ── Modal de post (abre ao tocar num card de "Hoje em Angatuba") ──
+       Quase full-screen (estilo "post aberto" do Instagram): a mídia
+       domina a tela (altura em vh, não mais uma caixinha 4:3) e o
+       conteúdo de texto vem logo abaixo, com scroll interno se precisar.
+       Continua sendo um bottom sheet (sobe de baixo) — fecha no X, no
+       toque fora ou no botão/gesto de voltar do navegador. ── */
     .aviso-post-sheet {
-      width: 100%; max-width: 460px; max-height: 88vh; overflow-y: auto; scrollbar-width: none;
+      width: 100%; max-width: 460px; max-height: 95vh; overflow-y: auto; scrollbar-width: none;
       background: var(--surface); border-radius: 22px 22px 0 0;
-      position: relative; box-shadow: 0 -10px 40px rgba(0,0,0,0.4);
+      position: relative; box-shadow: 0 -10px 44px rgba(0,0,0,0.5);
     }
     .aviso-post-sheet::-webkit-scrollbar { display: none; }
     .aviso-post-grabber {
@@ -2134,9 +2139,9 @@
       margin: 10px auto 4px;
     }
     .aviso-post-close {
-      position: absolute; top: 10px; right: 10px; z-index: 3;
-      width: 30px; height: 30px; border-radius: 50%;
-      background: rgba(0,0,0,0.55); color: #fff; font-size: 13px;
+      position: absolute; top: 12px; right: 12px; z-index: 3;
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(0,0,0,0.55); color: #fff; font-size: 14px;
       border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
       display: flex; align-items: center; justify-content: center; cursor: pointer;
       -webkit-tap-highlight-color: transparent;
@@ -2146,7 +2151,13 @@
       border-radius: 22px 22px 0 0;
     }
     .aviso-post-media-track { display: flex; transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); }
-    .aviso-post-slide { flex: 0 0 100%; min-width: 0; aspect-ratio: 4 / 3; background: #000; }
+    /* A foto/vídeo é o protagonista do modal: altura generosa em vh (em
+       vez da caixinha 4:3 de antes), com teto e piso pra não distorcer
+       demais em telas muito baixas ou muito altas. */
+    .aviso-post-slide {
+      flex: 0 0 100%; min-width: 0; background: #000;
+      height: 56vh; max-height: 560px; min-height: 280px;
+    }
     .aviso-post-slide img, .aviso-post-slide video {
       width: 100%; height: 100%; object-fit: cover; display: block;
     }
@@ -2159,7 +2170,7 @@
       transition: background 0.2s, width 0.2s;
     }
     .aviso-post-dot.active { background: #fff; width: 16px; border-radius: 3px; }
-    .aviso-post-body { padding: 16px 18px 24px; display: flex; flex-direction: column; gap: 9px; }
+    .aviso-post-body { padding: 18px 20px 28px; display: flex; flex-direction: column; gap: 10px; }
     .aviso-post-head { display: flex; align-items: center; gap: 8px; }
     .aviso-post-emoji { font-size: 26px; line-height: 1; }
     .aviso-post-badge {

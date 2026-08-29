@@ -2061,14 +2061,34 @@
     .aviso-card {
       position: relative;
       margin: 0 -16px;
-      cursor: pointer;
       -webkit-tap-highlight-color: transparent;
       transition: opacity 0.15s;
     }
-    .aviso-card:active { opacity: 0.85; }
+    /* Sem mídia, o card inteiro abre o detalhe (mantém o cursor/dim de
+       antes); com mídia, só a própria mídia reage ao toque — foto some
+       o "expandir", só o duplo toque curte (ver .aviso-card-media). */
+    .aviso-card:not(.aviso-card--com-midia) { cursor: pointer; }
+    .aviso-card:not(.aviso-card--com-midia):active { opacity: 0.85; }
     .aviso-card-media {
       position: relative; width: 100%; aspect-ratio: 4 / 5; max-height: 620px;
       background-size: cover; background-position: center; background-color: var(--surface2);
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .aviso-card-media:active { opacity: 0.85; }
+    /* Coração grande que "estoura" no meio da mídia no duplo toque
+       (estilo Instagram) — criado via JS e removido sozinho ao terminar. */
+    .aviso-heart-burst {
+      position: absolute; top: 50%; left: 50%; z-index: 2;
+      font-size: 64px; color: #fff; text-shadow: 0 2px 14px rgba(0,0,0,0.4);
+      pointer-events: none; opacity: 0;
+      animation: avisoHeartBurst 0.7s ease forwards;
+    }
+    @keyframes avisoHeartBurst {
+      0%   { opacity: 0;   transform: translate(-50%, -50%) scale(0.4); }
+      15%  { opacity: 1;   transform: translate(-50%, -50%) scale(1.15); }
+      30%  { opacity: 1;   transform: translate(-50%, -50%) scale(0.95); }
+      75%  { opacity: 1;   transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0;   transform: translate(-50%, -50%) scale(1); }
     }
     .aviso-card-media-count {
       position: absolute; right: 10px; bottom: 10px;

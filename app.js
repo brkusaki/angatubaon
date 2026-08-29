@@ -10799,10 +10799,17 @@
       var mediaHtml = '';
       if (midias.length) {
         // Se a 1ª mídia for vídeo, mostra o próprio frame do vídeo como "capa" (sem controles na lista).
+        // Toque na mídia: foto não faz nada (estilo Instagram — só o duplo
+        // toque curte); vídeo abre o modal (player maior) no toque simples.
+        // Duplo toque em qualquer uma das duas sempre curte, nunca descurte
+        // (ver _avisoCliqueMedia / _avisoDuploCliqueMedia).
         var primeira = midias[0];
-        var capaBg = primeira.tipo === 'video' ? '' : ('background-image:url(\'' + primeira.url + '\');');
-        mediaHtml = '<div class="aviso-card-media" style="' + capaBg + '">' +
-          (primeira.tipo === 'video' ? '<video src="' + primeira.url + '" muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>' : '') +
+        var ehVideo = primeira.tipo === 'video';
+        var capaBg = ehVideo ? '' : ('background-image:url(\'' + primeira.url + '\');');
+        mediaHtml = '<div class="aviso-card-media" onclick="_avisoCliqueMedia(' + i + ', event)" ondblclick="_avisoDuploCliqueMedia(' + i + ', event)"' +
+          (ehVideo ? ' role="button" tabindex="0" aria-label="Abrir vídeo" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_abrirAvisoPost(' + i + ');}"' : '') +
+          ' style="' + capaBg + '">' +
+          (ehVideo ? '<video src="' + primeira.url + '" muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>' : '') +
           (midias.length > 1 ? '<span class="aviso-card-media-count"><i class="fa fa-images" aria-hidden="true"></i> ' + midias.length + '</span>' : '') +
           '</div>';
       }
@@ -10824,8 +10831,14 @@
         '<span class="aviso-like-count" data-aviso-idx="' + i + '">' + (likes > 0 ? likes : '') + '</span>' +
         '<button type="button" class="aviso-share-btn" aria-label="Compartilhar" onclick="_avisoCompartilhar(' + i + ', event)"><i class="fa fa-share-nodes" aria-hidden="true"></i></button>' +
         '</div>';
-      return '<div class="aviso-card' + (midias.length ? ' aviso-card--com-midia' : '') + '" onclick="_abrirAvisoPost(' + i + ')" role="button" tabindex="0" ' +
-        'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_abrirAvisoPost(' + i + ');}">' +
+      // Sem mídia, o card inteiro continua abrindo o detalhe (não tem
+      // mídia pra tocar); com mídia, só a própria mídia reage ao toque —
+      // ver mediaHtml acima. Isso evita abrir o modal sem querer ao tocar
+      // no título/texto do post.
+      var cardAttrs = midias.length
+        ? ''
+        : ' onclick="_abrirAvisoPost(' + i + ')" role="button" tabindex="0" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_abrirAvisoPost(' + i + ');}"';
+      return '<div class="aviso-card' + (midias.length ? ' aviso-card--com-midia' : '') + '"' + cardAttrs + '>' +
         mediaHtml + adminHtml +
         '<div class="aviso-card-body"><span class="aviso-emoji">' + _escHtmlAviso(a.emoji || '📌') + '</span>' +
         '<div class="aviso-txt"><div class="aviso-txt-head"><strong>' + _escHtmlAviso(a.titulo) + '</strong>' + _badgeTipoAvisoHtml(a.tipo) + '</div>' +
@@ -11094,6 +11107,59 @@
     }
   }
   window._avisoCompartilhar = _avisoCompartilhar;
+
+  /* ── Toque na mídia do card (estilo Instagram) ──
+     Foto: toque simples não faz nada; vídeo: toque simples abre o modal
+     (player maior). Duplo toque em qualquer um dos dois sempre curte
+     (nunca descurte — descurtir é só pelo botão de coração embaixo), com
+     o coração grande "estourando" no meio da mídia.
+     Disambiguação clássica de clique único x duplo: o 1º clique agenda a
+     ação de toque simples com um pequeno atraso; se um 2º clique chegar
+     antes (o próprio dblclick do navegador), cancela o agendado — assim
+     o toque simples só executa se não virar duplo toque. ── */
+  var _avisoClickTimers = {};
+
+  function _avisoCliqueMedia(idx, ev) {
+    if (ev) ev.stopPropagation();
+    if (_avisoClickTimers[idx]) { clearTimeout(_avisoClickTimers[idx]); _avisoClickTimers[idx] = null; return; }
+    var lista = window._avisosAtuais || AVISOS_HOJE_MOCK;
+    var aviso = lista[idx];
+    var midias = aviso && Array.isArray(aviso.midias) ? aviso.midias : [];
+    var ehVideo = midias.length && midias[0].tipo === 'video';
+    if (!ehVideo) return; // foto: toque simples não expande/abre nada
+    _avisoClickTimers[idx] = setTimeout(function () {
+      _avisoClickTimers[idx] = null;
+      _abrirAvisoPost(idx);
+    }, 260);
+  }
+  window._avisoCliqueMedia = _avisoCliqueMedia;
+
+  function _avisoDuploCliqueMedia(idx, ev) {
+    if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+    if (_avisoClickTimers[idx]) { clearTimeout(_avisoClickTimers[idx]); _avisoClickTimers[idx] = null; }
+    var mediaEl = ev && ev.currentTarget;
+    var lista = window._avisosAtuais || AVISOS_HOJE_MOCK;
+    var aviso = lista[idx];
+    if (!aviso) return;
+    if (mediaEl) _avisoMostrarCoracaoBurst(mediaEl);
+    var jaCurtiu = _avisosCurtidosGet().indexOf(_avisoChaveCurtida(aviso, idx)) !== -1;
+    if (!jaCurtiu) _avisoToggleLike(idx); // duplo toque só curte, nunca descurte
+  }
+  window._avisoDuploCliqueMedia = _avisoDuploCliqueMedia;
+
+  // Cria e anima o coraçãozão que "estoura" no meio da mídia ao dar duplo
+  // toque (some sozinho em seguida) — puramente visual, criado sob demanda
+  // pra não precisar de um elemento extra parado em cada card.
+  function _avisoMostrarCoracaoBurst(mediaEl) {
+    try {
+      var burst = document.createElement('i');
+      burst.className = 'fa-solid fa-heart aviso-heart-burst';
+      burst.setAttribute('aria-hidden', 'true');
+      mediaEl.appendChild(burst);
+      burst.addEventListener('animationend', function () { burst.remove(); });
+      setTimeout(function () { if (burst.parentNode) burst.remove(); }, 900);
+    } catch (e) {}
+  }
 
   // ── Deep link do post (?post=ID ou #aviso=ID) — abre o modal do post
   //    automaticamente assim que ele aparecer na lista carregada do GAS.

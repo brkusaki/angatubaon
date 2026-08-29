@@ -10811,7 +10811,7 @@
           '</div>'
         : '';
       var tempoRel = _tempoRelativoAviso(a.criadoEm || a.data);
-      return '<div class="aviso-card" onclick="_abrirAvisoPost(' + i + ')" role="button" tabindex="0" ' +
+      return '<div class="aviso-card' + (midias.length ? ' aviso-card--com-midia' : '') + '" onclick="_abrirAvisoPost(' + i + ')" role="button" tabindex="0" ' +
         'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_abrirAvisoPost(' + i + ');}">' +
         mediaHtml + adminHtml +
         '<div class="aviso-card-body"><span class="aviso-emoji">' + _escHtmlAviso(a.emoji || '📌') + '</span>' +

@@ -2019,41 +2019,53 @@
     .weather-week-day-max { font-size: 11.5px; font-weight: 800; color: var(--text); }
     .weather-week-day-min { font-size: 10.5px; color: var(--muted); }
 
-    /* ── Página 2: "Hoje em Angatuba" (posts locais, ver AVISOS_HOJE_MOCK) ── */
-    .avisos-list { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+    /* ── Página 2: "Hoje em Angatuba" (posts locais, ver AVISOS_HOJE_MOCK) ──
+       Cards em estilo feed (base Instagram): mídia em destaque, cabeçalho
+       com emoji + título + badge, data relativa discreta, resumo em
+       2 linhas. Toques de "X" ficam só no texto (data/hora completas). ── */
+    .avisos-section .section-header { margin-bottom: 12px; }
+    .avisos-section .section-title  { font-weight: 800; }
+
+    .avisos-list { display: flex; flex-direction: column; gap: 16px; padding-top: 4px; }
     .aviso-card {
       position: relative;
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 18px; overflow: hidden; cursor: pointer;
+      border-radius: var(--r-lg); overflow: hidden; cursor: pointer;
       -webkit-tap-highlight-color: transparent;
       transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      box-shadow: 0 3px 14px rgba(0,0,0,0.22);
     }
-    .aviso-card:active { transform: scale(0.98); box-shadow: 0 4px 12px rgba(0,0,0,0.35); }
+    .aviso-card:active { transform: scale(0.98); box-shadow: 0 4px 12px rgba(0,0,0,0.32); }
     .aviso-card-media {
-      position: relative; width: 100%; aspect-ratio: 16 / 9;
+      position: relative; width: 100%; aspect-ratio: 1 / 1;
       background-size: cover; background-position: center; background-color: var(--surface2);
     }
     .aviso-card-media-count {
-      position: absolute; right: 8px; bottom: 8px;
+      position: absolute; right: 10px; bottom: 10px;
       background: rgba(0,0,0,0.6); color: #fff; font-size: 10.5px; font-weight: 700;
-      padding: 3px 8px; border-radius: 20px; display: flex; align-items: center; gap: 4px;
-      backdrop-filter: blur(2px);
+      padding: 3px 9px; border-radius: 20px; display: flex; align-items: center; gap: 4px;
+      backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
     }
-    .aviso-card-body { display: flex; align-items: flex-start; gap: 12px; padding: 13px 15px; }
-    .aviso-emoji { font-size: 20px; line-height: 1.2; flex-shrink: 0; }
-    .aviso-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-    .aviso-txt-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-    .aviso-txt-head strong { font-size: 13.5px; color: var(--text); }
+    .aviso-card-body { display: flex; align-items: flex-start; gap: 11px; padding: 16px; }
+    /* Com mídia, o corpo fica um pouco mais compacto embaixo da foto —
+       sem mídia, o card de texto puro mantém o padding cheio (não fica "vazio"). */
+    .aviso-card--com-midia .aviso-card-body { padding: 12px 16px 15px; }
+    .aviso-emoji { font-size: 19px; line-height: 1.3; flex-shrink: 0; }
+    .aviso-txt { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .aviso-txt-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+    .aviso-txt-head strong {
+      font-family: var(--font-h); font-size: 14px; font-weight: 800;
+      letter-spacing: 0.01em; color: var(--text); line-height: 1.25;
+    }
     /* Badge de tipo (Evento/Promoção/Aviso/...) — mesma pílula usada no
        card e no modal de detalhe (ver _badgeTipoAvisoHtml / aviso-post-badge). */
     .aviso-badge {
       font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px;
-      padding: 2px 7px; border-radius: 20px; border: 1px solid; line-height: 1.5; white-space: nowrap;
+      padding: 2px 8px; border-radius: 20px; border: 1px solid; line-height: 1.5; white-space: nowrap;
     }
-    .aviso-tempo { font-size: 10.5px; color: var(--muted); }
+    .aviso-tempo { font-size: 11px; color: var(--muted); font-weight: 500; }
     .aviso-desc {
-      font-size: 12px; color: var(--muted); line-height: 1.4;
+      font-size: 12.5px; color: var(--muted); line-height: 1.45;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
     .avisos-empty { font-size: 12.5px; color: var(--muted); text-align: center; padding: 18px 0; }
@@ -2090,17 +2102,21 @@
     }
     .aviso-post-sheet::-webkit-scrollbar { display: none; }
     .aviso-post-grabber {
-      width: 36px; height: 4px; border-radius: 3px; background: var(--border);
+      width: 40px; height: 4px; border-radius: 4px; background: rgba(255,255,255,0.22);
       margin: 10px auto 4px;
     }
     .aviso-post-close {
       position: absolute; top: 10px; right: 10px; z-index: 3;
-      width: 30px; height: 30px; border-radius: 50%; border: none;
-      background: rgba(0,0,0,0.45); color: #fff; font-size: 13px;
+      width: 30px; height: 30px; border-radius: 50%;
+      background: rgba(0,0,0,0.55); color: #fff; font-size: 13px;
+      border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
       display: flex; align-items: center; justify-content: center; cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
-    .aviso-post-media-wrap { position: relative; overflow: hidden; touch-action: pan-y; }
+    .aviso-post-media-wrap {
+      position: relative; overflow: hidden; touch-action: pan-y;
+      border-radius: 22px 22px 0 0;
+    }
     .aviso-post-media-track { display: flex; transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); }
     .aviso-post-slide { flex: 0 0 100%; min-width: 0; aspect-ratio: 4 / 3; background: #000; }
     .aviso-post-slide img, .aviso-post-slide video {
@@ -2115,16 +2131,16 @@
       transition: background 0.2s, width 0.2s;
     }
     .aviso-post-dot.active { background: #fff; width: 16px; border-radius: 3px; }
-    .aviso-post-body { padding: 14px 18px 22px; display: flex; flex-direction: column; gap: 8px; }
+    .aviso-post-body { padding: 16px 18px 24px; display: flex; flex-direction: column; gap: 9px; }
     .aviso-post-head { display: flex; align-items: center; gap: 8px; }
     .aviso-post-emoji { font-size: 26px; line-height: 1; }
     .aviso-post-badge {
       font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px;
-      padding: 3px 9px; border-radius: 20px; border: 1px solid;
+      padding: 3px 10px; border-radius: 20px; border: 1px solid;
     }
-    .aviso-post-titulo { font-family: var(--font-h); font-size: 1.05rem; font-weight: 800; color: var(--text); margin: 0; }
-    .aviso-post-data { font-size: 11px; color: var(--muted); margin-top: -4px; }
-    .aviso-post-texto { font-size: 13.5px; color: var(--muted); line-height: 1.55; margin: 0; white-space: pre-line; }
+    .aviso-post-titulo { font-family: var(--font-h); font-size: 1.1rem; font-weight: 800; color: var(--text); margin: 0; line-height: 1.3; }
+    .aviso-post-data { font-size: 11.5px; color: var(--muted); font-weight: 500; margin-top: -5px; }
+    .aviso-post-texto { font-size: 14px; color: var(--muted); line-height: 1.6; margin: 0; white-space: pre-line; }
 
     /* ── Editor de aviso (admin): criar/editar um post ── */
     .aviso-editor-sheet { max-height: 92vh; }
@@ -3175,6 +3191,17 @@
       background: var(--surface);
       box-shadow: 0 2px 10px rgba(15,26,46,0.12), 0 1px 3px rgba(15,26,46,0.08);
     }
+    /* Cards de "Hoje em Angatuba" no tema DIA — sombra mais suave (a
+       sombra escura do dark mode ficava pesada/suja sobre fundo branco)
+       e badges de tipo levemente escurecidos p/ manter contraste AA. */
+    body.light-mode .aviso-card {
+      box-shadow: 0 2px 10px rgba(15,26,46,0.12), 0 1px 3px rgba(15,26,46,0.08);
+    }
+    body.light-mode .aviso-card:active { box-shadow: 0 3px 14px rgba(15,26,46,0.16); }
+    body.light-mode .aviso-post-sheet  { box-shadow: 0 -10px 30px rgba(15,26,46,0.22); }
+    body.light-mode .aviso-post-grabber { background: rgba(0,0,0,0.2); }
+    body.light-mode .aviso-badge,
+    body.light-mode .aviso-post-badge { filter: brightness(0.82) contrast(1.05); }
     /* ── Cards por tier no tema DIA ──────────────────────────────
        No claro, o fundo branco puro "some" no azul-céu e o Plus perdia
        a cor. Aqui damos profundidade sem virar branco chapado. */

@@ -10352,7 +10352,7 @@
     var el = document.getElementById('weather-alerta-chuva');
     var elTxt = document.getElementById('weather-alerta-chuva-txt');
     if (!el || !elTxt) return;
-    var msg = _calcularAlertaChuva(pontosHoje, new Date().getHours());
+    var msg = _calcularAlertaChuva(pontosHoje, _horaSP().h);
     if (msg) { elTxt.textContent = msg; el.style.display = 'flex'; }
     else { el.style.display = 'none'; }
   }
@@ -10364,6 +10364,24 @@
   function _p2(n) { return (n < 10 ? '0' : '') + n; }
   function _horaLocalStr(dt) {
     return dt.getFullYear() + '-' + _p2(dt.getMonth() + 1) + '-' + _p2(dt.getDate()) + 'T' + _p2(dt.getHours());
+  }
+  // Fix: a API é pedida com timezone=America/Sao_Paulo, mas a "chuva agora"
+  // e o alerta comparavam com a hora do RELÓGIO DO DEVICE (_horaLocalStr/
+  // getHours) — num aparelho com fuso diferente (viagem, configuração
+  // errada) o horário não batia com nenhum ponto da API e o fallback caía
+  // silenciosamente na meia-noite. Deriva a hora de Angatuba de verdade.
+  function _horaSP() {
+    try {
+      var partes = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false
+      }).formatToParts(new Date());
+      var o = {};
+      partes.forEach(function (p) { o[p.type] = p.value; });
+      var hora = o.hour === '24' ? '00' : o.hour; // alguns navegadores devolvem "24" à meia-noite
+      return { str: o.year + '-' + o.month + '-' + o.day + 'T' + hora, h: parseInt(hora, 10) };
+    } catch (e) {
+      return { str: _horaLocalStr(new Date()), h: new Date().getHours() }; // sem Intl: cai no relógio do device mesmo
+    }
   }
 
   // Monta o formato interno usado pela UI a partir da resposta crua da
@@ -10417,10 +10435,9 @@
     // 8 pontos de 3 em 3h — a hora exata mais próxima do relógio).
     var chuvaAgora = null;
     if (hourly.time && hourly.precipitation_probability) {
-      var alvo = _horaLocalStr(new Date());
+      var alvo = _horaSP().str;
       var idx = hourly.time.findIndex(function (t) { return t.slice(0, 13) === alvo; });
-      if (idx === -1) idx = 0;
-      chuvaAgora = _climaNum(hourly.precipitation_probability[idx]);
+      if (idx !== -1) chuvaAgora = _climaNum(hourly.precipitation_probability[idx]); // sem match: fica null ("--"), não mais meia-noite
     }
     return {
       temp:    _climaNum(j.current.temperature_2m),
@@ -10457,10 +10474,10 @@
     if (i === 0) {
       var infoAgora = _weatherInfo(_climaBruto.code, _climaBruto.isDay !== false);
       if (elIcon) { elIcon.className = 'fa ' + infoAgora.ic + ' weather-icon'; elIcon.style.color = infoAgora.col; }
-      elTemp.textContent = Math.round(_climaBruto.temp) + '°';
+      elTemp.textContent = (_climaBruto.temp != null ? Math.round(_climaBruto.temp) : '--') + '°';
       if (elCond)  elCond.textContent  = infoAgora.txt;
-      if (elMax)   elMax.textContent   = Math.round(_climaBruto.max) + '°';
-      if (elMin)   elMin.textContent   = Math.round(_climaBruto.min) + '°';
+      if (elMax)   elMax.textContent   = (_climaBruto.max != null ? Math.round(_climaBruto.max) : '--') + '°';
+      if (elMin)   elMin.textContent   = (_climaBruto.min != null ? Math.round(_climaBruto.min) : '--') + '°';
       if (elChuva) elChuva.textContent = (_climaBruto.chuva   != null ? Math.round(_climaBruto.chuva)   : '--') + '%';
       if (elUmid)  elUmid.textContent  = (_climaBruto.umidade != null ? Math.round(_climaBruto.umidade) : '--') + '%';
       if (elVento) elVento.textContent = (_climaBruto.vento   != null ? Math.round(_climaBruto.vento)   : '--') + ' km/h';
@@ -10472,10 +10489,10 @@
     if (!dia) return;
     var info = _weatherInfo(dia.code, true); // dias futuros: sempre ícone diurno
     if (elIcon) { elIcon.className = 'fa ' + info.ic + ' weather-icon'; elIcon.style.color = info.col; }
-    elTemp.textContent = Math.round(dia.max) + '°';
+    elTemp.textContent = (dia.max != null ? Math.round(dia.max) : '--') + '°';
     if (elCond) elCond.textContent = info.txt;
-    if (elMax)  elMax.textContent  = Math.round(dia.max) + '°';
-    if (elMin)  elMin.textContent  = Math.round(dia.min) + '°';
+    if (elMax)  elMax.textContent  = (dia.max != null ? Math.round(dia.max) : '--') + '°';
+    if (elMin)  elMin.textContent  = (dia.min != null ? Math.round(dia.min) : '--') + '°';
 
     var pontos  = (_climaBruto.pontosPorDia && _climaBruto.pontosPorDia[i]) || [];
     var meioDia = pontos[4] || pontos[Math.floor(pontos.length / 2)] || null; // 13h (índice 4 dos 8 pontos)
@@ -10496,7 +10513,12 @@
   function _pintarClima(d) {
     if (!document.getElementById('weather-temp')) return;
     _climaBruto = d;
-    _climaDiaSelecionado = 0; // toda carga nova (ou cache) volta a mostrar "Hoje"
+    // Fix: antes zerava sempre, mesmo numa revalidação silenciosa em segundo
+    // plano (stale-while-revalidate) — se o usuário tinha acabado de tocar
+    // noutro dia da tira, o card saltava sozinho de volta pra "Hoje" assim
+    // que a resposta chegasse. Só reseta se o dia escolhido não existir mais.
+    var _nDiasNovo = (d.semana && d.semana.length) || 1;
+    if (_climaDiaSelecionado >= _nDiasNovo) _climaDiaSelecionado = 0;
 
     // Hide skeleton, show weather card
     var elSkeleton = document.getElementById('weather-skeleton');
@@ -10511,7 +10533,7 @@
       elCard.classList.add(weatherClass);
     }
 
-    _pintarTopoClimaParaDia(0);
+    _pintarTopoClimaParaDia(_climaDiaSelecionado);
     _pintarAlertaChuva(d.pontosHoje); // sempre relativo a "agora", não ao dia selecionado na tira
     _renderSemanaClima(d.semana);
     _renderGraficoClima(_climaAbaAtual);
@@ -10549,8 +10571,8 @@
         'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_selecionarDiaClima(' + i + ');}">' +
         '<span class="weather-week-day-nome">' + escHTML(dia.nome) + '</span>' +
         '<i class="fa ' + info.ic + ' weather-week-day-ic" style="color:' + info.col + '" aria-hidden="true"></i>' +
-        '<span class="weather-week-day-max">' + Math.round(dia.max) + '°</span>' +
-        '<span class="weather-week-day-min">' + Math.round(dia.min) + '°</span></div>';
+        '<span class="weather-week-day-max">' + (dia.max != null ? Math.round(dia.max) : '--') + '°</span>' +
+        '<span class="weather-week-day-min">' + (dia.min != null ? Math.round(dia.min) : '--') + '°</span></div>';
     }).join('');
   }
 
@@ -10832,13 +10854,18 @@
         '<span class="aviso-like-count" data-aviso-idx="' + i + '">' + (likes > 0 ? likes : '') + '</span>' +
         '<button type="button" class="aviso-share-btn" aria-label="Compartilhar" onclick="_avisoCompartilhar(' + i + ', event)"><i class="fa fa-share-nodes" aria-hidden="true"></i></button>' +
         '</div>';
-      // Sem mídia, o card inteiro continua abrindo o detalhe (não tem
-      // mídia pra tocar); com mídia, só a própria mídia reage ao toque —
+      // Sem mídia, o card inteiro continua abrindo o detalhe no toque (não
+      // tem mídia pra tocar); com mídia, só a própria mídia reage ao toque —
       // ver mediaHtml acima. Isso evita abrir o modal sem querer ao tocar
-      // no título/texto do post.
+      // no título/texto do post. Por teclado, os dois casos abrem o post —
+      // sem isso, um post com foto/vídeo (toque simples = no-op) não tinha
+      // NENHUMA forma de abrir o detalhe sem mouse/toque. O
+      // "event.target===event.currentTarget" evita que Enter num botão
+      // filho (curtir, compartilhar, editar) borbulhe e abra o modal junto.
+      var cardKeydown = 'if((event.key===\'Enter\'||event.key===\' \')&&event.target===event.currentTarget){event.preventDefault();_abrirAvisoPost(' + i + ');}';
       var cardAttrs = midias.length
-        ? ''
-        : ' onclick="_abrirAvisoPost(' + i + ')" role="button" tabindex="0" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();_abrirAvisoPost(' + i + ');}"';
+        ? ' role="button" tabindex="0" aria-label="Abrir publicação" onkeydown="' + cardKeydown + '"'
+        : ' onclick="_abrirAvisoPost(' + i + ')" role="button" tabindex="0" onkeydown="' + cardKeydown + '"';
       return '<div class="aviso-card' + (midias.length ? ' aviso-card--com-midia' : '') + '"' + cardAttrs + '>' +
         mediaHtml + adminHtml +
         '<div class="aviso-card-body"><span class="aviso-emoji">' + _escHtmlAviso(a.emoji || '📌') + '</span>' +
@@ -11274,6 +11301,12 @@
   // Mídia que já pertencia ao aviso ANTES de abrir o editor não entra aqui:
   // essa limpeza continua por conta do diff de avisosEditar, no _salvarAviso.
   var _avisoEditorMidiasNovas = [];
+  // Fix: token incrementado toda vez que o editor abre ou fecha. Um upload
+  // (foto/vídeo) que ainda está em voo quando isso muda (usuário fechou o
+  // editor, ou abriu o de OUTRO post, antes do upload terminar) captura o
+  // valor no início e descarta o resultado se ele não bater mais no fim —
+  // sem isso, a mídia entrava silenciosamente no post errado.
+  var _avisoEditorSessao = 0;
 
   function _abrirEditorAviso(id) {
     if (!_avisosSouAdmin()) return;
@@ -11284,6 +11317,7 @@
       var lista = window._avisosAtuais || [];
       for (var i = 0; i < lista.length; i++) { if (lista[i].id === id) { aviso = lista[i]; break; } }
     }
+    _avisoEditorSessao++;
     _avisoEditorId = aviso ? (aviso.id || null) : null;
     _avisoEditorMidias = (aviso && Array.isArray(aviso.midias)) ? aviso.midias.slice() : [];
     _avisoEditorMidiasNovas = [];
@@ -11306,6 +11340,7 @@
   window._abrirEditorAviso = _abrirEditorAviso;
 
   function _fecharEditorAviso(viaPopstate) {
+    _avisoEditorSessao++;
     var overlay = document.getElementById('aviso-editor-overlay');
     if (overlay) overlay.style.display = 'none';
     document.body.style.overflow = '';
@@ -11406,18 +11441,24 @@
     if (inpFoto) inpFoto.addEventListener('change', async function (e) {
       var files = Array.prototype.slice.call(e.target.files || []);
       e.target.value = '';
+      var sessaoDoUpload = _avisoEditorSessao;
       for (var i = 0; i < files.length; i++) {
         if (_avisoEditorMidias.length >= 10) break;
         var url = await _uploadMidiaAviso(files[i], 'foto');
-        if (url) { _avisoEditorMidias.push({ tipo: 'foto', url: url }); _avisoEditorMidiasNovas.push(url); _renderMidiasEditor(); }
+        if (!url) continue;
+        if (_avisoEditorSessao !== sessaoDoUpload) { _avisoCloudinaryApagarUrl(url); break; } // editor mudou no meio do upload
+        _avisoEditorMidias.push({ tipo: 'foto', url: url }); _avisoEditorMidiasNovas.push(url); _renderMidiasEditor();
       }
     });
     if (inpVideo) inpVideo.addEventListener('change', async function (e) {
       var file = e.target.files && e.target.files[0];
       e.target.value = '';
       if (!file || _avisoEditorMidias.length >= 10) return;
+      var sessaoDoUpload = _avisoEditorSessao;
       var url = await _uploadMidiaAviso(file, 'video');
-      if (url) { _avisoEditorMidias.push({ tipo: 'video', url: url }); _avisoEditorMidiasNovas.push(url); _renderMidiasEditor(); }
+      if (!url) return;
+      if (_avisoEditorSessao !== sessaoDoUpload) { _avisoCloudinaryApagarUrl(url); return; } // editor mudou no meio do upload
+      _avisoEditorMidias.push({ tipo: 'video', url: url }); _avisoEditorMidiasNovas.push(url); _renderMidiasEditor();
     });
   })();
 
@@ -11547,6 +11588,12 @@
     var startX = 0, startY = 0, dragging = false, isHoriz = null;
 
     wrap.addEventListener('touchstart', function (e) {
+      // Fix: gesto que começa num scroller horizontal (tira semanal do
+      // clima, categorias) não deve ser tratado como swipe de página —
+      // senão arrastar a tira pra ver sex/sáb trocava de página em vez de
+      // rolar a tira (ela ganhou "touch-action: pan-x" própria no CSS, mas
+      // só funciona se esse handler não competir pelo gesto).
+      if (e.target.closest('.scroll-x')) { dragging = false; return; }
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       dragging = true; isHoriz = null;
@@ -11556,7 +11603,14 @@
       if (!dragging) return;
       var dx = e.touches[0].clientX - startX;
       var dy = e.touches[0].clientY - startY;
-      if (isHoriz === null) isHoriz = Math.abs(dx) > Math.abs(dy);
+      // Fix: decidir o eixo já no primeiro touchmove (1-3px de ruído do
+      // dedo) fazia um scroll vertical normal virar "swipe horizontal" de
+      // vez em quando, travando a rolagem até soltar o dedo. Só decide
+      // depois de ~10px acumulados, com viés pro vertical.
+      if (isHoriz === null) {
+        if (Math.abs(dx) + Math.abs(dy) < 10) return;
+        isHoriz = Math.abs(dx) > Math.abs(dy) * 1.3;
+      }
       if (isHoriz) e.preventDefault(); // só trava o scroll vertical se o gesto for horizontal
     }, { passive: false });
 

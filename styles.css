@@ -475,6 +475,16 @@
       border-color: transparent;
       overflow: hidden;
       pointer-events: none;
+      /* Fix: pointer-events:none só bloqueia mouse/toque — sem isso, os
+         controles escondidos continuavam no tab order e no leitor de tela
+         (Tab entrava na busca invisível e rolava a página até ela; Enter
+         nos botões de categoria/pill filtrava a lista de lojas fora da
+         tela). visibility:hidden tira os dois; o atraso de 0.28s só na
+         saída preserva a animação de colapso ao entrar no modo feed. */
+      visibility: hidden;
+      transition: max-height 0.28s ease, opacity 0.2s ease,
+                  padding-top 0.28s ease, padding-bottom 0.28s ease,
+                  border-color 0.28s ease, visibility 0s linear 0.28s;
     }
     /* Sem busca/categorias/pills, o carrossel (dots + feed) sobe e cola
        no header-top -- sem o respiro de 16px pensado pra quando a busca
@@ -2032,7 +2042,12 @@
     }
 
     /* Tira semanal (7 dias) */
-    .weather-week-strip { gap: 8px; margin-top: 14px; padding-bottom: 2px; }
+    /* Fix: sem isso, o "touch-action: pan-y" do carrossel da home (ver
+       #home-carousel-wrap) bloqueava também o scroll horizontal nativo
+       desta tira, mesmo sendo .scroll-x — sex/sáb ficavam inalcançáveis
+       por toque (o JS do carrossel também passou a ignorar gestos que
+       começam aqui, ver initHomeCarouselSwipe). */
+    .weather-week-strip { gap: 8px; margin-top: 14px; padding-bottom: 2px; touch-action: pan-x; }
     .weather-week-day {
       flex: 0 0 54px; display: flex; flex-direction: column; align-items: center; gap: 5px;
       background: var(--surface2); border-radius: 12px; padding: 10px 4px;

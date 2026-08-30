@@ -10930,6 +10930,11 @@
     }
     if (shareBtn) shareBtn.onclick = function (e) { e.stopPropagation(); _avisoCompartilhar(idx, e); };
 
+    // Fix: pausa os vídeos do feed antes de abrir o modal — sem isso, um
+    // vídeo do feed tocando (com som) continuava atrás do overlay e tocava
+    // junto com o vídeo do modal.
+    document.querySelectorAll('.aviso-card-video').forEach(function (v) { v.pause(); });
+
     overlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
     if (history.state?.modal !== 'aviso-post') history.pushState({ modal: 'aviso-post' }, '');
@@ -10939,8 +10944,19 @@
   function _fecharAvisoPost(viaPopstate) {
     var overlay = document.getElementById('aviso-post-overlay');
     if (overlay) overlay.style.display = 'none';
+    // Fix: display:none não pausa <video> — o vídeo do modal continuava
+    // tocando (com som) escondido atrás do overlay fechado. Pausa e
+    // esvazia o track (libera o buffer) e reobserva o feed pra retomar o
+    // que estiver visível (o vídeo do feed foi pausado ao abrir, ver
+    // _abrirAvisoPost).
+    var track = document.getElementById('aviso-post-media-track');
+    if (track) {
+      track.querySelectorAll('video').forEach(function (v) { try { v.pause(); } catch (e) {} });
+      track.innerHTML = '';
+    }
     document.body.style.overflow = '';
     if (!viaPopstate && history.state?.modal === 'aviso-post') { _popstateNosso = true; history.back(); }
+    _avisoInitVideoObserver();
   }
   window._fecharAvisoPost = _fecharAvisoPost;
 
@@ -11157,13 +11173,20 @@
       entries.forEach(function (entry) {
         var video = entry.target;
         if (document.hidden) return; // aba escondida: quem cuida é o visibilitychange
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+        // Fix: em viewport baixa (celular deitado, janela de desktop baixa),
+        // a mídia (até 620px de altura) nunca alcança 60% de interseção
+        // mesmo ocupando a tela inteira — o limiar cai pra 0.3 quando a
+        // mídia é claramente maior que a área visível.
+        var alturaRoot = (entry.rootBounds && entry.rootBounds.height) || window.innerHeight;
+        var midiaMaiorQueTela = entry.boundingClientRect.height > alturaRoot * 0.8;
+        var limiar = midiaMaiorQueTela ? 0.3 : 0.6;
+        if (entry.isIntersecting && entry.intersectionRatio >= limiar) {
           video.play().catch(function () {}); // autoplay pode ser recusado silenciosamente — sem problema, fica parado
         } else {
           video.pause();
         }
       });
-    }, { threshold: [0, 0.6, 1] });
+    }, { threshold: [0, 0.3, 0.6, 1] });
     document.querySelectorAll('.aviso-card-video').forEach(function (v) { _avisoVideoObserver.observe(v); });
   }
   window._avisoInitVideoObserver = _avisoInitVideoObserver;
@@ -11188,6 +11211,10 @@
     });
     video.muted = !estavaMudo;
     _avisoAtualizarIconeSom(video);
+    // Fix: desmutar um vídeo fora da tela (pausado) deixava ele mudo=false
+    // mas parado — o áudio pegava o usuário de surpresa, em volume total,
+    // só quando ele rolasse até o vídeo depois. Retoma junto.
+    if (!video.muted && video.paused) video.play().catch(function () {});
   }
   window._avisoAlternarSom = _avisoAlternarSom;
 

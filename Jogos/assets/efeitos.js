@@ -6,9 +6,20 @@
    Não interfere no canvas do próprio jogo (ex.: Voo).
 
    Exposto ao app pela ponte (window.AngatubaGames.efeitos). Uso:
-     efeitos.confete(elOuId)   → chuva de confete colorido (recorde)
-     efeitos.estrelas(x, y)    → burst de estrelinhas num ponto
-     efeitos.brilho(elOuId)    → flash suave de brilho na área
+     efeitos.confete(elOuId, qtd, opcoes)   → chuva de confete colorido (recorde)
+     efeitos.estrelas(x, y, qtd, opcoes)    → burst de estrelinhas num ponto
+     efeitos.brilho(elOuId)                 → flash suave de brilho na área
+
+   'opcoes' é sempre opcional (retrocompatível — sem ela, tudo continua
+   desenhando as formas planas de sempre). Único campo hoje:
+     opcoes.sprites = [Image, Image, ...]
+   Quando presente, cada partícula sorteia um sprite da lista e desenha
+   ele (drawImage) em vez do retângulo/círculo colorido. Serve pra usar
+   texturas de pacotes tipo Kenney Particle Pack sem trocar a API.
+
+   efeitos.carregarSprites([urls]) → Promise<[Image,...]>
+   Helper opcional pra carregar essas imagens uma vez só (cacheado por
+   URL, então chamar de novo com a mesma lista não recarrega nada).
 
    Respeita prefers-reduced-motion: se o usuário pediu menos
    animação, os efeitos viram no-op (acessibilidade).
@@ -47,7 +58,7 @@
     s.height = r.height + 'px';
     s.pointerEvents = 'none';
     s.zIndex = '9999';
-    document.body.appendChild(cv);
+    (document.fullscreenElement || document.body).appendChild(cv);
     var ctx = cv.getContext('2d');
     ctx.scale(dpr, dpr);
     return { cv: cv, ctx: ctx, w: r.width, h: r.height };
@@ -55,6 +66,37 @@
 
   // Paleta alinhada à identidade (vermelho neon, âmbar, roxo, verde, azul).
   var CORES = ['#ff3b3b', '#f59e0b', '#a855f7', '#4ade80', '#3b82f6', '#fcd34d'];
+
+  // Sorteia um sprite de opcoes.sprites, se houver. undefined = usa a
+  // forma plana de sempre (fillRect/arc) — comportamento inalterado.
+  function _sortearSprite(opcoes) {
+    if (!opcoes || !opcoes.sprites || !opcoes.sprites.length) return undefined;
+    return opcoes.sprites[(Math.random() * opcoes.sprites.length) | 0];
+  }
+
+  // Cache de imagens carregadas por URL, pra não recarregar a mesma
+  // textura em cada chamada (mesmo padrão promise-cacheada usado nos
+  // loaders do Firebase/hub: reseta sozinha se a imagem falhar).
+  var _cacheSprites = {};
+  function _carregarUmSprite(url) {
+    if (_cacheSprites[url]) return _cacheSprites[url];
+    var p = new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { reject(new Error('Falha ao carregar sprite: ' + url)); };
+      img.src = url;
+    });
+    p.catch(function () { delete _cacheSprites[url]; }); // erro não trava tentativas futuras
+    _cacheSprites[url] = p;
+    return p;
+  }
+
+  // Carrega uma lista de URLs de sprite em paralelo. Uso:
+  //   efeitos.carregarSprites(['Jogos/assets/particulas/brilho/estrela1.webp', ...])
+  //     .then(function (sprites) { efeitos.estrelas(x, y, 16, { sprites: sprites }); });
+  function carregarSprites(urls) {
+    return Promise.all((urls || []).map(_carregarUmSprite));
+  }
 
   // Loop de animação genérico: recebe uma lista de partículas com
   // {x,y,vx,vy,...} e uma função de desenho/atualização por frame.
@@ -88,7 +130,7 @@
   }
 
   // ── Confete: chuva colorida caindo do topo da área ───────
-  function confete(alvo, qtd) {
+  function confete(alvo, qtd, opcoes) {
     if (_reduzMovimento()) return;
     var el = _resolverEl(alvo);
     var pack = _criarCanvas(el);
@@ -105,6 +147,7 @@
         larg: 5 + Math.random() * 5,
         alt: 8 + Math.random() * 6,
         cor: CORES[(Math.random() * CORES.length) | 0],
+        sprite: _sortearSprite(opcoes),
         vida: 1
       });
     }
@@ -117,16 +160,21 @@
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rot);
-      ctx.fillStyle = p.cor;
       ctx.globalAlpha = 0.95;
-      ctx.fillRect(-p.larg / 2, -p.alt / 2, p.larg, p.alt);
+      if (p.sprite) {
+        var tam = Math.max(p.larg, p.alt) * 1.6; // sprite costuma ter respiro/transparência nas bordas
+        ctx.drawImage(p.sprite, -tam / 2, -tam / 2, tam, tam);
+      } else {
+        ctx.fillStyle = p.cor;
+        ctx.fillRect(-p.larg / 2, -p.alt / 2, p.larg, p.alt);
+      }
       ctx.restore();
     }, 2800);
   }
 
   // ── Estrelas: burst radial a partir de um ponto (x,y em px de
   //    viewport). Bom pra marcar um acerto especial/bônus. ─────
-  function estrelas(x, y, qtd) {
+  function estrelas(x, y, qtd, opcoes) {
     if (_reduzMovimento()) return;
     // canvas do tamanho da tela toda (o ponto é em viewport)
     var fakeEl = {
@@ -145,7 +193,10 @@
         vx: Math.cos(ang) * vel,
         vy: Math.sin(ang) * vel,
         r: 2 + Math.random() * 2.5,
+        rot: Math.random() * Math.PI * 2,
+        vrot: (Math.random() - 0.5) * 0.2,
         cor: CORES[(Math.random() * CORES.length) | 0],
+        sprite: _sortearSprite(opcoes),
         vida: 1, t: 0
       });
     }
@@ -155,14 +206,22 @@
       p.y += p.vy * dt;
       p.vy += 0.05 * dt;
       p.vx *= 0.98; p.vy *= 0.98;
+      p.rot += p.vrot * dt;
       var a = Math.max(0, 1 - p.t / 40);
       if (a <= 0.02) { p.vida = 0; return; }
       ctx.save();
       ctx.globalAlpha = a;
-      ctx.fillStyle = p.cor;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fill();
+      if (p.sprite) {
+        var tam = p.r * 5; // sprite tem respiro/transparência — precisa de mais área que o raio "sólido" de antes
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.drawImage(p.sprite, -tam / 2, -tam / 2, tam, tam);
+      } else {
+        ctx.fillStyle = p.cor;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
     }, 1200);
   }
@@ -198,6 +257,7 @@
   window.AngatubaEfeitos = {
     confete: confete,
     estrelas: estrelas,
-    brilho: brilho
+    brilho: brilho,
+    carregarSprites: carregarSprites
   };
 })();

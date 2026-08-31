@@ -29,6 +29,43 @@
   function _som() {
     return (window.AngatubaGames && window.AngatubaGames.som) || null;
   }
+  // Atalho pra fachada de efeitos da ponte (no-op se não carregou ainda).
+  function _efeitos() {
+    return (window.AngatubaGames && window.AngatubaGames.efeitos) || null;
+  }
+
+  // Sprites do burst de match (mesmo pool usado no Blocos) — carregados
+  // uma vez em _dcPrepararTela e cacheados aqui. Enquanto não carregam
+  // (ou se falharem), o burst cai sozinho pro círculo colorido padrão
+  // do efeitos.js (retrocompatível — ver opcoes.sprites em efeitos.estrelas).
+  var _DC_SPRITES_MATCH_URLS = [
+    '/Jogos/assets/particulas/brilho/circle_01.webp',
+    '/Jogos/assets/particulas/brilho/circle_02.webp',
+    '/Jogos/assets/particulas/brilho/flare_01.webp',
+    '/Jogos/assets/particulas/brilho/magic_01.webp',
+    '/Jogos/assets/particulas/brilho/magic_04.webp',
+    '/Jogos/assets/particulas/brilho/muzzle_01.webp',
+    '/Jogos/assets/particulas/brilho/muzzle_03.webp',
+    '/Jogos/assets/particulas/brilho/spark_01.webp',
+    '/Jogos/assets/particulas/brilho/spark_02.webp',
+    '/Jogos/assets/particulas/brilho/spark_03.webp',
+    '/Jogos/assets/particulas/brilho/star_01.webp',
+    '/Jogos/assets/particulas/brilho/star_04.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff00.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff01.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff02.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff03.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff04.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff05.webp'
+  ];
+  var _dcSpritesMatch = null;
+  function _dcCarregarSpritesMatch() {
+    var fx = _efeitos();
+    if (!fx || !fx.carregarSprites || _dcSpritesMatch) return;
+    fx.carregarSprites(_DC_SPRITES_MATCH_URLS).then(function (imgs) {
+      _dcSpritesMatch = imgs;
+    }).catch(function () {}); // silencioso — sem sprites, o burst usa o fallback
+  }
 
   var _DC_TAM = 8; // grade 8×8
   var _dcCores = ['#ef4444', '#a855f7', '#4ade80', '#fbbf24', '#38bdf8'];
@@ -992,13 +1029,14 @@
       // lugar sem nenhuma ligação visual entre as duas).
       var s = _som(); if (s) s.combo();
       var fx = window.AngatubaGames && window.AngatubaGames.efeitos;
+      var opcoesFx = _dcSpritesMatch ? { sprites: _dcSpritesMatch } : undefined;
       var agora = performance.now();
       resultado.runs.forEach(function (run) {
         maiorRunNestaTroca = Math.max(maiorRunNestaTroca, run.cells.length);
         var meio = run.cells[Math.floor(run.cells.length / 2)];
         if (fx && fx.estrelas) {
           var p = _dcCentroCelulaTela(meio);
-          if (p) fx.estrelas(p.x, p.y);
+          if (p) fx.estrelas(p.x, p.y, undefined, opcoesFx);
         }
       });
       resultado.marcado.forEach(function (m, idx) {
@@ -1125,6 +1163,7 @@
       window.addEventListener('resize', _dcAjustarResolucaoCanvas);
     }
     _dcCarregarImagens();
+    _dcCarregarSpritesMatch();
     try {
       var corBorda = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
       if (corBorda) _dcCorBorda = corBorda;

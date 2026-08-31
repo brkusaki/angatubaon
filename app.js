@@ -1077,6 +1077,10 @@
     _gamesLimparFiltros(); // reseta busca/categoria a cada entrada no hub
     _streakAtualizarFaixa(false); // mostra a ofensiva atual (sem animar)
     _carregarAssetsJogos();  // som + efeitos (uma vez, sob demanda)
+    // Firestore (ranking) + Database (sinalização multiplayer) — dispara
+    // em paralelo assim que o hub abre, bem antes de terminar uma partida
+    // ou entrar numa sala. Ver _carregarFirebaseJogos.
+    if (typeof _carregarFirebaseJogos === 'function') _carregarFirebaseJogos().catch(function () {});
     // Fix A1.18/A1.20: se o hub fechou antes suspendeu o áudio (ver
     // _fecharGamesHub) — reabrir é, ele mesmo, um gesto do usuário, então dá
     // pra acordar o contexto na hora (cobre 'suspended' e o 'interrupted' do
@@ -1315,13 +1319,15 @@
     sequencia: { js: '/Jogos/sequencia.min.js', css: '/Jogos/sequencia.css', global: 'SequenciaGame' },
     corrida: { js: '/Jogos/corrida.min.js', css: '/Jogos/corrida.css', global: 'CorridaGame' },
     piano: { js: '/Jogos/piano.min.js', css: '/Jogos/piano.css', global: 'PianoGame' },
-    // Ping Pong depende de Jogos/multiplayer.js (AngatubaMP), que já é
-    // carregado direto no index.html (ver <script> depois do app_min.js)
-    // por ser infraestrutura leve e compartilhável com futuros jogos.
-    pingpong: { js: '/Jogos/pingpong.min.js', css: '/Jogos/pingpong.css', global: 'PingPongGame' },
+    // Ping Pong depende de Jogos/multiplayer.js (AngatubaMP), carregado
+    // sob demanda pelo _jogoLoader (ver flag mp abaixo) — infraestrutura
+    // leve e compartilhável com futuros jogos, sem custar nada em quem
+    // nunca abre jogo nenhum.
+    pingpong: { js: '/Jogos/pingpong.min.js', css: '/Jogos/pingpong.css', global: 'PingPongGame', mp: true },
     // Batalha de Tanques também depende de Jogos/multiplayer.js (AngatubaMP),
-    // já carregado direto no index.html — mesma infraestrutura do Ping Pong.
-    tanques: { js: '/Jogos/tanques.min.js', css: '/Jogos/tanques.css', global: 'TanquesGame' },
+    // carregado sob demanda pelo _jogoLoader (ver flag mp abaixo) — mesma
+    // infraestrutura do Ping Pong.
+    tanques: { js: '/Jogos/tanques.min.js', css: '/Jogos/tanques.css', global: 'TanquesGame', mp: true },
     // Coruja Party (2-4 jogadores): fala direto com o Firebase Realtime
     // Database, não usa AngatubaMP (que é só 1x1). Ver Jogos/party.js.
     party: { js: '/Jogos/party.min.js', css: '/Jogos/party.css', global: 'PartyGame' },
@@ -1368,6 +1374,78 @@
     document.head.appendChild(l);
   }
 
+  /* ── Firebase: SDKs compat carregados sob demanda ─────────────────
+     Antes, os 4 SDKs (app/auth/firestore/database) vinham em <script>
+     fixos no index.html, ANTES do app_min.js — bloqueavam o parse pra
+     todo mundo, inclusive quem só queria ver o cardápio.
+     Agora:
+     - app + auth: carregam em paralelo ao boot (não bloqueiam o
+       primeiro render), porque login é usado tanto no ranking dos
+       jogos quanto no botão de postar aviso (fora dos jogos) — ver
+       a chamada de cliAuthInit() no início do app.
+     - firestore + database: só entram quando o hub de jogos abre (ver
+       _abrirGamesHub) ou um jogo carrega (ver _jogoLoader), porque só
+       servem ranking e sinalização de multiplayer. Se falharem,
+       ranking/multiplayer degradam sozinhos (ver _rankDb / multiplayer.js)
+       — não travam o resto do app.
+  ══════════════════════════════════════════════════════════════ */
+  var FIREBASE_SDK_BASE = 'https://www.gstatic.com/firebasejs/12.17.1/';
+  var _fbConfig = {
+    // Config do projeto Firebase (valores públicos por design).
+    apiKey: "AIzaSyClKx3gSCgM1O6X6SMh3VyJLthp-oYnx3k",
+    authDomain: "angatubaon-cd333.firebaseapp.com",
+    projectId: "angatubaon-cd333",
+    storageBucket: "angatubaon-cd333.firebasestorage.app",
+    messagingSenderId: "559185630365",
+    appId: "1:559185630365:web:a2e7fc4cc9d26bfea67074",
+    // Preencher depois de criar o Realtime Database no console do Firebase
+    // (Build > Realtime Database > Criar banco de dados). A URL aparece
+    // no topo da tela de dados, algo como:
+    // "https://angatubaon-cd333-default-rtdb.firebaseio.com" ou com um
+    // sufixo de região (ex.: "...-default-rtdb.southamerica-east1.firebasedatabase.app").
+    // Enquanto ficar vazio, o multiplayer degrada com elegância (fica indisponível, sem quebrar o app).
+    databaseURL: "https://angatubaon-cd333-default-rtdb.firebaseio.com"
+  };
+
+  // Promises cacheadas — evitam injetar 2x quando já carregado (ou
+  // carregando). Em caso de falha (ex.: rede caiu bem na hora), a própria
+  // promise limpa seu cache antes de propagar o erro, pra uma PRÓXIMA
+  // chamada (outro clique no badge, abrir outro jogo) poder tentar nascer
+  // de novo — sem isso, um erro de rede uma única vez travaria auth,
+  // ranking e multiplayer pro resto da sessão.
+  var _fbAppCarregado = null;
+  function _carregarFirebaseApp() {
+    if (_fbAppCarregado) return _fbAppCarregado;
+    _fbAppCarregado = _injetarScript(FIREBASE_SDK_BASE + 'firebase-app-compat.js').then(function () {
+      try { if (window.firebase && firebase.initializeApp) firebase.initializeApp(_fbConfig); }
+      catch (e) { console.warn('[Firebase] init falhou:', e); }
+    }).catch(function (err) { _fbAppCarregado = null; throw err; });
+    return _fbAppCarregado;
+  }
+
+  var _fbAuthCarregado = null;
+  function _carregarFirebaseAuthCore() {
+    if (_fbAuthCarregado) return _fbAuthCarregado;
+    _fbAuthCarregado = _carregarFirebaseApp().then(function () {
+      return _injetarScript(FIREBASE_SDK_BASE + 'firebase-auth-compat.js');
+    }).catch(function (err) { _fbAuthCarregado = null; throw err; });
+    return _fbAuthCarregado;
+  }
+
+  var _fbJogosCarregado = null;
+  function _carregarFirebaseJogos() {
+    // Firestore (ranking) + Realtime Database (sinalização multiplayer) —
+    // só usados dentro do hub de jogos.
+    if (_fbJogosCarregado) return _fbJogosCarregado;
+    _fbJogosCarregado = _carregarFirebaseAuthCore().then(function () {
+      return Promise.all([
+        _injetarScript(FIREBASE_SDK_BASE + 'firebase-firestore-compat.js'),
+        _injetarScript(FIREBASE_SDK_BASE + 'firebase-database-compat.js')
+      ]);
+    }).catch(function (err) { _fbJogosCarregado = null; throw err; });
+    return _fbJogosCarregado;
+  }
+
   // Mostra/esconde o overlay de carregamento do jogo (reaproveita o
   // #games-loading se existir; senão cria um simples na tela do jogo).
   function _jogoLoadingMostrar(tela, mostrar) {
@@ -1399,7 +1477,21 @@
     }
     _jogoLoadingMostrar(tela, true);
     _injetarCSS(cfg.css);
-    return _injetarScript(cfg.js).then(function () {
+    // Firestore/Database já devem estar carregando desde a abertura do hub
+    // (ver _abrirGamesHub); aqui só garante (é idempotente — Promise
+    // cacheada), sem travar a abertura do jogo por isso: ranking e
+    // multiplayer degradam sozinhos se o SDK não vier (ver _rankDb /
+    // multiplayer.js).
+    if (typeof _carregarFirebaseJogos === 'function') _carregarFirebaseJogos().catch(function () {});
+    // Ping Pong e Batalha de Tanques dependem do multiplayer.min.js
+    // (AngatubaMP). Injeta em paralelo ao script do próprio jogo — como os
+    // dois usam script.async=false (ver _injetarScript), a ordem de
+    // EXECUÇÃO fica garantida (multiplayer antes do jogo) mesmo com
+    // download em paralelo.
+    var _pMultiplayer = cfg.mp ? _injetarScript('/Jogos/multiplayer.min.js') : null;
+    var _pJogo = _injetarScript(cfg.js);
+    var _pronto = _pMultiplayer ? Promise.all([_pMultiplayer, _pJogo]) : _pJogo;
+    return _pronto.then(function () {
       _jogosCarregados[nome] = true;
       _jogoLoadingMostrar(tela, false);
       var api = window[cfg.global];
@@ -7245,7 +7337,17 @@
   /* ── Inicializa nav ──────────────────────────────────────── */
   atualizarNav();
   // Inicializa auth de cliente (Firebase). Isolado do login de loja.
-  if (typeof cliAuthInit === 'function') cliAuthInit();
+  // app+auth carregam em paralelo ao boot (ver _carregarFirebaseAuthCore) —
+  // não bloqueiam o primeiro render de quem só quer ver o cardápio. Login
+  // é usado tanto no ranking dos jogos quanto no botão de postar aviso.
+  if (typeof _carregarFirebaseAuthCore === 'function') {
+    _carregarFirebaseAuthCore().then(function () {
+      if (typeof cliAuthInit === 'function') cliAuthInit();
+    }).catch(function (err) {
+      console.warn('[Firebase] auth indisponível:', err);
+      if (typeof cliAtualizarHeader === 'function') cliAtualizarHeader(); // mantém UI deslogada, sem quebrar nada
+    });
+  }
   // Se tem token de loja na session, valida silenciosamente ao carregar
   if (_lojaToken) {
     const _validParams = new URLSearchParams();
@@ -16234,11 +16336,13 @@ ${urlCard}`)}`;
   var CLI_APELIDO_KEY = 'angatuba_cli_apelido';
 
   /* ── Inicialização do Firebase ──────────────────────────────
-     firebase (namespace compat) é carregado via <script> no index.html
-     ANTES do app_min.js, então já existe aqui. Guardamos referência ao
-     auth uma vez. Se por algum motivo o SDK não carregou (offline no
-     primeiro load, bloqueio de rede), degradamos com elegância: o app
-     inteiro continua funcionando, só o login fica indisponível. */
+     firebase (namespace compat) é injetado sob demanda por
+     _carregarFirebaseAuthCore() (ver acima, perto de _jogoLoader), em
+     paralelo ao boot — pode ainda não existir no exato instante em que
+     este arquivo roda. Guardamos referência ao auth uma vez carregado.
+     Se por algum motivo o SDK não carregar (offline no primeiro load,
+     bloqueio de rede), degradamos com elegância: o app inteiro continua
+     funcionando, só o login fica indisponível. */
   var _fbAuth = null;
   function _cliFirebaseAuth() {
     if (_fbAuth) return _fbAuth;
@@ -16941,9 +17045,10 @@ ${urlCard}`)}`;
        (Firebase) que aplica.
   ══════════════════════════════════════════════════════════════ */
 
-  // Referência ao Firestore (compat). Carregado via <script> no index
-  // ANTES do app_min.js, junto com app/auth. Degradação graciosa se
-  // o SDK não carregou: ranking fica indisponível, jogo segue normal.
+  // Referência ao Firestore (compat). Injetado sob demanda por
+  // _carregarFirebaseJogos() ao abrir o hub de jogos (ver perto de
+  // _jogoLoader). Degradação graciosa se o SDK não carregou: ranking
+  // fica indisponível, jogo segue normal.
   var _fbDb = null;
   // Guarda a última pontuação feita DESLOGADO ({jogo, score}), pra ser
   // re-submetida automaticamente assim que o cliente logar. Zerada após

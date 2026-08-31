@@ -63,6 +63,45 @@
     return reg;
   }
 
+  // Sprites do burst de partículas do efeitos.js (faíscas no trampolim,
+  // confete de recorde) — mesmo pool usado em Blocos/Doces/Corrida.
+  // Carregados uma vez em _vooPreparar via efeitos.carregarSprites (pela
+  // ponte AngatubaGames, não o efeitos.js direto). Enquanto não carregam
+  // (ou se falharem), os call-sites de estrelas()/confete() já existentes
+  // caem sozinhos pro círculo colorido padrão — retrocompatível, nenhum
+  // deles muda de posição.
+  var _VOO_SPRITES_FX_URLS = [
+    '/Jogos/assets/particulas/brilho/circle_01.webp',
+    '/Jogos/assets/particulas/brilho/circle_02.webp',
+    '/Jogos/assets/particulas/brilho/flare_01.webp',
+    '/Jogos/assets/particulas/brilho/magic_01.webp',
+    '/Jogos/assets/particulas/brilho/magic_04.webp',
+    '/Jogos/assets/particulas/brilho/muzzle_01.webp',
+    '/Jogos/assets/particulas/brilho/muzzle_03.webp',
+    '/Jogos/assets/particulas/brilho/spark_01.webp',
+    '/Jogos/assets/particulas/brilho/spark_02.webp',
+    '/Jogos/assets/particulas/brilho/spark_03.webp',
+    '/Jogos/assets/particulas/brilho/star_01.webp',
+    '/Jogos/assets/particulas/brilho/star_04.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff00.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff01.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff02.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff03.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff04.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff05.webp'
+  ];
+  var _vooSpritesFx = null;
+  function _vooCarregarSpritesFx() {
+    var fx = window.AngatubaGames && window.AngatubaGames.efeitos;
+    if (!fx || !fx.carregarSprites || _vooSpritesFx) return;
+    fx.carregarSprites(_VOO_SPRITES_FX_URLS).then(function (imgs) {
+      _vooSpritesFx = imgs;
+    }).catch(function () {});
+  }
+  function _vooOpcoesFx() {
+    return _vooSpritesFx ? { sprites: _vooSpritesFx } : undefined;
+  }
+
   // Nome do arquivo de plataforma pra (tipo, faixa). Convenção:
   //   plat-<tipo>-<faixa>.webp   ex.: plat-normal-ceu.webp
   // Faixa por altitude: <0.55 = ceu, <0.82 = atm, senão = esp.
@@ -655,7 +694,8 @@
             window.AngatubaGames.efeitos.estrelas(
               rC.left + (o.x / _vooW) * rC.width,
               rC.top + ((pl.y - _vooCamY) / _vooH) * rC.height,
-              10
+              10,
+              _vooOpcoesFx()
             );
           }
           if (pl.tipo === 'break') pl.usada = true;  // quebra após impulsionar
@@ -1205,6 +1245,7 @@
     if (!_vooCanvas) return;
     _vooCtx = _vooCanvas.getContext('2d');
     _vooCarregarImg();
+    _vooCarregarSpritesFx();
     _vooLigarControles();
     if (!_vooResizeOn) {
       window.addEventListener('resize', function () {
@@ -1297,7 +1338,7 @@
 
     // Confete sobre a tela de fim quando bateu recorde.
     if (recorde && window.AngatubaGames && window.AngatubaGames.efeitos) {
-      window.AngatubaGames.efeitos.confete('vo-fim', 90);
+      window.AngatubaGames.efeitos.confete('vo-fim', 90, _vooOpcoesFx());
     }
 
     if (window.AngatubaGames) window.AngatubaGames.rankFimDeJogo('voo', 'vo-rank-slot', score);

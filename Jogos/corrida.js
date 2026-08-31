@@ -144,6 +144,44 @@
     return _corAssetMulti(_corVariantes(nome));
   }
 
+  // Sprites do burst de partículas do efeitos.js (impacto no zumbi, coleta
+  // de munição) — mesmo pool usado em Blocos/Doces. Carregados uma vez em
+  // _corPreparar via efeitos.carregarSprites (pela ponte AngatubaGames,
+  // não o efeitos.js direto). Enquanto não carregam (ou se falharem), os
+  // 3 call-sites de estrelas()/confete() já existentes caem sozinhos pro
+  // círculo colorido padrão — retrocompatível, nenhum deles muda de posição.
+  var _COR_SPRITES_FX_URLS = [
+    '/Jogos/assets/particulas/brilho/circle_01.webp',
+    '/Jogos/assets/particulas/brilho/circle_02.webp',
+    '/Jogos/assets/particulas/brilho/flare_01.webp',
+    '/Jogos/assets/particulas/brilho/magic_01.webp',
+    '/Jogos/assets/particulas/brilho/magic_04.webp',
+    '/Jogos/assets/particulas/brilho/muzzle_01.webp',
+    '/Jogos/assets/particulas/brilho/muzzle_03.webp',
+    '/Jogos/assets/particulas/brilho/spark_01.webp',
+    '/Jogos/assets/particulas/brilho/spark_02.webp',
+    '/Jogos/assets/particulas/brilho/spark_03.webp',
+    '/Jogos/assets/particulas/brilho/star_01.webp',
+    '/Jogos/assets/particulas/brilho/star_04.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff00.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff01.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff02.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff03.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff04.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff05.webp'
+  ];
+  var _corSpritesFx = null;
+  function _corCarregarSpritesFx() {
+    var fx = window.AngatubaGames && window.AngatubaGames.efeitos;
+    if (!fx || !fx.carregarSprites || _corSpritesFx) return;
+    fx.carregarSprites(_COR_SPRITES_FX_URLS).then(function (imgs) {
+      _corSpritesFx = imgs;
+    }).catch(function () {}); // silencioso — sem sprites, os bursts usam o fallback
+  }
+  function _corOpcoesFx() {
+    return _corSpritesFx ? { sprites: _corSpritesFx } : undefined;
+  }
+
   /* ── Fundo chapado → transparente ───────────────────────────────
      Vários sheets exportados de render 3D vêm com o fundo CHAPADO
      (cinza claro/branco) em vez de alfa. Desenhados no campo escuro,
@@ -725,7 +763,7 @@
       } else {
         _corSomImpacto(false);
         if (window.AngatubaGames && window.AngatubaGames.efeitos) {
-          window.AngatubaGames.efeitos.estrelas(alvo._px, alvo._py - 20 * alvo._ps, 4);
+          window.AngatubaGames.efeitos.estrelas(alvo._px, alvo._py - 20 * alvo._ps, 4, _corOpcoesFx());
         }
       }
     }
@@ -812,7 +850,7 @@
           _corSomRecarga();
           if (window.AngatubaGames && window.AngatubaGames.efeitos) {
             var pit = _corProj(it.z, it.faixa);
-            window.AngatubaGames.efeitos.estrelas(pit.x, pit.y - 16, 8);
+            window.AngatubaGames.efeitos.estrelas(pit.x, pit.y - 16, 8, _corOpcoesFx());
           }
         }
         _corItens.splice(i, 1);
@@ -1296,7 +1334,7 @@
       : (rec > 0 ? 'Seu recorde: ' + rec + 'm. Bora de novo?' : 'Arraste pra desviar, toque pra atirar!');
     _corMostrarOverlay('fim');
     _corAtualizarHUD(true);
-    if (recorde && window.AngatubaGames && window.AngatubaGames.efeitos) window.AngatubaGames.efeitos.confete('cor-fim', 90);
+    if (recorde && window.AngatubaGames && window.AngatubaGames.efeitos) window.AngatubaGames.efeitos.confete('cor-fim', 90, _corOpcoesFx());
     if (window.AngatubaGames) window.AngatubaGames.rankFimDeJogo('corrida', 'cor-rank-slot', score);
   }
 
@@ -1503,6 +1541,7 @@
     _corSheet('rapido');
     _corSheet('forte');
     _corAsset('cenario-floresta.webp');   // dispara o carregamento do fundo cedo
+    _corCarregarSpritesFx();
     _corPrepararFontes();
     // Pede ao sistema pra girar pra landscape (APK/instalado com manifest
     // "any"). No navegador comum é recusado e caímos na rotação CSS.

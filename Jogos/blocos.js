@@ -22,6 +22,43 @@
   function _som() {
     return (window.AngatubaGames && window.AngatubaGames.som) || null;
   }
+  // Atalho pra fachada de efeitos da ponte (no-op se não carregou ainda).
+  function _efeitos() {
+    return (window.AngatubaGames && window.AngatubaGames.efeitos) || null;
+  }
+
+  // Sprites do burst de limpeza (linha/coluna completada) — carregados uma
+  // vez em _bbPrepararTela e cacheados aqui. Enquanto não carregam (ou se
+  // falharem), o burst cai sozinho pro círculo colorido padrão do
+  // efeitos.js (retrocompatível — ver opcoes.sprites em efeitos.estrelas).
+  var _BB_SPRITES_LIMPEZA_URLS = [
+    '/Jogos/assets/particulas/brilho/circle_01.webp',
+    '/Jogos/assets/particulas/brilho/circle_02.webp',
+    '/Jogos/assets/particulas/brilho/flare_01.webp',
+    '/Jogos/assets/particulas/brilho/magic_01.webp',
+    '/Jogos/assets/particulas/brilho/magic_04.webp',
+    '/Jogos/assets/particulas/brilho/muzzle_01.webp',
+    '/Jogos/assets/particulas/brilho/muzzle_03.webp',
+    '/Jogos/assets/particulas/brilho/spark_01.webp',
+    '/Jogos/assets/particulas/brilho/spark_02.webp',
+    '/Jogos/assets/particulas/brilho/spark_03.webp',
+    '/Jogos/assets/particulas/brilho/star_01.webp',
+    '/Jogos/assets/particulas/brilho/star_04.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff00.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff01.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff02.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff03.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff04.webp',
+    '/Jogos/assets/particulas/fumaca/whitePuff05.webp'
+  ];
+  var _bbSpritesLimpeza = null;
+  function _bbCarregarSpritesLimpeza() {
+    var fx = _efeitos();
+    if (!fx || !fx.carregarSprites || _bbSpritesLimpeza) return;
+    fx.carregarSprites(_BB_SPRITES_LIMPEZA_URLS).then(function (imgs) {
+      _bbSpritesLimpeza = imgs;
+    }).catch(function () {}); // silencioso — sem sprites, o burst usa o fallback
+  }
 
   var _BB_TAM = 8;                 // grade 8×8
   var _bbCores = ['#a855f7', '#38bdf8', '#34d399', '#fbbf24', '#fb7185', '#22d3ee'];
@@ -220,7 +257,27 @@
     }
     linhas.forEach(function (rr) { for (var cc = 0; cc < _BB_TAM; cc++) _bbGrid[rr * _BB_TAM + cc] = 0; });
     colunas.forEach(function (cc) { for (var rr = 0; rr < _BB_TAM; rr++) _bbGrid[rr * _BB_TAM + cc] = 0; });
-    return linhas.length + colunas.length;
+    return { qtd: linhas.length + colunas.length, linhas: linhas, colunas: colunas };
+  }
+
+  // Burst de partículas (estrelas/sprites do efeitos.js) no centro de cada
+  // linha/coluna limpa — mesmo padrão já validado no Doces (um burst por
+  // "grupo" limpo, não por célula). As posições vêm de getBoundingClientRect
+  // dos próprios <div> da grade, já que aqui (ao contrário do Doces, que
+  // desenha tudo num <canvas>) cada célula é um elemento DOM de verdade.
+  function _bbBurstLimpeza(linhas, colunas) {
+    var fx = _efeitos();
+    if (!fx || !fx.estrelas || !_bbCelEls) return;
+    var opcoes = _bbSpritesLimpeza ? { sprites: _bbSpritesLimpeza } : undefined;
+    var meio = Math.floor(_BB_TAM / 2);
+    function burstNaCelula(idx) {
+      var el = _bbCelEls[idx];
+      if (!el) return;
+      var r = el.getBoundingClientRect();
+      fx.estrelas(r.left + r.width / 2, r.top + r.height / 2, undefined, opcoes);
+    }
+    linhas.forEach(function (r) { burstNaCelula(r * _BB_TAM + meio); });
+    colunas.forEach(function (c) { burstNaCelula(meio * _BB_TAM + c); });
   }
 
   // ── DOM: grade (criada 1x, só atualiza classes/cor depois) ──
@@ -419,13 +476,15 @@
     _bbTray[slotIdx] = null;
     _bbPontosFase += peca.cel.length;
 
-    var linhas = _bbLimparLinhasCompletas();
+    var limpeza = _bbLimparLinhasCompletas();
+    var qtdLimpas = limpeza.qtd;
     var s = _som();
-    if (linhas > 0) {
-      _bbLinhasFase += linhas;
-      _bbPontosFase += linhas * linhas * 10;
-      if (s) s.combo(linhas);
-      if (navigator.vibrate) { try { navigator.vibrate(linhas >= 2 ? [20, 30, 20] : 15); } catch (e) {} }
+    if (qtdLimpas > 0) {
+      _bbLinhasFase += qtdLimpas;
+      _bbPontosFase += qtdLimpas * qtdLimpas * 10;
+      if (s) s.combo(qtdLimpas);
+      if (navigator.vibrate) { try { navigator.vibrate(qtdLimpas >= 2 ? [20, 30, 20] : 15); } catch (e) {} }
+      _bbBurstLimpeza(limpeza.linhas, limpeza.colunas);
     } else if (s) { s.acerto(); }
 
     if (_bbTray.every(function (p) { return !p; })) {
@@ -538,6 +597,7 @@
     _bbCriarGridDOM();
     _bbCriarTrayDOM();
     _bbCancelarArraste();
+    _bbCarregarSpritesLimpeza();
     _bbRodando = false;
     var recorde = _bbRecordeGet();
     var faseIni = document.getElementById('bb-fase-inicio'); if (faseIni) faseIni.textContent = (recorde + 1);

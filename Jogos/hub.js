@@ -1955,9 +1955,17 @@
     // ── Efeitos visuais (partículas em canvas) ──────────────
     // Mesma fachada segura: no-op se o módulo não carregou.
     efeitos: {
-      confete:  function (alvo, qtd) { var E = window.AngatubaEfeitos; if (E) { try { E.confete(alvo, qtd); } catch (e) {} } },
-      estrelas: function (x, y, qtd) { var E = window.AngatubaEfeitos; if (E) { try { E.estrelas(x, y, qtd); } catch (e) {} } },
-      brilho:   function (alvo)      { var E = window.AngatubaEfeitos; if (E) { try { E.brilho(alvo); } catch (e) {} } }
+      confete:  function (alvo, qtd, opcoes) { var E = window.AngatubaEfeitos; if (E) { try { E.confete(alvo, qtd, opcoes); } catch (e) {} } },
+      estrelas: function (x, y, qtd, opcoes) { var E = window.AngatubaEfeitos; if (E) { try { E.estrelas(x, y, qtd, opcoes); } catch (e) {} } },
+      brilho:   function (alvo)      { var E = window.AngatubaEfeitos; if (E) { try { E.brilho(alvo); } catch (e) {} } },
+      // Repassa pro efeitos.js de verdade; sem ele (ainda não carregou,
+      // ou falhou), resolve com lista vazia — quem chama já trata isso
+      // como "sem sprite" e cai no círculo colorido padrão.
+      carregarSprites: function (urls) {
+        var E = window.AngatubaEfeitos;
+        if (E && E.carregarSprites) return E.carregarSprites(urls);
+        return Promise.resolve([]);
+      }
     },
 
     // ── Coruja Party ─────────────────────────────────────────

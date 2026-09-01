@@ -311,9 +311,16 @@
   }
 
   // Constantes de física em função de H (mesma sensação em qualquer tela).
-  function _vooGrav()  { return 2.3 * _vooH; }     // px/s²
-  function _vooJump()  { return -1.0 * _vooH; }    // px/s (impulso p/ cima; equilíbrio entre espaçamento de plataformas e ritmo)
-  function _vooPlatW() { return 0.28 * _vooW; }
+  // Gravidade um pouco maior + impulso um pouco menor → menos tempo no ar,
+  // pressão real de climber em vez de "flutuar" entre plataformas.
+  function _vooGrav()  { return 2.55 * _vooH; }    // px/s² (era 2.3)
+  function _vooJump()  { return -0.93 * _vooH; }   // px/s (era -1.0)
+  // Plataformas encolhem com a altura: 28% da tela no chão → 17% no alto
+  // (curva t², mesma escala de dificuldade que o gap, score/3200).
+  function _vooPlatW() {
+    var t = Math.min(1, _vooScore / 3200); t = t * t;
+    return (0.28 - 0.11 * t) * _vooW;
+  }
   function _vooPlatH() { return Math.max(8, 0.028 * _vooH); }
   function _vooOwlW()  { return 0.15 * _vooW; }
   function _vooOwlH()  { return _vooOwlW() * (_vooImgOk ? _vooImgRatio : 1); }
@@ -331,17 +338,17 @@
   // Gap efetivo entre plataformas ALCANÇÁVEIS (normais/móveis), sempre
   // <= teto seguro. Cresce com o score pra dificultar de forma GRADUAL:
   // no começo (céu) fica folgado e casual; lá no alto aperta de verdade,
-  // chegando perto do teto do pulo. A escala vai até score ~6000, então
-  // a subida da dificuldade acompanha as áreas longas.
+  // quase no limite do pulo. Escala até score ~3200 (era ~6000) — a
+  // dificuldade real chega bem mais cedo.
   function _vooGap() {
-    var teto = _vooAlcance() * 0.82;
+    var teto = _vooAlcance() * 0.88;               // era 0.82
     // Arranque suave (t²): gaps folgados no comecinho, apertando de verdade
-    // só conforme a altura sobe. Escala até score ~6000.
-    var tl = Math.min(1, _vooScore / 6000);
+    // só conforme a altura sobe. Escala até score ~3200.
+    var tl = Math.min(1, _vooScore / 3200);
     var t = tl * tl;
-    // min: 55% → 80% do teto | max: 72% → 98% do teto (quase no limite).
-    var min = teto * (0.55 + 0.25 * t);
-    var max = teto * (0.72 + 0.26 * t);
+    // min: 58% → 86% do teto | max: 78% → 99% do teto (quase no limite).
+    var min = teto * (0.58 + 0.28 * t);
+    var max = teto * (0.78 + 0.21 * t);
     if (max > teto) max = teto;
     if (min > max) min = max;
     return min + Math.random() * (max - min);
@@ -355,24 +362,24 @@
     var tipo = 'normal';
     if (!forcarNormal) {
       // Dificuldade progressiva: quanto mais alto, mais plataformas móveis
-      // e quebráveis. Escala até score ~6000 pra acompanhar as áreas longas.
-      // Usamos uma curva que ARRANCA suave (quase tudo normal no comecinho
-      // do céu) e sobe de verdade conforme ganha altura — 't' ao quadrado
-      // deixa o início leve e o topo pesado.
-      var tl = Math.min(1, _vooScore / 6000);
+      // e quebráveis. Escala até score ~3200 (era ~6000) pra a dificuldade
+      // real chegar bem mais cedo. Curva ARRANCA suave (quase tudo normal
+      // no comecinho do céu) e sobe de verdade conforme ganha altura —
+      // 't' ao quadrado deixa o início leve e o topo pesado.
+      var tl = Math.min(1, _vooScore / 3200);
       var t = tl * tl;                                // arranque suave
-      var chanceBreak = 0.02 + 0.23 * t;             // ~2% → 25%
-      var chanceMove  = chanceBreak + 0.14 + 0.46 * t; // móvel ~14% → 60%
+      var chanceBreak = 0.05 + 0.32 * t;             // ~5% → 37%
+      var chanceMove  = chanceBreak + 0.14 + 0.40 * t; // móvel sobe junto
       var r = Math.random();
       if (r < chanceBreak)      tipo = 'break';
       else if (r < chanceMove)  tipo = 'move';
     }
-    // Trampolim só em plataforma normal.
-    var boost = (tipo === 'normal' && Math.random() < 0.07);
+    // Trampolim mais raro (era 7%).
+    var boost = (tipo === 'normal' && Math.random() < 0.045);
     var vx = 0;
     if (tipo === 'move') {
-      // Móveis ficam mais rápidas com o score (0.10 → 0.32 · W/s).
-      var spd = (0.10 + 0.22 * Math.min(1, _vooScore / 6000)) * _vooW;
+      // Móveis ficam mais rápidas com o score (0.14 → 0.42 · W/s no alto).
+      var spd = (0.14 + 0.28 * Math.min(1, _vooScore / 3200)) * _vooW;
       vx = (Math.random() < 0.5 ? -1 : 1) * spd;
     }
     // FAIXA FIXA da plataforma: definida pela altitude DELA (onde ela
@@ -631,6 +638,13 @@
 
     // Movimento horizontal por teclado (desktop); o arraste mexe direto em o.x.
     if (_vooKeyDir !== 0) { o.x += _vooKeyDir * 0.9 * _vooW * dt; }
+
+    // Vento lateral: cresce com o score (fraco no céu, insistente no alto).
+    // Diferencia do Doodle Jump — força correção horizontal constante em
+    // vez de só reagir ao pulo. Escala junto com gap/plataformas (~3200).
+    var ventoT = Math.min(1, _vooScore / 3200);
+    var ventoAmp = (0.015 + 0.16 * ventoT) * _vooW;
+    o.x += Math.sin(_vooTempo * 0.55) * ventoAmp * dt;
 
     // Física vertical
     o.vy += g * dt;

@@ -519,10 +519,10 @@
   // Calibrado pra dar TEMPO DE VER E DESVIAR (Into the Dead):
   //   início  → zumbi normal leva ~9s do horizonte até você
   //   máximo  → ~5s (ainda confortável), atingido bem devagar
-  var _COR_VEL_INI = 0.105, _COR_VEL_MAX = 0.19, _COR_VEL_ACC = 0.0012;
+  var _COR_VEL_INI = 0.125, _COR_VEL_MAX = 0.28, _COR_VEL_ACC = 0.0024;
 
   /* ── Munição / tiro ───────────────────────────────────────────── */
-  var _COR_MUN_INI = 12;
+  var _COR_MUN_INI = 8;
   var _corMun = _COR_MUN_INI;
   var _COR_TIRO_CD = 0.14;
   var _corTiroT = 0, _corFlashT = 0, _corRecuo = 0;
@@ -536,9 +536,12 @@
   // Campo ABERTO: os zumbis nascem em qualquer x lateral contínuo dentro
   // deste range (em unidades de faixa; -1.6..1.6 cobre além das bordas pra
   // eles entrarem/saírem de campo naturalmente). Sem faixas discretas.
-  var _COR_CAMPO_LAT = 1.6;
-  // População alvo de zumbis vivos na tela (mantém 3-6 visíveis).
-  var _COR_POP_MIN = 4, _COR_POP_MAX = 7;
+  var _COR_CAMPO_LAT = 1.1;    // era 1.6 — campo mais estreito, zumbis nascem perto da linha de visão
+  // População alvo de zumbis vivos na tela: sobe com a distância (base
+  // 5-9, +1 a cada ~180m) — o campo enche de verdade com o tempo em vez
+  // de ficar fixo em 4-7 pra sempre.
+  function _corPopMin() { return 5 + Math.floor(_corDist / 180); }
+  function _corPopMax() { return 9 + Math.floor(_corDist / 180); }
 
   var _COR_TIPOS = {
     normal: { hp: 1, w: 0.16, cor: '#6f7d5a', corEsc: '#4b5640', vel: 1.00 },
@@ -552,7 +555,7 @@
   // (_corDrawZumbi) — as duas TÊM que usar exatamente o mesmo número, senão
   // o aviso mente (acende perigo num zumbi que ia passar reto, ou o
   // contrário).
-  function _corMeiaColisao(tipo) { return (_COR_TIPOS[tipo].w * 0.5) + 0.20; }
+  function _corMeiaColisao(tipo) { return (_COR_TIPOS[tipo].w * 0.5) + 0.11; }   // era 0.20 — desviar precisa ser de verdade
 
   /* ── Persistência ─────────────────────────────────────────────── */
   var _COR_REC_KEY = 'angatuba_corrida_rec';
@@ -631,7 +634,7 @@
     _corCamX = 0; _corCamVX = 0;
     _corPasso = 0; _corPassoUlt = 0;
     _corZumbis.length = 0; _corItens.length = 0; _corSangue.length = 0;
-    _corSpawnT = 0.9; _corItemT = 4.5;
+    _corSpawnT = 0.9; _corItemT = 8.5;
     _corAtualizarHUD(true);
   }
 
@@ -665,8 +668,10 @@
     // mais longa: continua ficando mais puxado por mais tempo de jogo,
     // sem mexer no ritmo de corrida em si (isso já era calibrado pra ser
     // "confortável", ver comentário perto de _COR_VEL_MAX).
-    var pRapido = _corClamp(0.08 + d / 5000, 0.08, 0.42);
-    var pForte  = _corClamp(0.04 + d / 7000, 0.04, 0.34);
+    // Mix sobe a partir dos ~200-400m (era desde o início, mais devagar) e
+    // continua apertando com teto mais alto.
+    var pRapido = _corClamp(0.10 + Math.max(0, d - 200) / 3500, 0.10, 0.48);
+    var pForte  = _corClamp(0.05 + Math.max(0, d - 400) / 4500, 0.05, 0.38);
     var r = Math.random();
     var tipo = (r < pForte) ? 'forte' : ((r < pForte + pRapido) ? 'rapido' : 'normal');
     var def = _COR_TIPOS[tipo];
@@ -684,7 +689,7 @@
       // no mesmo instante e parece um só zumbi clonado.
       fase: Math.random() * 4000,
       // deriva lateral lenta (cambaleio pelo campo)
-      swayA: (tipo === 'forte') ? _corRand(0.01, 0.03) : _corRand(0.03, 0.08),
+      swayA: (tipo === 'forte') ? _corRand(0.02, 0.05) : _corRand(0.04, 0.10),
       swayF: _corRand(0.8, 1.8), swayP: Math.random() * Math.PI * 2,
       // cada zumbi tem uma leve variação de velocidade individual
       velVar: _corRand(0.85, 1.15),
@@ -694,9 +699,11 @@
     });
   }
   function _corSpawnItem() {
-    // Relativo à câmera, como os zumbis — senão você anda pro lado e nunca
-    // mais encontra munição.
-    _corItens.push({ z: _COR_Z_FAR, faixa: _corCamX + _corRand(-1.0, 1.0), bob: Math.random() * Math.PI * 2 });
+    // Relativo à câmera, como os zumbis. Munição escassa: nasce mais nas
+    // laterais (longe do centro) — precisa se mover de verdade pra pegar,
+    // em vez de cair sozinha na mira.
+    var lado = (Math.random() < 0.5 ? -1 : 1) * _corRand(0.6, 1.4);
+    _corItens.push({ z: _COR_Z_FAR, faixa: _corCamX + lado, bob: Math.random() * Math.PI * 2 });
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -804,13 +811,14 @@
     var vivos = 0;
     for (var vi = 0; vi < _corZumbis.length; vi++) if (!_corZumbis[vi].morto) vivos++;
     _corSpawnT -= dt;
+    var popMin = _corPopMin(), popMax = _corPopMax();
     if (_corSpawnT <= 0) {
-      if (vivos < _COR_POP_MIN) {
+      if (vivos < popMin) {
         // Abaixo do mínimo: repõe rápido (spawna 1-2 de uma vez).
         _corSpawnZumbi();
-        if (vivos < _COR_POP_MIN - 1) _corSpawnZumbi();
+        if (vivos < popMin - 1) _corSpawnZumbi();
         _corSpawnT = _corRand(0.25, 0.6);
-      } else if (vivos < _COR_POP_MAX) {
+      } else if (vivos < popMax) {
         // Entre min e max: spawna esporádico.
         _corSpawnZumbi();
         _corSpawnT = _corRand(0.8, 1.6);
@@ -820,7 +828,7 @@
       }
     }
     _corItemT -= dt;
-    if (_corItemT <= 0) { _corSpawnItem(); _corItemT = _corRand(6, 11); }
+    if (_corItemT <= 0) { _corSpawnItem(); _corItemT = _corRand(8.5, 14); }
 
     var i, zb;
     for (i = _corZumbis.length - 1; i >= 0; i--) {
@@ -833,6 +841,12 @@
       zb.z -= _corVel * (_COR_TIPOS[zb.tipo].vel) * (zb.velVar || 1) * dt;
       zb.bob += dt * 4;
       zb.swayP += dt * zb.swayF;
+      // Homing suave: cada zumbi puxa levemente a faixa em direção à
+      // câmera (diferencia do Into the Dead, que só desvia em linha reta).
+      // Rápido "sente" mais forte, forte mais fraco, normal no meio; o
+      // sway (acima) continua por cima, então o rumo nunca fica reto.
+      var homingR = (zb.tipo === 'rapido') ? 0.32 : (zb.tipo === 'forte' ? 0.10 : 0.18);
+      zb.faixa += (_corCamX - zb.faixa) * Math.min(1, homingR * dt);
       if (zb.z <= 0.05) {
         var meia = _corMeiaColisao(zb.tipo);
         if (Math.abs(zb.faixa - _corCamX) < meia) { _corGameOver(); return; }
@@ -846,7 +860,7 @@
       it.bob += dt * 4;
       if (it.z <= 0.07) {
         if (Math.abs(it.faixa - _corCamX) < 0.32) {
-          _corMun = Math.min(99, _corMun + 6);
+          _corMun = Math.min(99, _corMun + 4);
           _corSomRecarga();
           if (window.AngatubaGames && window.AngatubaGames.efeitos) {
             var pit = _corProj(it.z, it.faixa);

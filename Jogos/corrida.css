@@ -52,3 +52,7 @@
 .cor-play{background:var(--red,#ff3355);color:#fff;border:none;border-radius:999px;padding:12px 34px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(255,51,85,.35);transition:transform .12s ease,filter .12s ease;}
 .cor-play:hover{filter:brightness(1.08);}
 .cor-play:active{transform:scale(.96);}
+
+/* Crédito da música de fundo (CC BY — obrigatório, discreto). Mesmo
+   tratamento visual do .pn-creditos do Piano da Coruja. */
+.cor-creditos{font-size:11px;line-height:1.5;color:rgba(199,209,224,.55);max-width:300px;margin-top:14px;}

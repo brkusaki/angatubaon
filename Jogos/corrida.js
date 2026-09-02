@@ -86,6 +86,12 @@
       reação nenhum. Base caiu pra 2-4 (sobe igual com a distância,
       com teto), _corSpawnT inicial subiu pra 2.2s, e nos primeiros
       ~100m a reposição spawna só 1 zumbi por vez em vez de 2.
+   8) MÚSICA DE FUNDO: trilha ambiente em loop baixinho (HTMLAudioElement
+      simples — não usa o Web Audio dos SFX). Toca ao Começar, para/
+      rebobina no game over e ao sair da Corrida, acompanha o botão de
+      mudo global durante a partida, e é 100% opcional (sem o arquivo,
+      o jogo segue normal). Crédito CC BY obrigatório na tela de fim
+      (ver index.html). Ver bloco "MÚSICA DE FUNDO (BGM)" abaixo.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -509,6 +515,63 @@
     _corSopro(ac, t, 0.45, 1400, 130, 0.30);
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     MÚSICA DE FUNDO (BGM) — HTMLAudioElement simples, DE PROPÓSITO
+     separado do Web Audio sintetizado dos SFX acima (motores diferentes,
+     sem mexer um no outro). Trilha:
+       /Jogos/assets/corrida/musica-fundo.mp3
+       "Dark Ambient Music" — TheoJT (Freesound, CC BY 4.0) — crédito
+       visível na tela de fim (ver index.html, overlay #cor-fim).
+     Opcional 100%: se o arquivo faltar/falhar, _corBgmOk fica false e
+     todo play/pause vira no-op — o jogo segue normal sem música.
+  ══════════════════════════════════════════════════════════════ */
+  var _corBgm = null, _corBgmOk = false;
+  var _COR_BGM_VOL = 0.30;   // dentro de 0.28-0.35 pedido — não abafa tiro/passo
+  var _corBgmMudoAntes = null;   // último estado conhecido de _corSomLigado(), p/ detectar o usuário mutar/desmutar NO MEIO da partida
+
+  // Cria e pré-carrega o elemento (chamado 1x em _corPreparar). Só cria o
+  // objeto e pede o load — o play de verdade só acontece em _corComecar.
+  function _corBgmPreparar() {
+    if (_corBgm) return;
+    try {
+      var a = new Audio(_COR_ASSET_BASE + 'musica-fundo.mp3');
+      a.loop = true;
+      a.preload = 'auto';
+      a.volume = _COR_BGM_VOL;
+      a.addEventListener('error', function () { _corBgmOk = false; });
+      _corBgm = a;
+      _corBgmOk = true;   // "existe e não deu erro síncrono" — não garante que carregou
+    } catch (e) { _corBgm = null; _corBgmOk = false; }
+  }
+  function _corBgmTocar() {
+    if (!_corBgm || !_corBgmOk || !_corSomLigado()) return;
+    try {
+      var p = _corBgm.play();
+      if (p && p.catch) p.catch(function () {});   // autoplay bloqueado/erro de decode → silencioso
+    } catch (e) {}
+  }
+  // Pausa e rebobina — usado no fim de jogo e ao sair da Corrida, pra a
+  // próxima partida sempre começar a música do zero (nunca no meio).
+  function _corBgmParar() {
+    if (!_corBgm) return;
+    try { _corBgm.pause(); _corBgm.currentTime = 0; } catch (e) {}
+  }
+  // Chamado a cada frame (rodando): detecta o jogador mutar/desmutar o som
+  // global NO MEIO da partida e acompanha (pausa/retoma) — sem isso a BGM
+  // ficava tocando por cima do botão de mudo, ou não voltava ao desmutar.
+  function _corBgmChecarMudo() {
+    var ligado = _corSomLigado();
+    if (ligado === _corBgmMudoAntes) return;
+    _corBgmMudoAntes = ligado;
+    if (ligado) _corBgmTocar(); else _corBgmParar_semRebobinar();
+  }
+  // Igual _corBgmParar, mas sem zerar o currentTime — mutar não é "acabou
+  // a partida", é só pausa; ao desmutar a música retoma de onde parou.
+  function _corBgmParar_semRebobinar() {
+    if (!_corBgm) return;
+    try { _corBgm.pause(); } catch (e) {}
+  }
+
   /* ── Estado / canvas ──────────────────────────────────────────── */
   var _corCanvas = null, _corCtx = null;
   var _corW = 640, _corH = 360, _corDpr = 1;
@@ -898,6 +961,7 @@
      UPDATE
   ══════════════════════════════════════════════════════════════ */
   function _corUpdate(dt) {
+    _corBgmChecarMudo();   // acompanha o jogador mutar/desmutar o som global no meio da partida
     _corVel = Math.min(_COR_VEL_MAX, _corVel + _COR_VEL_ACC * dt);
     if (_corSlowT > 0) _corSlowT = Math.max(0, _corSlowT - dt);
     // Cambaleio pós-esbarrão: avanço do MUNDO (distância pontuada + quão
@@ -1581,6 +1645,7 @@
   function _corGameOver() {
     if (_corRAF) { cancelAnimationFrame(_corRAF); _corRAF = 0; }
     _corEstado = 'fim';
+    _corBgmParar();
     var score = Math.floor(_corDist), rec = _corRec(), recorde = score > rec;
     if (recorde) _corRecSet(score);
     _corDraw();
@@ -1809,6 +1874,7 @@
     for (var oi = 0; oi < _COR_OBST_NOMES.length; oi++) _corAsset('obst-' + _COR_OBST_NOMES[oi] + '.webp');
     _corCarregarSpritesFx();
     _corPrepararFontes();
+    _corBgmPreparar();   // cria/pré-carrega a música de fundo (play só em _corComecar)
     // Pede ao sistema pra girar pra landscape (APK/instalado com manifest
     // "any"). No navegador comum é recusado e caímos na rotação CSS.
     _corTravarLandscape();
@@ -1897,12 +1963,16 @@
     _corEstado = 'jogando'; _corLast = 0;
     if (_corRAF) cancelAnimationFrame(_corRAF);
     _corRAF = requestAnimationFrame(_corLoop);
+    // Clique no botão = gesto do usuário → pode iniciar áudio de verdade.
+    _corBgmMudoAntes = _corSomLigado();
+    _corBgmTocar();
   }
 
   function _corParar() {
     if (_corRAF) { cancelAnimationFrame(_corRAF); _corRAF = 0; }
     if (_corEstado === 'jogando') _corEstado = 'inicio';
     _corDrag = false;
+    _corBgmParar();
     _corDestravarOrientacao();     // volta a orientação do sistema ao normal
     // Fix A2.22: cancela a cascata de remedição pós-rotação se ainda tiver
     // algum passo pendente — mesma correção do Tanques.
@@ -1963,6 +2033,7 @@
       out.cenario = { carregou: a.ok, imagem: a.ok ? (a.w + '×' + a.h) : null };
     })();
     out.audio = _corAC ? _corAC.state : 'não criado';
+    out.bgm = { existe: !!_corBgm, ok: _corBgmOk, tocando: !!(_corBgm && !_corBgm.paused), volume: _corBgm ? _corBgm.volume : null };
     return out;
   }
 

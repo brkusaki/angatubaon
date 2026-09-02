@@ -63,6 +63,17 @@
       só escreve quando o valor muda, com os elementos e o recorde em
       cache. A mira e o tiro também reaproveitam a projeção já calculada
       no desenho, em vez de reprojetar todos os zumbis de novo.
+
+   ─── MUDANÇAS DA v5 (Into the Dead: esbarrão + obstáculos) ─────
+   5) ESBARRÃO: relar na BORDA de um zumbi (fora do centro) não é mais
+      game over — só a colisão central mata. O esbarrão empurra o
+      zumbi pra longe, treme a câmera e abre um breve i-frame (ver
+      _corEsbarrao). Zumbi "forte" empurra menos.
+   6) OBSTÁCULOS DE CENÁRIO: carro/cerca/entulho/pedra nascem no
+      horizonte e avançam com o mundo, sem atirar nem ter HP — só pra
+      desviar. Colidir com um é morte na hora (sem esbarrão: cenário é
+      sólido, zumbi é mole). Sempre sobra passagem livre de um lado
+      (ver _corSpawnObstaculo).
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -503,6 +514,17 @@
   var _COR_CAM_LIM = 6.0;   // bem largo: sensação de campo livre (zumbis
                             // nascem relativos à câmera, então nunca "acaba")
 
+  /* ── Esbarrão (raspão em zumbi) ───────────────────────────────────
+     _corShakeT: segundos restantes do tremor de câmera do esbarrão —
+     separado de _corBobY (que é "só sobe", ver comentário dele) pra não
+     violar esse invariante. _corIframesT: janela curta em que nenhuma
+     colisão de zumbi (fatal ou esbarrão) é processada, pra um zumbi já
+     empurrado não matar/esbarrar de novo no mesmo lance. */
+  var _corShakeT = 0, _COR_SHAKE_DUR = 0.22;
+  var _corIframesT = 0, _COR_IFRAMES_DUR = 0.42;
+  function _corShakeY() { return _corShakeT > 0 ? Math.sin(_corShakeT * 80) * (_corShakeT / _COR_SHAKE_DUR) * 0.016 : 0; }
+  function _corShakeX() { return _corShakeT > 0 ? Math.cos(_corShakeT * 65) * (_corShakeT / _COR_SHAKE_DUR) * 0.014 : 0; }
+
   /* ── Head-bob / passada (sensação de correr, estilo Into the Dead) ─
      A passada avança proporcional à velocidade. Dela derivamos:
        bobY  = câmera sobe/desce (2 passos por ciclo → freq dobrada)
@@ -531,7 +553,8 @@
   var _corZumbis = [];
   var _corItens = [];
   var _corSangue = [];
-  var _corSpawnT = 0, _corItemT = 0;
+  var _corObstaculos = [];
+  var _corSpawnT = 0, _corItemT = 0, _corObstT = 0;
 
   // Campo ABERTO: os zumbis nascem em qualquer x lateral contínuo dentro
   // deste range (em unidades de faixa; -1.6..1.6 cobre além das bordas pra
@@ -556,6 +579,25 @@
   // o aviso mente (acende perigo num zumbi que ia passar reto, ou o
   // contrário).
   function _corMeiaColisao(tipo) { return (_COR_TIPOS[tipo].w * 0.5) + 0.11; }   // era 0.20 — desviar precisa ser de verdade
+  // Fração de _corMeiaColisao que conta como colisão FATAL (centro). Fora
+  // dela mas ainda dentro de _corMeiaColisao é ESBARRÃO (raspão), não morte.
+  var _COR_FATAL_FRAC = 0.55;
+
+  /* Obstáculos de cenário (carro/cerca/entulho/pedra): sólidos, sem HP,
+     só pra desviar — ver _corSpawnObstaculo/_corDrawObstaculo. altMul e
+     ratio são relativos ao mesmo hpx usado pro zumbi (_corDrawZumbi), pra
+     ficarem na mesma escala visual; larguraMundo é a largura na MESMA
+     unidade de faixa/camX que _COR_TIPOS[].w, usada só na colisão. */
+  var _COR_OBST_TIPOS = {
+    carro:   { altMul: 0.95, ratio: 1.85, larguraMundo: 0.62, cor: '#4c5761', corEsc: '#2b3237', corVid: '#232a30', corFarol: '#d8b24a' },
+    cerca:   { altMul: 0.55, ratio: 2.60, larguraMundo: 0.46, cor: '#8a6a44', corEsc: '#5c4630' },
+    entulho: { altMul: 0.50, ratio: 1.70, larguraMundo: 0.42, cor: '#6b6153', corEsc: '#453f36' },
+    pedra:   { altMul: 0.50, ratio: 1.25, larguraMundo: 0.32, cor: '#767670', corEsc: '#4a4a45' }
+  };
+  var _COR_OBST_NOMES = ['carro', 'cerca', 'entulho', 'pedra'];
+  // Mesma lógica do _corMeiaColisao, mas pro obstáculo (sem o +0.11 do
+  // zumbi, que existia pra compensar a "gordura" do boneco vetorial).
+  function _corMeiaObst(tipo) { return (_COR_OBST_TIPOS[tipo].larguraMundo * 0.5) + 0.05; }
 
   /* ── Persistência ─────────────────────────────────────────────── */
   var _COR_REC_KEY = 'angatuba_corrida_rec';
@@ -582,14 +624,15 @@
     var zc = _corClamp(z, 0, _COR_Z_FAR) / _COR_Z_FAR;
     // Head-bob empurra o horizonte pra baixo quando a câmera "sobe" no
     // passo (a cena inteira sobe/desce junto). Sway empurra lateral.
-    var horizonY = H * _COR_HORIZ + _corBobY * H;
-    var baseY = H * 1.06 + _corBobY * H;
+    // _corShakeY/_corShakeX somam o tremor curto do esbarrão em cima disso.
+    var horizonY = H * _COR_HORIZ + _corBobY * H + _corShakeY() * H;
+    var baseY = H * 1.06 + _corBobY * H + _corShakeY() * H;
     var t = 1 - zc;
     var tt = t * t;
     var y = horizonY + (baseY - horizonY) * tt;
     var s = 0.14 + 0.95 * tt;
     var espalhar = 0.08 + 0.92 * tt;
-    var cx = W * 0.5 - _corCamX * (W * 0.42) * espalhar + _corSwayX * W * espalhar;
+    var cx = W * 0.5 - _corCamX * (W * 0.42) * espalhar + _corSwayX * W * espalhar + _corShakeX() * W * espalhar;
     var x = cx + faixa * (W * 0.42) * espalhar;
     return { x: x, y: y, s: s, t: t };
   }
@@ -632,9 +675,10 @@
     _corMun = _COR_MUN_INI;
     _corTiroT = 0; _corFlashT = 0; _corRecuo = 0;
     _corCamX = 0; _corCamVX = 0;
+    _corShakeT = 0; _corIframesT = 0;
     _corPasso = 0; _corPassoUlt = 0;
-    _corZumbis.length = 0; _corItens.length = 0; _corSangue.length = 0;
-    _corSpawnT = 0.9; _corItemT = 8.5;
+    _corZumbis.length = 0; _corItens.length = 0; _corSangue.length = 0; _corObstaculos.length = 0;
+    _corSpawnT = 0.9; _corItemT = 8.5; _corObstT = _corRand(8, 12);
     _corAtualizarHUD(true);
   }
 
@@ -704,6 +748,32 @@
     // em vez de cair sozinha na mira.
     var lado = (Math.random() < 0.5 ? -1 : 1) * _corRand(0.6, 1.4);
     _corItens.push({ z: _COR_Z_FAR, faixa: _corCamX + lado, bob: Math.random() * Math.PI * 2 });
+  }
+
+  /* Obstáculo de cenário: nasce no horizonte, relativo à câmera (mesmo
+     padrão dos zumbis/itens — nunca "acaba" mesmo andando muito pro lado).
+     Metade das vezes nasce "no caminho" (perto do centro, força desviar de
+     verdade); a outra metade já nasce lateral (só decorativo). Quando já
+     existe outro obstáculo em campo, o novo é OBRIGATORIAMENTE lateral e do
+     lado OPOSTO ao último — assim os dois nunca fecham os dois lados ao
+     mesmo tempo e sempre sobra passagem livre. */
+  function _corSpawnObstaculo() {
+    var tipo = _COR_OBST_NOMES[(Math.random() * _COR_OBST_NOMES.length) | 0];
+    var lado, offset;
+    if (_corObstaculos.length > 0) {
+      var ultimo = _corObstaculos[_corObstaculos.length - 1];
+      lado = (ultimo.faixa - _corCamX) < 0 ? 1 : -1;
+      offset = _corRand(0.65, 1.05);
+    } else {
+      lado = (Math.random() < 0.5) ? -1 : 1;
+      offset = (Math.random() < 0.5) ? _corRand(0.10, 0.40) : _corRand(0.65, 1.05);
+    }
+    var faixa = _corCamX + lado * offset;
+    // Não nasce em cima de um item de munição já nascido no mesmo trecho.
+    for (var i = 0; i < _corItens.length; i++) {
+      if (Math.abs(_corItens[i].faixa - faixa) < 0.30) { faixa += lado * 0.35; break; }
+    }
+    _corObstaculos.push({ z: _COR_Z_FAR, faixa: faixa, tipo: tipo });
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -777,6 +847,23 @@
     _corAtualizarHUD();
   }
 
+  /* Esbarrão: raspão na BORDA de um zumbi — não mata. Empurra o zumbi pra
+     longe da câmera (mais fraco no zumbi "forte": ele quase não sai da
+     frente), treme a câmera e abre o i-frame. Reusa o som de impacto (sem
+     "matou") e um burst leve de partículas, se o efeitos.js tiver carregado. */
+  function _corEsbarrao(zb) {
+    var lado = (zb.faixa - _corCamX) < 0 ? -1 : 1;
+    var forca = (zb.tipo === 'forte') ? 0.05 : (zb.tipo === 'rapido' ? 0.16 : 0.12);
+    zb.faixa += lado * forca;
+    _corShakeT = _COR_SHAKE_DUR;
+    _corIframesT = _COR_IFRAMES_DUR;
+    _corSomImpacto(false);
+    if (window.AngatubaGames && window.AngatubaGames.efeitos) {
+      var p = _corProj(zb.z, zb.faixa);
+      window.AngatubaGames.efeitos.estrelas(p.x, p.y - 10 * p.s, 3, _corOpcoesFx());
+    }
+  }
+
   /* ══════════════════════════════════════════════════════════════
      UPDATE
   ══════════════════════════════════════════════════════════════ */
@@ -804,6 +891,8 @@
     if (_corTiroT > 0) _corTiroT -= dt;
     if (_corFlashT > 0) _corFlashT -= dt;
     if (_corRecuo > 0) _corRecuo = Math.max(0, _corRecuo - dt * 6);
+    if (_corShakeT > 0) _corShakeT = Math.max(0, _corShakeT - dt);
+    if (_corIframesT > 0) _corIframesT = Math.max(0, _corIframesT - dt);
     _corCamVX *= Math.max(0, 1 - dt * 10);
 
     // Spawn por POPULAÇÃO: mantém entre POP_MIN e POP_MAX zumbis vivos na
@@ -830,6 +919,16 @@
     _corItemT -= dt;
     if (_corItemT <= 0) { _corSpawnItem(); _corItemT = _corRand(8.5, 14); }
 
+    // Obstáculo: intervalo ~8-12s no começo, aperta um pouco (piso 4.5-6.5s)
+    // com a distância. No máx 1 obstáculo em campo no começo, 2 depois de
+    // ~500m (ver _corSpawnObstaculo pra garantia de passagem livre).
+    _corObstT -= dt;
+    if (_corObstT <= 0) {
+      var maxObst = (_corDist > 500) ? 2 : 1;
+      if (_corObstaculos.length < maxObst) _corSpawnObstaculo();
+      _corObstT = _corRand(_corClamp(8 - _corDist / 600, 4.5, 8), _corClamp(12 - _corDist / 500, 6.5, 12));
+    }
+
     var i, zb;
     for (i = _corZumbis.length - 1; i >= 0; i--) {
       zb = _corZumbis[i];
@@ -848,9 +947,27 @@
       var homingR = (zb.tipo === 'rapido') ? 0.32 : (zb.tipo === 'forte' ? 0.10 : 0.18);
       zb.faixa += (_corCamX - zb.faixa) * Math.min(1, homingR * dt);
       if (zb.z <= 0.05) {
-        var meia = _corMeiaColisao(zb.tipo);
-        if (Math.abs(zb.faixa - _corCamX) < meia) { _corGameOver(); return; }
-        else { _corZumbis.splice(i, 1); continue; }
+        // Fora do i-frame (pós-esbarrão), distingue COLISÃO FATAL (centro,
+        // < 55% da meia-colisão) de ESBARRÃO (borda, entre 55% e 100%).
+        // Dentro do i-frame nenhuma das duas é processada — o zumbi só some
+        // (já passou), pra não emendar dois esbarrões/mortes no mesmo lance.
+        if (_corIframesT <= 0) {
+          var meia = _corMeiaColisao(zb.tipo);
+          var dist = Math.abs(zb.faixa - _corCamX);
+          if (dist < meia * _COR_FATAL_FRAC) { _corGameOver(); return; }
+          if (dist < meia) { _corEsbarrao(zb); _corZumbis.splice(i, 1); continue; }
+        }
+        _corZumbis.splice(i, 1); continue;
+      }
+    }
+
+    for (i = _corObstaculos.length - 1; i >= 0; i--) {
+      var ob = _corObstaculos[i];
+      ob.z -= _corVel * dt;
+      if (ob.z <= 0.05) {
+        // Sólido: sem esbarrão, sem i-frame — se está na faixa, morre.
+        if (Math.abs(ob.faixa - _corCamX) < _corMeiaObst(ob.tipo)) { _corGameOver(); return; }
+        _corObstaculos.splice(i, 1);
       }
     }
 
@@ -884,7 +1001,7 @@
   ══════════════════════════════════════════════════════════════ */
   function _corDraw() {
     if (!_corCtx) return;
-    var ctx = _corCtx, W = _corW, H = _corH, horizonY = H * _COR_HORIZ + _corBobY * H;
+    var ctx = _corCtx, W = _corW, H = _corH, horizonY = H * _COR_HORIZ + _corBobY * H + _corShakeY() * H;
 
     // ── Chão (campo) — do horizonte pra baixo, tom escuro esverdeado ──
     // (pintado ANTES do céu/imagem: a imagem desvanece por cima dele perto
@@ -906,9 +1023,11 @@
     var i;
     for (i = 0; i < _corItens.length; i++) render.push({ k: 'item', o: _corItens[i], z: _corItens[i].z });
     for (i = 0; i < _corZumbis.length; i++) render.push({ k: 'zumbi', o: _corZumbis[i], z: _corZumbis[i].z });
+    for (i = 0; i < _corObstaculos.length; i++) render.push({ k: 'obst', o: _corObstaculos[i], z: _corObstaculos[i].z });
     render.sort(function (a, b) { return b.z - a.z; });
     for (i = 0; i < render.length; i++) {
       if (render[i].k === 'zumbi') _corDrawZumbi(ctx, render[i].o);
+      else if (render[i].k === 'obst') _corDrawObstaculo(ctx, render[i].o);
       else _corDrawItem(ctx, render[i].o);
     }
 
@@ -1247,6 +1366,87 @@
     }
   }
 
+  /* Obstáculo de cenário — ancorado no chão (pé em p.y), igual ao zumbi:
+     1ª opção imagem (se o asset carregar), 2ª opção sempre o vetor. Sem
+     HP/animação: só entra na composição do render por z, como zumbi/item. */
+  function _corDrawObstaculo(ctx, ob) {
+    var def = _COR_OBST_TIPOS[ob.tipo];
+    var p = _corProj(ob.z, ob.faixa);
+    var hpx = 0.5 * _corH * p.s * 0.94;
+    var ah = hpx * def.altMul, aw = ah * def.ratio;
+
+    ctx.globalAlpha = 0.35 * (0.4 + p.s); ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, aw * 0.52, aw * 0.15, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    var asset = _corAsset('obst-' + ob.tipo + '.webp');
+    var fonte = _corFonte(asset);
+    if (fonte && asset.w && asset.h) {
+      var iaw = ah * (asset.w / asset.h);
+      ctx.drawImage(fonte, p.x - iaw / 2, p.y - ah, iaw, ah);
+      return;
+    }
+    _corVetorObstaculo(ctx, p.x, p.y, aw, ah, ob.tipo, def);
+  }
+
+  // Silhuetas vetoriais simples e legíveis — sem sombreado nem detalhe
+  // demais, só o suficiente pra reconhecer o que é de longe e desviar a
+  // tempo (mesmo espírito do boneco vetorial do zumbi).
+  function _corVetorObstaculo(ctx, cx, footY, w, h, tipo, def) {
+    ctx.save(); ctx.translate(cx, footY);
+    if (tipo === 'carro') {
+      ctx.fillStyle = def.corEsc;
+      ctx.fillRect(-w * 0.5, -h * 0.55, w, h * 0.55);
+      ctx.fillStyle = def.cor;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.32, -h * 0.55); ctx.lineTo(-w * 0.20, -h);
+      ctx.lineTo(w * 0.22, -h); ctx.lineTo(w * 0.34, -h * 0.55);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = def.corVid;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.14, -h * 0.62); ctx.lineTo(-w * 0.04, -h * 0.90);
+      ctx.lineTo(w * 0.14, -h * 0.90); ctx.lineTo(w * 0.22, -h * 0.62);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = def.corFarol;
+      ctx.beginPath(); ctx.arc(-w * 0.44, -h * 0.24, w * 0.05, 0, Math.PI * 2); ctx.fill();
+    } else if (tipo === 'cerca') {
+      ctx.strokeStyle = def.corEsc; ctx.lineWidth = Math.max(2, h * 0.09);
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.5, 0); ctx.lineTo(-w * 0.5, -h);
+      ctx.moveTo(0, 0); ctx.lineTo(0, -h * 0.94);
+      ctx.moveTo(w * 0.5, 0); ctx.lineTo(w * 0.5, -h);
+      ctx.stroke();
+      ctx.strokeStyle = def.cor; ctx.lineWidth = Math.max(2, h * 0.15);
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.5, -h * 0.68); ctx.lineTo(w * 0.5, -h * 0.32);
+      ctx.moveTo(-w * 0.5, -h * 0.32); ctx.lineTo(w * 0.5, -h * 0.68);
+      ctx.stroke();
+    } else if (tipo === 'entulho') {
+      ctx.fillStyle = def.corEsc;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.5, 0); ctx.lineTo(-w * 0.18, -h * 0.7);
+      ctx.lineTo(w * 0.08, -h * 0.5); ctx.lineTo(w * 0.5, 0);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = def.cor;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.30, 0); ctx.lineTo(0, -h);
+      ctx.lineTo(w * 0.35, -h * 0.55); ctx.lineTo(w * 0.15, 0);
+      ctx.closePath(); ctx.fill();
+    } else { // pedra
+      ctx.fillStyle = def.corEsc;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.5, 0); ctx.lineTo(-w * 0.30, -h * 0.8);
+      ctx.lineTo(w * 0.15, -h); ctx.lineTo(w * 0.5, -h * 0.35); ctx.lineTo(w * 0.42, 0);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = def.cor;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.30, -h * 0.15); ctx.lineTo(-w * 0.10, -h * 0.75);
+      ctx.lineTo(w * 0.20, -h * 0.55); ctx.lineTo(0, 0);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function _corDrawArma(ctx, W, H) {
     var kick = _corRecuo * H * 0.05;
     // Arma balança em contrafase leve com a passada (sincronizada ao bob).
@@ -1555,6 +1755,7 @@
     _corSheet('rapido');
     _corSheet('forte');
     _corAsset('cenario-floresta.webp');   // dispara o carregamento do fundo cedo
+    for (var oi = 0; oi < _COR_OBST_NOMES.length; oi++) _corAsset('obst-' + _COR_OBST_NOMES[oi] + '.webp');
     _corCarregarSpritesFx();
     _corPrepararFontes();
     // Pede ao sistema pra girar pra landscape (APK/instalado com manifest
@@ -1585,6 +1786,7 @@
       }
       _corFonte(_corAsset('arma.webp'));
       _corFonte(_corAsset('municao.webp'));
+      for (var oi2 = 0; oi2 < _COR_OBST_NOMES.length; oi2++) _corFonte(_corAsset('obst-' + _COR_OBST_NOMES[oi2] + '.webp'));
       if (!faltou || ++tentativas > 20) { clearInterval(_corFontesTimer); _corFontesTimer = 0; }
     }, 400);
   }

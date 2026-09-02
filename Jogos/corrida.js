@@ -67,13 +67,25 @@
    ─── MUDANÇAS DA v5 (Into the Dead: esbarrão + obstáculos) ─────
    5) ESBARRÃO: relar na BORDA de um zumbi (fora do centro) não é mais
       game over — só a colisão central mata. O esbarrão empurra o
-      zumbi pra longe, treme a câmera e abre um breve i-frame (ver
-      _corEsbarrao). Zumbi "forte" empurra menos.
+      zumbi pra longe, treme a câmera e entra num cambaleio de ~1.2s
+      (_corSlowT) em que o mundo avança a ~50% — E qualquer novo
+      contato de zumbi (centro OU borda) durante o cambaleio é morte
+      na hora ("chain kill": levou um raspão, a horda te alcançou nele
+      antes de você se recompor). O i-frame de verdade é bem curto
+      (~0.14s), só pra não processar a mesma colisão duas vezes no
+      mesmo frame. Zumbi "forte" empurra menos. Ver _corEsbarrao.
    6) OBSTÁCULOS DE CENÁRIO: carro/cerca/entulho/pedra nascem no
       horizonte e avançam com o mundo, sem atirar nem ter HP — só pra
       desviar. Colidir com um é morte na hora (sem esbarrão: cenário é
       sólido, zumbi é mole). Sempre sobra passagem livre de um lado
       (ver _corSpawnObstaculo).
+   7) SPAWN DO INÍCIO (bug): população-alvo base era 5-9 zumbis vivos
+      com reposição em 0.25-0.6s (2 de uma vez quando bem abaixo do
+      alvo) e _corSpawnT inicial de só 0.9s — isso empilhava uma PAREDE
+      de zumbi bem em cima do jogador nos primeiros ~2s, sem tempo de
+      reação nenhum. Base caiu pra 2-4 (sobe igual com a distância,
+      com teto), _corSpawnT inicial subiu pra 2.2s, e nos primeiros
+      ~100m a reposição spawna só 1 zumbi por vez em vez de 2.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -517,11 +529,17 @@
   /* ── Esbarrão (raspão em zumbi) ───────────────────────────────────
      _corShakeT: segundos restantes do tremor de câmera do esbarrão —
      separado de _corBobY (que é "só sobe", ver comentário dele) pra não
-     violar esse invariante. _corIframesT: janela curta em que nenhuma
-     colisão de zumbi (fatal ou esbarrão) é processada, pra um zumbi já
-     empurrado não matar/esbarrar de novo no mesmo lance. */
+     violar esse invariante.
+     _corIframesT: janela BEM curta (só pra não processar a mesma colisão
+     duas vezes no mesmo lance — não é invulnerabilidade de verdade).
+     _corSlowT: "cambaleio" pós-esbarrão (~1.2s, estilo Into the Dead) —
+     enquanto ativo, o avanço do mundo fica ~50% (ver velEfetiva em
+     _corUpdate) E qualquer novo contato de zumbi em z≤0.05 (centro OU
+     borda) é morte na hora — é a "chain kill": levou um raspão, ficou
+     lento, se a horda te alcançar de novo antes de se recompor, morre. */
   var _corShakeT = 0, _COR_SHAKE_DUR = 0.22;
-  var _corIframesT = 0, _COR_IFRAMES_DUR = 0.42;
+  var _corIframesT = 0, _COR_IFRAMES_DUR = 0.14;
+  var _corSlowT = 0, _COR_SLOW_DUR = 1.2, _COR_SLOW_MUL = 0.5;
   function _corShakeY() { return _corShakeT > 0 ? Math.sin(_corShakeT * 80) * (_corShakeT / _COR_SHAKE_DUR) * 0.016 : 0; }
   function _corShakeX() { return _corShakeT > 0 ? Math.cos(_corShakeT * 65) * (_corShakeT / _COR_SHAKE_DUR) * 0.014 : 0; }
 
@@ -561,10 +579,14 @@
   // eles entrarem/saírem de campo naturalmente). Sem faixas discretas.
   var _COR_CAMPO_LAT = 1.1;    // era 1.6 — campo mais estreito, zumbis nascem perto da linha de visão
   // População alvo de zumbis vivos na tela: sobe com a distância (base
-  // 5-9, +1 a cada ~180m) — o campo enche de verdade com o tempo em vez
-  // de ficar fixo em 4-7 pra sempre.
-  function _corPopMin() { return 5 + Math.floor(_corDist / 180); }
-  function _corPopMax() { return 9 + Math.floor(_corDist / 180); }
+  // 2-4, +1 a cada ~200m, com teto) — o campo enche de verdade com o tempo
+  // em vez de ficar fixo pra sempre. Base era 5-9: com _corSpawnT inicial
+  // curto (0.9s) e reposição rápida (0.25-0.6s, 2 de uma vez), isso fazia
+  // nascer uma PAREDE de zumbi no centro nos primeiros ~2s de jogo, antes
+  // do jogador ter qualquer chance de reagir — ver também o reset de
+  // _corSpawnT e o "só 1 por vez nos primeiros 100m" em _corUpdate.
+  function _corPopMin() { return Math.min(6, 2 + Math.floor(_corDist / 200)); }
+  function _corPopMax() { return Math.min(10, 4 + Math.floor(_corDist / 200)); }
 
   var _COR_TIPOS = {
     normal: { hp: 1, w: 0.16, cor: '#6f7d5a', corEsc: '#4b5640', vel: 1.00 },
@@ -675,10 +697,12 @@
     _corMun = _COR_MUN_INI;
     _corTiroT = 0; _corFlashT = 0; _corRecuo = 0;
     _corCamX = 0; _corCamVX = 0;
-    _corShakeT = 0; _corIframesT = 0;
+    _corShakeT = 0; _corIframesT = 0; _corSlowT = 0;
     _corPasso = 0; _corPassoUlt = 0;
     _corZumbis.length = 0; _corItens.length = 0; _corSangue.length = 0; _corObstaculos.length = 0;
-    _corSpawnT = 0.9; _corItemT = 8.5; _corObstT = _corRand(8, 12);
+    // 2.2s (era 0.9s) — dá tempo do jogador se situar antes do primeiro
+    // lote de zumbis nascer (ver comentário em _corPopMin sobre a "parede").
+    _corSpawnT = 2.2; _corItemT = 8.5; _corObstT = _corRand(8, 12);
     _corAtualizarHUD(true);
   }
 
@@ -849,14 +873,20 @@
 
   /* Esbarrão: raspão na BORDA de um zumbi — não mata. Empurra o zumbi pra
      longe da câmera (mais fraco no zumbi "forte": ele quase não sai da
-     frente), treme a câmera e abre o i-frame. Reusa o som de impacto (sem
-     "matou") e um burst leve de partículas, se o efeitos.js tiver carregado. */
+     frente), treme a câmera, abre o i-frame curtinho (anti-double-hit no
+     mesmo frame) e entra em _corSlowT — o cambaleio que deixa o mundo
+     ~50% mais lento e vira "chain kill" se outro zumbi te alcançar antes
+     de passar (ver _corUpdate). Esbarrar de novo enquanto já está lento
+     RENOVA a duração do slow (não soma) — continua cambaleando, não
+     acumula pra sempre. Reusa o som de impacto (sem "matou") e um burst
+     leve de partículas, se o efeitos.js tiver carregado. */
   function _corEsbarrao(zb) {
     var lado = (zb.faixa - _corCamX) < 0 ? -1 : 1;
     var forca = (zb.tipo === 'forte') ? 0.05 : (zb.tipo === 'rapido' ? 0.16 : 0.12);
     zb.faixa += lado * forca;
     _corShakeT = _COR_SHAKE_DUR;
     _corIframesT = _COR_IFRAMES_DUR;
+    _corSlowT = _COR_SLOW_DUR;
     _corSomImpacto(false);
     if (window.AngatubaGames && window.AngatubaGames.efeitos) {
       var p = _corProj(zb.z, zb.faixa);
@@ -869,20 +899,28 @@
   ══════════════════════════════════════════════════════════════ */
   function _corUpdate(dt) {
     _corVel = Math.min(_COR_VEL_MAX, _corVel + _COR_VEL_ACC * dt);
+    if (_corSlowT > 0) _corSlowT = Math.max(0, _corSlowT - dt);
+    // Cambaleio pós-esbarrão: avanço do MUNDO (distância pontuada + quão
+    // rápido o zumbi se aproxima) a ~50%, sem mexer no _corVel "de verdade"
+    // (a aceleração/dificuldade de fundo continua subindo por baixo).
+    // Obstáculos NÃO usam isto (instrução explícita: não mexer neles).
+    var velEfetiva = _corSlowT > 0 ? _corVel * _COR_SLOW_MUL : _corVel;
     // Distância em "metros": fator reduzido pra dar ritmo de pessoa correndo,
     // não de veículo. Com vel~0.16-0.34 e fator 16, ~5-9 m/s (18-32 km/h no
     // pico), mas começa devagar e a sensação casa com o passo.
-    _corDist += _corVel * dt * 16;
+    _corDist += velEfetiva * dt * 16;
 
-    // Passada: avança com a velocidade. ~2.4 passos/seg em vel baixa,
-    // acelerando com a corrida. Deriva head-bob e micro-sway.
-    _corPasso += dt * (2.6 + _corVel * 1.6) * Math.PI;
+    // Passada: avança com a velocidade EFETIVA (não a "de verdade") — no
+    // cambaleio pós-esbarrão o passo fica mais pesado/arrastado também,
+    // não só o mundo. Deriva head-bob e micro-sway.
+    _corPasso += dt * (2.6 + velEfetiva * 1.6) * Math.PI;
     // bobY: 2 subidas por ciclo de passada (pé esq + pé dir). Amplitude
-    // pequena, cresce um tico com a velocidade. Valor em fração de H.
-    var ampBob = 0.014 + _corVel * 0.004;
+    // pequena, cresce um tico com a velocidade; um pouco maior no
+    // cambaleio (passo mais "pesado", opcional/leve como pedido).
+    var ampBob = 0.014 + velEfetiva * 0.004 + (_corSlowT > 0 ? 0.010 : 0);
     _corBobY = Math.abs(Math.sin(_corPasso)) * ampBob;      // sempre >=0 (só sobe)
     // swayX: 1 balanço por passo, alterna lados. Bem sutil.
-    var ampSway = 0.010 + _corVel * 0.003;
+    var ampSway = 0.010 + velEfetiva * 0.003;
     _corSwayX = Math.sin(_corPasso * 0.5) * ampSway;
     // Som do pé no chão: cada meio-ciclo de _corPasso é uma pisada.
     var meioCiclo = Math.floor(_corPasso / Math.PI);
@@ -903,9 +941,12 @@
     var popMin = _corPopMin(), popMax = _corPopMax();
     if (_corSpawnT <= 0) {
       if (vivos < popMin) {
-        // Abaixo do mínimo: repõe rápido (spawna 1-2 de uma vez).
+        // Abaixo do mínimo: repõe rápido. Nos primeiros ~100m spawna só 1
+        // por vez (popMin já começa baixo — 2 de uma vez ainda formava uma
+        // dupla em cima do jogador antes dele sequer se situar); depois
+        // disso volta a repor 2 de uma vez quando está bem abaixo do alvo.
         _corSpawnZumbi();
-        if (vivos < popMin - 1) _corSpawnZumbi();
+        if (_corDist > 100 && vivos < popMin - 1) _corSpawnZumbi();
         _corSpawnT = _corRand(0.25, 0.6);
       } else if (vivos < popMax) {
         // Entre min e max: spawna esporádico.
@@ -937,7 +978,7 @@
         if (zb.cai > 0.6) _corZumbis.splice(i, 1);
         continue;
       }
-      zb.z -= _corVel * (_COR_TIPOS[zb.tipo].vel) * (zb.velVar || 1) * dt;
+      zb.z -= velEfetiva * (_COR_TIPOS[zb.tipo].vel) * (zb.velVar || 1) * dt;
       zb.bob += dt * 4;
       zb.swayP += dt * zb.swayF;
       // Homing suave: cada zumbi puxa levemente a faixa em direção à
@@ -947,15 +988,25 @@
       var homingR = (zb.tipo === 'rapido') ? 0.32 : (zb.tipo === 'forte' ? 0.10 : 0.18);
       zb.faixa += (_corCamX - zb.faixa) * Math.min(1, homingR * dt);
       if (zb.z <= 0.05) {
-        // Fora do i-frame (pós-esbarrão), distingue COLISÃO FATAL (centro,
-        // < 55% da meia-colisão) de ESBARRÃO (borda, entre 55% e 100%).
-        // Dentro do i-frame nenhuma das duas é processada — o zumbi só some
-        // (já passou), pra não emendar dois esbarrões/mortes no mesmo lance.
+        // i-frame curtinho: só evita processar a MESMA colisão duas vezes
+        // no mesmo lance (não é invulnerabilidade — ver comentário na
+        // declaração de _corIframesT). Fora dele:
         if (_corIframesT <= 0) {
           var meia = _corMeiaColisao(zb.tipo);
           var dist = Math.abs(zb.faixa - _corCamX);
-          if (dist < meia * _COR_FATAL_FRAC) { _corGameOver(); return; }
-          if (dist < meia) { _corEsbarrao(zb); _corZumbis.splice(i, 1); continue; }
+          if (_corSlowT > 0) {
+            // CHAIN KILL: já esbarrou e está no cambaleio — QUALQUER
+            // contato agora (centro OU borda) mata. Sem segundo esbarrão
+            // de graça: se a horda te alcançar antes de você se afastar
+            // e o slow acabar, morreu.
+            if (dist < meia) { _corGameOver(); return; }
+          } else {
+            // Fora do cambaleio: distingue COLISÃO FATAL (centro, < 55%
+            // da meia-colisão) de ESBARRÃO (borda, entre 55% e 100%) —
+            // igual antes.
+            if (dist < meia * _COR_FATAL_FRAC) { _corGameOver(); return; }
+            if (dist < meia) { _corEsbarrao(zb); _corZumbis.splice(i, 1); continue; }
+          }
         }
         _corZumbis.splice(i, 1); continue;
       }

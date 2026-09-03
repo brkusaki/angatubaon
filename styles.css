@@ -6659,8 +6659,9 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
    elementos conectores separados. */
 .apr-menu-unidades { position: relative; display: flex; flex-direction: column; gap: 16px; padding-top: 4px; }
 .apr-menu-unidades::before {
-  content: ''; position: absolute; left: 50px; top: 48px; bottom: 48px; width: 4px;
-  border-radius: 999px; background: linear-gradient(180deg, rgba(56,189,248,.35), rgba(34,197,94,.35));
+  content: ''; position: absolute; left: 50px; top: 48px; bottom: 48px; width: 5px;
+  border-radius: 999px; background: linear-gradient(180deg, #38bdf8, #a855f7, #fb923c, #22c55e);
+  opacity: .55; box-shadow: 0 0 10px rgba(56,189,248,.35);
   z-index: 0;
 }
 .apr-unidade-card {
@@ -6668,7 +6669,8 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
   position: relative; z-index: 1; display: flex; align-items: center; gap: 16px;
   width: 100%; text-align: left; padding: 18px 20px; margin: 0;
   border: 1px solid var(--border); border-radius: 22px;
-  background: var(--surface); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  background: linear-gradient(135deg, var(--au-a), var(--surface) 60%);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
   transition: transform .14s ease, border-color .18s ease, box-shadow .18s ease;
 }
 .apr-unidade-card[data-unidade="u2"] { --au: #a855f7; --au-2: #7c3aed; --au-a: rgba(168,85,247,.14); }
@@ -6677,7 +6679,8 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .apr-unidade-card:active { transform: scale(.98); border-color: var(--au); }
 .apr-unidade-card:focus-visible { outline: 2px solid var(--au); outline-offset: 2px; }
 .apr-unidade-card.apr-unidade-atual {
-  border-color: var(--au); box-shadow: 0 0 0 3px var(--au-a), 0 8px 22px var(--au-a);
+  border-color: var(--au); box-shadow: 0 0 0 3px var(--au-a), 0 10px 28px var(--au-a);
+  animation: aprUnidadeAtualGlow 2.6s ease-in-out infinite;
 }
 .apr-unidade-card.apr-unidade-bloqueada {
   opacity: .62; filter: grayscale(.85); cursor: default; box-shadow: none;
@@ -6710,16 +6713,24 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
   animation: aprOwlBounceIn .5s ease;
 }
 
-.apr-lista-licoes { position: relative; display: flex; flex-direction: column; gap: 14px; padding-top: 2px; }
+.apr-lista-licoes {
+  --au: #38bdf8; --au-2: #22c55e; --au-a: rgba(56,189,248,.14);
+  position: relative; display: flex; flex-direction: column; gap: 14px; padding-top: 2px;
+}
+.apr-lista-licoes[data-unidade="u2"] { --au: #a855f7; --au-2: #7c3aed; --au-a: rgba(168,85,247,.14); }
+.apr-lista-licoes[data-unidade="u3"] { --au: #fb923c; --au-2: #ef4444; --au-a: rgba(251,146,60,.14); }
+.apr-lista-licoes[data-unidade="u4"] { --au: #34d399; --au-2: #0d9488; --au-a: rgba(16,185,129,.14); }
 .apr-lista-licoes::before {
-  content: ''; position: absolute; left: 42px; top: 38px; bottom: 38px; width: 4px;
-  border-radius: 999px; background: linear-gradient(180deg, rgba(56,189,248,.35), rgba(34,197,94,.35));
+  content: ''; position: absolute; left: 42px; top: 38px; bottom: 38px; width: 5px;
+  border-radius: 999px; background: linear-gradient(180deg, var(--au), var(--au-2));
+  opacity: .6; box-shadow: 0 0 10px var(--au-a);
   z-index: 0;
 }
 .apr-licao-item {
   position: relative; z-index: 1; display: flex; align-items: center; gap: 14px;
   width: 100%; text-align: left; padding: 14px 16px; margin: 0;
-  border: 1px solid var(--border); border-radius: 18px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 18px;
+  background: linear-gradient(135deg, var(--au-a), var(--surface) 55%);
   cursor: pointer; -webkit-tap-highlight-color: transparent;
   transition: transform .12s ease, border-color .15s ease, box-shadow .15s ease;
 }
@@ -6755,26 +6766,44 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .apr-licao-barra-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #38bdf8, #22c55e); transition: width .35s ease; box-shadow: 0 0 8px rgba(56,189,248,.5); }
 
 .apr-exercicio-corpo { flex: 1; display: flex; flex-direction: column; animation: aprExIn .32s cubic-bezier(.2,.8,.2,1); }
-.apr-ex-instrucao { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 12px; }
-.apr-ex-pergunta-row { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
-.apr-ex-pergunta { font-family: var(--font-h); font-size: 1.75rem; font-weight: 800; color: var(--text); margin-bottom: 26px; line-height: 1.25; }
-.apr-ex-pergunta-row .apr-ex-pergunta { margin-bottom: 0; }
-.apr-ex-frase { font-family: var(--font-b); font-size: 1.25rem; font-weight: 600; line-height: 1.55; }
+
+/* Personagem sempre presente: coruja + bolha de fala no topo de todo
+   exercício (múltipla escolha, completar ou parear). A coruja reage na
+   hora do acerto/erro — ver .apr-ex-owl-reagindo e _aprMostrarFeedback. */
+.apr-ex-topo { position: relative; z-index: 1; display: flex; align-items: flex-start; gap: 14px; margin-bottom: 22px; }
+.apr-ex-owl {
+  flex-shrink: 0; width: 78px; height: 78px; object-fit: contain;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,.28));
+  animation: aprOwlBounceIn .45s ease;
+}
+.apr-ex-owl.apr-ex-owl-reagindo { animation: aprOwlReage .5s ease; }
+.apr-ex-bolha {
+  position: relative; flex: 1; min-width: 0; padding: 14px 18px; border-radius: 4px 20px 20px 20px;
+  background: linear-gradient(135deg, rgba(56,189,248,.16), rgba(34,197,94,.08));
+  border: 1px solid rgba(56,189,248,.25);
+}
+.apr-ex-area { position: relative; z-index: 1; display: flex; flex-direction: column; }
+.apr-ex-instrucao { font-size: 12.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+.apr-ex-pergunta-row { display: flex; align-items: center; gap: 10px; }
+.apr-ex-pergunta { font-family: var(--font-h); font-size: 1.85rem; font-weight: 800; color: var(--text); line-height: 1.2; }
+.apr-ex-frase { font-family: var(--font-b); font-size: 1.3rem; font-weight: 600; line-height: 1.5; }
 .apr-lacuna { display: inline-block; min-width: 56px; border-bottom: 3px solid #38bdf8; color: #38bdf8; text-align: center; }
 
 .apr-ex-opcoes { display: flex; flex-direction: column; gap: 12px; }
 .apr-ex-opt-row { display: flex; align-items: stretch; gap: 8px; }
 .apr-ex-opt-row .apr-ex-opt { flex: 1; min-width: 0; }
 .apr-ex-opt {
-  width: 100%; text-align: left; padding: 18px 22px; border-radius: 18px;
+  width: 100%; text-align: left; padding: 18px 22px; border-radius: 20px;
   border: 2px solid var(--border); background: var(--surface); color: var(--text);
-  font-family: var(--font-b); font-size: 16px; font-weight: 600; cursor: pointer;
-  -webkit-tap-highlight-color: transparent; transition: border-color .15s, background .15s, transform .1s;
+  font-family: var(--font-b); font-size: 16px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.1);
+  -webkit-tap-highlight-color: transparent; transition: border-color .15s, background .15s, transform .1s, box-shadow .15s;
 }
+.apr-ex-opt:hover:not(:disabled) { border-color: #38bdf8; box-shadow: 0 4px 14px rgba(56,189,248,.22); }
 .apr-ex-opt:active { transform: scale(.98); }
 .apr-ex-opt:disabled { cursor: default; }
-.apr-ex-opt.apr-certa { border-color: #22c55e; background: rgba(34,197,94,.14); color: #22c55e; animation: aprPopCerta .35s ease; }
-.apr-ex-opt.apr-errada { border-color: #ef4444; background: rgba(239,68,68,.14); color: #ef4444; animation: streakPop .4s ease; }
+.apr-ex-opt.apr-certa { border-color: #22c55e; background: rgba(34,197,94,.2); color: #16a34a; box-shadow: 0 4px 16px rgba(34,197,94,.35); animation: aprPopCerta .35s ease; }
+.apr-ex-opt.apr-errada { border-color: #ef4444; background: rgba(239,68,68,.2); color: #dc2626; box-shadow: 0 4px 16px rgba(239,68,68,.3); animation: streakPop .4s ease; }
 
 /* Botão de áudio (Web Speech API) — sempre irmão do botão de opção/pergunta,
    nunca aninhado (HTML não permite <button> dentro de <button>). Só aparece
@@ -6782,12 +6811,14 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
    (ver _aprSuportaAudio em Aprender/hub.js); sem suporte, o botão simplesmente
    não é criado — nada quebra. */
 .apr-audio-btn {
-  flex-shrink: 0; width: 50px; border-radius: 16px; border: 2px solid var(--border);
-  background: var(--surface2); color: var(--muted); font-size: 17px; cursor: pointer;
+  flex-shrink: 0; width: 52px; border-radius: 16px; border: 2px solid rgba(56,189,248,.35);
+  background: linear-gradient(135deg, rgba(56,189,248,.18), rgba(34,197,94,.1));
+  color: #38bdf8; font-size: 18px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  -webkit-tap-highlight-color: transparent; transition: color .15s, border-color .15s, transform .1s;
+  -webkit-tap-highlight-color: transparent; transition: color .15s, border-color .15s, transform .1s, box-shadow .15s;
 }
-.apr-audio-btn:active { transform: scale(.92); color: #38bdf8; border-color: #38bdf8; }
+.apr-audio-btn:hover { box-shadow: 0 3px 10px rgba(56,189,248,.3); }
+.apr-audio-btn:active { transform: scale(.9); }
 .apr-ex-pergunta-row .apr-audio-btn { width: 46px; height: 46px; }
 
 /* ── Exercício "parear": duas colunas de palavras ─────────────── */
@@ -6806,30 +6837,44 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .apr-par-item-row .apr-par-item { flex: 1; min-width: 0; }
 .apr-par-item-row .apr-audio-btn { width: 40px; border-radius: 12px; font-size: 14px; }
 
-/* ── Feedback de acerto/erro (banner com coruja, some sozinho) ──── */
+/* ── Feedback de acerto/erro: flash de cor na tela + banner no rodapé
+   (a reação da coruja em si mora em .apr-ex-owl-reagindo, acima) ──── */
+.apr-tela-licao.apr-tela-flash-certa::after,
+.apr-tela-licao.apr-tela-flash-errada::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  animation: aprFlash .7s ease;
+}
+.apr-tela-licao.apr-tela-flash-certa::after { background: radial-gradient(circle at 50% 25%, rgba(34,197,94,.32), transparent 62%); }
+.apr-tela-licao.apr-tela-flash-errada::after { background: radial-gradient(circle at 50% 25%, rgba(239,68,68,.30), transparent 62%); }
 .apr-feedback-banner {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
-  display: flex; align-items: center; gap: 14px; padding: 16px 18px;
-  border-radius: 20px 20px 0 0; animation: aprFeedbackIn .28s cubic-bezier(.2,.8,.2,1);
-  box-shadow: 0 -6px 24px rgba(0,0,0,.18);
+  display: flex; align-items: center; gap: 14px; padding: 18px 20px;
+  border-radius: 22px 22px 0 0; animation: aprFeedbackIn .28s cubic-bezier(.2,.8,.2,1);
+  box-shadow: 0 -8px 28px rgba(0,0,0,.22);
 }
 .apr-feedback-banner.apr-feedback-saindo { opacity: 0; transition: opacity .2s ease; }
-.apr-feedback-banner.apr-feedback-certa { background: linear-gradient(135deg, rgba(34,197,94,.94), rgba(16,163,127,.94)); }
-.apr-feedback-banner.apr-feedback-errada { background: linear-gradient(135deg, rgba(239,68,68,.94), rgba(220,38,38,.94)); }
-.apr-feedback-owl { width: 54px; height: 54px; object-fit: contain; flex-shrink: 0; animation: aprOwlBounceIn .4s ease; }
-.apr-feedback-texto { font-family: var(--font-h); font-weight: 800; font-size: 16px; color: #fff; }
+.apr-feedback-banner.apr-feedback-certa { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.apr-feedback-banner.apr-feedback-errada { background: linear-gradient(135deg, #f87171, #dc2626); }
+.apr-feedback-icone { font-size: 26px; color: #fff; flex-shrink: 0; animation: aprPopCerta .4s ease; }
+.apr-feedback-texto { font-family: var(--font-h); font-weight: 800; font-size: 17px; color: #fff; }
 
 /* ── Tela de resultado da lição ────────────────────────────────── */
-.apr-tela-resultado { flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; animation: qzPop .35s ease; }
-.apr-resultado-owl { width: 170px; height: 170px; object-fit: contain; margin-bottom: 8px; animation: aprOwlCelebrate .7s ease; }
-.apr-resultado-titulo { font-family: var(--font-h); font-size: 1.55rem; font-weight: 800; color: var(--text); margin: 0 0 16px; }
-.apr-resultado-stats { display: flex; gap: 12px; margin-bottom: 30px; }
+.apr-tela-resultado { position: relative; overflow: hidden; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; animation: qzPop .35s ease; }
+.apr-confete-wrap { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.apr-confete { position: absolute; top: -12px; width: 9px; height: 15px; border-radius: 2px; opacity: .95; animation: aprConfeteQueda 1.7s ease-in forwards; }
+.apr-resultado-owl { position: relative; z-index: 1; width: 170px; height: 170px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 10px 22px rgba(0,0,0,.3)); animation: aprOwlCelebrate .7s ease; }
+.apr-resultado-titulo { position: relative; z-index: 1; font-family: var(--font-h); font-size: 1.55rem; font-weight: 800; color: var(--text); margin: 0 0 16px; }
+.apr-resultado-stats { position: relative; z-index: 1; display: flex; gap: 12px; margin-bottom: 30px; }
 .apr-resultado-stat {
   display: flex; align-items: center; gap: 7px; font-family: var(--font-h); font-weight: 800; font-size: 15.5px;
   color: var(--text); background: var(--surface2); border: 1px solid var(--border); padding: 10px 18px; border-radius: 999px;
 }
-.apr-resultado-stat.apr-resultado-xp { color: #fbbf24; background: rgba(251,191,36,.14); border-color: rgba(251,191,36,.35); font-size: 17px; animation: aprPopCerta .4s ease .1s both; }
+.apr-resultado-stat.apr-resultado-xp {
+  color: #fbbf24; background: rgba(251,191,36,.16); border-color: rgba(251,191,36,.4); font-size: 17px;
+  animation: aprPopCerta .4s ease .1s both, aprXpGlow 1.8s ease-in-out .5s infinite;
+}
 .apr-resultado-btn {
+  position: relative; z-index: 1;
   min-width: 220px; padding: 18px 32px; border-radius: 999px; border: none; cursor: pointer;
   background: linear-gradient(135deg, #38bdf8, #22c55e); color: #06261c;
   font-family: var(--font-b); font-size: 16.5px; font-weight: 800;
@@ -6870,6 +6915,27 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
   0%, 100% { box-shadow: 0 0 0 3px rgba(56,189,248,.22); }
   50%      { box-shadow: 0 0 0 7px rgba(56,189,248,.1); }
 }
+@keyframes aprUnidadeAtualGlow {
+  0%, 100% { box-shadow: 0 0 0 3px var(--au-a), 0 10px 28px var(--au-a); }
+  50%      { box-shadow: 0 0 0 6px var(--au-a), 0 10px 34px var(--au-a); }
+}
+@keyframes aprOwlReage {
+  0%   { transform: scale(1) rotate(0); }
+  30%  { transform: scale(1.18) rotate(-4deg); }
+  60%  { transform: scale(.96) rotate(3deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+@keyframes aprFlash {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes aprConfeteQueda {
+  to { transform: translateY(360px) rotate(340deg); opacity: 0; }
+}
+@keyframes aprXpGlow {
+  0%, 100% { box-shadow: none; }
+  50%      { box-shadow: 0 0 14px rgba(251,191,36,.55); }
+}
 
 /* ── Tela cheia do Aprender (mesmo mecanismo do hub de jogos) ──── */
 body.aprender-fs-open { overflow: hidden; }
@@ -6878,7 +6944,11 @@ body.aprender-fs-open #aprender-hub {
   position: fixed; inset: 0; z-index: 1000; display: block;
   width: 100%; height: 100vh; height: 100dvh; margin: 0; padding: 0;
   overflow-y: auto; -webkit-overflow-scrolling: touch;
-  background: var(--bg, #0b0f17);
+  background:
+    radial-gradient(circle at 12% -8%, rgba(56,189,248,.16), transparent 52%),
+    radial-gradient(circle at 100% 0%, rgba(34,197,94,.13), transparent 50%),
+    radial-gradient(circle at 50% 100%, rgba(168,85,247,.10), transparent 55%),
+    var(--bg, #0b0f17);
   padding-top: env(safe-area-inset-top, 0);
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
@@ -6891,9 +6961,16 @@ body.aprender-fs-open .apr-tela-unidade {
   height: 100vh; height: 100dvh; padding: 16px 16px 24px; overflow-y: auto;
 }
 /* apr-tela-licao e apr-tela-resultado ficam display:flex via JS — aqui só
-   completamos o layout (coluna, altura cheia, scroll se o conteúdo passar). */
+   completamos o layout (coluna, altura cheia, scroll se o conteúdo passar).
+   A tela de exercício ganha um segundo verniz de cor por cima do gradiente
+   do hub — é a tela mais importante, não podia parecer "preto vazio". */
 body.aprender-fs-open .apr-tela-licao,
 body.aprender-fs-open .apr-tela-resultado {
   height: 100vh; height: 100dvh; flex-direction: column;
   padding: 16px 16px 24px; overflow-y: auto;
+}
+body.aprender-fs-open .apr-tela-licao {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(56,189,248,.15), transparent 55%),
+    radial-gradient(circle at 90% 15%, rgba(168,85,247,.12), transparent 50%);
 }

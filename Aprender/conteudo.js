@@ -27,6 +27,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l1',
           titulo: 'Olá e tchau',
+          vocabulario: [{ en: 'Hello', pt: 'Olá' }, { en: 'Good morning', pt: 'Bom dia' }, { en: 'Goodbye', pt: 'Tchau' }, { en: 'Good night', pt: 'Boa noite' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Olá', opcoes: ['Hello', 'Goodbye', 'Please', 'Sorry'], correta: 'Hello' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Bom dia', opcoes: ['Good morning', 'Good night', 'Good afternoon', 'Goodbye'], correta: 'Good morning' },
@@ -39,6 +40,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l2',
           titulo: 'Como você está',
+          vocabulario: [{ en: 'Please', pt: 'Por favor' }, { en: 'Thank you', pt: 'Obrigado' }, { en: 'How are you?', pt: 'Como você está?' }, { en: 'You\'re welcome', pt: 'De nada' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Por favor', opcoes: ['Please', 'Thanks', 'Sorry', 'Welcome'], correta: 'Please' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Obrigado', opcoes: ['Thank you', "You're welcome", 'Excuse me', 'Please'], correta: 'Thank you' },
@@ -51,6 +53,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l3',
           titulo: 'Apresentações',
+          vocabulario: [{ en: 'What\'s your name?', pt: 'Qual é o seu nome?' }, { en: 'I\'m from Angatuba', pt: 'Eu sou de Angatuba' }, { en: 'Where are you from?', pt: 'De onde você é?' }, { en: 'This is my friend', pt: 'Este é meu amigo' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Qual é o seu nome?', opcoes: ["What's your name?", 'Where are you from?', 'How are you?', 'Nice to meet you'], correta: "What's your name?" },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Eu sou de Angatuba', opcoes: ["I'm from Angatuba", 'My name is Angatuba', 'I live here', 'This is Angatuba'], correta: "I'm from Angatuba" },
@@ -63,6 +66,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l4',
           titulo: 'Perguntas educadas',
+          vocabulario: [{ en: 'Can you help me?', pt: 'Você pode me ajudar?' }, { en: 'I don\'t understand', pt: 'Eu não entendo' }, { en: 'Could you repeat, please?', pt: 'Você pode repetir, por favor?' }, { en: 'No problem', pt: 'Sem problema' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Você pode me ajudar?', opcoes: ['Can you help me?', 'Do you speak English?', "I don't understand", 'No problem'], correta: 'Can you help me?' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Eu não entendo', opcoes: ["I don't understand", "I don't know", 'Can you help me?', 'No problem'], correta: "I don't understand" },
@@ -75,6 +79,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l5',
           titulo: 'Fechando a conversa',
+          vocabulario: [{ en: 'See you tomorrow', pt: 'Até amanhã' }, { en: 'Have a nice day', pt: 'Tenha um bom dia' }, { en: 'Take care', pt: 'Se cuida' }, { en: 'Have a good trip', pt: 'Tenha uma boa viagem' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Até amanhã', opcoes: ['See you tomorrow', 'See you later', 'Take care', 'Until next time'], correta: 'See you tomorrow' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Tenha um bom dia', opcoes: ['Have a nice day', 'Have a good trip', 'Take care', 'See you later'], correta: 'Have a nice day' },
@@ -94,6 +99,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l1',
           titulo: 'Números 1 a 5',
+          vocabulario: [{ en: 'Three', pt: 'Três' }, { en: 'One', pt: 'Um' }, { en: 'Four', pt: 'Quatro' }, { en: 'Five', pt: 'Cinco' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Três', opcoes: ['three', 'two', 'four', 'five'], correta: 'three' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Um', opcoes: ['one', 'two', 'three', 'four'], correta: 'one' },
@@ -106,6 +112,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l2',
           titulo: 'Números 6 a 10',
+          vocabulario: [{ en: 'Seven', pt: 'Sete' }, { en: 'Ten', pt: 'Dez' }, { en: 'Eight', pt: 'Oito' }, { en: 'Nine', pt: 'Nove' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Sete', opcoes: ['six', 'seven', 'eight', 'nine'], correta: 'seven' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Dez', opcoes: ['eight', 'nine', 'ten', 'seven'], correta: 'ten' },
@@ -118,6 +125,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l3',
           titulo: 'Contando objetos',
+          vocabulario: [{ en: 'One apple', pt: 'Uma maçã' }, { en: 'Just one', pt: 'Só um' }, { en: 'How many?', pt: 'Quantos?' }, { en: 'A few', pt: 'Alguns' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Uma maçã', opcoes: ['one apple', 'two apples', 'three breads', 'a few'], correta: 'one apple' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Só um', opcoes: ['just one', 'how many?', 'a few', 'two apples'], correta: 'just one' },
@@ -130,6 +138,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l4',
           titulo: 'Perguntando quantidade',
+          vocabulario: [{ en: 'How many do you want?', pt: 'Quantos você quer?' }, { en: 'Half a kilo, please', pt: 'Meio quilo, por favor' }, { en: 'One more, please', pt: 'Mais um, por favor' }, { en: 'A dozen, please', pt: 'Uma dúzia, por favor' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Quantos você quer?', opcoes: ['How many do you want?', 'Just one, please', 'One more, please', 'A dozen, please'], correta: 'How many do you want?' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Meio quilo, por favor', opcoes: ['Half a kilo, please', 'A dozen, please', 'Two, please', 'One more, please'], correta: 'Half a kilo, please' },
@@ -142,6 +151,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l5',
           titulo: 'Números no dia a dia',
+          vocabulario: [{ en: 'Table one', pt: 'Mesa um' }, { en: 'Order number three', pt: 'Pedido número três' }, { en: 'Room four', pt: 'Quarto quatro' }, { en: 'Aisle six', pt: 'Corredor seis' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Mesa um', opcoes: ['table one', 'table two', 'room four', 'order number three'], correta: 'table one' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Pedido número três', opcoes: ['order number three', 'table two', 'line five', 'aisle six'], correta: 'order number three' },
@@ -161,6 +171,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l1',
           titulo: 'Comidas do dia a dia',
+          vocabulario: [{ en: 'Bread', pt: 'Pão' }, { en: 'Water', pt: 'Água' }, { en: 'Chicken', pt: 'Frango' }, { en: 'Fruit', pt: 'Fruta' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Pão', opcoes: ['bread', 'rice', 'beans', 'meat'], correta: 'bread' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Água', opcoes: ['coffee', 'water', 'juice', 'milk'], correta: 'water' },
@@ -173,6 +184,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l2',
           titulo: 'No restaurante',
+          vocabulario: [{ en: 'The bill, please', pt: 'A conta, por favor' }, { en: 'Delicious', pt: 'Delicioso' }, { en: 'I would like', pt: 'Eu gostaria' }, { en: 'That\'s enough', pt: 'Já chega' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'A conta, por favor', opcoes: ['The bill, please', 'More, please', 'Water, please', "That's enough"], correta: 'The bill, please' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Delicioso', opcoes: ['Delicious', 'Expensive', 'Cheap', 'Fresh'], correta: 'Delicious' },
@@ -185,6 +197,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l3',
           titulo: 'Bebidas',
+          vocabulario: [{ en: 'Juice', pt: 'Suco' }, { en: 'Cold', pt: 'Gelado' }, { en: 'Beer', pt: 'Cerveja' }, { en: 'Hot', pt: 'Quente' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Suco', opcoes: ['juice', 'soda', 'beer', 'tea'], correta: 'juice' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Gelado', opcoes: ['cold', 'hot', 'fresh', 'sweet'], correta: 'cold' },
@@ -197,6 +210,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l4',
           titulo: 'Frutas e verduras',
+          vocabulario: [{ en: 'Orange', pt: 'Laranja' }, { en: 'Onion', pt: 'Cebola' }, { en: 'Potato', pt: 'Batata' }, { en: 'Lettuce', pt: 'Alface' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Laranja', opcoes: ['orange', 'apple', 'banana', 'tomato'], correta: 'orange' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Cebola', opcoes: ['onion', 'potato', 'lettuce', 'tomato'], correta: 'onion' },
@@ -209,6 +223,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l5',
           titulo: 'Pedindo comida',
+          vocabulario: [{ en: 'To go', pt: 'Para viagem' }, { en: 'No onions, please', pt: 'Sem cebola, por favor' }, { en: 'I\'ll have the chicken', pt: 'Eu vou querer o frango' }, { en: 'For here', pt: 'Para comer aqui' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Para viagem', opcoes: ['To go', 'For here', 'No onions, please', 'With rice and beans'], correta: 'To go' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Sem cebola, por favor', opcoes: ['No onions, please', 'To go', 'For here', 'Can I get a bag?'], correta: 'No onions, please' },
@@ -228,6 +243,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l1',
           titulo: 'Perguntando preço',
+          vocabulario: [{ en: 'How much is it?', pt: 'Quanto custa?' }, { en: 'Discount', pt: 'Desconto' }, { en: 'It\'s cheap', pt: 'É barato' }, { en: 'Cash', pt: 'Dinheiro' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Quanto custa?', opcoes: ['How much is it?', 'Do you accept card?', "It's expensive", 'Is it open?'], correta: 'How much is it?' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Desconto', opcoes: ['Discount', 'Cash', 'Price', 'Change'], correta: 'Discount' },
@@ -240,6 +256,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l2',
           titulo: 'Atendendo o cliente',
+          vocabulario: [{ en: 'Can I help you?', pt: 'Posso ajudar?' }, { en: 'Closed', pt: 'Fechado' }, { en: 'Welcome!', pt: 'Bem-vindo!' }, { en: 'Come again!', pt: 'Volte sempre!' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Posso ajudar?', opcoes: ['Can I help you?', 'Come again!', "It's closed", 'Welcome!'], correta: 'Can I help you?' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Fechado', opcoes: ['Open', 'Closed', 'Cheap', 'Expensive'], correta: 'Closed' },
@@ -252,6 +269,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l3',
           titulo: 'Horário de funcionamento',
+          vocabulario: [{ en: 'We open at nine', pt: 'Nós abrimos às nove' }, { en: 'Closed on Sundays', pt: 'Fechado aos domingos' }, { en: 'Lunch break', pt: 'Horário de almoço' }, { en: 'Back in 10 minutes', pt: 'Voltamos em 10 minutos' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Nós abrimos às nove', opcoes: ['We open at nine', 'We close at six', 'Closed on Sundays', 'Business hours'], correta: 'We open at nine' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Fechado aos domingos', opcoes: ['Closed on Sundays', 'We close at six', 'Lunch break', 'Back in 10 minutes'], correta: 'Closed on Sundays' },
@@ -264,6 +282,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l4',
           titulo: 'Formas de pagamento',
+          vocabulario: [{ en: 'Credit card', pt: 'Cartão de crédito' }, { en: 'Free delivery', pt: 'Entrega grátis' }, { en: 'Installments', pt: 'Parcelas' }, { en: 'Do you deliver?', pt: 'Vocês entregam?' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Cartão de crédito', opcoes: ['Credit card', 'Debit card', 'Cash', 'Installments'], correta: 'Credit card' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Entrega grátis', opcoes: ['Free delivery', 'Do you deliver?', 'Cash', 'Installments'], correta: 'Free delivery' },
@@ -276,6 +295,7 @@ var APRENDER_CONTEUDO = {
         {
           id: 'l5',
           titulo: 'Resolvendo problemas',
+          vocabulario: [{ en: 'One moment, please', pt: 'Um momento, por favor' }, { en: 'It\'s out of stock', pt: 'Está sem estoque' }, { en: 'Let me check', pt: 'Deixa eu verificar' }, { en: 'Anything else?', pt: 'Mais alguma coisa?' }],
           exercicios: [
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Um momento, por favor', opcoes: ['One moment, please', "I'll be right back", 'Let me check', 'Anything else?'], correta: 'One moment, please' },
             { tipo: 'escolha', direcao: 'pt-en', pergunta: 'Está sem estoque', opcoes: ["It's out of stock", "I'm sorry", 'Let me check', 'Anything else?'], correta: "It's out of stock" },

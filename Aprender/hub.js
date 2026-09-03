@@ -482,7 +482,56 @@
     if (!licao) return;
     _aprLicaoAtual = { unidadeId: unidadeId, licaoId: licaoId, exercicios: licao.exercicios, idx: 0, acertos: 0 };
     _aprMostrarTela('licao');
-    _aprRenderExercicio();
+    // Estilo Duolingo: ensina antes de testar. Só entra direto nos exercícios
+    // se a lição não tiver vocabulário cadastrado (robustez/retrocompatibilidade).
+    if (licao.vocabulario && licao.vocabulario.length) _aprRenderEnsinar(licao);
+    else _aprRenderExercicio();
+  }
+
+  // Tela "Aprenda": mostra as palavras/frases novas da lição (inglês em
+  // destaque + tradução + áudio) antes do primeiro exercício. Reaproveita
+  // o mesmo container #apr-exercicio-corpo dos exercícios — sem precisar
+  // de nenhum elemento novo no index.html.
+  function _aprRenderEnsinar(licao) {
+    var fill = document.getElementById('apr-licao-barra-fill');
+    if (fill) fill.style.width = '0%';
+    var corpo = document.getElementById('apr-exercicio-corpo');
+    if (!corpo) return;
+    var owl = _aprSortear(['/webp/owl-wave.webp', '/webp/owl-idea.webp', '/webp/owl-point.webp']);
+    var vocab = licao.vocabulario || [];
+    var itensHtml = '';
+    vocab.forEach(function (item, i) {
+      itensHtml +=
+        '<div class="apr-voc-item">' +
+        '<div class="apr-voc-textos">' +
+        '<div class="apr-voc-en">' + item.en + '</div>' +
+        '<div class="apr-voc-pt">' + item.pt + '</div>' +
+        '</div>' +
+        '<div class="apr-voc-audio-slot" id="apr-voc-audio-' + i + '"></div>' +
+        '</div>';
+    });
+    corpo.innerHTML =
+      '<div class="apr-ensinar-topo">' +
+      '<img src="' + owl + '" alt="" class="apr-ensinar-owl" onerror="this.style.display=\'none\'">' +
+      '<div class="apr-ensinar-cabecalho">' +
+      '<div class="apr-ex-instrucao">Vamos aprender</div>' +
+      '<h2 class="apr-ensinar-titulo">' + licao.titulo + '</h2>' +
+      '</div>' +
+      '</div>' +
+      '<div class="apr-voc-lista">' + itensHtml + '</div>' +
+      '<button type="button" class="apr-resultado-btn apr-ensinar-praticar" id="apr-ensinar-praticar">Começar a praticar</button>';
+
+    // Botões de áudio são adicionados via DOM (nunca por innerHTML) porque
+    // carregam um listener — mesmo padrão usado nas opções/perguntas dos
+    // exercícios. Sem suporte a speechSynthesis, o slot fica vazio (nada quebra).
+    vocab.forEach(function (item, i) {
+      var slot = document.getElementById('apr-voc-audio-' + i);
+      var botaoAudio = _aprCriarBotaoAudio(item.en);
+      if (slot && botaoAudio) slot.appendChild(botaoAudio);
+    });
+
+    var btnPraticar = document.getElementById('apr-ensinar-praticar');
+    if (btnPraticar) btnPraticar.addEventListener('click', function () { _aprRenderExercicio(); });
   }
 
   function _aprSairLicao() {

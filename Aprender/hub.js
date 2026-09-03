@@ -445,6 +445,7 @@
     }
     var lista = document.getElementById('apr-lista-licoes');
     if (lista) {
+      lista.setAttribute('data-unidade', unidadeId); // dá cor própria à trilha/bolhas (ver CSS)
       var html = '';
       unidade.licoes.forEach(function (l, idx) {
         var feita = prog.completedLessons.indexOf(l.id) !== -1;
@@ -498,6 +499,16 @@
     fill.style.width = pct + '%';
   }
 
+  // Coruja "em repouso" no topo do exercício — varia por tipo pra dar a
+  // sensação de personagem reagindo ao que está acontecendo na tela (aponta
+  // pra pergunta, "pensa" na lacuna, procura os pares). Some pro estado de
+  // acerto/erro em _aprMostrarFeedback.
+  function _aprOwlIdle(tipo) {
+    if (tipo === 'parear') return _aprSortear(['/webp/owl-search.webp', '/webp/owl-point.webp']);
+    if (tipo === 'completar') return _aprSortear(['/webp/owl-idea.webp', '/webp/owl-tip.webp']);
+    return _aprSortear(['/webp/owl-point.webp', '/webp/owl-wave.webp', '/webp/owl-idea.webp']);
+  }
+
   function _aprRenderExercicio() {
     if (!_aprLicaoAtual) return;
     _aprAtualizarBarraLicao();
@@ -505,9 +516,20 @@
     if (!corpo) return;
     var ex = _aprLicaoAtual.exercicios[_aprLicaoAtual.idx];
     if (!ex) { _aprConcluirLicao(); return; }
-    if (ex.tipo === 'escolha') _aprRenderEscolha(corpo, ex);
-    else if (ex.tipo === 'completar') _aprRenderCompletar(corpo, ex);
-    else if (ex.tipo === 'parear') _aprRenderParear(corpo, ex);
+    // Personagem sempre presente: a coruja + a "bolha de fala" com a
+    // instrução/pergunta ficam fixas aqui; cada tipo de exercício só
+    // preenche a bolha e a área de opções abaixo.
+    corpo.innerHTML =
+      '<div class="apr-ex-topo">' +
+      '<img src="' + _aprOwlIdle(ex.tipo) + '" alt="" class="apr-ex-owl" id="apr-ex-owl" onerror="this.style.display=\'none\'">' +
+      '<div class="apr-ex-bolha" id="apr-ex-bolha"></div>' +
+      '</div>' +
+      '<div class="apr-ex-area" id="apr-ex-area"></div>';
+    var bolha = document.getElementById('apr-ex-bolha');
+    var area = document.getElementById('apr-ex-area');
+    if (ex.tipo === 'escolha') _aprRenderEscolha(bolha, area, ex);
+    else if (ex.tipo === 'completar') _aprRenderCompletar(bolha, area, ex);
+    else if (ex.tipo === 'parear') _aprRenderParear(bolha, area, ex);
   }
 
   function _aprProximoExercicio() {
@@ -518,33 +540,32 @@
   // Múltipla escolha (PT→EN ou EN→PT): pergunta + 4 opções, uma correta.
   // Ganha botão de áudio no lado que estiver em inglês: na pergunta quando
   // en-pt, nas opções quando pt-en (a própria _aprMontarOpcoes decide).
-  function _aprRenderEscolha(corpo, ex) {
+  function _aprRenderEscolha(bolha, area, ex) {
     var enPt = (ex.direcao === 'en-pt');
     var pergLabel = enPt ? 'Traduza para o português:' : 'Traduza para o inglês:';
     var audioPergunta = enPt ? _aprCriarBotaoAudio(ex.pergunta) : null;
     if (audioPergunta) {
-      corpo.innerHTML =
+      bolha.innerHTML =
         '<div class="apr-ex-instrucao">' + pergLabel + '</div>' +
-        '<div class="apr-ex-pergunta-row"><div class="apr-ex-pergunta">' + ex.pergunta + '</div></div>' +
-        '<div class="apr-ex-opcoes" id="apr-ex-opcoes"></div>';
-      corpo.querySelector('.apr-ex-pergunta-row').appendChild(audioPergunta);
+        '<div class="apr-ex-pergunta-row"><div class="apr-ex-pergunta">' + ex.pergunta + '</div></div>';
+      bolha.querySelector('.apr-ex-pergunta-row').appendChild(audioPergunta);
     } else {
-      corpo.innerHTML =
+      bolha.innerHTML =
         '<div class="apr-ex-instrucao">' + pergLabel + '</div>' +
-        '<div class="apr-ex-pergunta">' + ex.pergunta + '</div>' +
-        '<div class="apr-ex-opcoes" id="apr-ex-opcoes"></div>';
+        '<div class="apr-ex-pergunta">' + ex.pergunta + '</div>';
     }
+    area.innerHTML = '<div class="apr-ex-opcoes" id="apr-ex-opcoes"></div>';
     _aprMontarOpcoes(ex.opcoes, ex.correta, /* opcoesEmIngles */ enPt);
   }
 
   // Completar frase: mostra a frase com a lacuna (___) destacada + opções.
   // As opções aqui são sempre palavras em inglês → sempre ganham áudio.
-  function _aprRenderCompletar(corpo, ex) {
+  function _aprRenderCompletar(bolha, area, ex) {
     var fraseHtml = ex.frase.replace('___', '<span class="apr-lacuna">___</span>');
-    corpo.innerHTML =
+    bolha.innerHTML =
       '<div class="apr-ex-instrucao">Complete a frase:</div>' +
-      '<div class="apr-ex-pergunta apr-ex-frase">' + fraseHtml + '</div>' +
-      '<div class="apr-ex-opcoes" id="apr-ex-opcoes"></div>';
+      '<div class="apr-ex-pergunta apr-ex-frase">' + fraseHtml + '</div>';
+    area.innerHTML = '<div class="apr-ex-opcoes" id="apr-ex-opcoes"></div>';
     _aprMontarOpcoes(ex.opcoes, ex.correta, /* opcoesEmIngles */ true);
   }
 
@@ -593,13 +614,14 @@
     });
   }
 
-  /* ── Feedback de acerto/erro: banner com coruja no rodapé da tela
-     de lição, some sozinho — reforça a sensação de "app de idioma"
-     sem precisar de clique extra pra continuar. ─────────────────── */
+  /* ── Feedback de acerto/erro: a coruja do topo muda de cara na hora,
+     a tela pisca um flash de cor forte e um banner reforça a mensagem
+     no rodapé — tudo some sozinho, sem precisar de clique extra pra
+     continuar. É o momento de maior "personalidade" do módulo. ────── */
   var _aprTextosCerto = ['Muito bem! 🎉', 'Isso aí! 🙌', 'Mandou bem!', 'Perfeito!', 'Você arrasou!'];
   var _aprTextosErrado = ['Quase!', 'Não foi dessa vez', 'Vamos na próxima!', 'Continue tentando!'];
-  var _aprOwlsCerto = ['/webp/owl-thumbsup.webp', '/webp/owl-celebrate-pro.webp', '/webp/owl-tada.webp'];
-  var _aprOwlsErrado = ['/webp/owl-surprised.webp'];
+  var _aprOwlsCerto = ['/webp/owl-thumbsup.webp', '/webp/owl-celebrate-pro.webp', '/webp/owl-tada.webp', '/webp/owl-love.webp'];
+  var _aprOwlsErrado = ['/webp/owl-surprised.webp', '/webp/owl-angry.webp'];
 
   function _aprSortear(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -610,11 +632,28 @@
     if (antigo) antigo.remove();
     var owl = acertou ? _aprSortear(_aprOwlsCerto) : _aprSortear(_aprOwlsErrado);
     var texto = acertou ? _aprSortear(_aprTextosCerto) : _aprSortear(_aprTextosErrado);
+
+    // A coruja-personagem no topo do exercício reage na hora.
+    var owlEl = document.getElementById('apr-ex-owl');
+    if (owlEl) {
+      owlEl.src = owl;
+      owlEl.classList.remove('apr-ex-owl-reagindo');
+      void owlEl.offsetWidth; // força reflow pra reiniciar a animação
+      owlEl.classList.add('apr-ex-owl-reagindo');
+    }
+
+    // Flash de cor forte na tela inteira — "cores saturadas em acerto/erro".
+    tela.classList.remove('apr-tela-flash-certa', 'apr-tela-flash-errada');
+    void tela.offsetWidth;
+    tela.classList.add(acertou ? 'apr-tela-flash-certa' : 'apr-tela-flash-errada');
+    setTimeout(function () { tela.classList.remove('apr-tela-flash-certa', 'apr-tela-flash-errada'); }, 700);
+
+    // Banner de reforço no rodapé (cor + ícone + texto).
     var div = document.createElement('div');
     div.id = 'apr-feedback-banner';
     div.className = 'apr-feedback-banner ' + (acertou ? 'apr-feedback-certa' : 'apr-feedback-errada');
     div.innerHTML =
-      '<img src="' + owl + '" alt="" class="apr-feedback-owl" onerror="this.style.display=\'none\'">' +
+      '<i class="fa ' + (acertou ? 'fa-check-circle' : 'fa-times-circle') + ' apr-feedback-icone"></i>' +
       '<div class="apr-feedback-texto">' + texto + '</div>';
     tela.appendChild(div);
     setTimeout(function () { div.classList.add('apr-feedback-saindo'); }, 650);
@@ -633,14 +672,14 @@
     return a;
   }
 
-  function _aprRenderParear(corpo, ex) {
+  function _aprRenderParear(bolha, area, ex) {
     var esquerda = _aprEmbaralhar(ex.pares.map(function (p) { return p[0]; }));
     var direita = _aprEmbaralhar(ex.pares.map(function (p) { return p[1]; }));
     var mapaCorreto = {};
     ex.pares.forEach(function (p) { mapaCorreto[p[0]] = p[1]; });
 
-    corpo.innerHTML =
-      '<div class="apr-ex-instrucao">Toque para formar os pares:</div>' +
+    bolha.innerHTML = '<div class="apr-ex-instrucao">Toque para formar os pares:</div>';
+    area.innerHTML =
       '<div class="apr-par-colunas">' +
       '<div class="apr-par-col" id="apr-par-esq"></div>' +
       '<div class="apr-par-col" id="apr-par-dir"></div>' +
@@ -753,6 +792,7 @@
     var corpo = document.getElementById('apr-tela-resultado');
     if (corpo) {
       corpo.innerHTML =
+        (pct >= 0.8 ? _aprConfeteHtml() : '') +
         '<img src="' + owl + '" alt="" class="apr-resultado-owl" onerror="this.style.display=\'none\'">' +
         '<h2 class="apr-resultado-titulo">' + titulo + '</h2>' +
         '<div class="apr-resultado-stats">' +
@@ -768,4 +808,21 @@
       });
     }
     _aprMostrarTela('resultado');
+  }
+
+  // Confete simples em CSS puro (sem lib): uma dezena de tarjetas coloridas
+  // caindo com posição/cor/atraso aleatórios. Só aparece em lições muito
+  // bem-sucedidas (pct >= 0.8) pra manter especial a sensação de conquista.
+  var APR_CONFETE_CORES = ['#38bdf8', '#22c55e', '#fbbf24', '#a855f7', '#fb923c', '#f472b6'];
+  function _aprConfeteHtml() {
+    var pecas = '';
+    for (var i = 0; i < 22; i++) {
+      var esquerda = Math.round(Math.random() * 100);
+      var atraso = (Math.random() * 0.35).toFixed(2);
+      var cor = APR_CONFETE_CORES[i % APR_CONFETE_CORES.length];
+      var giro = Math.round(Math.random() * 360);
+      pecas += '<span class="apr-confete" style="left:' + esquerda + '%;background:' + cor +
+        ';animation-delay:' + atraso + 's;transform:rotate(' + giro + 'deg)"></span>';
+    }
+    return '<div class="apr-confete-wrap" aria-hidden="true">' + pecas + '</div>';
   }

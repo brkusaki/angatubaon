@@ -200,6 +200,89 @@
     return prog.completedLessons.indexOf(anterior.id) !== -1;
   }
 
+  // Unidade "atual" pro destaque do menu: a primeira desbloqueada que ainda
+  // não está 100% completa. Se tudo estiver completo, não há destaque (-1).
+  function _aprUnidadeAtualIdx() {
+    var unidades = _aprUnidades();
+    for (var i = 0; i < unidades.length; i++) {
+      if (!_aprUnidadeDesbloqueada(i)) continue;
+      var prog = _aprProgressoUnidade(unidades[i].id);
+      var completa = unidades[i].licoes.every(function (l) { return prog.completedLessons.indexOf(l.id) !== -1; });
+      if (!completa) return i;
+    }
+    return -1;
+  }
+
+  // Lição "atual" pro destaque da lista: a primeira desbloqueada e não
+  // concluída dentro da unidade aberta.
+  function _aprLicaoAtualIdx(unidade, idxUnidade, prog) {
+    for (var i = 0; i < unidade.licoes.length; i++) {
+      if (!_aprLicaoDesbloqueada(unidade, idxUnidade, i)) continue;
+      if (prog.completedLessons.indexOf(unidade.licoes[i].id) === -1) return i;
+    }
+    return -1;
+  }
+
+  /* ── Áudio (Web Speech API) — só inglês, botão manual ──────────
+     Degrada de forma totalmente silenciosa: sem suporte no navegador,
+     _aprSuportaAudio() volta false e nenhum botão de áudio é criado em
+     lugar nenhum — o resto do módulo funciona exatamente igual. */
+  function _aprSuportaAudio() {
+    try { return typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined'; }
+    catch (e) { return false; }
+  }
+
+  var _aprVozesProntas = false;
+  if (_aprSuportaAudio()) {
+    try {
+      speechSynthesis.getVoices();
+      speechSynthesis.addEventListener('voiceschanged', function () { _aprVozesProntas = true; });
+    } catch (e) {}
+  }
+
+  function _aprEscolherVoz() {
+    if (!_aprSuportaAudio()) return null;
+    try {
+      var vozes = speechSynthesis.getVoices() || [];
+      if (!vozes.length) return null;
+      var v = null, i;
+      for (i = 0; i < vozes.length; i++) if (vozes[i].lang === 'en-US') { v = vozes[i]; break; }
+      if (!v) for (i = 0; i < vozes.length; i++) if (vozes[i].lang === 'en-GB') { v = vozes[i]; break; }
+      if (!v) for (i = 0; i < vozes.length; i++) if (/^en/i.test(vozes[i].lang)) { v = vozes[i]; break; }
+      return v;
+    } catch (e) { return null; }
+  }
+
+  // Fala um texto em inglês (best-effort, nunca lança erro pro chamador).
+  function _aprFalar(texto) {
+    if (!_aprSuportaAudio() || !texto) return;
+    try {
+      speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(texto);
+      u.lang = 'en-US';
+      u.rate = 0.92;
+      var voz = _aprEscolherVoz();
+      if (voz) u.voice = voz;
+      speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+
+  // Cria o botão de áudio (sempre IRMÃO do botão de opção/pergunta, nunca
+  // filho — <button> não pode conter <button>). Retorna null sem suporte.
+  function _aprCriarBotaoAudio(texto, classeExtra) {
+    if (!_aprSuportaAudio()) return null;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'apr-audio-btn' + (classeExtra ? ' ' + classeExtra : '');
+    b.setAttribute('aria-label', 'Ouvir pronúncia');
+    b.innerHTML = '<i class="fa fa-volume-up"></i>';
+    b.addEventListener('click', function (e) {
+      e.stopPropagation();
+      _aprFalar(texto);
+    });
+    return b;
+  }
+
   /* ── Tela cheia (mesmo mecanismo do hub de jogos, com classe própria
      — os dois hubs nunca ficam abertos ao mesmo tempo, ver mútua
      exclusão em _abrirAprender/_abrirGamesHub) ─────────────────── */
@@ -313,6 +396,7 @@
     var wrap = document.getElementById('apr-menu-unidades');
     if (!wrap) return;
     var unidades = _aprUnidades();
+    var atualIdx = _aprUnidadeAtualIdx();
     var html = '';
     unidades.forEach(function (u, idx) {
       var prog = _aprProgressoUnidade(u.id);
@@ -323,8 +407,11 @@
       html += '<button type="button" class="apr-unidade-card' +
         (desbloqueada ? '' : ' apr-unidade-bloqueada') +
         (completa ? ' apr-unidade-completa' : '') +
+        (idx === atualIdx ? ' apr-unidade-atual' : '') +
         '" data-unidade="' + u.id + '"' + (desbloqueada ? '' : ' disabled aria-disabled="true"') + '>' +
-        '<div class="apr-unidade-icone">' + (desbloqueada ? u.icone : '<i class="fa fa-lock"></i>') + '</div>' +
+        '<div class="apr-unidade-icone">' + (desbloqueada ? u.icone : '<i class="fa fa-lock"></i>') +
+        (completa ? '<img src="/webp/owl-trophy.webp" class="apr-unidade-owl-mini" alt="" onerror="this.style.display=\'none\'">' : '') +
+        '</div>' +
         '<div class="apr-unidade-corpo">' +
         '<div class="apr-unidade-titulo">' + u.titulo + '</div>' +
         '<div class="apr-unidade-sub">' + feitas + '/' + total + ' lições' + (completa ? ' · concluída ✓' : '') + '</div>' +
@@ -348,11 +435,13 @@
     _aprUnidadeAtualId = unidadeId;
     var idxUnidade = _aprUnidades().indexOf(unidade);
     var prog = _aprProgressoUnidade(unidadeId);
+    var licaoAtualIdx = _aprLicaoAtualIdx(unidade, idxUnidade, prog);
 
     var head = document.getElementById('apr-unidade-head');
     if (head) {
       head.innerHTML = '<div class="apr-unidade-head-icone">' + unidade.icone + '</div>' +
-        '<h2 class="apr-unidade-head-titulo">' + unidade.titulo + '</h2>';
+        '<h2 class="apr-unidade-head-titulo">' + unidade.titulo + '</h2>' +
+        '<img src="/webp/owl-wave.webp" class="apr-unidade-head-owl" alt="" onerror="this.style.display=\'none\'">';
     }
     var lista = document.getElementById('apr-lista-licoes');
     if (lista) {
@@ -362,6 +451,7 @@
         var desbloqueada = _aprLicaoDesbloqueada(unidade, idxUnidade, idx);
         html += '<button type="button" class="apr-licao-item' +
           (feita ? ' apr-licao-feita' : '') + (desbloqueada ? '' : ' apr-licao-bloqueada') +
+          (idx === licaoAtualIdx ? ' apr-licao-atual' : '') +
           '" data-licao="' + l.id + '"' + (desbloqueada ? '' : ' disabled aria-disabled="true"') + '>' +
           '<div class="apr-licao-bolha">' + (feita ? '<i class="fa fa-check"></i>' : (desbloqueada ? (idx + 1) : '<i class="fa fa-lock"></i>')) + '</div>' +
           '<div class="apr-licao-titulo">' + l.titulo + '</div>' +
@@ -426,32 +516,49 @@
   }
 
   // Múltipla escolha (PT→EN ou EN→PT): pergunta + 4 opções, uma correta.
+  // Ganha botão de áudio no lado que estiver em inglês: na pergunta quando
+  // en-pt, nas opções quando pt-en (a própria _aprMontarOpcoes decide).
   function _aprRenderEscolha(corpo, ex) {
-    var pergLabel = (ex.direcao === 'en-pt') ? 'Traduza para o português:' : 'Traduza para o inglês:';
-    corpo.innerHTML =
-      '<div class="apr-ex-instrucao">' + pergLabel + '</div>' +
-      '<div class="apr-ex-pergunta">' + ex.pergunta + '</div>' +
-      '<div class="apr-ex-opcoes" id="apr-ex-opcoes"></div>';
-    _aprMontarOpcoes(ex.opcoes, ex.correta);
+    var enPt = (ex.direcao === 'en-pt');
+    var pergLabel = enPt ? 'Traduza para o português:' : 'Traduza para o inglês:';
+    var audioPergunta = enPt ? _aprCriarBotaoAudio(ex.pergunta) : null;
+    if (audioPergunta) {
+      corpo.innerHTML =
+        '<div class="apr-ex-instrucao">' + pergLabel + '</div>' +
+        '<div class="apr-ex-pergunta-row"><div class="apr-ex-pergunta">' + ex.pergunta + '</div></div>' +
+        '<div class="apr-ex-opcoes" id="apr-ex-opcoes"></div>';
+      corpo.querySelector('.apr-ex-pergunta-row').appendChild(audioPergunta);
+    } else {
+      corpo.innerHTML =
+        '<div class="apr-ex-instrucao">' + pergLabel + '</div>' +
+        '<div class="apr-ex-pergunta">' + ex.pergunta + '</div>' +
+        '<div class="apr-ex-opcoes" id="apr-ex-opcoes"></div>';
+    }
+    _aprMontarOpcoes(ex.opcoes, ex.correta, /* opcoesEmIngles */ enPt);
   }
 
   // Completar frase: mostra a frase com a lacuna (___) destacada + opções.
+  // As opções aqui são sempre palavras em inglês → sempre ganham áudio.
   function _aprRenderCompletar(corpo, ex) {
     var fraseHtml = ex.frase.replace('___', '<span class="apr-lacuna">___</span>');
     corpo.innerHTML =
       '<div class="apr-ex-instrucao">Complete a frase:</div>' +
       '<div class="apr-ex-pergunta apr-ex-frase">' + fraseHtml + '</div>' +
       '<div class="apr-ex-opcoes" id="apr-ex-opcoes"></div>';
-    _aprMontarOpcoes(ex.opcoes, ex.correta);
+    _aprMontarOpcoes(ex.opcoes, ex.correta, /* opcoesEmIngles */ true);
   }
 
   // Monta os botões de opção (reaproveitado por escolha e completar) e
-  // trata o clique: trava, marca certo/errado, avança após um instante —
-  // mesmo padrão do Quiz da Coruja (ver _quizResponder em Jogos/hub.js).
-  function _aprMontarOpcoes(opcoes, correta) {
+  // trata o clique: trava, marca certo/errado, mostra o banner de feedback
+  // com coruja e avança após um instante — mesmo padrão do Quiz da Coruja
+  // (ver _quizResponder em Jogos/hub.js), só que com feedback mais forte.
+  // opcoesEmIngles controla se cada opção ganha um botão de áudio ao lado
+  // (irmão, nunca aninhado — <button> não pode conter <button>).
+  function _aprMontarOpcoes(opcoes, correta, opcoesEmIngles) {
     var wrap = document.getElementById('apr-ex-opcoes');
     if (!wrap) return;
     var travado = false;
+    var comAudio = !!opcoesEmIngles && _aprSuportaAudio();
     wrap.innerHTML = '';
     opcoes.forEach(function (opt) {
       var btn = document.createElement('button');
@@ -470,10 +577,48 @@
           else if (b === btn) b.classList.add('apr-errada');
         });
         if (acertou && navigator.vibrate) { try { navigator.vibrate(35); } catch (e) {} }
-        setTimeout(_aprProximoExercicio, 1000);
+        _aprMostrarFeedback(acertou);
+        setTimeout(_aprProximoExercicio, 900);
       });
-      wrap.appendChild(btn);
+      if (comAudio) {
+        var row = document.createElement('div');
+        row.className = 'apr-ex-opt-row';
+        row.appendChild(btn);
+        var botaoAudio = _aprCriarBotaoAudio(opt);
+        if (botaoAudio) row.appendChild(botaoAudio);
+        wrap.appendChild(row);
+      } else {
+        wrap.appendChild(btn);
+      }
     });
+  }
+
+  /* ── Feedback de acerto/erro: banner com coruja no rodapé da tela
+     de lição, some sozinho — reforça a sensação de "app de idioma"
+     sem precisar de clique extra pra continuar. ─────────────────── */
+  var _aprTextosCerto = ['Muito bem! 🎉', 'Isso aí! 🙌', 'Mandou bem!', 'Perfeito!', 'Você arrasou!'];
+  var _aprTextosErrado = ['Quase!', 'Não foi dessa vez', 'Vamos na próxima!', 'Continue tentando!'];
+  var _aprOwlsCerto = ['/webp/owl-thumbsup.webp', '/webp/owl-celebrate-pro.webp', '/webp/owl-tada.webp'];
+  var _aprOwlsErrado = ['/webp/owl-surprised.webp'];
+
+  function _aprSortear(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function _aprMostrarFeedback(acertou) {
+    var tela = document.getElementById('apr-tela-licao');
+    if (!tela) return;
+    var antigo = document.getElementById('apr-feedback-banner');
+    if (antigo) antigo.remove();
+    var owl = acertou ? _aprSortear(_aprOwlsCerto) : _aprSortear(_aprOwlsErrado);
+    var texto = acertou ? _aprSortear(_aprTextosCerto) : _aprSortear(_aprTextosErrado);
+    var div = document.createElement('div');
+    div.id = 'apr-feedback-banner';
+    div.className = 'apr-feedback-banner ' + (acertou ? 'apr-feedback-certa' : 'apr-feedback-errada');
+    div.innerHTML =
+      '<img src="' + owl + '" alt="" class="apr-feedback-owl" onerror="this.style.display=\'none\'">' +
+      '<div class="apr-feedback-texto">' + texto + '</div>';
+    tela.appendChild(div);
+    setTimeout(function () { div.classList.add('apr-feedback-saindo'); }, 650);
+    setTimeout(function () { if (div && div.parentNode) div.remove(); }, 900);
   }
 
   // Parear: duas colunas (PT embaralhado / EN embaralhado). Toca uma
@@ -507,12 +652,26 @@
     var matched = 0;
     var total = ex.pares.length;
 
+    // Item simples (coluna esquerda, português — sem áudio).
     function criarItem(valor) {
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'apr-par-item';
       b.textContent = valor;
       return b;
+    }
+
+    // Item com botão de áudio ao lado (coluna direita, inglês). O botão é
+    // IRMÃO do item numa div wrapper, nunca filho dele.
+    function criarItemComAudio(valor) {
+      var b = criarItem(valor);
+      var botaoAudio = _aprCriarBotaoAudio(valor);
+      if (!botaoAudio) return { el: b, btn: b };
+      var row = document.createElement('div');
+      row.className = 'apr-par-item-row';
+      row.appendChild(b);
+      row.appendChild(botaoAudio);
+      return { el: row, btn: b };
     }
 
     esquerda.forEach(function (valor) {
@@ -527,7 +686,8 @@
     });
 
     direita.forEach(function (valor) {
-      var b = criarItem(valor);
+      var item = criarItemComAudio(valor);
+      var b = item.btn;
       b.addEventListener('click', function () {
         if (!selEsq || b.classList.contains('apr-par-certa')) return;
         var certo = (mapaCorreto[selEsq.valor] === valor);
@@ -539,7 +699,8 @@
           selEsq = null;
           if (matched >= total) {
             _aprLicaoAtual.acertos++; // conta o exercício de parear como 1 acerto
-            setTimeout(_aprProximoExercicio, 700);
+            _aprMostrarFeedback(true);
+            setTimeout(_aprProximoExercicio, 850);
           }
         } else {
           b.classList.add('apr-par-errada');
@@ -552,7 +713,7 @@
           selEsq = null;
         }
       });
-      colDir.appendChild(b);
+      colDir.appendChild(item.el);
     });
   }
 
@@ -574,15 +735,28 @@
     var total = _aprLicaoAtual.exercicios.length;
     var acertos = Math.min(_aprLicaoAtual.acertos, total);
     var pct = total ? acertos / total : 1;
-    var owl = pct >= 0.8 ? '/webp/owl-celebrate-pro.webp' : (pct >= 0.4 ? '/webp/owl-thumbsup.webp' : '/webp/owl-idea.webp');
+    var owl, titulo;
+    if (pct >= 1) {
+      owl = _aprSortear(['/webp/owl-trophy.webp', '/webp/owl-celebrate-flying.webp']);
+      titulo = _aprSortear(['Perfeito! 🏆', 'Mandou muito bem!', 'Você arrasou!', 'Impecável!']);
+    } else if (pct >= 0.8) {
+      owl = _aprSortear(['/webp/owl-celebrate-pro.webp', '/webp/owl-tada.webp']);
+      titulo = _aprSortear(['Muito bem!', 'Ótimo trabalho!', 'Mandou bem!']);
+    } else if (pct >= 0.4) {
+      owl = '/webp/owl-thumbsup.webp';
+      titulo = _aprSortear(['Lição concluída!', 'Você está indo bem!', 'Continue assim!']);
+    } else {
+      owl = '/webp/owl-idea.webp';
+      titulo = _aprSortear(['Lição concluída!', 'Cada passo conta!', 'Vamos praticar mais!']);
+    }
 
     var corpo = document.getElementById('apr-tela-resultado');
     if (corpo) {
       corpo.innerHTML =
         '<img src="' + owl + '" alt="" class="apr-resultado-owl" onerror="this.style.display=\'none\'">' +
-        '<h2 class="apr-resultado-titulo">Lição concluída!</h2>' +
+        '<h2 class="apr-resultado-titulo">' + titulo + '</h2>' +
         '<div class="apr-resultado-stats">' +
-        '<div class="apr-resultado-stat"><span>⭐</span>' + (jaFeita ? '+0' : ('+' + APR_XP_POR_LICAO)) + ' XP</div>' +
+        '<div class="apr-resultado-stat apr-resultado-xp"><span>⭐</span>' + (jaFeita ? '+0' : ('+' + APR_XP_POR_LICAO)) + ' XP</div>' +
         (subiu ? '<div class="apr-resultado-stat"><span>🔥</span>' + en.streak + (en.streak === 1 ? ' dia' : ' dias') + '</div>' : '') +
         '</div>' +
         '<button type="button" class="apr-resultado-btn" id="apr-resultado-continuar">Continuar</button>';

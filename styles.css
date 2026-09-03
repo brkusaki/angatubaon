@@ -6789,6 +6789,34 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .apr-ex-frase { font-family: var(--font-b); font-size: 1.3rem; font-weight: 600; line-height: 1.5; }
 .apr-lacuna { display: inline-block; min-width: 56px; border-bottom: 3px solid #38bdf8; color: #38bdf8; text-align: center; }
 
+/* ── Tela "Aprenda": vocabulário novo antes do primeiro exercício ──
+   Estilo Duolingo — ensina antes de testar. Reaproveita o container
+   dos exercícios (#apr-exercicio-corpo) e o botão grande de resultado
+   (.apr-resultado-btn) pra "Começar a praticar". */
+.apr-ensinar-topo { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.apr-ensinar-owl {
+  flex-shrink: 0; width: 84px; height: 84px; object-fit: contain;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,.28));
+  animation: aprOwlBounceIn .5s ease;
+}
+.apr-ensinar-cabecalho { flex: 1; min-width: 0; }
+.apr-ensinar-cabecalho .apr-ex-instrucao { margin-bottom: 4px; }
+.apr-ensinar-titulo { font-family: var(--font-h); font-size: 1.4rem; font-weight: 800; color: var(--text); margin: 0; line-height: 1.2; }
+
+.apr-voc-lista { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+.apr-voc-item {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+  border-radius: 18px; border: 1px solid rgba(56,189,248,.25);
+  background: linear-gradient(135deg, rgba(56,189,248,.14), rgba(34,197,94,.07));
+  animation: aprExIn .3s cubic-bezier(.2,.8,.2,1) both;
+}
+.apr-voc-textos { flex: 1; min-width: 0; }
+.apr-voc-en { font-family: var(--font-h); font-size: 1.05rem; font-weight: 800; color: var(--text); line-height: 1.3; }
+.apr-voc-pt { font-family: var(--font-b); font-size: 13px; color: var(--muted); margin-top: 2px; }
+.apr-voc-audio-slot:empty { display: none; }
+
+.apr-ensinar-praticar { margin-top: auto; }
+
 .apr-ex-opcoes { display: flex; flex-direction: column; gap: 12px; }
 .apr-ex-opt-row { display: flex; align-items: stretch; gap: 8px; }
 .apr-ex-opt-row .apr-ex-opt { flex: 1; min-width: 0; }

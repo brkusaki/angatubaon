@@ -485,6 +485,39 @@
   // versão real assim que carrega.
   window._abrirGamesHub = _abrirGamesHub;
 
+  /* ── Módulo Aprender: Aprender/hub.js + Aprender/conteudo.js carregados
+     sob demanda ──────────────────────────────────────────────────
+     Mesmo padrão do hub de jogos acima: só baixa quem toca na pill
+     "Aprender". conteudo.js (banco de lições) entra ANTES de hub.js —
+     hub.js lê window.APRENDER_CONTEUDO já na primeira renderização.
+     Uma vez carregado, o próprio hub.js SUBSTITUI a função abaixo pela
+     versão real (mesmo nome — ver window._abrirAprender no fim de
+     Aprender/hub.js). */
+  var _hubAprenderCarregado = null;
+  function _carregarHubAprender() {
+    if (_hubAprenderCarregado) return _hubAprenderCarregado;
+    _hubAprenderCarregado = _injetarScript('/Aprender/conteudo.js').then(function () {
+      return _injetarScript('/Aprender/hub.min.js');
+    }).catch(function (err) {
+      _hubAprenderCarregado = null; // permite tentar de novo no próximo toque
+      throw err;
+    });
+    return _hubAprenderCarregado;
+  }
+
+  function _abrirAprender() {
+    if (typeof showToastSimples === 'function') showToastSimples('Carregando…', '/webp/owl-search.webp');
+    _carregarHubAprender().then(function () {
+      if (typeof window._abrirAprender === 'function') window._abrirAprender();
+    }).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[aprender] falha ao carregar Aprender/hub.min.js:', err && err.message);
+      if (typeof showToastSimples === 'function') showToastSimples('Não foi possível abrir. Verifique a conexão.', '/webp/owl-sign.webp');
+    });
+  }
+  // Exposto pela pill "Aprender" no header (index.html). Ver comentário
+  // acima: hub.js troca este stub pela versão real assim que carrega.
+  window._abrirAprender = _abrirAprender;
+
   /* ── Máscara de WhatsApp progressiva: (15) 9 9999-9999 ──────────
      Fonte única usada tanto no cadastro quanto no login de loja. */
   function mascararWppBR(valorBruto) {
@@ -2327,6 +2360,10 @@
     if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) {
       _fecharGamesHub();
     }
+    // Idem pro hub Aprender.
+    if (typeof _aprenderAberto === 'function' && _aprenderAberto()) {
+      _fecharAprender();
+    }
     activeCat    = cat;
     searchQuery  = '';  // limpa busca ao trocar categoria
     const searchEl = document.getElementById('main-search');
@@ -2651,6 +2688,12 @@
       _fecharGamesHub();
       const gp = document.getElementById('pill-games-btn');
       if (gp) gp.classList.remove('active');
+    }
+    // Idem pro hub Aprender.
+    if (typeof _aprenderAberto === 'function' && _aprenderAberto()) {
+      _fecharAprender();
+      const ap = document.getElementById('pill-aprender-btn');
+      if (ap) ap.classList.remove('active');
     }
     searchQuery = e.target.value.trim();
     renderLojas();
@@ -6283,14 +6326,35 @@
           activePillFilter = 'all';
           renderLojas();
         } else {
+          // Se o hub Aprender estava aberto, fecha antes (só um hub por vez).
+          if (typeof _aprenderAberto === 'function' && _aprenderAberto()) { _fecharAprender(); }
           btn.classList.add('active');
           _abrirGamesHub();
         }
         return;
       }
-      // Qualquer outra pill: se o hub estava aberto, fecha e volta pra lista.
+      // Pill Aprender: mesmo tratamento — não filtra lojas, abre/fecha o hub.
+      if (btn.dataset.filter === 'aprender') {
+        const jaAtiva = btn.classList.contains('active');
+        document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+        if (jaAtiva) {
+          if (typeof _fecharAprender === 'function') _fecharAprender();
+          activePillFilter = 'all';
+          renderLojas();
+        } else {
+          // Se o hub de jogos estava aberto, fecha antes (só um hub por vez).
+          if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) { _fecharGamesHub(); }
+          btn.classList.add('active');
+          _abrirAprender();
+        }
+        return;
+      }
+      // Qualquer outra pill: se algum hub estava aberto, fecha e volta pra lista.
       if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) {
         _fecharGamesHub();
+      }
+      if (typeof _aprenderAberto === 'function' && _aprenderAberto()) {
+        _fecharAprender();
       }
       // #12: clicar de novo na pill já ativa desliga o filtro (toggle-off),
       // em vez de reaplicar o mesmo filtro sem dar jeito de "limpar" pela pill.
@@ -6324,6 +6388,10 @@
       // Se o hub de jogos estava aberto, fecha antes de abrir o filtro de bairro.
       if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) {
         _fecharGamesHub();
+      }
+      // Idem pro hub Aprender.
+      if (typeof _aprenderAberto === 'function' && _aprenderAberto()) {
+        _fecharAprender();
       }
       overlay.classList.add('open');
       overlay.setAttribute('aria-hidden', 'false');
@@ -10730,6 +10798,11 @@
     // Hub de jogos (menu) — volta pra tela inicial em vez de sair do app.
     if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) {
       if (typeof _sairDosJogos === 'function') _sairDosJogos(true); return;
+    }
+    // Hub Aprender (qualquer tela dele) — fecha o hub inteiro, igual ao
+    // botão de voltar do cabeçalho (ver comentário em _fecharAprender).
+    if (typeof _aprenderAberto === 'function' && _aprenderAberto()) {
+      if (typeof _fecharAprender === 'function') _fecharAprender(true); return;
     }
     // Painel de conta do cliente (pode estar sobre tudo)
     if (document.getElementById('modal-cli-conta')?.classList.contains('open')) {

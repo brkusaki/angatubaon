@@ -451,7 +451,7 @@
       border-top: 1px solid rgba(255,255,255,0.05);
       border-bottom: 1px solid rgba(255,255,255,0.06);
     }
-    .filter-pills::-webkit-scrollbar { display: none; }
+    .filter-pills::-webkit-scrollbar { display: none; }
     /* ── Modo Feed ("Hoje em Angatuba", pagina 2 do carrossel da home) ──
        Busca, categorias e pills somem quando body.feed-mode esta ativo
        (ver _irParaPaginaHome em app.js, que alterna a classe no swipe,
@@ -6620,3 +6620,170 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .jogo-loading-lazy .jll-txt { font-size: 14px; color: var(--muted, #8794a8); }
 @keyframes jllPulse { 0%,100% { transform: scale(1); opacity: .8; } 50% { transform: scale(1.08); opacity: 1; } }
 .jogo-erro-lazy { padding: 24px 20px; text-align: center; color: var(--muted, #8794a8); font-size: 14px; }
+
+/* ══════════════════════════════════════════════════════════════
+   MÓDULO APRENDER (aba "Aprender") — Aprender/hub.js
+   Reaproveita ao máximo classes já existentes do hub de jogos
+   (.games-hub-head, .streak-faixa, .jogo-tela, .jogo-voltar) pra
+   manter a mesma identidade visual (tema dark/light automático via
+   var(--...), tela cheia, animações). Só o que é específico do
+   módulo (cards de unidade, lições, exercícios) ganha CSS novo aqui.
+══════════════════════════════════════════════════════════════ */
+.pill-aprender-btn.active {
+  background: linear-gradient(135deg, rgba(56,189,248,0.25), rgba(34,197,94,0.15));
+  border-color: rgba(56,189,248,0.5);
+  color: #fff;
+}
+#aprender-hub { animation: qzFade .3s ease; }
+
+/* Pílula de XP dentro da faixa de ofensiva (reaproveitada de .streak-faixa) */
+.apr-xp-pill {
+  flex-shrink: 0; font-family: var(--font-b); font-weight: 800; font-size: 12.5px;
+  color: #fbbf24; background: rgba(251,191,36,0.14); border: 1px solid rgba(251,191,36,0.3);
+  padding: 6px 11px; border-radius: 999px; white-space: nowrap;
+}
+
+/* ── Menu: cards de unidade ("prateleira", mesma ideia dos jogos) ── */
+.apr-menu-unidades { display: flex; flex-direction: column; gap: 12px; }
+.apr-unidade-card {
+  --au: #38bdf8; --au-2: #22c55e; --au-a: rgba(56,189,248,.14);
+  position: relative; display: flex; align-items: center; gap: 14px;
+  width: 100%; text-align: left; padding: 14px 16px; margin: 0;
+  border: 1px solid var(--border); border-radius: 18px;
+  background: var(--surface); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform .14s ease, border-color .18s ease;
+}
+.apr-unidade-card[data-unidade="u2"] { --au: #a855f7; --au-2: #7c3aed; --au-a: rgba(168,85,247,.14); }
+.apr-unidade-card[data-unidade="u3"] { --au: #fb923c; --au-2: #ef4444; --au-a: rgba(251,146,60,.14); }
+.apr-unidade-card[data-unidade="u4"] { --au: #34d399; --au-2: #0d9488; --au-a: rgba(16,185,129,.14); }
+.apr-unidade-card:active { transform: scale(.98); border-color: var(--au); }
+.apr-unidade-card:focus-visible { outline: 2px solid var(--au); outline-offset: 2px; }
+.apr-unidade-card.apr-unidade-bloqueada { opacity: .55; cursor: default; }
+.apr-unidade-card.apr-unidade-completa { border-color: var(--au); }
+.apr-unidade-icone {
+  flex-shrink: 0; width: 48px; height: 48px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+  background: linear-gradient(135deg, var(--au-a), transparent);
+  border: 1px solid var(--au-a); color: var(--au);
+}
+.apr-unidade-corpo { flex: 1; min-width: 0; }
+.apr-unidade-titulo { font-family: var(--font-h); font-weight: 800; font-size: 15px; color: var(--text); margin-bottom: 2px; }
+.apr-unidade-sub { font-size: 11.5px; color: var(--muted); margin-bottom: 6px; }
+.apr-unidade-barra { height: 5px; border-radius: 999px; background: var(--surface2); overflow: hidden; }
+.apr-unidade-barra-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--au), var(--au-2)); transition: width .3s ease; }
+.apr-unidade-seta { flex-shrink: 0; color: var(--muted); font-size: 13px; }
+
+/* ── Tela de unidade: cabeçalho + lista de lições ─────────────── */
+.apr-unidade-head { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 18px; text-align: center; }
+.apr-unidade-head-icone { font-size: 40px; line-height: 1; }
+.apr-unidade-head-titulo { font-family: var(--font-h); font-size: 1.3rem; font-weight: 800; color: var(--text); margin: 0; }
+
+.apr-lista-licoes { display: flex; flex-direction: column; gap: 10px; }
+.apr-licao-item {
+  position: relative; display: flex; align-items: center; gap: 12px;
+  width: 100%; text-align: left; padding: 12px 14px; margin: 0;
+  border: 1px solid var(--border); border-radius: 16px; background: var(--surface);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease, border-color .15s ease;
+}
+.apr-licao-item:active { transform: scale(.98); }
+.apr-licao-item.apr-licao-bloqueada { opacity: .5; cursor: default; }
+.apr-licao-item.apr-licao-feita { border-color: rgba(34,197,94,.4); }
+.apr-licao-bolha {
+  flex-shrink: 0; width: 36px; height: 36px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-h); font-weight: 800; font-size: 14px;
+  background: var(--surface2); color: var(--muted); border: 1px solid var(--border);
+}
+.apr-licao-item.apr-licao-feita .apr-licao-bolha { background: rgba(34,197,94,.18); color: #22c55e; border-color: rgba(34,197,94,.4); }
+.apr-licao-item:not(.apr-licao-bloqueada):not(.apr-licao-feita) .apr-licao-bolha { background: rgba(56,189,248,.16); color: #38bdf8; border-color: rgba(56,189,248,.4); }
+.apr-licao-titulo { flex: 1; min-width: 0; font-family: var(--font-b); font-weight: 700; font-size: 13.5px; color: var(--text); }
+.apr-licao-star { color: #fbbf24; font-size: 14px; flex-shrink: 0; }
+
+/* ── Tela de lição: barra de progresso + botão fechar ─────────── */
+.apr-tela-licao { flex-direction: column; }
+.apr-licao-topo { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.apr-licao-fechar {
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 999px; border: none;
+  background: transparent; color: var(--muted); font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent; transition: color .15s;
+}
+.apr-licao-fechar:hover { color: var(--text); }
+.apr-licao-barra { flex: 1; height: 8px; border-radius: 999px; background: var(--surface2); overflow: hidden; }
+.apr-licao-barra-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #38bdf8, #22c55e); transition: width .3s ease; }
+
+.apr-exercicio-corpo { flex: 1; display: flex; flex-direction: column; animation: qzFade .25s ease; }
+.apr-ex-instrucao { font-size: 12.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
+.apr-ex-pergunta { font-family: var(--font-h); font-size: 1.5rem; font-weight: 800; color: var(--text); margin-bottom: 24px; line-height: 1.3; }
+.apr-ex-frase { font-family: var(--font-b); font-size: 1.15rem; font-weight: 600; line-height: 1.5; }
+.apr-lacuna { display: inline-block; min-width: 52px; border-bottom: 3px solid #38bdf8; color: #38bdf8; text-align: center; }
+
+.apr-ex-opcoes { display: flex; flex-direction: column; gap: 10px; }
+.apr-ex-opt {
+  width: 100%; text-align: left; padding: 14px 16px; border-radius: 14px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font-family: var(--font-b); font-size: 14.5px; font-weight: 600; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: border-color .15s, background .15s, transform .1s;
+}
+.apr-ex-opt:active { transform: scale(.98); }
+.apr-ex-opt:disabled { cursor: default; }
+.apr-ex-opt.apr-certa { border-color: #22c55e; background: rgba(34,197,94,.14); color: #22c55e; }
+.apr-ex-opt.apr-errada { border-color: #ef4444; background: rgba(239,68,68,.14); color: #ef4444; }
+
+/* ── Exercício "parear": duas colunas de palavras ─────────────── */
+.apr-par-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.apr-par-col { display: flex; flex-direction: column; gap: 10px; }
+.apr-par-item {
+  padding: 12px 10px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); font-family: var(--font-b);
+  font-size: 13px; font-weight: 600; text-align: center; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: border-color .15s, background .15s;
+}
+.apr-par-item.apr-par-selecionada { border-color: #38bdf8; background: rgba(56,189,248,.14); color: #38bdf8; }
+.apr-par-item.apr-par-certa { border-color: #22c55e; background: rgba(34,197,94,.14); color: #22c55e; cursor: default; }
+.apr-par-item.apr-par-errada { border-color: #ef4444; background: rgba(239,68,68,.14); color: #ef4444; animation: streakPop .4s ease; }
+
+/* ── Tela de resultado da lição ────────────────────────────────── */
+.apr-tela-resultado { flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; animation: qzPop .35s ease; }
+.apr-resultado-owl { width: 120px; height: 120px; object-fit: contain; margin-bottom: 6px; }
+.apr-resultado-titulo { font-family: var(--font-h); font-size: 1.4rem; font-weight: 800; color: var(--text); margin: 0 0 14px; }
+.apr-resultado-stats { display: flex; gap: 12px; margin-bottom: 26px; }
+.apr-resultado-stat {
+  display: flex; align-items: center; gap: 6px; font-family: var(--font-h); font-weight: 800; font-size: 14px;
+  color: var(--text); background: var(--surface2); border: 1px solid var(--border); padding: 8px 16px; border-radius: 999px;
+}
+.apr-resultado-btn {
+  min-width: 200px; padding: 14px 24px; border-radius: 999px; border: none; cursor: pointer;
+  background: linear-gradient(135deg, #38bdf8, #22c55e); color: #06261c;
+  font-family: var(--font-b); font-size: 14.5px; font-weight: 800;
+  -webkit-tap-highlight-color: transparent; box-shadow: 0 4px 14px rgba(56,189,248,.3);
+}
+.apr-resultado-btn:active { transform: scale(.97); }
+
+/* ── Tela cheia do Aprender (mesmo mecanismo do hub de jogos) ──── */
+body.aprender-fs-open { overflow: hidden; }
+body.aprender-fs-open .bottom-nav { display: none; }
+body.aprender-fs-open #aprender-hub {
+  position: fixed; inset: 0; z-index: 1000; display: block;
+  width: 100%; height: 100vh; height: 100dvh; margin: 0; padding: 0;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: var(--bg, #0b0f17);
+  padding-top: env(safe-area-inset-top, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+body.aprender-fs-open .games-hub-head { padding: 14px 16px 0; }
+body.aprender-fs-open .streak-faixa   { margin: 0 16px 10px; }
+body.aprender-fs-open .apr-menu-unidades { padding: 0 16px 24px; }
+/* apr-tela-unidade fica display:block (setado via JS, ver _aprMostrarTela em
+   Aprender/hub.js) — só precisa da altura cheia + scroll, sem flex-column. */
+body.aprender-fs-open .apr-tela-unidade {
+  height: 100vh; height: 100dvh; padding: 16px 16px 24px; overflow-y: auto;
+}
+/* apr-tela-licao e apr-tela-resultado ficam display:flex via JS — aqui só
+   completamos o layout (coluna, altura cheia, scroll se o conteúdo passar). */
+body.aprender-fs-open .apr-tela-licao,
+body.aprender-fs-open .apr-tela-resultado {
+  height: 100vh; height: 100dvh; flex-direction: column;
+  padding: 16px 16px 24px; overflow-y: auto;
+}

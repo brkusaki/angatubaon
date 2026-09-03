@@ -246,7 +246,7 @@
         <div class="logo-city">Angatuba · SP</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <img src="/webp/owl-badge.webp" alt="Abrir Jogos da Coruja" class="owl-badge-anim" role="button" tabindex="0" aria-label="Abrir Jogos da Coruja" onclick="if(typeof _abrirGamesHub==='function')_abrirGamesHub();" onkeydown="if((event.key==='Enter'||event.key===' ')&&typeof _abrirGamesHub==='function'){event.preventDefault();_abrirGamesHub();}" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
+        <img src="/webp/owl-badge.webp" alt="Abrir Jogos da Coruja" class="owl-badge-anim" role="button" tabindex="0" aria-label="Abrir Jogos da Coruja" onclick="if(typeof _aprenderAberto==='function'&&_aprenderAberto())_fecharAprender();if(typeof _abrirGamesHub==='function')_abrirGamesHub();" onkeydown="if((event.key==='Enter'||event.key===' ')&&typeof _abrirGamesHub==='function'){event.preventDefault();if(typeof _aprenderAberto==='function'&&_aprenderAberto())_fecharAprender();_abrirGamesHub();}" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
         <div id="cli-account-slot"></div>
         <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()" aria-label="Alternar tema">
           <i class="fa fa-moon" id="theme-toggle-icon"></i>
@@ -273,6 +273,9 @@
       </button>
       <button class="pill-btn pill-games-btn" id="pill-games-btn" data-filter="games">
         <i class="fa fa-gamepad" style="font-size:10px;"></i> Jogos
+      </button>
+      <button class="pill-btn pill-aprender-btn" id="pill-aprender-btn" data-filter="aprender">
+        <i class="fa fa-graduation-cap" style="font-size:10px;"></i> Aprender
       </button>
       <button class="pill-btn pill-bairro-btn" id="pill-bairro-btn" data-filter="bairro">
         <i class="fa fa-map-marker-alt" style="font-size:10px;"></i> <span id="pill-bairro-label">Bairro</span>
@@ -1483,6 +1486,53 @@
       </div>
     </div>
 
+    <!-- ═══ HUB DE APRENDIZADO (aba Aprender) — escondido até abrir a pill ══
+         Conteúdo (unidades/lições/exercícios) e toda a lógica vêm de
+         Aprender/hub.js + Aprender/conteudo.js, carregados sob demanda (ver
+         _carregarHubAprender em app.js) — este bloco é só o esqueleto. ══ -->
+    <div id="aprender-hub" style="display:none;">
+      <div class="games-hub-head">
+        <div class="games-hub-bar">
+          <button type="button" id="aprender-sair-btn" class="games-sair-btn" onclick="_sairDoAprender()" aria-label="Voltar para a tela inicial" title="Voltar ao início">
+            <i class="fa fa-chevron-left"></i>
+          </button>
+        </div>
+        <h2 class="games-hub-title">Aprender <span>Inglês</span></h2>
+        <p class="games-hub-sub">Um pouquinho todo dia 🦉</p>
+      </div>
+
+      <!-- Faixa de ofensiva + XP do módulo (preenchida via JS) -->
+      <div id="apr-stats-faixa" class="streak-faixa" style="display:none;">
+        <div class="streak-chama" id="apr-streak-chama">🔥</div>
+        <div class="streak-txt">
+          <div class="streak-num" id="apr-streak-num">0 dias</div>
+          <div class="streak-sub" id="apr-streak-sub">Complete uma lição pra começar sua ofensiva!</div>
+        </div>
+        <div class="apr-xp-pill" id="apr-xp-pill">⭐ 0 XP</div>
+      </div>
+
+      <!-- TELA: menu de unidades -->
+      <div id="apr-menu-unidades" class="apr-menu-unidades"></div>
+
+      <!-- TELA: lições de uma unidade -->
+      <div id="apr-tela-unidade" class="jogo-tela apr-tela-unidade" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_aprVoltarMenu()"><i class="fa fa-chevron-left"></i> Voltar às unidades</button>
+        <div id="apr-unidade-head" class="apr-unidade-head"></div>
+        <div id="apr-lista-licoes" class="apr-lista-licoes"></div>
+      </div>
+
+      <!-- TELA: exercícios da lição -->
+      <div id="apr-tela-licao" class="jogo-tela apr-tela-licao" style="display:none;">
+        <div class="apr-licao-topo">
+          <button type="button" class="apr-licao-fechar" onclick="_aprSairLicao()" aria-label="Sair da lição"><i class="fa fa-times"></i></button>
+          <div class="apr-licao-barra"><div class="apr-licao-barra-fill" id="apr-licao-barra-fill"></div></div>
+        </div>
+        <div id="apr-exercicio-corpo" class="apr-exercicio-corpo"></div>
+      </div>
+
+      <!-- TELA: resultado da lição -->
+      <div id="apr-tela-resultado" class="jogo-tela apr-tela-resultado" style="display:none;"></div>
+    </div>
 
     <div class="footer">
       <div class="footer-logo">Angatuba<span>ON</span></div>

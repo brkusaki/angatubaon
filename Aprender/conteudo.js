@@ -9,6 +9,11 @@
      - escolha:   { tipo:'escolha', direcao:'pt-en'|'en-pt', pergunta, opcoes:[4], correta }
      - parear:    { tipo:'parear', pares:[[pt,en], ...] }               (4 pares)
      - completar: { tipo:'completar', frase:'... ___ ...', opcoes:[3], correta }
+     - formar:    { tipo:'formar', en, partes:[...], distratores:[...] } — banco de
+                  palavras em português (partes + distratores, embaralhados); o
+                  usuário monta a tradução tocando as palavras na ordem certa.
+                  partes/distratores não podem repetir texto entre si dentro do
+                  mesmo exercício (o motor compara/desfaz por texto, não por índice).
 
    Roda no MESMO escopo global do app.js/hub.js (script clássico, sem
    módulo/IIFE) — carregado sob demanda junto com Aprender/hub.js (ver
@@ -60,7 +65,8 @@ var APRENDER_CONTEUDO = {
             { tipo: 'escolha', direcao: 'en-pt', pergunta: 'Where are you from?', opcoes: ['De onde você é?', 'Qual é o seu nome?', 'Como você está?', 'Quantos anos você tem?'], correta: 'De onde você é?' },
             { tipo: 'escolha', direcao: 'en-pt', pergunta: 'This is my friend', opcoes: ['Este é meu amigo', 'Eu sou seu amigo', 'Prazer em conhecê-lo', 'Esta é minha casa'], correta: 'Este é meu amigo' },
             { tipo: 'parear', pares: [['Meu nome é...', 'My name is...'], ['Qual é o seu nome?', "What's your name?"], ['De onde você é?', 'Where are you from?'], ['Prazer em conhecê-lo', 'Nice to meet you']] },
-            { tipo: 'completar', frase: 'My ___ is Maria.', opcoes: ['name', 'friend', 'home'], correta: 'name' }
+            { tipo: 'completar', frase: 'My ___ is Maria.', opcoes: ['name', 'friend', 'home'], correta: 'name' },
+            { tipo: 'formar', en: "What's your name?", partes: ['Qual', 'é', 'o', 'seu', 'nome?'], distratores: ['Onde', 'amigo'] }
           ]
         },
         {
@@ -145,7 +151,8 @@ var APRENDER_CONTEUDO = {
             { tipo: 'escolha', direcao: 'en-pt', pergunta: 'One more, please', opcoes: ['Mais um, por favor', 'Só um, por favor', 'Dois, por favor', 'Uma dúzia, por favor'], correta: 'Mais um, por favor' },
             { tipo: 'escolha', direcao: 'en-pt', pergunta: 'A dozen, please', opcoes: ['Uma dúzia, por favor', 'Meio quilo, por favor', 'Quantos você quer?', 'Só um, por favor'], correta: 'Uma dúzia, por favor' },
             { tipo: 'parear', pares: [['Quantos você quer?', 'How many do you want?'], ['Só um, por favor', 'Just one, please'], ['Uma dúzia, por favor', 'A dozen, please'], ['Meio quilo, por favor', 'Half a kilo, please']] },
-            { tipo: 'completar', frase: '___ do you want?', opcoes: ['How many', 'How much', 'How often'], correta: 'How many' }
+            { tipo: 'completar', frase: '___ do you want?', opcoes: ['How many', 'How much', 'How often'], correta: 'How many' },
+            { tipo: 'formar', en: 'How many do you want?', partes: ['Quantos', 'você', 'quer?'], distratores: ['Muitos', 'poucos'] }
           ]
         },
         {
@@ -191,7 +198,8 @@ var APRENDER_CONTEUDO = {
             { tipo: 'escolha', direcao: 'en-pt', pergunta: 'I would like', opcoes: ['Eu quero', 'Eu gostaria', 'Eu preciso', 'Eu tenho'], correta: 'Eu gostaria' },
             { tipo: 'escolha', direcao: 'en-pt', pergunta: "That's enough", opcoes: ['Mais um pouco', 'Já chega', 'Está ótimo', 'Muito obrigado'], correta: 'Já chega' },
             { tipo: 'parear', pares: [['A conta, por favor', 'The bill, please'], ['Delicioso', 'Delicious'], ['Mais, por favor', 'More, please'], ['Água, por favor', 'Water, please']] },
-            { tipo: 'completar', frase: 'This soup is really ___!', opcoes: ['delicious', 'expensive', 'empty'], correta: 'delicious' }
+            { tipo: 'completar', frase: 'This soup is really ___!', opcoes: ['delicious', 'expensive', 'empty'], correta: 'delicious' },
+            { tipo: 'formar', en: 'The bill, please', partes: ['A', 'conta,', 'por', 'favor'], distratores: ['Rápido', 'devagar'] }
           ]
         },
         {
@@ -276,7 +284,8 @@ var APRENDER_CONTEUDO = {
             { tipo: 'escolha', direcao: 'en-pt', pergunta: 'Lunch break', opcoes: ['Horário de almoço', 'Horário de funcionamento', 'Voltamos em 10 minutos', 'Fechado aos domingos'], correta: 'Horário de almoço' },
             { tipo: 'escolha', direcao: 'en-pt', pergunta: 'Back in 10 minutes', opcoes: ['Voltamos em 10 minutos', 'Nós fechamos às seis', 'Horário de almoço', 'Nós abrimos às nove'], correta: 'Voltamos em 10 minutos' },
             { tipo: 'parear', pares: [['Nós abrimos às nove', 'We open at nine'], ['Nós fechamos às seis', 'We close at six'], ['Horário de almoço', 'Lunch break'], ['Horário de funcionamento', 'Business hours']] },
-            { tipo: 'completar', frase: 'We ___ at six.', opcoes: ['close', 'open', 'break'], correta: 'close' }
+            { tipo: 'completar', frase: 'We ___ at six.', opcoes: ['close', 'open', 'break'], correta: 'close' },
+            { tipo: 'formar', en: 'We open at nine', partes: ['Nós', 'abrimos', 'às', 'nove'], distratores: ['Fechamos', 'hoje'] }
           ]
         },
         {

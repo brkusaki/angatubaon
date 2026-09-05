@@ -507,7 +507,8 @@
     var unidade = _aprUnidade(unidadeId);
     var licao = unidade && _aprLicao(unidade, licaoId);
     if (!licao) return;
-    _aprLicaoAtual = { unidadeId: unidadeId, licaoId: licaoId, exercicios: licao.exercicios, idx: 0, acertos: 0 };
+    _aprLicaoAtual = { unidadeId: unidadeId, licaoId: licaoId, exercicios: licao.exercicios, idx: 0, acertos: 0, combo: 0, inicio: Date.now() };
+    _aprGarantirComboBadge();
     _aprMostrarTela('licao');
     // Estilo Duolingo: ensina antes de testar. Só entra direto nos exercícios
     // se a lição não tiver vocabulário cadastrado (robustez/retrocompatibilidade).
@@ -577,6 +578,77 @@
     fill.style.width = pct + '%';
   }
 
+  // Combo de acertos seguidos: mostrado de forma sutil no topo (dentro de
+  // .apr-licao-topo, ao lado da barra de progresso já existente no HTML
+  // estático). Criado uma vez via JS na primeira lição — evita mexer no
+  // esqueleto do index.html só por causa de um badge que só existe quando
+  // combo >= 2 (fica vazio/oculto o resto do tempo, ver :empty no CSS).
+  function _aprGarantirComboBadge() {
+    var topo = document.querySelector('#apr-tela-licao .apr-licao-topo');
+    if (topo && !document.getElementById('apr-licao-combo')) {
+      var el = document.createElement('div');
+      el.id = 'apr-licao-combo';
+      el.className = 'apr-licao-combo';
+      topo.appendChild(el);
+    }
+    var badge = document.getElementById('apr-licao-combo');
+    if (badge) badge.textContent = ''; // reseta ao abrir uma lição nova
+  }
+
+  function _aprRegistrarCombo(acertou) {
+    if (!_aprLicaoAtual) return;
+    _aprLicaoAtual.combo = acertou ? ((_aprLicaoAtual.combo || 0) + 1) : 0;
+    _aprAtualizarComboUI();
+  }
+
+  function _aprAtualizarComboUI() {
+    var el = document.getElementById('apr-licao-combo');
+    if (!el) return;
+    var combo = (_aprLicaoAtual && _aprLicaoAtual.combo) || 0;
+    if (combo >= 2) {
+      el.textContent = '🔥 Combo x' + combo;
+      el.classList.remove('apr-combo-pop');
+      void el.offsetWidth; // reforça a animação a cada novo acerto
+      el.classList.add('apr-combo-pop');
+    } else {
+      el.textContent = '';
+    }
+  }
+
+  /* ── Rodapé fixo dos exercícios: botão VERIFICAR → feedback → CONTINUAR.
+     Um único botão troca de fase (dataset.fase) em vez de dois elementos —
+     cada tipo de exercício só precisa registrar em _aprExVerificarFn como
+     conferir a resposta atual (chamado na hora de Verificar) e habilitar
+     o botão via _aprExHabilitarVerificar quando já houver algo pra checar.
+     "parear" foge um pouco desse padrão (cada par já se autoconfere na
+     hora do toque, como no Duolingo real) — usa _aprExRodapeOculto e só
+     mostra o CONTINUAR quando todos os pares já foram formados. ────── */
+  var _aprExVerificarFn = null;
+
+  function _aprExHabilitarVerificar() {
+    var btn = document.getElementById('apr-ex-verificar');
+    if (btn && btn.dataset.fase === 'verificar') btn.disabled = false;
+  }
+
+  function _aprExOnClickRodape() {
+    var btn = document.getElementById('apr-ex-verificar');
+    if (!btn) return;
+    if (btn.dataset.fase === 'verificar') {
+      if (!_aprExVerificarFn) return;
+      var acertou = !!_aprExVerificarFn();
+      if (acertou) _aprLicaoAtual.acertos++;
+      _aprRegistrarCombo(acertou);
+      _aprMostrarFeedback(acertou);
+      btn.textContent = 'Continuar';
+      btn.classList.remove('apr-ex-verificar-certa', 'apr-ex-verificar-errada');
+      btn.classList.add(acertou ? 'apr-ex-verificar-certa' : 'apr-ex-verificar-errada');
+      btn.dataset.fase = 'continuar';
+      btn.disabled = false;
+    } else {
+      _aprProximoExercicio();
+    }
+  }
+
   // Coruja "em repouso" no topo do exercício — varia por tipo pra dar a
   // sensação de personagem reagindo ao que está acontecendo na tela (aponta
   // pra pergunta, "pensa" na lacuna, procura os pares). Some pro estado de
@@ -584,6 +656,7 @@
   function _aprOwlIdle(tipo) {
     if (tipo === 'parear') return _aprSortear(['/webp/owl-search.webp', '/webp/owl-point.webp']);
     if (tipo === 'completar') return _aprSortear(['/webp/owl-idea.webp', '/webp/owl-tip.webp']);
+    if (tipo === 'formar') return _aprSortear(['/webp/owl-idea.webp', '/webp/owl-point.webp']);
     return _aprSortear(['/webp/owl-point.webp', '/webp/owl-wave.webp', '/webp/owl-idea.webp']);
   }
 
@@ -596,18 +669,32 @@
     if (!ex) { _aprConcluirLicao(); return; }
     // Personagem sempre presente: a coruja + a "bolha de fala" com a
     // instrução/pergunta ficam fixas aqui; cada tipo de exercício só
-    // preenche a bolha e a área de opções abaixo.
+    // preenche a bolha e a área de opções abaixo. O rodapé com o botão
+    // VERIFICAR/CONTINUAR fica fixo (sticky) no fim da tela — mesmo
+    // mecanismo do rodapé da tela "Vamos aprender" (ver .apr-ex-rodape
+    // em styles.css e #apr-exercicio-corpo, que é quem rola). "parear"
+    // começa com o rodapé oculto (cada par já se confere sozinho).
     corpo.innerHTML =
       '<div class="apr-ex-topo">' +
       '<img src="' + _aprOwlIdle(ex.tipo) + '" alt="" class="apr-ex-owl" id="apr-ex-owl" onerror="this.style.display=\'none\'">' +
       '<div class="apr-ex-bolha" id="apr-ex-bolha"></div>' +
       '</div>' +
-      '<div class="apr-ex-area" id="apr-ex-area"></div>';
+      '<div class="apr-ex-area" id="apr-ex-area"></div>' +
+      '<div class="apr-ex-rodape' + (ex.tipo === 'parear' ? ' apr-ex-rodape-oculto' : '') + '" id="apr-ex-rodape">' +
+      '<button type="button" class="apr-resultado-btn apr-ex-verificar" id="apr-ex-verificar" disabled>Verificar</button>' +
+      '</div>';
     var bolha = document.getElementById('apr-ex-bolha');
     var area = document.getElementById('apr-ex-area');
+    _aprExVerificarFn = null;
+    var btnVerificar = document.getElementById('apr-ex-verificar');
+    if (btnVerificar) {
+      btnVerificar.dataset.fase = 'verificar';
+      btnVerificar.addEventListener('click', _aprExOnClickRodape);
+    }
     if (ex.tipo === 'escolha') _aprRenderEscolha(bolha, area, ex);
     else if (ex.tipo === 'completar') _aprRenderCompletar(bolha, area, ex);
     else if (ex.tipo === 'parear') _aprRenderParear(bolha, area, ex);
+    else if (ex.tipo === 'formar') _aprRenderFormar(bolha, area, ex);
   }
 
   function _aprProximoExercicio() {
@@ -647,17 +734,19 @@
     _aprMontarOpcoes(ex.opcoes, ex.correta, /* opcoesEmIngles */ true);
   }
 
-  // Monta os botões de opção (reaproveitado por escolha e completar) e
-  // trata o clique: trava, marca certo/errado, mostra o banner de feedback
-  // com coruja e avança após um instante — mesmo padrão do Quiz da Coruja
-  // (ver _quizResponder em Jogos/hub.js), só que com feedback mais forte.
-  // opcoesEmIngles controla se cada opção ganha um botão de áudio ao lado
-  // (irmão, nunca aninhado — <button> não pode conter <button>).
+  // Monta os botões de opção (reaproveitado por escolha e completar).
+  // Estilo Duolingo: tocar numa opção só SELECIONA (destaque azul) e
+  // libera o botão VERIFICAR do rodapé; a conferência de verdade (travar,
+  // marcar certo/errado, feedback) só roda quando o usuário toca em
+  // Verificar — ver _aprExVerificarFn/_aprExOnClickRodape. opcoesEmIngles
+  // controla se cada opção ganha um botão de áudio ao lado (irmão, nunca
+  // aninhado — <button> não pode conter <button>).
   function _aprMontarOpcoes(opcoes, correta, opcoesEmIngles) {
     var wrap = document.getElementById('apr-ex-opcoes');
     if (!wrap) return;
-    var travado = false;
+    var selecionada = null;
     var comAudio = !!opcoesEmIngles && _aprSuportaAudio();
+    var botoes = [];
     wrap.innerHTML = '';
     opcoes.forEach(function (opt) {
       var btn = document.createElement('button');
@@ -665,20 +754,13 @@
       btn.className = 'apr-ex-opt';
       btn.textContent = opt;
       btn.addEventListener('click', function () {
-        if (travado) return;
-        travado = true;
-        var acertou = (opt === correta);
-        if (acertou) _aprLicaoAtual.acertos++;
-        var botoes = wrap.querySelectorAll('.apr-ex-opt');
-        botoes.forEach(function (b) {
-          b.disabled = true;
-          if (b.textContent === correta) b.classList.add('apr-certa');
-          else if (b === btn) b.classList.add('apr-errada');
-        });
-        if (acertou && navigator.vibrate) { try { navigator.vibrate(35); } catch (e) {} }
-        _aprMostrarFeedback(acertou);
-        setTimeout(_aprProximoExercicio, 900);
+        if (btn.disabled) return;
+        botoes.forEach(function (b) { b.classList.remove('apr-ex-opt-selecionada'); });
+        btn.classList.add('apr-ex-opt-selecionada');
+        selecionada = opt;
+        _aprExHabilitarVerificar();
       });
+      botoes.push(btn);
       if (comAudio) {
         var row = document.createElement('div');
         row.className = 'apr-ex-opt-row';
@@ -690,6 +772,16 @@
         wrap.appendChild(btn);
       }
     });
+    _aprExVerificarFn = function () {
+      var acertou = (selecionada === correta);
+      botoes.forEach(function (b) {
+        b.disabled = true;
+        if (b.textContent === correta) b.classList.add('apr-certa');
+        else if (b.textContent === selecionada) b.classList.add('apr-errada');
+      });
+      if (acertou && navigator.vibrate) { try { navigator.vibrate(35); } catch (e) {} }
+      return acertou;
+    };
   }
 
   /* ── Feedback de acerto/erro: a coruja do topo muda de cara na hora,
@@ -815,9 +907,21 @@
           matched++;
           selEsq = null;
           if (matched >= total) {
+            // "parear" já se autoconfere par a par (como no Duolingo real);
+            // ao formar o último par, só revela o CONTINUAR do rodapé —
+            // sem pular sozinho pro próximo exercício.
             _aprLicaoAtual.acertos++; // conta o exercício de parear como 1 acerto
+            _aprRegistrarCombo(true);
             _aprMostrarFeedback(true);
-            setTimeout(_aprProximoExercicio, 850);
+            var rodapePar = document.getElementById('apr-ex-rodape');
+            var btnPar = document.getElementById('apr-ex-verificar');
+            if (rodapePar) rodapePar.classList.remove('apr-ex-rodape-oculto');
+            if (btnPar) {
+              btnPar.textContent = 'Continuar';
+              btnPar.disabled = false;
+              btnPar.dataset.fase = 'continuar';
+              btnPar.classList.add('apr-ex-verificar-certa');
+            }
           }
         } else {
           b.classList.add('apr-par-errada');
@@ -832,6 +936,91 @@
       });
       colDir.appendChild(item.el);
     });
+  }
+
+  // "Formar a frase": mostra a frase em inglês (com áudio) e um banco de
+  // palavras em português embaralhadas (as certas + distratores); o
+  // usuário toca as palavras na ordem certa pra montar a tradução numa
+  // área de montagem separada. Toca de novo numa palavra já montada pra
+  // devolvê-la ao banco. ex = { tipo:'formar', en, partes:[...], distratores:[...] }
+  // — content design garante palavras sem repetição dentro do mesmo
+  // exercício, então comparar por texto (sem precisar rastrear instância
+  // por instância) é seguro.
+  function _aprRenderFormar(bolha, area, ex) {
+    var partes = ex.partes || [];
+    var todas = _aprEmbaralhar(partes.concat(ex.distratores || []));
+    var montagem = []; // palavras já colocadas na área de montagem, na ordem
+    var audioPergunta = _aprCriarBotaoAudio(ex.en);
+
+    bolha.innerHTML =
+      '<div class="apr-ex-instrucao">Monte a frase em português:</div>' +
+      '<div class="apr-ex-pergunta-row"><div class="apr-ex-pergunta apr-ex-frase">' + ex.en + '</div></div>';
+    if (audioPergunta) bolha.querySelector('.apr-ex-pergunta-row').appendChild(audioPergunta);
+
+    area.innerHTML =
+      '<div class="apr-formar-montagem apr-formar-vazio" id="apr-formar-montagem"></div>' +
+      '<div class="apr-formar-banco" id="apr-formar-banco"></div>';
+    var montEl = document.getElementById('apr-formar-montagem');
+    var bancoEl = document.getElementById('apr-formar-banco');
+
+    function atualizarVazio() {
+      montEl.classList.toggle('apr-formar-vazio', montagem.length === 0);
+    }
+
+    function criarChipBanco(palavra) {
+      var chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'apr-formar-chip';
+      chip.textContent = palavra;
+      chip.addEventListener('click', function () {
+        if (chip.disabled) return;
+        chip.disabled = true;
+        chip.classList.add('apr-formar-chip-usado');
+        montagem.push(palavra);
+        var chipMontada = document.createElement('button');
+        chipMontada.type = 'button';
+        chipMontada.className = 'apr-formar-chip apr-formar-chip-montada';
+        chipMontada.textContent = palavra;
+        chipMontada.addEventListener('click', function () {
+          if (chipMontada.disabled) return;
+          montEl.removeChild(chipMontada);
+          chip.disabled = false;
+          chip.classList.remove('apr-formar-chip-usado');
+          var pos = montagem.lastIndexOf(palavra);
+          if (pos !== -1) montagem.splice(pos, 1);
+          atualizarVazio();
+          if (!montagem.length) document.getElementById('apr-ex-verificar').disabled = true;
+        });
+        montEl.appendChild(chipMontada);
+        atualizarVazio();
+        _aprExHabilitarVerificar();
+      });
+      return chip;
+    }
+
+    todas.forEach(function (palavra) { bancoEl.appendChild(criarChipBanco(palavra)); });
+
+    _aprExVerificarFn = function () {
+      var certo = montagem.length === partes.length && montagem.every(function (p, i) { return p === partes[i]; });
+      bancoEl.querySelectorAll('.apr-formar-chip').forEach(function (c) { c.disabled = true; });
+      montEl.querySelectorAll('.apr-formar-chip').forEach(function (c) { c.disabled = true; });
+      montEl.classList.add(certo ? 'apr-formar-certa' : 'apr-formar-errada');
+      if (!certo) {
+        var correta = document.createElement('div');
+        correta.className = 'apr-formar-correta';
+        correta.textContent = 'Resposta certa: ' + partes.join(' ');
+        area.appendChild(correta);
+      }
+      return certo;
+    };
+  }
+
+  // Formata a duração da lição pro card de resultado: "42s" ou "2m 05s".
+  function _aprFormatarDuracao(ms) {
+    var s = Math.max(0, Math.round(ms / 1000));
+    if (s < 60) return s + 's';
+    var m = Math.floor(s / 60), r = s % 60;
+    return m + 'm ' + String(r).padStart(2, '0') + 's';
   }
 
   /* ── Conclusão da lição: grava XP/ofensiva e mostra resultado ── */
@@ -867,17 +1056,23 @@
       titulo = _aprSortear(['Lição concluída!', 'Cada passo conta!', 'Vamos praticar mais!']);
     }
 
+    var pctTexto = Math.round(pct * 100) + '%';
+    var duracaoTexto = _aprFormatarDuracao(Date.now() - (_aprLicaoAtual.inicio || Date.now()));
+
     var corpo = document.getElementById('apr-tela-resultado');
     if (corpo) {
       corpo.innerHTML =
         (pct >= 0.8 ? _aprConfeteHtml() : '') +
         '<img src="' + owl + '" alt="" class="apr-resultado-owl" onerror="this.style.display=\'none\'">' +
+        '<div class="apr-resultado-eyebrow">Lição concluída!</div>' +
         '<h2 class="apr-resultado-titulo">' + titulo + '</h2>' +
         '<div class="apr-resultado-stats">' +
         '<div class="apr-resultado-stat apr-resultado-xp"><span>⭐</span>' + (jaFeita ? '+0' : ('+' + APR_XP_POR_LICAO)) + ' XP</div>' +
+        '<div class="apr-resultado-stat"><span>🎯</span>' + pctTexto + '</div>' +
+        '<div class="apr-resultado-stat"><span>⏱️</span>' + duracaoTexto + '</div>' +
         (subiu ? '<div class="apr-resultado-stat"><span>🔥</span>' + en.streak + (en.streak === 1 ? ' dia' : ' dias') + '</div>' : '') +
         '</div>' +
-        '<button type="button" class="apr-resultado-btn" id="apr-resultado-continuar">Continuar</button>';
+        '<button type="button" class="apr-resultado-btn" id="apr-resultado-continuar">' + (jaFeita ? 'Continuar' : 'Receber XP 🎉') + '</button>';
       var btn = document.getElementById('apr-resultado-continuar');
       if (btn) btn.addEventListener('click', function () {
         _aprLicaoAtual = null;

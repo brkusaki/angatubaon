@@ -6776,7 +6776,7 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .apr-licao-combo:empty { display: none; padding: 0; border: none; }
 .apr-licao-combo.apr-combo-pop { animation: aprPopCerta .35s ease; }
 
-.apr-exercicio-corpo { flex: 1; display: flex; flex-direction: column; animation: aprExIn .32s cubic-bezier(.2,.8,.2,1); overflow-y: auto; min-height: 0; }
+.apr-exercicio-corpo { flex: 1; display: flex; flex-direction: column; justify-content: center; animation: aprExIn .32s cubic-bezier(.2,.8,.2,1); overflow-y: auto; min-height: 0; }
 
 /* Personagem sempre presente: coruja + bolha de fala no topo de todo
    exercício (múltipla escolha, completar ou parear). A coruja reage na
@@ -6835,6 +6835,17 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .apr-voc-en { font-family: var(--font-h); font-size: 1.05rem; font-weight: 800; color: var(--text); line-height: 1.3; }
 .apr-voc-pt { font-family: var(--font-b); font-size: 13px; color: var(--muted); margin-top: 2px; }
 .apr-voc-audio-slot:empty { display: none; }
+
+.apr-exemplo {
+  margin-top: 10px; padding: 12px 14px; border-radius: 16px;
+  border: 1px dashed rgba(251,191,36,.4);
+  background: linear-gradient(135deg, rgba(251,191,36,.12), rgba(251,191,36,.04));
+  animation: aprExIn .3s cubic-bezier(.2,.8,.2,1) both;
+}
+.apr-exemplo-label { font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.apr-exemplo-row { display: flex; align-items: center; gap: 10px; }
+.apr-exemplo-en { font-family: var(--font-h); font-size: 1rem; font-weight: 700; color: var(--text); line-height: 1.35; }
+.apr-exemplo-pt { font-family: var(--font-b); font-size: 13px; color: var(--muted); margin-top: 3px; }
 
 /* Rodapé do botão (Começar a praticar / Verificar / Continuar) — NADA
    de position:sticky/fixed/absolute. #apr-licao-rodape é um elemento

@@ -6715,42 +6715,42 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 
 .apr-lista-licoes {
   --au: #38bdf8; --au-2: #22c55e; --au-a: rgba(56,189,248,.14);
-  position: relative; display: flex; flex-direction: column; gap: 14px; padding-top: 2px;
+  position: relative; display: flex; flex-direction: column; gap: 20px; padding: 10px 0 6px;
 }
 .apr-lista-licoes[data-unidade="u2"] { --au: #a855f7; --au-2: #7c3aed; --au-a: rgba(168,85,247,.14); }
 .apr-lista-licoes[data-unidade="u3"] { --au: #fb923c; --au-2: #ef4444; --au-a: rgba(251,146,60,.14); }
 .apr-lista-licoes[data-unidade="u4"] { --au: #34d399; --au-2: #0d9488; --au-a: rgba(16,185,129,.14); }
-.apr-lista-licoes::before {
-  content: ''; position: absolute; left: 42px; top: 38px; bottom: 38px; width: 5px;
-  border-radius: 999px; background: linear-gradient(180deg, var(--au), var(--au-2));
-  opacity: .6; box-shadow: 0 0 10px var(--au-a);
-  z-index: 0;
-}
+.apr-caminho-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 0; }
 .apr-licao-item {
-  position: relative; z-index: 1; display: flex; align-items: center; gap: 14px;
-  width: 100%; text-align: left; padding: 14px 16px; margin: 0;
-  border: 1px solid var(--border); border-radius: 18px;
-  background: linear-gradient(135deg, var(--au-a), var(--surface) 55%);
-  cursor: pointer; -webkit-tap-highlight-color: transparent;
-  transition: transform .12s ease, border-color .15s ease, box-shadow .15s ease;
+  position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 104px; text-align: center; padding: 0; margin: 0; align-self: flex-start;
+  border: none; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease;
 }
-.apr-licao-item:active { transform: scale(.98); }
+.apr-licao-item.apr-licao-esq { margin-left: calc(30% - 52px); }
+.apr-licao-item.apr-licao-dir { margin-left: calc(70% - 52px); }
+.apr-licao-item:active { transform: scale(.94); }
 .apr-licao-item.apr-licao-bloqueada { opacity: .55; filter: grayscale(.7); cursor: default; }
-.apr-licao-item.apr-licao-feita { border-color: rgba(34,197,94,.4); }
-.apr-licao-item.apr-licao-atual {
-  border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56,189,248,.22);
+.apr-licao-bolha {
+  position: relative; flex-shrink: 0; width: 64px; height: 64px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-h); font-weight: 800; font-size: 20px;
+  background: var(--surface2); color: var(--muted); border: 3px solid var(--border);
+  box-shadow: 0 4px 0 rgba(0,0,0,.18);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.apr-licao-item.apr-licao-feita .apr-licao-bolha { background: rgba(34,197,94,.18); color: #22c55e; border-color: #22c55e; }
+.apr-licao-item:not(.apr-licao-bloqueada):not(.apr-licao-feita) .apr-licao-bolha { background: rgba(56,189,248,.16); color: #38bdf8; border-color: #38bdf8; }
+.apr-licao-item.apr-licao-atual .apr-licao-bolha {
+  box-shadow: 0 4px 0 rgba(0,0,0,.18), 0 0 0 3px rgba(56,189,248,.22);
   animation: aprPulseAtual 2.2s ease-in-out infinite;
 }
-.apr-licao-bolha {
-  flex-shrink: 0; width: 52px; height: 52px; border-radius: 999px;
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-h); font-weight: 800; font-size: 18px;
-  background: var(--surface2); color: var(--muted); border: 1px solid var(--border);
+.apr-licao-titulo { min-width: 0; max-width: 100%; min-height: 28px; font-family: var(--font-b); font-weight: 700; font-size: 12px; line-height: 1.25; color: var(--text); }
+.apr-licao-star {
+  position: absolute; top: -4px; right: -4px; width: 22px; height: 22px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center; font-size: 11px;
+  background: #fbbf24; color: #1a1206; border: 2px solid var(--surface);
 }
-.apr-licao-item.apr-licao-feita .apr-licao-bolha { background: rgba(34,197,94,.18); color: #22c55e; border-color: rgba(34,197,94,.4); }
-.apr-licao-item:not(.apr-licao-bloqueada):not(.apr-licao-feita) .apr-licao-bolha { background: rgba(56,189,248,.16); color: #38bdf8; border-color: rgba(56,189,248,.4); }
-.apr-licao-titulo { flex: 1; min-width: 0; font-family: var(--font-b); font-weight: 700; font-size: 14px; color: var(--text); }
-.apr-licao-star { color: #fbbf24; font-size: 16px; flex-shrink: 0; }
 
 /* ── Tela de lição: barra de progresso + botão fechar ─────────── */
 .apr-tela-licao { position: relative; flex-direction: column; }
@@ -6765,7 +6765,7 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .apr-licao-barra { flex: 1; height: 14px; border-radius: 999px; background: var(--surface2); overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,.15); }
 .apr-licao-barra-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #38bdf8, #22c55e); transition: width .35s ease; box-shadow: 0 0 8px rgba(56,189,248,.5); }
 
-.apr-exercicio-corpo { flex: 1; display: flex; flex-direction: column; animation: aprExIn .32s cubic-bezier(.2,.8,.2,1); }
+.apr-exercicio-corpo { flex: 1; display: flex; flex-direction: column; animation: aprExIn .32s cubic-bezier(.2,.8,.2,1); overflow-y: auto; min-height: 0; }
 
 /* Personagem sempre presente: coruja + bolha de fala no topo de todo
    exercício (múltipla escolha, completar ou parear). A coruja reage na
@@ -6793,20 +6793,20 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
    Estilo Duolingo — ensina antes de testar. Reaproveita o container
    dos exercícios (#apr-exercicio-corpo) e o botão grande de resultado
    (.apr-resultado-btn) pra "Começar a praticar". */
-.apr-ensinar-topo { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.apr-ensinar-topo { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .apr-ensinar-owl {
-  flex-shrink: 0; width: 84px; height: 84px; object-fit: contain;
+  flex-shrink: 0; width: 68px; height: 68px; object-fit: contain;
   filter: drop-shadow(0 6px 14px rgba(0,0,0,.28));
   animation: aprOwlBounceIn .5s ease;
 }
 .apr-ensinar-cabecalho { flex: 1; min-width: 0; }
-.apr-ensinar-cabecalho .apr-ex-instrucao { margin-bottom: 4px; }
-.apr-ensinar-titulo { font-family: var(--font-h); font-size: 1.4rem; font-weight: 800; color: var(--text); margin: 0; line-height: 1.2; }
+.apr-ensinar-cabecalho .apr-ex-instrucao { margin-bottom: 3px; }
+.apr-ensinar-titulo { font-family: var(--font-h); font-size: 1.3rem; font-weight: 800; color: var(--text); margin: 0; line-height: 1.2; }
 
-.apr-voc-lista { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+.apr-voc-lista { display: flex; flex-direction: column; gap: 8px; }
 .apr-voc-item {
-  display: flex; align-items: center; gap: 12px; padding: 14px 16px;
-  border-radius: 18px; border: 1px solid rgba(56,189,248,.25);
+  display: flex; align-items: center; gap: 12px; padding: 11px 14px;
+  border-radius: 16px; border: 1px solid rgba(56,189,248,.25);
   background: linear-gradient(135deg, rgba(56,189,248,.14), rgba(34,197,94,.07));
   animation: aprExIn .3s cubic-bezier(.2,.8,.2,1) both;
 }
@@ -6815,7 +6815,15 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .apr-voc-pt { font-family: var(--font-b); font-size: 13px; color: var(--muted); margin-top: 2px; }
 .apr-voc-audio-slot:empty { display: none; }
 
-.apr-ensinar-praticar { margin-top: auto; }
+/* Rodapé fixo: fica sempre visível na base da tela de ensino, com o
+   conteúdo (lista de vocabulário) rolando por cima dele — ver
+   #apr-exercicio-corpo (scroll) e _aprRenderEnsinar em Aprender/hub.js. */
+.apr-ensinar-rodape {
+  position: sticky; bottom: 0; z-index: 2; margin-top: auto;
+  padding-top: 14px;
+  background: linear-gradient(180deg, transparent, var(--bg, #0b0f17) 45%);
+}
+.apr-ensinar-praticar { width: 100%; }
 
 .apr-ex-opcoes { display: flex; flex-direction: column; gap: 12px; }
 .apr-ex-opt-row { display: flex; align-items: stretch; gap: 8px; }
@@ -6995,8 +7003,10 @@ body.aprender-fs-open .apr-tela-unidade {
 body.aprender-fs-open .apr-tela-licao,
 body.aprender-fs-open .apr-tela-resultado {
   height: 100vh; height: 100dvh; flex-direction: column;
-  padding: 16px 16px 24px; overflow-y: auto;
+  padding: 16px 16px 24px;
 }
+body.aprender-fs-open .apr-tela-resultado { overflow-y: auto; }
+body.aprender-fs-open .apr-tela-licao { overflow-y: hidden; }
 body.aprender-fs-open .apr-tela-licao {
   background:
     radial-gradient(circle at 20% 0%, rgba(56,189,248,.15), transparent 55%),

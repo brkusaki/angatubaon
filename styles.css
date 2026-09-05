@@ -6764,6 +6764,13 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .apr-licao-fechar:hover { color: var(--text); }
 .apr-licao-barra { flex: 1; height: 14px; border-radius: 999px; background: var(--surface2); overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,.15); }
 .apr-licao-barra-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #38bdf8, #22c55e); transition: width .35s ease; box-shadow: 0 0 8px rgba(56,189,248,.5); }
+.apr-licao-combo {
+  flex-shrink: 0; font-family: var(--font-h); font-weight: 800; font-size: 12.5px;
+  color: #fb923c; background: rgba(251,146,60,.14); border: 1px solid rgba(251,146,60,.4);
+  padding: 6px 12px; border-radius: 999px; white-space: nowrap;
+}
+.apr-licao-combo:empty { display: none; padding: 0; border: none; }
+.apr-licao-combo.apr-combo-pop { animation: aprPopCerta .35s ease; }
 
 .apr-exercicio-corpo { flex: 1; display: flex; flex-direction: column; animation: aprExIn .32s cubic-bezier(.2,.8,.2,1); overflow-y: auto; min-height: 0; }
 
@@ -6825,6 +6832,22 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 }
 .apr-ensinar-praticar { width: 100%; }
 
+/* Rodapé fixo dos exercícios: o botão VERIFICAR/CONTINUAR nunca sai da
+   parte de baixo da tela (mesmo mecanismo do .apr-ensinar-rodape, ver
+   acima). "parear" nasce com o rodapé oculto — cada par já se confere
+   sozinho no toque — e só revela o CONTINUAR ao formar o último par
+   (ver _aprRenderParear em Aprender/hub.js). */
+.apr-ex-rodape {
+  position: sticky; bottom: 0; z-index: 2; margin-top: auto;
+  padding-top: 14px;
+  background: linear-gradient(180deg, transparent, var(--bg, #0b0f17) 45%);
+}
+.apr-ex-rodape.apr-ex-rodape-oculto { display: none; }
+.apr-ex-verificar { width: 100%; }
+.apr-ex-verificar:disabled { opacity: .4; cursor: default; box-shadow: none; }
+.apr-ex-verificar.apr-ex-verificar-certa { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; }
+.apr-ex-verificar.apr-ex-verificar-errada { background: linear-gradient(135deg, #f87171, #dc2626); color: #fff; }
+
 .apr-ex-opcoes { display: flex; flex-direction: column; gap: 12px; }
 .apr-ex-opt-row { display: flex; align-items: stretch; gap: 8px; }
 .apr-ex-opt-row .apr-ex-opt { flex: 1; min-width: 0; }
@@ -6838,6 +6861,7 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .apr-ex-opt:hover:not(:disabled) { border-color: #38bdf8; box-shadow: 0 4px 14px rgba(56,189,248,.22); }
 .apr-ex-opt:active { transform: scale(.98); }
 .apr-ex-opt:disabled { cursor: default; }
+.apr-ex-opt.apr-ex-opt-selecionada { border-color: #38bdf8; background: rgba(56,189,248,.14); box-shadow: 0 4px 14px rgba(56,189,248,.22); }
 .apr-ex-opt.apr-certa { border-color: #22c55e; background: rgba(34,197,94,.2); color: #16a34a; box-shadow: 0 4px 16px rgba(34,197,94,.35); animation: aprPopCerta .35s ease; }
 .apr-ex-opt.apr-errada { border-color: #ef4444; background: rgba(239,68,68,.2); color: #dc2626; box-shadow: 0 4px 16px rgba(239,68,68,.3); animation: streakPop .4s ease; }
 
@@ -6873,6 +6897,32 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .apr-par-item-row .apr-par-item { flex: 1; min-width: 0; }
 .apr-par-item-row .apr-audio-btn { width: 40px; border-radius: 12px; font-size: 14px; }
 
+/* ── Exercício "formar frase": banco de palavras (estilo Duolingo) ───── */
+.apr-formar-montagem {
+  position: relative; min-height: 52px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 10px; margin-bottom: 18px; border-radius: 14px;
+  border: 2px dashed var(--border); background: var(--surface2);
+  transition: border-color .15s ease, background .15s ease;
+}
+.apr-formar-montagem.apr-formar-vazio::before {
+  content: 'Toque as palavras abaixo, na ordem certa'; font-size: 13px; color: var(--muted); font-family: var(--font-b);
+}
+.apr-formar-montagem.apr-formar-certa { border-style: solid; border-color: #22c55e; background: rgba(34,197,94,.1); }
+.apr-formar-montagem.apr-formar-errada { border-style: solid; border-color: #ef4444; background: rgba(239,68,68,.1); }
+.apr-formar-banco { display: flex; flex-wrap: wrap; gap: 8px; }
+.apr-formar-chip {
+  padding: 10px 16px; border-radius: 12px; border: 2px solid var(--border);
+  background: var(--surface); color: var(--text); font-family: var(--font-b);
+  font-size: 14.5px; font-weight: 700; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: border-color .15s, background .15s, opacity .15s, transform .1s;
+}
+.apr-formar-chip:hover:not(:disabled) { border-color: #38bdf8; }
+.apr-formar-chip:active:not(:disabled) { transform: scale(.95); }
+.apr-formar-chip:disabled { cursor: default; }
+.apr-formar-chip.apr-formar-chip-usado { opacity: .35; }
+.apr-formar-chip.apr-formar-chip-montada { border-color: #38bdf8; background: rgba(56,189,248,.14); color: #38bdf8; }
+.apr-formar-correta { margin-top: 12px; font-family: var(--font-b); font-size: 13.5px; color: var(--muted); }
+
 /* ── Feedback de acerto/erro: flash de cor na tela + banner no rodapé
    (a reação da coruja em si mora em .apr-ex-owl-reagindo, acima) ──── */
 .apr-tela-licao.apr-tela-flash-certa::after,
@@ -6899,6 +6949,7 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .apr-confete-wrap { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
 .apr-confete { position: absolute; top: -12px; width: 9px; height: 15px; border-radius: 2px; opacity: .95; animation: aprConfeteQueda 1.7s ease-in forwards; }
 .apr-resultado-owl { position: relative; z-index: 1; width: 170px; height: 170px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 10px 22px rgba(0,0,0,.3)); animation: aprOwlCelebrate .7s ease; }
+.apr-resultado-eyebrow { position: relative; z-index: 1; font-family: var(--font-b); font-weight: 800; font-size: 12.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
 .apr-resultado-titulo { position: relative; z-index: 1; font-family: var(--font-h); font-size: 1.55rem; font-weight: 800; color: var(--text); margin: 0 0 16px; }
 .apr-resultado-stats { position: relative; z-index: 1; display: flex; gap: 12px; margin-bottom: 30px; }
 .apr-resultado-stat {

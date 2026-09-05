@@ -6652,57 +6652,59 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
   padding: 6px 11px; border-radius: 999px; white-space: nowrap;
 }
 
-/* ── Menu: cards de unidade em formato de trilha ("path") ────────
-   Uma linha conectora (::before) corre atrás dos ícones das unidades;
-   os cards ficam opacos e com z-index acima pra ocultar o trecho da
-   linha por trás deles — dá a sensação de caminho sem precisar de N
-   elementos conectores separados. */
-.apr-menu-unidades { position: relative; display: flex; flex-direction: column; gap: 16px; padding-top: 4px; }
-.apr-menu-unidades::before {
-  content: ''; position: absolute; left: 50px; top: 48px; bottom: 48px; width: 5px;
-  border-radius: 999px; background: linear-gradient(180deg, #38bdf8, #a855f7, #fb923c, #22c55e);
-  opacity: .55; box-shadow: 0 0 10px rgba(56,189,248,.35);
-  z-index: 0;
-}
+/* ── Menu de unidades: seções grandes estilo Duolingo ────────────
+   Sem linha conectora entre unidades — no app real o "caminho" fica
+   DENTRO de cada unidade, entre as lições (ver .apr-lista-licoes mais
+   abaixo); aqui cada unidade é um banner de cor sólida (a cor do tema
+   da unidade), com ícone grande, barra de progresso grossa branca e,
+   na unidade atual, a coruja aparece de verdade (personagem, não só
+   decoração) — sensação de "seção" do curso, não item de lista. */
+.apr-menu-unidades { display: flex; flex-direction: column; gap: 18px; padding-top: 4px; }
 .apr-unidade-card {
   --au: #38bdf8; --au-2: #22c55e; --au-a: rgba(56,189,248,.14);
-  position: relative; z-index: 1; display: flex; align-items: center; gap: 16px;
-  width: 100%; text-align: left; padding: 18px 20px; margin: 0;
-  border: 1px solid var(--border); border-radius: 22px;
-  background: linear-gradient(135deg, var(--au-a), var(--surface) 60%);
+  position: relative; display: flex; align-items: center; gap: 18px;
+  width: 100%; text-align: left; padding: 22px; margin: 0;
+  border: none; border-radius: 24px; overflow: hidden;
+  background: linear-gradient(135deg, var(--au), var(--au-2));
   cursor: pointer; -webkit-tap-highlight-color: transparent;
-  transition: transform .14s ease, border-color .18s ease, box-shadow .18s ease;
+  box-shadow: 0 10px 26px rgba(0,0,0,.18);
+  transition: transform .14s ease, box-shadow .18s ease;
 }
 .apr-unidade-card[data-unidade="u2"] { --au: #a855f7; --au-2: #7c3aed; --au-a: rgba(168,85,247,.14); }
 .apr-unidade-card[data-unidade="u3"] { --au: #fb923c; --au-2: #ef4444; --au-a: rgba(251,146,60,.14); }
 .apr-unidade-card[data-unidade="u4"] { --au: #34d399; --au-2: #0d9488; --au-a: rgba(16,185,129,.14); }
-.apr-unidade-card:active { transform: scale(.98); border-color: var(--au); }
-.apr-unidade-card:focus-visible { outline: 2px solid var(--au); outline-offset: 2px; }
+.apr-unidade-card:active { transform: scale(.98); }
+.apr-unidade-card:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .apr-unidade-card.apr-unidade-atual {
-  border-color: var(--au); box-shadow: 0 0 0 3px var(--au-a), 0 10px 28px var(--au-a);
+  box-shadow: 0 10px 30px var(--au-a), 0 0 0 3px rgba(255,255,255,.3);
   animation: aprUnidadeAtualGlow 2.6s ease-in-out infinite;
 }
-.apr-unidade-card.apr-unidade-bloqueada {
-  opacity: .62; filter: grayscale(.85); cursor: default; box-shadow: none;
-}
-.apr-unidade-card.apr-unidade-bloqueada .apr-unidade-icone { background: var(--surface2); border-color: var(--border); color: var(--muted); }
-.apr-unidade-card.apr-unidade-completa { border-color: var(--au); }
+.apr-unidade-card.apr-unidade-bloqueada { background: var(--surface2); box-shadow: none; cursor: default; }
+.apr-unidade-card.apr-unidade-bloqueada .apr-unidade-icone { background: var(--surface); border-color: var(--border); color: var(--muted); }
+.apr-unidade-card.apr-unidade-bloqueada .apr-unidade-titulo { color: var(--text); }
+.apr-unidade-card.apr-unidade-bloqueada .apr-unidade-sub { color: var(--muted); }
+.apr-unidade-card.apr-unidade-bloqueada .apr-unidade-barra { background: var(--surface); }
+.apr-unidade-card.apr-unidade-bloqueada .apr-unidade-barra-fill { background: var(--muted); }
+.apr-unidade-card.apr-unidade-bloqueada .apr-unidade-seta { color: var(--muted); }
 .apr-unidade-icone {
-  position: relative; flex-shrink: 0; width: 60px; height: 60px; border-radius: 18px;
-  display: flex; align-items: center; justify-content: center; font-size: 30px;
-  background: linear-gradient(135deg, var(--au-a), transparent);
-  border: 1px solid var(--au-a); color: var(--au);
+  position: relative; z-index: 1; flex-shrink: 0; width: 64px; height: 64px; border-radius: 18px;
+  display: flex; align-items: center; justify-content: center; font-size: 32px;
+  background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.32); color: #fff;
 }
 .apr-unidade-owl-mini {
   position: absolute; top: -10px; right: -10px; width: 28px; height: 28px; object-fit: contain;
   filter: drop-shadow(0 2px 5px rgba(0,0,0,.35)); animation: aprOwlPopIn .4s ease;
 }
-.apr-unidade-corpo { flex: 1; min-width: 0; }
-.apr-unidade-titulo { font-family: var(--font-h); font-weight: 800; font-size: 16.5px; color: var(--text); margin-bottom: 3px; }
-.apr-unidade-sub { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-.apr-unidade-barra { height: 9px; border-radius: 999px; background: var(--surface2); overflow: hidden; }
-.apr-unidade-barra-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--au), var(--au-2)); transition: width .3s ease; }
-.apr-unidade-seta { flex-shrink: 0; color: var(--muted); font-size: 14px; }
+.apr-unidade-atual-owl {
+  position: absolute; top: -16px; right: 18px; width: 60px; height: 60px; object-fit: contain;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,.32)); animation: aprOwlBounceIn .55s ease; z-index: 2;
+}
+.apr-unidade-corpo { position: relative; z-index: 1; flex: 1; min-width: 0; }
+.apr-unidade-titulo { font-family: var(--font-h); font-weight: 800; font-size: 17.5px; color: #fff; margin-bottom: 3px; }
+.apr-unidade-sub { font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,.88); margin-bottom: 10px; }
+.apr-unidade-barra { height: 12px; border-radius: 999px; background: rgba(255,255,255,.28); overflow: hidden; }
+.apr-unidade-barra-fill { height: 100%; border-radius: 999px; background: #fff; transition: width .3s ease; }
+.apr-unidade-seta { position: relative; z-index: 1; flex-shrink: 0; color: rgba(255,255,255,.88); font-size: 16px; }
 
 /* ── Tela de unidade: cabeçalho + lista de lições em trilha ──────── */
 .apr-unidade-head { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 22px; text-align: center; }
@@ -6715,15 +6717,33 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 
 .apr-lista-licoes {
   --au: #38bdf8; --au-2: #22c55e; --au-a: rgba(56,189,248,.14);
-  position: relative; display: flex; flex-direction: column; gap: 20px; padding: 10px 0 6px;
+  position: relative; display: grid; grid-template-columns: 100%; row-gap: 20px; padding: 10px 0 6px;
 }
 .apr-lista-licoes[data-unidade="u2"] { --au: #a855f7; --au-2: #7c3aed; --au-a: rgba(168,85,247,.14); }
 .apr-lista-licoes[data-unidade="u3"] { --au: #fb923c; --au-2: #ef4444; --au-a: rgba(251,146,60,.14); }
 .apr-lista-licoes[data-unidade="u4"] { --au: #34d399; --au-2: #0d9488; --au-a: rgba(16,185,129,.14); }
-.apr-caminho-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 0; }
+.apr-caminho-svg {
+  /* grid-row vem inline (ver Aprender/hub.js): "-1" só alcança a última
+  linha do grid EXPLÍCITO, e aqui não declaramos grid-template-rows — só
+  teríamos ambiguidade. Como o nº de lições (nº de linhas) já é conhecido
+  em JS na hora de montar a lista, o span exato ("1 / span N") vai direto
+  no style do SVG — sem depender de nenhuma contagem implícita do grid.
+  position:absolute tira o SVG do cálculo de altura das linhas do grid
+  (item posicionado não entra no "track sizing"; a área do grid-row/
+  grid-column já serve de containing block, sem precisar de
+  position:relative no pai) — sem isso o SVG (só com viewBox, sem
+  width/height fixos) inflava a altura "auto" de cada linha pra caber
+  sua própria altura intrínseca, esticando também as bolhas de lição
+  (que dividem a mesma linha) bem além do tamanho real (confirmado em
+  teste visual: ~100px virando ~326px). Com absolute, quem define a
+  altura de cada linha volta a ser só o .apr-licao-item; a curva só
+  estica por cima (inset:0) do resultado real. */
+  grid-column: 1; position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none;
+}
 .apr-licao-item {
-  position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
-  width: 104px; text-align: center; padding: 0; margin: 0; align-self: flex-start;
+  position: relative; z-index: 1; grid-column: 1; justify-self: start;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 104px; text-align: center; padding: 0; margin: 0;
   border: none; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent;
   transition: transform .12s ease;
 }
@@ -6754,7 +6774,7 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 
 /* ── Tela de lição: barra de progresso + botão fechar ─────────── */
 .apr-tela-licao { position: relative; flex-direction: column; }
-.apr-licao-topo { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.apr-licao-topo { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
 .apr-licao-fechar {
   flex-shrink: 0; width: 34px; height: 34px; border-radius: 999px; border: none;
   background: transparent; color: var(--muted); font-size: 16px; cursor: pointer;
@@ -6777,9 +6797,9 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 /* Personagem sempre presente: coruja + bolha de fala no topo de todo
    exercício (múltipla escolha, completar ou parear). A coruja reage na
    hora do acerto/erro — ver .apr-ex-owl-reagindo e _aprMostrarFeedback. */
-.apr-ex-topo { position: relative; z-index: 1; display: flex; align-items: flex-start; gap: 14px; margin-bottom: 22px; }
+.apr-ex-topo { position: relative; z-index: 1; display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
 .apr-ex-owl {
-  flex-shrink: 0; width: 78px; height: 78px; object-fit: contain;
+  flex-shrink: 0; width: 96px; height: 96px; object-fit: contain;
   filter: drop-shadow(0 6px 14px rgba(0,0,0,.28));
   animation: aprOwlBounceIn .45s ease;
 }
@@ -6822,28 +6842,20 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
 .apr-voc-pt { font-family: var(--font-b); font-size: 13px; color: var(--muted); margin-top: 2px; }
 .apr-voc-audio-slot:empty { display: none; }
 
-/* Rodapé fixo: fica sempre visível na base da tela de ensino, com o
-   conteúdo (lista de vocabulário) rolando por cima dele — ver
-   #apr-exercicio-corpo (scroll) e _aprRenderEnsinar em Aprender/hub.js. */
-.apr-ensinar-rodape {
-  position: sticky; bottom: 0; z-index: 2; margin-top: auto;
-  padding-top: 14px;
-  background: linear-gradient(180deg, transparent, var(--bg, #0b0f17) 45%);
-}
-.apr-ensinar-praticar { width: 100%; }
-
-/* Rodapé fixo dos exercícios: o botão VERIFICAR/CONTINUAR nunca sai da
-   parte de baixo da tela (mesmo mecanismo do .apr-ensinar-rodape, ver
-   acima). "parear" nasce com o rodapé oculto — cada par já se confere
-   sozinho no toque — e só revela o CONTINUAR ao formar o último par
-   (ver _aprRenderParear em Aprender/hub.js). */
-.apr-ex-rodape {
-  position: sticky; bottom: 0; z-index: 2; margin-top: auto;
-  padding-top: 14px;
-  background: linear-gradient(180deg, transparent, var(--bg, #0b0f17) 45%);
-}
-.apr-ex-rodape.apr-ex-rodape-oculto { display: none; }
-.apr-ex-verificar { width: 100%; }
+/* Rodapé do botão (Começar a praticar / Verificar / Continuar) — NADA
+   de position:sticky/fixed/absolute. #apr-licao-rodape é um elemento
+   IRMÃO de #apr-exercicio-corpo dentro de #apr-tela-licao (ver
+   index.html), fora da área que rola. .apr-tela-licao é flex-column de
+   altura fixa (100dvh); #apr-exercicio-corpo tem flex:1 + overflow-y:auto
+   e rola sozinho; este rodapé, sem flex:1, é só o último item da coluna
+   — sobra sempre visível embaixo, em qualquer navegador/mobile, porque
+   nunca fez parte do que rola (ver _aprRenderEnsinar/_aprRenderExercicio
+   em Aprender/hub.js). "parear" nasce com o rodapé oculto — cada par já
+   se confere sozinho no toque — e só revela o CONTINUAR ao formar o
+   último par (ver _aprRenderParear). */
+.apr-licao-rodape { flex-shrink: 0; padding-top: 14px; border-top: 1px solid var(--border); margin-top: 4px; }
+.apr-licao-rodape.apr-licao-rodape-oculto { display: none; }
+.apr-licao-rodape .apr-resultado-btn { width: 100%; }
 .apr-ex-verificar:disabled { opacity: .4; cursor: default; box-shadow: none; }
 .apr-ex-verificar.apr-ex-verificar-certa { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; }
 .apr-ex-verificar.apr-ex-verificar-errada { background: linear-gradient(135deg, #f87171, #dc2626); color: #fff; }
@@ -7041,6 +7053,12 @@ body.aprender-fs-open #aprender-hub {
 }
 body.aprender-fs-open .games-hub-head { padding: 14px 16px 0; }
 body.aprender-fs-open .streak-faixa   { margin: 0 16px 10px; }
+/* Sub-tela ativa (unidade/lição/resultado): esconde o cabeçalho "Aprender
+   Inglês" pra sub-tela colar no topo — sem isso, cabeçalho + sub-tela de
+   100vh estouram a altura do #aprender-hub e o rodapé fica fora da tela
+   (era ESSE o bug real, não o rodapé em si — ver comentário acima e em
+   _aprMostrarTela em Aprender/hub.js). */
+#aprender-hub.apr-tela-ativa .games-hub-head { display: none; }
 body.aprender-fs-open .apr-menu-unidades { padding: 0 16px 24px; }
 /* apr-tela-unidade fica display:block (setado via JS, ver _aprMostrarTela em
    Aprender/hub.js) — só precisa da altura cheia + scroll, sem flex-column. */

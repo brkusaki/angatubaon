@@ -1528,6 +1528,13 @@
           <div class="apr-licao-barra"><div class="apr-licao-barra-fill" id="apr-licao-barra-fill"></div></div>
         </div>
         <div id="apr-exercicio-corpo" class="apr-exercicio-corpo"></div>
+        <!-- Rodapé do botão (Começar a praticar / Verificar / Continuar) —
+             IRMÃO do corpo que rola, não filho dele. Sem position:sticky/
+             fixed/absolute: como #apr-tela-licao é flex-column de altura
+             fixa e #apr-exercicio-corpo é quem tem flex:1 + scroll próprio,
+             este elemento sempre sobra por último, grudado embaixo, sem
+             nunca fazer parte da área que rola (ver Aprender/hub.js). -->
+        <div id="apr-licao-rodape" class="apr-licao-rodape"></div>
       </div>
 
       <!-- TELA: resultado da lição -->

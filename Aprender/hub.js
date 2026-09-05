@@ -429,6 +429,31 @@
   /* ── Tela 2: lições de uma unidade ─────────────────────────── */
   var _aprUnidadeAtualId = null;
 
+  // Gera o SVG do caminho sinuoso (estilo Duolingo) que fica atrás das
+  // bolhas de lição. Usa o MESMO sistema de coordenadas percentual (0-100
+  // de largura) que o CSS usa pra posicionar as bolhas (ver .apr-licao-esq/
+  // .apr-licao-dir em styles.css) — assim a linha sempre passa exatamente
+  // pelo centro de cada bolha, em qualquer largura de tela, sem precisar
+  // medir layout via JS. preserveAspectRatio="none" estica o SVG pra
+  // altura real do container (definida pelas próprias lições em fluxo).
+  function _aprCaminhoSvg(n, unidadeId) {
+    if (!n) return '';
+    var gradId = 'aprCaminhoGrad-' + unidadeId;
+    var pontos = [];
+    for (var i = 0; i < n; i++) pontos.push({ x: (i % 2 === 0) ? 30 : 70, y: i * 100 + 50 });
+    var d = 'M ' + pontos[0].x + ' ' + pontos[0].y;
+    for (var j = 1; j < pontos.length; j++) {
+      var p0 = pontos[j - 1], p1 = pontos[j], midY = (p0.y + p1.y) / 2;
+      d += ' C ' + p0.x + ' ' + midY + ', ' + p1.x + ' ' + midY + ', ' + p1.x + ' ' + p1.y;
+    }
+    return '<svg class="apr-caminho-svg" viewBox="0 0 100 ' + (n * 100) + '" preserveAspectRatio="none" aria-hidden="true">' +
+      '<defs><linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="var(--au)"></stop><stop offset="100%" stop-color="var(--au-2)"></stop>' +
+      '</linearGradient></defs>' +
+      '<path d="' + d + '" fill="none" stroke="url(#' + gradId + ')" stroke-width="3" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>' +
+      '</svg>';
+  }
+
   function _aprAbrirUnidade(unidadeId) {
     var unidade = _aprUnidade(unidadeId);
     if (!unidade) return;
@@ -446,17 +471,19 @@
     var lista = document.getElementById('apr-lista-licoes');
     if (lista) {
       lista.setAttribute('data-unidade', unidadeId); // dá cor própria à trilha/bolhas (ver CSS)
-      var html = '';
+      var html = _aprCaminhoSvg(unidade.licoes.length, unidadeId);
       unidade.licoes.forEach(function (l, idx) {
         var feita = prog.completedLessons.indexOf(l.id) !== -1;
         var desbloqueada = _aprLicaoDesbloqueada(unidade, idxUnidade, idx);
         html += '<button type="button" class="apr-licao-item' +
           (feita ? ' apr-licao-feita' : '') + (desbloqueada ? '' : ' apr-licao-bloqueada') +
           (idx === licaoAtualIdx ? ' apr-licao-atual' : '') +
+          (idx % 2 === 0 ? ' apr-licao-esq' : ' apr-licao-dir') +
           '" data-licao="' + l.id + '"' + (desbloqueada ? '' : ' disabled aria-disabled="true"') + '>' +
-          '<div class="apr-licao-bolha">' + (feita ? '<i class="fa fa-check"></i>' : (desbloqueada ? (idx + 1) : '<i class="fa fa-lock"></i>')) + '</div>' +
-          '<div class="apr-licao-titulo">' + l.titulo + '</div>' +
+          '<div class="apr-licao-bolha">' + (feita ? '<i class="fa fa-check"></i>' : (desbloqueada ? (idx + 1) : '<i class="fa fa-lock"></i>')) +
           (feita ? '<i class="fa fa-star apr-licao-star"></i>' : '') +
+          '</div>' +
+          '<div class="apr-licao-titulo">' + l.titulo + '</div>' +
           '</button>';
       });
       lista.innerHTML = html;
@@ -519,7 +546,9 @@
       '</div>' +
       '</div>' +
       '<div class="apr-voc-lista">' + itensHtml + '</div>' +
-      '<button type="button" class="apr-resultado-btn apr-ensinar-praticar" id="apr-ensinar-praticar">Começar a praticar</button>';
+      '<div class="apr-ensinar-rodape">' +
+      '<button type="button" class="apr-resultado-btn apr-ensinar-praticar" id="apr-ensinar-praticar">Começar a praticar</button>' +
+      '</div>';
 
     // Botões de áudio são adicionados via DOM (nunca por innerHTML) porque
     // carregam um listener — mesmo padrão usado nas opções/perguntas dos

@@ -350,7 +350,21 @@
   window._sairDoAprender = _sairDoAprender;
 
   /* ── Navegação entre as 4 telas do hub ─────────────────────── */
+  // BUG real do botão "preso embaixo" (relatado mesmo após tirar o rodapé
+  // da área que rola): #aprender-hub é o container de tela cheia (fixed,
+  // 100dvh, overflow-y:auto) e .games-hub-head (título "Aprender Inglês")
+  // continua visível e ocupando espaço ACIMA de qualquer sub-tela. Como
+  // cada sub-tela (unidade/licão/resultado) também reivindica 100vh de
+  // altura, a soma (cabeçalho + sub-tela de 100vh) estoura a altura do
+  // container fixo — e é ESSE overflow do #aprender-hub que obriga a
+  // rolar pra ver o rodapé, não o scroll interno do #apr-exercicio-corpo
+  // (que já está correto). Correção: esconder .games-hub-head assim que
+  // qualquer sub-tela abre — mesmo mecanismo já usado no hub de jogos
+  // (ver #games-hub.jogo-ativo no styles.css) — cada sub-tela já tem seu
+  // próprio botão de voltar/fechar/continuar, então a saída nunca fica
+  // bloqueada, só precisa passar pelo menu de novo pra sair do módulo.
   function _aprMostrarTela(nome) {
+    var hub = document.getElementById('aprender-hub');
     var menu = document.getElementById('apr-menu-unidades');
     var tUnidade = document.getElementById('apr-tela-unidade');
     var tLicao = document.getElementById('apr-tela-licao');
@@ -364,6 +378,7 @@
     // A faixa de ofensiva/XP só aparece no menu principal (mesma lógica
     // do hub de jogos, que some a faixa durante uma partida).
     if (faixa) faixa.style.display = (nome === 'menu') ? 'flex' : 'none';
+    if (hub) hub.classList.toggle('apr-tela-ativa', nome !== 'menu');
   }
 
   function _aprRenderStats() {
@@ -404,17 +419,22 @@
       var feitas = u.licoes.filter(function (l) { return prog.completedLessons.indexOf(l.id) !== -1; }).length;
       var desbloqueada = _aprUnidadeDesbloqueada(idx);
       var completa = feitas === total;
+      var atual = idx === atualIdx;
+      // Coruja da unidade atual: presença de personagem real na tela de
+      // unidades (não só decoração) — só aparece na unidade em andamento
+      // e ainda não concluída (a concluída já tem a owl-trophy no ícone).
       html += '<button type="button" class="apr-unidade-card' +
         (desbloqueada ? '' : ' apr-unidade-bloqueada') +
         (completa ? ' apr-unidade-completa' : '') +
-        (idx === atualIdx ? ' apr-unidade-atual' : '') +
+        (atual ? ' apr-unidade-atual' : '') +
         '" data-unidade="' + u.id + '"' + (desbloqueada ? '' : ' disabled aria-disabled="true"') + '>' +
+        (atual && !completa ? '<img src="/webp/owl-wave.webp" class="apr-unidade-atual-owl" alt="" onerror="this.style.display=\'none\'">' : '') +
         '<div class="apr-unidade-icone">' + (desbloqueada ? u.icone : '<i class="fa fa-lock"></i>') +
         (completa ? '<img src="/webp/owl-trophy.webp" class="apr-unidade-owl-mini" alt="" onerror="this.style.display=\'none\'">' : '') +
         '</div>' +
         '<div class="apr-unidade-corpo">' +
         '<div class="apr-unidade-titulo">' + u.titulo + '</div>' +
-        '<div class="apr-unidade-sub">' + feitas + '/' + total + ' lições' + (completa ? ' · concluída ✓' : '') + '</div>' +
+        '<div class="apr-unidade-sub">Nível ' + (idx + 1) + ' · ' + feitas + '/' + total + ' lições' + (completa ? ' · concluída ✓' : '') + '</div>' +
         '<div class="apr-unidade-barra"><div class="apr-unidade-barra-fill" style="width:' + Math.round((total ? feitas / total : 0) * 100) + '%"></div></div>' +
         '</div>' +
         (desbloqueada ? '<i class="fa fa-chevron-right apr-unidade-seta"></i>' : '') +
@@ -436,8 +456,18 @@
   // pelo centro de cada bolha, em qualquer largura de tela, sem precisar
   // medir layout via JS. preserveAspectRatio="none" estica o SVG pra
   // altura real do container (definida pelas próprias lições em fluxo).
+  // Cores por unidade resolvidas aqui em JS (hex direto), não via var()
+  // dentro do SVG — elimina qualquer dúvida de renderização entre
+  // navegadores (o resto do módulo já usa as mesmas cores no CSS, ver
+  // .apr-lista-licoes[data-unidade="u2"] etc. em styles.css).
+  var APR_CORES_UNIDADE = {
+    u1: ['#38bdf8', '#22c55e'], u2: ['#a855f7', '#7c3aed'],
+    u3: ['#fb923c', '#ef4444'], u4: ['#34d399', '#0d9488']
+  };
+
   function _aprCaminhoSvg(n, unidadeId) {
     if (!n) return '';
+    var cores = APR_CORES_UNIDADE[unidadeId] || APR_CORES_UNIDADE.u1;
     var gradId = 'aprCaminhoGrad-' + unidadeId;
     var pontos = [];
     for (var i = 0; i < n; i++) pontos.push({ x: (i % 2 === 0) ? 30 : 70, y: i * 100 + 50 });
@@ -446,9 +476,15 @@
       var p0 = pontos[j - 1], p1 = pontos[j], midY = (p0.y + p1.y) / 2;
       d += ' C ' + p0.x + ' ' + midY + ', ' + p1.x + ' ' + midY + ', ' + p1.x + ' ' + p1.y;
     }
-    return '<svg class="apr-caminho-svg" viewBox="0 0 100 ' + (n * 100) + '" preserveAspectRatio="none" aria-hidden="true">' +
+    // grid-row inline: "1 / span N" — N (nº de lições) só é conhecido aqui
+    // em JS; "-1" no CSS não alcançaria as linhas implícitas dos itens
+    // (ver comentário em .apr-caminho-svg no styles.css). É essa altura
+    // resolvida de verdade pelo grid — e não position:absolute+height:100%
+    // num container de altura automática — que fazia a curva não aparecer
+    // de verdade antes (só as bolhas ficavam visíveis).
+    return '<svg class="apr-caminho-svg" style="grid-row: 1 / span ' + n + '" viewBox="0 0 100 ' + (n * 100) + '" preserveAspectRatio="none" aria-hidden="true">' +
       '<defs><linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">' +
-      '<stop offset="0%" stop-color="var(--au)"></stop><stop offset="100%" stop-color="var(--au-2)"></stop>' +
+      '<stop offset="0%" stop-color="' + cores[0] + '"></stop><stop offset="100%" stop-color="' + cores[1] + '"></stop>' +
       '</linearGradient></defs>' +
       '<path d="' + d + '" fill="none" stroke="url(#' + gradId + ')" stroke-width="3" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>' +
       '</svg>';
@@ -475,11 +511,18 @@
       unidade.licoes.forEach(function (l, idx) {
         var feita = prog.completedLessons.indexOf(l.id) !== -1;
         var desbloqueada = _aprLicaoDesbloqueada(unidade, idxUnidade, idx);
+        // grid-row inline (idx+1): sem isso, o item (sem posição explícita)
+        // é auto-posicionado pelo grid DEPOIS de todas as linhas ocupadas
+        // pelo SVG (que ocupa "1 / span N" na mesma coluna) — o algoritmo
+        // de auto-placement do CSS Grid nunca sobrepõe um item explícito,
+        // então as bolhas apareciam empurradas pra baixo da curva inteira
+        // em vez de alinhadas sobre ela. Com grid-row igual à posição da
+        // linha, a bolha ocupa a MESMA linha que a curva passa por baixo.
         html += '<button type="button" class="apr-licao-item' +
           (feita ? ' apr-licao-feita' : '') + (desbloqueada ? '' : ' apr-licao-bloqueada') +
           (idx === licaoAtualIdx ? ' apr-licao-atual' : '') +
           (idx % 2 === 0 ? ' apr-licao-esq' : ' apr-licao-dir') +
-          '" data-licao="' + l.id + '"' + (desbloqueada ? '' : ' disabled aria-disabled="true"') + '>' +
+          '" style="grid-row:' + (idx + 1) + '" data-licao="' + l.id + '"' + (desbloqueada ? '' : ' disabled aria-disabled="true"') + '>' +
           '<div class="apr-licao-bolha">' + (feita ? '<i class="fa fa-check"></i>' : (desbloqueada ? (idx + 1) : '<i class="fa fa-lock"></i>')) +
           (feita ? '<i class="fa fa-star apr-licao-star"></i>' : '') +
           '</div>' +
@@ -546,10 +589,7 @@
       '<h2 class="apr-ensinar-titulo">' + licao.titulo + '</h2>' +
       '</div>' +
       '</div>' +
-      '<div class="apr-voc-lista">' + itensHtml + '</div>' +
-      '<div class="apr-ensinar-rodape">' +
-      '<button type="button" class="apr-resultado-btn apr-ensinar-praticar" id="apr-ensinar-praticar">Começar a praticar</button>' +
-      '</div>';
+      '<div class="apr-voc-lista">' + itensHtml + '</div>';
 
     // Botões de áudio são adicionados via DOM (nunca por innerHTML) porque
     // carregam um listener — mesmo padrão usado nas opções/perguntas dos
@@ -560,8 +600,19 @@
       if (slot && botaoAudio) slot.appendChild(botaoAudio);
     });
 
-    var btnPraticar = document.getElementById('apr-ensinar-praticar');
-    if (btnPraticar) btnPraticar.addEventListener('click', function () { _aprRenderExercicio(); });
+    // O botão "Começar a praticar" mora em #apr-licao-rodape — elemento
+    // IRMÃO de #apr-exercicio-corpo (ver index.html), fora da área que
+    // rola. Sem position:sticky/fixed: como .apr-tela-licao é flex-column
+    // de altura fixa e o corpo é quem tem flex:1 + scroll próprio, o
+    // rodapé é só o último item da coluna — nunca precisa "grudar" em
+    // lugar nenhum porque nunca esteve dentro do que rola.
+    var rodape = document.getElementById('apr-licao-rodape');
+    if (rodape) {
+      rodape.classList.remove('apr-licao-rodape-oculto'); // desfaz estado deixado por um "parear" anterior
+      rodape.innerHTML = '<button type="button" class="apr-resultado-btn apr-ensinar-praticar" id="apr-ensinar-praticar">Começar a praticar</button>';
+      var btnPraticar = document.getElementById('apr-ensinar-praticar');
+      if (btnPraticar) btnPraticar.addEventListener('click', function () { _aprRenderExercicio(); });
+    }
   }
 
   function _aprSairLicao() {
@@ -669,23 +720,25 @@
     if (!ex) { _aprConcluirLicao(); return; }
     // Personagem sempre presente: a coruja + a "bolha de fala" com a
     // instrução/pergunta ficam fixas aqui; cada tipo de exercício só
-    // preenche a bolha e a área de opções abaixo. O rodapé com o botão
-    // VERIFICAR/CONTINUAR fica fixo (sticky) no fim da tela — mesmo
-    // mecanismo do rodapé da tela "Vamos aprender" (ver .apr-ex-rodape
-    // em styles.css e #apr-exercicio-corpo, que é quem rola). "parear"
-    // começa com o rodapé oculto (cada par já se confere sozinho).
+    // preenche a bolha e a área de opções abaixo. O botão VERIFICAR/
+    // CONTINUAR mora em #apr-licao-rodape — irmão de #apr-exercicio-corpo,
+    // fora da área que rola (ver comentário em _aprRenderEnsinar e o
+    // index.html). "parear" começa com o rodapé oculto (cada par já se
+    // confere sozinho no toque).
     corpo.innerHTML =
       '<div class="apr-ex-topo">' +
       '<img src="' + _aprOwlIdle(ex.tipo) + '" alt="" class="apr-ex-owl" id="apr-ex-owl" onerror="this.style.display=\'none\'">' +
       '<div class="apr-ex-bolha" id="apr-ex-bolha"></div>' +
       '</div>' +
-      '<div class="apr-ex-area" id="apr-ex-area"></div>' +
-      '<div class="apr-ex-rodape' + (ex.tipo === 'parear' ? ' apr-ex-rodape-oculto' : '') + '" id="apr-ex-rodape">' +
-      '<button type="button" class="apr-resultado-btn apr-ex-verificar" id="apr-ex-verificar" disabled>Verificar</button>' +
-      '</div>';
+      '<div class="apr-ex-area" id="apr-ex-area"></div>';
     var bolha = document.getElementById('apr-ex-bolha');
     var area = document.getElementById('apr-ex-area');
     _aprExVerificarFn = null;
+    var rodape = document.getElementById('apr-licao-rodape');
+    if (rodape) {
+      rodape.classList.toggle('apr-licao-rodape-oculto', ex.tipo === 'parear');
+      rodape.innerHTML = '<button type="button" class="apr-resultado-btn apr-ex-verificar" id="apr-ex-verificar" disabled>Verificar</button>';
+    }
     var btnVerificar = document.getElementById('apr-ex-verificar');
     if (btnVerificar) {
       btnVerificar.dataset.fase = 'verificar';
@@ -913,9 +966,9 @@
             _aprLicaoAtual.acertos++; // conta o exercício de parear como 1 acerto
             _aprRegistrarCombo(true);
             _aprMostrarFeedback(true);
-            var rodapePar = document.getElementById('apr-ex-rodape');
+            var rodapePar = document.getElementById('apr-licao-rodape');
             var btnPar = document.getElementById('apr-ex-verificar');
-            if (rodapePar) rodapePar.classList.remove('apr-ex-rodape-oculto');
+            if (rodapePar) rodapePar.classList.remove('apr-licao-rodape-oculto');
             if (btnPar) {
               btnPar.textContent = 'Continuar';
               btnPar.disabled = false;

@@ -501,32 +501,162 @@
   window._aprVoltarMenu = _aprVoltarMenu;
 
   /* ── Tela 3: motor de exercícios de uma lição ──────────────── */
-  var _aprLicaoAtual = null; // { unidadeId, licaoId, exercicios, idx, acertos }
+  // Fluxo híbrido (a pedido — substitui de vez o modelo antigo de "mostra
+  // 4 palavras de uma vez, depois um bloco de exercícios"): cada lição
+  // declara 2 "blocos" de 2 palavras + 1 fraseFinal (ver conteudo.js). O
+  // motor MONTA sozinho o roteiro de telas, nessa ordem:
+  //   1) ensina bloco 1 (2 palavras + exemplo) → 1 exercício de múltipla
+  //      escolha só desse par
+  //   2) ensina bloco 2 → 1 exercício de múltipla escolha desse par
+  //   3) consolidação: "parear" com as 4 palavras dos dois blocos
+  //   4) produção: "formar frase" com a fraseFinal
+  //   5) reforço (condicional): se errou alguma palavra em qualquer passo
+  //      acima, 1 exercício extra de múltipla escolha só dela antes do
+  //      resultado — acertando tudo, pula direto pro resultado.
+  // _aprLicaoAtual.passos é montado 1x ao abrir a lição (menos o reforço,
+  // que só é decidido — e anexado ao próprio array — quando o roteiro
+  // principal acaba, em _aprRenderPasso).
+  var _aprLicaoAtual = null; // { unidadeId, licaoId, passos, idx, acertos, totalPontuavel, combo, errosPalavras, passoAtual }
+
+  // Banco de distratores: achata as palavras (dos blocos) de TODAS as
+  // lições de TODAS as unidades — dá sempre variedade suficiente pros
+  // exercícios de múltipla escolha que o motor gera sozinho por par,
+  // independente de em qual unidade/lição a pessoa está.
+  function _aprPalavrasGlobais() {
+    var todas = [];
+    _aprUnidades().forEach(function (u) {
+      u.licoes.forEach(function (l) {
+        (l.blocos || []).forEach(function (b) {
+          (b.palavras || []).forEach(function (p) { todas.push(p); });
+        });
+      });
+    });
+    return todas;
+  }
+
+  // 'campo' é 'en' ou 'pt' (o idioma das OPÇÕES, não da pergunta). Nunca
+  // repete um texto já usado (resposta certa + o que vier em excluirTextos).
+  function _aprDistratores(campo, excluirTextos, n) {
+    var vistos = {};
+    (excluirTextos || []).forEach(function (t) { if (t) vistos[t] = true; });
+    var candidatos = [];
+    _aprPalavrasGlobais().forEach(function (p) {
+      var texto = p[campo];
+      if (texto && !vistos[texto]) { vistos[texto] = true; candidatos.push(texto); }
+    });
+    return _aprEmbaralhar(candidatos).slice(0, n);
+  }
+
+  // Gera 1 exercício de múltipla escolha pra UMA palavra — reaproveitado
+  // tanto pelo par (bloco) quanto pelo reforço no fim da lição. Direção
+  // (pt-en/en-pt) sorteada pra variedade; distratores vêm do banco global,
+  // excluindo a própria resposta e, quando informado, a palavra "irmã" do
+  // par (excluirExtra) pra não repetir a mesma dupla ensinada agora.
+  function _aprGerarEscolha(palavra, excluirExtra) {
+    var direcao = _aprSortear(['pt-en', 'en-pt']);
+    var enPt = (direcao === 'en-pt'); // pergunta em inglês, responde em português
+    var campo = enPt ? 'pt' : 'en';
+    var pergunta = enPt ? palavra.en : palavra.pt;
+    var correta = palavra[campo];
+    var excluir = [correta].concat((excluirExtra || []).map(function (p) { return p[campo]; }));
+    var distratores = _aprDistratores(campo, excluir, 3);
+    var opcoes = _aprEmbaralhar([correta].concat(distratores));
+    return { tipo: 'escolha', direcao: direcao, pergunta: pergunta, opcoes: opcoes, correta: correta, _refPalavra: palavra };
+  }
+
+  function _aprGerarEscolhaDoPar(bloco) {
+    var idx = Math.random() < 0.5 ? 0 : 1;
+    var palavra = bloco.palavras[idx];
+    var companheira = bloco.palavras[1 - idx];
+    return _aprGerarEscolha(palavra, [companheira]);
+  }
+
+  // Registra uma palavra como "errada nesta lição" pra possível reforço no
+  // fim (dedupe por texto em inglês). Não afeta pontuação por si só — só
+  // decide se entra 1 exercício extra depois do roteiro principal.
+  function _aprRegistrarErroPalavra(palavra) {
+    if (!_aprLicaoAtual || !palavra) return;
+    var jaTem = _aprLicaoAtual.errosPalavras.some(function (p) { return p.en === palavra.en; });
+    if (!jaTem) _aprLicaoAtual.errosPalavras.push(palavra);
+  }
+
+  // Monta o roteiro principal (sem o reforço, que é condicional e só
+  // decidido no fim — ver _aprRenderPasso).
+  function _aprMontarRoteiro(licao) {
+    var passos = [];
+    var todasPalavras = [];
+    (licao.blocos || []).forEach(function (bloco) {
+      passos.push({ tipo: 'ensinarPar', palavras: bloco.palavras, exemplo: bloco.exemplo });
+      passos.push(_aprGerarEscolhaDoPar(bloco));
+      bloco.palavras.forEach(function (p) { todasPalavras.push(p); });
+    });
+    if (todasPalavras.length) {
+      passos.push({
+        tipo: 'parear',
+        pares: todasPalavras.map(function (p) { return [p.pt, p.en]; }),
+        _palavras: todasPalavras
+      });
+    }
+    if (licao.fraseFinal) {
+      passos.push({ tipo: 'formar', en: licao.fraseFinal.en, partes: licao.fraseFinal.pt, distratores: licao.fraseFinal.distratores });
+    }
+    return passos;
+  }
 
   function _aprAbrirLicao(unidadeId, licaoId) {
     var unidade = _aprUnidade(unidadeId);
     var licao = unidade && _aprLicao(unidade, licaoId);
     if (!licao) return;
-    _aprLicaoAtual = { unidadeId: unidadeId, licaoId: licaoId, exercicios: licao.exercicios, idx: 0, acertos: 0, combo: 0, inicio: Date.now() };
+    _aprLicaoAtual = {
+      unidadeId: unidadeId, licaoId: licaoId, passos: _aprMontarRoteiro(licao), idx: 0,
+      acertos: 0, totalPontuavel: 0, combo: 0, inicio: Date.now(),
+      errosPalavras: [], reforcoAdicionado: false, passoAtual: null
+    };
     _aprGarantirComboBadge();
     _aprMostrarTela('licao');
-    // Estilo Duolingo: ensina antes de testar. Só entra direto nos exercícios
-    // se a lição não tiver vocabulário cadastrado (robustez/retrocompatibilidade).
-    if (licao.vocabulario && licao.vocabulario.length) _aprRenderEnsinar(licao);
-    else _aprRenderExercicio();
+    _aprRenderPasso();
   }
 
-  // Tela "Aprenda": mostra as palavras/frases novas da lição (inglês em
-  // destaque + tradução + áudio) antes do primeiro exercício. Reaproveita
-  // o mesmo container #apr-exercicio-corpo dos exercícios — sem precisar
-  // de nenhum elemento novo no index.html.
-  function _aprRenderEnsinar(licao) {
+  // Despacha o passo atual do roteiro. Ao chegar no fim, decide o reforço
+  // (uma vez só): se alguma palavra foi errada em qualquer passo anterior,
+  // anexa 1 exercício de múltipla escolha por palavra errada (deduplicada)
+  // ao próprio array de passos e continua o roteiro; sem erros, conclui.
+  function _aprRenderPasso() {
+    if (!_aprLicaoAtual) return;
+    var passo = _aprLicaoAtual.passos[_aprLicaoAtual.idx];
+    if (!passo) {
+      if (!_aprLicaoAtual.reforcoAdicionado && _aprLicaoAtual.errosPalavras.length) {
+        _aprLicaoAtual.reforcoAdicionado = true;
+        _aprLicaoAtual.errosPalavras.forEach(function (p) {
+          _aprLicaoAtual.passos.push(_aprGerarEscolha(p, []));
+        });
+        _aprRenderPasso();
+        return;
+      }
+      _aprConcluirLicao();
+      return;
+    }
+    _aprAtualizarBarraLicao();
+    if (passo.tipo === 'ensinarPar') _aprRenderEnsinarPar(passo);
+    else _aprRenderExercicioPasso(passo);
+  }
+
+  function _aprProximoPasso() {
+    _aprLicaoAtual.idx++;
+    _aprRenderPasso();
+  }
+
+  // Tela "Aprenda": ensina as 2 palavras de UM bloco (inglês em destaque +
+  // tradução + áudio) e uma frase de exemplo curta, antes do exercício
+  // imediato desse par. Reaproveita o mesmo container #apr-exercicio-corpo
+  // dos exercícios — sem precisar de nenhum elemento novo no index.html.
+  function _aprRenderEnsinarPar(passo) {
     var fill = document.getElementById('apr-licao-barra-fill');
-    if (fill) fill.style.width = '0%';
+    if (fill && !_aprLicaoAtual.idx) fill.style.width = '0%';
     var corpo = document.getElementById('apr-exercicio-corpo');
     if (!corpo) return;
     var owl = _aprSortear(['/webp/owl-wave.webp', '/webp/owl-idea.webp', '/webp/owl-point.webp']);
-    var vocab = licao.vocabulario || [];
+    var vocab = passo.palavras || [];
     var itensHtml = '';
     vocab.forEach(function (item, i) {
       itensHtml +=
@@ -538,15 +668,25 @@
         '<div class="apr-voc-audio-slot" id="apr-voc-audio-' + i + '"></div>' +
         '</div>';
     });
+    var exemploHtml = '';
+    if (passo.exemplo) {
+      exemploHtml =
+        '<div class="apr-exemplo">' +
+        '<div class="apr-exemplo-label">Exemplo</div>' +
+        '<div class="apr-exemplo-row"><div class="apr-exemplo-en">' + passo.exemplo.en + '</div></div>' +
+        '<div class="apr-exemplo-pt">' + passo.exemplo.pt + '</div>' +
+        '</div>';
+    }
     corpo.innerHTML =
       '<div class="apr-ensinar-topo">' +
       '<img src="' + owl + '" alt="" class="apr-ensinar-owl" onerror="this.style.display=\'none\'">' +
       '<div class="apr-ensinar-cabecalho">' +
       '<div class="apr-ex-instrucao">Vamos aprender</div>' +
-      '<h2 class="apr-ensinar-titulo">' + licao.titulo + '</h2>' +
+      '<h2 class="apr-ensinar-titulo">' + vocab.map(function (p) { return p.en; }).join(' · ') + '</h2>' +
       '</div>' +
       '</div>' +
-      '<div class="apr-voc-lista">' + itensHtml + '</div>';
+      '<div class="apr-voc-lista">' + itensHtml + '</div>' +
+      exemploHtml;
 
     // Botões de áudio são adicionados via DOM (nunca por innerHTML) porque
     // carregam um listener — mesmo padrão usado nas opções/perguntas dos
@@ -556,19 +696,24 @@
       var botaoAudio = _aprCriarBotaoAudio(item.en);
       if (slot && botaoAudio) slot.appendChild(botaoAudio);
     });
+    if (passo.exemplo) {
+      var slotEx = document.querySelector('.apr-exemplo-row');
+      var botaoAudioEx = _aprCriarBotaoAudio(passo.exemplo.en);
+      if (slotEx && botaoAudioEx) slotEx.appendChild(botaoAudioEx);
+    }
 
-    // O botão "Começar a praticar" mora em #apr-licao-rodape — elemento
-    // IRMÃO de #apr-exercicio-corpo (ver index.html), fora da área que
-    // rola. Sem position:sticky/fixed: como .apr-tela-licao é flex-column
-    // de altura fixa e o corpo é quem tem flex:1 + scroll próprio, o
-    // rodapé é só o último item da coluna — nunca precisa "grudar" em
-    // lugar nenhum porque nunca esteve dentro do que rola.
+    // O botão "Continuar" mora em #apr-licao-rodape — elemento IRMÃO de
+    // #apr-exercicio-corpo (ver index.html), fora da área que rola. Sem
+    // position:sticky/fixed: como .apr-tela-licao é flex-column de altura
+    // fixa e o corpo é quem tem flex:1 + scroll próprio, o rodapé é só o
+    // último item da coluna — nunca precisa "grudar" em lugar nenhum
+    // porque nunca esteve dentro do que rola.
     var rodape = document.getElementById('apr-licao-rodape');
     if (rodape) {
       rodape.classList.remove('apr-licao-rodape-oculto'); // desfaz estado deixado por um "parear" anterior
-      rodape.innerHTML = '<button type="button" class="apr-resultado-btn apr-ensinar-praticar" id="apr-ensinar-praticar">Começar a praticar</button>';
+      rodape.innerHTML = '<button type="button" class="apr-resultado-btn apr-ensinar-praticar" id="apr-ensinar-praticar">Continuar</button>';
       var btnPraticar = document.getElementById('apr-ensinar-praticar');
-      if (btnPraticar) btnPraticar.addEventListener('click', function () { _aprRenderExercicio(); });
+      if (btnPraticar) btnPraticar.addEventListener('click', function () { _aprProximoPasso(); });
     }
   }
 
@@ -582,7 +727,7 @@
   function _aprAtualizarBarraLicao() {
     var fill = document.getElementById('apr-licao-barra-fill');
     if (!fill || !_aprLicaoAtual) return;
-    var pct = Math.round((_aprLicaoAtual.idx / _aprLicaoAtual.exercicios.length) * 100);
+    var pct = Math.round((_aprLicaoAtual.idx / _aprLicaoAtual.passos.length) * 100);
     fill.style.width = pct + '%';
   }
 
@@ -645,6 +790,9 @@
       if (!_aprExVerificarFn) return;
       var acertou = !!_aprExVerificarFn();
       if (acertou) _aprLicaoAtual.acertos++;
+      else if (_aprLicaoAtual.passoAtual && _aprLicaoAtual.passoAtual.tipo === 'escolha' && _aprLicaoAtual.passoAtual._refPalavra) {
+        _aprRegistrarErroPalavra(_aprLicaoAtual.passoAtual._refPalavra);
+      }
       _aprRegistrarCombo(acertou);
       _aprMostrarFeedback(acertou);
       btn.textContent = 'Continuar';
@@ -653,7 +801,7 @@
       btn.dataset.fase = 'continuar';
       btn.disabled = false;
     } else {
-      _aprProximoExercicio();
+      _aprProximoPasso();
     }
   }
 
@@ -663,23 +811,21 @@
   // acerto/erro em _aprMostrarFeedback.
   function _aprOwlIdle(tipo) {
     if (tipo === 'parear') return _aprSortear(['/webp/owl-search.webp', '/webp/owl-point.webp']);
-    if (tipo === 'completar') return _aprSortear(['/webp/owl-idea.webp', '/webp/owl-tip.webp']);
     if (tipo === 'formar') return _aprSortear(['/webp/owl-idea.webp', '/webp/owl-point.webp']);
     return _aprSortear(['/webp/owl-point.webp', '/webp/owl-wave.webp', '/webp/owl-idea.webp']);
   }
 
-  function _aprRenderExercicio() {
+  function _aprRenderExercicioPasso(ex) {
     if (!_aprLicaoAtual) return;
-    _aprAtualizarBarraLicao();
     var corpo = document.getElementById('apr-exercicio-corpo');
     if (!corpo) return;
-    var ex = _aprLicaoAtual.exercicios[_aprLicaoAtual.idx];
-    if (!ex) { _aprConcluirLicao(); return; }
+    _aprLicaoAtual.passoAtual = ex;
+    _aprLicaoAtual.totalPontuavel++;
     // Personagem sempre presente: a coruja + a "bolha de fala" com a
     // instrução/pergunta ficam fixas aqui; cada tipo de exercício só
     // preenche a bolha e a área de opções abaixo. O botão VERIFICAR/
     // CONTINUAR mora em #apr-licao-rodape — irmão de #apr-exercicio-corpo,
-    // fora da área que rola (ver comentário em _aprRenderEnsinar e o
+    // fora da área que rola (ver comentário em _aprRenderEnsinarPar e o
     // index.html). "parear" começa com o rodapé oculto (cada par já se
     // confere sozinho no toque).
     corpo.innerHTML =
@@ -702,14 +848,8 @@
       btnVerificar.addEventListener('click', _aprExOnClickRodape);
     }
     if (ex.tipo === 'escolha') _aprRenderEscolha(bolha, area, ex);
-    else if (ex.tipo === 'completar') _aprRenderCompletar(bolha, area, ex);
     else if (ex.tipo === 'parear') _aprRenderParear(bolha, area, ex);
     else if (ex.tipo === 'formar') _aprRenderFormar(bolha, area, ex);
-  }
-
-  function _aprProximoExercicio() {
-    _aprLicaoAtual.idx++;
-    _aprRenderExercicio();
   }
 
   // Múltipla escolha (PT→EN ou EN→PT): pergunta + 4 opções, uma correta.
@@ -733,18 +873,7 @@
     _aprMontarOpcoes(ex.opcoes, ex.correta, /* opcoesEmIngles */ enPt);
   }
 
-  // Completar frase: mostra a frase com a lacuna (___) destacada + opções.
-  // As opções aqui são sempre palavras em inglês → sempre ganham áudio.
-  function _aprRenderCompletar(bolha, area, ex) {
-    var fraseHtml = ex.frase.replace('___', '<span class="apr-lacuna">___</span>');
-    bolha.innerHTML =
-      '<div class="apr-ex-instrucao">Complete a frase:</div>' +
-      '<div class="apr-ex-pergunta apr-ex-frase">' + fraseHtml + '</div>';
-    area.innerHTML = '<div class="apr-ex-opcoes" id="apr-ex-opcoes"></div>';
-    _aprMontarOpcoes(ex.opcoes, ex.correta, /* opcoesEmIngles */ true);
-  }
-
-  // Monta os botões de opção (reaproveitado por escolha e completar).
+  // Monta os botões de opção (reaproveitado por escolha).
   // Estilo Duolingo: tocar numa opção só SELECIONA (destaque azul) e
   // libera o botão VERIFICAR do rodapé; a conferência de verdade (travar,
   // marcar certo/errado, feedback) só roda quando o usuário toca em
@@ -937,6 +1066,10 @@
           b.classList.add('apr-par-errada');
           var elEsq = selEsq.el;
           elEsq.classList.add('apr-par-errada');
+          if (ex._palavras) {
+            var pErrada = ex._palavras.filter(function (p) { return p.pt === selEsq.valor; })[0];
+            if (pErrada) _aprRegistrarErroPalavra(pErrada);
+          }
           setTimeout(function () {
             b.classList.remove('apr-par-errada');
             elEsq.classList.remove('apr-par-errada', 'apr-par-selecionada');
@@ -1048,7 +1181,7 @@
     _aprSalvarLocal();
     _aprSalvarNuvem();
 
-    var total = _aprLicaoAtual.exercicios.length;
+    var total = _aprLicaoAtual.totalPontuavel;
     var acertos = Math.min(_aprLicaoAtual.acertos, total);
     var pct = total ? acertos / total : 1;
     var owl, titulo;

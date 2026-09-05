@@ -449,47 +449,11 @@
   /* ── Tela 2: lições de uma unidade ─────────────────────────── */
   var _aprUnidadeAtualId = null;
 
-  // Gera o SVG do caminho sinuoso (estilo Duolingo) que fica atrás das
-  // bolhas de lição. Usa o MESMO sistema de coordenadas percentual (0-100
-  // de largura) que o CSS usa pra posicionar as bolhas (ver .apr-licao-esq/
-  // .apr-licao-dir em styles.css) — assim a linha sempre passa exatamente
-  // pelo centro de cada bolha, em qualquer largura de tela, sem precisar
-  // medir layout via JS. preserveAspectRatio="none" estica o SVG pra
-  // altura real do container (definida pelas próprias lições em fluxo).
-  // Cores por unidade resolvidas aqui em JS (hex direto), não via var()
-  // dentro do SVG — elimina qualquer dúvida de renderização entre
-  // navegadores (o resto do módulo já usa as mesmas cores no CSS, ver
-  // .apr-lista-licoes[data-unidade="u2"] etc. em styles.css).
-  var APR_CORES_UNIDADE = {
-    u1: ['#38bdf8', '#22c55e'], u2: ['#a855f7', '#7c3aed'],
-    u3: ['#fb923c', '#ef4444'], u4: ['#34d399', '#0d9488']
-  };
-
-  function _aprCaminhoSvg(n, unidadeId) {
-    if (!n) return '';
-    var cores = APR_CORES_UNIDADE[unidadeId] || APR_CORES_UNIDADE.u1;
-    var gradId = 'aprCaminhoGrad-' + unidadeId;
-    var pontos = [];
-    for (var i = 0; i < n; i++) pontos.push({ x: (i % 2 === 0) ? 30 : 70, y: i * 100 + 50 });
-    var d = 'M ' + pontos[0].x + ' ' + pontos[0].y;
-    for (var j = 1; j < pontos.length; j++) {
-      var p0 = pontos[j - 1], p1 = pontos[j], midY = (p0.y + p1.y) / 2;
-      d += ' C ' + p0.x + ' ' + midY + ', ' + p1.x + ' ' + midY + ', ' + p1.x + ' ' + p1.y;
-    }
-    // grid-row inline: "1 / span N" — N (nº de lições) só é conhecido aqui
-    // em JS; "-1" no CSS não alcançaria as linhas implícitas dos itens
-    // (ver comentário em .apr-caminho-svg no styles.css). É essa altura
-    // resolvida de verdade pelo grid — e não position:absolute+height:100%
-    // num container de altura automática — que fazia a curva não aparecer
-    // de verdade antes (só as bolhas ficavam visíveis).
-    return '<svg class="apr-caminho-svg" style="grid-row: 1 / span ' + n + '" viewBox="0 0 100 ' + (n * 100) + '" preserveAspectRatio="none" aria-hidden="true">' +
-      '<defs><linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">' +
-      '<stop offset="0%" stop-color="' + cores[0] + '"></stop><stop offset="100%" stop-color="' + cores[1] + '"></stop>' +
-      '</linearGradient></defs>' +
-      '<path d="' + d + '" fill="none" stroke="url(#' + gradId + ')" stroke-width="3" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>' +
-      '</svg>';
-  }
-
+  // SEM linha conectora (removida a pedido — só as bolhas, mais "ar" entre
+  // elas, sensação de caminho que sobe/desce sem poluição visual). Volta a
+  // ser flexbox simples em coluna: .apr-licao-esq/.apr-licao-dir (ver
+  // styles.css) alternam a margem lateral pra dar o zigue-zague só com o
+  // posicionamento das próprias bolhas, sem precisar de SVG nem CSS Grid.
   function _aprAbrirUnidade(unidadeId) {
     var unidade = _aprUnidade(unidadeId);
     if (!unidade) return;
@@ -506,23 +470,16 @@
     }
     var lista = document.getElementById('apr-lista-licoes');
     if (lista) {
-      lista.setAttribute('data-unidade', unidadeId); // dá cor própria à trilha/bolhas (ver CSS)
-      var html = _aprCaminhoSvg(unidade.licoes.length, unidadeId);
+      lista.setAttribute('data-unidade', unidadeId); // dá cor própria às bolhas (ver CSS)
+      var html = '';
       unidade.licoes.forEach(function (l, idx) {
         var feita = prog.completedLessons.indexOf(l.id) !== -1;
         var desbloqueada = _aprLicaoDesbloqueada(unidade, idxUnidade, idx);
-        // grid-row inline (idx+1): sem isso, o item (sem posição explícita)
-        // é auto-posicionado pelo grid DEPOIS de todas as linhas ocupadas
-        // pelo SVG (que ocupa "1 / span N" na mesma coluna) — o algoritmo
-        // de auto-placement do CSS Grid nunca sobrepõe um item explícito,
-        // então as bolhas apareciam empurradas pra baixo da curva inteira
-        // em vez de alinhadas sobre ela. Com grid-row igual à posição da
-        // linha, a bolha ocupa a MESMA linha que a curva passa por baixo.
         html += '<button type="button" class="apr-licao-item' +
           (feita ? ' apr-licao-feita' : '') + (desbloqueada ? '' : ' apr-licao-bloqueada') +
           (idx === licaoAtualIdx ? ' apr-licao-atual' : '') +
           (idx % 2 === 0 ? ' apr-licao-esq' : ' apr-licao-dir') +
-          '" style="grid-row:' + (idx + 1) + '" data-licao="' + l.id + '"' + (desbloqueada ? '' : ' disabled aria-disabled="true"') + '>' +
+          '" data-licao="' + l.id + '"' + (desbloqueada ? '' : ' disabled aria-disabled="true"') + '>' +
           '<div class="apr-licao-bolha">' + (feita ? '<i class="fa fa-check"></i>' : (desbloqueada ? (idx + 1) : '<i class="fa fa-lock"></i>')) +
           (feita ? '<i class="fa fa-star apr-licao-star"></i>' : '') +
           '</div>' +

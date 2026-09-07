@@ -454,7 +454,8 @@
      O hub inteiro (menu, streak, quiz, ranking, loader dos jogos
      externos) foi extraído pra Jogos/hub.js — quem só quer ver o
      cardápio nunca baixa esse código. Carrega no primeiro toque no
-     badge da coruja ou na pill "Joguinhos" (ver _abrirGamesHub abaixo)
+     badge da coruja ou no botao "Jogos" da bottom nav do modo cliente
+     (slide Utilidades) -- ver _abrirGamesHub abaixo
      e, uma vez carregado, o próprio hub.js SUBSTITUI a função abaixo
      por sua versão real (mesmo nome — ver window._abrirGamesHub no
      fim de Jogos/hub.js), então cliques seguintes já chamam ela direto,
@@ -480,15 +481,15 @@
       if (typeof showToastSimples === 'function') showToastSimples('Não foi possível abrir os jogos. Verifique a conexão.', '/webp/owl-sign.webp');
     });
   }
-  // Exposto pro badge da coruja e pela pill "Joguinhos" no header
-  // (index.html). Ver comentário acima: hub.js troca este stub pela
-  // versão real assim que carrega.
+  // Exposto pro badge da coruja (index.html) e pro botão "Jogos" da
+  // bottom nav no modo cliente. Ver comentário acima: hub.js troca este
+  // stub pela versão real assim que carrega.
   window._abrirGamesHub = _abrirGamesHub;
 
   /* ── Módulo Aprender: Aprender/hub.js + Aprender/conteudo.js carregados
      sob demanda ──────────────────────────────────────────────────
-     Mesmo padrão do hub de jogos acima: só baixa quem toca na pill
-     "Aprender". conteudo.js (banco de lições) entra ANTES de hub.js —
+     Mesmo padrão do hub de jogos acima: só baixa quem toca no botão
+     "Aprender" da bottom nav do modo cliente. conteudo.js (banco de lições) entra ANTES de hub.js —
      hub.js lê window.APRENDER_CONTEUDO já na primeira renderização.
      Uma vez carregado, o próprio hub.js SUBSTITUI a função abaixo pela
      versão real (mesmo nome — ver window._abrirAprender no fim de
@@ -514,8 +515,8 @@
       if (typeof showToastSimples === 'function') showToastSimples('Não foi possível abrir. Verifique a conexão.', '/webp/owl-sign.webp');
     });
   }
-  // Exposto pela pill "Aprender" no header (index.html). Ver comentário
-  // acima: hub.js troca este stub pela versão real assim que carrega.
+  // Exposto pro botão "Aprender" da bottom nav no modo cliente. Ver
+  // comentário acima: hub.js troca este stub pela versão real ao carregar.
   window._abrirAprender = _abrirAprender;
 
   /* ── Máscara de WhatsApp progressiva: (15) 9 9999-9999 ──────────
@@ -2686,14 +2687,10 @@
     // Se o hub de jogos estava aberto, fecha pra mostrar os resultados.
     if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) {
       _fecharGamesHub();
-      const gp = document.getElementById('pill-games-btn');
-      if (gp) gp.classList.remove('active');
     }
     // Idem pro hub Aprender.
     if (typeof _aprenderAberto === 'function' && _aprenderAberto()) {
       _fecharAprender();
-      const ap = document.getElementById('pill-aprender-btn');
-      if (ap) ap.classList.remove('active');
     }
     searchQuery = e.target.value.trim();
     renderLojas();
@@ -3896,6 +3893,35 @@
     document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
     document.getElementById('nav-cadastrar').classList.add('active');
     openModal(); // abre o seletor de planos → cadastro
+  });
+
+  /* ── Bottom nav do modo cliente (slide Utilidades / body.feed-mode) ──
+     Jogos · Aprender · Conta. Os três abrem overlays em tela cheia
+     (hubs) ou modal (conta), não "abas" da home — por isso NÃO mexem no
+     .active da nav: quem estava marcado (Início) continua marcado quando
+     o overlay fecha, sem estado preso. Só disparam os fluxos que já
+     existem. A visibilidade dos botões é 100% CSS (ver styles.css). */
+  document.getElementById('nav-jogos').addEventListener('click', () => {
+    // Só um hub por vez — mesma regra do badge da coruja.
+    if (typeof _aprenderAberto === 'function' && _aprenderAberto()) { _fecharAprender(); }
+    _abrirGamesHub();
+  });
+
+  document.getElementById('nav-aprender').addEventListener('click', () => {
+    if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) { _fecharGamesHub(); }
+    _abrirAprender();
+  });
+
+  document.getElementById('nav-conta').addEventListener('click', () => {
+    // Deslogado → mesmo login/cadastro de cliente usado pelo ranking dos
+    // jogos. Logado → painel de conta que já existe (apelido, foto, tema,
+    // recordes, favoritos, sair). _cliUser é o estado de sessão do
+    // Firebase Auth mantido lá embaixo, no bloco de auth do cliente.
+    if (_cliUser) {
+      cliAbrirPainelConta();
+    } else {
+      cliAbrirLogin('Entre para salvar sua pontuação, seus favoritos e aparecer no ranking da cidade.');
+    }
   });
 
   /* ── Modais de login ─────────────────────────────────────── */
@@ -6314,42 +6340,11 @@
   /* ── Pill filter events ──────────────────────────────────── */
   document.querySelectorAll('.pill-btn:not(.pill-bairro-btn)').forEach(btn => {
     btn.addEventListener('click', () => {
-      // Pill Joguinhos: não filtra lojas — abre/fecha o hub de mini-games.
-      if (btn.dataset.filter === 'games') {
-        const jaAtiva = btn.classList.contains('active');
-        document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
-        if (jaAtiva) {
-          // Clicar de novo fecha o hub e volta pra lista. Se o hub.js ainda
-          // está carregando (2º toque bem rápido, antes do 1º terminar),
-          // não há hub aberto pra fechar ainda — ignora em silêncio.
-          if (typeof _fecharGamesHub === 'function') _fecharGamesHub();
-          activePillFilter = 'all';
-          renderLojas();
-        } else {
-          // Se o hub Aprender estava aberto, fecha antes (só um hub por vez).
-          if (typeof _aprenderAberto === 'function' && _aprenderAberto()) { _fecharAprender(); }
-          btn.classList.add('active');
-          _abrirGamesHub();
-        }
-        return;
-      }
-      // Pill Aprender: mesmo tratamento — não filtra lojas, abre/fecha o hub.
-      if (btn.dataset.filter === 'aprender') {
-        const jaAtiva = btn.classList.contains('active');
-        document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
-        if (jaAtiva) {
-          if (typeof _fecharAprender === 'function') _fecharAprender();
-          activePillFilter = 'all';
-          renderLojas();
-        } else {
-          // Se o hub de jogos estava aberto, fecha antes (só um hub por vez).
-          if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) { _fecharGamesHub(); }
-          btn.classList.add('active');
-          _abrirAprender();
-        }
-        return;
-      }
-      // Qualquer outra pill: se algum hub estava aberto, fecha e volta pra lista.
+      // As pills "Jogos" e "Aprender" saíram desta faixa: aqui só moram
+      // filtros de LOJA. Os dois hubs agora abrem pela bottom nav do modo
+      // cliente (slide Utilidades) e, no caso dos jogos, também pelo badge
+      // da coruja — ver os handlers de #nav-jogos / #nav-aprender.
+      // Se algum hub estava aberto, fecha e volta pra lista.
       if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) {
         _fecharGamesHub();
       }

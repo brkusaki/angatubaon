@@ -683,6 +683,19 @@
     .nav-item.active i { filter: drop-shadow(0 0 4px rgba(255,68,68,0.35)); }
     .nav-item:active { transform: scale(0.88); }
     .nav-item.hidden { display: none !important; }
+    /* ── Nav contextual (slide Lojas × slide Utilidades) ──────────
+       Slide Lojas (idx 0): Início · Buscar · Minha Loja · Cadastrar.
+       Slide Utilidades (idx 1 → body.feed-mode): o usuário é cliente,
+       então os CTAs de lojista saem e entram Jogos · Aprender · Conta.
+       Feito só com CSS em cima de body.feed-mode (a mesma classe que
+       _irParaPaginaHome alterna) pra não recriar DOM a cada swipe e
+       pra já nascer certo quando a página inicial preferida é a 2 —
+       o <script> inline do index.html adiciona feed-mode antes do
+       primeiro paint. `visibility` + `position:absolute` não são
+       necessários aqui: a nav é flex e display:none basta. ── */
+    .nav-item--cli { display: none; }
+    body.feed-mode .nav-item--loja { display: none; }
+    body.feed-mode .nav-item--cli  { display: flex; }
 
     /* ════════════════════════════════════════════
        TOAST
@@ -5111,12 +5124,10 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   75% { transform: translateY(-4px) rotate(4deg); }
 }
 
-/* ═════ Hub de Mini-Games (aba Joguinhos) ══ */
-.pill-games-btn.active {
-  background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(255,68,68,0.15));
-  border-color: rgba(168,85,247,0.5);
-  color: #fff;
-}
+/* ═════ Hub de Mini-Games (aba Joguinhos) ══
+   Aberto pelo badge da coruja ou pelo botão "Jogos" da bottom nav no
+   modo cliente (slide Utilidades). A pill de filtro foi removida — não
+   fazia sentido no meio dos filtros de loja. */
 #games-hub { animation: qzFade .3s ease; }
 /* ═════ Cabeçalho do hub de jogos ══════════════════════════════
    Barra superior em FLUXO (voltar · som). Antes os botões
@@ -6638,11 +6649,9 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
    exercício. Mantém os nomes de classe e o mecanismo de tela cheia
    originais — só evolui valores e acrescenta o que é novo.
 ══════════════════════════════════════════════════════════════ */
-.pill-aprender-btn.active {
-  background: linear-gradient(135deg, rgba(56,189,248,0.25), rgba(34,197,94,0.15));
-  border-color: rgba(56,189,248,0.5);
-  color: #fff;
-}
+/* Aberto pelo botão "Aprender" da bottom nav no modo cliente (slide
+   Utilidades). A pill de filtro foi removida — não fazia sentido no
+   meio dos filtros de loja. */
 #aprender-hub { animation: qzFade .3s ease; }
 
 /* Pílula de XP dentro da faixa de ofensiva (reaproveitada de .streak-faixa) */

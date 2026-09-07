@@ -271,12 +271,6 @@
       <button class="pill-btn" data-filter="featured">
         <i class="fa fa-star" style="font-size:10px;"></i> Destaques
       </button>
-      <button class="pill-btn pill-games-btn" id="pill-games-btn" data-filter="games">
-        <i class="fa fa-gamepad" style="font-size:10px;"></i> Jogos
-      </button>
-      <button class="pill-btn pill-aprender-btn" id="pill-aprender-btn" data-filter="aprender">
-        <i class="fa fa-graduation-cap" style="font-size:10px;"></i> Aprender
-      </button>
       <button class="pill-btn pill-bairro-btn" id="pill-bairro-btn" data-filter="bairro">
         <i class="fa fa-map-marker-alt" style="font-size:10px;"></i> <span id="pill-bairro-label">Bairro</span>
         <i class="fa fa-chevron-down pill-bairro-caret" style="font-size:8px;margin-left:2px;opacity:.6;"></i>
@@ -3269,11 +3263,20 @@
   </div>
 
   <!-- ══════════════════════════════ BOTTOM NAV -->
+  <!-- Nav contextual: no slide Lojas (idx 0) valem os botões de lojista
+       (.nav-item--loja); no slide Utilidades (idx 1, body.feed-mode) o
+       usuário é cliente e valem os de cliente (.nav-item--cli). A troca
+       é 100% CSS em cima de body.feed-mode — a mesma classe que
+       _irParaPaginaHome() já alterna no swipe/dots — então não há
+       recriação de DOM a cada swipe nem "pulo" no boot. -->
   <nav class="bottom-nav" id="bottom-nav">
     <button class="nav-item active" id="nav-inicio"><i class="fa fa-house"></i><span>Início</span></button>
-    <button class="nav-item" id="nav-buscar"><i class="fa fa-search"></i><span>Buscar</span></button>
+    <button class="nav-item nav-item--loja" id="nav-buscar"><i class="fa fa-search"></i><span>Buscar</span></button>
     <button class="nav-item nav-item--loja" id="nav-loja"><i class="fa fa-store"></i><span>Minha Loja</span></button>
-    <button class="nav-item nav-item--cadastrar" id="nav-cadastrar"><i class="fa fa-plus-circle"></i><span>Cadastrar</span></button>
+    <button class="nav-item nav-item--loja nav-item--cadastrar" id="nav-cadastrar"><i class="fa fa-plus-circle"></i><span>Cadastrar</span></button>
+    <button class="nav-item nav-item--cli" id="nav-jogos"><i class="fa fa-gamepad"></i><span>Jogos</span></button>
+    <button class="nav-item nav-item--cli" id="nav-aprender"><i class="fa fa-graduation-cap"></i><span>Aprender</span></button>
+    <button class="nav-item nav-item--cli" id="nav-conta"><i class="fa fa-circle-user"></i><span>Conta</span></button>
   </nav>
 
   <!-- ══════════════════════════════ UPDATE BANNER -->

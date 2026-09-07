@@ -5592,25 +5592,25 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 
     /* ── Painel de conta ── */
     .cli-conta-head {
-      display: flex; align-items: center; gap: 14px;
-      padding: 4px 0 16px;
+      display: flex; align-items: center; gap: 16px;
+      padding: 6px 0 20px;
     }
     .cli-conta-avatar {
-      width: 56px; height: 56px; border-radius: 50%;
+      width: 68px; height: 68px; border-radius: 50%;
       background: linear-gradient(135deg, var(--red), #b91c1c);
       display: flex; align-items: center; justify-content: center;
-      font-family: var(--font-h); font-weight: 800; font-size: 24px;
+      font-family: var(--font-h); font-weight: 800; font-size: 28px;
       color: #fff; flex-shrink: 0;
       box-shadow: 0 2px 10px rgba(255,68,68,0.35);
     }
     .cli-conta-info { min-width: 0; flex: 1; }
     .cli-conta-info .nome {
-      font-family: var(--font-h); font-weight: 800; font-size: 17px;
-      color: var(--text); white-space: nowrap; overflow: hidden;
-      text-overflow: ellipsis;
+      font-family: var(--font-h); font-weight: 800; font-size: 20px;
+      letter-spacing: -0.01em; color: var(--text); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
     }
     .cli-conta-info .email {
-      font-size: 12px; color: var(--muted); margin-top: 2px;
+      font-size: 12px; color: var(--muted); margin-top: 3px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
@@ -5627,9 +5627,23 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     .cli-conta-row:active { opacity: 0.6; }
     .cli-conta-row i { width: 22px; text-align: center; font-size: 16px; color: var(--muted); }
     .cli-conta-row .row-label { flex: 1; }
-    .cli-conta-row .row-value { font-size: 13px; color: var(--muted); }
+    .cli-conta-row .row-value {
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      padding: 4px 10px; border-radius: 999px;
+      background: var(--surface2); border: 1px solid var(--border);
+    }
     .cli-conta-row.danger { color: var(--red); }
     .cli-conta-row.danger i { color: var(--red); }
+
+    /* Agrupa Tema + Sair num bloco destacado do conteúdo acima */
+    .cli-conta-config {
+      margin-top: 18px; padding-top: 2px;
+      border-top: 1px solid var(--border);
+      background: var(--bg); border-radius: var(--r-md);
+      overflow: hidden;
+    }
+    .cli-conta-config .cli-conta-row { padding: 14px 12px; border-top: 1px solid var(--border); }
+    .cli-conta-config .cli-conta-row:first-child { border-top: none; }
 
     /* ── Avatar grande com foto + botão de câmera ── */
     .cli-conta-avatar { position: relative; overflow: visible; }
@@ -5640,11 +5654,11 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     .cli-conta-avatar-ini2 {
       width: 100%; height: 100%; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-family: var(--font-h); font-weight: 800; font-size: 24px; color: #fff;
+      font-family: var(--font-h); font-weight: 800; font-size: 28px; color: #fff;
     }
     .cli-conta-avatar-cam {
       position: absolute; right: -2px; bottom: -2px;
-      width: 22px; height: 22px; border-radius: 50%;
+      width: 24px; height: 24px; border-radius: 50%;
       background: var(--surface); border: 2px solid var(--bg);
       color: var(--text); font-size: 10px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
@@ -5659,10 +5673,11 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     .cli-conta-apelido-view { display: flex; align-items: center; gap: 8px; }
     .cli-conta-apelido-btn {
       border: none; background: none; color: var(--muted);
-      font-size: 12px; cursor: pointer; padding: 2px; flex-shrink: 0;
+      font-size: 11px; cursor: pointer; padding: 2px; flex-shrink: 0;
+      opacity: 0.55; transition: opacity 0.15s;
       -webkit-tap-highlight-color: transparent;
     }
-    .cli-conta-apelido-btn:active { opacity: 0.6; }
+    .cli-conta-apelido-btn:active { opacity: 0.9; }
     .cli-conta-apelido-edit { display: flex; align-items: center; gap: 6px; }
     .cli-conta-apelido-input {
       flex: 1; min-width: 0; padding: 6px 10px;
@@ -5684,40 +5699,46 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     .cli-conta-apelido-ok:disabled { opacity: 0.5; cursor: default; }
 
     /* ── Seções (recordes / favoritas) ── */
-    .cli-conta-secao { padding: 12px 0 4px; border-top: 1px solid var(--border); }
+    .cli-conta-secao { padding: 20px 0 4px; border-top: 1px solid var(--border); }
     .cli-conta-secao-tit {
       font-family: var(--font-h); font-weight: 800; font-size: 13px;
-      text-transform: uppercase; letter-spacing: 0.04em;
-      color: var(--muted); margin-bottom: 10px;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--muted); margin-bottom: 12px;
       display: flex; align-items: center; gap: 8px;
     }
     .cli-conta-secao-tit i { color: var(--red); font-size: 13px; }
-    .cli-conta-divisor { height: 4px; }
 
-    /* ── Recordes ── */
-    .cli-conta-recordes { display: flex; flex-direction: column; gap: 6px; }
+    /* ── Recordes: grid de cards (2 colunas no mobile) ── */
+    .cli-conta-recordes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .cli-rec-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 12px; border-radius: 10px;
-      background: var(--bg); border: 1px solid var(--border);
+      display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+      padding: 14px; border-radius: var(--r-md);
+      background: var(--surface2); border: 1px solid var(--border);
     }
-    .cli-rec-nome { font-size: 14px; color: var(--text); font-weight: 600; }
+    .cli-rec-top { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+    .cli-rec-ico {
+      display: flex; align-items: center; justify-content: center;
+      width: 34px; height: 34px; border-radius: 10px;
+      font-size: 17px; line-height: 1; background: var(--bg);
+      flex-shrink: 0;
+    }
+    .cli-rec-nome { font-size: 12.5px; color: var(--muted); font-weight: 600; }
     .cli-rec-sub {
-      font-size: 11px; color: var(--muted); font-weight: 500;
-      margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+      font-size: 10.5px; color: var(--muted); font-weight: 500;
+      margin-left: 5px; padding: 1px 7px; border-radius: 999px;
       background: rgba(255,255,255,0.06);
     }
     .cli-rec-val {
-      font-family: var(--font-h); font-weight: 800; font-size: 16px;
-      color: var(--red); flex-shrink: 0; margin-left: 12px;
+      font-family: var(--font-h); font-weight: 800; font-size: 24px;
+      color: var(--red); flex-shrink: 0; line-height: 1;
     }
 
-    /* ── Favoritas ── */
-    .cli-conta-favoritos { display: flex; flex-direction: column; gap: 6px; }
+    /* ── Favoritas (mini-cards) ── */
+    .cli-conta-favoritos { display: flex; flex-direction: column; gap: 8px; }
     .cli-fav-item {
       display: flex; align-items: center; gap: 12px;
-      padding: 10px 12px; border-radius: 10px; cursor: pointer;
-      background: var(--bg); border: 1px solid var(--border);
+      padding: 10px 12px; border-radius: var(--r-md); cursor: pointer;
+      background: var(--surface2); border: 1px solid var(--border);
       -webkit-tap-highlight-color: transparent;
     }
     .cli-fav-item:active { opacity: 0.7; }
@@ -5737,10 +5758,18 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .cli-fav-seta { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+
+    /* Estado vazio de "Minhas lojas": ícone + texto + CTA opcional */
     .cli-conta-fav-vazio {
-      font-size: 13px; color: var(--muted); line-height: 1.5;
-      padding: 8px 2px;
+      text-align: center; color: var(--muted);
+      padding: 24px 16px 18px;
     }
+    .cli-conta-fav-vazio-ico {
+      display: block; font-size: 26px; color: var(--muted);
+      opacity: 0.45; margin: 0 auto 12px;
+    }
+    .cli-conta-fav-vazio p { font-size: 13px; line-height: 1.6; margin: 0 auto 14px; max-width: 260px; }
+    .cli-conta-fav-vazio .empty-action { margin: 0; }
 
     /* ════════════════════════════════════════════
        RANKING DOS JOGOS (Camada 2.4)

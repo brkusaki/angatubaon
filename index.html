@@ -3473,24 +3473,29 @@
           <div class="cli-conta-secao-tit"><i class="fa fa-heart"></i> Minhas lojas</div>
           <div class="cli-conta-favoritos" id="cli-conta-favoritos"></div>
           <div class="cli-conta-fav-vazio" id="cli-conta-favoritos-vazio" style="display:none;">
-            Você ainda não favoritou nenhuma loja. Toque no coração das lojas que curtir.
+            <i class="fa fa-heart cli-conta-fav-vazio-ico" aria-hidden="true"></i>
+            <p>Você ainda não favoritou nenhuma loja.<br>Toque no coração das lojas que curtir.</p>
+            <button type="button" class="empty-action" onclick="cliFecharPainelConta()">
+              <i class="ti ti-compass" aria-hidden="true"></i> Explorar lojas
+            </button>
           </div>
         </div>
 
-        <div class="cli-conta-divisor"></div>
+        <!-- Configurações: agrupadas e destacadas do conteúdo acima -->
+        <div class="cli-conta-config">
+          <!-- Tema (migrado do header) -->
+          <button class="cli-conta-row" onclick="cliTrocarTema()">
+            <i class="fa fa-circle-half-stroke"></i>
+            <span class="row-label">Tema</span>
+            <span class="row-value" id="cli-conta-tema-label">Automático</span>
+          </button>
 
-        <!-- Tema (migrado do header) -->
-        <button class="cli-conta-row" onclick="cliTrocarTema()">
-          <i class="fa fa-circle-half-stroke"></i>
-          <span class="row-label">Tema</span>
-          <span class="row-value" id="cli-conta-tema-label">Automático</span>
-        </button>
-
-        <!-- Sair -->
-        <button class="cli-conta-row danger" onclick="cliSair()">
-          <i class="fa fa-right-from-bracket"></i>
-          <span class="row-label">Sair da conta</span>
-        </button>
+          <!-- Sair -->
+          <button class="cli-conta-row danger" onclick="cliSair()">
+            <i class="fa fa-right-from-bracket"></i>
+            <span class="row-label">Sair da conta</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

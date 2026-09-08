@@ -887,6 +887,10 @@
     if (window.BlocosGame    && typeof window.BlocosGame.parar    === 'function') window.BlocosGame.parar();
     if (window.DocesGame     && typeof window.DocesGame.parar     === 'function') window.DocesGame.parar();
     if (window.Game2048      && typeof window.Game2048.parar      === 'function') window.Game2048.parar();
+    // Negócios da Cidade: parar() só mata timers e fecha modal — a partida
+    // em andamento sobrevive de propósito, pra quem sai pro menu por engano
+    // conseguir voltar de onde parou (ver _retomar em negocios.js).
+    if (window.NegociosGame  && typeof window.NegociosGame.parar  === 'function') window.NegociosGame.parar();
     // Coruja Party: sem isto, sair da lobby pelo botão genérico (em vez
     // das telas próprias do Party) não avisava o Firebase — a sala
     // ficava fantasma na lista pública. Ver PartyGame.parar em party.js.
@@ -1000,7 +1004,12 @@
     doces: { js: '/Jogos/doces.min.js', css: '/Jogos/doces.css', global: 'DocesGame' },
     // 2048 da Coruja: solo sem fases (corrida única, sem "vitória final"
     // que trava o jogo) — ranking = maior pontuação, igual a Voo/Piano.
-    '2048': { js: '/Jogos/2048.min.js', css: '/Jogos/2048.css', global: 'Game2048' }
+    '2048': { js: '/Jogos/2048.min.js', css: '/Jogos/2048.css', global: 'Game2048' },
+    // Negócios da Cidade: banco imobiliário de Angatuba, 2 a 8 pessoas no
+    // MESMO aparelho (passa-o-celular). Não usa AngatubaMP (não é 1x1 em
+    // rede) nem ranking: não existe pontuação individual, o placar é a
+    // própria partida. Monta tudo em #negocios-root — ver Jogos/negocios.js.
+    negocios: { js: '/Jogos/negocios.min.js', css: '/Jogos/negocios.css', global: 'NegociosGame' }
   };
   var _jogosCarregados = {};   // nome -> true quando js+css já injetados
 

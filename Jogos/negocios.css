@@ -1,0 +1,1019 @@
+/* =========================================================================
+   AngatubaON - Negócios da Cidade
+   style.css - Tema escuro, mobile-first.
+
+   Organização:
+     1. Tokens de design e reset
+     2. Botões e componentes básicos
+     3. Tela de setup
+     4. Faixa da vez
+     5. Tabuleiro e casas
+     6. Peças (tokens) e animação de movimento
+     7. Centro do tabuleiro e dados
+     8. Painel lateral (jogadores / bens / histórico)
+     9. Barra de ações
+    10. Modais
+    11. Toasts de dinheiro
+    12. Tela final
+    13. Layout de tablet/desktop
+   ========================================================================= */
+
+/* ============================ 1. TOKENS + RESET ========================= */
+#jogo-negocios {
+  --ndc-bg:       #070c18;
+  --ndc-bg2:      #0c1424;
+  --ndc-sup:      #141c31;
+  --ndc-sup2:     #1c2540;
+  --ndc-sup3:     #253052;
+  --ndc-linha:    #27314f;
+  --ndc-txt:      #e9edf9;
+  --ndc-txt2:     #97a4c4;
+  --ndc-txt3:     #6b7799;
+  --ndc-acc:      #38e1b0;
+  --ndc-acc-esc:  #16a67c;
+  --ndc-acc2:     #ffc857;
+  --ndc-perigo:   #ff5d73;
+  --ndc-ok:       #51cf66;
+  --ndc-r:        14px;
+  --ndc-r-sm:     9px;
+  --ndc-sombra:   0 8px 28px rgba(0,0,0,.45);
+  --ndc-topo:     env(safe-area-inset-top, 0px);
+  --ndc-base:     env(safe-area-inset-bottom, 0px);
+}
+
+#jogo-negocios * { box-sizing: border-box; }
+
+#jogo-negocios {
+  margin: 0;
+  padding: 0;
+  background: var(--ndc-bg);
+  color: var(--ndc-txt);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: contain;
+}
+
+#jogo-negocios {
+  min-height: 100dvh;
+  background:
+    radial-gradient(1200px 700px at 50% -10%, #16264a 0%, transparent 60%),
+    radial-gradient(900px 600px at 100% 100%, #14322f 0%, transparent 55%),
+    var(--ndc-bg);
+}
+
+#jogo-negocios button, #jogo-negocios input, #jogo-negocios select { font: inherit; color: inherit; }
+#jogo-negocios button { cursor: pointer; }
+
+#jogo-negocios h1, #jogo-negocios h2, #jogo-negocios h3, #jogo-negocios p { margin: 0; }
+
+#jogo-negocios .ndc-oculto { display: none !important; }
+
+#jogo-negocios .ndc-tela { display: none; }
+#jogo-negocios .ndc-tela.ndc-ativa { display: block; }
+
+/* ========================= 2. BOTÕES E BÁSICOS ========================== */
+#jogo-negocios .ndc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--ndc-linha);
+  background: var(--ndc-sup2);
+  color: var(--ndc-txt);
+  border-radius: var(--ndc-r-sm);
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.1;
+  min-height: 46px;
+  transition: transform .08s ease, filter .15s ease, background .15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+#jogo-negocios .ndc-btn:active { transform: scale(.97); }
+#jogo-negocios .ndc-btn:disabled { opacity: .38; cursor: not-allowed; }
+#jogo-negocios .ndc-btn:disabled:active { transform: none; }
+
+#jogo-negocios .ndc-btn-primario {
+  background: linear-gradient(180deg, var(--ndc-acc) 0%, var(--ndc-acc-esc) 100%);
+  border-color: transparent;
+  color: #04211a;
+  font-weight: 800;
+  box-shadow: 0 6px 18px rgba(56,225,176,.22);
+}
+#jogo-negocios .ndc-btn-ouro {
+  background: linear-gradient(180deg, #ffd977 0%, #e0a21c 100%);
+  border-color: transparent;
+  color: #241800;
+  font-weight: 800;
+}
+#jogo-negocios .ndc-btn-perigo { background: #3a1620; border-color: #6b2231; color: #ffb3bd; }
+#jogo-negocios .ndc-btn-fantasma { background: transparent; }
+#jogo-negocios .ndc-btn-bloco { width: 100%; }
+#jogo-negocios .ndc-btn-mini { min-height: 34px; padding: 6px 10px; font-size: 13px; border-radius: 8px; }
+
+#jogo-negocios .ndc-cartao {
+  background: var(--ndc-sup);
+  border: 1px solid var(--ndc-linha);
+  border-radius: var(--ndc-r);
+  padding: 14px;
+}
+
+#jogo-negocios .ndc-rotulo {
+  font-size: 11px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ndc-txt3);
+  font-weight: 700;
+}
+
+#jogo-negocios .ndc-grana { font-variant-numeric: tabular-nums; font-weight: 800; }
+#jogo-negocios .ndc-pos { color: var(--ndc-acc); }
+#jogo-negocios .ndc-neg { color: var(--ndc-perigo); }
+
+/* =========================== 3. TELA DE SETUP =========================== */
+#jogo-negocios #ndc-tela-setup {
+  padding: calc(var(--ndc-topo) + 22px) 16px calc(var(--ndc-base) + 26px);
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+#jogo-negocios .ndc-marca {
+  text-align: center;
+  margin-bottom: 22px;
+}
+#jogo-negocios .ndc-marca .ndc-selo {
+  display: inline-block;
+  font-size: 11px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--ndc-acc);
+  border: 1px solid rgba(56,225,176,.35);
+  background: rgba(56,225,176,.08);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+#jogo-negocios .ndc-marca h1 {
+  font-size: clamp(28px, 8vw, 40px);
+  line-height: 1.05;
+  margin: 14px 0 8px;
+  font-weight: 900;
+  letter-spacing: -.02em;
+  background: linear-gradient(100deg, #fff 10%, var(--ndc-acc) 55%, var(--ndc-acc2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+#jogo-negocios .ndc-marca p { color: var(--ndc-txt2); font-size: 14px; }
+
+#jogo-negocios .ndc-bloco-setup { margin-bottom: 16px; }
+#jogo-negocios .ndc-bloco-setup > .ndc-rotulo { display: block; margin-bottom: 9px; }
+
+#jogo-negocios .ndc-contador {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: center;
+  background: var(--ndc-sup);
+  border: 1px solid var(--ndc-linha);
+  border-radius: var(--ndc-r);
+  padding: 10px;
+}
+#jogo-negocios .ndc-contador button {
+  width: 46px; height: 46px;
+  border-radius: 12px;
+  border: 1px solid var(--ndc-linha);
+  background: var(--ndc-sup2);
+  font-size: 22px; font-weight: 800;
+}
+#jogo-negocios .ndc-contador .ndc-valor { font-size: 30px; font-weight: 900; min-width: 52px; text-align: center; }
+#jogo-negocios .ndc-contador .ndc-valor small { display: block; font-size: 11px; font-weight: 600; color: var(--ndc-txt3); }
+
+#jogo-negocios .ndc-lista-jogadores { display: grid; gap: 10px; }
+
+#jogo-negocios .ndc-linha-jogador {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ndc-sup);
+  border: 1px solid var(--ndc-linha);
+  border-radius: var(--ndc-r);
+  padding: 9px 10px;
+}
+#jogo-negocios .ndc-linha-jogador .ndc-avatar {
+  width: 40px; height: 40px;
+  flex: 0 0 40px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-weight: 900; font-size: 17px; color: #071018;
+  border: 2px solid rgba(255,255,255,.22);
+}
+#jogo-negocios .ndc-linha-jogador input[type="text"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--ndc-bg2);
+  border: 1px solid var(--ndc-linha);
+  border-radius: 10px;
+  padding: 11px 12px;
+  font-size: 15px;
+}
+#jogo-negocios .ndc-linha-jogador input:focus { outline: 2px solid var(--ndc-acc); outline-offset: -1px; }
+
+#jogo-negocios .ndc-cores { display: flex; gap: 5px; flex-wrap: wrap; max-width: 92px; justify-content: flex-end; }
+#jogo-negocios .ndc-cores button {
+  width: 19px; height: 19px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+}
+#jogo-negocios .ndc-cores button[aria-pressed="true"] { border-color: #fff; transform: scale(1.18); }
+#jogo-negocios .ndc-cores button:disabled { opacity: .2; }
+
+#jogo-negocios details.ndc-regras {
+  background: var(--ndc-sup);
+  border: 1px solid var(--ndc-linha);
+  border-radius: var(--ndc-r);
+  padding: 12px 14px;
+  margin-top: 16px;
+}
+#jogo-negocios details.ndc-regras summary { cursor: pointer; font-weight: 700; font-size: 14px; }
+#jogo-negocios details.ndc-regras ul { margin: 10px 0 0; padding-left: 18px; color: var(--ndc-txt2); font-size: 13.5px; line-height: 1.65; }
+
+/* =========================== 4. FAIXA DA VEZ ============================ */
+#jogo-negocios #ndc-tela-jogo { padding-bottom: 132px; }
+
+#jogo-negocios .ndc-faixa-vez {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding: calc(var(--ndc-topo) + 9px) 12px 9px;
+  background: linear-gradient(180deg, rgba(7,12,24,.97) 60%, rgba(7,12,24,.55) 100%);
+  backdrop-filter: blur(9px);
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+#jogo-negocios .ndc-faixa-vez .ndc-peca-vez {
+  width: 44px; height: 44px;
+  flex: 0 0 44px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-weight: 900; font-size: 19px; color: #06111a;
+  border: 3px solid rgba(255,255,255,.28);
+  box-shadow: 0 0 0 4px rgba(255,255,255,.05);
+}
+#jogo-negocios .ndc-faixa-vez .ndc-quem { flex: 1 1 auto; min-width: 0; }
+#jogo-negocios .ndc-faixa-vez .ndc-quem .ndc-rotulo { font-size: 10px; }
+#jogo-negocios .ndc-faixa-vez .ndc-quem b {
+  display: block;
+  font-size: 19px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.15;
+}
+#jogo-negocios .ndc-faixa-vez .ndc-caixa { text-align: right; }
+#jogo-negocios .ndc-faixa-vez .ndc-caixa .ndc-grana { font-size: 19px; }
+#jogo-negocios .ndc-faixa-vez .ndc-caixa .ndc-rotulo { font-size: 10px; }
+
+#jogo-negocios .ndc-faixa-vez.ndc-trocando { animation: piscaVez .7s ease; }
+@keyframes piscaVez {
+  0%   { background-color: rgba(56,225,176,.22); }
+  100% { background-color: transparent; }
+}
+
+/* ========================= 5. TABULEIRO E CASAS ========================= */
+#jogo-negocios .ndc-arena { padding: 0 10px; }
+
+#jogo-negocios .ndc-tabuleiro-wrap {
+  position: relative;
+  overflow: auto;
+  border-radius: var(--ndc-r);
+  -webkit-overflow-scrolling: touch;
+}
+
+#jogo-negocios .ndc-tabuleiro {
+  container-type: inline-size;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  grid-template-rows: repeat(11, 1fr);
+  gap: 1px;
+  padding: 1px;
+  background: var(--ndc-linha);
+  border: 1px solid var(--ndc-linha);
+  border-radius: var(--ndc-r);
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Modo ampliado: o tabuleiro fica maior que a tela e o wrap rola.
+   A fonte encolhe em cqw de propósito: como o container cresce, sem isso
+   o texto cresceria junto e continuaria quebrando feio. */
+#jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado { max-height: 72vh; }
+#jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado .ndc-tabuleiro { width: 165%; }
+#jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado .ndc-casa .ndc-curto, #jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado .ndc-casa.ndc-canto .ndc-curto { font-size: 1.45cqw; }
+#jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado .ndc-casa .ndc-preco { font-size: 1.45cqw; }
+#jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado .ndc-casa .ndc-icone { font-size: 2.5cqw; }
+
+#jogo-negocios .ndc-casa {
+  position: relative;
+  background: var(--ndc-sup);
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  cursor: pointer;
+  min-width: 0;
+  transition: background .18s ease;
+}
+#jogo-negocios .ndc-casa:active { background: var(--ndc-sup2); }
+
+/* Orientação da faixa de cor: sempre virada para o miolo do tabuleiro. */
+#jogo-negocios .ndc-casa[data-borda="sul"] { flex-direction: column; }
+#jogo-negocios .ndc-casa[data-borda="norte"] { flex-direction: column-reverse; }
+#jogo-negocios .ndc-casa[data-borda="oeste"] { flex-direction: row-reverse; }
+#jogo-negocios .ndc-casa[data-borda="leste"] { flex-direction: row; }
+#jogo-negocios .ndc-casa[data-borda="canto"] { flex-direction: column; }
+
+#jogo-negocios .ndc-casa .ndc-faixa { flex: 0 0 18%; background: var(--ndc-linha); }
+#jogo-negocios .ndc-casa[data-borda="oeste"] .ndc-faixa, #jogo-negocios .ndc-casa[data-borda="leste"] .ndc-faixa { flex-basis: 17%; }
+/* Casas sem grupo de cor (cantos, sorte, azar, impostos) não gastam
+   espaço com a faixa: sobra área para o ícone e o nome. */
+#jogo-negocios .ndc-casa.ndc-sem-faixa .ndc-faixa { display: none; }
+
+#jogo-negocios .ndc-casa .ndc-miolo {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .16em;
+  padding: 3% 2%;
+  text-align: center;
+  overflow: hidden;
+}
+/* Sem isto, um nome comprido vira um item flex mais largo que a casa
+   e vaza para os lados em vez de quebrar linha. */
+#jogo-negocios .ndc-casa .ndc-miolo { align-items: stretch; }
+#jogo-negocios .ndc-casa .ndc-miolo > * { max-width: 100%; }
+
+#jogo-negocios .ndc-casa .ndc-sigla {
+  font-size: 3.05cqw;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.02em;
+  color: var(--ndc-txt);
+  white-space: nowrap;
+}
+/* Nome curto: escondido no tabuleiro compacto, aparece no modo ampliado
+   e em telas grandes, onde a casa tem espaço para texto de verdade. */
+#jogo-negocios .ndc-casa .ndc-curto {
+  display: none;
+  font-size: 1.85cqw;
+  line-height: 1.08;
+  font-weight: 700;
+  color: var(--ndc-txt);
+  overflow: hidden;
+  overflow-wrap: break-word;
+  max-height: 4.6em;
+}
+#jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado .ndc-casa .ndc-sigla { display: none; }
+#jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado .ndc-casa .ndc-curto { display: block; }
+
+#jogo-negocios .ndc-casa .ndc-preco {
+  font-size: 2.3cqw;
+  line-height: 1;
+  color: var(--ndc-txt3);
+  font-variant-numeric: tabular-nums;
+}
+#jogo-negocios .ndc-casa .ndc-icone { font-size: 3.6cqw; line-height: 1; }
+
+/* Cantos: no tabuleiro compacto o ícone diz tudo (🏁 🚓 🅿️ 🚨) e o nome
+   não caberia legível. O nome volta no modo ampliado e no desktop. */
+#jogo-negocios .ndc-casa.ndc-canto { background: var(--ndc-sup2); }
+#jogo-negocios .ndc-casa.ndc-canto .ndc-miolo { padding: 4% 3%; gap: .1em; }
+#jogo-negocios .ndc-casa.ndc-canto .ndc-sigla, #jogo-negocios .ndc-casa.ndc-canto .ndc-curto { display: none; }
+#jogo-negocios .ndc-casa.ndc-canto .ndc-icone { font-size: 5.6cqw; }
+#jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado .ndc-casa.ndc-canto .ndc-curto { display: block; }
+#jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado .ndc-casa.ndc-canto .ndc-icone { font-size: 2.5cqw; }
+
+/* Marca de propriedade vendida */
+#jogo-negocios .ndc-casa .ndc-dono {
+  position: absolute;
+  top: 3%; right: 3%;
+  width: 15%; height: 15%;
+  min-width: 5px; min-height: 5px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,.5);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.28);
+}
+#jogo-negocios .ndc-casa .ndc-construcoes {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  justify-content: center;
+  gap: 5%;
+  padding-bottom: 3%;
+  pointer-events: none;
+}
+#jogo-negocios .ndc-casa .ndc-construcoes i {
+  width: 12%; aspect-ratio: 1;
+  min-width: 4px;
+  background: var(--ndc-ok);
+  border-radius: 1px;
+  box-shadow: 0 0 3px rgba(81,207,102,.7);
+}
+#jogo-negocios .ndc-casa .ndc-construcoes i.ndc-hotel {
+  width: 27%;
+  background: var(--ndc-perigo);
+  box-shadow: 0 0 4px rgba(255,93,115,.8);
+}
+#jogo-negocios .ndc-casa.ndc-hipotecada .ndc-miolo { opacity: .32; }
+#jogo-negocios .ndc-casa.ndc-hipotecada::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(45deg, transparent 0 4px, rgba(255,93,115,.28) 4px 8px);
+  pointer-events: none;
+}
+
+#jogo-negocios .ndc-casa.ndc-atual { background: #23345c; box-shadow: inset 0 0 0 2px var(--ndc-acc2); z-index: 2; }
+#jogo-negocios .ndc-casa.ndc-pisca { animation: piscaCasa .9s ease 2; }
+@keyframes piscaCasa {
+  0%, 100% { box-shadow: inset 0 0 0 2px transparent; }
+  50%      { box-shadow: inset 0 0 0 2px var(--ndc-acc); }
+}
+
+/* ============== 6. PEÇAS (TOKENS) E ANIMAÇÃO DE MOVIMENTO ============== */
+#jogo-negocios .ndc-camada-tokens {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+#jogo-negocios .ndc-token {
+  position: absolute;
+  top: 0; left: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  color: #061019;
+  border: 2px solid rgba(255,255,255,.55);
+  box-shadow: 0 2px 6px rgba(0,0,0,.6);
+  transition: transform .13s linear;
+  will-change: transform;
+}
+#jogo-negocios .ndc-token.ndc-andando { animation: pulo .13s linear infinite; }
+@keyframes pulo {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.45); }
+}
+#jogo-negocios .ndc-token.ndc-vez {
+  box-shadow: 0 0 0 3px rgba(255,200,87,.65), 0 2px 8px rgba(0,0,0,.7);
+  z-index: 3;
+}
+
+/* ==================== 7. CENTRO DO TABULEIRO E DADOS ==================== */
+#jogo-negocios .ndc-centro {
+  grid-column: 2 / 11;
+  grid-row: 2 / 11;
+  background: radial-gradient(120% 120% at 50% 0%, #17223f 0%, #0b1222 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3%;
+  padding: 5%;
+  text-align: center;
+  z-index: 1;
+}
+#jogo-negocios .ndc-centro .ndc-titulo-centro {
+  font-size: 3.1cqw;
+  font-weight: 900;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ndc-txt3);
+}
+#jogo-negocios .ndc-centro .ndc-titulo-centro b { color: var(--ndc-acc); }
+
+#jogo-negocios .ndc-dados {
+  display: flex;
+  gap: 4cqw;
+  align-items: center;
+  justify-content: center;
+}
+#jogo-negocios .ndc-dado {
+  width: 13cqw;
+  height: 13cqw;
+  background: linear-gradient(160deg, #ffffff 0%, #cfd8e8 100%);
+  border-radius: 18%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  padding: 12%;
+  gap: 4%;
+  box-shadow: 0 4px 12px rgba(0,0,0,.55), inset 0 -2px 5px rgba(0,0,0,.18);
+}
+#jogo-negocios .ndc-dado i {
+  border-radius: 50%;
+  background: #16203a;
+  visibility: hidden;
+}
+#jogo-negocios .ndc-dado i.ndc-on { visibility: visible; }
+#jogo-negocios .ndc-dado.ndc-rolando { animation: rolar .28s linear infinite; }
+@keyframes rolar {
+  0%   { transform: rotate(0deg)   scale(1); }
+  25%  { transform: rotate(90deg)  scale(1.1); }
+  50%  { transform: rotate(180deg) scale(.94); }
+  75%  { transform: rotate(270deg) scale(1.08); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+#jogo-negocios .ndc-centro .ndc-resultado {
+  font-size: 3.4cqw;
+  font-weight: 800;
+  color: var(--ndc-txt);
+  min-height: 1.2em;
+}
+#jogo-negocios .ndc-centro .ndc-resultado .ndc-dupla { color: var(--ndc-acc2); }
+
+#jogo-negocios .ndc-centro .ndc-msg {
+  font-size: 2.9cqw;
+  color: var(--ndc-txt2);
+  line-height: 1.4;
+  max-width: 92%;
+  min-height: 2.6em;
+}
+
+/* ============================== 8. PAINEL ============================== */
+#jogo-negocios .ndc-painel { margin-top: 12px; }
+
+#jogo-negocios .ndc-abas {
+  display: flex;
+  gap: 4px;
+  background: var(--ndc-sup);
+  border: 1px solid var(--ndc-linha);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 10px;
+}
+#jogo-negocios .ndc-abas button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--ndc-txt2);
+  border-radius: 9px;
+  padding: 10px 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+#jogo-negocios .ndc-abas button[aria-selected="true"] { background: var(--ndc-sup3); color: var(--ndc-txt); }
+
+#jogo-negocios .ndc-painel-conteudo > div { display: none; }
+#jogo-negocios .ndc-painel-conteudo > div.ndc-ativa { display: block; }
+
+#jogo-negocios .ndc-card-jogador {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ndc-sup);
+  border: 1px solid var(--ndc-linha);
+  border-radius: 12px;
+  padding: 10px 11px;
+  margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+}
+#jogo-negocios .ndc-card-jogador.ndc-davez { border-color: var(--ndc-acc); box-shadow: 0 0 0 1px rgba(56,225,176,.35); }
+#jogo-negocios .ndc-card-jogador.ndc-falido { opacity: .45; }
+#jogo-negocios .ndc-card-jogador .ndc-avatar {
+  width: 36px; height: 36px; flex: 0 0 36px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-weight: 900; color: #061019;
+  border: 2px solid rgba(255,255,255,.25);
+}
+#jogo-negocios .ndc-card-jogador .ndc-info { flex: 1 1 auto; min-width: 0; }
+#jogo-negocios .ndc-card-jogador .ndc-info b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#jogo-negocios .ndc-card-jogador .ndc-info small { color: var(--ndc-txt3); font-size: 12px; }
+#jogo-negocios .ndc-card-jogador .ndc-valores { text-align: right; }
+#jogo-negocios .ndc-card-jogador .ndc-valores .ndc-grana { font-size: 15px; display: block; }
+#jogo-negocios .ndc-card-jogador .ndc-valores small { font-size: 11px; color: var(--ndc-txt3); }
+
+#jogo-negocios .ndc-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+#jogo-negocios .ndc-chip {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 5px;
+  color: #06111a;
+  letter-spacing: .02em;
+}
+#jogo-negocios .ndc-chip.ndc-pouco { opacity: .55; }
+
+#jogo-negocios .ndc-lista-bens { display: grid; gap: 7px; }
+#jogo-negocios .ndc-item-bem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--ndc-sup);
+  border: 1px solid var(--ndc-linha);
+  border-left-width: 5px;
+  border-radius: 10px;
+  padding: 9px 10px;
+}
+#jogo-negocios .ndc-item-bem .ndc-nome { flex: 1 1 auto; min-width: 0; }
+#jogo-negocios .ndc-item-bem .ndc-nome b { display: block; font-size: 13.5px; font-weight: 700; }
+#jogo-negocios .ndc-item-bem .ndc-nome small { font-size: 11.5px; color: var(--ndc-txt3); }
+#jogo-negocios .ndc-item-bem .ndc-acao { display: flex; gap: 5px; }
+
+#jogo-negocios .ndc-vazio { color: var(--ndc-txt3); font-size: 13.5px; text-align: center; padding: 22px 10px; }
+
+#jogo-negocios .ndc-historico { display: flex; flex-direction: column-reverse; gap: 6px; max-height: 320px; overflow-y: auto; }
+#jogo-negocios .ndc-historico p {
+  font-size: 12.5px;
+  color: var(--ndc-txt2);
+  line-height: 1.45;
+  padding: 7px 10px;
+  background: var(--ndc-sup);
+  border-radius: 9px;
+  border-left: 3px solid var(--ndc-linha);
+}
+#jogo-negocios .ndc-historico p.ndc-destaque { border-left-color: var(--ndc-acc2); color: var(--ndc-txt); }
+#jogo-negocios .ndc-historico p.ndc-compra { border-left-color: var(--ndc-acc); }
+#jogo-negocios .ndc-historico p.ndc-pagamento { border-left-color: var(--ndc-perigo); }
+#jogo-negocios .ndc-historico p.ndc-recebimento { border-left-color: var(--ndc-ok); }
+#jogo-negocios .ndc-historico p.ndc-falencia { border-left-color: var(--ndc-perigo); color: #ffb3bd; font-weight: 700; }
+
+/* =========================== 9. BARRA DE AÇÕES ========================= */
+#jogo-negocios .ndc-acoes {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 40;
+  padding: 10px 10px calc(10px + var(--ndc-base));
+  background: linear-gradient(180deg, rgba(7,12,24,.35) 0%, rgba(7,12,24,.97) 32%);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--ndc-linha);
+}
+#jogo-negocios .ndc-acoes .ndc-secundarias {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 7px;
+}
+#jogo-negocios .ndc-acoes .ndc-secundarias .ndc-btn {
+  flex-direction: column;
+  gap: 2px;
+  min-height: 50px;
+  padding: 6px 2px;
+  font-size: 11px;
+  font-weight: 700;
+}
+#jogo-negocios .ndc-acoes .ndc-secundarias .ndc-btn span.ndc-ico { font-size: 17px; line-height: 1; }
+#jogo-negocios .ndc-acoes .ndc-principais { display: flex; gap: 7px; }
+#jogo-negocios .ndc-acoes .ndc-principais .ndc-btn { flex: 1; min-height: 52px; font-size: 16px; }
+
+/* ============================== 10. MODAIS ============================= */
+#jogo-negocios .ndc-fundo-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(3,6,14,.72);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px;
+  padding-bottom: calc(12px + var(--ndc-base));
+  animation: fadeIn .16s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+#jogo-negocios .ndc-modal {
+  width: 100%;
+  max-width: 460px;
+  max-height: 88dvh;
+  overflow-y: auto;
+  background: var(--ndc-sup);
+  border: 1px solid var(--ndc-linha);
+  border-radius: 18px;
+  box-shadow: var(--ndc-sombra);
+  animation: sobe .22s cubic-bezier(.2,.9,.3,1);
+}
+@keyframes sobe { from { transform: translateY(26px); opacity: .4; } to { transform: none; opacity: 1; } }
+
+#jogo-negocios .ndc-modal .ndc-topo-modal {
+  padding: 16px 16px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+#jogo-negocios .ndc-modal .ndc-topo-modal h3 { font-size: 18px; font-weight: 800; line-height: 1.2; flex: 1; }
+#jogo-negocios .ndc-modal .ndc-fechar {
+  border: 0; background: var(--ndc-sup2); color: var(--ndc-txt2);
+  width: 30px; height: 30px; border-radius: 50%; font-size: 17px; line-height: 1;
+}
+#jogo-negocios .ndc-modal .ndc-corpo-modal { padding: 12px 16px 4px; font-size: 14.5px; color: var(--ndc-txt2); line-height: 1.55; }
+#jogo-negocios .ndc-modal .ndc-corpo-modal strong { color: var(--ndc-txt); }
+#jogo-negocios .ndc-modal .ndc-acoes-modal { padding: 12px 16px calc(16px); display: grid; gap: 8px; }
+#jogo-negocios .ndc-modal .ndc-acoes-modal.ndc-duplo { grid-template-columns: 1fr 1fr; }
+
+#jogo-negocios .ndc-faixa-cor { height: 8px; border-radius: 18px 18px 0 0; }
+
+#jogo-negocios .ndc-tabela-aluguel { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+#jogo-negocios .ndc-tabela-aluguel td { padding: 5px 6px; border-bottom: 1px solid var(--ndc-linha); color: var(--ndc-txt2); }
+#jogo-negocios .ndc-tabela-aluguel td:last-child { text-align: right; font-variant-numeric: tabular-nums; color: var(--ndc-txt); font-weight: 700; }
+#jogo-negocios .ndc-tabela-aluguel tr.ndc-atual td { background: rgba(56,225,176,.1); color: var(--ndc-acc); }
+
+/* carta de sorte/azar */
+#jogo-negocios .ndc-carta {
+  border-radius: 14px;
+  padding: 20px 18px;
+  text-align: center;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #0b1220;
+  font-weight: 600;
+  animation: cartaEntra .35s cubic-bezier(.2,.9,.3,1);
+}
+#jogo-negocios .ndc-carta.ndc-sorte { background: linear-gradient(155deg, #7cf3c8 0%, #38e1b0 100%); }
+#jogo-negocios .ndc-carta.ndc-azar { background: linear-gradient(155deg, #ff9aa8 0%, #ff5d73 100%); }
+#jogo-negocios .ndc-carta .ndc-selo-carta {
+  display: block;
+  font-size: 11px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  font-weight: 900;
+  opacity: .6;
+  margin-bottom: 9px;
+}
+@keyframes cartaEntra {
+  from { transform: rotateX(70deg) translateY(-14px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+/* seletor de propriedades (troca / construir / hipoteca) */
+#jogo-negocios .ndc-selecao { display: grid; gap: 6px; max-height: 210px; overflow-y: auto; padding-right: 2px; }
+#jogo-negocios .ndc-opcao-prop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--ndc-bg2);
+  border: 1px solid var(--ndc-linha);
+  border-left-width: 5px;
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 13.5px;
+  text-align: left;
+  width: 100%;
+  color: var(--ndc-txt);
+}
+#jogo-negocios .ndc-opcao-prop.ndc-marcada { border-color: var(--ndc-acc); background: rgba(56,225,176,.1); }
+#jogo-negocios .ndc-opcao-prop .ndc-txt { flex: 1; min-width: 0; }
+#jogo-negocios .ndc-opcao-prop .ndc-txt b { display: block; font-weight: 700; }
+#jogo-negocios .ndc-opcao-prop .ndc-txt small { color: var(--ndc-txt3); font-size: 11.5px; }
+#jogo-negocios .ndc-opcao-prop:disabled { opacity: .4; }
+
+#jogo-negocios .ndc-campo-num {
+  width: 100%;
+  background: var(--ndc-bg2);
+  border: 1px solid var(--ndc-linha);
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+#jogo-negocios .ndc-duas-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#jogo-negocios .ndc-sub { font-size: 12px; color: var(--ndc-txt3); margin-top: 3px; }
+#jogo-negocios .ndc-alerta {
+  background: rgba(255,93,115,.12);
+  border: 1px solid rgba(255,93,115,.35);
+  color: #ffb3bd;
+  border-radius: 9px;
+  padding: 9px 11px;
+  font-size: 13px;
+  margin-top: 10px;
+}
+#jogo-negocios .ndc-aviso-ok {
+  background: rgba(56,225,176,.1);
+  border: 1px solid rgba(56,225,176,.3);
+  color: var(--ndc-acc);
+  border-radius: 9px;
+  padding: 9px 11px;
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+/* ========================= 11. TOASTS DE DINHEIRO ====================== */
+#jogo-negocios .ndc-brindes {
+  position: fixed;
+  left: 50%;
+  top: calc(var(--ndc-topo) + 66px);
+  transform: translateX(-50%);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+#jogo-negocios .ndc-brinde {
+  padding: 8px 15px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: var(--ndc-sombra);
+  animation: sobeSome 1.5s ease forwards;
+}
+#jogo-negocios .ndc-brinde.ndc-mais { background: var(--ndc-acc); color: #04211a; }
+#jogo-negocios .ndc-brinde.ndc-menos { background: var(--ndc-perigo); color: #2a0710; }
+@keyframes sobeSome {
+  0%   { transform: translateY(12px) scale(.85); opacity: 0; }
+  18%  { transform: translateY(0) scale(1); opacity: 1; }
+  70%  { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-26px) scale(.94); opacity: 0; }
+}
+
+/* =========================== 12. TELA FINAL =========================== */
+#jogo-negocios #ndc-tela-fim {
+  padding: calc(var(--ndc-topo) + 34px) 16px calc(var(--ndc-base) + 26px);
+  max-width: 560px;
+  margin: 0 auto;
+  text-align: center;
+}
+#jogo-negocios #ndc-tela-fim .ndc-trofeu { font-size: 62px; line-height: 1; animation: pulsa 1.7s ease-in-out infinite; }
+@keyframes pulsa { 0%,100% { transform: scale(1); } 50% { transform: scale(1.09); } }
+#jogo-negocios #ndc-tela-fim h2 { font-size: 28px; font-weight: 900; margin: 12px 0 4px; }
+#jogo-negocios #ndc-tela-fim .ndc-campeao { font-size: 21px; color: var(--ndc-acc); font-weight: 800; margin-bottom: 20px; }
+
+#jogo-negocios .ndc-ranking { display: grid; gap: 8px; text-align: left; margin-bottom: 22px; }
+#jogo-negocios .ndc-linha-rank {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--ndc-sup); border: 1px solid var(--ndc-linha);
+  border-radius: 12px; padding: 11px 12px;
+}
+#jogo-negocios .ndc-linha-rank .ndc-pos-rank { font-size: 17px; font-weight: 900; color: var(--ndc-txt3); width: 26px; }
+#jogo-negocios .ndc-linha-rank .ndc-avatar {
+  width: 32px; height: 32px; flex: 0 0 32px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 900; color: #061019;
+}
+#jogo-negocios .ndc-linha-rank .ndc-nome-rank { flex: 1; min-width: 0; font-weight: 700; }
+#jogo-negocios .ndc-linha-rank.ndc-primeiro { border-color: var(--ndc-acc2); box-shadow: 0 0 0 1px rgba(255,200,87,.3); }
+
+/* ====================== 13. TABLET / DESKTOP ========================== */
+@media (min-width: 900px) {
+  #jogo-negocios #ndc-tela-jogo { padding-bottom: 0; }
+
+  #jogo-negocios .ndc-arena {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 350px;
+    gap: 18px;
+    align-items: start;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 6px 18px 24px;
+  }
+  /* O tabuleiro é quadrado: limita pela altura da janela para ele não
+     estourar a tela em monitor largo. */
+  #jogo-negocios .ndc-tabuleiro-wrap { max-width: min(100%, calc(100dvh - 200px)); margin: 0 auto; }
+  #jogo-negocios .ndc-painel { margin-top: 0; position: sticky; top: 86px; }
+  #jogo-negocios .ndc-historico { max-height: 40vh; }
+
+  #jogo-negocios .ndc-acoes {
+    position: sticky;
+    bottom: 0;
+    max-width: 1200px;
+    margin: 0 auto;
+    border-radius: 14px 14px 0 0;
+  }
+  #jogo-negocios .ndc-acoes .ndc-secundarias { grid-template-columns: repeat(4, 1fr); }
+
+  #jogo-negocios .ndc-fundo-modal { align-items: center; }
+
+  /* Em telas grandes cabe texto de verdade nas casas. */
+  #jogo-negocios .ndc-casa .ndc-sigla { display: none; }
+  #jogo-negocios .ndc-casa .ndc-curto { display: block; font-size: 1.4cqw; }
+  #jogo-negocios .ndc-casa .ndc-preco { font-size: 1.3cqw; }
+  #jogo-negocios .ndc-casa.ndc-canto .ndc-curto { display: block; font-size: 1.45cqw; }
+  #jogo-negocios .ndc-casa.ndc-canto .ndc-icone { font-size: 2.6cqw; }
+}
+
+/* Fallback para navegadores sem container queries: usa vw. */
+@supports not (container-type: inline-size) {
+  #jogo-negocios .ndc-casa .ndc-sigla { font-size: 2.9vw; }
+  #jogo-negocios .ndc-casa .ndc-preco { font-size: 2.2vw; }
+  #jogo-negocios .ndc-casa .ndc-icone { font-size: 3.4vw; }
+  #jogo-negocios .ndc-casa.ndc-canto .ndc-sigla { font-size: 2.4vw; }
+  #jogo-negocios .ndc-centro .ndc-titulo-centro { font-size: 2.9vw; }
+  #jogo-negocios .ndc-centro .ndc-resultado { font-size: 3.2vw; }
+  #jogo-negocios .ndc-centro .ndc-msg { font-size: 2.7vw; }
+  #jogo-negocios .ndc-dado { width: 12vw; height: 12vw; }
+  #jogo-negocios .ndc-dados { gap: 4vw; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #jogo-negocios * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* =========================================================================
+   14. ADAPTAÇÃO AO HUB DE JOGOS
+   O protótipo standalone era dono da página inteira: usava 100dvh no body,
+   cabeçalho sticky e barra de ações position:fixed. Dentro do hub quem manda
+   no tamanho é a regra `body.games-fs-open .jogo-tela` (100dvh, flex column,
+   overflow hidden), então aqui a tela do jogo vira uma coluna flex comum:
+   faixa da vez em cima, arena rolando no meio, ações embaixo.
+   Estas regras vêm DEPOIS de propósito — mesma especificidade, então
+   sobrescrevem o bloco original sem precisar de !important.
+   ========================================================================= */
+
+#jogo-negocios {
+  position: relative;                /* referência para modal e avisos */
+  font-family: var(--font-b), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--ndc-txt);
+  background:
+    radial-gradient(1200px 700px at 50% -10%, #16264a 0%, transparent 60%),
+    radial-gradient(900px 600px at 100% 100%, #14322f 0%, transparent 55%),
+    var(--ndc-bg);
+}
+
+/* Raiz montada pelo JS: ocupa o que sobra abaixo do botão "Voltar aos jogos". */
+#negocios-root {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Cada tela (setup / jogo / fim) é uma coluna que preenche a raiz. */
+#jogo-negocios .ndc-tela { display: none; }
+#jogo-negocios .ndc-tela.ndc-ativa {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Setup e fim rolam por dentro. */
+#jogo-negocios #ndc-tela-setup,
+#jogo-negocios #ndc-tela-fim {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 16px 26px;
+}
+#jogo-negocios #ndc-tela-jogo { padding-bottom: 0; }
+
+/* Faixa da vez: fixa no topo da coluna, sem sticky nem safe-area (o botão
+   "Voltar aos jogos" do hub já cobre o topo da tela). */
+#jogo-negocios .ndc-faixa-vez {
+  position: static;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+/* Arena: é ela quem rola.
+   O width:100% é obrigatório: a arena tem `margin: 0 auto` (para centralizar
+   no desktop) e, num container flex em coluna, margem automática no eixo
+   transversal CANCELA o stretch — sem largura explícita ela encolhia até o
+   tamanho do conteúdo e o tabuleiro virava um ponto de 14px. */
+#jogo-negocios .ndc-arena {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 10px 14px;
+}
+
+/* Ações: rodapé da coluna, não mais preso na viewport. */
+#jogo-negocios .ndc-acoes {
+  position: static;
+  flex: 0 0 auto;
+  width: 100%;
+  margin: 0;
+  background: linear-gradient(180deg, rgba(7,12,24,.5) 0%, rgba(7,12,24,.97) 40%);
+}
+
+/* Modal e avisos de dinheiro ficam presos à tela do jogo (e não à janela),
+   para não escaparem quando o hub entra em tela cheia nativa. */
+#jogo-negocios .ndc-fundo-modal { position: absolute; }
+/* Abaixo do botão "Voltar aos jogos" + faixa da vez, para o aviso de
+   dinheiro não cobrir o nome de quem está jogando. */
+#jogo-negocios .ndc-brindes { position: absolute; top: 118px; }
+
+@media (min-width: 900px) {
+  #jogo-negocios .ndc-arena { padding: 6px 18px 20px; }
+  /* O tabuleiro é quadrado: desconta o botão voltar + faixa da vez + ações
+     para ele caber inteiro sem rolar. */
+  #jogo-negocios .ndc-tabuleiro-wrap { max-width: min(100%, calc(100dvh - 250px)); }
+  #jogo-negocios .ndc-painel { position: sticky; top: 0; }
+  #jogo-negocios .ndc-acoes { position: static; border-radius: 0; max-width: none; width: 100%; margin: 0; }
+}

@@ -128,7 +128,22 @@
 
     // Ritmo das animações (ms)
     MS_PASSO_TOKEN: 130,
-    MS_ROLAGEM_DADOS: 750
+    MS_ROLAGEM_DADOS: 750,
+
+    /* Peças ilustradas (ver NDC.TOKENS logo abaixo dos dados).
+       TOKEN_ESCALA é o tamanho da peça em relação ao lado da casa: 1.06
+       deixa a arte transbordar de leve a casa, que é como uma peça de
+       verdade se apoia no tabuleiro, e mantém ~30 px legíveis no celular
+       em pé (casa de ~29 px em 360 px de tela). */
+    TOKENS_BASE: '/Jogos/assets/negocios/',
+    TOKEN_ESCALA: 1.06,
+
+    /* Animação da coruja jogando os dados. Roda ANTES dos dados girarem;
+       o resultado continua vindo do motor (jogo.rolar()), a animação é só
+       enfeite. Desligue ANIM_CORUJA para voltar ao giro puro. */
+    ANIM_CORUJA: true,
+    MS_ANIM_CORUJA: 1500,
+    VIDEO_CORUJA: '/Jogos/assets/negocios/dados-coruja.mp4'
   };
 
   /* -----------------------------------------------------------------------
@@ -394,6 +409,38 @@
   ];
 
   /* -----------------------------------------------------------------------
+     PEÇAS ILUSTRADAS DOS JOGADORES
+     Uma por jogador (8, mesma quantidade das cores). `img` é resolvido
+     contra CFG.TOKENS_BASE, então trocar, renomear ou reordenar as artes
+     é mexer SÓ nesta lista. A cor do jogador continua existindo: vira o
+     anel em volta da peça, para dois carrinhos parecidos nunca se
+     confundirem.
+     ----------------------------------------------------------------------- */
+  NDC.TOKENS = [
+    { id: 'carrinho-colorido', nome: 'Carrinho colorido', img: 'token-carrinho-colorido.webp' },
+    { id: 'bike-amarela',      nome: 'Bicicleta amarela', img: 'token-bike-amarela.webp' },
+    { id: 'trator-azul',       nome: 'Trator azul',       img: 'token-trator-azul.webp' },
+    { id: 'onibus',            nome: 'Ônibus',            img: 'token-onibus.webp' },
+    { id: 'caminhao-laranja',  nome: 'Caminhão laranja',  img: 'token-caminhao-laranja.webp' },
+    { id: 'bike-colorida',     nome: 'Bicicleta colorida', img: 'token-bike-colorida.webp' },
+    { id: 'trator-branco',     nome: 'Trator branco',     img: 'token-trator-branco.webp' },
+    { id: 'carrinho-preto',    nome: 'Carrinho preto',    img: 'token-carrinho-preto.webp' }
+  ];
+
+  NDC.tokenPorId = function (id) {
+    for (var i = 0; i < NDC.TOKENS.length; i++) {
+      if (NDC.TOKENS[i].id === id) return NDC.TOKENS[i];
+    }
+    return null;
+  };
+
+  /** URL da arte de uma peça. Cai na primeira se o id não existir mais. */
+  NDC.urlToken = function (id) {
+    var t = NDC.tokenPorId(id) || NDC.TOKENS[0];
+    return NDC.CONFIG.TOKENS_BASE + t.img;
+  };
+
+  /* -----------------------------------------------------------------------
      POSIÇÃO DE CADA CASA NO GRID 11x11.
 
      O tabuleiro usa o desenho clássico: a Partida fica no canto inferior
@@ -489,7 +536,7 @@
 
   /* ------------------------------ início ------------------------------- */
   /**
-   * @param {Array} defs  [{ nome, corId }]
+   * @param {Array} defs  [{ nome, corId, tokenId }]
    */
   Jogo.prototype.iniciar = function (defs) {
     var self = this;
@@ -497,11 +544,16 @@
     this.jogadores = defs.map(function (d, i) {
       var cor = NDC.CORES_JOGADOR.filter(function (c) { return c.id === d.corId; })[0]
              || NDC.CORES_JOGADOR[i % NDC.CORES_JOGADOR.length];
+      // Sem tokenId (partida antiga, chamada externa) cada um pega a peça
+      // da sua posição na mesa — nunca ficam dois iguais.
+      var tok = NDC.tokenPorId(d.tokenId) || NDC.TOKENS[i % NDC.TOKENS.length];
       return {
         id: i,
         nome: (d.nome || '').trim() || ('Jogador ' + (i + 1)),
         corId: cor.id,
         cor: cor.cor,
+        tokenId: tok.id,
+        tokenImg: NDC.urlToken(tok.id),
         inicial: ((d.nome || '').trim() || ('J' + (i + 1))).charAt(0).toUpperCase(),
         dinheiro: CFG.DINHEIRO_INICIAL,
         posicao: 0,
@@ -1278,15 +1330,18 @@
       var self = this;
       // estado inicial dos 8 slots possíveis
       this.jogadores = NDC.CORES_JOGADOR.map(function (c, i) {
-        return { nome: '', corId: c.id, sugestao: 'Jogador ' + (i + 1) };
+        return {
+          nome: '',
+          corId: c.id,
+          tokenId: NDC.TOKENS[i % NDC.TOKENS.length].id,
+          sugestao: 'Jogador ' + (i + 1)
+        };
       });
 
       $('#ndc-qtd-menos').addEventListener('click', function () { self.mudarQtd(-1); });
       $('#ndc-qtd-mais').addEventListener('click', function () { self.mudarQtd(1); });
       $('#ndc-btn-comecar').addEventListener('click', function () {
-        aoComecar(self.jogadores.slice(0, self.qtd).map(function (j, i) {
-          return { nome: j.nome.trim() || ('Jogador ' + (i + 1)), corId: j.corId };
-        }));
+        aoComecar(self.definicoes());
       });
 
       this.desenhar();
@@ -1295,7 +1350,7 @@
     /* Jogadores configurados agora, no formato que Jogo.iniciar espera. */
     definicoes: function () {
       return this.jogadores.slice(0, this.qtd).map(function (j, i) {
-        return { nome: j.nome.trim() || ('Jogador ' + (i + 1)), corId: j.corId };
+        return { nome: j.nome.trim() || ('Jogador ' + (i + 1)), corId: j.corId, tokenId: j.tokenId };
       });
     },
 
@@ -1313,22 +1368,25 @@
       $('#ndc-qtd-mais').disabled  = this.qtd >= CFG.MAX_JOGADORES;
 
       var lista = limpar($('#ndc-lista-jogadores'));
-      var usadas = this.jogadores.slice(0, this.qtd).map(function (j) { return j.corId; });
+      var emJogo = this.jogadores.slice(0, this.qtd);
+      var usadas = emJogo.map(function (j) { return j.corId; });
+      var usados = emJogo.map(function (j) { return j.tokenId; });
 
-      this.jogadores.slice(0, this.qtd).forEach(function (j, i) {
+      emJogo.forEach(function (j, i) {
         var corHex = corPorId(j.corId);
 
-        var avatar = el('div', { class: 'avatar', estilo: 'background:' + corHex },
-          [(j.nome.trim() || String(i + 1)).charAt(0).toUpperCase()]);
+        // O avatar mostra a peça escolhida sobre o disco da cor: é a mesma
+        // dupla arte + anel que vai aparecer no tabuleiro.
+        var avatar = el('div', {
+          class: 'avatar peca-avatar',
+          estilo: 'background-color:' + corHex + ';background-image:url("' + NDC.urlToken(j.tokenId) + '")'
+        });
 
         var input = el('input', {
           type: 'text', maxlength: '14', value: j.nome,
           placeholder: j.sugestao, 'aria-label': 'Nome do jogador ' + (i + 1)
         });
-        input.addEventListener('input', function () {
-          j.nome = input.value;
-          avatar.textContent = (j.nome.trim() || String(i + 1)).charAt(0).toUpperCase();
-        });
+        input.addEventListener('input', function () { j.nome = input.value; });
 
         var cores = el('div', { class: 'cores' },
           NDC.CORES_JOGADOR.map(function (c) {
@@ -1344,7 +1402,22 @@
           })
         );
 
-        lista.appendChild(el('div', { class: 'linha-jogador' }, [avatar, input, cores]));
+        var pecas = el('div', { class: 'pecas' },
+          NDC.TOKENS.map(function (t) {
+            var tomada = usados.indexOf(t.id) !== -1 && t.id !== j.tokenId;
+            return el('button', {
+              type: 'button',
+              class: 'peca',
+              'aria-pressed': t.id === j.tokenId ? 'true' : 'false',
+              'aria-label': t.nome,
+              title: t.nome,
+              disabled: tomada ? 'disabled' : null,
+              onclick: function () { j.tokenId = t.id; self.desenhar(); }
+            }, [el('img', { src: CFG.TOKENS_BASE + t.img, alt: '', loading: 'lazy', draggable: 'false' })]);
+          })
+        );
+
+        lista.appendChild(el('div', { class: 'linha-jogador' }, [avatar, input, cores, pecas]));
       });
     }
   };
@@ -1354,6 +1427,13 @@
     return c ? c.cor : '#888';
   }
   UI.corPorId = corPorId;
+
+  /* Disco da cor do jogador com a peça ilustrada por cima. Um ponto só para
+     a faixa da vez, o painel, o ranking e o aviso de passar o aparelho. */
+  function estiloAvatar(j) {
+    return 'background-color:' + j.cor + ';background-image:url("' + j.tokenImg + '")';
+  }
+  UI.estiloAvatar = estiloAvatar;
 
   /* =====================================================================
      TABULEIRO
@@ -1443,11 +1523,16 @@
   UI.criarTokens = function (jogo) {
     var camada = limpar($('#ndc-camada-tokens'));
     tokensEls = jogo.jogadores.map(function (j) {
+      // A peça é a arte; a cor do jogador vira o anel e o brilho por baixo,
+      // que é o que separa duas bicicletas parecidas numa mesa de 8.
       var t = el('div', {
         class: 'token',
-        estilo: 'background:' + j.cor,
-        'data-jogador': j.id
-      }, [j.inicial]);
+        estilo: '--ndc-cor-peca:' + j.cor,
+        'data-jogador': j.id,
+        title: j.nome
+      }, [
+        el('img', { class: 'token-img', src: j.tokenImg, alt: '', draggable: 'false' })
+      ]);
       camada.appendChild(t);
       return t;
     });
@@ -1484,7 +1569,10 @@
 
       var cols = Math.ceil(Math.sqrt(n));
       var rows = Math.ceil(n / cols);
-      var tam = Math.min(m.w, m.h) / (cols + 0.3);
+      // Sozinha, a peça ocupa a casa inteira (TOKEN_ESCALA). Dividindo a casa
+      // com outras ela encolhe pelo número de colunas, com uma folga para as
+      // artes não se encostarem.
+      var tam = Math.min(m.w, m.h) * CFG.TOKEN_ESCALA / (n === 1 ? 1 : cols + 0.15);
       var gw = cols * tam, gh = rows * tam;
       var ox = m.x + (m.w - gw) / 2;
       var oy = m.y + (m.h - gh) / 2;
@@ -1506,7 +1594,7 @@
     var t = tokensEls[jogadorId];
     if (!t) return;
     var m = medidasCasa(casaId);
-    var tam = Math.min(m.w, m.h) * 0.52;
+    var tam = Math.min(m.w, m.h) * CFG.TOKEN_ESCALA;
     aplicarToken(t, m.x + (m.w - tam) / 2, m.y + (m.h - tam) / 2, tam);
   }
 
@@ -1601,6 +1689,49 @@
     $('#ndc-msg-centro').innerHTML = texto || '';
   };
 
+  /* ------------------------- animação da coruja ------------------------- */
+  /* O vídeo (dados-coruja.mp4) roda no miolo do tabuleiro antes dos dados
+     girarem. É enfeite: o lance já foi sorteado pelo motor quando isto
+     começa, então se o vídeo não tocar (autoplay bloqueado, arquivo
+     ausente, prefers-reduced-motion) o jogo segue igual pelo aoTerminar.
+
+     Marca d'água do Pika: a arte é ampliada (scale) e recortada por uma
+     máscara radial no CSS, o que empurra os cantos — onde a marca fica —
+     para fora do quadro e ainda funde a borda com o fundo do tabuleiro.
+     Se em algum aparelho a marca ainda aparecer de canto de olho, é
+     preferível deixar assim a não ter animação nenhuma. */
+  function _semMovimento() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  UI.animarCoruja = function (aoTerminar) {
+    var ov = $('#ndc-coruja');
+    var vid = $('#ndc-coruja-video');
+    if (!ov || !vid || !CFG.ANIM_CORUJA || _semMovimento()) {
+      aoTerminar && aoTerminar();
+      return;
+    }
+    ov.classList.add('ndc-ativa');
+    try {
+      vid.currentTime = 0;
+      var p = vid.play();
+      if (p && p.catch) p.catch(function () {});   // autoplay bloqueado: só o pôster
+    } catch (e) { /* sem vídeo, segue o jogo */ }
+
+    setTimeout(function () {
+      UI.pararCoruja();
+      aoTerminar && aoTerminar();
+    }, CFG.MS_ANIM_CORUJA);
+  };
+
+  UI.pararCoruja = function () {
+    if (!raiz) return;
+    var ov = $('#ndc-coruja');
+    var vid = $('#ndc-coruja-video');
+    if (ov) ov.classList.remove('ndc-ativa');
+    if (vid) { try { vid.pause(); } catch (e) { /* ignorado */ } }
+  };
+
   /* =====================================================================
      FAIXA DA VEZ + PAINÉIS
      ===================================================================== */
@@ -1608,8 +1739,8 @@
     var j = jogo.jogadorAtual();
     if (!j) return;
     var peca = $('#ndc-peca-vez');
-    peca.textContent = j.inicial;
-    peca.style.background = j.cor;
+    peca.textContent = '';
+    peca.setAttribute('style', estiloAvatar(j));
     $('#ndc-nome-vez').textContent = j.nome;
     $('#ndc-rotulo-vez').textContent = 'Rodada ' + jogo.rodada + ' • vez de';
     $('#ndc-caixa-vez').textContent = NDC.dinheiro(j.dinheiro);
@@ -1653,7 +1784,7 @@
     var atual = jogo.jogadorAtual();
 
     jogo.jogadores.forEach(function (j) {
-      var avatar = el('div', { class: 'avatar', estilo: 'background:' + j.cor }, [j.inicial]);
+      var avatar = el('div', { class: 'avatar peca-avatar', estilo: estiloAvatar(j) });
       var chips = el('div', { class: 'chips' }, chipsDoJogador(jogo, j.id));
 
       var info = el('div', { class: 'info' }, [
@@ -1921,7 +2052,7 @@
     ranking.forEach(function (j, i) {
       box.appendChild(el('div', { class: 'linha-rank' + (i === 0 ? ' primeiro' : '') }, [
         el('div', { class: 'pos-rank', texto: (i + 1) + 'º' }),
-        el('div', { class: 'avatar', estilo: 'background:' + j.cor }, [j.inicial]),
+        el('div', { class: 'avatar peca-avatar', estilo: estiloAvatar(j) }),
         el('div', { class: 'nome-rank' }, [
           el('div', { texto: j.nome }),
           el('small', { estilo: 'color:var(--ndc-txt3);font-size:12px',
@@ -2004,8 +2135,8 @@
         cor: j.cor,
         fechavel: false,
         corpo: '<div style="text-align:center;padding:14px 0">' +
-               '<div style="width:74px;height:74px;border-radius:50%;margin:0 auto 14px;display:grid;place-items:center;' +
-               'font-size:32px;font-weight:900;color:#06111a;background:' + j.cor + '">' + j.inicial + '</div>' +
+               '<div class="ndc-peca-avatar" style="width:74px;height:74px;border-radius:50%;margin:0 auto 14px;' +
+               'background-color:' + j.cor + ';background-image:url(&quot;' + j.tokenImg + '&quot;)"></div>' +
                '<div style="font-size:24px;font-weight:900;color:var(--ndc-txt)">' + textoSeguro(j.nome) + '</div>' +
                '<div style="margin-top:6px">Caixa: <strong>' + NDC.dinheiro(j.dinheiro) + '</strong></div>' +
                '</div>',
@@ -2027,9 +2158,13 @@
     ocupar('Rolando…');
     _emAnimacao = true;
     var lance = jogo.rolar();
-    UI.animarDados(lance, function () {
-      UI.mensagemCentro('Andando ' + lance.total + ' casas…');
-      andar(lance.total, 0);
+    // A coruja joga primeiro (enfeite), os dados do jogo revelam depois o
+    // lance que o motor já sorteou.
+    UI.animarCoruja(function () {
+      UI.animarDados(lance, function () {
+        UI.mensagemCentro('Andando ' + lance.total + ' casas…');
+        andar(lance.total, 0);
+      });
     });
   }
 
@@ -2869,7 +3004,7 @@
       '</header>' +
 
       '<main class="ndc-arena">' +
-        '<div>' +
+        '<div class="ndc-col-tabuleiro">' +
           '<div class="ndc-tabuleiro-wrap" id="ndc-tabuleiro-wrap">' +
             '<div class="ndc-tabuleiro" id="ndc-tabuleiro">' +
               '<div class="ndc-centro" id="ndc-centro">' +
@@ -2880,6 +3015,13 @@
                 '</div>' +
                 '<div class="ndc-resultado" id="ndc-resultado-dados"></div>' +
                 '<div class="ndc-msg" id="ndc-msg-centro">Toque em “Rolar dados” para começar.</div>' +
+              '</div>' +
+              // Overlay da coruja: ocupa o mesmo miolo do tabuleiro que o
+              // centro. O src entra no _montar() para o caminho morar só
+              // em NDC.CONFIG.
+              '<div class="ndc-coruja" id="ndc-coruja" aria-hidden="true">' +
+                '<video class="ndc-coruja-video" id="ndc-coruja-video" muted playsinline ' +
+                  'preload="auto" disablepictureinpicture></video>' +
               '</div>' +
               '<div class="ndc-camada-tokens" id="ndc-camada-tokens"></div>' +
             '</div>' +
@@ -2929,6 +3071,37 @@
   var _montado = false;
   var _aoRedimensionar = null;
 
+  /* ── Orientação ────────────────────────────────────────────────
+     O layout deitado é feito no CSS (seção 15 do negocios.css), que é
+     quem manda: media query não tem FOUC nem depende de JS. Aqui só
+     espelhamos o estado numa classe (útil para depurar e para quem
+     quiser gancho em JS) e, o que importa de verdade, reposicionamos as
+     peças: elas são colocadas em pixels absolutos e não acompanham a
+     mudança de tamanho das casas sozinhas. Dois requestAnimationFrame
+     porque as medidas só valem depois que o CSS novo já refluiu. */
+  var _mqDeitado = null;
+  var _aoGirar = null;
+
+  function _remedirPecas() {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        if (jogo && raiz) UI.posicionarTokens(jogo);
+      });
+    });
+  }
+
+  function _ligarOrientacao() {
+    if (_aoGirar || !window.matchMedia) return;
+    _mqDeitado = window.matchMedia('(orientation: landscape)');
+    _aoGirar = function () {
+      if (raiz) raiz.classList.toggle('ndc-deitado', _mqDeitado.matches);
+      _remedirPecas();
+    };
+    if (_mqDeitado.addEventListener) _mqDeitado.addEventListener('change', _aoGirar);
+    else if (_mqDeitado.addListener) _mqDeitado.addListener(_aoGirar);
+    _aoGirar();
+  }
+
   /* Monta o DOM e liga os controles. Idempotente: chamado de novo,
      redesenha do zero. */
   function _montar() {
@@ -2936,6 +3109,9 @@
     UI.setup.montar(comecarPartida);
     UI.ligarAbas();
     UI.zerarDados();
+
+    var vid = $('#ndc-coruja-video');
+    if (vid && CFG.ANIM_CORUJA) vid.src = CFG.VIDEO_CORUJA;
 
     $('#ndc-btn-construir').addEventListener('click', modalConstruir);
     $('#ndc-btn-hipoteca').addEventListener('click', modalHipotecas);
@@ -2950,6 +3126,7 @@
       _aoRedimensionar = function () { if (jogo && raiz) UI.posicionarTokens(jogo); };
       window.addEventListener('resize', _aoRedimensionar);
     }
+    _ligarOrientacao();
     _montado = true;
   }
 
@@ -2959,6 +3136,7 @@
      cruel, então o estado sobrevive — parar() só mata os timers. */
   function _retomar() {
     UI.mostrarTela('tela-jogo');
+    UI.pararCoruja();          // saiu no meio da animação: o overlay não fica preso
     UI.criarTokens(jogo);
     repintar();
     if (jogo.fase === 'fim') { UI.telaFinal(jogo); return; }
@@ -2997,6 +3175,7 @@
      Mata timers e fecha modal. NÃO destrói a partida: ver _retomar. */
   function parar() {
     _limparTimers();
+    UI.pararCoruja();
     if (UI && UI.temModal && UI.temModal()) UI.fecharModal(true);
     _emAnimacao = false;
   }

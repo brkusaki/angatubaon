@@ -16,6 +16,8 @@
     11. Toasts de dinheiro
     12. Tela final
     13. Layout de tablet/desktop
+    14. Adaptação ao hub de jogos
+    15. Celular deitado (landscape)
    ========================================================================= */
 
 /* ============================ 1. TOKENS + RESET ========================= */
@@ -194,6 +196,7 @@
 #jogo-negocios .ndc-linha-jogador {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;          /* a régua de peças cai para a segunda linha */
   gap: 10px;
   background: var(--ndc-sup);
   border: 1px solid var(--ndc-linha);
@@ -208,6 +211,51 @@
   font-weight: 900; font-size: 17px; color: #071018;
   border: 2px solid rgba(255,255,255,.22);
 }
+
+/* Disco da cor com a peça ilustrada por cima. Usado no setup, na faixa da
+   vez, no painel, no ranking e no aviso de passar o aparelho — todos já
+   têm o próprio tamanho, aqui só entra como a arte se encaixa no disco. */
+#jogo-negocios .ndc-peca-avatar {
+  background-repeat: no-repeat;
+  background-position: 50% 54%;
+  background-size: 76% 76%;
+  color: transparent;
+}
+
+/* Escolha da peça: régua de miniaturas na largura toda da linha.
+   Grade de 8 colunas iguais em vez de flex com largura fixa — assim as 8
+   peças SEMPRE cabem numa linha só, em qualquer largura de tela, sem
+   quebrar para uma segunda fileira e dobrar a altura de cada jogador
+   (com 8 jogadores isso viraria uma rolagem enorme no setup). */
+#jogo-negocios .ndc-pecas {
+  flex: 1 0 100%;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 5px;
+  border-top: 1px solid var(--ndc-linha);
+  padding-top: 8px;
+}
+#jogo-negocios .ndc-pecas .ndc-peca {
+  width: 100%;
+  aspect-ratio: 1;
+  max-height: 46px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: var(--ndc-bg2);
+  display: grid; place-items: center;
+}
+#jogo-negocios .ndc-pecas .ndc-peca img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+#jogo-negocios .ndc-pecas .ndc-peca[aria-pressed="true"] {
+  border-color: var(--ndc-acc);
+  background: var(--ndc-sup2);
+  box-shadow: 0 0 0 2px rgba(56,225,176,.25);
+}
+#jogo-negocios .ndc-pecas .ndc-peca:disabled { opacity: .22; }
 #jogo-negocios .ndc-linha-jogador input[type="text"] {
   flex: 1 1 auto;
   min-width: 0;
@@ -261,6 +309,10 @@
   font-weight: 900; font-size: 19px; color: #06111a;
   border: 3px solid rgba(255,255,255,.28);
   box-shadow: 0 0 0 4px rgba(255,255,255,.05);
+  /* o atualizarFaixa escreve a cor e a arte da peça no style */
+  background-repeat: no-repeat;
+  background-position: 50% 54%;
+  background-size: 76% 76%;
 }
 #jogo-negocios .ndc-faixa-vez .ndc-quem { flex: 1 1 auto; min-width: 0; }
 #jogo-negocios .ndc-faixa-vez .ndc-quem .ndc-rotulo { font-size: 10px; }
@@ -454,18 +506,39 @@
   pointer-events: none;
   z-index: 5;
 }
+/* A peça é a arte ilustrada; a cor do jogador (--ndc-cor-peca, escrita no
+   style pelo criarTokens) vira o anel e o halo por baixo — é o que separa
+   duas bicicletas parecidas numa mesa de 8. O disco fica levemente escuro
+   para a arte não sumir numa casa clara. */
 #jogo-negocios .ndc-token {
   position: absolute;
   top: 0; left: 0;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-weight: 900;
-  color: #061019;
-  border: 2px solid rgba(255,255,255,.55);
-  box-shadow: 0 2px 6px rgba(0,0,0,.6);
+  background:
+    radial-gradient(circle at 50% 50%,
+      color-mix(in srgb, var(--ndc-cor-peca, #888) 34%, transparent) 0 52%,
+      transparent 72%),
+    rgba(6,12,26,.34);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--ndc-cor-peca, #888) 88%, transparent),
+    0 2px 6px rgba(0,0,0,.6);
   transition: transform .13s linear;
   will-change: transform;
+}
+/* Navegadores sem color-mix caem no anel sólido da cor do jogador. */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  #jogo-negocios .ndc-token {
+    background: rgba(6,12,26,.34);
+    box-shadow: 0 0 0 2px var(--ndc-cor-peca, #888), 0 2px 6px rgba(0,0,0,.6);
+  }
+}
+#jogo-negocios .ndc-token .ndc-token-img {
+  width: 88%; height: 88%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.7));
 }
 #jogo-negocios .ndc-token.ndc-andando { animation: pulo .13s linear infinite; }
 @keyframes pulo {
@@ -473,7 +546,10 @@
   50%      { filter: brightness(1.45); }
 }
 #jogo-negocios .ndc-token.ndc-vez {
-  box-shadow: 0 0 0 3px rgba(255,200,87,.65), 0 2px 8px rgba(0,0,0,.7);
+  box-shadow:
+    0 0 0 2px var(--ndc-cor-peca, #888),
+    0 0 0 4px rgba(255,200,87,.7),
+    0 2px 8px rgba(0,0,0,.7);
   z-index: 3;
 }
 
@@ -547,6 +623,59 @@
   line-height: 1.4;
   max-width: 92%;
   min-height: 2.6em;
+}
+
+/* ---- Coruja jogando os dados (overlay sobre o miolo do tabuleiro) ----
+   Ocupa exatamente a mesma área do centro. Fica acima da camada de peças
+   (z-index 5) porque as peças ficam na moldura de casas, não no miolo. */
+#jogo-negocios .ndc-coruja {
+  grid-column: 2 / 11;
+  grid-row: 2 / 11;
+  z-index: 6;
+  position: relative;      /* âncora do ::after que cobre a marca do Pika */
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 48%, #0b1222 0%, #0b1222 58%, rgba(11,18,34,.86) 100%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .22s ease, visibility .22s;
+}
+#jogo-negocios .ndc-coruja.ndc-ativa { opacity: 1; visibility: visible; }
+
+/* MARCA D'ÁGUA DO PIKA — tratamento deliberado, não é bug.
+   A marca NÃO fica num canto: é o wordmark "Pika" no meio-esquerda do
+   quadro (x 12%-28%, y 24%-28,5% do vídeo, medido frame a frame — está lá
+   os 5 segundos inteiros), então recorte de borda não alcança ela. O que
+   salva é o entorno: ali o fundo do vídeo é preto puro (brilho médio 8 de
+   255), então uma mancha preta suave por cima apaga o wordmark sem deixar
+   buraco visível — some no próprio fundo da cena.
+
+   São três camadas, nesta ordem:
+     1. scale(1.12) no vídeo — tira as bordas e qualquer sujeira de canto;
+     2. máscara radial — funde a borda do vídeo com o fundo do tabuleiro;
+     3. ::after — a mancha preta em cima do wordmark (já em coordenadas do
+        container, ou seja, com o scale do item 1 descontado).
+   Nada de inpainting. Se um dia sair uma versão sem marca, é só trocar o
+   mp4 e apagar o ::after. */
+#jogo-negocios .ndc-coruja-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.12);
+  -webkit-mask-image: radial-gradient(circle at 50% 48%, #000 0 56%, rgba(0,0,0,.6) 74%, transparent 88%);
+          mask-image: radial-gradient(circle at 50% 48%, #000 0 56%, rgba(0,0,0,.6) 74%, transparent 88%);
+}
+
+/* camada 3: a mancha que cobre o wordmark (ver bloco acima) */
+#jogo-negocios .ndc-coruja::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 19% 11% at 16.5% 23.5%,
+    #000 0 52%, rgba(0,0,0,.92) 72%, transparent 100%);
 }
 
 /* ============================== 8. PAINEL ============================== */
@@ -1016,4 +1145,140 @@
   #jogo-negocios .ndc-tabuleiro-wrap { max-width: min(100%, calc(100dvh - 250px)); }
   #jogo-negocios .ndc-painel { position: sticky; top: 0; }
   #jogo-negocios .ndc-acoes { position: static; border-radius: 0; max-width: none; width: 100%; margin: 0; }
+}
+
+/* =========================================================================
+   15. CELULAR DEITADO (LANDSCAPE)
+   Em pé o jogo é uma coluna: faixa da vez, tabuleiro, painel, ações. Deitado
+   isso não serve — sobrariam ~250 px de altura para o tabuleiro e um vão de
+   largura sem uso. Aqui a tela vira uma grade de duas colunas: o tabuleiro
+   ocupa TODA a altura na esquerda e faixa + painel + ações empilham na
+   direita, no espaço que antes ficava vazio.
+
+   Como o tabuleiro é quadrado, quem manda no tamanho dele é a ALTURA: a
+   coluna da esquerda é `auto` e o tabuleiro pega 100% da altura da grade,
+   deixando o aspect-ratio devolver a largura. Isso evita chutar numa conta
+   de dvh a altura do botão "Voltar aos jogos" do hub — o tabuleiro
+   simplesmente usa toda a altura que sobrar. Num 844x390 dá ~340 px, quase
+   o mesmo do modo em pé (~370 px), só que agora ele não divide a altura com
+   painel e botões: tudo aparece junto, sem rolagem, e ainda sobram ~480 px
+   de largura para o painel e as ações.
+
+   .ndc-arena vira `display: contents` para os filhos dela (coluna do
+   tabuleiro e painel) entrarem direto na grade da tela, sem mexer no HTML.
+
+   Recorte: (orientation: landscape) + (max-height: 600px) pega celular e
+   foldable deitados e deixa tablet e desktop de fora — eles continuam no
+   bloco de 900px. Este bloco fica por último no arquivo de propósito: em
+   aparelhos largos e baixos (ex.: 926x428) as duas media queries valem, e
+   quem vem depois ganha.
+   ========================================================================= */
+@media (orientation: landscape) and (max-height: 600px) {
+  #jogo-negocios #ndc-tela-jogo.ndc-ativa {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "tabuleiro faixa"
+      "tabuleiro painel"
+      "tabuleiro acoes";
+    gap: 0 10px;
+    padding: 0 10px 4px;
+    overflow: hidden;
+  }
+
+  #jogo-negocios .ndc-arena { display: contents; }
+
+  /* ---- coluna do tabuleiro ---- */
+  #jogo-negocios .ndc-col-tabuleiro {
+    grid-area: tabuleiro;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* O tabuleiro é quadrado, então quem manda no tamanho é a ALTURA: o wrap
+     pega 100% da altura da grade e o aspect-ratio devolve a largura, que é
+     o que dimensiona a coluna `auto`. Assim ele usa toda a altura que
+     sobrou, sem eu ter que adivinhar a altura do botão do hub numa conta
+     de dvh. O max-width segura o caso extremo de tela muito baixa e larga,
+     para o tabuleiro nunca engolir a coluna da direita. */
+  #jogo-negocios .ndc-tabuleiro-wrap {
+    height: 100%;
+    width: auto;
+    aspect-ratio: 1 / 1;
+    max-width: 62vw;
+    margin: 0;
+    overflow: visible;        /* não precisa rolar: já cabe inteiro */
+  }
+  #jogo-negocios .ndc-tabuleiro { height: 100%; }
+  /* Sem concorrência por espaço, as casas comportam texto maior. */
+  #jogo-negocios .ndc-casa .ndc-sigla { font-size: 3.4cqw; }
+  #jogo-negocios .ndc-casa .ndc-preco { font-size: 2.5cqw; }
+  #jogo-negocios .ndc-casa .ndc-icone { font-size: 3.9cqw; }
+  #jogo-negocios .ndc-casa.ndc-canto .ndc-icone { font-size: 6cqw; }
+
+  /* O modo ampliado (menu Mais) volta a rolar dentro da coluna. */
+  #jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado {
+    max-height: 100%;
+    overflow: auto;
+  }
+  #jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado .ndc-tabuleiro { height: auto; }
+
+  /* ---- faixa da vez: enxuta, no topo da coluna direita ---- */
+  #jogo-negocios .ndc-faixa-vez {
+    grid-area: faixa;
+    padding: 6px 2px;
+    gap: 9px;
+  }
+  #jogo-negocios .ndc-faixa-vez .ndc-peca-vez {
+    width: 36px; height: 36px; flex: 0 0 36px;
+    border-width: 2px;
+  }
+  #jogo-negocios .ndc-faixa-vez .ndc-quem b { font-size: 16px; }
+  #jogo-negocios .ndc-faixa-vez .ndc-caixa .ndc-grana { font-size: 16px; }
+
+  /* ---- painel: rola só ele ---- */
+  #jogo-negocios .ndc-painel {
+    grid-area: painel;
+    margin-top: 0;
+    min-width: 0; min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #jogo-negocios .ndc-painel-conteudo {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #jogo-negocios .ndc-historico { max-height: none; }
+  /* Cards mais baixos: cabem 3 jogadores sem rolar. */
+  #jogo-negocios .ndc-card-jogador { padding: 7px 9px; margin-bottom: 6px; }
+  #jogo-negocios .ndc-card-jogador .ndc-avatar { width: 30px; height: 30px; flex: 0 0 30px; }
+
+  /* ---- ações: faixa compacta no pé da coluna direita ---- */
+  #jogo-negocios .ndc-acoes {
+    grid-area: acoes;
+    padding: 7px 0 calc(2px + var(--ndc-base));
+    border-top: 1px solid var(--ndc-linha);
+    background: none;
+    backdrop-filter: none;
+  }
+  #jogo-negocios .ndc-acoes .ndc-principais .ndc-btn { min-height: 44px; font-size: 15px; }
+  #jogo-negocios .ndc-acoes .ndc-secundarias { margin-top: 5px; gap: 5px; }
+  #jogo-negocios .ndc-acoes .ndc-secundarias .ndc-btn {
+    min-height: 38px;
+    flex-direction: row;
+    gap: 5px;
+    font-size: 11px;
+    padding: 5px 4px;
+  }
+  #jogo-negocios .ndc-acoes .ndc-secundarias .ndc-btn span.ndc-ico { font-size: 14px; }
+
+  /* Avisos de dinheiro sobem: aqui não há faixa da vez ocupando o topo. */
+  #jogo-negocios .ndc-brindes { top: 56px; }
+  #jogo-negocios .ndc-fundo-modal { align-items: center; }
+  #jogo-negocios .ndc-modal { max-height: 88%; }
 }

@@ -329,6 +329,16 @@
 #jogo-negocios .ndc-faixa-vez .ndc-caixa .ndc-grana { font-size: 19px; }
 #jogo-negocios .ndc-faixa-vez .ndc-caixa .ndc-rotulo { font-size: 10px; }
 
+/* Botão que abre o painel (bottom-sheet) e as peças do próprio painel-
+   drawer (backdrop, alça, ✕) só existem visualmente em landscape (seção
+   15) — em pé o painel já é uma faixa normal do fluxo, sem gaveta nenhuma
+   pra abrir. Ficam escondidas por padrão pra não aparecer nem ocupar
+   espaço fora desse modo. */
+#jogo-negocios .ndc-btn-painel,
+#jogo-negocios .ndc-painel-backdrop,
+#jogo-negocios .ndc-painel-alca,
+#jogo-negocios .ndc-painel-fechar { display: none; }
+
 #jogo-negocios .ndc-faixa-vez.ndc-trocando { animation: piscaVez .7s ease; }
 @keyframes piscaVez {
   0%   { background-color: rgba(56,225,176,.22); }
@@ -1150,22 +1160,34 @@
 /* =========================================================================
    15. CELULAR DEITADO (LANDSCAPE)
    Em pé o jogo é uma coluna: faixa da vez, tabuleiro, painel, ações. Deitado
-   isso não serve — sobrariam ~250 px de altura para o tabuleiro e um vão de
-   largura sem uso. Aqui a tela vira uma grade de duas colunas: o tabuleiro
-   ocupa TODA a altura na esquerda e faixa + painel + ações empilham na
-   direita, no espaço que antes ficava vazio.
+   a primeira versão disto virava uma grade de DUAS colunas (tabuleiro à
+   esquerda, faixa+painel+ações empilhados à direita) — no playtest isso
+   deixava o tabuleiro espremido contra a coluna do painel, "preso no
+   canto" em vez de ser o centro das atenções.
 
-   Como o tabuleiro é quadrado, quem manda no tamanho dele é a ALTURA: a
-   coluna da esquerda é `auto` e o tabuleiro pega 100% da altura da grade,
-   deixando o aspect-ratio devolver a largura. Isso evita chutar numa conta
-   de dvh a altura do botão "Voltar aos jogos" do hub — o tabuleiro
-   simplesmente usa toda a altura que sobrar. Num 844x390 dá ~340 px, quase
-   o mesmo do modo em pé (~370 px), só que agora ele não divide a altura com
-   painel e botões: tudo aparece junto, sem rolagem, e ainda sobram ~480 px
-   de largura para o painel e as ações.
+   Redesenho: o painel deixa de ter coluna PERMANENTE nenhuma. A tela
+   volta a ser uma coluna só — faixa fina em cima, tabuleiro no meio,
+   ações fixas embaixo — só que agora o tabuleiro é quem ganha o espaço
+   que sobra (a linha `1fr`), centralizado, e cresce até a altura
+   disponível permitir (largura sobra de lado, de propósito: o
+   tabuleiro é quadrado e a altura aqui é sempre o fator apertado).
+   Jogadores/Bens/Histórico viram um bottom-sheet: recolhido por
+   padrão, abre por cima de tudo ao tocar o botão 👥 na faixa da vez, e
+   fecha tocando fora (backdrop), no ✕ ou arrastando a alça pra baixo.
 
-   .ndc-arena vira `display: contents` para os filhos dela (coluna do
-   tabuleiro e painel) entrarem direto na grade da tela, sem mexer no HTML.
+   Como o tabuleiro é quadrado, quem manda no tamanho dele agora é a
+   altura QUE SOBROU depois de faixa + ações (não mais 100% da tela: essas
+   duas faixas competem por altura com ele, de propósito, pra ficarem
+   compactas). Num 844x390 dá por volta de 280-300px de tabuleiro — menor
+   que a versão anterior (~340px), mas CENTRALIZADO, sem o painel
+   grudado do lado brigando por atenção, que era o pedido do playtest.
+
+   .ndc-arena vira `display: contents` para os filhos dela entrarem direto
+   na grade da tela sem mexer no HTML. O painel e o backdrop, por serem
+   `position: absolute`, saem do fluxo do grid sozinhos (não precisam de
+   grid-area): flutuam por cima, ancorados em #jogo-negocios (que já é
+   `position: relative` — mesmo truque que .ndc-fundo-modal usa pra não
+   escapar da tela cheia nativa do hub).
 
    Recorte: (orientation: landscape) + (max-height: 600px) pega celular e
    foldable deitados e deixa tablet e desktop de fora — eles continuam no
@@ -1176,43 +1198,42 @@
 @media (orientation: landscape) and (max-height: 600px) {
   #jogo-negocios #ndc-tela-jogo.ndc-ativa {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "tabuleiro faixa"
-      "tabuleiro painel"
-      "tabuleiro acoes";
-    gap: 0 10px;
+      "faixa"
+      "tabuleiro"
+      "acoes";
+    gap: 4px;
     padding: 0 10px 4px;
     overflow: hidden;
   }
 
   #jogo-negocios .ndc-arena { display: contents; }
 
-  /* ---- coluna do tabuleiro ---- */
+  /* ---- tabuleiro: o foco, centralizado na linha do meio ---- */
   #jogo-negocios .ndc-col-tabuleiro {
     grid-area: tabuleiro;
     min-width: 0;
+    min-height: 0;
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  /* O tabuleiro é quadrado, então quem manda no tamanho é a ALTURA: o wrap
-     pega 100% da altura da grade e o aspect-ratio devolve a largura, que é
-     o que dimensiona a coluna `auto`. Assim ele usa toda a altura que
-     sobrou, sem eu ter que adivinhar a altura do botão do hub numa conta
-     de dvh. O max-width segura o caso extremo de tela muito baixa e larga,
-     para o tabuleiro nunca engolir a coluna da direita. */
+  /* height:100% da linha 1fr + aspect-ratio devolve a largura — o
+     tabuleiro cresce até a altura disponível permitir. max-width:100% é
+     só uma rede de segurança (foldable esquisito, altura sobrando mais
+     que largura), não o limite normal do dia a dia. */
   #jogo-negocios .ndc-tabuleiro-wrap {
     height: 100%;
     width: auto;
+    max-width: 100%;
     aspect-ratio: 1 / 1;
-    max-width: 62vw;
     margin: 0;
     overflow: visible;        /* não precisa rolar: já cabe inteiro */
   }
   #jogo-negocios .ndc-tabuleiro { height: 100%; }
-  /* Sem concorrência por espaço, as casas comportam texto maior. */
+  /* Sem concorrência por espaço lateral, as casas comportam texto maior. */
   #jogo-negocios .ndc-casa .ndc-sigla { font-size: 3.4cqw; }
   #jogo-negocios .ndc-casa .ndc-preco { font-size: 2.5cqw; }
   #jogo-negocios .ndc-casa .ndc-icone { font-size: 3.9cqw; }
@@ -1225,60 +1246,169 @@
   }
   #jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado .ndc-tabuleiro { height: auto; }
 
-  /* ---- faixa da vez: enxuta, no topo da coluna direita ---- */
+  /* ---- faixa da vez: fina, no topo, largura toda ----
+     z-index acima do backdrop (50) e do painel (55): a base (seção 4) já
+     dá z-index:30 pro sticky, o que a colocaria ATRÁS do backdrop —
+     sem isto o botão 👥 lá dentro ficaria inclicável com o painel
+     aberto (backdrop cobre tudo pra capturar "toque fora"). Com a faixa
+     por cima, o botão sempre fecha o painel também, além de tocar fora,
+     no ✕ ou arrastar. */
   #jogo-negocios .ndc-faixa-vez {
     grid-area: faixa;
-    padding: 6px 2px;
-    gap: 9px;
+    z-index: 57;
+    padding: 4px 8px;
+    gap: 8px;
   }
   #jogo-negocios .ndc-faixa-vez .ndc-peca-vez {
-    width: 36px; height: 36px; flex: 0 0 36px;
+    width: 30px; height: 30px; flex: 0 0 30px;
     border-width: 2px;
   }
-  #jogo-negocios .ndc-faixa-vez .ndc-quem b { font-size: 16px; }
-  #jogo-negocios .ndc-faixa-vez .ndc-caixa .ndc-grana { font-size: 16px; }
+  #jogo-negocios .ndc-faixa-vez .ndc-quem b { font-size: 14px; }
+  #jogo-negocios .ndc-faixa-vez .ndc-quem .ndc-rotulo { font-size: 9px; }
+  #jogo-negocios .ndc-faixa-vez .ndc-caixa .ndc-grana { font-size: 14px; }
+  #jogo-negocios .ndc-faixa-vez .ndc-caixa .ndc-rotulo { font-size: 9px; }
 
-  /* ---- painel: rola só ele ---- */
-  #jogo-negocios .ndc-painel {
-    grid-area: painel;
+  /* Botão 👥 que abre o painel — só existe (visualmente) aqui.
+     z-index acima do backdrop (50): com o painel aberto o backdrop cobre
+     a tela inteira pra capturar "toque fora", mas o próprio botão que
+     abriu continua clicável por cima dele — dá pra fechar tocando nele
+     de novo, além de tocar fora, no ✕ ou arrastar. */
+  #jogo-negocios .ndc-btn-painel {
+    position: relative;
+    z-index: 56;
+    display: grid;
+    place-items: center;
+    flex: 0 0 34px;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--ndc-linha);
+    background: var(--ndc-sup2);
+    font-size: 15px;
+    line-height: 1;
+  }
+  #jogo-negocios .ndc-btn-painel:active { transform: scale(.94); }
+  #jogo-negocios .ndc-btn-painel[aria-expanded="true"] {
+    background: var(--ndc-acc);
+    border-color: transparent;
+  }
+
+  /* ---- ações: UMA faixa só, fixa embaixo (principais + secundárias
+     lado a lado, em vez de duas linhas empilhadas — é o que sobra de
+     altura pro tabuleiro crescer). ---- */
+  #jogo-negocios .ndc-acoes {
+    grid-area: acoes;
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    padding: 6px 0 calc(4px + var(--ndc-base));
+    border-top: 1px solid var(--ndc-linha);
+    background: none;
+    backdrop-filter: none;
+  }
+  #jogo-negocios .ndc-acoes .ndc-principais {
+    flex: 1 1 40%;
+    min-width: 0;
+  }
+  #jogo-negocios .ndc-acoes .ndc-principais .ndc-btn { min-height: 42px; font-size: 14px; }
+  #jogo-negocios .ndc-acoes .ndc-secundarias {
+    flex: 1 1 60%;
+    min-width: 0;
+    grid-template-columns: repeat(4, 1fr);
     margin-top: 0;
-    min-width: 0; min-height: 0;
+  }
+  #jogo-negocios .ndc-acoes .ndc-secundarias .ndc-btn {
+    min-height: 42px;
+    flex-direction: row;
+    gap: 4px;
+    font-size: 10px;
+    padding: 4px 2px;
+  }
+  #jogo-negocios .ndc-acoes .ndc-secundarias .ndc-btn span.ndc-ico { font-size: 13px; }
+
+  /* ---- painel: bottom-sheet recolhido por padrão ----
+     position:absolute tira ele do grid (não precisa de grid-area) e o
+     ancora em #jogo-negocios, não na viewport — mesmo motivo do
+     .ndc-fundo-modal: não escapar da tela cheia nativa do hub. */
+  #jogo-negocios .ndc-painel {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    z-index: 55;                 /* acima do tabuleiro/ações, abaixo do modal (60) */
+    margin-top: 0;
+    max-height: 74%;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    min-height: 0;
+    background: var(--ndc-bg2);
+    border: 1px solid var(--ndc-linha);
+    border-bottom: none;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 26px rgba(0,0,0,.5);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    transform: translateY(100%);
+    transition: transform .24s cubic-bezier(.32,.9,.4,1);
   }
+  #negocios-root.ndc-painel-aberto .ndc-painel { transform: translateY(0); }
+
+  /* Alça de arrastar: só a barrinha é decoração, a faixa inteira é alvo
+     de toque/arraste (mais fácil de acertar que os 4px da barra). */
+  #jogo-negocios .ndc-painel-alca {
+    display: flex;
+    justify-content: center;
+    flex: 0 0 auto;
+    padding: 9px 0 4px;
+    touch-action: none;
+    cursor: grab;
+  }
+  #jogo-negocios .ndc-painel-alca span {
+    width: 36px; height: 4px;
+    border-radius: 3px;
+    background: var(--ndc-linha);
+  }
+
+  #jogo-negocios .ndc-painel-fechar {
+    position: absolute;
+    top: 6px; right: 6px;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--ndc-linha);
+    background: var(--ndc-sup);
+    color: var(--ndc-txt2);
+    font-size: 14px;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+  }
+
+  #jogo-negocios .ndc-abas { flex: 0 0 auto; margin: 0 10px 8px; }
   #jogo-negocios .ndc-painel-conteudo {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    padding: 0 10px 10px;
   }
   #jogo-negocios .ndc-historico { max-height: none; }
-  /* Cards mais baixos: cabem 3 jogadores sem rolar. */
-  #jogo-negocios .ndc-card-jogador { padding: 7px 9px; margin-bottom: 6px; }
-  #jogo-negocios .ndc-card-jogador .ndc-avatar { width: 30px; height: 30px; flex: 0 0 30px; }
 
-  /* ---- ações: faixa compacta no pé da coluna direita ---- */
-  #jogo-negocios .ndc-acoes {
-    grid-area: acoes;
-    padding: 7px 0 calc(2px + var(--ndc-base));
-    border-top: 1px solid var(--ndc-linha);
-    background: none;
-    backdrop-filter: none;
+  /* ---- backdrop: escurece o resto e fecha o painel ao tocar fora ----
+     display:block PRECISA vir aqui: fora do landscape a regra base
+     (seção 2) esconde este elemento com display:none, e opacity/
+     visibility sozinhos não bastam pra revogar isso. */
+  #jogo-negocios .ndc-painel-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    background: rgba(4,7,14,.55);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .2s ease, visibility .2s;
   }
-  #jogo-negocios .ndc-acoes .ndc-principais .ndc-btn { min-height: 44px; font-size: 15px; }
-  #jogo-negocios .ndc-acoes .ndc-secundarias { margin-top: 5px; gap: 5px; }
-  #jogo-negocios .ndc-acoes .ndc-secundarias .ndc-btn {
-    min-height: 38px;
-    flex-direction: row;
-    gap: 5px;
-    font-size: 11px;
-    padding: 5px 4px;
-  }
-  #jogo-negocios .ndc-acoes .ndc-secundarias .ndc-btn span.ndc-ico { font-size: 14px; }
+  #negocios-root.ndc-painel-aberto .ndc-painel-backdrop { opacity: 1; visibility: visible; pointer-events: auto; }
 
-  /* Avisos de dinheiro sobem: aqui não há faixa da vez ocupando o topo. */
-  #jogo-negocios .ndc-brindes { top: 56px; }
+  /* Avisos de dinheiro sobem: aqui não há faixa da vez alta ocupando
+     o topo. */
+  #jogo-negocios .ndc-brindes { top: 46px; }
   #jogo-negocios .ndc-fundo-modal { align-items: center; }
   #jogo-negocios .ndc-modal { max-height: 88%; }
 }

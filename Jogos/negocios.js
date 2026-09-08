@@ -662,7 +662,7 @@
 
     if (casa.tipo === 'propriedade') {
       if (est.casas > 0) return casa.alugueis[est.casas];
-      // Terreno pelado vale o dobro se o dono tiver o grupo de cor inteiro.
+      // Terreno vazio vale o dobro se o dono tiver o grupo de cor inteiro.
       return casa.alugueis[0] * (this.monopolioAtivo(est.dono, casa.grupo) ? 2 : 1);
     }
 
@@ -1983,7 +1983,7 @@
       html += '<p>Grupo <strong>' + grupo.nome + '</strong> • preço <strong>' + NDC.dinheiro(casa.preco) +
               '</strong> • casa <strong>' + NDC.dinheiro(grupo.custoCasa) + '</strong></p>';
       var nivelAtual = est.casas;
-      var linhas = ['Terreno pelado', '1 casa', '2 casas', '3 casas', '4 casas', 'Hotel'];
+      var linhas = ['Terreno vazio', '1 casa', '2 casas', '3 casas', '4 casas', 'Hotel'];
       html += '<table class="ndc-tabela-aluguel">';
       linhas.forEach(function (rot, i) {
         var v = casa.alugueis[i];
@@ -2284,7 +2284,7 @@
       var est = jogo.casas[d.casa.id];
       detalhe = '<p class="ndc-sub">' + (est.casas === CFG.NIVEL_HOTEL ? 'Com hotel.'
               : est.casas ? 'Com ' + est.casas + (est.casas === 1 ? ' casa.' : ' casas.')
-              : (jogo.monopolioAtivo(d.dono.id, d.casa.grupo) ? 'Terreno pelado, mas o grupo de cor é todo dele: aluguel em dobro.' : 'Terreno pelado.')) + '</p>';
+              : (jogo.monopolioAtivo(d.dono.id, d.casa.grupo) ? 'Terreno vazio, mas o grupo de cor é todo dele: aluguel em dobro.' : 'Terreno vazio.')) + '</p>';
     }
 
     UI.modal({
@@ -2610,7 +2610,7 @@
             el('div', { class: 'txt' }, [
               el('b', { texto: casa.curto }),
               el('small', { texto: (est.casas === CFG.NIVEL_HOTEL ? '🏨 hotel'
-                : est.casas ? '🏠'.repeat(est.casas) : 'terreno pelado') +
+                : est.casas ? '🏠'.repeat(est.casas) : 'terreno vazio') +
                 ' • aluguel ' + NDC.dinheiro(jogo.aluguel(casa.id, 7)) })
             ]),
             el('button', {
@@ -2915,7 +2915,7 @@
         '<li>Começa com <strong>' + NDC.dinheiro(CFG.DINHEIRO_INICIAL) + '</strong>.</li>' +
         '<li>Passou ou caiu na Partida: <strong>' + NDC.dinheiro(CFG.SALARIO_PARTIDA) + '</strong>.</li>' +
         '<li>Terreno sem dono: <strong>compra ou passa</strong>. Sem leilão.</li>' +
-        '<li>Grupo de cor completo dobra o aluguel do terreno pelado e libera construir.</li>' +
+        '<li>Grupo de cor completo dobra o aluguel do terreno vazio e libera construir.</li>' +
         '<li>Casas custam o valor fixo do grupo. Máximo 4 casas + 1 hotel.</li>' +
         (CFG.CONSTRUCAO_UNIFORME ? '<li>Construção uniforme: dentro do grupo a diferença de casas nunca passa de 1.</li>' : '') +
         '<li>Hipoteca = metade do preço. Quitar custa +' + (CFG.JUROS_DESHIPOTECA * 100) + '%. Hipotecada não cobra aluguel.</li>' +
@@ -2980,7 +2980,7 @@
           '<li>Cada um começa com <strong>R$ 2.500</strong> e anda com 2 dados.</li>' +
           '<li>Caiu em terreno sem dono: <strong>compra ou passa</strong>. Não tem leilão.</li>' +
           '<li>Caiu em terreno dos outros: <strong>paga aluguel</strong>. Hipotecado não cobra.</li>' +
-          '<li>Terreno pelado com o <strong>grupo de cor completo</strong> cobra aluguel em dobro.</li>' +
+          '<li>Terreno vazio com o <strong>grupo de cor completo</strong> cobra aluguel em dobro.</li>' +
           '<li>Com o grupo completo dá para <strong>construir</strong>: até 4 casas e depois o hotel.</li>' +
           '<li><strong>Tirou dupla, joga de novo</strong> (no máximo 3 vezes seguidas).</li>' +
           '<li>Passou pela Partida, recebe <strong>R$ 200</strong>.</li>' +
@@ -3001,6 +3001,11 @@
           '<span class="ndc-rotulo">Caixa</span>' +
           '<div class="ndc-grana" id="ndc-caixa-vez">R$ 0</div>' +
         '</div>' +
+        // Só existe (visualmente) em landscape — ver seção 15 do CSS. Em pé
+        // fica display:none: o painel já é uma faixa normal ali embaixo,
+        // não precisa de botão pra abrir.
+        '<button type="button" class="ndc-btn-painel" id="ndc-btn-painel" ' +
+          'aria-label="Jogadores e bens" aria-expanded="false">👥</button>' +
       '</header>' +
 
       '<main class="ndc-arena">' +
@@ -3028,7 +3033,16 @@
           '</div>' +
         '</div>' +
 
+        // Backdrop do painel em landscape (ver seção 15 do CSS): some fora
+        // do modo deitado, então em pé é só um <div> vazio sem efeito.
+        '<div class="ndc-painel-backdrop" id="ndc-painel-backdrop"></div>' +
         '<aside class="ndc-painel">' +
+          // Alça (arrastar pra fechar) e X — os dois só aparecem em
+          // landscape, onde o painel vira bottom-sheet. Em pé o painel é
+          // uma faixa normal do fluxo e nenhum dos dois faz sentido.
+          '<div class="ndc-painel-alca" id="ndc-painel-alca"><span></span></div>' +
+          '<button type="button" class="ndc-painel-fechar" id="ndc-painel-fechar" ' +
+            'aria-label="Fechar painel">✕</button>' +
           '<nav class="ndc-abas" role="tablist">' +
             '<button type="button" role="tab" aria-selected="true"  data-aba="jogadores">Jogadores</button>' +
             '<button type="button" role="tab" aria-selected="false" data-aba="bens">Meus bens</button>' +
@@ -3095,11 +3109,77 @@
     _mqDeitado = window.matchMedia('(orientation: landscape)');
     _aoGirar = function () {
       if (raiz) raiz.classList.toggle('ndc-deitado', _mqDeitado.matches);
+      // Girando pra qualquer lado, o painel (que só existe como
+      // bottom-sheet em landscape) começa fechado — sem isso, sair do
+      // landscape com ele aberto e voltar reabriria ele sozinho.
+      setPainelAberto(false);
       _remedirPecas();
     };
     if (_mqDeitado.addEventListener) _mqDeitado.addEventListener('change', _aoGirar);
     else if (_mqDeitado.addListener) _mqDeitado.addListener(_aoGirar);
     _aoGirar();
+  }
+
+  /* ── Painel em landscape (bottom-sheet) ───────────────────────────
+     Em pé o painel (Jogadores/Bens/Histórico) é uma faixa normal do
+     fluxo, sempre visível. Deitado ele viraria uma coluna permanente ao
+     lado do tabuleiro — só que aí o tabuleiro fica pequeno e espremido
+     contra ela, que era exatamente a reclamação do playtest. Agora,
+     deitado, o painel fica recolhido por padrão e só sobe (como um
+     bottom-sheet) quando o botão 👥 da faixa da vez é tocado.
+
+     _painelAberto só controla a classe; quem decide como o painel SE
+     COMPORTA com ela é o CSS (seção 15) — em pé a classe não muda nada
+     porque lá o painel nem tem o botão pra abrir (display:none). */
+  var _painelAberto = false;
+
+  function setPainelAberto(aberto) {
+    _painelAberto = !!aberto;
+    if (raiz) raiz.classList.toggle('ndc-painel-aberto', _painelAberto);
+    var btn = $('#ndc-btn-painel');
+    if (btn) btn.setAttribute('aria-expanded', _painelAberto ? 'true' : 'false');
+    // Limpa qualquer transform/transition deixado pelo arraste (ver
+    // _ligarArrastarPainel) pra a transição por classe do CSS assumir.
+    var painelEl = $('.ndc-painel');
+    if (painelEl) { painelEl.style.transform = ''; painelEl.style.transition = ''; }
+  }
+
+  /* Arrastar a alça pra baixo fecha o painel. Pointer Events cobrem
+     mouse e touch com o mesmo código; o threshold de 70px é o "soltou
+     longe o bastante pra valer fechar" — abaixo disso ele volta pro
+     lugar. Puramente aditivo: sem isto, tocar fora (backdrop) ou o ✕
+     já fecham. */
+  function _ligarArrastarPainel() {
+    var alca = $('#ndc-painel-alca');
+    var painelEl = $('.ndc-painel');
+    if (!alca || !painelEl || alca._ndcLigado) return;
+    alca._ndcLigado = true;
+
+    var startY = 0, dy = 0, arrastando = false;
+
+    function aoMover(e) {
+      if (!arrastando) return;
+      var y = e.clientY;
+      dy = Math.max(0, y - startY);
+      painelEl.style.transform = 'translateY(' + dy + 'px)';
+    }
+    function aoSoltar() {
+      if (!arrastando) return;
+      arrastando = false;
+      window.removeEventListener('pointermove', aoMover);
+      window.removeEventListener('pointerup', aoSoltar);
+      window.removeEventListener('pointercancel', aoSoltar);
+      if (dy > 70) setPainelAberto(false);
+      else { painelEl.style.transform = ''; painelEl.style.transition = ''; }
+    }
+    alca.addEventListener('pointerdown', function (e) {
+      if (!_painelAberto) return;
+      arrastando = true; startY = e.clientY; dy = 0;
+      painelEl.style.transition = 'none';
+      window.addEventListener('pointermove', aoMover);
+      window.addEventListener('pointerup', aoSoltar);
+      window.addEventListener('pointercancel', aoSoltar);
+    });
   }
 
   /* Monta o DOM e liga os controles. Idempotente: chamado de novo,
@@ -3122,6 +3202,17 @@
       UI.mostrarTela('tela-setup');
     });
 
+    // Painel em landscape (bottom-sheet): botão da faixa, backdrop e ✕
+    // fecham/abrem; sem efeito em pé (ver comentário de setPainelAberto).
+    setPainelAberto(false);
+    var btnPainel = $('#ndc-btn-painel');
+    if (btnPainel) btnPainel.addEventListener('click', function () { setPainelAberto(!_painelAberto); });
+    var backdropPainel = $('#ndc-painel-backdrop');
+    if (backdropPainel) backdropPainel.addEventListener('click', function () { setPainelAberto(false); });
+    var fecharPainel = $('#ndc-painel-fechar');
+    if (fecharPainel) fecharPainel.addEventListener('click', function () { setPainelAberto(false); });
+    _ligarArrastarPainel();
+
     if (!_aoRedimensionar) {
       _aoRedimensionar = function () { if (jogo && raiz) UI.posicionarTokens(jogo); };
       window.addEventListener('resize', _aoRedimensionar);
@@ -3137,6 +3228,7 @@
   function _retomar() {
     UI.mostrarTela('tela-jogo');
     UI.pararCoruja();          // saiu no meio da animação: o overlay não fica preso
+    setPainelAberto(false);    // idem pro painel, se tinha ficado aberto
     UI.criarTokens(jogo);
     repintar();
     if (jogo.fase === 'fim') { UI.telaFinal(jogo); return; }

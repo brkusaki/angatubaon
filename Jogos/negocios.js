@@ -3001,11 +3001,13 @@
           '<span class="ndc-rotulo">Caixa</span>' +
           '<div class="ndc-grana" id="ndc-caixa-vez">R$ 0</div>' +
         '</div>' +
-        // Só existe (visualmente) em landscape — ver seção 15 do CSS. Em pé
-        // fica display:none: o painel já é uma faixa normal ali embaixo,
-        // não precisa de botão pra abrir.
+        // Só existe (visualmente) em landscape — ver seção 15 do CSS, onde
+        // ele vai morar na lateral direita. Em pé fica display:none: o
+        // painel já é uma faixa normal ali embaixo, não precisa de botão.
         '<button type="button" class="ndc-btn-painel" id="ndc-btn-painel" ' +
-          'aria-label="Jogadores e bens" aria-expanded="false">👥</button>' +
+          'aria-label="Jogadores e bens" aria-expanded="false">' +
+          '<span class="ndc-ico">👥</span><span class="ndc-rot">Jogadores</span>' +
+        '</button>' +
       '</header>' +
 
       '<main class="ndc-arena">' +

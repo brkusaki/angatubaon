@@ -1159,35 +1159,48 @@
 
 /* =========================================================================
    15. CELULAR DEITADO (LANDSCAPE)
-   Em pé o jogo é uma coluna: faixa da vez, tabuleiro, painel, ações. Deitado
-   a primeira versão disto virava uma grade de DUAS colunas (tabuleiro à
-   esquerda, faixa+painel+ações empilhados à direita) — no playtest isso
-   deixava o tabuleiro espremido contra a coluna do painel, "preso no
-   canto" em vez de ser o centro das atenções.
 
-   Redesenho: o painel deixa de ter coluna PERMANENTE nenhuma. A tela
-   volta a ser uma coluna só — faixa fina em cima, tabuleiro no meio,
-   ações fixas embaixo — só que agora o tabuleiro é quem ganha o espaço
-   que sobra (a linha `1fr`), centralizado, e cresce até a altura
-   disponível permitir (largura sobra de lado, de propósito: o
-   tabuleiro é quadrado e a altura aqui é sempre o fator apertado).
-   Jogadores/Bens/Histórico viram um bottom-sheet: recolhido por
-   padrão, abre por cima de tudo ao tocar o botão 👥 na faixa da vez, e
-   fecha tocando fora (backdrop), no ✕ ou arrastando a alça pra baixo.
+   HISTÓRICO (dois desenhos descartados, pra não repetir os erros):
+   1º) grade de 2 colunas — tabuleiro à esquerda, faixa+painel+ações
+       empilhados numa coluna à direita. O tabuleiro ficava espremido
+       contra a coluna do painel, "preso no canto".
+   2º) coluna única — faixa fina em cima, tabuleiro no meio, ações
+       embaixo. Aí o tabuleiro passou a dividir a ALTURA (que é o recurso
+       escasso deitado) com a faixa e as ações: num 800x300 real de
+       navegador sobravam 149 px de tabuleiro, com ~650 px de preto morto
+       dos dois lados. Playtest reprovou.
 
-   Como o tabuleiro é quadrado, quem manda no tamanho dele agora é a
-   altura QUE SOBROU depois de faixa + ações (não mais 100% da tela: essas
-   duas faixas competem por altura com ele, de propósito, pra ficarem
-   compactas). Num 844x390 dá por volta de 280-300px de tabuleiro — menor
-   que a versão anterior (~340px), mas CENTRALIZADO, sem o painel
-   grudado do lado brigando por atenção, que era o pedido do playtest.
+   DESENHO ATUAL — a altura só é gasta com o tabuleiro e as ações; tudo
+   que é informação de estado vai para as LATERAIS, que antes eram preto
+   morto. Grade de 3 colunas x 5 linhas:
 
-   .ndc-arena vira `display: contents` para os filhos dela entrarem direto
-   na grade da tela sem mexer no HTML. O painel e o backdrop, por serem
-   `position: absolute`, saem do fluxo do grid sozinhos (não precisam de
-   grid-area): flutuam por cima, ancorados em #jogo-negocios (que já é
-   `position: relative` — mesmo truque que .ndc-fundo-modal usa pra não
-   escapar da tela cheia nativa do hub).
+       .      tab   .          <- 1fr (respiro)
+       peca   tab   caixa      <- auto
+       quem   tab   btn        <- auto
+       .      tab   .          <- 1fr (respiro)
+       acoes  acoes acoes      <- auto, sempre visível
+
+   - O tabuleiro ocupa a coluna do meio e ATRAVESSA as 4 primeiras
+     linhas: ganha toda a altura acima das ações, sem dividir com faixa
+     nenhuma. Coluna `auto` + `height:100%` + `aspect-ratio:1/1` = ele
+     mede pela altura e devolve a largura, continuando quadrado.
+   - As colunas laterais são `1fr` cada: absorvem toda a largura que
+     sobra em volta do tabuleiro quadrado (é bastante) e ficam com o
+     chrome — esquerda: peça + de quem é a vez; direita: caixa + botão
+     que abre o painel. Como as duas são iguais, o tabuleiro fica
+     centralizado de graça.
+   - As linhas 1 e 4 são `1fr` só para centralizar verticalmente o
+     conteúdo das laterais; as linhas 2 e 3 são `auto`. Se a tela for
+     baixíssima, os respiros vão a zero e as ações (linha 5, `auto`)
+     NUNCA são espremidas — era o bug de "as ações não aparecem".
+
+   .ndc-faixa-vez vira `display: contents`: ela some como caixa e seus 4
+   filhos (peça, quem, caixa, botão) entram direto na grade, cada um na
+   sua área. Isso mata de uma vez dois problemas: não precisa duplicar
+   markup pra ter a mesma informação nas laterais, e a faixa deixa de
+   existir como caixa pintável — antes ela tinha z-index alto e aparecia
+   POR CIMA do bottom-sheet, misturando "vez de / caixa" com a lista de
+   jogadores (o vazamento reportado no playtest).
 
    Recorte: (orientation: landscape) + (max-height: 600px) pega celular e
    foldable deitados e deixa tablet e desktop de fora — eles continuam no
@@ -1198,32 +1211,35 @@
 @media (orientation: landscape) and (max-height: 600px) {
   #jogo-negocios #ndc-tela-jogo.ndc-ativa {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "faixa"
-      "tabuleiro"
-      "acoes";
-    gap: 4px;
-    padding: 0 10px 4px;
+      ".     tab   .    "
+      "peca  tab   caixa"
+      "quem  tab   btn  "
+      ".     tab   .    "
+      "acoes acoes acoes";
+    column-gap: 8px;
     overflow: hidden;
+    /* Deitado, o notch e os cantos arredondados comem as BORDAS LATERAIS:
+       sem isto o primeiro/último botão de ação fica embaixo do notch. */
+    padding-top: 2px;
+    padding-left: max(8px, env(safe-area-inset-left, 0px));
+    padding-right: max(8px, env(safe-area-inset-right, 0px));
+    padding-bottom: max(4px, env(safe-area-inset-bottom, 0px));
   }
 
   #jogo-negocios .ndc-arena { display: contents; }
 
-  /* ---- tabuleiro: o foco, centralizado na linha do meio ---- */
+  /* ---- tabuleiro: coluna do meio, atravessando as 4 primeiras linhas ---- */
   #jogo-negocios .ndc-col-tabuleiro {
-    grid-area: tabuleiro;
+    grid-area: tab;
     min-width: 0;
     min-height: 0;
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  /* height:100% da linha 1fr + aspect-ratio devolve a largura — o
-     tabuleiro cresce até a altura disponível permitir. max-width:100% é
-     só uma rede de segurança (foldable esquisito, altura sobrando mais
-     que largura), não o limite normal do dia a dia. */
   #jogo-negocios .ndc-tabuleiro-wrap {
     height: 100%;
     width: auto;
@@ -1233,7 +1249,7 @@
     overflow: visible;        /* não precisa rolar: já cabe inteiro */
   }
   #jogo-negocios .ndc-tabuleiro { height: 100%; }
-  /* Sem concorrência por espaço lateral, as casas comportam texto maior. */
+  /* Sem concorrência lateral por espaço, as casas comportam texto maior. */
   #jogo-negocios .ndc-casa .ndc-sigla { font-size: 3.4cqw; }
   #jogo-negocios .ndc-casa .ndc-preco { font-size: 2.5cqw; }
   #jogo-negocios .ndc-casa .ndc-icone { font-size: 3.9cqw; }
@@ -1246,72 +1262,107 @@
   }
   #jogo-negocios .ndc-tabuleiro-wrap.ndc-ampliado .ndc-tabuleiro { height: auto; }
 
-  /* ---- faixa da vez: fina, no topo, largura toda ----
-     z-index acima do backdrop (50) e do painel (55): a base (seção 4) já
-     dá z-index:30 pro sticky, o que a colocaria ATRÁS do backdrop —
-     sem isto o botão 👥 lá dentro ficaria inclicável com o painel
-     aberto (backdrop cobre tudo pra capturar "toque fora"). Com a faixa
-     por cima, o botão sempre fecha o painel também, além de tocar fora,
-     no ✕ ou arrastar. */
+  /* ---- laterais: a faixa da vez se desmonta nas duas bordas ---- */
   #jogo-negocios .ndc-faixa-vez {
-    grid-area: faixa;
-    z-index: 57;
-    padding: 4px 8px;
-    gap: 8px;
+    display: contents;
   }
+
+  /* As laterais são largas (sobra de um tabuleiro quadrado), então o
+     conteúdo é limitado e centralizado pra não virar texto esticado. */
+  #jogo-negocios .ndc-faixa-vez .ndc-peca-vez,
+  #jogo-negocios .ndc-faixa-vez .ndc-quem,
+  #jogo-negocios .ndc-faixa-vez .ndc-caixa,
+  #jogo-negocios .ndc-btn-painel {
+    justify-self: center;
+    max-width: 150px;
+  }
+
   #jogo-negocios .ndc-faixa-vez .ndc-peca-vez {
-    width: 30px; height: 30px; flex: 0 0 30px;
+    grid-area: peca;
+    align-self: end;
+    width: 44px; height: 44px; flex: none;
+    margin-bottom: 6px;
     border-width: 2px;
   }
-  #jogo-negocios .ndc-faixa-vez .ndc-quem b { font-size: 14px; }
+  #jogo-negocios .ndc-faixa-vez .ndc-quem {
+    grid-area: quem;
+    align-self: start;
+    width: 100%;
+    text-align: center;
+  }
   #jogo-negocios .ndc-faixa-vez .ndc-quem .ndc-rotulo { font-size: 9px; }
-  #jogo-negocios .ndc-faixa-vez .ndc-caixa .ndc-grana { font-size: 14px; }
-  #jogo-negocios .ndc-faixa-vez .ndc-caixa .ndc-rotulo { font-size: 9px; }
+  #jogo-negocios .ndc-faixa-vez .ndc-quem b { font-size: 15px; }
 
-  /* Botão 👥 que abre o painel — só existe (visualmente) aqui.
-     z-index acima do backdrop (50): com o painel aberto o backdrop cobre
-     a tela inteira pra capturar "toque fora", mas o próprio botão que
-     abriu continua clicável por cima dele — dá pra fechar tocando nele
-     de novo, além de tocar fora, no ✕ ou arrastar. */
+  #jogo-negocios .ndc-faixa-vez .ndc-caixa {
+    grid-area: caixa;
+    align-self: end;
+    width: 100%;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  #jogo-negocios .ndc-faixa-vez .ndc-caixa .ndc-rotulo { font-size: 9px; }
+  #jogo-negocios .ndc-faixa-vez .ndc-caixa .ndc-grana { font-size: 17px; }
+
+  /* Botão que abre o painel: na lateral direita, com rótulo (aqui tem
+     largura de sobra, então não precisa ser só um ícone mudo).
+     Sem z-index de propósito: com a gaveta aberta o backdrop cobre ele,
+     e o toque nesse ponto vira "tocar fora" — que fecha do mesmo jeito. */
   #jogo-negocios .ndc-btn-painel {
-    position: relative;
-    z-index: 56;
-    display: grid;
-    place-items: center;
-    flex: 0 0 34px;
-    width: 34px; height: 34px;
-    border-radius: 50%;
+    grid-area: btn;
+    align-self: start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 38px;
+    padding: 6px 10px;
+    border-radius: 999px;
     border: 1px solid var(--ndc-linha);
     background: var(--ndc-sup2);
-    font-size: 15px;
+    color: var(--ndc-txt2);
+    font-size: 12px;
+    font-weight: 700;
     line-height: 1;
   }
-  #jogo-negocios .ndc-btn-painel:active { transform: scale(.94); }
+  #jogo-negocios .ndc-btn-painel .ndc-ico { font-size: 14px; line-height: 1; }
+  #jogo-negocios .ndc-btn-painel:active { transform: scale(.96); }
   #jogo-negocios .ndc-btn-painel[aria-expanded="true"] {
     background: var(--ndc-acc);
     border-color: transparent;
+    color: #04211a;
   }
 
-  /* ---- ações: UMA faixa só, fixa embaixo (principais + secundárias
-     lado a lado, em vez de duas linhas empilhadas — é o que sobra de
-     altura pro tabuleiro crescer). ---- */
+  /* A faixa não existe mais como caixa, então o pisca de troca de vez
+     (que era um flash no fundo dela) passa a ser um anel na peça. */
+  #jogo-negocios .ndc-faixa-vez.ndc-trocando { animation: none; }
+  #jogo-negocios .ndc-faixa-vez.ndc-trocando .ndc-peca-vez {
+    animation: piscaPecaVez .7s ease;
+  }
+
+  /* ---- ações: faixa inteira embaixo, atravessando as 3 colunas ----
+     Principais e secundárias entram lado a lado na MESMA linha (em pé
+     são duas linhas empilhadas): deitado, altura é o recurso caro. */
   #jogo-negocios .ndc-acoes {
     grid-area: acoes;
+    position: relative;
+    z-index: 2;
     display: flex;
     align-items: stretch;
     gap: 6px;
-    padding: 6px 0 calc(4px + var(--ndc-base));
+    padding: 6px 0 0;
+    margin: 0;
     border-top: 1px solid var(--ndc-linha);
     background: none;
     backdrop-filter: none;
   }
   #jogo-negocios .ndc-acoes .ndc-principais {
-    flex: 1 1 40%;
+    flex: 1 1 38%;
     min-width: 0;
   }
   #jogo-negocios .ndc-acoes .ndc-principais .ndc-btn { min-height: 42px; font-size: 14px; }
   #jogo-negocios .ndc-acoes .ndc-secundarias {
-    flex: 1 1 60%;
+    flex: 1 1 62%;
     min-width: 0;
     grid-template-columns: repeat(4, 1fr);
     margin-top: 0;
@@ -1325,19 +1376,27 @@
   }
   #jogo-negocios .ndc-acoes .ndc-secundarias .ndc-btn span.ndc-ico { font-size: 13px; }
 
-  /* ---- painel: bottom-sheet recolhido por padrão ----
-     position:absolute tira ele do grid (não precisa de grid-area) e o
+  /* ---- painel: bottom-sheet ----
+     ALTURA EXPLÍCITA em dvh, não `max-height: %`. Com só max-height a
+     gaveta ficava do tamanho do CONTEÚDO — na aba "Meus bens" vazia ela
+     subia uns 160 px e pronto, que é o "não expande de forma usável" do
+     playtest. Altura definida também é o que faz .ndc-painel-conteudo
+     ter contra o que rolar (flex:1 + min-height:0 precisam de um pai com
+     altura resolvida).
+     position:absolute tira ela do grid (não precisa de grid-area) e a
      ancora em #jogo-negocios, não na viewport — mesmo motivo do
      .ndc-fundo-modal: não escapar da tela cheia nativa do hub. */
   #jogo-negocios .ndc-painel {
     position: absolute;
     left: 0; right: 0; bottom: 0;
-    z-index: 55;                 /* acima do tabuleiro/ações, abaixo do modal (60) */
+    z-index: 55;                 /* acima de tudo, abaixo do modal (60) */
     margin-top: 0;
-    max-height: 74%;
+    height: 72dvh;
+    max-height: calc(100dvh - 44px);
+    min-height: 160px;
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    min-width: 0;
     background: var(--ndc-bg2);
     border: 1px solid var(--ndc-linha);
     border-bottom: none;
@@ -1367,7 +1426,7 @@
 
   #jogo-negocios .ndc-painel-fechar {
     position: absolute;
-    top: 6px; right: 6px;
+    top: 6px; right: 10px;
     width: 30px; height: 30px;
     border-radius: 50%;
     border: 1px solid var(--ndc-linha);
@@ -1377,17 +1436,26 @@
     line-height: 1;
     display: grid;
     place-items: center;
+    z-index: 1;
   }
 
-  #jogo-negocios .ndc-abas { flex: 0 0 auto; margin: 0 10px 8px; }
+  #jogo-negocios .ndc-abas {
+    flex: 0 0 auto;
+    margin: 0 max(10px, env(safe-area-inset-left, 0px)) 8px;
+    margin-right: max(48px, env(safe-area-inset-right, 0px));  /* espaço do ✕ */
+  }
   #jogo-negocios .ndc-painel-conteudo {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 0 10px 10px;
+    padding: 0 max(10px, env(safe-area-inset-right, 0px))
+               10px max(10px, env(safe-area-inset-left, 0px));
   }
   #jogo-negocios .ndc-historico { max-height: none; }
+  /* Cards mais baixos: cabem mais jogadores sem rolar. */
+  #jogo-negocios .ndc-card-jogador { padding: 7px 9px; margin-bottom: 6px; }
+  #jogo-negocios .ndc-card-jogador .ndc-avatar { width: 30px; height: 30px; flex: 0 0 30px; }
 
   /* ---- backdrop: escurece o resto e fecha o painel ao tocar fora ----
      display:block PRECISA vir aqui: fora do landscape a regra base
@@ -1406,9 +1474,13 @@
   }
   #negocios-root.ndc-painel-aberto .ndc-painel-backdrop { opacity: 1; visibility: visible; pointer-events: auto; }
 
-  /* Avisos de dinheiro sobem: aqui não há faixa da vez alta ocupando
-     o topo. */
-  #jogo-negocios .ndc-brindes { top: 46px; }
+  /* Avisos de dinheiro: sem faixa no topo, sobem pro alto da tela. */
+  #jogo-negocios .ndc-brindes { top: 10px; }
   #jogo-negocios .ndc-fundo-modal { align-items: center; }
-  #jogo-negocios .ndc-modal { max-height: 88%; }
+  #jogo-negocios .ndc-modal { max-height: 86%; }
+}
+
+@keyframes piscaPecaVez {
+  0%   { box-shadow: 0 0 0 0 rgba(56,225,176,.85); }
+  100% { box-shadow: 0 0 0 12px rgba(56,225,176,0); }
 }

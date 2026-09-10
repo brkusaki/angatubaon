@@ -5452,16 +5452,16 @@
      ----------------------------------------------------------
      Diferente do onboarding do lojista (boas-vindas ao painel).
      1 card de boas-vindas + destaques ancorados nos elementos reais
-     do cabeçalho (busca, filtros, favoritos, tema). Um recorte escuro
-     ("furo") destaca cada elemento e um balão explica o que faz, ali
-     no contexto — em vez de telas genéricas soltas.
+     do cabeçalho (busca, categorias, filtros, favoritos, bairro). Um
+     recorte escuro ("furo") destaca cada elemento e um balão explica
+     o que faz, ali no contexto — em vez de telas genéricas soltas.
      Aparece só 1x (flag versionada em localStorage) e pode ser pulado.
      Só ancora em elementos ESTÁTICOS do header, então não depende do
      carregamento das lojas (GAS) para funcionar.
   ══════════════════════════════════════════════════════════════ */
   // Versionada: bump o sufixo (_v2 -> _v3) para relançar o tour quando
   // adicionar uma feature nova, sem remostrar a versão antiga a quem já viu.
-  const CLIENTE_ONB_KEY = 'angatuba_cliente_onboarded_v2';
+  const CLIENTE_ONB_KEY = 'angatuba_cliente_onboarded_v3';
   // Passos do tour. O passo 0 é o card de boas-vindas central (sem alvo).
   // Os demais apontam para um elemento real via seletor CSS. Se o alvo não
   // existir na tela, o passo é pulado automaticamente.
@@ -5481,32 +5481,32 @@
       texto: 'Digite o <strong>nome</strong> ou o <strong>tipo</strong> — pizza, farmácia, mercado. As lojas de Angatuba num só lugar.'
     },
     {
+      sel: '#cat-bar',
+      owl: '/webp/owl-idea.webp',
+      icon: '🗂️',
+      titulo: 'Navegue por categoria',
+      texto: 'Toque numa <strong>categoria</strong> — farmácia, pizza, mercado — e veja só quem é daquele ramo.'
+    },
+    {
       sel: '.pill-btn[data-filter="open"]',
       owl: '/webp/owl-point.webp',
       icon: '🎯',
       titulo: 'Só o que está aberto',
-      texto: 'Toque aqui pra ver <strong>só quem está aberto agora</strong>. Menos rolagem, mais praticidade.'
-    },
-    {
-      sel: '.pill-btn[data-filter="delivery"]',
-      owl: '/webp/owl-point.webp',
-      icon: '🛵',
-      titulo: 'Quem faz entrega',
-      texto: 'Filtre por <strong>quem entrega</strong> e receba sem sair de casa.'
+      texto: 'Toque aqui pra ver <strong>só quem está aberto agora</strong>. Do lado dá pra filtrar quem <strong>faz entrega</strong> também.'
     },
     {
       sel: '.pill-fav-btn',
       owl: '/webp/owl-love.webp',
       icon: '❤️',
       titulo: 'Salve suas favoritas',
-      texto: 'Toque no <strong>❤️</strong> da loja pra salvar. Depois é só abrir aqui os <strong>Favoritos</strong> pra achar rapidinho.'
+      texto: 'Toque no <strong>❤️</strong> dentro da loja pra salvar. Depois é só abrir aqui os <strong>Favoritos</strong> pra achar rapidinho.'
     },
     {
-      sel: '#theme-toggle-btn',
-      owl: '/webp/owl-idea.webp',
-      icon: '🌙',
-      titulo: 'Claro ou escuro',
-      texto: 'Troque o tema quando quiser — ele também acompanha o dia e a noite sozinho.'
+      sel: '#pill-bairro-btn',
+      owl: '/webp/owl-tip.webp',
+      icon: '📍',
+      titulo: 'Filtre pelo seu bairro',
+      texto: 'Quer ver só quem é mais perto de você? Filtre por <strong>bairro</strong> aqui. E lá em cima, na coruja 🦉, tem os <strong>Jogos da Coruja</strong> com ranking da cidade — dá uma olhada depois!'
     }
   ];
   let _clienteOnbIdx = 0;

@@ -1209,6 +1209,12 @@
    quem vem depois ganha.
    ========================================================================= */
 @media (orientation: landscape) and (max-height: 600px) {
+  /* Altura real da faixa de ações. O JS sobrescreve inline em
+     #negocios-root (ResizeObserver na .ndc-acoes); este valor é só o
+     fallback pro primeiro frame e pra quem não tem ResizeObserver.
+     A gaveta e o backdrop se ancoram nela — ver comentários abaixo. */
+  #negocios-root { --ndc-acoes-h: 56px; }
+
   #jogo-negocios #ndc-tela-jogo.ndc-ativa {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -1342,18 +1348,25 @@
 
   /* ---- ações: faixa inteira embaixo, atravessando as 3 colunas ----
      Principais e secundárias entram lado a lado na MESMA linha (em pé
-     são duas linhas empilhadas): deitado, altura é o recurso caro. */
+     são duas linhas empilhadas): deitado, altura é o recurso caro.
+
+     z-index 58 (acima da gaveta, 55) e fundo OPACO: esta faixa é a
+     única coisa que não pode sumir deitado. A gaveta já ancora acima
+     dela, mas na TRANSIÇÃO de fechar ela desce cruzando esta faixa —
+     sem fundo opaco daria pra ver a lista de jogadores passando por
+     trás dos botões. Era o bug do playtest: gaveta aberta cobria
+     "Rolar dados" inteiro. */
   #jogo-negocios .ndc-acoes {
     grid-area: acoes;
     position: relative;
-    z-index: 2;
+    z-index: 58;
     display: flex;
     align-items: stretch;
     gap: 6px;
     padding: 6px 0 0;
     margin: 0;
     border-top: 1px solid var(--ndc-linha);
-    background: none;
+    background: var(--ndc-bg);
     backdrop-filter: none;
   }
   #jogo-negocios .ndc-acoes .ndc-principais {
@@ -1376,24 +1389,36 @@
   }
   #jogo-negocios .ndc-acoes .ndc-secundarias .ndc-btn span.ndc-ico { font-size: 13px; }
 
-  /* ---- painel: bottom-sheet ----
-     ALTURA EXPLÍCITA em dvh, não `max-height: %`. Com só max-height a
-     gaveta ficava do tamanho do CONTEÚDO — na aba "Meus bens" vazia ela
-     subia uns 160 px e pronto, que é o "não expande de forma usável" do
+  /* ---- painel: bottom-sheet ANCORADO ACIMA DAS AÇÕES ----
+     ALTURA EXPLÍCITA, não `max-height: %`. Com só max-height a gaveta
+     ficava do tamanho do CONTEÚDO — na aba "Meus bens" vazia ela subia
+     uns 160 px e pronto, que é o "não expande de forma usável" do
      playtest. Altura definida também é o que faz .ndc-painel-conteudo
-     ter contra o que rolar (flex:1 + min-height:0 precisam de um pai com
-     altura resolvida).
+     ter contra o que rolar (flex:1 + min-height:0 precisam de um pai
+     com altura resolvida).
+
+     bottom = --ndc-acoes-h (altura REAL da faixa de ações, medida pelo
+     JS num ResizeObserver). Antes era bottom:0 e a gaveta aberta
+     enterrava "Rolar dados" e companhia — o bug do playtest. Agora ela
+     nasce em cima da faixa e ocupa ~72% do que sobra ACIMA dela.
+
+     Fechada, o deslocamento é 100% da própria altura MAIS a faixa de
+     ações (mais uma folga pra sombra): só `translateY(100%)` deixaria a
+     borda de cima da gaveta parada exatamente no topo das ações, ou
+     seja, um "peek" de abas cobrindo os botões.
+
      position:absolute tira ela do grid (não precisa de grid-area) e a
      ancora em #jogo-negocios, não na viewport — mesmo motivo do
      .ndc-fundo-modal: não escapar da tela cheia nativa do hub. */
   #jogo-negocios .ndc-painel {
     position: absolute;
-    left: 0; right: 0; bottom: 0;
-    z-index: 55;                 /* acima de tudo, abaixo do modal (60) */
+    left: 0; right: 0;
+    bottom: var(--ndc-acoes-h, 56px);
+    z-index: 55;                 /* abaixo das ações (58) e do modal (60) */
     margin-top: 0;
-    height: 72dvh;
-    max-height: calc(100dvh - 44px);
-    min-height: 160px;
+    height: calc((100dvh - var(--ndc-acoes-h, 56px)) * .72);
+    max-height: calc(100dvh - var(--ndc-acoes-h, 56px) - 36px);
+    min-height: 140px;
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -1402,8 +1427,8 @@
     border-bottom: none;
     border-radius: 16px 16px 0 0;
     box-shadow: 0 -10px 26px rgba(0,0,0,.5);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    transform: translateY(100%);
+    padding-bottom: 0;           /* a safe-area de baixo é das ações */
+    transform: translateY(calc(100% + var(--ndc-acoes-h, 56px) + 12px));
     transition: transform .24s cubic-bezier(.32,.9,.4,1);
   }
   #negocios-root.ndc-painel-aberto .ndc-painel { transform: translateY(0); }
@@ -1460,11 +1485,16 @@
   /* ---- backdrop: escurece o resto e fecha o painel ao tocar fora ----
      display:block PRECISA vir aqui: fora do landscape a regra base
      (seção 2) esconde este elemento com display:none, e opacity/
-     visibility sozinhos não bastam pra revogar isso. */
+     visibility sozinhos não bastam pra revogar isso.
+
+     Ele para ACIMA da faixa de ações (bottom, não inset:0): com a
+     gaveta aberta, "Rolar dados" continua sendo um toque só — não um
+     toque pra fechar e outro pra jogar. */
   #jogo-negocios .ndc-painel-backdrop {
     display: block;
     position: absolute;
-    inset: 0;
+    top: 0; left: 0; right: 0;
+    bottom: var(--ndc-acoes-h, 56px);
     z-index: 50;
     background: rgba(4,7,14,.55);
     opacity: 0;

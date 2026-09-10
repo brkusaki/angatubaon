@@ -2091,6 +2091,7 @@
     jogo.iniciar(defs);
 
     UI.mostrarTela('tela-jogo');
+    setPainelAberto(false);   // partida nova sempre entra com a gaveta fechada
     UI.montarTabuleiro(function (casaId) { UI.fichaDaCasa(jogo, casaId); });
 
     // espera o layout existir para calcular a posição das peças
@@ -3115,6 +3116,7 @@
       // bottom-sheet em landscape) começa fechado — sem isso, sair do
       // landscape com ele aberto e voltar reabriria ele sozinho.
       setPainelAberto(false);
+      _medirAcoes();     // a faixa muda de altura entre em pé e deitado
       _remedirPecas();
     };
     if (_mqDeitado.addEventListener) _mqDeitado.addEventListener('change', _aoGirar);
@@ -3134,6 +3136,43 @@
      COMPORTA com ela é o CSS (seção 15) — em pé a classe não muda nada
      porque lá o painel nem tem o botão pra abrir (display:none). */
   var _painelAberto = false;
+
+  /* Deitado, a gaveta ancora ACIMA da faixa de ações — que é a única
+     coisa que nunca pode sumir. O CSS precisa saber onde essa faixa
+     começa, e isso não é fixo: a altura muda com o tamanho de fonte do
+     sistema e ainda tem a safe-area de baixo somada pelo container.
+
+     --ndc-acoes-h é a distância entre o TOPO da faixa de ações e a base
+     do bloco que posiciona a gaveta (o offsetParent, = #jogo-negocios).
+     Medir o topo, e não só a altura da faixa, é o que faz a gaveta e o
+     backdrop encostarem exatamente nela, sem sobrar borda por cima.
+     A seção 15 usa a variável no `bottom` dos dois e no deslocamento do
+     estado fechado. */
+  var _obsAcoes = null;
+
+  function _medirAcoes() {
+    if (!raiz) return;
+    var acoes = $('.ndc-acoes');
+    if (!acoes) return;
+    var ra = acoes.getBoundingClientRect();
+    if (!ra.height) return;              // tela do jogo escondida: não mede
+    var painelEl = $('.ndc-painel');
+    var base = (painelEl && painelEl.offsetParent) || raiz;
+    var h = Math.round(base.getBoundingClientRect().bottom - ra.top);
+    if (h > 0) raiz.style.setProperty('--ndc-acoes-h', h + 'px');
+  }
+
+  function _ligarMedidaAcoes() {
+    var acoes = $('.ndc-acoes');
+    if (!acoes) return;
+    // _montar() troca o innerHTML: o observer antigo aponta pra um nó
+    // solto e nunca mais dispara. Religa sempre no elemento atual.
+    if (_obsAcoes) { _obsAcoes.disconnect(); _obsAcoes = null; }
+    _medirAcoes();
+    if (!window.ResizeObserver) return;
+    _obsAcoes = new ResizeObserver(_medirAcoes);
+    _obsAcoes.observe(acoes);
+  }
 
   function setPainelAberto(aberto) {
     _painelAberto = !!aberto;
@@ -3214,9 +3253,13 @@
     var fecharPainel = $('#ndc-painel-fechar');
     if (fecharPainel) fecharPainel.addEventListener('click', function () { setPainelAberto(false); });
     _ligarArrastarPainel();
+    _ligarMedidaAcoes();
 
     if (!_aoRedimensionar) {
-      _aoRedimensionar = function () { if (jogo && raiz) UI.posicionarTokens(jogo); };
+      _aoRedimensionar = function () {
+        _medirAcoes();
+        if (jogo && raiz) UI.posicionarTokens(jogo);
+      };
       window.addEventListener('resize', _aoRedimensionar);
     }
     _ligarOrientacao();
@@ -3248,6 +3291,10 @@
     raiz = document.getElementById('negocios-root');
     if (!raiz) return;
     if (!_montado || !raiz.firstChild) _montar();
+    // Abrir o jogo NUNCA começa com a gaveta de jogadores no ar, mesmo
+    // que a pessoa tenha saído do hub com ela aberta.
+    setPainelAberto(false);
+    _medirAcoes();
     if (jogo && jogo.fase !== 'fim') { _retomar(); return; }
     jogo = null;
     UI.mostrarTela('tela-setup');

@@ -5452,7 +5452,8 @@
      ----------------------------------------------------------
      Diferente do onboarding do lojista (boas-vindas ao painel).
      1 card de boas-vindas + destaques ancorados nos elementos reais
-     do cabeçalho (busca, categorias, filtros, favoritos, bairro). Um
+     do cabeçalho (busca, categorias, filtros, favoritos, bairro) e
+     nos dots do carrossel da home (clima/notícias no 2º slide). Um
      recorte escuro ("furo") destaca cada elemento e um balão explica
      o que faz, ali no contexto — em vez de telas genéricas soltas.
      Aparece só 1x (flag versionada em localStorage) e pode ser pulado.
@@ -5506,7 +5507,14 @@
       owl: '/webp/owl-tip.webp',
       icon: '📍',
       titulo: 'Filtre pelo seu bairro',
-      texto: 'Quer ver só quem é mais perto de você? Filtre por <strong>bairro</strong> aqui. E lá em cima, na coruja 🦉, tem os <strong>Jogos da Coruja</strong> com ranking da cidade — dá uma olhada depois!'
+      texto: 'Quer ver só quem é mais perto de você? Filtre por <strong>bairro</strong> aqui.'
+    },
+    {
+      sel: '#home-dots',
+      owl: '/webp/owl-highlight.webp',
+      icon: '👉',
+      titulo: 'Tem mais um lado aqui',
+      texto: 'Arraste a tela (ou toque nas bolinhas) e veja o <strong>clima de Angatuba</strong> e as <strong>notícias da cidade</strong>. O menu de baixo também muda, com <strong>Jogos</strong> e <strong>Aprender</strong> 🦉'
     }
   ];
   let _clienteOnbIdx = 0;

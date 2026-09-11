@@ -64,6 +64,31 @@
      comum de implementar o blefe da carta escondida sem exigir botar
      e tirar peso da rodada em tempo real.
 
+   MÃO DE 11 E MÃO DE FERRO
+   Quando um time chega a EXATAMENTE 11 pontos e o outro tem menos:
+   antes de qualquer jogada, esse time vê as 3 cartas dele e escolhe
+   (ação 'responderOnze'):
+     - "ir"    -> a mão é jogada valendo 3 (e não 1);
+     - "correr"-> o adversário leva 1 ponto e a mão nem é jogada.
+   O outro time não vê as cartas nem a deliberação, só o resultado. Em
+   4 jogadores, qualquer um da dupla pode decidir pelos dois
+   (simplificação assumida). Com 11 a 11 é MÃO DE FERRO: ninguém olha e
+   corre, a mão vale 3 e quem ganhar fecha a partida. Nas duas, o truco
+   fica BLOQUEADO (mão de 11 não se truca) — ver _meuTeamPode. Campos no
+   estado: game.decisaoOnze = { time } enquanto a decisão está pendente,
+   e game.maoEspecial = 'onze' | 'ferro' depois de resolvida.
+
+   REAÇÕES (balões estilo 8 Ball Pool)
+   Não é chat: o cliente manda só o ID de uma reação da lista fixa
+   REACOES (ação 'reacao'), e o anfitrião valida id + autor + cooldown
+   antes de gravar em game.reacoes[uid] = { id, seq }. O "seq" é um
+   contador — é ele que diz ao cliente que a reação é NOVA; comparar
+   timestamp entre aparelhos com relógios diferentes daria balão
+   fantasma ou balão nenhum. O tempo que o balão fica no ar é decidido
+   por timer LOCAL de cada cliente (MS_BALAO). O mesmo canal carrega os
+   balões que o próprio jogo solta ("Cai dentro!" ao aceitar um truco),
+   via _balaoDoSistema, que manda { texto, seq } em vez de { id }.
+
    MODO SOLO (1 jogador vs. Coruja) — seção 3.5 abaixo
    Sala com maxJogadores=1 na sala/lobby (ver Jogos/baralho.js) tem só
    UM jogador de verdade no RTDB. Pra mesa funcionar (dupla de
@@ -79,8 +104,9 @@
    vista das regras do jogo, é só mais um uid.
 
    PENDÊNCIAS CONHECIDAS
-   1. "Mão de 11" (regra especial quando um time está com 11 pontos)
-      não implementada — fica pra uma rodada futura se fizer falta.
+   1. Na mão de 11 de uma DUPLA (4 jogadores), quem decide é o primeiro
+      da dupla que responder, e ele enxerga só as próprias 3 cartas —
+      na mesa real os dois veem as seis antes de decidir juntos.
    2. Sinais visuais entre parceiros (4 jogadores) não implementados
       — o combinado por ora é só a comunicação por fora do app.
    3. Se o anfitrião cair no meio de uma mão, a partida é cancelada
@@ -116,6 +142,55 @@
   var SIMBOLO_NAIPE = { O: '♦', E: '♠', C: '♥', P: '♣' };
   var COR_NAIPE = { O: 'vermelha', E: 'preta', C: 'vermelha', P: 'preta' };
   var SEQUENCIA_APOSTA = [1, 3, 6, 9, 12];
+
+  /* Reações da mesa (estilo 8 Ball Pool): lista FIXA, o cliente manda só o
+     id e quem desenha o balão é o texto daqui — ninguém digita nada, então
+     não há o que moderar. Pra acrescentar uma reação basta uma linha nova:
+     o id é o que trafega no RTDB, o texto é só apresentação. */
+  var REACOES = [
+    { id: 'medo',      texto: 'Tá com medo?' },
+    { id: 'blefe',     texto: 'Tá blefando!' },
+    { id: 'chora',     texto: 'Chora!' },
+    { id: 'vamos',     texto: 'Vamos!' },
+    { id: 'sorte',     texto: 'Sorte de principiante…' },
+    { id: 'boa',       texto: 'Boa!' },
+    { id: 'pensando',  texto: '🤔' },
+    { id: 'silencio',  texto: '🤫' },
+    { id: 'tedio',     texto: '🥱' },
+    { id: 'risada',    texto: '😂' },
+    { id: 'estiloso',  texto: '😎' },
+    { id: 'fogo',      texto: '🔥' },
+    { id: 'palmas',    texto: '👏' },
+    { id: 'caveira',   texto: '💀' }
+  ];
+  /* Linguagem de mesa. Cada situação tem 2-4 variações sorteadas — o que
+     tira o ar de robô sem precisar de texto livre. ATENÇÃO: frase que os
+     DOIS lados precisam ver igual (pedido de truco, fim de mão, fim de
+     partida) é sorteada pelo ANFITRIÃO e gravada no "game"; sorteio local
+     faria cada aparelho mostrar uma coisa diferente. As frases locais
+     (de quem é a vez) podem sortear no cliente. */
+  var FRASES = {
+    pedir3:     ['TRUCO!', 'Truco, pilantra!', 'Truco na mesa!'],
+    pedir6:     ['SEIS!', 'Seis, ladrão!', 'Seis pra cima!'],
+    pedir9:     ['NOVE!', 'Nove na conta!', 'Quero nove!'],
+    pedir12:    ['DOZE!', 'Doze ou corre!', 'É doze!'],
+    aceitar:    ['Aceito!', 'Cai dentro!', 'Manda ver!', 'Bora!'],
+    correr:     ['Corre!', 'Tô fora!', 'Não dessa vez.', 'Guarda isso'],
+    fimMao:     ['Fechou a mão!', 'Essa é nossa!', 'Levou!'],
+    empate:     ['Empatou!', 'Fica pra próxima'],
+    fimPartida: ['Ganhou a partida!', 'É campeão!', 'Acabou!'],
+    minhaVez:   ['Sua vez', 'Joga aí', 'Manda a carta'],
+    vezDele:    ['Vez de', 'Esperando']
+  };
+  function _frase(chave) {
+    var lista = FRASES[chave] || [''];
+    return lista[Math.floor(Math.random() * lista.length)];
+  }
+
+  function _reacaoPorId(id) {
+    for (var i = 0; i < REACOES.length; i++) if (REACOES[i].id === id) return REACOES[i];
+    return null;
+  }
   var PONTOS_PARTIDA = 12;
 
   function _criarBaralho() {
@@ -234,11 +309,20 @@
   var _timerBot = null;
   var _timerVaza = null;
   var _modoEscondida = false; // toggle persistente: próximo toque joga a carta virada
+  var _painelReacoes = false; // painel de reações aberto?
+  var _baloes = {};           // uid -> { id, expiraEm } — balões no ar AGORA (só local)
+  var _reacoesVistas = {};    // uid -> última seq já exibida (evita repetir balão a cada render)
+  var _cooldownReacao = {};   // uid -> timestamp da última reação aceita (só no anfitrião)
+  var _timerBalao = null;
+  var _fraseVez = { chave: '', texto: '' }; // sorteia a frase da vez UMA vez por turno
   var _root = null;          // container da mesa (ctx.container)
   var _flashTimer = null;
 
   var MS_VAZA = 1200;   // quanto tempo a vaza fechada fica à vista antes de recolher
   var MS_BOT = 1100;    // pausa do bot antes de jogar/responder (dá tempo de ler a mesa)
+  var MS_BALAO = 2400;  // quanto tempo o balão de reação fica no ar
+  var MS_COOLDOWN_REACAO = 3500; // anti-spam por jogador
+  var PONTOS_MAO_ONZE = 3; // mão de 11 (e mão de ferro) vale 3
   var _BOT_UID = '_bot_coruja';
   var _NOME_BOT = 'Coruja 🦉';
 
@@ -246,6 +330,8 @@
   function _meuTeamPode(gameAtual) {
     // pode pedir aumento se ninguém pediu ainda e não foi o próprio time
     // que fez a última aposta aceita (não dá pra "re-truco" sozinho).
+    // Mão de 11 e mão de ferro já nascem valendo 3 e NÃO se trucam.
+    if (gameAtual.maoEspecial || gameAtual.decisaoOnze) return false;
     return !gameAtual.pedidoTruco && gameAtual.apostaAtual < 12 && gameAtual.ultimoTimeAumentou !== _time();
   }
 
@@ -262,6 +348,7 @@
     g.historico = g.historico || [];
     g.maos = g.maos || {};
     g.pontuacao = g.pontuacao || { A: 0, B: 0 };
+    g.reacoes = g.reacoes || {};
     return g;
   }
 
@@ -320,6 +407,25 @@
     g.vencedorMao = null;
     g.pontosUltimaMao = 0;
     g.timeDaMao = _timeDoAssento(seatMao); // fixo pro desempate "3 vazas empatadas" — não muda durante a mão
+
+    // ---- mão de 11 / mão de ferro (ver cabeçalho) ----
+    // Só entra em jogo com pontuação EXATAMENTE 11: acima disso a partida
+    // já teria acabado (12 pontos), então não há caso de "12 ou mais aqui".
+    var pts = g.pontuacao || { A: 0, B: 0 };
+    var onzeA = pts.A === 11, onzeB = pts.B === 11;
+    g.maoEspecial = null;
+    g.decisaoOnze = null;
+    if (onzeA && onzeB) {
+      // Mão de ferro: os dois estão com 11, ninguém olha e corre, vale 3 e
+      // quem ganhar fecha a partida.
+      g.maoEspecial = 'ferro';
+      g.apostaAtual = PONTOS_MAO_ONZE;
+    } else if (onzeA || onzeB) {
+      // O time com 11 vê as próprias cartas e decide ir ou correr antes de
+      // qualquer jogada (ver _acaoResponderOnze).
+      g.decisaoOnze = { time: onzeA ? 'A' : 'B' };
+      g.apostaAtual = PONTOS_MAO_ONZE; // valor SE for jogada; correr paga 1 ao adversário
+    }
     return g;
   }
 
@@ -342,6 +448,10 @@
   function _salvarGame() {
     if (!_souAnfitriao || !_ctx.salaRef) return;
     _ctx.salaRef.child('game').set(_g).catch(function () {});
+    // O anfitrião não adota o eco do RTDB (ver armadilha no cabeçalho),
+    // então é aqui que ele percebe as próprias reações/balões novos.
+    _processarReacoes();
+    _render();
     _talvezAgirComoBot();
   }
 
@@ -366,11 +476,71 @@
     // (é a própria condição que mostra o botão) — por isso trata ela ANTES
     // do "return" de partida encerrada, senão nunca seria processada.
     if (acao.tipo === 'revanche') { _acaoRevanche(acao, jogadores); return; }
+    // Reação é só enfeite e vale até depois da partida acabar (a galera
+    // comemora/zoa no fim), então também vem antes do return abaixo.
+    if (acao.tipo === 'reacao') { _acaoReacao(acao, jogadores); return; }
     if (_g.vencedorPartida) return; // partida já acabou, ignora qualquer outra ação atrasada
+
+    if (acao.tipo === 'responderOnze') { _acaoResponderOnze(acao, jogadores); return; }
+    if (_g.decisaoOnze) return; // mão de 11 pendente: ninguém joga nem pede nada
 
     if (acao.tipo === 'jogarCarta') _acaoJogarCarta(acao, jogadores);
     else if (acao.tipo === 'pedirAumento') _acaoPedirAumento(acao, jogadores);
     else if (acao.tipo === 'responderAumento') _acaoResponderAumento(acao, jogadores);
+  }
+
+  /* Reação: o cliente manda só o id; o anfitrião confere se o id existe na
+     lista fixa, se o uid é mesmo alguém da mesa e aplica o cooldown. O
+     "seq" é um contador simples — é ele que diz aos clientes que a reação
+     é NOVA (comparar timestamp entre aparelhos com relógios diferentes
+     daria balão fantasma ou balão nenhum). */
+  function _acaoReacao(acao, jogadores) {
+    var g = _g;
+    var id = acao.payload && acao.payload.id;
+    if (!_reacaoPorId(id)) return;          // id fora da lista: ignora
+    if (!jogadores[acao.uid]) return;       // não está na mesa
+    var agora = Date.now();
+    if (_cooldownReacao[acao.uid] && (agora - _cooldownReacao[acao.uid]) < MS_COOLDOWN_REACAO) return;
+    _cooldownReacao[acao.uid] = agora;
+
+    g.reacaoSeq = (g.reacaoSeq || 0) + 1;
+    g.reacoes = g.reacoes || {};
+    g.reacoes[acao.uid] = { id: id, seq: g.reacaoSeq };
+    _salvarGame();
+  }
+
+  /* Balão que o JOGO solta (não veio de toque em reação): "Cai dentro!"
+     quando alguém aceita o truco, "Tô fora!" quando corre. Usa o mesmo
+     canal das reações — o cliente desenha { texto, seq } igualzinho, então
+     não precisa de um segundo mecanismo só pra isso. */
+  function _balaoDoSistema(uid, texto) {
+    var g = _g;
+    if (!g || !uid || !texto) return;
+    g.reacaoSeq = (g.reacaoSeq || 0) + 1;
+    g.reacoes = g.reacoes || {};
+    g.reacoes[uid] = { texto: texto, seq: g.reacaoSeq };
+  }
+
+  /* Mão de 11: só o time que está com 11 responde. "ir" transforma a mão
+     numa mão normal valendo 3 (sem direito a truco); "correr" entrega 1
+     ponto ao adversário e a mão nem chega a ser jogada. */
+  function _acaoResponderOnze(acao, jogadores) {
+    var g = _g;
+    if (!g.decisaoOnze) return;
+    var time = _timeDoUid(acao.uid, jogadores);
+    if (!time || time !== g.decisaoOnze.time) return; // só o time da mão de 11 decide
+    var resposta = acao.payload && acao.payload.resposta;
+
+    if (resposta === 'ir') {
+      g.decisaoOnze = null;
+      g.maoEspecial = 'onze';
+      g.apostaAtual = PONTOS_MAO_ONZE;
+      _salvarGame();
+    } else if (resposta === 'correr') {
+      g.decisaoOnze = null;
+      g.maoEspecial = null;
+      _fecharMao(_timeAdversario(time), 1, 'correuOnze');
+    }
   }
 
   function _acaoJogarCarta(acao, jogadores) {
@@ -400,7 +570,13 @@
     // vista de quem jogou, ela "nunca apareceu" (bug reportado). Fica em
     // exibição por MS_VAZA e só então _fecharVaza() resolve de verdade.
     var resultado = _avaliarVaza(g.cartasNaMesa, g.manilha, jogadores);
-    g.vazaEmExibicao = { time: resultado.time || null, uid: resultado.uid || null };
+    // A frase do empate vai no estado (e não sorteada no render): render
+    // roda várias vezes durante a exibição e a frase ficaria trocando.
+    g.vazaEmExibicao = {
+      time: resultado.time || null,
+      uid: resultado.uid || null,
+      frase: resultado.time ? null : _frase('empate')
+    };
     _salvarGame();
     _agendarFecharVaza();
   }
@@ -435,6 +611,7 @@
     var g = _g;
     g.vencedorMao = timeVencedor;
     g.pontosUltimaMao = pontos;
+    g.fraseFimMao = _frase('fimMao');
     g.pontuacao[timeVencedor] = (g.pontuacao[timeVencedor] || 0) + pontos;
     g.historico = (g.historico || []).concat([{
       maoAtual: g.maoAtual, vencedor: timeVencedor, pontos: pontos, motivo: motivo
@@ -443,9 +620,11 @@
 
     if (g.pontuacao[timeVencedor] >= PONTOS_PARTIDA) {
       g.vencedorPartida = timeVencedor;
+      g.fraseFimPartida = _frase('fimPartida');
       _salvarGame();
       return;
     }
+    _talvezReagirComoBot(timeVencedor);
     _salvarGame();
     _cancelarAgendamentos();
     _timerProximaMao = setTimeout(function () {
@@ -464,10 +643,11 @@
     if (!time || !_meuTeamPodeServidor(g, time)) return;
     var proximo = _proximoValorAposta(g.apostaAtual);
     if (!proximo) return;
-    g.pedidoTruco = { de: acao.uid, time: time, valor: proximo };
+    g.pedidoTruco = { de: acao.uid, time: time, valor: proximo, frase: _frase('pedir' + proximo) };
     _salvarGame();
   }
   function _meuTeamPodeServidor(g, time) {
+    if (g.maoEspecial || g.decisaoOnze) return false; // mão de 11 / de ferro não se truca
     return !g.pedidoTruco && g.apostaAtual < 12 && g.ultimoTimeAumentou !== time;
   }
 
@@ -482,16 +662,18 @@
       g.ultimoTimeAumentou = g.pedidoTruco.time;
       g.apostaAtual = g.pedidoTruco.valor;
       g.pedidoTruco = null;
+      _balaoDoSistema(acao.uid, _frase('aceitar'));
       _salvarGame();
     } else if (resposta === 'correr') {
       var timeQueGanhou = g.pedidoTruco.time;
       var pontos = g.apostaAtual; // valor QUE JÁ VALIA antes deste pedido
       g.pedidoTruco = null;
+      _balaoDoSistema(acao.uid, _frase('correr'));
       _fecharMao(timeQueGanhou, pontos, 'correu');
     } else if (resposta === 'aumentar') {
       var proximo = _proximoValorAposta(g.pedidoTruco.valor);
       if (!proximo) return;
-      g.pedidoTruco = { de: acao.uid, time: time, valor: proximo };
+      g.pedidoTruco = { de: acao.uid, time: time, valor: proximo, frase: _frase('pedir' + proximo) };
       _salvarGame();
     }
   }
@@ -518,6 +700,12 @@
     if (!_solo || !_souAnfitriao || !_g || _g.vencedorPartida || _g.vencedorMao || _g.vazaEmExibicao) { clearTimeout(_timerBot); return; }
     var timeBot = _timeDoUid(_BOT_UID, _jogadoresEfetivos());
     clearTimeout(_timerBot);
+    if (_g.decisaoOnze) {
+      // Só age se a mão de 11 for DO bot; se for do humano, espera a
+      // decisão dele (o overlay está aberto do lado de lá).
+      if (_g.decisaoOnze.time === timeBot) _timerBot = setTimeout(_botDecidirOnze, MS_BOT + 600);
+      return;
+    }
     if (_g.pedidoTruco && _g.pedidoTruco.time !== timeBot) {
       _timerBot = setTimeout(_botResponderAumento, MS_BOT); // pedido é do time do humano — bot responde
     } else if (!_g.pedidoTruco && _g.vez === _BOT_UID) {
@@ -545,6 +733,33 @@
     visiveis.forEach(function (e) { var p = _poder(e.carta, _g.manilha); if (p > maxPoderMesa) maxPoderMesa = p; });
     var mata = mao.filter(function (c) { return _poder(c, _g.manilha) > maxPoderMesa; });
     return mata.length ? _cartaMaisFraca(mata) : _cartaMaisFraca(mao);
+  }
+
+  /* Mão de 11 do bot (v1, de propósito simples e previsível): ele olha as
+     3 cartas e vai se tiver pelo menos UMA manilha, ou pelo menos DUAS
+     cartas altas (Ás, 2 ou 3). Fora isso corre e entrega 1 ponto — que é
+     o que um jogador cauteloso faria estando a um ponto da vitória. */
+  function _botDecidirOnze() {
+    if (!_solo || !_g || !_g.decisaoOnze) return;
+    var mao = (_g.maos && _g.maos[_BOT_UID]) || [];
+    var manilhas = 0, altas = 0;
+    mao.forEach(function (c) {
+      if (_ehManilha(c, _g.manilha)) manilhas++;
+      else if (ORDEM_VALOR.indexOf(_valorCarta(c)) >= ORDEM_VALOR.indexOf('A')) altas++;
+    });
+    var vai = manilhas >= 1 || altas >= 2;
+    _processarAcao({ uid: _BOT_UID, tipo: 'responderOnze', payload: { resposta: vai ? 'ir' : 'correr' } });
+  }
+
+  /* O bot comemora de vez em quando ao fechar uma mão — raro de propósito
+     (1 em 4), senão vira poluição. Só no solo, e nunca depois que a
+     partida acabou. */
+  function _talvezReagirComoBot(timeVencedor) {
+    if (!_solo || !_souAnfitriao || !_g) return;
+    var timeBot = _timeDoUid(_BOT_UID, _jogadoresEfetivos());
+    if (timeVencedor !== timeBot) return;
+    if (Math.random() > 0.25) return;
+    _balaoDoSistema(_BOT_UID, _frase(Math.random() < 0.5 ? 'fimMao' : 'aceitar'));
   }
 
   function _botJogarCarta() {
@@ -602,6 +817,9 @@
     _solo = _maxJogadores === 1;
     _assentos = _solo ? 2 : _maxJogadores; // mesa efetiva: eu + bot no solo
     _modoEscondida = false;
+    _painelReacoes = false;
+    _baloes = {}; _reacoesVistas = {}; _cooldownReacao = {};
+    _fraseVez = { chave: '', texto: '' };
 
     if (_souAnfitriao) _iniciarComoAnfitriao();
 
@@ -614,6 +832,7 @@
       // hospeda só tem o eco, então normaliza o que chegou.
       if (!_souAnfitriao) _g = _normalizarGame(sala.game) || _g;
       if (_g && !_g.timeDaMao && _g.vez) _g.timeDaMao = _timeDoUid(_g.vez, _jogadoresEfetivos());
+      _processarReacoes();
       _checarJogadoresAusentes(sala);
       _render();
     });
@@ -625,18 +844,34 @@
     _off.forEach(function (l) { try { l.ref.off(l.evento, l.cb); } catch (e) {} });
     _off = [];
     _cancelarAgendamentos();
+    if (_timerBalao) { clearTimeout(_timerBalao); _timerBalao = null; }
     if (_root) { while (_root.firstChild) _root.removeChild(_root.firstChild); }
     _ctx = null; _uid = null; _souAnfitriao = false; _g = null; _sala = null;
     _modoEscondida = false; _root = null; _solo = false; _assentos = 2;
+    _painelReacoes = false; _baloes = {}; _reacoesVistas = {}; _cooldownReacao = {};
+    _fraseVez = { chave: '', texto: '' };
   }
 
+  // NÃO mexe no _timerBalao: esta função roda no meio da partida (a cada
+  // fim de mão) e mataria o balão que acabou de subir. Balão é enfeite de
+  // ciclo próprio — só o parar() derruba.
   function _cancelarAgendamentos() {
     if (_timerVaza) { clearTimeout(_timerVaza); _timerVaza = null; }
     if (_timerProximaMao) { clearTimeout(_timerProximaMao); _timerProximaMao = null; }
     if (_timerBot) { clearTimeout(_timerBot); _timerBot = null; }
   }
 
-  /* ═══════════════ 7. UI: MESA DO TRUCO (prefixo trc-) ═══════════════ */
+  /* ═══════════════ 7. UI: MESA DO TRUCO (prefixo trc-) ═══════════════
+     Layout, de cima pra baixo: placar -> vira/manilha -> oponente(s) ->
+     centro (a vaza) -> base (Truco! | minha mão | Fechada). A base em três
+     colunas é o desenho de mini truco de celular: o polegar alcança os
+     dois botões sem tapar as cartas.
+
+     ATENÇÃO: _elx já prefixa TODA classe com "trc-" (ver _cls). Passar a
+     classe já prefixada gera "trc-trc-x", que não casa com nada no CSS e
+     falha em silêncio — foi assim que o oponente foi parar no canto
+     esquerdo e as cartas jogadas empilharam no mesmo ponto. Classe aqui
+     vai SEMPRE sem prefixo. */
 
   function _cls(n) { return 'trc-' + n; }
   function _elx(tag, classes, attrs) {
@@ -659,9 +894,14 @@
   }
 
   function _nomeDoUid(uid) {
-    if (_solo && uid === _BOT_UID) return _NOME_BOT;
-    var j = _sala && _sala.jogadores && _sala.jogadores[uid];
+    var j = _jogadoresEfetivos()[uid];
     return j ? j.nome : '...';
+  }
+
+  function _nomesDoTime(time) {
+    var jogadores = _jogadoresEfetivos();
+    return Object.keys(jogadores).filter(function (uid) { return _timeDoUid(uid, jogadores) === time; })
+      .map(function (uid) { return jogadores[uid].nome; }).join(' & ');
   }
 
   function _cartaEl(cod, opcoes) {
@@ -691,6 +931,47 @@
     return ['sul', 'leste', 'norte', 'oeste'][diff] || 'norte';
   }
 
+  /* ---------- balões de reação ----------
+     O estado que trafega é só { id|texto, seq }. Quem controla POR QUANTO
+     TEMPO o balão fica no ar é cada cliente, com timer local: comparar
+     timestamp do anfitrião com o relógio de quem assiste daria balão
+     fantasma (relógio adiantado) ou balão nenhum (atrasado). */
+  function _processarReacoes() {
+    if (!_g || !_g.reacoes) return;
+    var agora = Date.now(), mudou = false;
+    Object.keys(_g.reacoes).forEach(function (uid) {
+      var r = _g.reacoes[uid];
+      if (!r || !r.seq) return;
+      if (_reacoesVistas[uid] === r.seq) return; // já mostrei esta
+      _reacoesVistas[uid] = r.seq;
+      var def = r.texto ? { texto: r.texto } : _reacaoPorId(r.id);
+      if (!def) return;
+      _baloes[uid] = { texto: def.texto, expiraEm: agora + MS_BALAO };
+      mudou = true;
+    });
+    if (mudou) _agendarLimpezaBaloes();
+  }
+
+  function _agendarLimpezaBaloes() {
+    clearTimeout(_timerBalao);
+    _timerBalao = setTimeout(function () {
+      var agora = Date.now(), limpou = false;
+      Object.keys(_baloes).forEach(function (uid) {
+        if (_baloes[uid].expiraEm <= agora) { delete _baloes[uid]; limpou = true; }
+      });
+      if (Object.keys(_baloes).length) _agendarLimpezaBaloes();
+      if (limpou) _render();
+    }, MS_BALAO + 60);
+  }
+
+  function _balaoEl(uid) {
+    var b = _baloes[uid];
+    if (!b || b.expiraEm <= Date.now()) return null;
+    return _elx('div', 'balao', { texto: b.texto });
+  }
+
+  /* ---------- render ---------- */
+
   function _render() {
     if (!_root || !_sala) return;
     while (_root.firstChild) _root.removeChild(_root.firstChild);
@@ -699,47 +980,52 @@
     var jogadores = _jogadoresEfetivos();
     var meuSeat = (jogadores[_uid] && jogadores[_uid].seat) || 0;
     var meuTime = _time();
+    var travado = !!(_g.pedidoTruco || _g.vencedorMao || _g.vencedorPartida || _g.vazaEmExibicao || _g.decisaoOnze);
+    var souVez = _g.vez === _uid && !travado;
 
     var mesa = _elx('div', 'mesa');
 
-    // ---- placar ----
+    // ---- placar: pontos dos dois lados + quanto vale a mão ----
     var placar = _elx('div', 'placar');
     placar.appendChild(_criarPlacarTime('A', jogadores, meuTime));
     var centro = _elx('div', 'placar-centro');
-    centro.appendChild(_elx('span', 'placar-aposta', { texto: _g.apostaAtual + ' ponto' + (_g.apostaAtual > 1 ? 's' : '') }));
-    centro.appendChild(_elx('span', 'placar-mao', { texto: 'Mão ' + (_g.maoAtual + 1) }));
+    centro.appendChild(_elx('span', 'placar-aposta', { texto: 'vale ' + _g.apostaAtual }));
+    centro.appendChild(_elx('span', 'placar-mao', { texto: _rotuloDaMao() }));
     placar.appendChild(centro);
     placar.appendChild(_criarPlacarTime('B', jogadores, meuTime));
     mesa.appendChild(placar);
 
     // ---- vira / manilha ----
     var viraWrap = _elx('div', 'vira-wrap');
-    viraWrap.appendChild(_elx('span', 'vira-label', { texto: 'Vira' }));
-    viraWrap.appendChild(_cartaEl(_g.vira, { pequena: true }));
-    viraWrap.appendChild(_elx('span', 'vira-manilha', { texto: 'Manilha: ' + _g.manilha + SIMBOLO_NAIPE.O + ' e naipes' }));
+    var viraCol = _elx('div', 'vira-col');
+    viraCol.appendChild(_elx('span', 'vira-label', { texto: 'vira' }));
+    viraCol.appendChild(_cartaEl(_g.vira, { pequena: true }));
+    viraWrap.appendChild(viraCol);
+    var manilhaCol = _elx('div', 'manilha-col');
+    manilhaCol.appendChild(_elx('span', 'vira-manilha', { texto: 'Manilha: ' + _g.manilha }));
+    manilhaCol.appendChild(_elx('span', 'vira-ordem', { texto: '♦ < ♠ < ♥ < ♣' }));
+    viraWrap.appendChild(manilhaCol);
     mesa.appendChild(viraWrap);
 
-    // ---- outros jogadores (norte/leste/oeste) ----
-    // O modificador por nº de assentos deixa o CSS resolver os dois casos
-    // sem if aqui: com 2 assentos o único oponente vai no fluxo normal,
-    // centralizado no topo; com 4, cada um no seu canto (absoluto).
+    // ---- oponente(s): nome + leque de versos + balão ----
     var faixaOutros = _elx('div', 'outros outros-' + _assentos);
     Object.keys(jogadores).forEach(function (uid) {
       if (uid === _uid) return;
-      var seat = jogadores[uid].seat;
-      var pos = _posicaoRelativa(meuSeat, seat);
+      var pos = _posicaoRelativa(meuSeat, jogadores[uid].seat);
       var chip = _elx('div', 'jogador-chip pos-' + pos);
+      var balao = _balaoEl(uid);
+      if (balao) chip.appendChild(balao);
       chip.appendChild(_elx('span', 'jogador-nome', { texto: jogadores[uid].nome }));
       var qtdMao = (_g.maos && _g.maos[uid] && _g.maos[uid].length) || 0;
       var mini = _elx('div', 'mini-mao');
       for (var i = 0; i < qtdMao; i++) mini.appendChild(_cartaEl(null, { virada: true, pequena: true }));
       chip.appendChild(mini);
-      if (_g.vez === uid) chip.classList.add(_cls('jogador-vez'));
+      if (_g.vez === uid && !travado) chip.classList.add(_cls('jogador-vez'));
       faixaOutros.appendChild(chip);
     });
     mesa.appendChild(faixaOutros);
 
-    // ---- mesa (cartas jogadas nesta vaza) ----
+    // ---- centro: as cartas da vaza ----
     var centroMesa = _elx('div', 'centro-mesa');
     var exib = _g.vazaEmExibicao;
     (_g.cartasNaMesa || []).forEach(function (e) {
@@ -754,45 +1040,62 @@
       }));
       centroMesa.appendChild(slot);
     });
+    if (exib && !exib.time) centroMesa.appendChild(_elx('div', 'aviso-vaza', { texto: exib.frase || 'Empatou!' }));
     mesa.appendChild(centroMesa);
 
-    // ---- overlay: pedido de aumento pendente ----
+    // ---- overlays ----
     // Ordem importa: vencedorPartida implica vencedorMao (fecharMao nunca
     // limpa o campo), então a checagem de partida vem ANTES da de mão —
-    // senão o placar final nunca apareceria, só a tela de "mão terminou".
-    if (_g.pedidoTruco) mesa.appendChild(_criarOverlayPedido(meuTime));
+    // senão o placar final nunca apareceria.
+    if (_g.decisaoOnze) mesa.appendChild(_criarOverlayOnze(meuTime));
+    else if (_g.pedidoTruco) mesa.appendChild(_criarOverlayPedido(meuTime));
     else if (_g.vencedorPartida) mesa.appendChild(_criarOverlayFimPartida());
     else if (_g.vencedorMao) mesa.appendChild(_criarOverlayFimMao());
 
-    // ---- minha mão + ações ----
-    mesa.appendChild(_criarMinhaMao(jogadores));
-    mesa.appendChild(_criarBarraAcoes(meuTime));
+    // ---- base: Truco! | minha mão | Fechada ----
+    mesa.appendChild(_criarBase(souVez));
 
-    var voltar = _elx('button', 'btn-sair-partida', { type: 'button', texto: 'Sair da partida' });
-    voltar.addEventListener('click', function () { _ctx.sairDoJogo(); });
-    mesa.appendChild(voltar);
+    // ---- reações (botão discreto + painel) ----
+    mesa.appendChild(_criarBotaoReacoes());
+    if (_painelReacoes) mesa.appendChild(_criarPainelReacoes());
 
     _root.appendChild(mesa);
   }
 
+  // "Mão 3" normalmente; nas mãos especiais o rótulo já avisa o que é.
+  function _rotuloDaMao() {
+    if (_g.maoEspecial === 'ferro' || (_g.pontuacao.A === 11 && _g.pontuacao.B === 11)) return 'mão de ferro';
+    if (_g.maoEspecial === 'onze' || _g.decisaoOnze) return 'mão de 11';
+    return 'mão ' + (_g.maoAtual + 1);
+  }
+
   function _criarPlacarTime(time, jogadores, meuTime) {
-    var nomes = Object.keys(jogadores).filter(function (uid) { return _timeDoUid(uid, jogadores) === time; })
-      .map(function (uid) { return jogadores[uid].nome; }).join(' & ');
     var wrap = _elx('div', 'placar-time' + (time === meuTime ? ' placar-meu' : ''));
     wrap.appendChild(_elx('span', 'placar-numero', { texto: String((_g.pontuacao && _g.pontuacao[time]) || 0) }));
-    wrap.appendChild(_elx('span', 'placar-nomes', { texto: nomes || ('Time ' + time) }));
+    wrap.appendChild(_elx('span', 'placar-nomes', { texto: _nomesDoTime(time) || ('Time ' + time) }));
     return wrap;
   }
 
-  function _criarMinhaMao(jogadores) {
-    var wrap = _elx('div', 'minha-mao-wrap');
-    var minhaMao = (_g.maos && _g.maos[_uid]) || [];
-    var mao = _elx('div', 'minha-mao');
-    var souVez = _g.vez === _uid && !_g.pedidoTruco && !_g.vencedorMao && !_g.vencedorPartida;
+  /* Base em 3 colunas. As laterais existem sempre (mesmo vazias) pra a mão
+     não dançar horizontalmente quando um botão some. */
+  function _criarBase(souVez) {
+    var base = _elx('div', 'base');
 
-    // Um toque = joga. O "escondida" virou um toggle na barra de ações
-    // (ver _criarBarraAcoes): confirmar carta a carta com dois botões era
-    // um toque a mais em TODA jogada só pra atender o caso raro.
+    var esq = _elx('div', 'base-lado');
+    if (_meuTeamPode(_g) && !_g.vencedorMao && !_g.vencedorPartida && !_g.vazaEmExibicao) {
+      var proximo = _proximoValorAposta(_g.apostaAtual);
+      var btn = _elx('button', 'btn-truco', { type: 'button', texto: _g.apostaAtual === 1 ? 'TRUCO!' : String(proximo) });
+      btn.addEventListener('click', function () { _empurrarAcao('pedirAumento', {}); });
+      esq.appendChild(btn);
+    }
+    base.appendChild(esq);
+
+    var meio = _elx('div', 'base-meio');
+    var minhaMao = (_g.maos && _g.maos[_uid]) || [];
+    var mao = _elx('div', 'minha-mao' + (souVez ? ' minha-mao-ativa' : ''));
+    // Um toque = joga. O "escondida" é o toggle da direita: confirmar carta
+    // a carta com dois botões custava um toque a mais em TODA jogada só
+    // pra atender o caso raro.
     minhaMao.forEach(function (cod) {
       var el = _cartaEl(cod, { manilha: _ehManilha(cod, _g.manilha) });
       if (souVez) {
@@ -806,58 +1109,115 @@
       }
       mao.appendChild(el);
     });
-    wrap.appendChild(mao);
+    meio.appendChild(mao);
+    var meuBalao = _balaoEl(_uid);
+    if (meuBalao) meio.appendChild(meuBalao);
+    meio.appendChild(_elx('p', 'turno-info', { texto: _textoDoTurno(souVez) }));
+    base.appendChild(meio);
 
-    wrap.appendChild(_elx('p', 'turno-info', {
-      texto: _g.vencedorPartida ? '' : _g.vencedorMao ? '' : _g.pedidoTruco ? '' : _g.vazaEmExibicao ? '' :
-        (souVez ? (_modoEscondida ? 'Toque numa carta pra jogar ESCONDIDA' : 'Sua vez — toque na carta pra jogar')
-                : 'Vez de ' + _nomeDoUid(_g.vez))
-    }));
-    return wrap;
-  }
-
-  function _criarBarraAcoes(meuTime) {
-    var barra = _elx('div', 'barra-acoes');
-    if (_g.vencedorPartida || _g.vencedorMao || _g.pedidoTruco || _g.vazaEmExibicao) return barra; // nada a pedir agora
-
-    if (_meuTeamPode(_g)) {
-      var proximo = _proximoValorAposta(_g.apostaAtual);
-      var rotulo = _g.apostaAtual === 1 ? 'Truco!' : ('Pedir ' + proximo);
-      var btn = _elx('button', 'btn-truco', { type: 'button', texto: rotulo });
-      btn.addEventListener('click', function () { _empurrarAcao('pedirAumento', {}); });
-      barra.appendChild(btn);
-    }
-
-    // Toggle da carta virada: fica ligado até a próxima jogada (ou até
-    // desligarem na mão), em vez de perguntar a cada carta.
-    var souVez = _g.vez === _uid && !_g.pedidoTruco && !_g.vencedorMao && !_g.vencedorPartida && !_g.vazaEmExibicao;
+    var dir = _elx('div', 'base-lado');
     if (souVez) {
       var btnEsc = _elx('button', 'btn-escondida' + (_modoEscondida ? ' btn-escondida-ativo' : ''), {
-        type: 'button', texto: _modoEscondida ? '🙈 Escondida: ON' : '🙈 Jogar escondida'
+        type: 'button', texto: 'Fechada'
       });
       btnEsc.addEventListener('click', function () { _modoEscondida = !_modoEscondida; _render(); });
-      barra.appendChild(btnEsc);
+      dir.appendChild(btnEsc);
     }
-    return barra;
+    base.appendChild(dir);
+    return base;
+  }
+
+  /* A frase da vez é sorteada UMA vez por turno, não a cada render — senão
+     ela trocaria sozinha a cada atualização de estado. */
+  function _textoDoTurno(souVez) {
+    if (_g.vencedorPartida || _g.vencedorMao || _g.pedidoTruco || _g.decisaoOnze || _g.vazaEmExibicao) return '';
+    var chaveTurno = _g.maoAtual + '|' + _g.rodadaAtual + '|' + _g.vez + '|' + (souVez ? 'eu' : 'ele');
+    if (_fraseVez.chave !== chaveTurno) {
+      _fraseVez = { chave: chaveTurno, texto: souVez ? _frase('minhaVez') : _frase('vezDele') };
+    }
+    if (souVez && _modoEscondida) return 'Toque na carta — vai FECHADA';
+    return souVez ? _fraseVez.texto : _fraseVez.texto + ' ' + _nomeDoUid(_g.vez);
+  }
+
+  /* ---------- reações ---------- */
+
+  function _criarBotaoReacoes() {
+    var btn = _elx('button', 'btn-reacoes' + (_painelReacoes ? ' btn-reacoes-aberto' : ''), {
+      type: 'button', texto: '💬', 'aria-label': 'Reações'
+    });
+    btn.addEventListener('click', function () { _painelReacoes = !_painelReacoes; _render(); });
+    return btn;
+  }
+
+  function _criarPainelReacoes() {
+    var painel = _elx('div', 'painel-reacoes');
+    REACOES.forEach(function (r) {
+      var b = _elx('button', 'chip-reacao', { type: 'button', texto: r.texto });
+      b.addEventListener('click', function () {
+        _empurrarAcao('reacao', { id: r.id });
+        _painelReacoes = false;
+        _render();
+      });
+      painel.appendChild(b);
+    });
+    return painel;
+  }
+
+  /* ---------- overlays ---------- */
+
+  /* Mão de 11: só o time que está com 11 vê as cartas e decide. O outro
+     time fica sabendo apenas que há uma decisão em curso — e depois, pelo
+     resultado, se o adversário foi ou correu. */
+  function _criarOverlayOnze(meuTime) {
+    var ov = _elx('div', 'overlay');
+    var caixa = _elx('div', 'overlay-caixa');
+    var minhaDecisao = _g.decisaoOnze.time === meuTime;
+    caixa.appendChild(_elx('h3', 'overlay-titulo', { texto: minhaDecisao ? 'Mão de 11!' : 'Mão de 11 do adversário' }));
+
+    if (!minhaDecisao) {
+      caixa.appendChild(_elx('p', 'overlay-texto', { texto: 'Eles estão olhando as cartas pra decidir se vão…' }));
+      ov.appendChild(caixa);
+      return ov;
+    }
+
+    caixa.appendChild(_elx('p', 'overlay-texto', { texto: 'Suas cartas — vale 3 se jogar, 1 pro adversário se correr.' }));
+    var cartas = _elx('div', 'overlay-cartas');
+    ((_g.maos && _g.maos[_uid]) || []).forEach(function (cod) {
+      cartas.appendChild(_cartaEl(cod, { manilha: _ehManilha(cod, _g.manilha) }));
+    });
+    caixa.appendChild(cartas);
+
+    var acoes = _elx('div', 'overlay-acoes');
+    var btnIr = _elx('button', 'btn-aceitar', { type: 'button', texto: 'Jogar (vale 3)' });
+    btnIr.addEventListener('click', function () { _empurrarAcao('responderOnze', { resposta: 'ir' }); });
+    var btnCorrer = _elx('button', 'btn-correr', { type: 'button', texto: 'Correr (+1 pra eles)' });
+    btnCorrer.addEventListener('click', function () { _empurrarAcao('responderOnze', { resposta: 'correr' }); });
+    acoes.appendChild(btnIr); acoes.appendChild(btnCorrer);
+    caixa.appendChild(acoes);
+    ov.appendChild(caixa);
+    return ov;
   }
 
   function _criarOverlayPedido(meuTime) {
     var ov = _elx('div', 'overlay');
     var caixa = _elx('div', 'overlay-caixa');
     var pedeNome = _nomeDoUid(_g.pedidoTruco.de);
-    caixa.appendChild(_elx('h3', 'overlay-titulo', { texto: pedeNome + ' pediu ' + _g.pedidoTruco.valor + '!' }));
+    // A frase vem do anfitrião (gravada no pedido), pra todo mundo ver a
+    // MESMA — sorteio local faria cada aparelho mostrar uma coisa.
+    caixa.appendChild(_elx('h3', 'overlay-titulo-grande', { texto: _g.pedidoTruco.frase || (_g.pedidoTruco.valor + '!') }));
+    caixa.appendChild(_elx('p', 'overlay-texto', { texto: pedeNome + ' pediu ' + _g.pedidoTruco.valor }));
 
     if (_g.pedidoTruco.time === meuTime) {
-      caixa.appendChild(_elx('p', 'overlay-texto', { texto: 'Aguardando resposta do outro time…' }));
+      caixa.appendChild(_elx('p', 'overlay-texto', { texto: 'Esperando a resposta deles…' }));
     } else {
       var acoes = _elx('div', 'overlay-acoes');
-      var btnAceitar = _elx('button', 'btn-aceitar', { type: 'button', texto: 'Aceitar' });
+      var btnAceitar = _elx('button', 'btn-aceitar', { type: 'button', texto: 'Cai dentro!' });
       btnAceitar.addEventListener('click', function () { _empurrarAcao('responderAumento', { resposta: 'aceitar' }); });
-      var btnCorrer = _elx('button', 'btn-correr', { type: 'button', texto: 'Correr' });
+      var btnCorrer = _elx('button', 'btn-correr', { type: 'button', texto: 'Corro' });
       btnCorrer.addEventListener('click', function () { _empurrarAcao('responderAumento', { resposta: 'correr' }); });
       acoes.appendChild(btnAceitar); acoes.appendChild(btnCorrer);
       if (_proximoValorAposta(_g.pedidoTruco.valor)) {
-        var btnAumentar = _elx('button', 'btn-aumentar', { type: 'button', texto: 'Pedir ' + _proximoValorAposta(_g.pedidoTruco.valor) });
+        var btnAumentar = _elx('button', 'btn-aumentar', { type: 'button', texto: 'Pede ' + _proximoValorAposta(_g.pedidoTruco.valor) + '!' });
         btnAumentar.addEventListener('click', function () { _empurrarAcao('responderAumento', { resposta: 'aumentar' }); });
         acoes.appendChild(btnAumentar);
       }
@@ -870,11 +1230,9 @@
   function _criarOverlayFimMao() {
     var ov = _elx('div', 'overlay');
     var caixa = _elx('div', 'overlay-caixa');
-    var jogadoresEf = _jogadoresEfetivos();
-    var nomeTime = Object.keys(jogadoresEf).filter(function (uid) { return _timeDoUid(uid, jogadoresEf) === _g.vencedorMao; })
-      .map(function (uid) { return _nomeDoUid(uid); }).join(' & ');
-    caixa.appendChild(_elx('h3', 'overlay-titulo', { texto: (nomeTime || ('Time ' + _g.vencedorMao)) + ' venceu a mão! +' + _g.pontosUltimaMao }));
-    caixa.appendChild(_elx('p', 'overlay-texto', { texto: 'Preparando a próxima mão…' }));
+    var nomeTime = _nomesDoTime(_g.vencedorMao);
+    caixa.appendChild(_elx('h3', 'overlay-titulo', { texto: _g.fraseFimMao || 'Fechou a mão!' }));
+    caixa.appendChild(_elx('p', 'overlay-texto', { texto: (nomeTime || ('Time ' + _g.vencedorMao)) + ' +' + _g.pontosUltimaMao }));
     ov.appendChild(caixa);
     return ov;
   }
@@ -882,11 +1240,9 @@
   function _criarOverlayFimPartida() {
     var ov = _elx('div', 'overlay');
     var caixa = _elx('div', 'overlay-caixa');
-    var jogadoresEf = _jogadoresEfetivos();
-    var nomeTime = Object.keys(jogadoresEf).filter(function (uid) { return _timeDoUid(uid, jogadoresEf) === _g.vencedorPartida; })
-      .map(function (uid) { return _nomeDoUid(uid); }).join(' & ');
-    caixa.appendChild(_elx('h3', 'overlay-titulo-grande', { texto: '🏆 ' + (nomeTime || ('Time ' + _g.vencedorPartida)) + ' venceu!' }));
-    caixa.appendChild(_elx('p', 'overlay-texto', { texto: _g.pontuacao.A + ' x ' + _g.pontuacao.B }));
+    var nomeTime = _nomesDoTime(_g.vencedorPartida);
+    caixa.appendChild(_elx('h3', 'overlay-titulo-grande', { texto: '🏆 ' + (_g.fraseFimPartida || 'Ganhou a partida!') }));
+    caixa.appendChild(_elx('p', 'overlay-texto', { texto: (nomeTime || ('Time ' + _g.vencedorPartida)) + ' — ' + _g.pontuacao.A + ' x ' + _g.pontuacao.B }));
     var acoes = _elx('div', 'overlay-acoes');
     if (_souAnfitriao) {
       // Só o anfitrião decide "revanche" ou "voltar ao lobby" — são os dois

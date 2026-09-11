@@ -86,7 +86,7 @@
   gap: 2px;
 }
 
-.trc-placar-aposta {
+.trc-placar-aposta-legado {
   font-family: var(--font-h);
   font-weight: 800;
   font-size: 0.95rem;
@@ -96,7 +96,18 @@
   border-radius: 999px;
 }
 
-.trc-placar-mao { font-size: 0.68rem; color: #cfc6b6; }
+.trc-placar-mao { font-size: 0.66rem; color: #cfc6b6; text-transform: lowercase; }
+
+/* Quanto a mão está valendo é a informação que mais muda decisão — fica
+   no centro do placar, grande, com o nome da mão pequeno embaixo. */
+.trc-placar-aposta {
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--trc-dourado-forte);
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+}
 
 /* ---------- vira / manilha ---------- */
 
@@ -104,13 +115,30 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 6px 10px;
+  gap: 12px;
+  padding: 8px 10px 4px;
   flex-shrink: 0;
 }
 
-.trc-vira-label { font-size: 0.7rem; color: #cfc6b6; text-transform: uppercase; letter-spacing: 0.06em; }
-.trc-vira-manilha { font-size: 0.7rem; color: var(--trc-dourado-forte); }
+.trc-vira-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.trc-manilha-col { display: flex; flex-direction: column; gap: 1px; }
+
+.trc-vira-label {
+  font-size: 0.62rem;
+  color: #cfc6b6;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+/* A vira é a carta que define a manilha — merece ser lida de longe. */
+.trc-vira-wrap .trc-carta-pequena { width: 46px; height: 66px; }
+.trc-vira-manilha {
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 0.98rem;
+  color: var(--trc-dourado-forte);
+  line-height: 1.1;
+}
+.trc-vira-ordem { font-size: 0.66rem; color: #cfc6b6; letter-spacing: 0.08em; }
 
 /* ---------- outros jogadores ---------- */
 
@@ -144,7 +172,9 @@
   justify-content: center;
   align-items: flex-start;
 }
-.trc-outros-2 .trc-jogador-chip { position: static; transform: none; }
+/* relative (e não static): fica no fluxo igual, mas continua sendo o
+   ancoradouro do balão de reação, que é position:absolute. */
+.trc-outros-2 .trc-jogador-chip { position: relative; transform: none; }
 
 .trc-jogador-nome {
   font-size: 0.74rem;
@@ -244,9 +274,10 @@
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
 }
-/* Norte acima do meio, sul abaixo, com uma folga clara entre os dois. */
-.trc-slot-mesa.trc-pos-norte { transform: translate(-50%, -115%); }
-.trc-slot-mesa.trc-pos-sul { transform: translate(-50%, 15%); }
+/* Norte acima do meio e sul abaixo, com um overlap leve (e um deslocamento
+   lateral) — lê como cartas jogadas na mesa, não como duas fileiras. */
+.trc-slot-mesa.trc-pos-norte { transform: translate(-62%, -96%) rotate(-4deg); }
+.trc-slot-mesa.trc-pos-sul { transform: translate(-38%, -4%) rotate(3deg); }
 .trc-slot-mesa.trc-pos-leste { transform: translate(65%, -50%); }
 .trc-slot-mesa.trc-pos-oeste { transform: translate(-165%, -50%); }
 
@@ -266,38 +297,104 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+/* Vaza empatada não tem carta vencedora pra marcar, então o centro avisa. */
+.trc-aviso-vaza {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  font-family: var(--font-h);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--trc-dourado-forte);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
 /* Vaza fechada: a carta que ganhou fica marcada durante a pausa de
    exibição (ver MS_VAZA em truco.js). */
 .trc-carta-vencedora {
   box-shadow: 0 0 0 3px #6ee7a0, 0 0 16px rgba(110, 231, 160, 0.6);
 }
 
-/* ---------- minha mão ---------- */
+/* ---------- base: Truco! | minha mão | Fechada ---------- */
 
-.trc-minha-mao-wrap {
+/* Três colunas fixas: o polegar alcança os dois botões sem passar por cima
+   das cartas, e as laterais existem mesmo vazias pra a mão não dançar
+   horizontalmente quando um botão some. */
+.trc-base {
   flex-shrink: 0;
+  display: grid;
+  grid-template-columns: minmax(72px, auto) 1fr minmax(72px, auto);
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 12px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.trc-base-lado { display: flex; justify-content: center; }
+.trc-base-meio {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 10px 10px 6px;
-  background: rgba(0, 0, 0, 0.25);
+  gap: 6px;
+  min-width: 0;
 }
 
-.trc-minha-mao { display: flex; gap: 10px; justify-content: center; }
+.trc-minha-mao {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  padding: 4px 0 2px;
+}
+/* Mão maior que as cartas de referência do topo — é o que a pessoa toca. */
+.trc-minha-mao .trc-carta { width: 60px; height: 87px; }
+.trc-minha-mao .trc-carta .trc-carta-naipe-grande { font-size: 1.6rem; }
 
-.trc-turno-info { font-size: 0.82rem; color: #e7dfcf; min-height: 1.1em; margin: 0; }
+/* Feedback de vez sem texto: a mão inteira "acende" quando é sua vez. */
+.trc-minha-mao-ativa .trc-carta { box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(244, 205, 119, 0.55); }
+.trc-minha-mao-ativa .trc-carta.trc-carta-manilha { box-shadow: 0 0 0 2px var(--trc-dourado), 0 0 12px rgba(217, 164, 65, 0.75); }
 
-/* Toggle "jogar escondida" — substituiu os dois botões de confirmação que
+.trc-turno-info {
+  font-size: 0.78rem;
+  color: #e7dfcf;
+  min-height: 1.1em;
+  margin: 0;
+  text-align: center;
+}
+
+.trc-btn-truco {
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 0.95rem;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, var(--trc-vermelho), #b5302a);
+  box-shadow: 0 4px 14px rgba(225, 75, 63, 0.4);
+  width: 100%;
+  max-width: 104px;
+  min-height: 52px;
+}
+.trc-btn-truco:active { transform: scale(0.96); }
+
+/* Toggle "Fechada" — substituiu os dois botões de confirmação que
    apareciam a cada carta selecionada (um toque a mais em toda jogada). */
 .trc-btn-escondida {
   font-family: var(--font-h);
   font-weight: 700;
   font-size: 0.82rem;
-  padding: 11px 18px;
-  border-radius: 999px;
+  padding: 12px 12px;
+  border-radius: 14px;
   cursor: pointer;
-  min-height: 42px;
+  width: 100%;
+  max-width: 104px;
+  min-height: 52px;
   background: rgba(255, 255, 255, 0.1);
   color: #f2ece0;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -315,45 +412,97 @@
   opacity: 0.85;
 }
 
-/* ---------- barra de ações (truco/aumentar) ---------- */
+/* ---------- balões de reação ---------- */
 
-.trc-barra-acoes {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 8px 10px 14px;
-  min-height: 8px;
-}
-
-.trc-btn-truco {
+.trc-balao {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fbf6ea;
+  color: #241a08;
   font-family: var(--font-h);
-  font-weight: 800;
-  font-size: 1rem;
-  padding: 13px 30px;
-  border-radius: 999px;
-  border: none;
-  cursor: pointer;
-  color: #fff;
-  background: linear-gradient(135deg, var(--trc-vermelho), #b5302a);
-  box-shadow: 0 4px 14px rgba(225, 75, 63, 0.4);
-  min-width: 160px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 7px 13px;
+  border-radius: 14px;
+  white-space: nowrap;
+  max-width: min(70vw, 220px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  animation: trcBalao 0.18s ease-out;
+  z-index: 6;
+  pointer-events: none;
 }
-.trc-btn-truco:active { transform: scale(0.96); }
+/* Rabinho do balão */
+.trc-balao::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #fbf6ea;
+}
+/* No chip do oponente o balão sobe; na minha base ele fica acima da mão. */
+.trc-jogador-chip .trc-balao { bottom: calc(100% + 4px); }
+.trc-base-meio .trc-balao { bottom: calc(100% - 2px); }
 
-.trc-btn-sair-partida {
-  align-self: center;
-  margin: 4px 0 10px;
-  background: none;
-  border: none;
-  color: #cfc6b6;
-  text-decoration: underline;
-  font-size: 0.78rem;
-  cursor: pointer;
-  flex-shrink: 0;
+@keyframes trcBalao {
+  from { opacity: 0; transform: translate(-50%, 6px) scale(0.9); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
+
+.trc-btn-reacoes {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(0, 0, 0, 0.4);
+  color: #f2ece0;
+  font-size: 1.05rem;
+  cursor: pointer;
+  /* acima do .trc-overlay (z-index 20) de propósito: dá pra mandar uma
+     reação durante o pedido de truco e no fim da partida, que é
+     justamente quando a mesa tem o que comentar. */
+  z-index: 21;
+  line-height: 1;
+}
+.trc-btn-reacoes-aberto { background: var(--trc-dourado); color: #241a08; border-color: transparent; }
+
+.trc-painel-reacoes {
+  position: absolute;
+  right: 8px;
+  bottom: 96px;
+  z-index: 22;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  width: min(280px, calc(100% - 16px));
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(10, 30, 20, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+.trc-chip-reacao {
+  font-family: var(--font-b, inherit);
+  font-size: 0.82rem;
+  padding: 8px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f2ece0;
+  cursor: pointer;
+  min-height: 36px;
+}
+.trc-chip-reacao:active { background: var(--trc-dourado); color: #241a08; }
 
 /* ---------- overlays (pedido / fim de mão / fim de partida) ---------- */
 
@@ -402,6 +551,9 @@
 
 .trc-overlay-acoes { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
 
+/* As 3 cartas que o time da mão de 11 vê antes de decidir. */
+.trc-overlay-cartas { display: flex; gap: 8px; justify-content: center; margin: 4px 0 2px; }
+
 .trc-btn-aceitar,
 .trc-btn-correr,
 .trc-btn-aumentar {
@@ -446,7 +598,10 @@
   .trc-carta { width: 44px; height: 64px; }
   .trc-carta-pequena { width: 32px; height: 46px; }
   .trc-minha-mao { gap: 6px; }
-  .trc-btn-truco { min-width: 130px; padding: 12px 22px; }
+  .trc-minha-mao .trc-carta { width: 54px; height: 78px; }
+  .trc-btn-truco, .trc-btn-escondida { max-width: 84px; font-size: 0.8rem; padding: 10px 8px; }
+  .trc-base { grid-template-columns: minmax(62px, auto) 1fr minmax(62px, auto); gap: 4px; }
+  .trc-vira-wrap .trc-carta-pequena { width: 40px; height: 58px; }
   /* A carta da vaza continua sendo a maior da tela, mas cabe no celular. */
   .trc-centro-mesa .trc-carta { width: 56px; height: 81px; }
   .trc-centro-mesa { min-height: 150px; }
@@ -459,4 +614,5 @@
   .trc-carta-naipe-grande { font-size: 1.7rem; }
   .trc-centro-mesa .trc-carta { width: 78px; height: 113px; }
   .trc-centro-mesa { min-height: 210px; }
+  .trc-minha-mao .trc-carta { width: 72px; height: 104px; }
 }

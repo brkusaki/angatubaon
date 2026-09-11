@@ -5233,6 +5233,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .gc-tanques  { --gc:#34d399; --gc-2:#0d9488; --gc-a:rgba(16,185,129,.16); --gc-b:rgba(16,185,129,.34); }
 .gc-party    { --gc:#ec4899; --gc-2:#f59e0b; --gc-a:rgba(236,72,153,.16); --gc-b:rgba(236,72,153,.34); }
 .gc-negocios { --gc:#38e1b0; --gc-2:#f59e0b; --gc-a:rgba(56,225,176,.16); --gc-b:rgba(56,225,176,.34); }
+.gc-baralho  { --gc:#d9a441; --gc-2:#8a2f23; --gc-a:rgba(217,164,65,.16); --gc-b:rgba(217,164,65,.34); }
 
 .game-card:active { transform: scale(.97); border-color: var(--gc-b); }
 .game-card:focus-visible { outline: 2px solid var(--gc); outline-offset: 2px; }

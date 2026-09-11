@@ -730,6 +730,15 @@
             <span class="gc-cta">Jogar</span>
           </div>
         </button>
+
+        <button type="button" class="game-card gc-baralho" data-cat="multi" data-nome="jogos de baralho truco paulista" data-desc="truco paulista online 2 ou 4 jogadores em sala com codigo" onclick="_abrirJogo('baralho')">
+          <div class="gc-media"><img src="/Jogos/assets/card-baralho.webp" alt="" loading="lazy" class="gc-hero-img" onerror="this.style.display='none'"></div>
+          <div class="gc-body">
+            <div class="gc-title">Jogos de Baralho</div>
+            <div class="gc-desc">Truco Paulista online, 2 ou 4 jogadores. Crie uma sala e chame a turma.</div>
+            <span class="gc-cta">Jogar</span>
+          </div>
+        </button>
       </div>
 
       <!-- Estado vazio: nenhum jogo bate com a busca/filtro -->
@@ -1476,6 +1485,15 @@
       <div id="jogo-negocios" class="jogo-tela" style="display:none;">
         <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
         <div id="negocios-root"></div>
+      </div>
+
+      <!-- TELA: Jogos de Baralho (Truco Paulista + futuros modos) -->
+      <!-- Mesmo esquema de #negocios-root: Jogos/baralho.js desenha tudo
+           (escolha de jogo, salas, lobby e a mesa do modo escolhido)
+           dentro de #baralho-root — nada de markup do jogo mora aqui. -->
+      <div id="jogo-baralho" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div id="baralho-root"></div>
       </div>
 
       <!-- TELA: Ranking da cidade (antes era o modal-rank; virou tela do hub) -->

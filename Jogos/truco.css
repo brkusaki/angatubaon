@@ -114,10 +114,13 @@
 
 /* ---------- outros jogadores ---------- */
 
+/* A faixa dos oponentes NÃO cresce mais (era flex:1): quem fica com a
+   sobra de altura é a .trc-centro-mesa, que é onde a partida acontece. */
 .trc-outros {
   position: relative;
-  flex: 1;
-  min-height: 90px;
+  flex: 0 0 auto;
+  min-height: 84px;
+  padding-top: 4px;
 }
 
 .trc-jogador-chip {
@@ -125,12 +128,23 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
 .trc-pos-norte { top: 4px; left: 50%; transform: translateX(-50%); }
 .trc-pos-leste { top: 50%; right: 4px; transform: translateY(-50%); }
 .trc-pos-oeste { top: 50%; left: 4px; transform: translateY(-50%); }
+
+/* Mesa de 2 assentos (solo ou 1x1): só existe UM oponente, então ele vai
+   no fluxo normal, centralizado no topo — bem mais estável que depender
+   de posicionamento absoluto pra centralizar um elemento só. Mesa de 4
+   continua no absoluto (norte/leste/oeste), que aí faz sentido. */
+.trc-outros-2 {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+.trc-outros-2 .trc-jogador-chip { position: static; transform: none; }
 
 .trc-jogador-nome {
   font-size: 0.74rem;
@@ -147,7 +161,20 @@
   box-shadow: 0 0 10px rgba(217, 164, 65, 0.65);
 }
 
-.trc-mini-mao { display: flex; gap: 3px; }
+/* Leque: as cartas de costas se sobrepõem e abrem levemente, em vez de
+   ficarem lado a lado — ocupa menos largura e lê como "mão" de verdade.
+   O nth-child cobre as 3 cartas do Truco; qualquer carta além disso
+   simplesmente fica reta, sem quebrar. */
+.trc-mini-mao {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  height: 58px;
+}
+.trc-mini-mao .trc-carta { margin: 0 -9px; transform-origin: 50% 100%; }
+.trc-mini-mao .trc-carta:nth-child(1) { transform: rotate(-9deg) translateY(1px); }
+.trc-mini-mao .trc-carta:nth-child(2) { transform: rotate(0deg) translateY(-3px); }
+.trc-mini-mao .trc-carta:nth-child(3) { transform: rotate(9deg) translateY(1px); }
 
 /* ---------- cartas ---------- */
 
@@ -203,10 +230,13 @@
 
 /* ---------- mesa (cartas jogadas) ---------- */
 
+/* É aqui que a vaza acontece, então é esta faixa que fica com toda a
+   altura que sobra — antes ela era fixa em 110px e a carta jogada saía
+   quase colada na mão do jogador. */
 .trc-centro-mesa {
   position: relative;
-  height: 110px;
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-height: 168px;
 }
 
 .trc-slot-mesa {
@@ -214,10 +244,33 @@
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
 }
-.trc-slot-mesa.trc-pos-norte { transform: translate(-50%, -140%); }
-.trc-slot-mesa.trc-pos-sul { transform: translate(-50%, 40%); }
-.trc-slot-mesa.trc-pos-leste { transform: translate(60%, -50%); }
-.trc-slot-mesa.trc-pos-oeste { transform: translate(-160%, -50%); }
+/* Norte acima do meio, sul abaixo, com uma folga clara entre os dois. */
+.trc-slot-mesa.trc-pos-norte { transform: translate(-50%, -115%); }
+.trc-slot-mesa.trc-pos-sul { transform: translate(-50%, 15%); }
+.trc-slot-mesa.trc-pos-leste { transform: translate(65%, -50%); }
+.trc-slot-mesa.trc-pos-oeste { transform: translate(-165%, -50%); }
+
+/* Carta jogada é a estrela da tela: maior que a da mão e com uma entrada
+   curta, pra ficar claro QUE ela entrou (a queixa era justamente não
+   perceber a carta aparecendo). */
+.trc-centro-mesa .trc-carta {
+  width: 64px;
+  height: 93px;
+  animation: trcCartaEntra 0.22s ease-out;
+}
+.trc-centro-mesa .trc-carta .trc-carta-naipe-grande { font-size: 1.75rem; }
+.trc-centro-mesa .trc-carta .trc-carta-valor { font-size: 1rem; }
+
+@keyframes trcCartaEntra {
+  from { opacity: 0; transform: scale(0.86); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Vaza fechada: a carta que ganhou fica marcada durante a pausa de
+   exibição (ver MS_VAZA em truco.js). */
+.trc-carta-vencedora {
+  box-shadow: 0 0 0 3px #6ee7a0, 0 0 16px rgba(110, 231, 160, 0.6);
+}
 
 /* ---------- minha mão ---------- */
 
@@ -235,21 +288,32 @@
 
 .trc-turno-info { font-size: 0.82rem; color: #e7dfcf; min-height: 1.1em; margin: 0; }
 
-.trc-confirmar-jogada { display: flex; gap: 10px; }
-
-.trc-btn-jogar,
-.trc-btn-jogar-escondida {
+/* Toggle "jogar escondida" — substituiu os dois botões de confirmação que
+   apareciam a cada carta selecionada (um toque a mais em toda jogada). */
+.trc-btn-escondida {
   font-family: var(--font-h);
   font-weight: 700;
-  font-size: 0.85rem;
-  padding: 10px 16px;
-  border-radius: 10px;
-  border: none;
+  font-size: 0.82rem;
+  padding: 11px 18px;
+  border-radius: 999px;
   cursor: pointer;
-  min-height: 40px;
+  min-height: 42px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #f2ece0;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
-.trc-btn-jogar { background: linear-gradient(135deg, var(--trc-dourado-forte), var(--trc-dourado)); color: #241a08; }
-.trc-btn-jogar-escondida { background: rgba(255, 255, 255, 0.1); color: #f2ece0; border: 1px solid rgba(255, 255, 255, 0.3); }
+.trc-btn-escondida-ativo {
+  background: linear-gradient(135deg, var(--trc-dourado-forte), var(--trc-dourado));
+  color: #241a08;
+  border-color: transparent;
+  box-shadow: 0 0 12px rgba(217, 164, 65, 0.6);
+}
+/* Com o toggle ligado, a própria mão avisa o que vai acontecer. */
+.trc-carta-vai-escondida {
+  outline: 2px dashed var(--trc-dourado-forte);
+  outline-offset: 2px;
+  opacity: 0.85;
+}
 
 /* ---------- barra de ações (truco/aumentar) ---------- */
 
@@ -257,6 +321,9 @@
   flex-shrink: 0;
   display: flex;
   justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
   padding: 8px 10px 14px;
   min-height: 8px;
 }
@@ -380,10 +447,16 @@
   .trc-carta-pequena { width: 32px; height: 46px; }
   .trc-minha-mao { gap: 6px; }
   .trc-btn-truco { min-width: 130px; padding: 12px 22px; }
+  /* A carta da vaza continua sendo a maior da tela, mas cabe no celular. */
+  .trc-centro-mesa .trc-carta { width: 56px; height: 81px; }
+  .trc-centro-mesa { min-height: 150px; }
+  .trc-mini-mao { height: 50px; }
 }
 
 @media (min-width: 700px) {
   .trc-mesa { min-height: 640px; }
   .trc-carta { width: 64px; height: 92px; }
   .trc-carta-naipe-grande { font-size: 1.7rem; }
+  .trc-centro-mesa .trc-carta { width: 78px; height: 113px; }
+  .trc-centro-mesa { min-height: 210px; }
 }

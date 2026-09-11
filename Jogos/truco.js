@@ -232,10 +232,13 @@
   var _sala = null;          // último snapshot completo da sala
   var _timerProximaMao = null;
   var _timerBot = null;
-  var _cartaSelecionada = null; // código da carta selecionada na mão local, aguardando confirmação
+  var _timerVaza = null;
+  var _modoEscondida = false; // toggle persistente: próximo toque joga a carta virada
   var _root = null;          // container da mesa (ctx.container)
   var _flashTimer = null;
 
+  var MS_VAZA = 1200;   // quanto tempo a vaza fechada fica à vista antes de recolher
+  var MS_BOT = 1100;    // pausa do bot antes de jogar/responder (dá tempo de ler a mesa)
   var _BOT_UID = '_bot_coruja';
   var _NOME_BOT = 'Coruja 🦉';
 
@@ -322,7 +325,15 @@
 
   function _iniciarComoAnfitriao() {
     var jogadores = _jogadoresEfetivos();
-    if (_sala.game) { _g = _normalizarGame(_sala.game); _ouvirAcoes(); _talvezAgirComoBot(); return; }
+    if (_sala.game) {
+      _g = _normalizarGame(_sala.game);
+      _ouvirAcoes();
+      // Retomou no meio de uma vaza em exibição: reagenda o recolhimento,
+      // senão as cartas ficariam na mesa pra sempre e a mão travava.
+      if (_g.vazaEmExibicao) _agendarFecharVaza();
+      _talvezAgirComoBot();
+      return;
+    }
     _g = _prepararNovaMao(_novoJogoInicial(), jogadores);
     _salvarGame();
     _ouvirAcoes();
@@ -365,6 +376,7 @@
   function _acaoJogarCarta(acao, jogadores) {
     var g = _g;
     if (g.vencedorMao) return; // mão em exibição de resultado, aguardando próxima
+    if (g.vazaEmExibicao) return; // vaza fechada à vista: ninguém joga até recolher
     if (g.pedidoTruco) return; // aposta pendente: ninguém joga carta até resolver
     if (g.vez !== acao.uid) return;
     var mao = g.maos[acao.uid] || [];
@@ -383,10 +395,30 @@
       return;
     }
 
-    // Vaza completa: avalia, arquiva no descarte e decide se a mão fechou.
+    // Vaza completa: NÃO recolhe as cartas agora. Sem esta pausa, a carta
+    // que fecha a vaza era jogada e some no mesmo instante — do ponto de
+    // vista de quem jogou, ela "nunca apareceu" (bug reportado). Fica em
+    // exibição por MS_VAZA e só então _fecharVaza() resolve de verdade.
     var resultado = _avaliarVaza(g.cartasNaMesa, g.manilha, jogadores);
+    g.vazaEmExibicao = { time: resultado.time || null, uid: resultado.uid || null };
+    _salvarGame();
+    _agendarFecharVaza();
+  }
+
+  function _agendarFecharVaza() {
+    if (!_souAnfitriao) return;
+    clearTimeout(_timerVaza);
+    _timerVaza = setTimeout(_fecharVaza, MS_VAZA);
+  }
+
+  function _fecharVaza() {
+    _timerVaza = null;
+    var g = _g;
+    if (!g || !g.vazaEmExibicao) return;
+    var resultado = g.vazaEmExibicao;
+    g.vazaEmExibicao = null;
     g.vazasResultados.push(resultado.time);
-    g.descarte = g.descarte.concat(g.cartasNaMesa.map(function (e) { return e.carta; }));
+    g.descarte = g.descarte.concat((g.cartasNaMesa || []).map(function (e) { return e.carta; }));
     g.cartasNaMesa = [];
     g.rodadaAtual++;
 
@@ -427,7 +459,7 @@
 
   function _acaoPedirAumento(acao, jogadores) {
     var g = _g;
-    if (g.vencedorMao) return;
+    if (g.vencedorMao || g.vazaEmExibicao) return;
     var time = _timeDoUid(acao.uid, jogadores);
     if (!time || !_meuTeamPodeServidor(g, time)) return;
     var proximo = _proximoValorAposta(g.apostaAtual);
@@ -480,13 +512,16 @@
      — pro resto das regras, o bot é só mais um jogador. */
 
   function _talvezAgirComoBot() {
-    if (!_solo || !_souAnfitriao || !_g || _g.vencedorPartida || _g.vencedorMao) { clearTimeout(_timerBot); return; }
+    // vazaEmExibicao: o bot espera a vaza ser recolhida (_fecharVaza chama
+    // _salvarGame, que passa por aqui de novo) — senão ele jogaria por cima
+    // da carta que o humano acabou de ver entrar na mesa.
+    if (!_solo || !_souAnfitriao || !_g || _g.vencedorPartida || _g.vencedorMao || _g.vazaEmExibicao) { clearTimeout(_timerBot); return; }
     var timeBot = _timeDoUid(_BOT_UID, _jogadoresEfetivos());
     clearTimeout(_timerBot);
     if (_g.pedidoTruco && _g.pedidoTruco.time !== timeBot) {
-      _timerBot = setTimeout(_botResponderAumento, 900); // pedido é do time do humano — bot responde
+      _timerBot = setTimeout(_botResponderAumento, MS_BOT); // pedido é do time do humano — bot responde
     } else if (!_g.pedidoTruco && _g.vez === _BOT_UID) {
-      _timerBot = setTimeout(_botJogarCarta, 900);
+      _timerBot = setTimeout(_botJogarCarta, MS_BOT);
     }
   }
 
@@ -566,7 +601,7 @@
     _maxJogadores = (_sala && _sala.maxJogadores) || 2;
     _solo = _maxJogadores === 1;
     _assentos = _solo ? 2 : _maxJogadores; // mesa efetiva: eu + bot no solo
-    _cartaSelecionada = null;
+    _modoEscondida = false;
 
     if (_souAnfitriao) _iniciarComoAnfitriao();
 
@@ -592,10 +627,11 @@
     _cancelarAgendamentos();
     if (_root) { while (_root.firstChild) _root.removeChild(_root.firstChild); }
     _ctx = null; _uid = null; _souAnfitriao = false; _g = null; _sala = null;
-    _cartaSelecionada = null; _root = null; _solo = false; _assentos = 2;
+    _modoEscondida = false; _root = null; _solo = false; _assentos = 2;
   }
 
   function _cancelarAgendamentos() {
+    if (_timerVaza) { clearTimeout(_timerVaza); _timerVaza = null; }
     if (_timerProximaMao) { clearTimeout(_timerProximaMao); _timerProximaMao = null; }
     if (_timerBot) { clearTimeout(_timerBot); _timerBot = null; }
   }
@@ -630,7 +666,7 @@
 
   function _cartaEl(cod, opcoes) {
     opcoes = opcoes || {};
-    var el = _elx('div', 'carta' + (opcoes.pequena ? ' trc-carta-pequena' : ''));
+    var el = _elx('div', 'carta' + (opcoes.pequena ? ' carta-pequena' : ''));
     if (opcoes.virada) {
       el.classList.add(_cls('carta-verso'));
       el.appendChild(_elx('span', 'carta-verso-coruja', { texto: '🦉' }));
@@ -639,6 +675,7 @@
     var valor = _valorCarta(cod), naipe = _naipeCarta(cod);
     el.classList.add(_cls('carta-' + COR_NAIPE[naipe]));
     if (opcoes.manilha) el.classList.add(_cls('carta-manilha'));
+    if (opcoes.vencedora) el.classList.add(_cls('carta-vencedora'));
     var topo = _elx('span', 'carta-valor', { texto: valor });
     var meio = _elx('span', 'carta-naipe-grande', { texto: SIMBOLO_NAIPE[naipe] });
     var baixo = _elx('span', 'carta-valor carta-valor-baixo', { texto: valor });
@@ -683,16 +720,19 @@
     mesa.appendChild(viraWrap);
 
     // ---- outros jogadores (norte/leste/oeste) ----
-    var faixaOutros = _elx('div', 'outros');
+    // O modificador por nº de assentos deixa o CSS resolver os dois casos
+    // sem if aqui: com 2 assentos o único oponente vai no fluxo normal,
+    // centralizado no topo; com 4, cada um no seu canto (absoluto).
+    var faixaOutros = _elx('div', 'outros outros-' + _assentos);
     Object.keys(jogadores).forEach(function (uid) {
       if (uid === _uid) return;
       var seat = jogadores[uid].seat;
       var pos = _posicaoRelativa(meuSeat, seat);
-      var chip = _elx('div', 'jogador-chip trc-pos-' + pos);
+      var chip = _elx('div', 'jogador-chip pos-' + pos);
       chip.appendChild(_elx('span', 'jogador-nome', { texto: jogadores[uid].nome }));
       var qtdMao = (_g.maos && _g.maos[uid] && _g.maos[uid].length) || 0;
       var mini = _elx('div', 'mini-mao');
-      for (var i = 0; i < qtdMao; i++) mini.appendChild(_cartaEl(null, { virada: true }));
+      for (var i = 0; i < qtdMao; i++) mini.appendChild(_cartaEl(null, { virada: true, pequena: true }));
       chip.appendChild(mini);
       if (_g.vez === uid) chip.classList.add(_cls('jogador-vez'));
       faixaOutros.appendChild(chip);
@@ -701,10 +741,17 @@
 
     // ---- mesa (cartas jogadas nesta vaza) ----
     var centroMesa = _elx('div', 'centro-mesa');
+    var exib = _g.vazaEmExibicao;
     (_g.cartasNaMesa || []).forEach(function (e) {
       var pos = _posicaoRelativa(meuSeat, jogadores[e.uid] ? jogadores[e.uid].seat : meuSeat);
-      var slot = _elx('div', 'slot-mesa trc-pos-' + pos);
-      slot.appendChild(_cartaEl(e.carta, { virada: e.escondida && e.uid !== _uid }));
+      var slot = _elx('div', 'slot-mesa pos-' + pos);
+      // A carta escondida é revelada quando a vaza fecha (é a regra: ela
+      // perde a disputa, mas todo mundo vê o que era no fim).
+      slot.appendChild(_cartaEl(e.carta, {
+        virada: e.escondida && e.uid !== _uid && !exib,
+        manilha: _ehManilha(e.carta, _g.manilha),
+        vencedora: !!(exib && exib.uid === e.uid)
+      }));
       centroMesa.appendChild(slot);
     });
     mesa.appendChild(centroMesa);
@@ -731,7 +778,7 @@
   function _criarPlacarTime(time, jogadores, meuTime) {
     var nomes = Object.keys(jogadores).filter(function (uid) { return _timeDoUid(uid, jogadores) === time; })
       .map(function (uid) { return jogadores[uid].nome; }).join(' & ');
-    var wrap = _elx('div', 'placar-time' + (time === meuTime ? ' trc-placar-meu' : ''));
+    var wrap = _elx('div', 'placar-time' + (time === meuTime ? ' placar-meu' : ''));
     wrap.appendChild(_elx('span', 'placar-numero', { texto: String((_g.pontuacao && _g.pontuacao[time]) || 0) }));
     wrap.appendChild(_elx('span', 'placar-nomes', { texto: nomes || ('Time ' + time) }));
     return wrap;
@@ -743,47 +790,35 @@
     var mao = _elx('div', 'minha-mao');
     var souVez = _g.vez === _uid && !_g.pedidoTruco && !_g.vencedorMao && !_g.vencedorPartida;
 
+    // Um toque = joga. O "escondida" virou um toggle na barra de ações
+    // (ver _criarBarraAcoes): confirmar carta a carta com dois botões era
+    // um toque a mais em TODA jogada só pra atender o caso raro.
     minhaMao.forEach(function (cod) {
-      var opts = { manilha: _ehManilha(cod, _g.manilha) };
-      var el = _cartaEl(cod, opts);
+      var el = _cartaEl(cod, { manilha: _ehManilha(cod, _g.manilha) });
       if (souVez) {
         el.classList.add(_cls('carta-jogavel'));
-        if (_cartaSelecionada === cod) el.classList.add(_cls('carta-selecionada'));
+        if (_modoEscondida) el.classList.add(_cls('carta-vai-escondida'));
         el.addEventListener('click', function () {
-          _cartaSelecionada = (_cartaSelecionada === cod) ? null : cod;
-          _render();
+          var escondida = _modoEscondida;
+          _modoEscondida = false; // volta pro normal depois de usar
+          _empurrarAcao('jogarCarta', { carta: cod, escondida: escondida });
         });
       }
       mao.appendChild(el);
     });
     wrap.appendChild(mao);
 
-    if (souVez && _cartaSelecionada) {
-      var confirmar = _elx('div', 'confirmar-jogada');
-      var btnJogar = _elx('button', 'btn-jogar', { type: 'button', texto: 'Jogar' });
-      btnJogar.addEventListener('click', function () {
-        _empurrarAcao('jogarCarta', { carta: _cartaSelecionada, escondida: false });
-        _cartaSelecionada = null;
-      });
-      var btnEsconder = _elx('button', 'btn-jogar-escondida', { type: 'button', texto: 'Jogar escondida' });
-      btnEsconder.addEventListener('click', function () {
-        _empurrarAcao('jogarCarta', { carta: _cartaSelecionada, escondida: true });
-        _cartaSelecionada = null;
-      });
-      confirmar.appendChild(btnJogar); confirmar.appendChild(btnEsconder);
-      wrap.appendChild(confirmar);
-    } else {
-      wrap.appendChild(_elx('p', 'turno-info', {
-        texto: _g.vencedorPartida ? '' : _g.vencedorMao ? '' : _g.pedidoTruco ? '' :
-          (souVez ? 'Sua vez — escolha uma carta' : 'Vez de ' + _nomeDoUid(_g.vez))
-      }));
-    }
+    wrap.appendChild(_elx('p', 'turno-info', {
+      texto: _g.vencedorPartida ? '' : _g.vencedorMao ? '' : _g.pedidoTruco ? '' : _g.vazaEmExibicao ? '' :
+        (souVez ? (_modoEscondida ? 'Toque numa carta pra jogar ESCONDIDA' : 'Sua vez — toque na carta pra jogar')
+                : 'Vez de ' + _nomeDoUid(_g.vez))
+    }));
     return wrap;
   }
 
   function _criarBarraAcoes(meuTime) {
     var barra = _elx('div', 'barra-acoes');
-    if (_g.vencedorPartida || _g.vencedorMao || _g.pedidoTruco) return barra; // nada a pedir agora
+    if (_g.vencedorPartida || _g.vencedorMao || _g.pedidoTruco || _g.vazaEmExibicao) return barra; // nada a pedir agora
 
     if (_meuTeamPode(_g)) {
       var proximo = _proximoValorAposta(_g.apostaAtual);
@@ -791,6 +826,17 @@
       var btn = _elx('button', 'btn-truco', { type: 'button', texto: rotulo });
       btn.addEventListener('click', function () { _empurrarAcao('pedirAumento', {}); });
       barra.appendChild(btn);
+    }
+
+    // Toggle da carta virada: fica ligado até a próxima jogada (ou até
+    // desligarem na mão), em vez de perguntar a cada carta.
+    var souVez = _g.vez === _uid && !_g.pedidoTruco && !_g.vencedorMao && !_g.vencedorPartida && !_g.vazaEmExibicao;
+    if (souVez) {
+      var btnEsc = _elx('button', 'btn-escondida' + (_modoEscondida ? ' btn-escondida-ativo' : ''), {
+        type: 'button', texto: _modoEscondida ? '🙈 Escondida: ON' : '🙈 Jogar escondida'
+      });
+      btnEsc.addEventListener('click', function () { _modoEscondida = !_modoEscondida; _render(); });
+      barra.appendChild(btnEsc);
     }
     return barra;
   }

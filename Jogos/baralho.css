@@ -60,10 +60,14 @@
   margin: -4px 0;
 }
 
+/* Tela curta entre "Jogar vs Coruja" e a mesa (ver _comecarSoloDireto). */
+#baralho-root .brl-preparando { text-align: center; align-items: center; }
+
 /* ---------- escolha de modo ---------- */
 
 #baralho-root .brl-escolha,
 #baralho-root .brl-criar-entrar,
+#baralho-root .brl-preparando,
 #baralho-root .brl-lobby {
   display: flex;
   flex-direction: column;

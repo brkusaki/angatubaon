@@ -336,12 +336,13 @@
   // Anfitrião: começa a partida (o motor do modo faz o "deal" inicial —
   // ver iniciarPartida em truco.js, chamado depois que status vira 'jogando').
   function iniciarPartida() {
-    if (!_souAnfitriao || !_salaRef || !_sala) return;
+    if (!_souAnfitriao || !_salaRef || !_sala) return null;
     var def = _MODOS[_sala.modo];
-    if (!def) return;
+    if (!def) return null;
     var jogadores = Object.keys(_sala.jogadores || {});
-    if (jogadores.length !== _sala.maxJogadores || jogadores.length < def.min) return;
-    _salaRef.update({ status: 'jogando' }).catch(function () {});
+    if (jogadores.length !== _sala.maxJogadores || jogadores.length < def.min) return null;
+    var pJogando = _salaRef.update({ status: 'jogando' });
+    pJogando.catch(function () {});
     if (_sala.publica && _codigo) {
       var db = _db();
       if (db) {
@@ -350,6 +351,7 @@
         refPublica.remove().catch(function () {});
       }
     }
+    return pJogando;
   }
 
   // Anfitrião: volta o status pra 'lobby' (fim de partida / cancelamento)
@@ -461,6 +463,7 @@
   var _tela = 'escolha'; // escolha | criar | lobby | jogo
   var _modoEscolhido = null;
   var _pararListaPublicas = null;
+  var _timerSolo = null; // rede de segurança do "solo começa direto" (ver _comecarSoloDireto)
 
   function _cls(nome) { return 'brl-' + nome; }
   function _q(sel) { return _raiz ? _raiz.querySelector(sel) : null; }
@@ -502,6 +505,7 @@
     _limpar(_raiz);
     if (_tela === 'escolha') _renderEscolha();
     else if (_tela === 'criar') _renderCriarEntrar();
+    else if (_tela === 'preparando') _renderPreparando();
     else if (_tela === 'lobby') _renderLobby();
   }
 
@@ -576,6 +580,7 @@
         seletor.querySelectorAll('.' + _cls('chip-num')).forEach(function (b) { b.classList.remove(_cls('chip-ativo')); });
         btn.classList.add(_cls('chip-ativo'));
         _ajustarPublicaParaN(n);
+        _ajustarRotuloCriar(n);
       });
       seletor.appendChild(btn);
     });
@@ -584,10 +589,20 @@
     blocoCriar.appendChild(checkPublica);
 
     var btnCriar = _el('button', 'btn-primario', { type: 'button', texto: 'Criar sala' });
+    function _ajustarRotuloCriar(n) {
+      // No solo não existe "sala" pra ninguém entrar — o botão é o próprio
+      // "começar a jogar".
+      btnCriar.textContent = n === 1 ? 'Jogar vs Coruja 🦉' : 'Criar sala';
+    }
+    _ajustarRotuloCriar(escolhido.v);
     btnCriar.addEventListener('click', function () {
       btnCriar.disabled = true; mostrarErro('');
-      criarSala(_modoEscolhido, inputPublica.checked, escolhido.v).then(function () {
+      var solo = escolhido.v === 1;
+      criarSala(_modoEscolhido, solo ? false : inputPublica.checked, escolhido.v).then(function () {
         if (_pararListaPublicas) { _pararListaPublicas(); _pararListaPublicas = null; }
+        // Solo pula o lobby inteiro: código de sala, "estou pronto" e
+        // "começar partida" não fazem sentido com um jogador só.
+        if (solo) { _comecarSoloDireto(); return; }
         _tela = 'lobby'; _renderizar();
       }).catch(function (err) {
         btnCriar.disabled = false;
@@ -656,6 +671,34 @@
       });
     });
 
+    _raiz.appendChild(wrap);
+  }
+
+  // Solo: sala criada -> já manda começar -> a mesa entra sozinha pelo
+  // salaMudou (status 'jogando'). O lobby (código, pronto, começar) só
+  // aparece se algo der errado no caminho — com um jogador só ele não
+  // tem função nenhuma.
+  function _comecarSoloDireto() {
+    _tela = 'preparando';
+    _renderizar();
+    function cair(msg) {
+      if (_tela !== 'preparando') return; // já entrou na mesa, ignora
+      _flash(msg);
+      _tela = 'lobby'; _renderizar();
+    }
+    var p = iniciarPartida();
+    if (!p) { cair('Não consegui começar a partida.'); return; }
+    p.catch(function () { cair('Não consegui começar a partida.'); });
+    // Rede de segurança: se o status não virar 'jogando' (write aceito mas
+    // sem eco, por exemplo), não deixa a pessoa presa no "Preparando…".
+    clearTimeout(_timerSolo);
+    _timerSolo = setTimeout(function () { cair('Demorou demais pra começar. Tente pelo lobby.'); }, 8000);
+  }
+
+  function _renderPreparando() {
+    var wrap = _el('div', 'preparando');
+    wrap.appendChild(_el('h2', 'titulo', { texto: 'Preparando a mesa…' }));
+    wrap.appendChild(_el('p', 'subtitulo', { texto: 'Embaralhando contra a Coruja 🦉' }));
     _raiz.appendChild(wrap);
   }
 
@@ -740,6 +783,7 @@
   }
 
   function _entrarNaTelaDeJogo(sala) {
+    clearTimeout(_timerSolo);
     // O motor (ex.: truco.min.js) pode ainda não ter chegado — acontece
     // com um convidado que entrou na sala direto por código, sem passar
     // pela tela de escolha (que é quem normalmente dispara o preload).
@@ -797,6 +841,7 @@
   }
 
   function parar() {
+    clearTimeout(_timerSolo);
     if (_motorAtivo && _motorAtivo.api.parar) { try { _motorAtivo.api.parar(); } catch (e) {} }
     _motorAtivo = null;
     _cbMotorSala = null;

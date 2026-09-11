@@ -30,6 +30,17 @@
    e publica _g inteiro em "game" a cada mudança. Ver
    claude/database.rules.json (nó "salasBaralho").
 
+   ARMADILHA DO RTDB: ARRAY VAZIO NÃO EXISTE
+   O Firebase não guarda lista nem objeto vazio — ele apaga a chave. Um
+   "cartasNaMesa: []" salvo pelo anfitrião NÃO volta como [] no eco do
+   'value': volta como undefined. Por isso duas coisas:
+     1. o anfitrião NUNCA adota o eco (a cópia local _g é a boa — ele já
+        mexeu nela antes de salvar); só quem não hospeda lê do "game";
+     2. todo estado que vem do RTDB passa por _normalizarGame(), que
+        recria as listas que sumiram.
+   Sem isso, o PRIMEIRO render de qualquer partida estourava em
+   "cartasNaMesa.forEach" e a mesa ficava em branco — em todos os modos.
+
    REGRAS IMPLEMENTADAS (Truco Paulista)
    - Baralho limpo de 40 cartas (sem 8/9/10), manilha = carta seguinte
      à virada na ordem 4-5-6-7-Q-J-K-A-2-3 (cíclica).
@@ -235,6 +246,22 @@
     return !gameAtual.pedidoTruco && gameAtual.apostaAtual < 12 && gameAtual.ultimoTimeAumentou !== _time();
   }
 
+  // O RTDB NÃO guarda array vazio nem objeto vazio: um "cartasNaMesa: []"
+  // salvo pelo anfitrião simplesmente não existe quando o estado volta do
+  // Firebase — e volta como undefined, não como []. Sem isto, o primeiro
+  // render de qualquer partida estourava em "cartasNaMesa.forEach" e a mesa
+  // ficava em branco. Vale pra todo campo de lista do "game".
+  function _normalizarGame(g) {
+    if (!g) return null;
+    g.cartasNaMesa = g.cartasNaMesa || [];
+    g.vazasResultados = g.vazasResultados || [];
+    g.descarte = g.descarte || [];
+    g.historico = g.historico || [];
+    g.maos = g.maos || {};
+    g.pontuacao = g.pontuacao || { A: 0, B: 0 };
+    return g;
+  }
+
   // "jogadores" completo pra fins de jogo: os reais da sala (RTDB) + o bot
   // do assento 1, se for modo solo. É o que _prepararNovaMao/_avaliarVaza/
   // _render etc. devem usar sempre que precisam "ver a mesa inteira" — o
@@ -295,7 +322,7 @@
 
   function _iniciarComoAnfitriao() {
     var jogadores = _jogadoresEfetivos();
-    if (_sala.game) { _g = _sala.game; _ouvirAcoes(); _talvezAgirComoBot(); return; }
+    if (_sala.game) { _g = _normalizarGame(_sala.game); _ouvirAcoes(); _talvezAgirComoBot(); return; }
     _g = _prepararNovaMao(_novoJogoInicial(), jogadores);
     _salvarGame();
     _ouvirAcoes();
@@ -545,7 +572,12 @@
 
     ctx.onSala(function (sala) {
       _sala = sala;
-      _g = sala.game || _g;
+      // O anfitrião é dono do estado: a cópia local (_g) é sempre a boa e
+      // já está atualizada antes mesmo de salvar. Adotar o eco do RTDB
+      // (como era feito antes) só trazia de volta um estado mutilado pelo
+      // Firebase — arrays vazios somem — e derrubava o render. Quem não
+      // hospeda só tem o eco, então normaliza o que chegou.
+      if (!_souAnfitriao) _g = _normalizarGame(sala.game) || _g;
       if (_g && !_g.timeDaMao && _g.vez) _g.timeDaMao = _timeDoUid(_g.vez, _jogadoresEfetivos());
       _checarJogadoresAusentes(sala);
       _render();
@@ -669,7 +701,7 @@
 
     // ---- mesa (cartas jogadas nesta vaza) ----
     var centroMesa = _elx('div', 'centro-mesa');
-    _g.cartasNaMesa.forEach(function (e) {
+    (_g.cartasNaMesa || []).forEach(function (e) {
       var pos = _posicaoRelativa(meuSeat, jogadores[e.uid] ? jogadores[e.uid].seat : meuSeat);
       var slot = _elx('div', 'slot-mesa trc-pos-' + pos);
       slot.appendChild(_cartaEl(e.carta, { virada: e.escondida && e.uid !== _uid }));

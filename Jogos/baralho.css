@@ -1,0 +1,331 @@
+/* ══════════════════════════════════════════════════════════════
+   JOGOS DE BARALHO — estilos do hub/lobby (prefixo brl-)
+   Injetado sob demanda pelo _jogoLoader ao abrir o card "Jogos de
+   Baralho". Escopado em #baralho-root — nenhuma regra vaza pro
+   resto do app. Usa os tokens de tema já existentes em styles.css
+   (--surface/--surface2/--border/--text/--muted/--font-h) pra
+   herdar claro/escuro automaticamente, com dourado como cor de
+   destaque própria do módulo (mesma linguagem das manilhas do
+   Truco — ver truco.css).
+   ══════════════════════════════════════════════════════════════ */
+
+#baralho-root {
+  --brl-dourado: #d9a441;
+  --brl-dourado-forte: #f0c26a;
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  box-sizing: border-box;
+  color: var(--text);
+  overflow-y: auto;
+}
+
+#baralho-root * { box-sizing: border-box; }
+
+#baralho-root .brl-titulo {
+  margin: 0;
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 1.3rem;
+  color: var(--brl-dourado-forte);
+  text-align: center;
+}
+
+#baralho-root .brl-subtitulo {
+  margin: -8px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+#baralho-root .brl-link-voltar {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--muted);
+  text-decoration: underline;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+#baralho-root .brl-erro {
+  color: var(--red, #ff4444);
+  font-size: 0.85rem;
+  text-align: center;
+  margin: -4px 0;
+}
+
+/* ---------- escolha de modo ---------- */
+
+#baralho-root .brl-escolha,
+#baralho-root .brl-criar-entrar,
+#baralho-root .brl-lobby {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+#baralho-root .brl-lista-modos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+#baralho-root .brl-card-modo,
+#baralho-root .brl-card-modo-em-breve {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px 12px;
+  border-radius: 16px;
+  background: var(--surface2, var(--surface));
+  border: 1px solid var(--border);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  min-height: 96px;
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#baralho-root .brl-card-modo:active { transform: scale(0.97); }
+
+#baralho-root .brl-card-modo-em-breve { opacity: 0.5; cursor: default; }
+
+#baralho-root .brl-card-modo-nome { font-family: var(--font-h); font-weight: 700; font-size: 1.05rem; }
+#baralho-root .brl-card-modo-jogadores { font-size: 0.82rem; color: var(--muted); }
+
+/* ---------- blocos criar / entrar ---------- */
+
+#baralho-root .brl-bloco {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#baralho-root .brl-bloco-titulo {
+  margin: 0;
+  font-family: var(--font-h);
+  font-size: 1rem;
+  color: var(--brl-dourado);
+}
+
+#baralho-root .brl-seletor-jogadores { display: flex; gap: 8px; flex-wrap: wrap; }
+
+#baralho-root .brl-chip-num {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface2, var(--surface));
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+
+#baralho-root .brl-chip-ativo {
+  background: linear-gradient(135deg, var(--brl-dourado-forte), var(--brl-dourado));
+  border-color: transparent;
+  color: #241a08;
+  font-weight: 700;
+}
+
+#baralho-root .brl-check-publica {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+#baralho-root .brl-linha-codigo { display: flex; gap: 8px; }
+
+#baralho-root .brl-campo-codigo {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface2, var(--surface));
+  color: var(--text);
+  font-family: var(--font-h);
+  font-size: 1.1rem;
+  letter-spacing: 0.25em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+#baralho-root .brl-lista-publicas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+#baralho-root .brl-linha-publica {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface2, var(--surface));
+}
+
+#baralho-root .brl-linha-publica-nome { font-weight: 600; }
+#baralho-root .brl-linha-publica-info { color: var(--muted); font-size: 0.85rem; }
+
+#baralho-root .brl-vazio {
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-align: center;
+  margin: 4px 0;
+}
+
+/* ---------- lobby ---------- */
+
+#baralho-root .brl-caixa-codigo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px dashed var(--brl-dourado);
+  border-radius: 16px;
+}
+
+#baralho-root .brl-caixa-codigo-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+#baralho-root .brl-caixa-codigo-valor {
+  font-family: var(--font-h);
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: var(--brl-dourado-forte);
+}
+
+#baralho-root .brl-btn-copiar {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2, var(--surface));
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+#baralho-root .brl-lista-jogadores { display: flex; flex-direction: column; gap: 8px; }
+
+#baralho-root .brl-linha-jogador {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+#baralho-root .brl-linha-jogador-anfitriao { border-color: var(--brl-dourado); }
+#baralho-root .brl-linha-jogador-vazia { opacity: 0.45; }
+#baralho-root .brl-linha-jogador-nome { font-weight: 600; }
+
+#baralho-root .brl-chip-pronto,
+#baralho-root .brl-chip-esperando {
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+#baralho-root .brl-chip-pronto { background: var(--green, #00d084); color: #06281c; }
+#baralho-root .brl-chip-esperando { background: var(--surface2, var(--surface)); color: var(--muted); }
+
+/* ---------- botões genéricos ---------- */
+
+#baralho-root .brl-btn-primario,
+#baralho-root .brl-btn-secundario {
+  padding: 13px 18px;
+  border-radius: 12px;
+  font-family: var(--font-h);
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  border: none;
+  min-height: 46px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#baralho-root .brl-btn-primario {
+  background: linear-gradient(135deg, var(--brl-dourado-forte), var(--brl-dourado));
+  color: #241a08;
+}
+#baralho-root .brl-btn-primario:active { transform: scale(0.97); }
+
+#baralho-root .brl-btn-desabilitado { opacity: 0.4; cursor: not-allowed; }
+
+#baralho-root .brl-btn-secundario {
+  background: var(--surface2, var(--surface));
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+#baralho-root .brl-palco-jogo { width: 100%; height: 100%; flex: 1; min-height: 0; }
+
+#baralho-root .brl-carregando-modo {
+  margin: auto;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* ---------- flash de mensagem ---------- */
+
+#baralho-root .brl-flash {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translate(-50%, 12px);
+  background: var(--surface2, var(--surface));
+  border: 1px solid var(--brl-dourado);
+  color: var(--text);
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 60;
+  max-width: 90vw;
+  text-align: center;
+}
+
+#baralho-root .brl-flash-visivel { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- responsivo ---------- */
+
+@media (max-width: 400px) {
+  #baralho-root { padding: 12px; gap: 12px; }
+  #baralho-root .brl-caixa-codigo-valor { font-size: 1.3rem; letter-spacing: 0.14em; }
+}

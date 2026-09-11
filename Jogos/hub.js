@@ -895,6 +895,10 @@
     // das telas próprias do Party) não avisava o Firebase — a sala
     // ficava fantasma na lista pública. Ver PartyGame.parar em party.js.
     if (window.PartyGame     && typeof window.PartyGame.parar     === 'function') window.PartyGame.parar();
+    // Jogos de Baralho: mesmo motivo do Coruja Party acima — sem isto, sair
+    // pelo botão genérico não avisava o Firebase e a sala ficava fantasma
+    // na lista pública. Ver BaralhoGame.parar em baralho.js.
+    if (window.BaralhoGame   && typeof window.BaralhoGame.parar   === 'function') window.BaralhoGame.parar();
   }
 
   /* -- Roteador de jogos: menu <-> tela de cada jogo -- */
@@ -1009,7 +1013,15 @@
     // MESMO aparelho (passa-o-celular). Não usa AngatubaMP (não é 1x1 em
     // rede) nem ranking: não existe pontuação individual, o placar é a
     // própria partida. Monta tudo em #negocios-root — ver Jogos/negocios.js.
-    negocios: { js: '/Jogos/negocios.min.js', css: '/Jogos/negocios.css', global: 'NegociosGame' }
+    negocios: { js: '/Jogos/negocios.min.js', css: '/Jogos/negocios.css', global: 'NegociosGame' },
+    // Jogos de Baralho: hub + sistema de salas (Firebase RTDB), no mesmo
+    // espírito do Coruja Party mas com estado jogada a jogada validado
+    // pelo anfitrião — ver Jogos/baralho.js. Truco Paulista é o primeiro
+    // modo; NÃO tem tela nem card próprios (mesmo esquema do Puff/
+    // Ervilhas dentro do party.js) — baralho.js carrega ele sob demanda
+    // via window._jogoLoader('truco') assim que o hub de baralho abre.
+    baralho: { js: '/Jogos/baralho.min.js', css: '/Jogos/baralho.css', global: 'BaralhoGame' },
+    truco: { js: '/Jogos/truco.min.js', css: '/Jogos/truco.css', global: 'TrucoGame' }
   };
   var _jogosCarregados = {};   // nome -> true quando js+css já injetados
 

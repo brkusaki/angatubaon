@@ -1,0 +1,389 @@
+/* ══════════════════════════════════════════════════════════════
+   TRUCO PAULISTA — mesa (prefixo trc-)
+   Escopado em .trc-mesa (raiz desenhada dentro de #baralho-root >
+   .brl-palco-jogo pelo próprio truco.js). Tema de feltro escuro com
+   dourado nas manilhas — usa os tokens de styles.css onde faz
+   sentido (--text/--muted/--font-h) pro texto continuar legível nos
+   dois temas do app, mas o fundo da mesa é sempre escuro (feltro),
+   igual mesa de baralho de verdade, mesmo no tema claro do app.
+   ══════════════════════════════════════════════════════════════ */
+
+.trc-mesa {
+  --trc-feltro: #0b3d24;
+  --trc-feltro-2: #0f4d2d;
+  --trc-dourado: #d9a441;
+  --trc-dourado-forte: #f4cd77;
+  --trc-vermelho: #e14b3f;
+  --trc-preto: #1a1a1a;
+  --trc-carta-bg: #fbf6ea;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+  box-sizing: border-box;
+  background:
+    radial-gradient(ellipse at 50% 38%, var(--trc-feltro-2), var(--trc-feltro) 72%);
+  color: #f2ece0;
+  font-family: var(--font-b, inherit);
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.trc-mesa * { box-sizing: border-box; }
+
+.trc-carregando {
+  margin: auto;
+  color: #f2ece0;
+  font-size: 0.95rem;
+}
+
+/* ---------- placar ---------- */
+
+.trc-placar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.28);
+  flex-shrink: 0;
+}
+
+.trc-placar-time {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 64px;
+}
+
+.trc-placar-meu .trc-placar-numero { color: var(--trc-dourado-forte); }
+
+.trc-placar-numero {
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: #f2ece0;
+}
+
+.trc-placar-nomes {
+  font-size: 0.68rem;
+  color: #cfc6b6;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.trc-placar-centro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.trc-placar-aposta {
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--trc-dourado-forte);
+  padding: 2px 10px;
+  border: 1px solid var(--trc-dourado);
+  border-radius: 999px;
+}
+
+.trc-placar-mao { font-size: 0.68rem; color: #cfc6b6; }
+
+/* ---------- vira / manilha ---------- */
+
+.trc-vira-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 10px;
+  flex-shrink: 0;
+}
+
+.trc-vira-label { font-size: 0.7rem; color: #cfc6b6; text-transform: uppercase; letter-spacing: 0.06em; }
+.trc-vira-manilha { font-size: 0.7rem; color: var(--trc-dourado-forte); }
+
+/* ---------- outros jogadores ---------- */
+
+.trc-outros {
+  position: relative;
+  flex: 1;
+  min-height: 90px;
+}
+
+.trc-jogador-chip {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.trc-pos-norte { top: 4px; left: 50%; transform: translateX(-50%); }
+.trc-pos-leste { top: 50%; right: 4px; transform: translateY(-50%); }
+.trc-pos-oeste { top: 50%; left: 4px; transform: translateY(-50%); }
+
+.trc-jogador-nome {
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #f2ece0;
+}
+
+.trc-jogador-vez .trc-jogador-nome {
+  background: var(--trc-dourado);
+  color: #241a08;
+  box-shadow: 0 0 10px rgba(217, 164, 65, 0.65);
+}
+
+.trc-mini-mao { display: flex; gap: 3px; }
+
+/* ---------- cartas ---------- */
+
+.trc-carta {
+  width: 52px;
+  height: 76px;
+  border-radius: 7px;
+  background: var(--trc-carta-bg);
+  color: var(--trc-preto);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 3px 5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+  position: relative;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.trc-carta-pequena { width: 38px; height: 55px; padding: 2px 4px; }
+
+.trc-carta-vermelha { color: var(--trc-vermelho); }
+.trc-carta-preta { color: var(--trc-preto); }
+
+.trc-carta-valor { font-family: var(--font-h); font-weight: 800; font-size: 0.85rem; line-height: 1; }
+.trc-carta-valor-baixo { align-self: flex-end; transform: rotate(180deg); }
+.trc-carta-naipe-grande {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.4rem;
+  opacity: 0.9;
+}
+
+.trc-carta-manilha {
+  box-shadow: 0 0 0 2px var(--trc-dourado), 0 0 12px rgba(217, 164, 65, 0.75);
+}
+.trc-carta-manilha .trc-carta-naipe-grande { text-shadow: 0 0 6px rgba(217, 164, 65, 0.8); }
+
+.trc-carta-verso {
+  background: linear-gradient(135deg, #123a2a, #0a2418);
+  border: 2px solid var(--trc-dourado);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.trc-carta-verso-coruja { font-size: 1.2rem; opacity: 0.85; }
+
+.trc-carta-jogavel { cursor: pointer; transition: transform 0.12s ease; }
+.trc-carta-jogavel:active { transform: translateY(-4px); }
+.trc-carta-selecionada { transform: translateY(-14px); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5), 0 0 0 3px var(--trc-dourado-forte); }
+
+/* ---------- mesa (cartas jogadas) ---------- */
+
+.trc-centro-mesa {
+  position: relative;
+  height: 110px;
+  flex-shrink: 0;
+}
+
+.trc-slot-mesa {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+.trc-slot-mesa.trc-pos-norte { transform: translate(-50%, -140%); }
+.trc-slot-mesa.trc-pos-sul { transform: translate(-50%, 40%); }
+.trc-slot-mesa.trc-pos-leste { transform: translate(60%, -50%); }
+.trc-slot-mesa.trc-pos-oeste { transform: translate(-160%, -50%); }
+
+/* ---------- minha mão ---------- */
+
+.trc-minha-mao-wrap {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 6px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.trc-minha-mao { display: flex; gap: 10px; justify-content: center; }
+
+.trc-turno-info { font-size: 0.82rem; color: #e7dfcf; min-height: 1.1em; margin: 0; }
+
+.trc-confirmar-jogada { display: flex; gap: 10px; }
+
+.trc-btn-jogar,
+.trc-btn-jogar-escondida {
+  font-family: var(--font-h);
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  min-height: 40px;
+}
+.trc-btn-jogar { background: linear-gradient(135deg, var(--trc-dourado-forte), var(--trc-dourado)); color: #241a08; }
+.trc-btn-jogar-escondida { background: rgba(255, 255, 255, 0.1); color: #f2ece0; border: 1px solid rgba(255, 255, 255, 0.3); }
+
+/* ---------- barra de ações (truco/aumentar) ---------- */
+
+.trc-barra-acoes {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  padding: 8px 10px 14px;
+  min-height: 8px;
+}
+
+.trc-btn-truco {
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 1rem;
+  padding: 13px 30px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, var(--trc-vermelho), #b5302a);
+  box-shadow: 0 4px 14px rgba(225, 75, 63, 0.4);
+  min-width: 160px;
+}
+.trc-btn-truco:active { transform: scale(0.96); }
+
+.trc-btn-sair-partida {
+  align-self: center;
+  margin: 4px 0 10px;
+  background: none;
+  border: none;
+  color: #cfc6b6;
+  text-decoration: underline;
+  font-size: 0.78rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ---------- overlays (pedido / fim de mão / fim de partida) ---------- */
+
+.trc-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 20, 12, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  padding: 16px;
+}
+
+.trc-overlay-caixa {
+  background: var(--trc-feltro-2);
+  border: 1px solid var(--trc-dourado);
+  border-radius: 16px;
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 320px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.trc-overlay-titulo {
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--trc-dourado-forte);
+  margin: 0;
+}
+
+.trc-overlay-titulo-grande {
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: var(--trc-dourado-forte);
+  margin: 0;
+}
+
+.trc-overlay-texto { font-size: 0.85rem; color: #e7dfcf; margin: 0; }
+
+.trc-overlay-acoes { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+
+.trc-btn-aceitar,
+.trc-btn-correr,
+.trc-btn-aumentar {
+  font-family: var(--font-h);
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  min-height: 42px;
+}
+.trc-btn-aceitar { background: #00d084; color: #06281c; }
+.trc-btn-correr { background: rgba(255, 255, 255, 0.12); color: #f2ece0; border: 1px solid rgba(255, 255, 255, 0.3); }
+.trc-btn-aumentar { background: linear-gradient(135deg, var(--trc-dourado-forte), var(--trc-dourado)); color: #241a08; }
+
+/* ---------- flash de mensagem ---------- */
+
+.trc-flash {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  transform: translate(-50%, -12px);
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid var(--trc-dourado);
+  color: #f2ece0;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 30;
+  max-width: 88%;
+  text-align: center;
+}
+.trc-flash-visivel { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- responsivo ---------- */
+
+@media (max-width: 400px) {
+  .trc-carta { width: 44px; height: 64px; }
+  .trc-carta-pequena { width: 32px; height: 46px; }
+  .trc-minha-mao { gap: 6px; }
+  .trc-btn-truco { min-width: 130px; padding: 12px 22px; }
+}
+
+@media (min-width: 700px) {
+  .trc-mesa { min-height: 640px; }
+  .trc-carta { width: 64px; height: 92px; }
+  .trc-carta-naipe-grande { font-size: 1.7rem; }
+}

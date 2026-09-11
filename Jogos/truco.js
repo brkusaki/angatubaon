@@ -53,6 +53,20 @@
      comum de implementar o blefe da carta escondida sem exigir botar
      e tirar peso da rodada em tempo real.
 
+   MODO SOLO (1 jogador vs. Coruja) — seção 3.5 abaixo
+   Sala com maxJogadores=1 na sala/lobby (ver Jogos/baralho.js) tem só
+   UM jogador de verdade no RTDB. Pra mesa funcionar (dupla de
+   times A/B) o anfitrião — que aqui é sempre o próprio jogador
+   solo — preenche o assento 1 com um bot LOCAL ("Coruja"): o bot
+   NUNCA é escrito em salasBaralho/{codigo}/jogadores (não é um
+   jogador real pro RTDB/regras de segurança), ele só existe dentro
+   da cópia local do estado do anfitrião e é injetado via
+   _jogadoresEfetivos() sempre que o resto do código precisa "ver"
+   todos os assentos da mesa. O bot processa a própria jogada
+   chamando _processarAcao() diretamente (mesma função que trata as
+   ações vindas da fila "acoes" de um jogador humano) — do ponto de
+   vista das regras do jogo, é só mais um uid.
+
    PENDÊNCIAS CONHECIDAS
    1. "Mão de 11" (regra especial quando um time está com 11 pontos)
       não implementada — fica pra uma rodada futura se fizer falta.
@@ -69,6 +83,15 @@
       própria, podendo voltar a pedir depois. Trocar pra esse
       comportamento exigiria rastrear "última vez que a vez avançou
       sem pedido", que não valia a complexidade extra nesta rodada.
+   5. Bot do modo solo (v1) é simples de propósito: na vez dele joga a
+      carta mais fraca que mata a maior carta da mesa (ou a mais fraca
+      da mão, se nenhuma mata ou se ele abre a vaza); nunca pede
+      truco sozinho, só responde a pedido do humano (aceita se seu
+      time já está ganhando a mão em vazas, senão corre em pedidos
+      altos — 9 ou 12); nunca joga carta escondida. Sem blefe, sem
+      contagem de cartas, sem covardia/agressividade configurável —
+      dá pra evoluir depois sem mudar a integração (é só trocar
+      _escolherCartaBot/_botResponderAumento).
    ══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -190,20 +213,38 @@
   var _ctx = null;          // contexto recebido de baralho.js
   var _uid = null;
   var _souAnfitriao = false;
-  var _maxJogadores = 2;
+  var _maxJogadores = 2;    // capacidade REAL da sala (salasBaralho/.../maxJogadores) — só usado em _checarJogadoresAusentes
+  var _assentos = 2;        // total de assentos da MESA (dealing/times/posição) — 2 mesmo no solo (eu + bot)
+  var _solo = false;        // maxJogadores da sala == 1 -> assento 1 é o bot "Coruja" (ver seção 3.5)
   var _off = [];            // { ref, evento, cb } — listeners próprios (acoes)
   var _g = null;             // cópia local do "game" (autoritativa só se _souAnfitriao)
   var _sala = null;          // último snapshot completo da sala
   var _timerProximaMao = null;
+  var _timerBot = null;
   var _cartaSelecionada = null; // código da carta selecionada na mão local, aguardando confirmação
   var _root = null;          // container da mesa (ctx.container)
   var _flashTimer = null;
+
+  var _BOT_UID = '_bot_coruja';
+  var _NOME_BOT = 'Coruja 🦉';
 
   function _time() { return _sala && _uid ? _timeDoUid(_uid, _sala.jogadores || {}) : null; }
   function _meuTeamPode(gameAtual) {
     // pode pedir aumento se ninguém pediu ainda e não foi o próprio time
     // que fez a última aposta aceita (não dá pra "re-truco" sozinho).
     return !gameAtual.pedidoTruco && gameAtual.apostaAtual < 12 && gameAtual.ultimoTimeAumentou !== _time();
+  }
+
+  // "jogadores" completo pra fins de jogo: os reais da sala (RTDB) + o bot
+  // do assento 1, se for modo solo. É o que _prepararNovaMao/_avaliarVaza/
+  // _render etc. devem usar sempre que precisam "ver a mesa inteira" — o
+  // bot nunca existe em _sala.jogadores (ver seção 3.5 no cabeçalho).
+  function _jogadoresEfetivos() {
+    var jogadores = {};
+    var base = (_sala && _sala.jogadores) || {};
+    Object.keys(base).forEach(function (uid) { jogadores[uid] = base[uid]; });
+    if (_solo) jogadores[_BOT_UID] = { nome: _NOME_BOT, seat: 1, pronto: true, bot: true };
+    return jogadores;
   }
 
   /* ═══════════════ 3. ANFITRIÃO: DEAL E PROCESSAMENTO DE AÇÕES ═══════════════ */
@@ -217,12 +258,12 @@
     var baralho = _embaralhar(_criarBaralho());
     var maos = {};
     var ordemAssentos = [];
-    for (var s = 0; s < _maxJogadores; s++) ordemAssentos.push(_uidDoAssento(jogadores, s));
+    for (var s = 0; s < _assentos; s++) ordemAssentos.push(_uidDoAssento(jogadores, s));
 
     // 3 cartas por jogador, na ordem dos assentos a partir de quem é "mão".
-    var seatMao = base.maoAtual % _maxJogadores;
+    var seatMao = base.maoAtual % _assentos;
     var ordemDeal = [];
-    for (var k = 0; k < _maxJogadores; k++) ordemDeal.push(ordemAssentos[(seatMao + k) % _maxJogadores]);
+    for (var k = 0; k < _assentos; k++) ordemDeal.push(ordemAssentos[(seatMao + k) % _assentos]);
     ordemDeal.forEach(function (uid) { maos[uid] = []; });
     for (var rodada = 0; rodada < 3; rodada++) {
       ordemDeal.forEach(function (uid) { maos[uid].push(baralho.pop()); });
@@ -253,8 +294,8 @@
   }
 
   function _iniciarComoAnfitriao() {
-    var jogadores = _sala.jogadores || {};
-    if (_sala.game) { _g = _sala.game; _ouvirAcoes(); return; }
+    var jogadores = _jogadoresEfetivos();
+    if (_sala.game) { _g = _sala.game; _ouvirAcoes(); _talvezAgirComoBot(); return; }
     _g = _prepararNovaMao(_novoJogoInicial(), jogadores);
     _salvarGame();
     _ouvirAcoes();
@@ -263,6 +304,7 @@
   function _salvarGame() {
     if (!_souAnfitriao || !_ctx.salaRef) return;
     _ctx.salaRef.child('game').set(_g).catch(function () {});
+    _talvezAgirComoBot();
   }
 
   function _ouvirAcoes() {
@@ -277,17 +319,20 @@
     _off.push({ ref: ref, evento: 'child_added', cb: handler });
   }
 
-  function _proximoAssentoVivo(seatAtual) { return (seatAtual + 1) % _maxJogadores; }
+  function _proximoAssentoVivo(seatAtual) { return (seatAtual + 1) % _assentos; }
 
   function _processarAcao(acao) {
     if (!_g || !_sala) return;
-    var jogadores = _sala.jogadores || {};
-    if (_g.vencedorPartida) return; // partida já acabou, ignora qualquer ação atrasada
+    var jogadores = _jogadoresEfetivos();
+    // "revanche" só é enviada DEPOIS que vencedorPartida já está setado
+    // (é a própria condição que mostra o botão) — por isso trata ela ANTES
+    // do "return" de partida encerrada, senão nunca seria processada.
+    if (acao.tipo === 'revanche') { _acaoRevanche(acao, jogadores); return; }
+    if (_g.vencedorPartida) return; // partida já acabou, ignora qualquer outra ação atrasada
 
     if (acao.tipo === 'jogarCarta') _acaoJogarCarta(acao, jogadores);
     else if (acao.tipo === 'pedirAumento') _acaoPedirAumento(acao, jogadores);
     else if (acao.tipo === 'responderAumento') _acaoResponderAumento(acao, jogadores);
-    else if (acao.tipo === 'revanche') _acaoRevanche(acao, jogadores);
   }
 
   function _acaoJogarCarta(acao, jogadores) {
@@ -346,7 +391,7 @@
     _cancelarAgendamentos();
     _timerProximaMao = setTimeout(function () {
       if (!_souAnfitriao || !_g || _g.vencedorPartida) return;
-      var jogadores = (_sala && _sala.jogadores) || {};
+      var jogadores = _jogadoresEfetivos();
       var base = { pontuacao: _g.pontuacao, maoAtual: _g.maoAtual + 1, vencedorPartida: null, historico: _g.historico };
       _g = _prepararNovaMao(base, jogadores);
       _salvarGame();
@@ -399,6 +444,70 @@
     _salvarGame();
   }
 
+  /* ═══════════════ 3.5. MODO SOLO: BOT LOCAL "CORUJA" (só anfitrião) ═══
+     Chamado a partir de _salvarGame() — todo lugar que muda _g e persiste
+     já passa por ali, então é o único ponto que precisa "acordar" o bot.
+     O bot só REAGE (joga carta na vez dele, ou responde a um pedido de
+     aumento do time do humano); nunca pede truco por conta própria (ver
+     pendência 5 no cabeçalho). Usa _processarAcao() com um uid sintético
+     — pro resto das regras, o bot é só mais um jogador. */
+
+  function _talvezAgirComoBot() {
+    if (!_solo || !_souAnfitriao || !_g || _g.vencedorPartida || _g.vencedorMao) { clearTimeout(_timerBot); return; }
+    var timeBot = _timeDoUid(_BOT_UID, _jogadoresEfetivos());
+    clearTimeout(_timerBot);
+    if (_g.pedidoTruco && _g.pedidoTruco.time !== timeBot) {
+      _timerBot = setTimeout(_botResponderAumento, 900); // pedido é do time do humano — bot responde
+    } else if (!_g.pedidoTruco && _g.vez === _BOT_UID) {
+      _timerBot = setTimeout(_botJogarCarta, 900);
+    }
+  }
+
+  function _cartaMaisFraca(lista) {
+    var melhor = lista[0], melhorPoder = _poder(melhor, _g.manilha);
+    lista.forEach(function (c) {
+      var p = _poder(c, _g.manilha);
+      if (p < melhorPoder) { melhor = c; melhorPoder = p; }
+    });
+    return melhor;
+  }
+
+  // Se existe carta na mão do bot que mata a maior carta visível da mesa,
+  // joga a MAIS FRACA dessas (economiza as boas); senão joga a mais fraca
+  // da mão inteira (também cobre o caso de o bot abrir a vaza — não há
+  // "carta da mesa" pra matar, cai direto nesse fallback).
+  function _escolherCartaBot(mao) {
+    var visiveis = (_g.cartasNaMesa || []).filter(function (e) { return !e.escondida; });
+    if (!visiveis.length) return _cartaMaisFraca(mao);
+    var maxPoderMesa = -1;
+    visiveis.forEach(function (e) { var p = _poder(e.carta, _g.manilha); if (p > maxPoderMesa) maxPoderMesa = p; });
+    var mata = mao.filter(function (c) { return _poder(c, _g.manilha) > maxPoderMesa; });
+    return mata.length ? _cartaMaisFraca(mata) : _cartaMaisFraca(mao);
+  }
+
+  function _botJogarCarta() {
+    if (!_solo || !_g || _g.vez !== _BOT_UID || _g.pedidoTruco || _g.vencedorMao || _g.vencedorPartida) return;
+    var mao = (_g.maos && _g.maos[_BOT_UID]) || [];
+    if (!mao.length) return;
+    _processarAcao({ uid: _BOT_UID, tipo: 'jogarCarta', payload: { carta: _escolherCartaBot(mao), escondida: false } });
+  }
+
+  // Regra simples (v1): aceita se o time do bot já está ganhando a mão em
+  // vazas fechadas; senão corre só em pedidos altos (9 ou 12) — pedidos
+  // baixos (6) o bot aceita mesmo sem estar ganhando, pra não fugir logo
+  // de cara. Ver pendência 5 no cabeçalho.
+  function _botResponderAumento() {
+    if (!_solo || !_g || !_g.pedidoTruco) return;
+    var timeBot = _timeDoUid(_BOT_UID, _jogadoresEfetivos());
+    if (!timeBot || _g.pedidoTruco.time === timeBot) return; // pedido não é do time adversário do bot
+    var vazasBot = (_g.vazasResultados || []).filter(function (v) { return v === timeBot; }).length;
+    var vazasHumano = (_g.vazasResultados || []).filter(function (v) { return v && v !== timeBot; }).length;
+    var ganhando = vazasBot > vazasHumano;
+    var pedidoAlto = _g.pedidoTruco.valor >= 9;
+    var resposta = (!ganhando && pedidoAlto) ? 'correr' : 'aceitar';
+    _processarAcao({ uid: _BOT_UID, tipo: 'responderAumento', payload: { resposta: resposta } });
+  }
+
   /* ═══════════════ 4. QUALQUER CLIENTE: EMPURRAR AÇÕES ═══════════════ */
 
   function _empurrarAcao(tipo, payload) {
@@ -428,6 +537,8 @@
     _root = ctx.container;
     _sala = ctx.salaSnapshot();
     _maxJogadores = (_sala && _sala.maxJogadores) || 2;
+    _solo = _maxJogadores === 1;
+    _assentos = _solo ? 2 : _maxJogadores; // mesa efetiva: eu + bot no solo
     _cartaSelecionada = null;
 
     if (_souAnfitriao) _iniciarComoAnfitriao();
@@ -435,7 +546,7 @@
     ctx.onSala(function (sala) {
       _sala = sala;
       _g = sala.game || _g;
-      if (_g && !_g.timeDaMao && _g.vez && sala.jogadores) _g.timeDaMao = _timeDoUid(_g.vez, sala.jogadores);
+      if (_g && !_g.timeDaMao && _g.vez) _g.timeDaMao = _timeDoUid(_g.vez, _jogadoresEfetivos());
       _checarJogadoresAusentes(sala);
       _render();
     });
@@ -449,11 +560,12 @@
     _cancelarAgendamentos();
     if (_root) { while (_root.firstChild) _root.removeChild(_root.firstChild); }
     _ctx = null; _uid = null; _souAnfitriao = false; _g = null; _sala = null;
-    _cartaSelecionada = null; _root = null;
+    _cartaSelecionada = null; _root = null; _solo = false; _assentos = 2;
   }
 
   function _cancelarAgendamentos() {
     if (_timerProximaMao) { clearTimeout(_timerProximaMao); _timerProximaMao = null; }
+    if (_timerBot) { clearTimeout(_timerBot); _timerBot = null; }
   }
 
   /* ═══════════════ 7. UI: MESA DO TRUCO (prefixo trc-) ═══════════════ */
@@ -479,6 +591,7 @@
   }
 
   function _nomeDoUid(uid) {
+    if (_solo && uid === _BOT_UID) return _NOME_BOT;
     var j = _sala && _sala.jogadores && _sala.jogadores[uid];
     return j ? j.nome : '...';
   }
@@ -504,8 +617,8 @@
   // Layout relativo: sul = eu, norte = à minha frente (parceiro se 4
   // jogadores, único adversário se 2), leste/oeste = os outros dois (4).
   function _posicaoRelativa(meuSeat, seatAlvo) {
-    var diff = (seatAlvo - meuSeat + _maxJogadores) % _maxJogadores;
-    if (_maxJogadores === 2) return diff === 0 ? 'sul' : 'norte';
+    var diff = (seatAlvo - meuSeat + _assentos) % _assentos;
+    if (_assentos === 2) return diff === 0 ? 'sul' : 'norte';
     return ['sul', 'leste', 'norte', 'oeste'][diff] || 'norte';
   }
 
@@ -514,7 +627,7 @@
     while (_root.firstChild) _root.removeChild(_root.firstChild);
     if (!_g) { _root.appendChild(_elx('div', 'carregando', { texto: 'Preparando a mesa…' })); return; }
 
-    var jogadores = _sala.jogadores || {};
+    var jogadores = _jogadoresEfetivos();
     var meuSeat = (jogadores[_uid] && jogadores[_uid].seat) || 0;
     var meuTime = _time();
 
@@ -679,8 +792,9 @@
   function _criarOverlayFimMao() {
     var ov = _elx('div', 'overlay');
     var caixa = _elx('div', 'overlay-caixa');
-    var nomeTime = Object.keys(_sala.jogadores || {}).filter(function (uid) { return _timeDoUid(uid, _sala.jogadores) === _g.vencedorMao; })
-      .map(function (uid) { return _sala.jogadores[uid].nome; }).join(' & ');
+    var jogadoresEf = _jogadoresEfetivos();
+    var nomeTime = Object.keys(jogadoresEf).filter(function (uid) { return _timeDoUid(uid, jogadoresEf) === _g.vencedorMao; })
+      .map(function (uid) { return _nomeDoUid(uid); }).join(' & ');
     caixa.appendChild(_elx('h3', 'overlay-titulo', { texto: (nomeTime || ('Time ' + _g.vencedorMao)) + ' venceu a mão! +' + _g.pontosUltimaMao }));
     caixa.appendChild(_elx('p', 'overlay-texto', { texto: 'Preparando a próxima mão…' }));
     ov.appendChild(caixa);
@@ -690,8 +804,9 @@
   function _criarOverlayFimPartida() {
     var ov = _elx('div', 'overlay');
     var caixa = _elx('div', 'overlay-caixa');
-    var nomeTime = Object.keys(_sala.jogadores || {}).filter(function (uid) { return _timeDoUid(uid, _sala.jogadores) === _g.vencedorPartida; })
-      .map(function (uid) { return _sala.jogadores[uid].nome; }).join(' & ');
+    var jogadoresEf = _jogadoresEfetivos();
+    var nomeTime = Object.keys(jogadoresEf).filter(function (uid) { return _timeDoUid(uid, jogadoresEf) === _g.vencedorPartida; })
+      .map(function (uid) { return _nomeDoUid(uid); }).join(' & ');
     caixa.appendChild(_elx('h3', 'overlay-titulo-grande', { texto: '🏆 ' + (nomeTime || ('Time ' + _g.vencedorPartida)) + ' venceu!' }));
     caixa.appendChild(_elx('p', 'overlay-texto', { texto: _g.pontuacao.A + ' x ' + _g.pontuacao.B }));
     var acoes = _elx('div', 'overlay-acoes');
@@ -716,7 +831,7 @@
 
   if (window.AngatubaBaralho) {
     window.AngatubaBaralho.registrarModo('truco', {
-      nome: 'Truco Paulista', min: 2, max: 4,
+      nome: 'Truco Paulista', min: 1, max: 4, opcoesJogadores: [1, 2, 4],
       iniciar: iniciar, parar: parar
     });
   }

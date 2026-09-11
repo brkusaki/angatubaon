@@ -63,8 +63,12 @@
   // dentro de party.js) e é buscado sob demanda com window._jogoLoader.
   // Novo jogo de baralho (ex.: Uno) = uma linha aqui + o arquivo dele
   // chamando registrarModo(). Ver o resumo de integração entregue.
+  // opcoesJogadores: valores de maxJogadores realmente jogáveis (Truco não
+  // roda com 3) — quando presente, é o que a UI usa pros seletores em vez
+  // do intervalo [min, max]. 1 jogador = modo solo (o motor cria bot(s)
+  // locais pra preencher a mesa; ver truco.js).
   var _CATALOGO = {
-    truco: { nome: 'Truco Paulista', min: 2, max: 4 }
+    truco: { nome: 'Truco Paulista', min: 1, max: 4, opcoesJogadores: [1, 2, 4] }
   };
   var _promessasModos = {}; // chave -> Promise do _jogoLoader (evita pedir 2x)
 
@@ -201,8 +205,7 @@
           }).catch(function () {});
           refPublica.onDisconnect().remove();
         }
-        _observarSala();
-        return codigo;
+        return _observarSala().then(function () { return codigo; });
       });
     });
   }
@@ -239,8 +242,7 @@
         }).then(function () {
           _codigo = codigo; _salaRef = ref; _souAnfitriao = (sala.anfitriao && sala.anfitriao.uid === eu.uid);
           if (!_souAnfitriao) ref.child('jogadores/' + eu.uid).onDisconnect().remove();
-          _observarSala();
-          return codigo;
+          return _observarSala().then(function () { return codigo; });
         });
       });
     });
@@ -284,16 +286,31 @@
     return function () { cancelado = true; desligar(); };
   }
 
-  /* ── Observação contínua da sala ─────────────────────────────── */
+  /* ── Observação contínua da sala ─────────────────────────────────
+     Retorna uma Promise que só resolve depois do PRIMEIRO snapshot —
+     é o que garante que criarSala()/entrarSala() só levam a UI pro
+     lobby quando estado() já tem o que _renderLobby() precisa (ver
+     bug da tela preta: antes disso, a Promise resolvia antes do
+     primeiro 'value' chegar do RTDB e a tela virava lobby com _sala
+     ainda null). O listener continua vivo depois, normalmente. */
   function _observarSala() {
-    if (!_salaRef) return;
+    if (!_salaRef) return Promise.resolve();
+    var jaResolveu = false;
+    var resolverPrimeiro;
+    var primeiro = new Promise(function (resolve) { resolverPrimeiro = resolve; });
     _escutar(_salaRef, 'value', function (snap) {
       var sala = snap.val();
-      if (!sala) { _emit('salaFechada'); _limparTudo(); return; }
+      if (!sala) {
+        _emit('salaFechada'); _limparTudo();
+        if (!jaResolveu) { jaResolveu = true; resolverPrimeiro(); }
+        return;
+      }
       _sala = sala; _sala._codigo = _codigo;
       _atualizarEspelhoPublico();
       _emit('salaMudou', sala);
+      if (!jaResolveu) { jaResolveu = true; resolverPrimeiro(); }
     });
+    return primeiro;
   }
 
   function _atualizarEspelhoPublico() {
@@ -451,6 +468,7 @@
   function _escHTML(s) {
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
+  function _rotuloJogadores(n) { return n === 1 ? 'Sozinho (vs. Coruja)' : (n + ' jogadores'); }
   function _el(tag, classes, attrs) {
     var e = document.createElement(tag);
     if (classes) (Array.isArray(classes) ? classes : classes.split(' ')).forEach(function (c) { e.classList.add(_cls(c)); });
@@ -532,26 +550,37 @@
     // ---- criar sala ----
     var blocoCriar = _el('div', 'bloco');
     blocoCriar.appendChild(_el('h3', 'bloco-titulo', { texto: 'Criar sala' }));
-    var opcoes = def.max > def.min ? [def.min, def.max] : [def.min];
+    var opcoes = def.opcoesJogadores || (def.max > def.min ? [def.min, def.max] : [def.min]);
     var escolhido = { v: opcoes[0] };
     var seletor = _el('div', 'seletor-jogadores');
-    opcoes.forEach(function (n) {
-      var btn = _el('button', 'chip-num', { type: 'button', texto: n + ' jogadores' });
-      if (n === escolhido.v) btn.classList.add(_cls('chip-ativo'));
-      btn.addEventListener('click', function () {
-        escolhido.v = n;
-        seletor.querySelectorAll('.' + _cls('chip-num')).forEach(function (b) { b.classList.remove(_cls('chip-ativo')); });
-        btn.classList.add(_cls('chip-ativo'));
-      });
-      seletor.appendChild(btn);
-    });
-    blocoCriar.appendChild(seletor);
 
     var checkPublica = _el('label', 'check-publica');
     var inputPublica = document.createElement('input');
     inputPublica.type = 'checkbox'; inputPublica.checked = true;
     checkPublica.appendChild(inputPublica);
     checkPublica.appendChild(document.createTextNode(' Sala pública (aparece na lista)'));
+    // Sala solo (1 jogador) já nasce cheia — não faz sentido listar
+    // publicamente algo que ninguém consegue entrar.
+    function _ajustarPublicaParaN(n) {
+      checkPublica.style.display = n === 1 ? 'none' : '';
+      if (n === 1) inputPublica.checked = false;
+      else if (!checkPublica.dataset.tocado) inputPublica.checked = true;
+    }
+    inputPublica.addEventListener('change', function () { checkPublica.dataset.tocado = '1'; });
+
+    opcoes.forEach(function (n) {
+      var btn = _el('button', 'chip-num', { type: 'button', texto: _rotuloJogadores(n) });
+      if (n === escolhido.v) btn.classList.add(_cls('chip-ativo'));
+      btn.addEventListener('click', function () {
+        escolhido.v = n;
+        seletor.querySelectorAll('.' + _cls('chip-num')).forEach(function (b) { b.classList.remove(_cls('chip-ativo')); });
+        btn.classList.add(_cls('chip-ativo'));
+        _ajustarPublicaParaN(n);
+      });
+      seletor.appendChild(btn);
+    });
+    blocoCriar.appendChild(seletor);
+    _ajustarPublicaParaN(escolhido.v);
     blocoCriar.appendChild(checkPublica);
 
     var btnCriar = _el('button', 'btn-primario', { type: 'button', texto: 'Criar sala' });
@@ -632,11 +661,21 @@
 
   function _renderLobby() {
     var sala = estado();
-    if (!sala) return;
+    if (!sala) {
+      // Defensivo: com criarSala()/entrarSala() só resolvendo depois do
+      // primeiro snapshot (ver _observarSala), isto não devia mais
+      // acontecer — mas se acontecer, mostra loading em vez de ficar
+      // com a tela preta (raiz já veio limpa de _renderizar()).
+      _raiz.appendChild(_el('div', 'carregando-modo', { texto: 'Entrando na sala…' }));
+      return;
+    }
     var def = modos()[sala.modo] || { nome: sala.modo, min: 2, max: sala.maxJogadores };
 
     var wrap = _el('div', 'lobby');
     wrap.appendChild(_el('h2', 'titulo', { texto: def.nome }));
+    if (sala.maxJogadores === 1) {
+      wrap.appendChild(_el('p', 'subtitulo', { texto: 'Modo solo — você joga contra a Coruja 🦉' }));
+    }
 
     var caixaCodigo = _el('div', 'caixa-codigo');
     caixaCodigo.appendChild(_el('span', 'caixa-codigo-label', { texto: 'Código da sala' }));
@@ -668,8 +707,8 @@
 
     if (souAnfitriao() && def.max > def.min) {
       var seletor = _el('div', 'seletor-jogadores');
-      [def.min, def.max].forEach(function (n) {
-        var btn = _el('button', 'chip-num', { type: 'button', texto: n + ' jogadores' });
+      (def.opcoesJogadores || [def.min, def.max]).forEach(function (n) {
+        var btn = _el('button', 'chip-num', { type: 'button', texto: _rotuloJogadores(n) });
         if (n === sala.maxJogadores) btn.classList.add(_cls('chip-ativo'));
         btn.addEventListener('click', function () {
           if (uids.length > n) { _flash('Já tem gente demais na sala pra esse tamanho.'); return; }

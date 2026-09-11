@@ -69,7 +69,14 @@
   flex-direction: column;
   gap: 14px;
   max-width: 480px;
-  margin: 0 auto;
+  /* margin:auto nos 4 lados (não só esquerda/direita) centraliza
+     também no eixo vertical dentro do #baralho-root (flex column) —
+     MAS sem o problema clássico do justify-content:center: margens
+     auto colapsam pra 0 quando o conteúdo não cabe, então uma tela
+     alta (ex.: lista grande de salas públicas) nunca esconde o topo
+     atrás do overflow simétrico — ela some sozinha e o scroll natural
+     do #baralho-root mostra o conteúdo inteiro a partir do topo. */
+  margin: auto;
   width: 100%;
 }
 

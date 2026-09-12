@@ -100,6 +100,21 @@
      declaração.
    - Os bots declaram UNO em ~80% das vezes: dá pra pegar a Coruja.
 
+   FASES DE ABERTURA DA RODADA (game.fase)
+   Uma mão que já nasce pronta na tela não parece dada — parece que o app
+   decidiu sozinho. Por isso toda rodada abre em três fases, escritas no
+   estado pelo anfitrião como qualquer outra mudança:
+     'embaralhando' (~1s)  -> monte tremendo, ninguém tem carta na mesa;
+     'distribuindo' (~1,2s)-> as cartas entram uma a uma na mão e nos
+                              oponentes, e o descarte ainda está virado;
+     'jogando'             -> primeira carta na mesa e a vez liberada.
+   As cartas JÁ estão distribuídas no estado desde o primeiro instante: a
+   fase controla só o que a mesa mostra. Isso é de propósito — a abertura
+   não depende de o RTDB entregar nada em ordem nenhuma, e quem entra no
+   meio dela (ou reabre o app) cai na fase certa. Enquanto a fase não é
+   'jogando', _processarAcao recusa toda ação de jogo e os bots não agem,
+   então não dá pra "jogar por cima" da animação.
+
    VITÓRIA
    - Ganha quem esvazia a mão. O placar acumulado de rodadas fica em
      game.placar e aparece no fim; o anfitrião decide "Nova rodada" ou
@@ -123,7 +138,10 @@
      2 cartas ou menos; fora disso descarta o número mais alto.
    - Responde stack se tiver +2/+4 compatível; senão compra a dívida.
    - Escolhe a cor do coringa pela cor mais comum na mão.
-   - Pausa de 1,2–2,0s em toda ação (_pausaBot).
+   - Ritmo: ~2,2–2,9s pra jogar carta e ~2,0–2,6s pra responder cor/stack
+     (ver MS_BOT_CARTA/MS_BOT_RESPOSTA/MS_BOT_ENTRE). A v1 usava 1,2–2,0s e
+     ficava atropelado: em mesa de 4 o humano jogava e levava três
+     respostas quase juntas, sem tempo de ver o que cada uma foi.
 
    PENDÊNCIAS CONHECIDAS
    1. Sem "desafio" do +4 (ver acima) e sem regra de 7/0 (troca de
@@ -259,19 +277,35 @@
   var _timerBot = null;
   var _timerPegar = null;    // janela do "PEGAR!" (anfitrião)
   var _timerBotPegar = null; // bot decidindo se pega alguém
+  var _timerFase = null;     // abertura da rodada: embaralhando -> distribuindo -> jogando
   var _timerBalao = null;
+  var _timerEvento = null;   // re-render que apaga o aviso de "fulano jogou"
   var _flashTimer = null;
   var _painelReacoes = false;
   var _baloes = {};          // uid -> { texto, expiraEm } (só local)
   var _reacoesVistas = {};   // uid -> última seq exibida
   var _cooldownReacao = {};  // uid -> timestamp (só no anfitrião)
   var _fraseVez = { chave: '', texto: '' };
+  var _eventoVisto = 0;      // seq do último game.ultimoEvento já animado (só local)
+  var _eventoEm = 0;         // quando ele entrou em cena (Date.now)
 
   var MS_BALAO = 2400;
   var MS_COOLDOWN_REACAO = 3500;
   var MS_PEGAR = 5000;       // janela pra pegar quem esqueceu o UNO
-  var MS_BOT_BASE = 1200;    // pausas do bot: 1,2s + até 0,8s
-  function _pausaBot() { return MS_BOT_BASE + Math.floor(Math.random() * 800); }
+  /* Ritmo dos bots. A v1 usava 1,2-2,0s e ficou atropelado: em mesa de 4
+     o humano jogava e levava três respostas quase juntas, sem tempo de ver
+     o que cada uma foi. Jogar carta ganhou mais folga que responder cor/
+     stack — responder é reação, jogar é decisão. */
+  var MS_BOT_CARTA = 1800;   // 1,8s + até 0,7s
+  var MS_BOT_RESPOSTA = 1600; // 1,6s + até 0,6s (escolher cor / responder stack)
+  var MS_BOT_ENTRE = 350;    // respiro mínimo entre um bot e o seguinte
+  function _pausaBot(base, extra) { return base + MS_BOT_ENTRE + Math.floor(Math.random() * extra); }
+
+  /* Abertura da rodada (ver FASES DE ABERTURA no cabeçalho). */
+  var MS_EMBARALHANDO = 1000;
+  var MS_DISTRIBUINDO = 1250;
+  var MS_ENTRADA_CARTA = 420;  // quanto tempo a carta nova fica "chegando" no descarte
+  var MS_AVISO_JOGADA = 1100;  // quanto tempo o "Fulano jogou" fica acima do descarte
 
   var QTD_BOTS_SOLO = 3;     // mesa solo = 1 humano + 3 bots (ver cabeçalho)
   var NOMES_BOT = ['Coruja 🦉', 'Corujão 🦉', 'Corujinha 🦉'];
@@ -330,6 +364,10 @@
     g.stackTipo = g.stackTipo || null;
     g.sentido = g.sentido || 1;
     g.monteQtd = g.monteQtd || 0;
+    // Partida começada antes desta versão não tem "fase": trata como mesa
+    // já aberta, senão ela travaria em "Embaralhando…" sem ninguém pra
+    // avançar a fase.
+    g.fase = g.fase || 'jogando';
     return g;
   }
 
@@ -385,6 +423,11 @@
     g.vencedorPartida = null;
     g.ultimoEvento = null;
     g.eventoSeq = 0;
+    // A mão JÁ está distribuída aqui, mas a mesa ainda não mostra nada:
+    // quem revela é a fase (ver _agendarAbertura e FASES DE ABERTURA no
+    // cabeçalho). Estado e apresentação separados de propósito — assim a
+    // abertura não depende de o RTDB entregar nada em ordem nenhuma.
+    g.fase = 'embaralhando';
     // Quem abre gira a cada rodada, pra não ser sempre o anfitrião.
     g.vez = ordem[(base.rodadaAtual || 0) % ordem.length];
     return g;
@@ -397,12 +440,35 @@
       _reconstruirMonte();
       _ouvirAcoes();
       if (_g.pegavel) _agendarFecharPegavel();
+      // Retomou no meio da abertura: reagenda daquela fase em diante, senão
+      // a mesa ficaria presa em "Embaralhando…" pra sempre.
+      if (_g.fase && _g.fase !== 'jogando') _agendarAbertura(_g.fase);
       _talvezAgirComoBot();
       return;
     }
     _g = _prepararNovaRodada(_novoJogoInicial(jogadores), jogadores);
     _salvarGame();
+    _agendarAbertura('embaralhando');
     _ouvirAcoes();
+  }
+
+  /* Abertura da rodada, só no anfitrião: 'embaralhando' -> 'distribuindo'
+     -> 'jogando', cada passo publicado no "game" como qualquer outra
+     mudança de estado. Enquanto a fase não é 'jogando', _processarAcao
+     recusa tudo e os bots não agem — então a animação não é só enfeite,
+     é um estado de jogo de verdade e não dá pra "jogar por cima" dela. */
+  function _agendarAbertura(deFase) {
+    if (!_souAnfitriao) return;
+    clearTimeout(_timerFase);
+    var proxima = deFase === 'distribuindo' ? 'jogando' : 'distribuindo';
+    var espera = deFase === 'distribuindo' ? MS_DISTRIBUINDO : MS_EMBARALHANDO;
+    _timerFase = setTimeout(function () {
+      _timerFase = null;
+      if (!_g || !_souAnfitriao) return;
+      _g.fase = proxima;
+      _salvarGame();
+      if (proxima !== 'jogando') _agendarAbertura(proxima);
+    }, espera);
   }
 
   /* Retomada do anfitrião: o monte nunca foi pro RTDB (ver cabeçalho),
@@ -453,6 +519,10 @@
     if (acao.tipo === 'revanche') { _acaoRevanche(jogadores); return; }
     if (acao.tipo === 'reacao') { _acaoReacao(acao, jogadores); return; }
     if (_g.vencedorPartida) return;
+    // Abertura em curso: a mesa ainda está embaralhando/distribuindo, então
+    // nada de jogo passa (nem ação atrasada de quem clicou antes da fase
+    // virar). Reação e revanche já saíram acima.
+    if (_g.fase && _g.fase !== 'jogando') return;
 
     if (acao.tipo === 'uno') { _acaoUno(acao); return; }
     if (acao.tipo === 'pegar') { _acaoPegar(acao, jogadores); return; }
@@ -681,6 +751,7 @@
     };
     _g = _prepararNovaRodada(base, jogadores);
     _salvarGame();
+    _agendarAbertura('embaralhando'); // a rodada nova também embaralha na frente de todo mundo
   }
 
   /* ---------- reações ---------- */
@@ -720,6 +791,7 @@
     clearTimeout(_timerBot);
     clearTimeout(_timerBotPegar);
     if (!_solo || !_souAnfitriao || !_g || _g.vencedorPartida) return;
+    if (_g.fase && _g.fase !== 'jogando') return; // mesa ainda abrindo
 
     // Alguém esqueceu o UNO: um bot pode pegar (se não for outro bot —
     // bot pegando bot é invisível pra quem joga e só atrasa a mesa).
@@ -733,11 +805,17 @@
     }
 
     if (_g.escolhaCor && _ehBot(_g.escolhaCor.uid)) {
-      _timerBot = setTimeout(_botEscolherCor, _pausaBot());
+      _timerBot = setTimeout(_botEscolherCor, _pausaBot(MS_BOT_RESPOSTA, 600));
       return;
     }
     if (_g.escolhaCor) return; // cor é do humano: espera
-    if (_ehBot(_g.vez)) _timerBot = setTimeout(_botAgir, _pausaBot());
+    if (_ehBot(_g.vez)) {
+      // Responder um stack é reação (mais rápido); jogar carta é decisão.
+      var respondendo = _g.stack > 0;
+      _timerBot = setTimeout(_botAgir, respondendo
+        ? _pausaBot(MS_BOT_RESPOSTA, 600)
+        : _pausaBot(MS_BOT_CARTA, 700));
+    }
   }
 
   function _escolherBotCaçador() {
@@ -881,6 +959,7 @@
     _painelReacoes = false;
     _baloes = {}; _reacoesVistas = {}; _cooldownReacao = {};
     _fraseVez = { chave: '', texto: '' };
+    _eventoVisto = 0; _eventoEm = 0;
 
     if (_souAnfitriao) _iniciarComoAnfitriao();
 
@@ -903,11 +982,13 @@
     _off = [];
     _cancelarAgendamentos();
     if (_timerBalao) { clearTimeout(_timerBalao); _timerBalao = null; }
+    if (_timerEvento) { clearTimeout(_timerEvento); _timerEvento = null; }
     if (_root) { while (_root.firstChild) _root.removeChild(_root.firstChild); }
     _ctx = null; _uid = null; _souAnfitriao = false; _g = null; _sala = null;
     _monte = []; _root = null; _solo = false; _assentos = 2;
     _painelReacoes = false; _baloes = {}; _reacoesVistas = {}; _cooldownReacao = {};
     _fraseVez = { chave: '', texto: '' };
+    _eventoVisto = 0; _eventoEm = 0;
   }
 
   // NÃO mexe no _timerBalao: esta função roda no meio da partida e
@@ -917,6 +998,7 @@
     if (_timerBot) { clearTimeout(_timerBot); _timerBot = null; }
     if (_timerBotPegar) { clearTimeout(_timerBotPegar); _timerBotPegar = null; }
     if (_timerPegar) { clearTimeout(_timerPegar); _timerPegar = null; }
+    if (_timerFase) { clearTimeout(_timerFase); _timerFase = null; }
   }
 
   /* ═══════════════ 7. UI: MESA DO UNO (prefixo uno-) ═══════════════
@@ -967,6 +1049,13 @@
   function _cartaEl(cod, opcoes) {
     opcoes = opcoes || {};
     var el = _elx('div', 'carta' + (opcoes.pequena ? ' carta-pequena' : ''));
+    // "dando" é o índice da carta na distribuição: vira um atraso crescente
+    // na MESMA animação, o que dá o efeito de o monte servir carta por
+    // carta sem precisar de um sprite voando por cima da mesa.
+    if (typeof opcoes.dando === 'number' && opcoes.dando >= 0) {
+      el.classList.add(_cls('carta-dando'));
+      el.style.animationDelay = (opcoes.dando * 90) + 'ms';
+    }
     if (opcoes.verso) {
       el.classList.add(_cls('carta-verso'));
       el.appendChild(_elx('span', 'carta-verso-marca', { texto: '🦉' }));
@@ -1023,6 +1112,26 @@
     return _elx('div', 'balao', { texto: b.texto });
   }
 
+  /* ---------- eventos de mesa (a carta não pode teletransportar) ----------
+     game.ultimoEvento carrega { tipo, uid, seq }. O cliente guarda a seq já
+     vista e a HORA em que ela apareceu: enquanto a janela não expira, o
+     render marca a carta nova do descarte como "chegando" e mostra "Fulano
+     jogou" acima dela. Guardar a hora local (em vez de ligar a animação a
+     "mudou a seq") é o que faz a animação sobreviver aos re-renders que
+     acontecem no meio dela — um balão expirando redesenha a mesa e, sem
+     isso, a carta congelava no meio do caminho. */
+  function _verEvento() {
+    var ev = _g && _g.ultimoEvento;
+    if (!ev || !ev.seq || _eventoVisto === ev.seq) return;
+    _eventoVisto = ev.seq;
+    _eventoEm = Date.now();
+    clearTimeout(_timerEvento);
+    _timerEvento = setTimeout(function () { _timerEvento = null; _render(); }, MS_AVISO_JOGADA + 40);
+  }
+  function _eventoRecente(ms) {
+    return !!(_g && _g.ultimoEvento && _g.ultimoEvento.seq === _eventoVisto && (Date.now() - _eventoEm) < ms);
+  }
+
   /* ---------- render ---------- */
 
   function _render() {
@@ -1030,14 +1139,18 @@
     while (_root.firstChild) _root.removeChild(_root.firstChild);
     if (!_g) { _root.appendChild(_elx('div', 'carregando', { texto: 'Embaralhando…' })); return; }
 
+    _verEvento();
     var jogadores = _jogadoresEfetivos();
     var ordem = _ordemAssentos(jogadores);
-    var travado = !!(_g.vencedorPartida || (_g.escolhaCor && _g.escolhaCor.uid !== _uid));
+    var fase = _g.fase || 'jogando';
+    var abrindo = fase !== 'jogando';
+    var travado = !!(_g.vencedorPartida || abrindo || (_g.escolhaCor && _g.escolhaCor.uid !== _uid));
     var souVez = _g.vez === _uid && !travado && !_g.escolhaCor;
     var minhaMao = (_g.maos && _g.maos[_uid]) || [];
 
     var mesa = _elx('div', 'mesa');
-    if (_g.corAtual) mesa.classList.add(_cls('mesa-cor-' + _g.corAtual));
+    if (_g.corAtual && !abrindo) mesa.classList.add(_cls('mesa-cor-' + _g.corAtual));
+    if (abrindo) mesa.classList.add(_cls('mesa-abrindo'));
 
     // ---- barra de status: sentido, cor da vez, rodada ----
     var topo = _elx('div', 'topo');
@@ -1045,7 +1158,9 @@
     sentidoEl.setAttribute('aria-label', _g.sentido === -1 ? 'Sentido anti-horário' : 'Sentido horário');
     topo.appendChild(sentidoEl);
     var corAtualEl = _elx('div', 'cor-atual');
-    if (_g.corAtual) {
+    if (abrindo) {
+      corAtualEl.appendChild(_elx('span', 'cor-atual-nome', { texto: _rotuloFase(fase) }));
+    } else if (_g.corAtual) {
       corAtualEl.appendChild(_elx('span', 'bolinha bolinha-' + _g.corAtual));
       corAtualEl.appendChild(_elx('span', 'cor-atual-nome', { texto: NOME_COR[_g.corAtual] }));
     } else {
@@ -1061,7 +1176,10 @@
     for (var k = 1; k < ordem.length; k++) outros.push(ordem[(meuIdx + k) % ordem.length]);
     var faixa = _elx('div', 'oponentes' + (outros.length > 3 ? ' oponentes-compacto' : ''));
     outros.forEach(function (uid) {
-      var qtd = ((_g.maos && _g.maos[uid]) || []).length;
+      // Durante "embaralhando" ninguém tem carta na mesa ainda; em
+      // "distribuindo" os versos entram um a um (ver _cartaEl/atraso).
+      var total = ((_g.maos && _g.maos[uid]) || []).length;
+      var qtd = fase === 'embaralhando' ? 0 : total;
       var chip = _elx('div', 'op');
       if (_g.vez === uid && !travado) chip.classList.add(_cls('op-vez'));
       if (qtd === 1) chip.classList.add(_cls('op-uno'));
@@ -1072,7 +1190,12 @@
       chip.appendChild(_elx('span', 'op-nome', { texto: jogadores[uid].nome }));
       var linhaCartas = _elx('div', 'op-cartas');
       var versos = Math.min(qtd, 5);
-      for (var i = 0; i < versos; i++) linhaCartas.appendChild(_cartaEl(null, { verso: true, pequena: true }));
+      for (var i = 0; i < versos; i++) {
+        linhaCartas.appendChild(_cartaEl(null, {
+          verso: true, pequena: true,
+          dando: fase === 'distribuindo' ? i : -1
+        }));
+      }
       linhaCartas.appendChild(_elx('span', 'op-qtd', { texto: '×' + qtd }));
       chip.appendChild(linhaCartas);
       if (qtd === 1) chip.appendChild(_elx('span', 'op-badge-uno', { texto: 'UNO' }));
@@ -1086,6 +1209,13 @@
     var monteWrap = _elx('div', 'monte-wrap');
     var monte = _cartaEl(null, { verso: true });
     monte.classList.add(_cls('monte'));
+    if (fase === 'embaralhando') monte.classList.add(_cls('monte-embaralha'));
+    // Pulso curto no monte quando alguém acabou de comprar — sem isso, a
+    // compra do adversário não tinha nenhum sinal na tela.
+    if (!abrindo && _eventoRecente(MS_ENTRADA_CARTA) && _g.ultimoEvento &&
+        (_g.ultimoEvento.tipo === 'comprou' || _g.ultimoEvento.tipo === 'comprouStack')) {
+      monte.classList.add(_cls('monte-pulso'));
+    }
     if (souVez) {
       monte.classList.add(_cls('monte-ativo'));
       monte.addEventListener('click', function () { _empurrarAcao('comprar', {}); });
@@ -1096,23 +1226,39 @@
 
     var descarteWrap = _elx('div', 'descarte-wrap');
     var cartaTopo = _topo(_g);
-    if (cartaTopo) {
-      descarteWrap.appendChild(_cartaEl(cartaTopo, {
+    // A primeira carta do descarte só é virada no fim da distribuição.
+    if (cartaTopo && !abrindo) {
+      var jogouAgora = _eventoRecente(MS_ENTRADA_CARTA) && _g.ultimoEvento && _g.ultimoEvento.tipo === 'jogou';
+      var elTopo = _cartaEl(cartaTopo, {
         corEscolhida: _ehCoringa(cartaTopo) && _g.corAtual ? _g.corAtual : null
-      }));
+      });
+      if (jogouAgora) elTopo.classList.add(_cls('carta-entra'));
+      descarteWrap.appendChild(elTopo);
+      // Aviso curto de quem jogou — dura MS_AVISO_JOGADA e some sozinho.
+      if (_eventoRecente(MS_AVISO_JOGADA) && _g.ultimoEvento && _g.ultimoEvento.uid) {
+        var ev = _g.ultimoEvento;
+        var texto = ev.tipo === 'jogou' ? _nomeDoUid(ev.uid) + ' jogou'
+          : ev.tipo === 'comprouStack' ? _nomeDoUid(ev.uid) + ' comprou ' + String(ev.texto || '').replace('+', '')
+            : ev.tipo === 'pegou' ? _nomeDoUid(ev.uid) + ': ' + (ev.texto || 'pegou!')
+              : ev.tipo === 'comprou' ? _nomeDoUid(ev.uid) + ' comprou' : '';
+        if (texto) descarteWrap.appendChild(_elx('div', 'aviso-jogada', { texto: texto }));
+      }
+    } else {
+      descarteWrap.appendChild(_elx('div', 'descarte-vazio'));
     }
     centro.appendChild(descarteWrap);
 
-    if (_g.stack > 0) {
+    if (_g.stack > 0 && !abrindo) {
       centro.appendChild(_elx('div', 'stack-aviso', { texto: '+' + _g.stack + ' pra comprar!' }));
     }
+    if (abrindo) centro.appendChild(_elx('div', 'abertura-aviso', { texto: _rotuloFase(fase) }));
     mesa.appendChild(centro);
 
     // ---- base: ações + minha mão + info do turno ----
-    mesa.appendChild(_criarBase(souVez, minhaMao, travado));
+    mesa.appendChild(_criarBase(souVez, minhaMao, fase));
 
     // ---- overlays ----
-    if (_g.escolhaCor && _g.escolhaCor.uid === _uid) mesa.appendChild(_criarOverlayCor());
+    if (_g.escolhaCor && _g.escolhaCor.uid === _uid && !abrindo) mesa.appendChild(_criarOverlayCor());
     else if (_g.vencedorPartida) mesa.appendChild(_criarOverlayFim(jogadores, ordem));
 
     // ---- reações ----
@@ -1122,23 +1268,25 @@
     _root.appendChild(mesa);
   }
 
-  function _criarBase(souVez, minhaMao, travado) {
+  function _criarBase(souVez, minhaMao, fase) {
+    var abrindo = fase !== 'jogando';
     var base = _elx('div', 'base');
 
     // Linha de ações: PEGAR! (alguém esqueceu o UNO), UNO! (eu com 1 ou 2
-    // cartas) e Passar (só depois de comprar e não querer jogar).
+    // cartas) e Passar (só depois de comprar e não querer jogar). Nenhuma
+    // aparece durante a abertura — não há jogo pra agir sobre.
     var acoes = _elx('div', 'acoes');
-    if (_g.pegavel && _g.pegavel.uid !== _uid && !_g.vencedorPartida) {
+    if (!abrindo && _g.pegavel && _g.pegavel.uid !== _uid && !_g.vencedorPartida) {
       var btnPegar = _elx('button', 'btn-pegar', { type: 'button', texto: 'PEGAR ' + _nomeDoUid(_g.pegavel.uid) + '!' });
       btnPegar.addEventListener('click', function () { _empurrarAcao('pegar', {}); });
       acoes.appendChild(btnPegar);
     }
-    if (!_g.vencedorPartida && minhaMao.length >= 1 && minhaMao.length <= 2 && !_g.unoDeclarado[_uid]) {
+    if (!abrindo && !_g.vencedorPartida && minhaMao.length >= 1 && minhaMao.length <= 2 && !_g.unoDeclarado[_uid]) {
       var btnUno = _elx('button', 'btn-uno', { type: 'button', texto: 'UNO!' });
       btnUno.addEventListener('click', function () { _empurrarAcao('uno', {}); });
       acoes.appendChild(btnUno);
     }
-    if (_g.compradaJogavel && _g.compradaJogavel.uid === _uid) {
+    if (!abrindo && _g.compradaJogavel && _g.compradaJogavel.uid === _uid) {
       var btnPassar = _elx('button', 'btn-passar', { type: 'button', texto: 'Passar a vez' });
       btnPassar.addEventListener('click', function () { _empurrarAcao('passar', {}); });
       acoes.appendChild(btnPassar);
@@ -1152,9 +1300,20 @@
     var soAComprada = !!(_g.compradaJogavel && _g.compradaJogavel.uid === _uid);
     var mao = _elx('div', 'mao' + (souVez ? ' mao-ativa' : ''));
     if (minhaMao.length > 8) mao.classList.add(_cls('mao-cheia'));
-    minhaMao.forEach(function (cod) {
+    // "embaralhando": mão vazia (as cartas ainda não foram dadas).
+    // "distribuindo": entram uma a uma, com atraso crescente.
+    // A carta recém-COMPRADA (última da mão) entra suave, pra não brotar.
+    var visiveis = fase === 'embaralhando' ? [] : minhaMao;
+    var idxComprada = -1;
+    if (!abrindo && _eventoRecente(MS_ENTRADA_CARTA) && _g.ultimoEvento &&
+        _g.ultimoEvento.uid === _uid &&
+        (_g.ultimoEvento.tipo === 'comprou' || _g.ultimoEvento.tipo === 'comprouStack' || _g.ultimoEvento.tipo === 'pegou')) {
+      idxComprada = visiveis.length - 1;
+    }
+    visiveis.forEach(function (cod, i) {
       var jogavel = souVez && _podeJogar(cod, _g) && (!soAComprada || cod === _g.compradaJogavel.carta);
-      var el = _cartaEl(cod);
+      var el = _cartaEl(cod, { dando: fase === 'distribuindo' ? i : -1 });
+      if (i === idxComprada) el.classList.add(_cls('carta-entra'));
       if (jogavel) {
         el.classList.add(_cls('carta-jogavel'));
         el.addEventListener('click', function () { _empurrarAcao('jogarCarta', { carta: cod }); });
@@ -1165,13 +1324,18 @@
     });
     base.appendChild(mao);
 
-    base.appendChild(_elx('p', 'turno-info', { texto: _textoDoTurno(souVez, minhaMao, travado) }));
+    base.appendChild(_elx('p', 'turno-info', { texto: _textoDoTurno(souVez, minhaMao, fase) }));
     return base;
+  }
+
+  function _rotuloFase(fase) {
+    return fase === 'embaralhando' ? 'Embaralhando…' : fase === 'distribuindo' ? 'Distribuindo…' : '';
   }
 
   /* A frase da vez é sorteada UMA vez por turno, não a cada render — senão
      ela trocaria sozinha a cada atualização de estado. */
-  function _textoDoTurno(souVez, minhaMao, travado) {
+  function _textoDoTurno(souVez, minhaMao, fase) {
+    if (fase !== 'jogando') return _rotuloFase(fase);
     if (_g.vencedorPartida) return '';
     if (_g.escolhaCor) {
       return _g.escolhaCor.uid === _uid ? 'Escolha a cor' : _nomeDoUid(_g.escolhaCor.uid) + ' está escolhendo a cor…';

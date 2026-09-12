@@ -6627,6 +6627,43 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-tanques .tq-hud-lado-label {
   opacity: 0.85;
 }
 
+/* ── BARALHO/TRUCO: mesa ocupando a TELA INTEIRA durante a PARTIDA ──
+   Diferente do Voo/Corrida/Piano/etc., #jogo-baralho também hospeda as
+   telas de escolha/criar/lobby de Jogos/baralho.js — essas continuam com
+   a barra "Voltar aos jogos" cheia e normal (fazem parte do fluxo, não
+   têm pressa de espaço). Só durante uma PARTIDA ativa é que a barra rouba
+   espaço da mesa; por isso o gatilho aqui não é #jogo-baralho sozinho,
+   é a classe "brl-em-jogo" que Jogos/baralho.js liga/desliga exatamente
+   enquanto o motor do jogo (truco.js) está montado (ver
+   _entrarNaTelaDeJogo/parar). Mesma receita visual das outras: a barra
+   vira um botão flutuante discreto num canto, nunca mais a faixa preta
+   larga — o gesto de voltar do Android continua funcionando pelo
+   histórico do hub (onclick="_voltarAoMenu()" no botão, inalterado). */
+body.games-fs-open #jogo-baralho.brl-em-jogo .jogo-voltar {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 8px;
+  z-index: 6;
+  margin: 0;
+  padding: 8px 10px;
+  background: rgba(9, 14, 22, 0.55);
+  border-radius: 999px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  /* Só o ícone "‹" fica visível — o texto "Voltar aos jogos" busca
+     discrição aqui (item B pede "mínimo e discreto"), não uma pílula
+     larga como as outras (lá o HUD ao lado sobra espaço; aqui a mesa
+     usa a largura toda). */
+  font-size: 0;
+  line-height: 1;
+}
+body.games-fs-open #jogo-baralho.brl-em-jogo .jogo-voltar i {
+  font-size: 15px;
+}
+/* Com a barra fora do fluxo (position:absolute), #baralho-root — único
+   filho que sobra no fluxo de .jogo-tela — passa a herdar a altura TODA
+   de 100dvh sozinho, sem precisar de nenhum ajuste extra de layout. */
+
 /* Elemento em tela cheia NATIVA (Fullscreen API): o navegador dá 100%
    da tela ao #games-hub. Garantimos preenchimento total e fundo opaco,
    independente do fallback games-fs-open. */

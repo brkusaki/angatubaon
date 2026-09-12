@@ -467,9 +467,15 @@
   to { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
 
+/* Fica no canto inferior direito, logo ACIMA da base (não mais no topo —
+   ali sobrepunha o placar do oponente, canto superior direito onde nome e
+   pontos moram). bottom:100px cai na faixa vazia entre a base (que termina
+   por volta de 96px — mesma referência que o painel já usava) e o centro
+   da mesa; a vaza não costuma ocupar essa quina (cartas ficam perto do
+   centro, não da borda). */
 .trc-btn-reacoes {
   position: absolute;
-  top: 8px;
+  bottom: 100px;
   right: 8px;
   width: 38px;
   height: 38px;
@@ -487,10 +493,12 @@
 }
 .trc-btn-reacoes-aberto { background: var(--trc-dourado); color: #241a08; border-color: transparent; }
 
+/* Abre logo ACIMA do botão agora (perto dele) — antes ficava perto da base
+   enquanto o botão ficava lá no topo, longe um do outro. */
 .trc-painel-reacoes {
   position: absolute;
   right: 8px;
-  bottom: 96px;
+  bottom: 144px;
   z-index: 22;
   display: flex;
   flex-wrap: wrap;
@@ -552,7 +560,8 @@
 
 .trc-overlay-titulo,
 .trc-overlay-titulo-grande,
-.trc-overlay-texto {
+.trc-overlay-texto,
+.trc-overlay-legenda {
   max-width: 100%;
   min-width: 0;
   overflow-wrap: break-word;
@@ -567,16 +576,30 @@
   margin: 0;
 }
 
+/* Legenda pequena acima da frase grande do pedido ("Fulano pediu") — ver
+   hierarquia nova em _criarOverlayPedido: o número já vem embutido na
+   frase grande (TRUCO!/SEIS!/NOVE!/DOZE!) e nos botões de aumento, então
+   não repetimos "pediu 3" como legenda solta. */
+.trc-overlay-legenda {
+  font-size: 0.72rem;
+  color: #cfc6b6;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+
 /* Frase grande do pedido de truco ("Truco, pilantra!", "Seis, ladrão!") —
-   é a que mais corre risco de vazar da caixa; por isso ganha padding
-   lateral próprio além do break-word herdado acima. */
+   é a que mais corre risco de vazar da caixa. line-height folgado porque
+   agora ela pode quebrar em 2 linhas com mais frequência (a legenda acima
+   tomou o lugar do "pediu N", sobrando menos altura só pra ela). */
 .trc-overlay-titulo-grande {
   font-family: var(--font-h);
   font-weight: 800;
   font-size: 1.4rem;
+  line-height: 1.3;
   color: var(--trc-dourado-forte);
   margin: 0;
-  padding: 0 4px;
+  padding: 0 6px;
 }
 
 .trc-overlay-texto { font-size: 0.85rem; color: #e7dfcf; margin: 0; }
@@ -639,6 +662,11 @@
   .trc-centro-mesa .trc-carta { width: 74px; height: 107px; }
   .trc-centro-mesa { min-height: 192px; }
   .trc-mini-mao { height: 50px; }
+  /* Tela estreita: 1.4rem de uma frase comprida ("Truco, pilantra!") some
+     em menos espaço lateral. Reduzir a fonte é mais seguro que confiar só
+     na quebra de linha — pedido explícito, mesmo o break-word já ajudando. */
+  .trc-overlay-titulo-grande { font-size: 1.2rem; }
+  .trc-overlay-caixa { padding: 18px 14px; }
 }
 
 @media (min-width: 700px) {

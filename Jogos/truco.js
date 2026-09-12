@@ -1276,10 +1276,15 @@
     var ov = _elx('div', 'overlay');
     var caixa = _elx('div', 'overlay-caixa');
     var pedeNome = _nomeDoUid(_g.pedidoTruco.de);
+    // Hierarquia nova: legenda pequena ("Fulano pediu") em cima, a frase
+    // GRANDE no meio ("Truco, pilantra!"/"Seis, ladrão!"...) carrega o
+    // valor sozinha — repetir "pediu 3" como legenda embaixo da frase era
+    // robótico e redundante (o número já está na frase e nos botões de
+    // aumento).
+    caixa.appendChild(_elx('p', 'overlay-legenda', { texto: pedeNome + ' pediu' }));
     // A frase vem do anfitrião (gravada no pedido), pra todo mundo ver a
     // MESMA — sorteio local faria cada aparelho mostrar uma coisa.
     caixa.appendChild(_elx('h3', 'overlay-titulo-grande', { texto: _g.pedidoTruco.frase || (_g.pedidoTruco.valor + '!') }));
-    caixa.appendChild(_elx('p', 'overlay-texto', { texto: pedeNome + ' pediu ' + _g.pedidoTruco.valor }));
 
     if (_g.pedidoTruco.time === meuTime) {
       caixa.appendChild(_elx('p', 'overlay-texto', { texto: 'Esperando a resposta deles…' }));

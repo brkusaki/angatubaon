@@ -1016,12 +1016,14 @@
     negocios: { js: '/Jogos/negocios.min.js', css: '/Jogos/negocios.css', global: 'NegociosGame' },
     // Jogos de Baralho: hub + sistema de salas (Firebase RTDB), no mesmo
     // espírito do Coruja Party mas com estado jogada a jogada validado
-    // pelo anfitrião — ver Jogos/baralho.js. Truco Paulista é o primeiro
-    // modo; NÃO tem tela nem card próprios (mesmo esquema do Puff/
-    // Ervilhas dentro do party.js) — baralho.js carrega ele sob demanda
-    // via window._jogoLoader('truco') assim que o hub de baralho abre.
+    // pelo anfitrião — ver Jogos/baralho.js. Truco Paulista e Uno são os
+    // modos de hoje; NENHUM tem tela nem card próprios (mesmo esquema do
+    // Puff/Ervilhas dentro do party.js) — baralho.js carrega cada um sob
+    // demanda via window._jogoLoader('truco'|'uno') assim que o hub de
+    // baralho abre.
     baralho: { js: '/Jogos/baralho.min.js', css: '/Jogos/baralho.css', global: 'BaralhoGame' },
-    truco: { js: '/Jogos/truco.min.js', css: '/Jogos/truco.css', global: 'TrucoGame' }
+    truco: { js: '/Jogos/truco.min.js', css: '/Jogos/truco.css', global: 'TrucoGame' },
+    uno: { js: '/Jogos/uno.min.js', css: '/Jogos/uno.css', global: 'UnoGame' }
   };
   var _jogosCarregados = {};   // nome -> true quando js+css já injetados
 

@@ -1,0 +1,670 @@
+/* ══════════════════════════════════════════════════════════════
+   UNO — mesa (prefixo uno-)
+   Escopado em .uno-mesa (raiz desenhada dentro de #baralho-root >
+   .brl-palco-jogo pelo próprio uno.js). Diferente do Truco, aqui NÃO
+   tem feltro verde: o Uno é noite roxo-azulada com as quatro cores
+   vibrantes por cima — é essa a identidade do jogo. Por isso o fundo
+   é sempre escuro, mesmo no tema claro do app (mesma decisão do
+   truco.css), e só o texto herda --font-h/--font-b de styles.css.
+
+   Layout, de cima pra baixo:
+     .uno-topo       sentido da mesa + cor da vez + nº da rodada
+     .uno-oponentes  chips que QUEBRAM LINHA (é o que faz 7 oponentes
+                     caberem em tela de celular sem virar sopa)
+     .uno-centro     monte (compra) + descarte + aviso de stack
+     .uno-base       ações (PEGAR!/UNO!/Passar) + minha mão + turno
+   A barra "Voltar aos jogos" some sozinha na partida — quem cuida
+   disso é o .brl-em-jogo de baralho.js/styles.css, não este arquivo.
+   ══════════════════════════════════════════════════════════════ */
+
+.uno-mesa {
+  --uno-R: #e2352b;
+  --uno-R-esc: #a5231c;
+  --uno-B: #1573d8;
+  --uno-B-esc: #0d4c92;
+  --uno-G: #1ba34c;
+  --uno-G-esc: #126e34;
+  --uno-Y: #f2b705;
+  --uno-Y-esc: #b58500;
+  --uno-fundo: #171233;
+  --uno-fundo-2: #2c2260;
+  --uno-carta-borda: #fdfaf3;
+  --uno-texto: #f3efff;
+  --uno-texto-fraco: #b9b0e0;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+  box-sizing: border-box;
+  background: radial-gradient(ellipse at 50% 40%, var(--uno-fundo-2), var(--uno-fundo) 74%);
+  color: var(--uno-texto);
+  font-family: var(--font-b, inherit);
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.uno-mesa * { box-sizing: border-box; }
+
+/* Halo sutil na cor da vez: dá a informação "a cor agora é azul" pelo
+   canto do olho, sem ocupar mais um elemento na tela. */
+.uno-mesa::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.16;
+  transition: background 0.35s ease;
+  background: radial-gradient(ellipse at 50% 45%, transparent 45%, transparent 100%);
+}
+.uno-mesa-cor-R::before { background: radial-gradient(ellipse at 50% 45%, var(--uno-R) 0%, transparent 62%); }
+.uno-mesa-cor-B::before { background: radial-gradient(ellipse at 50% 45%, var(--uno-B) 0%, transparent 62%); }
+.uno-mesa-cor-G::before { background: radial-gradient(ellipse at 50% 45%, var(--uno-G) 0%, transparent 62%); }
+.uno-mesa-cor-Y::before { background: radial-gradient(ellipse at 50% 45%, var(--uno-Y) 0%, transparent 62%); }
+
+.uno-carregando { margin: auto; color: var(--uno-texto); font-size: 0.95rem; }
+
+/* ---------- topo ---------- */
+
+.uno-topo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.28);
+  flex-shrink: 0;
+}
+
+.uno-sentido {
+  font-size: 1.3rem;
+  line-height: 1;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.uno-cor-atual { display: flex; align-items: center; gap: 7px; }
+
+.uno-bolinha {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 10px currentColor;
+}
+.uno-bolinha-R { background: var(--uno-R); color: var(--uno-R); }
+.uno-bolinha-B { background: var(--uno-B); color: var(--uno-B); }
+.uno-bolinha-G { background: var(--uno-G); color: var(--uno-G); }
+.uno-bolinha-Y { background: var(--uno-Y); color: var(--uno-Y); }
+
+.uno-cor-atual-nome {
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 0.88rem;
+  letter-spacing: 0.02em;
+}
+
+.uno-rodada { font-size: 0.7rem; color: var(--uno-texto-fraco); text-transform: lowercase; }
+
+/* ---------- oponentes ---------- */
+
+.uno-oponentes {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 8px 4px;
+  flex-shrink: 0;
+}
+
+.uno-op {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 8px 7px;
+  min-width: 78px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
+}
+
+/* Quem está jogando agora ganha borda e brilho — em mesa de 8 é a única
+   forma de achar a vez sem ler nome por nome. */
+.uno-op-vez {
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12), 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+
+.uno-op-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 0.78rem;
+  color: #1c1440;
+  background: linear-gradient(135deg, #ffe9a8, #f2b705);
+}
+
+.uno-op-nome {
+  font-size: 0.7rem;
+  max-width: 82px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--uno-texto);
+}
+
+.uno-op-cartas { display: flex; align-items: center; gap: 1px; }
+.uno-op-qtd { font-size: 0.68rem; color: var(--uno-texto-fraco); margin-left: 3px; }
+
+.uno-op-badge-uno {
+  position: absolute;
+  top: -7px;
+  right: -4px;
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--uno-R);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(226, 53, 43, 0.6);
+}
+
+.uno-op-uno { border-color: rgba(226, 53, 43, 0.6); }
+
+/* 4+ oponentes: encolhe tudo pra caber 7 chips sem rolagem. */
+.uno-oponentes-compacto .uno-op { min-width: 62px; padding: 5px 6px 6px; gap: 2px; }
+.uno-oponentes-compacto .uno-op-avatar { width: 24px; height: 24px; font-size: 0.66rem; }
+.uno-oponentes-compacto .uno-op-nome { font-size: 0.62rem; max-width: 62px; }
+.uno-oponentes-compacto .uno-carta-pequena { width: 13px; height: 19px; }
+
+/* ---------- centro: monte + descarte ---------- */
+
+.uno-centro {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 4px 12px;
+}
+
+.uno-monte-wrap,
+.uno-descarte-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+.uno-monte-qtd { font-size: 0.66rem; color: var(--uno-texto-fraco); }
+
+.uno-monte-ativo {
+  cursor: pointer;
+  animation: uno-pulsa 1.8s ease-in-out infinite;
+}
+.uno-monte-ativo:active { transform: scale(0.95); }
+
+@keyframes uno-pulsa {
+  0%, 100% { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); }
+  50% { box-shadow: 0 6px 26px rgba(255, 255, 255, 0.35); }
+}
+
+/* O descarte ganha uma sombra colorida na cor da vez — é o que mostra a
+   cor escolhida quando o topo é um coringa (que não tem cor própria). */
+.uno-descarte-wrap .uno-carta { transform: rotate(-4deg); }
+
+.uno-stack-aviso {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 1rem;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--uno-R);
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(226, 53, 43, 0.55);
+  animation: uno-bate 0.9s ease-in-out infinite;
+  white-space: nowrap;
+}
+
+@keyframes uno-bate {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.07); }
+}
+
+/* ---------- cartas ---------- */
+
+.uno-carta {
+  position: relative;
+  width: 62px;
+  height: 92px;
+  border-radius: 10px;
+  border: 3px solid var(--uno-carta-borda);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.uno-carta-pequena { width: 16px; height: 24px; border-width: 1.5px; border-radius: 4px; box-shadow: none; }
+
+.uno-carta-c-R { background: var(--uno-R); }
+.uno-carta-c-B { background: var(--uno-B); }
+.uno-carta-c-G { background: var(--uno-G); }
+.uno-carta-c-Y { background: var(--uno-Y); }
+/* Coringa: os quatro quadrantes de cor, como na carta de verdade. */
+.uno-carta-c-W {
+  background:
+    conic-gradient(from 0deg, var(--uno-R) 0 25%, var(--uno-Y) 25% 50%, var(--uno-G) 50% 75%, var(--uno-B) 75% 100%);
+}
+
+/* Coringa já no descarte com cor escolhida: anel na cor pra ninguém
+   precisar procurar essa informação no topo da tela. */
+.uno-carta-tingida-R { box-shadow: 0 0 0 4px var(--uno-R), 0 6px 18px rgba(0, 0, 0, 0.45); }
+.uno-carta-tingida-B { box-shadow: 0 0 0 4px var(--uno-B), 0 6px 18px rgba(0, 0, 0, 0.45); }
+.uno-carta-tingida-G { box-shadow: 0 0 0 4px var(--uno-G), 0 6px 18px rgba(0, 0, 0, 0.45); }
+.uno-carta-tingida-Y { box-shadow: 0 0 0 4px var(--uno-Y), 0 6px 18px rgba(0, 0, 0, 0.45); }
+
+/* A oval branca inclinada é o que faz a carta "parecer Uno" de longe. */
+.uno-carta-oval {
+  position: absolute;
+  width: 78%;
+  height: 62%;
+  border-radius: 50%;
+  background: #fdfaf3;
+  transform: rotate(-22deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uno-carta-valor {
+  font-family: var(--font-h);
+  font-weight: 900;
+  font-size: 1.5rem;
+  line-height: 1;
+  transform: rotate(22deg);
+  color: #1c1440;
+}
+
+.uno-carta-c-R .uno-carta-valor { color: var(--uno-R-esc); }
+.uno-carta-c-B .uno-carta-valor { color: var(--uno-B-esc); }
+.uno-carta-c-G .uno-carta-valor { color: var(--uno-G-esc); }
+.uno-carta-c-Y .uno-carta-valor { color: var(--uno-Y-esc); }
+
+.uno-carta-canto {
+  position: absolute;
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 0.66rem;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  line-height: 1;
+}
+.uno-carta-canto-cima { top: 4px; left: 5px; }
+.uno-carta-canto-baixo { bottom: 4px; right: 5px; transform: rotate(180deg); }
+
+.uno-carta-verso {
+  background: linear-gradient(150deg, #241a52, #120e2b);
+  border-color: #f4e3b8;
+}
+.uno-carta-verso-marca { font-size: 1.5rem; line-height: 1; }
+.uno-carta-pequena.uno-carta-verso .uno-carta-verso-marca { font-size: 0.62rem; }
+
+/* ---------- base: ações + mão ---------- */
+
+.uno-base {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.uno-acoes {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 8px;
+  flex-wrap: wrap;
+}
+
+.uno-btn-uno,
+.uno-btn-pegar,
+.uno-btn-passar {
+  border: none;
+  border-radius: 999px;
+  font-family: var(--font-h);
+  font-weight: 800;
+  cursor: pointer;
+  padding: 9px 18px;
+  font-size: 0.92rem;
+  min-height: 40px;
+  -webkit-tap-highlight-color: transparent;
+}
+.uno-btn-uno:active,
+.uno-btn-pegar:active,
+.uno-btn-passar:active { transform: scale(0.95); }
+
+.uno-btn-uno {
+  background: linear-gradient(135deg, #ffd45e, var(--uno-Y));
+  color: #3a2a00;
+  letter-spacing: 0.08em;
+  box-shadow: 0 4px 16px rgba(242, 183, 5, 0.5);
+  animation: uno-bate-simples 1.1s ease-in-out infinite;
+}
+
+@keyframes uno-bate-simples {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+.uno-btn-pegar {
+  background: linear-gradient(135deg, #ff6a5e, var(--uno-R));
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(226, 53, 43, 0.5);
+}
+
+.uno-btn-passar {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--uno-texto);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+/* Mão: rola na horizontal quando passa de ~6 cartas, em vez de encolher
+   tudo — carta pequena demais é carta que não se acerta com o polegar. */
+.uno-mao {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 4px 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  min-height: 104px;
+}
+.uno-mao::-webkit-scrollbar { display: none; }
+.uno-mao-cheia { justify-content: flex-start; }
+
+.uno-mao .uno-carta { width: 66px; height: 98px; }
+
+.uno-carta-jogavel {
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.uno-carta-jogavel:active { transform: translateY(-8px) scale(1.04); }
+.uno-mao-ativa .uno-carta-jogavel { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.75), 0 8px 22px rgba(0, 0, 0, 0.5); }
+
+/* Carta sem jogada válida fica apagada e não responde ao toque — evita
+   tentativa e erro no celular. */
+.uno-carta-apagada { opacity: 0.34; filter: saturate(0.5); pointer-events: none; }
+
+.uno-turno-info {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--uno-texto-fraco);
+  text-align: center;
+  min-height: 1em;
+}
+
+/* ---------- overlays ---------- */
+
+.uno-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(10, 7, 26, 0.78);
+  backdrop-filter: blur(3px);
+  z-index: 40;
+}
+
+.uno-overlay-caixa {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 18px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, #2e2464, #1a1338);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.uno-overlay-titulo {
+  margin: 0;
+  font-family: var(--font-h);
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.uno-overlay-titulo-grande {
+  margin: 0;
+  font-family: var(--font-h);
+  font-size: 1.6rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.uno-overlay-texto { margin: 0; font-size: 0.9rem; color: var(--uno-texto-fraco); }
+.uno-overlay-legenda {
+  margin: 4px 0 -6px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--uno-texto-fraco);
+}
+
+.uno-grade-cores {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+}
+
+.uno-botao-cor {
+  border: none;
+  border-radius: 14px;
+  min-height: 74px;
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.uno-botao-cor:active { transform: scale(0.96); }
+.uno-botao-cor-R { background: var(--uno-R); }
+.uno-botao-cor-B { background: var(--uno-B); }
+.uno-botao-cor-G { background: var(--uno-G); }
+.uno-botao-cor-Y { background: var(--uno-Y); color: #3a2a00; text-shadow: none; }
+
+.uno-placar-lista { width: 100%; display: flex; flex-direction: column; gap: 4px; }
+
+.uno-placar-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 0.85rem;
+}
+.uno-placar-linha-venc { background: rgba(242, 183, 5, 0.22); font-weight: 700; }
+.uno-placar-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uno-placar-pontos { font-family: var(--font-h); font-weight: 800; }
+
+.uno-overlay-acoes { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+
+.uno-btn-principal,
+.uno-btn-secundario {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px;
+  min-height: 46px;
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 0.98rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.uno-btn-principal { background: linear-gradient(135deg, #ffd45e, var(--uno-Y)); color: #3a2a00; }
+.uno-btn-secundario { background: rgba(255, 255, 255, 0.12); color: var(--uno-texto); border: 1px solid rgba(255, 255, 255, 0.22); }
+.uno-btn-principal:active, .uno-btn-secundario:active { transform: scale(0.97); }
+
+/* ---------- balões de reação ---------- */
+
+.uno-balao {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fdfaf3;
+  color: #1c1440;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  z-index: 30;
+  animation: uno-sobe 0.2s ease;
+  pointer-events: none;
+}
+
+@keyframes uno-sobe {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.uno-acoes .uno-balao { bottom: calc(100% + 6px); }
+
+.uno-btn-reacoes {
+  position: absolute;
+  right: 10px;
+  bottom: 118px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--uno-texto);
+  font-size: 1.05rem;
+  cursor: pointer;
+  z-index: 25;
+  -webkit-tap-highlight-color: transparent;
+}
+.uno-btn-reacoes-aberto { background: rgba(255, 255, 255, 0.26); }
+
+.uno-painel-reacoes {
+  position: absolute;
+  right: 10px;
+  bottom: 164px;
+  z-index: 26;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: min(280px, 78vw);
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(20, 14, 46, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.uno-chip-reacao {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--uno-texto);
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.uno-chip-reacao:active { transform: scale(0.95); }
+
+/* ---------- flash ---------- */
+
+.uno-flash {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translate(-50%, 12px);
+  background: rgba(20, 14, 46, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: var(--uno-texto);
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 60;
+  max-width: 90%;
+  text-align: center;
+}
+.uno-flash-visivel { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- responsivo ---------- */
+
+@media (max-width: 400px) {
+  .uno-centro { gap: 14px; }
+  .uno-carta { width: 54px; height: 80px; }
+  .uno-mao .uno-carta { width: 58px; height: 86px; }
+  .uno-carta-valor { font-size: 1.3rem; }
+  .uno-mao { min-height: 92px; }
+  .uno-btn-reacoes { bottom: 108px; }
+  .uno-painel-reacoes { bottom: 154px; }
+}
+
+/* Tela baixa (celular deitado / janela curta): a mesa não pode empurrar
+   a mão pra fora da tela, então o centro cede espaço primeiro. */
+@media (max-height: 620px) {
+  .uno-mesa { min-height: 440px; }
+  .uno-oponentes { padding: 6px 8px 2px; }
+  .uno-carta { width: 52px; height: 78px; }
+  .uno-mao .uno-carta { width: 56px; height: 84px; }
+  .uno-mao { min-height: 90px; }
+  .uno-carta-valor { font-size: 1.25rem; }
+}

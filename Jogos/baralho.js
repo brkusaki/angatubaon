@@ -2,7 +2,7 @@
    JOGOS DE BARALHO — hub + sistema de salas (Firebase RTDB)
    ------------------------------------------------------------
    Ponto de entrada único pro card "Jogos de Baralho" do hub:
-   escolha de jogo (Truco | Uno em breve), sistema de salas
+   escolha de jogo (Truco | Uno), sistema de salas
    multiplayer (código de 4 letras + salas públicas) e delegação
    da partida em si pro "motor" que cada jogo registra.
 
@@ -68,7 +68,10 @@
   // do intervalo [min, max]. 1 jogador = modo solo (o motor cria bot(s)
   // locais pra preencher a mesa; ver truco.js).
   var _CATALOGO = {
-    truco: { nome: 'Truco Paulista', min: 1, max: 4, opcoesJogadores: [1, 2, 4] }
+    truco: { nome: 'Truco Paulista', min: 1, max: 4, opcoesJogadores: [1, 2, 4] },
+    // Uno: 2 a 8 na mesa, ou 1 = solo contra bots "Coruja" locais (o motor
+    // monta a mesa de 4 sozinho — ver MODO SOLO no cabeçalho de uno.js).
+    uno: { nome: 'Uno', min: 1, max: 8, opcoesJogadores: [1, 2, 3, 4, 5, 6, 7, 8] }
   };
   var _promessasModos = {}; // chave -> Promise do _jogoLoader (evita pedir 2x)
 
@@ -524,12 +527,6 @@
       card.addEventListener('click', function () { _modoEscolhido = chave; _tela = 'criar'; _renderizar(); });
       lista.appendChild(card);
     });
-    if (!modos().uno) {
-      var emBreve = _el('div', 'card-modo-em-breve');
-      emBreve.appendChild(_el('span', 'card-modo-nome', { texto: 'Uno' }));
-      emBreve.appendChild(_el('span', 'card-modo-jogadores', { texto: 'Em breve' }));
-      lista.appendChild(emBreve);
-    }
     wrap.appendChild(lista);
     _raiz.appendChild(wrap);
   }

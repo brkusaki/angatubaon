@@ -173,8 +173,16 @@
   align-items: flex-start;
 }
 /* relative (e não static): fica no fluxo igual, mas continua sendo o
-   ancoradouro do balão de reação, que é position:absolute. */
-.trc-outros-2 .trc-jogador-chip { position: relative; transform: none; }
+   ancoradouro do balão de reação, que é position:absolute.
+   ATENÇÃO — os offsets do .trc-pos-norte (left:50%/top:4px) PRECISAM ser
+   zerados aqui: static os ignorava, relative os obedece, e sem isto o chip
+   era empurrado meia largura pra direita (ficava no canto, sem o
+   translateX(-50%) que compensava no modo absoluto). */
+.trc-outros-2 .trc-jogador-chip {
+  position: relative;
+  top: auto; left: auto; right: auto; bottom: auto;
+  transform: none;
+}
 
 .trc-jogador-nome {
   font-size: 0.74rem;
@@ -266,7 +274,7 @@
 .trc-centro-mesa {
   position: relative;
   flex: 1 1 auto;
-  min-height: 168px;
+  min-height: 205px;
 }
 
 .trc-slot-mesa {
@@ -285,12 +293,12 @@
    curta, pra ficar claro QUE ela entrou (a queixa era justamente não
    perceber a carta aparecendo). */
 .trc-centro-mesa .trc-carta {
-  width: 64px;
-  height: 93px;
+  width: 78px;
+  height: 113px;
   animation: trcCartaEntra 0.22s ease-out;
 }
-.trc-centro-mesa .trc-carta .trc-carta-naipe-grande { font-size: 1.75rem; }
-.trc-centro-mesa .trc-carta .trc-carta-valor { font-size: 1rem; }
+.trc-centro-mesa .trc-carta .trc-carta-naipe-grande { font-size: 2.1rem; }
+.trc-centro-mesa .trc-carta .trc-carta-valor { font-size: 1.15rem; }
 
 @keyframes trcCartaEntra {
   from { opacity: 0; transform: scale(0.86); }
@@ -351,8 +359,9 @@
   padding: 4px 0 2px;
 }
 /* Mão maior que as cartas de referência do topo — é o que a pessoa toca. */
-.trc-minha-mao .trc-carta { width: 60px; height: 87px; }
-.trc-minha-mao .trc-carta .trc-carta-naipe-grande { font-size: 1.6rem; }
+.trc-minha-mao .trc-carta { width: 70px; height: 101px; }
+.trc-minha-mao .trc-carta .trc-carta-naipe-grande { font-size: 1.9rem; }
+.trc-minha-mao .trc-carta .trc-carta-valor { font-size: 1.05rem; }
 
 /* Feedback de vez sem texto: a mão inteira "acende" quando é sua vez. */
 .trc-minha-mao-ativa .trc-carta { box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(244, 205, 119, 0.55); }
@@ -422,12 +431,12 @@
   background: #fbf6ea;
   color: #241a08;
   font-family: var(--font-h);
-  font-weight: 700;
-  font-size: 0.82rem;
-  padding: 7px 13px;
-  border-radius: 14px;
+  font-weight: 800;
+  font-size: 1.05rem;
+  padding: 11px 18px;
+  border-radius: 16px;
   white-space: nowrap;
-  max-width: min(70vw, 220px);
+  max-width: min(80vw, 280px);
   overflow: hidden;
   text-overflow: ellipsis;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
@@ -442,7 +451,7 @@
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  border: 6px solid transparent;
+  border: 8px solid transparent;
   border-top-color: #fbf6ea;
 }
 /* No chip do oponente o balão sobe; na minha base ele fica acima da mão. */
@@ -597,14 +606,15 @@
 @media (max-width: 400px) {
   .trc-carta { width: 44px; height: 64px; }
   .trc-carta-pequena { width: 32px; height: 46px; }
-  .trc-minha-mao { gap: 6px; }
-  .trc-minha-mao .trc-carta { width: 54px; height: 78px; }
-  .trc-btn-truco, .trc-btn-escondida { max-width: 84px; font-size: 0.8rem; padding: 10px 8px; }
-  .trc-base { grid-template-columns: minmax(62px, auto) 1fr minmax(62px, auto); gap: 4px; }
+  .trc-minha-mao { gap: 5px; }
+  .trc-minha-mao .trc-carta { width: 66px; height: 96px; }
+  .trc-btn-truco, .trc-btn-escondida { max-width: 76px; font-size: 0.78rem; padding: 10px 6px; }
+  .trc-base { grid-template-columns: minmax(58px, auto) 1fr minmax(58px, auto); gap: 4px; padding: 6px 4px 10px; }
   .trc-vira-wrap .trc-carta-pequena { width: 40px; height: 58px; }
+  .trc-balao { font-size: 0.96rem; padding: 9px 14px; }
   /* A carta da vaza continua sendo a maior da tela, mas cabe no celular. */
-  .trc-centro-mesa .trc-carta { width: 56px; height: 81px; }
-  .trc-centro-mesa { min-height: 150px; }
+  .trc-centro-mesa .trc-carta { width: 74px; height: 107px; }
+  .trc-centro-mesa { min-height: 192px; }
   .trc-mini-mao { height: 50px; }
 }
 
@@ -612,7 +622,8 @@
   .trc-mesa { min-height: 640px; }
   .trc-carta { width: 64px; height: 92px; }
   .trc-carta-naipe-grande { font-size: 1.7rem; }
-  .trc-centro-mesa .trc-carta { width: 78px; height: 113px; }
-  .trc-centro-mesa { min-height: 210px; }
-  .trc-minha-mao .trc-carta { width: 72px; height: 104px; }
+  .trc-centro-mesa .trc-carta { width: 94px; height: 136px; }
+  .trc-centro-mesa { min-height: 248px; }
+  .trc-minha-mao .trc-carta { width: 84px; height: 122px; }
+  .trc-balao { font-size: 1.15rem; padding: 12px 20px; }
 }

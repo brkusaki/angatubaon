@@ -120,15 +120,18 @@
       própria, podendo voltar a pedir depois. Trocar pra esse
       comportamento exigiria rastrear "última vez que a vez avançou
       sem pedido", que não valia a complexidade extra nesta rodada.
-   5. Bot do modo solo (v1) é simples de propósito: na vez dele joga a
-      carta mais fraca que mata a maior carta da mesa (ou a mais fraca
-      da mão, se nenhuma mata ou se ele abre a vaza); nunca pede
-      truco sozinho, só responde a pedido do humano (aceita se seu
-      time já está ganhando a mão em vazas, senão corre em pedidos
-      altos — 9 ou 12); nunca joga carta escondida. Sem blefe, sem
-      contagem de cartas, sem covardia/agressividade configurável —
-      dá pra evoluir depois sem mudar a integração (é só trocar
-      _escolherCartaBot/_botResponderAumento).
+   5. Bot do modo solo: na vez dele joga a carta mais fraca que mata a
+      maior carta da mesa (ou a mais fraca da mão, se nenhuma mata ou
+      se ele abre a vaza) e nunca pede truco sozinho nem joga carta
+      escondida — isso segue simples de propósito. O que ele já faz
+      com alguma personalidade é RESPONDER a truco (ver
+      _botResponderAumento): mede manilha/3 na mão e vazas ganhas
+      antes de decidir, corre bastante em pedido alto quando está
+      atrás, e ainda tem 10% de coragem pra aceitar do mesmo jeito.
+      Pausas de 1,6-2,2s (_pausaBot) e balões de comentário
+      (_balaoDoBot) completam o ritmo de mesa. Falta blefe de verdade
+      (pedir truco com mão ruim) e contagem de cartas — dá pra evoluir
+      sem mudar a integração.
    ══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -180,7 +183,12 @@
     empate:     ['Empatou!', 'Fica pra próxima'],
     fimPartida: ['Ganhou a partida!', 'É campeão!', 'Acabou!'],
     minhaVez:   ['Sua vez', 'Joga aí', 'Manda a carta'],
-    vezDele:    ['Vez de', 'Esperando']
+    vezDele:    ['Vez de', 'Esperando'],
+    // Oratória do bot: comemorar vaza é provocação leve; perder a mão é
+    // reconhecer a jogada do outro (bot cuspindo "chora" quando PERDE
+    // ficaria mal-educado e sem graça).
+    botVaza:    ['Boa!', '🔥', 'Levou!', 'Essa é minha'],
+    botPerdeu:  ['Boa!', '👏', 'Essa foi sua', 'Tá jogando…']
   };
   function _frase(chave) {
     var lista = FRASES[chave] || [''];
@@ -313,13 +321,21 @@
   var _baloes = {};           // uid -> { id, expiraEm } — balões no ar AGORA (só local)
   var _reacoesVistas = {};    // uid -> última seq já exibida (evita repetir balão a cada render)
   var _cooldownReacao = {};   // uid -> timestamp da última reação aceita (só no anfitrião)
+  var _ultimoBalaoBot = 0;    // anti-spam da oratória do bot (ver _balaoDoBot)
   var _timerBalao = null;
   var _fraseVez = { chave: '', texto: '' }; // sorteia a frase da vez UMA vez por turno
   var _root = null;          // container da mesa (ctx.container)
   var _flashTimer = null;
 
   var MS_VAZA = 1200;   // quanto tempo a vaza fechada fica à vista antes de recolher
-  var MS_BOT = 1100;    // pausa do bot antes de jogar/responder (dá tempo de ler a mesa)
+  // Pausas do bot. Ritmo de mesa: ninguém joga instantaneamente, e um bot
+  // que responde na hora entrega que é bot. Cada pausa sorteia um extra
+  // aleatório pra não ficar metronômico.
+  var MS_BOT_CARTA = 1800;
+  var MS_BOT_TRUCO = 1600;
+  var MS_BOT_ONZE = 2000;
+  function _pausaBot(base) { return base + Math.floor(Math.random() * 400); }
+  var MS_BALAO_BOT_MIN = 4000; // o bot não solta dois balões seguidos
   var MS_BALAO = 2400;  // quanto tempo o balão de reação fica no ar
   var MS_COOLDOWN_REACAO = 3500; // anti-spam por jogador
   var PONTOS_MAO_ONZE = 3; // mão de 11 (e mão de ferro) vale 3
@@ -602,6 +618,10 @@
     g.liderVaza = proximoLider;
     g.vez = proximoLider;
 
+    // Bot comenta a vaza que acabou de levar (1 em 3, com o cooldown de
+    // _balaoDoBot segurando o resto).
+    if (_solo && resultado.uid === _BOT_UID) _balaoDoBot('botVaza', 0.33);
+
     var vencedorMao = _avaliarMao(g.vazasResultados, g.timeDaMao);
     if (vencedorMao) _fecharMao(vencedorMao, g.apostaAtual, 'vazas');
     else _salvarGame();
@@ -703,13 +723,13 @@
     if (_g.decisaoOnze) {
       // Só age se a mão de 11 for DO bot; se for do humano, espera a
       // decisão dele (o overlay está aberto do lado de lá).
-      if (_g.decisaoOnze.time === timeBot) _timerBot = setTimeout(_botDecidirOnze, MS_BOT + 600);
+      if (_g.decisaoOnze.time === timeBot) _timerBot = setTimeout(_botDecidirOnze, _pausaBot(MS_BOT_ONZE));
       return;
     }
     if (_g.pedidoTruco && _g.pedidoTruco.time !== timeBot) {
-      _timerBot = setTimeout(_botResponderAumento, MS_BOT); // pedido é do time do humano — bot responde
+      _timerBot = setTimeout(_botResponderAumento, _pausaBot(MS_BOT_TRUCO)); // pedido é do time do humano — bot responde
     } else if (!_g.pedidoTruco && _g.vez === _BOT_UID) {
-      _timerBot = setTimeout(_botJogarCarta, MS_BOT);
+      _timerBot = setTimeout(_botJogarCarta, _pausaBot(MS_BOT_CARTA));
     }
   }
 
@@ -751,15 +771,25 @@
     _processarAcao({ uid: _BOT_UID, tipo: 'responderOnze', payload: { resposta: vai ? 'ir' : 'correr' } });
   }
 
-  /* O bot comemora de vez em quando ao fechar uma mão — raro de propósito
-     (1 em 4), senão vira poluição. Só no solo, e nunca depois que a
-     partida acabou. */
+  /* Oratória do bot. Tudo passa por aqui pra respeitar um cooldown único
+     (MS_BALAO_BOT_MIN): sem isso, fechar uma vaza e a mão no mesmo instante
+     dispararia dois balões colados. Não grava sozinho — quem chama já está
+     no meio de uma mudança de estado que termina em _salvarGame(). */
+  function _balaoDoBot(chaveFrase, chance) {
+    if (!_solo || !_souAnfitriao || !_g) return;
+    if (Math.random() > chance) return;
+    var agora = Date.now();
+    if (agora - _ultimoBalaoBot < MS_BALAO_BOT_MIN) return;
+    _ultimoBalaoBot = agora;
+    _balaoDoSistema(_BOT_UID, _frase(chaveFrase));
+  }
+
+  // Fim de mão: comemora se ganhou (1 em 4), elogia se perdeu (1 em 4).
   function _talvezReagirComoBot(timeVencedor) {
     if (!_solo || !_souAnfitriao || !_g) return;
     var timeBot = _timeDoUid(_BOT_UID, _jogadoresEfetivos());
-    if (timeVencedor !== timeBot) return;
-    if (Math.random() > 0.25) return;
-    _balaoDoSistema(_BOT_UID, _frase(Math.random() < 0.5 ? 'fimMao' : 'aceitar'));
+    if (!timeBot) return;
+    _balaoDoBot(timeVencedor === timeBot ? 'fimMao' : 'botPerdeu', 0.25);
   }
 
   function _botJogarCarta() {
@@ -769,20 +799,44 @@
     _processarAcao({ uid: _BOT_UID, tipo: 'jogarCarta', payload: { carta: _escolherCartaBot(mao), escondida: false } });
   }
 
-  // Regra simples (v1): aceita se o time do bot já está ganhando a mão em
-  // vazas fechadas; senão corre só em pedidos altos (9 ou 12) — pedidos
-  // baixos (6) o bot aceita mesmo sem estar ganhando, pra não fugir logo
-  // de cara. Ver pendência 5 no cabeçalho.
+  /* Resposta ao truco (v2) — a v1 aceitava quase tudo, o que fazia o bot
+     parecer um caixa eletrônico. Agora ele mede a mão antes:
+       - pedido alto (9 ou 12) sem estar ganhando as vazas  -> corre em 85%;
+       - pedido de 6 com mão fraca (sem manilha e sem 3)    -> corre em 60%;
+       - tem manilha OU está ganhando em vazas              -> aceita sempre;
+       - e em 10% das vezes que decidiu correr, aceita assim mesmo — é a
+         dose de coragem/blefe que faz o bot não ser 100% previsível.
+     Ordem importa: a checagem de "tem manilha / está ganhando" vem depois
+     das de medo, justamente pra poder anular as duas. */
   function _botResponderAumento() {
     if (!_solo || !_g || !_g.pedidoTruco) return;
     var timeBot = _timeDoUid(_BOT_UID, _jogadoresEfetivos());
     if (!timeBot || _g.pedidoTruco.time === timeBot) return; // pedido não é do time adversário do bot
+
     var vazasBot = (_g.vazasResultados || []).filter(function (v) { return v === timeBot; }).length;
     var vazasHumano = (_g.vazasResultados || []).filter(function (v) { return v && v !== timeBot; }).length;
     var ganhando = vazasBot > vazasHumano;
-    var pedidoAlto = _g.pedidoTruco.valor >= 9;
-    var resposta = (!ganhando && pedidoAlto) ? 'correr' : 'aceitar';
-    _processarAcao({ uid: _BOT_UID, tipo: 'responderAumento', payload: { resposta: resposta } });
+
+    var mao = (_g.maos && _g.maos[_BOT_UID]) || [];
+    var temManilha = mao.some(function (c) { return _ehManilha(c, _g.manilha); });
+    var temTres = mao.some(function (c) { return _valorCarta(c) === '3'; });
+    var valor = _g.pedidoTruco.valor;
+
+    var maoFraca = !temManilha && !temTres;
+    var correr = false;
+    if (valor >= 9 && !ganhando) correr = Math.random() < 0.85;
+    else if (valor === 6 && maoFraca) correr = Math.random() < 0.60;
+    // O truco simples (3) é o pedido que MAIS acontece — depois de aceitar
+    // uma vez, o adversário nem pode repedir na mesma mão (ver pendência 4),
+    // então quase todo pedido que o bot vê é um "TRUCO!" seco. Sem um caso
+    // pra ele aqui, o bot aceitava 100% deles: era essa a sensação de
+    // "aceita tudo". Correr custa 1 ponto; aceitar e perder custa 3, então
+    // fugir com mão ruim é a jogada certa, não covardia.
+    else if (valor === 3 && !ganhando) correr = Math.random() < (maoFraca ? 0.45 : 0.20);
+    if (temManilha || ganhando) correr = false;
+    if (correr && Math.random() < 0.10) correr = false; // coragem
+
+    _processarAcao({ uid: _BOT_UID, tipo: 'responderAumento', payload: { resposta: correr ? 'correr' : 'aceitar' } });
   }
 
   /* ═══════════════ 4. QUALQUER CLIENTE: EMPURRAR AÇÕES ═══════════════ */
@@ -818,7 +872,7 @@
     _assentos = _solo ? 2 : _maxJogadores; // mesa efetiva: eu + bot no solo
     _modoEscondida = false;
     _painelReacoes = false;
-    _baloes = {}; _reacoesVistas = {}; _cooldownReacao = {};
+    _baloes = {}; _reacoesVistas = {}; _cooldownReacao = {}; _ultimoBalaoBot = 0;
     _fraseVez = { chave: '', texto: '' };
 
     if (_souAnfitriao) _iniciarComoAnfitriao();
@@ -848,7 +902,7 @@
     if (_root) { while (_root.firstChild) _root.removeChild(_root.firstChild); }
     _ctx = null; _uid = null; _souAnfitriao = false; _g = null; _sala = null;
     _modoEscondida = false; _root = null; _solo = false; _assentos = 2;
-    _painelReacoes = false; _baloes = {}; _reacoesVistas = {}; _cooldownReacao = {};
+    _painelReacoes = false; _baloes = {}; _reacoesVistas = {}; _cooldownReacao = {}; _ultimoBalaoBot = 0;
     _fraseVez = { chave: '', texto: '' };
   }
 

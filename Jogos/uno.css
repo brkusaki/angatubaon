@@ -167,6 +167,17 @@
   font-size: 0.78rem;
   color: #1c1440;
   background: linear-gradient(135deg, #ffe9a8, #f2b705);
+  overflow: hidden;
+}
+
+/* Avatar de bot: a arte da coruja preenche o mesmo círculo das iniciais
+   (não troca o gradiente por padrão — só cobre com overflow:hidden). */
+.uno-op-avatar-bot { background: #241a52; }
+.uno-op-avatar-bot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .uno-op-nome {
@@ -444,23 +455,25 @@
 .uno-carta-canto-cima { top: 4px; left: 5px; }
 .uno-carta-canto-baixo { bottom: 4px; right: 5px; transform: rotate(180deg); }
 
-/* Verso: não existe arte de verso no repo (só as capas card-*.webp), então
-   ele é desenhado em CSS mesmo — faixa diagonal clara atrás da coruja, que
-   é a marca da casa. Trocar por <img> depois é só mexer aqui. */
+/* Verso: agora usa a arte /Jogos/assets/baralho/verso-uno.webp, cobrindo a
+   carta inteira. O fundo/borda abaixo só aparecem enquanto a imagem não
+   carregou (ou se ela falhar — ver onerror em _cartaEl, que esconde a img
+   e mostra a marca 🦉 de novo). */
 .uno-carta-verso {
   background: linear-gradient(150deg, #2b1f63, #120e2b);
   border-color: #f4e3b8;
+  overflow: hidden;
+  padding: 0;
 }
-.uno-carta-verso::before {
-  content: '';
+.uno-carta-verso-img {
   position: absolute;
-  width: 132%;
-  height: 46%;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1));
-  transform: rotate(-26deg);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
 }
 .uno-carta-verso-marca { font-size: 1.5rem; line-height: 1; position: relative; }
-.uno-carta-pequena.uno-carta-verso::before { height: 52%; }
 .uno-carta-pequena.uno-carta-verso .uno-carta-verso-marca { font-size: 0.62rem; }
 
 /* ---------- base: ações + mão ---------- */

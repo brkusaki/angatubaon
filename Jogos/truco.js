@@ -965,6 +965,33 @@
     return j ? j.nome : '...';
   }
 
+  /* Avatar do bot Coruja no chip do oponente (só existe no modo solo — o
+     único "bot" que o Truco tem). Comemorando reaproveita estado que já
+     existe: _g.vencedorMao é o time que acabou de fechar a mão (fica
+     setado durante a pausa curta antes da próxima mão ser servida — ver
+     MS_TROCA_MAO) e _g.vencedorPartida o time que fechou a partida. Não
+     precisa de campo novo só pra isso. Se a arte não carregar, cai pro
+     emoji de sempre. */
+  function _corujaComemorando() {
+    var timeBot = _timeDoUid(_BOT_UID, _jogadoresEfetivos());
+    if (!timeBot) return false;
+    return _g.vencedorMao === timeBot || _g.vencedorPartida === timeBot;
+  }
+
+  function _avatarCorujaEl() {
+    var av = _elx('div', 'avatar-coruja');
+    var img = _elx('img', null, {
+      src: '/Jogos/assets/baralho/' + (_corujaComemorando() ? 'owl-comemorando' : 'owl-neutra') + '.webp',
+      alt: '', draggable: 'false'
+    });
+    img.addEventListener('error', function () {
+      av.classList.add(_cls('avatar-coruja-erro'));
+      av.textContent = '🦉';
+    });
+    av.appendChild(img);
+    return av;
+  }
+
   function _nomesDoTime(time) {
     var jogadores = _jogadoresEfetivos();
     return Object.keys(jogadores).filter(function (uid) { return _timeDoUid(uid, jogadores) === time; })
@@ -976,7 +1003,20 @@
     var el = _elx('div', 'carta' + (opcoes.pequena ? ' carta-pequena' : ''));
     if (opcoes.virada) {
       el.classList.add(_cls('carta-verso'));
-      el.appendChild(_elx('span', 'carta-verso-coruja', { texto: '🦉' }));
+      // Marca de fallback primeiro (fica por baixo, escondida) — se a arte
+      // não carregar, o onerror da img só precisa revelar o que já está
+      // no DOM, sem recriar nada.
+      var marcaVerso = _elx('span', 'carta-verso-coruja', { texto: '🦉' });
+      marcaVerso.style.display = 'none';
+      var imgVerso = _elx('img', 'carta-verso-img', {
+        src: '/Jogos/assets/baralho/verso-truco.webp', alt: '', draggable: 'false'
+      });
+      imgVerso.addEventListener('error', function () {
+        imgVerso.style.display = 'none';
+        marcaVerso.style.display = '';
+      });
+      el.appendChild(imgVerso);
+      el.appendChild(marcaVerso);
       return el;
     }
     var valor = _valorCarta(cod), naipe = _naipeCarta(cod);
@@ -1084,7 +1124,16 @@
       var chip = _elx('div', 'jogador-chip pos-' + pos);
       var balao = _balaoEl(uid);
       if (balao) chip.appendChild(balao);
-      chip.appendChild(_elx('span', 'jogador-nome', { texto: jogadores[uid].nome }));
+      // Avatar só existe pro bot Coruja (único "oponente" sem foto de
+      // verdade); parceiro/adversário humano continua só com o nome.
+      if (uid === _BOT_UID) {
+        var linhaNome = _elx('div', 'nome-linha');
+        linhaNome.appendChild(_avatarCorujaEl());
+        linhaNome.appendChild(_elx('span', 'jogador-nome', { texto: jogadores[uid].nome }));
+        chip.appendChild(linhaNome);
+      } else {
+        chip.appendChild(_elx('span', 'jogador-nome', { texto: jogadores[uid].nome }));
+      }
       var qtdMao = (_g.maos && _g.maos[uid] && _g.maos[uid].length) || 0;
       var mini = _elx('div', 'mini-mao');
       for (var i = 0; i < qtdMao; i++) mini.appendChild(_cartaEl(null, { virada: true, pequena: true }));

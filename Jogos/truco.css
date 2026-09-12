@@ -199,6 +199,30 @@
   box-shadow: 0 0 10px rgba(217, 164, 65, 0.65);
 }
 
+/* Nome + avatar do bot Coruja lado a lado, sem mudar a pílula do nome. */
+.trc-nome-linha { display: flex; align-items: center; gap: 5px; }
+
+.trc-avatar-coruja {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #123a2a;
+  border: 1px solid rgba(244, 205, 119, 0.5);
+}
+.trc-avatar-coruja img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Se a arte não carregar, o emoji de fallback (texto puro) não precisa de
+   círculo em volta — o próprio 🦉 já se explica sozinho. */
+.trc-avatar-coruja-erro {
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
 /* Leque: as cartas de costas se sobrepõem e abrem levemente, em vez de
    ficarem lado a lado — ocupa menos largura e lê como "mão" de verdade.
    O nth-child cobre as 3 cartas do Truco; qualquer carta além disso
@@ -259,8 +283,20 @@
   align-items: center;
   justify-content: center;
   padding: 0;
+  overflow: hidden;
 }
-.trc-carta-verso-coruja { font-size: 1.2rem; opacity: 0.85; }
+/* Arte /Jogos/assets/baralho/verso-truco.webp cobrindo a carta inteira; o
+   gradiente acima só aparece enquanto ela não carregou. Se falhar de
+   verdade, o onerror em _cartaEl esconde a img e volta o emoji 🦉. */
+.trc-carta-verso-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.trc-carta-verso-coruja { font-size: 1.2rem; opacity: 0.85; position: relative; }
 
 .trc-carta-jogavel { cursor: pointer; transition: transform 0.12s ease; }
 .trc-carta-jogavel:active { transform: translateY(-4px); }

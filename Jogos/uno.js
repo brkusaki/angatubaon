@@ -1043,6 +1043,32 @@
     return (partes[0][0] + (partes[1] ? partes[1][0] : '')).toUpperCase();
   }
 
+  /* Avatar do chip de oponente. Humano continua com as iniciais (não
+     precisa de arte pra isso). Bot mostra a coruja: neutra no dia a dia,
+     e comemorando por um instante quando acabou de vencer a rodada ou
+     acabou de gritar UNO — os dois já são sinais que o estado carrega
+     (game.vencedorPartida e o balão "UNO!" que _acaoUno solta), então não
+     precisa de campo novo só pra isso. Se a arte não carregar, cai pras
+     iniciais como qualquer avatar humano. */
+  function _avatarEl(uid, jogadores) {
+    if (!_ehBot(uid)) return _elx('div', 'op-avatar', { texto: _iniciais(jogadores[uid].nome) });
+
+    var comemorando = _g.vencedorPartida === uid ||
+      (_baloes[uid] && _baloes[uid].texto === 'UNO!' && _baloes[uid].expiraEm > Date.now());
+    var arte = comemorando ? 'owl-comemorando' : 'owl-neutra';
+
+    var av = _elx('div', 'op-avatar op-avatar-bot');
+    var img = _elx('img', null, {
+      src: '/Jogos/assets/baralho/' + arte + '.webp', alt: '', draggable: 'false'
+    });
+    img.addEventListener('error', function () {
+      av.classList.remove(_cls('op-avatar-bot'));
+      av.textContent = _iniciais(jogadores[uid].nome);
+    });
+    av.appendChild(img);
+    return av;
+  }
+
   /* Carta: fundo na cor, oval branca inclinada no meio (a cara do Uno) e
      o valor grande por cima, com os cantos repetindo o valor. Coringa usa
      as 4 cores num conic-gradient (ver uno.css). */
@@ -1058,7 +1084,21 @@
     }
     if (opcoes.verso) {
       el.classList.add(_cls('carta-verso'));
-      el.appendChild(_elx('span', 'carta-verso-marca', { texto: '🦉' }));
+      // Marca de fallback primeiro (fica por baixo, escondida) — se a arte
+      // do verso não carregar (offline na primeira visita, por exemplo), o
+      // onerror da img só precisa mostrar o que já está no DOM, sem
+      // recriar nada.
+      var marcaVerso = _elx('span', 'carta-verso-marca', { texto: '🦉' });
+      marcaVerso.style.display = 'none';
+      var imgVerso = _elx('img', 'carta-verso-img', {
+        src: '/Jogos/assets/baralho/verso-uno.webp', alt: '', draggable: 'false'
+      });
+      imgVerso.addEventListener('error', function () {
+        imgVerso.style.display = 'none';
+        marcaVerso.style.display = '';
+      });
+      el.appendChild(imgVerso);
+      el.appendChild(marcaVerso);
       return el;
     }
     var cor = _cor(cod), v = _valor(cod);
@@ -1185,8 +1225,7 @@
       if (qtd === 1) chip.classList.add(_cls('op-uno'));
       var balao = _balaoEl(uid);
       if (balao) chip.appendChild(balao);
-      var av = _elx('div', 'op-avatar', { texto: _iniciais(jogadores[uid].nome) });
-      chip.appendChild(av);
+      chip.appendChild(_avatarEl(uid, jogadores));
       chip.appendChild(_elx('span', 'op-nome', { texto: jogadores[uid].nome }));
       var linhaCartas = _elx('div', 'op-cartas');
       var versos = Math.min(qtd, 5);

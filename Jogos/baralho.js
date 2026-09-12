@@ -782,19 +782,31 @@
     _raiz.appendChild(wrap);
   }
 
+  // Correção UX (item B): a barra "Voltar aos jogos" é ótima na escolha/
+  // criar/lobby, mas rouba altura útil da MESA durante a partida. #jogo-
+  // baralho (a casca no index.html, fora de #baralho-root) ganha esta
+  // classe só enquanto o motor do jogo está de fato montado — o CSS
+  // (styles.css) transforma a barra num botão flutuante discreto nesse
+  // estado, mesma receita já usada em Voo/Corrida/Piano/Pingue-pongue.
+  function _marcarTelaCheiaJogo(ligado) {
+    var tela = document.getElementById('jogo-baralho');
+    if (tela) tela.classList.toggle('brl-em-jogo', !!ligado);
+  }
+
   function _entrarNaTelaDeJogo(sala) {
     clearTimeout(_timerSolo);
     // O motor (ex.: truco.min.js) pode ainda não ter chegado — acontece
     // com um convidado que entrou na sala direto por código, sem passar
     // pela tela de escolha (que é quem normalmente dispara o preload).
     _tela = 'jogo';
+    _marcarTelaCheiaJogo(true);
     _limpar(_raiz);
     var carregando = _el('div', 'carregando-modo', { texto: 'Carregando o jogo…' });
     _raiz.appendChild(carregando);
     _garantirModoCarregado(sala.modo, function (def) {
       if (_tela !== 'jogo' || !_raiz) return; // saiu da tela enquanto carregava
       _limpar(_raiz);
-      if (!def || typeof def.iniciar !== 'function') { _flash('Não foi possível carregar o jogo.'); _tela = 'lobby'; _renderizar(); return; }
+      if (!def || typeof def.iniciar !== 'function') { _marcarTelaCheiaJogo(false); _flash('Não foi possível carregar o jogo.'); _tela = 'lobby'; _renderizar(); return; }
       var palco = _el('div', 'palco-jogo');
       _raiz.appendChild(palco);
       _motorAtivo = { chave: sala.modo, api: def };
@@ -811,6 +823,7 @@
       _motorAtivo = null;
       _cbMotorSala = null;
       _tela = 'lobby';
+      _marcarTelaCheiaJogo(false);
     }
     if (_tela === 'lobby') _renderizar();
   });
@@ -820,6 +833,7 @@
     _motorAtivo = null;
     _cbMotorSala = null;
     _tela = 'escolha';
+    _marcarTelaCheiaJogo(false);
     _flash('A sala foi encerrada.');
     _renderizar();
   });
@@ -845,6 +859,7 @@
     if (_motorAtivo && _motorAtivo.api.parar) { try { _motorAtivo.api.parar(); } catch (e) {} }
     _motorAtivo = null;
     _cbMotorSala = null;
+    _marcarTelaCheiaJogo(false);
     if (_pararListaPublicas) { _pararListaPublicas(); _pararListaPublicas = null; }
     // Não sai da sala automaticamente (permite retomar ao reabrir o
     // card) — sala só é abandonada pelo botão explícito "Sair da sala".

@@ -103,6 +103,16 @@
    ações vindas da fila "acoes" de um jogador humano) — do ponto de
    vista das regras do jogo, é só mais um uid.
 
+   FIM DE MÃO SEM OVERLAY (correção de ritmo — rodada 5 de UX)
+   Fechar uma mão NÃO abre mais um card no centro da tela: o placar já
+   reflete os pontos novos e a próxima mão é servida ~400ms depois (ver
+   MS_TROCA_MAO em _fecharMao). Um overlay a cada mão parava o jogo por
+   2,6s à toa — a pausa de exibição da ÚLTIMA vaza (MS_VAZA, com a carta
+   vencedora destacada) já avisa quem ganhou, então um segundo aviso
+   modal era ritmo morto. Overlay continua existindo só onde exige
+   decisão ou marca um momento raro: pedido de truco, mão de 11/de
+   ferro e fim de PARTIDA.
+
    PENDÊNCIAS CONHECIDAS
    1. Na mão de 11 de uma DUPLA (4 jogadores), quem decide é o primeiro
       da dupla que responder, e ele enxerga só as próprias 3 cartas —
@@ -339,6 +349,7 @@
   var MS_BALAO = 2400;  // quanto tempo o balão de reação fica no ar
   var MS_COOLDOWN_REACAO = 3500; // anti-spam por jogador
   var PONTOS_MAO_ONZE = 3; // mão de 11 (e mão de ferro) vale 3
+  var MS_TROCA_MAO = 400; // pausa entre fechar uma mão e servir a próxima (sem overlay — ver cabeçalho)
   var _BOT_UID = '_bot_coruja';
   var _NOME_BOT = 'Coruja 🦉';
 
@@ -631,7 +642,6 @@
     var g = _g;
     g.vencedorMao = timeVencedor;
     g.pontosUltimaMao = pontos;
-    g.fraseFimMao = _frase('fimMao');
     g.pontuacao[timeVencedor] = (g.pontuacao[timeVencedor] || 0) + pontos;
     g.historico = (g.historico || []).concat([{
       maoAtual: g.maoAtual, vencedor: timeVencedor, pontos: pontos, motivo: motivo
@@ -647,13 +657,16 @@
     _talvezReagirComoBot(timeVencedor);
     _salvarGame();
     _cancelarAgendamentos();
+    // Sem overlay de fim de mão (ver cabeçalho), essa pausa é só o tempo de
+    // deixar o placar novo "assentar" antes de virar a página — não é mais
+    // um tempo de leitura de card, por isso é curta.
     _timerProximaMao = setTimeout(function () {
       if (!_souAnfitriao || !_g || _g.vencedorPartida) return;
       var jogadores = _jogadoresEfetivos();
       var base = { pontuacao: _g.pontuacao, maoAtual: _g.maoAtual + 1, vencedorPartida: null, historico: _g.historico };
       _g = _prepararNovaMao(base, jogadores);
       _salvarGame();
-    }, 2600);
+    }, MS_TROCA_MAO);
   }
 
   function _acaoPedirAumento(acao, jogadores) {
@@ -1040,11 +1053,13 @@
     var mesa = _elx('div', 'mesa');
 
     // ---- placar: pontos dos dois lados + quanto vale a mão ----
+    // "mão N" é ruído no dia a dia (ninguém decide nada com esse número) —
+    // só aparece quando é de fato especial (mão de 11 / mão de ferro).
     var placar = _elx('div', 'placar');
     placar.appendChild(_criarPlacarTime('A', jogadores, meuTime));
     var centro = _elx('div', 'placar-centro');
     centro.appendChild(_elx('span', 'placar-aposta', { texto: 'vale ' + _g.apostaAtual }));
-    centro.appendChild(_elx('span', 'placar-mao', { texto: _rotuloDaMao() }));
+    if (_maoEhEspecial()) centro.appendChild(_elx('span', 'placar-mao', { texto: _rotuloDaMao() }));
     placar.appendChild(centro);
     placar.appendChild(_criarPlacarTime('B', jogadores, meuTime));
     mesa.appendChild(placar);
@@ -1098,13 +1113,11 @@
     mesa.appendChild(centroMesa);
 
     // ---- overlays ----
-    // Ordem importa: vencedorPartida implica vencedorMao (fecharMao nunca
-    // limpa o campo), então a checagem de partida vem ANTES da de mão —
-    // senão o placar final nunca apareceria.
+    // Fim de MÃO não tem mais overlay próprio (ver cabeçalho) — só fim de
+    // PARTIDA, pedido de truco e mão de 11 param o jogo pra mostrar algo.
     if (_g.decisaoOnze) mesa.appendChild(_criarOverlayOnze(meuTime));
     else if (_g.pedidoTruco) mesa.appendChild(_criarOverlayPedido(meuTime));
     else if (_g.vencedorPartida) mesa.appendChild(_criarOverlayFimPartida());
-    else if (_g.vencedorMao) mesa.appendChild(_criarOverlayFimMao());
 
     // ---- base: Truco! | minha mão | Fechada ----
     mesa.appendChild(_criarBase(souVez));
@@ -1121,6 +1134,13 @@
     if (_g.maoEspecial === 'ferro' || (_g.pontuacao.A === 11 && _g.pontuacao.B === 11)) return 'mão de ferro';
     if (_g.maoEspecial === 'onze' || _g.decisaoOnze) return 'mão de 11';
     return 'mão ' + (_g.maoAtual + 1);
+  }
+
+  // Só mão de 11 / mão de ferro merecem ocupar espaço no placar do dia a
+  // dia — "mão 3", "mão 7" etc. não mudam nenhuma decisão de quem joga.
+  function _maoEhEspecial() {
+    return !!(_g.maoEspecial === 'ferro' || _g.maoEspecial === 'onze' || _g.decisaoOnze ||
+      (_g.pontuacao.A === 11 && _g.pontuacao.B === 11));
   }
 
   function _criarPlacarTime(time, jogadores, meuTime) {
@@ -1277,16 +1297,6 @@
       }
       caixa.appendChild(acoes);
     }
-    ov.appendChild(caixa);
-    return ov;
-  }
-
-  function _criarOverlayFimMao() {
-    var ov = _elx('div', 'overlay');
-    var caixa = _elx('div', 'overlay-caixa');
-    var nomeTime = _nomesDoTime(_g.vencedorMao);
-    caixa.appendChild(_elx('h3', 'overlay-titulo', { texto: _g.fraseFimMao || 'Fechou a mão!' }));
-    caixa.appendChild(_elx('p', 'overlay-texto', { texto: (nomeTime || ('Time ' + _g.vencedorMao)) + ' +' + _g.pontosUltimaMao }));
     ov.appendChild(caixa);
     return ov;
   }

@@ -454,8 +454,12 @@
   border: 8px solid transparent;
   border-top-color: #fbf6ea;
 }
-/* No chip do oponente o balão sobe; na minha base ele fica acima da mão. */
-.trc-jogador-chip .trc-balao { bottom: calc(100% + 4px); }
+/* No chip do oponente o balão sobe; na minha base ele fica acima da mão.
+   ATENÇÃO: o rabinho (::after) tem 8px de altura própria — com um respiro
+   de só 4px aqui, a ponta do rabinho invadia o topo do nome (relato:
+   "balão em cima do nome"). Respiro precisa ser MAIOR que os 8px do
+   rabinho, senão ele fecha em cima da pílula do nome. */
+.trc-jogador-chip .trc-balao { bottom: calc(100% + 14px); }
 .trc-base-meio .trc-balao { bottom: calc(100% - 2px); }
 
 @keyframes trcBalao {
@@ -535,9 +539,24 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  width: 100%;
   max-width: 320px;
+  /* min-width:0 anula o "automatic minimum size" padrão de item flex —
+     sem isto, um filho de texto comprido (a frase grande do pedido de
+     truco) podia forçar a caixa pra além do max-width e vazar da tela. */
+  min-width: 0;
+  box-sizing: border-box;
   text-align: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.trc-overlay-titulo,
+.trc-overlay-titulo-grande,
+.trc-overlay-texto {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .trc-overlay-titulo {
@@ -548,12 +567,16 @@
   margin: 0;
 }
 
+/* Frase grande do pedido de truco ("Truco, pilantra!", "Seis, ladrão!") —
+   é a que mais corre risco de vazar da caixa; por isso ganha padding
+   lateral próprio além do break-word herdado acima. */
 .trc-overlay-titulo-grande {
   font-family: var(--font-h);
   font-weight: 800;
   font-size: 1.4rem;
   color: var(--trc-dourado-forte);
   margin: 0;
+  padding: 0 4px;
 }
 
 .trc-overlay-texto { font-size: 0.85rem; color: #e7dfcf; margin: 0; }

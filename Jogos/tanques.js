@@ -2062,7 +2062,7 @@
 
     if (motivo === 'desconexao') {
       if (titulo) titulo.textContent = 'Conexão perdida';
-      if (msg) msg.textContent = 'O outro jogador saiu ou a conexão caiu. Volte ao menu pra criar outra sala ou entrar numa aberta.';
+      if (msg) msg.textContent = 'O outro jogador saiu ou a conexão caiu.';
       if (placar) placar.style.display = 'none';
       if (btnRev) btnRev.style.display = 'none';
       // Sem revanche, este é o ÚNICO caminho da tela: vira o botão

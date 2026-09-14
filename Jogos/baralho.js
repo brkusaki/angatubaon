@@ -236,7 +236,7 @@
         // entrar no meio de uma partida, não — o estado das mãos é do
         // anfitrião e não dá pra reconstruir pra quem chega agora.
         if (sala.status !== 'lobby') {
-          return Promise.reject(new Error('A partida já começou. Peça um código novo ou espere a mesa voltar ao lobby.'));
+          return Promise.reject(new Error('Essa partida já começou. Peça um código novo ou espere voltar ao lobby.'));
         }
         if (!sala.criadoEm || (Date.now() - sala.criadoEm) > SALA_EXPIRA_MS) {
           return Promise.reject(new Error('Essa sala expirou. Peça um código novo.'));
@@ -901,7 +901,7 @@
       _tela = 'lobby';
       _marcarTelaCheiaJogo(false);
       _aviso = faltaGente
-        ? 'Um jogador saiu ou a conexão dele caiu — a partida foi cancelada. A sala continua de pé: chame a galera e comece outra.'
+        ? 'Um jogador saiu ou a conexão caiu — a partida foi cancelada. A sala continua de pé: chame a galera e comece outra.'
         : '';
     }
     if (_tela === 'lobby') _renderizar();
@@ -913,7 +913,7 @@
     _cbMotorSala = null;
     _tela = 'escolha';
     _marcarTelaCheiaJogo(false);
-    _aviso = 'A sala foi encerrada — o anfitrião saiu ou a conexão caiu. Escolha um jogo pra criar ou entrar em outra sala.';
+    _aviso = 'A sala foi encerrada — o anfitrião saiu ou a conexão caiu.';
     // _renderizar() ANTES do _flash: ele limpa a raiz inteira e apagava a
     // caixa do flash recém-criada — a mensagem nunca chegava a aparecer.
     _renderizar();

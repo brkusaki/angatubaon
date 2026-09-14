@@ -203,7 +203,7 @@
       return ref.get().then(function (snap) {
         if (!snap.exists()) return Promise.reject(new Error('Sala não encontrada. Confira o código.'));
         var sala = snap.val();
-        if (sala.status !== 'lobby') return Promise.reject(new Error('Essa Party já começou. Peça um código novo.'));
+        if (sala.status !== 'lobby') return Promise.reject(new Error('Essa Party já começou. Peça um código novo ou espere voltar ao lobby.'));
         var jogadores = sala.jogadores || {};
         var qtd = Object.keys(jogadores).length;
         if (jogadores[eu.uid]) {
@@ -970,8 +970,8 @@
     var tit = _q('pty-erro-titulo');
     var desc = _q('pty-erro-desc');
     if (info && info.emAndamento) {
-      if (tit) tit.textContent = 'A Party acabou';
-      if (desc) desc.textContent = 'Alguém saiu ou a conexão caiu no meio da partida. Dá pra começar outra agora mesmo.';
+      if (tit) tit.textContent = 'Conexão perdida';
+      if (desc) desc.textContent = 'Alguém saiu ou a conexão caiu no meio da partida.';
     } else {
       if (tit) tit.textContent = 'A Party foi encerrada';
       if (desc) desc.textContent = 'O anfitrião saiu ou a sala expirou.';

@@ -450,6 +450,33 @@
     return _fbAuthCarregado;
   }
 
+  /* Realtime Database sozinho — usado pela PRESENÇA (ver bloco de
+     presença, perto do fim do arquivo), que precisa dele fora do hub de
+     jogos. Jogos/hub.js tem o seu próprio loader (_carregarFirebaseJogos)
+     que traz Firestore + Database juntos; os dois convivem porque
+     _injetarScript não injeta a mesma URL duas vezes.
+     O espera-pelo-global existe por causa desse compartilhamento: se o
+     hub já tiver COMEÇADO a injetar o script, _injetarScript acha a tag
+     e resolve na hora, mesmo antes do onload — sem a espera, um
+     firebase.database() logo em seguida estouraria. */
+  var _fbDbCarregado = null;
+  function _carregarFirebaseDb() {
+    if (_fbDbCarregado) return _fbDbCarregado;
+    _fbDbCarregado = _carregarFirebaseAuthCore().then(function () {
+      return _injetarScript(FIREBASE_SDK_BASE + 'firebase-database-compat.js');
+    }).then(function () {
+      return new Promise(function (resolve, reject) {
+        var tentativas = 0;
+        (function checar() {
+          if (window.firebase && firebase.database) { resolve(); return; }
+          if (++tentativas > 100) { reject(new Error('Realtime Database não carregou.')); return; }
+          setTimeout(checar, 50);
+        })();
+      });
+    }).catch(function (err) { _fbDbCarregado = null; throw err; });
+    return _fbDbCarregado;
+  }
+
   /* ── Hub de jogos: Jogos/hub.js carregado sob demanda ──────────────
      O hub inteiro (menu, streak, quiz, ranking, loader dos jogos
      externos) foi extraído pra Jogos/hub.js — quem só quer ver o
@@ -15423,6 +15450,13 @@ ${urlCard}`)}`;
             setTimeout(function () { _rankAtualizarSlotAposLogin(pend.jogo, pend.score); }, 1100);
           }
         }
+        // Presença (4.2): só conta nomeada entra. Adiado pra depois do
+        // boot assentar — baixa o SDK do Realtime Database, e isso não
+        // pode competir com a primeira pintura da tela.
+        setTimeout(_presencaIniciar, 2000);
+      } else {
+        // Deslogou (ou é sessão anônima de sala): tira do ar.
+        _presencaParar();
       }
       cliAtualizarHeader();
     });
@@ -15718,6 +15752,14 @@ ${urlCard}`)}`;
     wrap.innerHTML +=
       '<button type="button" class="cli-conta-avatar-cam" onclick="cliEscolherFoto()" ' +
       'aria-label="Trocar foto" title="Trocar foto"><i class="fa fa-camera"></i></button>';
+    // Pontinho de presença (4.2), canto oposto ao da câmera. Estilo
+    // inline de propósito: são 6 propriedades num elemento só, não vale
+    // uma regra nova no styles.css (e evita subir o CSS por causa disto).
+    wrap.innerHTML +=
+      '<span id="cli-conta-presenca" style="position:absolute;top:2px;right:2px;' +
+      'width:12px;height:12px;border-radius:50%;border:2px solid var(--card,#fff);' +
+      'background:#94a3b8;pointer-events:none;"></span>';
+    _presPintarIndicador();
   }
 
   /* ── Trocar apelido/nome ──────────────────────
@@ -15766,6 +15808,9 @@ ${urlCard}`)}`;
       if (nomeEl) nomeEl.textContent = novo;
       cliPintarAvatarPainel(novo);
       cliAtualizarHeader();
+      // Presença guarda o nome junto do state — reescreve pra 4.3 não
+      // mostrar o apelido antigo na lista de amigos.
+      try { window.AngatubaPresenca.atualizarNome(); } catch (e) {}
       cliCancelarApelido();
       if (btn) btn.disabled = false;
       if (typeof showToastSimples === 'function') showToastSimples('Apelido atualizado!', '/webp/owl-thumbsup.webp');
@@ -15952,6 +15997,9 @@ ${urlCard}`)}`;
   function cliSair() {
     const auth = _cliFirebaseAuth();
     cliFecharPainelConta();
+    // Presença sai do ar ANTES do signOut: depois dele o token já não
+    // vale e as regras do RTDB recusam a escrita no próprio nó.
+    _presencaParar();
     // Limpa também o apelido espelhado: sem isto ele sobrevivia no
     // localStorage e a próxima sala de multiplayer entrada sem conta
     // (sessão anônima) reaparecia com o nome de quem tinha saído.
@@ -15997,3 +16045,208 @@ ${urlCard}`)}`;
   // enxergam o app por window.* (hub.js roda no mesmo escopo global
   // e poderia chamar direto, mas usa o mesmo caminho por clareza).
   window.cliNomeExibicao      = cliNomeExibicao;
+
+  /* ══════════════════════════════════════════════════════════════
+     PRESENÇA (Realtime Database) — Etapa 4.2
+     ------------------------------------------------------------
+     Diz se uma CONTA NOMEADA está online. É a base pra lista de
+     amigos (4.3) e convites (4.4). Aqui não há UI de "quem está
+     online na cidade" — de propósito: privacidade e escala. A UI de
+     outras pessoas nasce na 4.3, sobre a lista de amigos.
+
+     Nó no RTDB:
+       presence/{uid} = {
+         state:        'online' | 'away' | 'offline',
+         nome:         string (cliNomeExibicao, máx 20),
+         atualizadoEm: timestamp do servidor
+       }
+
+     `atualizadoEm` (e não `atualmenteEm`) pra casar com o nome que os
+     docs de ranking no Firestore já usam.
+
+     Quem entra: SÓ conta nomeada. Sessão anônima de sala (multiplayer,
+     party, baralho) não grava presença — as regras do RTDB também
+     barram por sign_in_provider, então não depende só do cliente.
+
+     Mecânica padrão de presença do Firebase:
+       1. ouvir .info/connected
+       2. ao conectar, registrar o onDisconnect ANTES de escrever
+          'online' — se a ordem inverter e a queda acontecer no meio,
+          o nó fica 'online' pra sempre
+       3. onDisconnect().set() em vez de .remove(): guarda o último
+          `atualizadoEm`, que a 4.3 vai querer pra "offline há 2h"
+
+     'away': após ~60s com a aba escondida. Em celular isso quase
+     nunca chega a acontecer — o navegador congela a aba, a conexão
+     com o RTDB cai e o onDisconnect já marca 'offline' direto. Ou
+     seja, na prática 'away' é um estado de desktop; o par
+     online/offline é que carrega o peso.
+
+     API pública (window.AngatubaPresenca):
+       disponivel()        -> bool, se dá pra usar presença agora
+       meuEstado()         -> 'online'|'away'|'offline'|null
+       observar(uid, cb)   -> escuta a presença de UM uid; cb recebe
+                              {state, nome, atualizadoEm} ou null.
+                              Devolve uma função pra parar de ouvir.
+       atualizarNome()     -> reescreve o nome (chamado ao trocar o
+                              apelido), sem mexer no state
+     As regras não permitem LISTAR presence/ — só ler presence/{uid}
+     um a um. Isso é proposital: impede o feed "toda Angatuba online"
+     mesmo que alguém tente pelo console.
+  ══════════════════════════════════════════════════════════════ */
+
+  var PRES_AWAY_MS = 60000;      // tempo escondido antes de virar 'away'
+  var _presRef = null;           // ref de presence/{uid} do usuário atual
+  var _presConnRef = null;       // ref de .info/connected
+  var _presConnCb = null;        // handler do .info/connected (pra .off)
+  var _presUid = null;           // uid que está publicando presença
+  var _presEstado = null;        // último state publicado
+  var _presAwayTimer = null;
+  var _presVisBind = false;      // visibilitychange ligado uma única vez
+  var _presIniciando = false;    // evita dois _presencaIniciar em paralelo
+
+  function _presDb() {
+    if (typeof firebase === 'undefined' || !firebase.database) return null;
+    try { return firebase.database(); } catch (e) { return null; }
+  }
+
+  // Objeto gravado no nó. nome sempre pelo cliNomeExibicao (mesma
+  // identidade do header, do painel e do ranking).
+  function _presValor(state) {
+    return {
+      state: state,
+      nome: cliNomeExibicao() || 'Jogador',
+      atualizadoEm: firebase.database.ServerValue.TIMESTAMP
+    };
+  }
+
+  // Publica um state no nó do próprio usuário. Silencioso: presença é
+  // enfeite, nunca pode quebrar nada se falhar.
+  function _presPublicar(state) {
+    if (!_presRef) return;
+    _presEstado = state;
+    try { _presRef.set(_presValor(state)).catch(function () {}); } catch (e) {}
+    _presPintarIndicador();
+  }
+
+  /* Indicador no painel de conta — só o SEU próprio estado. Não existe
+     lista de quem está online: isso é 4.3, sobre amigos. O elemento é
+     criado por cliPintarAvatarPainel; se o painel estiver fechado, aqui
+     não faz nada. */
+  function _presPintarIndicador() {
+    var el = document.getElementById('cli-conta-presenca');
+    if (!el) return;
+    var mapa = {
+      online:  { cor: '#22c55e', txt: 'Online' },
+      away:    { cor: '#f59e0b', txt: 'Ausente' },
+      offline: { cor: '#94a3b8', txt: 'Offline' }
+    };
+    var m = mapa[_presEstado] || { cor: '#94a3b8', txt: 'Conectando…' };
+    el.style.background = m.cor;
+    el.title = m.txt;
+    el.setAttribute('aria-label', m.txt);
+  }
+
+  function _presCancelarAwayTimer() {
+    if (_presAwayTimer) { clearTimeout(_presAwayTimer); _presAwayTimer = null; }
+  }
+
+  // Aba escondida por PRES_AWAY_MS -> 'away'. Voltou -> 'online'.
+  function _presVisibilidade() {
+    if (!_presRef) return;
+    _presCancelarAwayTimer();
+    if (document.hidden) {
+      _presAwayTimer = setTimeout(function () {
+        _presAwayTimer = null;
+        if (_presRef && document.hidden) _presPublicar('away');
+      }, PRES_AWAY_MS);
+    } else if (_presEstado !== 'online') {
+      _presPublicar('online');
+    }
+  }
+
+  /* Liga a presença do usuário logado. Idempotente: chamar de novo com
+     o mesmo uid não faz nada. Carrega o SDK do Realtime Database sob
+     demanda — quem nunca loga jamais baixa esse script. */
+  function _presencaIniciar() {
+    if (!_cliContaReal(_cliUser)) return;
+    var uid = _cliUser.uid;
+    if (_presUid === uid || _presIniciando) return;
+    _presIniciando = true;
+    _carregarFirebaseDb().then(function () {
+      _presIniciando = false;
+      // A pessoa pode ter saído (ou trocado de conta) enquanto o SDK
+      // baixava — nesse caso não publica nada.
+      if (!_cliContaReal(_cliUser) || _cliUser.uid !== uid) return;
+      var db = _presDb();
+      if (!db) return;
+      _presencaParar();
+      _presUid = uid;
+      _presRef = db.ref('presence/' + uid);
+      _presConnRef = db.ref('.info/connected');
+      _presConnCb = function (snap) {
+        if (snap.val() !== true) return;
+        // onDisconnect PRIMEIRO, 'online' depois (ver comentário acima).
+        try { _presRef.onDisconnect().set(_presValor('offline')); } catch (e) {}
+        _presPublicar(document.hidden ? 'away' : 'online');
+      };
+      _presConnRef.on('value', _presConnCb);
+      if (!_presVisBind && typeof document.addEventListener === 'function') {
+        document.addEventListener('visibilitychange', _presVisibilidade);
+        _presVisBind = true;
+      }
+      _presPintarIndicador();
+    }).catch(function () {
+      _presIniciando = false;
+      // Sem RTDB (offline, rede bloqueada): app segue igual, sem presença.
+    });
+  }
+
+  /* Desliga: cancela o onDisconnect (senão ele dispararia depois, já
+     deslogado) e marca offline na hora. Chamado no cliSair e antes de
+     religar com outro uid. */
+  function _presencaParar() {
+    _presCancelarAwayTimer();
+    if (_presConnRef && _presConnCb) {
+      try { _presConnRef.off('value', _presConnCb); } catch (e) {}
+    }
+    if (_presRef) {
+      var ref = _presRef;
+      // Ordem de propósito: marca offline ANTES de cancelar o
+      // onDisconnect. Se o set falhar (token já expirado, rede caindo),
+      // o onDisconnect ainda não foi cancelado e marca offline sozinho
+      // quando a conexão cair — o nó nunca fica preso em 'online'.
+      try {
+        ref.set(_presValor('offline')).then(function () {
+          try { ref.onDisconnect().cancel(); } catch (e) {}
+        }).catch(function () {});
+      } catch (e) {}
+    }
+    _presRef = null; _presConnRef = null; _presConnCb = null;
+    _presUid = null; _presEstado = null;
+  }
+
+  window.AngatubaPresenca = {
+    disponivel: function () { return !!_presRef; },
+    meuEstado: function () { return _presEstado; },
+    // Escuta a presença de UM uid (a 4.3 chama isto por amigo).
+    // cb recebe {state, nome, atualizadoEm} ou null se não houver nó.
+    observar: function (uid, cb) {
+      if (!uid || typeof cb !== 'function') return function () {};
+      var parado = false, off = function () {};
+      _carregarFirebaseDb().then(function () {
+        if (parado) return;
+        var db = _presDb();
+        if (!db) { cb(null); return; }
+        var ref = db.ref('presence/' + uid);
+        var h = function (snap) { cb(snap.val() || null); };
+        ref.on('value', h, function () { cb(null); });
+        off = function () { try { ref.off('value', h); } catch (e) {} };
+      }).catch(function () { if (!parado) cb(null); });
+      return function () { parado = true; off(); };
+    },
+    // Trocou o apelido: reescreve o nome mantendo o state atual.
+    atualizarNome: function () {
+      if (_presRef && _presEstado) _presPublicar(_presEstado);
+    }
+  };

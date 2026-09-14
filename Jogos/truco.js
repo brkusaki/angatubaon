@@ -1375,6 +1375,15 @@
       acoes.appendChild(_elx('p', 'overlay-texto', { texto: 'Aguardando o anfitrião decidir revanche ou voltar ao lobby…' }));
     }
     caixa.appendChild(acoes);
+    // Sair da sala é explícito e vale pra TODO MUNDO (2.3). Sem isto, quem
+    // não é anfitrião não tinha saída nenhuma aqui além da barra genérica
+    // "← Voltar aos jogos" — que fecha a tela mas NÃO larga a sala, deixando
+    // o assento ocupado pros outros até a conexão cair. Fica abaixo das
+    // ações de continuar, e discreto de propósito: o caminho principal do
+    // fim de partida é ficar na sala.
+    var btnSair = _elx('button', 'btn-sair', { type: 'button', texto: 'Sair da sala' });
+    btnSair.addEventListener('click', function () { if (_ctx && _ctx.sairDoJogo) _ctx.sairDoJogo(); });
+    caixa.appendChild(btnSair);
     ov.appendChild(caixa);
     return ov;
   }

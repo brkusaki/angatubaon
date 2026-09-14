@@ -494,9 +494,15 @@
       onSala: function (cb) { _cbMotorSala = cb; if (_sala) cb(_sala); },
       // O motor chama isto quando a partida termina (ou é abandonada) e
       // deve voltar ao lobby DESTA MESMA sala (revanche fica a critério
-      // do motor: ele decide se zera o placar ou só volta ao lobby).
+      // do motor: ele decide se zera o placar ou só volta ao lobby). É o
+      // caminho PRINCIPAL do fim de partida — mesma sala, mesmo código,
+      // mesma galera.
       voltarAoLobby: voltarAoLobby,
-      sairDoJogo: sair
+      // Saída explícita da sala a partir da MESA (botão "Sair da sala" do
+      // fim de partida). Antes apontava direto pro sair(), que larga a sala
+      // no RTDB mas não desmonta a tela do jogo: o palco ficava vazio, em
+      // tela cheia, sem nenhum caminho de volta. Ver _sairDaSalaEVoltar.
+      sairDoJogo: _sairDaSalaEVoltar
     };
   }
 
@@ -622,6 +628,11 @@
 
     var voltarTopo = _el('button', 'link-voltar', { type: 'button', texto: '← Escolher outro jogo' });
     voltarTopo.addEventListener('click', function () {
+      // Trocar de jogo é trocar de sala: se ainda houver uma sala ativa
+      // presa neste módulo, ela tem que ser largada de verdade aqui — só
+      // mudar de tela deixaria sala fantasma na listagem pública e o
+      // assento ocupado pros outros até a conexão cair (2.3).
+      if (codigoSala()) { _sairDaSalaEVoltar(); return; }
       if (_pararListaPublicas) { _pararListaPublicas(); _pararListaPublicas = null; }
       _tela = 'escolha'; _renderizar();
     });
@@ -857,8 +868,10 @@
       wrap.appendChild(btnIniciar);
     }
 
-    var btnSair = _el('button', 'link-voltar', { type: 'button', texto: '← Sair da sala' });
-    btnSair.addEventListener('click', function () { sair(); _tela = 'escolha'; _renderizar(); });
+    // Rótulo alinhado com o Party e com o fim de partida da mesa: sair da
+    // sala é sempre "Sair da sala", em qualquer tela do Baralho.
+    var btnSair = _el('button', 'link-voltar', { type: 'button', texto: 'Sair da sala' });
+    btnSair.addEventListener('click', _sairDaSalaEVoltar);
     wrap.appendChild(btnSair);
 
     _raiz.appendChild(wrap);
@@ -873,6 +886,22 @@
   function _marcarTelaCheiaJogo(ligado) {
     var tela = document.getElementById('jogo-baralho');
     if (tela) tela.classList.toggle('brl-em-jogo', !!ligado);
+  }
+
+  /* Saída explícita e completa da sala (2.3) — único caminho que ABANDONA a
+     sala de verdade, venha do lobby ou do fim de partida na mesa. Larga a
+     sala no RTDB (sair() cuida do espelho público e do onDisconnect), desliga
+     a tela cheia do jogo e volta pra escolha de modo, sem deixar sala
+     fantasma pra trás. Continuar jogando é outra coisa: é voltarAoLobby(),
+     que mantém a mesma sala. */
+  function _sairDaSalaEVoltar() {
+    sair();
+    if (!_montado) return;
+    if (_pararListaPublicas) { _pararListaPublicas(); _pararListaPublicas = null; }
+    _marcarTelaCheiaJogo(false);
+    _aviso = '';
+    _tela = 'escolha'; _modoEscolhido = null;
+    _renderizar();
   }
 
   function _entrarNaTelaDeJogo(sala) {

@@ -710,6 +710,21 @@
 .uno-btn-secundario { background: rgba(255, 255, 255, 0.12); color: var(--uno-texto); border: 1px solid rgba(255, 255, 255, 0.22); }
 .uno-btn-principal:active, .uno-btn-secundario:active { transform: scale(0.97); }
 
+/* "Sair da sala" do fim de partida: de propósito mais discreto que
+   "Nova rodada"/"Voltar ao lobby" — continuar na mesma sala é o caminho
+   principal, sair é a exceção explícita. */
+.uno-btn-sair {
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  margin-top: 2px;
+  font-family: var(--font-h);
+  font-size: 0.84rem;
+  color: rgba(255, 255, 255, 0.68);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* ---------- balões de reação ---------- */
 
 .uno-balao {

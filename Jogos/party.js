@@ -286,6 +286,14 @@
     if (_reentrarNoLobbySePreciso(sala)) return; // o write dispara outro snapshot
     _emit('salaMudou', sala);
 
+    // Voltou pro lobby (Revanchinha, 2.3): a numeração de rodada recomeça do
+    // zero (ver revanche()), então o "já vi esta rodada" precisa recomeçar
+    // junto. Sem isto, a SEGUNDA revanchinha da mesma sala travava: o
+    // comecarParty() punha rodadaAtual = 1 de novo, _rodadaVistaEm ainda
+    // valia 1 da revanche anterior, a comparação abaixo dava "igual" e o
+    // minigame nunca abria — todo mundo ficava olhando o lobby.
+    if (sala.status === 'lobby') _rodadaVistaEm = -1;
+
     if (sala.status === 'rodada' && sala.rodadaAtual !== _rodadaVistaEm) {
       _rodadaVistaEm = sala.rodadaAtual;
       _iniciarRodadaLocal(sala);
@@ -820,6 +828,10 @@
   function _ptyComecarParty() { window.AngatubaParty.comecarParty(); }
   window._ptyComecarParty = _ptyComecarParty;
 
+  // Continuar na MESMA sala é o caminho principal do fim de rodada e do fim
+  // de Party (2.3): nenhuma das duas encosta em sair() — quem sai da sala é
+  // só o botão explícito "Sair da sala" (_ptyVoltarMenuLobby) ou o
+  // "Voltar ao hub" (_ptyVoltarHubFinal).
   function _ptyProximaRodada() { window.AngatubaParty.proximaRodada(); }
   window._ptyProximaRodada = _ptyProximaRodada;
 
@@ -963,8 +975,15 @@
       tituloEl.classList.remove('pty-campeao-titulo-anim'); void tituloEl.offsetWidth; tituloEl.classList.add('pty-campeao-titulo-anim');
     }
 
+    var souAnf = window.AngatubaParty.souAnfitriao();
     var btnRev = _q('pty-btn-revanche');
-    if (btnRev) btnRev.style.display = window.AngatubaParty.souAnfitriao() ? '' : 'none';
+    if (btnRev) btnRev.style.display = souAnf ? '' : 'none';
+    // Quem não é anfitrião via só "Voltar ao hub" aqui: parecia que a Party
+    // tinha acabado de vez e o jeito era ir embora. Agora sabe que dá pra
+    // ficar — a revanchinha reabre o lobby com a mesma galera e o mesmo
+    // código (ver revanche()).
+    var esperaRev = _q('pty-campeao-espera-anfitriao');
+    if (esperaRev) esperaRev.style.display = souAnf ? 'none' : '';
 
     document.body.classList.remove('angatuba-party-ativo');
     _mostrarTelaJogo('party');

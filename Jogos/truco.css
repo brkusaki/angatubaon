@@ -661,6 +661,22 @@
 .trc-btn-correr { background: rgba(255, 255, 255, 0.12); color: #f2ece0; border: 1px solid rgba(255, 255, 255, 0.3); }
 .trc-btn-aumentar { background: linear-gradient(135deg, var(--trc-dourado-forte), var(--trc-dourado)); color: #241a08; }
 
+/* "Sair da sala" do fim de partida: de propósito mais discreto que
+   "Revanche"/"Voltar ao lobby" — continuar na mesma sala é o caminho
+   principal, sair é a exceção explícita. */
+.trc-btn-sair {
+  display: block;
+  margin: 10px auto 0;
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  font-family: var(--font-h);
+  font-size: 0.8rem;
+  color: rgba(231, 223, 207, 0.7);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* ---------- flash de mensagem ---------- */
 
 .trc-flash {

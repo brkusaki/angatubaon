@@ -46,7 +46,7 @@
 
    SALAS: criar sala aceita pública (aparece na lista "salas abertas
    agora", 1 toque pra entrar) ou privada (só quem tem o código
-   entra) — ver _ppCriarSala / o checkbox #pp-privada-check. A lista
+   entra) — ver _ppCriarSala / o checkbox #pp-publica-check. A lista
    de salas públicas é mantida viva enquanto a tela inicial estiver
    visível (_ppIniciarListaSalas/_ppPararListaSalas).
 
@@ -304,7 +304,7 @@
     }
     var validas = (lista || []).filter(function (s) { return _ppCodigoValido(s.codigo); });
     if (!validas.length) {
-      wrap.innerHTML = '<div class="pp-lista-vazia">Nenhuma sala pública aberta agora.</div>';
+      wrap.innerHTML = '<div class="pp-lista-vazia">Nenhuma sala aberta agora. Crie a primeira!</div>';
       return;
     }
     var html = '';
@@ -340,8 +340,8 @@
     _ppLimparErroMenu();
     var btn = document.getElementById('pp-btn-criar');
     if (btn) btn.disabled = true;
-    var chkPrivada = document.getElementById('pp-privada-check');
-    var publica = !(chkPrivada && chkPrivada.checked);
+    var chkPublica = document.getElementById('pp-publica-check');
+    var publica = !!(chkPublica && chkPublica.checked);
     window.AngatubaMP.criarSala(publica).then(function (codigo) {
       _ppModo = 'multiplayer';
       _ppSouAnfitriao = true;
@@ -394,7 +394,7 @@
     var desc   = document.getElementById('pp-sala-desc');
     var codEl  = document.getElementById('pp-sala-codigo');
     if (modo === 'aguardando') {
-      if (titulo) titulo.textContent = 'Chame um amigo!';
+      if (titulo) titulo.textContent = 'Aguardando o amigo…';
       if (desc) desc.textContent = 'Manda esse código pro seu amigo digitar em "Entrar com código":';
       if (codEl) { codEl.textContent = codigo; codEl.style.display = ''; }
     } else {

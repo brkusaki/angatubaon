@@ -744,7 +744,7 @@
     }
     var validas = (lista || []).filter(function (s) { return _ptyCodigoValido(s.codigo); });
     if (!validas.length) {
-      wrap.innerHTML = '<div class="pty-lista-vazia">Nenhuma Party pública aberta agora.</div>';
+      wrap.innerHTML = '<div class="pty-lista-vazia">Nenhuma sala aberta agora. Crie a primeira!</div>';
       return;
     }
     wrap.innerHTML = validas.map(function (s) {
@@ -759,8 +759,8 @@
   }
 
   function _ptyCriarSala() {
-    var privadaCheck = _q('pty-privada-check');
-    var publica = !(privadaCheck && privadaCheck.checked);
+    var publicaCheck = _q('pty-publica-check');
+    var publica = !!(publicaCheck && publicaCheck.checked);
     _erroMenu('');
     window.AngatubaParty.criarSala(publica).then(function () {
       _rendarLobby();

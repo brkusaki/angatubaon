@@ -642,7 +642,7 @@
     var inputPublica = document.createElement('input');
     inputPublica.type = 'checkbox'; inputPublica.checked = true;
     checkPublica.appendChild(inputPublica);
-    checkPublica.appendChild(document.createTextNode(' Sala pública (aparece na lista)'));
+    checkPublica.appendChild(document.createTextNode(' 🌐 Sala pública (aparece na lista)'));
     // Sala solo (1 jogador) já nasce cheia — não faz sentido listar
     // publicamente algo que ninguém consegue entrar.
     function _ajustarPublicaParaN(n) {
@@ -697,7 +697,7 @@
     blocoCodigo.appendChild(_el('h3', 'bloco-titulo', { texto: 'Entrar com código' }));
     var linhaCodigo = _el('div', 'linha-codigo');
     var campoCodigo = document.createElement('input');
-    campoCodigo.type = 'text'; campoCodigo.maxLength = TAM_CODIGO; campoCodigo.placeholder = 'ABCD';
+    campoCodigo.type = 'text'; campoCodigo.maxLength = TAM_CODIGO; campoCodigo.placeholder = 'CÓDIGO';
     campoCodigo.className = _cls('campo-codigo');
     campoCodigo.addEventListener('input', function () { campoCodigo.value = campoCodigo.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
     var btnEntrar = _el('button', 'btn-secundario', { type: 'button', texto: 'Entrar' });
@@ -719,7 +719,7 @@
 
     // ---- salas públicas ----
     var blocoPublicas = _el('div', 'bloco');
-    blocoPublicas.appendChild(_el('h3', 'bloco-titulo', { texto: 'Salas públicas' }));
+    blocoPublicas.appendChild(_el('h3', 'bloco-titulo', { texto: 'Salas abertas agora' }));
     var listaPublicas = _el('div', 'lista-publicas');
     blocoPublicas.appendChild(listaPublicas);
     wrap.appendChild(blocoPublicas);
@@ -728,7 +728,7 @@
     _pararListaPublicas = listarSalas(_modoEscolhido, function (lista) {
       _limpar(listaPublicas);
       if (!lista.length) {
-        listaPublicas.appendChild(_el('p', 'vazio', { texto: 'Nenhuma sala pública agora. Crie a primeira!' }));
+        listaPublicas.appendChild(_el('p', 'vazio', { texto: 'Nenhuma sala aberta agora. Crie a primeira!' }));
         return;
       }
       lista.forEach(function (s) {
@@ -805,9 +805,9 @@
     var caixaCodigo = _el('div', 'caixa-codigo');
     caixaCodigo.appendChild(_el('span', 'caixa-codigo-label', { texto: 'Código da sala' }));
     caixaCodigo.appendChild(_el('span', 'caixa-codigo-valor', { texto: codigoSala() }));
-    var btnCopiar = _el('button', 'btn-copiar', { type: 'button', texto: 'Copiar' });
+    var btnCopiar = _el('button', 'btn-copiar', { type: 'button', texto: 'Copiar código' });
     btnCopiar.addEventListener('click', function () {
-      try { navigator.clipboard.writeText(codigoSala()); btnCopiar.textContent = 'Copiado!'; setTimeout(function () { btnCopiar.textContent = 'Copiar'; }, 1400); } catch (e) {}
+      try { navigator.clipboard.writeText(codigoSala()); btnCopiar.textContent = 'Copiado!'; setTimeout(function () { btnCopiar.textContent = 'Copiar código'; }, 1400); } catch (e) {}
     });
     caixaCodigo.appendChild(btnCopiar);
     wrap.appendChild(caixaCodigo);

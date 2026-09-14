@@ -707,7 +707,7 @@
     }
     var validas = (lista || []).filter(function (s) { return _tqCodigoValido(s.codigo); });
     if (!validas.length) {
-      wrap.innerHTML = '<div class="tq-lista-vazia">Nenhuma sala pública aberta agora.</div>';
+      wrap.innerHTML = '<div class="tq-lista-vazia">Nenhuma sala aberta agora. Crie a primeira!</div>';
       return;
     }
     var html = '';
@@ -741,8 +741,8 @@
     _tqLimparErroMenu();
     var btn = document.getElementById('tq-btn-criar');
     if (btn) btn.disabled = true;
-    var chkPrivada = document.getElementById('tq-privada-check');
-    var publica = !(chkPrivada && chkPrivada.checked);
+    var chkPublica = document.getElementById('tq-publica-check');
+    var publica = !!(chkPublica && chkPublica.checked);
     window.AngatubaMP.criarSala(publica).then(function (codigo) {
       _tqModo = 'multiplayer';
       _tqSouAnfitriao = true;
@@ -789,7 +789,7 @@
     var desc   = document.getElementById('tq-sala-desc');
     var codEl  = document.getElementById('tq-sala-codigo');
     if (modo === 'aguardando') {
-      if (titulo) titulo.textContent = 'Chame um amigo!';
+      if (titulo) titulo.textContent = 'Aguardando o amigo…';
       if (desc) desc.textContent = 'Manda esse código pro seu amigo digitar em "Entrar com código":';
       if (codEl) { codEl.textContent = codigo; codEl.style.display = ''; }
     } else {

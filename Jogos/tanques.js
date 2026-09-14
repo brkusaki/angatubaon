@@ -458,6 +458,12 @@
   // normal de criarSala() — descarta em vez de renderizar.
   function _tqCodigoValido(c) { return /^[A-Z0-9]{4}$/.test(c || ''); }
   var _tqSaindoVoluntariamente = false;
+  /* 2.2 — mesmo papel do _ppSemAdversario do Ping Pong: não tem mais
+     ninguém do outro lado (queda de conexão, ou o adversário saiu depois
+     do fim da partida), então não existe revanche e o botão principal da
+     tela de fim vira "Criar nova sala" (ver _tqMostrarFim e
+     _tqPedirRevanche). */
+  var _tqSemAdversario = false;
   var _tqApelidoAdversario = '';
 
   // Tanques: {x,y,ang} em espaço 0..MUNDO_LARGURA/MUNDO_ALTURA. O
@@ -827,6 +833,7 @@
     _tqDestravarOrientacao();
     _tqModo = null;
     _tqSouAnfitriao = false;
+    _tqSemAdversario = false;
     var btnC = document.getElementById('tq-btn-criar');
     var btnE = document.getElementById('tq-btn-entrar');
     if (btnC) btnC.disabled = false;
@@ -876,6 +883,10 @@
     if (desc) desc.textContent = TQ_MODO_DESC[modo] || '';
   };
   window._tqPedirRevanche = function () {
+    // 2.2: sem ninguém do outro lado este botão não é revanche — está
+    // rotulado "Criar nova sala" e leva ao menu já abrindo uma sala nova,
+    // em vez de pedir revanche num canal que não existe mais.
+    if (_tqSemAdversario) { _tqVoltarMenu(); _tqCriarSala(); return; }
     if (_tqModo === 'solo') { _tqReiniciarPartida(); _tqComecarPartida(); }
     else if (_tqSouAnfitriao) { _tqReiniciarPartida(); _tqEnviarReinicio(); _tqComecarPartida(); }
     else if (window.AngatubaMP) window.AngatubaMP.enviar({ t: 'pr' });
@@ -889,6 +900,7 @@
     _tqEventosLigados = true;
 
     window.AngatubaMP.on('conectado', function () {
+      _tqSemAdversario = false;
       var bridge = _tqBridge();
       var meuNome = (bridge && bridge.apelido && bridge.apelido()) || 'Jogador';
       var msg = { t: 'oi', nome: meuNome, classe: _tqMinhaClasse };
@@ -919,6 +931,12 @@
     window.AngatubaMP.on('desconectado', function () {
       if (_tqSaindoVoluntariamente) { _tqSaindoVoluntariamente = false; return; }
       if (_tqEstado === 'jogando' || _tqEstado === 'sala') _tqMostrarFim('desconexao');
+      /* 2.2: a partida já tinha acabado e o adversário saiu com a tela de
+         resultado aberta. O placar continua valendo, mas a revanche
+         deixa de existir — sem isto o "Jogar de novo" ficava vivo e não
+         fazia nada. O !_tqSemAdversario ignora o onclose tardio do canal
+         que o nosso próprio sair() fechou. */
+      else if (_tqEstado === 'fim' && _tqModo === 'multiplayer' && !_tqSemAdversario) _tqAdversarioSumiuNoFim();
     });
 
     window.AngatubaMP.on('erro', function (err) {
@@ -2061,31 +2079,51 @@
     var btnVoltar = document.getElementById('tq-btn-voltar-fim');
 
     if (motivo === 'desconexao') {
+      _tqSemAdversario = true;
       if (titulo) titulo.textContent = 'Conexão perdida';
       if (msg) msg.textContent = 'O outro jogador saiu ou a conexão caiu.';
       if (placar) placar.style.display = 'none';
-      if (btnRev) btnRev.style.display = 'none';
-      // Sem revanche, este é o ÚNICO caminho da tela: vira o botão
-      // principal (mesma classe do "Jogar de novo") em vez de um link
-      // discreto — mesma decisão do Ping Pong.
-      if (btnVoltar) { btnVoltar.className = 'tq-play'; btnVoltar.textContent = 'Voltar ao menu'; }
+      /* 2.2: revanche não existe mais (não tem com quem), mas a tela não
+         pode virar um beco sem saída — mesma decisão do Ping Pong. O
+         botão principal passa a abrir uma sala nova (ver
+         _tqPedirRevanche) e o "Voltar ao menu" volta a ser o link
+         secundário, levando ao menu completo do 2.1 (Criar sala / Entrar
+         com código / Salas abertas agora). */
+      if (btnRev) { btnRev.style.display = ''; btnRev.textContent = 'Criar nova sala'; }
+      if (btnVoltar) { btnVoltar.className = 'tq-link'; btnVoltar.textContent = 'Voltar ao menu'; }
       if (owlEl) { owlEl.src = '/webp/owl-wave.webp'; owlEl.style.display = ''; }
       // Libera a sala no Firebase e deixa os handlers prontos pra próxima
       // partida — ver _tqSairDaRede.
       _tqSairDaRede(true);
       return;
     }
-    if (btnVoltar) { btnVoltar.className = 'tq-link'; btnVoltar.textContent = 'Voltar ao início'; }
+    if (btnVoltar) { btnVoltar.className = 'tq-link'; btnVoltar.textContent = 'Voltar ao menu'; }
     var venceu = meu > dele;
     if (titulo) titulo.textContent = venceu ? 'Você venceu! 🏆' : 'Não foi dessa vez';
     if (msg) msg.textContent = venceu ? 'Mandou bem contra ' + (_tqApelidoAdversario || 'seu adversário') + '!'
                                        : (_tqApelidoAdversario || 'Seu adversário') + ' levou essa.';
     if (placar) { placar.textContent = meu + ' x ' + dele; placar.style.display = ''; }
-    if (btnRev) btnRev.style.display = '';
+    // O rótulo é reposto (e não só o display): numa partida anterior a
+    // tela de desconexão pode ter deixado este botão como "Criar nova sala".
+    if (btnRev) { btnRev.style.display = ''; btnRev.textContent = 'Jogar de novo'; }
     if (owlEl) { owlEl.src = venceu ? '/webp/owl-trophy.webp' : '/webp/owl-wave.webp'; owlEl.style.display = ''; }
 
     var bridge = _tqBridge();
     if (venceu && bridge && bridge.efeitos) bridge.efeitos.confete('tq-fim', 80);
+  }
+
+  /* 2.2 — adversário sumiu com a tela de resultado já aberta (ver o
+     handler de 'desconectado'). Mantém o resultado da partida na tela e
+     troca só o que deixou de ser verdade: a revanche. */
+  function _tqAdversarioSumiuNoFim() {
+    _tqSemAdversario = true;
+    var btnRev = document.getElementById('tq-btn-revanche');
+    var msg = document.getElementById('tq-fim-msg');
+    if (btnRev) { btnRev.disabled = false; btnRev.style.display = ''; btnRev.textContent = 'Criar nova sala'; }
+    if (msg) msg.textContent = (_tqApelidoAdversario || 'O adversário') + ' saiu. Crie uma sala nova pra jogar outra.';
+    // Mesma limpeza da tela de desconexão: libera a sala e religa os
+    // handlers pra próxima partida (ver _tqSairDaRede).
+    _tqSairDaRede(true);
   }
 
   function _tqAtualizarHUD() {

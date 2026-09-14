@@ -146,6 +146,12 @@
 
   var _ppApelidoAdversario = '';
   var _ppSaindoVoluntariamente = false; // true durante um sair() pedido pelo próprio jogador
+  /* 2.2 — não tem mais ninguém do outro lado (a conexão caiu, ou o
+     adversário saiu depois que a partida acabou). Enquanto isso for
+     verdade não existe revanche: o botão principal da tela de fim vira
+     "Criar nova sala" (ver _ppMostrarFim e _ppPedirRevanche), que é o
+     caminho real de volta pra uma partida. */
+  var _ppSemAdversario = false;
 
   /* ── Cenário (fundo): arena de ping pong gerada por IA (arquibancada,
      holofotes, piso de madeira), desenhada em "cover fit" atrás da mesa —
@@ -428,6 +434,7 @@
     _ppSairDaRede(true);
     _ppModo = null;
     _ppSouAnfitriao = false;
+    _ppSemAdversario = false;
     var btnC = document.getElementById('pp-btn-criar');
     var btnE = document.getElementById('pp-btn-entrar');
     if (btnC) btnC.disabled = false;
@@ -441,6 +448,10 @@
   window._ppCopiarCodigo = _ppCopiarCodigo;
   window._ppVoltarMenu = _ppVoltarMenu;
   window._ppPedirRevanche = function () {
+    // 2.2: sem ninguém do outro lado este botão não é revanche — ele está
+    // rotulado "Criar nova sala" e leva ao menu já abrindo uma sala nova,
+    // em vez de pedir revanche num canal que não existe mais.
+    if (_ppSemAdversario) { _ppVoltarMenu(); _ppCriarSala(); return; }
     if (_ppModo === 'solo') { _ppReiniciarPartida(); _ppComecarPartida(); }
     else if (_ppSouAnfitriao) { _ppReiniciarPartida(); _ppEnviarReinicio(); _ppComecarPartida(); }
     else if (window.AngatubaMP) window.AngatubaMP.enviar({ t: 'pr' });
@@ -454,6 +465,7 @@
     _ppEventosLigados = true;
 
     window.AngatubaMP.on('conectado', function () {
+      _ppSemAdversario = false;
       var bridge = _ppBridge();
       var meuNome = (bridge && bridge.apelido && bridge.apelido()) || 'Jogador';
       window.AngatubaMP.enviar({ t: 'oi', nome: meuNome });
@@ -471,6 +483,14 @@
     window.AngatubaMP.on('desconectado', function () {
       if (_ppSaindoVoluntariamente) { _ppSaindoVoluntariamente = false; return; }
       if (_ppEstado === 'jogando' || _ppEstado === 'sala') _ppMostrarFim('desconexao');
+      /* 2.2: a partida já tinha acabado e o adversário saiu enquanto a
+         tela de resultado estava aberta. O placar continua valendo (não
+         vira "Conexão perdida"), mas a revanche deixa de existir — sem
+         isto o "Jogar de novo" ficava vivo e não fazia nada (o convidado
+         mandava 'pr' pro vazio; o anfitrião recomeçava uma partida contra
+         uma raquete parada). O !_ppSemAdversario ignora o onclose tardio
+         do canal que o nosso próprio sair() fechou. */
+      else if (_ppEstado === 'fim' && _ppModo === 'multiplayer' && !_ppSemAdversario) _ppAdversarioSumiuNoFim();
     });
 
     window.AngatubaMP.on('erro', function (err) {
@@ -880,14 +900,18 @@
     var btnVoltar = document.getElementById('pp-btn-voltar-fim');
 
     if (motivo === 'desconexao') {
+      _ppSemAdversario = true;
       if (titulo) titulo.textContent = 'Conexão perdida';
       if (msg) msg.textContent = 'O outro jogador saiu ou a conexão caiu.';
       if (placar) placar.style.display = 'none';
-      if (btnRev) btnRev.style.display = 'none';
-      // Sem revanche, este é o ÚNICO caminho da tela: vira o botão
-      // principal (mesma classe do "Jogar de novo") em vez de um link
-      // discreto, pra ninguém ficar olhando a tela sem saber o que fazer.
-      if (btnVoltar) { btnVoltar.className = 'pp-play'; btnVoltar.textContent = 'Voltar ao menu'; }
+      /* 2.2: revanche não existe mais (não tem com quem), mas a tela não
+         pode virar um beco sem saída. O mesmo botão principal passa a
+         oferecer o caminho útil — abrir uma sala nova pro amigo entrar de
+         novo (ver _ppPedirRevanche) — e o "Voltar ao menu" volta a ser o
+         link secundário, levando ao menu completo do 2.1 (Criar sala /
+         Entrar com código / Salas abertas agora). */
+      if (btnRev) { btnRev.style.display = ''; btnRev.textContent = 'Criar nova sala'; }
+      if (btnVoltar) { btnVoltar.className = 'pp-link'; btnVoltar.textContent = 'Voltar ao menu'; }
       if (owlEl) { owlEl.src = '/webp/owl-wave.webp'; owlEl.style.display = ''; }
       // Libera a sala no Firebase (sem isso ela ficava fantasma até o
       // onDisconnect do navegador) e deixa os handlers prontos pra
@@ -895,17 +919,33 @@
       _ppSairDaRede(true);
       return;
     }
-    if (btnVoltar) { btnVoltar.className = 'pp-link'; btnVoltar.textContent = 'Voltar ao início'; }
+    if (btnVoltar) { btnVoltar.className = 'pp-link'; btnVoltar.textContent = 'Voltar ao menu'; }
     var venceu = meu > dele;
     if (titulo) titulo.textContent = venceu ? 'Você venceu! 🏆' : 'Não foi dessa vez';
     if (msg) msg.textContent = venceu ? 'Mandou bem contra ' + (_ppApelidoAdversario || 'seu adversário') + '!'
                                        : (_ppApelidoAdversario || 'Seu adversário') + ' levou essa.';
     if (placar) { placar.textContent = meu + ' x ' + dele; placar.style.display = ''; }
-    if (btnRev) btnRev.style.display = '';
+    // O rótulo é reposto (e não só o display): numa partida anterior a
+    // tela de desconexão pode ter deixado este botão como "Criar nova sala".
+    if (btnRev) { btnRev.style.display = ''; btnRev.textContent = 'Jogar de novo'; }
     if (owlEl) { owlEl.src = venceu ? '/webp/owl-trophy.webp' : '/webp/owl-wave.webp'; owlEl.style.display = ''; }
 
     var bridge = _ppBridge();
     if (venceu && bridge && bridge.efeitos) bridge.efeitos.confete('pp-fim', 80);
+  }
+
+  /* 2.2 — adversário sumiu com a tela de resultado já aberta (ver o
+     handler de 'desconectado'). Mantém o resultado da partida na tela e
+     troca só o que deixou de ser verdade: a revanche. */
+  function _ppAdversarioSumiuNoFim() {
+    _ppSemAdversario = true;
+    var btnRev = document.getElementById('pp-btn-revanche');
+    var msg = document.getElementById('pp-fim-msg');
+    if (btnRev) { btnRev.disabled = false; btnRev.style.display = ''; btnRev.textContent = 'Criar nova sala'; }
+    if (msg) msg.textContent = (_ppApelidoAdversario || 'O adversário') + ' saiu. Crie uma sala nova pra jogar outra.';
+    // Mesma limpeza da tela de desconexão: libera a sala e religa os
+    // handlers pra próxima partida (ver _ppSairDaRede).
+    _ppSairDaRede(true);
   }
 
   function _ppAtualizarHUD() {

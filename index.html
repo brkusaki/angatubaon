@@ -1210,20 +1210,20 @@
               <div class="pp-overlay-desc">Jogue sozinho contra a CPU, ou desafie um amigo em tempo real criando uma sala.</div>
               <div class="pp-opcoes">
                 <button type="button" class="pp-btn-opcao" onclick="_ppJogarSozinho()">Jogar sozinho</button>
-                <button type="button" class="pp-btn-opcao pp-btn-opcao-alt" id="pp-btn-criar" onclick="_ppCriarSala()">Criar sala (com um amigo)</button>
+                <button type="button" class="pp-btn-opcao pp-btn-opcao-alt" id="pp-btn-criar" onclick="_ppCriarSala()">Criar sala</button>
                 <label class="pp-privada-toggle">
-                  <input type="checkbox" id="pp-privada-check">
-                  <span>🔒 Sala privada (só por código)</span>
+                  <input type="checkbox" id="pp-publica-check" checked>
+                  <span>🌐 Sala pública (aparece na lista)</span>
                 </label>
               </div>
-              <div class="pp-divisor">salas abertas agora</div>
-              <div class="pp-lista-salas" id="pp-lista-salas">
-                <div class="pp-lista-vazia">Nenhuma sala pública aberta agora.</div>
-              </div>
-              <div class="pp-divisor">ou entrar com um código</div>
+              <div class="pp-divisor">Entrar com código</div>
               <div class="pp-entrar-wrap">
                 <input type="text" class="pp-codigo-input" id="pp-codigo-input" placeholder="CÓDIGO" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
                 <button type="button" class="pp-btn-entrar-mini" id="pp-btn-entrar" onclick="_ppEntrarSala()">Entrar</button>
+              </div>
+              <div class="pp-divisor">Salas abertas agora</div>
+              <div class="pp-lista-salas" id="pp-lista-salas">
+                <div class="pp-lista-vazia">Nenhuma sala aberta agora. Crie a primeira!</div>
               </div>
               <div class="pp-menu-erro" id="pp-menu-erro" style="display:none;"></div>
             </div>
@@ -1231,7 +1231,7 @@
             <!-- Tela de sala: aguardando adversário OU conectando -->
             <div class="pp-overlay" id="pp-sala" style="display:none;">
               <img src="/webp/owl-wave.webp" alt="" class="pp-overlay-owl" onerror="this.style.display='none'">
-              <div class="pp-overlay-titulo" id="pp-sala-titulo">Chame um amigo!</div>
+              <div class="pp-overlay-titulo" id="pp-sala-titulo">Aguardando o amigo…</div>
               <div class="pp-overlay-desc" id="pp-sala-desc"></div>
               <div class="pp-sala-codigo" id="pp-sala-codigo" style="display:none;"></div>
               <div class="pp-sala-spinner"></div>
@@ -1333,20 +1333,20 @@
               </div>
               <div class="tq-opcoes">
                 <button type="button" class="tq-btn-opcao" onclick="_tqJogarSozinho()">Jogar sozinho</button>
-                <button type="button" class="tq-btn-opcao tq-btn-opcao-alt" id="tq-btn-criar" onclick="_tqCriarSala()">Criar sala (com um amigo)</button>
+                <button type="button" class="tq-btn-opcao tq-btn-opcao-alt" id="tq-btn-criar" onclick="_tqCriarSala()">Criar sala</button>
                 <label class="tq-privada-toggle">
-                  <input type="checkbox" id="tq-privada-check">
-                  <span>🔒 Sala privada (só por código)</span>
+                  <input type="checkbox" id="tq-publica-check" checked>
+                  <span>🌐 Sala pública (aparece na lista)</span>
                 </label>
               </div>
-              <div class="tq-divisor">salas abertas agora</div>
-              <div class="tq-lista-salas" id="tq-lista-salas">
-                <div class="tq-lista-vazia">Nenhuma sala pública aberta agora.</div>
-              </div>
-              <div class="tq-divisor">ou entrar com um código</div>
+              <div class="tq-divisor">Entrar com código</div>
               <div class="tq-entrar-wrap">
                 <input type="text" class="tq-codigo-input" id="tq-codigo-input" placeholder="CÓDIGO" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
                 <button type="button" class="tq-btn-entrar-mini" id="tq-btn-entrar" onclick="_tqEntrarSala()">Entrar</button>
+              </div>
+              <div class="tq-divisor">Salas abertas agora</div>
+              <div class="tq-lista-salas" id="tq-lista-salas">
+                <div class="tq-lista-vazia">Nenhuma sala aberta agora. Crie a primeira!</div>
               </div>
               <div class="tq-menu-erro" id="tq-menu-erro" style="display:none;"></div>
             </div>
@@ -1354,7 +1354,7 @@
             <!-- Tela de sala: aguardando adversário OU conectando -->
             <div class="tq-overlay" id="tq-sala" style="display:none;">
               <img src="/webp/owl-wave.webp" alt="" class="tq-overlay-owl" onerror="this.style.display='none'">
-              <div class="tq-overlay-titulo" id="tq-sala-titulo">Chame um amigo!</div>
+              <div class="tq-overlay-titulo" id="tq-sala-titulo">Aguardando o amigo…</div>
               <div class="tq-overlay-desc" id="tq-sala-desc"></div>
               <div class="tq-sala-codigo" id="tq-sala-codigo" style="display:none;"></div>
               <div class="tq-sala-spinner"></div>
@@ -1392,18 +1392,18 @@
             <div class="pty-opcoes">
               <button type="button" class="pty-btn" onclick="_ptyCriarSala()">Criar Party</button>
               <label class="pty-privada-toggle">
-                <input type="checkbox" id="pty-privada-check">
-                <span>🔒 Sala privada (só por código)</span>
+                <input type="checkbox" id="pty-publica-check" checked>
+                <span>🌐 Sala pública (aparece na lista)</span>
               </label>
             </div>
-            <div class="pty-divisor">parties abertas agora</div>
-            <div class="pty-lista-salas" id="pty-lista-salas">
-              <div class="pty-lista-vazia">Nenhuma Party pública aberta agora.</div>
-            </div>
-            <div class="pty-divisor">ou entrar com um código</div>
+            <div class="pty-divisor">Entrar com código</div>
             <div class="pty-entrar-wrap">
               <input type="text" class="pty-codigo-input" id="pty-codigo-input" placeholder="CÓDIGO" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
               <button type="button" class="pty-btn-entrar-mini" onclick="_ptyEntrarSala()">Entrar</button>
+            </div>
+            <div class="pty-divisor">Salas abertas agora</div>
+            <div class="pty-lista-salas" id="pty-lista-salas">
+              <div class="pty-lista-vazia">Nenhuma sala aberta agora. Crie a primeira!</div>
             </div>
             <div class="pty-menu-erro" id="pty-menu-erro" style="display:none;"></div>
           </div>

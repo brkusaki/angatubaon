@@ -202,9 +202,29 @@
 
   function _ppComecar() { _ppPreparar(); } // exigido pelo contrato { preparar, comecar, parar }
 
+  /* Saída da rede em um único lugar (P1 — recuperação de conexão).
+     AngatubaMP.sair() zera TODOS os handlers do core (ver comentário em
+     multiplayer.js/sair) — sem religar depois, o jogador que caiu e tocou
+     "Voltar ao menu" criava uma sala nova que nunca recebia 'conectado' e
+     ficava presa em "aguardando". Por isso:
+       religar = true  -> continuamos dentro do Ping Pong (voltar ao menu,
+                          queda de conexão): reinscreve os handlers na hora;
+       religar = false -> estamos fechando o jogo (_ppParar): só marca pra
+                          reinscrever no próximo _ppPreparar(), senão os
+                          handlers do Ping Pong processariam pacotes do
+                          Tanques (ver A1.2). */
+  function _ppSairDaRede(religar) {
+    if (!window.AngatubaMP) return;
+    _ppSaindoVoluntariamente = true;
+    try { window.AngatubaMP.sair(); } catch (e) {}
+    _ppSaindoVoluntariamente = false;
+    _ppEventosLigados = false;
+    if (religar) _ppLigarEventosRede();
+  }
+
   function _ppParar() {
     if (_ppRAF) { cancelAnimationFrame(_ppRAF); _ppRAF = 0; }
-    if (window.AngatubaMP) { _ppSaindoVoluntariamente = true; window.AngatubaMP.sair(); }
+    _ppSairDaRede(false);
     _ppPararListaSalas();
     _ppEstado = 'inicio';
     _ppModo = null;
@@ -383,7 +403,7 @@
 
   function _ppVoltarMenu() {
     if (_ppRAF) { cancelAnimationFrame(_ppRAF); _ppRAF = 0; }
-    if (window.AngatubaMP) { _ppSaindoVoluntariamente = true; window.AngatubaMP.sair(); }
+    _ppSairDaRede(true);
     _ppModo = null;
     _ppSouAnfitriao = false;
     var btnC = document.getElementById('pp-btn-criar');
@@ -456,11 +476,19 @@
       case 'e': // anfitrião -> convidado: estado da bola + placar + sets + saque
         if (!_ppSouAnfitriao) {
           _ppUltimoEEm = performance.now();
-          _ppBola.x = dado.bx; _ppBola.d = dado.bd; _ppBola.h = dado.bh;
-          _ppRaqueteAdversarioX = dado.hx; _ppRaqueteAdversarioH = dado.hh;
-          _ppPlacarAnfitriao = dado.sh; _ppPlacarConvidado = dado.sg;
-          _ppSetsAnfitriao = dado.sta || 0; _ppSetsConvidado = dado.stg || 0;
-          _ppAguardandoSaque = !!dado.ag; _ppSaquePara = dado.qs;
+          // Fix A2.8: valida tipo antes de aplicar — mesmo padrão do case
+          // 'p' — um pacote corrompido não pode virar NaN no estado local.
+          if (typeof dado.bx === 'number') _ppBola.x = _ppClamp(dado.bx, -1, 1);
+          if (typeof dado.bd === 'number') _ppBola.d = _ppClamp(dado.bd, 0, 1);
+          if (typeof dado.bh === 'number') _ppBola.h = _ppClamp(dado.bh, 0, 3);
+          if (typeof dado.hx === 'number') _ppRaqueteAdversarioX = _ppClamp(dado.hx, -1, 1);
+          if (typeof dado.hh === 'number') _ppRaqueteAdversarioH = _ppClamp(dado.hh, 0, PP_RAQUETE_ALTURA_MAX);
+          if (typeof dado.sh === 'number') _ppPlacarAnfitriao = _ppClamp(dado.sh, 0, 99);
+          if (typeof dado.sg === 'number') _ppPlacarConvidado = _ppClamp(dado.sg, 0, 99);
+          _ppSetsAnfitriao = (typeof dado.sta === 'number') ? _ppClamp(dado.sta, 0, PP_SETS_PARA_VENCER) : 0;
+          _ppSetsConvidado = (typeof dado.stg === 'number') ? _ppClamp(dado.stg, 0, PP_SETS_PARA_VENCER) : 0;
+          _ppAguardandoSaque = !!dado.ag;
+          if (dado.qs === 0 || dado.qs === 1) _ppSaquePara = dado.qs;
           _ppAtualizarHUD();
           if (dado.fim) _ppMostrarFim('fim');
         }
@@ -537,9 +565,16 @@
     if (e.cancelable) e.preventDefault();
   }
   function _ppPointerUp() { _ppArrastoAnterior = null; _ppMinhaRaqueteVX = 0; }
+  var _ppUltimoEnvioRaquete = 0;
   function _ppEnviarMinhaRaquete() {
     if (_ppModo !== 'multiplayer' || !window.AngatubaMP) return;
     if (_ppSouAnfitriao) return; // o anfitrião já tem a própria posição local; só o convidado precisa mandar
+    // Throttle: sem isto, telas de alta taxa de atualização mandam até uma
+    // mensagem por frame de pointermove — mesmo corte de 33ms do Tanques
+    // (ver A2.7).
+    var agora = performance.now();
+    if ((agora - _ppUltimoEnvioRaquete) < 33) return;
+    _ppUltimoEnvioRaquete = agora;
     window.AngatubaMP.enviar({ t: 'p', x: _ppMinhaRaqueteX, h: _ppMinhaRaqueteH, v: _ppMinhaRaqueteVX });
   }
   var _ppControlesOn = false;
@@ -820,15 +855,25 @@
     var dele = _ppSouAnfitriao ? _ppSetsConvidado : _ppSetsAnfitriao;
     var btnRev = document.getElementById('pp-btn-revanche');
     if (btnRev) btnRev.disabled = false;
+    var btnVoltar = document.getElementById('pp-btn-voltar-fim');
 
     if (motivo === 'desconexao') {
       if (titulo) titulo.textContent = 'Conexão perdida';
-      if (msg) msg.textContent = 'O outro jogador saiu ou a conexão caiu.';
+      if (msg) msg.textContent = 'O outro jogador saiu ou a conexão caiu. Volte ao menu pra criar outra sala ou entrar numa aberta.';
       if (placar) placar.style.display = 'none';
       if (btnRev) btnRev.style.display = 'none';
+      // Sem revanche, este é o ÚNICO caminho da tela: vira o botão
+      // principal (mesma classe do "Jogar de novo") em vez de um link
+      // discreto, pra ninguém ficar olhando a tela sem saber o que fazer.
+      if (btnVoltar) { btnVoltar.className = 'pp-play'; btnVoltar.textContent = 'Voltar ao menu'; }
       if (owlEl) { owlEl.src = '/webp/owl-wave.webp'; owlEl.style.display = ''; }
+      // Libera a sala no Firebase (sem isso ela ficava fantasma até o
+      // onDisconnect do navegador) e deixa os handlers prontos pra
+      // próxima partida — ver _ppSairDaRede.
+      _ppSairDaRede(true);
       return;
     }
+    if (btnVoltar) { btnVoltar.className = 'pp-link'; btnVoltar.textContent = 'Voltar ao início'; }
     var venceu = meu > dele;
     if (titulo) titulo.textContent = venceu ? 'Você venceu! 🏆' : 'Não foi dessa vez';
     if (msg) msg.textContent = venceu ? 'Mandou bem contra ' + (_ppApelidoAdversario || 'seu adversário') + '!'

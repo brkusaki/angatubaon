@@ -311,6 +311,38 @@
   text-align: center;
 }
 
+/* ---------- aviso persistente (queda de conexão / sala encerrada) ----------
+   Diferente do .brl-flash (toque rápido, some em 3,2s), este fica na tela
+   até a pessoa fechar ou navegar — é o que explica por que a partida
+   acabou sozinha. Ver _renderAviso em baralho.js. */
+
+#baralho-root .brl-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  background: var(--surface2, var(--surface));
+  border: 1px solid var(--brl-dourado);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: var(--text);
+  text-align: left;
+}
+
+#baralho-root .brl-aviso-texto { flex: 1; }
+
+#baralho-root .brl-aviso-fechar {
+  background: none;
+  border: 0;
+  color: var(--text2, var(--text));
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
 /* ---------- flash de mensagem ---------- */
 
 #baralho-root .brl-flash {

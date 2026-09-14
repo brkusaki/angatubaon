@@ -290,9 +290,36 @@
     }
   }
 
+  // A sala sumiu do RTDB (anfitrião saiu/caiu e o onDisconnect removeu,
+  // ou ela expirou). P1: antes daqui só ir pra tela de erro, é preciso
+  // desmontar o que estava rodando LOCALMENTE — sem isso o minigame da
+  // rodada continuava com timers e countdown vivos por cima da tela de
+  // aviso (mesmo problema do A2.2, mas neste caminho), e o onDisconnect
+  // do próprio jogador ficava armado numa sala que não existe mais.
   function _aoSalaFechada() {
-    _emit('salaFechada');
+    var estavaEmPartida = !!(_sala && _sala.status && _sala.status !== 'lobby');
+    _pararLocal();
+    if (_salaRef) {
+      try { _salaRef.onDisconnect().cancel(); } catch (e) {}
+      if (_meuUid) { try { _salaRef.child('jogadores/' + _meuUid).onDisconnect().cancel(); } catch (e) {} }
+    }
+    _emit('salaFechada', { emAndamento: estavaEmPartida });
     _limparTudo();
+  }
+
+  /* Desmontagem só do que roda NESTE aparelho (timers, minigame em
+     andamento, listeners e a classe de tela cheia). Usada tanto pelo
+     sair() voluntário quanto pela queda da sala — ver _aoSalaFechada. */
+  function _pararLocal() {
+    _pararListeners();
+    if (_timeoutSeguranca) { clearTimeout(_timeoutSeguranca); _timeoutSeguranca = null; }
+    if (_contagemHandle) { clearTimeout(_contagemHandle); _contagemHandle = null; }
+    _rodadaEmAndamento = false;
+    // Sem isto, o minigame em andamento (Puff/Ervilhas sobretudo — os
+    // outros já se auto-limpam por outros caminhos) continuava rodando
+    // timers sobre uma tela já abandonada (ver A2.2).
+    if (_apiAtual && typeof _apiAtual.parar === 'function') { try { _apiAtual.parar(); } catch (e) {} }
+    document.body.classList.remove('angatuba-party-ativo');
   }
 
   /* ── Handlers (equivalente ao AngatubaMP.on) ─────────────────── */
@@ -460,9 +487,8 @@
   }
 
   // "Começar Party": só aqui o totalRodadas é (re)calculado — fixa a linha
-  // de chegada da sessão. baseRodada normalmente é 0 (sala nova), mas numa
-  // revanche já vem com o valor da sessão anterior (ver revanche()), então
-  // a numeração de rodada continua subindo em vez de reiniciar do zero.
+  // de chegada da sessão. baseRodada é 0 tanto numa sala nova quanto numa
+  // revanche (que agora reseta rodadaAtual — ver A2.16 em revanche()).
   function comecarParty() {
     if (!_souAnfitriao || !_sala || !_salaRef) return;
     var qtd = Object.keys(_sala.jogadores || {}).length;
@@ -509,28 +535,24 @@
     }).catch(function () {});
   }
 
-  // Revanchinha: zera o placar geral e reabre o lobby — sem apagar
-  // nada (rodadaAtual/totalRodadas continuam subindo na próxima
-  // sessão, ver comecarParty()). Mesma sala, mesmo código, mesma
-  // galera.
+  // Revanchinha: zera o placar geral e reabre o lobby. Mesma sala, mesmo
+  // código, mesma galera.
+  // Fix A2.16: rodadaAtual volta a 0 (e resultados/placarRodadas somem)
+  // a cada revanche — sem isto, a numeração de rodada nunca reiniciava e
+  // uma sala muito usada (ex.: 25 revanches de 20 rodadas) passava do
+  // teto de 500 da regra do RTDB; o update seguinte era negado em
+  // silêncio e a Party simplesmente parava de começar.
   function revanche() {
     if (!_souAnfitriao || !_sala || !_salaRef) return;
     var jogadores = _sala.jogadores || {};
-    var updates = { status: 'lobby' };
+    var updates = { status: 'lobby', rodadaAtual: 0, resultados: null, placarRodadas: null };
     Object.keys(jogadores).forEach(function (uid) { updates['jogadores/' + uid + '/pontosTotal'] = 0; });
     _salaRef.update(updates).catch(function () {});
   }
 
   /* ── Sair da sala / limpeza ───────────────────────────────────── */
   function sair() {
-    _pararListeners();
-    if (_timeoutSeguranca) { clearTimeout(_timeoutSeguranca); _timeoutSeguranca = null; }
-    if (_contagemHandle) { clearTimeout(_contagemHandle); _contagemHandle = null; }
-    // Sem isto, o minigame em andamento (Puff/Ervilhas sobretudo — os
-    // outros já se auto-limpam por outros caminhos) continuava rodando
-    // timers sobre uma tela já abandonada (ver A2.2).
-    if (_apiAtual && typeof _apiAtual.parar === 'function') { try { _apiAtual.parar(); } catch (e) {} }
-    document.body.classList.remove('angatuba-party-ativo');
+    _pararLocal();
     if (_salaRef) {
       try { _salaRef.onDisconnect().cancel(); } catch (e) {}
       if (_souAnfitriao) {
@@ -896,8 +918,20 @@
     if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.fim(true);
   });
 
-  window.AngatubaParty.on('salaFechada', function () {
+  window.AngatubaParty.on('salaFechada', function (info) {
     document.body.classList.remove('angatuba-party-ativo');
+    // Duas situações bem diferentes pra quem está olhando: a Party caiu no
+    // meio (o que a pessoa quer saber é "o que aconteceu com a partida?")
+    // ou a sala do lobby sumiu antes de começar.
+    var tit = _q('pty-erro-titulo');
+    var desc = _q('pty-erro-desc');
+    if (info && info.emAndamento) {
+      if (tit) tit.textContent = 'A Party acabou';
+      if (desc) desc.textContent = 'Alguém saiu ou a conexão caiu no meio da partida. Dá pra começar outra agora mesmo.';
+    } else {
+      if (tit) tit.textContent = 'A Party foi encerrada';
+      if (desc) desc.textContent = 'O anfitrião saiu ou a sala expirou.';
+    }
     _mostrarTelaJogo('party');
     _mostrarSub('erro');
   });

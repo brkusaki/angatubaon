@@ -485,6 +485,22 @@
     return e;
   }
 
+  /* Aviso persistente do topo da tela (P1 — recuperação de conexão).
+     O _flash some em 3,2s e, pior, era apagado na hora pelo _limpar()
+     do _renderizar() seguinte: quem voltava pra escolha/lobby depois de
+     uma queda não via mensagem nenhuma. Este aviso fica na tela até a
+     pessoa navegar pra outro lugar (ou tocar no "×"). */
+  var _aviso = '';
+  function _renderAviso(wrap) {
+    if (!_aviso) return;
+    var caixa = _el('div', 'aviso');
+    caixa.appendChild(_el('span', 'aviso-texto', { texto: _aviso }));
+    var fechar = _el('button', 'aviso-fechar', { type: 'button', texto: '×', 'aria-label': 'Fechar aviso' });
+    fechar.addEventListener('click', function () { _aviso = ''; _renderizar(); });
+    caixa.appendChild(fechar);
+    wrap.appendChild(caixa);
+  }
+
   var _msgTimer = null;
   function _flash(texto) {
     if (!_raiz) return;
@@ -514,6 +530,7 @@
 
   function _renderEscolha() {
     var wrap = _el('div', 'escolha');
+    _renderAviso(wrap);
     wrap.appendChild(_el('h2', 'titulo', { texto: 'Jogos de Baralho' }));
     wrap.appendChild(_el('p', 'subtitulo', { texto: 'Chame a turma pra uma partida.' }));
 
@@ -524,7 +541,7 @@
       var card = _el('button', 'card-modo', { type: 'button' });
       card.appendChild(_el('span', 'card-modo-nome', { texto: def.nome }));
       card.appendChild(_el('span', 'card-modo-jogadores', { texto: def.min + ' a ' + def.max + ' jogadores' }));
-      card.addEventListener('click', function () { _modoEscolhido = chave; _tela = 'criar'; _renderizar(); });
+      card.addEventListener('click', function () { _aviso = ''; _modoEscolhido = chave; _tela = 'criar'; _renderizar(); });
       lista.appendChild(card);
     });
     wrap.appendChild(lista);
@@ -680,8 +697,9 @@
     _renderizar();
     function cair(msg) {
       if (_tela !== 'preparando') return; // já entrou na mesa, ignora
-      _flash(msg);
+      // _renderizar() antes do _flash: ele limpa a raiz e apagaria a caixa.
       _tela = 'lobby'; _renderizar();
+      _flash(msg);
     }
     var p = iniciarPartida();
     if (!p) { cair('Não consegui começar a partida.'); return; }
@@ -712,6 +730,7 @@
     var def = modos()[sala.modo] || { nome: sala.modo, min: 2, max: sala.maxJogadores };
 
     var wrap = _el('div', 'lobby');
+    _renderAviso(wrap);
     wrap.appendChild(_el('h2', 'titulo', { texto: def.nome }));
     if (sala.maxJogadores === 1) {
       wrap.appendChild(_el('p', 'subtitulo', { texto: 'Modo solo — você joga contra a Coruja 🦉' }));
@@ -803,7 +822,7 @@
     _garantirModoCarregado(sala.modo, function (def) {
       if (_tela !== 'jogo' || !_raiz) return; // saiu da tela enquanto carregava
       _limpar(_raiz);
-      if (!def || typeof def.iniciar !== 'function') { _marcarTelaCheiaJogo(false); _flash('Não foi possível carregar o jogo.'); _tela = 'lobby'; _renderizar(); return; }
+      if (!def || typeof def.iniciar !== 'function') { _marcarTelaCheiaJogo(false); _tela = 'lobby'; _renderizar(); _flash('Não foi possível carregar o jogo.'); return; }
       var palco = _el('div', 'palco-jogo');
       _raiz.appendChild(palco);
       _motorAtivo = { chave: sala.modo, api: def };
@@ -814,13 +833,24 @@
   on('salaMudou', function (sala) {
     if (_cbMotorSala) _cbMotorSala(sala); // encaminha pro motor ativo, se houver
     if (!_montado) return;
-    if (sala.status === 'jogando' && _tela !== 'jogo') { _entrarNaTelaDeJogo(sala); return; }
+    if (sala.status === 'jogando' && _tela !== 'jogo') { _entrarNaTelaDeJogo(sala); _aviso = ''; return; }
     if (sala.status === 'lobby' && _tela === 'jogo') {
+      // Voltamos da mesa pro lobby. Duas causas possíveis: o anfitrião
+      // encerrou a partida normalmente (todo mundo ainda na sala) ou ela
+      // foi cancelada porque alguém caiu (_checarJogadoresAusentes em
+      // truco.js/uno.js chama voltarAoLobby). Só o anfitrião via o flash
+      // do motor — e mesmo ele o perdia, porque o container do jogo é
+      // destruído logo em seguida. Contando os jogadores aqui, TODO MUNDO
+      // na mesa recebe a explicação, e ela fica na tela.
+      var faltaGente = Object.keys(sala.jogadores || {}).length < (sala.maxJogadores || 0);
       if (_motorAtivo && _motorAtivo.api.parar) { try { _motorAtivo.api.parar(); } catch (e) {} }
       _motorAtivo = null;
       _cbMotorSala = null;
       _tela = 'lobby';
       _marcarTelaCheiaJogo(false);
+      _aviso = faltaGente
+        ? 'Um jogador saiu ou a conexão dele caiu — a partida foi cancelada. A sala continua de pé: chame a galera e comece outra.'
+        : '';
     }
     if (_tela === 'lobby') _renderizar();
   });
@@ -831,8 +861,11 @@
     _cbMotorSala = null;
     _tela = 'escolha';
     _marcarTelaCheiaJogo(false);
-    _flash('A sala foi encerrada.');
+    _aviso = 'A sala foi encerrada — o anfitrião saiu ou a conexão caiu. Escolha um jogo pra criar ou entrar em outra sala.';
+    // _renderizar() ANTES do _flash: ele limpa a raiz inteira e apagava a
+    // caixa do flash recém-criada — a mensagem nunca chegava a aparecer.
     _renderizar();
+    _flash('A sala foi encerrada.');
   });
 
   /* ── API do hub (window.BaralhoGame) ─────────────────────────────

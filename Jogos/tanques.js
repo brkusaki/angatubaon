@@ -602,9 +602,27 @@
 
   function _tqComecar() { _tqPreparar(); }
 
+  /* Saída da rede em um único lugar (P1 — recuperação de conexão).
+     Espelha _ppSairDaRede do Ping Pong: AngatubaMP.sair() zera TODOS os
+     handlers do core (ver multiplayer.js/sair), então quem continua na
+     tela do Tanques precisa reinscrevê-los na hora — senão a partida
+     seguinte nunca recebe 'conectado' e trava em "aguardando".
+       religar = true  -> seguimos no Tanques (voltar ao menu / queda);
+       religar = false -> estamos fechando o jogo (_tqParar): reinscreve
+                          só no próximo _tqPreparar(), pra não processar
+                          pacotes do Ping Pong (ver A1.2). */
+  function _tqSairDaRede(religar) {
+    if (!window.AngatubaMP) return;
+    _tqSaindoVoluntariamente = true;
+    try { window.AngatubaMP.sair(); } catch (e) {}
+    _tqSaindoVoluntariamente = false;
+    _tqEventosLigados = false;
+    if (religar) _tqLigarEventosRede();
+  }
+
   function _tqParar() {
     if (_tqRAF) { cancelAnimationFrame(_tqRAF); _tqRAF = 0; }
-    if (window.AngatubaMP) { _tqSaindoVoluntariamente = true; window.AngatubaMP.sair(); }
+    _tqSairDaRede(false);
     _tqPararListaSalas();
     _tqDestravarOrientacao();
     // Fix A2.22: cancela a cascata de remedição pós-rotação se ainda tiver
@@ -783,7 +801,7 @@
 
   function _tqVoltarMenu() {
     if (_tqRAF) { cancelAnimationFrame(_tqRAF); _tqRAF = 0; }
-    if (window.AngatubaMP) { _tqSaindoVoluntariamente = true; window.AngatubaMP.sair(); }
+    _tqSairDaRede(true);
     // Fix A2.10: _tqParar() já libera a trava de orientação, mas voltar ao
     // menu do Tanques pela tela de fim (sem fechar o jogo) não passava por
     // ali — a tela ficava presa em paisagem.
@@ -2021,15 +2039,24 @@
     var dele = _tqSouAnfitriao ? _tqPlacarConvidado : _tqPlacarAnfitriao;
     var btnRev = document.getElementById('tq-btn-revanche');
     if (btnRev) btnRev.disabled = false;
+    var btnVoltar = document.getElementById('tq-btn-voltar-fim');
 
     if (motivo === 'desconexao') {
       if (titulo) titulo.textContent = 'Conexão perdida';
-      if (msg) msg.textContent = 'O outro jogador saiu ou a conexão caiu.';
+      if (msg) msg.textContent = 'O outro jogador saiu ou a conexão caiu. Volte ao menu pra criar outra sala ou entrar numa aberta.';
       if (placar) placar.style.display = 'none';
       if (btnRev) btnRev.style.display = 'none';
+      // Sem revanche, este é o ÚNICO caminho da tela: vira o botão
+      // principal (mesma classe do "Jogar de novo") em vez de um link
+      // discreto — mesma decisão do Ping Pong.
+      if (btnVoltar) { btnVoltar.className = 'tq-play'; btnVoltar.textContent = 'Voltar ao menu'; }
       if (owlEl) { owlEl.src = '/webp/owl-wave.webp'; owlEl.style.display = ''; }
+      // Libera a sala no Firebase e deixa os handlers prontos pra próxima
+      // partida — ver _tqSairDaRede.
+      _tqSairDaRede(true);
       return;
     }
+    if (btnVoltar) { btnVoltar.className = 'tq-link'; btnVoltar.textContent = 'Voltar ao início'; }
     var venceu = meu > dele;
     if (titulo) titulo.textContent = venceu ? 'Você venceu! 🏆' : 'Não foi dessa vez';
     if (msg) msg.textContent = venceu ? 'Mandou bem contra ' + (_tqApelidoAdversario || 'seu adversário') + '!'

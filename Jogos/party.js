@@ -392,6 +392,14 @@
       if (!_rodadaEmAndamento) return;
       if (!entry) { reportarResultado(0); return; }
       entry.iniciar(sala.seed).then(function (api) {
+        // A sala pode ter caído enquanto o minigame carregava (P4): neste
+        // ponto _pararLocal() já rodou e não teria nada pra parar, porque
+        // _apiAtual ainda era null. Guarda a api pra ninguém, e desmonta o
+        // que acabou de nascer.
+        if (!_rodadaEmAndamento) {
+          if (api && typeof api.parar === 'function') { try { api.parar(); } catch (e) {} }
+          return;
+        }
         _apiAtual = api;
       }).catch(function () {
         reportarResultado(0); // jogo não carregou: não trava a rodada pros outros
@@ -429,6 +437,11 @@
 
   function _iniciarJogoTela(nome, comecarArgs, tetoSeg) {
     return window._jogoLoader(nome).then(function (api) {
+      // P4: o anfitrião pode ter caído enquanto o arquivo do minigame
+      // carregava. Sem esta guarda, o jogo abria em tela cheia POR CIMA do
+      // aviso de "Party encerrada", com os timers dele soltos — e nada mais
+      // o pararia, porque _pararLocal() já tinha rodado antes disto.
+      if (!_rodadaEmAndamento) return null;
       if (typeof api.preparar === 'function') api.preparar();
       _mostrarTelaJogo(nome);
       if (typeof api.comecar === 'function') api.comecar.apply(api, comecarArgs || []);
@@ -451,6 +464,9 @@
     _mostrarTelaJogo('party');
     _emit('mostrarArena');
     return window._jogoLoader(nome).then(function (api) {
+      // Mesma guarda do _iniciarJogoTela (P4): sala caiu durante o load,
+      // não adianta montar a arena por cima da tela de aviso.
+      if (!_rodadaEmAndamento) return null;
       var container = document.getElementById('pty-arena-container');
       if (!container) throw new Error('Arena da Party não encontrada.');
       if (typeof api.render !== 'function') throw new Error('Módulo ' + nome + ' não expõe render().');

@@ -386,7 +386,13 @@
       var salaRefAtual = _salaRef;
       try { salaRefAtual.onDisconnect().cancel(); } catch (e) {}
       if (_souAnfitriao) {
-        var _apagarSala = function () { try { salaRefAtual.remove(); } catch (e) {} };
+        // O .catch() importa (P4): quando quem caiu foi o anfitrião, a sala
+        // já não existe e a regra de salas/$codigo nega qualquer escrita
+        // (o ".write" cai no ramo "data.child('anfitriao/uid')", que é null).
+        // O try/catch só pega erro síncrono — sem o .catch(), a Promise
+        // rejeitada do remove() virava um "Uncaught (in promise)
+        // PERMISSION_DENIED" no console de quem só estava saindo direito.
+        var _apagarSala = function () { try { salaRefAtual.remove().catch(function () {}); } catch (e) {} };
         if (_salaPublica) {
           // Apaga o espelho ANTES da sala: a regra de escrita de
           // salasPublicas/$codigo exige provar (lendo salas/$codigo) que
@@ -408,8 +414,11 @@
         }
       } else {
         // Convidado: sem isto o nó fica preso e a sala trava pra quem
-        // ficou (ver A1.5).
-        try { salaRefAtual.child('convidado').remove(); } catch (e) {}
+        // ficou (ver A1.5). O .catch() é o caso mais comum do P4 — o
+        // anfitrião caiu, a sala inteira já foi embora e este remove é
+        // negado pela regra; sem ele a saída limpa do convidado terminava
+        // num "Uncaught (in promise) PERMISSION_DENIED".
+        try { salaRefAtual.child('convidado').remove().catch(function () {}); } catch (e) {}
       }
     }
     _salaRef = null;

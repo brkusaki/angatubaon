@@ -349,6 +349,20 @@
     _escutar(_salaRef, 'value', function (snap) {
       var sala = snap.val();
       if (!sala) {
+        // A sala sumiu: o anfitrião saiu/caiu e o onDisconnect dele a
+        // removeu (ou ela expirou). P4 — antes de avisar, desarma o que
+        // ficou apontando pra uma ref morta, como já fazia o _aoSalaFechada
+        // de party.js: (1) o listener desta sala, que _limparTudo() não
+        // desliga e ficaria vivo num caminho inexistente (se o mesmo código
+        // de 4 letras fosse sorteado de novo depois, ele acordaria dentro da
+        // sala de estranhos); (2) o onDisconnect ainda armado nesta conexão,
+        // que nessa mesma situação apagaria a sala/o jogador de outra mesa.
+        var refMorta = _salaRef;
+        _pararListeners();
+        if (refMorta) {
+          try { refMorta.onDisconnect().cancel(); } catch (e) {}
+          if (_meuUid) { try { refMorta.child('jogadores/' + _meuUid).onDisconnect().cancel(); } catch (e) {} }
+        }
         _emit('salaFechada'); _limparTudo();
         if (!jaResolveu) { jaResolveu = true; resolverPrimeiro(); }
         return;

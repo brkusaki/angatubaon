@@ -107,7 +107,23 @@
      sala seguem vivos até sair()); adicionar uma track reaproveita
      o transporte já negociado, então normalmente nem surgem.
 
+   ── POLIMENTO 3.3 ─────────────────────────────────────────────
+   - getUserMedia pede echoCancellation/noiseSuppression/autoGainControl
+     (ver RESTRICOES_AUDIO). São constraints simples, não "exact": quem
+     não suporta ignora. Se ainda assim algum navegador rejeitar por
+     causa delas, o pedido é refeito com { audio: true }.
+   - Queda de conexão apaga o microfone na hora (_encerrarAudio dentro de
+     _emitDesconectadoUmaVez), não só no sair() — o indicador de
+     "gravando" do aparelho não fica aceso na tela de resultado.
+   - audioRemotoAtivo() também olha track.muted: quando o outro lado
+     desliga a voz, a track daqui fica mutada (não 'ended'), então sem
+     isso o indicador remoto nunca apagava.
+   - Autoplay barrado pelo navegador não quebra nada: o áudio remoto
+     tenta tocar de novo no próximo toque/tecla, em silêncio.
+
    Limitações conhecidas (aceitas nesta etapa):
+   - Sem AEC próprio: em viva-voz com os dois aparelhos no mesmo ambiente
+     ainda pode haver eco. O cancelamento é o do navegador/SO ou nada.
    - Sem servidor TURN. Em NAT muito restritivo a conexão (jogo E voz)
      não fecha — igual já era antes do áudio.
    - Voz só existe no AngatubaMP (Ping Pong e Tanques). Party e
@@ -126,6 +142,16 @@
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' }
   ];
+
+  // Eco (3.3): pedidas como constraints simples (não "exact"), então
+  // navegador que não conhece alguma delas simplesmente ignora em vez de
+  // rejeitar. Resolve o eco normal de fone/alto-falante baixo; em viva-voz
+  // com os dois aparelhos no mesmo ambiente AINDA PODE HAVER ECO — não tem
+  // AEC próprio aqui, é o do navegador/SO ou nada.
+  var RESTRICOES_AUDIO = {
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    video: false
+  };
 
   var SALA_EXPIRA_MS = 5 * 60 * 1000; // sala sem ninguém entrar por 5min = expirada
   var ALFABETO_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sem 0/O/1/I
@@ -147,6 +173,7 @@
   var _sendersAudio = [];     // RTCRtpSender das tracks locais já entregues ao pc
   var _micMutado = false;
   var _elAudioRemoto = null;  // <audio> escondido que toca a voz do outro
+  var _esperandoGesto = false; // autoplay barrado: esperando um toque pra tentar de novo
   var _fazendoOferta = false; // perfect negotiation
   var _educado = true;        // convidado = educado (cede em colisão de ofertas)
 
@@ -222,6 +249,13 @@
   function _emitDesconectadoUmaVez() {
     if (_jaEmitiuDesconexao) return;
     _jaEmitiuDesconexao = true;
+    // 3.3: a conexão morreu — não existe mais ninguém pra ouvir. Apaga o
+    // microfone AQUI (e não só no sair()), senão o indicador de "gravando"
+    // do aparelho fica aceso enquanto a tela de resultado estiver aberta e
+    // a stream sobrevive órfã até o jogador sair do jogo. O 'audio' emitido
+    // por _encerrarAudio() sai ANTES do 'desconectado', então a UI dos
+    // jogos já volta pro estado desligado.
+    _encerrarAudio();
     _emit('desconectado');
   }
 
@@ -259,11 +293,34 @@
       _elAudioRemoto = el;
     }
     _elAudioRemoto.srcObject = stream;
-    // Autoplay de áudio já passou por gesto do usuário (ele tocou em
-    // criar/entrar na sala), mas se o navegador barrar não é motivo pra
-    // quebrar a partida — só não sai som.
-    var p = _elAudioRemoto.play();
-    if (p && p.catch) p.catch(function () {});
+    _tentarTocarRemoto();
+  }
+
+  // Autoplay de áudio normalmente já passou por gesto do usuário (ele tocou
+  // em criar/entrar na sala e no botão de mic), mas se o navegador barrar
+  // mesmo assim não é motivo pra quebrar a partida: fica sem som e o
+  // PRÓXIMO toque em qualquer lugar tenta de novo — o primeiro toque no
+  // botão de mic já basta. Falha silenciosa, sem aviso na tela.
+  function _tentarTocarRemoto() {
+    if (!_elAudioRemoto) return;
+    var p;
+    try { p = _elAudioRemoto.play(); } catch (e) { _armarGestoAudio(); return; }
+    if (p && p.catch) p.catch(function () { _armarGestoAudio(); });
+  }
+
+  function _armarGestoAudio() {
+    if (_esperandoGesto || typeof document === 'undefined') return;
+    _esperandoGesto = true;
+    var retomar = function () {
+      document.removeEventListener('pointerdown', retomar, true);
+      document.removeEventListener('touchend', retomar, true);
+      document.removeEventListener('keydown', retomar, true);
+      _esperandoGesto = false;
+      if (_elAudioRemoto && _elAudioRemoto.srcObject) _tentarTocarRemoto();
+    };
+    document.addEventListener('pointerdown', retomar, true);
+    document.addEventListener('touchend', retomar, true);
+    document.addEventListener('keydown', retomar, true);
   }
 
   function _removerAudioRemoto() {
@@ -286,7 +343,11 @@
   function audioRemotoAtivo() {
     if (!_elAudioRemoto || !_elAudioRemoto.srcObject) return false;
     var faixas = _elAudioRemoto.srcObject.getAudioTracks ? _elAudioRemoto.srcObject.getAudioTracks() : [];
-    return faixas.some(function (t) { return t.readyState === 'live'; });
+    // 3.3: quando o outro lado chama desabilitarAudio(), o removeTrack dele
+    // deixa a track DAQUI mutada (t.muted = true) — o readyState só vira
+    // 'ended' quando a conexão inteira cai. Sem checar .muted o pontinho
+    // verde ficava aceso pra sempre depois que o outro desligava o mic.
+    return faixas.some(function (t) { return t.readyState === 'live' && !t.muted; });
   }
 
   function _emitirAudio() {
@@ -321,6 +382,20 @@
     });
   }
 
+  // Pede o mic com as constraints de eco; se algum navegador teimar e
+  // rejeitar por causa delas (OverconstrainedError), tenta o pedido simples
+  // em vez de deixar o jogador sem voz por um detalhe de qualidade.
+  function _pedirMicrofone() {
+    var md = navigator.mediaDevices;
+    return md.getUserMedia(RESTRICOES_AUDIO).catch(function (err) {
+      var nome = err && err.name ? String(err.name) : '';
+      if (nome === 'OverconstrainedError' || nome === 'ConstraintNotSatisfiedError') {
+        return md.getUserMedia({ audio: true, video: false });
+      }
+      throw err;
+    });
+  }
+
   function habilitarAudio() {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       return Promise.reject(new Error('Seu navegador não permite usar o microfone aqui.'));
@@ -330,7 +405,7 @@
 
     _intencaoAudio = true;
     var geracao = _geracaoAudio;
-    var pedido = navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    var pedido = _pedirMicrofone()
       .then(function (stream) {
         if (geracao === _geracaoAudio) _pedidoMic = null;
         // Desligou a voz (ou saiu da sala) enquanto o navegador perguntava
@@ -379,6 +454,24 @@
     _sendersAudio = [];
     _pararStreamLocal();
     _emitirAudio();
+  }
+
+  // Apaga TUDO de áudio sem tentar renegociar nada — pra quando não existe
+  // mais conexão viva (queda) ou estamos saindo da sala. Emite 'audio' uma
+  // única vez, já com o <audio> remoto fora, pra UI não ver um estado
+  // intermediário. _geracaoAudio++ aborta um getUserMedia ainda no ar: se a
+  // permissão sair depois, a stream que chegar é descartada em vez de
+  // acender o microfone sem ninguém pedir (ver habilitarAudio).
+  function _encerrarAudio() {
+    var tinhaAlgo = !!_streamLocal || _intencaoAudio || !!_elAudioRemoto || !!_pedidoMic;
+    _intencaoAudio = false;
+    _micMutado = false;
+    _pedidoMic = null;
+    _geracaoAudio++;
+    _sendersAudio = [];
+    _pararStreamLocal();
+    _removerAudioRemoto();
+    if (tinhaAlgo) _emitirAudio();
   }
 
   function microfoneMutado() { return !!_micMutado; }
@@ -717,12 +810,7 @@
     // partida, senão o indicador de "gravando" fica aceso no aparelho e a
     // próxima sala herda track órfã. _intencaoAudio = false também aborta
     // um getUserMedia que ainda esteja no ar (ver habilitarAudio).
-    _intencaoAudio = false;
-    _micMutado = false;
-    _pedidoMic = null;
-    _geracaoAudio++;
-    _pararStreamLocal();
-    _removerAudioRemoto();
+    _encerrarAudio();
     _pararListeners();
     _limparPeer();
     if (_salaRef) {

@@ -1199,9 +1199,16 @@
               <span class="pp-hud-lado-valor" id="pp-hud-dele">0</span>
               <span class="pp-hud-lado-sets" id="pp-hud-dele-sets">0 sets</span>
             </div>
+            <!-- Voz (3.2): só aparece em multiplayer. Fica no canto do HUD,
+                 fora da arena, pra não atrapalhar o arrasto da raquete.
+                 Ciclo: desligado -> ligado -> mudo (ver _ppAlternarMic). -->
+            <button type="button" class="pp-mic-btn pp-mic-btn-hud" id="pp-mic-hud" onclick="_ppAlternarMic()" style="display:none;" aria-pressed="false" aria-label="Ligar microfone"><i class="fa fa-microphone-slash"></i><span class="pp-mic-dot"></span></button>
           </div>
           <div class="pp-arena" id="pp-arena">
             <canvas id="pp-canvas"></canvas>
+
+            <!-- Aviso curto de microfone (permissão negada etc.) — some sozinho -->
+            <div class="pp-mic-aviso" id="pp-mic-erro" style="display:none;"></div>
 
             <!-- Tela inicial: criar sala ou entrar com código -->
             <div class="pp-overlay" id="pp-menu">
@@ -1236,6 +1243,9 @@
               <div class="pp-sala-codigo" id="pp-sala-codigo" style="display:none;"></div>
               <div class="pp-sala-spinner"></div>
               <button type="button" class="pp-btn-copiar" id="pp-btn-copiar" onclick="_ppCopiarCodigo()">Copiar código</button>
+              <!-- Voz (3.2): mesmo botão do HUD, aqui com rótulo. O mic só
+                   é pedido no toque — sem tocar, nada de getUserMedia. -->
+              <button type="button" class="pp-mic-btn" id="pp-mic-sala" onclick="_ppAlternarMic()" style="display:none;" aria-pressed="false" aria-label="Ligar microfone"><i class="fa fa-microphone-slash"></i><span class="pp-mic-txt">Ligar mic</span><span class="pp-mic-dot"></span></button>
               <button type="button" class="pp-link" onclick="_ppVoltarMenu()">Voltar ao menu</button>
             </div>
 
@@ -1276,8 +1286,14 @@
                 <span class="tq-pip"></span><span class="tq-pip"></span>
               </div>
             </div>
+            <!-- Voz (3.2): só em multiplayer. Fica no HUD, fora da arena —
+                 assim nunca cobre o joystick nem a zona de fogo, e continua
+                 na horizontal mesmo com a arena girada em retrato. -->
+            <button type="button" class="tq-mic-btn tq-mic-btn-hud" id="tq-mic-hud" onclick="_tqAlternarMic()" style="display:none;" aria-pressed="false" aria-label="Ligar microfone"><i class="fa fa-microphone-slash"></i><span class="tq-mic-dot"></span></button>
           </div>
           <div class="tq-arena" id="tq-arena">
+            <!-- Aviso curto de microfone (permissão negada etc.) — some sozinho -->
+            <div class="tq-mic-aviso" id="tq-mic-erro" style="display:none;"></div>
             <!-- Wrapper que o JS gira 90° quando o celular está em pé e
                  o lock nativo de orientação não pegou (mesmo padrão da
                  Corrida — ver _tqAplicarOrientacao em tanques.js). -->
@@ -1363,6 +1379,9 @@
               <div class="tq-sala-codigo" id="tq-sala-codigo" style="display:none;"></div>
               <div class="tq-sala-spinner"></div>
               <button type="button" class="tq-btn-copiar" id="tq-btn-copiar" onclick="_tqCopiarCodigo()">Copiar código</button>
+              <!-- Voz (3.2): mesmo botão do HUD, aqui com rótulo. O mic só
+                   é pedido no toque — sem tocar, nada de getUserMedia. -->
+              <button type="button" class="tq-mic-btn" id="tq-mic-sala" onclick="_tqAlternarMic()" style="display:none;" aria-pressed="false" aria-label="Ligar microfone"><i class="fa fa-microphone-slash"></i><span class="tq-mic-txt">Ligar mic</span><span class="tq-mic-dot"></span></button>
               <button type="button" class="tq-link" onclick="_tqVoltarMenu()">Voltar ao menu</button>
             </div>
 

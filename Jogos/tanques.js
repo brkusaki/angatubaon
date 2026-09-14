@@ -645,6 +645,9 @@
      'jogando' nenhum aparece — só o HUD + canvas + controles. */
   function _tqMostrarTela(qual) {
     _tqEstado = qual;
+    // Saiu da tela de sala (conectou, voltou ao menu, acabou): o teto de
+    // espera do "Conectando…" não tem mais o que vigiar (ver _tqMostrarSala).
+    if (qual !== 'sala') _tqPararTimerConectando();
     var menu = document.getElementById('tq-menu');
     var sala = document.getElementById('tq-sala');
     var fim  = document.getElementById('tq-fim');
@@ -770,7 +773,17 @@
     });
   }
 
+  /* Teto de espera do convidado na tela "Conectando…" (P2) — mesmo papel
+     e mesmo valor do PP_CONECTANDO_TIMEOUT_MS do Ping Pong. O anfitrião em
+     "aguardando" não tem teto: ele está esperando um amigo de propósito. */
+  var TQ_CONECTANDO_TIMEOUT_MS = 20000;
+  var _tqTimerConectando = null;
+  function _tqPararTimerConectando() {
+    if (_tqTimerConectando) { clearTimeout(_tqTimerConectando); _tqTimerConectando = null; }
+  }
+
   function _tqMostrarSala(modo, codigo) {
+    _tqPararTimerConectando();
     _tqMostrarTela('sala');
     var titulo = document.getElementById('tq-sala-titulo');
     var desc   = document.getElementById('tq-sala-desc');
@@ -783,6 +796,12 @@
       if (titulo) titulo.textContent = 'Conectando…';
       if (desc) desc.textContent = 'Aguardando o anfitrião confirmar a conexão.';
       if (codEl) codEl.style.display = 'none';
+      _tqTimerConectando = setTimeout(function () {
+        _tqTimerConectando = null;
+        if (_tqEstado !== 'sala') return; // já conectou ou já saiu
+        _tqVoltarMenu();
+        _tqErroMenu('Não consegui conectar com o anfitrião. Confira o código ou peça um novo.');
+      }, TQ_CONECTANDO_TIMEOUT_MS);
     }
   }
 

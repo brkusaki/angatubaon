@@ -215,11 +215,22 @@
           return Promise.reject(new Error('Essa sala expirou. Peça um código novo.'));
         }
 
-        _codigo = codigo; _salaRef = ref; _souAnfitriao = false;
+        _codigo = codigo; _salaRef = ref;
+        // Quem entra por código pode ser o próprio anfitrião voltando (a
+        // conexão oscilou mas o onDisconnect da sala ainda não rodou).
+        // Fixar false aqui apagava esse papel: ninguém mais via o botão
+        // "Começar Party" e a sala travava no lobby pra sempre. Mesma
+        // leitura que baralho.js/entrarSala já faz.
+        _souAnfitriao = !!(sala.anfitriao && sala.anfitriao.uid === eu.uid);
         return ref.child('jogadores/' + eu.uid).set({
-          nome: eu.nome, entrouEm: firebase.database.ServerValue.TIMESTAMP, pontosTotal: 0
+          nome: eu.nome, entrouEm: firebase.database.ServerValue.TIMESTAMP,
+          pontosTotal: (jogadores[eu.uid] && jogadores[eu.uid].pontosTotal) || 0
         }).then(function () {
-          ref.child('jogadores/' + eu.uid).onDisconnect().remove();
+          // Anfitrião de volta: rearma a limpeza da sala inteira nesta
+          // conexão (a da sessão anterior já se foi) pra não deixar sala
+          // fantasma. Convidado limpa só o próprio nó, como sempre.
+          if (_souAnfitriao) ref.onDisconnect().remove();
+          else ref.child('jogadores/' + eu.uid).onDisconnect().remove();
           _observarSala();
           return codigo;
         });
@@ -272,6 +283,7 @@
     var sala = snap.val();
     if (!sala) { _aoSalaFechada(); return; }
     _sala = sala;
+    if (_reentrarNoLobbySePreciso(sala)) return; // o write dispara outro snapshot
     _emit('salaMudou', sala);
 
     if (sala.status === 'rodada' && sala.rodadaAtual !== _rodadaVistaEm) {
@@ -288,6 +300,37 @@
     } else if (sala.status === 'campeao') {
       _emit('campeao', sala);
     }
+  }
+
+  /* Reconexão leve no lobby (P2) ────────────────────────────────────
+     A rede caiu por tempo suficiente pro RTDB executar o onDisconnect
+     (app no segundo plano, túnel, 4G oscilando), mas o app nunca fechou:
+     quando a conexão volta, o SDK reconecta sozinho e o listener dispara
+     de novo — só que agora sem a gente na lista de jogadores. Antes disso
+     aqui, a pessoa ficava olhando o lobby dos outros sem aparecer nele e
+     sem entender por quê. Só vale no 'lobby': com a Party em andamento,
+     voltar pro meio da rodada é outro problema (não é este P2).
+     Retorna true quando disparou a reentrada — o write gera um snapshot
+     novo, então não vale seguir renderizando com o estado furado. */
+  var _reentrando = false;
+  var _tentativasReentrada = 0;
+  var MAX_TENTATIVAS_REENTRADA = 3; // teto: se o write é negado, não insiste pra sempre
+  function _reentrarNoLobbySePreciso(sala) {
+    if (!_salaRef || !_meuUid) return false;
+    if (sala.status !== 'lobby') return false;
+    if (_souAnfitriao) return false;            // anfitrião sumindo = sala sumindo
+    if ((sala.jogadores || {})[_meuUid]) { _tentativasReentrada = 0; return false; }
+    if (_reentrando || _tentativasReentrada >= MAX_TENTATIVAS_REENTRADA) return false;
+    if (Object.keys(sala.jogadores || {}).length >= MAX_JOGADORES) return false; // encheu sem mim
+    _reentrando = true;
+    _tentativasReentrada++;
+    var ref = _salaRef.child('jogadores/' + _meuUid);
+    ref.set({
+      nome: _meuNome, entrouEm: firebase.database.ServerValue.TIMESTAMP, pontosTotal: 0
+    }).then(function () {
+      ref.onDisconnect().remove();
+    }).catch(function () {}).then(function () { _reentrando = false; });
+    return true;
   }
 
   // A sala sumiu do RTDB (anfitrião saiu/caiu e o onDisconnect removeu,
@@ -600,6 +643,7 @@
     _sala = null; _resultadosCache = {};
     _rodadaEmAndamento = false; _rodadaVistaEm = -1;
     _apiAtual = null;
+    _reentrando = false; _tentativasReentrada = 0; // ver _reentrarNoLobbySePreciso
   }
 
   function estado() { return _sala; }

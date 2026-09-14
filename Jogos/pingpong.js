@@ -240,6 +240,9 @@
      'jogando' nenhum aparece — só o HUD + canvas. */
   function _ppMostrarTela(qual) {
     _ppEstado = qual;
+    // Saiu da tela de sala (conectou, voltou ao menu, acabou): o teto de
+    // espera do "Conectando…" não tem mais o que vigiar (ver _ppMostrarSala).
+    if (qual !== 'sala') _ppPararTimerConectando();
     var menu = document.getElementById('pp-menu');
     var sala = document.getElementById('pp-sala');
     var fim  = document.getElementById('pp-fim');
@@ -372,7 +375,20 @@
     });
   }
 
+  /* Teto de espera do convidado na tela "Conectando…" (P2). Sem isto, uma
+     negociação que nunca fecha (ICE barrado por NAT/firewall, anfitrião que
+     fechou a aba sem o onDisconnect ter rodado ainda) deixava a pessoa
+     olhando o spinner pra sempre, sem nem um jeito de tentar de novo. O
+     anfitrião em "aguardando" NÃO tem teto: esperar um amigo digitar o
+     código é justamente o que ele está fazendo ali. */
+  var PP_CONECTANDO_TIMEOUT_MS = 20000;
+  var _ppTimerConectando = null;
+  function _ppPararTimerConectando() {
+    if (_ppTimerConectando) { clearTimeout(_ppTimerConectando); _ppTimerConectando = null; }
+  }
+
   function _ppMostrarSala(modo, codigo) {
+    _ppPararTimerConectando();
     _ppMostrarTela('sala');
     var titulo = document.getElementById('pp-sala-titulo');
     var desc   = document.getElementById('pp-sala-desc');
@@ -385,6 +401,12 @@
       if (titulo) titulo.textContent = 'Conectando…';
       if (desc) desc.textContent = 'Aguardando o anfitrião confirmar a conexão.';
       if (codEl) codEl.style.display = 'none';
+      _ppTimerConectando = setTimeout(function () {
+        _ppTimerConectando = null;
+        if (_ppEstado !== 'sala') return; // já conectou ou já saiu
+        _ppVoltarMenu();
+        _ppErroMenu('Não consegui conectar com o anfitrião. Confira o código ou peça um novo.');
+      }, PP_CONECTANDO_TIMEOUT_MS);
     }
   }
 

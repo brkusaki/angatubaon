@@ -38,9 +38,12 @@
 
    Pendências conhecidas
    ----------------------
-   1. Reconexão automática do jogador (hoje, cair da sala = sair da
-      sala; reentrar com o mesmo código funciona, mas não há
-      "retomar sozinho" se o app fechar no meio de uma partida).
+   1. Reconexão automática do jogador: no LOBBY já está resolvida —
+      reentrar com o mesmo código mantém assento/pronto, e uma queda
+      curta (app no segundo plano) se recupera sozinha assim que o
+      RTDB reconecta (ver _reentrarNoLobbySePreciso). O que ainda não
+      existe é "retomar sozinho" no meio de uma PARTIDA: quem cai com
+      a mesa rolando volta pro lobby, sem estado de mão/pontos.
    2. Chat/sinais dos 4 jogadores (fora do escopo desta rodada).
    3. Bot pra substituir jogador desconectado em partida de 4 — por
       enquanto o anfitrião só cancela e avisa (ver truco.js).
@@ -229,7 +232,12 @@
       return ref.get().then(function (snap) {
         if (!snap.exists()) return Promise.reject(new Error('Sala não encontrada. Confira o código.'));
         var sala = snap.val();
-        if (sala.status !== 'lobby') return Promise.reject(new Error('Essa sala já começou ou terminou.'));
+        // Reentrar no lobby é permitido (ver o bloco de reconexão abaixo);
+        // entrar no meio de uma partida, não — o estado das mãos é do
+        // anfitrião e não dá pra reconstruir pra quem chega agora.
+        if (sala.status !== 'lobby') {
+          return Promise.reject(new Error('A partida já começou. Peça um código novo ou espere a mesa voltar ao lobby.'));
+        }
         if (!sala.criadoEm || (Date.now() - sala.criadoEm) > SALA_EXPIRA_MS) {
           return Promise.reject(new Error('Essa sala expirou. Peça um código novo.'));
         }
@@ -243,12 +251,49 @@
           nome: eu.nome, pronto: jaEstou ? !!jaEstou.pronto : false, seat: assento,
           entrouEm: firebase.database.ServerValue.TIMESTAMP
         }).then(function () {
-          _codigo = codigo; _salaRef = ref; _souAnfitriao = (sala.anfitriao && sala.anfitriao.uid === eu.uid);
-          if (!_souAnfitriao) ref.child('jogadores/' + eu.uid).onDisconnect().remove();
+          _codigo = codigo; _salaRef = ref; _souAnfitriao = !!(sala.anfitriao && sala.anfitriao.uid === eu.uid);
+          // Anfitrião de volta (a conexão oscilou mas o onDisconnect da sala
+          // ainda não tinha rodado): rearma a limpeza da sala NESTA conexão,
+          // senão ela vira sala fantasma quando ele fechar o app.
+          if (_souAnfitriao) ref.onDisconnect().remove();
+          else ref.child('jogadores/' + eu.uid).onDisconnect().remove();
           return _observarSala().then(function () { return codigo; });
         });
       });
     });
+  }
+
+  /* Reconexão leve no lobby (P2) ────────────────────────────────────
+     A rede caiu o bastante pro RTDB executar o onDisconnect (app no
+     segundo plano, 4G oscilando), mas o app nunca fechou: o SDK reconecta
+     sozinho e o listener volta a disparar — só que sem a gente na mesa.
+     Antes disso aqui, a pessoa via o lobby dos outros sem aparecer nele.
+     Vale só no 'lobby': retomar uma partida em andamento (mão, vira,
+     pontos) é outro problema, fora deste P2. Mantém o assento de antes
+     quando ele ainda estiver livre, pra não embaralhar a mesa.
+     Retorna true quando disparou a reentrada. */
+  var _reentrando = false;
+  var _tentativasReentrada = 0;
+  var MAX_TENTATIVAS_REENTRADA = 3; // teto: se o write é negado, não insiste pra sempre
+  function _reentrarNoLobbySePreciso(sala) {
+    if (!_salaRef || !_meuUid) return false;
+    if (sala.status !== 'lobby') return false;
+    if (_souAnfitriao) return false;            // anfitrião sumindo = sala sumindo
+    var jogadores = sala.jogadores || {};
+    if (jogadores[_meuUid]) { _tentativasReentrada = 0; return false; }
+    if (_reentrando || _tentativasReentrada >= MAX_TENTATIVAS_REENTRADA) return false;
+    if (Object.keys(jogadores).length >= sala.maxJogadores) return false; // encheu sem mim
+    _reentrando = true;
+    _tentativasReentrada++;
+    var ref = _salaRef.child('jogadores/' + _meuUid);
+    ref.set({
+      nome: _meuNome, pronto: false,
+      seat: _proximoAssento(jogadores, sala.maxJogadores),
+      entrouEm: firebase.database.ServerValue.TIMESTAMP
+    }).then(function () {
+      ref.onDisconnect().remove();
+    }).catch(function () {}).then(function () { _reentrando = false; });
+    return true;
   }
 
   function _proximoAssento(jogadoresObj, max) {
@@ -309,6 +354,12 @@
         return;
       }
       _sala = sala; _sala._codigo = _codigo;
+      // O write da reentrada gera um snapshot novo — não vale seguir
+      // renderizando a mesa com o estado furado (ver _reentrarNoLobbySePreciso).
+      if (_reentrarNoLobbySePreciso(sala)) {
+        if (!jaResolveu) { jaResolveu = true; resolverPrimeiro(); }
+        return;
+      }
       _atualizarEspelhoPublico();
       _emit('salaMudou', sala);
       if (!jaResolveu) { jaResolveu = true; resolverPrimeiro(); }
@@ -400,6 +451,7 @@
   function _limparTudo() {
     _codigo = null; _salaRef = null; _souAnfitriao = false;
     _sala = null; _motorAtivo = null;
+    _reentrando = false; _tentativasReentrada = 0; // ver _reentrarNoLobbySePreciso
   }
 
   function estado() { return _sala; }

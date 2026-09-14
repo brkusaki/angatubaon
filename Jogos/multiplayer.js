@@ -76,6 +76,7 @@
   var _salaPublica = false;   // true se a sala atual (quando anfitrião) tem espelho em salasPublicas/
   var _listeners = [];        // { ref, evento, cb } abertos, pra desligar depois
   var _handlers = { conectado: [], mensagem: [], desconectado: [], erro: [] };
+  var _jaEmitiuDesconexao = false; // evita emitir 'desconectado' duas vezes pela mesma queda (A1.13)
 
   function disponivel() {
     return typeof RTCPeerConnection !== 'undefined'
@@ -141,10 +142,19 @@
     if (_pc) { try { _pc.close(); } catch (e) {} _pc = null; }
   }
 
+  // Garante um único disparo de 'desconectado' por queda: canal.onclose e
+  // pc.onconnectionstatechange podem disparar os dois pra mesma queda
+  // (ver A1.13). Zerada em sair().
+  function _emitDesconectadoUmaVez() {
+    if (_jaEmitiuDesconexao) return;
+    _jaEmitiuDesconexao = true;
+    _emit('desconectado');
+  }
+
   function _configurarCanalDados(canal) {
     _canal = canal;
     canal.onopen = function () { _emit('conectado'); };
-    canal.onclose = function () { _emit('desconectado'); };
+    canal.onclose = function () { _emitDesconectadoUmaVez(); };
     canal.onerror = function () { _emit('erro', new Error('Conexão com o outro jogador falhou.')); };
     canal.onmessage = function (ev) {
       try { _emit('mensagem', JSON.parse(ev.data)); } catch (e) { /* mensagem não-JSON: ignora */ }
@@ -168,7 +178,18 @@
       if (ev.candidate) salaRef.child(campoIceLocal).push(ev.candidate.toJSON());
     };
     pc.onconnectionstatechange = function () {
-      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') _emit('desconectado');
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+        _emitDesconectadoUmaVez();
+      } else if (pc.connectionState === 'disconnected') {
+        // Transitório: uma oscilação de rede costuma voltar sozinha pra
+        // 'connected'. Só trata como queda de verdade se continuar assim
+        // por ~5s (ver A1.13).
+        setTimeout(function () {
+          if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+            _emitDesconectadoUmaVez();
+          }
+        }, 5000);
+      }
     };
 
     _escutar(salaRef.child(campoIceRemoto), 'child_added', function (snap) {
@@ -265,11 +286,27 @@
           return Promise.reject(new Error('Essa sala expirou. Peça um código novo.'));
         }
         if (!sala.oferta) return Promise.reject(new Error('Sala ainda não está pronta. Tente de novo em instantes.'));
-
-        _salaRef = ref;
-        _souAnfitriao = false;
+        // Sinalização já gasta (P2): um convidado anterior escreveu a
+        // resposta e saiu — o onDisconnect só apaga o nó 'convidado', a
+        // 'resposta' fica. Entrar aqui seria cair num buraco: o pc do
+        // anfitrião já tem remoteDescription daquela negociação e ignora
+        // respostas novas ("if (resp && !pc.remoteDescription)" em
+        // _tentarCriar), então a tela ficaria em "conectando" pra sempre.
+        // Reaproveitar a sala exigiria o anfitrião derrubar o pc e publicar
+        // uma oferta nova — e tanto 'oferta' quanto 'resposta' têm
+        // ".validate": "!data.exists()" nas regras, ou seja, são escritas
+        // uma única vez por sala. Então o caminho honesto é avisar e pedir
+        // um código novo, não fingir que dá pra conectar.
+        if (sala.resposta) {
+          return Promise.reject(new Error('Essa sala já foi usada em outra conexão. Peça um código novo pro anfitrião.'));
+        }
 
         return ref.child('convidado').set({ uid: eu.uid, nome: eu.nome }).then(function () {
+          // Só marca esta sala como "a nossa" depois que o set() realmente
+          // vingou — dois convidados entrando juntos na mesma sala pública
+          // não deixam mais _salaRef sujo pro que perdeu a corrida (A2.15).
+          _salaRef = ref;
+          _souAnfitriao = false;
           // Sem isto, um convidado que cai (sem passar por sair()) deixa o
           // nó preso pra sempre: a sala trava porque ninguém mais consegue
           // entrar (ver A1.5, mesmo padrão já usado em party.js:220).
@@ -286,6 +323,14 @@
               return ref.child('resposta').set({ type: resposta.type, sdp: resposta.sdp });
             });
           });
+        }).catch(function (err) {
+          // Corrida: dois jogadores tocaram "Entrar" na mesma sala pública
+          // ao mesmo tempo — o segundo set() é barrado pela regra
+          // !data.exists() e sobe PERMISSION_DENIED cru (ver A2.15).
+          if (err && (err.code === 'PERMISSION_DENIED' || /permission_denied/i.test(String(err.message || '')))) {
+            throw new Error('Essa sala já tem dois jogadores.');
+          }
+          throw err;
         });
       });
     });
@@ -370,6 +415,7 @@
     _salaRef = null;
     _souAnfitriao = false;
     _salaPublica = false;
+    _jaEmitiuDesconexao = false;
   }
 
   window.AngatubaMP = {

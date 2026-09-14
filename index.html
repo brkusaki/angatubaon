@@ -1246,7 +1246,9 @@
               <div class="pp-fim-placar" id="pp-fim-placar"></div>
               <div class="pp-overlay-desc" id="pp-fim-msg"></div>
               <button type="button" class="pp-play" id="pp-btn-revanche" onclick="_ppPedirRevanche()">Jogar de novo</button>
-              <button type="button" class="pp-link" onclick="_ppVoltarMenu()">Voltar ao início</button>
+              <!-- Na queda de conexão o "Jogar de novo" some e este vira o
+                   botão principal (ver _ppMostrarFim/'desconexao'). -->
+              <button type="button" class="pp-link" id="pp-btn-voltar-fim" onclick="_ppVoltarMenu()">Voltar ao início</button>
             </div>
           </div>
         </div>
@@ -1367,7 +1369,9 @@
               <div class="tq-fim-placar" id="tq-fim-placar"></div>
               <div class="tq-overlay-desc" id="tq-fim-msg"></div>
               <button type="button" class="tq-play" id="tq-btn-revanche" onclick="_tqPedirRevanche()">Jogar de novo</button>
-              <button type="button" class="tq-link" onclick="_tqVoltarMenu()">Voltar ao início</button>
+              <!-- Mesmo papel do pp-btn-voltar-fim: vira principal na
+                   queda de conexão (ver _tqMostrarFim/'desconexao'). -->
+              <button type="button" class="tq-link" id="tq-btn-voltar-fim" onclick="_tqVoltarMenu()">Voltar ao início</button>
             </div>
           </div>
         </div>
@@ -1471,9 +1475,13 @@
           <!-- Sub-tela: sala encerrada / erro -->
           <div class="pty-sub" id="pty-erro">
             <img src="/webp/owl-surprised.webp" alt="" class="pty-owl" onerror="this.style.display='none'">
-            <div class="pty-titulo">A Party foi encerrada</div>
-            <div class="pty-desc">O anfitrião saiu ou a sala expirou.</div>
+            <!-- Título e descrição são ajustados pelo handler de
+                 'salaFechada' (party.js): a mensagem muda se a sala caiu
+                 no meio de uma rodada ou ainda estava no lobby. -->
+            <div class="pty-titulo" id="pty-erro-titulo">A Party foi encerrada</div>
+            <div class="pty-desc" id="pty-erro-desc">O anfitrião saiu ou a sala expirou.</div>
             <button type="button" class="pty-btn" onclick="_ptyVoltarHubFinal()">Voltar ao hub</button>
+            <button type="button" class="pty-link" onclick="_ptyVoltarMenuLobby()">Entrar em outra Party</button>
           </div>
 
         </div>

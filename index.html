@@ -1245,10 +1245,14 @@
               <div class="pp-overlay-titulo" id="pp-fim-titulo">Fim de jogo</div>
               <div class="pp-fim-placar" id="pp-fim-placar"></div>
               <div class="pp-overlay-desc" id="pp-fim-msg"></div>
+              <!-- Sem adversário do outro lado (queda, ou ele saiu depois do
+                   fim) este botão vira "Criar nova sala" e leva ao menu já
+                   abrindo uma sala — ver _ppMostrarFim/'desconexao' e
+                   _ppPedirRevanche. -->
               <button type="button" class="pp-play" id="pp-btn-revanche" onclick="_ppPedirRevanche()">Jogar de novo</button>
-              <!-- Na queda de conexão o "Jogar de novo" some e este vira o
-                   botão principal (ver _ppMostrarFim/'desconexao'). -->
-              <button type="button" class="pp-link" id="pp-btn-voltar-fim" onclick="_ppVoltarMenu()">Voltar ao início</button>
+              <!-- Sempre visível: leva ao menu completo do 2.1 (Criar sala /
+                   Entrar com código / Salas abertas agora). -->
+              <button type="button" class="pp-link" id="pp-btn-voltar-fim" onclick="_ppVoltarMenu()">Voltar ao menu</button>
             </div>
           </div>
         </div>
@@ -1368,10 +1372,13 @@
               <div class="tq-overlay-titulo" id="tq-fim-titulo">Fim de jogo</div>
               <div class="tq-fim-placar" id="tq-fim-placar"></div>
               <div class="tq-overlay-desc" id="tq-fim-msg"></div>
+              <!-- Mesmo papel do pp-btn-revanche: sem adversário do outro
+                   lado vira "Criar nova sala" (ver _tqMostrarFim/'desconexao'
+                   e _tqPedirRevanche). -->
               <button type="button" class="tq-play" id="tq-btn-revanche" onclick="_tqPedirRevanche()">Jogar de novo</button>
-              <!-- Mesmo papel do pp-btn-voltar-fim: vira principal na
-                   queda de conexão (ver _tqMostrarFim/'desconexao'). -->
-              <button type="button" class="tq-link" id="tq-btn-voltar-fim" onclick="_tqVoltarMenu()">Voltar ao início</button>
+              <!-- Sempre visível: leva ao menu completo do 2.1 (Criar sala /
+                   Entrar com código / Salas abertas agora). -->
+              <button type="button" class="tq-link" id="tq-btn-voltar-fim" onclick="_tqVoltarMenu()">Voltar ao menu</button>
             </div>
           </div>
         </div>

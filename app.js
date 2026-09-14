@@ -15314,14 +15314,53 @@ ${urlCard}`)}`;
        intocado. Este módulo só cuida do CLIENTE (morador).
   ══════════════════════════════════════════════════════════════ */
 
-  // Estado local do cliente logado (espelho leve do Firebase user).
-  // Guardamos só o mínimo para a UI; a fonte da verdade é o Firebase.
-  var _cliUser = null;              // objeto Firebase user, ou null
+  /* ── IDENTIDADE: dois níveis, de propósito ─────────────────────
+     O Firebase Auth deste app tem DOIS tipos de sessão:
+
+     1. ANÔNIMA — criada sozinha por multiplayer.js / party.js /
+        baralho.js só pra ter permissão de escrever na sala do
+        Realtime Database. Entrar numa sala por código NUNCA exige
+        conta; essa sessão é descartável e não é "eu".
+     2. CONTA NOMEADA — Google ou e-mail/senha, feita pela pessoa.
+        É esta que vale como identidade: ranking, recordes, foto,
+        favoritos, progresso do Aprender e (a partir da 4.2) a
+        camada social.
+
+     `_cliUser` guarda SOMENTE o nível 2. Sessão anônima entra aqui
+     como null — senão o app trataria um convidado de sala como
+     logado: avatar "?" no header, painel de conta vazio e, pior,
+     o ranking da cidade recebendo docs "Jogador" de uids
+     descartáveis (as regras do Firestore só exigem auth != null,
+     então quem barra isso é o cliente).
+     Quem precisa da sessão crua (inclusive anônima) usa
+     firebase.auth().currentUser direto, como o multiplayer faz. */
+  var _cliUser = null;              // conta NOMEADA logada, ou null
   var _cliApelido = null;          // nome/apelido de exibição escolhido
 
   // Chave local só para lembrar o apelido preferido entre reloads antes
   // de o Firebase reidratar o usuário (evita "piscar" sem nome).
   var CLI_APELIDO_KEY = 'angatuba_cli_apelido';
+
+  // Limite do nome de exibição. Igual ao das regras do Firestore
+  // (nome.size() <= 20 em scoreValido) e ao slice(0,20) que
+  // multiplayer/party/baralho aplicam — um número só, um lugar só.
+  var CLI_NOME_MAX = 20;
+
+  // Uma sessão só conta como identidade se for conta nomeada.
+  function _cliContaReal(u) { return !!u && !u.isAnonymous; }
+
+  /* Fonte única do "quem sou eu" visível: o apelido escolhido, senão
+     o displayName do provedor, sempre trimado e truncado igual em
+     todo lugar (header, painel, ranking, salas de multiplayer).
+     Retorna null quando não há conta nomeada — inclusive quando
+     sobrou apelido no localStorage de um login anterior, pra esse
+     nome antigo nunca vazar pra uma sessão anônima. */
+  function cliNomeExibicao() {
+    if (!_cliContaReal(_cliUser)) return null;
+    var nome = String(_cliApelido || _cliUser.displayName || '')
+      .trim().slice(0, CLI_NOME_MAX).trim();
+    return nome || null;
+  }
 
   /* ── Inicialização do Firebase ──────────────────────────────
      firebase (namespace compat) é injetado sob demanda por
@@ -15344,7 +15383,10 @@ ${urlCard}`)}`;
   // reabrir o app), este callback roda e sincroniza a UI.
   function cliAuthInit() {
     const auth = _cliFirebaseAuth();
-    _cliApelido = localStorage.getItem(CLI_APELIDO_KEY) || null;
+    // Trunca na leitura também: valores salvos por versões antigas (antes
+    // do limite ser aplicado na entrada) podem passar de 20 caracteres.
+    _cliApelido = String(localStorage.getItem(CLI_APELIDO_KEY) || '')
+      .trim().slice(0, CLI_NOME_MAX).trim() || null;
     if (!auth) {
       // SDK indisponível: mantém UI deslogada, sem quebrar nada.
       cliAtualizarHeader();
@@ -15356,11 +15398,13 @@ ${urlCard}`)}`;
 
     auth.onAuthStateChanged(function (user) {
       var estavaDeslogado = !_cliUser;
-      _cliUser = user || null;
-      if (user) {
+      // Sessão anônima (sala de multiplayer) NÃO é identidade: entra
+      // aqui como deslogado. Ver o bloco de comentário lá em cima.
+      _cliUser = _cliContaReal(user) ? user : null;
+      if (_cliUser) {
         // Preferimos o displayName do Firebase; se não houver (ex.: e-mail
         // sem nome ainda), caímos no apelido salvo localmente.
-        _cliApelido = user.displayName || _cliApelido || null;
+        _cliApelido = (user.displayName || _cliApelido || '').trim().slice(0, CLI_NOME_MAX) || null;
         if (_cliApelido) localStorage.setItem(CLI_APELIDO_KEY, _cliApelido);
         // Acabou de logar e havia uma pontuação feita deslogado? Submete
         // agora. O rankSubmeter já reconcilia com o recorde local do
@@ -15410,7 +15454,7 @@ ${urlCard}`)}`;
     if (_cliUser) {
       // Logado: monta/mostra o avatar; esconde o botão de tema do header
       // (ele reaparece dentro do painel).
-      const nome = _cliApelido || _cliUser.displayName || 'Você';
+      const nome = cliNomeExibicao() || 'Você';
       const inicial = (nome.trim()[0] || '?').toUpperCase();
       const foto = _cliUser.photoURL || '';
 
@@ -15527,8 +15571,10 @@ ${urlCard}`)}`;
         // trocar depois no painel da conta).
         const u = result.user;
         if (u && u.displayName) {
-          _cliApelido = u.displayName;
-          localStorage.setItem(CLI_APELIDO_KEY, u.displayName);
+          // Trunca já na entrada: nome do Google costuma passar de 20
+          // caracteres e o ranking/multiplayer trabalham com esse limite.
+          _cliApelido = u.displayName.trim().slice(0, CLI_NOME_MAX).trim();
+          if (_cliApelido) localStorage.setItem(CLI_APELIDO_KEY, _cliApelido);
         }
         cliFecharLogin();
         if (typeof showToastSimples === 'function') {
@@ -15622,7 +15668,7 @@ ${urlCard}`)}`;
   function cliAbrirPainelConta() {
     const overlay = document.getElementById('modal-cli-conta');
     if (!overlay) return;
-    const nome = _cliApelido || (_cliUser && _cliUser.displayName) || 'Você';
+    const nome = cliNomeExibicao() || 'Você';
     const email = (_cliUser && _cliUser.email) || '';
     const nomeEl = document.getElementById('cli-conta-nome');
     const emailEl = document.getElementById('cli-conta-email');
@@ -15684,7 +15730,7 @@ ${urlCard}`)}`;
     if (!row || !view || !inp) return;
     view.style.display = 'none';
     row.style.display = 'flex';
-    inp.value = _cliApelido || (_cliUser && _cliUser.displayName) || '';
+    inp.value = cliNomeExibicao() || '';
     try { inp.focus(); inp.select(); } catch (e) {}
   }
 
@@ -15698,9 +15744,17 @@ ${urlCard}`)}`;
   function cliSalvarApelido() {
     const inp = document.getElementById('cli-conta-apelido-input');
     if (!inp) return;
-    const novo = String(inp.value || '').trim().slice(0, 20);
+    const novo = String(inp.value || '').trim().slice(0, CLI_NOME_MAX).trim();
     if (!novo) {
       if (typeof showToastSimples === 'function') showToastSimples('Escolha um apelido.', '/webp/owl-idea.webp');
+      return;
+    }
+    // Mesma mínima do cadastro e das regras do Firestore (nome >= 2):
+    // sem isto, um apelido de 1 letra era aceito aqui e depois virava
+    // "Jogador" na hora de gravar o ranking — a pessoa via um nome no
+    // painel e outro na lista.
+    if (novo.length < 2) {
+      if (typeof showToastSimples === 'function') showToastSimples('O apelido precisa de pelo menos 2 letras.', '/webp/owl-idea.webp');
       return;
     }
     const btn = document.getElementById('cli-conta-apelido-salvar');
@@ -15795,7 +15849,7 @@ ${urlCard}`)}`;
       const finalizar = function () {
         // Atualiza a UI imediatamente (o photoURL local do objeto também).
         try { if (_cliUser) _cliUser.photoURL = url; } catch (e) {}
-        cliPintarAvatarPainel(_cliApelido || (_cliUser && _cliUser.displayName) || 'Você');
+        cliPintarAvatarPainel(cliNomeExibicao() || 'Você');
         cliAtualizarHeader();
         _cliSetStatusFoto('', null);
         if (typeof showToastSimples === 'function') showToastSimples('Foto atualizada!', '/webp/owl-celebrate-gratis.webp');
@@ -15898,17 +15952,25 @@ ${urlCard}`)}`;
   function cliSair() {
     const auth = _cliFirebaseAuth();
     cliFecharPainelConta();
-    if (!auth) { _cliUser = null; cliAtualizarHeader(); return; }
+    // Limpa também o apelido espelhado: sem isto ele sobrevivia no
+    // localStorage e a próxima sala de multiplayer entrada sem conta
+    // (sessão anônima) reaparecia com o nome de quem tinha saído.
+    const limpar = function () {
+      _cliUser = null;
+      _cliApelido = null;
+      try { localStorage.removeItem(CLI_APELIDO_KEY); } catch (e) {}
+    };
+    if (!auth) { limpar(); cliAtualizarHeader(); return; }
     auth.signOut()
       .then(function () {
-        _cliUser = null;
+        limpar();
         if (typeof showToastSimples === 'function') {
           showToastSimples('Você saiu da conta.', '/webp/owl-wave.webp');
         }
       })
       .catch(function () {
         // Mesmo se falhar remotamente, refletimos deslogado na UI.
-        _cliUser = null; cliAtualizarHeader();
+        limpar(); cliAtualizarHeader();
       });
   }
 
@@ -15930,3 +15992,8 @@ ${urlCard}`)}`;
   window.cliSalvarApelido     = cliSalvarApelido;
   window.cliEscolherFoto      = cliEscolherFoto;
   window.cliAbrirLojaFav      = cliAbrirLojaFav;
+  // Fonte única do nome visível. Exportada porque multiplayer.js,
+  // party.js e baralho.js são IIFEs em arquivos separados e só
+  // enxergam o app por window.* (hub.js roda no mesmo escopo global
+  // e poderia chamar direto, mas usa o mesmo caminho por clareza).
+  window.cliNomeExibicao      = cliNomeExibicao;

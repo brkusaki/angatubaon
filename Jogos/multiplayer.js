@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   AngatubaON — Multiplayer Core (sala + sinalização WebRTC)
+   AngatubaON — Multiplayer Core (sala + sinalização WebRTC + voz)
    ------------------------------------------------------------
    Peça de infraestrutura REUTILIZÁVEL: não é um jogo, é a camada
    de rede que qualquer jogo 1x1 em tempo real (Ping Pong, etc.)
@@ -28,6 +28,11 @@
      pra ter permissão de escrever na sala (precisa habilitar o
      provedor "Anônimo" no console — ver claude/database.rules.json).
 
+   Globais expostos: window.AngatubaMP com
+     disponivel, criarSala, entrarSala, listarSalas, enviar, sair, on,
+     habilitarAudio, desabilitarAudio, microfoneMutado,
+     setMicrofoneMutado, audioAtivo, audioRemotoAtivo
+
    Uso (por um jogo futuro):
      if (!AngatubaMP.disponivel()) { // esconde o botão de multiplayer }
 
@@ -53,6 +58,62 @@
 
      AngatubaMP.enviar({ tipo: 'raquete', y: 0.42 });
      AngatubaMP.sair(); // ao terminar a partida ou sair da tela
+
+   ── VOZ P2P (opcional) — Etapa 3.1 ────────────────────────────
+   O áudio viaja na MESMA RTCPeerConnection do jogo (mesma porta,
+   mesmo ICE, mesmo custo zero). É 100% opcional: quem nunca chamar
+   habilitarAudio() tem exatamente o fluxo de antes — nenhum
+   getUserMedia é pedido em criarSala()/entrarSala(), nenhuma m-line
+   de áudio entra no SDP, nada muda.
+
+     AngatubaMP.habilitarAudio()          // → Promise (pede o microfone)
+       .then(function () { // voz ligada
+         })
+       .catch(function (err) { alert(err.message); }); // PT-BR
+
+     AngatubaMP.desabilitarAudio();       // desliga o mic de vez (libera o aparelho)
+     AngatubaMP.setMicrofoneMutado(true); // mute temporário (não libera o mic)
+     AngatubaMP.microfoneMutado();        // → bool
+     AngatubaMP.audioAtivo();             // → bool (minha voz está indo)
+     AngatubaMP.audioRemotoAtivo();       // → bool (estou recebendo a voz do outro)
+
+     AngatubaMP.on('audio', function (e) {
+       // e = { local: bool, remoto: bool }
+       // disparado quando minha voz liga/desliga e quando a voz do
+       // outro começa/para de chegar. É o único evento de áudio —
+       // não existem 'audioLocal'/'audioRemoto' separados.
+     });
+
+   QUANDO DÁ PRA LIGAR A VOZ: antes OU depois de conectar.
+   - Antes de criarSala()/entrarSala(): a intenção fica guardada e a
+     track entra já na primeira oferta/resposta. É o caminho mais
+     barato e o recomendado pra UI da Etapa 3.2 (botão de mic no
+     lobby, antes de criar/entrar).
+   - Depois de conectado: funciona também, via RENEGOCIAÇÃO PELO
+     PRÓPRIO DATACHANNEL. Os campos 'oferta' e 'resposta' no RTDB são
+     write-once (".validate": "!data.exists()" em
+     claude/database.rules.json) e "$outro": false impede criar campos
+     novos — ou seja, o RTDB NÃO serve pra uma segunda negociação.
+     Então o SDP novo vai empacotado como mensagem de controle dentro
+     do DataChannel já aberto ({ __mp: 'sdp', desc }), que é P2P e não
+     passa por regra nenhuma. Nada mudou no database.rules.json nem no
+     GAS. Padrão "perfect negotiation": em colisão (os dois ligam o mic
+     no mesmo instante), o convidado é o "educado" e cede.
+   - Se ligar a voz enquanto a conexão ainda está sendo montada, a
+     renegociação é feita sozinha assim que o DataChannel abre.
+   - Mensagens com a chave "__mp" são reservadas do core e NUNCA
+     chegam no handler 'mensagem' dos jogos (os jogos usam "t").
+   - Candidatos ICE novos continuam indo pelo RTDB (os listeners da
+     sala seguem vivos até sair()); adicionar uma track reaproveita
+     o transporte já negociado, então normalmente nem surgem.
+
+   Limitações conhecidas (aceitas nesta etapa):
+   - Sem servidor TURN. Em NAT muito restritivo a conexão (jogo E voz)
+     não fecha — igual já era antes do áudio.
+   - Voz só existe no AngatubaMP (Ping Pong e Tanques). Party e
+     Baralho usam só RTDB, sem WebRTC: PARTY/BARALHO SEM VOZ NESTA
+     ETAPA.
+   - Sem UI nos jogos ainda — isso é a Etapa 3.2. Aqui só a API.
    ══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -75,8 +136,19 @@
   var _souAnfitriao = false;
   var _salaPublica = false;   // true se a sala atual (quando anfitrião) tem espelho em salasPublicas/
   var _listeners = [];        // { ref, evento, cb } abertos, pra desligar depois
-  var _handlers = { conectado: [], mensagem: [], desconectado: [], erro: [] };
+  var _handlers = { conectado: [], mensagem: [], desconectado: [], erro: [], audio: [] };
   var _jaEmitiuDesconexao = false; // evita emitir 'desconectado' duas vezes pela mesma queda (A1.13)
+
+  // ── Estado do áudio opcional (Etapa 3.1) ──────────────────────
+  var _intencaoAudio = false; // usuário pediu voz (vale mesmo antes do pc existir)
+  var _streamLocal = null;    // MediaStream do microfone
+  var _pedidoMic = null;      // Promise de getUserMedia em andamento (evita 2 pedidos juntos)
+  var _geracaoAudio = 0;      // invalida um getUserMedia antigo que voltar tarde
+  var _sendersAudio = [];     // RTCRtpSender das tracks locais já entregues ao pc
+  var _micMutado = false;
+  var _elAudioRemoto = null;  // <audio> escondido que toca a voz do outro
+  var _fazendoOferta = false; // perfect negotiation
+  var _educado = true;        // convidado = educado (cede em colisão de ofertas)
 
   function disponivel() {
     return typeof RTCPeerConnection !== 'undefined'
@@ -140,6 +212,8 @@
   function _limparPeer() {
     if (_canal) { try { _canal.close(); } catch (e) {} _canal = null; }
     if (_pc) { try { _pc.close(); } catch (e) {} _pc = null; }
+    _sendersAudio = [];
+    _fazendoOferta = false;
   }
 
   // Garante um único disparo de 'desconectado' por queda: canal.onclose e
@@ -151,13 +225,242 @@
     _emit('desconectado');
   }
 
+  // ── Áudio: microfone local ────────────────────────────────────
+
+  function _mensagemErroMic(err) {
+    var nome = err && (err.name || err.code) ? String(err.name || err.code) : '';
+    if (nome === 'NotAllowedError' || nome === 'PermissionDeniedError' || nome === 'SecurityError') {
+      return 'Você precisa permitir o microfone pra falar com o outro jogador.';
+    }
+    if (nome === 'NotFoundError' || nome === 'DevicesNotFoundError' || nome === 'OverconstrainedError') {
+      return 'Não encontrei um microfone neste aparelho.';
+    }
+    if (nome === 'NotReadableError' || nome === 'TrackStartError') {
+      return 'Não consegui abrir o microfone — pode estar em uso por outro app.';
+    }
+    return 'Não consegui ligar o microfone agora. Tente de novo.';
+  }
+
+  function _pararStreamLocal() {
+    if (!_streamLocal) return;
+    _streamLocal.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+    _streamLocal = null;
+  }
+
+  function _tocarAudioRemoto(stream) {
+    if (typeof document === 'undefined') return;
+    if (!_elAudioRemoto) {
+      var el = document.createElement('audio');
+      el.autoplay = true;
+      el.setAttribute('playsinline', '');
+      el.setAttribute('aria-hidden', 'true');
+      el.style.display = 'none';
+      try { (document.body || document.documentElement).appendChild(el); } catch (e) { return; }
+      _elAudioRemoto = el;
+    }
+    _elAudioRemoto.srcObject = stream;
+    // Autoplay de áudio já passou por gesto do usuário (ele tocou em
+    // criar/entrar na sala), mas se o navegador barrar não é motivo pra
+    // quebrar a partida — só não sai som.
+    var p = _elAudioRemoto.play();
+    if (p && p.catch) p.catch(function () {});
+  }
+
+  function _removerAudioRemoto() {
+    if (!_elAudioRemoto) return;
+    try { _elAudioRemoto.pause(); } catch (e) {}
+    try { _elAudioRemoto.srcObject = null; } catch (e) {}
+    try {
+      if (_elAudioRemoto.parentNode) _elAudioRemoto.parentNode.removeChild(_elAudioRemoto);
+    } catch (e) {}
+    _elAudioRemoto = null;
+  }
+
+  function audioAtivo() {
+    if (_streamLocal) {
+      return _streamLocal.getAudioTracks().some(function (t) { return t.readyState === 'live'; });
+    }
+    return !!_intencaoAudio;
+  }
+
+  function audioRemotoAtivo() {
+    if (!_elAudioRemoto || !_elAudioRemoto.srcObject) return false;
+    var faixas = _elAudioRemoto.srcObject.getAudioTracks ? _elAudioRemoto.srcObject.getAudioTracks() : [];
+    return faixas.some(function (t) { return t.readyState === 'live'; });
+  }
+
+  function _emitirAudio() {
+    _emit('audio', { local: audioAtivo(), remoto: audioRemotoAtivo() });
+  }
+
+  // Entrega as tracks do microfone pro pc. Se o pc ainda não existe, não
+  // faz nada — criarSala()/entrarSala() chamam isto de novo assim que
+  // criam a conexão (é aí que a intenção guardada vira track de verdade).
+  function _aplicarAudioNoPeer() {
+    if (!_pc || !_streamLocal) return;
+    if (_sendersAudio.length) return; // já entregue
+    _streamLocal.getAudioTracks().forEach(function (t) {
+      try { _sendersAudio.push(_pc.addTrack(t, _streamLocal)); } catch (e) {}
+    });
+  }
+
+  // true quando existe track local que ainda não está saindo de verdade —
+  // acontece quando o mic foi ligado depois da oferta/resposta inicial (a
+  // m-line de áudio não existia ainda). Aí precisa renegociar.
+  function _audioPrecisaNegociar() {
+    if (!_pc || !_sendersAudio.length || typeof _pc.getTransceivers !== 'function') return false;
+    var trs = _pc.getTransceivers();
+    return _sendersAudio.some(function (s) {
+      for (var i = 0; i < trs.length; i++) {
+        if (trs[i].sender === s) {
+          var d = trs[i].currentDirection;
+          return !(d === 'sendrecv' || d === 'sendonly');
+        }
+      }
+      return true;
+    });
+  }
+
+  function habilitarAudio() {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return Promise.reject(new Error('Seu navegador não permite usar o microfone aqui.'));
+    }
+    if (_streamLocal && audioAtivo()) { _intencaoAudio = true; return Promise.resolve(); }
+    if (_pedidoMic) return _pedidoMic;
+
+    _intencaoAudio = true;
+    var geracao = _geracaoAudio;
+    var pedido = navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      .then(function (stream) {
+        if (geracao === _geracaoAudio) _pedidoMic = null;
+        // Desligou a voz (ou saiu da sala) enquanto o navegador perguntava
+        // da permissão: não deixa o mic aceso por nada.
+        if (!_intencaoAudio || geracao !== _geracaoAudio) {
+          stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+          return;
+        }
+        _streamLocal = stream;
+        if (_micMutado) {
+          stream.getAudioTracks().forEach(function (t) { t.enabled = false; });
+        }
+        _aplicarAudioNoPeer();
+        // Já conectado? addTrack dispara onnegotiationneeded e a renegociação
+        // sai pelo DataChannel. Ainda conectando? a oferta/resposta inicial
+        // já leva o áudio, ou o onopen do canal renegocia.
+        _emitirAudio();
+      })
+      .catch(function (err) {
+        if (geracao === _geracaoAudio) {
+          _pedidoMic = null;
+          _intencaoAudio = false;
+        }
+        throw new Error(_mensagemErroMic(err));
+      });
+
+    _pedidoMic = pedido;
+    return pedido;
+  }
+
+  function desabilitarAudio() {
+    _intencaoAudio = false;
+    _micMutado = false;
+    // Invalida um getUserMedia ainda no ar: se a permissão for concedida
+    // depois deste desligamento, a stream que chegar é descartada na hora
+    // em vez de acender o microfone sem ninguém pedir.
+    _geracaoAudio++;
+    _pedidoMic = null;
+    if (_pc) {
+      _sendersAudio.forEach(function (s) {
+        // removeTrack dispara onnegotiationneeded → renegocia pelo canal e o
+        // outro lado para de receber. Se o pc já morreu, não tem o que fazer.
+        try { _pc.removeTrack(s); } catch (e) {}
+      });
+    }
+    _sendersAudio = [];
+    _pararStreamLocal();
+    _emitirAudio();
+  }
+
+  function microfoneMutado() { return !!_micMutado; }
+
+  // Mute de verdade (a track continua viva, o aparelho continua "em uso",
+  // só não sai som). Serve pro botão de mic da Etapa 3.2 sem ter que pedir
+  // permissão de novo a cada toque.
+  function setMicrofoneMutado(valor) {
+    _micMutado = !!valor;
+    if (_streamLocal) {
+      _streamLocal.getAudioTracks().forEach(function (t) { t.enabled = !_micMutado; });
+    }
+    return _micMutado;
+  }
+
+  // ── Renegociação (SDP dentro do DataChannel) ──────────────────
+  // Os campos 'oferta'/'resposta' do RTDB são write-once nas regras, então
+  // qualquer negociação DEPOIS da primeira tem que sair por outro caminho:
+  // o próprio canal P2P já aberto. Ver cabeçalho.
+
+  function _enviarControle(msg) {
+    if (!_canal || _canal.readyState !== 'open') return false;
+    try { _canal.send(JSON.stringify(msg)); return true; } catch (e) { return false; }
+  }
+
+  function _negociar(pc) {
+    if (!pc || _fazendoOferta) return;
+    if (pc.signalingState !== 'stable') return;
+    if (!_canal || _canal.readyState !== 'open') return;
+    _fazendoOferta = true;
+    pc.createOffer().then(function (oferta) {
+      return pc.setLocalDescription(oferta);
+    }).then(function () {
+      _enviarControle({ __mp: 'sdp', desc: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } });
+    }).catch(function () {
+      /* renegociação é best-effort: falhar aqui não derruba a partida */
+    }).then(function () { _fazendoOferta = false; });
+  }
+
+  function _tratarControle(msg) {
+    var pc = _pc;
+    if (!pc || msg.__mp !== 'sdp' || !msg.desc) return;
+    var ehOferta = msg.desc.type === 'offer';
+    var pronto = !_fazendoOferta && pc.signalingState === 'stable';
+    // Colisão (os dois ligaram o mic junto): o anfitrião é o "mal-educado"
+    // e ignora a oferta do outro; o convidado desfaz a dele e aceita.
+    if (ehOferta && !pronto && !_educado) return;
+
+    var antes = Promise.resolve();
+    if (ehOferta && !pronto) {
+      antes = pc.setLocalDescription({ type: 'rollback' }).catch(function () {});
+    }
+    antes.then(function () {
+      return pc.setRemoteDescription(new RTCSessionDescription(msg.desc));
+    }).then(function () {
+      if (!ehOferta) return null;
+      return pc.createAnswer().then(function (resp) {
+        return pc.setLocalDescription(resp);
+      }).then(function () {
+        _enviarControle({ __mp: 'sdp', desc: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } });
+      });
+    }).catch(function () {});
+  }
+
   function _configurarCanalDados(canal) {
     _canal = canal;
-    canal.onopen = function () { _emit('conectado'); };
+    canal.onopen = function () {
+      _emit('conectado');
+      // Mic ligado antes do canal abrir mas fora da oferta inicial (ex.: o
+      // convidado ligou a voz numa sala cuja oferta não tinha áudio): agora
+      // dá pra renegociar.
+      if (_audioPrecisaNegociar()) _negociar(_pc);
+    };
     canal.onclose = function () { _emitDesconectadoUmaVez(); };
     canal.onerror = function () { _emit('erro', new Error('Conexão com o outro jogador falhou.')); };
     canal.onmessage = function (ev) {
-      try { _emit('mensagem', JSON.parse(ev.data)); } catch (e) { /* mensagem não-JSON: ignora */ }
+      var dado;
+      try { dado = JSON.parse(ev.data); } catch (e) { return; /* mensagem não-JSON: ignora */ }
+      // Pacotes de controle do core (renegociação de áudio) NUNCA vazam pro
+      // jogo: os jogos usam a chave "t", nunca "__mp".
+      if (dado && dado.__mp) { _tratarControle(dado); return; }
+      _emit('mensagem', dado);
     };
   }
 
@@ -189,6 +492,25 @@
             _emitDesconectadoUmaVez();
           }
         }, 5000);
+      }
+    };
+    // Só dispara quando alguém liga/desliga a voz. Enquanto o canal não
+    // abriu, a negociação inicial (RTDB) é quem manda — o onopen do canal
+    // cobre o resto.
+    pc.onnegotiationneeded = function () {
+      if (!_canal || _canal.readyState !== 'open') return;
+      _negociar(pc);
+    };
+    // Voz do outro jogador chegando.
+    pc.ontrack = function (ev) {
+      if (ev.track && ev.track.kind !== 'audio') return;
+      var stream = (ev.streams && ev.streams[0]) ? ev.streams[0] : new MediaStream([ev.track]);
+      _tocarAudioRemoto(stream);
+      _emitirAudio();
+      if (ev.track) {
+        ev.track.onended = function () { _emitirAudio(); };
+        ev.track.onmute = function () { _emitirAudio(); };
+        ev.track.onunmute = function () { _emitirAudio(); };
       }
     };
 
@@ -228,6 +550,7 @@
         _salaRef = ref;
         _souAnfitriao = true;
         _salaPublica = publica;
+        _educado = false; // anfitrião não cede em colisão de renegociação
         // Se o anfitrião cair/fechar a aba antes de alguém entrar, a sala
         // some sozinha — evita salas fantasmas acumulando no banco.
         ref.onDisconnect().remove();
@@ -248,6 +571,10 @@
 
         var pc = _novoPeerConnection(ref, true);
         _pc = pc;
+        // Voz ligada antes de criar a sala: a track entra ANTES do
+        // createOffer, então a m-line de áudio já vai na primeira oferta e
+        // nenhuma renegociação é necessária. É o caminho barato.
+        _aplicarAudioNoPeer();
         _configurarCanalDados(pc.createDataChannel('jogo'));
 
         _escutar(ref.child('resposta'), 'value', function (snap) {
@@ -307,12 +634,18 @@
           // não deixam mais _salaRef sujo pro que perdeu a corrida (A2.15).
           _salaRef = ref;
           _souAnfitriao = false;
+          _educado = true; // convidado cede em colisão de renegociação
           // Sem isto, um convidado que cai (sem passar por sair()) deixa o
           // nó preso pra sempre: a sala trava porque ninguém mais consegue
           // entrar (ver A1.5, mesmo padrão já usado em party.js:220).
           ref.child('convidado').onDisconnect().remove();
           var pc = _novoPeerConnection(ref, false);
           _pc = pc;
+          // Voz ligada antes de entrar: entrega a track ANTES do
+          // setRemoteDescription pra ela casar com a m-line de áudio da
+          // oferta, se o anfitrião tiver aberto voz. Se a oferta não tiver
+          // áudio, a track fica pendurada e o onopen do canal renegocia.
+          _aplicarAudioNoPeer();
           pc.ondatachannel = function (ev) { _configurarCanalDados(ev.channel); };
 
           return pc.setRemoteDescription(new RTCSessionDescription(sala.oferta)).then(function () {
@@ -379,7 +712,17 @@
     // jogo continuam vivos depois de sair dele. Como Ping Pong e Tanques
     // usam os mesmos tipos de pacote (oi/p/e/rr/pr), abrir os dois na mesma
     // sessão faz cada um processar os pacotes do outro (ver A1.2).
-    _handlers = { conectado: [], mensagem: [], desconectado: [], erro: [] };
+    _handlers = { conectado: [], mensagem: [], desconectado: [], erro: [], audio: [] };
+    // Áudio antes do _limparPeer(): o microfone tem que apagar junto com a
+    // partida, senão o indicador de "gravando" fica aceso no aparelho e a
+    // próxima sala herda track órfã. _intencaoAudio = false também aborta
+    // um getUserMedia que ainda esteja no ar (ver habilitarAudio).
+    _intencaoAudio = false;
+    _micMutado = false;
+    _pedidoMic = null;
+    _geracaoAudio++;
+    _pararStreamLocal();
+    _removerAudioRemoto();
     _pararListeners();
     _limparPeer();
     if (_salaRef) {
@@ -425,6 +768,7 @@
     _souAnfitriao = false;
     _salaPublica = false;
     _jaEmitiuDesconexao = false;
+    _educado = true;
   }
 
   window.AngatubaMP = {
@@ -434,6 +778,12 @@
     listarSalas: listarSalas,
     enviar: enviar,
     sair: sair,
-    on: on
+    on: on,
+    habilitarAudio: habilitarAudio,
+    desabilitarAudio: desabilitarAudio,
+    microfoneMutado: microfoneMutado,
+    setMicrofoneMutado: setMicrofoneMutado,
+    audioAtivo: audioAtivo,
+    audioRemotoAtivo: audioRemotoAtivo
   };
 })();

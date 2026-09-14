@@ -200,8 +200,18 @@
   }
 
   // Garante alguém autenticado (mesmo que anônimo) pra ter permissão de
-  // escrever na sala. Se já tem um cliente logado (fluxo do ranking),
-  // usa esse uid/nome; senão entra anônimo só pra essa sessão.
+  // escrever na sala.
+  //
+  // Regra de identidade do app (ver o bloco de auth em app.js):
+  //   - SALA / CÓDIGO  → sessão anônima serve. Jogar com um amigo nunca
+  //     exige conta, e este módulo NÃO abre login em lugar nenhum.
+  //   - RANKING e camada social → só CONTA NOMEADA (Google ou e-mail).
+  //
+  // Se a pessoa já está logada com conta nomeada, a sala herda o mesmo
+  // uid e o mesmo apelido que ela vê no painel e no ranking —
+  // cliNomeExibicao() (via AngatubaGames.apelido) devolve null quando a
+  // sessão é só anônima, então um convidado sem conta continua sendo
+  // "Jogador" em vez de herdar o nome de um login antigo do aparelho.
   function _garantirIdentidade() {
     return new Promise(function (resolve, reject) {
       if (typeof firebase === 'undefined' || !firebase.auth) {
@@ -211,7 +221,8 @@
       var auth = firebase.auth();
       var atual = auth.currentUser;
       if (atual) {
-        resolve({ uid: atual.uid, nome: (atual.displayName || 'Jogador').slice(0, 20) });
+        var apelido = (window.AngatubaGames && window.AngatubaGames.apelido && window.AngatubaGames.apelido());
+        resolve({ uid: atual.uid, nome: String(apelido || atual.displayName || 'Jogador').slice(0, 20) });
         return;
       }
       auth.signInAnonymously()

@@ -1373,7 +1373,11 @@
     if (!colecao) return;
 
     var uid = _cliUser.uid;
-    var nome = (_cliApelido || _cliUser.displayName || 'Jogador').trim().slice(0, 20);
+    // cliNomeExibicao() é a fonte única do nome visível (app.js): mesmo
+    // trim e mesmo truncamento do header, do painel de conta e das salas
+    // de multiplayer. Antes o ranking montava o nome por conta própria e
+    // podia divergir do que a pessoa via no painel.
+    var nome = (typeof cliNomeExibicao === 'function' && cliNomeExibicao()) || 'Jogador';
     // Garante nome válido pras regras do Firestore (mín. 2 caracteres).
     if (nome.length < 2) nome = 'Jogador';
     // Reconcilia com o recorde LOCAL do dispositivo: sempre tentamos subir
@@ -1792,8 +1796,7 @@
         if (!estaNoTop && typeof rankMinhaPontuacao === 'function') {
           rankMinhaPontuacao(jogoKey).then(function (minha) {
             if (minha == null || !barra || jogoKey !== _rankAbaAtual) return;
-            var meuNome = (typeof _cliApelido !== 'undefined' && _cliApelido) ||
-                          (_cliUser && _cliUser.displayName) || 'Você';
+            var meuNome = (typeof cliNomeExibicao === 'function' && cliNomeExibicao()) || 'Você';
             var rotulo = (top.length >= 20) ? '(fora do top 20)' : '(sua marca)';
             barra.innerHTML = '<div class="rank-linha rank-linha-eu">' +
                 '<div class="rank-pos-num">—</div>' +
@@ -1923,10 +1926,13 @@
     estaLogado: function () {
       return (typeof _cliUser !== 'undefined' && !!_cliUser);
     },
-    // Apelido de exibição atual (ou null).
+    // Apelido de exibição atual, ou null quando não há CONTA NOMEADA.
+    // Delegado a cliNomeExibicao() (app.js) de propósito: numa sessão
+    // só anônima (entrou em sala por código, sem conta) isto precisa
+    // devolver null, pra sala não rotular o convidado com um apelido
+    // que sobrou de um login anterior no mesmo aparelho.
     apelido: function () {
-      if (typeof _cliApelido !== 'undefined' && _cliApelido) return _cliApelido;
-      if (typeof _cliUser !== 'undefined' && _cliUser && _cliUser.displayName) return _cliUser.displayName;
+      if (typeof cliNomeExibicao === 'function') return cliNomeExibicao();
       return null;
     },
     // Abre o modal de login sob demanda, com uma mensagem opcional.

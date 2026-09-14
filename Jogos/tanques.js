@@ -623,6 +623,10 @@
     try { window.AngatubaMP.sair(); } catch (e) {}
     _tqSaindoVoluntariamente = false;
     _tqEventosLigados = false;
+    // 3.2: sair() já parou o microfone e limpou o <audio> remoto no core —
+    // aqui só devolvemos o botão ao estado "desligado" pra ele não voltar
+    // pintado de verde na próxima sala (e nunca religar sozinho).
+    _tqResetarMic();
     if (religar) _tqLigarEventosRede();
   }
 
@@ -641,6 +645,7 @@
     _tqEstado = 'inicio';
     _tqModo = null;
     _tqSouAnfitriao = false;
+    _tqAtualizarMic(); // fechando o jogo: o botão de voz não fica pra trás
   }
 
   window.TanquesGame = { preparar: _tqPreparar, comecar: _tqComecar, parar: _tqParar };
@@ -665,6 +670,7 @@
     var controles = document.getElementById('tq-controles');
     if (controles) controles.style.display = (qual === 'jogando') ? '' : 'none';
     if (qual !== 'jogando') _tqResetJoystickVisual();
+    _tqAtualizarMic(); // 3.2: o botão de voz só existe em sala/partida multiplayer
     if (qual === 'inicio') {
       var btnC = document.getElementById('tq-btn-criar');
       var btnE = document.getElementById('tq-btn-entrar');
@@ -841,6 +847,105 @@
     _tqMostrarTela('inicio');
   }
 
+  /* ── Voz opcional (Etapa 3.2) ──────────────────────────────────
+     Espelha o Ping Pong (ver pingpong.js): todo o trabalho de mídia
+     (getUserMedia, tracks, renegociação, limpeza no sair) é do core —
+     AngatubaMP em multiplayer.js. Aqui existe só o estado visual, em
+     ciclo: desligado --toque--> ligado --toque--> mudo --toque--> ligado.
+     O mic nunca é pedido sozinho: só no primeiro toque. Mutar usa
+     setMicrofoneMutado, que NÃO solta o aparelho — dá pra calar a boca
+     no meio da rodada sem uma nova permissão. Solo e tela inicial não
+     mostram nada (ver _tqAtualizarMic). */
+  var _tqMicPedindo = false;   // true enquanto o navegador pergunta da permissão
+  var _tqMicRemoto = false;    // recebendo a voz do outro lado (evento 'audio')
+  var _tqMicAvisoTimer = 0;
+
+  function _tqMicPronto() {
+    return !!(window.AngatubaMP && typeof window.AngatubaMP.habilitarAudio === 'function');
+  }
+
+  function _tqAtualizarMic() {
+    // Cada botão vive na sua tela: o da sala no overlay tq-sala, o
+    // compacto dentro do tq-hud da partida.
+    var base = _tqModo === 'multiplayer' && _tqMicPronto();
+    var mostrar = base && (_tqEstado === 'sala' || _tqEstado === 'jogando');
+    var estado = 'off';
+    if (mostrar && window.AngatubaMP.audioAtivo()) {
+      estado = window.AngatubaMP.microfoneMutado() ? 'mudo' : 'on';
+    }
+    var rotulo = _tqMicPedindo ? 'Pedindo…'
+               : (estado === 'on' ? 'Mic ligado' : (estado === 'mudo' ? 'Mic mudo' : 'Ligar mic'));
+    var icone = _tqMicPedindo ? 'fa-spinner fa-spin'
+              : (estado === 'on' ? 'fa-microphone' : 'fa-microphone-slash');
+    [['tq-mic-sala', 'sala'], ['tq-mic-hud', 'jogando']].forEach(function (par) {
+      var btn = document.getElementById(par[0]);
+      if (!btn) return;
+      var aqui = base && _tqEstado === par[1];
+      btn.style.display = aqui ? '' : 'none';
+      if (!aqui) return;
+      btn.setAttribute('data-mic', _tqMicPedindo ? 'carregando' : estado);
+      btn.disabled = _tqMicPedindo;
+      btn.setAttribute('aria-pressed', estado === 'on' ? 'true' : 'false');
+      btn.setAttribute('aria-label', rotulo);
+      btn.title = rotulo;
+      var ic = btn.querySelector('i');
+      if (ic) ic.className = 'fa ' + icone;
+      var txt = btn.querySelector('.tq-mic-txt');
+      if (txt) txt.textContent = rotulo;
+      var pt = btn.querySelector('.tq-mic-dot');
+      if (pt) pt.style.display = (_tqMicRemoto && !_tqMicPedindo) ? 'block' : 'none';
+    });
+    var aviso = document.getElementById('tq-mic-erro');
+    if (aviso && !mostrar) { aviso.textContent = ''; aviso.style.display = 'none'; }
+  }
+
+  function _tqMicAviso(msg) {
+    var aviso = document.getElementById('tq-mic-erro');
+    if (_tqMicAvisoTimer) { clearTimeout(_tqMicAvisoTimer); _tqMicAvisoTimer = 0; }
+    if (!aviso) return;
+    aviso.textContent = msg || '';
+    aviso.style.display = msg ? '' : 'none';
+    if (msg) {
+      _tqMicAvisoTimer = setTimeout(function () {
+        _tqMicAvisoTimer = 0;
+        aviso.textContent = '';
+        aviso.style.display = 'none';
+      }, 5000);
+    }
+  }
+
+  function _tqAlternarMic() {
+    if (_tqMicPedindo || _tqModo !== 'multiplayer' || !_tqMicPronto()) return;
+    var MP = window.AngatubaMP;
+    if (MP.audioAtivo()) {           // já tem sessão de voz: só muta/desmuta
+      MP.setMicrofoneMutado(!MP.microfoneMutado());
+      _tqAtualizarMic();
+      return;
+    }
+    _tqMicPedindo = true;
+    _tqMicAviso('');
+    _tqAtualizarMic();
+    MP.habilitarAudio().then(function () {
+      _tqMicPedindo = false;
+      _tqAtualizarMic();
+    }).catch(function (err) {
+      _tqMicPedindo = false;
+      _tqMicAviso((err && err.message) || 'Não consegui ligar o microfone.');
+      _tqAtualizarMic();
+    });
+  }
+
+  // Chamado depois de AngatubaMP.sair(): o core já desligou tudo, aqui é só
+  // o visual. Nunca chama habilitarAudio — ligar é sempre um toque da pessoa.
+  function _tqResetarMic() {
+    _tqMicPedindo = false;
+    _tqMicRemoto = false;
+    _tqMicAviso('');
+    _tqAtualizarMic();
+  }
+
+  window._tqAlternarMic = _tqAlternarMic;
+
   window._tqJogarSozinho = _tqJogarSozinho;
   window._tqCriarSala = _tqCriarSala;
   window._tqEntrarSala = _tqEntrarSala;
@@ -927,6 +1032,14 @@
     });
 
     window.AngatubaMP.on('mensagem', _tqReceberMensagem);
+
+    // 3.2: o core avisa quando a minha voz entra/sai e quando a do outro
+    // lado chega — o botão e o pontinho seguem esse evento em vez de ficar
+    // consultando o estado a cada quadro.
+    window.AngatubaMP.on('audio', function (e) {
+      _tqMicRemoto = !!(e && e.remoto);
+      _tqAtualizarMic();
+    });
 
     window.AngatubaMP.on('desconectado', function () {
       if (_tqSaindoVoluntariamente) { _tqSaindoVoluntariamente = false; return; }

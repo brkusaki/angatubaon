@@ -5,8 +5,10 @@
 
 .tq-card{background:var(--card,#151d2b);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:12px;}
 
-/* HUD durante a partida: placar em losangos (pips), igual ao mockup */
-.tq-hud{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;}
+/* HUD durante a partida: placar em losangos (pips), igual ao mockup.
+   position:relative só pra ancorar o botão de mic no canto sem tirar o
+   placar do centro (ver .tq-mic-btn-hud). */
+.tq-hud{position:relative;display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;}
 .tq-hud-lado{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.04);border-radius:12px;padding:6px 16px;min-width:78px;}
 .tq-hud-lado-label{font-size:10.5px;color:var(--muted,#8794a8);text-transform:uppercase;letter-spacing:.04em;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px;}
 .tq-pips{display:flex;gap:5px;}
@@ -71,6 +73,11 @@
 .tq-classe-btn.tq-classe-ativa{border-color:#ff4757;background:rgba(255,71,87,.16);color:#fff;}
 .tq-classes-desc{font-size:11.5px;color:rgba(199,209,224,.55);text-align:center;margin-top:6px;min-height:14px;}
 
+/* Escolha de modo de jogo (menu inicial) — mesmo visual da classe acima,
+   classes próprias pra não interferir na busca por ".tq-classe-btn". */
+.tq-modo-btn{flex:1;padding:8px 4px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#c7d1e0;font-family:'Syne',sans-serif;font-size:12.5px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .12s ease;}
+.tq-modo-btn.tq-modo-ativo{border-color:#ff4757;background:rgba(255,71,87,.16);color:#fff;}
+
 /* Tela inicial: sozinho / criar sala / entrar com código */
 .tq-opcoes{display:flex;flex-direction:column;gap:10px;width:100%;max-width:290px;}
 .tq-btn-opcao{width:100%;padding:13px 16px;border-radius:14px;border:1px solid rgba(255,71,87,.35);background:rgba(255,71,87,.10);color:#fff;font-family:'Syne',sans-serif;font-size:15px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s ease,filter .12s ease;}
@@ -110,3 +117,21 @@
 .tq-play:hover{filter:brightness(1.08);}
 .tq-play:active{transform:scale(.96);}
 .tq-play:disabled{opacity:.5;pointer-events:none;}
+
+/* ── Voz opcional (Etapa 3.2) ─────────────────────────────────────
+   Mesmo padrão do Ping Pong: um botão só, em 3 estados (data-mic):
+   off (cinza) → on (verde) → mudo (âmbar); 'carregando' é enquanto o
+   navegador pergunta da permissão. O ponto (.tq-mic-dot) acende quando
+   estamos RECEBENDO a voz do outro lado. Fica no HUD (fora da arena)
+   pra não encostar no joystick nem na zona de fogo. */
+.tq-mic-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:9px 16px;margin-bottom:12px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:#c7d1e0;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s ease,border-color .12s ease,color .12s ease;}
+.tq-mic-btn i{font-size:15px;}
+.tq-mic-btn:active{transform:scale(.96);}
+.tq-mic-btn:disabled{opacity:.65;pointer-events:none;}
+.tq-mic-btn[data-mic="on"]{border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.16);color:#34d399;}
+.tq-mic-btn[data-mic="mudo"]{border-color:rgba(255,176,32,.5);background:rgba(255,176,32,.14);color:#ffb020;}
+.tq-mic-btn-hud{position:absolute;right:0;top:50%;transform:translateY(-50%);min-width:40px;padding:0;margin:0;}
+.tq-mic-btn-hud:active{transform:translateY(-50%) scale(.96);}
+.tq-mic-dot{position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 6px rgba(52,211,153,.8);display:none;}
+/* Acima dos overlays (z-index 4) pra servir na sala e no meio da partida */
+.tq-mic-aviso{position:absolute;top:8px;left:10px;right:10px;z-index:6;margin:0 auto;max-width:290px;background:rgba(0,0,0,.78);color:#ff9aa8;font-size:12px;font-weight:600;line-height:1.35;text-align:center;padding:8px 12px;border-radius:10px;backdrop-filter:blur(2px);pointer-events:none;}

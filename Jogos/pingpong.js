@@ -225,6 +225,10 @@
     try { window.AngatubaMP.sair(); } catch (e) {}
     _ppSaindoVoluntariamente = false;
     _ppEventosLigados = false;
+    // 3.2: sair() já parou o microfone e limpou o <audio> remoto no core —
+    // aqui só devolvemos o botão ao estado "desligado" pra ele não voltar
+    // pintado de verde na próxima sala (e nunca religar sozinho).
+    _ppResetarMic();
     if (religar) _ppLigarEventosRede();
   }
 
@@ -235,6 +239,7 @@
     _ppEstado = 'inicio';
     _ppModo = null;
     _ppSouAnfitriao = false;
+    _ppAtualizarMic(); // fechando o jogo: o botão de voz não fica pra trás
   }
 
   window._ppComecar = _ppComecar;
@@ -257,6 +262,7 @@
     if (fim)  fim.style.display  = (qual === 'fim')  ? '' : 'none';
     var hud = document.getElementById('pp-hud');
     if (hud) hud.style.display = (qual === 'jogando') ? '' : 'none';
+    _ppAtualizarMic(); // 3.2: o botão de voz só existe em sala/partida multiplayer
     if (qual === 'inicio') {
       // Blindagem: garante que os botões nunca fiquem travados de uma
       // tentativa anterior (ex.: o app foi pro segundo plano e voltou no
@@ -442,6 +448,105 @@
     _ppMostrarTela('inicio');
   }
 
+  /* ── Voz opcional (Etapa 3.2) ──────────────────────────────────
+     Todo o trabalho de mídia (getUserMedia, tracks, renegociação,
+     limpeza no sair) é do core — ver AngatubaMP em multiplayer.js.
+     Aqui existe só o estado visual do botão, em ciclo:
+       desligado --toque--> ligado --toque--> mudo --toque--> ligado
+     O mic nunca é pedido sozinho: só no primeiro toque. Mutar usa
+     setMicrofoneMutado, que NÃO solta o aparelho — assim dá pra
+     calar a boca no meio do rali sem uma nova permissão. Solo e
+     tela inicial não mostram nada (ver _ppAtualizarMic). */
+  var _ppMicPedindo = false;   // true enquanto o navegador pergunta da permissão
+  var _ppMicRemoto = false;    // recebendo a voz do outro lado (evento 'audio')
+  var _ppMicAvisoTimer = 0;
+
+  function _ppMicPronto() {
+    return !!(window.AngatubaMP && typeof window.AngatubaMP.habilitarAudio === 'function');
+  }
+
+  function _ppAtualizarMic() {
+    // Cada botão vive na sua tela: o da sala no overlay pp-sala, o
+    // compacto dentro do pp-hud da partida.
+    var base = _ppModo === 'multiplayer' && _ppMicPronto();
+    var mostrar = base && (_ppEstado === 'sala' || _ppEstado === 'jogando');
+    var estado = 'off';
+    if (mostrar && window.AngatubaMP.audioAtivo()) {
+      estado = window.AngatubaMP.microfoneMutado() ? 'mudo' : 'on';
+    }
+    var rotulo = _ppMicPedindo ? 'Pedindo…'
+               : (estado === 'on' ? 'Mic ligado' : (estado === 'mudo' ? 'Mic mudo' : 'Ligar mic'));
+    var icone = _ppMicPedindo ? 'fa-spinner fa-spin'
+              : (estado === 'on' ? 'fa-microphone' : 'fa-microphone-slash');
+    [['pp-mic-sala', 'sala'], ['pp-mic-hud', 'jogando']].forEach(function (par) {
+      var btn = document.getElementById(par[0]);
+      if (!btn) return;
+      var aqui = base && _ppEstado === par[1];
+      btn.style.display = aqui ? '' : 'none';
+      if (!aqui) return;
+      btn.setAttribute('data-mic', _ppMicPedindo ? 'carregando' : estado);
+      btn.disabled = _ppMicPedindo;
+      btn.setAttribute('aria-pressed', estado === 'on' ? 'true' : 'false');
+      btn.setAttribute('aria-label', rotulo);
+      btn.title = rotulo;
+      var ic = btn.querySelector('i');
+      if (ic) ic.className = 'fa ' + icone;
+      var txt = btn.querySelector('.pp-mic-txt');
+      if (txt) txt.textContent = rotulo;
+      var pt = btn.querySelector('.pp-mic-dot');
+      if (pt) pt.style.display = (_ppMicRemoto && !_ppMicPedindo) ? 'block' : 'none';
+    });
+    var aviso = document.getElementById('pp-mic-erro');
+    if (aviso && !mostrar) { aviso.textContent = ''; aviso.style.display = 'none'; }
+  }
+
+  function _ppMicAviso(msg) {
+    var aviso = document.getElementById('pp-mic-erro');
+    if (_ppMicAvisoTimer) { clearTimeout(_ppMicAvisoTimer); _ppMicAvisoTimer = 0; }
+    if (!aviso) return;
+    aviso.textContent = msg || '';
+    aviso.style.display = msg ? '' : 'none';
+    if (msg) {
+      _ppMicAvisoTimer = setTimeout(function () {
+        _ppMicAvisoTimer = 0;
+        aviso.textContent = '';
+        aviso.style.display = 'none';
+      }, 5000);
+    }
+  }
+
+  function _ppAlternarMic() {
+    if (_ppMicPedindo || _ppModo !== 'multiplayer' || !_ppMicPronto()) return;
+    var MP = window.AngatubaMP;
+    if (MP.audioAtivo()) {           // já tem sessão de voz: só muta/desmuta
+      MP.setMicrofoneMutado(!MP.microfoneMutado());
+      _ppAtualizarMic();
+      return;
+    }
+    _ppMicPedindo = true;
+    _ppMicAviso('');
+    _ppAtualizarMic();
+    MP.habilitarAudio().then(function () {
+      _ppMicPedindo = false;
+      _ppAtualizarMic();
+    }).catch(function (err) {
+      _ppMicPedindo = false;
+      _ppMicAviso((err && err.message) || 'Não consegui ligar o microfone.');
+      _ppAtualizarMic();
+    });
+  }
+
+  // Chamado depois de AngatubaMP.sair(): o core já desligou tudo, aqui é só
+  // o visual. Nunca chama habilitarAudio — ligar é sempre um toque da pessoa.
+  function _ppResetarMic() {
+    _ppMicPedindo = false;
+    _ppMicRemoto = false;
+    _ppMicAviso('');
+    _ppAtualizarMic();
+  }
+
+  window._ppAlternarMic = _ppAlternarMic;
+
   window._ppJogarSozinho = _ppJogarSozinho;
   window._ppCriarSala  = _ppCriarSala;
   window._ppEntrarSala = _ppEntrarSala;
@@ -475,6 +580,14 @@
     });
 
     window.AngatubaMP.on('mensagem', _ppReceberMensagem);
+
+    // 3.2: o core avisa quando a minha voz entra/sai e quando a do outro
+    // lado chega — o botão e o pontinho seguem esse evento em vez de ficar
+    // consultando o estado a cada quadro.
+    window.AngatubaMP.on('audio', function (e) {
+      _ppMicRemoto = !!(e && e.remoto);
+      _ppAtualizarMic();
+    });
 
     // sair()/_ppParar()/_ppVoltarMenu() também fecham o canal (o que
     // dispara este mesmo evento) — _ppSaindoVoluntariamente distingue

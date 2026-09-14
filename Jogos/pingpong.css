@@ -5,8 +5,10 @@
 
 .pp-card{background:var(--card,#151d2b);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:12px;}
 
-/* HUD durante a partida: meu placar à esquerda, do adversário à direita */
-.pp-hud{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;}
+/* HUD durante a partida: meu placar à esquerda, do adversário à direita.
+   position:relative só pra ancorar o botão de mic no canto sem tirar o
+   placar do centro (ver .pp-mic-btn-hud). */
+.pp-hud{position:relative;display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;}
 .pp-hud-lado{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.04);border-radius:12px;padding:6px 18px;min-width:78px;}
 .pp-hud-lado-label{font-size:10.5px;color:var(--muted,#8794a8);text-transform:uppercase;letter-spacing:.04em;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pp-hud-lado-valor{font-size:24px;font-weight:800;color:#fff;font-family:'Syne',sans-serif;}
@@ -67,3 +69,23 @@
 .pp-play:hover{filter:brightness(1.08);}
 .pp-play:active{transform:scale(.96);}
 .pp-play:disabled{opacity:.5;pointer-events:none;}
+
+/* ── Voz opcional (Etapa 3.2) ─────────────────────────────────────
+   Um botão só, em 3 estados (data-mic): off (cinza) → on (verde) →
+   mudo (âmbar). 'carregando' é o intervalo em que o navegador está
+   perguntando da permissão. O ponto (.pp-mic-dot) acende quando
+   estamos RECEBENDO a voz do outro lado. O JS mostra/esconde tudo —
+   solo e tela inicial nunca veem o botão. */
+.pp-mic-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:9px 16px;margin-bottom:12px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:#c7d1e0;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s ease,border-color .12s ease,color .12s ease;}
+.pp-mic-btn i{font-size:15px;}
+.pp-mic-btn:active{transform:scale(.96);}
+.pp-mic-btn:disabled{opacity:.65;pointer-events:none;}
+.pp-mic-btn[data-mic="on"]{border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.16);color:#34d399;}
+.pp-mic-btn[data-mic="mudo"]{border-color:rgba(255,176,32,.5);background:rgba(255,176,32,.14);color:#ffb020;}
+/* Variante do HUD: só ícone, ancorada no canto direito do placar */
+.pp-mic-btn-hud{position:absolute;right:0;top:50%;transform:translateY(-50%);min-width:40px;padding:0;margin:0;}
+.pp-mic-btn-hud:active{transform:translateY(-50%) scale(.96);}
+.pp-mic-dot{position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 6px rgba(52,211,153,.8);display:none;}
+/* Aviso curto (permissão negada, navegador sem suporte). Fica acima dos
+   overlays pra servir tanto na sala quanto no meio da partida. */
+.pp-mic-aviso{position:absolute;top:8px;left:10px;right:10px;z-index:5;margin:0 auto;max-width:290px;background:rgba(0,0,0,.78);color:#ff9aa8;font-size:12px;font-weight:600;line-height:1.35;text-align:center;padding:8px 12px;border-radius:10px;backdrop-filter:blur(2px);pointer-events:none;}

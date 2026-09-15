@@ -3541,25 +3541,6 @@
         <input type="file" id="cli-conta-foto-input" accept="image/*" style="display:none;" />
         <div class="cli-conta-foto-status" id="cli-conta-foto-status" style="display:none;"></div>
 
-        <!-- Recordes dos jogos -->
-        <div class="cli-conta-secao">
-          <div class="cli-conta-secao-tit"><i class="fa fa-trophy"></i> Meus recordes</div>
-          <div class="cli-conta-recordes" id="cli-conta-recordes"></div>
-        </div>
-
-        <!-- Lojas favoritas -->
-        <div class="cli-conta-secao">
-          <div class="cli-conta-secao-tit"><i class="fa fa-heart"></i> Minhas lojas</div>
-          <div class="cli-conta-favoritos" id="cli-conta-favoritos"></div>
-          <div class="cli-conta-fav-vazio" id="cli-conta-favoritos-vazio" style="display:none;">
-            <i class="fa fa-heart cli-conta-fav-vazio-ico" aria-hidden="true"></i>
-            <p>Você ainda não favoritou nenhuma loja.<br>Toque no coração das lojas que curtir.</p>
-            <button type="button" class="empty-action" onclick="cliFecharPainelConta()">
-              <i class="ti ti-compass" aria-hidden="true"></i> Explorar lojas
-            </button>
-          </div>
-        </div>
-
         <!-- Amigos (4.3): lista com presença, pedidos recebidos e o
              código pra adicionar. Convites pra jogar (4.4) entram
              logo acima dos pedidos. -->
@@ -3594,6 +3575,25 @@
                       onclick="cliAmigosPedir()" aria-label="Adicionar amigo"><i class="fa fa-plus"></i></button>
             </div>
             <div class="cli-amigos-msg" id="cli-amigos-msg"></div>
+          </div>
+        </div>
+
+        <!-- Recordes dos jogos -->
+        <div class="cli-conta-secao">
+          <div class="cli-conta-secao-tit"><i class="fa fa-trophy"></i> Meus recordes</div>
+          <div class="cli-conta-recordes" id="cli-conta-recordes"></div>
+        </div>
+
+        <!-- Lojas favoritas -->
+        <div class="cli-conta-secao">
+          <div class="cli-conta-secao-tit"><i class="fa fa-heart"></i> Minhas lojas</div>
+          <div class="cli-conta-favoritos" id="cli-conta-favoritos"></div>
+          <div class="cli-conta-fav-vazio" id="cli-conta-favoritos-vazio" style="display:none;">
+            <i class="fa fa-heart cli-conta-fav-vazio-ico" aria-hidden="true"></i>
+            <p>Você ainda não favoritou nenhuma loja.<br>Toque no coração das lojas que curtir.</p>
+            <button type="button" class="empty-action" onclick="cliFecharPainelConta()">
+              <i class="ti ti-compass" aria-hidden="true"></i> Explorar lojas
+            </button>
           </div>
         </div>
 

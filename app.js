@@ -15470,6 +15470,9 @@ ${urlCard}`)}`;
         _convPararCaixa();
         _pedPararGlobal();
         _avisoLimpar();
+        // Código curto (P2) é por conta: o da conta que saiu não pode
+        // sobrar em cache pra próxima pessoa deste aparelho.
+        _amCodigoLimpar();
       }
       cliAtualizarHeader();
     });
@@ -15911,6 +15914,14 @@ ${urlCard}`)}`;
         try { if (_cliUser) _cliUser.photoURL = url; } catch (e) {}
         cliPintarAvatarPainel(cliNomeExibicao() || 'Você');
         cliAtualizarHeader();
+        // Espelha a foto nova na lista dos amigos (P3). Silencioso e
+        // sem await: se falhar, a foto antiga só continua lá até o
+        // próximo aceite — nada na troca de foto depende disto.
+        try {
+          if (window.AngatubaAmigos && window.AngatubaAmigos.atualizarFoto) {
+            window.AngatubaAmigos.atualizarFoto();
+          }
+        } catch (e) {}
         _cliSetStatusFoto('', null);
         if (typeof showToastSimples === 'function') showToastSimples('Foto atualizada!', '/webp/owl-celebrate-gratis.webp');
       };
@@ -16033,6 +16044,7 @@ ${urlCard}`)}`;
       _cliUser = null;
       _cliApelido = null;
       _amNomeVivo = {};   // cache de nomes de amigos da conta que saiu
+      _amCodigoLimpar();  // e o código curto (P2) da conta que saiu
       try { localStorage.removeItem(CLI_APELIDO_KEY); } catch (e) {}
     };
     if (!auth) { limpar(); cliAtualizarHeader(); return; }
@@ -16298,13 +16310,14 @@ ${urlCard}`)}`;
      nenhum. É isso que evita amizade meio-feita sem precisar de
      Cloud Function.
 
-     COMO ALGUÉM TE ACHA — o "código de amigo" é o próprio uid com o
-     prefixo AON-. Não existe busca por nome, de propósito: para
-     buscar seria preciso um índice legível de todo mundo, que é
-     exatamente o que as regras impedem. O uid já é semipúblico (os
-     docs de ranking no Firestore são de leitura pública e carregam
-     uid), então o código não revela nada novo; ele é feito pra ser
-     copiado e colado no WhatsApp, não digitado à mão.
+     COMO ALGUÉM TE ACHA — pelo "código de amigo". Não existe busca
+     por nome, de propósito: para buscar seria preciso um índice
+     legível de todo mundo, que é exatamente o que as regras impedem.
+
+     O código nasceu como AON-<uid>: 28 caracteres, impossível de
+     passar de boca. A P2 trocou pelo CURTO (AON-AB12CD, 6 chars),
+     mantendo o antigo aceito na colagem pra ninguém ficar com um
+     código morto no WhatsApp. Ver o bloco de código curto abaixo.
 
      NOME EXIBIDO — o `nome` gravado nos nós é uma fotografia do
      momento. Quem renomear depois apareceria com o nome velho na
@@ -16314,27 +16327,108 @@ ${urlCard}`)}`;
      sem regra nova.
 
      API pública (window.AngatubaAmigos):
-       meuCodigo()             -> 'AON-<uid>' ou null
+       meuCodigo()             -> 'AON-<uid>' ou null (legado/fallback)
+       meuCodigoCurto()        -> 'AON-AB12CD' do cache, ou null
+       garantirCodigo()        -> Promise<'AON-AB12CD'> (gera se falta)
        pedir(codigo)           -> Promise; erros já em PT-BR
        aceitar(uid)            -> Promise (grava os dois lados)
        recusar(uid)            -> Promise
        remover(uid)            -> Promise (apaga os dois lados)
-       observarAmigos(cb)      -> cb([{uid, nome, desde}]); devolve
-                                  a função de parar de ouvir
-       observarPedidos(cb)     -> cb([{uid, nome, em}]); idem
+       atualizarFoto()         -> Promise; espelha a foto nova (P3)
+       observarAmigos(cb)      -> cb([{uid, nome, foto, desde}]);
+                                  devolve a função de parar de ouvir
+       observarPedidos(cb)     -> cb([{uid, nome, foto, em}]); idem
   ══════════════════════════════════════════════════════════════ */
 
   var AMIGO_PREFIXO = 'AON-';
 
-  // Transforma o que a pessoa colou num uid. Aceita com ou sem o
-  // prefixo, com espaços sobrando e em qualquer caixa no prefixo —
-  // o uid em si é sensível a maiúsculas, então esse não mexemos.
-  function _amigosUidDoCodigo(codigo) {
+  /* ── Código curto de amigo (P2) ────────────────────────────────
+     AON-<uid> tinha 32 caracteres: dava pra copiar e colar, mas não
+     pra ditar no balcão nem digitar no celular do amigo. O curto tem
+     6, num alfabeto sem os pares que todo mundo erra (0/O, 1/I/L).
+
+       friendCodes/{CODIGO} = { uid, em }     <- resolve código -> uid
+       friendCodeOf/{uid}   = { codigo, em }  <- resolve uid -> código
+
+     Dois nós porque cada um responde uma pergunta diferente, e nenhum
+     dos dois tem leitura na RAIZ: dá pra ler UM código (é o que o
+     "colar" precisa), nunca pra listar todos. O reverso só o dono lê.
+
+     ESTÁVEL POR CONTA, não regenerável pela UI. É por isso que existe
+     o friendCodeOf: sem ele, abrir o app noutro aparelho sortearia um
+     código novo e a pessoa passaria pro amigo um código diferente do
+     que passou ontem. Não há botão de "trocar meu código" — se um dia
+     precisar (código vazado virando spam), é apagar os dois nós e
+     deixar o garantir sortear de novo.
+
+     COLISÃO — quem decide não é o cliente: a regra do RTDB só deixa
+     CRIAR friendCodes/{codigo} que ainda não existe. Duas pessoas
+     sorteando o mesmo código no mesmo instante: uma escreve, a outra
+     leva permission_denied e sorteia outro. 31^6 ≈ 887 milhões de
+     combinações pra uma cidade de 20 mil habitantes — a colisão é
+     teórica, mas o tratamento é de graça.
+
+     GERAÇÃO SOB DEMANDA, não no login: quem nunca abre "Meus amigos"
+     não gasta uma escrita no banco. A garantia roda ao pintar o
+     painel (aquece o cache) e no toque de "Copiar meu código". */
+  var AMIGO_COD_ALFA = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';  // sem 0 O 1 I L
+  var AMIGO_COD_LEN  = 6;
+  var AMIGO_COD_TENT = 6;      // tentativas antes de desistir
+  var AMIGO_FOTO_MAX = 300;    // teto da photoURL gravada (igual na regra)
+
+  var _amCodRe = new RegExp('^[' + AMIGO_COD_ALFA + ']{' + AMIGO_COD_LEN + '}$');
+  var _amCodigoCurto = null;   // código da conta atual, já garantido
+  var _amCodigoUid   = null;   // uid a que o cache pertence
+  var _amCodigoProm  = null;   // garantia em voo (não dispara duas)
+
+  function _amCodigoLimpar() {
+    _amCodigoCurto = null; _amCodigoUid = null; _amCodigoProm = null;
+  }
+
+  // Math.random basta: o código é um apelido público, não um segredo.
+  // Quem impede de adivinhar não é a entropia, é o fato de o pedido
+  // não criar vínculo nenhum sem o aceite do outro lado.
+  function _amCodigoSortear() {
+    var s = '', n = AMIGO_COD_ALFA.length;
+    for (var i = 0; i < AMIGO_COD_LEN; i++) {
+      s += AMIGO_COD_ALFA.charAt(Math.floor(Math.random() * n));
+    }
+    return s;
+  }
+
+  // Tira espaços e o prefixo AON- (em qualquer caixa) do que a pessoa
+  // colou, sem decidir ainda se o miolo é uid ou código curto.
+  function _amigosMiolo(codigo) {
     var s = String(codigo || '').trim().replace(/\s+/g, '');
     if (s.toUpperCase().indexOf(AMIGO_PREFIXO) === 0) s = s.slice(AMIGO_PREFIXO.length);
-    // uid do Firebase: alfanumérico, tipicamente 28 chars. A faixa
-    // larga aceita variações sem deixar passar texto solto.
+    return s;
+  }
+
+  // Código ANTIGO (AON-<uid>): devolve o uid, ou null.
+  // uid do Firebase: alfanumérico, tipicamente 28 chars. A faixa
+  // larga aceita variações sem deixar passar texto solto — e nunca
+  // colide com o curto, que tem 6.
+  function _amigosUidDoCodigo(codigo) {
+    var s = _amigosMiolo(codigo);
     return /^[A-Za-z0-9]{20,64}$/.test(s) ? s : null;
+  }
+
+  // Código CURTO normalizado (sem prefixo, maiúsculo), ou null.
+  function _amigosCurtoDoCodigo(codigo) {
+    var s = _amigosMiolo(codigo).replace(/-/g, '').toUpperCase();
+    return _amCodRe.test(s) ? s : null;
+  }
+
+  /* photoURL pra gravar nos nós de amizade (P3). Só https e com teto
+     de tamanho — é o mesmo endereço do Cloudinary que o avatar já
+     usa, e a regra do RTDB repete os dois limites. */
+  function _amigosFotoValida(url) {
+    var f = String(url || '').trim();
+    return (f.indexOf('https://') === 0 && f.length <= AMIGO_FOTO_MAX) ? f : '';
+  }
+
+  function _amigosMinhaFoto() {
+    return _amigosFotoValida(_cliUser && _cliUser.photoURL);
   }
 
   // Carrega o RTDB e devolve {db, uid} — ou rejeita com uma
@@ -16364,6 +16458,75 @@ ${urlCard}`)}`;
     return 'Algo deu errado. Tente de novo em instantes.';
   }
 
+  /* Sorteia um código livre e o grava nos dois nós. Quem garante que
+     não houve colisão são as REGRAS (só deixam criar um friendCodes
+     inexistente), não o cliente: permission_denied aqui quase sempre
+     quer dizer "esse já é de alguém", então tenta outro. */
+  function _amigosCodigoCriar(ctx, resta) {
+    if (resta <= 0) {
+      return Promise.reject(new Error('Não deu pra gerar seu código agora. Tente de novo em instantes.'));
+    }
+    var cod = _amCodigoSortear();
+    return ctx.db.ref('friendCodes/' + cod).set({
+      uid: ctx.uid,
+      em: firebase.database.ServerValue.TIMESTAMP
+    }).then(function () {
+      // Espelho reverso: é ele que faz o código ser o MESMO em
+      // qualquer aparelho. Se falhar, o código vale igual — só o
+      // próximo aparelho é que sortearia outro.
+      return ctx.db.ref('friendCodeOf/' + ctx.uid).set({
+        codigo: cod, em: firebase.database.ServerValue.TIMESTAMP
+      }).then(function () { return cod; }, function () { return cod; });
+    }, function (err) {
+      if (/permission_denied/i.test(String((err && (err.message || err.code)) || ''))) {
+        return _amigosCodigoCriar(ctx, resta - 1);
+      }
+      throw err;
+    });
+  }
+
+  // Devolve o código curto da conta (sem prefixo), criando na
+  // primeira vez. Idempotente e com cache — chamar de novo enquanto
+  // a primeira está em voo devolve a MESMA promessa.
+  function _amigosCodigoGarantir() {
+    return _amigosCtx().then(function (ctx) {
+      if (_amCodigoUid === ctx.uid) {
+        if (_amCodigoCurto) return _amCodigoCurto;
+        if (_amCodigoProm) return _amCodigoProm;
+      }
+      _amCodigoLimpar();
+      _amCodigoUid = ctx.uid;
+      _amCodigoProm = ctx.db.ref('friendCodeOf/' + ctx.uid + '/codigo').get()
+        .then(function (snap) {
+          var v = snap.val();
+          return (typeof v === 'string' && _amCodRe.test(v)) ? v : _amigosCodigoCriar(ctx, AMIGO_COD_TENT);
+        })
+        .then(function (cod) {
+          if (_amCodigoUid === ctx.uid) { _amCodigoCurto = cod; _amCodigoProm = null; }
+          return cod;
+        }, function (err) {
+          if (_amCodigoUid === ctx.uid) _amCodigoProm = null;
+          throw err;
+        });
+      return _amCodigoProm;
+    });
+  }
+
+  /* Transforma o que a pessoa colou num uid. O antigo (AON-<uid>)
+     resolve sem tocar no banco; o curto custa UMA leitura de
+     friendCodes/{codigo} — que é o único acesso que as regras dão a
+     esse nó (ler um código de cada vez, nunca a lista). */
+  function _amigosResolverCodigo(ctx, codigo) {
+    var uid = _amigosUidDoCodigo(codigo);
+    if (uid) return Promise.resolve(uid);
+    var curto = _amigosCurtoDoCodigo(codigo);
+    if (!curto) return Promise.resolve(null);
+    return ctx.db.ref('friendCodes/' + curto + '/uid').get().then(function (snap) {
+      var v = snap.val();
+      return (typeof v === 'string' && /^[A-Za-z0-9]{20,64}$/.test(v)) ? v : null;
+    }, function () { return null; });
+  }
+
   // Lê um nó de lista (friends/{uid} ou friendRequests/{uid}) e
   // entrega um array ordenado pelo campo de data, mais novo em cima.
   function _amigosObservarLista(caminho, campoData, cb) {
@@ -16376,7 +16539,12 @@ ${urlCard}`)}`;
         var val = snap.val() || {};
         var lista = Object.keys(val).map(function (uid) {
           var d = val[uid] || {};
-          return { uid: uid, nome: String(d.nome || 'Jogador').slice(0, CLI_NOME_MAX), data: d[campoData] || 0 };
+          return {
+            uid: uid,
+            nome: String(d.nome || 'Jogador').slice(0, CLI_NOME_MAX),
+            foto: _amigosFotoValida(d.foto),
+            data: d[campoData] || 0
+          };
         });
         lista.sort(function (a, b) { return b.data - a.data; });
         cb(lista);
@@ -16388,30 +16556,55 @@ ${urlCard}`)}`;
   }
 
   window.AngatubaAmigos = {
-    // Código pra mandar no Zap. null se não há conta nomeada.
+    /* Código LONGO (AON-<uid>). Continua aqui como fallback pra quando
+       o RTDB não responde e o curto não pode ser garantido — e porque
+       códigos antigos ainda circulam no WhatsApp das pessoas. */
     meuCodigo: function () {
       return _cliContaReal(_cliUser) ? (AMIGO_PREFIXO + _cliUser.uid) : null;
     },
 
+    // Código CURTO já garantido nesta sessão, ou null (sem I/O).
+    meuCodigoCurto: function () {
+      return (_amCodigoCurto && _cliContaReal(_cliUser) && _cliUser.uid === _amCodigoUid)
+        ? (AMIGO_PREFIXO + _amCodigoCurto) : null;
+    },
+
+    // Garante o curto (cria na primeira vez) e devolve com prefixo.
+    garantirCodigo: function () {
+      return _amigosCodigoGarantir().then(function (cod) { return AMIGO_PREFIXO + cod; });
+    },
+
     /* Manda pedido. Só escreve no ramo de quem RECEBE — é o único nó
        que as regras liberam pra isso, e é o que mantém o pedido sem
-       nenhum efeito até a outra pessoa aceitar. */
+       nenhum efeito até a outra pessoa aceitar.
+
+       Aceita os DOIS formatos de código: o curto (uma leitura em
+       friendCodes) e o antigo AON-<uid> (sem leitura nenhuma). */
     pedir: function (codigo) {
-      var alvo = _amigosUidDoCodigo(codigo);
-      if (!alvo) return Promise.reject(new Error('Código inválido. Peça pra pessoa copiar o código dela de novo.'));
+      if (!String(codigo || '').trim()) {
+        return Promise.reject(new Error('Cole aqui o código do seu amigo.'));
+      }
       return _amigosCtx().then(function (ctx) {
-        if (alvo === ctx.uid) throw new Error('Esse é o seu próprio código.');
-        // Já são amigos? Evita um pedido que não levaria a nada.
-        return ctx.db.ref('friends/' + ctx.uid + '/' + alvo).get().then(function (snap) {
-          if (snap.exists()) throw new Error('Vocês já são amigos.');
-          return ctx.db.ref('friendRequests/' + alvo + '/' + ctx.uid).set({
-            nome: cliNomeExibicao() || 'Jogador',
-            em: firebase.database.ServerValue.TIMESTAMP
+        return _amigosResolverCodigo(ctx, codigo).then(function (alvo) {
+          if (!alvo) throw new Error('Código inválido. Peça pra pessoa copiar o código dela de novo.');
+          if (alvo === ctx.uid) throw new Error('Esse é o seu próprio código.');
+          // Já são amigos? Evita um pedido que não levaria a nada.
+          return ctx.db.ref('friends/' + ctx.uid + '/' + alvo).get().then(function (snap) {
+            if (snap.exists()) throw new Error('Vocês já são amigos.');
+            // A foto vai junto pra quem recebe já ver o rosto no aviso
+            // e, ao aceitar, gravá-la na própria lista (P3).
+            var pedido = {
+              nome: cliNomeExibicao() || 'Jogador',
+              em: firebase.database.ServerValue.TIMESTAMP
+            };
+            var minhaFoto = _amigosMinhaFoto();
+            if (minhaFoto) pedido.foto = minhaFoto;
+            return ctx.db.ref('friendRequests/' + alvo + '/' + ctx.uid).set(pedido);
           });
         });
       }).catch(function (err) {
         // Mensagens que já são nossas passam direto; o resto vira PT-BR.
-        throw new Error(/próprio código|já são amigos|Entre na sua conta|Sem conexão agora/.test(String(err && err.message))
+        throw new Error(/Código inválido|próprio código|já são amigos|Entre na sua conta|Sem conexão agora|Cole aqui/.test(String(err && err.message))
           ? err.message : _amigosErroPt(err));
       });
     },
@@ -16425,12 +16618,19 @@ ${urlCard}`)}`;
       return _amigosCtx().then(function (ctx) {
         return ctx.db.ref('friendRequests/' + ctx.uid + '/' + outroUid).get().then(function (snap) {
           if (!snap.exists()) throw new Error('Esse pedido não está mais valendo.');
-          var nomeDele = String((snap.val() || {}).nome || 'Jogador').slice(0, CLI_NOME_MAX);
+          var d = snap.val() || {};
+          var nomeDele = String(d.nome || 'Jogador').slice(0, CLI_NOME_MAX);
+          var fotoDele = _amigosFotoValida(d.foto);      // veio no pedido (P3)
           var meuNome = cliNomeExibicao() || 'Jogador';
+          var minhaFoto = _amigosMinhaFoto();
           var agora = firebase.database.ServerValue.TIMESTAMP;
+          var dele = { nome: nomeDele, desde: agora };
+          if (fotoDele) dele.foto = fotoDele;
+          var meu = { nome: meuNome, desde: agora };
+          if (minhaFoto) meu.foto = minhaFoto;
           var updates = {};
-          updates['friends/' + ctx.uid + '/' + outroUid] = { nome: nomeDele, desde: agora };
-          updates['friends/' + outroUid + '/' + ctx.uid] = { nome: meuNome, desde: agora };
+          updates['friends/' + ctx.uid + '/' + outroUid] = dele;
+          updates['friends/' + outroUid + '/' + ctx.uid] = meu;
           updates['friendRequests/' + ctx.uid + '/' + outroUid] = null;
           return ctx.db.ref().update(updates);
         });
@@ -16467,15 +16667,42 @@ ${urlCard}`)}`;
       });
     },
 
+    /* Espelha a foto NOVA no meu cartão dentro da lista de cada amigo
+       (P3). Sem isto, a foto gravada no aceite envelheceria e a pessoa
+       apareceria pros amigos com o rosto de meses atrás.
+
+       Uma escrita por amigo, cada uma com seu próprio catch, em vez de
+       um update multi-caminho: o multi-caminho é atômico, e bastaria
+       UM amigo que já tivesse me removido (nó inexistente, validate
+       exige nome+desde) pra derrubar o espelho de todos os outros.
+
+       A regra libera porque o nó JÁ existe e quem escreve é o dono da
+       própria entrada — é o cartão dele na lista alheia, não uma
+       entrada nova. Silencioso: foto é enfeite, nunca pode quebrar a
+       troca de foto em si. */
+    atualizarFoto: function () {
+      var foto = _amigosMinhaFoto();
+      return _amigosCtx().then(function (ctx) {
+        return ctx.db.ref('friends/' + ctx.uid).get().then(function (snap) {
+          var uids = Object.keys(snap.val() || {});
+          if (!uids.length) return;
+          return Promise.all(uids.map(function (u) {
+            return ctx.db.ref('friends/' + u + '/' + ctx.uid + '/foto')
+              .set(foto || null).catch(function () {});
+          }));
+        });
+      }).catch(function () {});
+    },
+
     observarAmigos: function (cb) {
       return _amigosObservarLista('friends', 'desde', function (l) {
-        cb(l.map(function (i) { return { uid: i.uid, nome: i.nome, desde: i.data }; }));
+        cb(l.map(function (i) { return { uid: i.uid, nome: i.nome, foto: i.foto, desde: i.data }; }));
       });
     },
 
     observarPedidos: function (cb) {
       return _amigosObservarLista('friendRequests', 'em', function (l) {
-        cb(l.map(function (i) { return { uid: i.uid, nome: i.nome, em: i.data }; }));
+        cb(l.map(function (i) { return { uid: i.uid, nome: i.nome, foto: i.foto, em: i.data }; }));
       });
     }
   };
@@ -16497,13 +16724,23 @@ ${urlCard}`)}`;
     _amUnsubPresenca = {};
   }
 
-  // Avatar de inicial + pontinho de presença. O estado entra como
-  // classe pra não recriar a linha inteira a cada mudança.
+  // Avatar (foto ou inicial) + pontinho de presença. O estado entra
+  // como classe pra não recriar a linha inteira a cada mudança.
   // semDot: o convite (4.4) reusa o avatar mas NÃO pode repetir o
   // data-pres do amigo — _amPintarPresenca pinta o primeiro que
   // acha, e o pontinho da lista pararia de atualizar.
-  function _amLinhaAvatar(uid, nome, semDot) {
-    return '<span class="cli-amigo-av">' + escHTML((String(nome).trim()[0] || '?').toUpperCase()) +
+  // foto (P3): a photoURL gravada no nó. Mesma mecânica de fallback do
+  // avatar do header e do painel — onerror esconde a imagem e revela a
+  // inicial que já está montada atrás dela.
+  function _amLinhaAvatar(uid, nome, semDot, foto) {
+    var ini = escHTML((String(nome).trim()[0] || '?').toUpperCase());
+    var f = _amigosFotoValida(foto);
+    return '<span class="cli-amigo-av">' +
+      (f
+        ? '<img src="' + escHTML(f) + '" alt="" class="cli-amigo-av-img" ' +
+          'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" />' +
+          '<span class="cli-amigo-av-ini" style="display:none">' + ini + '</span>'
+        : ini) +
       (semDot ? '' : '<span class="cli-amigo-dot" data-pres="' + escHTML(uid) + '"></span>') + '</span>';
   }
 
@@ -16529,6 +16766,14 @@ ${urlCard}`)}`;
 
     cliAmigosSoltar();
 
+    /* Aquece o código curto (P2) enquanto a pessoa olha a lista. Sem
+       isto, o primeiro toque em "Copiar meu código" teria que ir ao
+       banco ANTES de escrever na área de transferência — e alguns
+       navegadores (Safari) recusam o clipboard fora do gesto. Com o
+       cache quente, a cópia é síncrona. Falhou? O botão tenta de novo
+       sozinho no toque. */
+    window.AngatubaAmigos.garantirCodigo().catch(function () {});
+
     _amUnsubLista = window.AngatubaAmigos.observarAmigos(function (amigos) {
       _amSoltarPresencas();
       if (!amigos.length) {
@@ -16540,7 +16785,7 @@ ${urlCard}`)}`;
       elLista.innerHTML = amigos.map(function (a) {
         var nome = _amNomeVivo[a.uid] || a.nome;
         return '<div class="cli-amigo-item" data-amigo="' + escHTML(a.uid) + '">' +
-          _amLinhaAvatar(a.uid, nome) +
+          _amLinhaAvatar(a.uid, nome, false, a.foto) +
           '<span class="cli-amigo-txt">' +
             '<span class="cli-amigo-nome">' + escHTML(nome) + '</span>' +
             '<span class="cli-amigo-sub" data-pres-txt="' + escHTML(a.uid) + '">—</span>' +
@@ -16577,7 +16822,7 @@ ${urlCard}`)}`;
       elPed.style.display = 'flex';
       elPed.innerHTML = pedidos.map(function (p) {
         return '<div class="cli-amigo-item pedido">' +
-          _amLinhaAvatar(p.uid, p.nome) +
+          _amLinhaAvatar(p.uid, p.nome, false, p.foto) +
           '<span class="cli-amigo-txt">' +
             '<span class="cli-amigo-nome">' + escHTML(p.nome) + '</span>' +
             '<span class="cli-amigo-sub">quer ser seu amigo</span>' +
@@ -16619,20 +16864,39 @@ ${urlCard}`)}`;
     el.className = 'cli-amigos-msg' + (tipo ? ' ' + tipo : '');
   }
 
-  /* Copiar o código. navigator.clipboard falha em contexto não
-     seguro e em alguns WebViews, então caímos pra seleção manual
-     mostrando o código na própria mensagem — a pessoa copia à mão. */
+  /* Copiar o código CURTO (P2). navigator.clipboard falha em contexto
+     não seguro e em alguns WebViews, então caímos pra seleção manual
+     mostrando o código na própria mensagem — a pessoa copia à mão (e
+     com 6 caracteres agora dá até pra ditar).
+
+     Três caminhos, nesta ordem: cache quente (o comum, síncrono, vindo
+     do garantirCodigo do render), garantia sob demanda, e o código
+     antigo AON-<uid> se o banco não responder — melhor um código longo
+     que código nenhum. */
   function cliAmigosCopiarCodigo() {
-    var cod = window.AngatubaAmigos.meuCodigo();
-    if (!cod) { _amMsg('Entre na sua conta pra ter um código.', 'erro'); return; }
-    var mostrar = function () { _amMsg('Seu código: ' + cod, ''); };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(cod)
-        .then(function () { _amMsg('Código copiado! Mande pro seu amigo no WhatsApp.', 'ok'); })
-        .catch(mostrar);
-    } else {
-      mostrar();
-    }
+    if (!_cliContaReal(_cliUser)) { _amMsg('Entre na sua conta pra ter um código.', 'erro'); return; }
+    var btn = document.getElementById('cli-amigos-cod-btn');
+    var copiar = function (cod) {
+      var mostrar = function () { _amMsg('Seu código: ' + cod, ''); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(cod)
+          .then(function () { _amMsg('Código copiado: ' + cod + ' — mande pro seu amigo.', 'ok'); })
+          .catch(mostrar);
+      } else {
+        mostrar();
+      }
+    };
+
+    var pronto = window.AngatubaAmigos.meuCodigoCurto();
+    if (pronto) { copiar(pronto); return; }
+
+    if (btn) btn.disabled = true;
+    _amMsg('Gerando seu código…', '');
+    window.AngatubaAmigos.garantirCodigo().then(copiar).catch(function () {
+      var velho = window.AngatubaAmigos.meuCodigo();
+      if (velho) copiar(velho);
+      else _amMsg('Não deu pra gerar seu código agora. Tente de novo em instantes.', 'erro');
+    }).then(function () { if (btn) btn.disabled = false; });
   }
 
   function cliAmigosPedir() {
@@ -17185,7 +17449,17 @@ ${urlCard}`)}`;
         'onclick="aonAvisoAcao(\'' + id + '\',' + i + ')">' + escHTML(a.rotulo) + '</button>';
     }).join('');
     var nome = String(o.nome || 'Jogador');
-    return '<span class="aon-aviso-av">' + escHTML((nome.trim()[0] || '?').toUpperCase()) +
+    var ini = escHTML((nome.trim()[0] || '?').toUpperCase());
+    // Foto (P3): o pedido de amizade traz a photoURL de quem pediu; o
+    // convite pra jogar (4.4) não tem esse campo no nó e fica na
+    // inicial, que é o comportamento de sempre.
+    var foto = _amigosFotoValida(o.foto);
+    return '<span class="aon-aviso-av">' +
+        (foto
+          ? '<img src="' + escHTML(foto) + '" alt="" class="aon-aviso-av-img" ' +
+            'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" />' +
+            '<span class="aon-aviso-av-ini" style="display:none">' + ini + '</span>'
+          : ini) +
         (o.owl ? '<img src="' + o.owl + '" alt="" class="aon-aviso-owl" onerror="this.style.display=\'none\'" />' : '') +
       '</span>' +
       '<span class="aon-aviso-txt">' +
@@ -17197,7 +17471,7 @@ ${urlCard}`)}`;
         'aria-label="Dispensar aviso" title="Dispensar">✕</button>';
   }
 
-  // opts: {chave, tipo:'convite'|'pedido', nome, texto, owl, acoes:[{rotulo,classe,fn}]}
+  // opts: {chave, tipo:'convite'|'pedido', nome, foto, texto, owl, acoes:[{rotulo,classe,fn}]}
   function _avisoMostrar(o) {
     var raiz = _avisoRaiz();
     if (!raiz || !o || !o.chave) return '';
@@ -17299,6 +17573,7 @@ ${urlCard}`)}`;
       chave: 'ped:' + p.uid,
       tipo: 'pedido',
       nome: p.nome,
+      foto: p.foto,
       owl: '/webp/owl-wave.webp',
       texto: 'quer ser seu amigo',
       acoes: [

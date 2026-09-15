@@ -15469,6 +15469,10 @@ ${urlCard}`)}`;
         _presencaParar();
         _convPararCaixa();
         _pedPararGlobal();
+        // Lobby social (5.1): sai do lobby ANTES de o token morrer —
+        // depois do signOut as regras recusam a escrita e a entrada só
+        // sumiria quando a conexão caísse.
+        _lobSair();
         _avisoLimpar();
         // Código curto (P2) é por conta: o da conta que saiu não pode
         // sobrar em cache pra próxima pessoa deste aparelho.
@@ -16036,6 +16040,8 @@ ${urlCard}`)}`;
     // Pedidos de amizade e a pilha de avisos do topo (P1) saem pelo
     // mesmo motivo: nada da conta anterior pode sobrar na tela.
     _pedPararGlobal();
+    // Lobby social (5.1): pelo mesmo motivo da presença acima.
+    _lobSair();
     _avisoLimpar();
     // Limpa também o apelido espelhado: sem isto ele sobrevivia no
     // localStorage e a próxima sala de multiplayer entrada sem conta
@@ -17627,3 +17633,447 @@ ${urlCard}`)}`;
     _pedVistos = {};
     _pedPrimeira = true;
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     LOBBY SOCIAL (Realtime Database) — Etapa 5.1 (núcleo)
+     ------------------------------------------------------------
+     O QUE FALTAVA. Até a 4.4 dava pra chamar um amigo pra jogar,
+     mas o jogo tinha que ser escolhido ANTES: a pessoa abria a tela
+     do Ping Pong, criava a sala e só então o convite saía com o
+     código. Não havia lugar pra "reunir a galera" e só depois
+     decidir o que jogar — nem pra trocar de jogo mantendo o mesmo
+     grupo. O lobby é esse lugar: um cômodo que existe antes de
+     qualquer sala de jogo e sobrevive à troca de jogo.
+
+     ESTA SUBTAREFA É SÓ O NÚCLEO: nó no banco, regras e API. A UI
+     (painel, lista de gente, botão "vamos de...") é a 5.2, e criar
+     a sala do jogo a partir do lobby é a 5.3. Aqui não se desenha
+     nada na tela.
+
+     NÃO CONFUNDIR COM O LOBBY DA PARTY. O `salasParty` também tem
+     uma antessala, mas ela é de DENTRO de um jogo (a Party é um
+     jogo). Este lobby é uma camada acima: existe sem jogo nenhum
+     escolhido e vai APONTAR pra sala de um jogo quando a 5.3
+     chegar. Os dois convivem, não se substituem.
+
+     Nó no RTDB (ver database.rules.json pro raciocínio das regras):
+       socialLobbies/{CODIGO} = {
+         anfitriao:      { uid, nome },
+         criadoEm:       timestamp do servidor,
+         status:         'aberto' | 'em_jogo' | 'fechado',
+         jogoSugerido:   null | 'pingpong'|'tanques'|'party'|'baralho',
+         codigoSalaJogo: null | 'ABCD'   <- só a 5.3 preenche
+         membros: {
+           {uid}: { nome, foto?, entrouEm, pronto }
+         }
+       }
+
+     A CHAVE É O PRÓPRIO CÓDIGO — não existe `socialLobbyCodes`
+     espelhando código -> id. Com o id sendo o código não há dois nós
+     pra manter em sincronia nem uma segunda chance de sobrar lixo, e
+     "achar pelo código" vira ler a chave direto. O código usa o MESMO
+     sorteio do código de amigo (`_amCodigoSortear`, 6 chars num
+     alfabeto sem 0/O e 1/I/L) porque o problema é idêntico: alguém
+     vai ditar isso no grupo do WhatsApp.
+
+     É um código DIFERENTE do código de amigo, ainda que com a mesma
+     cara. O de amigo é permanente e identifica uma pessoa; o do
+     lobby é descartável e identifica uma reunião. O `entrar` tolera
+     o prefixo AON- colado por engano (o alfabeto não tem 'O', então
+     "AON" nunca é começo de código de verdade) e devolve "esse lobby
+     não existe" — que é a verdade.
+
+     COLISÃO é resolvida pela REGRA, igual ao código de amigo: só dá
+     pra CRIAR socialLobbies/{CODIGO} que ainda não existe. Quem
+     sorteou um código já usado leva permission_denied e sorteia
+     outro.
+
+     LIMITE DE 6 PESSOAS. Seis e não quatro porque o lobby é o lugar
+     de juntar gente ANTES de saber o que vai rolar — obrigar o grupo
+     a encolher pra caber no lobby inverteria o propósito. E não oito
+     (o teto do Uno) porque a maioria dos jogos com sala para em 2 ou
+     4, e um lobby de oito passaria a maior parte do tempo sem caber
+     inteiro na partida. QUEM IMPÕE O LIMITE É O CLIENTE: as regras
+     do RTDB não sabem contar filhos. Isso é assumido, não esquecido
+     — o estrago possível é alguém com o código entrar num lobby
+     lotado pelo console, que é o mesmo grupo de pessoas que já tem o
+     código. Nada além de um sétimo nome na lista.
+
+     ANFITRIÃO CAIU, LOBBY ACABOU. O onDisconnect do anfitrião apaga
+     o nó INTEIRO; o de cada membro apaga só a si mesmo. É a opção
+     mais simples e a mais segura das duas: um lobby sem anfitrião
+     não consegue sugerir jogo nem (na 5.3) abrir sala, então manter
+     o nó vivo só criaria fantasma eterno no banco — e não há Cloud
+     Function pra varrer. O preço é real e conhecido: se o celular do
+     anfitrião dormir, o grupo perde o lobby e alguém abre outro.
+     Quem fica vê o nó sumir pela própria escuta e recebe null.
+
+     O onDisconnect é armado ANTES da escrita e DE NOVO depois dela
+     (mesma disciplina da presença 4.2): antes, pra não existir uma
+     janela em que o lobby está no banco sem ninguém pra apagá-lo;
+     depois, porque o registro anterior pode ter sido recusado
+     enquanto o nó ainda não existia. Registrar duas vezes na mesma
+     ref só substitui o registro.
+
+     RECONEXÃO. O RTDB descarta os onDisconnect ao cair, então a
+     escuta de `.info/connected` rearma tudo a cada volta — e, se a
+     queda tiver removido o membro de um lobby que continua de pé,
+     reescreve a própria entrada (preservando o `pronto`). Sem isso,
+     quem oscila de rede sairia do lobby sozinho e não voltaria.
+
+     API pública (window.AngatubaLobby):
+       disponivel()        -> bool (conta nomeada e num lobby)
+       limite()            -> 6
+       jogos()             -> catálogo de jogos com sala (o da 4.4)
+       criar()             -> Promise<{codigo, lobbyId}>
+       entrar(codigo)      -> Promise<{codigo, lobbyId}>
+       sair()              -> Promise
+       meuLobby()          -> estado atual em cache, ou null (sem I/O)
+       observar(cb)        -> cb(estado|null) agora e a cada mudança;
+                              devolve a função de parar de ouvir
+       definirPronto(bool) -> Promise (o membro marca o próprio pronto)
+       sugerirJogo(jogo)   -> Promise (só o anfitrião)
+       iniciarJogo()       -> STUB: rejeita; é a 5.3
+
+     Estado entregue por meuLobby()/observar():
+       { codigo, lobbyId, status, jogoSugerido, codigoSalaJogo,
+         anfitriao: {uid, nome}, souAnfitriao, criadoEm, cheio,
+         membros: [{uid, nome, foto, entrouEm, pronto, anfitriao}] }
+  ══════════════════════════════════════════════════════════════ */
+
+  var LOB_RAIZ = 'socialLobbies';
+  var LOB_MAX_MEMBROS = 6;     // ver comentário acima; regra não conta filhos
+  var LOB_COD_TENT = 6;        // sorteios antes de desistir (colisão)
+
+  var _lobCodigo = null;       // código do lobby em que estou, ou null
+  var _lobUid = null;          // uid que está no lobby (guarda troca de conta)
+  var _lobAnfitriao = false;   // sou o anfitrião deste lobby
+  var _lobRef = null;          // ref de socialLobbies/{codigo}
+  var _lobValCb = null;        // handler do .on('value')
+  var _lobConnRef = null;      // ref de .info/connected
+  var _lobConnCb = null;       // handler dela (pra .off)
+  var _lobEstado = null;       // último estado normalizado, ou null
+  var _lobPronto = false;      // meu "pronto", guardado à parte (ver reconexão)
+  var _lobSubs = [];           // callbacks de observar()
+
+  // Mesmo ctx de amigos/convites ({db, uid}), só com a mensagem no
+  // vocabulário daqui — quem cai nesse erro está tentando abrir lobby,
+  // não lista de amigos.
+  function _lobCtx() {
+    return _amigosCtx().catch(function (err) {
+      var msg = String((err && err.message) || '');
+      throw new Error(/lista de amigos/.test(msg) ? 'Entre na sua conta pra usar o lobby.' : msg);
+    });
+  }
+
+  // Mensagens nossas passam direto; o resto do RTDB vira PT-BR.
+  function _lobErro(err) {
+    var msg = String((err && err.message) || '');
+    return /lobby|Código inválido|Entre na sua conta|Sem conexão|jogo/i.test(msg)
+      ? new Error(msg) : new Error(_amigosErroPt(err));
+  }
+
+  /* Aceita o código como a pessoa colou: com espaços, com traço, em
+     minúscula, e até com o AON- do código de amigo grudado na frente
+     (o alfabeto não tem 'O', então "AON" jamais começa um código
+     legítimo). Devolve o código limpo ou null. */
+  function _lobNormalizarCodigo(codigo) {
+    var s = String(codigo || '').trim().replace(/\s+/g, '').replace(/-/g, '').toUpperCase();
+    if (s.length > AMIGO_COD_LEN && s.indexOf('AON') === 0) s = s.slice(3);
+    return _amCodRe.test(s) ? s : null;
+  }
+
+  // O cartão do próprio membro. `pronto` vem por fora pra reescrita de
+  // reconexão não desmarcar quem já tinha marcado.
+  function _lobMeuValor(pronto) {
+    var v = {
+      nome: cliNomeExibicao() || 'Jogador',
+      entrouEm: firebase.database.ServerValue.TIMESTAMP,
+      pronto: pronto === true
+    };
+    var foto = _amigosMinhaFoto();
+    if (foto) v.foto = foto;
+    return v;
+  }
+
+  /* Snapshot cru -> estado que a 5.2 consegue desenhar sem pensar.
+     Devolve null pro nó que não existe mais ou que perdeu o
+     anfitrião: pros dois casos a resposta da UI é a mesma. */
+  function _lobNormalizar(codigo, val) {
+    if (!val || !val.anfitriao || !val.anfitriao.uid) return null;
+    var membrosVal = val.membros || {};
+    var membros = Object.keys(membrosVal).map(function (uid) {
+      var m = membrosVal[uid] || {};
+      return {
+        uid: uid,
+        nome: String(m.nome || 'Jogador').slice(0, CLI_NOME_MAX),
+        foto: _amigosFotoValida(m.foto),
+        entrouEm: m.entrouEm || 0,
+        pronto: m.pronto === true,
+        anfitriao: uid === val.anfitriao.uid
+      };
+    });
+    // Mais antigo em cima: o anfitrião encabeça a lista naturalmente.
+    membros.sort(function (a, b) { return a.entrouEm - b.entrouEm; });
+    var jogo = val.jogoSugerido;
+    return {
+      codigo: codigo,
+      lobbyId: codigo,
+      status: String(val.status || 'aberto'),
+      jogoSugerido: (jogo && CONV_JOGOS[jogo]) ? jogo : null,
+      codigoSalaJogo: val.codigoSalaJogo ? String(val.codigoSalaJogo).toUpperCase() : null,
+      anfitriao: {
+        uid: val.anfitriao.uid,
+        nome: String(val.anfitriao.nome || 'Jogador').slice(0, CLI_NOME_MAX)
+      },
+      souAnfitriao: !!(_lobUid && val.anfitriao.uid === _lobUid),
+      criadoEm: val.criadoEm || 0,
+      cheio: membros.length >= LOB_MAX_MEMBROS,
+      membros: membros
+    };
+  }
+
+  // Avisa todo mundo que chamou observar(). Cópia do array porque um
+  // callback pode cancelar a própria inscrição aqui dentro.
+  function _lobAvisar() {
+    _lobSubs.slice().forEach(function (cb) {
+      try { cb(_lobEstado); } catch (e) {}
+    });
+  }
+
+  // Solta as escutas e zera o local. NÃO escreve nada no banco e NÃO
+  // mexe em _lobSubs — quem observa continua observando, e recebe o
+  // null logo em seguida.
+  function _lobDesligar() {
+    if (_lobRef && _lobValCb) { try { _lobRef.off('value', _lobValCb); } catch (e) {} }
+    if (_lobConnRef && _lobConnCb) { try { _lobConnRef.off('value', _lobConnCb); } catch (e) {} }
+    _lobRef = null; _lobValCb = null; _lobConnRef = null; _lobConnCb = null;
+    _lobCodigo = null; _lobUid = null; _lobAnfitriao = false; _lobEstado = null;
+    _lobPronto = false;
+  }
+
+  /* Arma (ou rearma) o onDisconnect desta sessão. O anfitrião derruba
+     o lobby inteiro; o membro tira só a si. Chamado no entrar/criar e
+     a cada volta de conexão. */
+  function _lobArmarQueda() {
+    if (!_lobRef) return;
+    try {
+      if (_lobAnfitriao) _lobRef.onDisconnect().remove().catch(function () {});
+      else _lobRef.child('membros/' + _lobUid).onDisconnect().remove().catch(function () {});
+    } catch (e) {}
+  }
+
+  /* Liga tudo depois de entrar/criar: a escuta do nó (que é o que
+     alimenta observar) e a de .info/connected (que rearma o
+     onDisconnect e me traz de volta depois de uma queda curta). */
+  function _lobLigar(ctx, codigo, souAnfitriao) {
+    _lobDesligar();
+    _lobCodigo = codigo;
+    _lobUid = ctx.uid;
+    _lobAnfitriao = !!souAnfitriao;
+    _lobRef = ctx.db.ref(LOB_RAIZ + '/' + codigo);
+
+    _lobValCb = function (snap) {
+      var est = _lobNormalizar(codigo, snap.val());
+      if (!est) { _lobEncerrado(); return; }   // anfitrião caiu/fechou
+      // Guarda o meu "pronto" à parte: na queda a minha entrada some do
+      // nó, e é justamente daí que a reescrita de reconexão precisa
+      // dele. Ler do estado não serve — lá eu já não estou.
+      for (var i = 0; i < est.membros.length; i++) {
+        if (est.membros[i].uid === _lobUid) { _lobPronto = est.membros[i].pronto; break; }
+      }
+      _lobEstado = est;
+      _lobAvisar();
+    };
+    _lobRef.on('value', _lobValCb, function () { _lobEncerrado(); });
+
+    _lobConnRef = ctx.db.ref('.info/connected');
+    _lobConnCb = function (snap) {
+      if (snap.val() !== true || !_lobRef) return;
+      _lobArmarQueda();
+      // Caí e voltei: se o lobby seguiu de pé sem mim, volto pra lista.
+      if (!_lobAnfitriao && _lobEstado && _lobEstado.status !== 'fechado') {
+        try {
+          _lobRef.child('membros/' + _lobUid).set(_lobMeuValor(_lobPronto)).catch(function () {});
+        } catch (e) {}
+      }
+    };
+    _lobConnRef.on('value', _lobConnCb);
+    _lobArmarQueda();
+  }
+
+  // O lobby sumiu por fora (anfitrião caiu, anfitrião fechou). Solta
+  // tudo e avisa com null — a UI da 5.2 volta pro estado "sem lobby".
+  function _lobEncerrado() {
+    if (!_lobCodigo) return;
+    _lobDesligar();
+    _lobAvisar();
+  }
+
+  /* Sai de verdade: apaga do banco e solta tudo. Anfitrião apaga o
+     lobby inteiro (ver "anfitrião caiu, lobby acabou" no cabeçalho);
+     membro apaga só a própria entrada.
+
+     A ordem importa. Solta a escuta ANTES de apagar pra não disparar
+     o _lobEncerrado por cima do que já estamos fazendo, e cancela o
+     onDisconnect DEPOIS que o remove confirmou — se o remove falhar
+     (token vencido, rede caindo), o onDisconnect continua armado e
+     limpa sozinho na queda. */
+  function _lobSair() {
+    if (!_lobCodigo || !_lobRef) { return Promise.resolve(); }
+    var ref = _lobRef, uid = _lobUid, anf = _lobAnfitriao;
+    _lobDesligar();
+    _lobAvisar();
+    var meu = ref.child('membros/' + uid);
+    return (anf ? ref.remove() : meu.remove()).then(function () {
+      try { ref.onDisconnect().cancel(); } catch (e) {}
+      try { meu.onDisconnect().cancel(); } catch (e) {}
+    }).catch(function () { /* o onDisconnect armado limpa na queda */ });
+  }
+
+  /* Sorteia um código livre e grava o lobby. Quem garante que o
+     código estava livre são as REGRAS (só criam o que não existe):
+     permission_denied aqui quase sempre é "esse código já é de
+     alguém", então tenta outro. Mesma mecânica do código de amigo. */
+  function _lobCriarTentar(ctx, resta) {
+    if (resta <= 0) {
+      return Promise.reject(new Error('Não deu pra abrir o lobby agora. Tente de novo em instantes.'));
+    }
+    var cod = _amCodigoSortear();
+    var ref = ctx.db.ref(LOB_RAIZ + '/' + cod);
+    var no = {
+      anfitriao: { uid: ctx.uid, nome: cliNomeExibicao() || 'Jogador' },
+      criadoEm: firebase.database.ServerValue.TIMESTAMP,
+      status: 'aberto',
+      membros: {}
+    };
+    no.membros[ctx.uid] = _lobMeuValor(false);
+    // Antes do set: fecha a janela em que o lobby existiria sem
+    // ninguém pra apagá-lo. Pode ser recusado (o nó ainda não é meu),
+    // por isso o segundo registro depois do set é o que vale.
+    try { ref.onDisconnect().remove().catch(function () {}); } catch (e) {}
+    return ref.set(no).then(function () {
+      return cod;
+    }, function (err) {
+      try { ref.onDisconnect().cancel(); } catch (e) {}
+      if (/permission_denied/i.test(String((err && (err.message || err.code)) || ''))) {
+        return _lobCriarTentar(ctx, resta - 1);
+      }
+      throw err;
+    });
+  }
+
+  function _lobCriar() {
+    return _lobCtx().then(function (ctx) {
+      return _lobSair().then(function () {     // um lobby por vez
+        return _lobCriarTentar(ctx, LOB_COD_TENT).then(function (cod) {
+          _lobLigar(ctx, cod, true);
+          return { codigo: cod, lobbyId: cod };
+        });
+      });
+    }).catch(function (err) { throw _lobErro(err); });
+  }
+
+  function _lobEntrar(codigo) {
+    var cod = _lobNormalizarCodigo(codigo);
+    if (!cod) {
+      return Promise.reject(new Error('Código inválido. São 6 letras e números — confira e tente de novo.'));
+    }
+    return _lobCtx().then(function (ctx) {
+      // Já estou NESTE lobby: não saio pra entrar de novo (a UI
+      // piscaria e os outros me veriam sumir). Só reescrevo a minha
+      // entrada — que é o que resolve o caso de ter sido removido por
+      // uma queda que o .info/connected não pegou.
+      var jaAqui = (_lobCodigo === cod && _lobUid === ctx.uid);
+      return (jaAqui ? Promise.resolve() : _lobSair()).then(function () {
+        var ref = ctx.db.ref(LOB_RAIZ + '/' + cod);
+        // Uma leitura só pra decidir se dá pra entrar. As regras
+        // repetem status e existência; o que elas NÃO conseguem
+        // conferir é a lotação (não dá pra contar filhos).
+        return ref.get().then(function (snap) { return snap.val(); },
+                             function () { return null; })
+          .then(function (val) {
+            if (!val || !val.anfitriao || !val.anfitriao.uid) {
+              throw new Error('Esse lobby não existe mais. Confira o código com quem te chamou.');
+            }
+            if (String(val.status || 'aberto') !== 'aberto') {
+              throw new Error('Esse lobby já está em partida.');
+            }
+            var membros = val.membros || {};
+            if (!membros[ctx.uid] && Object.keys(membros).length >= LOB_MAX_MEMBROS) {
+              throw new Error('Esse lobby já está cheio (' + LOB_MAX_MEMBROS + ' pessoas).');
+            }
+            var meu = ref.child('membros/' + ctx.uid);
+            try { meu.onDisconnect().remove().catch(function () {}); } catch (e) {}
+            _lobPronto = !!(membros[ctx.uid] && membros[ctx.uid].pronto === true);
+            return meu.set(_lobMeuValor(_lobPronto))
+              .then(function () {
+                _lobLigar(ctx, cod, val.anfitriao.uid === ctx.uid);
+                return { codigo: cod, lobbyId: cod };
+              });
+          });
+      });
+    }).catch(function (err) { throw _lobErro(err); });
+  }
+
+  window.AngatubaLobby = {
+    disponivel: function () { return !!_lobCodigo && _cliContaReal(_cliUser); },
+    limite: function () { return LOB_MAX_MEMBROS; },
+
+    // Catálogo dos jogos com sala — o MESMO da 4.4, pra 5.2/5.3 não
+    // manterem uma segunda lista que envelhece sozinha.
+    jogos: function () { return CONV_JOGOS; },
+
+    criar: _lobCriar,
+    entrar: _lobEntrar,
+    sair: _lobSair,
+
+    // Estado em cache, sem I/O. null = não estou em lobby nenhum.
+    meuLobby: function () { return _lobEstado; },
+
+    /* Escuta o lobby atual. Chama o cb JÁ com o estado de agora
+       (inclusive null) pra quem se inscreve depois do lobby montado
+       não ficar esperando a próxima mudança. Devolve a função de
+       parar. Vários inscritos convivem: a 5.2 vai querer o painel e o
+       aviso do topo olhando a mesma coisa. */
+    observar: function (cb) {
+      if (typeof cb !== 'function') return function () {};
+      _lobSubs.push(cb);
+      try { cb(_lobEstado); } catch (e) {}
+      return function () {
+        var i = _lobSubs.indexOf(cb);
+        if (i >= 0) _lobSubs.splice(i, 1);
+      };
+    },
+
+    // O membro marca o próprio "pronto". Só o próprio — é o que as
+    // regras deixam, e é o que a 5.2 precisa.
+    definirPronto: function (pronto) {
+      if (!_lobRef || !_lobUid) return Promise.reject(new Error('Você não está num lobby.'));
+      _lobPronto = pronto === true;
+      return _lobRef.child('membros/' + _lobUid + '/pronto').set(_lobPronto)
+        .catch(function (err) { throw _lobErro(err); });
+    },
+
+    /* Anfitrião aponta o jogo da vez. É só uma SUGESTÃO gravada no nó:
+       ninguém entra em sala nenhuma por causa dela. Trocar de jogo
+       mantendo o grupo é reescrever este campo — que era justamente o
+       que não dava pra fazer antes do lobby existir. Passar null
+       limpa. */
+    sugerirJogo: function (jogo) {
+      if (jogo && !CONV_JOGOS[jogo]) return Promise.reject(new Error('Jogo desconhecido.'));
+      if (!_lobRef || !_lobAnfitriao) {
+        return Promise.reject(new Error('Só quem abriu o lobby escolhe o jogo.'));
+      }
+      return _lobRef.child('jogoSugerido').set(jogo || null)
+        .catch(function (err) { throw _lobErro(err); });
+    },
+
+    /* STUB DA 5.1 — abrir a sala do jogo a partir do lobby, gravar o
+       codigoSalaJogo e levar o grupo pra dentro é a 5.3. A assinatura
+       já fica no lugar pra a UI da 5.2 poder chamar e mostrar a
+       mensagem certa em vez de quebrar. */
+    iniciarJogo: function () {
+      return Promise.reject(new Error('Ainda não dá pra começar a partida pelo lobby — isso chega na próxima etapa.'));
+    }
+  };

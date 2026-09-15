@@ -3554,9 +3554,15 @@
         </div>
 
         <!-- Amigos (4.3): lista com presença, pedidos recebidos e o
-             código pra adicionar. Convites pra jogar são 4.4. -->
+             código pra adicionar. Convites pra jogar (4.4) entram
+             logo acima dos pedidos. -->
         <div class="cli-conta-secao">
           <div class="cli-conta-secao-tit"><i class="fa fa-user-group"></i> Meus amigos</div>
+
+          <!-- Convites pra jogar (4.4): só aparece quando há algum.
+               Quem preenche é a escuta de gameInvites/{uid}, que fica
+               viva enquanto a conta estiver logada. -->
+          <div class="cli-amigos-convites" id="cli-amigos-convites" style="display:none;"></div>
 
           <!-- Pedidos recebidos: só aparece quando há algum -->
           <div class="cli-amigos-pedidos" id="cli-amigos-pedidos" style="display:none;"></div>

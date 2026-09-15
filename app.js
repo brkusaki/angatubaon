@@ -15454,9 +15454,16 @@ ${urlCard}`)}`;
         // boot assentar — baixa o SDK do Realtime Database, e isso não
         // pode competir com a primeira pintura da tela.
         setTimeout(_presencaIniciar, 2000);
+        // Convites pra jogar (4.4): a caixa fica ouvindo enquanto a
+        // conta estiver logada, não só com o painel aberto — é o que
+        // faz o aviso chegar em quem está na home. Entra depois da
+        // presença pelo mesmo motivo (não disputar a primeira
+        // pintura); o SDK já vem carregado por ela.
+        setTimeout(_convObservarCaixa, 2600);
       } else {
         // Deslogou (ou é sessão anônima de sala): tira do ar.
         _presencaParar();
+        _convPararCaixa();
       }
       cliAtualizarHeader();
     });
@@ -16005,6 +16012,10 @@ ${urlCard}`)}`;
     // Presença sai do ar ANTES do signOut: depois dele o token já não
     // vale e as regras do RTDB recusam a escrita no próprio nó.
     _presencaParar();
+    // Convites: solta a escuta da caixa e limpa o cache — sem isso a
+    // próxima conta deste aparelho abriria o painel com os convites
+    // de quem saiu.
+    _convPararCaixa();
     // Limpa também o apelido espelhado: sem isto ele sobrevivia no
     // localStorage e a próxima sala de multiplayer entrada sem conta
     // (sessão anônima) reaparecia com o nome de quem tinha saído.
@@ -16478,9 +16489,12 @@ ${urlCard}`)}`;
 
   // Avatar de inicial + pontinho de presença. O estado entra como
   // classe pra não recriar a linha inteira a cada mudança.
-  function _amLinhaAvatar(uid, nome) {
+  // semDot: o convite (4.4) reusa o avatar mas NÃO pode repetir o
+  // data-pres do amigo — _amPintarPresenca pinta o primeiro que
+  // acha, e o pontinho da lista pararia de atualizar.
+  function _amLinhaAvatar(uid, nome, semDot) {
     return '<span class="cli-amigo-av">' + escHTML((String(nome).trim()[0] || '?').toUpperCase()) +
-      '<span class="cli-amigo-dot" data-pres="' + escHTML(uid) + '"></span></span>';
+      (semDot ? '' : '<span class="cli-amigo-dot" data-pres="' + escHTML(uid) + '"></span>') + '</span>';
   }
 
   function cliAmigosRender() {
@@ -16488,6 +16502,10 @@ ${urlCard}`)}`;
     var elVazio = document.getElementById('cli-amigos-vazio');
     var elPed = document.getElementById('cli-amigos-pedidos');
     if (!elLista) return;
+
+    // Convites pra jogar (4.4) vêm do cache da escuta global — pinta
+    // já na abertura do painel, sem esperar snapshot novo.
+    cliConvitesRender();
 
     // Sem conta nomeada não há lista: o painel nem abre nesse caso
     // (o header só mostra o avatar pra quem está logado), mas se
@@ -16511,13 +16529,20 @@ ${urlCard}`)}`;
       if (elVazio) elVazio.style.display = 'none';
       elLista.innerHTML = amigos.map(function (a) {
         var nome = _amNomeVivo[a.uid] || a.nome;
-        return '<div class="cli-amigo-item">' +
+        return '<div class="cli-amigo-item" data-amigo="' + escHTML(a.uid) + '">' +
           _amLinhaAvatar(a.uid, nome) +
           '<span class="cli-amigo-txt">' +
             '<span class="cli-amigo-nome">' + escHTML(nome) + '</span>' +
             '<span class="cli-amigo-sub" data-pres-txt="' + escHTML(a.uid) + '">—</span>' +
           '</span>' +
           '<span class="cli-amigo-acoes">' +
+            // Chamar pra jogar (4.4): abre a fileira de jogos logo
+            // abaixo desta linha. Ganha destaque quando a presença
+            // diz que a pessoa está online.
+            '<button type="button" class="cli-amigo-btn jogar" data-jogar="' + escHTML(a.uid) + '" ' +
+              'onclick="cliAmigosJogar(\'' + escHTML(a.uid) + '\')" ' +
+              'aria-label="Chamar pra jogar" title="Chamar pra jogar">' +
+              '<i class="fa fa-gamepad"></i></button>' +
             '<button type="button" class="cli-amigo-btn no" onclick="cliAmigosRemover(\'' +
               escHTML(a.uid) + '\')" aria-label="Remover amigo" title="Remover amigo">' +
               '<i class="fa fa-user-minus"></i></button>' +
@@ -16564,6 +16589,10 @@ ${urlCard}`)}`;
     if (dot) dot.className = 'cli-amigo-dot' + (estado === 'online' ? ' online' : (estado === 'away' ? ' away' : ''));
     var txt = document.querySelector('.cli-amigo-sub[data-pres-txt="' + uid + '"]');
     if (txt) txt.textContent = (estado === 'online') ? 'Online' : (estado === 'away' ? 'Ausente' : 'Offline');
+    // Botão de chamar pra jogar (4.4) em destaque só pra quem está
+    // online — offline continua clicável, o convite espera na caixa.
+    var jg = document.querySelector('.cli-amigo-btn.jogar[data-jogar="' + uid + '"]');
+    if (jg) jg.classList.toggle('on', estado === 'online');
   }
 
   // Desliga todos os listeners de amigos (chamado ao fechar o painel).
@@ -16639,3 +16668,402 @@ ${urlCard}`)}`;
   window.cliAmigosAceitar      = cliAmigosAceitar;
   window.cliAmigosRecusar      = cliAmigosRecusar;
   window.cliAmigosRemover      = cliAmigosRemover;
+
+  /* ══════════════════════════════════════════════════════════════
+     CONVITES PRA JOGAR (Realtime Database) — Etapa 4.4
+     ------------------------------------------------------------
+     "Chamar pra jogar" de dentro da lista de amigos, sem depender do
+     WhatsApp. Só conta nomeada, só entre amigos já aceitos (4.3).
+
+     Nó (ver database.rules.json pro raciocínio das regras):
+       gameInvites/{paraUid}/{inviteId} = {
+         de, nome, jogo, codigo, em, expiraEm
+       }
+
+     O inviteId NÃO é aleatório: é `{deUid}_{jogo}`, e as regras
+     exigem exatamente esse formato. Isso resolve duas coisas de uma
+     vez — reconvidar pro mesmo jogo sobrescreve em vez de empilhar,
+     e ninguém consegue entupir a caixa de alguém com mil chaves
+     diferentes (o teto é o número de jogos, por amigo).
+
+     O QUE O CONVITE CARREGA é só o CÓDIGO da sala. Entrar continua
+     sendo o fluxo normal do jogo (salas/, salasParty/,
+     salasBaralho/, com as regras daqueles nós valendo iguais); o
+     convite é um recado, não um atalho pra dentro de sala nenhuma.
+
+     COMO O CÓDIGO É CAPTURADO — quem abre a sala é o próprio jogo,
+     pela tela dele, com as opções dele (sala pública, classe do
+     tanque, modo do baralho). Tentar criar a sala por fora daria uma
+     sala órfã: a UI do jogo não saberia que ela existe. Então o
+     caminho é o inverso — ao escolher "chamar pra jogar", o app
+     guarda o convite PENDENTE, abre a tela do jogo e embrulha o
+     criarSala() da API pública daquele jogo. Quando o anfitrião
+     toca em "Criar sala" e a promise resolve com o código, o convite
+     sai sozinho. Nenhum jogo precisou saber que convites existem.
+
+     PUSH NOTIFICATION NÃO IMPLEMENTADA — o convite só chega em quem
+     está com o app aberto e logado. FCM ficaria pra uma etapa
+     futura (exige service worker de push, chave VAPID e um nó de
+     tokens por usuário).
+
+     API pública (window.AngatubaConvites):
+       jogos()              -> catálogo {chave: {nome, emoji}}
+       convidar(uid, jogo)  -> arma o pendente e abre a tela do jogo
+       observarCaixa()      -> liga a escuta da própria caixa
+       lista()              -> convites válidos em cache
+       aceitar(id)          -> abre o jogo e entra na sala do código
+       recusar(id)          -> apaga o convite da própria caixa
+  ══════════════════════════════════════════════════════════════ */
+
+  var CONV_VALIDADE_MS = 15 * 60 * 1000;  // convite vale 15 min
+  var CONV_PENDENTE_MS = 5 * 60 * 1000;   // janela pro anfitrião criar a sala
+  var CONV_ESPERA_MS   = 20000;           // teto da espera pela tela do jogo ficar pronta
+  var CONV_ESPERA_PASSO = 80;
+
+  /* Catálogo dos jogos que têm sala em rede. `pronto` é o teste de
+     "a tela do jogo já montou e dá pra mexer"; `entrar` é o ponto de
+     entrada que o próprio jogo já expunha pra lista de salas
+     públicas (é o mesmo caminho de quem toca em "Entrar" ali, só que
+     com o código vindo do convite). Os 2048/Voo/etc. da vida não
+     entram aqui: não têm sala. */
+  var CONV_JOGOS = {
+    pingpong: {
+      nome: 'Ping Pong', emoji: '🏓', api: 'AngatubaMP',
+      pronto: function () {
+        return !!document.getElementById('pp-btn-entrar') && typeof window._ppEntrarSala === 'function';
+      },
+      entrar: function (codigo) { window._ppEntrarSala(codigo); }
+    },
+    tanques: {
+      nome: 'Tanques', emoji: '💥', api: 'AngatubaMP',
+      pronto: function () {
+        return !!document.getElementById('tq-btn-entrar') && typeof window._tqEntrarSala === 'function';
+      },
+      entrar: function (codigo) { window._tqEntrarSala(codigo); }
+    },
+    party: {
+      nome: 'Party', emoji: '🎉', api: 'AngatubaParty',
+      pronto: function () {
+        return !!document.getElementById('pty-codigo-input') && typeof window._ptyEntrarSala === 'function';
+      },
+      entrar: function (codigo) { window._ptyEntrarSala(codigo); }
+    },
+    baralho: {
+      nome: 'Baralho', emoji: '🃏', api: 'AngatubaBaralho',
+      pronto: function () {
+        var raiz = document.getElementById('baralho-root');
+        return !!(raiz && raiz.firstChild && window.BaralhoGame &&
+                  typeof window.BaralhoGame.entrarPorCodigo === 'function');
+      },
+      entrar: function (codigo) { window.BaralhoGame.entrarPorCodigo(codigo); }
+    }
+  };
+
+  // Uma API serve mais de um jogo (AngatubaMP é Ping Pong E Tanques),
+  // então o embrulho de criarSala precisa saber quais jogos aquele
+  // global cobre pra não mandar convite de Ping Pong quando a sala
+  // criada era de Tanques.
+  var CONV_API_JOGOS = {};
+  Object.keys(CONV_JOGOS).forEach(function (k) {
+    var api = CONV_JOGOS[k].api;
+    (CONV_API_JOGOS[api] = CONV_API_JOGOS[api] || []).push(k);
+  });
+
+  var _convUnsub = null;      // desliga a escuta da própria caixa
+  var _convUid = null;        // uid que está ouvindo
+  var _convLista = [];        // convites válidos em cache (mais novo em cima)
+  var _convVistos = {};       // "id|codigo" -> true, pra só avisar de convite novo
+  var _convPendente = null;   // {paraUid, nome, jogo, ate} esperando o código da sala
+  var _convEnvolvidos = {};   // nome do global -> true (criarSala já embrulhado)
+
+  /* ── Caixa de entrada ──────────────────────────────────────────
+     A escuta fica viva enquanto a conta estiver logada, não só com o
+     painel aberto (como a de amigos): é ela que faz o aviso chegar
+     em quem está na home. O nó é minúsculo e só o próprio dono lê. */
+  function _convObservarCaixa() {
+    if (!_cliContaReal(_cliUser)) return;
+    var uid = _cliUser.uid;
+    if (_convUid === uid) return;
+    _convPararCaixa();
+    _convUid = uid;
+    var parado = false, off = function () {};
+    _convUnsub = function () { parado = true; off(); };
+    _amigosCtx().then(function (ctx) {
+      if (parado || ctx.uid !== uid) return;
+      var ref = ctx.db.ref('gameInvites/' + uid);
+      var h = function (snap) { _convReceber(snap.val() || {}); };
+      ref.on('value', h, function () { _convReceber({}); });
+      off = function () { try { ref.off('value', h); } catch (e) {} };
+    }).catch(function () { /* sem RTDB: o app segue igual, só não recebe convite */ });
+  }
+
+  function _convPararCaixa() {
+    if (_convUnsub) { try { _convUnsub(); } catch (e) {} _convUnsub = null; }
+    _convUid = null;
+    _convLista = [];
+    _convVistos = {};
+    _convPendente = null;
+    cliConvitesRender();
+  }
+
+  // Apaga um convite da PRÓPRIA caixa (aceitou, recusou ou expirou).
+  function _convApagar(id) {
+    if (!id || !_convUid) return;
+    _amigosCtx().then(function (ctx) {
+      return ctx.db.ref('gameInvites/' + ctx.uid + '/' + id).remove();
+    }).catch(function () {});
+  }
+
+  /* Cada snapshot da caixa: filtra o que expirou (e aproveita pra
+     apagar do banco — é a faxina, já que não há Cloud Function),
+     guarda em cache e avisa do que é novo. O "novo" leva o código
+     junto na chave: reconvidar pro mesmo jogo reusa o mesmo id, e
+     sem isso a segunda chamada entraria muda. */
+  function _convReceber(val) {
+    var agora = Date.now();
+    var lista = [];
+    Object.keys(val || {}).forEach(function (id) {
+      var c = val[id] || {};
+      if (!c.de || !c.codigo || !CONV_JOGOS[c.jogo]) return;
+      var ate = c.expiraEm || ((c.em || agora) + CONV_VALIDADE_MS);
+      if (ate <= agora) { _convApagar(id); return; }
+      lista.push({
+        id: id,
+        de: c.de,
+        nome: String(c.nome || 'Jogador').slice(0, CLI_NOME_MAX),
+        jogo: c.jogo,
+        codigo: String(c.codigo).toUpperCase(),
+        em: c.em || 0,
+        expiraEm: ate
+      });
+    });
+    lista.sort(function (a, b) { return b.em - a.em; });
+
+    var novos = lista.filter(function (c) { return !_convVistos[c.id + '|' + c.codigo]; });
+    _convVistos = {};
+    lista.forEach(function (c) { _convVistos[c.id + '|' + c.codigo] = true; });
+    _convLista = lista;
+    cliConvitesRender();
+
+    // Um aviso só, do mais recente: logar com três convites parados
+    // na caixa não vira três toasts em cima do outro.
+    if (novos.length && typeof showToastSimples === 'function') {
+      var n = novos[0];
+      showToastSimples(n.nome + ' te chamou pro ' + CONV_JOGOS[n.jogo].nome + '!', '/webp/owl-tada.webp');
+    }
+  }
+
+  /* ── Abrir a tela do jogo e esperar ela montar ─────────────────
+     Carrega o hub (que troca window._abrirGamesHub pela versão real),
+     abre o hub, abre a tela do jogo e espera o `pronto` do catálogo.
+     A espera existe porque _abrirJogo() dispara o loader do jogo e
+     não devolve promise nenhuma. */
+  function _convEsperarPronto(teste) {
+    return new Promise(function (resolve, reject) {
+      var gasto = 0;
+      (function checar() {
+        var ok = false;
+        try { ok = !!teste(); } catch (e) { ok = false; }
+        if (ok) { resolve(); return; }
+        gasto += CONV_ESPERA_PASSO;
+        if (gasto > CONV_ESPERA_MS) { reject(new Error('A tela do jogo não abriu.')); return; }
+        setTimeout(checar, CONV_ESPERA_PASSO);
+      })();
+    });
+  }
+
+  function _convAbrirTelaJogo(jogo) {
+    var cfg = CONV_JOGOS[jogo];
+    if (!cfg) return Promise.reject(new Error('Jogo desconhecido.'));
+    return _carregarHubJogos().then(function () {
+      if (typeof window._abrirGamesHub !== 'function' || typeof window._abrirJogo !== 'function') {
+        throw new Error('Hub de jogos indisponível.');
+      }
+      window._abrirGamesHub();
+      window._abrirJogo(jogo);
+      return _convEsperarPronto(cfg.pronto);
+    });
+  }
+
+  /* ── Lado de quem convida ──────────────────────────────────────
+     Embrulha o criarSala() da API pública do jogo UMA vez, e só em
+     quem realmente usou "chamar pra jogar" — quem nunca convida não
+     paga nem esse wrapper. O jogo continua chamando o mesmo
+     criarSala de sempre; o embrulho só olha o código que passa. */
+  function _convEnvolverCriar(jogo) {
+    var cfg = CONV_JOGOS[jogo];
+    if (!cfg) return;
+    var nomeApi = cfg.api;
+    if (_convEnvolvidos[nomeApi]) return;
+    var api = window[nomeApi];
+    if (!api || typeof api.criarSala !== 'function') return;
+    _convEnvolvidos[nomeApi] = true;
+    var original = api.criarSala;
+    api.criarSala = function () {
+      var r = original.apply(this, arguments);
+      if (!r || typeof r.then !== 'function') return r;
+      return r.then(function (codigo) {
+        _convEnviarSePendente(nomeApi, codigo);
+        return codigo;
+      });
+    };
+  }
+
+  function _convEnviarSePendente(nomeApi, codigo) {
+    var p = _convPendente;
+    if (!p || !codigo) return;
+    // A sala criada é de outro jogo da mesma API (criou Tanques mas o
+    // convite pendente era de Ping Pong): não é esta.
+    if ((CONV_API_JOGOS[nomeApi] || []).indexOf(p.jogo) < 0) return;
+    _convPendente = null;
+    if (Date.now() > p.ate) return;  // demorou demais: o convite pendente caducou
+    _convEnviar(p.paraUid, p.jogo, String(codigo)).then(function () {
+      if (typeof showToastSimples === 'function') {
+        showToastSimples('Convite enviado pro ' + p.nome + '!', '/webp/owl-thumbsup.webp');
+      }
+    }).catch(function () {
+      if (typeof showToastSimples === 'function') {
+        showToastSimples('Não deu pra enviar o convite. Mande o código ' + String(codigo).toUpperCase() + '.', '/webp/owl-sign.webp');
+      }
+    });
+  }
+
+  function _convEnviar(paraUid, jogo, codigo) {
+    return _amigosCtx().then(function (ctx) {
+      // A chave é imposta pelas regras: {deUid}_{jogo}.
+      return ctx.db.ref('gameInvites/' + paraUid + '/' + ctx.uid + '_' + jogo).set({
+        de: ctx.uid,
+        nome: cliNomeExibicao() || 'Jogador',
+        jogo: jogo,
+        codigo: codigo,
+        em: firebase.database.ServerValue.TIMESTAMP,
+        expiraEm: Date.now() + CONV_VALIDADE_MS
+      });
+    });
+  }
+
+  window.AngatubaConvites = {
+    jogos: function () { return CONV_JOGOS; },
+    lista: function () { return _convLista.slice(); },
+    observarCaixa: _convObservarCaixa,
+
+    // Arma o convite e leva pra tela do jogo. O envio acontece quando
+    // o anfitrião criar a sala ali (ver _convEnvolverCriar).
+    convidar: function (paraUid, jogo, nomeAmigo) {
+      var cfg = CONV_JOGOS[jogo];
+      if (!cfg) return Promise.reject(new Error('Jogo desconhecido.'));
+      if (!_cliContaReal(_cliUser)) return Promise.reject(new Error('Entre na sua conta pra convidar.'));
+      var nome = String(nomeAmigo || 'seu amigo').slice(0, CLI_NOME_MAX);
+      _convPendente = { paraUid: paraUid, nome: nome, jogo: jogo, ate: Date.now() + CONV_PENDENTE_MS };
+      return _convAbrirTelaJogo(jogo).then(function () {
+        _convEnvolverCriar(jogo);
+        if (typeof showToastSimples === 'function') {
+          showToastSimples('Crie a sala — o convite vai sozinho pro ' + nome + '.', '/webp/owl-point.webp');
+        }
+      }).catch(function (err) {
+        _convPendente = null;
+        throw err;
+      });
+    },
+
+    aceitar: function (id) {
+      var c = null;
+      for (var i = 0; i < _convLista.length; i++) if (_convLista[i].id === id) { c = _convLista[i]; break; }
+      if (!c) return Promise.reject(new Error('Esse convite não está mais valendo.'));
+      if (Date.now() > c.expiraEm) { _convApagar(id); return Promise.reject(new Error('Esse convite expirou.')); }
+      // Apaga já: o convite cumpriu o papel, e deixá-lo na caixa só
+      // daria um segundo "Entrar" numa sala onde a pessoa já está.
+      _convApagar(id);
+      return _convAbrirTelaJogo(c.jogo).then(function () { CONV_JOGOS[c.jogo].entrar(c.codigo); });
+    },
+
+    recusar: function (id) { _convApagar(id); return Promise.resolve(); }
+  };
+
+  /* ── UI: convites recebidos, no painel de conta ────────────────
+     Mesma linha visual dos pedidos de amizade (4.3). Renderiza do
+     cache: quem atualiza é a escuta global, que roda com o painel
+     aberto ou fechado. */
+  function cliConvitesRender() {
+    var el = document.getElementById('cli-amigos-convites');
+    if (!el) return;
+    if (!_convLista.length || !_cliContaReal(_cliUser)) {
+      el.innerHTML = ''; el.style.display = 'none';
+      return;
+    }
+    el.style.display = 'flex';
+    el.innerHTML = _convLista.map(function (c) {
+      var j = CONV_JOGOS[c.jogo];
+      return '<div class="cli-amigo-item convite">' +
+        _amLinhaAvatar(c.de, c.nome, true) +
+        '<span class="cli-amigo-txt">' +
+          '<span class="cli-amigo-nome">' + escHTML(c.nome) + '</span>' +
+          '<span class="cli-amigo-sub">te chamou pro ' + j.emoji + ' ' + escHTML(j.nome) + '</span>' +
+        '</span>' +
+        '<span class="cli-amigo-acoes">' +
+          '<button type="button" class="cli-amigo-btn ok" onclick="cliConviteEntrar(\'' +
+            escHTML(c.id) + '\')" aria-label="Entrar no jogo" title="Entrar"><i class="fa fa-play"></i></button>' +
+          '<button type="button" class="cli-amigo-btn no" onclick="cliConviteRecusar(\'' +
+            escHTML(c.id) + '\')" aria-label="Recusar" title="Recusar"><i class="fa fa-xmark"></i></button>' +
+        '</span></div>';
+    }).join('');
+  }
+
+  /* Abre (ou fecha) a fileira de jogos embaixo do amigo. Mexe direto
+     no DOM em vez de entrar no render da lista: a fileira é efêmera e
+     some sozinha no próximo redesenho da lista, que é o que a gente
+     quer mesmo. */
+  function cliAmigosJogar(uid) {
+    var item = document.querySelector('.cli-amigo-item[data-amigo="' + uid + '"]');
+    if (!item) return;
+    var prox = item.nextElementSibling;
+    var jaAberto = !!(prox && prox.classList.contains('cli-amigo-jogos'));
+    var abertos = document.querySelectorAll('.cli-amigo-jogos');
+    for (var i = 0; i < abertos.length; i++) abertos[i].parentNode.removeChild(abertos[i]);
+    if (jaAberto) return;
+    var box = document.createElement('div');
+    box.className = 'cli-amigo-jogos';
+    box.innerHTML = Object.keys(CONV_JOGOS).map(function (k) {
+      return '<button type="button" class="cli-amigo-jogo" onclick="cliConviteEnviar(\'' +
+        escHTML(uid) + '\',\'' + k + '\')">' + CONV_JOGOS[k].emoji + ' ' + escHTML(CONV_JOGOS[k].nome) + '</button>';
+    }).join('');
+    item.parentNode.insertBefore(box, item.nextSibling);
+  }
+
+  function cliConviteEnviar(uid, jogo) {
+    var nomeEl = document.querySelector('.cli-amigo-item[data-amigo="' + uid + '"] .cli-amigo-nome');
+    var nome = (nomeEl && nomeEl.textContent) || _amNomeVivo[uid] || 'seu amigo';
+    _amMsg('', '');
+    // Mesmo compasso do cliAbrirLojaFav: fechar o painel dispara um
+    // history.back(), e o hub de jogos empilha a entrada dele logo em
+    // seguida. Sem a folga, o popstate atrasado derrubaria a tela do
+    // jogo que acabou de abrir.
+    cliFecharPainelConta();
+    setTimeout(function () {
+      window.AngatubaConvites.convidar(uid, jogo, nome).catch(function (err) {
+        if (typeof showToastSimples === 'function') {
+          showToastSimples((err && err.message) || 'Não deu pra abrir o jogo.', '/webp/owl-sign.webp');
+        }
+      });
+    }, 220);
+  }
+
+  function cliConviteEntrar(id) {
+    cliFecharPainelConta();
+    setTimeout(function () {   // ver cliConviteEnviar: mesma folga pro popstate
+      window.AngatubaConvites.aceitar(id).catch(function (err) {
+        if (typeof showToastSimples === 'function') {
+          showToastSimples((err && err.message) || 'Não deu pra entrar na sala.', '/webp/owl-sign.webp');
+        }
+      });
+    }, 220);
+  }
+
+  function cliConviteRecusar(id) {
+    window.AngatubaConvites.recusar(id);
+  }
+
+  window.cliAmigosJogar    = cliAmigosJogar;
+  window.cliConviteEnviar  = cliConviteEnviar;
+  window.cliConviteEntrar  = cliConviteEntrar;
+  window.cliConviteRecusar = cliConviteRecusar;

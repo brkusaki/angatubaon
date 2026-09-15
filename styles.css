@@ -5805,6 +5805,29 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     .cli-amigo-btn.ok { color: #22c55e; border-color: rgba(34,197,94,0.4); }
     .cli-amigo-btn.no { color: var(--red); border-color: rgba(255,68,68,0.35); }
 
+    /* ── Convites pra jogar (4.4) ──
+       Reusa .cli-amigo-item; só muda a cor da borda pra se distinguir
+       do pedido de amizade (âmbar) sem inventar outro cartão. */
+    .cli-amigos-convites { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .cli-amigo-item.convite { border-color: rgba(34,197,94,0.38); background: rgba(34,197,94,0.08); }
+    /* Botão "chamar pra jogar": neutro por padrão, verde quando a
+       presença diz que a pessoa está online. */
+    .cli-amigo-btn.jogar.on { color: #22c55e; border-color: rgba(34,197,94,0.4); }
+    /* Fileira de jogos que abre embaixo do amigo escolhido. */
+    .cli-amigo-jogos {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      margin: -2px 0 2px; padding: 0 4px 2px;
+    }
+    .cli-amigo-jogo {
+      flex: 1 1 calc(50% - 3px); min-width: 0; cursor: pointer;
+      padding: 9px 10px; border-radius: var(--r-md);
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); font-size: 13px; font-weight: 600; font-family: inherit;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-amigo-jogo:active { opacity: 0.6; }
+
     /* Adicionar por código */
     .cli-amigos-add { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
     .cli-amigos-cod-btn {

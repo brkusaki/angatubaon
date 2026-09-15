@@ -5761,6 +5761,80 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     }
     .cli-fav-seta { color: var(--muted); font-size: 12px; flex-shrink: 0; }
 
+    /* ── Amigos (4.3) ──
+       Mesma linguagem dos mini-cards de "Minhas lojas": linha com
+       avatar de inicial, nome e ação à direita. */
+    .cli-amigos-lista, .cli-amigos-pedidos { display: flex; flex-direction: column; gap: 8px; }
+    .cli-amigos-pedidos { margin-bottom: 12px; }
+    .cli-amigo-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border-radius: var(--r-md);
+      background: var(--surface2); border: 1px solid var(--border);
+    }
+    /* Pedido recebido chama atenção sem virar alarme. */
+    .cli-amigo-item.pedido { border-color: rgba(255,180,0,0.38); background: rgba(255,180,0,0.08); }
+    .cli-amigo-av {
+      position: relative; width: 38px; height: 38px; border-radius: 50%;
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      color: #fff; font-family: var(--font-h); font-weight: 800; font-size: 15px;
+      background: linear-gradient(135deg, var(--red), #b91c1c);
+    }
+    /* Pontinho de presença, mesmas cores do indicador do avatar do painel. */
+    .cli-amigo-dot {
+      position: absolute; right: -1px; bottom: -1px;
+      width: 11px; height: 11px; border-radius: 50%;
+      border: 2px solid var(--surface2); background: #94a3b8;
+    }
+    .cli-amigo-dot.online { background: #22c55e; }
+    .cli-amigo-dot.away { background: #f59e0b; }
+    .cli-amigo-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .cli-amigo-nome {
+      font-size: 14px; color: var(--text); font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .cli-amigo-sub { font-size: 11.5px; color: var(--muted); font-weight: 500; }
+    .cli-amigo-acoes { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .cli-amigo-btn {
+      width: 32px; height: 32px; border-radius: 9px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; background: var(--bg); color: var(--muted);
+      border: 1px solid var(--border);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-amigo-btn:active { opacity: 0.6; }
+    .cli-amigo-btn.ok { color: #22c55e; border-color: rgba(34,197,94,0.4); }
+    .cli-amigo-btn.no { color: var(--red); border-color: rgba(255,68,68,0.35); }
+
+    /* Adicionar por código */
+    .cli-amigos-add { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .cli-amigos-cod-btn {
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 11px 12px; border-radius: var(--r-md); cursor: pointer;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); font-size: 13.5px; font-weight: 600;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-amigos-cod-btn:active { opacity: 0.6; }
+    .cli-amigos-cod-btn i { color: var(--muted); font-size: 13px; }
+    .cli-amigos-add-row { display: flex; gap: 8px; }
+    .cli-amigos-cod-input {
+      flex: 1; min-width: 0; padding: 10px 12px; border-radius: var(--r-md);
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); font-size: 13.5px; font-family: inherit;
+    }
+    .cli-amigos-cod-input:focus { outline: none; border-color: var(--red); }
+    .cli-amigos-add-ok {
+      width: 42px; flex-shrink: 0; border-radius: var(--r-md); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+      background: var(--red); color: #fff; border: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-amigos-add-ok:active { opacity: 0.7; }
+    .cli-amigos-add-ok:disabled { opacity: 0.5; cursor: default; }
+    .cli-amigos-msg { font-size: 12.5px; line-height: 1.5; color: var(--muted); min-height: 1px; }
+    .cli-amigos-msg.erro { color: var(--red); }
+    .cli-amigos-msg.ok { color: #22c55e; }
+
     /* Estado vazio de "Minhas lojas": ícone + texto + CTA opcional */
     .cli-conta-fav-vazio {
       text-align: center; color: var(--muted);

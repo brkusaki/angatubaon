@@ -15724,6 +15724,8 @@ ${urlCard}`)}`;
       }).catch(function () {});
     }
     cliRenderFavoritos();
+    // Amigos (4.3): liga os listeners só enquanto o painel está aberto.
+    cliAmigosRender();
     // Garante o binding do seletor de foto (idempotente).
     cliBindFotoInput();
     overlay.classList.add('open');
@@ -15969,6 +15971,9 @@ ${urlCard}`)}`;
   function cliFecharPainelConta(viaPopstate) {
     const overlay = document.getElementById('modal-cli-conta');
     if (!overlay) return;
+    // Solta os listeners de amigos/presença: painel fechado não
+    // precisa continuar recebendo atualização do RTDB.
+    cliAmigosSoltar();
     overlay.classList.remove('open');
     document.body.style.overflow = '';
     if (!viaPopstate && history.state?.modal === 'cli-conta') { _popstateNosso = true; history.back(); }
@@ -16006,6 +16011,7 @@ ${urlCard}`)}`;
     const limpar = function () {
       _cliUser = null;
       _cliApelido = null;
+      _amNomeVivo = {};   // cache de nomes de amigos da conta que saiu
       try { localStorage.removeItem(CLI_APELIDO_KEY); } catch (e) {}
     };
     if (!auth) { limpar(); cliAtualizarHeader(); return; }
@@ -16250,3 +16256,386 @@ ${urlCard}`)}`;
       if (_presRef && _presEstado) _presPublicar(_presEstado);
     }
   };
+
+  /* ══════════════════════════════════════════════════════════════
+     AMIGOS (Realtime Database) — Etapa 4.3
+     ------------------------------------------------------------
+     Pedir, aceitar, listar e remover amigo. Só conta nomeada. É a
+     base dos convites pra jogar (4.4), que NÃO estão aqui.
+
+     Nós (ver database.rules.json pro raciocínio das regras):
+       friendRequests/{paraUid}/{deUid} = { nome, em }
+       friends/{donoUid}/{amigoUid}     = { nome, desde }
+
+     A amizade fica gravada nos DOIS lados pra cada um listar a
+     própria lista lendo só o seu ramo — nenhum dos dois nós tem
+     leitura na raiz, então continua impossível varrer os usuários
+     da cidade (mesma disciplina de presence/).
+
+     Aceite e remoção saem num update() multi-caminho, que o RTDB
+     aplica de forma atômica: ou os dois lados entram/saem, ou
+     nenhum. É isso que evita amizade meio-feita sem precisar de
+     Cloud Function.
+
+     COMO ALGUÉM TE ACHA — o "código de amigo" é o próprio uid com o
+     prefixo AON-. Não existe busca por nome, de propósito: para
+     buscar seria preciso um índice legível de todo mundo, que é
+     exatamente o que as regras impedem. O uid já é semipúblico (os
+     docs de ranking no Firestore são de leitura pública e carregam
+     uid), então o código não revela nada novo; ele é feito pra ser
+     copiado e colado no WhatsApp, não digitado à mão.
+
+     NOME EXIBIDO — o `nome` gravado nos nós é uma fotografia do
+     momento. Quem renomear depois apareceria com o nome velho na
+     lista dos outros; por isso a UI prefere o nome que vem VIVO da
+     presença (AngatubaPresenca.observar devolve {state, nome}) e só
+     cai no nome gravado quando não há presença. Sem escrita extra e
+     sem regra nova.
+
+     API pública (window.AngatubaAmigos):
+       meuCodigo()             -> 'AON-<uid>' ou null
+       pedir(codigo)           -> Promise; erros já em PT-BR
+       aceitar(uid)            -> Promise (grava os dois lados)
+       recusar(uid)            -> Promise
+       remover(uid)            -> Promise (apaga os dois lados)
+       observarAmigos(cb)      -> cb([{uid, nome, desde}]); devolve
+                                  a função de parar de ouvir
+       observarPedidos(cb)     -> cb([{uid, nome, em}]); idem
+  ══════════════════════════════════════════════════════════════ */
+
+  var AMIGO_PREFIXO = 'AON-';
+
+  // Transforma o que a pessoa colou num uid. Aceita com ou sem o
+  // prefixo, com espaços sobrando e em qualquer caixa no prefixo —
+  // o uid em si é sensível a maiúsculas, então esse não mexemos.
+  function _amigosUidDoCodigo(codigo) {
+    var s = String(codigo || '').trim().replace(/\s+/g, '');
+    if (s.toUpperCase().indexOf(AMIGO_PREFIXO) === 0) s = s.slice(AMIGO_PREFIXO.length);
+    // uid do Firebase: alfanumérico, tipicamente 28 chars. A faixa
+    // larga aceita variações sem deixar passar texto solto.
+    return /^[A-Za-z0-9]{20,64}$/.test(s) ? s : null;
+  }
+
+  // Carrega o RTDB e devolve {db, uid} — ou rejeita com uma
+  // mensagem que já dá pra mostrar na tela.
+  function _amigosCtx() {
+    if (!_cliContaReal(_cliUser)) {
+      return Promise.reject(new Error('Entre na sua conta pra usar a lista de amigos.'));
+    }
+    var uid = _cliUser.uid;
+    return _carregarFirebaseDb().then(function () {
+      var db = _presDb();
+      if (!db) throw new Error('Sem conexão agora. Tente de novo em instantes.');
+      if (!_cliContaReal(_cliUser) || _cliUser.uid !== uid) {
+        throw new Error('Entre na sua conta pra usar a lista de amigos.');
+      }
+      return { db: db, uid: uid };
+    });
+  }
+
+  // Erros do RTDB em PT-BR, no tom do resto do app.
+  function _amigosErroPt(err) {
+    var msg = String((err && (err.message || err.code)) || '');
+    if (/permission_denied/i.test(msg)) {
+      return 'Não foi possível concluir. O pedido pode ter expirado — peça pra pessoa mandar de novo.';
+    }
+    if (/network|offline/i.test(msg)) return 'Sem conexão. Verifique a internet e tente de novo.';
+    return 'Algo deu errado. Tente de novo em instantes.';
+  }
+
+  // Lê um nó de lista (friends/{uid} ou friendRequests/{uid}) e
+  // entrega um array ordenado pelo campo de data, mais novo em cima.
+  function _amigosObservarLista(caminho, campoData, cb) {
+    if (typeof cb !== 'function') return function () {};
+    var parado = false, off = function () {};
+    _amigosCtx().then(function (ctx) {
+      if (parado) return;
+      var ref = ctx.db.ref(caminho + '/' + ctx.uid);
+      var h = function (snap) {
+        var val = snap.val() || {};
+        var lista = Object.keys(val).map(function (uid) {
+          var d = val[uid] || {};
+          return { uid: uid, nome: String(d.nome || 'Jogador').slice(0, CLI_NOME_MAX), data: d[campoData] || 0 };
+        });
+        lista.sort(function (a, b) { return b.data - a.data; });
+        cb(lista);
+      };
+      ref.on('value', h, function () { cb([]); });
+      off = function () { try { ref.off('value', h); } catch (e) {} };
+    }).catch(function () { if (!parado) cb([]); });
+    return function () { parado = true; off(); };
+  }
+
+  window.AngatubaAmigos = {
+    // Código pra mandar no Zap. null se não há conta nomeada.
+    meuCodigo: function () {
+      return _cliContaReal(_cliUser) ? (AMIGO_PREFIXO + _cliUser.uid) : null;
+    },
+
+    /* Manda pedido. Só escreve no ramo de quem RECEBE — é o único nó
+       que as regras liberam pra isso, e é o que mantém o pedido sem
+       nenhum efeito até a outra pessoa aceitar. */
+    pedir: function (codigo) {
+      var alvo = _amigosUidDoCodigo(codigo);
+      if (!alvo) return Promise.reject(new Error('Código inválido. Peça pra pessoa copiar o código dela de novo.'));
+      return _amigosCtx().then(function (ctx) {
+        if (alvo === ctx.uid) throw new Error('Esse é o seu próprio código.');
+        // Já são amigos? Evita um pedido que não levaria a nada.
+        return ctx.db.ref('friends/' + ctx.uid + '/' + alvo).get().then(function (snap) {
+          if (snap.exists()) throw new Error('Vocês já são amigos.');
+          return ctx.db.ref('friendRequests/' + alvo + '/' + ctx.uid).set({
+            nome: cliNomeExibicao() || 'Jogador',
+            em: firebase.database.ServerValue.TIMESTAMP
+          });
+        });
+      }).catch(function (err) {
+        // Mensagens que já são nossas passam direto; o resto vira PT-BR.
+        throw new Error(/próprio código|já são amigos|Entre na sua conta|Sem conexão agora/.test(String(err && err.message))
+          ? err.message : _amigosErroPt(err));
+      });
+    },
+
+    /* Aceita: grava os dois lados e apaga o pedido, tudo num update
+       atômico. A regra que libera friends/{outro}/{eu} confere que o
+       pedido existe — e o `root` das regras é o estado ANTERIOR ao
+       update, então apagar o pedido aqui não atrapalha. */
+    aceitar: function (outroUid) {
+      if (!outroUid) return Promise.reject(new Error('Pedido inválido.'));
+      return _amigosCtx().then(function (ctx) {
+        return ctx.db.ref('friendRequests/' + ctx.uid + '/' + outroUid).get().then(function (snap) {
+          if (!snap.exists()) throw new Error('Esse pedido não está mais valendo.');
+          var nomeDele = String((snap.val() || {}).nome || 'Jogador').slice(0, CLI_NOME_MAX);
+          var meuNome = cliNomeExibicao() || 'Jogador';
+          var agora = firebase.database.ServerValue.TIMESTAMP;
+          var updates = {};
+          updates['friends/' + ctx.uid + '/' + outroUid] = { nome: nomeDele, desde: agora };
+          updates['friends/' + outroUid + '/' + ctx.uid] = { nome: meuNome, desde: agora };
+          updates['friendRequests/' + ctx.uid + '/' + outroUid] = null;
+          return ctx.db.ref().update(updates);
+        });
+      }).catch(function (err) {
+        throw new Error(/não está mais valendo|Entre na sua conta|Sem conexão agora/.test(String(err && err.message))
+          ? err.message : _amigosErroPt(err));
+      });
+    },
+
+    // Recusar é só apagar o pedido da própria caixa.
+    recusar: function (outroUid) {
+      if (!outroUid) return Promise.reject(new Error('Pedido inválido.'));
+      return _amigosCtx().then(function (ctx) {
+        return ctx.db.ref('friendRequests/' + ctx.uid + '/' + outroUid).remove();
+      }).catch(function (err) {
+        throw new Error(/Entre na sua conta|Sem conexão agora/.test(String(err && err.message))
+          ? err.message : _amigosErroPt(err));
+      });
+    },
+
+    /* Remove dos DOIS lados. Apagar a própria entrada na lista do
+       outro é o segundo caso que as regras liberam (remoção, nunca
+       escrita). Atômico pelo mesmo update multi-caminho. */
+    remover: function (outroUid) {
+      if (!outroUid) return Promise.reject(new Error('Amigo inválido.'));
+      return _amigosCtx().then(function (ctx) {
+        var updates = {};
+        updates['friends/' + ctx.uid + '/' + outroUid] = null;
+        updates['friends/' + outroUid + '/' + ctx.uid] = null;
+        return ctx.db.ref().update(updates);
+      }).catch(function (err) {
+        throw new Error(/Entre na sua conta|Sem conexão agora/.test(String(err && err.message))
+          ? err.message : _amigosErroPt(err));
+      });
+    },
+
+    observarAmigos: function (cb) {
+      return _amigosObservarLista('friends', 'desde', function (l) {
+        cb(l.map(function (i) { return { uid: i.uid, nome: i.nome, desde: i.data }; }));
+      });
+    },
+
+    observarPedidos: function (cb) {
+      return _amigosObservarLista('friendRequests', 'em', function (l) {
+        cb(l.map(function (i) { return { uid: i.uid, nome: i.nome, em: i.data }; }));
+      });
+    }
+  };
+
+  /* ── UI de amigos, dentro do painel de conta ──────────────────
+     Só monta quando o painel abre e desliga tudo quando ele fecha:
+     são listeners de RTDB (a lista, os pedidos e uma presença por
+     amigo), e deixá-los vivos com o painel fechado seria tráfego à
+     toa no celular de quem nem está olhando. */
+  var _amUnsubLista = null;     // para de ouvir friends/{uid}
+  var _amUnsubPedidos = null;   // para de ouvir friendRequests/{uid}
+  var _amUnsubPresenca = {};    // uid do amigo -> função de parar
+  var _amNomeVivo = {};         // uid -> nome que veio da presença
+
+  function _amSoltarPresencas() {
+    Object.keys(_amUnsubPresenca).forEach(function (uid) {
+      try { _amUnsubPresenca[uid](); } catch (e) {}
+    });
+    _amUnsubPresenca = {};
+  }
+
+  // Avatar de inicial + pontinho de presença. O estado entra como
+  // classe pra não recriar a linha inteira a cada mudança.
+  function _amLinhaAvatar(uid, nome) {
+    return '<span class="cli-amigo-av">' + escHTML((String(nome).trim()[0] || '?').toUpperCase()) +
+      '<span class="cli-amigo-dot" data-pres="' + escHTML(uid) + '"></span></span>';
+  }
+
+  function cliAmigosRender() {
+    var elLista = document.getElementById('cli-amigos-lista');
+    var elVazio = document.getElementById('cli-amigos-vazio');
+    var elPed = document.getElementById('cli-amigos-pedidos');
+    if (!elLista) return;
+
+    // Sem conta nomeada não há lista: o painel nem abre nesse caso
+    // (o header só mostra o avatar pra quem está logado), mas se
+    // chegar aqui, mostra o vazio em vez de listener nenhum.
+    if (!_cliContaReal(_cliUser)) {
+      elLista.innerHTML = '';
+      if (elPed) { elPed.innerHTML = ''; elPed.style.display = 'none'; }
+      if (elVazio) elVazio.style.display = 'block';
+      return;
+    }
+
+    cliAmigosSoltar();
+
+    _amUnsubLista = window.AngatubaAmigos.observarAmigos(function (amigos) {
+      _amSoltarPresencas();
+      if (!amigos.length) {
+        elLista.innerHTML = '';
+        if (elVazio) elVazio.style.display = 'block';
+        return;
+      }
+      if (elVazio) elVazio.style.display = 'none';
+      elLista.innerHTML = amigos.map(function (a) {
+        var nome = _amNomeVivo[a.uid] || a.nome;
+        return '<div class="cli-amigo-item">' +
+          _amLinhaAvatar(a.uid, nome) +
+          '<span class="cli-amigo-txt">' +
+            '<span class="cli-amigo-nome">' + escHTML(nome) + '</span>' +
+            '<span class="cli-amigo-sub" data-pres-txt="' + escHTML(a.uid) + '">—</span>' +
+          '</span>' +
+          '<span class="cli-amigo-acoes">' +
+            '<button type="button" class="cli-amigo-btn no" onclick="cliAmigosRemover(\'' +
+              escHTML(a.uid) + '\')" aria-label="Remover amigo" title="Remover amigo">' +
+              '<i class="fa fa-user-minus"></i></button>' +
+          '</span></div>';
+      }).join('');
+      // Uma escuta de presença por amigo (AngatubaPresenca.observar).
+      // As regras só deixam ler presence/{uid} um a um — é exatamente
+      // este acesso, e é o que impede varrer a cidade inteira.
+      amigos.forEach(function (a) {
+        _amUnsubPresenca[a.uid] = window.AngatubaPresenca.observar(a.uid, function (p) {
+          // O nome da presença é o VIVO; o gravado em friends/ é uma
+          // fotografia de quando a amizade nasceu.
+          if (p && p.nome) _amNomeVivo[a.uid] = String(p.nome).slice(0, CLI_NOME_MAX);
+          _amPintarPresenca(a.uid, p);
+        });
+      });
+    });
+
+    _amUnsubPedidos = window.AngatubaAmigos.observarPedidos(function (pedidos) {
+      if (!elPed) return;
+      if (!pedidos.length) { elPed.innerHTML = ''; elPed.style.display = 'none'; return; }
+      elPed.style.display = 'flex';
+      elPed.innerHTML = pedidos.map(function (p) {
+        return '<div class="cli-amigo-item pedido">' +
+          _amLinhaAvatar(p.uid, p.nome) +
+          '<span class="cli-amigo-txt">' +
+            '<span class="cli-amigo-nome">' + escHTML(p.nome) + '</span>' +
+            '<span class="cli-amigo-sub">quer ser seu amigo</span>' +
+          '</span>' +
+          '<span class="cli-amigo-acoes">' +
+            '<button type="button" class="cli-amigo-btn ok" onclick="cliAmigosAceitar(\'' +
+              escHTML(p.uid) + '\')" aria-label="Aceitar" title="Aceitar"><i class="fa fa-check"></i></button>' +
+            '<button type="button" class="cli-amigo-btn no" onclick="cliAmigosRecusar(\'' +
+              escHTML(p.uid) + '\')" aria-label="Recusar" title="Recusar"><i class="fa fa-xmark"></i></button>' +
+          '</span></div>';
+      }).join('');
+    });
+  }
+
+  // Pinta o pontinho e o rótulo de UM amigo, sem redesenhar a lista.
+  function _amPintarPresenca(uid, p) {
+    var estado = (p && p.state) || 'offline';
+    var dot = document.querySelector('.cli-amigo-dot[data-pres="' + uid + '"]');
+    if (dot) dot.className = 'cli-amigo-dot' + (estado === 'online' ? ' online' : (estado === 'away' ? ' away' : ''));
+    var txt = document.querySelector('.cli-amigo-sub[data-pres-txt="' + uid + '"]');
+    if (txt) txt.textContent = (estado === 'online') ? 'Online' : (estado === 'away' ? 'Ausente' : 'Offline');
+  }
+
+  // Desliga todos os listeners de amigos (chamado ao fechar o painel).
+  function cliAmigosSoltar() {
+    if (_amUnsubLista) { try { _amUnsubLista(); } catch (e) {} _amUnsubLista = null; }
+    if (_amUnsubPedidos) { try { _amUnsubPedidos(); } catch (e) {} _amUnsubPedidos = null; }
+    _amSoltarPresencas();
+  }
+
+  function _amMsg(texto, tipo) {
+    var el = document.getElementById('cli-amigos-msg');
+    if (!el) return;
+    el.textContent = texto || '';
+    el.className = 'cli-amigos-msg' + (tipo ? ' ' + tipo : '');
+  }
+
+  /* Copiar o código. navigator.clipboard falha em contexto não
+     seguro e em alguns WebViews, então caímos pra seleção manual
+     mostrando o código na própria mensagem — a pessoa copia à mão. */
+  function cliAmigosCopiarCodigo() {
+    var cod = window.AngatubaAmigos.meuCodigo();
+    if (!cod) { _amMsg('Entre na sua conta pra ter um código.', 'erro'); return; }
+    var mostrar = function () { _amMsg('Seu código: ' + cod, ''); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cod)
+        .then(function () { _amMsg('Código copiado! Mande pro seu amigo no WhatsApp.', 'ok'); })
+        .catch(mostrar);
+    } else {
+      mostrar();
+    }
+  }
+
+  function cliAmigosPedir() {
+    var inp = document.getElementById('cli-amigos-cod-input');
+    var btn = document.getElementById('cli-amigos-add-ok');
+    if (!inp) return;
+    var cod = inp.value || '';
+    if (!cod.trim()) { _amMsg('Cole aqui o código do seu amigo.', 'erro'); return; }
+    if (btn) btn.disabled = true;
+    _amMsg('Enviando…', '');
+    window.AngatubaAmigos.pedir(cod).then(function () {
+      inp.value = '';
+      _amMsg('Pedido enviado! Agora é só a pessoa aceitar.', 'ok');
+    }).catch(function (err) {
+      _amMsg((err && err.message) || 'Não deu pra enviar o pedido.', 'erro');
+    }).then(function () { if (btn) btn.disabled = false; });
+  }
+
+  function cliAmigosAceitar(uid) {
+    _amMsg('', '');
+    window.AngatubaAmigos.aceitar(uid).then(function () {
+      if (typeof showToastSimples === 'function') showToastSimples('Amizade confirmada!', '/webp/owl-thumbsup.webp');
+    }).catch(function (err) { _amMsg((err && err.message) || 'Não deu pra aceitar.', 'erro'); });
+  }
+
+  function cliAmigosRecusar(uid) {
+    _amMsg('', '');
+    window.AngatubaAmigos.recusar(uid).catch(function (err) {
+      _amMsg((err && err.message) || 'Não deu pra recusar.', 'erro');
+    });
+  }
+
+  function cliAmigosRemover(uid) {
+    if (!confirm('Remover esta pessoa dos seus amigos?')) return;
+    _amMsg('', '');
+    window.AngatubaAmigos.remover(uid).catch(function (err) {
+      _amMsg((err && err.message) || 'Não deu pra remover.', 'erro');
+    });
+  }
+
+  window.cliAmigosCopiarCodigo = cliAmigosCopiarCodigo;
+  window.cliAmigosPedir        = cliAmigosPedir;
+  window.cliAmigosAceitar      = cliAmigosAceitar;
+  window.cliAmigosRecusar      = cliAmigosRecusar;
+  window.cliAmigosRemover      = cliAmigosRemover;

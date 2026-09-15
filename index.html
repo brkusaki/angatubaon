@@ -3553,6 +3553,37 @@
           </div>
         </div>
 
+        <!-- Amigos (4.3): lista com presença, pedidos recebidos e o
+             código pra adicionar. Convites pra jogar são 4.4. -->
+        <div class="cli-conta-secao">
+          <div class="cli-conta-secao-tit"><i class="fa fa-user-group"></i> Meus amigos</div>
+
+          <!-- Pedidos recebidos: só aparece quando há algum -->
+          <div class="cli-amigos-pedidos" id="cli-amigos-pedidos" style="display:none;"></div>
+
+          <!-- Lista de amigos -->
+          <div class="cli-amigos-lista" id="cli-amigos-lista"></div>
+          <div class="cli-conta-fav-vazio" id="cli-amigos-vazio" style="display:none;">
+            <i class="fa fa-user-group cli-conta-fav-vazio-ico" aria-hidden="true"></i>
+            <p>Você ainda não tem amigos por aqui.<br>Mande o seu código pra quem você quer adicionar.</p>
+          </div>
+
+          <!-- Adicionar por código -->
+          <div class="cli-amigos-add">
+            <button type="button" class="cli-amigos-cod-btn" id="cli-amigos-cod-btn" onclick="cliAmigosCopiarCodigo()">
+              <i class="fa fa-copy"></i> <span>Copiar meu código</span>
+            </button>
+            <div class="cli-amigos-add-row">
+              <input type="text" id="cli-amigos-cod-input" class="cli-amigos-cod-input"
+                     maxlength="70" placeholder="Colar código do amigo" autocomplete="off"
+                     autocapitalize="off" spellcheck="false" />
+              <button type="button" class="cli-amigos-add-ok" id="cli-amigos-add-ok"
+                      onclick="cliAmigosPedir()" aria-label="Adicionar amigo"><i class="fa fa-plus"></i></button>
+            </div>
+            <div class="cli-amigos-msg" id="cli-amigos-msg"></div>
+          </div>
+        </div>
+
         <!-- Configurações: agrupadas e destacadas do conteúdo acima -->
         <div class="cli-conta-config">
           <!-- Tema (migrado do header) -->

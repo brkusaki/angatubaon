@@ -204,6 +204,13 @@
     <button id="toast-close" onclick="hideToast()" aria-label="Fechar">✕</button>
   </div>
 
+  <!-- ══ AVISOS NO TOPO (polimento social P1) ══
+       Pilha de cards de convite pra jogar e pedido de amizade. Fica
+       vazia até chegar alguma coisa; o container é pointer-events:none
+       pra não roubar toque do header quando não há card nenhum.
+       Quem preenche é o módulo AngatubaAvisos (app.js). -->
+  <div id="aon-avisos" class="aon-avisos" role="region" aria-live="polite" aria-label="Avisos"></div>
+
   <!-- Item 11: modal de confirmação no tema do app (substitui o confirm() nativo,
        que mostra fundo branco + domínio no iOS e quebra a identidade dark). -->
   <div id="ml-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="ml-confirm-titulo" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:24px;">

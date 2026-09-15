@@ -15460,10 +15460,16 @@ ${urlCard}`)}`;
         // presença pelo mesmo motivo (não disputar a primeira
         // pintura); o SDK já vem carregado por ela.
         setTimeout(_convObservarCaixa, 2600);
+        // Pedidos de amizade (P1): escuta global irmã da caixa de
+        // convites, pra o aviso no topo chegar sem abrir o painel.
+        // Logo depois dela — o SDK já veio com a presença.
+        setTimeout(_pedObservarGlobal, 2700);
       } else {
         // Deslogou (ou é sessão anônima de sala): tira do ar.
         _presencaParar();
         _convPararCaixa();
+        _pedPararGlobal();
+        _avisoLimpar();
       }
       cliAtualizarHeader();
     });
@@ -16016,6 +16022,10 @@ ${urlCard}`)}`;
     // próxima conta deste aparelho abriria o painel com os convites
     // de quem saiu.
     _convPararCaixa();
+    // Pedidos de amizade e a pilha de avisos do topo (P1) saem pelo
+    // mesmo motivo: nada da conta anterior pode sobrar na tela.
+    _pedPararGlobal();
+    _avisoLimpar();
     // Limpa também o apelido espelhado: sem isto ele sobrevivia no
     // localStorage e a próxima sala de multiplayer entrada sem conta
     // (sessão anônima) reaparecia com o nome de quem tinha saído.
@@ -16775,6 +16785,7 @@ ${urlCard}`)}`;
   var _convVistos = {};       // "id|codigo" -> true, pra só avisar de convite novo
   var _convPendente = null;   // {paraUid, nome, jogo, ate} esperando o código da sala
   var _convEnvolvidos = {};   // nome do global -> true (criarSala já embrulhado)
+  var _convPrimeira = true;   // primeiro snapshot da caixa (ver _convReceber)
 
   /* ── Caixa de entrada ──────────────────────────────────────────
      A escuta fica viva enquanto a conta estiver logada, não só com o
@@ -16803,6 +16814,7 @@ ${urlCard}`)}`;
     _convLista = [];
     _convVistos = {};
     _convPendente = null;
+    _convPrimeira = true;
     cliConvitesRender();
   }
 
@@ -16845,11 +16857,22 @@ ${urlCard}`)}`;
     _convLista = lista;
     cliConvitesRender();
 
-    // Um aviso só, do mais recente: logar com três convites parados
-    // na caixa não vira três toasts em cima do outro.
-    if (novos.length && typeof showToastSimples === 'function') {
-      var n = novos[0];
-      showToastSimples(n.nome + ' te chamou pro ' + CONV_JOGOS[n.jogo].nome + '!', '/webp/owl-tada.webp');
+    /* Aviso no TOPO (P1) no lugar do toast de baixo, que sumia em
+       2,2s. A pilha primeiro se sincroniza com o nó — convite aceito,
+       recusado ou expirado não pode deixar card pra trás — e só
+       depois abre os novos. */
+    var vivas = {};
+    lista.forEach(function (c) { vivas['conv:' + c.id + '|' + c.codigo] = true; });
+    _avisoSincronizar('conv:', vivas);
+
+    var primeira = _convPrimeira;
+    _convPrimeira = false;
+    if (novos.length) {
+      // Mesma regra dos pedidos: entrar no app com a caixa cheia
+      // mostra só o mais recente; depois disso, até AVISO_MAX por
+      // snapshot, com o mais novo em cima (daí o reverse).
+      (primeira ? novos.slice(0, 1) : novos.slice(0, AVISO_MAX))
+        .reverse().forEach(_avisoConvite);
     }
   }
 
@@ -17067,3 +17090,265 @@ ${urlCard}`)}`;
   window.cliConviteEnviar  = cliConviteEnviar;
   window.cliConviteEntrar  = cliConviteEntrar;
   window.cliConviteRecusar = cliConviteRecusar;
+
+  /* ══════════════════════════════════════════════════════════════
+     AVISOS NO TOPO — polimento social P1
+     ------------------------------------------------------------
+     O convite pra jogar (4.4) chegava só como toast na BASE da tela,
+     sumindo em 2,2s; o pedido de amizade (4.3) não chegava de jeito
+     nenhum — só aparecia pra quem abrisse o painel de conta e
+     rolasse até "Meus amigos". Os dois viram agora um card no TOPO,
+     que fica tempo suficiente pra reagir e já traz as ações.
+
+     NÃO É PUSH — continua valendo só com o app aberto e logado. FCM
+     é outra etapa (service worker de push, chave VAPID, nó de tokens
+     por usuário).
+
+     SEM MODELO NOVO — a pilha é só apresentação, não existe nó novo
+     no banco. O convite vem da escuta de gameInvites que a 4.4 já
+     mantinha viva enquanto logado. O pedido de amizade ganhou aqui
+     uma escuta GLOBAL de friendRequests, irmã daquela: a do painel
+     (cliAmigosRender) continua existindo e continua sendo solta ao
+     fechar o painel. Duas escutas no mesmo caminho não custam duas
+     conexões — o SDK do RTDB compartilha a subscrição e entrega o
+     mesmo snapshot pras duas.
+
+     SINCRONIA COM A LISTA — a cada snapshot a pilha fecha os cards
+     cuja chave sumiu do nó. Aceitar/recusar pelo painel, ou em outro
+     aparelho, apaga o card do topo sozinho; nunca sobra botão pra
+     uma ação que já aconteceu.
+
+     O TOAST DE BAIXO FOI SUBSTITUÍDO, não somado: _convReceber não
+     chama mais showToastSimples pro convite que chega. O toast segue
+     vivo pras confirmações curtas ("Amizade confirmada!", "Convite
+     enviado pro Fulano!"), que são resposta a um toque e não têm
+     ação nenhuma pra oferecer.
+
+     API pública (window.AngatubaAvisos):
+       mostrar(opts) -> id do card ('' se não deu pra montar)
+       fechar(id)
+       limpar()      -> logout (cliSair e onAuthStateChanged)
+  ══════════════════════════════════════════════════════════════ */
+
+  var AVISO_MAX      = 3;      // teto de cards empilhados
+  var AVISO_AUTO_MS  = 45000;  // some sozinho; o item continua no painel
+  var AVISO_SAIDA_MS = 220;    // igual à transição do .aon-aviso no CSS
+
+  var _avisoSeq = 0;
+  var _avisoCards = {};      // id -> {el, chave, acoes, timer}
+  var _avisoPorChave = {};   // chave -> id (um card por convite/pedido)
+
+  function _avisoRaiz() { return document.getElementById('aon-avisos'); }
+
+  function _avisoFechar(id) {
+    var c = _avisoCards[id];
+    if (!c) return;
+    if (c.timer) { clearTimeout(c.timer); c.timer = null; }
+    delete _avisoCards[id];
+    if (_avisoPorChave[c.chave] === id) delete _avisoPorChave[c.chave];
+    var el = c.el;
+    if (!el) return;
+    // A classe sai primeiro (anima), o nó some depois. Enquanto isso o
+    // card conta como "saindo" e não entra mais no teto do AVISO_MAX.
+    el.classList.remove('on');
+    el.classList.add('saindo');
+    setTimeout(function () {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }, AVISO_SAIDA_MS);
+  }
+
+  function _avisoFecharChave(chave) {
+    if (_avisoPorChave[chave]) _avisoFechar(_avisoPorChave[chave]);
+  }
+
+  function _avisoLimpar() {
+    Object.keys(_avisoCards).forEach(function (id) { _avisoFechar(id); });
+    _avisoCards = {}; _avisoPorChave = {};
+    var raiz = _avisoRaiz();
+    if (raiz) raiz.innerHTML = '';
+  }
+
+  /* Fecha os cards de um prefixo cuja chave não está mais viva no nó.
+     É o que mantém a pilha em dia com a lista do painel. */
+  function _avisoSincronizar(prefixo, vivas) {
+    Object.keys(_avisoPorChave).forEach(function (k) {
+      if (k.indexOf(prefixo) === 0 && !vivas[k]) _avisoFechar(_avisoPorChave[k]);
+    });
+  }
+
+  /* o.texto entra como HTML — quem chama já escapou o que veio do
+     banco (escHTML) e pode mandar o emoji do jogo junto. o.nome e a
+     inicial são escapados aqui. */
+  function _avisoHtml(id, o) {
+    var acoes = (o.acoes || []).map(function (a, i) {
+      return '<button type="button" class="aon-aviso-btn ' + (a.classe || '') + '" ' +
+        'onclick="aonAvisoAcao(\'' + id + '\',' + i + ')">' + escHTML(a.rotulo) + '</button>';
+    }).join('');
+    var nome = String(o.nome || 'Jogador');
+    return '<span class="aon-aviso-av">' + escHTML((nome.trim()[0] || '?').toUpperCase()) +
+        (o.owl ? '<img src="' + o.owl + '" alt="" class="aon-aviso-owl" onerror="this.style.display=\'none\'" />' : '') +
+      '</span>' +
+      '<span class="aon-aviso-txt">' +
+        '<span class="aon-aviso-nome">' + escHTML(nome) + '</span>' +
+        '<span class="aon-aviso-sub">' + (o.texto || '') + '</span>' +
+      '</span>' +
+      '<span class="aon-aviso-acoes">' + acoes + '</span>' +
+      '<button type="button" class="aon-aviso-x" onclick="aonAvisoAcao(\'' + id + '\',-1)" ' +
+        'aria-label="Dispensar aviso" title="Dispensar">✕</button>';
+  }
+
+  // opts: {chave, tipo:'convite'|'pedido', nome, texto, owl, acoes:[{rotulo,classe,fn}]}
+  function _avisoMostrar(o) {
+    var raiz = _avisoRaiz();
+    if (!raiz || !o || !o.chave) return '';
+    // Mesmo item chegando de novo (reconvite pro mesmo jogo reusa o
+    // inviteId): troca o card em vez de empilhar dois iguais.
+    _avisoFecharChave(o.chave);
+
+    var id = 'aon-av-' + (++_avisoSeq);
+    var el = document.createElement('div');
+    el.id = id;
+    el.className = 'aon-aviso' + (o.tipo ? ' ' + o.tipo : '');
+    el.setAttribute('role', 'alert');
+    el.innerHTML = _avisoHtml(id, o);
+    raiz.insertBefore(el, raiz.firstChild);   // mais novo em cima
+    _avisoCards[id] = { el: el, chave: o.chave, acoes: (o.acoes || []).slice(), timer: null };
+    _avisoPorChave[o.chave] = id;
+
+    // A classe de entrada só no frame seguinte, senão o navegador
+    // pinta já no estado final e a transição não roda.
+    var ligar = function () { el.classList.add('on'); };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(ligar);
+    else setTimeout(ligar, 16);
+
+    if (AVISO_AUTO_MS > 0) {
+      _avisoCards[id].timer = setTimeout(function () { _avisoFechar(id); }, AVISO_AUTO_MS);
+    }
+
+    // Teto da pilha: os mais antigos caem. Conta só os que não estão
+    // saindo — os que estão já foram fechados e o nó some sozinho.
+    var vivos = raiz.querySelectorAll('.aon-aviso:not(.saindo)');
+    for (var i = AVISO_MAX; i < vivos.length; i++) _avisoFechar(vivos[i].id);
+    return id;
+  }
+
+  /* Handler único dos botões do card. i >= 0 é uma ação do array;
+     -1 é o ✕. Fecha sempre antes de agir: a ação pode abrir o hub de
+     jogos, e o card não pode ficar pendurado por cima da partida. */
+  function aonAvisoAcao(id, i) {
+    var c = _avisoCards[id];
+    if (!c) return;
+    var acao = (i >= 0) ? c.acoes[i] : null;
+    _avisoFechar(id);
+    if (acao && typeof acao.fn === 'function') { try { acao.fn(); } catch (e) {} }
+  }
+
+  window.AngatubaAvisos = {
+    mostrar: _avisoMostrar,
+    fechar: _avisoFechar,
+    limpar: _avisoLimpar
+  };
+  window.aonAvisoAcao = aonAvisoAcao;
+
+  /* ── Convite pra jogar no topo ─────────────────────────────────
+     Entrar/Recusar caem nos MESMOS cliConviteEntrar/cliConviteRecusar
+     da lista do painel — inclusive o fechamento do painel com a folga
+     de 220ms pro popstate, que é inofensiva com o painel já fechado. */
+  function _avisoConvite(c) {
+    var j = CONV_JOGOS[c.jogo];
+    if (!j) return;
+    _avisoMostrar({
+      chave: 'conv:' + c.id + '|' + c.codigo,
+      tipo: 'convite',
+      nome: c.nome,
+      owl: '/webp/owl-tada.webp',
+      texto: 'te chamou pro ' + j.emoji + ' ' + escHTML(j.nome),
+      acoes: [
+        { rotulo: 'Entrar',  classe: 'ok', fn: function () { cliConviteEntrar(c.id); } },
+        { rotulo: 'Recusar', classe: 'no', fn: function () { cliConviteRecusar(c.id); } }
+      ]
+    });
+  }
+
+  /* ── Pedido de amizade no topo ─────────────────────────────────
+     Aceitar/Recusar chamam a MESMA AngatubaAmigos.aceitar/recusar da
+     lista. Não dá pra reusar cliAmigosAceitar/cliAmigosRecusar
+     direto: elas reportam erro no #cli-amigos-msg, que não existe com
+     o painel fechado — justamente o caso do aviso no topo. Mesma
+     ação, erro em toast. */
+  function _avisoPedidoAceitar(uid) {
+    window.AngatubaAmigos.aceitar(uid).then(function () {
+      if (typeof showToastSimples === 'function') showToastSimples('Amizade confirmada!', '/webp/owl-thumbsup.webp');
+    }).catch(function (err) {
+      if (typeof showToastSimples === 'function') {
+        showToastSimples((err && err.message) || 'Não deu pra aceitar.', '/webp/owl-sign.webp');
+      }
+    });
+  }
+
+  function _avisoPedidoRecusar(uid) {
+    window.AngatubaAmigos.recusar(uid).catch(function (err) {
+      if (typeof showToastSimples === 'function') {
+        showToastSimples((err && err.message) || 'Não deu pra recusar.', '/webp/owl-sign.webp');
+      }
+    });
+  }
+
+  function _avisoPedido(p) {
+    _avisoMostrar({
+      chave: 'ped:' + p.uid,
+      tipo: 'pedido',
+      nome: p.nome,
+      owl: '/webp/owl-wave.webp',
+      texto: 'quer ser seu amigo',
+      acoes: [
+        { rotulo: 'Aceitar', classe: 'ok', fn: function () { _avisoPedidoAceitar(p.uid); } },
+        { rotulo: 'Recusar', classe: 'no', fn: function () { _avisoPedidoRecusar(p.uid); } }
+      ]
+    });
+  }
+
+  /* ── Escuta global de pedidos de amizade ───────────────────────
+     Irmã de _convObservarCaixa: vive enquanto a conta nomeada estiver
+     logada, com painel aberto ou fechado. É ela que faz o pedido de
+     amizade aparecer sem a pessoa precisar abrir o painel. */
+  var _pedUnsub = null;       // desliga a escuta global
+  var _pedUid = null;         // uid que está ouvindo
+  var _pedVistos = {};        // uid -> true, pra só avisar de pedido novo
+  var _pedPrimeira = true;    // primeiro snapshot = caixa que já estava lá
+
+  function _pedObservarGlobal() {
+    if (!_cliContaReal(_cliUser)) return;
+    var uid = _cliUser.uid;
+    if (_pedUid === uid) return;
+    _pedPararGlobal();
+    _pedUid = uid;
+    _pedUnsub = window.AngatubaAmigos.observarPedidos(function (pedidos) {
+      // Some do nó (aceito/recusado aqui, no painel ou em outro
+      // aparelho) -> o card do topo sai junto.
+      var vivas = {};
+      pedidos.forEach(function (p) { vivas['ped:' + p.uid] = true; });
+      _avisoSincronizar('ped:', vivas);
+
+      var novos = pedidos.filter(function (p) { return !_pedVistos[p.uid]; });
+      _pedVistos = {};
+      pedidos.forEach(function (p) { _pedVistos[p.uid] = true; });
+
+      var primeira = _pedPrimeira;
+      _pedPrimeira = false;
+      if (!novos.length) return;
+      // Entrar no app com três pedidos parados não vira parede de
+      // cards: no primeiro snapshot mostra só o mais recente.
+      // `pedidos` vem do mais novo pro mais velho; o reverse faz o
+      // mais novo ser o ÚLTIMO inserido, e portanto o de cima.
+      (primeira ? novos.slice(0, 1) : novos.slice(0, AVISO_MAX))
+        .reverse().forEach(_avisoPedido);
+    });
+  }
+
+  function _pedPararGlobal() {
+    if (_pedUnsub) { try { _pedUnsub(); } catch (e) {} _pedUnsub = null; }
+    _pedUid = null;
+    _pedVistos = {};
+    _pedPrimeira = true;
+  }

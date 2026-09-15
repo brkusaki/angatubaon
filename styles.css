@@ -5858,6 +5858,102 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     .cli-amigos-msg.erro { color: var(--red); }
     .cli-amigos-msg.ok { color: #22c55e; }
 
+    /* ── Avisos no topo (polimento social P1) ──
+       Pilha fixa de cards pra convite pra jogar (4.4) e pedido de
+       amizade (4.3). Mesma linguagem do .cli-amigo-item do painel —
+       avatar de inicial, nome, subtítulo, ações à direita — só que
+       flutuando e com a coruja como acento.
+
+       O topo NÃO é 0: o offset deixa a faixa do logo + avatar de conta
+       livre, senão o card cobriria justamente o botão que a pessoa
+       precisa tocar pra ver a lista completa. No hub de jogos (que não
+       tem header) o mesmo offset passa longe do botão de voltar, que
+       mora em env(safe-area-inset-top) + 8px.
+
+       z-index 9500: acima do painel de conta (3000) e do hub (9100),
+       abaixo do #toast e dos modais de confirmação (9999). */
+    .aon-avisos {
+      position: fixed; z-index: 9500;
+      top: calc(env(safe-area-inset-top, 0px) + 64px);
+      left: 50%; transform: translateX(-50%);
+      width: min(440px, calc(100vw - 20px));
+      display: flex; flex-direction: column; gap: 8px;
+      /* Container transparente ao toque: sem card, o header recebe
+         os toques normalmente. Cada card religa pointer-events. */
+      pointer-events: none;
+    }
+    .aon-aviso {
+      position: relative; pointer-events: auto;
+      /* flex-wrap: em telas muito estreitas (≤ ~330px) as ações caem
+         pra uma segunda linha em vez de espremer o nome a três letras. */
+      display: flex; flex-wrap: wrap; align-items: center; gap: 9px;
+      padding: 10px 26px 10px 10px;
+      border-radius: var(--r-md);
+      background: var(--surface2); border: 1px solid var(--border);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+      opacity: 0; transform: translateY(-10px);
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      will-change: opacity, transform;
+    }
+    .aon-aviso.on { opacity: 1; transform: translateY(0); }
+    .aon-aviso.saindo { opacity: 0; transform: translateY(-8px); }
+    /* Mesmas cores que o painel já usa: verde = convite, âmbar = pedido. */
+    .aon-aviso.convite { border-color: rgba(34,197,94,0.45); }
+    .aon-aviso.pedido  { border-color: rgba(255,180,0,0.45); }
+    .aon-aviso-av {
+      position: relative; width: 34px; height: 34px; border-radius: 50%;
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      color: #fff; font-family: var(--font-h); font-weight: 800; font-size: 14px;
+      background: linear-gradient(135deg, var(--red), #b91c1c);
+    }
+    /* Coruja como selo do aviso. Fica no canto ESQUERDO do avatar, que
+       cai dentro do padding do card: no canto direito ela encostaria
+       no subtítulo quando o nome é curto. */
+    .aon-aviso-owl {
+      position: absolute; left: -5px; bottom: -5px;
+      width: 19px; height: 19px; object-fit: contain;
+      filter: drop-shadow(0 2px 5px rgba(0,0,0,0.55));
+    }
+    .aon-aviso-txt { flex: 1 1 86px; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .aon-aviso-nome {
+      font-size: 14px; color: var(--text); font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    /* O nome corta com reticências (a lista do painel tem o inteiro),
+       mas o subtítulo é a mensagem — quebra em até 2 linhas em vez de
+       virar "quer ser seu a…" nos aparelhos de 360px. */
+    .aon-aviso-sub {
+      font-size: 11.5px; color: var(--muted); font-weight: 500;
+      line-height: 1.35; overflow: hidden;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    /* margin-left:auto mantém as ações à direita mesmo quando o
+       flex-wrap joga elas pra segunda linha em tela estreita. */
+    .aon-aviso-acoes { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
+    .aon-aviso-btn {
+      padding: 7px 10px; border-radius: 9px; cursor: pointer;
+      font-family: inherit; font-size: 12px; font-weight: 700;
+      background: var(--bg); color: var(--muted);
+      border: 1px solid var(--border);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .aon-aviso-btn:active { opacity: 0.6; }
+    .aon-aviso-btn.ok { color: #22c55e; border-color: rgba(34,197,94,0.45); }
+    .aon-aviso-btn.no { color: var(--red); border-color: rgba(255,68,68,0.35); }
+    /* Dispensar: discreto, no canto, longe das ações de verdade. */
+    .aon-aviso-x {
+      position: absolute; top: 4px; right: 4px;
+      width: 22px; height: 22px; border-radius: 7px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; color: var(--muted); font-size: 12px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .aon-aviso-x:active { opacity: 0.5; }
+    @media (prefers-reduced-motion: reduce) {
+      .aon-aviso { transition: opacity 0.01s linear; transform: none; }
+      .aon-aviso.on, .aon-aviso.saindo { transform: none; }
+    }
+
     /* Estado vazio de "Minhas lojas": ícone + texto + CTA opcional */
     .cli-conta-fav-vazio {
       text-align: center; color: var(--muted);

@@ -591,7 +591,21 @@
     return true;
   }
 
+  /* 5.3.3 — "dá pra entrar numa sala por código agora?". É o que o lobby
+     social pergunta antes de mandar o convidado pra dentro (ver
+     CONV_JOGOS.baralho.pronto em app.js). A resposta NÃO podia ser "a
+     raiz tem filho", como era: parar() esvazia a raiz, e parar() roda em
+     toda abertura do hub e em todo "voltar" — bastava um popstate
+     atravessado pra a tela "nunca abrir" pra sempre. Com _renderizar()
+     se remontando sozinho (logo abaixo), a raiz existir no documento é
+     tudo de que entrarPorCodigo precisa. */
+  function pronto() { return !!document.getElementById('baralho-root'); }
+
   function _renderizar() {
+    // 5.3.3 — remonta se preciso. A raiz pode ter sido esvaziada (ou o
+    // elemento trocado) por um parar() no meio do caminho, e desenhar
+    // era justamente o que ia devolver a tela.
+    if (_raiz !== document.getElementById('baralho-root') && !_montar()) return;
     if (!_raiz) return;
     _limpar(_raiz);
     if (_tela === 'escolha') _renderEscolha();
@@ -689,7 +703,11 @@
     btnCriar.addEventListener('click', function () {
       btnCriar.disabled = true; mostrarErro('');
       var solo = escolhido.v === 1;
-      criarSala(_modoEscolhido, solo ? false : inputPublica.checked, escolhido.v).then(function () {
+      // Passa pela API pública de propósito: é o ponto único por onde
+      // uma sala nasce neste módulo, e é nele que o app.js pendura o
+      // embrulho que captura o código do convite pra jogar (4.4).
+      // Chamar a função local direto pularia esse embrulho.
+      window.AngatubaBaralho.criarSala(_modoEscolhido, solo ? false : inputPublica.checked, escolhido.v).then(function () {
         if (_pararListaPublicas) { _pararListaPublicas(); _pararListaPublicas = null; }
         // Solo pula o lobby inteiro: código de sala, "estou pronto" e
         // "começar partida" não fazem sentido com um jogador só.
@@ -991,10 +1009,31 @@
     if (_raiz) _limpar(_raiz);
   }
 
+  /* Entrar direto num código, sem passar pela escolha do modo (4.4):
+     o convite pra jogar já traz o código, e o modo vem da própria
+     sala — o lobby lê tudo de estado(), nunca de _modoEscolhido.
+     Ping Pong, Tanques e Party já tinham um ponto de entrada assim
+     (_ppEntrarSala / _tqEntrarSala / _ptyEntrarSala, usados pela
+     lista de salas públicas); aqui esse caminho era só interno ao
+     listener do botão "Entrar". */
+  function entrarPorCodigo(codigo) {
+    return entrarSala(codigo).then(function (cod) {
+      if (_pararListaPublicas) { _pararListaPublicas(); _pararListaPublicas = null; }
+      _aviso = '';
+      _tela = 'lobby';
+      _renderizar();
+      return cod;
+    });
+  }
+
   window.BaralhoGame = {
     disponivel: disponivel,
     preparar: preparar,
     iniciar: preparar, // alias — ver pedido original do módulo
+    entrarPorCodigo: entrarPorCodigo,
+    // 5.3.3 — o lobby social pergunta isto antes de levar o convidado
+    // pra sala. Ver o comentário em `pronto` lá em cima.
+    pronto: pronto,
     parar: parar
   };
 })();

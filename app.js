@@ -18336,34 +18336,82 @@ ${urlCard}`)}`;
      tela do jogo seria capturada como se fosse a nova. */
   var LOB_VIGIA_MS     = 700;               // passo do vigia
   var LOB_LEMBRETE_MS  = 45 * 1000;         // lembrete do "toque em Criar sala"
+  var LOB_VIGIA_TETO_MS = 15 * 60 * 1000;   // 5.3.2: teto duro do vigia
   var _lobVigiaTimer = null;
   var _lobVigiaLembrou = false;
+  var _lobVigiaJogo = null;    // 5.3.2: jogo que o vigia está olhando agora
+  var _lobVigiaBase = null;    // 5.3.2: código que o módulo já tinha ao ARMAR
+  var _lobVigiaAuto = false;   // 5.3.2: a sala nasce sozinha neste jogo?
 
   function _lobPararVigia() {
     if (_lobVigiaTimer) { clearInterval(_lobVigiaTimer); _lobVigiaTimer = null; }
     _lobVigiaLembrou = false;
+    _lobVigiaJogo = null;
+    _lobVigiaBase = null;
+    _lobVigiaAuto = false;
   }
 
+  /* 5.3.2 — QUANDO o vigia arma passou a importar mais que como ele
+     olha. Antes ele era armado só DEPOIS de `_convAbrirTelaJogo`
+     resolver, e a "base" era lida ali, com o módulo do jogo já de pé.
+     No Baralho isso abria um buraco mudo: o módulo guarda a sala pra
+     você retomar ao reabrir o card (`BaralhoGame.parar` não sai da
+     sala), então quem tinha acabado de jogar Truco voltava pro lobby
+     social com `codigoSala()` ainda apontando pra aquela sala. Essa
+     sala virava a base, a tela do jogo abria direto no lobby DELA (não
+     no seletor de modo), nenhum código novo aparecia — e o nó ficava
+     'aberto' pra sempre, sem erro em canto nenhum. Agora:
+       1. o vigia arma em `iniciarJogo`, ANTES de a tela do jogo subir
+          (base normalmente null, porque o módulo nem foi baixado);
+       2. rearmar o mesmo jogo não recomeça nada (nem a base, nem o
+          relógio do lembrete) — só conta que o disparo foi automático;
+       3. a cada passo ele tenta pendurar o embrulho de novo, de graça:
+          o caminho rápido volta a existir assim que o global do jogo
+          aparece, mesmo que na primeira tentativa ele não existisse. */
   function _lobVigiarSala(jogo, automatico) {
-    _lobPararVigia();
     var cfg = CONV_JOGOS[jogo];
     if (!cfg || typeof cfg.codigoAtual !== 'function') return;
-    var codigoBase = null;
-    try { codigoBase = cfg.codigoAtual(); } catch (e) { codigoBase = null; }
+    if (_lobVigiaTimer && _lobVigiaJogo === jogo) {
+      _lobVigiaAuto = _lobVigiaAuto || !!automatico;
+      return;
+    }
+    _lobPararVigia();
+    _lobVigiaJogo = jogo;
+    _lobVigiaAuto = !!automatico;
+    try { _lobVigiaBase = cfg.codigoAtual(); } catch (e) { _lobVigiaBase = null; }
     var comecou = Date.now();
     _lobVigiaTimer = setInterval(function () {
       var p = _lobPendente;
-      if (!p || p.jogo !== jogo || !_lobRef || !_lobAnfitriao || Date.now() > p.ate) {
+      if (!p || p.jogo !== jogo || !_lobRef || !_lobAnfitriao) {
         _lobPararVigia();
         return;
       }
+      try { _convEnvolverCriar(jogo); } catch (e) {}
       var cod = null;
       try { cod = cfg.codigoAtual(); } catch (e) { cod = null; }
-      if (cod && cod !== codigoBase) { _lobRegistrarSala(cod); return; }
+      if (cod && cod !== _lobVigiaBase) { _lobRegistrarSala(cod); return; }
+      /* 5.3.2 — enquanto o vigia estiver de pé e o anfitrião ainda no
+         lobby, a janela do pendente se renova. Escolher o modo do
+         Baralho leva o tempo que leva, e perder a captura por causa
+         disso era trocar um relógio por um grupo parado. O teto duro
+         é LOB_VIGIA_TETO_MS contado do "Começar" — e quando ele chega,
+         o anfitrião FICA SABENDO. */
+      if (Date.now() - comecou > LOB_VIGIA_TETO_MS) {
+        _lobPendente = null;
+        _lobPararVigia();
+        if (typeof showToastSimples === 'function') {
+          showToastSimples('Desisti de esperar a sala. Toque em "Começar a partida" de novo.', '/webp/owl-sign.webp');
+        }
+        try { cliAbrirLobby(); } catch (e) {}
+        _lobUiMsg('Ninguém criou a sala a tempo — o lobby parou de esperar. ' +
+                  'Toque em "Começar a partida" de novo.', 'erro');
+        return;
+      }
+      if (p.ate - Date.now() < LOB_PENDENTE_MS / 2) p.ate = Date.now() + LOB_PENDENTE_MS;
       // Baralho (e qualquer jogo em que o anfitrião ainda toca "Criar
       // sala"): passou tempo demais parado no seletor de modo. Um
       // lembrete só — o grupo está esperando e não tem como saber.
-      if (!automatico && !_lobVigiaLembrou && Date.now() - comecou > LOB_LEMBRETE_MS) {
+      if (!_lobVigiaAuto && !_lobVigiaLembrou && Date.now() - comecou > LOB_LEMBRETE_MS) {
         _lobVigiaLembrou = true;
         if (typeof showToastSimples === 'function') {
           showToastSimples('A galera ainda está no lobby — escolha o modo e toque em "Criar sala".', '/webp/owl-point.webp');
@@ -18548,6 +18596,11 @@ ${urlCard}`)}`;
       _lobPendente = { jogo: jogo, ate: Date.now() + LOB_PENDENTE_MS };
       _lobSalaVista = null;
       _lobPararVigia();
+      /* 5.3.2 — o vigia arma AQUI, antes de a tela do jogo subir. Ver o
+         cabeçalho de _lobVigiarSala: armado depois, ele lia a "base"
+         com o módulo do jogo já carregado e adotava como "sala velha"
+         justamente a sala que o grupo precisava ver. */
+      _lobVigiarSala(jogo, false);
       return _lobFecharUiEEsperar().then(function () {
         return _convAbrirTelaJogo(jogo);
       }).then(function () {
@@ -18555,10 +18608,20 @@ ${urlCard}`)}`;
         // carregado — window.AngatubaMP/Party/Baralho nascem com ele.
         _convEnvolverCriar(jogo);
         var automatico = _lobDispararCriar(jogo);
-        // O vigia começa JUNTO com o embrulho, não no lugar dele: os
-        // dois olham a mesma coisa por caminhos diferentes, e o
-        // primeiro que vir o código ganha (ver _lobRegistrarSala).
+        // O vigia já está de pé desde antes da tela; isto só conta pra
+        // ele que o disparo foi automático (muda o lembrete).
         _lobVigiarSala(jogo, automatico);
+        /* 5.3.2 — jogo em que a sala nasce À MÃO (Baralho): se o módulo
+           JÁ está numa sala, é ela que o grupo tem que ver. É o caso
+           real de quem acabou de jogar Truco e voltou pro lobby: a tela
+           reabre direto no lobby daquela sala, não no seletor de modo,
+           e não existe "Criar sala" pra tocar. Sem esta linha ninguém
+           era avisado de nada. */
+        if (!automatico) {
+          var jaTem = null;
+          try { jaTem = CONV_JOGOS[jogo].codigoAtual(); } catch (e) { jaTem = null; }
+          if (jaTem) _lobRegistrarSala(jaTem);
+        }
         return { jogo: jogo, automatico: automatico, aviso: aviso };
       }).catch(function (err) {
         /* 5.3.1 — o pendente NÃO morre aqui. A falha mais comum deste

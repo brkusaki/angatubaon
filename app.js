@@ -17015,7 +17015,12 @@ ${urlCard}`)}`;
 
   var CONV_VALIDADE_MS = 15 * 60 * 1000;  // convite vale 15 min
   var CONV_PENDENTE_MS = 5 * 60 * 1000;   // janela pro anfitrião criar a sala
-  var CONV_ESPERA_MS   = 20000;           // teto da espera pela tela do jogo ficar pronta
+  /* Teto da espera pela tela do jogo ficar pronta. Subiu de 20s pra
+     30s na 5.3.1: no 4G ruim daqui a abertura do Baralho pelo lobby
+     baixa hub.min.js + baralho.min.js + truco.min.js + o SDK do
+     Realtime Database, e estourar o teto era o começo da história em
+     que a sala nasce sem o lobby saber (ver iniciarJogo). */
+  var CONV_ESPERA_MS   = 30000;
   var CONV_ESPERA_PASSO = 80;
 
   /* Catálogo dos jogos que têm sala em rede. `pronto` é o teste de
@@ -17023,28 +17028,61 @@ ${urlCard}`)}`;
      entrada que o próprio jogo já expunha pra lista de salas
      públicas (é o mesmo caminho de quem toca em "Entrar" ali, só que
      com o código vindo do convite). Os 2048/Voo/etc. da vida não
-     entram aqui: não têm sala. */
+     entram aqui: não têm sala.
+
+     `codigoAtual` (5.3.1) é o TERCEIRO teste, e o mais importante pro
+     lobby: "qual é o código da sala que este módulo tem aberta agora".
+     Serve de rede de segurança pro embrulho de criarSala — ver
+     `_lobVigiarSala`. Não é API nova em jogo nenhum: Party e Baralho
+     já expunham `codigoSala()`, e Ping Pong/Tanques já escrevem o
+     código no próprio elemento que mostram pro anfitrião. */
+
+  /* Lê o código da sala do elemento que o jogo já pinta pro anfitrião.
+     Só vale o que está VISÍVEL: o texto sobrevive ao fim da sala, e um
+     código velho aqui apontaria o lobby pra uma sala que não existe. */
+  function _convCodigoNoDom(id) {
+    var el = document.getElementById(id);
+    // offsetParent não serve de teste sozinho (elemento em position:fixed
+    // tem offsetParent null mesmo visível): o par largura/altura é o
+    // jeito honesto de perguntar "isto está renderizado?".
+    if (!el || el.style.display === 'none' || !(el.offsetWidth || el.offsetHeight)) return null;
+    var s = String(el.textContent || '').trim().toUpperCase();
+    return /^[A-Z0-9]{3,8}$/.test(s) ? s : null;
+  }
+
+  function _convCodigoDaApi(nomeApi) {
+    try {
+      var api = window[nomeApi];
+      if (!api || typeof api.codigoSala !== 'function') return null;
+      var s = api.codigoSala();
+      return s ? String(s).toUpperCase() : null;
+    } catch (e) { return null; }
+  }
+
   var CONV_JOGOS = {
     pingpong: {
       nome: 'Ping Pong', emoji: '🏓', api: 'AngatubaMP',
       pronto: function () {
         return !!document.getElementById('pp-btn-entrar') && typeof window._ppEntrarSala === 'function';
       },
-      entrar: function (codigo) { window._ppEntrarSala(codigo); }
+      entrar: function (codigo) { window._ppEntrarSala(codigo); },
+      codigoAtual: function () { return _convCodigoNoDom('pp-sala-codigo'); }
     },
     tanques: {
       nome: 'Tanques', emoji: '💥', api: 'AngatubaMP',
       pronto: function () {
         return !!document.getElementById('tq-btn-entrar') && typeof window._tqEntrarSala === 'function';
       },
-      entrar: function (codigo) { window._tqEntrarSala(codigo); }
+      entrar: function (codigo) { window._tqEntrarSala(codigo); },
+      codigoAtual: function () { return _convCodigoNoDom('tq-sala-codigo'); }
     },
     party: {
       nome: 'Party', emoji: '🎉', api: 'AngatubaParty',
       pronto: function () {
         return !!document.getElementById('pty-codigo-input') && typeof window._ptyEntrarSala === 'function';
       },
-      entrar: function (codigo) { window._ptyEntrarSala(codigo); }
+      entrar: function (codigo) { window._ptyEntrarSala(codigo); },
+      codigoAtual: function () { return _convCodigoDaApi('AngatubaParty'); }
     },
     baralho: {
       nome: 'Baralho', emoji: '🃏', api: 'AngatubaBaralho',
@@ -17053,7 +17091,10 @@ ${urlCard}`)}`;
         return !!(raiz && raiz.firstChild && window.BaralhoGame &&
                   typeof window.BaralhoGame.entrarPorCodigo === 'function');
       },
-      entrar: function (codigo) { window.BaralhoGame.entrarPorCodigo(codigo); }
+      // entrarPorCodigo devolve Promise: o `return` é o que deixa o
+      // lobby saber que a entrada falhou (ver _lobEntrarNaSala).
+      entrar: function (codigo) { return window.BaralhoGame.entrarPorCodigo(codigo); },
+      codigoAtual: function () { return _convCodigoDaApi('AngatubaBaralho'); }
     }
   };
 
@@ -17072,7 +17113,7 @@ ${urlCard}`)}`;
   var _convLista = [];        // convites válidos em cache (mais novo em cima)
   var _convVistos = {};       // "id|codigo" -> true, pra só avisar de convite novo
   var _convPendente = null;   // {paraUid, nome, jogo, ate} esperando o código da sala
-  var _convEnvolvidos = {};   // nome do global -> true (criarSala já embrulhado)
+  var _convEnvolvidos = {};   // nome do global -> a função embrulhada que penduramos
   var _convPrimeira = true;   // primeiro snapshot da caixa (ver _convReceber)
 
   /* ── Caixa de entrada ──────────────────────────────────────────
@@ -17205,12 +17246,17 @@ ${urlCard}`)}`;
     var cfg = CONV_JOGOS[jogo];
     if (!cfg) return;
     var nomeApi = cfg.api;
-    if (_convEnvolvidos[nomeApi]) return;
     var api = window[nomeApi];
     if (!api || typeof api.criarSala !== 'function') return;
-    _convEnvolvidos[nomeApi] = true;
+    // 5.3.1 — a guarda era um booleano, e por isso mentia em um caso
+    // real: se o módulo do jogo reescrevesse window.<API> depois do
+    // embrulho (recarga do script, módulo que se redefine), o embrulho
+    // ia junto e o booleano impedia pendurar outro pra sempre. Guardar
+    // a PRÓPRIA função embrulhada torna a checagem honesta: se o que
+    // está lá não é a nossa, embrulha de novo.
+    if (_convEnvolvidos[nomeApi] === api.criarSala) return;
     var original = api.criarSala;
-    api.criarSala = function () {
+    var embrulho = function () {
       var r = original.apply(this, arguments);
       if (!r || typeof r.then !== 'function') return r;
       return r.then(function (codigo) {
@@ -17222,6 +17268,8 @@ ${urlCard}`)}`;
         return codigo;
       });
     };
+    api.criarSala = embrulho;
+    _convEnvolvidos[nomeApi] = embrulho;
   }
 
   function _convEnviarSePendente(nomeApi, codigo) {
@@ -17904,6 +17952,8 @@ ${urlCard}`)}`;
     // isto, entrar em OUTRO lobby herdaria a guarda do anterior e a
     // sala nova poderia passar batida.
     _lobPendente = null; _lobSalaVista = null; _lobIndoPraSala = false;
+    _lobSalaFalhou = null;
+    _lobPararVigia();
   }
 
   /* Arma (ou rearma) o onDisconnect desta sessão. O anfitrião derruba
@@ -18117,6 +18167,23 @@ ${urlCard}`)}`;
      e chama o `entrar` do catálogo da 4.4 (`_ppEntrarSala`,
      `_ptyEntrarSala`, `BaralhoGame.entrarPorCodigo`…).
 
+     5.3.1 — POR QUE ISSO NÃO FUNCIONAVA NO BARALHO. O parágrafo
+     acima descrevia o caminho certo, mas ele tinha um elo só: o
+     embrulho de `criarSala`. Nos jogos em que o lobby aperta o botão
+     sozinho (`_lobDispararCriar`) a sala nasce no mesmo instante em
+     que o embrulho é pendurado, e a janela pra dar errado é de
+     milissegundos. No Baralho não: entre "Começar" e "Criar sala"
+     passam a escolha do modo, o número de jogadores e vários
+     segundos — tempo de sobra pro teto de espera de
+     `_convEsperarPronto` estourar e `iniciarJogo` desistir, LIMPANDO
+     o pendente. A tela do jogo ficava aberta do mesmo jeito, o
+     anfitrião criava a sala e o código morria no embrulho: sala com
+     uma pessoa só, grupo preso no lobby, e nenhuma mensagem de erro
+     em lugar nenhum. Três coisas mudaram: o pendente sobrevive à
+     falha de abertura da tela, um vigia lê o código direto do módulo
+     do jogo (`cfg.codigoAtual`) e qualquer falha de escrita no nó
+     agora reabre o lobby com o código na tela em vez de sumir.
+
      UMA VEZ POR CÓDIGO. `_lobSalaVista` guarda o código que já me
      levou pra dentro. Sem ele, todo snapshot do lobby (alguém marca
      "pronto", alguém entra) reabriria o jogo, e quem saiu da partida
@@ -18172,21 +18239,129 @@ ${urlCard}`)}`;
      dentro. */
   function _lobCapturarSala(nomeApi, codigo) {
     var p = _lobPendente;
-    if (!p || !codigo || !_lobRef || !_lobAnfitriao) return;
+    if (!p || !codigo) return;
     // A sala é de outro jogo da mesma API (o anfitrião desistiu do
     // Ping Pong e criou uma de Tanques na mesma tela): não é esta.
     if ((CONV_API_JOGOS[nomeApi] || []).indexOf(p.jogo) < 0) return;
-    _lobPendente = null;
-    if (Date.now() > p.ate) return;   // demorou demais: o pedido caducou
+    _lobRegistrarSala(codigo);
+  }
+
+  /* ── 5.3.1: a captura deixou de depender de um caminho só ──────
+     O circuito da 5.3 tinha UM elo e ele era fino: o embrulho de
+     `criarSala`. Se o embrulho não estivesse pendurado na hora do
+     toque — porque a tela do jogo demorou mais que o teto de espera
+     e `iniciarJogo` já tinha desistido (limpando o pendente), porque
+     o módulo reexportou a API por cima do embrulho, ou porque o
+     `criarSala` de verdade foi chamado por um caminho que não passa
+     pela API pública — o código da sala nascia e MORRIA ali. O
+     anfitrião entrava na sala e o resto do grupo ficava olhando
+     "quando ele começar, você entra sozinho" pra sempre, sem erro
+     nenhum na tela: o silêncio era o bug.
+
+     Agora são dois caminhos que desembocam no mesmo lugar:
+       1. o embrulho (rápido, continua sendo o caminho normal);
+       2. `_lobVigiarSala`, que enquanto houver pedido pendente
+          pergunta ao PRÓPRIO módulo do jogo qual é o código da sala
+          aberta (cfg.codigoAtual) — Party/Baralho respondem por
+          `codigoSala()`, Ping Pong/Tanques pelo código que já pintam
+          na tela do anfitrião.
+     `_lobRegistrarSala` é idempotente (o pendente vira null no
+     primeiro que chegar), então os dois podem correr juntos sem
+     medo. E a escrita no nó não é mais engolida: falhou, o anfitrião
+     vê o porquê e o código pra ditar à mão. */
+  function _lobRegistrarSala(codigo, _retentativa) {
+    var p = _lobPendente;
+    if (!p || !codigo) return;
     var cod = String(codigo).toUpperCase();
+    if (!_lobRef || !_lobAnfitriao) {
+      _lobPendente = null; _lobPararVigia();
+      _lobFalhouCaptura(cod, 'Você saiu do lobby antes de a sala abrir.');
+      return;
+    }
+    if (Date.now() > p.ate) {        // demorou demais: o pedido caducou
+      _lobPendente = null; _lobPararVigia();
+      _lobFalhouCaptura(cod, 'Demorou demais entre "Começar" e criar a sala.');
+      return;
+    }
+    _lobPendente = null;
+    _lobPararVigia();
     // Antes da escrita: eu criei a sala, já estou nela. A guarda evita
     // que a minha própria escuta me mande "entrar" de novo.
     _lobSalaVista = cod;
-    _lobRef.update({ status: 'em_jogo', codigoSalaJogo: cod }).catch(function () {
-      if (typeof showToastSimples === 'function') {
-        showToastSimples('A sala abriu, mas não deu pra avisar o lobby. Passe o código ' + cod + ' pra galera.', '/webp/owl-sign.webp');
+    var ref = _lobRef;
+    ref.update({ status: 'em_jogo', codigoSalaJogo: cod }).catch(function (err) {
+      // Uma segunda chance antes de desistir: a primeira escrita
+      // acontece no pior momento possível (tela do jogo subindo, rede
+      // do celular oscilando), e recusar por isso seria trocar um erro
+      // de rede por um grupo parado.
+      if (!_retentativa && _lobRef === ref && _lobAnfitriao) {
+        _lobPendente = { jogo: (p && p.jogo), ate: Date.now() + 15000 };
+        setTimeout(function () { _lobRegistrarSala(cod, true); }, 900);
+        return;
       }
+      _lobSalaVista = null;
+      _lobFalhouCaptura(cod, _amigosErroPt(err));
     });
+  }
+
+  /* A sala existe mas o lobby não soube dela. Isto NÃO pode ser um
+     toast de 2s no meio da tela do jogo: o anfitrião precisa entender
+     que o grupo ficou pra trás e ter o código na mão. Então reabre o
+     lobby, escreve o motivo lá dentro (onde fica) e ainda toca o
+     toast pra quem estiver olhando a tela do jogo. */
+  function _lobFalhouCaptura(cod, motivo) {
+    var txt = 'A sala ' + cod + ' abriu, mas o lobby não foi avisado' +
+              (motivo ? ' (' + motivo + ')' : '') +
+              '. Passe o código ' + cod + ' pra galera entrar por "Entrar com código".';
+    if (typeof showToastSimples === 'function') {
+      showToastSimples('O lobby não foi avisado da sala ' + cod + '. Toque no chip do lobby.', '/webp/owl-sign.webp');
+    }
+    try { cliAbrirLobby(); } catch (e) {}
+    _lobUiMsg(txt, 'erro');
+  }
+
+  /* ── Vigia do código da sala (rede de segurança da captura) ────
+     Roda só entre "Começar" e o nascimento da sala, e morre no
+     primeiro código capturado, no fim do pendente ou na saída do
+     lobby. `codigoBase` é o que o módulo já tinha aberto ANTES de
+     começarmos a olhar: sem isso, uma sala velha ainda pintada na
+     tela do jogo seria capturada como se fosse a nova. */
+  var LOB_VIGIA_MS     = 700;               // passo do vigia
+  var LOB_LEMBRETE_MS  = 45 * 1000;         // lembrete do "toque em Criar sala"
+  var _lobVigiaTimer = null;
+  var _lobVigiaLembrou = false;
+
+  function _lobPararVigia() {
+    if (_lobVigiaTimer) { clearInterval(_lobVigiaTimer); _lobVigiaTimer = null; }
+    _lobVigiaLembrou = false;
+  }
+
+  function _lobVigiarSala(jogo, automatico) {
+    _lobPararVigia();
+    var cfg = CONV_JOGOS[jogo];
+    if (!cfg || typeof cfg.codigoAtual !== 'function') return;
+    var codigoBase = null;
+    try { codigoBase = cfg.codigoAtual(); } catch (e) { codigoBase = null; }
+    var comecou = Date.now();
+    _lobVigiaTimer = setInterval(function () {
+      var p = _lobPendente;
+      if (!p || p.jogo !== jogo || !_lobRef || !_lobAnfitriao || Date.now() > p.ate) {
+        _lobPararVigia();
+        return;
+      }
+      var cod = null;
+      try { cod = cfg.codigoAtual(); } catch (e) { cod = null; }
+      if (cod && cod !== codigoBase) { _lobRegistrarSala(cod); return; }
+      // Baralho (e qualquer jogo em que o anfitrião ainda toca "Criar
+      // sala"): passou tempo demais parado no seletor de modo. Um
+      // lembrete só — o grupo está esperando e não tem como saber.
+      if (!automatico && !_lobVigiaLembrou && Date.now() - comecou > LOB_LEMBRETE_MS) {
+        _lobVigiaLembrou = true;
+        if (typeof showToastSimples === 'function') {
+          showToastSimples('A galera ainda está no lobby — escolha o modo e toque em "Criar sala".', '/webp/owl-point.webp');
+        }
+      }
+    }, LOB_VIGIA_MS);
   }
 
   /* Abre a tela do jogo e entra na sala apontada pelo lobby. Serve a
@@ -18205,8 +18380,16 @@ ${urlCard}`)}`;
     return _lobFecharUiEEsperar().then(function () {
       return _convAbrirTelaJogo(jogo);
     }).then(function () {
-      cfg.entrar(codigo);
+      // 5.3.1 — o `return` é o conserto: `entrar` do Baralho devolve a
+      // Promise de entrarSala(), e antes ela era descartada. Sala que
+      // não existe mais, partida que já começou, rede caindo: tudo
+      // isso falhava em silêncio, com a tela do jogo aberta no menu e
+      // a pessoa sem saber por quê. Ping Pong/Tanques/Party não
+      // devolvem nada, e aí o `then` segue direto, como antes.
+      return cfg.entrar(codigo);
+    }).then(function () {
       _lobIndoPraSala = false;
+      _lobSalaFalhou = null;
     }).catch(function (err) {
       _lobIndoPraSala = false;
       _lobSalaVista = null;   // deixa tentar de novo pelo botão da tela
@@ -18220,11 +18403,35 @@ ${urlCard}`)}`;
     if (!est || est.status !== 'em_jogo') return;
     if (!est.codigoSalaJogo || !est.jogoSugerido) return;
     if (_lobIndoPraSala || _lobSalaVista === est.codigoSalaJogo) return;
-    _lobEntrarNaSala(est.jogoSugerido, est.codigoSalaJogo).catch(function (err) {
-      if (typeof showToastSimples === 'function') {
-        showToastSimples((err && err.message) || 'Não deu pra entrar na partida.', '/webp/owl-sign.webp');
-      }
+    // Já tentou sozinho e falhou nesta sala: não insiste a cada
+    // snapshot (alguém marcando "pronto" reabriria o lobby na cara da
+    // pessoa em looping). Daqui pra frente é pelo botão, que é
+    // justamente o que a mensagem de erro manda fazer.
+    if (_lobSalaFalhou === est.codigoSalaJogo) return;
+    var cod = est.codigoSalaJogo;
+    _lobEntrarNaSala(est.jogoSugerido, cod).catch(function (err) {
+      _lobEntradaFalhou(cod, err);
     });
+  }
+
+  /* 5.3.1 — o convidado nunca mais fica mudo. A entrada automática é
+     um luxo: ela depende do hub carregar, da tela do jogo montar e da
+     sala aceitar mais um. Quando qualquer um desses falha, o caminho
+     de volta tem que estar na cara — e o botão já existe desde a 5.3
+     ("Entrar na partida", que chama o MESMO _lobEntrarNaSala). Então
+     aqui a gente só garante que a pessoa o encontre: reabre o lobby,
+     escreve o motivo dentro dele e toca o toast. */
+  var _lobSalaFalhou = null;   // código que a entrada automática já não conseguiu
+
+  function _lobEntradaFalhou(cod, err) {
+    _lobSalaFalhou = cod;
+    var msg = (err && err.message) || 'Não deu pra entrar na partida.';
+    if (typeof showToastSimples === 'function') {
+      showToastSimples(msg + ' Toque em "Entrar na partida".', '/webp/owl-sign.webp');
+    }
+    try { cliAbrirLobby(); } catch (e) {}
+    _lobUiMsg(msg + ' A partida está na sala ' + cod +
+              ' — use o botão "Entrar na partida" aqui embaixo.', 'erro');
   }
 
   /* Por que este lobby NÃO pode começar agora. String vazia = pode.
@@ -18332,15 +18539,30 @@ ${urlCard}`)}`;
       var aviso = _lobAvisoLotacao(est);
       _lobPendente = { jogo: jogo, ate: Date.now() + LOB_PENDENTE_MS };
       _lobSalaVista = null;
+      _lobPararVigia();
       return _lobFecharUiEEsperar().then(function () {
         return _convAbrirTelaJogo(jogo);
       }).then(function () {
         // O embrulho só pode ser pendurado com o módulo do jogo já
         // carregado — window.AngatubaMP/Party/Baralho nascem com ele.
         _convEnvolverCriar(jogo);
-        return { jogo: jogo, automatico: _lobDispararCriar(jogo), aviso: aviso };
+        var automatico = _lobDispararCriar(jogo);
+        // O vigia começa JUNTO com o embrulho, não no lugar dele: os
+        // dois olham a mesma coisa por caminhos diferentes, e o
+        // primeiro que vir o código ganha (ver _lobRegistrarSala).
+        _lobVigiarSala(jogo, automatico);
+        return { jogo: jogo, automatico: automatico, aviso: aviso };
       }).catch(function (err) {
-        _lobPendente = null;
+        /* 5.3.1 — o pendente NÃO morre aqui. A falha mais comum deste
+           caminho é o teto de espera de `_convEsperarPronto`: a tela
+           do jogo demorou mais que o esperado, mas ela ABRIU — e o
+           anfitrião vai criar a sala nela daqui a pouco. Matar o
+           pendente aqui era o que fazia a sala nascer órfã, com o
+           grupo preso no lobby sem nenhum aviso. Mantemos o pendente,
+           deixamos o vigia de pé (é ele que captura o código sem
+           depender do embrulho) e mesmo assim contamos o erro. */
+        try { _convEnvolverCriar(jogo); } catch (e) {}
+        _lobVigiarSala(jogo, false);
         throw _lobErro(err);
       });
     },
@@ -18353,6 +18575,9 @@ ${urlCard}`)}`;
       if (!est || est.status !== 'em_jogo' || !est.codigoSalaJogo || !est.jogoSugerido) {
         return Promise.reject(new Error('Não tem partida em andamento neste lobby.'));
       }
+      // Toque explícito zera a marca de "já falhou sozinho": a pessoa
+      // quer tentar de novo, e uma nova falha volta a ser contada.
+      _lobSalaFalhou = null;
       return _lobEntrarNaSala(est.jogoSugerido, est.codigoSalaJogo, true)
         .catch(function (err) { throw _lobErro(err); });
     },
@@ -18367,6 +18592,8 @@ ${urlCard}`)}`;
       }
       _lobPendente = null;
       _lobSalaVista = null;
+      _lobSalaFalhou = null;
+      _lobPararVigia();
       return _lobRef.update({ status: 'aberto', codigoSalaJogo: null })
         .catch(function (err) { throw _lobErro(err); });
     },

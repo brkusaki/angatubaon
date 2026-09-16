@@ -7376,3 +7376,181 @@ body.aprender-fs-open .apr-tela-licao {
     radial-gradient(circle at 20% 0%, rgba(56,189,248,.15), transparent 55%),
     radial-gradient(circle at 90% 15%, rgba(168,85,247,.12), transparent 50%);
 }
+
+    /* ── Lobby social (Etapa 5.2) ──
+       Tela de "jogar em grupo" + o chip que fica na faixa de avisos
+       enquanto você está num lobby.
+
+       A casca do overlay é a do app (.modal-overlay/.modal-sheet/
+       .modal-header/.modal-body, iguais ao painel de conta): mesma
+       entrada, mesmo arrastar, mesmo comportamento de abrir e fechar.
+       Daqui pra baixo é só o miolo.
+
+       A lista de membros reusa de propósito .cli-amigo-item/.cli-amigo-av/
+       .cli-amigo-dot da lista de amigos — é a mesma linha visual, e o
+       pontinho de presença é literalmente o mesmo componente (muda só o
+       data-attr que o JS pinta; ver o bloco 5.2 em app.js). As mensagens
+       reusam .cli-amigos-msg. */
+    .lobby-corpo { display: flex; flex-direction: column; gap: 10px; }
+
+    /* Botão de entrada, no alto de "Meus amigos" */
+    .cli-amigos-lobby-btn {
+      width: 100%; display: flex; align-items: center; gap: 10px;
+      padding: 12px; margin-bottom: 12px; cursor: pointer;
+      border-radius: var(--r-md);
+      background: var(--surface2); border: 1px solid rgba(34,197,94,0.38);
+      color: var(--text); font-size: 13.5px; font-weight: 600; font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-amigos-lobby-btn:active { opacity: 0.6; }
+    .cli-amigos-lobby-btn > span { flex: 1; text-align: left; }
+    .cli-amigos-lobby-btn .fa-users { color: #22c55e; font-size: 14px; }
+    .cli-amigos-lobby-btn .fa-chevron-right { color: var(--muted); font-size: 11px; }
+
+    /* ── Estado "fora de lobby" ── */
+    .lobby-vazio { text-align: center; padding: 2px 0 4px; }
+    .lobby-owl { width: 92px; height: auto; display: block; margin: 0 auto 8px; }
+    .lobby-lead { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
+
+    .lobby-ou {
+      display: flex; align-items: center; gap: 10px;
+      margin: 6px 0 2px; color: var(--muted); font-size: 11.5px;
+      text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;
+    }
+    .lobby-ou::before, .lobby-ou::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    .lobby-entrar { display: flex; gap: 8px; }
+    .lobby-input {
+      flex: 1; min-width: 0; padding: 10px 12px; border-radius: var(--r-md);
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); font-family: inherit;
+      font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase;
+    }
+    .lobby-input::placeholder {
+      letter-spacing: normal; text-transform: none;
+      font-size: 13.5px; color: var(--muted);
+    }
+    .lobby-input:focus { outline: none; border-color: var(--red); }
+
+    /* ── Botões ── */
+    .lobby-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 11px 12px; border-radius: var(--r-md); cursor: pointer;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); font-size: 13.5px; font-weight: 600; font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .lobby-btn:active { opacity: 0.6; }
+    .lobby-btn:disabled { opacity: 0.5; cursor: default; }
+    .lobby-btn.grande {
+      width: 100%; padding: 12px;
+      background: var(--red); border-color: transparent; color: #fff;
+    }
+    .lobby-btn.grande:disabled {
+      background: var(--surface2); color: var(--muted); border-color: var(--border);
+    }
+    .lobby-btn.peq { padding: 8px 10px; font-size: 12.5px; flex-shrink: 0; }
+    .lobby-btn.pronto { width: 100%; }
+    .lobby-btn.pronto.on {
+      border-color: rgba(34,197,94,0.45); background: rgba(34,197,94,0.08); color: #22c55e;
+    }
+    .lobby-btn.sair {
+      width: 100%; margin-top: 4px; background: var(--bg);
+      color: var(--red); border-color: rgba(255,68,68,0.35);
+    }
+
+    /* ── Código do lobby ── */
+    .lobby-cod-box {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px; border-radius: var(--r-md);
+      background: var(--surface2); border: 1px solid var(--border);
+    }
+    .lobby-cod-rot {
+      font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--muted);
+    }
+    .lobby-cod {
+      flex: 1; font-family: var(--font-h); font-weight: 800;
+      font-size: 22px; line-height: 1; letter-spacing: 0.14em; color: var(--text);
+      /* 6 caracteres que a pessoa vai ditar no Zap: sem corte, sem quebra. */
+      white-space: nowrap;
+    }
+    /* Em tela estreita o rótulo sobe pra própria linha em vez de espremer
+       o código. */
+    @media (max-width: 360px) {
+      .lobby-cod-box { flex-wrap: wrap; }
+      .lobby-cod-rot { width: 100%; }
+    }
+
+    .lobby-dica { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+    .lobby-dica.breve { opacity: 0.85; font-style: italic; }
+
+    /* ── Seções e lista ── */
+    .lobby-sec-tit {
+      display: flex; align-items: baseline; justify-content: space-between;
+      margin-top: 6px; font-family: var(--font-h); font-weight: 800; font-size: 12px;
+      text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
+    }
+    .lobby-cont { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+
+    .lobby-membros { display: flex; flex-direction: column; gap: 8px; }
+    .cli-amigo-item.lobby-membro.pronto {
+      border-color: rgba(34,197,94,0.38); background: rgba(34,197,94,0.08);
+    }
+    .lobby-membro .cli-amigo-nome i {
+      font-style: normal; font-weight: 500; color: var(--muted);
+    }
+    .lobby-tag {
+      display: inline-block; margin-right: 6px; padding: 1px 7px;
+      border-radius: 999px; font-size: 10.5px; font-weight: 600;
+      background: rgba(255,255,255,0.06); color: var(--muted);
+    }
+    .lobby-tag.anf { background: rgba(255,180,0,0.14); color: #f59e0b; }
+    .lobby-tag.ok { background: rgba(34,197,94,0.14); color: #22c55e; }
+
+    /* ── Chips de jogo (só o anfitrião vê) ──
+       Mesma fileira da lista de amigos (.cli-amigo-jogo), com o estado
+       "escolhido" a mais. */
+    .lobby-jogos { display: flex; flex-wrap: wrap; gap: 6px; }
+    .lobby-jogo {
+      flex: 1 1 calc(50% - 3px); min-width: 0; cursor: pointer;
+      padding: 9px 10px; border-radius: var(--r-md);
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); font-size: 13px; font-weight: 600; font-family: inherit;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .lobby-jogo:active { opacity: 0.6; }
+    .lobby-jogo:disabled { opacity: 0.5; cursor: default; }
+    .lobby-jogo.on {
+      border-color: rgba(34,197,94,0.45); background: rgba(34,197,94,0.1);
+      color: #22c55e; font-weight: 700;
+    }
+
+    /* "Chamar pro lobby" na fileira de jogos do amigo: ocupa a linha
+       inteira acima dos jogos, porque não é um jogo. */
+    .cli-amigo-jogo.lobby {
+      flex: 1 1 100%; border-color: rgba(34,197,94,0.4); color: #22c55e;
+    }
+
+    /* ── Chip do lobby na faixa de avisos ──
+       Mora dentro do #aon-avisos (que é pointer-events:none pro header
+       receber os toques), então religa o ponteiro igual ao .aon-aviso. */
+    .aon-lobby-chip {
+      pointer-events: auto; align-self: flex-end;
+      display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+      padding: 7px 12px; border-radius: 999px;
+      background: var(--surface2); border: 1px solid rgba(34,197,94,0.45);
+      color: var(--text); font-size: 12.5px; font-weight: 600; font-family: inherit;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .aon-lobby-chip:active { opacity: 0.6; }
+    .aon-lobby-chip i { color: #22c55e; font-size: 12px; }
+    .aon-lobby-chip b { font-weight: 800; letter-spacing: 0.08em; }
+    .aon-lobby-chip-n {
+      padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700;
+      background: rgba(255,255,255,0.06); color: var(--muted);
+    }

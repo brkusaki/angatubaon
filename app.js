@@ -10834,6 +10834,10 @@
     if (typeof _aprenderAberto === 'function' && _aprenderAberto()) {
       if (typeof _fecharAprender === 'function') _fecharAprender(true); return;
     }
+    // Lobby social (5.2) — abre EM CIMA do painel de conta, então sai antes
+    if (document.getElementById('modal-lobby')?.classList.contains('open')) {
+      if (typeof cliFecharLobby === 'function') cliFecharLobby(true); return;
+    }
     // Painel de conta do cliente (pode estar sobre tudo)
     if (document.getElementById('modal-cli-conta')?.classList.contains('open')) {
       if (typeof cliFecharPainelConta === 'function') cliFecharPainelConta(true); return;
@@ -15464,6 +15468,10 @@ ${urlCard}`)}`;
         // convites, pra o aviso no topo chegar sem abrir o painel.
         // Logo depois dela — o SDK já veio com a presença.
         setTimeout(_pedObservarGlobal, 2700);
+        // Lobby social (5.2): a escuta vive com a conta logada, não com a
+        // tela aberta — é ela que põe o chip do lobby na faixa de avisos
+        // pra quem está na home.
+        setTimeout(_lobUiObservar, 2800);
       } else {
         // Deslogou (ou é sessão anônima de sala): tira do ar.
         _presencaParar();
@@ -15471,7 +15479,10 @@ ${urlCard}`)}`;
         _pedPararGlobal();
         // Lobby social (5.1): sai do lobby ANTES de o token morrer —
         // depois do signOut as regras recusam a escrita e a entrada só
-        // sumiria quando a conexão caísse.
+        // sumiria quando a conexão caísse. A UI (5.2) solta primeiro: o
+        // null do sair não pode virar "o lobby foi encerrado" na tela de
+        // quem só deslogou.
+        _lobUiSoltar();
         _lobSair();
         _avisoLimpar();
         // Código curto (P2) é por conta: o da conta que saiu não pode
@@ -16040,7 +16051,9 @@ ${urlCard}`)}`;
     // Pedidos de amizade e a pilha de avisos do topo (P1) saem pelo
     // mesmo motivo: nada da conta anterior pode sobrar na tela.
     _pedPararGlobal();
-    // Lobby social (5.1): pelo mesmo motivo da presença acima.
+    // Lobby social (5.1/5.2): pelo mesmo motivo da presença acima, e a
+    // UI solta antes do sair (ver o onAuthStateChanged).
+    _lobUiSoltar();
     _lobSair();
     _avisoLimpar();
     // Limpa também o apelido espelhado: sem isto ele sobrevivia no
@@ -16738,7 +16751,11 @@ ${urlCard}`)}`;
   // foto (P3): a photoURL gravada no nó. Mesma mecânica de fallback do
   // avatar do header e do painel — onerror esconde a imagem e revela a
   // inicial que já está montada atrás dela.
-  function _amLinhaAvatar(uid, nome, semDot, foto) {
+  /* attrPres: nome do atributo do pontinho ('pres' por padrão). O lobby
+     (5.2) desenha a MESMA pessoa numa lista que pode estar na tela junto
+     com esta — com dois data-pres iguais, o querySelector do
+     _amPintarPresenca pintaria sempre o primeiro. */
+  function _amLinhaAvatar(uid, nome, semDot, foto, attrPres) {
     var ini = escHTML((String(nome).trim()[0] || '?').toUpperCase());
     var f = _amigosFotoValida(foto);
     return '<span class="cli-amigo-av">' +
@@ -16747,7 +16764,8 @@ ${urlCard}`)}`;
           'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" />' +
           '<span class="cli-amigo-av-ini" style="display:none">' + ini + '</span>'
         : ini) +
-      (semDot ? '' : '<span class="cli-amigo-dot" data-pres="' + escHTML(uid) + '"></span>') + '</span>';
+      (semDot ? '' : '<span class="cli-amigo-dot" data-' + (attrPres || 'pres') +
+        '="' + escHTML(uid) + '"></span>') + '</span>';
   }
 
   function cliAmigosRender() {
@@ -17316,7 +17334,13 @@ ${urlCard}`)}`;
     if (jaAberto) return;
     var box = document.createElement('div');
     box.className = 'cli-amigo-jogos';
-    box.innerHTML = Object.keys(CONV_JOGOS).map(function (k) {
+    // Lobby (5.2): quando você está num, o primeiro botão da fileira
+    // chama pro lobby em vez de abrir sala de jogo nenhuma.
+    var _lobAtual = window.AngatubaLobby && window.AngatubaLobby.meuLobby();
+    box.innerHTML = (_lobAtual
+      ? '<button type="button" class="cli-amigo-jogo lobby" onclick="cliLobbyChamar(\'' +
+        escHTML(uid) + '\')">\uD83C\uDFAA Chamar pro lobby</button>'
+      : '') + Object.keys(CONV_JOGOS).map(function (k) {
       return '<button type="button" class="cli-amigo-jogo" onclick="cliConviteEnviar(\'' +
         escHTML(uid) + '\',\'' + k + '\')">' + CONV_JOGOS[k].emoji + ' ' + escHTML(CONV_JOGOS[k].nome) + '</button>';
     }).join('');
@@ -18077,3 +18101,491 @@ ${urlCard}`)}`;
       return Promise.reject(new Error('Ainda não dá pra começar a partida pelo lobby — isso chega na próxima etapa.'));
     }
   };
+
+  /* ══════════════════════════════════════════════════════════════
+     LOBBY SOCIAL — UI (Etapa 5.2)
+     ------------------------------------------------------------
+     A 5.1 deixou o lobby funcionando no banco e uma API (window.
+     AngatubaLobby) sem nenhuma tela. Aqui ele ganha rosto: criar,
+     entrar por código, ver quem está, marcar "pronto", o anfitrião
+     apontar o jogo da vez, e sair.
+
+     CRIAR A SALA DO JOGO A PARTIR DO LOBBY CONTINUA FORA — é a 5.3.
+     O botão "Começar" existe, desenhado, e vem DESABILITADO com o
+     recado na tela. Nenhum fluxo de criarSala é chamado daqui, e o
+     `iniciarJogo()` (que é stub e rejeita) não é chamado por botão
+     nenhum: não adianta pedir pra API o que ela ainda não faz.
+
+     POR ONDE SE CHEGA
+       1. Painel de conta -> "Meus amigos" -> botão "Jogar em grupo".
+          É onde a pessoa já está quando pensa em jogar com alguém.
+       2. Pilha de avisos do topo: enquanto você estiver num lobby,
+          um chip "Lobby XXXXXX · n/6" fica ali. Tocar reabre a tela.
+          Ele mora DENTRO do #aon-avisos de propósito — aquela faixa
+          já é o lugar reservado do app pra recado flutuante, então o
+          chip não inventa posição nova nem briga com o header, com o
+          botão do WhatsApp ou com a barra do celular.
+       3. Conta anônima/deslogada não tem lobby: o botão leva pro
+          login, igual ao resto do social.
+
+     UMA ESCUTA SÓ, VIVA O TEMPO TODO. `AngatubaLobby.observar` é
+     assinado no login (irmão do _convObservarCaixa e do
+     _pedObservarGlobal) e não ao abrir a tela: é isso que faz o chip
+     aparecer pra quem está na home e o "o lobby acabou" chegar sem a
+     tela aberta. O desenho pesado (lista de membros, escutas de
+     presença) só roda com o overlay ABERTO — fechado, a UI só cuida
+     do chip.
+
+     PRESENÇA NA LISTA. Mesmo mecanismo da lista de amigos (uma
+     escuta de presence/{uid} por pessoa, que é o único acesso que as
+     regras dão), mas com o atributo `data-lobpres` em vez de
+     `data-pres`. Não é preciosismo: o painel de conta pode estar
+     aberto POR BAIXO com o mesmo amigo na lista, e dois elementos
+     com o mesmo data-pres fariam o querySelector pintar sempre o
+     primeiro.
+
+     "CHAMAR PRO LOBBY" É COPIAR O CÓDIGO. Na fileira de jogos que já
+     abre embaixo de cada amigo (4.4), entra um primeiro botão
+     "Chamar pro lobby" quando você está num lobby — ele copia o
+     código e manda avisar no Zap. Não inventei um convite de lobby
+     no RTDB: seria nó novo, regra nova e caixa de entrada nova pra
+     entregar o que 6 caracteres no WhatsApp já entregam. Se um dia
+     valer a pena, o padrão a copiar é o gameInvites da 4.4 — mas
+     `jogo` e `codigo` de lá são de sala de jogo, não de lobby, então
+     seria nó separado mesmo.
+
+     Funções globais (onclick do HTML gerado):
+       cliAbrirLobby / cliFecharLobby
+       cliLobbyCriar / cliLobbyEntrar / cliLobbySair
+       cliLobbyCopiar / cliLobbyPronto / cliLobbySugerir
+       cliLobbyChamar(uid)
+  ══════════════════════════════════════════════════════════════ */
+
+  var _lobUiUnsub = null;     // desliga o observar() da 5.1
+  var _lobUiPres = {};        // uid -> função de parar a escuta de presença
+  var _lobUiPill = null;      // chip "Lobby XXXXXX" na faixa de avisos
+  var _lobUiTinha = false;    // eu estava num lobby no snapshot anterior
+  var _lobUiOcupado = false;  // uma ação (criar/entrar/sair) em voo
+
+  function _lobUiEl() { return document.getElementById('modal-lobby'); }
+
+  function _lobUiAberto() {
+    var el = _lobUiEl();
+    return !!(el && el.classList.contains('open'));
+  }
+
+  /* A mensagem fica guardada, não só escrita na tela: qualquer snapshot
+     do lobby redesenha o corpo inteiro, e sem isto o "Lobby aberto!
+     Código: XXXXXX" sumiria no redesenho que o próprio criar() provoca
+     — uma corrida que depende de quem chega primeiro, o `then` ou o
+     snapshot. */
+  var _lobUiMsgAtual = null;   // {texto, tipo}
+
+  function _lobUiPintarMsg() {
+    var el = document.getElementById('lobby-msg');
+    if (!el) return;
+    el.textContent = _lobUiMsgAtual ? _lobUiMsgAtual.texto : '';
+    el.className = 'cli-amigos-msg' +
+      (_lobUiMsgAtual && _lobUiMsgAtual.tipo ? ' ' + _lobUiMsgAtual.tipo : '');
+  }
+
+  function _lobUiMsg(texto, tipo) {
+    _lobUiMsgAtual = texto ? { texto: texto, tipo: tipo || '' } : null;
+    _lobUiPintarMsg();
+  }
+
+  /* Trava os botões enquanto uma ação está em voo: criar e entrar
+     demoram uma ida ao banco, e dois toques seguidos abririam dois
+     lobbies (o segundo apagando o primeiro no sair implícito).
+
+     `data-travar="nao"` marca quem fica de fora nos DOIS sentidos —
+     o "Copiar", que não precisa esperar nada, e o "Começar", que é
+     desabilitado de propósito até a 5.3 e não pode ser reabilitado
+     de brinde quando a trava solta. */
+  function _lobUiTravar(on) {
+    _lobUiOcupado = !!on;
+    var box = document.getElementById('lobby-corpo');
+    if (!box) return;
+    var bts = box.querySelectorAll('button');
+    for (var i = 0; i < bts.length; i++) {
+      if (bts[i].getAttribute('data-travar') === 'nao') continue;
+      bts[i].disabled = !!on;
+    }
+  }
+
+  /* ── Chip na faixa de avisos ───────────────────────────────────
+     Vive dentro do #aon-avisos, mas com classe própria: o teto de
+     cards do _avisoMostrar conta `.aon-aviso`, então o chip não
+     empurra nenhum aviso pra fora da pilha. */
+  function _lobUiPintarPill(est) {
+    var raiz = _avisoRaiz();
+    var esconder = !est || !raiz || _lobUiAberto() ||
+      (typeof _gamesHubAberto === 'function' && _gamesHubAberto());
+    if (esconder) {
+      if (_lobUiPill && _lobUiPill.parentNode) _lobUiPill.parentNode.removeChild(_lobUiPill);
+      if (!est) _lobUiPill = null;
+      return;
+    }
+    // O _avisoLimpar() zera o innerHTML da faixa: se o chip foi junto,
+    // monta outro em vez de ressuscitar um nó solto.
+    if (!_lobUiPill || !_lobUiPill.parentNode) {
+      _lobUiPill = document.createElement('button');
+      _lobUiPill.type = 'button';
+      _lobUiPill.className = 'aon-lobby-chip';
+      _lobUiPill.setAttribute('aria-label', 'Abrir o lobby');
+      _lobUiPill.onclick = function () { cliAbrirLobby(); };
+      raiz.appendChild(_lobUiPill);
+    }
+    _lobUiPill.innerHTML =
+      '<i class="fa fa-users"></i>' +
+      '<span>Lobby <b>' + escHTML(est.codigo) + '</b></span>' +
+      '<span class="aon-lobby-chip-n">' + est.membros.length + '/' +
+        window.AngatubaLobby.limite() + '</span>';
+  }
+
+  /* ── Escutas de presença dos membros ───────────────────────────*/
+  function _lobUiSoltarPresencas() {
+    Object.keys(_lobUiPres).forEach(function (uid) {
+      try { _lobUiPres[uid](); } catch (e) {}
+    });
+    _lobUiPres = {};
+  }
+
+  function _lobUiPintarPresenca(uid, p) {
+    var estado = (p && p.state) || 'offline';
+    var dot = document.querySelector('.cli-amigo-dot[data-lobpres="' + uid + '"]');
+    if (dot) {
+      dot.className = 'cli-amigo-dot' +
+        (estado === 'online' ? ' online' : (estado === 'away' ? ' away' : ''));
+    }
+  }
+
+  function _lobUiLigarPresencas(est) {
+    est.membros.forEach(function (m) {
+      if (m.uid === (_cliUser && _cliUser.uid)) return;   // o meu ponto sou eu
+      _lobUiPres[m.uid] = window.AngatubaPresenca.observar(m.uid, function (p) {
+        _lobUiPintarPresenca(m.uid, p);
+      });
+    });
+  }
+
+  /* ── HTML: fora de lobby ───────────────────────────────────────*/
+  function _lobUiHtmlFora() {
+    return '' +
+      '<div class="lobby-vazio">' +
+        '<img src="/webp/owl-marching.webp" alt="" class="lobby-owl" onerror="this.style.display=\'none\'" />' +
+        '<p class="lobby-lead">Junte a galera primeiro e escolha o jogo depois.</p>' +
+      '</div>' +
+      '<button type="button" class="lobby-btn grande" onclick="cliLobbyCriar()">' +
+        '<i class="fa fa-plus"></i> Criar um lobby</button>' +
+      '<div class="lobby-ou"><span>ou entre com o código</span></div>' +
+      '<div class="lobby-entrar">' +
+        '<input id="lobby-cod-input" class="lobby-input" type="text" inputmode="latin" ' +
+          'autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="14" ' +
+          'placeholder="Ex.: AB12CD" aria-label="Código do lobby" ' +
+          'onkeydown="if(event.key===\'Enter\'){event.preventDefault();cliLobbyEntrar();}" />' +
+        '<button type="button" class="lobby-btn" onclick="cliLobbyEntrar()">Entrar</button>' +
+      '</div>' +
+      '<p id="lobby-msg" class="cli-amigos-msg"></p>';
+  }
+
+  /* ── HTML: dentro do lobby ─────────────────────────────────────*/
+  function _lobUiHtmlMembro(m, souAnfitriao) {
+    var eu = (_cliUser && m.uid === _cliUser.uid);
+    return '<div class="cli-amigo-item lobby-membro' + (m.pronto ? ' pronto' : '') + '">' +
+      _amLinhaAvatar(m.uid, m.nome, eu, m.foto, 'lobpres') +
+      '<span class="cli-amigo-txt">' +
+        '<span class="cli-amigo-nome">' + escHTML(m.nome) + (eu ? ' <i>(você)</i>' : '') + '</span>' +
+        '<span class="cli-amigo-sub">' +
+          (m.anfitriao ? '<span class="lobby-tag anf">Anfitrião</span>' : '') +
+          (m.pronto ? '<span class="lobby-tag ok">Pronto</span>' : '<span class="lobby-tag">Escolhendo…</span>') +
+        '</span>' +
+      '</span></div>';
+  }
+
+  function _lobUiHtmlJogos(est) {
+    var cat = window.AngatubaLobby.jogos();
+    var chips = Object.keys(cat).map(function (k) {
+      var on = (est.jogoSugerido === k);
+      return '<button type="button" class="lobby-jogo' + (on ? ' on' : '') + '" ' +
+        'onclick="cliLobbySugerir(\'' + k + '\')" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+        cat[k].emoji + ' ' + escHTML(cat[k].nome) + '</button>';
+    }).join('');
+    return '<div class="lobby-jogos">' + chips + '</div>';
+  }
+
+  function _lobUiHtmlDentro(est) {
+    var cat = window.AngatubaLobby.jogos();
+    var jogo = est.jogoSugerido ? cat[est.jogoSugerido] : null;
+    var lim = window.AngatubaLobby.limite();
+
+    var html = '' +
+      '<div class="lobby-cod-box">' +
+        '<span class="lobby-cod-rot">Código do lobby</span>' +
+        '<strong class="lobby-cod">' + escHTML(est.codigo) + '</strong>' +
+        '<button type="button" class="lobby-btn peq" onclick="cliLobbyCopiar()" data-travar="nao">' +
+          '<i class="fa fa-copy"></i> Copiar</button>' +
+      '</div>' +
+      '<p class="lobby-dica">Manda esse código pra galera entrar.</p>' +
+
+      '<div class="lobby-sec-tit">' +
+        '<span>Na sala</span><span class="lobby-cont">' + est.membros.length + '/' + lim + '</span>' +
+      '</div>' +
+      '<div class="lobby-membros">' +
+        est.membros.map(function (m) { return _lobUiHtmlMembro(m, est.souAnfitriao); }).join('') +
+      '</div>';
+
+    // "Estou pronto" — cada um marca o seu (a regra só deixa o próprio).
+    var euPronto = false;
+    for (var i = 0; i < est.membros.length; i++) {
+      if (_cliUser && est.membros[i].uid === _cliUser.uid) { euPronto = est.membros[i].pronto; break; }
+    }
+    html +=
+      '<button type="button" class="lobby-btn pronto' + (euPronto ? ' on' : '') + '" ' +
+        'onclick="cliLobbyPronto()" aria-pressed="' + (euPronto ? 'true' : 'false') + '">' +
+        '<i class="fa fa-' + (euPronto ? 'check' : 'hourglass-half') + '"></i> ' +
+        (euPronto ? 'Estou pronto' : 'Marcar que estou pronto') +
+      '</button>';
+
+    html += '<div class="lobby-sec-tit"><span>O que vamos jogar</span></div>';
+    if (est.souAnfitriao) {
+      html += _lobUiHtmlJogos(est) +
+        '<p class="lobby-dica">' +
+          (jogo ? 'Escolhido: <b>' + jogo.emoji + ' ' + escHTML(jogo.nome) + '</b> — dá pra trocar quando quiser.'
+                : 'Escolha um jogo — o grupo continua o mesmo se você trocar depois.') +
+        '</p>' +
+        // 5.3: aqui é onde a sala do jogo vai nascer. Desabilitado de
+        // propósito — e sem onclick nenhum, pra não haver caminho
+        // acidental pra um criarSala que ainda não existe.
+        '<button type="button" class="lobby-btn grande" disabled data-travar="nao" ' +
+          'title="Chega na próxima etapa">' +
+          '<i class="fa fa-play"></i> Começar a partida</button>' +
+        '<p class="lobby-dica breve">Em breve — próxima etapa. Por enquanto, combinem o jogo aqui e abram a sala pelo hub de jogos, como sempre.</p>';
+    } else {
+      html += '<p class="lobby-dica">' +
+        (jogo ? 'O anfitrião escolheu <b>' + jogo.emoji + ' ' + escHTML(jogo.nome) + '</b>.'
+              : 'O anfitrião ainda não escolheu.') + '</p>';
+    }
+
+    html +=
+      '<p id="lobby-msg" class="cli-amigos-msg"></p>' +
+      '<button type="button" class="lobby-btn sair" onclick="cliLobbySair()">' +
+        '<i class="fa fa-right-from-bracket"></i> ' +
+        (est.souAnfitriao ? 'Encerrar o lobby' : 'Sair do lobby') + '</button>';
+    return html;
+  }
+
+  function _lobUiHtmlDeslogado() {
+    return '' +
+      '<div class="lobby-vazio">' +
+        '<img src="/webp/owl-wave.webp" alt="" class="lobby-owl" onerror="this.style.display=\'none\'" />' +
+        '<p class="lobby-lead">Entre na sua conta pra jogar em grupo.</p>' +
+      '</div>' +
+      '<button type="button" class="lobby-btn grande" onclick="cliFecharLobby();cliAbrirLogin();">' +
+        'Entrar na conta</button>';
+  }
+
+  /* ── Desenho ───────────────────────────────────────────────────
+     Só roda com o overlay aberto: fechado, a UI do lobby é só o chip
+     (e nenhuma escuta de presença pendurada). */
+  function _lobUiRender(est) {
+    var box = document.getElementById('lobby-corpo');
+    if (!box) return;
+    _lobUiSoltarPresencas();
+    if (!_lobUiAberto()) return;
+    if (!_cliContaReal(_cliUser)) { box.innerHTML = _lobUiHtmlDeslogado(); return; }
+    box.innerHTML = est ? _lobUiHtmlDentro(est) : _lobUiHtmlFora();
+    if (est) _lobUiLigarPresencas(est);
+    _lobUiPintarMsg();
+    if (_lobUiOcupado) _lobUiTravar(true);
+  }
+
+  /* ── Escuta global (irmã da caixa de convites e dos pedidos) ────*/
+  function _lobUiEstado(est) {
+    // Entrou ou saiu de lobby: a mensagem da tela anterior não vale mais.
+    if (!!est !== _lobUiTinha) _lobUiMsgAtual = null;
+    // Estava num lobby e agora não estou mais, sem ter tocado em sair:
+    // o anfitrião caiu ou encerrou. Ver "ANFITRIÃO CAIU" na 5.1.
+    if (!est && _lobUiTinha && !_lobUiOcupado) {
+      if (typeof showToastSimples === 'function') {
+        showToastSimples('O lobby foi encerrado.', '/webp/owl-sleeping.webp');
+      }
+      _lobUiMsg('O lobby foi encerrado — o anfitrião saiu. Crie outro ou entre com um código.', 'erro');
+    }
+    _lobUiTinha = !!est;
+    _lobUiRender(est);
+    _lobUiPintarPill(est);
+  }
+
+  function _lobUiObservar() {
+    if (_lobUiUnsub || !_cliContaReal(_cliUser)) return;
+    _lobUiUnsub = window.AngatubaLobby.observar(_lobUiEstado);
+  }
+
+  function _lobUiSoltar() {
+    if (_lobUiUnsub) { try { _lobUiUnsub(); } catch (e) {} _lobUiUnsub = null; }
+    _lobUiSoltarPresencas();
+    _lobUiTinha = false;
+    _lobUiOcupado = false;
+    _lobUiMsgAtual = null;
+    _lobUiPintarPill(null);
+    var box = document.getElementById('lobby-corpo');
+    if (box && _lobUiAberto()) box.innerHTML = _lobUiHtmlDeslogado();
+  }
+
+  /* ── Abrir e fechar ────────────────────────────────────────────*/
+  function cliAbrirLobby() {
+    var overlay = _lobUiEl();
+    if (!overlay) return;
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    // Empilha sobre o painel de conta em vez de fechá-lo: o handler de
+    // popstate testa o lobby ANTES do painel, então um "voltar" fecha
+    // só o de cima e a pessoa cai de volta em "Meus amigos".
+    if (!history.state || history.state.modal !== 'lobby') {
+      history.pushState({ modal: 'lobby' }, '');
+    }
+    _lobUiObservar();
+    _lobUiRender(_cliContaReal(_cliUser) ? window.AngatubaLobby.meuLobby() : null);
+    _lobUiPintarPill(window.AngatubaLobby.meuLobby());
+  }
+
+  function cliFecharLobby(viaPopstate) {
+    var overlay = _lobUiEl();
+    if (overlay) overlay.classList.remove('open');
+    _lobUiSoltarPresencas();
+    // O painel de conta pode ter ficado aberto por baixo — nesse caso o
+    // scroll do body continua travado, que é o estado certo pra ele.
+    var conta = document.getElementById('modal-cli-conta');
+    document.body.style.overflow = (conta && conta.classList.contains('open')) ? 'hidden' : '';
+    if (!viaPopstate && history.state && history.state.modal === 'lobby') {
+      _popstateNosso = true; history.back();
+    }
+    _lobUiPintarPill(window.AngatubaLobby.meuLobby());
+  }
+
+  /* ── Ações ─────────────────────────────────────────────────────*/
+  function _lobUiFalhar(err) {
+    _lobUiTravar(false);
+    _lobUiMsg((err && err.message) || 'Algo deu errado. Tente de novo em instantes.', 'erro');
+  }
+
+  function cliLobbyCriar() {
+    if (_lobUiOcupado) return;
+    _lobUiMsg('Abrindo o lobby…', '');
+    _lobUiTravar(true);
+    window.AngatubaLobby.criar().then(function (r) {
+      _lobUiTravar(false);
+      _lobUiMsg('Lobby aberto! Código: ' + r.codigo, 'ok');
+    }).catch(_lobUiFalhar);
+  }
+
+  function cliLobbyEntrar() {
+    if (_lobUiOcupado) return;
+    var inp = document.getElementById('lobby-cod-input');
+    var cod = inp ? inp.value : '';
+    if (!String(cod || '').trim()) { _lobUiMsg('Cole o código que te mandaram.', 'erro'); return; }
+    _lobUiMsg('Entrando…', '');
+    _lobUiTravar(true);
+    window.AngatubaLobby.entrar(cod).then(function () {
+      _lobUiTravar(false);
+      _lobUiMsg('', '');
+    }).catch(_lobUiFalhar);
+  }
+
+  /* Sair. O anfitrião derruba o lobby pra todo mundo (ver 5.1), então
+     ele confirma antes — e a confirmação diz exatamente isso. */
+  function cliLobbySair() {
+    if (_lobUiOcupado) return;
+    var est = window.AngatubaLobby.meuLobby();
+    if (!est) { cliFecharLobby(); return; }
+    var fim = function () {
+      _lobUiTravar(true);
+      window.AngatubaLobby.sair().then(function () {
+        _lobUiTravar(false);
+        _lobUiMsg('', '');
+      }).catch(_lobUiFalhar);
+    };
+    if (!est.souAnfitriao) { fim(); return; }
+    var perguntar = (typeof mlConfirmar === 'function')
+      ? mlConfirmar('Encerrar o lobby?',
+          'Você é o anfitrião: sair encerra o lobby pra todo mundo que está nele.',
+          { okLabel: 'Encerrar', owlSrc: '/webp/owl-shy.webp' })
+      : Promise.resolve(true);
+    perguntar.then(function (sim) { if (sim) fim(); });
+  }
+
+  /* Copiar o código. Mesmo caminho do "copiar meu código de amigo":
+     clipboard quando dá, e o código na mensagem quando o navegador
+     recusa (WebView, contexto não seguro) — com 6 caracteres, dá pra
+     ditar. */
+  function cliLobbyCopiar() {
+    var est = window.AngatubaLobby.meuLobby();
+    if (!est) return;
+    var cod = est.codigo;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cod)
+        .then(function () { _lobUiMsg('Código copiado: ' + cod + ' — manda pra galera.', 'ok'); })
+        .catch(function () { _lobUiMsg('Seu código: ' + cod, ''); });
+    } else {
+      _lobUiMsg('Seu código: ' + cod, '');
+    }
+  }
+
+  function cliLobbyPronto() {
+    var est = window.AngatubaLobby.meuLobby();
+    if (!est || !_cliUser) return;
+    var atual = false;
+    for (var i = 0; i < est.membros.length; i++) {
+      if (est.membros[i].uid === _cliUser.uid) { atual = est.membros[i].pronto; break; }
+    }
+    window.AngatubaLobby.definirPronto(!atual).catch(function (err) {
+      _lobUiMsg((err && err.message) || 'Não deu pra marcar agora.', 'erro');
+    });
+  }
+
+  function cliLobbySugerir(jogo) {
+    var est = window.AngatubaLobby.meuLobby();
+    if (!est) return;
+    // Tocar no jogo já escolhido desmarca — é como se desfaz sem ter
+    // que inventar um botão "limpar".
+    var alvo = (est.jogoSugerido === jogo) ? null : jogo;
+    window.AngatubaLobby.sugerirJogo(alvo).catch(function (err) {
+      _lobUiMsg((err && err.message) || 'Não deu pra escolher agora.', 'erro');
+    });
+  }
+
+  /* Chamar um amigo pro lobby, da fileira de jogos da lista de amigos.
+     É copiar o código + um empurrão pro WhatsApp — ver o cabeçalho
+     deste bloco pra por que não virou convite no banco. */
+  function cliLobbyChamar(uid) {
+    var est = window.AngatubaLobby.meuLobby();
+    if (!est) return;
+    var nomeEl = document.querySelector('.cli-amigo-item[data-amigo="' + uid + '"] .cli-amigo-nome');
+    var nome = (nomeEl && nomeEl.textContent) || 'seu amigo';
+    var pronto = function (copiou) {
+      if (typeof showToastSimples === 'function') {
+        showToastSimples(copiou
+          ? 'Código ' + est.codigo + ' copiado — manda pro ' + nome + ' no Zap!'
+          : 'Passe o código ' + est.codigo + ' pro ' + nome + '.', '/webp/owl-phone.webp');
+      }
+      _amMsg('Código do lobby: ' + est.codigo, 'ok');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(est.codigo)
+        .then(function () { pronto(true); })
+        .catch(function () { pronto(false); });
+    } else {
+      pronto(false);
+    }
+  }
+
+  window.cliAbrirLobby   = cliAbrirLobby;
+  window.cliFecharLobby  = cliFecharLobby;
+  window.cliLobbyCriar   = cliLobbyCriar;
+  window.cliLobbyEntrar  = cliLobbyEntrar;
+  window.cliLobbySair    = cliLobbySair;
+  window.cliLobbyCopiar  = cliLobbyCopiar;
+  window.cliLobbyPronto  = cliLobbyPronto;
+  window.cliLobbySugerir = cliLobbySugerir;
+  window.cliLobbyChamar  = cliLobbyChamar;

@@ -3547,6 +3547,16 @@
         <div class="cli-conta-secao">
           <div class="cli-conta-secao-tit"><i class="fa fa-user-group"></i> Meus amigos</div>
 
+          <!-- Lobby social (5.2): juntar a galera ANTES de escolher o
+               jogo. Fica no alto da seção — é a primeira coisa que faz
+               sentido oferecer a quem abriu "Meus amigos" pensando em
+               jogar com alguém. Abre por cima deste painel. -->
+          <button type="button" class="cli-amigos-lobby-btn" onclick="cliAbrirLobby()">
+            <i class="fa fa-users"></i>
+            <span>Jogar em grupo</span>
+            <i class="fa fa-chevron-right"></i>
+          </button>
+
           <!-- Convites pra jogar (4.4): só aparece quando há algum.
                Quem preenche é a escuta de gameInvites/{uid}, que fica
                viva enquanto a conta estiver logada. -->
@@ -3612,6 +3622,28 @@
             <span class="row-label">Sair da conta</span>
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Lobby social (Etapa 5.2) ══
+       Tela de "jogar em grupo". O corpo é desenhado pelo JS (bloco
+       LOBBY SOCIAL — UI em app.js) a partir do que o
+       AngatubaLobby.observar entrega: fora de lobby, dentro dele, ou
+       deslogado. Aqui fica só a casca, na mesma sheet do painel de
+       conta. Abre EM CIMA dele — o handler de popstate testa este
+       overlay antes do #modal-cli-conta. -->
+  <div class="modal-overlay" id="modal-lobby" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Jogar em <span>grupo</span></div>
+        </div>
+        <button class="modal-close" onclick="cliFecharLobby()" aria-label="Fechar">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="lobby-corpo" id="lobby-corpo"></div>
       </div>
     </div>
   </div>

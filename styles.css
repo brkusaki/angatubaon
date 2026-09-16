@@ -7529,6 +7529,21 @@ body.aprender-fs-open .apr-tela-licao {
       color: #22c55e; font-weight: 700;
     }
 
+    /* ── Faixa "partida em andamento" (5.3) ──
+       Mesma caixa do código do lobby, em verde: é o estado, não um
+       botão. O código da sala herda o tabular do resto e não quebra
+       linha — é o que a pessoa lê pra conferir se caiu na sala certa. */
+    .lobby-emjogo {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 10px 12px; border-radius: var(--r-md);
+      background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.32);
+    }
+    .lobby-emjogo .lobby-tag { margin-right: 0; }
+    .lobby-emjogo-txt {
+      flex: 1; min-width: 0; font-size: 13px; color: var(--text);
+    }
+    .lobby-emjogo-txt b { letter-spacing: 0.08em; white-space: nowrap; }
+
     /* "Chamar pro lobby" na fileira de jogos do amigo: ocupa a linha
        inteira acima dos jogos, porque não é um jogo. */
     .cli-amigo-jogo.lobby {

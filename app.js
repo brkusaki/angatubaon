@@ -17215,6 +17215,10 @@ ${urlCard}`)}`;
       if (!r || typeof r.then !== 'function') return r;
       return r.then(function (codigo) {
         _convEnviarSePendente(nomeApi, codigo);
+        // 5.3: o lobby usa o MESMO embrulho pra descobrir o código da
+        // sala que acabou de nascer. Um embrulho só por API — duas
+        // formas de espiar o criarSala seriam duas formas de errar.
+        _lobCapturarSala(nomeApi, codigo);
         return codigo;
       });
     };
@@ -17757,7 +17761,9 @@ ${urlCard}`)}`;
                               devolve a função de parar de ouvir
        definirPronto(bool) -> Promise (o membro marca o próprio pronto)
        sugerirJogo(jogo)   -> Promise (só o anfitrião)
-       iniciarJogo()       -> STUB: rejeita; é a 5.3
+       iniciarJogo()       -> Promise<{jogo, automatico, aviso}> (5.3)
+       entrarNaPartida()   -> Promise (entrar/voltar na sala apontada)
+       encerrarPartida()   -> Promise (só o anfitrião; volta a 'aberto')
 
      Estado entregue por meuLobby()/observar():
        { codigo, lobbyId, status, jogoSugerido, codigoSalaJogo,
@@ -17769,6 +17775,23 @@ ${urlCard}`)}`;
   var LOB_MAX_MEMBROS = 6;     // ver comentário acima; regra não conta filhos
   var LOB_COD_TENT = 6;        // sorteios antes de desistir (colisão)
 
+  /* ── 5.3: quanta gente cabe em cada jogo ──────────────────────
+     O lobby vai a 6, mas cada jogo tem o teto DELE. Os números são
+     os dos próprios módulos (MAX_JOGADORES da Party = 4; o Uno do
+     baralho vai a 8, o Truco a 4 — fica o maior, porque o modo só é
+     escolhido lá dentro), repetidos aqui porque party.js/baralho.js
+     só carregam quando alguém abre o jogo, e a checagem precisa
+     acontecer ANTES disso, no lobby.
+
+     LOB_JOGO_EXATO marca quem NÃO aceita sobra: Ping Pong e Tanques
+     são 1x1: o terceiro não fica de fora, ele simplesmente não tem
+     onde entrar — então ali a gente barra em vez de avisar. */
+  var LOB_JOGO_MAX   = { pingpong: 2, tanques: 2, party: 4, baralho: 8 };
+  var LOB_JOGO_EXATO = { pingpong: true, tanques: true };
+  var LOB_MIN_MEMBROS = 2;                 // sozinho não é partida em grupo
+  var LOB_PENDENTE_MS = 5 * 60 * 1000;     // janela pro código da sala aparecer
+  var LOB_FECHAR_MS   = 220;               // folga pro popstate do overlay (ver cliConviteEntrar)
+
   var _lobCodigo = null;       // código do lobby em que estou, ou null
   var _lobUid = null;          // uid que está no lobby (guarda troca de conta)
   var _lobAnfitriao = false;   // sou o anfitrião deste lobby
@@ -17779,6 +17802,9 @@ ${urlCard}`)}`;
   var _lobEstado = null;       // último estado normalizado, ou null
   var _lobPronto = false;      // meu "pronto", guardado à parte (ver reconexão)
   var _lobSubs = [];           // callbacks de observar()
+  var _lobPendente = null;     // 5.3: {jogo, ate} esperando o código da sala
+  var _lobSalaVista = null;    // 5.3: codigoSalaJogo que já me levou pra dentro
+  var _lobIndoPraSala = false; // 5.3: uma entrada em voo (guarda de corrida)
 
   // Mesmo ctx de amigos/convites ({db, uid}), só com a mensagem no
   // vocabulário daqui — quem cai nesse erro está tentando abrir lobby,
@@ -17874,6 +17900,10 @@ ${urlCard}`)}`;
     _lobRef = null; _lobValCb = null; _lobConnRef = null; _lobConnCb = null;
     _lobCodigo = null; _lobUid = null; _lobAnfitriao = false; _lobEstado = null;
     _lobPronto = false;
+    // 5.3: saí deste lobby — nada do que ele apontava vale mais. Sem
+    // isto, entrar em OUTRO lobby herdaria a guarda do anterior e a
+    // sala nova poderia passar batida.
+    _lobPendente = null; _lobSalaVista = null; _lobIndoPraSala = false;
   }
 
   /* Arma (ou rearma) o onDisconnect desta sessão. O anfitrião derruba
@@ -17908,6 +17938,11 @@ ${urlCard}`)}`;
       }
       _lobEstado = est;
       _lobAvisar();
+      // 5.3: o nó passou a apontar pra uma sala de jogo — quem ainda
+      // não está lá dentro é levado. Depois do _lobAvisar de
+      // propósito: a UI já desenhou o estado novo quando (e se) a
+      // tela do jogo subir por cima.
+      _lobTalvezEntrarNaSala(est);
     };
     _lobRef.on('value', _lobValCb, function () { _lobEncerrado(); });
 
@@ -18040,6 +18075,186 @@ ${urlCard}`)}`;
     }).catch(function (err) { throw _lobErro(err); });
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     COMEÇAR A PARTIDA PELO LOBBY — Etapa 5.3
+     ------------------------------------------------------------
+     O que faltava pro lobby servir pra alguma coisa: até aqui o
+     grupo se juntava, escolhia o jogo e... abria a sala na mão, cada
+     um pelo hub, ditando código. A 5.3 fecha o circuito — o
+     anfitrião toca "Começar a partida" e todo mundo cai na mesma
+     sala.
+
+     A SALA NASCE PELA TELA DO JOGO, NÃO PELA API CRUA. Essa é a
+     decisão que sustenta o resto. Chamar `AngatubaMP.criarSala()`
+     por fora criaria uma sala ÓRFÃ: o RTDB teria a sala, mas a tela
+     do Ping Pong continuaria no menu, sem saber que ela existe e sem
+     mostrar o código nem o "aguardando adversário". É exatamente a
+     razão pela qual o convite 4.4 também não cria sala sozinho. Aqui
+     o caminho é o mesmo dele: abre a tela do jogo, embrulha o
+     criarSala daquela API pra espiar o código, e dispara o MESMO
+     botão que a pessoa tocaria (`_ppCriarSala` / `_tqCriarSala` /
+     `_ptyCriarSala`, já expostos desde antes). Nenhum arquivo de
+     jogo precisou mudar pra 5.3.
+
+     SALA DO LOBBY NASCE PRIVADA. O único enfeite antes do disparo é
+     desmarcar "sala pública". Num 1x1 a vaga é uma só: se um
+     desconhecido da lista pública entrar primeiro, o amigo que está
+     no lobby fica de fora — e o grupo não teria como saber por quê.
+
+     BARALHO É A EXCEÇÃO, E DE PROPÓSITO. Truco, Uno e companhia são
+     modos diferentes com números de jogadores diferentes, escolhidos
+     na tela do próprio jogo. Não existe padrão honesto pra chutar
+     daqui — "começar" abre a tela do baralho no seletor de modo e o
+     anfitrião toca "Criar sala" ali. O embrulho captura o código do
+     mesmo jeito e o grupo é levado igual; o que muda é um toque a
+     mais pro anfitrião. `iniciarJogo()` devolve `automatico: false`
+     nesse caso pra UI poder dizer isso em voz alta.
+
+     COMO O GRUPO ENTRA. O anfitrião grava `status: 'em_jogo'` e
+     `codigoSalaJogo` no nó. Todo mundo já está escutando esse nó
+     desde a 5.1 — não precisou de convite, notificação nem nó novo:
+     o snapshot chega e `_lobTalvezEntrarNaSala` abre a tela do jogo
+     e chama o `entrar` do catálogo da 4.4 (`_ppEntrarSala`,
+     `_ptyEntrarSala`, `BaralhoGame.entrarPorCodigo`…).
+
+     UMA VEZ POR CÓDIGO. `_lobSalaVista` guarda o código que já me
+     levou pra dentro. Sem ele, todo snapshot do lobby (alguém marca
+     "pronto", alguém entra) reabriria o jogo, e quem saiu da partida
+     de propósito seria arrastado de volta pra sempre. O anfitrião
+     marca a guarda ANTES de escrever no nó — a escrita dele volta
+     pela própria escuta, e ele já está na sala.
+
+     O LOBBY NÃO SOME. `status: 'em_jogo'` mantém o nó de pé, com a
+     lista de gente e o jogo escolhido. "Encerrar a partida" (só o
+     anfitrião) devolve `status: 'aberto'` e limpa o código — o grupo
+     volta pra escolher outro jogo sem refazer o lobby, que era o
+     ponto do lobby existir.
+
+     O QUE NÃO DÁ PRA FAZER AINDA — voltar sozinho. Sair da tela do
+     jogo NÃO devolve o lobby pra 'aberto': os jogos não avisam
+     ninguém quando a partida acaba ou quando a pessoa fecha a tela,
+     e inventar essa ponte seria mexer em quatro módulos de jogo pra
+     resolver o que um botão resolve. Então o lobby fica 'em_jogo'
+     até o anfitrião encerrar (ou até ele cair, e aí o lobby some
+     inteiro, como sempre). Está na tela, escrito, pra ninguém achar
+     que travou.
+  ══════════════════════════════════════════════════════════════ */
+
+  /* Fecha o overlay do lobby e espera a folga do popstate antes de
+     deixar a tela do jogo subir — mesma disciplina do
+     cliConviteEntrar, que fecha o painel de conta e só então abre o
+     jogo. Sem a folga, o `history.back()` do lobby chegaria DEPOIS
+     do push do hub e fecharia a tela errada. */
+  function _lobFecharUiEEsperar() {
+    if (!_lobUiAberto()) return Promise.resolve();
+    cliFecharLobby();
+    return new Promise(function (r) { setTimeout(r, LOB_FECHAR_MS); });
+  }
+
+  /* Dispara o "criar sala" pela tela do jogo (ver o cabeçalho: sala
+     criada por fora nasce órfã). Devolve true se deu pra disparar
+     sozinho; false quando a escolha é do anfitrião (baralho). */
+  function _lobDispararCriar(jogo) {
+    var idCheck = jogo === 'pingpong' ? 'pp-publica-check'
+                : jogo === 'tanques'  ? 'tq-publica-check'
+                : jogo === 'party'    ? 'pty-publica-check' : '';
+    var chk = idCheck ? document.getElementById(idCheck) : null;
+    if (chk) chk.checked = false;   // sala do lobby é do grupo
+    if (jogo === 'pingpong' && typeof window._ppCriarSala  === 'function') { window._ppCriarSala();  return true; }
+    if (jogo === 'tanques'  && typeof window._tqCriarSala  === 'function') { window._tqCriarSala();  return true; }
+    if (jogo === 'party'    && typeof window._ptyCriarSala === 'function') { window._ptyCriarSala(); return true; }
+    return false;
+  }
+
+  /* Chamado pelo embrulho de criarSala da 4.4 toda vez que uma sala
+     nasce. Se este lobby estava esperando por ela, o nó passa a
+     apontar pra sala — e é a escuta de cada um que leva o grupo pra
+     dentro. */
+  function _lobCapturarSala(nomeApi, codigo) {
+    var p = _lobPendente;
+    if (!p || !codigo || !_lobRef || !_lobAnfitriao) return;
+    // A sala é de outro jogo da mesma API (o anfitrião desistiu do
+    // Ping Pong e criou uma de Tanques na mesma tela): não é esta.
+    if ((CONV_API_JOGOS[nomeApi] || []).indexOf(p.jogo) < 0) return;
+    _lobPendente = null;
+    if (Date.now() > p.ate) return;   // demorou demais: o pedido caducou
+    var cod = String(codigo).toUpperCase();
+    // Antes da escrita: eu criei a sala, já estou nela. A guarda evita
+    // que a minha própria escuta me mande "entrar" de novo.
+    _lobSalaVista = cod;
+    _lobRef.update({ status: 'em_jogo', codigoSalaJogo: cod }).catch(function () {
+      if (typeof showToastSimples === 'function') {
+        showToastSimples('A sala abriu, mas não deu pra avisar o lobby. Passe o código ' + cod + ' pra galera.', '/webp/owl-sign.webp');
+      }
+    });
+  }
+
+  /* Abre a tela do jogo e entra na sala apontada pelo lobby. Serve a
+     entrada automática e o botão "Entrar na partida" — é o mesmo
+     caminho, e por isso a guarda mora aqui e não no chamador. */
+  function _lobEntrarNaSala(jogo, codigo, aMao) {
+    var cfg = CONV_JOGOS[jogo];
+    if (!cfg) return Promise.reject(new Error('Jogo desconhecido.'));
+    if (_lobIndoPraSala) return Promise.resolve();
+    _lobIndoPraSala = true;
+    _lobSalaVista = codigo;
+    if (typeof showToastSimples === 'function') {
+      showToastSimples(aMao ? 'Voltando pra sala ' + codigo + '…' : 'A partida começou! Entrando na sala…',
+                       '/webp/owl-marching.webp');
+    }
+    return _lobFecharUiEEsperar().then(function () {
+      return _convAbrirTelaJogo(jogo);
+    }).then(function () {
+      cfg.entrar(codigo);
+      _lobIndoPraSala = false;
+    }).catch(function (err) {
+      _lobIndoPraSala = false;
+      _lobSalaVista = null;   // deixa tentar de novo pelo botão da tela
+      throw new Error((err && err.message) || 'Não deu pra abrir o jogo. Tente de novo pelo lobby.');
+    });
+  }
+
+  /* Cada snapshot passa por aqui. Só age quando o lobby aponta pra
+     uma sala que eu ainda não vi — ver "UMA VEZ POR CÓDIGO". */
+  function _lobTalvezEntrarNaSala(est) {
+    if (!est || est.status !== 'em_jogo') return;
+    if (!est.codigoSalaJogo || !est.jogoSugerido) return;
+    if (_lobIndoPraSala || _lobSalaVista === est.codigoSalaJogo) return;
+    _lobEntrarNaSala(est.jogoSugerido, est.codigoSalaJogo).catch(function (err) {
+      if (typeof showToastSimples === 'function') {
+        showToastSimples((err && err.message) || 'Não deu pra entrar na partida.', '/webp/owl-sign.webp');
+      }
+    });
+  }
+
+  /* Por que este lobby NÃO pode começar agora. String vazia = pode.
+     Vive aqui, e não na UI, porque `iniciarJogo` precisa da mesma
+     resposta — a UI só a repete antes do toque. */
+  function _lobPorQueNaoComecar(est) {
+    if (!est) return 'Você não está num lobby.';
+    if (!est.souAnfitriao) return 'Só quem abriu o lobby começa a partida.';
+    var jogo = est.jogoSugerido;
+    if (!jogo || !CONV_JOGOS[jogo]) return 'Escolha um jogo pra liberar o começo.';
+    var n = est.membros.length;
+    if (n < LOB_MIN_MEMBROS) {
+      return 'Falta gente: chame pelo menos mais uma pessoa pro lobby.';
+    }
+    if (LOB_JOGO_EXATO[jogo] && n > LOB_JOGO_MAX[jogo]) {
+      return CONV_JOGOS[jogo].nome + ' é 1x1 e vocês são ' + n + '. Escolham Party ou Baralho — ou fiquem só em 2 no lobby.';
+    }
+    return '';
+  }
+
+  /* O recado que não impede de começar: Party/Baralho aceitam menos
+     gente que o lobby comporta, e quem sobrar entra na próxima. */
+  function _lobAvisoLotacao(est) {
+    var jogo = est && est.jogoSugerido;
+    var teto = jogo ? LOB_JOGO_MAX[jogo] : 0;
+    if (!teto || LOB_JOGO_EXATO[jogo] || est.membros.length <= teto) return '';
+    return CONV_JOGOS[jogo].nome + ' vai até ' + teto + ' jogadores e vocês são ' +
+      est.membros.length + ' — quem chegar depois fica de fora desta.';
+  }
+
   window.AngatubaLobby = {
     disponivel: function () { return !!_lobCodigo && _cliContaReal(_cliUser); },
     limite: function () { return LOB_MAX_MEMBROS; },
@@ -18093,13 +18308,73 @@ ${urlCard}`)}`;
         .catch(function (err) { throw _lobErro(err); });
     },
 
-    /* STUB DA 5.1 — abrir a sala do jogo a partir do lobby, gravar o
-       codigoSalaJogo e levar o grupo pra dentro é a 5.3. A assinatura
-       já fica no lugar pra a UI da 5.2 poder chamar e mostrar a
-       mensagem certa em vez de quebrar. */
+    /* 5.3 — o anfitrião começa a partida. Abre a tela do jogo e
+       deixa a sala nascer pelo caminho normal dele; o nó só passa a
+       apontar pra sala quando o código aparece (ver
+       _lobCapturarSala). Resolve assim que a tela do jogo está de
+       pé, não quando a sala existe: a promise é "o caminho está
+       aberto", e o resto o grupo vê acontecer no nó.
+
+       Devolve { jogo, automatico, aviso }:
+         automatico=false -> o anfitrião ainda toca "Criar sala" na
+                             tela do jogo (baralho; ver cabeçalho)
+         aviso            -> lotação acima do teto do jogo, sem
+                             impedir (Party/Baralho) */
     iniciarJogo: function () {
-      return Promise.reject(new Error('Ainda não dá pra começar a partida pelo lobby — isso chega na próxima etapa.'));
-    }
+      var est = _lobEstado;
+      var motivo = _lobPorQueNaoComecar(est);
+      if (motivo) return Promise.reject(new Error(motivo));
+      if (!_lobRef) return Promise.reject(new Error('Você não está num lobby.'));
+      if (est.status === 'em_jogo' && est.codigoSalaJogo) {
+        return Promise.reject(new Error('A partida já começou — use "Entrar na partida".'));
+      }
+      var jogo = est.jogoSugerido;
+      var aviso = _lobAvisoLotacao(est);
+      _lobPendente = { jogo: jogo, ate: Date.now() + LOB_PENDENTE_MS };
+      _lobSalaVista = null;
+      return _lobFecharUiEEsperar().then(function () {
+        return _convAbrirTelaJogo(jogo);
+      }).then(function () {
+        // O embrulho só pode ser pendurado com o módulo do jogo já
+        // carregado — window.AngatubaMP/Party/Baralho nascem com ele.
+        _convEnvolverCriar(jogo);
+        return { jogo: jogo, automatico: _lobDispararCriar(jogo), aviso: aviso };
+      }).catch(function (err) {
+        _lobPendente = null;
+        throw _lobErro(err);
+      });
+    },
+
+    /* Entrar (ou VOLTAR) na sala que o lobby está apontando. É o
+       mesmo caminho da entrada automática — quem saiu da partida sem
+       querer volta por aqui, e quem chegou depois do começo também. */
+    entrarNaPartida: function () {
+      var est = _lobEstado;
+      if (!est || est.status !== 'em_jogo' || !est.codigoSalaJogo || !est.jogoSugerido) {
+        return Promise.reject(new Error('Não tem partida em andamento neste lobby.'));
+      }
+      return _lobEntrarNaSala(est.jogoSugerido, est.codigoSalaJogo, true)
+        .catch(function (err) { throw _lobErro(err); });
+    },
+
+    /* Devolve o lobby pro estado 'aberto' e larga o código da sala.
+       NÃO encosta na sala do jogo: quem ainda estiver jogando segue
+       jogando: o lobby só para de apontar pra lá e volta a ser o
+       cômodo onde se escolhe o próximo. */
+    encerrarPartida: function () {
+      if (!_lobRef || !_lobAnfitriao) {
+        return Promise.reject(new Error('Só quem abriu o lobby encerra a partida.'));
+      }
+      _lobPendente = null;
+      _lobSalaVista = null;
+      return _lobRef.update({ status: 'aberto', codigoSalaJogo: null })
+        .catch(function (err) { throw _lobErro(err); });
+    },
+
+    /* A UI da 5.2 pergunta as duas coisas antes de desenhar o botão:
+       por que está travado, e o que avisar se não estiver. */
+    porQueNaoComecar: function () { return _lobPorQueNaoComecar(_lobEstado); },
+    avisoLotacao: function () { return _lobAvisoLotacao(_lobEstado); }
   };
 
   /* ══════════════════════════════════════════════════════════════
@@ -18110,11 +18385,13 @@ ${urlCard}`)}`;
      entrar por código, ver quem está, marcar "pronto", o anfitrião
      apontar o jogo da vez, e sair.
 
-     CRIAR A SALA DO JOGO A PARTIR DO LOBBY CONTINUA FORA — é a 5.3.
-     O botão "Começar" existe, desenhado, e vem DESABILITADO com o
-     recado na tela. Nenhum fluxo de criarSala é chamado daqui, e o
-     `iniciarJogo()` (que é stub e rejeita) não é chamado por botão
-     nenhum: não adianta pedir pra API o que ela ainda não faz.
+     O BOTÃO "COMEÇAR" GANHOU FUNÇÃO NA 5.3. Ele deixa de ser enfeite
+     desabilitado e chama `AngatubaLobby.iniciarJogo()`. Continua
+     travado quando não dá pra começar — mas agora o motivo é o
+     mesmo que a API usaria (`porQueNaoComecar()`), escrito embaixo
+     do botão em vez de um "chega na próxima etapa". Com a partida em
+     curso, o bloco vira "Entrar na partida" + "Encerrar a partida"
+     (este só pro anfitrião).
 
      POR ONDE SE CHEGA
        1. Painel de conta -> "Meus amigos" -> botão "Jogar em grupo".
@@ -18159,6 +18436,7 @@ ${urlCard}`)}`;
        cliLobbyCriar / cliLobbyEntrar / cliLobbySair
        cliLobbyCopiar / cliLobbyPronto / cliLobbySugerir
        cliLobbyChamar(uid)
+       cliLobbyComecar / cliLobbyEntrarPartida / cliLobbyEncerrarPartida (5.3)
   ══════════════════════════════════════════════════════════════ */
 
   var _lobUiUnsub = null;     // desliga o observar() da 5.1
@@ -18199,9 +18477,10 @@ ${urlCard}`)}`;
      lobbies (o segundo apagando o primeiro no sair implícito).
 
      `data-travar="nao"` marca quem fica de fora nos DOIS sentidos —
-     o "Copiar", que não precisa esperar nada, e o "Começar", que é
-     desabilitado de propósito até a 5.3 e não pode ser reabilitado
-     de brinde quando a trava solta. */
+     o "Copiar", que não precisa esperar nada, e o "Começar" quando
+     ele está travado por falta de gente ou de jogo (5.3): soltar a
+     trava não pode reabilitá-lo de brinde. Com o "Começar" liberado,
+     a marca não vai, e ele trava junto com o resto. */
   function _lobUiTravar(on) {
     _lobUiOcupado = !!on;
     var box = document.getElementById('lobby-corpo');
@@ -18347,23 +18626,53 @@ ${urlCard}`)}`;
         (euPronto ? 'Estou pronto' : 'Marcar que estou pronto') +
       '</button>';
 
-    html += '<div class="lobby-sec-tit"><span>O que vamos jogar</span></div>';
-    if (est.souAnfitriao) {
-      html += _lobUiHtmlJogos(est) +
+    /* 5.3 — com a partida em curso o bloco inteiro muda de assunto:
+       não é mais "o que vamos jogar", é "a partida está lá". Os chips
+       de jogo somem no caminho de propósito: trocar o jogo escolhido
+       com o grupo dentro de uma sala só confundiria quem está lá. */
+    var emJogo = (est.status === 'em_jogo' && !!est.codigoSalaJogo && !!jogo);
+
+    if (emJogo) {
+      html +=
+        '<div class="lobby-sec-tit"><span>Partida em andamento</span></div>' +
+        '<div class="lobby-emjogo">' +
+          '<span class="lobby-tag ok">Em partida</span>' +
+          '<span class="lobby-emjogo-txt">' + jogo.emoji + ' ' + escHTML(jogo.nome) +
+            ' · sala <b>' + escHTML(est.codigoSalaJogo) + '</b></span>' +
+        '</div>' +
+        '<button type="button" class="lobby-btn grande" onclick="cliLobbyEntrarPartida()">' +
+          '<i class="fa fa-play"></i> Entrar na partida</button>' +
+        '<p class="lobby-dica breve">Saiu sem querer ou chegou agora? É por aqui que se volta pra sala.</p>';
+      if (est.souAnfitriao) {
+        html +=
+          '<button type="button" class="lobby-btn" onclick="cliLobbyEncerrarPartida()">' +
+            '<i class="fa fa-flag-checkered"></i> Encerrar a partida</button>' +
+          '<p class="lobby-dica breve">O lobby não some enquanto a partida rola — e ele só volta a "escolher jogo" quando você encerra aqui.</p>';
+      }
+    } else if (est.souAnfitriao) {
+      var motivo = window.AngatubaLobby.porQueNaoComecar();
+      var avisoLot = motivo ? '' : window.AngatubaLobby.avisoLotacao();
+      html += '<div class="lobby-sec-tit"><span>O que vamos jogar</span></div>' +
+        _lobUiHtmlJogos(est) +
         '<p class="lobby-dica">' +
           (jogo ? 'Escolhido: <b>' + jogo.emoji + ' ' + escHTML(jogo.nome) + '</b> — dá pra trocar quando quiser.'
                 : 'Escolha um jogo — o grupo continua o mesmo se você trocar depois.') +
         '</p>' +
-        // 5.3: aqui é onde a sala do jogo vai nascer. Desabilitado de
-        // propósito — e sem onclick nenhum, pra não haver caminho
-        // acidental pra um criarSala que ainda não existe.
-        '<button type="button" class="lobby-btn grande" disabled data-travar="nao" ' +
-          'title="Chega na próxima etapa">' +
+        // Travado, ele carrega o data-travar="nao" pra trava de
+        // criar/entrar não reabilitá-lo ao soltar (ver _lobUiTravar).
+        '<button type="button" class="lobby-btn grande" onclick="cliLobbyComecar()"' +
+          (motivo ? ' disabled data-travar="nao" title="' + escHTML(motivo) + '"' : '') + '>' +
           '<i class="fa fa-play"></i> Começar a partida</button>' +
-        '<p class="lobby-dica breve">Em breve — próxima etapa. Por enquanto, combinem o jogo aqui e abram a sala pelo hub de jogos, como sempre.</p>';
+        '<p class="lobby-dica breve">' +
+          (motivo ? escHTML(motivo)
+                  : (avisoLot ? escHTML(avisoLot)
+                              : 'Todo mundo aqui cai na mesma sala — ninguém precisa ditar código.')) +
+        '</p>';
     } else {
-      html += '<p class="lobby-dica">' +
-        (jogo ? 'O anfitrião escolheu <b>' + jogo.emoji + ' ' + escHTML(jogo.nome) + '</b>.'
+      html += '<div class="lobby-sec-tit"><span>O que vamos jogar</span></div>' +
+        '<p class="lobby-dica">' +
+        (jogo ? 'O anfitrião escolheu <b>' + jogo.emoji + ' ' + escHTML(jogo.nome) +
+                '</b>. Quando ele começar, você entra na sala sozinho.'
               : 'O anfitrião ainda não escolheu.') + '</p>';
     }
 
@@ -18555,6 +18864,57 @@ ${urlCard}`)}`;
     });
   }
 
+  /* ── 5.3: começar, entrar e encerrar a partida ─────────────────
+     As três chamam a API e deixam o resto acontecer pelo nó. A
+     mensagem de erro vai POR TOAST além do #lobby-msg: quando
+     iniciarJogo/entrarNaPartida falham, o overlay do lobby já
+     fechou, e o recado escrito lá dentro ninguém veria. */
+  function _lobUiFalharComToast(err) {
+    _lobUiFalhar(err);
+    if (typeof showToastSimples === 'function') {
+      showToastSimples((err && err.message) || 'Algo deu errado. Tente de novo.', '/webp/owl-sign.webp');
+    }
+  }
+
+  function cliLobbyComecar() {
+    if (_lobUiOcupado) return;
+    var motivo = window.AngatubaLobby.porQueNaoComecar();
+    if (motivo) { _lobUiMsg(motivo, 'erro'); return; }
+    _lobUiMsg('Abrindo a sala do jogo…', '');
+    _lobUiTravar(true);
+    window.AngatubaLobby.iniciarJogo().then(function (r) {
+      _lobUiTravar(false);
+      _lobUiMsg('', '');
+      // Um toast só: dois empilhados no meio da abertura do jogo
+      // viram ruído em cima da tela que acabou de subir.
+      var recado = r.automatico
+        ? '' : 'Escolha o modo e toque em "Criar sala" — a galera entra sozinha.';
+      if (r.aviso) recado = r.aviso + (recado ? ' ' + recado : '');
+      if (recado && typeof showToastSimples === 'function') {
+        showToastSimples(recado, '/webp/owl-point.webp');
+      }
+    }).catch(_lobUiFalharComToast);
+  }
+
+  function cliLobbyEntrarPartida() {
+    if (_lobUiOcupado) return;
+    _lobUiMsg('Entrando na partida…', '');
+    _lobUiTravar(true);
+    window.AngatubaLobby.entrarNaPartida().then(function () {
+      _lobUiTravar(false);
+      _lobUiMsg('', '');
+    }).catch(_lobUiFalharComToast);
+  }
+
+  function cliLobbyEncerrarPartida() {
+    if (_lobUiOcupado) return;
+    _lobUiTravar(true);
+    window.AngatubaLobby.encerrarPartida().then(function () {
+      _lobUiTravar(false);
+      _lobUiMsg('Partida encerrada — escolham o próximo jogo.', 'ok');
+    }).catch(_lobUiFalhar);
+  }
+
   /* Chamar um amigo pro lobby, da fileira de jogos da lista de amigos.
      É copiar o código + um empurrão pro WhatsApp — ver o cabeçalho
      deste bloco pra por que não virou convite no banco. */
@@ -18589,3 +18949,6 @@ ${urlCard}`)}`;
   window.cliLobbyPronto  = cliLobbyPronto;
   window.cliLobbySugerir = cliLobbySugerir;
   window.cliLobbyChamar  = cliLobbyChamar;
+  window.cliLobbyComecar         = cliLobbyComecar;
+  window.cliLobbyEntrarPartida   = cliLobbyEntrarPartida;
+  window.cliLobbyEncerrarPartida = cliLobbyEncerrarPartida;

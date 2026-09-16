@@ -15472,6 +15472,10 @@ ${urlCard}`)}`;
         // tela aberta — é ela que põe o chip do lobby na faixa de avisos
         // pra quem está na home.
         setTimeout(_lobUiObservar, 2800);
+        // Convites de LOBBY (L1): irmã da caixa de convites de jogo.
+        // Nó diferente (lobbyInvites), assunto diferente — ver o bloco
+        // "CONVIDAR AMIGO PRO LOBBY".
+        setTimeout(_lobConvObservar, 2900);
       } else {
         // Deslogou (ou é sessão anônima de sala): tira do ar.
         _presencaParar();
@@ -15483,6 +15487,7 @@ ${urlCard}`)}`;
         // null do sair não pode virar "o lobby foi encerrado" na tela de
         // quem só deslogou.
         _lobUiSoltar();
+        _lobConvParar();
         _lobSair();
         _avisoLimpar();
         // Código curto (P2) é por conta: o da conta que saiu não pode
@@ -16054,6 +16059,9 @@ ${urlCard}`)}`;
     // Lobby social (5.1/5.2): pelo mesmo motivo da presença acima, e a
     // UI solta antes do sair (ver o onAuthStateChanged).
     _lobUiSoltar();
+    // Convites de lobby (L1): a caixa e o cache de "Convidado" são da
+    // conta que está saindo — nada disso pode sobrar pra próxima.
+    _lobConvParar();
     _lobSair();
     _avisoLimpar();
     // Limpa também o apelido espelhado: sem isto ele sobrevivia no
@@ -18755,6 +18763,9 @@ ${urlCard}`)}`;
       try { _lobUiPres[uid](); } catch (e) {}
     });
     _lobUiPres = {};
+    // A lista "Chamar amigos" (L1) mantém as presenças DELA, com outro
+    // atributo; o redesenho do corpo derruba as duas juntas.
+    _lobAmiSoltarPresencas();
   }
 
   function _lobUiPintarPresenca(uid, p) {
@@ -18824,6 +18835,10 @@ ${urlCard}`)}`;
     var cat = window.AngatubaLobby.jogos();
     var jogo = est.jogoSugerido ? cat[est.jogoSugerido] : null;
     var lim = window.AngatubaLobby.limite();
+    /* 5.3 — com a partida em curso o bloco de baixo muda de assunto.
+       Subiu pra cá na L1 porque a seção "Chamar amigos" também some
+       nesse estado: ninguém entra num lobby que não está 'aberto'. */
+    var emJogo = (est.status === 'em_jogo' && !!est.codigoSalaJogo && !!jogo);
 
     var html = '' +
       '<div class="lobby-cod-box">' +
@@ -18841,6 +18856,17 @@ ${urlCard}`)}`;
         est.membros.map(function (m) { return _lobUiHtmlMembro(m, est.souAnfitriao); }).join('') +
       '</div>';
 
+    /* L1 — chamar amigo direto, sem ditar código. O miolo é pintado
+       pelo _lobAmiRender (que tem a lista e as presenças), não aqui:
+       esta string só reserva o lugar. Qualquer membro convida — as
+       regras pedem amizade entre quem manda e quem recebe, não
+       anfitrião (ver o bloco "CONVIDAR AMIGO PRO LOBBY"). */
+    if (!emJogo) {
+      html +=
+        '<div class="lobby-sec-tit"><span>Chamar amigos</span></div>' +
+        '<div id="lobby-amigos" class="lobby-amigos"></div>';
+    }
+
     // "Estou pronto" — cada um marca o seu (a regra só deixa o próprio).
     var euPronto = false;
     for (var i = 0; i < est.membros.length; i++) {
@@ -18853,12 +18879,10 @@ ${urlCard}`)}`;
         (euPronto ? 'Estou pronto' : 'Marcar que estou pronto') +
       '</button>';
 
-    /* 5.3 — com a partida em curso o bloco inteiro muda de assunto:
-       não é mais "o que vamos jogar", é "a partida está lá". Os chips
-       de jogo somem no caminho de propósito: trocar o jogo escolhido
-       com o grupo dentro de uma sala só confundiria quem está lá. */
-    var emJogo = (est.status === 'em_jogo' && !!est.codigoSalaJogo && !!jogo);
-
+    /* Com a partida em curso o bloco inteiro muda de assunto: não é
+       mais "o que vamos jogar", é "a partida está lá". Os chips de jogo
+       somem no caminho de propósito — trocar o jogo escolhido com o
+       grupo dentro de uma sala só confundiria quem está lá. */
     if (emJogo) {
       html +=
         '<div class="lobby-sec-tit"><span>Partida em andamento</span></div>' +
@@ -18932,6 +18956,9 @@ ${urlCard}`)}`;
     if (!_cliContaReal(_cliUser)) { box.innerHTML = _lobUiHtmlDeslogado(); return; }
     box.innerHTML = est ? _lobUiHtmlDentro(est) : _lobUiHtmlFora();
     if (est) _lobUiLigarPresencas(est);
+    // L1: o miolo do "Chamar amigos" entra depois do corpo montado —
+    // ele depende da lista de amigos, que tem escuta própria.
+    _lobAmiRender();
     _lobUiPintarMsg();
     if (_lobUiOcupado) _lobUiTravar(true);
   }
@@ -18961,6 +18988,7 @@ ${urlCard}`)}`;
   function _lobUiSoltar() {
     if (_lobUiUnsub) { try { _lobUiUnsub(); } catch (e) {} _lobUiUnsub = null; }
     _lobUiSoltarPresencas();
+    _lobAmiSoltar();
     _lobUiTinha = false;
     _lobUiOcupado = false;
     _lobUiMsgAtual = null;
@@ -18982,6 +19010,9 @@ ${urlCard}`)}`;
       history.pushState({ modal: 'lobby' }, '');
     }
     _lobUiObservar();
+    // L1: a lista de amigos vive só com a tela aberta (igual à do
+    // painel de conta) — são listeners de RTDB.
+    _lobAmiLigar();
     _lobUiRender(_cliContaReal(_cliUser) ? window.AngatubaLobby.meuLobby() : null);
     _lobUiPintarPill(window.AngatubaLobby.meuLobby());
   }
@@ -18990,6 +19021,7 @@ ${urlCard}`)}`;
     var overlay = _lobUiEl();
     if (overlay) overlay.classList.remove('open');
     _lobUiSoltarPresencas();
+    _lobAmiSoltar();
     // O painel de conta pode ter ficado aberto por baixo — nesse caso o
     // scroll do body continua travado, que é o estado certo pra ele.
     var conta = document.getElementById('modal-cli-conta');
@@ -19166,6 +19198,426 @@ ${urlCard}`)}`;
       pronto(false);
     }
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     CONVIDAR AMIGO PRO LOBBY — Etapa L1
+     ------------------------------------------------------------
+     Até a 5.2, "chamar pro lobby" era copiar 6 caracteres e mandar
+     no Zap. Funciona, mas é o único lugar do social onde a pessoa
+     ainda precisa DIGITAR alguma coisa: o pedido de amizade (4.3) e
+     o convite pra jogar (4.4) já chegam como card no topo com um
+     botão. Aqui o lobby ganha o mesmo tratamento — com o lobby
+     aberto, você vê a lista de amigos, toca "Convidar", e do outro
+     lado aparece "Fulano te chamou pro lobby XXXXXX · Aceitar".
+     Aceitar ENTRA no lobby. Nenhum código passa pela mão de
+     ninguém.
+
+     NÓ NOVO, e de propósito não é o gameInvites da 4.4:
+
+       lobbyInvites/{paraUid}/{deUid} = {
+         nome, codigoLobby, em, expiraEm
+       }
+
+     São coisas diferentes e misturá-las custaria caro. O gameInvites
+     carrega `jogo` + `codigo` de uma SALA DE JOGO que já existe, e a
+     chave dele é `{deUid}_{jogo}` porque uma pessoa pode te chamar
+     pro Truco e pro Ping Pong ao mesmo tempo. O lobby não tem jogo
+     nenhum escolhido ainda, e uma pessoa só pode te chamar pro lobby
+     em que ELA está — um por vez. Então a chave aqui é só o `deUid`:
+     reconvidar SOBRESCREVE em vez de empilhar, e o teto da sua caixa
+     é o número de amigos que você mesmo aceitou.
+
+     REGRAS (ver database.rules.json): escrever exige `de == auth.uid`
+     E `friends/{de}/{para}` — ou seja, só amigo de verdade convida,
+     mesma trava do gameInvites. Ler e apagar, só o dono da caixa;
+     cancelar, só quem mandou. Não existe `.read` na raiz, então
+     ninguém varre as caixas do app. `expiraEm` é 12 min no cliente,
+     com teto de 1h na regra (mesmo raciocínio da 4.4: teto de
+     sanidade, quem filtra o velho na tela é o cliente).
+
+     QUALQUER MEMBRO CONVIDA, não só o anfitrião. As regras pedem
+     amizade entre quem manda e quem recebe, e o anfitrião não é
+     necessariamente amigo dos amigos dos outros — exigir que tudo
+     passasse por ele deixaria metade dos convites impossíveis sem
+     ganhar segurança nenhuma (o código do lobby já circula entre
+     todos os membros de qualquer jeito).
+
+     NÃO É PUSH — igual a 4.4 e a P1: o card só chega em quem está
+     com o app aberto e logado. FCM continua sendo outra etapa.
+
+     O CÓDIGO CONTINUA VALENDO como plano B: o botão "Copiar" da tela
+     e o "Chamar pro lobby" da fileira de amigos (5.2) não saíram do
+     lugar. É por eles que se chama quem não é amigo aqui dentro, ou
+     quem está com o app fechado.
+
+     MIC, CHAT E VOZ NÃO EXISTEM NO LOBBY — nem aqui nem em lugar
+     nenhum desta etapa.
+
+     Funções globais (onclick do HTML gerado):
+       cliLobbyConvidar(uid)
+       cliLobbyConviteAceitar(deUid) / cliLobbyConviteRecusar(deUid)
+  ══════════════════════════════════════════════════════════════ */
+
+  var LOBCONV_RAIZ = 'lobbyInvites';
+  var LOBCONV_VALIDADE_MS = 12 * 60 * 1000;   // convite de lobby vale 12 min
+
+  /* ── Lado de quem RECEBE: caixa de entrada ─────────────────────
+     Irmã de _convObservarCaixa (4.4) e de _pedObservarGlobal (P1):
+     vive enquanto a conta nomeada estiver logada, com tela aberta ou
+     fechada — é isso que faz o card chegar em quem está na home. */
+  var _lobConvUnsub = null;     // desliga a escuta da própria caixa
+  var _lobConvUid = null;       // uid que está ouvindo
+  var _lobConvLista = [];       // convites válidos em cache
+  var _lobConvVistos = {};      // "de|codigo" -> true, pra só avisar do novo
+  var _lobConvPrimeira = true;  // primeiro snapshot = caixa que já estava lá
+
+  /* ── Lado de quem CONVIDA ──────────────────────────────────────
+     Só memória de tela: uid -> {codigo, ate}. Serve pra pintar
+     "Convidado" no lugar de "Convidar" sem ir ao banco perguntar o
+     que a gente acabou de escrever. Some no logout. */
+  var _lobConvEnviados = {};
+
+  function _lobConvParar() {
+    if (_lobConvUnsub) { try { _lobConvUnsub(); } catch (e) {} _lobConvUnsub = null; }
+    _lobConvUid = null;
+    _lobConvLista = [];
+    _lobConvVistos = {};
+    _lobConvEnviados = {};
+    _lobConvPrimeira = true;
+  }
+
+  function _lobConvObservar() {
+    if (!_cliContaReal(_cliUser)) return;
+    var uid = _cliUser.uid;
+    if (_lobConvUid === uid) return;
+    _lobConvParar();
+    _lobConvUid = uid;
+    var parado = false, off = function () {};
+    _lobConvUnsub = function () { parado = true; off(); };
+    _amigosCtx().then(function (ctx) {
+      if (parado || ctx.uid !== uid) return;
+      var ref = ctx.db.ref(LOBCONV_RAIZ + '/' + uid);
+      var h = function (snap) { _lobConvReceber(snap.val() || {}); };
+      ref.on('value', h, function () { _lobConvReceber({}); });
+      off = function () { try { ref.off('value', h); } catch (e) {} };
+    }).catch(function () { /* sem RTDB: o app segue igual, só não recebe convite */ });
+  }
+
+  // Apaga um convite da PRÓPRIA caixa (aceitou, recusou ou expirou).
+  function _lobConvApagar(deUid) {
+    if (!deUid || !_lobConvUid) return;
+    _amigosCtx().then(function (ctx) {
+      return ctx.db.ref(LOBCONV_RAIZ + '/' + ctx.uid + '/' + deUid).remove();
+    }).catch(function () {});
+  }
+
+  /* Cada snapshot: descarta o que expirou (e aproveita pra apagar do
+     banco — é a faxina, já que não há Cloud Function), ignora convite
+     pro lobby em que eu JÁ estou, guarda em cache e abre card pro que
+     é novo. A chave do "novo" leva o código junto: reconvidar reusa a
+     mesma chave do nó, e sem isso o segundo convite entraria mudo. */
+  function _lobConvReceber(val) {
+    var agora = Date.now();
+    var lista = [];
+    Object.keys(val || {}).forEach(function (de) {
+      var c = val[de] || {};
+      var cod = _lobNormalizarCodigo(c.codigoLobby);
+      if (!cod) return;
+      var ate = c.expiraEm || ((c.em || agora) + LOBCONV_VALIDADE_MS);
+      if (ate <= agora) { _lobConvApagar(de); return; }
+      // Já estou nesse lobby (entrei pelo código, ou aceitei noutro
+      // aparelho): o convite não tem mais o que oferecer.
+      if (_lobCodigo === cod) { _lobConvApagar(de); return; }
+      lista.push({
+        de: de,
+        nome: String(c.nome || 'Jogador').slice(0, CLI_NOME_MAX),
+        codigo: cod,
+        em: c.em || 0,
+        expiraEm: ate
+      });
+    });
+    lista.sort(function (a, b) { return b.em - a.em; });
+
+    var novos = lista.filter(function (c) { return !_lobConvVistos[c.de + '|' + c.codigo]; });
+    _lobConvVistos = {};
+    lista.forEach(function (c) { _lobConvVistos[c.de + '|' + c.codigo] = true; });
+    _lobConvLista = lista;
+
+    // Sincroniza a pilha do topo com o nó: convite aceito, recusado ou
+    // expirado (aqui ou noutro aparelho) não deixa card pra trás.
+    var vivas = {};
+    lista.forEach(function (c) { vivas['lobconv:' + c.de + '|' + c.codigo] = true; });
+    _avisoSincronizar('lobconv:', vivas);
+
+    var primeira = _lobConvPrimeira;
+    _lobConvPrimeira = false;
+    if (!novos.length) return;
+    // Mesma regra dos pedidos e dos convites de jogo: abrir o app com
+    // a caixa cheia mostra só o mais recente.
+    (primeira ? novos.slice(0, 1) : novos.slice(0, AVISO_MAX))
+      .reverse().forEach(_lobConvAviso);
+  }
+
+  /* ── Card no topo ──────────────────────────────────────────────*/
+  function _lobConvAviso(c) {
+    _avisoMostrar({
+      chave: 'lobconv:' + c.de + '|' + c.codigo,
+      tipo: 'lobby',
+      nome: c.nome,
+      owl: '/webp/owl-marching.webp',
+      texto: 'te chamou pro lobby <b>' + escHTML(c.codigo) + '</b>',
+      acoes: [
+        { rotulo: 'Aceitar', classe: 'ok', fn: function () { cliLobbyConviteAceitar(c.de); } },
+        { rotulo: 'Recusar', classe: 'no', fn: function () { cliLobbyConviteRecusar(c.de); } }
+      ]
+    });
+  }
+
+  function _lobConvToast(msg, owl) {
+    if (typeof showToastSimples === 'function') {
+      showToastSimples(msg, owl || '/webp/owl-sign.webp');
+    }
+  }
+
+  /* Aceitar = entrar no lobby. Apaga o convite ANTES de entrar: ele
+     cumpriu o papel, e deixá-lo na caixa daria um segundo "Aceitar"
+     pra um lobby onde a pessoa já está.
+
+     A folga de LOB_FECHAR_MS é a mesma do cliConviteEntrar (4.4):
+     fechar o painel de conta dispara um history.back(), e a tela do
+     lobby empilha a entrada dela logo em seguida — sem a folga, o
+     popstate atrasado derrubaria a tela que acabou de abrir. Com o
+     painel já fechado, é inofensiva. */
+  function cliLobbyConviteAceitar(deUid) {
+    var c = null;
+    for (var i = 0; i < _lobConvLista.length; i++) {
+      if (_lobConvLista[i].de === deUid) { c = _lobConvLista[i]; break; }
+    }
+    if (!c) { _lobConvToast('Esse convite não está mais valendo.'); return; }
+    _lobConvApagar(deUid);
+    if (Date.now() > c.expiraEm) { _lobConvToast('Esse convite expirou. Peça pra pessoa chamar de novo.'); return; }
+    var codigo = c.codigo, nome = c.nome;
+    cliFecharPainelConta();
+    setTimeout(function () {
+      window.AngatubaLobby.entrar(codigo).then(function () {
+        _lobConvToast('Você entrou no lobby do ' + nome + '!', '/webp/owl-tada.webp');
+        // Com o hub de jogos aberto por cima, não roubamos a tela: o
+        // chip do lobby na faixa de avisos já leva pra lá num toque.
+        var hub = (typeof _gamesHubAberto === 'function' && _gamesHubAberto());
+        if (!hub) cliAbrirLobby();
+      }).catch(function (err) {
+        _lobConvToast((err && err.message) || 'Não deu pra entrar no lobby.');
+      });
+    }, LOB_FECHAR_MS);
+  }
+
+  function cliLobbyConviteRecusar(deUid) { _lobConvApagar(deUid); }
+
+  /* ── Lado de quem convida: escrita no nó ───────────────────────*/
+  function _lobConvErroPt(err) {
+    var msg = String((err && (err.message || err.code)) || '');
+    // O permission_denied aqui tem uma causa provável só: a regra pede
+    // friends/{eu}/{ele}, e a amizade pode ter sido desfeita.
+    if (/permission_denied/i.test(msg)) {
+      return 'Não deu pra convidar. Vocês precisam ser amigos aqui no app.';
+    }
+    return _amigosErroPt(err);
+  }
+
+  function _lobConvEnviar(paraUid, codigo) {
+    return _amigosCtx().then(function (ctx) {
+      // A chave é o próprio remetente: reconvidar sobrescreve.
+      return ctx.db.ref(LOBCONV_RAIZ + '/' + paraUid + '/' + ctx.uid).set({
+        nome: cliNomeExibicao() || 'Jogador',
+        codigoLobby: codigo,
+        em: firebase.database.ServerValue.TIMESTAMP,
+        expiraEm: Date.now() + LOBCONV_VALIDADE_MS
+      });
+    });
+  }
+
+  /* ── Lista de amigos DENTRO da tela do lobby ───────────────────
+     Vive só com o overlay aberto (igual à lista do painel de conta):
+     são listeners de RTDB, e mantê-los com a tela fechada seria
+     tráfego à toa. Quem já é membro do lobby não aparece — o lugar
+     dele é a lista "Na sala", logo acima.
+
+     PRESENÇA com atributo PRÓPRIO (`data-lobami`): a mesma pessoa
+     pode estar desenhada em "Na sala" (data-lobpres) e no painel de
+     conta por baixo (data-pres); três data-pres iguais fariam o
+     querySelector pintar sempre o primeiro. */
+  var _lobAmiUnsub = null;      // desliga o observarAmigos
+  var _lobAmiLista = [];        // [{uid, nome, foto, desde}]
+  var _lobAmiPres = {};         // uid -> 'online'|'away'|'offline'
+  var _lobAmiPresOff = {};      // uid -> função de parar a escuta
+  var _lobAmiTimer = null;      // junta redesenhos de presença
+
+  function _lobAmiSoltarPresencas() {
+    Object.keys(_lobAmiPresOff).forEach(function (uid) {
+      try { _lobAmiPresOff[uid](); } catch (e) {}
+    });
+    _lobAmiPresOff = {};
+  }
+
+  function _lobAmiLigar() {
+    if (_lobAmiUnsub || !_cliContaReal(_cliUser)) return;
+    _lobAmiUnsub = window.AngatubaAmigos.observarAmigos(function (amigos) {
+      _lobAmiLista = amigos || [];
+      _lobAmiRender();
+    });
+  }
+
+  function _lobAmiSoltar() {
+    if (_lobAmiUnsub) { try { _lobAmiUnsub(); } catch (e) {} _lobAmiUnsub = null; }
+    _lobAmiSoltarPresencas();
+    if (_lobAmiTimer) { clearTimeout(_lobAmiTimer); _lobAmiTimer = null; }
+    _lobAmiLista = [];
+    _lobAmiPres = {};
+  }
+
+  // Um redesenho por rajada: ao abrir a tela chega um snapshot de
+  // presença por amigo, e cada um deles pode mudar a ORDEM da lista.
+  function _lobAmiRenderBreve() {
+    if (_lobAmiTimer) return;
+    _lobAmiTimer = setTimeout(function () { _lobAmiTimer = null; _lobAmiRender(); }, 120);
+  }
+
+  /* Uma escuta de presence/{uid} por amigo listado — o único acesso
+     que as regras dão (não existe listar presence/). Solta quem saiu
+     da lista e não reassina quem já está de pé. */
+  function _lobAmiLigarPresencas(uids) {
+    Object.keys(_lobAmiPresOff).forEach(function (uid) {
+      if (uids.indexOf(uid) < 0) {
+        try { _lobAmiPresOff[uid](); } catch (e) {}
+        delete _lobAmiPresOff[uid];
+      }
+    });
+    uids.forEach(function (uid) {
+      if (_lobAmiPresOff[uid]) return;
+      _lobAmiPresOff[uid] = window.AngatubaPresenca.observar(uid, function (p) {
+        var antes = _lobAmiPres[uid] || '';
+        var agora = (p && p.state) || 'offline';
+        // O nome que vem da presença é o VIVO (ver 4.3): quem renomeou
+        // depois de virar seu amigo aparece com o nome de hoje.
+        if (p && p.nome) _amNomeVivo[uid] = String(p.nome).slice(0, CLI_NOME_MAX);
+        _lobAmiPres[uid] = agora;
+        var dot = document.querySelector('.cli-amigo-dot[data-lobami="' + uid + '"]');
+        if (dot) {
+          dot.className = 'cli-amigo-dot' +
+            (agora === 'online' ? ' online' : (agora === 'away' ? ' away' : ''));
+        }
+        // Só redesenha quando a ORDEM muda (entrou ou saiu do grupo
+        // "online"): o pontinho acima já resolveu o resto.
+        if ((antes === 'online') !== (agora === 'online')) _lobAmiRenderBreve();
+      });
+    });
+  }
+
+  function _lobAmiNome(a) {
+    return _amNomeVivo[a.uid] || a.nome || 'Jogador';
+  }
+
+  function _lobAmiPeso(uid) {
+    var s = _lobAmiPres[uid];
+    return s === 'online' ? 0 : (s === 'away' ? 1 : 2);
+  }
+
+  function _lobAmiHtmlItem(a, convidado, cheio) {
+    var nome = _lobAmiNome(a);
+    var st = _lobAmiPres[a.uid] || 'offline';
+    var sub = (st === 'online')
+      ? 'Online agora'
+      : (st === 'away' ? 'Ausente' : 'Offline — o convite espera até ele abrir o app');
+    var botao = convidado
+      ? '<button type="button" class="lobby-ami-btn ok" disabled data-travar="nao">' +
+          '<i class="fa fa-check"></i> Convidado</button>'
+      : '<button type="button" class="lobby-ami-btn" onclick="cliLobbyConvidar(\'' +
+          escHTML(a.uid) + '\')"' + (cheio ? ' disabled data-travar="nao"' : '') + '>' +
+          '<i class="fa fa-user-plus"></i> Convidar</button>';
+    return '<div class="cli-amigo-item lobby-ami">' +
+      _amLinhaAvatar(a.uid, nome, false, a.foto, 'lobami') +
+      '<span class="cli-amigo-txt">' +
+        '<span class="cli-amigo-nome">' + escHTML(nome) + '</span>' +
+        '<span class="cli-amigo-sub">' + escHTML(sub) + '</span>' +
+      '</span>' +
+      '<span class="cli-amigo-acoes">' + botao + '</span>' +
+    '</div>';
+  }
+
+  /* Pinta só o #lobby-amigos, sem passar pelo redesenho do corpo
+     inteiro: a lista de amigos muda por conta própria (presença,
+     convite enviado) e o resto da tela não tem por que piscar. */
+  function _lobAmiRender() {
+    var box = document.getElementById('lobby-amigos');
+    if (!box) { _lobAmiSoltarPresencas(); return; }
+    var est = window.AngatubaLobby.meuLobby();
+    if (!est) { box.innerHTML = ''; _lobAmiSoltarPresencas(); return; }
+
+    var dentro = {};
+    est.membros.forEach(function (m) { dentro[m.uid] = true; });
+    var fora = _lobAmiLista.filter(function (a) { return !dentro[a.uid]; });
+
+    _lobAmiLigarPresencas(fora.map(function (a) { return a.uid; }));
+
+    if (!_lobAmiLista.length) {
+      box.innerHTML = '<p class="lobby-dica">Você ainda não tem amigos por aqui. ' +
+        'Adicione pelo painel de conta e depois chame direto, sem ditar código.</p>';
+      return;
+    }
+    if (!fora.length) {
+      box.innerHTML = '<p class="lobby-dica">Todo mundo da sua lista já está aqui no lobby.</p>';
+      return;
+    }
+
+    var cheio = est.membros.length >= window.AngatubaLobby.limite();
+    var agora = Date.now();
+    fora.sort(function (x, y) {
+      var d = _lobAmiPeso(x.uid) - _lobAmiPeso(y.uid);
+      if (d) return d;
+      return String(_lobAmiNome(x)).localeCompare(String(_lobAmiNome(y)));
+    });
+
+    box.innerHTML = fora.map(function (a) {
+      var env = _lobConvEnviados[a.uid];
+      var convidado = !!(env && env.codigo === est.codigo && env.ate > agora);
+      return _lobAmiHtmlItem(a, convidado, cheio);
+    }).join('') +
+      (cheio ? '<p class="lobby-dica breve">O lobby está cheio — alguém precisa sair pra caber mais gente.</p>' : '');
+
+    // Uma ação de criar/entrar/sair pode estar em voo: os botões que
+    // acabaram de nascer entram travados junto com o resto.
+    if (_lobUiOcupado) _lobUiTravar(true);
+  }
+
+  /* Convidar. Pinta "Convidado" na hora e só depois espera o banco —
+     se a escrita falhar, o botão volta ao que era e o erro aparece no
+     #lobby-msg, que é onde a pessoa está olhando. */
+  function cliLobbyConvidar(uid) {
+    var est = window.AngatubaLobby.meuLobby();
+    if (!est) return;
+    if (est.status !== 'aberto') { _lobUiMsg('Com a partida rolando ninguém entra no lobby.', 'erro'); return; }
+    if (est.membros.length >= window.AngatubaLobby.limite()) {
+      _lobUiMsg('O lobby está cheio (' + window.AngatubaLobby.limite() + ' pessoas).', 'erro');
+      return;
+    }
+    var nome = 'seu amigo';
+    for (var i = 0; i < _lobAmiLista.length; i++) {
+      if (_lobAmiLista[i].uid === uid) { nome = _lobAmiNome(_lobAmiLista[i]); break; }
+    }
+    _lobConvEnviados[uid] = { codigo: est.codigo, ate: Date.now() + LOBCONV_VALIDADE_MS };
+    _lobAmiRender();
+    _lobConvEnviar(uid, est.codigo).then(function () {
+      _lobUiMsg('Convite enviado pro ' + nome + ' — ele aceita e cai aqui.', 'ok');
+    }).catch(function (err) {
+      delete _lobConvEnviados[uid];
+      _lobAmiRender();
+      _lobUiMsg(_lobConvErroPt(err), 'erro');
+    });
+  }
+
+  window.cliLobbyConvidar        = cliLobbyConvidar;
+  window.cliLobbyConviteAceitar  = cliLobbyConviteAceitar;
+  window.cliLobbyConviteRecusar  = cliLobbyConviteRecusar;
 
   window.cliAbrirLobby   = cliAbrirLobby;
   window.cliFecharLobby  = cliFecharLobby;

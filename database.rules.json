@@ -1,0 +1,663 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "salas": {
+      "$codigo": {
+        ".read": "auth != null",
+        // ".validate" nunca roda quando o novo valor é nulo (apagar), então
+        // sem a segunda parte aqui qualquer autenticado podia apagar a
+        // sala de qualquer um. "newData.exists()" cobre toda escrita que
+        // NÃO é apagar a sala inteira (inclui remover só um filho, como o
+        // convidado saindo) — só a exclusão da sala em si exige ser o
+        // anfitrião (ver A1.6).
+        ".write": "auth != null && (newData.exists() || data.child('anfitriao/uid').val() == auth.uid)",
+        "anfitriao": {
+          ".validate": "!data.exists() && newData.hasChildren(['uid','nome']) && newData.child('uid').val() == auth.uid && newData.child('nome').isString() && newData.child('nome').val().length <= 20"
+        },
+        "convidado": {
+          ".validate": "!data.exists() && newData.hasChildren(['uid','nome']) && newData.child('uid').val() == auth.uid && newData.child('uid').val() != data.parent().child('anfitriao/uid').val() && newData.child('nome').isString() && newData.child('nome').val().length <= 20"
+        },
+        "publica": {
+          ".validate": "!data.exists() && newData.parent().child('anfitriao/uid').val() == auth.uid && newData.isBoolean()"
+        },
+        "oferta": {
+          ".validate": "!data.exists() && data.parent().child('anfitriao/uid').val() == auth.uid && newData.hasChildren(['type','sdp'])"
+        },
+        "resposta": {
+          ".validate": "!data.exists() && data.parent().child('convidado/uid').val() == auth.uid && newData.hasChildren(['type','sdp'])"
+        },
+        "iceAnfitriao": {
+          "$id": {
+            ".validate": "data.parent().parent().child('anfitriao/uid').val() == auth.uid && newData.hasChild('candidate')"
+          }
+        },
+        "iceConvidado": {
+          "$id": {
+            ".validate": "data.parent().parent().child('convidado/uid').val() == auth.uid && newData.hasChild('candidate')"
+          }
+        },
+        "criadoEm": {
+          ".validate": "newData.val() == now"
+        },
+        "$outro": {
+          ".validate": false
+        }
+      }
+    },
+    "salasPublicas": {
+      ".read": "auth != null",
+      "$codigo": {
+        ".write": "auth != null && root.child('salas').child($codigo).child('anfitriao').child('uid').val() == auth.uid",
+        ".validate": "!newData.exists() || (newData.hasChildren(['nome','criadoEm']) && newData.child('nome').isString() && newData.child('nome').val().length <= 20)"
+      }
+    },
+
+    /* ── Coruja Party (2-4 jogadores) ────────────────────────────
+       Diferente de "salas" (sinalização WebRTC 1x1), aqui o RTDB é o
+       próprio meio de troca de estado (sem WebRTC) — sala com N
+       jogadores, rodadas e placar. Segue o MESMO estilo de "salas"
+       acima: .write liberado a qualquer autenticado no nó da sala, e
+       cada campo se protege sozinho no .validate (checando auth.uid
+       contra o anfitrião ou contra o próprio $uid). O anfitrião é a
+       fonte da verdade: só ele grava status/rodadaAtual/jogoAtual/
+       seed/placarRodadas/pontosTotal. Cada jogador só cria a própria
+       entrada em jogadores/$uid (uma vez, ao entrar — auth.uid==$uid)
+       e o próprio resultado em resultados/{rodada}/$uid (uma vez por
+       rodada, sem poder reenviar depois de ver o dos outros).
+       Revanchinha nunca apaga nada: o anfitrião zera pontosTotal e
+       continua contando rodadaAtual pra cima (ver claude/Jogos/party.js) —
+       assim nenhuma regra precisa lidar com delete de subárvore. */
+    "salasParty": {
+      "$codigo": {
+        ".read": "auth != null",
+        // Mesma correção de "salas" acima: sem isto, apagar não passa por
+        // .validate e qualquer autenticado podia matar a Party de outro
+        // grupo (ver A1.6).
+        ".write": "auth != null && (newData.exists() || data.child('anfitriao/uid').val() == auth.uid)",
+        "anfitriao": {
+          ".validate": "!data.exists() && newData.hasChildren(['uid','nome']) && newData.child('uid').val() == auth.uid && newData.child('nome').isString() && newData.child('nome').val().length <= 20"
+        },
+        "publica": {
+          ".validate": "!data.exists() && newData.parent().child('anfitriao/uid').val() == auth.uid && newData.isBoolean()"
+        },
+        "criadoEm": {
+          ".validate": "newData.val() == now"
+        },
+        "status": {
+          ".validate": "newData.isString() && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        "totalRodadas": {
+          ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 500 && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        "rodadaAtual": {
+          ".validate": "newData.isNumber() && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        "jogoAtual": {
+          ".validate": "newData.isString() && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        "seed": {
+          ".validate": "newData.isNumber() && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        "rodadaIniciadaEm": {
+          ".validate": "newData.val() == now && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        "jogadores": {
+          "$uid": {
+            "nome": {
+              ".validate": "!data.exists() && auth.uid == $uid && newData.isString() && newData.val().length <= 20"
+            },
+            "entrouEm": {
+              ".validate": "!data.exists() && auth.uid == $uid && newData.val() == now"
+            },
+            "pontosTotal": {
+              ".validate": "newData.isNumber() && ((auth.uid == $uid && newData.val() == 0) || newData.parent().parent().parent().child('anfitriao/uid').val() == auth.uid)"
+            },
+            "$outro": { ".validate": false }
+          }
+        },
+        "resultados": {
+          "$rodada": {
+            "$uid": {
+              "score": {
+                // Teto cobre o maior score plausível da pool (Ervilhas: 14 x
+                // 100 + bônus) com folga enorme — sem isto dava pra gravar
+                // qualquer número direto pelo console e vencer toda rodada
+                // (ver A2.4).
+                ".validate": "!data.exists() && auth.uid == $uid && newData.isNumber() && newData.val() >= 0 && newData.val() <= 20000"
+              },
+              "enviadoEm": {
+                ".validate": "auth.uid == $uid && newData.val() == now"
+              },
+              "$outro": { ".validate": false }
+            }
+          }
+        },
+        "placarRodadas": {
+          "$rodada": {
+            ".validate": "newData.parent().parent().child('anfitriao/uid').val() == auth.uid"
+          }
+        },
+        "$outro": { ".validate": false }
+      }
+    },
+
+    // Espelho leve das salas de Party públicas (mesmo espírito de
+    // salasPublicas/, só nome do anfitrião + data — nunca jogadores/
+    // resultados/placar, que ficam restritos a quem tem o código).
+    "salasPartyPublicas": {
+      ".read": "auth != null",
+      "$codigo": {
+        ".write": "auth != null && root.child('salasParty').child($codigo).child('anfitriao').child('uid').val() == auth.uid",
+        ".validate": "!newData.exists() || (newData.hasChildren(['nome','criadoEm']) && newData.child('nome').isString() && newData.child('nome').val().length <= 20)"
+      }
+    },
+
+    /* ── Jogos de Baralho (Truco Paulista e futuros modos) ───────
+       Igual em espírito a "salasParty" (mesmo padrão de .write liberado
+       a qualquer autenticado no nó da sala, cada campo se protegendo
+       sozinho no .validate), mas com uma diferença: aqui tem jogada a
+       jogada (não só um placar no final), então o nó "game" inteiro é
+       escrito SÓ pelo anfitrião — sempre um objeto completo via set(),
+       nunca campo a campo — e os jogadores só mandam INTENÇÃO de jogada
+       pela fila "acoes" (cada um só empurra a própria, com o próprio
+       uid; o anfitrião apaga cada uma depois de processar). Ver
+       claude/Jogos/baralho.js e claude/Jogos/truco.js. */
+    "salasBaralho": {
+      "$codigo": {
+        ".read": "auth != null",
+        // Mesma correção de "salas"/"salasParty": sem o "newData.exists()"
+        // qualquer autenticado podia apagar a sala de outro grupo.
+        ".write": "auth != null && (newData.exists() || data.child('anfitriao/uid').val() == auth.uid)",
+        "anfitriao": {
+          ".validate": "!data.exists() && newData.hasChildren(['uid','nome']) && newData.child('uid').val() == auth.uid && newData.child('nome').isString() && newData.child('nome').val().length <= 20"
+        },
+        "publica": {
+          ".validate": "!data.exists() && newData.parent().child('anfitriao/uid').val() == auth.uid && newData.isBoolean()"
+        },
+        "criadoEm": {
+          ".validate": "newData.val() == now"
+        },
+        "modo": {
+          ".validate": "!data.exists() && newData.isString() && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        "maxJogadores": {
+          // 1 (solo, vs. bots locais — ver truco.js/uno.js) até 8 (mesa
+          // cheia de Uno). Qual número cada modo aceita de fato é o
+          // catálogo de baralho.js que decide (opcoesJogadores: Truco só
+          // roda com 1, 2 ou 4; Uno vai de 1 a 8) — a regra aqui só
+          // segura o teto da mesa. O anfitrião pode trocar no lobby (ver
+          // definirMaxJogadores em baralho.js).
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 8 && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        "status": {
+          ".validate": "newData.isString() && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        "jogadores": {
+          "$uid": {
+            // Cada jogador só mexe no PRÓPRIO nó (criação e reentrada
+            // reescrevem nome/seat/entrouEm/pronto de uma vez — por isso,
+            // diferente de salasParty, não trava com "!data.exists()").
+            ".write": "auth != null && auth.uid == $uid",
+            "nome": { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "entrouEm": { ".validate": "newData.val() == now" },
+            // Até 8 assentos (0-7) por causa do Uno; Truco usa só 0-3.
+            "seat": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 7" },
+            "pronto": { ".validate": "newData.isBoolean()" },
+            "$outro": { ".validate": false }
+          }
+        },
+        // Estado completo da partida em andamento — só o anfitrião
+        // escreve (sempre um objeto inteiro; ver truco.js _salvarGame).
+        // Confiança na mesma medida de rodadaAtual/jogoAtual/seed em
+        // salasParty: quem hospeda é quem valida as regras do jogo.
+        "game": {
+          ".write": "auth != null && data.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        // Fila de intenções de jogada. Qualquer jogador cria a própria
+        // (uid tem que bater com quem está autenticado); só o autor ou o
+        // anfitrião podem apagar (o anfitrião apaga depois de processar).
+        "acoes": {
+          "$acaoId": {
+            ".write": "auth != null && (newData.exists() ? newData.child('uid').val() == auth.uid : (data.child('uid').val() == auth.uid || data.parent().parent().child('anfitriao/uid').val() == auth.uid))",
+            ".validate": "newData.hasChildren(['uid','tipo','ts']) && newData.child('uid').val() == auth.uid && newData.child('tipo').isString()"
+          }
+        },
+        "$outro": { ".validate": false }
+      }
+    },
+
+    // Espelho leve das salas de Baralho públicas — mesmo espírito de
+    // salasPartyPublicas/: só o que a lista "Salas públicas" precisa pra
+    // mostrar um cartão (nunca jogadores/game/acoes).
+    "salasBaralhoPublicas": {
+      ".read": "auth != null",
+      "$codigo": {
+        ".write": "auth != null && root.child('salasBaralho').child($codigo).child('anfitriao/uid').val() == auth.uid",
+        ".validate": "!newData.exists() || (newData.hasChildren(['anfitriao','criadoEm','modo','maxJogadores']) && newData.child('anfitriao').isString() && newData.child('anfitriao').val().length <= 20)"
+      }
+    },
+
+    /* ── Presença (Etapa 4.2) ────────────────────────────────────
+       presence/{uid} = { state, nome, atualizadoEm } — diz se uma
+       CONTA NOMEADA está online. Base pra lista de amigos (4.3) e
+       convites (4.4).
+
+       Três decisões que valem o comentário:
+
+       1. NÃO existe ".read" na raiz de "presence". Só se lê
+          presence/{uid}, um uid de cada vez. Sem o read na raiz,
+          ninguém consegue LISTAR quem está online — nem pelo console.
+          É o que impede, na marra, um feed "toda Angatuba online"
+          (privacidade e escala). A 4.3 lê os amigos um a um, que é
+          exatamente o acesso que ela precisa.
+
+       2. sign_in_provider != 'anonymous' nas duas pontas. A sessão
+          anônima que multiplayer/party/baralho criam pra ter permissão
+          de sala não é identidade (ver o bloco de auth em app.js) e
+          não entra em presença. O cliente já evita gravar; a regra
+          fecha por baixo, pra não depender só dele.
+
+       3. "atualizadoEm" valida como número com folga pra frente, não
+          como "== now" (que é o padrão em criadoEm das salas acima).
+          Aqui a escrita mais importante é a do onDisconnect, resolvida
+          pelo servidor no momento da queda: amarrar em "== now" arrisca
+          rejeitar justamente ela por diferença de milissegundos — e o
+          preço desse erro é um nó preso em 'online' pra sempre. O campo
+          é informativo (a 4.3 mostra "offline há 2h"), não é segurança;
+          quem protege o nó é o auth.uid == $uid. */
+    "presence": {
+      "$uid": {
+        ".read": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'",
+        ".write": "auth != null && auth.uid == $uid && auth.token.firebase.sign_in_provider != 'anonymous'",
+        ".validate": "newData.hasChildren(['state','nome','atualizadoEm'])",
+        "state": {
+          ".validate": "newData.isString() && (newData.val() == 'online' || newData.val() == 'away' || newData.val() == 'offline')"
+        },
+        "nome": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20"
+        },
+        "atualizadoEm": {
+          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000"
+        },
+        "$outro": { ".validate": false }
+      }
+    },
+
+    /* ── Amigos (Etapa 4.3) ──────────────────────────────────────
+       Dois nós, os dois indexados por uid e sem leitura na raiz —
+       mesma disciplina de "presence": ninguém consegue LISTAR os
+       usuários da cidade, só ler o próprio ramo.
+
+         friendRequests/{paraUid}/{deUid} = { nome, em }
+         friends/{donoUid}/{amigoUid}     = { nome, desde }
+
+       A amizade é gravada nos DOIS lados (friends/A/B e friends/B/A)
+       pra cada um conseguir listar a própria lista lendo só o seu
+       ramo. O truque é fazer isso sem cloud function: as regras
+       abaixo deixam alguém escrever no ramo ALHEIO em exatamente
+       dois casos, os dois verificáveis com o que já está no banco.
+
+       1. ACEITAR — B aceita o pedido de A. B escreve friends/A/B
+          (ramo do A). A regra só libera se friendRequests/B/A
+          existir, ou seja, se A realmente pediu. Não dá pra se
+          enfiar na lista de quem não te chamou.
+       2. REMOVER — A desfaz a amizade. Além de apagar friends/A/B,
+          A apaga friends/B/A (ramo do B). A regra libera porque é
+          uma REMOÇÃO (!newData.exists()) da própria entrada: você
+          pode sempre se tirar da lista dos outros, nunca escrever
+          nela.
+       3. ATUALIZAR O PRÓPRIO CARTÃO (P3) — `data.exists()`. Depois
+          que a amizade EXISTE, A pode reescrever a entrada dela na
+          lista do B. É isso que deixa a troca de foto se espelhar
+          na lista dos amigos, em vez de a foto do aceite envelhecer
+          pra sempre. Não abre porta nenhuma: o que ela reescreve é
+          o cartão dela mesma, num nó onde ela já estava — quem não
+          é amigo continua sem `data` e cai no caso 1, que exige o
+          pedido pendente.
+
+       O aceite e a remoção saem num update() multi-caminho, que o
+       RTDB aplica de forma atômica; as regras são avaliadas com o
+       `root` ANTERIOR à escrita, então apagar o pedido no mesmo
+       update não derruba a checagem do caso 1.
+
+       Anônimo (sessão de sala) fica de fora dos dois nós, igual à
+       presença.
+
+       Limitação conhecida, documentada: qualquer um que tenha o seu
+       uid pode te MANDAR pedido (o uid aparece nos docs públicos do
+       ranking). Pedido não cria vínculo nenhum — só aparece na sua
+       lista pra você aceitar ou recusar —, e as regras não têm como
+       contar filhos pra impor um teto de pendências. Se virar
+       incômodo, é caso pra 4.4 com Cloud Function. */
+    "friendRequests": {
+      "$para": {
+        // Só o destinatário lê a própria caixa de pedidos.
+        ".read": "auth != null && auth.uid == $para && auth.token.firebase.sign_in_provider != 'anonymous'",
+        "$de": {
+          // Quem pede cria o próprio pedido; o destinatário pode
+          // apagar (recusar, ou limpar ao aceitar). Ninguém escreve
+          // pedido em nome de terceiro.
+          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && $de != $para && ((auth.uid == $de && newData.exists()) || (auth.uid == $para && !newData.exists()))",
+          ".validate": "newData.hasChildren(['nome','em'])",
+          "nome": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
+          "em": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
+          // Foto (P3): OPCIONAL — quem nunca subiu avatar não grava o
+          // campo, e a UI cai na inicial. https obrigatório (é sempre
+          // a URL do Cloudinary que o avatar já usa) e teto de 300
+          // caracteres, pra este nó não virar carona pra texto.
+          "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().beginsWith('https://')" },
+          "$outro": { ".validate": false }
+        }
+      }
+    },
+
+    "friends": {
+      "$dono": {
+        // Só o dono lista os próprios amigos.
+        ".read": "auth != null && auth.uid == $dono && auth.token.firebase.sign_in_provider != 'anonymous'",
+        "$amigo": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && $amigo != $dono && (auth.uid == $dono || (auth.uid == $amigo && (!newData.exists() || data.exists() || root.child('friendRequests').child($amigo).child($dono).exists())))",
+          ".validate": "newData.hasChildren(['nome','desde'])",
+          "nome": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
+          "desde": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
+          // Foto (P3): OPCIONAL, mesmas travas do friendRequests.
+          "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().beginsWith('https://')" },
+          "$outro": { ".validate": false }
+        }
+      }
+    },
+
+    /* ── Código curto de amigo (P2) ──────────────────────────────
+       AON-<uid> tinha 32 caracteres. O curto tem 6, num alfabeto sem
+       os pares que todo mundo erra (0/O, 1/I/L):
+
+         friendCodes/{CODIGO} = { uid, em }     código -> uid
+         friendCodeOf/{uid}   = { codigo, em }  uid -> código
+
+       LEITURA — friendCodes NÃO tem ".read" na raiz, só em
+       {CODIGO}. Ou seja: dá pra resolver UM código que alguém te
+       passou (que é exatamente o que o "colar" precisa) e não dá
+       pra baixar o índice da cidade inteira. Mesma disciplina de
+       presence/ e friends/. O reverso (friendCodeOf) é mais fechado
+       ainda: só o dono lê o próprio.
+
+       COLISÃO, resolvida pela REGRA e não pelo cliente — criar só
+       vale pra um código que ainda NÃO existe (!data.exists()).
+       Dois aparelhos sorteando o mesmo código no mesmo instante: um
+       escreve, o outro leva permission_denied e sorteia de novo. Sem
+       transação, sem Cloud Function.
+
+       DEPOIS DE CRIADO o código é do dono: ele pode reescrever ou
+       apagar o próprio (data.child('uid') == auth.uid), e ninguém
+       consegue sequestrar código alheio nem apontar um código pra
+       uid de terceiro (o validate amarra uid == auth.uid).
+
+       O formato entra no validate de propósito: sem ele, daria pra
+       encher friendCodes de chaves arbitrárias e usar o nó como
+       depósito de texto. São 6 caracteres do alfabeto, e ponto.
+
+       friendCodeOf é do próprio dono de ponta a ponta. A regra NÃO
+       confere se o código apontado é mesmo dele — não teria como sem
+       encarecer a escrita, e o estrago possível é só contra si mesmo
+       (mostrar no painel um código que adiciona outra pessoa). */
+    "friendCodes": {
+      "$codigo": {
+        ".read": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'",
+        ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((newData.exists() && !data.exists() && newData.child('uid').val() == auth.uid) || (data.exists() && data.child('uid').val() == auth.uid))",
+        ".validate": "newData.hasChildren(['uid','em']) && $codigo.length == 6 && $codigo.matches(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]+$/)",
+        "uid": { ".validate": "newData.isString() && newData.val() == auth.uid" },
+        "em": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
+        "$outro": { ".validate": false }
+      }
+    },
+
+    "friendCodeOf": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid && auth.token.firebase.sign_in_provider != 'anonymous'",
+        ".write": "auth != null && auth.uid == $uid && auth.token.firebase.sign_in_provider != 'anonymous'",
+        ".validate": "newData.hasChildren(['codigo','em'])",
+        "codigo": { ".validate": "newData.isString() && newData.val().length == 6" },
+        "em": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
+        "$outro": { ".validate": false }
+      }
+    },
+
+    /* ── Convites pra jogar (Etapa 4.4) ──────────────────────────
+       Caixa de entrada por usuário, mesma disciplina de presence/ e
+       friends/: não existe leitura na raiz, então ninguém consegue
+       varrer as caixas do app — só a sua.
+
+         gameInvites/{paraUid}/{inviteId} = {
+           de, nome, jogo, codigo, em, expiraEm
+         }
+
+       O convite carrega só o CÓDIGO da sala. Quem entra usa o fluxo
+       normal do jogo (salas/, salasParty/, salasBaralho/), com as
+       regras daqueles nós valendo iguais — o convite não é um atalho
+       pra dentro de sala nenhuma, é um recado com o código.
+
+       TRÊS coisas as regras garantem:
+
+       1. SÓ AMIGO CONVIDA — a escrita exige
+          friends/{auth.uid}/{paraUid}, ou seja, a amizade já aceita
+          nos dois lados (ver 4.3). Isso fecha o convite-spam de
+          desconhecido que o pedido de amizade ainda deixa passar, já
+          que ali o uid basta.
+
+       2. NINGUÉM FORJA CONVITE EM NOME DE OUTRO — `de` é validado
+          como == auth.uid.
+
+       3. UM CONVITE POR REMETENTE POR JOGO — a chave do convite é
+          obrigatoriamente `auth.uid + '_' + jogo`. Não é enfeite: é
+          o que impede alguém de encher a sua caixa com mil chaves
+          diferentes. Reconvidar para o mesmo jogo SOBRESCREVE o
+          convite anterior em vez de empilhar, então o teto é o
+          número de jogos (4), por amigo.
+
+       Apagar: o destinatário (aceitou, recusou ou expirou) ou o
+       próprio remetente (cancelar o que mandou). Escrever, só o
+       remetente.
+
+       `expiraEm` vale no máximo 1h à frente; o cliente usa 15min. É
+       teto de sanidade, não segurança — quem filtra o convite velho
+       na tela é o cliente, e o nó é do próprio destinatário. */
+    "gameInvites": {
+      "$para": {
+        // Só o dono da caixa lê a caixa inteira.
+        ".read": "auth != null && auth.uid == $para && auth.token.firebase.sign_in_provider != 'anonymous'",
+        "$convite": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((auth.uid == $para && !newData.exists()) || (auth.uid != $para && newData.exists() && $convite == auth.uid + '_' + newData.child('jogo').val() && root.child('friends').child(auth.uid).child($para).exists()) || (auth.uid != $para && !newData.exists() && data.child('de').val() == auth.uid))",
+          ".validate": "newData.hasChildren(['de','nome','jogo','codigo','em','expiraEm'])",
+          "de": { ".validate": "newData.isString() && newData.val() == auth.uid" },
+          "nome": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
+          "jogo": { ".validate": "newData.isString() && (newData.val() == 'pingpong' || newData.val() == 'tanques' || newData.val() == 'party' || newData.val() == 'baralho')" },
+          // Código de sala dos três sistemas: 4 letras hoje, faixa com
+          // folga pra não travar uma mudança de tamanho lá na frente.
+          "codigo": { ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 8" },
+          "em": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
+          // Teto de sanidade, não segurança: quem filtra convite velho
+          // na tela é o cliente. Não exigimos `> now` de propósito —
+          // celular com relógio atrasado escreveria um expiraEm já no
+          // passado e teria o convite RECUSADO pela regra, quando o
+          // certo é ele simplesmente nascer vencido.
+          "expiraEm": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 3600000" },
+          "$outro": { ".validate": false }
+        }
+      }
+    },
+
+    /* ── Convites pro LOBBY (Etapa L1) ──────────────────────────
+       Irmão do gameInvites acima, e de propósito NÃO é ele.
+
+         lobbyInvites/{paraUid}/{deUid} = {
+           nome, codigoLobby, em, expiraEm
+         }
+
+       A CHAVE É O REMETENTE, e só ele. No gameInvites a chave é
+       `{deUid}_{jogo}` porque a mesma pessoa pode te chamar pro
+       Truco e pro Ping Pong ao mesmo tempo — são duas salas. Aqui
+       não: uma pessoa só está em UM lobby, então um convite por
+       remetente é o número certo. Reconvidar SOBRESCREVE em vez de
+       empilhar, e o teto da sua caixa é o número de amigos que você
+       mesmo aceitou — não dá pra entupir caixa de ninguém.
+
+       O convite carrega o CÓDIGO DO LOBBY, não um atalho: quem
+       aceita entra pelo mesmo caminho de sempre (membros/{uid} em
+       socialLobbies/{CODIGO}), com as regras daquele nó valendo
+       iguais — lotação, status e tudo o mais.
+
+       SÓ AMIGO CONVIDA: a escrita exige friends/{auth.uid}/{$para},
+       a amizade já aceita nos dois lados (4.3). Mesma trava do
+       gameInvites, pelo mesmo motivo — fecha o convite-spam de
+       desconhecido.
+
+       Apagar: o destinatário (aceitou, recusou, expirou) ou o
+       próprio remetente (cancelar o que mandou). Não existe ".read"
+       na raiz: cada um lê só a própria caixa.
+
+       O codigoLobby entra no validate com o formato exato do código
+       de lobby (6 chars, mesmo alfabeto sem 0/O e 1/I/L) — sem isso
+       o campo viraria depósito de texto livre.
+
+       `expiraEm` vale no máximo 1h à frente; o cliente usa 12min.
+       Teto de sanidade, não segurança: quem filtra convite velho na
+       tela é o cliente, e o nó é do próprio destinatário. E, como no
+       gameInvites, NÃO exigimos `> now` — celular com relógio
+       atrasado deve escrever um convite que nasce vencido, não levar
+       permission_denied. */
+    "lobbyInvites": {
+      "$para": {
+        // Só o dono da caixa lê a caixa inteira.
+        ".read": "auth != null && auth.uid == $para && auth.token.firebase.sign_in_provider != 'anonymous'",
+        "$de": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((auth.uid == $para && !newData.exists()) || (auth.uid == $de && auth.uid != $para && newData.exists() && root.child('friends').child(auth.uid).child($para).exists()) || (auth.uid == $de && !newData.exists()))",
+          ".validate": "newData.hasChildren(['nome','codigoLobby','em','expiraEm'])",
+          "nome": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
+          "codigoLobby": { ".validate": "newData.isString() && newData.val().length == 6 && newData.val().matches(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]+$/)" },
+          "em": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
+          "expiraEm": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 3600000" },
+          "$outro": { ".validate": false }
+        }
+      }
+    },
+
+    /* ── Lobby social (Etapa 5.1) ────────────────────────────────
+       A camada que faltava entre "ter amigos" e "estar numa sala de
+       jogo": um cômodo onde o grupo se junta ANTES de decidir o que
+       jogar, e que sobrevive à troca de jogo.
+
+         socialLobbies/{CODIGO} = {
+           anfitriao: { uid, nome },
+           criadoEm, status, jogoSugerido?, codigoSalaJogo?,
+           membros: { {uid}: { nome, foto?, entrouEm, pronto } }
+         }
+
+       A CHAVE É O PRÓPRIO CÓDIGO (6 chars, mesmo alfabeto sem 0/O e
+       1/I/L do código de amigo). Sem nó espelho código -> id: um nó
+       só, nada pra sair de sincronia, e "achar pelo código" é ler a
+       chave. A colisão é resolvida pela regra, igual a friendCodes —
+       criar só vale pro código que ainda NÃO existe.
+
+       LEITURA — NÃO existe ".read" na raiz de socialLobbies, só em
+       {CODIGO}: dá pra abrir UM lobby cujo código alguém te passou,
+       nunca pra listar os lobbies da cidade. Mesma disciplina de
+       presence/, friends/ e friendCodes/. Quem tem o código entra —
+       o código É a permissão, como nas salas de jogo; são 31^6 ≈ 887
+       milhões de combinações e o que está lá dentro são nomes e
+       fotos que o grupo já ia ver mesmo.
+
+       ESCRITA, e aqui está a diferença pras salas de jogo. Em
+       "salas"/"salasParty"/"salasBaralho" o ".write" do nó da sala é
+       liberado a qualquer autenticado e cada campo se protege no
+       ".validate" — o que deixa um buraco conhecido: ".validate"
+       nunca roda pra APAGAR, então quem tem o código pode remover o
+       que quiser de dentro. Aqui esse buraco está fechado por
+       construção:
+
+         - no nó do lobby, ".write" só pro ANFITRIÃO (criar o próprio
+           lobby, mexer em status/jogoSugerido/codigoSalaJogo,
+           remover um membro, apagar o lobby);
+         - o membro NÃO herda escrita do nó do lobby: ele só tem
+           ".write" em membros/{proprio uid}.
+
+       Ou seja, ninguém apaga o lobby de ninguém, ninguém tira
+       ninguém, ninguém escreve com o nome de outro. O que o membro
+       pode é entrar, marcar o próprio "pronto" e sair.
+
+       SÓ CONTA NOMEADA nas duas pontas, igual à presença: a sessão
+       anônima que multiplayer/party/baralho criam pra ter permissão
+       de sala não é identidade e não entra em lobby.
+
+       O QUE A REGRA NÃO CONSEGUE FAZER — contar. O teto de 6 pessoas
+       é do cliente, porque o RTDB não sabe contar filhos e não há
+       Cloud Function. Assumido: quem burlaria isso pelo console já
+       tem o código, e o resultado é um sétimo nome na lista.
+
+       ENTRAR exige que o lobby EXISTA (tem anfitrião) e não esteja
+       'fechado'. Repare que 'em_jogo' é permitido de propósito: o
+       membro que cai no meio da partida e volta precisa reescrever a
+       própria entrada — o onDisconnect já a removeu. "Não entrar em
+       partida que já começou" é regra de produto, do cliente; a
+       regra aqui cuida de existência e identidade.
+
+       FANTASMA — o onDisconnect do anfitrião apaga o nó inteiro (o
+       do membro apaga só a si). Um lobby sem anfitrião não sugere
+       jogo nem abre sala, então não há estado intermediário pra
+       varrer depois; ver claude/app.js, bloco "LOBBY SOCIAL". */
+    "socialLobbies": {
+      "$codigo": {
+        ".read": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'",
+        // Criar o próprio lobby, ou ser o anfitrião do que já existe.
+        // Como não há ".write" liberado a todo autenticado aqui, o
+        // membro NÃO herda escrita no nó — e por isso apagar o lobby
+        // (que o ".validate" nunca vê) continua sendo só do anfitrião.
+        ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((!data.exists() && newData.child('anfitriao/uid').val() == auth.uid) || data.child('anfitriao/uid').val() == auth.uid)",
+        ".validate": "newData.hasChildren(['anfitriao','criadoEm','status','membros']) && $codigo.length == 6 && $codigo.matches(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]+$/)",
+        "anfitriao": {
+          // Escrito uma vez, na criação, e nunca mais: não existe
+          // passar o lobby pra frente (quem quiser, abre outro).
+          ".validate": "!data.exists() && newData.hasChildren(['uid','nome']) && newData.child('uid').val() == auth.uid && newData.child('nome').isString() && newData.child('nome').val().length >= 1 && newData.child('nome').val().length <= 20"
+        },
+        "criadoEm": {
+          ".validate": "newData.val() == now"
+        },
+        "status": {
+          ".validate": "newData.isString() && (newData.val() == 'aberto' || newData.val() == 'em_jogo' || newData.val() == 'fechado') && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        // Sugestão de jogo — mesma lista de gameInvites (4.4). É só um
+        // recado no nó: ninguém entra em sala por causa dela.
+        "jogoSugerido": {
+          ".validate": "newData.isString() && (newData.val() == 'pingpong' || newData.val() == 'tanques' || newData.val() == 'party' || newData.val() == 'baralho') && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        // Preenchido só na 5.3, quando o lobby passar a apontar pra uma
+        // sala de verdade. Mesma faixa de tamanho do codigo de
+        // gameInvites (4 letras hoje, folga pra mudar).
+        "codigoSalaJogo": {
+          ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 8 && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        "membros": {
+          "$uid": {
+            // O único ".write" do membro em todo o lobby: a própria
+            // entrada. Sair vale sempre; entrar/reescrever exige lobby
+            // existente e não fechado (ver o comentário acima sobre
+            // 'em_jogo' e reconexão).
+            ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && auth.uid == $uid && (!newData.exists() || (root.child('socialLobbies').child($codigo).child('anfitriao/uid').exists() && root.child('socialLobbies').child($codigo).child('status').val() != 'fechado'))",
+            ".validate": "newData.hasChildren(['nome','entrouEm'])",
+            "nome": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
+            // Folga pra frente em vez de "== now": a reescrita de
+            // reconexão vem do cliente com o relógio do servidor, mas o
+            // preço de errar por milissegundos aqui seria a pessoa não
+            // conseguir voltar pro lobby.
+            "entrouEm": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
+            // Foto: OPCIONAL, mesmas travas de friends/ e friendRequests/.
+            "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().beginsWith('https://')" },
+            "pronto": { ".validate": "newData.isBoolean()" },
+            "$outro": { ".validate": false }
+          }
+        },
+        "$outro": { ".validate": false }
+      }
+    }
+  }
+}

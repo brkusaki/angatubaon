@@ -10822,6 +10822,12 @@
     // em vez de sair do hub inteiro (A1.15).
     var _hubComJogoAtivo = document.getElementById('games-hub');
     if (_hubComJogoAtivo && _hubComJogoAtivo.classList.contains('jogo-ativo')) {
+      // 5.3.3 — com o lobby levando o grupo pra dentro de uma sala, a
+      // tela do jogo está SUBINDO agora. `_voltarAoMenu` aqui chamaria
+      // `parar()` no módulo que acabou de montar e a espera do lobby
+      // morreria em "A tela do jogo não abriu". Este back é sobra de
+      // algum overlay que fechou no caminho: engole e segue.
+      if (_lobIndoPraSala) return;
       if (typeof _voltarAoMenu === 'function') _voltarAoMenu();
       return;
     }
@@ -17094,10 +17100,20 @@ ${urlCard}`)}`;
     },
     baralho: {
       nome: 'Baralho', emoji: '🃏', api: 'AngatubaBaralho',
+      /* 5.3.3 — o teste era `#baralho-root` ter filho, e isso é frágil
+         justamente aqui: `BaralhoGame.parar()` (chamado por
+         `_pararJogosExternos`, que roda em toda abertura do hub e em
+         todo "voltar") esvazia a raiz. Um único popstate atravessado
+         zerava o firstChild e a tela "nunca abria" pra sempre. Agora a
+         pergunta é a certa — "dá pra chamar entrarPorCodigo?" — e quem
+         responde é o próprio módulo (`BaralhoGame.pronto()`, que vive
+         do `preparar()`). O teste antigo fica de reserva pra um
+         baralho.min.js velho ainda em cache. */
       pronto: function () {
+        if (!window.BaralhoGame || typeof window.BaralhoGame.entrarPorCodigo !== 'function') return false;
+        if (typeof window.BaralhoGame.pronto === 'function') return !!window.BaralhoGame.pronto();
         var raiz = document.getElementById('baralho-root');
-        return !!(raiz && raiz.firstChild && window.BaralhoGame &&
-                  typeof window.BaralhoGame.entrarPorCodigo === 'function');
+        return !!(raiz && raiz.firstChild);
       },
       // entrarPorCodigo devolve Promise: o `return` é o que deixa o
       // lobby saber que a entrada falhou (ver _lobEntrarNaSala).
@@ -17232,7 +17248,14 @@ ${urlCard}`)}`;
     });
   }
 
-  function _convAbrirTelaJogo(jogo) {
+  /* 5.3.3 — uma segunda tentativa antes de desistir. Abrir a tela do
+     jogo é um caminho com muita peça móvel (hub, loader do módulo,
+     histórico do navegador); se alguma delas desmontou a tela no meio
+     do caminho, reabrir resolve — e desistir na primeira era trocar
+     "demorou um segundo a mais" por um grupo parado com "A tela do
+     jogo não abriu". Só a espera é repetida: o hub já está carregado e
+     `_abrirJogo` é idempotente. */
+  function _convAbrirTelaJogo(jogo, _segunda) {
     var cfg = CONV_JOGOS[jogo];
     if (!cfg) return Promise.reject(new Error('Jogo desconhecido.'));
     return _carregarHubJogos().then(function () {
@@ -17241,7 +17264,10 @@ ${urlCard}`)}`;
       }
       window._abrirGamesHub();
       window._abrirJogo(jogo);
-      return _convEsperarPronto(cfg.pronto);
+      return _convEsperarPronto(cfg.pronto).catch(function (err) {
+        if (_segunda) throw err;
+        return _convAbrirTelaJogo(jogo, true);
+      });
     });
   }
 
@@ -18220,9 +18246,24 @@ ${urlCard}`)}`;
      cliConviteEntrar, que fecha o painel de conta e só então abre o
      jogo. Sem a folga, o `history.back()` do lobby chegaria DEPOIS
      do push do hub e fecharia a tela errada. */
+  /* 5.3.3 — o `true` aqui é o conserto. `cliFecharLobby()` sem ele faz
+     `history.back()` pra desfazer o pushState do overlay, e esse back é
+     ASSÍNCRONO: no celular o popstate dele chega depois de
+     `_abrirGamesHub` + `_abrirJogo` já terem empilhado 'jogos-hub' e
+     'jogo'. Aí ele deixa de ser "o back do lobby" e vira, aos olhos do
+     handler global, o "voltar" do usuário em cima de um jogo aberto —
+     que responde com `_voltarAoMenu()` → `_pararJogosExternos()` →
+     `BaralhoGame.parar()`, e esse `parar()` ESVAZIA o #baralho-root. O
+     `pronto` do catálogo nunca mais ficava true e a espera morria em
+     "A tela do jogo não abriu" (o convidado ficava com essa mensagem
+     no lobby enquanto o anfitrião já estava na sala).
+     Fechando com viaPopstate=true, o overlay some sem back nenhum e o
+     pushState do hub entra por cima — nada pra chegar atrasado. A
+     entrada 'lobby' que fica embaixo é consumida depois, quando a
+     pessoa sai do hub pelo "voltar". */
   function _lobFecharUiEEsperar() {
     if (!_lobUiAberto()) return Promise.resolve();
-    cliFecharLobby();
+    cliFecharLobby(true);
     return new Promise(function (r) { setTimeout(r, LOB_FECHAR_MS); });
   }
 

@@ -7564,6 +7564,13 @@ body.aprender-fs-open .apr-tela-licao {
     .lobby-ami-btn:active { opacity: 0.6; }
     .lobby-ami-btn:disabled { cursor: default; opacity: 0.7; }
     .lobby-ami-btn.ok { color: #22c55e; border-color: rgba(34,197,94,0.4); }
+    /* L2 — convite de pé. Âmbar em vez do verde do "ok": não é um
+       fim de história, é um "esperando", e o botão continua clicável
+       porque tocar nele cancela o convite. */
+    .lobby-ami-btn.aguardando {
+      color: #f59e0b; border-color: rgba(245,158,11,0.45);
+      background: rgba(245,158,11,0.08);
+    }
 
     /* "Chamar pro lobby" na fileira de jogos do amigo: ocupa a linha
        inteira acima dos jogos, porque não é um jogo. */

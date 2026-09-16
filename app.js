@@ -19215,8 +19215,15 @@ ${urlCard}`)}`;
      NÓ NOVO, e de propósito não é o gameInvites da 4.4:
 
        lobbyInvites/{paraUid}/{deUid} = {
-         nome, codigoLobby, em, expiraEm
+         nome, codigoLobby, em, expiraEm, foto?
        }
+
+     L2 acrescentou duas coisas a isto, sem mexer no resto:
+     `foto` (opcional) no convite, pra o card do topo mostrar o rosto
+     de quem chamou em vez da inicial — ele já sabia desenhar foto
+     desde o P3, só não recebia nenhuma daqui; e o ramo espelho
+     lobbyInvitesSent, que é o que faz o botão do remetente dizer
+     "Aguardando" e oferecer cancelar (ver o bloco logo abaixo).
 
      São coisas diferentes e misturá-las custaria caro. O gameInvites
      carrega `jogo` + `codigo` de uma SALA DE JOGO que já existe, e a
@@ -19256,10 +19263,35 @@ ${urlCard}`)}`;
      Funções globais (onclick do HTML gerado):
        cliLobbyConvidar(uid)
        cliLobbyConviteAceitar(deUid) / cliLobbyConviteRecusar(deUid)
+       cliLobbyConviteCancelar(paraUid)   (L2)
   ══════════════════════════════════════════════════════════════ */
 
   var LOBCONV_RAIZ = 'lobbyInvites';
   var LOBCONV_VALIDADE_MS = 12 * 60 * 1000;   // convite de lobby vale 12 min
+
+  /* ── Etapa L2: espelho do que EU mandei ────────────────────────
+     Na L1 o botão "Convidar" virava "Convidado" só na memória da
+     tela: recarregou a página, trocou de aparelho ou fechou o lobby,
+     e o estado sumia — quem convidou reconvidava no escuro.
+
+       lobbyInvitesSent/{deUid}/{paraUid} = { codigoLobby, em, expiraEm }
+
+     É ESPELHO, não fonte: o convite de verdade continua sendo o
+     lobbyInvites/{para}/{de}. A caixa alheia ninguém lê (as regras
+     não dão), então a única forma honesta de o remetente saber que o
+     convite ainda está de pé é ele guardar uma cópia no PRÓPRIO
+     ramo, escrita no mesmo gesto do convite.
+
+     QUEM APAGA: o remetente (cancelou, o amigo entrou, venceu) e o
+     destinatário (aceitou ou recusou — ele apaga o convite dele e o
+     espelho do outro, e só a chave com o próprio uid). É por isso
+     que "Recusar" devolve o botão pra "Convidar" em vez de deixar
+     "Aguardando" até vencer.
+
+     As duas escritas NÃO vão num update atômico só: espelho é
+     conveniência, convite é o que importa. Se o ramo novo ainda não
+     tiver regra publicada, o convite precisa continuar saindo. */
+  var LOBENV_RAIZ = 'lobbyInvitesSent';
 
   /* ── Lado de quem RECEBE: caixa de entrada ─────────────────────
      Irmã de _convObservarCaixa (4.4) e de _pedObservarGlobal (P1):
@@ -19272,10 +19304,17 @@ ${urlCard}`)}`;
   var _lobConvPrimeira = true;  // primeiro snapshot = caixa que já estava lá
 
   /* ── Lado de quem CONVIDA ──────────────────────────────────────
-     Só memória de tela: uid -> {codigo, ate}. Serve pra pintar
-     "Convidado" no lugar de "Convidar" sem ir ao banco perguntar o
-     que a gente acabou de escrever. Some no logout. */
-  var _lobConvEnviados = {};
+     Dois mapas, de propósito. _lobEnvMapa é o que o BANCO diz (o
+     espelho da L2) e sobrevive a recarregar a página; _lobConvEnviados
+     é o otimista de tela, que pinta "Aguardando" no toque e vale só
+     até o snapshot do espelho chegar com a mesma chave. Sem o otimista
+     o botão ficaria um instante em "Convidar" depois do toque; sem o
+     do banco ele voltaria pra "Convidar" a cada recarga. */
+  var _lobConvEnviados = {};    // otimista: uid -> {codigo, ate}
+  var _lobEnvUnsub = null;      // desliga a escuta do próprio espelho
+  var _lobEnvUid   = null;      // uid que está ouvindo
+  var _lobEnvMapa  = {};        // uid -> {codigo, ate}, do banco
+  var _lobEnvTimer = null;      // redesenha quando o convite mais próximo vence
 
   function _lobConvParar() {
     if (_lobConvUnsub) { try { _lobConvUnsub(); } catch (e) {} _lobConvUnsub = null; }
@@ -19284,6 +19323,7 @@ ${urlCard}`)}`;
     _lobConvVistos = {};
     _lobConvEnviados = {};
     _lobConvPrimeira = true;
+    _lobEnvParar();
   }
 
   function _lobConvObservar() {
@@ -19303,11 +19343,17 @@ ${urlCard}`)}`;
     }).catch(function () { /* sem RTDB: o app segue igual, só não recebe convite */ });
   }
 
-  // Apaga um convite da PRÓPRIA caixa (aceitou, recusou ou expirou).
+  /* Apaga um convite da PRÓPRIA caixa (aceitou, recusou ou expirou) e,
+     junto, o espelho no ramo de quem mandou — é isso que faz o botão
+     do outro lado voltar de "Aguardando" pra "Convidar" quando alguém
+     recusa. Duas escritas soltas, não um update atômico: o convite
+     precisa sair da caixa mesmo que a regra do ramo novo ainda não
+     esteja publicada. */
   function _lobConvApagar(deUid) {
     if (!deUid || !_lobConvUid) return;
     _amigosCtx().then(function (ctx) {
-      return ctx.db.ref(LOBCONV_RAIZ + '/' + ctx.uid + '/' + deUid).remove();
+      ctx.db.ref(LOBCONV_RAIZ + '/' + ctx.uid + '/' + deUid).remove().catch(function () {});
+      ctx.db.ref(LOBENV_RAIZ + '/' + deUid + '/' + ctx.uid).remove().catch(function () {});
     }).catch(function () {});
   }
 
@@ -19331,6 +19377,11 @@ ${urlCard}`)}`;
       lista.push({
         de: de,
         nome: String(c.nome || 'Jogador').slice(0, CLI_NOME_MAX),
+        // Foto (L2): o convite passou a carregar a photoURL de quem
+        // chamou, com as mesmas travas dos nós de amizade. Convite
+        // antigo, gravado antes disso, simplesmente não tem o campo e
+        // cai na inicial — que era o comportamento da L1.
+        foto: _amigosFotoValida(c.foto),
         codigo: cod,
         em: c.em || 0,
         expiraEm: ate
@@ -19364,6 +19415,7 @@ ${urlCard}`)}`;
       chave: 'lobconv:' + c.de + '|' + c.codigo,
       tipo: 'lobby',
       nome: c.nome,
+      foto: c.foto,
       owl: '/webp/owl-marching.webp',
       texto: 'te chamou pro lobby <b>' + escHTML(c.codigo) + '</b>',
       acoes: [
@@ -19426,14 +19478,123 @@ ${urlCard}`)}`;
 
   function _lobConvEnviar(paraUid, codigo) {
     return _amigosCtx().then(function (ctx) {
-      // A chave é o próprio remetente: reconvidar sobrescreve.
-      return ctx.db.ref(LOBCONV_RAIZ + '/' + paraUid + '/' + ctx.uid).set({
+      var expira = Date.now() + LOBCONV_VALIDADE_MS;
+      var convite = {
         nome: cliNomeExibicao() || 'Jogador',
         codigoLobby: codigo,
         em: firebase.database.ServerValue.TIMESTAMP,
-        expiraEm: Date.now() + LOBCONV_VALIDADE_MS
-      });
+        expiraEm: expira
+      };
+      // Foto opcional (L2): só entra se existir e passar nas mesmas
+      // travas dos nós de amizade (https e teto de tamanho). Campo
+      // ausente é válido na regra — quem não tem foto grava sem ele.
+      var foto = _amigosMinhaFoto();
+      if (foto) convite.foto = foto;
+      // A chave é o próprio remetente: reconvidar sobrescreve.
+      return ctx.db.ref(LOBCONV_RAIZ + '/' + paraUid + '/' + ctx.uid).set(convite)
+        .then(function () {
+          // Espelho (L2), DEPOIS e à parte: se ele falhar, o convite já
+          // está de pé e quem perde é só o "Aguardando" desta tela.
+          ctx.db.ref(LOBENV_RAIZ + '/' + ctx.uid + '/' + paraUid).set({
+            codigoLobby: codigo,
+            em: firebase.database.ServerValue.TIMESTAMP,
+            expiraEm: expira
+          }).catch(function () {});
+        });
     });
+  }
+
+  /* ── Espelho do remetente: escuta do próprio ramo ───────────────
+     Vive junto com a lista de amigos do lobby (tela aberta), porque é
+     só ela que usa o estado. Cada snapshot joga fora o que venceu —
+     essa é a faxina do ramo, já que não há Cloud Function. */
+  function _lobEnvParar() {
+    if (_lobEnvUnsub) { try { _lobEnvUnsub(); } catch (e) {} _lobEnvUnsub = null; }
+    if (_lobEnvTimer) { clearTimeout(_lobEnvTimer); _lobEnvTimer = null; }
+    _lobEnvUid = null;
+    _lobEnvMapa = {};
+  }
+
+  function _lobEnvObservar() {
+    if (!_cliContaReal(_cliUser)) return;
+    var uid = _cliUser.uid;
+    if (_lobEnvUid === uid && _lobEnvUnsub) return;
+    _lobEnvParar();
+    _lobEnvUid = uid;
+    var parado = false, off = function () {};
+    _lobEnvUnsub = function () { parado = true; off(); };
+    _amigosCtx().then(function (ctx) {
+      if (parado || ctx.uid !== uid) return;
+      var ref = ctx.db.ref(LOBENV_RAIZ + '/' + uid);
+      var h = function (snap) { _lobEnvReceber(snap.val() || {}); };
+      // Sem o ramo (regra não publicada ainda), o lobby segue igual:
+      // o botão volta a ser só o otimista da L1.
+      ref.on('value', h, function () { _lobEnvReceber({}); });
+      off = function () { try { ref.off('value', h); } catch (e) {} };
+    }).catch(function () {});
+  }
+
+  function _lobEnvApagar(paraUid) {
+    if (!paraUid) return;
+    if (_lobEnvMapa[paraUid]) delete _lobEnvMapa[paraUid];
+    delete _lobConvEnviados[paraUid];
+    _amigosCtx().then(function (ctx) {
+      return ctx.db.ref(LOBENV_RAIZ + '/' + ctx.uid + '/' + paraUid).remove();
+    }).catch(function () {});
+  }
+
+  function _lobEnvReceber(val) {
+    var agora = Date.now();
+    var mapa = {}, proximo = 0;
+    Object.keys(val || {}).forEach(function (para) {
+      var c = val[para] || {};
+      var cod = _lobNormalizarCodigo(c.codigoLobby);
+      if (!cod) return;
+      var ate = c.expiraEm || ((c.em || agora) + LOBCONV_VALIDADE_MS);
+      if (ate <= agora) { _lobEnvApagar(para); return; }
+      mapa[para] = { codigo: cod, ate: ate };
+      // O otimista cumpriu o papel: daqui pra frente quem manda é o banco.
+      delete _lobConvEnviados[para];
+      if (!proximo || ate < proximo) proximo = ate;
+    });
+    _lobEnvMapa = mapa;
+
+    // Um despertador só, no convite que vence primeiro: sem isso o
+    // botão ficaria "Aguardando" pra sempre numa tela parada.
+    if (_lobEnvTimer) { clearTimeout(_lobEnvTimer); _lobEnvTimer = null; }
+    if (proximo) {
+      _lobEnvTimer = setTimeout(function () {
+        _lobEnvTimer = null;
+        _lobEnvReceber(val);
+        _lobAmiRender();
+      }, Math.max(1000, proximo - agora + 250));
+    }
+    _lobAmiRender();
+  }
+
+  /* Estado do amigo na lista "Chamar amigos": o do banco tem a
+     palavra, o otimista cobre a janela entre o toque e o snapshot. */
+  function _lobEnvEstado(uid, codigo) {
+    var agora = Date.now();
+    var e = _lobEnvMapa[uid];
+    if (e && e.codigo === codigo && e.ate > agora) return e;
+    var o = _lobConvEnviados[uid];
+    if (o && o.codigo === codigo && o.ate > agora) return o;
+    return null;
+  }
+
+  /* Cancelar o convite que EU mandei: apaga a caixa do amigo e o
+     espelho. O botão volta pra "Convidar" na hora. */
+  function cliLobbyConviteCancelar(uid) {
+    if (!uid) return;
+    delete _lobConvEnviados[uid];
+    delete _lobEnvMapa[uid];
+    _lobAmiRender();
+    _amigosCtx().then(function (ctx) {
+      ctx.db.ref(LOBCONV_RAIZ + '/' + uid + '/' + ctx.uid).remove().catch(function () {});
+      ctx.db.ref(LOBENV_RAIZ + '/' + ctx.uid + '/' + uid).remove().catch(function () {});
+      _lobUiMsg('Convite cancelado.', 'ok');
+    }).catch(function () {});
   }
 
   /* ── Lista de amigos DENTRO da tela do lobby ───────────────────
@@ -19461,6 +19622,9 @@ ${urlCard}`)}`;
 
   function _lobAmiLigar() {
     if (_lobAmiUnsub || !_cliContaReal(_cliUser)) return;
+    // L2: o espelho dos convites que EU mandei sobe junto — é o que
+    // pinta "Aguardando" no lugar de "Convidar".
+    _lobEnvObservar();
     _lobAmiUnsub = window.AngatubaAmigos.observarAmigos(function (amigos) {
       _lobAmiLista = amigos || [];
       _lobAmiRender();
@@ -19473,6 +19637,7 @@ ${urlCard}`)}`;
     if (_lobAmiTimer) { clearTimeout(_lobAmiTimer); _lobAmiTimer = null; }
     _lobAmiLista = [];
     _lobAmiPres = {};
+    _lobEnvParar();
   }
 
   // Um redesenho por rajada: ao abrir a tela chega um snapshot de
@@ -19522,15 +19687,26 @@ ${urlCard}`)}`;
     return s === 'online' ? 0 : (s === 'away' ? 1 : 2);
   }
 
+  /* L2 — o botão agora conta a história em vez de só desligar:
+     "Convidar" (ainda não chamei), "Aguardando" (convite de pé, e
+     tocar cancela). "Já no lobby" não aparece aqui porque quem é
+     membro sai desta lista e entra na de cima, "Na sala". A linha de
+     baixo do OFFLINE continua sendo a da L1 — o convite espera. */
   function _lobAmiHtmlItem(a, convidado, cheio) {
     var nome = _lobAmiNome(a);
     var st = _lobAmiPres[a.uid] || 'offline';
-    var sub = (st === 'online')
-      ? 'Online agora'
-      : (st === 'away' ? 'Ausente' : 'Offline — o convite espera até ele abrir o app');
+    var sub = convidado
+      ? (st === 'offline'
+          ? 'Convite enviado — espera ele abrir o app · toque pra cancelar'
+          : 'Convite enviado — aguardando resposta · toque pra cancelar')
+      : ((st === 'online')
+          ? 'Online agora'
+          : (st === 'away' ? 'Ausente' : 'Offline — o convite espera até ele abrir o app'));
     var botao = convidado
-      ? '<button type="button" class="lobby-ami-btn ok" disabled data-travar="nao">' +
-          '<i class="fa fa-check"></i> Convidado</button>'
+      ? '<button type="button" class="lobby-ami-btn aguardando" ' +
+          'onclick="cliLobbyConviteCancelar(\'' + escHTML(a.uid) + '\')" ' +
+          'title="Cancelar o convite" data-travar="nao">' +
+          '<i class="fa fa-hourglass-half"></i> Aguardando</button>'
       : '<button type="button" class="lobby-ami-btn" onclick="cliLobbyConvidar(\'' +
           escHTML(a.uid) + '\')"' + (cheio ? ' disabled data-travar="nao"' : '') + '>' +
           '<i class="fa fa-user-plus"></i> Convidar</button>';
@@ -19557,6 +19733,16 @@ ${urlCard}`)}`;
     est.membros.forEach(function (m) { dentro[m.uid] = true; });
     var fora = _lobAmiLista.filter(function (a) { return !dentro[a.uid]; });
 
+    /* L2 — o amigo aceitou e entrou: o convite virou passado. Some da
+       lista "Chamar" (já é membro, filtrado acima) e o espelho sai do
+       banco aqui, senão ele ficaria vencendo sozinho por 12 min. */
+    Object.keys(_lobEnvMapa).forEach(function (uid) {
+      if (dentro[uid]) _lobEnvApagar(uid);
+    });
+    Object.keys(_lobConvEnviados).forEach(function (uid) {
+      if (dentro[uid]) delete _lobConvEnviados[uid];
+    });
+
     _lobAmiLigarPresencas(fora.map(function (a) { return a.uid; }));
 
     if (!_lobAmiLista.length) {
@@ -19570,7 +19756,6 @@ ${urlCard}`)}`;
     }
 
     var cheio = est.membros.length >= window.AngatubaLobby.limite();
-    var agora = Date.now();
     fora.sort(function (x, y) {
       var d = _lobAmiPeso(x.uid) - _lobAmiPeso(y.uid);
       if (d) return d;
@@ -19578,9 +19763,7 @@ ${urlCard}`)}`;
     });
 
     box.innerHTML = fora.map(function (a) {
-      var env = _lobConvEnviados[a.uid];
-      var convidado = !!(env && env.codigo === est.codigo && env.ate > agora);
-      return _lobAmiHtmlItem(a, convidado, cheio);
+      return _lobAmiHtmlItem(a, !!_lobEnvEstado(a.uid, est.codigo), cheio);
     }).join('') +
       (cheio ? '<p class="lobby-dica breve">O lobby está cheio — alguém precisa sair pra caber mais gente.</p>' : '');
 
@@ -19618,6 +19801,7 @@ ${urlCard}`)}`;
   window.cliLobbyConvidar        = cliLobbyConvidar;
   window.cliLobbyConviteAceitar  = cliLobbyConviteAceitar;
   window.cliLobbyConviteRecusar  = cliLobbyConviteRecusar;
+  window.cliLobbyConviteCancelar = cliLobbyConviteCancelar;
 
   window.cliAbrirLobby   = cliAbrirLobby;
   window.cliFecharLobby  = cliFecharLobby;

@@ -17911,6 +17911,8 @@ ${urlCard}`)}`;
   var LOB_JOGO_MAX   = { pingpong: 2, tanques: 2, party: 4, baralho: 8 };
   var LOB_JOGO_EXATO = { pingpong: true, tanques: true };
   var LOB_MIN_MEMBROS = 2;                 // sozinho não é partida em grupo
+  var LOB_CHAT_MAX    = 160;               // teto do texto de uma mensagem (bate com a regra)
+  var LOB_CHAT_JANELA = 40;                // últimas mensagens que a tela carrega
   var LOB_PENDENTE_MS = 5 * 60 * 1000;     // janela pro código da sala aparecer
   var LOB_FECHAR_MS   = 220;               // folga pro popstate do overlay (ver cliConviteEntrar)
 
@@ -18753,7 +18755,58 @@ ${urlCard}`)}`;
     /* A UI da 5.2 pergunta as duas coisas antes de desenhar o botão:
        por que está travado, e o que avisar se não estiver. */
     porQueNaoComecar: function () { return _lobPorQueNaoComecar(_lobEstado); },
-    avisoLotacao: function () { return _lobAvisoLotacao(_lobEstado); }
+    avisoLotacao: function () { return _lobAvisoLotacao(_lobEstado); },
+
+    /* ── Chat de texto do lobby (Etapa L3) ──────────────────────
+       socialLobbies/{codigo}/chat/{pushId} = { uid, nome, texto, em }
+
+       Mora DENTRO do nó do lobby: o remove()/onDisconnect do
+       anfitrião leva o chat junto e não sobra lixo pra varrer. A
+       janela é curta de propósito (limitToLast) — é recado de
+       "cheguei", "bora", "espera aí", não histórico.
+
+       Escuta por 'value' e não por 'child_added': com 40 filhos no
+       teto, o redesenho inteiro custa menos que a contabilidade de
+       entrada/saída — e o corpo da tela já é redesenhado por
+       snapshot do lobby de qualquer jeito. */
+    chatLimite: function () { return LOB_CHAT_MAX; },
+
+    observarChat: function (cb) {
+      if (typeof cb !== 'function' || !_lobRef) return function () {};
+      var q = _lobRef.child('chat').limitToLast(LOB_CHAT_JANELA);
+      var h = function (snap) {
+        var val = snap.val() || {};
+        var msgs = Object.keys(val).map(function (id) {
+          var m = val[id] || {};
+          return {
+            id: id,
+            uid: String(m.uid || ''),
+            nome: String(m.nome || 'Jogador').slice(0, CLI_NOME_MAX),
+            texto: String(m.texto || '').slice(0, LOB_CHAT_MAX),
+            em: m.em || 0
+          };
+        }).filter(function (m) { return m.uid && m.texto; });
+        // A chave do push já é cronológica; `em` desempata o que o
+        // servidor carimbou no mesmo milissegundo.
+        msgs.sort(function (a, b) { return (a.em - b.em) || (a.id < b.id ? -1 : 1); });
+        try { cb(msgs); } catch (e) {}
+      };
+      q.on('value', h);
+      return function () { try { q.off('value', h); } catch (e) {} };
+    },
+
+    enviarChat: function (texto) {
+      var t = String(texto == null ? '' : texto).replace(/\s+/g, ' ').trim().slice(0, LOB_CHAT_MAX);
+      if (!t) return Promise.resolve(null);
+      if (!_lobRef || !_lobUid) return Promise.reject(new Error('Você não está num lobby.'));
+      return _lobRef.child('chat').push({
+        uid: _lobUid,
+        nome: String(cliNomeExibicao() || 'Jogador').slice(0, CLI_NOME_MAX),
+        texto: t,
+        em: firebase.database.ServerValue.TIMESTAMP
+      }).then(function (ref) { return ref.key; })
+        .catch(function (err) { throw _lobErro(err); });
+    }
   };
 
   /* ══════════════════════════════════════════════════════════════
@@ -18816,6 +18869,12 @@ ${urlCard}`)}`;
        cliLobbyCopiar / cliLobbyPronto / cliLobbySugerir
        cliLobbyChamar(uid)
        cliLobbyComecar / cliLobbyEntrarPartida / cliLobbyEncerrarPartida (5.3)
+       cliLobbyChatEnviar / cliLobbyChatRascunho / cliLobbyChamarAberto (L3)
+
+     L3 REDESENHOU A TELA (e só a tela): o corpo virou três peças —
+     topo com o código, miolo rolável, rodapé preso — e ganhou o
+     chat de texto. Nenhum handler mudou de nome nem de regra; ver o
+     cabeçalho de _lobUiHtmlDentro pro que saiu e o que entrou.
   ══════════════════════════════════════════════════════════════ */
 
   var _lobUiUnsub = null;     // desliga o observar() da 5.1
@@ -18933,6 +18992,7 @@ ${urlCard}`)}`;
   /* ── HTML: fora de lobby ───────────────────────────────────────*/
   function _lobUiHtmlFora() {
     return '' +
+      '<div class="lobby-simples">' +
       '<div class="lobby-vazio">' +
         '<img src="/webp/owl-marching.webp" alt="" class="lobby-owl" onerror="this.style.display=\'none\'" />' +
         '<p class="lobby-lead">Junte a galera primeiro e escolha o jogo depois.</p>' +
@@ -18947,21 +19007,40 @@ ${urlCard}`)}`;
           'onkeydown="if(event.key===\'Enter\'){event.preventDefault();cliLobbyEntrar();}" />' +
         '<button type="button" class="lobby-btn" onclick="cliLobbyEntrar()">Entrar</button>' +
       '</div>' +
-      '<p id="lobby-msg" class="cli-amigos-msg"></p>';
+      '<p id="lobby-msg" class="cli-amigos-msg"></p>' +
+      '</div>';
   }
 
-  /* ── HTML: dentro do lobby ─────────────────────────────────────*/
-  function _lobUiHtmlMembro(m, souAnfitriao) {
+  /* ── HTML: dentro do lobby ─────────────────────────────────────
+     L3 — a lista virou GRADE DE VAGAS. Em 360px, seis linhas de
+     avatar+nome+tag comiam a tela inteira e empurravam o resto pra
+     baixo da dobra; três colunas de tile mostram o grupo todo de uma
+     vez, que é a única coisa que a pessoa realmente veio ver aqui.
+     O avatar continua sendo o _amLinhaAvatar da lista de amigos —
+     mesmo componente, mesmo `data-lobpres`, então as escutas de
+     presença da 5.2 seguem pintando o pontinho sem saber de nada. */
+  function _lobUiHtmlSlot(m) {
     var eu = (_cliUser && m.uid === _cliUser.uid);
-    return '<div class="cli-amigo-item lobby-membro' + (m.pronto ? ' pronto' : '') + '">' +
-      _amLinhaAvatar(m.uid, m.nome, eu, m.foto, 'lobpres') +
-      '<span class="cli-amigo-txt">' +
-        '<span class="cli-amigo-nome">' + escHTML(m.nome) + (eu ? ' <i>(você)</i>' : '') + '</span>' +
-        '<span class="cli-amigo-sub">' +
-          (m.anfitriao ? '<span class="lobby-tag anf">Anfitrião</span>' : '') +
-          (m.pronto ? '<span class="lobby-tag ok">Pronto</span>' : '<span class="lobby-tag">Escolhendo…</span>') +
-        '</span>' +
-      '</span></div>';
+    return '<div class="lobby-slot' + (m.pronto ? ' pronto' : '') + '">' +
+      '<span class="lobby-slot-av">' +
+        _amLinhaAvatar(m.uid, m.nome, false, m.foto, 'lobpres') +
+        (m.anfitriao ? '<i class="fa fa-crown lobby-slot-coroa" aria-label="Anfitrião" title="Anfitrião"></i>' : '') +
+      '</span>' +
+      '<span class="lobby-slot-nome">' + escHTML(m.nome) + (eu ? ' <i>(você)</i>' : '') + '</span>' +
+      '<span class="lobby-slot-st' + (m.pronto ? ' ok' : '') + '">' +
+        (m.pronto ? 'Pronto' : 'Escolhendo') + '</span>' +
+    '</div>';
+  }
+
+  /* Vaga vazia. Só as que FECHAM A LINHA da grade: com dois na sala
+     aparece uma vaga, não quatro — a grade fica inteira sem virar um
+     tabuleiro de buracos. */
+  function _lobUiHtmlVaga() {
+    return '<div class="lobby-slot vago" aria-hidden="true">' +
+      '<span class="lobby-slot-av"><span class="lobby-slot-mais">+</span></span>' +
+      '<span class="lobby-slot-nome">Vaga</span>' +
+      '<span class="lobby-slot-st"></span>' +
+    '</div>';
   }
 
   function _lobUiHtmlJogos(est) {
@@ -18975,118 +19054,286 @@ ${urlCard}`)}`;
     return '<div class="lobby-jogos">' + chips + '</div>';
   }
 
+  /* L3 — HIERARQUIA DA TELA, em três peças fixas dentro do
+     #lobby-corpo: topo (o código, compacto), miolo rolável, rodapé
+     preso embaixo. O que mudou e por quê:
+
+       - o código saiu da caixa de largura inteira com rótulo e virou
+         um chip no topo. Ele é consulta, não a atração: quem chega
+         aqui quer ver QUEM está na sala;
+       - "Na sala" subiu pro primeiro lugar e virou grade;
+       - "Chamar amigos" virou <details>, fechado quando já tem gente
+         na sala — a lista de amigos offline não pode competir com o
+         grupo que já está de pé;
+       - a pilha de <p class="lobby-dica"> em itálico foi embora.
+         Sobrou UMA linha, no rodapé, e só quando ela explica um botão
+         travado (ou avisa da lotação acima do teto do jogo);
+       - as ações pararam de aparecer no meio do texto: "pronto" e
+         "começar" moram no rodapé, e "sair/encerrar" fica abaixo
+         deles, em contorno, sem disputar o toque.
+
+     A LÓGICA é a mesma da 5.3/L1/L2: mesmos handlers, mesmo
+     porQueNaoComecar(), mesmo `emJogo`, mesmo #lobby-amigos pro
+     _lobAmiRender achar. */
   function _lobUiHtmlDentro(est) {
     var cat = window.AngatubaLobby.jogos();
     var jogo = est.jogoSugerido ? cat[est.jogoSugerido] : null;
     var lim = window.AngatubaLobby.limite();
+    var n = est.membros.length;
     /* 5.3 — com a partida em curso o bloco de baixo muda de assunto.
        Subiu pra cá na L1 porque a seção "Chamar amigos" também some
        nesse estado: ninguém entra num lobby que não está 'aberto'. */
     var emJogo = (est.status === 'em_jogo' && !!est.codigoSalaJogo && !!jogo);
 
-    var html = '' +
-      '<div class="lobby-cod-box">' +
-        '<span class="lobby-cod-rot">Código do lobby</span>' +
-        '<strong class="lobby-cod">' + escHTML(est.codigo) + '</strong>' +
-        '<button type="button" class="lobby-btn peq" onclick="cliLobbyCopiar()" data-travar="nao">' +
-          '<i class="fa fa-copy"></i> Copiar</button>' +
-      '</div>' +
-      '<p class="lobby-dica">Manda esse código pra galera entrar.</p>' +
-
-      '<div class="lobby-sec-tit">' +
-        '<span>Na sala</span><span class="lobby-cont">' + est.membros.length + '/' + lim + '</span>' +
-      '</div>' +
-      '<div class="lobby-membros">' +
-        est.membros.map(function (m) { return _lobUiHtmlMembro(m, est.souAnfitriao); }).join('') +
-      '</div>';
-
-    /* L1 — chamar amigo direto, sem ditar código. O miolo é pintado
-       pelo _lobAmiRender (que tem a lista e as presenças), não aqui:
-       esta string só reserva o lugar. Qualquer membro convida — as
-       regras pedem amizade entre quem manda e quem recebe, não
-       anfitrião (ver o bloco "CONVIDAR AMIGO PRO LOBBY"). */
-    if (!emJogo) {
-      html +=
-        '<div class="lobby-sec-tit"><span>Chamar amigos</span></div>' +
-        '<div id="lobby-amigos" class="lobby-amigos"></div>';
-    }
-
     // "Estou pronto" — cada um marca o seu (a regra só deixa o próprio).
     var euPronto = false;
-    for (var i = 0; i < est.membros.length; i++) {
+    for (var i = 0; i < n; i++) {
       if (_cliUser && est.membros[i].uid === _cliUser.uid) { euPronto = est.membros[i].pronto; break; }
     }
-    html +=
-      '<button type="button" class="lobby-btn pronto' + (euPronto ? ' on' : '') + '" ' +
-        'onclick="cliLobbyPronto()" aria-pressed="' + (euPronto ? 'true' : 'false') + '">' +
-        '<i class="fa fa-' + (euPronto ? 'check' : 'hourglass-half') + '"></i> ' +
-        (euPronto ? 'Estou pronto' : 'Marcar que estou pronto') +
-      '</button>';
 
-    /* Com a partida em curso o bloco inteiro muda de assunto: não é
-       mais "o que vamos jogar", é "a partida está lá". Os chips de jogo
-       somem no caminho de propósito — trocar o jogo escolhido com o
-       grupo dentro de uma sala só confundiria quem está lá. */
+    /* ── 1. Topo fixo: o código ─────────────────────────────────*/
+    var html = '' +
+      '<div class="lobby-topo">' +
+        '<button type="button" class="lobby-cod-chip" onclick="cliLobbyCopiar()" ' +
+          'data-travar="nao" aria-label="Copiar o código do lobby">' +
+          '<b>' + escHTML(est.codigo) + '</b><i class="fa fa-copy"></i>' +
+        '</button>' +
+        (emJogo ? '<span class="lobby-tag ok">Em partida</span>' : '') +
+      '</div>' +
+      '<div class="lobby-scroll">';
+
+    /* ── 2. Na sala ─────────────────────────────────────────────*/
+    var slots = est.membros.map(_lobUiHtmlSlot).join('');
+    var vagas = Math.min(lim, Math.ceil(n / 3) * 3) - n;
+    for (var v = 0; v < vagas; v++) slots += _lobUiHtmlVaga();
+    html +=
+      '<div class="lobby-sec-tit">' +
+        '<span>Na sala</span><span class="lobby-cont">' + n + '/' + lim + '</span>' +
+      '</div>' +
+      '<div class="lobby-slots">' + slots + '</div>';
+
+    /* ── 3. Chamar amigos (L1), agora colapsável ────────────────
+       O miolo é pintado pelo _lobAmiRender (que tem a lista e as
+       presenças), não aqui: esta string só reserva o lugar — e ele
+       existe no DOM mesmo com o <details> fechado, então nada muda
+       pro render de lá. Qualquer membro convida: as regras pedem
+       amizade entre quem manda e quem recebe, não anfitrião (ver o
+       bloco "CONVIDAR AMIGO PRO LOBBY"). */
+    if (!emJogo) {
+      var aberto = (_lobChamarAberto === null) ? (n <= 1) : !!_lobChamarAberto;
+      html +=
+        /* O <summary> fica display:block e quem vira flex é o <span>
+           de dentro: Safari tem histórico de engasgar com summary
+           display:flex/grid, e o preço de descobrir isso no iPhone de
+           alguém é a seção não abrir mais. */
+        '<details class="lobby-chamar"' + (aberto ? ' open' : '') +
+          ' ontoggle="window.cliLobbyChamarAberto(this.open)">' +
+          '<summary class="lobby-chamar-tit">' +
+            '<span class="lobby-sec-tit">' +
+              '<span>Chamar amigos</span><i class="fa fa-chevron-down"></i>' +
+            '</span>' +
+          '</summary>' +
+          '<div id="lobby-amigos" class="lobby-amigos"></div>' +
+        '</details>';
+    }
+
+    /* ── 4. Modo ────────────────────────────────────────────────
+       Com a partida em curso o bloco muda de assunto: não é mais "o
+       que vamos jogar", é "a partida está lá". Os chips somem de
+       propósito — trocar o jogo com o grupo dentro de uma sala só
+       confundiria quem está lá. */
     if (emJogo) {
       html +=
-        '<div class="lobby-sec-tit"><span>Partida em andamento</span></div>' +
+        '<div class="lobby-sec-tit"><span>Partida</span></div>' +
         '<div class="lobby-emjogo">' +
-          '<span class="lobby-tag ok">Em partida</span>' +
           '<span class="lobby-emjogo-txt">' + jogo.emoji + ' ' + escHTML(jogo.nome) +
             ' · sala <b>' + escHTML(est.codigoSalaJogo) + '</b></span>' +
+        '</div>';
+    } else if (est.souAnfitriao) {
+      html +=
+        '<div class="lobby-sec-tit"><span>Modo</span>' +
+          (jogo ? '<span class="lobby-cont">' + jogo.emoji + ' ' + escHTML(jogo.nome) + '</span>' : '') +
         '</div>' +
+        _lobUiHtmlJogos(est);
+    } else {
+      html +=
+        '<div class="lobby-sec-tit"><span>Modo</span></div>' +
+        '<p class="lobby-modo-ro">' +
+          (jogo ? jogo.emoji + ' <b>' + escHTML(jogo.nome) + '</b> — escolha do anfitrião.'
+                : 'O anfitrião ainda não escolheu.') +
+        '</p>';
+    }
+
+    /* ── 5. Chat (L3) ───────────────────────────────────────────
+       Fica DEPOIS do modo e antes do rodapé, com altura fixa: a
+       janela é dele, e o resto da tela não pode encolher porque
+       alguém falou muito. O miolo é pintado pelo _lobChatRender a
+       partir do cache da escuta — aqui só nasce a casca. */
+    html +=
+      '<div class="lobby-sec-tit"><span>Chat</span></div>' +
+      '<div class="lobby-chat">' +
+        '<div class="lobby-chat-msgs" id="lobby-chat-msgs" aria-live="polite"></div>' +
+        '<div class="lobby-chat-barra">' +
+          '<input id="lobby-chat-input" class="lobby-chat-input" type="text" ' +
+            'maxlength="' + window.AngatubaLobby.chatLimite() + '" autocomplete="off" ' +
+            'placeholder="Falar com a sala…" aria-label="Mensagem pra sala" ' +
+            'oninput="window.cliLobbyChatRascunho(this.value)" ' +
+            'onkeydown="if(event.key===\'Enter\'){event.preventDefault();cliLobbyChatEnviar();}" />' +
+          '<button type="button" class="lobby-chat-env" onclick="cliLobbyChatEnviar()" ' +
+            'data-travar="nao" aria-label="Enviar"><i class="fa fa-paper-plane"></i></button>' +
+        '</div>' +
+      '</div>';
+
+    /* ── 6. Rodapé fixo ─────────────────────────────────────────*/
+    var dica = '', acoes = '', sec = '';
+    if (emJogo) {
+      acoes =
         '<button type="button" class="lobby-btn grande" onclick="cliLobbyEntrarPartida()">' +
-          '<i class="fa fa-play"></i> Entrar na partida</button>' +
-        '<p class="lobby-dica breve">Saiu sem querer ou chegou agora? É por aqui que se volta pra sala.</p>';
-      if (est.souAnfitriao) {
-        html +=
-          '<button type="button" class="lobby-btn" onclick="cliLobbyEncerrarPartida()">' +
+          '<i class="fa fa-play"></i> Entrar na partida</button>';
+      sec = est.souAnfitriao
+        ? '<button type="button" class="lobby-btn sec" onclick="cliLobbyEncerrarPartida()">' +
             '<i class="fa fa-flag-checkered"></i> Encerrar a partida</button>' +
-          '<p class="lobby-dica breve">O lobby não some enquanto a partida rola — e ele só volta a "escolher jogo" quando você encerra aqui.</p>';
-      }
+          '<button type="button" class="lobby-btn sair" onclick="cliLobbySair()">Encerrar o lobby</button>'
+        : '<button type="button" class="lobby-btn sair" onclick="cliLobbySair()">' +
+            '<i class="fa fa-right-from-bracket"></i> Sair do lobby</button>';
     } else if (est.souAnfitriao) {
       var motivo = window.AngatubaLobby.porQueNaoComecar();
-      var avisoLot = motivo ? '' : window.AngatubaLobby.avisoLotacao();
-      html += '<div class="lobby-sec-tit"><span>O que vamos jogar</span></div>' +
-        _lobUiHtmlJogos(est) +
-        '<p class="lobby-dica">' +
-          (jogo ? 'Escolhido: <b>' + jogo.emoji + ' ' + escHTML(jogo.nome) + '</b> — dá pra trocar quando quiser.'
-                : 'Escolha um jogo — o grupo continua o mesmo se você trocar depois.') +
-        '</p>' +
+      // UMA linha só: o que trava o botão vence; sem trava, o aviso de
+      // lotação acima do teto do jogo (que não impede, mas importa).
+      dica = motivo || window.AngatubaLobby.avisoLotacao();
+      acoes =
+        '<button type="button" class="lobby-btn pronto' + (euPronto ? ' on' : '') + '" ' +
+          'onclick="cliLobbyPronto()" aria-pressed="' + (euPronto ? 'true' : 'false') + '">' +
+          '<i class="fa fa-' + (euPronto ? 'check' : 'hourglass-half') + '"></i> Pronto</button>' +
         // Travado, ele carrega o data-travar="nao" pra trava de
         // criar/entrar não reabilitá-lo ao soltar (ver _lobUiTravar).
         '<button type="button" class="lobby-btn grande" onclick="cliLobbyComecar()"' +
           (motivo ? ' disabled data-travar="nao" title="' + escHTML(motivo) + '"' : '') + '>' +
-          '<i class="fa fa-play"></i> Começar a partida</button>' +
-        '<p class="lobby-dica breve">' +
-          (motivo ? escHTML(motivo)
-                  : (avisoLot ? escHTML(avisoLot)
-                              : 'Todo mundo aqui cai na mesma sala — ninguém precisa ditar código.')) +
-        '</p>';
+          '<i class="fa fa-play"></i> Começar</button>';
+      sec = '<button type="button" class="lobby-btn sair" onclick="cliLobbySair()">' +
+        '<i class="fa fa-right-from-bracket"></i> Encerrar o lobby</button>';
     } else {
-      html += '<div class="lobby-sec-tit"><span>O que vamos jogar</span></div>' +
-        '<p class="lobby-dica">' +
-        (jogo ? 'O anfitrião escolheu <b>' + jogo.emoji + ' ' + escHTML(jogo.nome) +
-                '</b>. Quando ele começar, você entra na sala sozinho.'
-              : 'O anfitrião ainda não escolheu.') + '</p>';
+      acoes =
+        '<button type="button" class="lobby-btn grande pronto' + (euPronto ? ' on' : '') + '" ' +
+          'onclick="cliLobbyPronto()" aria-pressed="' + (euPronto ? 'true' : 'false') + '">' +
+          '<i class="fa fa-' + (euPronto ? 'check' : 'hourglass-half') + '"></i> ' +
+          (euPronto ? 'Estou pronto' : 'Marcar que estou pronto') + '</button>';
+      sec = '<button type="button" class="lobby-btn sair" onclick="cliLobbySair()">' +
+        '<i class="fa fa-right-from-bracket"></i> Sair do lobby</button>';
     }
 
     html +=
-      '<p id="lobby-msg" class="cli-amigos-msg"></p>' +
-      '<button type="button" class="lobby-btn sair" onclick="cliLobbySair()">' +
-        '<i class="fa fa-right-from-bracket"></i> ' +
-        (est.souAnfitriao ? 'Encerrar o lobby' : 'Sair do lobby') + '</button>';
+      '</div>' +                       // fecha .lobby-scroll
+      '<div class="lobby-rodape">' +
+        '<p id="lobby-msg" class="cli-amigos-msg"></p>' +
+        (dica ? '<p class="lobby-dica">' + escHTML(dica) + '</p>' : '') +
+        '<div class="lobby-acoes">' + acoes + '</div>' +
+        '<div class="lobby-acoes sec">' + sec + '</div>' +
+      '</div>';
     return html;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     CHAT DO LOBBY — Etapa L3 (UI)
+     ------------------------------------------------------------
+     O banco é da 5.1 (AngatubaLobby.observarChat/enviarChat, nó
+     socialLobbies/{codigo}/chat). Aqui é só tela.
+
+     O CACHE EXISTE PORQUE O CORPO É REDESENHADO INTEIRO. Qualquer
+     snapshot do lobby (alguém marcou pronto, alguém entrou) refaz o
+     innerHTML do #lobby-corpo e leva o chat junto — então as
+     mensagens ficam guardadas em _lobChatMsgs e são repintadas
+     depois de cada redesenho, igual ao que o _lobAmiRender faz com a
+     lista de amigos.
+
+     E POR ISSO O RASCUNHO E O FOCO TAMBÉM SÃO GUARDADOS: sem isso,
+     bastava alguém entrar na sala pra você perder o que estava
+     digitando no meio da frase (e o teclado do celular fechar na
+     sua cara).
+
+     A ESCUTA SEGUE O LOBBY, não a tela: religa quando o código muda,
+     e cai no fechar do overlay e no sair do lobby. Um lobby só tem
+     40 mensagens em memória — é recado, não histórico.
+
+     MIC E VOZ CONTINUAM NÃO EXISTINDO. Só texto.
+  ══════════════════════════════════════════════════════════════ */
+  var _lobChatUnsub = null;     // desliga o observarChat
+  var _lobChatCod = null;       // código do lobby que a escuta segue
+  var _lobChatMsgs = [];        // últimas mensagens, pra repintar no redesenho
+  var _lobChatRascunho = '';    // o que estava digitado antes do redesenho
+  var _lobChatRefoco = false;   // o input estava com o foco antes do redesenho
+  var _lobChamarAberto = null;  // <details> "Chamar amigos": null = automático
+
+  function _lobChatSoltar() {
+    if (_lobChatUnsub) { try { _lobChatUnsub(); } catch (e) {} _lobChatUnsub = null; }
+    _lobChatCod = null;
+    _lobChatMsgs = [];
+    _lobChatRascunho = '';
+    _lobChatRefoco = false;
+  }
+
+  function _lobChatLigar(est) {
+    if (!est) { _lobChatSoltar(); return; }
+    if (_lobChatUnsub && _lobChatCod === est.codigo) return;   // já estou nesse
+    _lobChatSoltar();
+    _lobChatCod = est.codigo;
+    _lobChatUnsub = window.AngatubaLobby.observarChat(function (msgs) {
+      _lobChatMsgs = msgs || [];
+      _lobChatRender();
+    });
+  }
+
+  function _lobChatRender() {
+    var box = document.getElementById('lobby-chat-msgs');
+    if (!box) return;
+    var meu = (_cliUser && _cliUser.uid) || '';
+    box.innerHTML = _lobChatMsgs.length
+      ? _lobChatMsgs.map(function (m) {
+          return '<div class="lobby-msg' + (m.uid === meu ? ' minha' : '') + '">' +
+            (m.uid === meu ? '' : '<span class="lobby-msg-de">' + escHTML(m.nome) + '</span>') +
+            '<span class="lobby-msg-txt">' + escHTML(m.texto) + '</span>' +
+          '</div>';
+        }).join('')
+      : '<p class="lobby-chat-vazio">Ninguém falou nada ainda.</p>';
+    // Novas embaixo: a janela abre sempre no fim da conversa.
+    box.scrollTop = box.scrollHeight;
+    var inp = document.getElementById('lobby-chat-input');
+    if (!inp) return;
+    if (inp.value !== _lobChatRascunho) inp.value = _lobChatRascunho;
+    if (_lobChatRefoco) {
+      _lobChatRefoco = false;
+      try { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) {}
+    }
+  }
+
+  /* Enviar. Limpa o campo na hora e devolve o texto se o banco
+     recusar — quem escreveu não perde a frase por causa de uma regra
+     ou de uma queda de rede. */
+  function cliLobbyChatEnviar() {
+    var inp = document.getElementById('lobby-chat-input');
+    if (!inp) return;
+    var txt = inp.value;
+    if (!String(txt || '').trim()) return;
+    inp.value = '';
+    _lobChatRascunho = '';
+    window.AngatubaLobby.enviarChat(txt).catch(function (err) {
+      _lobChatRascunho = txt;
+      var el = document.getElementById('lobby-chat-input');
+      if (el) el.value = txt;
+      _lobUiMsg((err && err.message) || 'Não deu pra enviar agora.', 'erro');
+    });
   }
 
   function _lobUiHtmlDeslogado() {
     return '' +
-      '<div class="lobby-vazio">' +
-        '<img src="/webp/owl-wave.webp" alt="" class="lobby-owl" onerror="this.style.display=\'none\'" />' +
-        '<p class="lobby-lead">Entre na sua conta pra jogar em grupo.</p>' +
-      '</div>' +
-      '<button type="button" class="lobby-btn grande" onclick="cliFecharLobby();cliAbrirLogin();">' +
-        'Entrar na conta</button>';
+      '<div class="lobby-simples">' +
+        '<div class="lobby-vazio">' +
+          '<img src="/webp/owl-wave.webp" alt="" class="lobby-owl" onerror="this.style.display=\'none\'" />' +
+          '<p class="lobby-lead">Entre na sua conta pra jogar em grupo.</p>' +
+        '</div>' +
+        '<button type="button" class="lobby-btn grande" onclick="cliFecharLobby();cliAbrirLogin();">' +
+          'Entrar na conta</button>' +
+      '</div>';
   }
 
   /* ── Desenho ───────────────────────────────────────────────────
@@ -19097,20 +19344,27 @@ ${urlCard}`)}`;
     if (!box) return;
     _lobUiSoltarPresencas();
     if (!_lobUiAberto()) return;
-    if (!_cliContaReal(_cliUser)) { box.innerHTML = _lobUiHtmlDeslogado(); return; }
+    if (!_cliContaReal(_cliUser)) { box.innerHTML = _lobUiHtmlDeslogado(); _lobChatSoltar(); return; }
+    // L3: quem estava digitando no chat volta a digitar depois do
+    // redesenho — o innerHTML abaixo mata o input com foco e tudo.
+    var ae = document.activeElement;
+    _lobChatRefoco = !!(ae && ae.id === 'lobby-chat-input');
     box.innerHTML = est ? _lobUiHtmlDentro(est) : _lobUiHtmlFora();
     if (est) _lobUiLigarPresencas(est);
     // L1: o miolo do "Chamar amigos" entra depois do corpo montado —
     // ele depende da lista de amigos, que tem escuta própria.
     _lobAmiRender();
+    // L3: mesma ideia pro chat — a escuta é do lobby, o desenho é daqui.
+    if (est) { _lobChatLigar(est); _lobChatRender(); } else { _lobChatSoltar(); }
     _lobUiPintarMsg();
     if (_lobUiOcupado) _lobUiTravar(true);
   }
 
   /* ── Escuta global (irmã da caixa de convites e dos pedidos) ────*/
   function _lobUiEstado(est) {
-    // Entrou ou saiu de lobby: a mensagem da tela anterior não vale mais.
-    if (!!est !== _lobUiTinha) _lobUiMsgAtual = null;
+    // Entrou ou saiu de lobby: a mensagem da tela anterior não vale
+    // mais — e o "Chamar amigos" volta ao padrão automático (L3).
+    if (!!est !== _lobUiTinha) { _lobUiMsgAtual = null; _lobChamarAberto = null; }
     // Estava num lobby e agora não estou mais, sem ter tocado em sair:
     // o anfitrião caiu ou encerrou. Ver "ANFITRIÃO CAIU" na 5.1.
     if (!est && _lobUiTinha && !_lobUiOcupado) {
@@ -19133,6 +19387,8 @@ ${urlCard}`)}`;
     if (_lobUiUnsub) { try { _lobUiUnsub(); } catch (e) {} _lobUiUnsub = null; }
     _lobUiSoltarPresencas();
     _lobAmiSoltar();
+    _lobChatSoltar();
+    _lobChamarAberto = null;
     _lobUiTinha = false;
     _lobUiOcupado = false;
     _lobUiMsgAtual = null;
@@ -19166,6 +19422,8 @@ ${urlCard}`)}`;
     if (overlay) overlay.classList.remove('open');
     _lobUiSoltarPresencas();
     _lobAmiSoltar();
+    // L3: a escuta do chat vive com a tela aberta, como a dos amigos.
+    _lobChatSoltar();
     // O painel de conta pode ter ficado aberto por baixo — nesse caso o
     // scroll do body continua travado, que é o estado certo pra ele.
     var conta = document.getElementById('modal-cli-conta');
@@ -19401,8 +19659,9 @@ ${urlCard}`)}`;
      lugar. É por eles que se chama quem não é amigo aqui dentro, ou
      quem está com o app fechado.
 
-     MIC, CHAT E VOZ NÃO EXISTEM NO LOBBY — nem aqui nem em lugar
-     nenhum desta etapa.
+     MIC E VOZ NÃO EXISTEM NO LOBBY. O CHAT DE TEXTO passou a
+     existir na L3 (nó socialLobbies/{codigo}/chat; ver o bloco
+     "CHAT DO LOBBY" mais abaixo) — voz, não.
 
      Funções globais (onclick do HTML gerado):
        cliLobbyConvidar(uid)
@@ -19909,7 +20168,7 @@ ${urlCard}`)}`;
     box.innerHTML = fora.map(function (a) {
       return _lobAmiHtmlItem(a, !!_lobEnvEstado(a.uid, est.codigo), cheio);
     }).join('') +
-      (cheio ? '<p class="lobby-dica breve">O lobby está cheio — alguém precisa sair pra caber mais gente.</p>' : '');
+      (cheio ? '<p class="lobby-dica">O lobby está cheio — alguém precisa sair pra caber mais gente.</p>' : '');
 
     // Uma ação de criar/entrar/sair pode estar em voo: os botões que
     // acabaram de nascer entram travados junto com o resto.
@@ -19959,6 +20218,11 @@ ${urlCard}`)}`;
   window.cliLobbyComecar         = cliLobbyComecar;
   window.cliLobbyEntrarPartida   = cliLobbyEntrarPartida;
   window.cliLobbyEncerrarPartida = cliLobbyEncerrarPartida;
+
+  // L3 — chat e o estado do "Chamar amigos" (onclick/oninput do HTML gerado).
+  window.cliLobbyChatEnviar   = cliLobbyChatEnviar;
+  window.cliLobbyChatRascunho = function (v) { _lobChatRascunho = String(v == null ? '' : v); };
+  window.cliLobbyChamarAberto = function (on) { _lobChamarAberto = !!on; };
 
   /* ══════════════════════════════════════════════════════════════
      PUSH NOTIFICATIONS (FCM) — Preparação

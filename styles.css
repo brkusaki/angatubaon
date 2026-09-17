@@ -7397,6 +7397,78 @@ body.aprender-fs-open .apr-tela-licao {
        reusam .cli-amigos-msg. */
     .lobby-corpo { display: flex; flex-direction: column; gap: 10px; }
 
+    /* ── L3: a casca do lobby vira coluna com rodapé preso ──
+       Escopado no #modal-lobby pra não encostar em nenhum outro
+       sheet do app. A sheet deixa de rolar (overflow:hidden) e passa
+       a distribuir altura; quem rola é só o miolo (.lobby-scroll).
+       Com pouco conteúdo nada disso aparece: sem altura fixa não há
+       folga pra distribuir, e a sheet continua do tamanho do que tem
+       dentro — é o estado "fora do lobby", que não mudou. */
+    #modal-lobby .modal-sheet {
+      display: flex; flex-direction: column;
+      overflow: hidden; padding-bottom: 0;
+    }
+    #modal-lobby .modal-body {
+      flex: 1 1 auto; min-height: 0;
+      display: flex; flex-direction: column; gap: 0;
+      /* Menos folga no alto: o título e o código são a mesma faixa. */
+      padding-top: 12px; padding-bottom: 0;
+    }
+    /* gap:0 aqui porque as três peças da L3 já se separam por borda e
+       padding próprios; quem precisa de respiro entre filhos é o
+       .lobby-simples (estados "fora do lobby" e "deslogado"). */
+    #modal-lobby .lobby-corpo { flex: 1 1 auto; min-height: 0; gap: 0; }
+
+    /* Estados sem rodapé preso: eles devolvem o padding de baixo que a
+       sheet do lobby abriu mão pra encostar o rodapé na borda. */
+    .lobby-simples {
+      display: flex; flex-direction: column; gap: 10px;
+      padding: 0 0 calc(24px + env(safe-area-inset-bottom));
+    }
+
+    .lobby-topo {
+      flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+      margin: 0 -20px; padding: 0 20px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .lobby-scroll {
+      flex: 1 1 auto; min-height: 0; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 10px;
+      padding: 12px 0; scrollbar-width: none;
+      /* Rolagem do miolo não arrasta a página atrás do overlay. */
+      overscroll-behavior: contain;
+    }
+    .lobby-scroll::-webkit-scrollbar { display: none; }
+    .lobby-rodape {
+      flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px;
+      margin: 0 -20px; padding: 10px 20px calc(14px + env(safe-area-inset-bottom));
+      background: var(--surface); border-top: 1px solid var(--border);
+    }
+    /* Sem recado no ar, o <p> não abre buraco no rodapé. */
+    .lobby-rodape .cli-amigos-msg:empty { display: none; }
+
+    .lobby-acoes { display: flex; gap: 8px; }
+    .lobby-acoes .lobby-btn { flex: 1 1 auto; width: auto; margin-top: 0; }
+    /* O "Pronto" do anfitrião divide a linha com o "Começar", que é o
+       primário: ele encolhe pro tamanho do texto em vez de disputar
+       metade da barra. */
+    .lobby-acoes .lobby-btn.pronto:not(.grande) { flex: 0 0 auto; }
+
+    /* Código no topo: chip de toque, não caixa de destaque. */
+    .lobby-cod-chip {
+      display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+      padding: 6px 10px; border-radius: 999px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .lobby-cod-chip:active { opacity: 0.6; }
+    .lobby-cod-chip b {
+      font-family: var(--font-h); font-weight: 800; font-size: 15px;
+      letter-spacing: 0.12em; white-space: nowrap;
+    }
+    .lobby-cod-chip .fa-copy { font-size: 12px; color: var(--muted); }
+
     /* Botão de entrada, no alto de "Meus amigos" */
     .cli-amigos-lobby-btn {
       width: 100%; display: flex; align-items: center; gap: 10px;
@@ -7455,57 +7527,72 @@ body.aprender-fs-open .apr-tela-licao {
     .lobby-btn.grande:disabled {
       background: var(--surface2); color: var(--muted); border-color: var(--border);
     }
-    .lobby-btn.peq { padding: 8px 10px; font-size: 12.5px; flex-shrink: 0; }
-    .lobby-btn.pronto { width: 100%; }
     .lobby-btn.pronto.on {
       border-color: rgba(34,197,94,0.45); background: rgba(34,197,94,0.08); color: #22c55e;
     }
+    /* Ação secundária do rodapé: contorno, nunca preenchida — ela não
+       pode competir com o "Começar"/"Entrar na partida" ao lado. */
+    .lobby-btn.sec { background: var(--bg); }
     .lobby-btn.sair {
-      width: 100%; margin-top: 4px; background: var(--bg);
-      color: var(--red); border-color: rgba(255,68,68,0.35);
-    }
-
-    /* ── Código do lobby ── */
-    .lobby-cod-box {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px; border-radius: var(--r-md);
-      background: var(--surface2); border: 1px solid var(--border);
-    }
-    .lobby-cod-rot {
-      font-size: 10.5px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.05em; color: var(--muted);
-    }
-    .lobby-cod {
-      flex: 1; font-family: var(--font-h); font-weight: 800;
-      font-size: 22px; line-height: 1; letter-spacing: 0.14em; color: var(--text);
-      /* 6 caracteres que a pessoa vai ditar no Zap: sem corte, sem quebra. */
-      white-space: nowrap;
-    }
-    /* Em tela estreita o rótulo sobe pra própria linha em vez de espremer
-       o código. */
-    @media (max-width: 360px) {
-      .lobby-cod-box { flex-wrap: wrap; }
-      .lobby-cod-rot { width: 100%; }
+      padding: 9px 12px; font-size: 12.5px;
+      background: var(--bg); color: var(--red); border-color: rgba(255,68,68,0.35);
     }
 
     .lobby-dica { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
-    .lobby-dica.breve { opacity: 0.85; font-style: italic; }
 
     /* ── Seções e lista ── */
     .lobby-sec-tit {
-      display: flex; align-items: baseline; justify-content: space-between;
-      margin-top: 6px; font-family: var(--font-h); font-weight: 800; font-size: 12px;
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+      font-family: var(--font-h); font-weight: 800; font-size: 11.5px;
       text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
     }
-    .lobby-cont { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+    .lobby-cont {
+      font-size: 11.5px; font-weight: 700; color: var(--muted);
+      text-transform: none; letter-spacing: 0; white-space: nowrap;
+    }
 
-    .lobby-membros { display: flex; flex-direction: column; gap: 8px; }
-    .cli-amigo-item.lobby-membro.pronto {
-      border-color: rgba(34,197,94,0.38); background: rgba(34,197,94,0.08);
+    /* ── L3: "Na sala" como grade de vagas ──
+       Três colunas cabem em 360px sem espremer o nome; seis membros
+       ocupam duas linhas e a sala inteira é lida de um golpe só. */
+    .lobby-slots {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
     }
-    .lobby-membro .cli-amigo-nome i {
-      font-style: normal; font-weight: 500; color: var(--muted);
+    .lobby-slot {
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      min-width: 0; padding: 10px 4px; border-radius: var(--r-md);
+      background: var(--surface2); border: 1px solid var(--border);
     }
+    .lobby-slot.pronto {
+      border-color: rgba(34,197,94,0.42); background: rgba(34,197,94,0.08);
+    }
+    .lobby-slot.vago {
+      background: transparent; border-style: dashed; opacity: 0.55;
+    }
+    .lobby-slot-av { position: relative; display: block; line-height: 0; }
+    /* Avatar um pouco menor que o da lista de amigos: aqui ele aparece
+       seis vezes, e 38px cada empurrava o resto da tela pra baixo. */
+    .lobby-slot .cli-amigo-av { width: 34px; height: 34px; font-size: 13px; }
+    .lobby-slot-coroa {
+      position: absolute; top: -4px; right: -6px; font-size: 10px; color: #f59e0b;
+      text-shadow: 0 0 3px var(--surface2);
+    }
+    .lobby-slot-mais {
+      display: flex; align-items: center; justify-content: center;
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 1px dashed var(--border); color: var(--muted);
+      font-size: 15px; line-height: 1;
+    }
+    .lobby-slot-nome {
+      max-width: 100%; font-size: 11.5px; font-weight: 600; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .lobby-slot-nome i { font-style: normal; font-weight: 500; color: var(--muted); }
+    .lobby-slot-st {
+      font-size: 10px; font-weight: 600; color: var(--muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+    }
+    .lobby-slot-st.ok { color: #22c55e; }
+
     .lobby-tag {
       display: inline-block; margin-right: 6px; padding: 1px 7px;
       border-radius: 999px; font-size: 10.5px; font-weight: 600;
@@ -7515,14 +7602,15 @@ body.aprender-fs-open .apr-tela-licao {
     .lobby-tag.ok { background: rgba(34,197,94,0.14); color: #22c55e; }
 
     /* ── Chips de jogo (só o anfitrião vê) ──
-       Mesma fileira da lista de amigos (.cli-amigo-jogo), com o estado
-       "escolhido" a mais. */
+       L3: pílulas do tamanho do texto, em vez de dois blocos de meia
+       largura. Quatro modos cabem em duas linhas curtas e param de
+       parecer a ação principal da tela — que mora no rodapé. */
     .lobby-jogos { display: flex; flex-wrap: wrap; gap: 6px; }
     .lobby-jogo {
-      flex: 1 1 calc(50% - 3px); min-width: 0; cursor: pointer;
-      padding: 9px 10px; border-radius: var(--r-md);
+      flex: 0 1 auto; min-width: 0; cursor: pointer;
+      padding: 7px 12px; border-radius: 999px;
       background: var(--surface2); border: 1px solid var(--border);
-      color: var(--text); font-size: 13px; font-weight: 600; font-family: inherit;
+      color: var(--text); font-size: 12.5px; font-weight: 600; font-family: inherit;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       -webkit-tap-highlight-color: transparent;
     }
@@ -7532,6 +7620,11 @@ body.aprender-fs-open .apr-tela-licao {
       border-color: rgba(34,197,94,0.45); background: rgba(34,197,94,0.1);
       color: #22c55e; font-weight: 700;
     }
+
+    /* Modo escolhido, na visão de quem NÃO é o anfitrião: uma linha,
+       sem chips (só o anfitrião troca o jogo). */
+    .lobby-modo-ro { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text); }
+    .lobby-modo-ro b { font-weight: 700; }
 
     /* ── Faixa "partida em andamento" (5.3) ──
        Mesma caixa do código do lobby, em verde: é o estado, não um
@@ -7552,7 +7645,25 @@ body.aprender-fs-open .apr-tela-licao {
        Mesma linha visual da lista de amigos do painel (.cli-amigo-item),
        com um botão de texto no lugar dos ícones: "Convidar" precisa ser
        lido, não adivinhado. */
-    .lobby-amigos { display: flex; flex-direction: column; gap: 8px; }
+    /* L3 — a seção virou <details>. Com gente na sala ela abre
+       fechada: a lista de amigos (metade dela offline) não pode
+       roubar a tela do grupo que já está de pé. O estado de aberto/
+       fechado é lembrado pelo JS, senão o redesenho do corpo (que
+       acontece a cada snapshot do lobby) fecharia na mão da pessoa. */
+    .lobby-chamar { min-width: 0; }
+    .lobby-chamar-tit {
+      display: block; cursor: pointer; list-style: none; padding: 4px 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .lobby-chamar-tit::-webkit-details-marker { display: none; }
+    .lobby-chamar-tit::marker { content: ''; }
+    .lobby-chamar-tit:active { opacity: 0.6; }
+    .lobby-chamar-tit .fa-chevron-down {
+      font-size: 10px; transition: transform 0.18s ease;
+    }
+    .lobby-chamar[open] > .lobby-chamar-tit .fa-chevron-down { transform: rotate(180deg); }
+
+    .lobby-amigos { display: flex; flex-direction: column; gap: 8px; padding-top: 6px; }
     .cli-amigo-item.lobby-ami { padding: 8px 10px; }
     .lobby-ami-btn {
       display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
@@ -7571,6 +7682,61 @@ body.aprender-fs-open .apr-tela-licao {
       color: #f59e0b; border-color: rgba(245,158,11,0.45);
       background: rgba(245,158,11,0.08);
     }
+
+    /* ── Chat do lobby (L3) ──
+       Altura fixa de propósito: a janela é do chat, e o resto da tela
+       não encolhe porque alguém falou muito. As bolhas reusam a
+       linguagem do app (surface2, raio médio); a minha vem do lado
+       direito, em verde, sem repetir o meu nome. */
+    .lobby-chat {
+      display: flex; flex-direction: column; gap: 8px;
+      border-radius: var(--r-md); border: 1px solid var(--border);
+      background: var(--bg); padding: 8px;
+    }
+    .lobby-chat-msgs {
+      display: flex; flex-direction: column; gap: 6px;
+      height: 148px; overflow-y: auto; overscroll-behavior: contain;
+      scrollbar-width: none;
+    }
+    .lobby-chat-msgs::-webkit-scrollbar { display: none; }
+    .lobby-chat-vazio {
+      margin: auto 0; text-align: center; font-size: 12px; color: var(--muted);
+    }
+    .lobby-msg {
+      align-self: flex-start; max-width: 84%;
+      display: flex; flex-direction: column; gap: 1px;
+      padding: 6px 10px; border-radius: 12px;
+      background: var(--surface2); border: 1px solid var(--border);
+    }
+    .lobby-msg.minha {
+      align-self: flex-end;
+      background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.32);
+    }
+    .lobby-msg-de {
+      font-size: 10.5px; font-weight: 700; color: var(--muted);
+    }
+    .lobby-msg-txt {
+      font-size: 13px; line-height: 1.4; color: var(--text);
+      /* Mensagem sem espaço (link colado, "aaaaa…") não estoura a caixa. */
+      overflow-wrap: anywhere; word-break: break-word;
+    }
+
+    .lobby-chat-barra { display: flex; gap: 6px; }
+    .lobby-chat-input {
+      flex: 1; min-width: 0; padding: 9px 11px; border-radius: 10px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); font-family: inherit; font-size: 13.5px;
+    }
+    .lobby-chat-input::placeholder { color: var(--muted); }
+    .lobby-chat-input:focus { outline: none; border-color: rgba(34,197,94,0.45); }
+    .lobby-chat-env {
+      flex: 0 0 auto; width: 40px; border-radius: 10px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: #22c55e; font-size: 13px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .lobby-chat-env:active { opacity: 0.6; }
 
     /* "Chamar pro lobby" na fileira de jogos do amigo: ocupa a linha
        inteira acima dos jogos, porque não é um jogo. */

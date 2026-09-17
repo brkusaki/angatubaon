@@ -18921,8 +18921,38 @@ ${urlCard}`)}`;
      do lobby redesenha o corpo inteiro, e sem isto o "Lobby aberto!
      Código: XXXXXX" sumiria no redesenho que o próprio criar() provoca
      — uma corrida que depende de quem chega primeiro, o `then` ou o
-     snapshot. */
+     snapshot.
+
+     E É EXATAMENTE POR ISSO QUE ELA PRECISOU APRENDER A IR EMBORA.
+     Guardar a mensagem resolveu o sumiço no redesenho e criou o
+     problema oposto: "Convite enviado pro Fulano — ele aceita e cai
+     aqui" ficava no rodapé até alguém escrever outra coisa. Uma
+     linha verde permanente embaixo de "Pronto/Começar" parece
+     estado da sala, e não é: é o eco de um toque que já aconteceu.
+
+     A REGRA, por TIPO da mensagem:
+       'erro'  -> FICA. Ele pede uma ação de quem está lendo ("cole o
+                  código que te mandaram", "não deu pra entrar na
+                  partida — use o botão"). Sair sozinho esconderia o
+                  que a pessoa precisa resolver.
+       'ok'/'' -> APAGA SOZINHO em LOB_MSG_MS. Feedback de ação
+                  (convite enviado, código copiado, convite cancelado)
+                  e recado de progresso ("Entrando…") já cumpriram o
+                  papel no instante em que foram lidos.
+
+     O BLOQUEIO REAL NUNCA PASSOU POR AQUI, e continua não passando:
+     "Esperando todo mundo ficar pronto", "Escolha um jogo" e afins
+     são o <p class="lobby-dica">, recalculado do porQueNaoComecar()
+     a cada redesenho — ele aparece e some sozinho porque a CONDIÇÃO
+     mudou, que é o certo pra um bloqueio. Este temporizador não
+     encosta nele. */
+  var LOB_MSG_MS = 3200;       // feedback de ação no rodapé: vida útil
   var _lobUiMsgAtual = null;   // {texto, tipo}
+  var _lobUiMsgTimer = null;   // apagador do feedback não-erro
+
+  function _lobUiMsgParar() {
+    if (_lobUiMsgTimer) { clearTimeout(_lobUiMsgTimer); _lobUiMsgTimer = null; }
+  }
 
   function _lobUiPintarMsg() {
     var el = document.getElementById('lobby-msg');
@@ -18933,8 +18963,20 @@ ${urlCard}`)}`;
   }
 
   function _lobUiMsg(texto, tipo) {
+    /* Sempre zera o anterior: duas ações seguidas (copiar e depois
+       convidar) não podem deixar o apagador da primeira levando a
+       segunda embora antes da hora. */
+    _lobUiMsgParar();
     _lobUiMsgAtual = texto ? { texto: texto, tipo: tipo || '' } : null;
     _lobUiPintarMsg();
+    if (!_lobUiMsgAtual || _lobUiMsgAtual.tipo === 'erro') return;
+    _lobUiMsgTimer = setTimeout(function () {
+      _lobUiMsgTimer = null;
+      _lobUiMsgAtual = null;
+      /* Só repinta. Não redesenha o corpo: o rodapé some a linha e o
+         resto da tela (grade, chat, rascunho, foco) fica onde está. */
+      _lobUiPintarMsg();
+    }, LOB_MSG_MS);
   }
 
   /* Trava os botões enquanto uma ação está em voo: criar e entrar
@@ -19404,7 +19446,7 @@ ${urlCard}`)}`;
   function _lobUiEstado(est) {
     // Entrou ou saiu de lobby: a mensagem da tela anterior não vale
     // mais — e o "Chamar amigos" volta ao padrão automático (L3).
-    if (!!est !== _lobUiTinha) { _lobUiMsgAtual = null; _lobChamarAberto = null; }
+    if (!!est !== _lobUiTinha) { _lobUiMsgParar(); _lobUiMsgAtual = null; _lobChamarAberto = null; }
     // Estava num lobby e agora não estou mais, sem ter tocado em sair:
     // o anfitrião caiu ou encerrou. Ver "ANFITRIÃO CAIU" na 5.1.
     if (!est && _lobUiTinha && !_lobUiOcupado) {
@@ -19431,6 +19473,7 @@ ${urlCard}`)}`;
     _lobChamarAberto = null;
     _lobUiTinha = false;
     _lobUiOcupado = false;
+    _lobUiMsgParar();
     _lobUiMsgAtual = null;
     _lobUiPintarPill(null);
     var box = document.getElementById('lobby-corpo');

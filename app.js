@@ -18575,7 +18575,16 @@ ${urlCard}`)}`;
 
   /* Por que este lobby NÃO pode começar agora. String vazia = pode.
      Vive aqui, e não na UI, porque `iniciarJogo` precisa da mesma
-     resposta — a UI só a repete antes do toque. */
+     resposta — a UI só a repete antes do toque.
+
+     POLIMENTO — "PRONTO" PASSOU A VALER. Até aqui o botão "Pronto"
+     era decoração: o anfitrião começava com metade da sala ainda
+     escolhendo, e a partida nascia com gente caindo dentro sem ter
+     dito que estava pronta. A checagem entra POR ÚLTIMO de propósito
+     — falta de jogo e falta de gente são problemas mais concretos, e
+     mandar "esperando todo mundo ficar pronto" pra quem está sozinho
+     no lobby seria mentira. Como a UI e o `iniciarJogo` leem a mesma
+     função, travar aqui trava nos dois lugares. */
   function _lobPorQueNaoComecar(est) {
     if (!est) return 'Você não está num lobby.';
     if (!est.souAnfitriao) return 'Só quem abriu o lobby começa a partida.';
@@ -18587,6 +18596,15 @@ ${urlCard}`)}`;
     }
     if (LOB_JOGO_EXATO[jogo] && n > LOB_JOGO_MAX[jogo]) {
       return CONV_JOGOS[jogo].nome + ' é 1x1 e vocês são ' + n + '. Escolham Party ou Baralho — ou fiquem só em 2 no lobby.';
+    }
+    /* O anfitrião conta junto: ele também tem o botão "Pronto", e
+       começar sem ter marcado o próprio seria a mesma pressa por
+       outro caminho. */
+    var faltam = 0;
+    for (var i = 0; i < n; i++) { if (!est.membros[i].pronto) faltam++; }
+    if (faltam) {
+      return 'Esperando todo mundo ficar pronto — ' +
+        (faltam === 1 ? 'falta 1.' : 'faltam ' + faltam + '.');
     }
     return '';
   }
@@ -18875,6 +18893,15 @@ ${urlCard}`)}`;
      topo com o código, miolo rolável, rodapé preso — e ganhou o
      chat de texto. Nenhum handler mudou de nome nem de regra; ver o
      cabeçalho de _lobUiHtmlDentro pro que saiu e o que entrou.
+
+     O POLIMENTO SEGUINTE mexeu na MESMA camada, e só nela: o lobby
+     deixou de parecer uma janela cinza e virou tela cheia com a
+     igreja à noite atrás (CSS, em #modal-lobby), perdeu o título
+     "Jogar em grupo" e o chip permanente do código, e o "Pronto"
+     passou a valer — o "Começar" só libera com a sala inteira
+     pronta (a regra mora no _lobPorQueNaoComecar, de onde a UI e o
+     iniciarJogo já liam). Rede, RTDB, convites e o caminho da 5.3
+     estão exatamente como estavam.
   ══════════════════════════════════════════════════════════════ */
 
   var _lobUiUnsub = null;     // desliga o observar() da 5.1
@@ -19058,9 +19085,11 @@ ${urlCard}`)}`;
      #lobby-corpo: topo (o código, compacto), miolo rolável, rodapé
      preso embaixo. O que mudou e por quê:
 
-       - o código saiu da caixa de largura inteira com rótulo e virou
-         um chip no topo. Ele é consulta, não a atração: quem chega
-         aqui quer ver QUEM está na sala;
+       - o código saiu da caixa de largura inteira com rótulo. Ele é
+         consulta, não a atração: quem chega aqui quer ver QUEM está
+         na sala. (No polimento seguinte ele saiu TAMBÉM do topo e
+         virou "Copiar código" na fila secundária do rodapé — o topo
+         é do título "Na sala n/6", que antes era uma seção à parte.)
        - "Na sala" subiu pro primeiro lugar e virou grade;
        - "Chamar amigos" virou <details>, fechado quando já tem gente
          na sala — a lista de amigos offline não pode competir com o
@@ -19091,13 +19120,18 @@ ${urlCard}`)}`;
       if (_cliUser && est.membros[i].uid === _cliUser.uid) { euPronto = est.membros[i].pronto; break; }
     }
 
-    /* ── 1. Topo fixo: o código ─────────────────────────────────*/
+    /* ── 1. Topo fixo: "Na sala n/6" ────────────────────────────
+       POLIMENTO: o chip do código saiu daqui. Ele era permanente e
+       não precisava ser — a pessoa lê o código uma vez, quando vai
+       chamar alguém, e o resto da sessão ele só ocupava a primeira
+       linha da tela. Desceu pro rodapé como "Copiar código" (abaixo,
+       na fila secundária). No lugar entrou o título que era a
+       primeira seção do miolo: uma faixa faz o trabalho de duas, e o
+       X do canto (HTML) mora nesta mesma linha. */
     var html = '' +
       '<div class="lobby-topo">' +
-        '<button type="button" class="lobby-cod-chip" onclick="cliLobbyCopiar()" ' +
-          'data-travar="nao" aria-label="Copiar o código do lobby">' +
-          '<b>' + escHTML(est.codigo) + '</b><i class="fa fa-copy"></i>' +
-        '</button>' +
+        '<span class="lobby-topo-tit">Na sala' +
+          '<span class="lobby-cont">' + n + '/' + lim + '</span></span>' +
         (emJogo ? '<span class="lobby-tag ok">Em partida</span>' : '') +
       '</div>' +
       '<div class="lobby-scroll">';
@@ -19106,11 +19140,7 @@ ${urlCard}`)}`;
     var slots = est.membros.map(_lobUiHtmlSlot).join('');
     var vagas = Math.min(lim, Math.ceil(n / 3) * 3) - n;
     for (var v = 0; v < vagas; v++) slots += _lobUiHtmlVaga();
-    html +=
-      '<div class="lobby-sec-tit">' +
-        '<span>Na sala</span><span class="lobby-cont">' + n + '/' + lim + '</span>' +
-      '</div>' +
-      '<div class="lobby-slots">' + slots + '</div>';
+    html += '<div class="lobby-slots">' + slots + '</div>';
 
     /* ── 3. Chamar amigos (L1), agora colapsável ────────────────
        O miolo é pintado pelo _lobAmiRender (que tem a lista e as
@@ -19150,10 +19180,11 @@ ${urlCard}`)}`;
             ' · sala <b>' + escHTML(est.codigoSalaJogo) + '</b></span>' +
         '</div>';
     } else if (est.souAnfitriao) {
+      /* O nome do jogo escolhido NÃO se repete aqui: o chip aceso
+         logo abaixo já diz qual é, e o rótulo à direita era um dos
+         labels duplicados que enchiam a tela. */
       html +=
-        '<div class="lobby-sec-tit"><span>Modo</span>' +
-          (jogo ? '<span class="lobby-cont">' + jogo.emoji + ' ' + escHTML(jogo.nome) + '</span>' : '') +
-        '</div>' +
+        '<div class="lobby-sec-tit"><span>Modo</span></div>' +
         _lobUiHtmlJogos(est);
     } else {
       html +=
@@ -19221,6 +19252,15 @@ ${urlCard}`)}`;
       sec = '<button type="button" class="lobby-btn sair" onclick="cliLobbySair()">' +
         '<i class="fa fa-right-from-bracket"></i> Sair do lobby</button>';
     }
+
+    /* O código da sala virou ISTO: primeiro item da fila secundária,
+       botão de texto, sem caixa e sem o código à mostra — ele aparece
+       na mensagem depois do toque (ver cliLobbyCopiar). data-travar
+       ="nao" pelo mesmo motivo do antigo chip: copiar não espera
+       ida nenhuma ao banco. */
+    sec = '<button type="button" class="lobby-btn cod" onclick="cliLobbyCopiar()" ' +
+        'data-travar="nao" aria-label="Copiar o código da sala">' +
+        '<i class="fa fa-copy"></i> Copiar código</button>' + sec;
 
     html +=
       '</div>' +                       // fecha .lobby-scroll
@@ -19495,7 +19535,9 @@ ${urlCard}`)}`;
     var cod = est.codigo;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(cod)
-        .then(function () { _lobUiMsg('Código copiado: ' + cod + ' — manda pra galera.', 'ok'); })
+        // Sem "manda pra galera": o botão já é "Copiar código", e o
+        // recado extra era uma das linhas que poluíam a tela.
+        .then(function () { _lobUiMsg('Código copiado: ' + cod, 'ok'); })
         .catch(function () { _lobUiMsg('Seu código: ' + cod, ''); });
     } else {
       _lobUiMsg('Seu código: ' + cod, '');

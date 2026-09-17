@@ -3630,18 +3630,24 @@
        Tela de "jogar em grupo". O corpo é desenhado pelo JS (bloco
        LOBBY SOCIAL — UI em app.js) a partir do que o
        AngatubaLobby.observar entrega: fora de lobby, dentro dele, ou
-       deslogado. Aqui fica só a casca, na mesma sheet do painel de
-       conta. Abre EM CIMA dele — o handler de popstate testa este
-       overlay antes do #modal-cli-conta. -->
-  <div class="modal-overlay" id="modal-lobby" role="dialog" aria-modal="true">
+       deslogado. Aqui fica só a casca. Abre EM CIMA do painel de
+       conta — o handler de popstate testa este overlay antes do
+       #modal-cli-conta.
+
+       POLIMENTO: a casca deixou de ser sheet e virou TELA. Saiu o
+       .modal-handle (não se arrasta uma sala pra fechar; o X e o
+       "voltar" bastam), saiu o .modal-header inteiro com o título
+       "Jogar em grupo" — o lugar se apresenta sozinho, e o rótulo
+       só roubava a primeira linha da tela. Sobrou o X, solto no
+       canto (position:absolute no CSS, sobre o fundo da igreja à
+       noite). A sheet continua sendo .modal-sheet de propósito: a
+       entrada, o popstate e o travamento de scroll são os mesmos do
+       resto do app; quem a transforma em tela cheia é o CSS
+       escopado em #modal-lobby. -->
+  <div class="modal-overlay" id="modal-lobby" role="dialog" aria-modal="true"
+       aria-label="Sala de jogo em grupo">
     <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <div>
-          <div class="modal-title">Jogar em <span>grupo</span></div>
-        </div>
-        <button class="modal-close" onclick="cliFecharLobby()" aria-label="Fechar">✕</button>
-      </div>
+      <button class="modal-close lobby-x" onclick="cliFecharLobby()" aria-label="Fechar">✕</button>
       <div class="modal-body">
         <div class="lobby-corpo" id="lobby-corpo"></div>
       </div>

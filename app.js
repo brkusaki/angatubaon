@@ -477,6 +477,28 @@
     return _fbDbCarregado;
   }
 
+  /* Messaging (FCM) sozinho — igual em espírito ao _carregarFirebaseDb
+     acima: SDK carregado sob demanda, só quando o bloco de PUSH (perto
+     do fim do arquivo) decide pedir permissão ou buscar o token. Quem
+     nunca loga (ou loga e nunca ativa) jamais baixa esse script. */
+  var _fbMsgCarregado = null;
+  function _carregarFirebaseMessaging() {
+    if (_fbMsgCarregado) return _fbMsgCarregado;
+    _fbMsgCarregado = _carregarFirebaseAuthCore().then(function () {
+      return _injetarScript(FIREBASE_SDK_BASE + 'firebase-messaging-compat.js');
+    }).then(function () {
+      return new Promise(function (resolve, reject) {
+        var tentativas = 0;
+        (function checar() {
+          if (window.firebase && firebase.messaging) { resolve(); return; }
+          if (++tentativas > 100) { reject(new Error('Firebase Messaging não carregou.')); return; }
+          setTimeout(checar, 50);
+        })();
+      });
+    }).catch(function (err) { _fbMsgCarregado = null; throw err; });
+    return _fbMsgCarregado;
+  }
+
   /* ── Hub de jogos: Jogos/hub.js carregado sob demanda ──────────────
      O hub inteiro (menu, streak, quiz, ranking, loader dos jogos
      externos) foi extraído pra Jogos/hub.js — quem só quer ver o
@@ -6705,10 +6727,16 @@
   })();
 
   /* ── Service Worker ──────────────────────────────────────── */
+  // Registration guardada pro bloco de PUSH (FCM), perto do fim do
+  // arquivo — getToken() precisa dela porque o app registra o SW num
+  // caminho próprio ('/service-worker.js'), não no nome padrão que o
+  // Messaging procura sozinho.
+  var _swRegistration = null;
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
         .then(reg => {
+          _swRegistration = reg;
           // Verifica se há update a cada 60 segundos
           setInterval(() => { if (!document.hidden) reg.update(); }, 60_000);
 
@@ -15482,6 +15510,10 @@ ${urlCard}`)}`;
         // Nó diferente (lobbyInvites), assunto diferente — ver o bloco
         // "CONVIDAR AMIGO PRO LOBBY".
         setTimeout(_lobConvObservar, 2900);
+        // Push (FCM, preparação): por último — pede permissão (se ainda
+        // não decidida) e guarda o token. Só depois de todo o resto do
+        // social ter assentado, pelo mesmo motivo dos timers acima.
+        setTimeout(_fcmIniciar, 3000);
       } else {
         // Deslogou (ou é sessão anônima de sala): tira do ar.
         _presencaParar();
@@ -15499,6 +15531,11 @@ ${urlCard}`)}`;
         // Código curto (P2) é por conta: o da conta que saiu não pode
         // sobrar em cache pra próxima pessoa deste aparelho.
         _amCodigoLimpar();
+        // Push (FCM): apaga o token desta conta (best-effort — se já
+        // não há mais auth válido, a escrita falha em silêncio e só o
+        // cache local sai) e limpa o cache, pro próximo login decidir
+        // de novo.
+        _fcmParar();
       }
       cliAtualizarHeader();
     });
@@ -16070,6 +16107,9 @@ ${urlCard}`)}`;
     _lobConvParar();
     _lobSair();
     _avisoLimpar();
+    // Push (FCM): apaga o token ANTES do signOut, mesmo motivo da
+    // presença acima — depois dele as regras recusam a escrita.
+    _fcmParar();
     // Limpa também o apelido espelhado: sem isto ele sobrevivia no
     // localStorage e a próxima sala de multiplayer entrada sem conta
     // (sessão anônima) reaparecia com o nome de quem tinha saído.
@@ -19919,3 +19959,270 @@ ${urlCard}`)}`;
   window.cliLobbyComecar         = cliLobbyComecar;
   window.cliLobbyEntrarPartida   = cliLobbyEntrarPartida;
   window.cliLobbyEncerrarPartida = cliLobbyEncerrarPartida;
+
+  /* ══════════════════════════════════════════════════════════════
+     PUSH NOTIFICATIONS (FCM) — Preparação
+     ------------------------------------------------------------
+     Só o token: pedir permissão, obter o token do navegador e
+     guardá-lo em fcmTokens/{uid}/{tokenId} (ver database.rules.json).
+     O ENVIO real (uma Cloud Function escutando gameInvites/
+     lobbyInvites e chamando a Admin SDK) é etapa futura — aqui o
+     convite/pedido só chega em quem está com o app aberto e logado,
+     exatamente como hoje. Isto prepara o terreno pra quando o envio
+     existir: o Service Worker já sabe mostrar a notificação em
+     segundo plano e abrir o app no lugar certo ao clicar nela (ver
+     service-worker.js).
+
+     PENDÊNCIA MANUAL: FCM_VAPID_KEY abaixo precisa da chave pública
+     gerada no console do Firebase (Project Settings → Cloud
+     Messaging → Web Push certificates → gerar par, se ainda não
+     existir um). Enquanto ficar vazia, _fcmObterToken desiste cedo
+     e o app segue normal — só não grava token nenhum. Mesma
+     disciplina da databaseURL vazia lá em cima.
+
+     Nó no RTDB:
+       fcmTokens/{uid}/{tokenId} = { token, criadoEm }
+     $tokenId é gerado por push() aqui no cliente — o token cru tem
+     caracteres que o RTDB não aceita como chave. Um token novo
+     (rotação) grava numa chave NOVA e apaga a antiga; nunca
+     sobrescreve, pra rotação nunca parecer "continua o mesmo".
+
+     NÃO AGRESSIVO — como o pedido de permissão é decidido: liga
+     3s após o login nomeado (depois de presença/amigos/convites/
+     lobby já terem assentado, mesma disciplina dos outros timers
+     abaixo do onAuthStateChanged), só entra em cena se
+     Notification.permission ainda for 'default' (nunca insiste
+     depois de 'denied', e não pede de novo se já for 'granted'), e
+     aparece como um CARD dispensável na mesma pilha de avisos do
+     topo — nunca chama Notification.requestPermission() sozinho: só
+     quando a pessoa toca "Ativar". Dispensado (X, "Agora não", ou
+     nem tocado — o card some sozinho como os outros) => não pergunta
+     de novo por 7 dias (FCM_ASK_COOLDOWN_MS, mesmo prazo do banner
+     de instalar o PWA).
+
+     API pública (window.AngatubaFCM):
+       disponivel()   -> bool, se o navegador suporta Notification/SW/Push
+       permissao()    -> 'default' | 'granted' | 'denied' | 'unsupported'
+       ativar()       -> pede permissão agora (chamado pelo botão do card;
+                          pode ser chamado à mão de outro lugar também)
+       tokenAtual()   -> o token gravado nesta sessão, ou null
+  ══════════════════════════════════════════════════════════════ */
+
+  // Preencher com a chave pública VAPID do console do Firebase.
+  var FCM_VAPID_KEY = '';
+
+  var FCM_TOKEN_KEY        = 'angatuba_fcm_token_v1';  // cache local: {uid, tokenId, token}
+  var FCM_ASK_KEY           = 'angatuba_fcm_pedir_em';  // timestamp do último card mostrado/dispensado
+  var FCM_ASK_COOLDOWN_MS   = 7 * 24 * 60 * 60 * 1000;  // 7 dias — mesmo prazo do banner de instalar
+
+  var _fcmMsg           = null;  // instância do firebase.messaging(), cacheada
+  var _fcmTokenObtendo  = false; // evita duas corridas de getToken em paralelo
+  var _fcmOnMessageLigado = false;
+
+  function _fcmSuportado() {
+    return typeof Notification !== 'undefined' &&
+      'serviceWorker' in navigator &&
+      typeof window.PushManager !== 'undefined';
+  }
+
+  function _fcmMsgObter() {
+    if (_fcmMsg) return _fcmMsg;
+    if (typeof firebase === 'undefined' || !firebase.messaging) return null;
+    try { _fcmMsg = firebase.messaging(); } catch (e) { _fcmMsg = null; }
+    return _fcmMsg;
+  }
+
+  // A registration do SW já vem pronta (ver var _swRegistration lá em
+  // cima, perto do navigator.serviceWorker.register); se por algum
+  // motivo o boot ainda não terminou de registrar, espera o 'ready'.
+  function _swRegistrationObter() {
+    if (_swRegistration) return Promise.resolve(_swRegistration);
+    if (!('serviceWorker' in navigator)) return Promise.resolve(null);
+    return navigator.serviceWorker.ready.then(function (reg) {
+      _swRegistration = reg;
+      return reg;
+    }).catch(function () { return null; });
+  }
+
+  function _fcmLerCache() {
+    try { return JSON.parse(localStorage.getItem(FCM_TOKEN_KEY) || 'null'); } catch (e) { return null; }
+  }
+  function _fcmGravarCache(o) {
+    try { localStorage.setItem(FCM_TOKEN_KEY, JSON.stringify(o)); } catch (e) {}
+  }
+
+  // Grava o token em fcmTokens/{uid}/{tokenId} (chave nova por
+  // push()) e, se havia um token ANTERIOR desta mesma conta neste
+  // aparelho, apaga a entrada velha — best-effort: se a conta trocou
+  // no meio do caminho, não há mais permissão pra apagar o ramo
+  // alheio mesmo, então nem tenta.
+  function _fcmSalvarToken(uid, token) {
+    var db = _presDb();
+    if (!db) return;
+    var cache = _fcmLerCache();
+    if (cache && cache.uid === uid && cache.token === token && cache.tokenId) return; // nada mudou
+    var novaRef = db.ref('fcmTokens/' + uid).push();
+    var tokenId = novaRef.key;
+    novaRef.set({ token: token, criadoEm: firebase.database.ServerValue.TIMESTAMP }).then(function () {
+      if (cache && cache.uid === uid && cache.tokenId && cache.tokenId !== tokenId) {
+        try { db.ref('fcmTokens/' + uid + '/' + cache.tokenId).remove().catch(function () {}); } catch (e) {}
+      }
+      _fcmGravarCache({ uid: uid, tokenId: tokenId, token: token });
+    }).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.warn('[FCM] salvar token falhou:', err && err.message);
+    });
+  }
+
+  // Mensagem chegando com o app em PRIMEIRO plano: o Messaging não
+  // mostra notificação de sistema sozinho nesse caso (quem faz isso
+  // em segundo plano é o onBackgroundMessage do service-worker.js) —
+  // aqui só um toast, reaproveitando o que já existe.
+  function _fcmOnMessageLigar() {
+    if (_fcmOnMessageLigado) return;
+    var msg = _fcmMsgObter();
+    if (!msg || typeof msg.onMessage !== 'function') return;
+    _fcmOnMessageLigado = true;
+    try {
+      msg.onMessage(function (payload) {
+        var n = (payload && payload.notification) || {};
+        if (typeof showToastSimples === 'function') {
+          showToastSimples(n.title ? (n.body ? n.title + ' — ' + n.body : n.title) : 'Nova notificação.', '/webp/owl-wave.webp');
+        }
+      });
+    } catch (e) {}
+  }
+
+  // Carrega o SDK (Messaging + Database, em paralelo) e a registration
+  // do SW, arma o SW customizado no Messaging e pede o token.
+  function _fcmObterToken() {
+    if (!_cliContaReal(_cliUser) || _fcmTokenObtendo) return;
+    if (!FCM_VAPID_KEY) return; // pendência manual — ver comentário do bloco
+    var uid = _cliUser.uid;
+    _fcmTokenObtendo = true;
+    Promise.all([_carregarFirebaseMessaging(), _carregarFirebaseDb(), _swRegistrationObter()])
+      .then(function (r) {
+        var reg = r[2];
+        var msg = _fcmMsgObter();
+        if (!msg) throw new Error('Messaging indisponível.');
+        if (reg && typeof msg.useServiceWorker === 'function') {
+          try { msg.useServiceWorker(reg); } catch (e) {}
+        }
+        return msg.getToken({ vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: reg || undefined });
+      })
+      .then(function (token) {
+        _fcmTokenObtendo = false;
+        if (!token || !_cliContaReal(_cliUser) || _cliUser.uid !== uid) return;
+        _fcmSalvarToken(uid, token);
+        _fcmOnMessageLigar();
+      })
+      .catch(function (err) {
+        _fcmTokenObtendo = false;
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.warn('[FCM] getToken falhou:', err && err.message);
+      });
+  }
+
+  function _fcmPedirPermissao() {
+    if (!_fcmSuportado()) return;
+    try {
+      Notification.requestPermission().then(function (perm) {
+        if (perm === 'granted') _fcmObterToken();
+        // 'denied' ou fechou sem escolher: o navegador já lembra a
+        // escolha pra esta origem — insistir de novo só irrita.
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  function _fcmPodePerguntar() {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'default') return false;
+    try {
+      var t = parseInt(localStorage.getItem(FCM_ASK_KEY) || '0', 10);
+      return !t || (Date.now() - t) > FCM_ASK_COOLDOWN_MS;
+    } catch (e) { return true; }
+  }
+
+  // Marca "perguntado agora" no instante em que o CARD aparece, não só
+  // quando a pessoa toca "Agora não" — senão dispensar pelo X (que o
+  // handler genérico do aviso trata sem chamar nenhuma ação) deixaria
+  // o card voltando no próximo login, o que é exatamente o "agressivo"
+  // que essa etapa pediu pra evitar.
+  function _fcmMostrarPedido() {
+    if (!_fcmSuportado() || !_fcmPodePerguntar()) return;
+    try { localStorage.setItem(FCM_ASK_KEY, String(Date.now())); } catch (e) {}
+    _avisoMostrar({
+      chave: 'fcm:pedir',
+      nome: 'AngatubaON',
+      owl: '/webp/owl-wave.webp',
+      texto: 'Ativar avisos de convite e amigo mesmo com o app fechado?',
+      acoes: [
+        { rotulo: 'Ativar',    classe: 'ok', fn: _fcmPedirPermissao },
+        { rotulo: 'Agora não', classe: 'no', fn: function () {} }
+      ]
+    });
+  }
+
+  // Chamado 3s após o login nomeado (ver onAuthStateChanged). Só
+  // decide alguma coisa se o navegador ainda não tiver uma resposta —
+  // 'granted' busca o token direto, sem card; 'denied' não faz nada.
+  function _fcmIniciar() {
+    if (!_cliContaReal(_cliUser) || !_fcmSuportado()) return;
+    if (Notification.permission === 'granted') _fcmObterToken();
+    else if (Notification.permission === 'default') _fcmMostrarPedido();
+  }
+
+  // Chamado no cliSair (antes do signOut) e no onAuthStateChanged
+  // quando a sessão cai por qualquer outro motivo — mesma disciplina
+  // da presença: apagar ANTES do token morrer, senão a regra recusa.
+  function _fcmParar() {
+    var cache = _fcmLerCache();
+    if (cache && _cliContaReal(_cliUser) && _cliUser.uid === cache.uid && cache.tokenId) {
+      var db = _presDb();
+      if (db) {
+        try { db.ref('fcmTokens/' + cache.uid + '/' + cache.tokenId).remove().catch(function () {}); } catch (e) {}
+      }
+    }
+    try { localStorage.removeItem(FCM_TOKEN_KEY); } catch (e) {}
+    _fcmTokenObtendo = false;
+  }
+
+  window.AngatubaFCM = {
+    disponivel: _fcmSuportado,
+    permissao: function () { return _fcmSuportado() ? Notification.permission : 'unsupported'; },
+    ativar: _fcmPedirPermissao,
+    tokenAtual: function () { var c = _fcmLerCache(); return c ? c.token : null; }
+  };
+
+  /* ── Clique numa notificação em segundo plano ───────────────────
+     O service-worker.js foca uma aba já aberta (e manda ela pra cá
+     por postMessage) ou abre uma nova direto na URL do payload — ver
+     o notificationclick de lá. Convenção do "lugar certo": a URL do
+     payload leva "?abrir=lobby|amigos|jogos"; sem Cloud Function
+     ainda, ninguém escreve esse payload de verdade — o handler aqui
+     só espera que, quando escrever, seja assim. */
+  function _fcmAbrirDestino(urlStr) {
+    try {
+      var u = new URL(urlStr, location.origin);
+      var alvo = u.searchParams.get('abrir');
+      if (!alvo) return;
+      if (alvo === 'lobby' && typeof cliAbrirLobby === 'function') { cliAbrirLobby(); return; }
+      if (alvo === 'amigos' && typeof cliAbrirPainelConta === 'function') { cliAbrirPainelConta(); return; }
+      if (alvo === 'jogos' && typeof _abrirGamesHub === 'function') { _abrirGamesHub(); return; }
+    } catch (e) {}
+  }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', function (event) {
+      if (event.data && event.data.tipo === 'FCM_CLIQUE') _fcmAbrirDestino(event.data.url);
+    });
+  }
+
+  // Abriu o app do zero a partir do clique (clients.openWindow, sem
+  // aba já aberta pra focar) — mesmo destino, lido da própria URL.
+  // Espera o boot/login assentar antes de agir, e limpa a query pra
+  // um F5 não reabrir a mesma tela sozinho.
+  (function _fcmDestinoNoBoot() {
+    if (location.search.indexOf('abrir=') === -1) return;
+    setTimeout(function () {
+      _fcmAbrirDestino(location.href);
+      try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    }, 1500);
+  })();

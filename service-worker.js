@@ -1,4 +1,72 @@
-const CACHE = 'angatubaon-v337';
+/* ── Push notifications (FCM) — preparação ───────────────────────
+   importScripts roda ANTES de qualquer outra coisa no SW: se o
+   Messaging falhar (offline no instante da instalação, SDK do
+   gstatic bloqueado), o try/catch abaixo segura o erro e o resto
+   deste arquivo — cache, install, activate, fetch — segue igual.
+   Config duplicada do _fbConfig em app.js: o service worker roda num
+   escopo isolado, sem import nenhum do resto do app, então os valores
+   públicos do projeto (a mesma constante em dois lugares) são o preço
+   de não ter um bundler. Mudou o projeto Firebase? muda nos dois. */
+try {
+  importScripts('https://www.gstatic.com/firebasejs/12.17.1/firebase-app-compat.js');
+  importScripts('https://www.gstatic.com/firebasejs/12.17.1/firebase-messaging-compat.js');
+
+  firebase.initializeApp({
+    apiKey: "AIzaSyClKx3gSCgM1O6X6SMh3VyJLthp-oYnx3k",
+    authDomain: "angatubaon-cd333.firebaseapp.com",
+    projectId: "angatubaon-cd333",
+    storageBucket: "angatubaon-cd333.firebasestorage.app",
+    messagingSenderId: "559185630365",
+    appId: "1:559185630365:web:a2e7fc4cc9d26bfea67074",
+    databaseURL: "https://angatubaon-cd333-default-rtdb.firebaseio.com"
+  });
+
+  const messaging = firebase.messaging();
+
+  // Mensagem chegando com o app em SEGUNDO plano (aba fechada,
+  // minimizada, ou trocada). Em primeiro plano quem trata é o
+  // messaging.onMessage() em app.js (bloco PUSH NOTIFICATIONS). Sem
+  // Cloud Function ainda ninguém envia payload nenhum — isto só
+  // prepara a exibição pro dia em que alguém enviar.
+  messaging.onBackgroundMessage(function (payload) {
+    const n = (payload && payload.notification) || {};
+    const d = (payload && payload.data) || {};
+    self.registration.showNotification(n.title || 'AngatubaON', {
+      body: n.body || '',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      // Convenção lida por _fcmAbrirDestino em app.js: "?abrir=lobby
+      // |amigos|jogos" leva pro lugar certo; sem o parâmetro, só abre
+      // o app na home (ver notificationclick logo abaixo).
+      data: { url: d.url || '/' }
+    });
+  });
+} catch (e) {
+  console.warn('[SW] Firebase Messaging não iniciou:', e && e.message);
+}
+
+// Clique numa notificação em segundo plano: foca uma aba já aberta
+// (e manda ela pro lugar certo por postMessage — quem escuta é o
+// navigator.serviceWorker.addEventListener('message') em app.js) ou,
+// se não há nenhuma aberta, abre uma nova direto na URL do payload.
+self.addEventListener('notificationclick', function (event) {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (lista) {
+      for (let i = 0; i < lista.length; i++) {
+        const c = lista[i];
+        if ('focus' in c) {
+          try { c.postMessage({ tipo: 'FCM_CLIQUE', url: url }); } catch (e) {}
+          return c.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(url);
+    })
+  );
+});
+
+const CACHE = 'angatubaon-v338';
 const STATIC = [
   '/',
   '/index.html',

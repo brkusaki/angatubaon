@@ -20008,8 +20008,10 @@ ${urlCard}`)}`;
        tokenAtual()   -> o token gravado nesta sessão, ou null
   ══════════════════════════════════════════════════════════════ */
 
-  // Preencher com a chave pública VAPID do console do Firebase.
-  var FCM_VAPID_KEY = '';
+  // Chave pública VAPID (Project Settings → Cloud Messaging → Web Push
+  // certificates, console do Firebase). Pública por design, igual ao
+  // resto do _fbConfig lá em cima.
+  var FCM_VAPID_KEY = 'BOdWtmORdRrXsyYMuVNlXIxgRxJYx-tXfJeDJrfR2g8q988ISKPonUWkk1IYzgtvWkbzHqlZSIN2kpy7S3kU81I';
 
   var FCM_TOKEN_KEY        = 'angatuba_fcm_token_v1';  // cache local: {uid, tokenId, token}
   var FCM_ASK_KEY           = 'angatuba_fcm_pedir_em';  // timestamp do último card mostrado/dispensado

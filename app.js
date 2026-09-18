@@ -2818,6 +2818,10 @@
 
   /* ── Modal de Planos ─────────────────────────────────────── */
   let selectedPlan = 'GRATIS';
+  // A1: quando true, modal-planos foi aberto a partir do painel (loja já
+  // logada, querendo upgrade) em vez do fluxo de cadastro. Muda o que o
+  // CTA principal faz ao confirmar — ver confirmPlan().
+  let _planosCtxPainel = false;
 
   /* ── Ciclos de cobrança e preços ──────────────────────────────
      Base mensal: Plus R$29,90 · Pro R$49,90.
@@ -3161,6 +3165,82 @@
   function closePlanModal() {
     document.getElementById('modal-planos').classList.remove('open');
     document.body.style.overflow = '';
+    // A1: sempre limpa o contexto de painel ao fechar (inclusive fechar sem
+    // confirmar, ex.: clique fora) — não deve vazar pro próximo uso do modal.
+    _planosCtxPainel = false;
+    _cicloSelecionado = 'mensal';
+  }
+
+  // A1: abre o modal de planos a partir do painel Minha Loja (loja já
+  // logada). Reaproveita o carrossel existente; ao confirmar, chama
+  // iniciarPagamentoMP direto — sem passar pelo cadastro — com o WhatsApp
+  // da loja já logada. Ver confirmPlan() para a ramificação do CTA.
+  window.mlAbrirUpgrade = function () {
+    const wpp = _lojaWpp || localStorage.getItem('angatuba_loja_wpp') || '';
+    if (!wpp) {
+      // Sem wpp resolvido ainda não dá pra cobrar — cai pro WhatsApp direto.
+      window.open(_mlUpgradeWppUrl || `https://wa.me/${ADMIN_WPP_CONTATO}`, '_blank', 'noopener');
+      return;
+    }
+    _planosCtxPainel = true;
+    openPlanModal();
+  };
+
+  // Ajusta o modal-planos para o contexto do painel: mostra o seletor de
+  // ciclo, troca o texto/ação do CTA principal e oferece WhatsApp como
+  // alternativa secundária. No-op fora do contexto de painel (fluxo normal
+  // de cadastro fica intocado).
+  function _mlPlanosAtualizarContexto() {
+    const cicloWrap = document.getElementById('plan-ciclo-toggle');
+    const wppLink   = document.getElementById('plan-wpp-secundario');
+    if (!_planosCtxPainel) {
+      if (cicloWrap) cicloWrap.style.display = 'none';
+      if (wppLink) wppLink.style.display = 'none';
+      return;
+    }
+    const btn  = document.getElementById('plan-cta-btn');
+    const note = document.getElementById('plan-note');
+    const isPago = selectedPlan !== 'GRATIS';
+    if (cicloWrap) cicloWrap.style.display = isPago ? '' : 'none';
+    if (wppLink) {
+      wppLink.style.display = isPago ? 'flex' : 'none';
+      if (_mlUpgradeWppUrl) wppLink.href = _mlUpgradeWppUrl;
+    }
+    if (isPago) {
+      if (btn) {
+        btn.textContent = 'Assinar ' + (selectedPlan === 'PRO' ? 'Pro' : 'Plus') + ' →';
+        btn.className = 'plan-cta ' + (selectedPlan === 'PRO' ? 'cta-pro' : 'cta-plus');
+      }
+      if (note) note.textContent = 'Pagamento seguro via Mercado Pago.';
+      mlPlanosAtualizarPreco();
+    } else {
+      if (btn) { btn.textContent = 'Fechar'; btn.className = 'plan-cta cta-gratis'; }
+      if (note) note.textContent = 'Disponível apenas nos planos pagos.';
+    }
+  }
+
+  // Troca o ciclo de cobrança dentro do modal-planos (contexto painel).
+  window.mlPlanosCiclo = function (ciclo) {
+    if (!CICLOS[ciclo]) ciclo = 'mensal';
+    _cicloSelecionado = ciclo;
+    document.querySelectorAll('#plan-ciclo-toggle .ciclo-btn').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.ciclo === ciclo);
+    });
+    mlPlanosAtualizarPreco();
+  };
+
+  // Atualiza o preço exibido no card do plano selecionado conforme o ciclo.
+  function mlPlanosAtualizarPreco() {
+    if (selectedPlan === 'GRATIS') return;
+    const calc = calcPreco(selectedPlan, _cicloSelecionado);
+    if (!calc) return;
+    const sufixo = selectedPlan.toLowerCase();
+    const valEl = document.getElementById('plan-price-val-' + sufixo);
+    const perEl = document.getElementById('plan-price-per-' + sufixo);
+    if (valEl) valEl.textContent = fmtBRL(calc.porMes);
+    if (perEl) perEl.textContent = (_cicloSelecionado === 'mensal')
+      ? 'por mês'
+      : ('por mês · ' + CICLOS[_cicloSelecionado].rotulo.toLowerCase());
   }
 
   function _irParaSlide(idx, animado = true) {
@@ -3187,6 +3267,9 @@
     const note = document.getElementById('plan-note');
     if (btn)  { btn.textContent = cfg.btn; btn.className = 'plan-cta ' + cfg.cls; }
     if (note) note.textContent = cfg.note;
+
+    // A1: no contexto de painel, sobrescreve texto/ação do CTA e mostra ciclo.
+    _mlPlanosAtualizarContexto();
   }
 
   // Dots clicáveis
@@ -3247,6 +3330,20 @@
   }
 
   function confirmPlan() {
+    // A1: contexto painel (loja já logada, querendo upgrade) — chama o
+    // pagamento direto, sem passar pelo cadastro. Mesma função usada em
+    // abrirAguardando() para "Pagar agora".
+    if (_planosCtxPainel) {
+      _planosCtxPainel = false;
+      const plano = selectedPlan;
+      const ciclo = _cicloSelecionado;
+      const wpp   = _lojaWpp || localStorage.getItem('angatuba_loja_wpp') || '';
+      const btn   = document.getElementById('plan-cta-btn');
+      closePlanModal();
+      if (plano === 'GRATIS') return; // nada a fazer — loja já está no Grátis
+      iniciarPagamentoMP(wpp, plano, ciclo, btn);
+      return;
+    }
     closePlanModal();
     // Aplica o plano selecionado na etapa 3 do cadastro
     cadSelecionarPlano(selectedPlan);
@@ -3854,6 +3951,8 @@
   let _lojaToken = localStorage.getItem('angatuba_loja_token') || null;
   let _lojaNome  = localStorage.getItem('angatuba_loja_nome')  || '';
   let _mlPlanoAtual = 'GRATIS'; // plano da loja logada (Fase 2: decide stories múltiplos)
+  let _mlUpgradeWppUrl = ''; // A1: link wa.me de fallback do CTA de upgrade do painel
+  let _mlChecklistD = null;  // A1: últimos dados da loja aplicados, para o checklist re-renderizar sob demanda
   let _lojaWpp   = ''; // capturado no passo 1 do login
   let _llVerificando = false;          // trava anti-duplo-submit do código
   let _llTimerInt    = null;           // timer de expiração (10 min)
@@ -4451,6 +4550,9 @@
   function _aplicarDadosLoja(d, metJson, preservarToggle = false) {
     _lojaNome = d.nome;
     localStorage.setItem('angatuba_loja_nome', _lojaNome);
+    // A1: guarda os dados da loja para o checklist de ativação renderizar/re-renderizar
+    // (ex.: depois que o cardápio carrega em separado, ver mlCardapioCarregar).
+    _mlChecklistD = d;
 
     document.getElementById('ml-nome').textContent = d.nome;
     document.getElementById('ml-ramo').textContent = d.ramo || '—';
@@ -4640,11 +4742,13 @@
     const upgradeCta = document.getElementById('ml-upgrade-cta');
     upgradeCta.style.display = (plano === 'GRATIS') ? '' : 'none';
     if (plano === 'GRATIS') {
+      // A1: WhatsApp vira alternativa secundária — o botão principal agora abre
+      // o modal de planos (mlAbrirUpgrade → modal-planos → Mercado Pago).
       const upgradeMsg = encodeURIComponent(`Olá! Sou dono da loja *${d.nome}* no AngatubaON e quero saber mais sobre os planos pagos!`);
       const upgradeUrl = `https://wa.me/${ADMIN_WPP_CONTATO}?text=${upgradeMsg}`;
-      document.getElementById('ml-upgrade-link').href = upgradeUrl;
-      const lockLink = document.getElementById('ml-lock-upgrade-link');
-      if (lockLink) lockLink.href = upgradeUrl;
+      _mlUpgradeWppUrl = upgradeUrl;
+      const wppLink = document.getElementById('ml-upgrade-wpp-link');
+      if (wppLink) wppLink.href = upgradeUrl;
     }
 
     // ── Banners da aba Hoje: vencimento (#3) e nova avaliação (#5) ──
@@ -4785,7 +4889,165 @@
         }
       }
     }
+
+    // ── Checklist de ativação (A1) ────────────────────────
+    if (typeof mlChecklistRender === 'function') mlChecklistRender();
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     CHECKLIST DE ATIVAÇÃO (A1) — aba Hoje do painel
+     ----------------------------------------------------------
+     Nudge com progresso real: cada item é inferido dos dados da loja
+     sempre que dá (nome/ramo, horário, itens do cardápio, foto/logo).
+     Só "status testado" precisa de uma flag própria, gravada quando o
+     lojista mexe em qualquer toggle de status (ver lojaToggle).
+     Persistido por loja (chave por WhatsApp, como o onboarding).
+     Cardápio e foto/logo são recursos pagos: no GRÁTIS aparecem como
+     linhas "bloqueadas" com CTA de upgrade, e NÃO contam no total —
+     assim uma loja Grátis também consegue chegar a "100%" nos itens
+     que ela pode de fato completar.
+  ══════════════════════════════════════════════════════════════ */
+  function _mlChecklistKey() {
+    const n = _wppFlagOnb();
+    return n ? ('angatuba_ml_checklist_' + n) : '';
+  }
+  function _mlChecklistState() {
+    const key = _mlChecklistKey();
+    const padrao = { dismissed: false, statusTestado: false };
+    if (!key) return padrao;
+    try {
+      const raw = JSON.parse(localStorage.getItem(key) || 'null');
+      return Object.assign({}, padrao, raw || {});
+    } catch (e) { return padrao; }
+  }
+  function _mlChecklistSalvar(state) {
+    const key = _mlChecklistKey();
+    if (!key) return;
+    try { localStorage.setItem(key, JSON.stringify(state)); } catch (e) {}
+  }
+
+  // Chamado pelo toggle de status (lojaToggle) assim que o lojista mexe em
+  // Aberto/Já voltamos/Fechado com sucesso — não dá pra inferir isso só
+  // olhando o status atual, por isso precisa de uma flag própria.
+  function mlChecklistMarcarStatusTestado() {
+    if (!_mlChecklistKey()) return;
+    const state = _mlChecklistState();
+    if (state.statusTestado) return; // já marcado — evita gravação redundante
+    state.statusTestado = true;
+    _mlChecklistSalvar(state);
+    mlChecklistRender();
+  }
+
+  // "Dispensar" esconde o card (progresso continua salvo).
+  function mlChecklistDispensar() {
+    const state = _mlChecklistState();
+    state.dismissed = true;
+    _mlChecklistSalvar(state);
+    const card = document.getElementById('ml-checklist');
+    if (card) card.style.display = 'none';
+  }
+  window.mlChecklistDispensar = mlChecklistDispensar;
+
+  // Toque num item incompleto: troca de aba e rola o alvo pra dentro da tela.
+  function mlChecklistIrPara(tab, sel) {
+    if (tab && typeof mlSwitchTab === 'function') { try { mlSwitchTab(tab); } catch (e) {} }
+    if (sel) {
+      setTimeout(function () {
+        const el = document.querySelector(sel);
+        if (el && el.scrollIntoView) { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {} }
+      }, 60);
+    }
+  }
+  window.mlChecklistIrPara = mlChecklistIrPara;
+
+  function mlChecklistRender() {
+    const card = document.getElementById('ml-checklist');
+    if (!card) return;
+    const d = _mlChecklistD;
+    if (!d || !_lojaToken) { card.style.display = 'none'; return; }
+
+    const state = _mlChecklistState();
+    if (state.dismissed) { card.style.display = 'none'; return; }
+
+    const plano  = (d.plano || _mlPlanoAtual || 'GRATIS').toUpperCase();
+    const isPago = plano !== 'GRATIS';
+    const cardapioAtivos = (typeof _cardapioItens !== 'undefined' ? _cardapioItens : [])
+      .filter(function (i) { return i.ativo !== 'NAO'; }).length;
+
+    const itens = [
+      {
+        id: 'status', titulo: 'Status testado',
+        done: !!state.statusTestado,
+        tab: 'hoje', sel: '.toggle-status-btn[data-status="ABERTO"]'
+      },
+      {
+        id: 'horario', titulo: 'Horário preenchido',
+        done: !!(d.horario && String(d.horario).trim()),
+        tab: 'loja', sel: '#ml-info-section'
+      },
+      {
+        id: 'perfil', titulo: 'Perfil básico completo',
+        done: !!(d.nome && d.ramo),
+        tab: 'loja', sel: '#ml-info-section'
+      },
+      isPago ? {
+        id: 'cardapio', titulo: 'Cardápio com pelo menos 1 item',
+        done: cardapioAtivos > 0,
+        tab: 'loja', sel: '#ml-cardapio-add-btn'
+      } : {
+        id: 'cardapio', locked: true,
+        titulo: 'Cardápio (Plus/Pro)',
+        texto: 'No Grátis sua loja aparece na lista. No Plus você monta o cardápio e o cliente pede pelo WhatsApp com os itens.'
+      },
+      isPago ? {
+        id: 'foto', titulo: 'Foto ou logo da loja',
+        done: !!(d.foto || d.logo),
+        tab: 'loja', sel: '#ml-upload-section'
+      } : {
+        id: 'foto', locked: true,
+        titulo: 'Foto e logo (Plus/Pro)',
+        texto: 'Destaque sua loja com foto de capa e logo — disponível nos planos pagos.'
+      }
+    ];
+
+    const contaveis = itens.filter(function (i) { return !i.locked; });
+    const feitos = contaveis.filter(function (i) { return i.done; }).length;
+    const total  = contaveis.length;
+    const pct    = total ? Math.round((feitos / total) * 100) : 100;
+    const tudoOk = total > 0 && feitos === total;
+
+    card.style.display = '';
+    const bar = document.getElementById('ml-checklist-bar');
+    if (bar) bar.style.width = pct + '%';
+    const titulo = document.getElementById('ml-checklist-titulo');
+    if (titulo) titulo.textContent = tudoOk
+      ? 'Sua loja está redonda! 🎉'
+      : ('Deixe sua loja redonda · ' + feitos + ' de ' + total);
+
+    const lista = document.getElementById('ml-checklist-itens');
+    if (lista) {
+      lista.innerHTML = itens.map(function (item) {
+        if (item.locked) {
+          return '<div class="ml-checklist-item ml-checklist-item-locked">' +
+            '<div class="ml-checklist-item-locked-head"><span class="ml-checklist-check">🔒</span>' +
+            '<span class="ml-checklist-txt">' + escHTML(item.titulo) + '</span></div>' +
+            '<div class="ml-checklist-locked-texto">' + escHTML(item.texto) + '</div>' +
+            '<button type="button" class="ml-checklist-upsell-btn" onclick="mlAbrirUpgrade()">⭐ Ver planos</button>' +
+          '</div>';
+        }
+        const acao = "mlChecklistIrPara('" + item.tab + "','" + item.sel.replace(/'/g, "\\'") + "')";
+        return '<button type="button" class="ml-checklist-item' + (item.done ? ' done' : '') + '" onclick="' + acao + '">' +
+          '<span class="ml-checklist-check">' + (item.done ? '✓' : '○') + '</span>' +
+          '<span class="ml-checklist-txt">' + escHTML(item.titulo) + '</span>' +
+          (item.done ? '' : '<span class="ml-checklist-seta">›</span>') +
+        '</button>';
+      }).join('');
+    }
+
+    const completoEl = document.getElementById('ml-checklist-completo');
+    if (completoEl) completoEl.style.display = tudoOk ? '' : 'none';
+  }
+  window.mlChecklistRender = mlChecklistRender;
 
   // ── Banner de vencimento do plano (#3) ───────────────────
   // Usa d.planoValidade ('dd/mm/yyyy') que já vem do backend. Mostra o banner
@@ -5185,7 +5447,10 @@
   // ══════════════════════════════════════════════════════════
   // Versionada por loja: bump o sufixo (v2 -> v3) para relançar quando
   // adicionar features novas ao painel.
-  const LOJISTA_ONB_VER = 'v2';
+  // A1: v3 — passos agora são filtrados por plano ANTES de trocar de aba
+  // (_lojistaOnbEscondidoPorPlano) e o último passo no GRÁTIS vira um CTA
+  // de upgrade. Bump para quem já viu o v2 ver a versão nova 1x.
+  const LOJISTA_ONB_VER = 'v3';
   function _wppFlagOnb() {
     let n = String(_lojaWpp || localStorage.getItem('angatuba_loja_wpp') || '').replace(/\D/g, '');
     if (n && !n.startsWith('55')) n = '55' + n;
@@ -5259,14 +5524,34 @@
     return true;
   }
 
-  // Próximo passo "servível" a partir de `from`. Como o alvo pode estar em
-  // outra aba (oculto agora), a visibilidade é checada APÓS trocar de aba —
-  // ver avancarOnboardingLojista. Aqui só filtramos hero e existência no DOM.
+  // A1: alvo escondido por PLANO (feature de plano superior), diferente de
+  // escondido só porque a aba dele não está ativa agora. Sobe pelos
+  // ancestrais do alvo procurando um display:none inline — mas para assim
+  // que chega num .ml-tab-content, porque ESSE display:none é controlado
+  // pela troca de aba (mlSwitchTab), não pelo plano da loja. Isso permite
+  // filtrar os passos ANTES de trocar de aba, sem falso-positivo pra alvos
+  // que só ainda não estão na aba visível.
+  function _lojistaOnbEscondidoPorPlano(sel) {
+    if (!sel) return false;
+    let el = document.querySelector(sel);
+    if (!el) return true; // nem existe no DOM — trata como indisponível
+    while (el && el !== document.body) {
+      if (el.classList && el.classList.contains('ml-tab-content')) return false;
+      if (el.style && el.style.display === 'none') return true;
+      el = el.parentElement;
+    }
+    return false;
+  }
+
+  // Próximo passo "servível" a partir de `from`. Filtra hero, existência no
+  // DOM e ocultação por plano de uma vez. Ocultação só por aba inativa (o
+  // alvo está numa aba que ainda não foi trocada) NÃO é filtrada aqui — só
+  // é checada depois de trocar de aba, em posicionarOnboardingLojista.
   function _lojistaOnbProx(from) {
     for (let i = from; i < LOJISTA_ONB_STEPS.length; i++) {
       const st = LOJISTA_ONB_STEPS[i];
       if (st.hero) return i;
-      if (st.sel && document.querySelector(st.sel)) return i;
+      if (st.sel && document.querySelector(st.sel) && !_lojistaOnbEscondidoPorPlano(st.sel)) return i;
     }
     return -1;
   }
@@ -5358,7 +5643,19 @@
         return '<span class="conb-dot' + (i === _lojistaOnbIdx ? ' active' : '') + '"></span>';
       }).join('');
     }
-    if (cta) cta.textContent = (_lojistaOnbIdx === LOJISTA_ONB_STEPS.length - 1) ? 'Entendi! 🚀' : 'Próximo';
+    // A1: último passo (métricas — sempre visível, nunca pulado) no plano
+    // GRÁTIS vira um CTA de upgrade em vez de um "Entendi" genérico.
+    const _ehUltimoPasso = (_lojistaOnbIdx === LOJISTA_ONB_STEPS.length - 1);
+    const _ehGratisOnb   = (_mlPlanoAtual || 'GRATIS') === 'GRATIS';
+    if (cta) {
+      if (_ehUltimoPasso && _ehGratisOnb) {
+        cta.textContent = '⭐ Ver planos';
+        cta.onclick = finalizarOnboardingLojistaComUpgrade;
+      } else {
+        cta.textContent = _ehUltimoPasso ? 'Entendi! 🚀' : 'Próximo';
+        cta.onclick = window.avancarOnboardingLojista;
+      }
+    }
     // 3) Rola o alvo pra dentro da área visível, depois posiciona.
     if (!s.hero && s.sel) {
       const el = document.querySelector(s.sel);
@@ -5465,6 +5762,12 @@
     }
   };
   window.pularOnboardingLojista = function () { fecharOnboardingLojista(); };
+  // A1: fecha o tour e, na sequência, abre o modal de planos (fluxo de upgrade).
+  function finalizarOnboardingLojistaComUpgrade() {
+    fecharOnboardingLojista();
+    setTimeout(function () { if (typeof mlAbrirUpgrade === 'function') mlAbrirUpgrade(); }, 320);
+  }
+  window.finalizarOnboardingLojistaComUpgrade = finalizarOnboardingLojistaComUpgrade;
 
   function fecharOnboardingLojista() {
     if (_lojistaOnbFlag) { try { localStorage.setItem(_lojistaOnbFlag, '1'); } catch(e) {} }
@@ -6264,6 +6567,8 @@
       if (json.status !== 'ok') throw new Error(json.msg || 'Falha ao salvar status');
       // Item 6: feedback de sucesso via helper à prova de corrida.
       _mlToggleFeedback('ok', '✅ Status salvo');
+      // A1: marca o item "Status testado" do checklist de ativação.
+      if (typeof mlChecklistMarcarStatusTestado === 'function') mlChecklistMarcarStatusTestado();
     } catch(e) {
       if (e.message === 'UNAUTHORIZED') return; // apiPost já fez logout
       console.warn('[lojaToggle] Erro:', e.message);
@@ -11524,7 +11829,8 @@ ${urlCard}`)}`;
       _mlStoriesCache = stories;
       if (cnt) cnt.textContent = stories.length + ' de ' + limite + ' stories publicados';
       if (!stories.length) {
-        lst.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 2px;">Nenhum story ainda. Crie o primeiro abaixo \u2014 pode ter at\u00e9 ' + limite + '.</div>';
+        // A1: copy de neg\u00f3cio \u2014 refor\u00e7a o benef\u00edcio (destaque na cidade) em vez de s\u00f3 instruir.
+        lst.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 2px;">Publique o primeiro story e apare\u00e7a em destaque na cidade \u2014 pode ter at\u00e9 ' + limite + '.</div>';
       } else {
         lst.innerHTML = stories.map(function(st){
           var ehVideo = String(st.midiaTipo||'foto') === 'video';
@@ -12278,6 +12584,8 @@ ${urlCard}`)}`;
     } catch(e) { console.warn('[Cardapio] Erro ao carregar:', e.message); }
     // Grupos de opcoes sao PRO-only; carrega em paralelo (nao bloqueia o cardapio).
     if (isPro) { mlGruposCarregar(); }
+    // A1: re-renderiza o checklist agora que a contagem real de itens chegou.
+    if (typeof mlChecklistRender === 'function') mlChecklistRender();
   }
 
   /* ═══════════════════════════════════════════════════════════
@@ -12887,10 +13195,16 @@ ${urlCard}`)}`;
     if (buscaWrap) buscaWrap.style.display = (isPro && ativos.length >= 6) ? '' : 'none';
 
     if (ativos.length === 0) {
+      // A1: empty state com copy de negócio — reforça o benefício (pedido pelo
+      // WhatsApp) e já abre o form do 1º item, sem depender de achar o botão
+      // "+ Adicionar" lá em cima.
       lista.innerHTML = `<div style="text-align:center;padding:24px 16px 20px;color:var(--muted);">
         <img src="/webp/owl-idea.webp" alt="" style="width:72px;height:72px;object-fit:contain;margin-bottom:8px;opacity:.9;" onerror="this.style.display='none'" />
-        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">Cardápio vazio</div>
-        <div style="font-size:11px;line-height:1.5;">Clique em <strong style="color:var(--green);">+ Adicionar</strong> para incluir<br>seu primeiro produto ou serviço.</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;">Nenhum item ainda</div>
+        <div style="font-size:11px;line-height:1.5;margin-bottom:12px;">Adicione o primeiro produto com preço — o cliente<br>abre o cardápio e manda o pedido no WhatsApp.</div>
+        <button type="button" onclick="mlCardapioAbrirForm()" style="padding:9px 16px;border-radius:8px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-family:var(--font-h);font-size:11px;font-weight:800;border:none;cursor:pointer;">
+          <i class="fa fa-plus"></i> Adicionar primeiro item
+        </button>
       </div>`;
       return;
     }

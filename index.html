@@ -2244,8 +2244,8 @@
                 <div class="plan-card-top">
                   <div class="plan-card-name">✦ Plus</div>
                   <div class="plan-card-price">
-                    <span class="price-val">R$ 29,90</span>
-                    <span class="price-per">por mês</span>
+                    <span class="price-val" id="plan-price-val-plus">R$ 29,90</span>
+                    <span class="price-per" id="plan-price-per-plus">por mês</span>
                   </div>
                 </div>
                 <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);border-radius:20px;padding:4px 10px;margin-bottom:10px;">
@@ -2285,8 +2285,8 @@
                 <div class="plan-card-top">
                   <div class="plan-card-name">⭐ Pro</div>
                   <div class="plan-card-price">
-                    <span class="price-val">R$ 49,90</span>
-                    <span class="price-per">por mês</span>
+                    <span class="price-val" id="plan-price-val-pro">R$ 49,90</span>
+                    <span class="price-per" id="plan-price-per-pro">por mês</span>
                   </div>
                 </div>
                 <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:20px;padding:4px 10px;margin-bottom:10px;">
@@ -2316,12 +2316,29 @@
         </div>
       </div>
 
+      <!-- A1: seletor de ciclo — só aparece no contexto de upgrade a partir do painel
+           (mlAbrirUpgrade). Fluxo normal de cadastro não usa ciclo aqui (fica na etapa 3). -->
+      <div class="ciclo-toggle" id="plan-ciclo-toggle" role="tablist" aria-label="Ciclo de cobrança" style="display:none;margin:0 20px 10px;">
+        <button type="button" class="ciclo-btn active" data-ciclo="mensal" onclick="mlPlanosCiclo('mensal')">Mensal</button>
+        <button type="button" class="ciclo-btn" data-ciclo="trimestral" onclick="mlPlanosCiclo('trimestral')">
+          Trimestral <span class="ciclo-selo">-10%</span>
+        </button>
+        <button type="button" class="ciclo-btn" data-ciclo="anual" onclick="mlPlanosCiclo('anual')">
+          Anual <span class="ciclo-selo ciclo-selo-destaque">2 meses grátis</span>
+        </button>
+      </div>
+
       <button class="plan-cta cta-gratis" id="plan-cta-btn" onclick="confirmPlan()">
         Continuar com Grátis →
       </button>
       <p class="plan-note" id="plan-note">
         Planos pagos são ativados após análise e pagamento via WhatsApp.
       </p>
+      <!-- A1: WhatsApp como alternativa secundária no contexto de upgrade do painel. -->
+      <a id="plan-wpp-secundario" href="#" target="_blank" rel="noopener"
+        style="display:none;align-items:center;justify-content:center;gap:6px;margin:8px 20px 4px;padding:6px;font-size:11px;color:var(--muted);text-decoration:none;">
+        <i class="fab fa-whatsapp"></i> Prefiro falar no WhatsApp
+      </a>
     </div>
   </div>
 
@@ -2614,6 +2631,24 @@
               </div>
             </div>
 
+            <!-- A1: Checklist de ativação — nudge de progresso, logo abaixo do
+                 status. Preenchido/mostrado por mlChecklistRender() (app.js). -->
+            <div id="ml-checklist" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+                <div id="ml-checklist-titulo" style="font-family:var(--font-h);font-size:12px;font-weight:800;color:var(--text);">Deixe sua loja redonda</div>
+                <button type="button" onclick="mlChecklistDispensar()" aria-label="Dispensar checklist"
+                  style="flex-shrink:0;background:none;border:none;color:var(--muted);font-size:16px;line-height:1;cursor:pointer;padding:2px 4px;">×</button>
+              </div>
+              <div style="height:6px;border-radius:3px;background:var(--surface);overflow:hidden;margin-bottom:10px;">
+                <div id="ml-checklist-bar" style="height:100%;width:0%;background:var(--green);transition:width .3s;"></div>
+              </div>
+              <div id="ml-checklist-itens" style="display:flex;flex-direction:column;gap:6px;"></div>
+              <div id="ml-checklist-completo" style="display:none;text-align:center;padding-top:8px;">
+                <button type="button" onclick="mlChecklistDispensar()"
+                  style="padding:7px 14px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;">Dispensar</button>
+              </div>
+            </div>
+
             <!-- Anúncio do dia -->
             <div id="ml-anuncio-section" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -2757,8 +2792,13 @@
             <div id="ml-upgrade-cta" style="display:none;border:1px solid rgba(245,158,11,0.3);border-radius:16px;padding:14px;text-align:center;margin-bottom:4px;background:linear-gradient(135deg,rgba(28,26,20,0.8),rgba(37,33,15,0.8));">
               <div style="font-family:var(--font-h);font-size:.9rem;font-weight:800;color:var(--zap);margin-bottom:4px;">⭐ Quer mais visibilidade?</div>
               <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Lojas Pro aparecem no topo, têm foto de capa, cardápio e muito mais.</div>
-              <a id="ml-upgrade-link" href="#" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:.85rem;font-weight:700;padding:10px 18px;border-radius:10px;text-decoration:none;">
-                <i class="fab fa-whatsapp"></i> Quero o Plano Pro
+              <!-- A1: CTA principal abre o modal de planos → Mercado Pago (mesmo fluxo do cadastro). -->
+              <button type="button" id="ml-upgrade-link" onclick="mlAbrirUpgrade()" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:.85rem;font-weight:700;padding:10px 18px;border-radius:10px;border:none;cursor:pointer;">
+                <i class="fa fa-star"></i> Fazer upgrade
+              </button>
+              <!-- WhatsApp: alternativa secundária (href preenchido em _aplicarDadosLoja). -->
+              <a id="ml-upgrade-wpp-link" href="#" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:5px;margin-top:8px;font-size:10.5px;color:var(--muted);text-decoration:none;">
+                <i class="fab fa-whatsapp"></i> Prefiro falar no WhatsApp
               </a>
             </div>
 
@@ -3193,7 +3233,7 @@
                       Disponível nos planos <strong style="color:var(--plano-plus-txt);">Plus</strong> e <strong style="color:var(--plano-pro-1);">Pro</strong>.<br>
                       Você já tem <span id="ml-lock-total" style="color:#fff;font-weight:800;">N</span> cliques registrados!
                     </div>
-                    <a id="ml-lock-upgrade-link" href="#" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:11px;font-weight:800;padding:7px 14px;border-radius:8px;text-decoration:none;">⭐ Ver planos</a>
+                    <button type="button" id="ml-lock-upgrade-link" onclick="mlAbrirUpgrade()" style="display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:11px;font-weight:800;padding:7px 14px;border-radius:8px;border:none;cursor:pointer;">⭐ Ver planos</button>
                   </div>
                 </div>
               </div>

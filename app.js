@@ -349,7 +349,9 @@
      Retorna o objeto JSON parseado. Lança Error em falha de rede/timeout.
   ════════════════════════════════════════════════════════════ */
   async function apiPost(action, dados = {}, opts = {}) {
-    const timeout = opts.timeout || 12000;
+    // 20s (era 12s): margem para o GAS "frio". Com 12s ações normais do painel
+    // (salvar status, etc.) falhavam com "sem conexão" mesmo com rede boa.
+    const timeout = opts.timeout || 20000;
     const params  = new URLSearchParams();
     params.append('payload', JSON.stringify(Object.assign({ action }, dados)));
     const resp = await fetch(APPS_SCRIPT_URL, {
@@ -3863,6 +3865,16 @@
     btn.classList.add('is-loading');
     btn.disabled = true;
 
+    // Declarado fora do try: o catch precisa dele para decidir o que fazer
+    // quando o servidor não responde (ver o catch no fim deste handler).
+    let wppCadastro = '';
+    const _salvarCadastroPendente = () => {
+      if (!wppCadastro) return;
+      localStorage.setItem('angatuba_pendente_wpp',   wppCadastro);
+      localStorage.setItem('angatuba_pendente_plano', selectedPlan);
+      localStorage.setItem('angatuba_pendente_ciclo', _cicloSelecionado);
+    };
+
     try {
       // Garante que endereço completo foi montado (rua selecionada da lista)
       const ruaInput  = document.getElementById('f-endereco-rua');
@@ -3903,34 +3915,40 @@
       const params = new URLSearchParams();
       params.append('payload', JSON.stringify(payload));
 
-      const resp = await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        body:   params,
-        signal: AbortSignal.timeout(20000),
-      });
-      const json = await resp.json();
-      if (json.status !== 'ok') throw new Error(json.msg || 'Erro no servidor. Tente novamente.');
-
-      this.style.display = 'none';
-
-      const nomeLoja  = payload.nome || payload.storeName || 'sua loja';
-      const plano     = selectedPlan;
-
       // Normaliza o WPP com DDI 55, pois é assim que salvarNaPlanilha() grava na
       // planilha (col E). Sem o 55, buscarLojaPorWpp() faz comparação exata e
       // NUNCA encontra a loja — o auto-login ficaria preso em "PENDENTE".
-      const wppCadastro = (() => {
+      // Calculado ANTES do fetch: o catch precisa dele para salvar o pendente
+      // quando o servidor não responde a tempo (ver abaixo).
+      wppCadastro = (() => {
         const n = String(payload.whatsapp || '').replace(/\D/g, '');
         return n && !n.startsWith('55') ? '55' + n : n;
       })();
 
+      // Timeout generoso: este é o POST mais pesado do app (grava na planilha
+      // E dispara o e-mail de aprovação) e o GAS ainda pode estar "frio". Com
+      // 20s o cadastro entrava no servidor e o app dizia "sem conexão".
+      const resp = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body:   params,
+        signal: AbortSignal.timeout(45000),
+      });
+      const json = await resp.json();
+      if (json.status !== 'ok') {
+        // Servidor respondeu recusando: nada foi criado, dá pra tentar de novo
+        // com segurança (sem risco de loja duplicada).
+        const errServidor = new Error(json.msg || 'Erro no servidor. Tente novamente.');
+        errServidor.respondido = true;
+        throw errServidor;
+      }
+
+      this.style.display = 'none';
+
+      const plano = selectedPlan;
+
       // Persiste o cadastro pendente (WPP + plano + ciclo) para que, se a pessoa
       // fechar e reabrir o app, a tela de aguardando seja reconstruída igual.
-      if (wppCadastro) {
-        localStorage.setItem('angatuba_pendente_wpp',   wppCadastro);
-        localStorage.setItem('angatuba_pendente_plano', plano);
-        localStorage.setItem('angatuba_pendente_ciclo', _cicloSelecionado);
-      }
+      _salvarCadastroPendente();
 
       // Fecha o modal de cadastro e abre a tela "Aguardando aprovação".
       // Ela mostra a coruja analisando, faz o polling e, ao aprovar, troca para
@@ -3938,10 +3956,43 @@
       const modalCad = document.getElementById('modal-cadastro');
       if (modalCad && modalCad.classList.contains('open')) closeModal(false);
       setTimeout(() => abrirAguardando(wppCadastro, plano, _cicloSelecionado), 350);
-    } catch {
+    } catch (err) {
       btn.classList.remove('is-loading');
       btn.disabled = false;
-      mlToast('Erro ao enviar. Verifique sua conexão e tente novamente.', 'erro');
+
+      // Sem resposta do servidor (timeout) é MUITO diferente de sem rede:
+      // no timeout a requisição saiu do celular e o GAS provavelmente gravou
+      // a loja e mandou o e-mail — só demorou mais que o limite. Tratar isso
+      // como "erro de conexão" fazia o lojista ficar preso na última etapa do
+      // cadastro, sem polling de aprovação, e um novo envio criaria loja
+      // duplicada. Nesse caso guardamos o pendente e mandamos pra tela de
+      // aguardando, que confirma sozinha pelo polling.
+      const semRede = (err instanceof TypeError) || navigator.onLine === false;
+      const semResposta = !err?.respondido && !semRede &&
+                          (err?.name === 'TimeoutError' || err?.name === 'AbortError');
+
+      if (semResposta && wppCadastro) {
+        _salvarCadastroPendente();
+        const modalCad = document.getElementById('modal-cadastro');
+        if (modalCad && modalCad.classList.contains('open')) closeModal(false);
+        setTimeout(() => {
+          abrirAguardando(wppCadastro, selectedPlan, _cicloSelecionado);
+          // Honestidade: não sabemos se entrou — a tela padrão diz "recebemos
+          // os dados", o que seria mentira aqui.
+          const subEl = document.getElementById('aguardando-sub');
+          if (subEl) subEl.innerHTML =
+            'Enviamos seu cadastro, mas a confirmação não chegou a tempo.<br>' +
+            '<strong>Se ele entrou, sua loja abre aqui assim que for aprovada.</strong> ' +
+            'Se em alguns minutos nada aparecer, faça o cadastro de novo.';
+          const stEl = document.getElementById('aguardando-status-text');
+          if (stEl) stEl.textContent = 'Confirmando o envio…';
+        }, 350);
+        return;
+      }
+
+      mlToast(err?.respondido
+        ? (err.message || 'Erro ao enviar. Tente novamente.')
+        : 'Erro ao enviar. Verifique sua conexão e tente novamente.', 'erro');
     }
   });
 
@@ -5556,7 +5607,23 @@
     return -1;
   }
 
+  // O painel está realmente aberto? `.detail-overlay` fechado é opacity:0 com
+  // pointer-events:none — NÃO display:none. Ou seja: com o painel fechado os
+  // elementos dele continuam no layout, com bounding rect válido, e a checagem
+  // de visibilidade do posicionamento (offsetParent/getClientRects) não pega
+  // esse caso. Por isso o tour precisa olhar a classe .open explicitamente.
+  function _mlPainelAberto() {
+    const ov = document.getElementById('modal-minha-loja');
+    return !!(ov && ov.classList.contains('open'));
+  }
+
   function mostrarOnboarding(_tentativa) {
+    // Sem o painel aberto o tour ancoraria em elementos invisíveis e o "furo"
+    // apareceria sobre a tela inicial das lojas. Acontecia quando o painel
+    // fechava antes dos 900ms do disparo (voltar do Android, sessão expirada,
+    // toque no fundo). Sai sem gravar a flag — o tour continua pendente para
+    // a próxima abertura do painel.
+    if (!_mlPainelAberto()) return;
     const wppN = _wppFlagOnb();
     // Sem WhatsApp resolvido ainda (token via cache, dados a caminho): tenta de novo
     // até 3x com intervalo curto, em vez de gravar uma flag genérica vazia.
@@ -5621,6 +5688,9 @@
   // e posiciona. Feito com pequenos delays pra dar tempo do layout assentar
   // (troca de aba mexe em display; scroll precisa de um frame).
   function aplicarPassoLojista() {
+    // Painel fechou no meio do tour: encerra em vez de seguir apontando para
+    // elementos que ninguém mais vê.
+    if (!_mlPainelAberto()) { fecharOnboardingLojista(); return; }
     const s = LOJISTA_ONB_STEPS[_lojistaOnbIdx];
     if (!s) return;
     // 1) Aba certa.
@@ -5671,6 +5741,9 @@
   function posicionarOnboardingLojista() {
     const ov = document.getElementById('lojista-onb-overlay');
     if (!ov) return;
+    // Roda também em scroll/resize: é aqui que pegamos o painel fechando
+    // enquanto o tour está no ar.
+    if (!_mlPainelAberto()) { fecharOnboardingLojista(); return; }
     const s = LOJISTA_ONB_STEPS[_lojistaOnbIdx];
     const pop = document.getElementById('lonb-pop');
     const ring = document.getElementById('lonb-ring');
@@ -6345,9 +6418,11 @@
         p.append('payload', JSON.stringify({ action, token: _lojaToken }));
         return p;
       };
+      // 20s (era 10s): o GAS "frio" passa fácil de 10s na primeira chamada e o
+      // painel mostrava "Sem conexão" com a internet funcionando normalmente.
       const [dadosResp, metResp] = await Promise.all([
-        fetch(APPS_SCRIPT_URL, { method: 'POST', body: mkParams('lojaDados'),    signal: AbortSignal.timeout(10000) }),
-        fetch(APPS_SCRIPT_URL, { method: 'POST', body: mkParams('lojaMetricas'), signal: AbortSignal.timeout(10000) }),
+        fetch(APPS_SCRIPT_URL, { method: 'POST', body: mkParams('lojaDados'),    signal: AbortSignal.timeout(20000) }),
+        fetch(APPS_SCRIPT_URL, { method: 'POST', body: mkParams('lojaMetricas'), signal: AbortSignal.timeout(20000) }),
       ]);
 
       const dadosJson = await dadosResp.json();
@@ -6393,6 +6468,9 @@
   }
 
   function fecharMinhaLoja(viaPopstate) {
+    // O tour vive no <body>, acima do painel: se o painel fecha, ele vai junto.
+    // Sem isto o tour ficava órfão sobre a tela inicial das lojas.
+    if (document.querySelector('#lojista-onb-overlay.open')) fecharOnboardingLojista();
     document.getElementById('modal-minha-loja').classList.remove('open');
     document.body.style.overflow = '';
     if (typeof _mlPararTimerAnuncio === 'function') _mlPararTimerAnuncio(); // Item 17: não deixa o interval rodando com o painel fechado
@@ -11139,6 +11217,18 @@
     // Navegação já tratada por quem chamou history.back() manualmente —
     // não interpretar como "voltar" do usuário (ver A1.3/A4.1).
     if (_popstateNosso) { _popstateNosso = false; return; }
+    // Tour do painel do lojista: fica acima de tudo e não empilha histórico
+    // próprio. Um "voltar" com o tour aberto tem que fechar O TOUR, não o
+    // painel debaixo dele — senão o painel some e o tour continua sozinho,
+    // com o furo apontando para a tela inicial das lojas.
+    if (document.querySelector('#lojista-onb-overlay.open')) {
+      const painelSegueAberto = document.getElementById('modal-minha-loja')?.classList.contains('open');
+      fecharOnboardingLojista();
+      // Este "voltar" consumiu a entrada do painel: devolve, para o próximo
+      // "voltar" fechar o painel normalmente.
+      if (painelSegueAberto) history.pushState({ modal: 'minha-loja' }, '');
+      return;
+    }
     // Editor de aviso (admin) — fecha antes do modal de post, que fica por baixo
     if (document.getElementById('aviso-editor-overlay')?.style.display === 'flex') {
       if (typeof _fecharEditorAviso === 'function') _fecharEditorAviso(true); return;

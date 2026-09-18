@@ -1536,10 +1536,58 @@
     }).catch(function () { return null; });
   }
 
-  window.rankSubmeter       = rankSubmeter;
-  window.rankLerTop         = rankLerTop;
-  window.rankMinhaPontuacao = rankMinhaPontuacao;
-  window.rankLerGeral       = rankLerGeral;
+  /* ── Espelhar nome/foto do painel de conta nos docs de ranking ──
+     Chamada quando a pessoa troca apelido ou foto no painel. NÃO mexe
+     no score: só corrige nome/photoURL nos docs de ranking que a
+     pessoa já tem, pra não ficar com identidade desatualizada até
+     bater um novo recorde (a regra do Firestore só aceita update com
+     score igual quando nome OU foto mudam — ver rankUpdateOk).
+     - Sem login ou sem Firestore → não faz nada (silencioso).
+     - Doc inexistente pra um jogo → ignora esse jogo (nada a fazer;
+       o primeiro recorde ainda cria o doc normalmente).
+     - Falha por jogo não quebra os demais nem o painel (catch por
+       coleção). */
+  function rankAtualizarIdentidade() {
+    if (typeof _cliUser === 'undefined' || !_cliUser) return;
+    var db = _rankDb();
+    if (!db) return;
+
+    var nome = (typeof cliNomeExibicao === 'function' && cliNomeExibicao()) || 'Jogador';
+    if (nome.length < 2) nome = 'Jogador';
+    var foto = _cliUser.photoURL || '';
+    if (foto.length >= 300) foto = foto.slice(0, 299);
+
+    Object.keys(RANK_COLECOES).forEach(function (jogoKey) {
+      var colecao = RANK_COLECOES[jogoKey];
+      var ref = db.collection(colecao).doc(_cliUser.uid);
+      ref.get().then(function (doc) {
+        if (!doc || !doc.exists) return;
+        var d = doc.data() || {};
+        if (d.nome === nome && (d.photoURL || '') === foto) return;
+        var scoreAtual = (typeof d.score === 'number') ? d.score : 0;
+        ref.set({
+          uid: _cliUser.uid,
+          nome: nome,
+          score: scoreAtual,
+          photoURL: foto,
+          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true }).catch(function (err) {
+          if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] falha ao espelhar identidade:', colecao, err && err.code);
+        });
+      }).catch(function (err) {
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] falha ao ler antes de espelhar identidade:', colecao, err && err.message);
+      });
+    });
+
+    // Docs podem ter mudado de nome/foto: invalida o cache dos tops.
+    _rankTopsCache = null;
+  }
+
+  window.rankSubmeter            = rankSubmeter;
+  window.rankLerTop              = rankLerTop;
+  window.rankMinhaPontuacao      = rankMinhaPontuacao;
+  window.rankLerGeral            = rankLerGeral;
+  window.rankAtualizarIdentidade = rankAtualizarIdentidade;
 
   /* ══════════════════════════════════════════════════════════════
      UI DO RANKING (Camada 2.4)

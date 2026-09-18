@@ -3229,9 +3229,10 @@
                   <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:12px;text-align:center;">
                     <div style="font-size:1.5rem;margin-bottom:6px;">🔒</div>
                     <div style="font-size:12px;font-weight:800;color:#fff;margin-bottom:3px;">Métricas detalhadas</div>
-                    <div style="font-size:10px;color:rgba(255,255,255,0.55);line-height:1.5;margin-bottom:10px;">
-                      Disponível nos planos <strong style="color:var(--plano-plus-txt);">Plus</strong> e <strong style="color:var(--plano-pro-1);">Pro</strong>.<br>
-                      Você já tem <span id="ml-lock-total" style="color:#fff;font-weight:800;">N</span> cliques registrados!
+                    <!-- A2: copy dinâmica (com/sem movimento), preenchida em _aplicarDadosLoja
+                         a partir do total de cliques já público no GRÁTIS. -->
+                    <div id="ml-lock-teaser" style="font-size:10px;color:rgba(255,255,255,0.55);line-height:1.5;margin-bottom:10px;">
+                      Disponível nos planos <strong style="color:var(--plano-plus-txt);">Plus</strong> e <strong style="color:var(--plano-pro-1);">Pro</strong>.
                     </div>
                     <button type="button" id="ml-lock-upgrade-link" onclick="mlAbrirUpgrade()" style="display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:11px;font-weight:800;padding:7px 14px;border-radius:8px;border:none;cursor:pointer;">⭐ Ver planos</button>
                   </div>

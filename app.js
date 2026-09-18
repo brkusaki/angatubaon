@@ -4071,7 +4071,10 @@
     setTimeout(() => searchEl.focus(), 320);
   });
 
-  document.getElementById('nav-loja').addEventListener('click', () => {
+  // A3: extraído para função nomeada — o mesmo roteamento (painel logado /
+  // aguardando aprovação / login) é reaproveitado pelo atalho de instalação
+  // "Meu painel" (?atalho=painel, ver _atalhoPainelNoBoot mais abaixo).
+  function _abrirPainelOuLogin() {
     document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
     document.getElementById('nav-loja').classList.add('active');
     if (_lojaToken) {
@@ -4086,7 +4089,8 @@
     } else {
       openLoginLoja(); // abre direto o login
     }
-  });
+  }
+  document.getElementById('nav-loja').addEventListener('click', _abrirPainelOuLogin);
 
   document.getElementById('nav-cadastrar').addEventListener('click', () => {
     document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
@@ -4921,7 +4925,17 @@
         document.getElementById('ml-m-wpp').textContent   = '—';
         document.getElementById('ml-m-tel').textContent   = '—';
         if (document.getElementById('ml-m-ig')) document.getElementById('ml-m-ig').textContent = '—';
-        document.getElementById('ml-lock-total').textContent = m.total ?? 0;
+        // A2: teaser com copy de dor/valor — usa só o total (já público no
+        // GRÁTIS) pra não inventar número nem depender de campo novo do GAS.
+        const lockTeaserEl = document.getElementById('ml-lock-teaser');
+        if (lockTeaserEl) {
+          const total = m.total ?? 0;
+          lockTeaserEl.innerHTML = total > 0
+            ? `Sua loja já despertou interesse: <strong style="color:#fff;">${total}</strong> ${total === 1 ? 'clique registrado' : 'cliques registrados'}.<br>` +
+              `No <strong style="color:var(--plano-plus-txt);">Plus</strong> você vê de onde vieram (WhatsApp, telefone) e o que está funcionando.`
+            : `Assim que o movimento começar, o <strong style="color:var(--plano-plus-txt);">Plus</strong> mostra de onde vêm os cliques.<br>` +
+              `Enquanto isso, complete o checklist da aba <strong>Hoje</strong> pra loja aparecer melhor.`;
+        }
         if (lockEl) lockEl.style.display = '';
       }
 
@@ -6359,6 +6373,18 @@
     const overlay = document.getElementById('modal-minha-loja');
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
+
+    // A3: primeira aterrissagem (tour ainda não visto ou checklist não
+    // dispensado) sempre cai na aba Hoje — onde vivem o checklist e o
+    // início do tour. Sem isto, abrir o painel podia manter a aba que
+    // ficou selecionada numa sessão bem anterior (ex.: recém-aprovado,
+    // ou entrando pelo atalho "Meu painel" com sessão já salva).
+    try {
+      const wppN = _wppFlagOnb();
+      const tourVisto = wppN && localStorage.getItem('angatuba_onboarded_' + LOJISTA_ONB_VER + '_' + wppN) === '1';
+      if ((!tourVisto || !_mlChecklistState().dismissed) && typeof mlSwitchTab === 'function') mlSwitchTab('hoje');
+    } catch (e) {}
+
     if (typeof mlAvisoOffline === 'function') mlAvisoOffline(false); // Item 3: reseta aviso ao (re)abrir
     mlSortearDica();
     // Onboarding de boas-vindas: só na 1ª vez que esta loja abre o painel.
@@ -21007,5 +21033,24 @@ ${urlCard}`)}`;
     setTimeout(function () {
       _fcmAbrirDestino(location.href);
       try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    }, 1500);
+  })();
+
+  // A3: atalho de instalação "Meu painel" (manifest.json → shortcuts,
+  // ?atalho=painel) e link genérico pós-aprovação. Reaproveita o mesmo
+  // roteamento do nav "Minha Loja" — entra direto se já logado, retoma
+  // "aguardando" se há cadastro pendente, ou pede login (que já abre o
+  // painel sozinho ao concluir, ver lojaVerificarCodigo). Mesma folga de
+  // 1500ms do atalho de push acima pro boot/login assentar antes de agir,
+  // e limpa a query pra um F5 não reabrir a mesma tela sozinho.
+  (function _atalhoPainelNoBoot() {
+    if (new URLSearchParams(location.search).get('atalho') !== 'painel') return;
+    setTimeout(function () {
+      if (typeof _abrirPainelOuLogin === 'function') _abrirPainelOuLogin();
+      try {
+        const p = new URLSearchParams(location.search);
+        p.delete('atalho');
+        history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p.toString() : ''));
+      } catch (e) {}
     }, 1500);
   })();

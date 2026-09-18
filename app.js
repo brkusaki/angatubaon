@@ -5621,6 +5621,21 @@
     return -1;
   }
 
+  // Lista de índices efetivamente "servíveis" no momento (mesma regra do
+  // _lojistaOnbProx, só que colhendo todos em vez de parar no primeiro).
+  // Usado pelas bolinhas do tour pra não contar passo que o plano pula.
+  function _lojistaOnbIndicesValidos() {
+    const out = [];
+    let i = 0;
+    while (i < LOJISTA_ONB_STEPS.length) {
+      const prox = _lojistaOnbProx(i);
+      if (prox < 0) break;
+      out.push(prox);
+      i = prox + 1;
+    }
+    return out;
+  }
+
   // O painel está realmente aberto? `.detail-overlay` fechado é opacity:0 com
   // pointer-events:none — NÃO display:none. Ou seja: com o painel fechado os
   // elementos dele continuam no layout, com bounding rect válido, e a checagem
@@ -5722,14 +5737,23 @@
     if (icon) icon.textContent = s.icon || '';
     if (titulo) titulo.textContent = s.titulo || '';
     if (texto) texto.innerHTML = s.texto || '';
+    // Bolinhas = só os passos que o plano atual realmente mostra (mesma
+    // regra do avançar). Ativa = posição do passo atual DENTRO dessa lista,
+    // não o índice bruto no array — senão a bolinha "salta" quando o plano
+    // pula anúncio/agenda/share. Se por corrida o idx atual não estiver na
+    // lista (plano mudou no meio do tour), nenhuma bolinha fica ativa.
+    const _lojistaOnbValidos = _lojistaOnbIndicesValidos();
     if (dots) {
-      dots.innerHTML = LOJISTA_ONB_STEPS.map(function (_, i) {
-        return '<span class="conb-dot' + (i === _lojistaOnbIdx ? ' active' : '') + '"></span>';
+      dots.innerHTML = _lojistaOnbValidos.map(function (idx) {
+        return '<span class="conb-dot' + (idx === _lojistaOnbIdx ? ' active' : '') + '"></span>';
       }).join('');
     }
     // A1: último passo (métricas — sempre visível, nunca pulado) no plano
     // GRÁTIS vira um CTA de upgrade em vez de um "Entendi" genérico.
-    const _ehUltimoPasso = (_lojistaOnbIdx === LOJISTA_ONB_STEPS.length - 1);
+    // Usa o último ÍNDICE VÁLIDO, não length-1 do array cheio, pra não
+    // depender de métricas ser sempre o último item físico do array.
+    const _ehUltimoPasso = _lojistaOnbValidos.length > 0 &&
+      _lojistaOnbIdx === _lojistaOnbValidos[_lojistaOnbValidos.length - 1];
     const _ehGratisOnb   = (_mlPlanoAtual || 'GRATIS') === 'GRATIS';
     if (cta) {
       if (_ehUltimoPasso && _ehGratisOnb) {
@@ -5978,6 +6002,20 @@
     return -1;
   }
 
+  // Mesmo alinhamento das bolinhas do tour do lojista: lista de índices
+  // que existem de fato na tela, pra bolinha não contar passo sem alvo.
+  function _clienteOnbIndicesValidos() {
+    const out = [];
+    let i = 0;
+    while (i < CLIENTE_ONB_STEPS.length) {
+      const prox = _clienteOnbProxValido(i);
+      if (prox < 0) break;
+      out.push(prox);
+      i = prox + 1;
+    }
+    return out;
+  }
+
   function mostrarOnboardingCliente() {
     if (clienteJaViuOnboarding()) return;
     if (document.getElementById('cliente-onb-overlay')) return;
@@ -6043,12 +6081,15 @@
     if (icon) icon.textContent = s.icon || '';
     if (titulo) titulo.textContent = s.titulo || '';
     if (texto) texto.innerHTML = s.texto || '';
+    const _clienteOnbValidos = _clienteOnbIndicesValidos();
     if (dots) {
-      dots.innerHTML = CLIENTE_ONB_STEPS.map(function (_, i) {
-        return '<span class="conb-dot' + (i === _clienteOnbIdx ? ' active' : '') + '"></span>';
+      dots.innerHTML = _clienteOnbValidos.map(function (idx) {
+        return '<span class="conb-dot' + (idx === _clienteOnbIdx ? ' active' : '') + '"></span>';
       }).join('');
     }
-    if (cta) cta.textContent = (_clienteOnbIdx === CLIENTE_ONB_STEPS.length - 1) ? 'Entendi! 🚀' : 'Próximo';
+    const _clienteEhUltimoPasso = _clienteOnbValidos.length > 0 &&
+      _clienteOnbIdx === _clienteOnbValidos[_clienteOnbValidos.length - 1];
+    if (cta) cta.textContent = _clienteEhUltimoPasso ? 'Entendi! 🚀' : 'Próximo';
     posicionarOnboardingCliente();
   }
 
@@ -21036,21 +21077,91 @@ ${urlCard}`)}`;
     }, 1500);
   })();
 
-  // A3: atalho de instalação "Meu painel" (manifest.json → shortcuts,
-  // ?atalho=painel) e link genérico pós-aprovação. Reaproveita o mesmo
-  // roteamento do nav "Minha Loja" — entra direto se já logado, retoma
-  // "aguardando" se há cadastro pendente, ou pede login (que já abre o
-  // painel sozinho ao concluir, ver lojaVerificarCodigo). Mesma folga de
-  // 1500ms do atalho de push acima pro boot/login assentar antes de agir,
-  // e limpa a query pra um F5 não reabrir a mesma tela sozinho.
-  (function _atalhoPainelNoBoot() {
-    if (new URLSearchParams(location.search).get('atalho') !== 'painel') return;
+  // Atalhos do manifest.json → shortcuts, todos no mesmo dispatcher:
+  //   ?atalho=painel    → "Meu painel" (A3, comportamento inalterado)
+  //   ?atalho=busca     → home na aba Lojas com a busca focada
+  //   ?atalho=favoritos → home na aba Lojas com o filtro Favoritos ativo
+  //   ?atalho=stories   → abre o 1º story não visto (ou rola até o 1º
+  //                       anel de anúncio, se nenhum estiver pronto ainda)
+  // Qualquer outro valor de ?atalho= é ignorado. Mesma folga de 1500ms do
+  // atalho de push acima pro boot/login assentar antes de agir, e limpa a
+  // query depois (preservando #slug) pra um F5 não repetir a ação sozinho.
+  //
+  // "painel" reaproveita o mesmo roteamento do nav "Minha Loja" — entra
+  // direto se já logado, retoma "aguardando" se há cadastro pendente, ou
+  // pede login (que já abre o painel sozinho ao concluir, ver
+  // lojaVerificarCodigo). Os outros nunca abrem o painel nem o tour do
+  // lojista — só mexem na home de lojas.
+
+  // Primeiro story não visto entre as lojas PRO com anúncio-foto, na ordem
+  // de LOJAS (mesmo critério do anel "aceso" no card). Retorna true se
+  // achou e abriu; false se não há nenhum pronto ainda.
+  function _abrirPrimeiraStoryNaoVista() {
+    if (!Array.isArray(LOJAS) || typeof abrirStories !== 'function') return false;
+    for (var i = 0; i < LOJAS.length; i++) {
+      var loja = LOJAS[i];
+      if (!loja || (loja.plano || '').toUpperCase() !== 'PRO') continue;
+      var stories = _normalizarStories(loja);
+      if (!stories.length || !stories.some(function (st) { return st.imagemUrl; })) continue;
+      if (!_lojaTemStoryNaoVisto(stories)) continue;
+      var lojaId = loja.id || loja.wpp || loja.nome;
+      abrirStories(stories, loja.nome, lojaId, _assinaturaAnuncio(loja), loja.plano, loja.categoria);
+      return true;
+    }
+    return false;
+  }
+
+  function _atalhoBusca() {
+    if (typeof _irParaPaginaHome === 'function') _irParaPaginaHome(0, false);
+    var input = document.getElementById('main-search');
+    if (input) { try { input.focus(); } catch (e) {} }
+  }
+
+  function _atalhoFavoritos() {
+    if (typeof _irParaPaginaHome === 'function') _irParaPaginaHome(0, false);
+    var btn = document.querySelector('.pill-btn[data-filter="favoritos"]');
+    // Só clica se ainda não está no filtro Favoritos — clicar de novo numa
+    // pill já ativa desliga ela (toggle-off), o que desfaria o atalho.
+    if (btn && !(btn.classList.contains('active') && activePillFilter === 'favoritos')) {
+      btn.click(); // mesmo caminho do clique do usuário: active + activePillFilter + renderLojas
+    }
+    // Zero favoritos: o empty state que a lista já mostra basta.
+  }
+
+  function _atalhoStories(_semRetry) {
+    if (typeof _irParaPaginaHome === 'function') _irParaPaginaHome(0, false);
+    if (_abrirPrimeiraStoryNaoVista()) return;
+    // LOJAS ainda vazio (raro — já nasce com o fallback fixo): 1 retry
+    // curto, sem loop infinito.
+    if (!_semRetry && (!Array.isArray(LOJAS) || LOJAS.length === 0)) {
+      setTimeout(function () { _atalhoStories(true); }, 1500);
+      return;
+    }
+    // Fallback: rola até o primeiro anel de anúncio visível na lista.
+    var ring = document.querySelector('.anuncio-ring');
+    if (ring && ring.scrollIntoView) {
+      try { ring.scrollIntoView({ block: 'center', behavior: 'auto' }); } catch (e) {}
+    }
+    // Nenhum story disponível: no-op silencioso.
+  }
+
+  (function _atalhosNoBoot() {
+    const atalho = new URLSearchParams(location.search).get('atalho');
+    if (['painel', 'busca', 'favoritos', 'stories'].indexOf(atalho) === -1) return;
     setTimeout(function () {
-      if (typeof _abrirPainelOuLogin === 'function') _abrirPainelOuLogin();
+      if (atalho === 'painel') {
+        if (typeof _abrirPainelOuLogin === 'function') _abrirPainelOuLogin();
+      } else if (atalho === 'busca') {
+        _atalhoBusca();
+      } else if (atalho === 'favoritos') {
+        _atalhoFavoritos();
+      } else if (atalho === 'stories') {
+        _atalhoStories();
+      }
       try {
         const p = new URLSearchParams(location.search);
         p.delete('atalho');
-        history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p.toString() : ''));
+        history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p.toString() : '') + location.hash);
       } catch (e) {}
     }, 1500);
   })();

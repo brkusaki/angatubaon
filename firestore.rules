@@ -1,0 +1,194 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function scoreValido(dados, teto) {
+      return dados.keys().hasOnly(['uid', 'nome', 'score', 'photoURL', 'atualizadoEm'])
+        && dados.uid is string
+        && dados.uid == request.auth.uid
+        && dados.nome is string
+        && dados.nome.size() >= 2
+        && dados.nome.size() <= 20
+        && dados.score is int
+        && dados.score >= 0
+        && dados.score <= teto
+        && dados.photoURL is string
+        && dados.photoURL.size() < 300
+        && (dados.photoURL == ''
+            || dados.photoURL.matches('https://(lh3[.]googleusercontent[.]com|res[.]cloudinary[.]com)/.*'))
+        && dados.atualizadoEm is timestamp;
+    }
+    function rankUpdateOk(dadosNovos, dadosAntigos, teto) {
+      return scoreValido(dadosNovos, teto)
+        && (dadosNovos.score > dadosAntigos.score
+            || (dadosNovos.score == dadosAntigos.score
+                && (dadosNovos.nome != dadosAntigos.nome
+                    || dadosNovos.photoURL != dadosAntigos.photoURL)));
+    }
+    match /ranking_pegacoruja/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && scoreValido(request.resource.data, 500);
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && rankUpdateOk(request.resource.data, resource.data, 500);
+      allow delete: if false;
+    }
+    match /ranking_pegacoruja_surv/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && scoreValido(request.resource.data, 2000);
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && rankUpdateOk(request.resource.data, resource.data, 2000);
+      allow delete: if false;
+    }
+    match /ranking_relampago/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && scoreValido(request.resource.data, 4500);
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && rankUpdateOk(request.resource.data, resource.data, 4500);
+      allow delete: if false;
+    }
+    match /ranking_sequencia/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && scoreValido(request.resource.data, 200);
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && rankUpdateOk(request.resource.data, resource.data, 200);
+      allow delete: if false;
+    }
+    match /ranking_voo/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && scoreValido(request.resource.data, 100000);
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && rankUpdateOk(request.resource.data, resource.data, 100000);
+      allow delete: if false;
+    }
+    // Corrida da Coruja — score em METROS percorridos.
+    // Teto 50000: a velocidade satura em 3,04 m/s (_COR_VEL_MAX 0.19 x 16),
+    // entao 50000m exigiriam ~4h30 de partida sem morrer. Folga enorme pra
+    // um recorde legitimo e ainda barra valor injetado pelo console.
+    match /ranking_corrida/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && scoreValido(request.resource.data, 50000);
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && rankUpdateOk(request.resource.data, resource.data, 50000);
+      allow delete: if false;
+    }
+    // Piano da Coruja — score em AZULEJOS tocados (1 ponto = 1 toque certo).
+    // Teto 10000: o ritmo do jogo tem limite duro. A queda comeca em 1,8
+    // linha/s e sobe 0,045 por ponto ate saturar em 7,5 linha/s (_PN_VEL_INI,
+    // _PN_VEL_ACC e _PN_VEL_MAX no piano.js), e so da pra adiantar o que
+    // esta na tela — ou seja, no longo prazo a pontuacao nao passa da
+    // velocidade da esteira. Os 127 primeiros pontos levam ~32s e o resto
+    // sai a 7,5/s, entao 10000 pontos pedem ~22min de partida perfeita, sem
+    // um erro. Folga de sobra pro melhor jogador da cidade e ainda barra
+    // valor injetado pelo console.
+    match /ranking_piano/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && scoreValido(request.resource.data, 10000);
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && rankUpdateOk(request.resource.data, resource.data, 10000);
+      allow delete: if false;
+    }
+    // Blocos da Coruja e Doces da Coruja — score = MAIOR FASE CONCLUÍDA
+    // (inteiro), não pontos brutos. Teto 999: as fases são geradas por
+    // fórmula sem limite fixo, mas chegar à fase 999 exigiria muito mais
+    // partidas do que qualquer jogador real — folga de sobra pro melhor
+    // jogador da cidade e ainda barra valor injetado pelo console.
+    match /ranking_blocos/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && scoreValido(request.resource.data, 999);
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && rankUpdateOk(request.resource.data, resource.data, 999);
+      allow delete: if false;
+    }
+    match /ranking_doces/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && scoreValido(request.resource.data, 999);
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && rankUpdateOk(request.resource.data, resource.data, 999);
+      allow delete: if false;
+    }
+    // 2048 da Coruja — score BRUTO (soma do valor de cada fusão), não fase
+    // como Blocos/Doces. Teto 300000: o mínimo matemático pra só CHEGAR à
+    // peça 2048 já passa de 20 mil pontos (caminho ótimo conhecido); uma
+    // partida muito boa, emendando fusões maiores (4096/8192), fica na
+    // casa de 40-80 mil. 300000 dá folga enorme pro melhor jogador da
+    // cidade (cobre até uma sequência de sorte chegando perto da peça
+    // 16384) e ainda barra valor injetado pelo console.
+    match /ranking_2048/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && scoreValido(request.resource.data, 300000);
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && rankUpdateOk(request.resource.data, resource.data, 300000);
+      allow delete: if false;
+    }
+    // Módulo Aprender — progresso de idiomas (XP, ofensiva, lições concluídas).
+    // Diferente dos rankings acima, é dado PRIVADO do próprio usuário (não
+    // aparece pra mais ninguém), então só o dono pode ler ou escrever o
+    // próprio doc. Ainda assim valida a forma pra evitar lixo/abuso de
+    // armazenamento; os tetos são generosos porque isso não afeta terceiros.
+    function unidadeAprenderValida(u) {
+      return u.keys().hasOnly(['completedLessons', 'xp'])
+        && u.completedLessons is list
+        && u.completedLessons.size() <= 50
+        && u.xp is int
+        && u.xp >= 0
+        && u.xp <= 100000;
+    }
+    function langProgressValido(dados) {
+      return dados.keys().hasOnly(['en', 'atualizadoEm'])
+        && dados.en is map
+        && dados.en.keys().hasOnly(['totalXp', 'streak', 'lastDate', 'units'])
+        && dados.en.totalXp is int && dados.en.totalXp >= 0 && dados.en.totalXp <= 1000000
+        && dados.en.streak is int && dados.en.streak >= 0 && dados.en.streak <= 100000
+        && dados.en.lastDate is string && dados.en.lastDate.size() <= 10
+        && dados.en.units is map
+        && dados.en.units.keys().hasOnly(['u1', 'u2', 'u3', 'u4'])
+        && unidadeAprenderValida(dados.en.units.u1)
+        && unidadeAprenderValida(dados.en.units.u2)
+        && unidadeAprenderValida(dados.en.units.u3)
+        && unidadeAprenderValida(dados.en.units.u4)
+        && dados.atualizadoEm is timestamp;
+    }
+    match /lang_progress/{uid} {
+      allow read: if request.auth != null && uid == request.auth.uid;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && langProgressValido(request.resource.data);
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && langProgressValido(request.resource.data);
+      allow delete: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

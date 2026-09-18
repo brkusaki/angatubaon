@@ -15864,6 +15864,32 @@ ${urlCard}`)}`;
     if (view) view.style.display = 'flex';
   }
 
+  /* ── Espelhar apelido/foto novos no ranking (gap 4.2) ──────────────
+     rankAtualizarIdentidade (Jogos/hub.js) corrige nome/foto nos docs
+     de ranking que a pessoa já tem, sem mexer no score. Se o hub ainda
+     não foi carregado (quem nunca abriu Joguinhos), carrega ele e o
+     Firestore sob demanda só pra isso — silencioso: uma falha aqui não
+     pode atrapalhar o painel de conta, e quem não tem doc de ranking
+     nenhum simplesmente não faz nada (ver rankAtualizarIdentidade). */
+  function _cliEspelharIdentidadeNoRanking() {
+    try {
+      if (typeof rankAtualizarIdentidade === 'function') {
+        rankAtualizarIdentidade();
+        return;
+      }
+      _carregarHubJogos().then(function () {
+        try {
+          if (typeof _carregarFirebaseJogos !== 'function') return;
+          _carregarFirebaseJogos().then(function () {
+            try {
+              if (typeof rankAtualizarIdentidade === 'function') rankAtualizarIdentidade();
+            } catch (e) {}
+          }).catch(function () {});
+        } catch (e) {}
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
   function cliSalvarApelido() {
     const inp = document.getElementById('cli-conta-apelido-input');
     if (!inp) return;
@@ -15892,6 +15918,7 @@ ${urlCard}`)}`;
       // Presença guarda o nome junto do state — reescreve pra 4.3 não
       // mostrar o apelido antigo na lista de amigos.
       try { window.AngatubaPresenca.atualizarNome(); } catch (e) {}
+      _cliEspelharIdentidadeNoRanking();
       cliCancelarApelido();
       if (btn) btn.disabled = false;
       if (typeof showToastSimples === 'function') showToastSimples('Apelido atualizado!', '/webp/owl-thumbsup.webp');
@@ -15985,6 +16012,7 @@ ${urlCard}`)}`;
             window.AngatubaAmigos.atualizarFoto();
           }
         } catch (e) {}
+        _cliEspelharIdentidadeNoRanking();
         _cliSetStatusFoto('', null);
         if (typeof showToastSimples === 'function') showToastSimples('Foto atualizada!', '/webp/owl-celebrate-gratis.webp');
       };

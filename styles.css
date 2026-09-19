@@ -7004,6 +7004,15 @@ body.games-fs-open #jogo-baralho.brl-em-jogo .jogo-voltar i {
 .apr-unidade-card[data-unidade="u2"] { --au: #a855f7; --au-2: #7c3aed; --au-a: rgba(168,85,247,.14); }
 .apr-unidade-card[data-unidade="u3"] { --au: #fb923c; --au-2: #ef4444; --au-a: rgba(251,146,60,.14); }
 .apr-unidade-card[data-unidade="u4"] { --au: #34d399; --au-2: #0d9488; --au-a: rgba(16,185,129,.14); }
+/* u5–u10: mesma ideia, uma cor por unidade. Os tons de partida são
+   médios/escuros de propósito — o texto do card é branco e a u1 já ocupa
+   a faixa clara do azul/verde. */
+.apr-unidade-card[data-unidade="u5"] { --au: #60a5fa; --au-2: #1d4ed8; --au-a: rgba(96,165,250,.14); }
+.apr-unidade-card[data-unidade="u6"] { --au: #f472b6; --au-2: #be185d; --au-a: rgba(244,114,182,.14); }
+.apr-unidade-card[data-unidade="u7"] { --au: #f59e0b; --au-2: #b45309; --au-a: rgba(245,158,11,.14); }
+.apr-unidade-card[data-unidade="u8"] { --au: #06b6d4; --au-2: #0e7490; --au-a: rgba(6,182,212,.14); }
+.apr-unidade-card[data-unidade="u9"] { --au: #94a3b8; --au-2: #334155; --au-a: rgba(148,163,184,.14); }
+.apr-unidade-card[data-unidade="u10"] { --au: #d946ef; --au-2: #6d28d9; --au-a: rgba(217,70,239,.14); }
 .apr-unidade-card:active { transform: scale(.98); }
 .apr-unidade-card:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .apr-unidade-card.apr-unidade-atual {
@@ -7053,6 +7062,14 @@ body.games-fs-open #jogo-baralho.brl-em-jogo .jogo-voltar i {
 .apr-lista-licoes[data-unidade="u2"] { --au: #a855f7; --au-2: #7c3aed; --au-a: rgba(168,85,247,.14); }
 .apr-lista-licoes[data-unidade="u3"] { --au: #fb923c; --au-2: #ef4444; --au-a: rgba(251,146,60,.14); }
 .apr-lista-licoes[data-unidade="u4"] { --au: #34d399; --au-2: #0d9488; --au-a: rgba(16,185,129,.14); }
+/* As bolhas das lições herdam a MESMA cor do card da unidade (acima) —
+   abrir a u7 deixa o caminho todo dourado, a u10 roxo, e por aí vai. */
+.apr-lista-licoes[data-unidade="u5"] { --au: #60a5fa; --au-2: #1d4ed8; --au-a: rgba(96,165,250,.14); }
+.apr-lista-licoes[data-unidade="u6"] { --au: #f472b6; --au-2: #be185d; --au-a: rgba(244,114,182,.14); }
+.apr-lista-licoes[data-unidade="u7"] { --au: #f59e0b; --au-2: #b45309; --au-a: rgba(245,158,11,.14); }
+.apr-lista-licoes[data-unidade="u8"] { --au: #06b6d4; --au-2: #0e7490; --au-a: rgba(6,182,212,.14); }
+.apr-lista-licoes[data-unidade="u9"] { --au: #94a3b8; --au-2: #334155; --au-a: rgba(148,163,184,.14); }
+.apr-lista-licoes[data-unidade="u10"] { --au: #d946ef; --au-2: #6d28d9; --au-a: rgba(217,70,239,.14); }
 .apr-licao-item {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
   width: 104px; text-align: center; padding: 0; margin: 0; align-self: flex-start;

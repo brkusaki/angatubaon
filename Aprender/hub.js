@@ -21,7 +21,7 @@
 
   var APR_XP_POR_LICAO = 10;         // XP simples por lição concluída (MVP)
   var APR_CHAVE_LOCAL = 'angatuba_aprender';
-  var APR_UNIDADE_IDS = ['u1', 'u2', 'u3', 'u4'];
+  var APR_UNIDADE_IDS = ['u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7', 'u8', 'u9', 'u10'];
 
   /* ── Estado em memória (carregado de localStorage/Firestore) ── */
   var _aprEstado = null;   // { en: { totalXp, streak, lastDate, placementDone, placementLevel, units:{u1:{completedLessons:[],xp:0}, ...} } }
@@ -503,7 +503,7 @@
       '<img src="/webp/owl-idea.webp" alt="" class="apr-place-owl" onerror="this.style.display=\'none\'">' +
       '<div class="apr-resultado-eyebrow">Antes de começar</div>' +
       '<h2 class="apr-resultado-titulo">Qual o seu nível de inglês?</h2>' +
-      '<p class="apr-place-texto">Um teste rapidinho de ' + total + ' perguntas — uns 2 minutos — pra você não perder tempo com lições fáceis demais.</p>' +
+      '<p class="apr-place-texto">Um teste rapidinho de ' + total + ' perguntas — uns 3 minutos — pra você não perder tempo com lições fáceis demais.</p>' +
       '<div class="apr-place-acoes">' +
       '<button type="button" class="apr-resultado-btn" id="apr-place-iniciar">Fazer o teste</button>' +
       '<button type="button" class="apr-place-btn-sec" id="apr-place-pular">Começar do zero</button>' +

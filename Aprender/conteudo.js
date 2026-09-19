@@ -40,6 +40,14 @@
         escolha só dessa palavra antes da tela de resultado — se acertou
         tudo, pula direto pro resultado.
 
+   TESTE DE NIVELAMENTO (placement): o array "placement" no fim deste
+   arquivo é independente do formato das lições — 8 perguntas de múltipla
+   escolha, 2 por unidade, na ordem das unidades. O motor usa só pra
+   decidir quais unidades iniciais a pessoa já domina (ver a seção
+   "Tela 0" em Aprender/hub.js); ele embaralha as opções na hora de
+   mostrar, então a posição da resposta certa aqui não importa pro jogo —
+   "correta" é o ÍNDICE da opção certa dentro de "opcoes".
+
    Roda no MESMO escopo global do app.js/hub.js (script clássico, sem
    módulo/IIFE) — carregado sob demanda junto com Aprender/hub.js (ver
    _carregarHubAprender em app.js). Só declara UMA variável global:
@@ -417,6 +425,32 @@ var APRENDER_CONTEUDO = {
         }
       ]
     }
+  ],
+
+  /* ── Teste de nivelamento (placement) ────────────────────────────
+     2 perguntas por unidade, na ordem das unidades acima, usando só
+     vocabulário que a unidade correspondente realmente ensina. Acertar
+     as DUAS de uma unidade libera pular aquela unidade; o motor para na
+     primeira unidade em que a pessoa errar alguma (ver
+     _aprCalcularNivelPlacement em Aprender/hub.js).
+
+     Pra ajustar o teste depois: mantenha sempre 2 perguntas por unidade
+     e o campo "unidade" batendo com o id da unidade lá em cima — o motor
+     ignora unidades sem pergunta (para o nivelamento nelas, por
+     segurança, em vez de liberar de graça). ───────────────────────── */
+  placement: [
+    // u1 — Cumprimentos (Hello / Thank you)
+    { id: 'p1', unidade: 'u1', pergunta: 'Olá', opcoes: ['Hello', 'Goodbye', 'Please', 'Good night'], correta: 0 },
+    { id: 'p2', unidade: 'u1', pergunta: 'Obrigado', opcoes: ['How are you?', 'Thank you', "You're welcome", 'Take care'], correta: 1 },
+    // u2 — Números 1-10 (Five / Ten)
+    { id: 'p3', unidade: 'u2', pergunta: 'Cinco', opcoes: ['Nine', 'Three', 'Five', 'Four'], correta: 2 },
+    { id: 'p4', unidade: 'u2', pergunta: 'Dez', opcoes: ['Ten', 'Seven', 'Eight', 'One'], correta: 0 },
+    // u3 — Comida (Water / Bread)
+    { id: 'p5', unidade: 'u3', pergunta: 'Água', opcoes: ['Juice', 'Beer', 'Fruit', 'Water'], correta: 3 },
+    { id: 'p6', unidade: 'u3', pergunta: 'Pão', opcoes: ['Bread', 'Chicken', 'Potato', 'Orange'], correta: 0 },
+    // u4 — No comércio (How much is it? / Do you deliver?)
+    { id: 'p7', unidade: 'u4', pergunta: 'Quanto custa?', opcoes: ['Can I help you?', 'How much is it?', 'Anything else?', 'Let me check'], correta: 1 },
+    { id: 'p8', unidade: 'u4', pergunta: 'Vocês entregam?', opcoes: ['Free delivery', 'Credit card', 'Do you deliver?', "It's out of stock"], correta: 2 }
   ]
 };
 

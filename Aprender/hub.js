@@ -24,7 +24,7 @@
   var APR_UNIDADE_IDS = ['u1', 'u2', 'u3', 'u4'];
 
   /* ── Estado em memória (carregado de localStorage/Firestore) ── */
-  var _aprEstado = null;   // { en: { totalXp, streak, lastDate, units:{u1:{completedLessons:[],xp:0}, ...} } }
+  var _aprEstado = null;   // { en: { totalXp, streak, lastDate, placementDone, placementLevel, units:{u1:{completedLessons:[],xp:0}, ...} } }
   var _aprSincronizado = false; // true depois da 1ª mesclagem com o Firestore nesta sessão
 
   function _aprEstadoPadrao() {
@@ -32,7 +32,29 @@
     for (var i = 0; i < APR_UNIDADE_IDS.length; i++) {
       units[APR_UNIDADE_IDS[i]] = { completedLessons: [], xp: 0 };
     }
-    return { totalXp: 0, streak: 0, lastDate: null, units: units };
+    return { totalXp: 0, streak: 0, lastDate: null, placementDone: false, placementLevel: 0, units: units };
+  }
+
+  // true se a pessoa já concluiu QUALQUER lição — usado pra reconhecer
+  // quem vem da versão sem teste de nivelamento.
+  function _aprTemProgresso(en) {
+    var units = (en && en.units) || {};
+    for (var id in units) {
+      if (!Object.prototype.hasOwnProperty.call(units, id)) continue;
+      if (units[id] && (units[id].completedLessons || []).length) return true;
+    }
+    return false;
+  }
+
+  // Normaliza os campos do nivelamento em um estado vindo do disco ou da
+  // nuvem. Quem já tinha progresso antes deste recurso existir entra como
+  // "já nivelado" — a pessoa está no meio do caminho, forçar um teste de
+  // nível agora seria só atrapalhar.
+  function _aprNormalizarPlacement(en) {
+    if (!en) return en;
+    en.placementDone = !!en.placementDone || _aprTemProgresso(en);
+    en.placementLevel = Math.max(0, Math.round(Number(en.placementLevel) || 0));
+    return en;
   }
 
   function _aprLerLocal() {
@@ -50,6 +72,7 @@
       }
       obj.en.totalXp = Number(obj.en.totalXp) || 0;
       obj.en.streak = Number(obj.en.streak) || 0;
+      _aprNormalizarPlacement(obj.en);
       return obj;
     } catch (e) { return { en: _aprEstadoPadrao() }; }
   }
@@ -117,6 +140,11 @@
       totalXp: Math.max(Number(local.totalXp) || 0, Number(remoto.totalXp) || 0),
       streak: Math.max(Number(local.streak) || 0, Number(remoto.streak) || 0),
       lastDate: ((local.lastDate || '') > (remoto.lastDate || '')) ? local.lastDate : (remoto.lastDate || local.lastDate),
+      // Nivelamento: feito num aparelho vale pra todos (OR) e o nível fica
+      // sempre o mais avançado (max) — mesma regra "nunca perde progresso"
+      // do resto da mesclagem.
+      placementDone: !!(local.placementDone || remoto.placementDone),
+      placementLevel: Math.max(Number(local.placementLevel) || 0, Number(remoto.placementLevel) || 0),
       units: {}
     };
     for (var i = 0; i < APR_UNIDADE_IDS.length; i++) {
@@ -129,7 +157,7 @@
       });
       out.units[id] = { completedLessons: licoes, xp: Math.max(Number(lu.xp) || 0, Number(ru.xp) || 0) };
     }
-    return out;
+    return _aprNormalizarPlacement(out);
   }
 
   // Chamado ao abrir o hub, se houver cliente logado: lê o doc do Firestore
@@ -149,7 +177,17 @@
         _aprSalvarNuvem();
         _aprSincronizado = true;
         // Se a mesclagem trouxe progresso de outro aparelho, atualiza a tela.
-        if (_aprenderAberto()) { _aprRenderStats(); _aprRenderMenu(); }
+        if (_aprenderAberto()) {
+          _aprRenderStats();
+          _aprRenderMenu();
+          // A nuvem pode trazer um nivelamento já feito em outro aparelho:
+          // quem está parado na intro do teste vai direto pro menu (um quiz
+          // em andamento ou a tela de resumo nunca são interrompidos).
+          if (_aprPlacementFase === 'intro' && _aprEstado.en.placementDone) {
+            _aprPlacementFase = null;
+            _aprMostrarTela('menu');
+          }
+        }
       });
     }).catch(function (err) {
       if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[aprender] sync falhou:', err && err.message);
@@ -311,7 +349,11 @@
 
     hub.style.display = 'block';
     document.body.classList.add('aprender-fs-open');
-    _aprVoltarMenu(); // sempre abre mostrando o menu de unidades (já renderiza os cards)
+    // Primeira visita de quem nunca estudou: oferece o teste de nível antes
+    // do menu, pra não começar do zero à toa (ver seção "Tela 0" abaixo).
+    // Em qualquer outro caso abre no menu de unidades, como sempre.
+    if (_aprPrecisaPlacement()) _aprMostrarPlacementIntro();
+    else _aprVoltarMenu(); // já renderiza os cards
     _aprRenderStats();
     _aprSincronizarNuvem();
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
@@ -369,12 +411,14 @@
     var tUnidade = document.getElementById('apr-tela-unidade');
     var tLicao = document.getElementById('apr-tela-licao');
     var tResultado = document.getElementById('apr-tela-resultado');
+    var tPlacement = document.getElementById('apr-tela-placement');
     var faixa = document.getElementById('apr-stats-faixa');
-    [menu, tUnidade, tLicao, tResultado].forEach(function (el) { if (el) el.style.display = 'none'; });
+    [menu, tUnidade, tLicao, tResultado, tPlacement].forEach(function (el) { if (el) el.style.display = 'none'; });
     if (nome === 'menu' && menu) menu.style.display = 'block';
     if (nome === 'unidade' && tUnidade) tUnidade.style.display = 'block';
     if (nome === 'licao' && tLicao) tLicao.style.display = 'flex';
     if (nome === 'resultado' && tResultado) tResultado.style.display = 'flex';
+    if (nome === 'placement' && tPlacement) tPlacement.style.display = 'flex';
     // A faixa de ofensiva/XP só aparece no menu principal (mesma lógica
     // do hub de jogos, que some a faixa durante uma partida).
     if (faixa) faixa.style.display = (nome === 'menu') ? 'flex' : 'none';
@@ -404,6 +448,230 @@
       }
     }
     if (xpEl) xpEl.textContent = '⭐ ' + (en.totalXp || 0) + ' XP';
+  }
+
+  /* ── Tela 0: teste de nivelamento (placement) ──────────────────
+     Antes do menu de unidades, só na primeira visita de quem nunca
+     estudou: 8 perguntas de múltipla escolha (2 por unidade, ver o array
+     "placement" em Aprender/conteudo.js) que dizem quais unidades
+     iniciais a pessoa já domina. Acertando as 2 de uma unidade, ela é
+     marcada como concluída (com o XP das lições) e o menu abre já no
+     ponto certo; errando qualquer uma, o nivelamento para ali — é sempre
+     melhor repetir do que pular algo que a pessoa não sabe.
+
+     Reaproveita as peças visuais que já existem (.apr-ex-*, .apr-licao-
+     topo/barra, .apr-resultado-*) — a tela nova traz só o mínimo em
+     .apr-place-*. A tela inteira é desenhada aqui dentro de
+     #apr-tela-placement, que no index.html é um <div> vazio. ───────── */
+  var _aprPlacement = null;      // { idx, perguntas, erros } — só durante o quiz
+  var _aprPlacementFase = null;  // 'intro' | 'quiz' | 'resultado' | null
+
+  function _aprPlacementPerguntas() {
+    return (window.APRENDER_CONTEUDO && APRENDER_CONTEUDO.placement) || [];
+  }
+
+  // Sem conteúdo de placement (ou já nivelado), o módulo se comporta
+  // exatamente como antes: abre direto no menu.
+  function _aprPrecisaPlacement() {
+    return !_aprEstado.en.placementDone && _aprPlacementPerguntas().length > 0;
+  }
+
+  // Cabeçalho comum das telas do teste: o X leva pra fora do hub na intro
+  // (a pessoa ainda não se comprometeu com nada) e de volta pra intro
+  // durante o quiz. Sem ele a tela ficaria sem saída, já que a sub-tela
+  // ativa esconde o cabeçalho "Aprender Inglês" (ver _aprMostrarTela).
+  // total = 0 é a intro: só o X, sem barra nem contador.
+  function _aprPlacementTopoHtml(n, total) {
+    return '<div class="apr-licao-topo apr-place-topo">' +
+      '<button type="button" class="apr-licao-fechar" id="apr-place-sair" aria-label="Sair do teste"><i class="fa fa-times"></i></button>' +
+      (total
+        ? '<div class="apr-licao-barra"><div class="apr-licao-barra-fill" style="width:' + Math.round((n / total) * 100) + '%"></div></div>' +
+          '<div class="apr-place-contador">' + n + '/' + total + '</div>'
+        : '') +
+      '</div>';
+  }
+
+  function _aprMostrarPlacementIntro() {
+    var tela = document.getElementById('apr-tela-placement');
+    if (!tela) { _aprVoltarMenu(); return; }
+    _aprPlacement = null;
+    _aprPlacementFase = 'intro';
+    var total = _aprPlacementPerguntas().length;
+    tela.innerHTML =
+      _aprPlacementTopoHtml(0, 0) +
+      '<div class="apr-place-centro">' +
+      '<img src="/webp/owl-idea.webp" alt="" class="apr-place-owl" onerror="this.style.display=\'none\'">' +
+      '<div class="apr-resultado-eyebrow">Antes de começar</div>' +
+      '<h2 class="apr-resultado-titulo">Qual o seu nível de inglês?</h2>' +
+      '<p class="apr-place-texto">Um teste rapidinho de ' + total + ' perguntas — uns 2 minutos — pra você não perder tempo com lições fáceis demais.</p>' +
+      '<div class="apr-place-acoes">' +
+      '<button type="button" class="apr-resultado-btn" id="apr-place-iniciar">Fazer o teste</button>' +
+      '<button type="button" class="apr-place-btn-sec" id="apr-place-pular">Começar do zero</button>' +
+      '</div></div>';
+    var btnSair = document.getElementById('apr-place-sair');
+    if (btnSair) btnSair.addEventListener('click', function () { _sairDoAprender(); });
+    var btnIniciar = document.getElementById('apr-place-iniciar');
+    if (btnIniciar) btnIniciar.addEventListener('click', function () { _aprIniciarPlacement(); });
+    var btnPular = document.getElementById('apr-place-pular');
+    if (btnPular) btnPular.addEventListener('click', function () { _aprPularPlacement(); });
+    _aprMostrarTela('placement');
+  }
+
+  function _aprIniciarPlacement() {
+    var perguntas = _aprPlacementPerguntas();
+    if (!perguntas.length) { _aprPularPlacement(); return; }
+    _aprPlacement = { idx: 0, perguntas: perguntas, erros: {}, travado: false };
+    _aprRenderPlacementPergunta();
+  }
+
+  function _aprRenderPlacementPergunta() {
+    var tela = document.getElementById('apr-tela-placement');
+    if (!tela || !_aprPlacement) return;
+    var p = _aprPlacement.perguntas[_aprPlacement.idx];
+    if (!p) { _aprFinalizarPlacement(); return; }
+    _aprPlacementFase = 'quiz';
+    var total = _aprPlacement.perguntas.length;
+    var correta = p.opcoes[p.correta];
+    tela.innerHTML =
+      _aprPlacementTopoHtml(_aprPlacement.idx, total) +
+      '<div class="apr-ex-topo">' +
+      '<img src="/webp/owl-point.webp" alt="" class="apr-ex-owl" onerror="this.style.display=\'none\'">' +
+      '<div class="apr-ex-bolha">' +
+      '<div class="apr-ex-instrucao">Traduza para o inglês:</div>' +
+      '<div class="apr-ex-pergunta">' + p.pergunta + '</div>' +
+      '</div></div>' +
+      '<div class="apr-ex-area"><div class="apr-ex-opcoes" id="apr-place-opcoes"></div></div>';
+    var btnSair = document.getElementById('apr-place-sair');
+    if (btnSair) btnSair.addEventListener('click', function () { _aprMostrarPlacementIntro(); });
+
+    var wrap = document.getElementById('apr-place-opcoes');
+    if (!wrap) return;
+    var botoes = [];
+    _aprEmbaralhar(p.opcoes).forEach(function (texto) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'apr-ex-opt';
+      btn.textContent = texto;
+      btn.addEventListener('click', function () {
+        if (!_aprPlacement || _aprPlacement.travado) return;
+        _aprPlacement.travado = true;
+        var acertou = (texto === correta);
+        if (!acertou) _aprPlacement.erros[p.unidade] = true;
+        botoes.forEach(function (b) {
+          b.disabled = true;
+          if (b.textContent === correta) b.classList.add('apr-certa');
+          else if (b === btn) b.classList.add('apr-errada');
+        });
+        if (acertou && navigator.vibrate) { try { navigator.vibrate(35); } catch (e) {} }
+        setTimeout(function () {
+          if (!_aprPlacement) return; // saiu do teste enquanto o feedback rodava
+          _aprPlacement.travado = false;
+          _aprPlacement.idx++;
+          _aprRenderPlacementPergunta();
+        }, 520);
+      });
+      botoes.push(btn);
+      wrap.appendChild(btn);
+    });
+  }
+
+  // Quantas unidades iniciais dá pra pular: percorre as unidades na ordem e
+  // para na primeira em que houve erro — ou que não tem pergunta nenhuma no
+  // placement (sem como avaliar, não libera de graça).
+  function _aprCalcularNivelPlacement() {
+    var unidades = _aprUnidades();
+    var perguntas = _aprPlacementPerguntas();
+    var nivel = 0;
+    for (var i = 0; i < unidades.length; i++) {
+      var id = unidades[i].id;
+      var temPergunta = perguntas.some(function (q) { return q.unidade === id; });
+      if (!temPergunta) break;
+      if (_aprPlacement && _aprPlacement.erros[id]) break;
+      nivel++;
+    }
+    return nivel;
+  }
+
+  // Aplica o nível: marca como concluídas as lições das unidades 0..nivel-1
+  // (com o XP de cada uma), fecha o nivelamento e salva local + nuvem.
+  // Retorna o XP concedido agora, só pra tela de resumo mostrar.
+  function _aprAplicarPlacement(nivel) {
+    var en = _aprEstado.en;
+    var unidades = _aprUnidades();
+    var max = Math.max(0, Math.min(nivel, unidades.length));
+    var xpGanho = 0;
+    for (var i = 0; i < max; i++) {
+      var u = unidades[i];
+      var prog = en.units[u.id] || (en.units[u.id] = { completedLessons: [], xp: 0 });
+      (u.licoes || []).forEach(function (l) {
+        if (prog.completedLessons.indexOf(l.id) !== -1) return;
+        prog.completedLessons.push(l.id);
+        prog.xp = (prog.xp || 0) + APR_XP_POR_LICAO;
+        en.totalXp = (en.totalXp || 0) + APR_XP_POR_LICAO;
+        xpGanho += APR_XP_POR_LICAO;
+      });
+    }
+    en.placementDone = true;
+    en.placementLevel = max;
+    _aprPlacement = null;
+    _aprSalvarLocal();
+    _aprSalvarNuvem();
+    return xpGanho;
+  }
+
+  // "Começar do zero": pula o teste sem penalidade nenhuma — nível 0,
+  // nivelamento fechado, menu normal com a u1 desbloqueada.
+  function _aprPularPlacement() {
+    _aprAplicarPlacement(0);
+    _aprPlacementFase = null;
+    _aprRenderStats();
+    _aprVoltarMenu();
+  }
+
+  function _aprFinalizarPlacement() {
+    var nivel = _aprCalcularNivelPlacement();
+    var xpGanho = _aprAplicarPlacement(nivel);
+    _aprMostrarPlacementResultado(_aprEstado.en.placementLevel, xpGanho);
+  }
+
+  function _aprMostrarPlacementResultado(nivel, xpGanho) {
+    var tela = document.getElementById('apr-tela-placement');
+    if (!tela) { _aprRenderStats(); _aprVoltarMenu(); return; }
+    _aprPlacementFase = 'resultado';
+    var unidades = _aprUnidades();
+    var proxima = unidades[nivel] || null;
+    var owl, titulo, texto;
+    if (!nivel) {
+      owl = '/webp/owl-wave.webp';
+      titulo = 'Vamos começar do começo!';
+      texto = 'Sem pressa — você começa pela primeira unidade e constrói a base direitinho.';
+    } else if (!proxima) {
+      owl = '/webp/owl-trophy.webp';
+      titulo = 'Você mandou muito bem! 🏆';
+      texto = 'Acertou tudo: todas as unidades disponíveis já entraram como concluídas. Conteúdo novo vem por aí!';
+    } else {
+      owl = (nivel >= 2) ? '/webp/owl-trophy.webp' : '/webp/owl-thumbsup.webp';
+      titulo = 'Nível encontrado! 🎉';
+      texto = 'Você já domina ' + nivel + (nivel === 1 ? ' unidade' : ' unidades') +
+        '. Vamos direto para <b>' + proxima.titulo + '</b>.';
+    }
+    tela.innerHTML =
+      (nivel ? _aprConfeteHtml() : '') +
+      '<div class="apr-place-centro">' +
+      '<img src="' + owl + '" alt="" class="apr-resultado-owl" onerror="this.style.display=\'none\'">' +
+      '<div class="apr-resultado-eyebrow">Teste de nível</div>' +
+      '<h2 class="apr-resultado-titulo">' + titulo + '</h2>' +
+      '<p class="apr-place-texto">' + texto + '</p>' +
+      (xpGanho ? '<div class="apr-resultado-stats"><div class="apr-resultado-stat apr-resultado-xp"><span>⭐</span>+' + xpGanho + ' XP</div></div>' : '') +
+      '<button type="button" class="apr-resultado-btn" id="apr-place-ver">Ver unidades</button>' +
+      '</div>';
+    var btn = document.getElementById('apr-place-ver');
+    if (btn) btn.addEventListener('click', function () {
+      _aprPlacementFase = null;
+      _aprRenderStats();
+      _aprVoltarMenu();
+    });
+    _aprMostrarTela('placement');
   }
 
   /* ── Tela 1: menu de unidades ──────────────────────────────── */

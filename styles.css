@@ -7318,6 +7318,43 @@ body.games-fs-open #jogo-baralho.brl-em-jogo .jogo-voltar i {
 }
 .apr-resultado-btn:active { transform: scale(.97); }
 
+/* ── Teste de nivelamento (placement) ───────────────────────────
+   Só o mínimo: a tela reaproveita .apr-licao-topo/.apr-licao-barra no
+   cabeçalho, .apr-ex-* no quiz e .apr-resultado-* na intro/resumo (ver a
+   seção "Tela 0" em Aprender/hub.js). .apr-place-centro é o miolo
+   centrado da intro e do resumo; o quiz não usa ele — cai direto no
+   .apr-ex-area, que já empurra as opções pro fim da tela. */
+.apr-tela-placement { position: relative; overflow: hidden; }
+.apr-place-topo { flex-shrink: 0; }
+.apr-place-contador {
+  flex-shrink: 0; font-family: var(--font-h); font-weight: 800; font-size: 13px;
+  color: var(--muted); white-space: nowrap;
+}
+.apr-place-centro {
+  position: relative; z-index: 1; flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; animation: qzPop .35s ease;
+}
+.apr-place-owl {
+  width: 150px; height: 150px; object-fit: contain; margin-bottom: 10px;
+  filter: drop-shadow(0 10px 22px rgba(0,0,0,.3)); animation: aprOwlBounceIn .5s ease;
+}
+.apr-place-texto {
+  max-width: 340px; margin: 0 0 26px; font-family: var(--font-b);
+  font-size: 15px; line-height: 1.55; color: var(--muted);
+}
+.apr-place-texto b { color: var(--text); }
+.apr-place-acoes { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.apr-place-btn-sec {
+  min-width: 220px; padding: 14px 28px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--muted);
+  font-family: var(--font-b); font-size: 14.5px; font-weight: 700;
+  -webkit-tap-highlight-color: transparent; transition: color .15s, border-color .15s, transform .12s;
+}
+.apr-place-btn-sec:hover { color: var(--text); border-color: var(--muted); }
+.apr-place-btn-sec:active { transform: scale(.97); }
+.apr-tela-placement .apr-ex-area { padding-bottom: 8px; }
+
 /* ── Animações — Fase 2 ────────────────────────────────────────── */
 @keyframes aprExIn {
   from { opacity: 0; transform: translateY(14px) scale(.98); }
@@ -7406,11 +7443,13 @@ body.aprender-fs-open .apr-tela-unidade {
    A tela de exercício ganha um segundo verniz de cor por cima do gradiente
    do hub — é a tela mais importante, não podia parecer "preto vazio". */
 body.aprender-fs-open .apr-tela-licao,
-body.aprender-fs-open .apr-tela-resultado {
+body.aprender-fs-open .apr-tela-resultado,
+body.aprender-fs-open .apr-tela-placement {
   height: 100vh; height: 100dvh; flex-direction: column;
   padding: 16px 16px 24px;
 }
 body.aprender-fs-open .apr-tela-resultado { overflow-y: auto; }
+body.aprender-fs-open .apr-tela-placement { overflow-y: auto; }
 body.aprender-fs-open .apr-tela-licao { overflow-y: hidden; }
 body.aprender-fs-open .apr-tela-licao {
   background:

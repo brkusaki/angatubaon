@@ -208,7 +208,15 @@
       _quizAplicarTema(card);
       var bloco = _quizBlocoDoDia(banco);
       _quizEstado = { perguntas: bloco, idx: 0, acertos: 0, travado: false };
-      card.style.display = 'block';
+      // Limpa o display inline em vez de forçar 'block' — só assim a regra
+      // "body.games-fs-open .quiz-coruja { display:flex; flex:1 }" consegue
+      // valer (estilo inline sempre vence regra de classe). Mesmo motivo do
+      // fix já aplicado em _abrirJogo().
+      card.style.display = '';
+      // Carregou com sucesso: esconde o "Carregando o quiz…" na hora, em vez
+      // de depender só do setTimeout de segurança em _abrirJogo().
+      var ld = document.getElementById('games-loading');
+      if (ld) ld.style.display = 'none';
       // Já jogou hoje? Mostra o placar salvo direto (não deixa refazer).
       var jaJogou = null;
       try { jaJogou = localStorage.getItem(_quizChaveDia()); } catch(e) {}
@@ -268,7 +276,9 @@
     var telas = document.querySelectorAll('.jogo-tela');
     for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
     var tela = document.getElementById('jogo-relampago');
-    if (tela) tela.style.display = 'block';
+    // Limpa o inline em vez de 'block' — mesmo motivo do fix em _abrirJogo():
+    // "body.games-fs-open .jogo-tela { display:flex }" só vale sem inline.
+    if (tela) tela.style.display = '';
     _rlPreparar();
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
   }
@@ -444,7 +454,8 @@
     var telas = document.querySelectorAll('.jogo-tela');
     for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
     var tela = document.getElementById('jogo-tema-escolha');
-    if (tela) tela.style.display = 'block';
+    // Limpa o inline em vez de 'block' — mesmo motivo do fix em _abrirJogo().
+    if (tela) tela.style.display = '';
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
   }
   window._qtAbrirEscolha = _qtAbrirEscolha;
@@ -454,7 +465,7 @@
     var telas = document.querySelectorAll('.jogo-tela');
     for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
     var tela = document.getElementById('jogo-tema-escolha');
-    if (tela) tela.style.display = 'block';
+    if (tela) tela.style.display = '';
   }
   window._qtVoltarEscolha = _qtVoltarEscolha;
 
@@ -466,7 +477,8 @@
     var telas = document.querySelectorAll('.jogo-tela');
     for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
     var tela = document.getElementById('jogo-tema-quiz');
-    if (tela) tela.style.display = 'block';
+    // Limpa o inline em vez de 'block' — mesmo motivo do fix em _abrirJogo().
+    if (tela) tela.style.display = '';
     var card = document.getElementById('qt-card');
     var fase = document.getElementById('qt-fase-perguntas');
     var placar = document.getElementById('qt-placar');
@@ -489,7 +501,9 @@
         _qtVoltarEscolha();
         return;
       }
-      card && (card.style.display = 'block');
+      // Idem: '' em vez de 'block' — #qt-card usa a mesma classe .quiz-coruja
+      // que precisa de display:flex no fullscreen (ver _carregarQuizCoruja).
+      card && (card.style.display = '');
       var qtd = Math.min(_QT_POR_TEMA, banco.length);
       var perguntas = _rlEmbaralhar(banco).slice(0, qtd);
       _qtEstado = { perguntas: perguntas, idx: 0, acertos: 0, travado: false };

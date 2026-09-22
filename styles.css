@@ -5123,6 +5123,25 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   0% { opacity: 0; transform: translateX(12px); }
   100% { opacity: 1; transform: translateX(0); }
 }
+/* Coruja reativa acima da pergunta (diário e tema reaproveitam a classe) */
+.quiz-owl-live {
+  display: block;
+  width: 52px; height: 52px;
+  object-fit: contain;
+  margin: 0 auto 6px;
+  filter: drop-shadow(0 3px 10px rgba(0,0,0,0.6));
+}
+.quiz-owl-live.qz-owl-pop { animation: qzBounce .5s ease; }
+/* Explicação opcional da pergunta (some se o banco não mandar o campo) */
+.quiz-explicacao {
+  display: none;
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  font-style: italic;
+  color: rgba(230,230,240,0.72);
+}
+.quiz-explicacao.show { display: block; animation: qzFade .3s ease; }
 /* —— Tela de placar final —— */
 .quiz-placar {
   display: none; text-align: center; padding: 8px 4px;

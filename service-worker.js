@@ -66,7 +66,7 @@ self.addEventListener('notificationclick', function (event) {
   );
 });
 
-const CACHE = 'angatubaon-v350';
+const CACHE = 'angatubaon-v351';
 const STATIC = [
   '/',
   '/index.html',

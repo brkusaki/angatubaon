@@ -5085,11 +5085,11 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
   text-shadow: 0 1px 8px rgba(0,0,0,0.85);
   min-height: 42px;
 }
-.quiz-opcoes { display: flex; flex-direction: column; gap: 8px; }
+.quiz-opcoes { display: flex; flex-direction: column; gap: 10px; }
 .quiz-opt {
   display: flex; align-items: center; gap: 10px;
   width: 100%; text-align: left;
-  padding: 12px 14px; border-radius: 12px;
+  min-height: 48px; padding: 13px 14px; border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.16);
   background: rgba(255,255,255,0.08);
   backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
@@ -5440,7 +5440,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .rl-hud-valor { font-family: var(--font-h); font-weight: 800; font-size: 22px; color: var(--text); }
 .rl-hud-valor.rl-recorde-novo { color: #f59e0b; animation: stGlow .5s ease 3; }
 /* Barra de tempo por pergunta */
-.rl-timer-wrap { height: 6px; background: var(--surface2); overflow: hidden; }
+.rl-timer-wrap { height: 8px; background: var(--surface2); overflow: hidden; }
 .rl-timer-fill {
   height: 100%; width: 100%;
   background: linear-gradient(90deg, #eab308, #f59e0b);
@@ -5456,7 +5456,7 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .rl-opcoes { display: flex; flex-direction: column; gap: 10px; }
 .rl-opt {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
-  padding: 14px 16px; border-radius: 12px;
+  min-height: 48px; padding: 14px 16px; border-radius: 12px;
   background: var(--surface2); border: 1px solid var(--border);
   color: var(--text); font-size: 14px; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -5473,13 +5473,28 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .rl-opt.rl-certa .rl-opt-letra { background: #4ade80; color: #052e16; }
 .rl-opt.rl-errada { background: rgba(239,68,68,0.15); border-color: #ef4444; }
 .rl-opt.rl-errada .rl-opt-letra { background: #ef4444; color: #450a0a; }
-/* Overlays início/fim */
+/* Overlays início/fim — alinhado ao topo (em vez de centralizado) e com
+   scroll próprio: quando o conteúdo é mais alto que o card (ex.: fim com
+   ranking Top 5), ele rola dentro do overlay em vez de cortar a owl no
+   topo (que é o que "centralizado + overflow:hidden do card" fazia). */
 .rl-overlay {
   position: absolute; inset: 0; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; text-align: center;
-  padding: 24px; gap: 8px; background: rgba(10,10,12,.94); backdrop-filter: blur(3px); z-index: 6;
+  align-items: center; justify-content: flex-start; text-align: center;
+  padding: calc(24px + env(safe-area-inset-top, 0)) 24px calc(24px + env(safe-area-inset-bottom, 0));
+  gap: 8px; background: rgba(10,10,12,.94); backdrop-filter: blur(3px); z-index: 6;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
 }
-.rl-overlay-owl { width: 76px; height: 76px; object-fit: contain; margin-bottom: 4px; }
+.rl-overlay-owl { width: 76px; height: 76px; object-fit: contain; margin-bottom: 4px; flex-shrink: 0; }
+/* Agrupa o conteúdo do overlay pra centralizar com margin:auto — quando
+   cabe, os dois "auto" dividem o espaço sobrando e centraliza igual
+   antes; quando não cabe (fim com ranking), os "auto" somem sozinhos e o
+   conteúdo cola no topo do overlay (que agora tem scroll), sem cortar
+   nada — sem depender de "justify-content: safe center" (suporte ainda
+   inconsistente entre navegadores/webviews). */
+.rl-overlay-corpo {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  width: 100%; margin: auto 0;
+}
 .rl-overlay-titulo { font-family: var(--font-h); font-weight: 800; font-size: 24px; color: var(--text); }
 .rl-overlay-desc { font-size: 13px; color: var(--muted); line-height: 1.45; max-width: 270px; }
 .rl-play {
@@ -6485,6 +6500,54 @@ body.games-fs-open .t48-arena {
   justify-content: center;
 }
 body.games-fs-open .sq-grade { margin: auto 0; }
+
+/* Quiz da Coruja (diário + tema) e Relâmpago em tela cheia: sem arena de
+   canvas, então sem essas regras a pergunta+opções ficavam coladas no
+   topo do card e sobrava um vazio preto embaixo. Cabeçalho/progresso/
+   barra (e, no Relâmpago, o HUD + barra de tempo, que já são sticky)
+   continuam no topo; só o bloco pergunta+opções centraliza no espaço que
+   sobra. */
+body.games-fs-open .rl-fase {
+  flex: 1 1 auto;
+  display: flex; flex-direction: column;
+  justify-content: center;
+  min-height: 0; /* deixa o flex encolher certo em vez de estourar o card */
+}
+body.games-fs-open .quiz-inner {
+  flex: 1 1 auto;
+  display: flex; flex-direction: column;
+  min-height: 0;
+}
+body.games-fs-open #quiz-fase-perguntas,
+body.games-fs-open #qt-fase-perguntas {
+  flex: 1 1 auto;
+  display: flex; flex-direction: column;
+  min-height: 0;
+}
+body.games-fs-open .quiz-corpo {
+  flex: 1 1 auto;
+  display: flex; flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
+/* Placar (diário/tema) também centraliza no espaço do card, em vez de
+   ficar grudado no topo — só entra em jogo quando .quiz-placar.show
+   (a fase de perguntas já está escondida nesse momento). */
+body.games-fs-open .quiz-placar { margin: auto 0; }
+/* Respeita a barra de gestos do celular no rodapé do card (a regra
+   compartilhada dos outros jogos usa 20px fixo; aqui soma a safe-area). */
+body.games-fs-open .rl-card,
+body.games-fs-open .quiz-coruja {
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0));
+}
+/* Ranking Top 5 do fim do Relâmpago: com o overlay agora dando scroll
+   (ver .rl-overlay), isto é só um reforço pra telas bem baixas — encolhe
+   um pouco em vez de precisar rolar tanto. */
+@media (max-height: 640px) {
+  .rl-overlay-owl { width: 56px; height: 56px; }
+  .rank-linha-mini { padding: 6px 10px; }
+  .rank-fim-titulo { margin-bottom: 2px; }
+}
 
 /* ── TELA CHEIA DE VERDADE (jogo ativo) ──────────────────────────
    Quando um jogo está aberto, o hub ganha .jogo-ativo (via JS). Aí

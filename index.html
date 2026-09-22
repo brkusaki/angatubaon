@@ -767,9 +767,11 @@
                 <span class="quiz-progresso" id="quiz-progresso">1/5</span>
               </div>
               <div class="quiz-barra"><div class="quiz-barra-fill" id="quiz-barra-fill"></div></div>
-              <div class="quiz-pergunta" id="quiz-pergunta"></div>
-              <div class="quiz-opcoes" id="quiz-opcoes"></div>
-              <div class="quiz-explicacao" id="quiz-explicacao"></div>
+              <div class="quiz-corpo">
+                <div class="quiz-pergunta" id="quiz-pergunta"></div>
+                <div class="quiz-opcoes" id="quiz-opcoes"></div>
+                <div class="quiz-explicacao" id="quiz-explicacao"></div>
+              </div>
             </div>
             <div class="quiz-placar" id="quiz-placar">
               <img id="quiz-placar-img" src="" alt="" onerror="this.style.display='none'">
@@ -825,9 +827,11 @@
                 <span class="quiz-progresso" id="qt-progresso">1/15</span>
               </div>
               <div class="quiz-barra"><div class="quiz-barra-fill" id="qt-barra-fill"></div></div>
-              <div class="quiz-pergunta" id="qt-pergunta"></div>
-              <div class="quiz-opcoes" id="qt-opcoes"></div>
-              <div class="quiz-explicacao" id="qt-explicacao"></div>
+              <div class="quiz-corpo">
+                <div class="quiz-pergunta" id="qt-pergunta"></div>
+                <div class="quiz-opcoes" id="qt-opcoes"></div>
+                <div class="quiz-explicacao" id="qt-explicacao"></div>
+              </div>
             </div>
             <div class="quiz-placar" id="qt-placar">
               <img id="qt-placar-img" src="" alt="" onerror="this.style.display='none'">
@@ -863,18 +867,22 @@
           </div>
           <!-- Tela inicial -->
           <div class="rl-overlay" id="rl-inicio">
-            <img src="/webp/owl-idea.webp" alt="" class="rl-overlay-owl" onerror="this.style.display='none'">
-            <div class="rl-overlay-titulo">⚡ Modo Relâmpago</div>
-            <div class="rl-overlay-desc">Responda o mais rápido que conseguir! Quanto mais rápido acertar, mais pontos. Erro ou tempo esgotado encerra o jogo.</div>
-            <button type="button" class="rl-play" onclick="_rlComecar()">Começar</button>
+            <div class="rl-overlay-corpo">
+              <img src="/webp/owl-idea.webp" alt="" class="rl-overlay-owl" onerror="this.style.display='none'">
+              <div class="rl-overlay-titulo">⚡ Modo Relâmpago</div>
+              <div class="rl-overlay-desc">Responda o mais rápido que conseguir! Quanto mais rápido acertar, mais pontos. Erro ou tempo esgotado encerra o jogo.</div>
+              <button type="button" class="rl-play" onclick="_rlComecar()">Começar</button>
+            </div>
           </div>
           <!-- Tela de fim -->
           <div class="rl-overlay" id="rl-fim" style="display:none;">
-            <img src="" alt="" class="rl-overlay-owl" id="rl-fim-owl" onerror="this.style.display='none'">
-            <div class="rl-overlay-titulo" id="rl-fim-titulo">Fim!</div>
-            <div class="rl-overlay-desc" id="rl-fim-msg"></div>
-            <div class="rank-slot" id="rl-rank-slot" style="display:none;"></div>
-            <button type="button" class="rl-play" onclick="_rlComecar()">Jogar de novo</button>
+            <div class="rl-overlay-corpo">
+              <img src="" alt="" class="rl-overlay-owl" id="rl-fim-owl" onerror="this.style.display='none'">
+              <div class="rl-overlay-titulo" id="rl-fim-titulo">Fim!</div>
+              <div class="rl-overlay-desc" id="rl-fim-msg"></div>
+              <div class="rank-slot" id="rl-rank-slot" style="display:none;"></div>
+              <button type="button" class="rl-play" onclick="_rlComecar()">Jogar de novo</button>
+            </div>
           </div>
         </div>
       </div>

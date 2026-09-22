@@ -34,10 +34,41 @@
 
   // Corujas por faixa de acerto no placar (caminho real: /webp/ com hífen).
   var _QUIZ_OWL = {
-    otimo: '/webp/owl-celebrate-pro.webp', // 4-5 acertos
-    bom:   '/webp/owl-thumbsup.webp',      // 2-3 acertos
-    fraco: '/webp/owl-idea.webp'           // 0-1 acerto
+    otimo:    '/webp/owl-celebrate-pro.webp', // 4-5 acertos
+    bom:      '/webp/owl-thumbsup.webp',      // 2-3 acertos
+    fraco:    '/webp/owl-idea.webp',          // 0-1 acerto
+    perfeito: '/webp/owl-tada.webp'           // acertou todas (placar do diário)
   };
+
+  // Coruja reativa ao lado das perguntas (diário e tema reaproveitam pelo id da img).
+  var _QUIZ_OWL_LIVE = {
+    idea:   '/webp/owl-idea.webp',      // ao mostrar a pergunta
+    acerto: '/webp/owl-thumbsup.webp',  // ao acertar
+    erro:   '/webp/owl-surprised.webp'  // ao errar
+  };
+  function _quizOwlReact(imgId, estado) {
+    var img = document.getElementById(imgId);
+    if (!img) return;
+    img.src = _QUIZ_OWL_LIVE[estado] || _QUIZ_OWL_LIVE.idea;
+    img.classList.remove('qz-owl-pop'); void img.offsetWidth; img.classList.add('qz-owl-pop');
+  }
+
+  // Explicação opcional da pergunta: só aparece se o campo vier do banco.
+  function _quizExplicacaoMostrar(elId, pergunta) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    var txt = pergunta && pergunta.explicacao;
+    if (typeof txt === 'string' && txt.trim()) {
+      el.textContent = txt;
+      el.classList.add('show');
+    }
+  }
+  function _quizExplicacaoLimpar(elId) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    el.textContent = '';
+    el.classList.remove('show');
+  }
 
   function _quizChaveDia() { return 'angatuba_quiz_' + Math.floor(Date.now() / 86400000); }
 
@@ -74,6 +105,8 @@
     var progEl = document.getElementById('quiz-progresso');
     var barraEl = document.getElementById('quiz-barra-fill');
     if (!perguntaEl || !opcoesEl) return;
+    _quizOwlReact('quiz-owl-live', 'idea');
+    _quizExplicacaoLimpar('quiz-explicacao');
     if (progEl) progEl.textContent = (idx + 1) + '/' + total;
     if (barraEl) barraEl.style.width = Math.round((idx / total) * 100) + '%';
     perguntaEl.textContent = pergunta.pergunta;
@@ -110,7 +143,15 @@
       if (letras[i] === pergunta.correta) botoes[i].classList.add('qz-certa');
       else if (letras[i] === escolha) botoes[i].classList.add('qz-errada');
     }
-    if (acertou && navigator.vibrate) { try { navigator.vibrate(35); } catch(e) {} }
+    if (acertou) {
+      AngatubaGames.som.acerto();
+      if (navigator.vibrate) { try { navigator.vibrate(35); } catch(e) {} }
+    } else {
+      AngatubaGames.som.erro();
+      if (navigator.vibrate) { try { navigator.vibrate(100); } catch(e) {} }
+    }
+    _quizOwlReact('quiz-owl-live', acertou ? 'acerto' : 'erro');
+    _quizExplicacaoMostrar('quiz-explicacao', pergunta);
     // Aguarda 1.1s pra pessoa ver o resultado, depois avança.
     setTimeout(function(){
       _quizEstado.idx++;
@@ -126,6 +167,7 @@
     var total = _quizEstado.perguntas.length;
     // Trava o dia: guarda que completou (não refaz hoje).
     try { localStorage.setItem(_quizChaveDia(), String(acertos)); } catch(e) {}
+    AngatubaGames.som.fim(acertos >= 4);
     var faseEl = document.getElementById('quiz-fase-perguntas');
     var placarEl = document.getElementById('quiz-placar');
     var imgEl = document.getElementById('quiz-placar-img');
@@ -133,12 +175,14 @@
     var msgEl = document.getElementById('quiz-placar-msg');
     if (faseEl) faseEl.style.display = 'none';
     if (!placarEl || !imgEl || !notaEl || !msgEl) return;
-    // Coruja + mensagem conforme desempenho.
+    // Coruja + mensagem conforme desempenho (gabaritou é um caso especial
+    // dentro da faixa "ótimo" — as 3 faixas de sempre continuam as mesmas).
     var owl, msg;
     var pct = acertos / total;
-    if (pct >= 0.8)      { owl = _QUIZ_OWL.otimo; msg = 'Você manja MUITO de Angatuba! 🏆'; }
-    else if (pct >= 0.4) { owl = _QUIZ_OWL.bom;   msg = 'Mandou bem! Dá pra melhorar amanhã! 😉'; }
-    else                 { owl = _QUIZ_OWL.fraco; msg = 'Bora estudar a cidade e voltar amanhã! 🦉'; }
+    if (acertos === total)  { owl = _QUIZ_OWL.perfeito; msg = 'Gabaritou! A coruja se orgulha de você! 🏆'; }
+    else if (pct >= 0.8)    { owl = _QUIZ_OWL.otimo; msg = 'Você manja MUITO de Angatuba! 🏆'; }
+    else if (pct >= 0.4)    { owl = _QUIZ_OWL.bom;   msg = 'Mandou bem! Dá pra melhorar amanhã! 😉'; }
+    else                    { owl = _QUIZ_OWL.fraco; msg = 'Bora estudar a cidade e voltar amanhã! 🦉'; }
     imgEl.src = owl; imgEl.style.display = '';
     notaEl.innerHTML = 'Você acertou <b>' + acertos + '</b> de ' + total + '!';
     msgEl.textContent = msg;
@@ -321,9 +365,11 @@
       _rlAcertos++;
       var pEl = document.getElementById('rl-pontos'); if (pEl) pEl.textContent = _rlPontos;
       var aEl = document.getElementById('rl-acertos'); if (aEl) aEl.textContent = _rlAcertos;
+      AngatubaGames.som.acerto();
       if (navigator.vibrate) { try { navigator.vibrate(30); } catch(e) {} }
       setTimeout(function(){ _rlIdx++; _rlRenderPergunta(); }, 700);
     } else {
+      AngatubaGames.som.erro();
       if (navigator.vibrate) { try { navigator.vibrate(150); } catch(e) {} }
       setTimeout(function(){ _rlFim(false); }, 900);
     }
@@ -339,6 +385,7 @@
       botoes[i].disabled = true;
       if (letras[i] === pergunta.correta) botoes[i].classList.add('rl-certa');
     }
+    AngatubaGames.som.erro();
     if (navigator.vibrate) { try { navigator.vibrate(150); } catch(e) {} }
     setTimeout(function(){ _rlFim(false); }, 900);
   }
@@ -349,6 +396,7 @@
     var rec = _rlRecordeGet();
     var bateu = _rlPontos > rec;
     if (bateu) _rlRecordeSet(_rlPontos);
+    AngatubaGames.som.fim(bateu || venceuBanco);
     if (typeof rankSubmeter === 'function') rankSubmeter('relampago', _rlPontos);
     var recEl = document.getElementById('rl-recorde'); if (recEl) recEl.textContent = _rlRecordeGet();
     var fim = document.getElementById('rl-fim');
@@ -473,6 +521,8 @@
     var progEl = document.getElementById('qt-progresso');
     var barraEl = document.getElementById('qt-barra-fill');
     if (!perguntaEl || !opcoesEl) return;
+    _quizOwlReact('qt-owl-live', 'idea');
+    _quizExplicacaoLimpar('qt-explicacao');
     if (progEl) progEl.textContent = (idx + 1) + '/' + total;
     if (barraEl) barraEl.style.width = Math.round((idx / total) * 100) + '%';
     perguntaEl.textContent = pergunta.pergunta;
@@ -509,7 +559,15 @@
       if (letras[i] === pergunta.correta) botoes[i].classList.add('qz-certa');
       else if (letras[i] === escolha) botoes[i].classList.add('qz-errada');
     }
-    if (acertou && navigator.vibrate) { try { navigator.vibrate(35); } catch(e) {} }
+    if (acertou) {
+      AngatubaGames.som.acerto();
+      if (navigator.vibrate) { try { navigator.vibrate(35); } catch(e) {} }
+    } else {
+      AngatubaGames.som.erro();
+      if (navigator.vibrate) { try { navigator.vibrate(100); } catch(e) {} }
+    }
+    _quizOwlReact('qt-owl-live', acertou ? 'acerto' : 'erro');
+    _quizExplicacaoMostrar('qt-explicacao', pergunta);
     setTimeout(function(){
       _qtEstado.idx++;
       _qtEstado.travado = false;
@@ -524,6 +582,7 @@
     var acertos = _qtEstado.acertos;
     var total = _qtEstado.perguntas.length;
     var pct = total ? Math.round((acertos / total) * 100) : 0;
+    AngatubaGames.som.fim(pct >= 71);
     var cfg = _QT_TEMAS[_qtTemaAtual] || { label: 'isso', iniciante: 'Só de passagem', manja: 'Manja do assunto!', expert: 'Expert!' };
     var faseEl = document.getElementById('qt-fase-perguntas');
     var placarEl = document.getElementById('qt-placar');

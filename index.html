@@ -702,6 +702,15 @@
           </div>
         </button>
 
+        <button type="button" class="game-card gc-armadilha" data-cat="acao" data-nome="armadilha da coruja level devil plataforma" data-desc="chegue na bandeira fases cheias de armadilhas" onclick="_abrirJogo('armadilha')">
+          <div class="gc-media"><img src="/img/pixel/coruja-pixel-idle.png" alt="" loading="lazy" class="gc-hero-img"></div>
+          <div class="gc-body">
+            <div class="gc-title">Armadilha da Coruja</div>
+            <div class="gc-desc">Chegue na bandeira. Nada é o que parece!</div>
+            <span class="gc-cta">Jogar</span>
+          </div>
+        </button>
+
         <button type="button" class="game-card gc-pingpong" data-cat="multi" data-nome="ping pong da coruja" data-desc="sozinho contra a cpu ou 1x1 com um amigo em tempo real" onclick="_abrirJogo('pingpong')">
           <div class="gc-media"><img src="/Jogos/assets/card-pingpong.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
@@ -1550,6 +1559,14 @@
       <div id="jogo-baralho" class="jogo-tela" style="display:none;">
         <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
         <div id="baralho-root"></div>
+      </div>
+
+      <!-- TELA: Armadilha da Coruja (platformer estilo Level Devil) -->
+      <!-- Mesmo esquema de #negocios-root: Jogos/armadilha.js desenha tudo
+           (canvas, HUD, controles e menus) dentro de #armadilha-root. -->
+      <div id="jogo-armadilha" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div id="armadilha-root"></div>
       </div>
 
       <!-- TELA: Ranking da cidade (antes era o modal-rank; virou tela do hub) -->

@@ -14,8 +14,11 @@
      calculado da própria imagem (largura/4), então tanto a versão 1x
      quanto a ampliada funcionam.
    - Fases são DADOS (array FASES logo abaixo): mapa ASCII + lista de
-     armadilhas + textos + (opcional) corujas guia. Nada de código novo
-     pra criar uma fase.
+     armadilhas + textos + (opcional) corujas guia e grupos condicionais.
+     Nada de código novo pra criar uma fase (formato documentado em cima
+     do array).
+   - v357: bloco caindo/andando é sólido (carrega, empurra, esmaga — nunca
+     atravessa); no toque só o ▲ pula; 40 fases.
    - Sem backend: progresso (fase liberada) fica no localStorage.
    - Feito pra jogar DEITADO: em pé funciona, mas mostra um aviso leve
      ("Gira o celular") e, onde o navegador deixa, um botão que trava a
@@ -46,38 +49,89 @@
   var RISADAS = ['Ha ha!', 'Otário!', 'Ha ha ha!'];
 
   /* ══════════════════════════════════════════════════════════════
-     FASES — edite aqui.
-     mapa (12 linhas, todas do mesmo tamanho):
+     FASES — edite aqui. (40 fases; fase = DADOS, nada de código novo)
+
+     COMO ADICIONAR UMA FASE
+       Copie um bloco { nome, cores, mapa, armadilhas, textos } parecido,
+       cole no fim do array e mude o mapa. O menu, o HUD ("Fase N/40") e
+       o progresso (localStorage) se ajustam sozinhos ao tamanho do array.
+       Teste pela Jogos/armadilha-teste.html (carrega o .js sem minificar).
+       Física de referência: pulo máx ≈ 3 tiles de altura e ≈ 3,4 tiles de
+       distância (vão seguro: 3). Gravidade 0,45 (lua) ≈ 5,7 tiles de altura.
+
+     mapa (12 linhas, todas do mesmo tamanho; o chão costuma ser as linhas 10-11):
        .  vazio            #  chão/parede      ^  espinho (pra cima)
        v  espinho (pra baixo, no teto)         S  início da coruja
        F  bandeira         a-z  bloco de um GRUPO (pode cair/sumir/mover)
        1-9  espinho de um GRUPO (pode aparecer/sumir/mover)
-     armadilhas: { g: grupo ('a', '1'... ou 'bandeira'),
-                   gatilho: coluna (dispara quando o CENTRO da coruja passa dela),
-                   acao: 'cai' | 'some' | 'aparece' | 'move',
-                   dx/dy: tiles (só 'move'), vel: px/s (só 'move'),
-                   atraso: ms (opcional), mata: true (bloco mata ao encostar),
-                   lado: 'esq' (opcional: só dispara VOLTANDO — depois de ter
-                         passado do gatilho pra direita, ao cruzar de volta),
-                   abaixo: linha (opcional: só se os pés estão ABAIXO do topo
-                         dessa linha — ex.: caiu no buraco),
-                   acima: linha (opcional: só se os pés estão ACIMA do topo
-                         dessa linha — ex.: está pulando / na plataforma de cima) }
-     Grupo com alguma armadilha 'aparece' começa invisível.
-     Várias armadilhas podem mexer no mesmo grupo (ex.: vai e volta com atraso).
+       %  PAREDE/CHÃO FALSO: desenhado igual ao '#', mas atravessável
+          (depois que alguém passa, fica translúcido até o fim da fase)
+       ?  BLOCO INVISÍVEL: sólido, mas só aparece depois que a coruja
+          encosta nele (e continua à mostra nas próximas vidas da fase)
+
+     armadilhas: [{ g: grupo ('a', '1'... ou 'bandeira'), acao, ...condições }]
+       acao: 'cai' | 'some' | 'aparece' | 'move' | 'gravidade'
+         cai:      pousa: true → para ao bater no chão fixo (vira degrau/parede)
+         move:     dx/dy (tiles), vel (px/s)
+         gravidade (sem g): grav (fator, 0,45 = lua / 1,7 = pesado),
+                   pulo (fator do impulso), ms (duração; barrinha na cabeça)
+         mata: true → o bloco passa a matar ao encostar
+         atraso: ms entre o disparo e a ação
+       CONDIÇÕES DE DISPARO (todas as que estiverem no objeto valem juntas):
+         gatilho: coluna — dispara quando o CENTRO da coruja passa dela
+                  (sem gatilho: só as outras condições contam)
+         lado: 'esq'     só VOLTANDO (passou da coluna e cruzou de volta)
+         abaixo: linha   pés abaixo do topo da linha (ex.: caiu no buraco)
+         acima: linha    pés acima do topo da linha (ex.: pulando/lá em cima)
+         pulou: true     só se cruzar a coluna NO AR  (pular = castigo)
+         pulou: false    só se cruzar a coluna NO CHÃO (não pular = castigo)
+         pisou: true     quando a coruja PISA num bloco do grupo g
+                         (use com atraso: "chão que desaba depois que pisou")
+         tempo: ms       depois de N ms da vida — o relógio só começa no
+                         primeiro movimento (ex.: teto que desce)
+       Grupo com alguma 'aparece' começa invisível ('bandeira' também: aí ela
+       só existe — e só dá pra vencer — depois do gatilho).
+       Várias armadilhas podem mexer no mesmo grupo (vai e volta com atraso).
+
+     grupos (opcional): comportamento contínuo de um grupo, sem gatilho
+       { a: { so: 'andando' } }  existe só enquanto a coruja anda
+            so: 'parado'         existe só com ela parada (≥ 0,3 s)
+            so: 'noAr'           existe só com ela no ar (+0,12 s de folga ao pousar)
+            so: 'noChao'         existe só com ela no chão (pular = atravessar)
+       { '1': { pisca: [ligadoMs, desligadoMs, defasagemMs] } }  ritmo fixo
+       Desligado, o grupo aparece só em contorno pontilhado (dá pra ler o
+       padrão). Bloco nunca religa em cima da coruja; espinho religa, mas
+       mostra a pontinha 250 ms antes.
+
+     BLOCO EM MOVIMENTO É SÓLIDO: chão que anda/cai carrega a coruja; bloco
+     que invade empurra; se prensar contra outro sólido, esmaga.
+
      textos: { c: coluna, r: linha, t: 'texto' } — dicas desenhadas no cenário.
+
      guias (opcional): corujas "clone" que o jogador NÃO controla:
        { tipo: 'traidora' | 'confiavel',
          c, r: célula onde ela começa em pé,
-         ativa: coluna — quando o jogador passa, ela diz "Me siga" e sai andando,
+         ativa: coluna — quando o jogador passa, ela fala e sai andando,
+         fala: 'txt'      (padrão "Me siga")
+         morte: 'txt' ou ['a', 'b']  fala quando o jogador morre (padrão:
+                risada na traidora / "Era só me seguir..." na confiável)
+         fim: 'txt'       fala ao ser alcançada no fim do caminho (padrão:
+                "Obrigado pela confiança" / "Sortudo...")
+         aparece: true    fica invisível até ativar (pra "trocar" de guia
+                          no mesmo lugar em que a outra sumiu)
+         vel: px/s        (padrão 115)
          caminho: [ passos, em ordem ]
            { c }            anda até a coluna (mesma altura)
            { c, r }         pula até a célula (arco)
            { espera: ms }   para um tempo
-           { fala: 'txt' }  balão de fala
-           { aguarda: 'g' } espera o grupo g disparar e terminar (ex.: bloco cair) }
+           { fala: 'txt' }  balão de fala (a guia pode MENTIR na fala e
+                            acertar no caminho — ou o contrário)
+           { aguarda: 'g' } espera o grupo g disparar e terminar (quem
+                            dispara é o jogador: ponha o gatilho ANTES dela)
+           { some: true }   some (a próxima guia pode surgir ali) }
        A guia atravessa tudo (não sofre armadilha): quem dispara é SEMPRE o
-       jogador. Traidora: ri quando o jogador morre. Confiável: agradece no fim.
+       jogador. Traidora: ri quando o jogador morre. Confiável: agradece no
+       fim. Espera o jogador se ele ficar > 7 tiles atrás.
   ══════════════════════════════════════════════════════════════ */
   var FASES = [
     {
@@ -508,7 +562,7 @@
       textos: []
     },
     {
-      nome: 'Final',
+      nome: 'Final?',
       cores: { fundo: '#f2a541', chao: '#2b1d14', pano: '#fff6e5' },
       mapa: [
         '.....................######.....ii..............................................',
@@ -550,6 +604,709 @@
           ] }
       ],
       textos: [{ c: 2, r: 5, t: 'tudo junto agora' }]
+    },
+    {
+      // 16 — Pé leve: chão que desaba DEPOIS que você pisa (pisou + atraso)
+      nome: 'Pé leve',
+      cores: { fundo: '#9fd8cb', chao: '#123029', pano: '#fff6e5' },
+      mapa: [
+        '..........................................................',
+        '..........................................................',
+        '..........................................................',
+        '..........................................................',
+        '..........................................................',
+        '..........................................................',
+        '..........................................................',
+        '..........................................................',
+        '..........................................................',
+        '..S..................................................F....',
+        '############..aa..bb..cc..########..ddd...#####eee########',
+        '############..............########........#####eee########'
+      ],
+      armadilhas: [
+        { g: 'a', pisou: true, acao: 'cai', atraso: 450 },
+        { g: 'b', pisou: true, acao: 'cai', atraso: 450 },
+        { g: 'c', pisou: true, acao: 'cai', atraso: 450 },
+        { g: 'd', pisou: true, acao: 'cai', atraso: 220 },
+        { g: 'e', pisou: true, acao: 'cai', atraso: 250 }
+      ],
+      textos: [{ c: 2, r: 5, t: 'pé leve...' }, { c: 27, r: 5, t: 'não enrola' }, { c: 43, r: 5, t: 'tá tranquilo...' }]
+    },
+    {
+      // 17 — Não pula!: armadilha que depende de pular (pulou:true) ou NÃO pular (pulou:false)
+      nome: 'Não pula!',
+      cores: { fundo: '#f7c59f', chao: '#2e1a0e', pano: '#fff6e5' },
+      mapa: [
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '...........aaa..................................................',
+        '...........aaa..................................................',
+        '...........aaa..................................................',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '..S.......................^....^....1...........22...^....3..F..',
+        '################################################################',
+        '################################################################'
+      ],
+      armadilhas: [
+        { g: 'a', gatilho: 11, pulou: true, acao: 'cai', mata: true },
+        { g: '1', gatilho: 34.5, pulou: false, acao: 'aparece' },
+        { g: '2', gatilho: 46, pulou: true, acao: 'aparece' },
+        { g: '3', gatilho: 56.5, pulou: false, acao: 'aparece' }
+      ],
+      textos: [{ c: 8, r: 7, t: 'pula!' }, { c: 22, r: 5, t: 'pula... pula... pula!' }, { c: 43, r: 5, t: 'e agora?' }]
+    },
+    {
+      // 18 — Alçapão: o caminho óbvio (pra direita) mata; o escondido (chão falso atrás de você + túnel por baixo) salva
+      nome: 'Alçapão',
+      cores: { fundo: '#c7d3e8', chao: '#18202e', pano: '#fff6e5' },
+      mapa: [
+        '..............................................................',
+        '..............................................................',
+        '..............................................................',
+        '..............................................................',
+        '...........................###................................',
+        '.......................##..###................................',
+        '............S.......#..##..###..........^^^^^^^^^^^^^......F..',
+        '######%%#############################################%%%%#####',
+        '####.....................................................#####',
+        '####...................................................#.#####',
+        '####....................^...........^..................#.#####',
+        '##############################################################'
+      ],
+      armadilhas: [],
+      textos: [{ c: 12, r: 2, t: 'por aqui →' }, { c: 31, r: 2, t: 'quase lá!' }, { c: 9, r: 8, t: 'psiu...' }]
+    },
+    {
+      // 19 — Bloco invisível: some de primeira, óbvio na segunda (o que você toca fica à mostra)
+      nome: 'Bloco invisível',
+      cores: { fundo: '#e6d3a3', chao: '#2a2112', pano: '#fff6e5' },
+      mapa: [
+        '....................................................',
+        '....................................................',
+        '....................................................',
+        '.............................................F......',
+        '............................................###.....',
+        '............................................###.....',
+        '.........................................??.###.....',
+        '........................???.................###.....',
+        '......................................##....###.....',
+        '..S...................#.^^^.............^^^^###.....',
+        '##########..???..###################################',
+        '##########.......###################################'
+      ],
+      armadilhas: [],
+      textos: [{ c: 2, r: 5, t: 'confia no ar' }, { c: 19, r: 4, t: 'pula, ué' }, { c: 33, r: 3, t: 'lá em cima?' }]
+    },
+    {
+      // 20 — Lua: gravidade baixa por alguns segundos, depois pesada
+      nome: 'Lua',
+      cores: { fundo: '#27304a', chao: '#c9d1e6', pano: '#f2a11f' },
+      mapa: [
+        '..................#############...................................',
+        '..................vvvvvvvvvvvvv...................................',
+        '..................................................................',
+        '..................................................................',
+        '..................................................................',
+        '................##................................................',
+        '................##................................................',
+        '................##................................................',
+        '................##...................................##...........',
+        '..S.............##..............................^....##.....F.....',
+        '################################......############################',
+        '################################......############################'
+      ],
+      armadilhas: [
+        { gatilho: 10, acao: 'gravidade', grav: 0.45, pulo: 0.9, ms: 7000 },
+        { gatilho: 44, acao: 'gravidade', grav: 1.7, pulo: 1, ms: 3500 }
+      ],
+      textos: [{ c: 3, r: 5, t: 'que muro alto...' }, { c: 19, r: 4, t: 'sem pular aqui' }, { c: 41, r: 5, t: 'pesado...' }]
+    },
+    {
+      // 21 — Coruja sincera: CONFIÁVEL que mente na fala, mas o caminho dela é o certo
+      nome: 'Coruja sincera',
+      cores: { fundo: '#d4e6b5', chao: '#1d2a10', pano: '#fff6e5' },
+      mapa: [
+        '....................................................aa..........',
+        '....................................................aa..........',
+        '....................................................aa..........',
+        '....................................................aa..........',
+        '....................................................aa..........',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '..S.........#..............................1................F...',
+        '##############??????????????????################################',
+        '##############..................################################'
+      ],
+      armadilhas: [
+        { g: '1', gatilho: 41.5, pulou: false, acao: 'aparece' },
+        { g: 'a', gatilho: 47, acao: 'cai', mata: true, atraso: 350 }
+      ],
+      guias: [
+        { tipo: 'confiavel', c: 8, r: 9, ativa: 4, fala: 'Não me siga!', morte: ['Falei pra não seguir?', 'Mentira... segue sim'], fim: 'Só minto na fala :)',
+          caminho: [
+            { c: 10.6 }, { c: 13.4, r: 9 }, { fala: 'Aqui não tem chão...' }, { c: 31 }, { c: 40.4 }, { fala: 'Não pula!' },
+            { c: 44.4, r: 9 }, { c: 48.6 }, { fala: 'Corre!' }, { aguarda: 'a' }, { c: 57 }
+          ] }
+      ],
+      textos: []
+    },
+    {
+      // 22 — Só andando: ponte que só existe se você anda; espinho que nasce se você para
+      nome: 'Só andando',
+      cores: { fundo: '#f3d9e8', chao: '#321528', pano: '#fff6e5' },
+      mapa: [
+        '...............................bb.............................',
+        '...............................bb.............................',
+        '...............................bb.............................',
+        '...............................bb.............................',
+        '...............................bb.............................',
+        '.....................................................d........',
+        '.....................................................d........',
+        '.....................................................d........',
+        '.....................................................d........',
+        '..S.....................111111111111....^...^........d....F...',
+        '##########aaaaaaaaaaaa##############cccccccccccc##############',
+        '##########............##############............##############'
+      ],
+      armadilhas: [
+        { g: 'b', gatilho: 28, acao: 'cai', mata: true, atraso: 600 }
+      ],
+      grupos: { '1': { so: 'parado' }, a: { so: 'andando' }, c: { so: 'andando' }, d: { so: 'andando' } },
+      textos: [{ c: 2, r: 5, t: 'não para' }, { c: 24, r: 5, t: 'nem pra esperar' }, { c: 49, r: 5, t: 'licença...' }]
+    },
+    {
+      // 23 — Pisca-pisca: plataformas e espinhos num ritmo fixo (contorno mostra o padrão)
+      nome: 'Pisca-pisca',
+      cores: { fundo: '#1f2a3a', chao: '#b8c7dc', pano: '#f2a11f' },
+      mapa: [
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '..S.......................................11....22....3....F....',
+        '##########..aaa...bbb...ccc...ddd...############################',
+        '##########..........................############################'
+      ],
+      armadilhas: [],
+      grupos: { '1': { pisca: [800, 800, 0] }, '2': { pisca: [800, 800, 800] }, '3': { pisca: [600, 600, 300] }, a: { pisca: [1400, 1000, 0] }, b: { pisca: [1400, 1000, 1200] }, c: { pisca: [1400, 1000, 0] }, d: { pisca: [1400, 1000, 1200] } },
+      textos: [{ c: 2, r: 5, t: 'olha o ritmo' }]
+    },
+    {
+      // 24 — Ela anda no ar: TRAIDORA atravessa o buraco "andando no ar"; o chão invisível de verdade está em cima
+      nome: 'Ela anda no ar',
+      cores: { fundo: '#bfe3f2', chao: '#0f2733', pano: '#fff6e5' },
+      mapa: [
+        '............................................................',
+        '............................................................',
+        '............................................................',
+        '............................................................',
+        '............................................................',
+        '............................................................',
+        '............................................................',
+        '.............##?????????????................................',
+        '............................................................',
+        '..S........#............................11.............F....',
+        '##############..............################################',
+        '##############..............################################'
+      ],
+      armadilhas: [
+        { g: '1', gatilho: 38, pulou: true, acao: 'aparece' }
+      ],
+      guias: [
+        { tipo: 'traidora', c: 7, r: 9, ativa: 3, fala: 'Me siga, tem chão!',
+          caminho: [
+            { c: 9.6 }, { c: 12.4, r: 9 }, { c: 13.6 }, { c: 28 }, { c: 35.6 }, { fala: 'Pula aqui!' },
+            { c: 36.6 }, { c: 40.6, r: 9 }, { c: 47 }
+          ] }
+      ],
+      textos: [{ c: 12, r: 4, t: 'hm...' }]
+    },
+    {
+      // 25 — Volta pra casa: a bandeira só aparece no fim... lá no começo; na volta tudo dispara (lado:'esq')
+      nome: 'Volta pra casa',
+      cores: { fundo: '#f6e3b4', chao: '#33250b', pano: '#fff6e5' },
+      mapa: [
+        '..........bb....................................................',
+        '..........bb....................................................',
+        '..........bb....................................................',
+        '..........bb....................................................',
+        '..........bb....................................................',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '............................................##..................',
+        '..S..F........^.....2.........^.......11....##..................',
+        '##################################################aaa###########',
+        '##################################################aaa###########'
+      ],
+      armadilhas: [
+        { g: 'bandeira', gatilho: 58, acao: 'aparece' },
+        { g: 'a', gatilho: 55, lado: 'esq', acao: 'cai' },
+        { g: '1', gatilho: 42.5, lado: 'esq', acao: 'aparece' },
+        { g: '2', gatilho: 26, lado: 'esq', acao: 'move', dx: 6, vel: 120 },
+        { g: 'b', gatilho: 14.5, lado: 'esq', acao: 'cai', mata: true, atraso: 150 }
+      ],
+      textos: [{ c: 3, r: 5, t: 'cadê a bandeira?' }, { c: 50, r: 5, t: 'achou?' }]
+    },
+    {
+      // 26 — Relógio: o teto começa a descer 2 s depois do primeiro passo
+      nome: 'Relógio',
+      cores: { fundo: '#e9c46a', chao: '#2b2208', pano: '#fff6e5' },
+      mapa: [
+        '............aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.......................',
+        '............aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.......................',
+        '............aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.......................',
+        '......................................................................',
+        '......................................................................',
+        '......................................................................',
+        '......................................................................',
+        '......................................................................',
+        '......................................................................',
+        '..S.............^.....^.....^....^^....^.......................F......',
+        '###################################################...################',
+        '###################################################...################'
+      ],
+      armadilhas: [
+        { g: 'a', tempo: 2000, acao: 'move', dy: 5, vel: 15 }
+      ],
+      textos: [{ c: 2, r: 5, t: 'o teto tá com pressa' }, { c: 48, r: 5, t: 'ufa' }]
+    },
+    {
+      // 27 — Duas vozes: as duas guias falam AO MESMO TEMPO e vão por caminhos diferentes
+      nome: 'Duas vozes',
+      cores: { fundo: '#d6c9f0', chao: '#1e1633', pano: '#fff6e5' },
+      mapa: [
+        '.........................cc.....................................',
+        '.........................cc.....................................',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '...............##...##...##...##................................',
+        '................................................................',
+        '............##..................................................',
+        '............##..................................................',
+        '..S........###....^....^....^....^.........................F....',
+        '################################################################',
+        '################################################################'
+      ],
+      armadilhas: [
+        { g: 'c', gatilho: 23.6, acima: 6, acao: 'cai', mata: true }
+      ],
+      guias: [
+        { tipo: 'traidora', c: 5, r: 9, ativa: 6, fala: 'Não! Me siga!',
+          caminho: [
+            { c: 9.6 }, { c: 11.4, r: 8 }, { c: 12.6, r: 6 }, { c: 15.5, r: 4 }, { c: 20.5, r: 4 }, { c: 25.5, r: 4 },
+            { c: 30.5, r: 4 }, { fala: 'Vem!' }
+          ] },
+        { tipo: 'confiavel', c: 7, r: 9, ativa: 6, fala: 'Me siga',
+          caminho: [
+            { c: 9.6 }, { c: 11.4, r: 8 }, { c: 12.6, r: 6 }, { c: 15.4, r: 9 }, { c: 16.4 }, { c: 19.6, r: 9 },
+            { c: 21.4 }, { c: 24.6, r: 9 }, { c: 26.4 }, { c: 29.6, r: 9 }, { c: 31.4 }, { c: 34.6, r: 9 },
+            { c: 55 }
+          ] }
+      ],
+      textos: []
+    },
+    {
+      // 28 — Torre amiga: a torre que cai vira degrau (pousa); dá pra ficar em cima dela
+      nome: 'Torre amiga',
+      cores: { fundo: '#a9d6e5', chao: '#10242e', pano: '#fff6e5' },
+      mapa: [
+        '..................aa.........................dd.................',
+        '..................aa.........................dd.................',
+        '.............................................dd.................',
+        '.............................................dd.................',
+        '.............................................dd.................',
+        '................................................................',
+        '....................##..........................................',
+        '....................##........ccc...............................',
+        '....................##..........................................',
+        '..S.................##....##..............................F.....',
+        '#############################111111#############################',
+        '################################################################'
+      ],
+      armadilhas: [
+        { g: 'a', gatilho: 14, acao: 'cai', pousa: true, atraso: 300 },
+        { g: 'c', pisou: true, acao: 'cai', pousa: true, atraso: 350 },
+        { g: 'd', gatilho: 42, acao: 'cai', mata: true, atraso: 200 }
+      ],
+      textos: [{ c: 3, r: 5, t: 'muro alto...' }, { c: 13, r: 3, t: 'espera...' }, { c: 24, r: 4, t: 'sobe nela' }]
+    },
+    {
+      // 29 — Gravidade traiçoeira: na lua, pulo alto demais bate no espinho do teto
+      nome: 'Gravidade traiçoeira',
+      cores: { fundo: '#2d2640', chao: '#d8cfee', pano: '#f2a11f' },
+      mapa: [
+        '................................................................',
+        '................................................................',
+        '..........###############################.......................',
+        '..........vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv.......................',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '........................#..........................##...........',
+        '..S............^.....^..#.....^^.....^.........^...##.....F.....',
+        '################################################################',
+        '################################################################'
+      ],
+      armadilhas: [
+        { gatilho: 7, acao: 'gravidade', grav: 0.45, pulo: 0.9, ms: 6500 },
+        { gatilho: 43, acao: 'gravidade', grav: 1.7, pulo: 1, ms: 3000 }
+      ],
+      textos: [{ c: 2, r: 5, t: 'devagar...' }, { c: 42, r: 5, t: 'agora pesa' }]
+    },
+    {
+      // 30 — Confia de novo: CONFIÁVEL pula no buraco (tem chão invisível lá embaixo)
+      nome: 'Confia de novo',
+      cores: { fundo: '#b8e0d2', chao: '#0f2a20', pano: '#fff6e5' },
+      mapa: [
+        '.................................bb...........................',
+        '.................................bb...........................',
+        '.................................bb...........................',
+        '.................................bb...........................',
+        '.................................bb...........................',
+        '..............................................................',
+        '..............................................................',
+        '..............................................................',
+        '...................aa.........................................',
+        '..S......................................11.............F.....',
+        '################.........#####################################',
+        '################?????????#####################################'
+      ],
+      armadilhas: [
+        { g: 'a', pisou: true, acao: 'cai', mata: true },
+        { g: 'b', gatilho: 30, acao: 'cai', mata: true, atraso: 250 },
+        { g: '1', gatilho: 38, pulou: true, acao: 'aparece' }
+      ],
+      guias: [
+        { tipo: 'confiavel', c: 9, r: 9, ativa: 5, fala: 'Pula no buraco!',
+          caminho: [
+            { c: 15.6 }, { c: 17.5, r: 10 }, { c: 23.4 }, { c: 26, r: 9 }, { c: 31.4 }, { fala: 'Espera...' },
+            { aguarda: 'b' }, { c: 36 }, { fala: 'Sem pular' }, { c: 52 }
+          ] }
+      ],
+      textos: []
+    },
+    {
+      // 31 — Espelho: primeiro uma TRAIDORA, depois (do nada) uma CONFIÁVEL
+      nome: 'Espelho',
+      cores: { fundo: '#cfe0f5', chao: '#141f33', pano: '#fff6e5' },
+      mapa: [
+        '............................................................................',
+        '............................................................................',
+        '............................................................................',
+        '............................................................................',
+        '............................................................................',
+        '..............................................###...........................',
+        '..............................................###^^^^^^^^^^^^...............',
+        '...........................................##.%%%############...............',
+        '...........................................##.%%%...........................',
+        '..S......................................#.##.%%%.....................F.....',
+        '############..##...bb...##..################################################',
+        '############................################################################'
+      ],
+      armadilhas: [
+        { g: 'b', pisou: true, acao: 'cai', atraso: 400 }
+      ],
+      guias: [
+        { tipo: 'traidora', c: 6, r: 9, ativa: 3,
+          caminho: [
+            { c: 11.6 }, { c: 14.5, r: 9 }, { c: 19.5, r: 9 }, { fala: 'Descansa aqui' }, { espera: 900 }, { c: 24.5, r: 9 },
+            { c: 29, r: 9 }, { c: 31 }
+          ] },
+        { tipo: 'confiavel', c: 38, r: 9, ativa: 36, aparece: true, fala: 'Agora é sério. Me siga.',
+          caminho: [
+            { c: 39.6 }, { c: 41.4, r: 8 }, { c: 43.5, r: 6 }, { c: 45.4, r: 9 }, { fala: 'Por aqui.' }, { c: 62 },
+            { c: 67 }
+          ] }
+      ],
+      textos: [{ c: 50, r: 3, t: 'por cima?' }]
+    },
+    {
+      // 32 — Chão de vidro: cada pedaço cai depois que você pisa, cada vez mais rápido
+      nome: 'Chão de vidro',
+      cores: { fundo: '#dff3f7', chao: '#123038', pano: '#fff6e5' },
+      mapa: [
+        '......................................................................',
+        '......................................................................',
+        '........................................%%............................',
+        '........................................%%............................',
+        '........................................%%............................',
+        '........................................%%............................',
+        '........................................%%............................',
+        '........................................%%.......???..................',
+        '........................................##............................',
+        '..S.....................................##.....#.^^^...........F......',
+        '########aabbccddeeffgghhiijjkkll######################################',
+        '########........................######################################'
+      ],
+      armadilhas: [
+        { g: 'a', pisou: true, acao: 'cai', atraso: 400 },
+        { g: 'b', pisou: true, acao: 'cai', atraso: 400 },
+        { g: 'c', pisou: true, acao: 'cai', atraso: 400 },
+        { g: 'd', pisou: true, acao: 'cai', atraso: 400 },
+        { g: 'e', pisou: true, acao: 'cai', atraso: 250 },
+        { g: 'f', pisou: true, acao: 'cai', atraso: 250 },
+        { g: 'g', pisou: true, acao: 'cai', atraso: 250 },
+        { g: 'h', pisou: true, acao: 'cai', atraso: 250 },
+        { g: 'i', pisou: true, acao: 'cai', atraso: 120 },
+        { g: 'j', pisou: true, acao: 'cai', atraso: 120 },
+        { g: 'k', pisou: true, acao: 'cai', atraso: 120 },
+        { g: 'l', pisou: true, acao: 'cai', atraso: 120 }
+      ],
+      textos: [{ c: 2, r: 5, t: 'não olha pra baixo' }, { c: 35, r: 4, t: 'parede de novo?' }]
+    },
+    {
+      // 33 — Pula-pula: pedra que só existe NO AR, parede que some quando você pula, espinho que só nasce se você pular
+      nome: 'Pula-pula',
+      cores: { fundo: '#ffd6a5', chao: '#3a1f05', pano: '#fff6e5' },
+      mapa: [
+        '..................................................................',
+        '..................................................................',
+        '..................................................................',
+        '..................................................................',
+        '...................................d.....e........................',
+        '...................................d.....e........................',
+        '...................................d.....e........................',
+        '...................................d.....e........................',
+        '...................................d.....e........................',
+        '..S................................d.....e....1111...^......F.....',
+        '##########.aa.bb.cc.ff.###########################################',
+        '##########.............###########################################'
+      ],
+      armadilhas: [],
+      grupos: { '1': { so: 'noAr' }, a: { so: 'noAr' }, b: { so: 'noAr' }, c: { so: 'noAr' }, f: { so: 'noAr' }, d: { so: 'noChao' }, e: { so: 'noChao' } },
+      textos: [{ c: 2, r: 5, t: 'pula-pula' }, { c: 31, r: 3, t: 'atravessa' }, { c: 45, r: 5, t: 'agora não' }]
+    },
+    {
+      // 34 — Quase impossível: de primeira não dá; na segunda é óbvio
+      nome: 'Quase impossível',
+      cores: { fundo: '#f4a6a6', chao: '#330d0d', pano: '#fff6e5' },
+      mapa: [
+        '......................................................................',
+        '......................................................................',
+        '..............................bbb.....................................',
+        '..............................bbb.......##............................',
+        '..............................bbb.......##............................',
+        '........................................##............................',
+        '........................................##............................',
+        '.....................??.................##............................',
+        '........................................%%............................',
+        '..S.....F..........#.^^........^........%%............................',
+        '############aaa########################################ccc############',
+        '############aaa########################################ccc############'
+      ],
+      armadilhas: [
+        { g: 'bandeira', gatilho: 6, acao: 'move', dx: 52, vel: 320 },
+        { g: 'a', gatilho: 11, acao: 'cai' },
+        { g: 'b', gatilho: 29.5, pulou: true, acao: 'cai', mata: true },
+        { g: 'c', pisou: true, acao: 'cai', atraso: 150 }
+      ],
+      textos: [{ c: 2, r: 5, t: 'fácil!' }, { c: 36, r: 4, t: 'hm' }]
+    },
+    {
+      // 35 — Ritmo: a TRAIDORA pula quando não devia e anda quando devia pular
+      nome: 'Ritmo',
+      cores: { fundo: '#fbe7c6', chao: '#3b2a10', pano: '#fff6e5' },
+      mapa: [
+        '..................................................................',
+        '..................................................................',
+        '.....................................aaa..........................',
+        '.....................................aaa..........................',
+        '.....................................aaa..........................',
+        '..........................................#####...................',
+        '..........................................vvvvv...................',
+        '..................................................................',
+        '..................................................................',
+        '..S...........11....^........2..............^...............F.....',
+        '##################################################################',
+        '##################################################################'
+      ],
+      armadilhas: [
+        { g: '1', gatilho: 12, pulou: true, acao: 'aparece' },
+        { g: '2', gatilho: 27, pulou: false, acao: 'aparece' },
+        { g: 'a', gatilho: 35.5, pulou: true, acao: 'cai', mata: true }
+      ],
+      guias: [
+        { tipo: 'traidora', c: 6, r: 9, ativa: 3, fala: 'Pula comigo!',
+          caminho: [
+            { c: 10.4 }, { c: 14.4, r: 9 }, { c: 25.6 }, { c: 27.6 }, { c: 33.6 }, { c: 37.6, r: 9 },
+            { c: 42.4 }, { c: 46, r: 9 }, { c: 52 }
+          ] }
+      ],
+      textos: [{ c: 40, r: 3, t: 'pulinho...' }]
+    },
+    {
+      // 36 — Ela mudou de ideia: a CONFIÁVEL some e no mesmo lugar surge uma TRAIDORA
+      nome: 'Ela mudou de ideia',
+      cores: { fundo: '#e8d5f2', chao: '#27123a', pano: '#fff6e5' },
+      mapa: [
+        '...........................aa...................................................',
+        '...........................aa...................................................',
+        '...........................aa...................................................',
+        '...........................aa...................................................',
+        '...........................aa...................................................',
+        '................................................................................',
+        '................................................................................',
+        '.........................................##..##.................................',
+        '................................................................................',
+        '..S...................................#..................11.............F.......',
+        '############????????####################bbbbbbbb################################',
+        '############........####################........################################'
+      ],
+      armadilhas: [
+        { g: 'a', gatilho: 24, acao: 'cai', mata: true, atraso: 250 },
+        { g: 'b', pisou: true, acao: 'cai', atraso: 150 },
+        { g: '1', gatilho: 55, pulou: true, acao: 'aparece' }
+      ],
+      guias: [
+        { tipo: 'confiavel', c: 6, r: 9, ativa: 3,
+          caminho: [
+            { c: 11.6 }, { c: 19.6 }, { c: 24.4 }, { fala: 'Espera...' }, { aguarda: 'a' }, { c: 34 },
+            { some: true }
+          ] },
+        { tipo: 'traidora', c: 34, r: 9, ativa: 34.5, aparece: true, fala: 'Continua!',
+          caminho: [
+            { c: 36.6 }, { c: 39.4, r: 9 }, { c: 48 }, { fala: 'Vem!' }, { c: 54.4 }, { c: 58, r: 9 },
+            { c: 63 }
+          ] }
+      ],
+      textos: []
+    },
+    {
+      // 37 — Sobe e desce: elevador (sem pular!), bloco que empurra, carona na plataforma que cai
+      nome: 'Sobe e desce',
+      cores: { fundo: '#cde7b0', chao: '#16240a', pano: '#fff6e5' },
+      mapa: [
+        '.........#####..................................................',
+        '.........vvvvv..................................................',
+        '................................................................',
+        '.......................bb.......................................',
+        '.............############.ccc...................................',
+        '................................................................',
+        '................................................................',
+        '................................................................',
+        '..............................................dd................',
+        '..S.......aaa111111111111111111....^^.........dd..........F.....',
+        '################################################################',
+        '################################################################'
+      ],
+      armadilhas: [
+        { g: 'a', pisou: true, acao: 'move', dy: -5, vel: 60, atraso: 300 },
+        { g: 'b', gatilho: 15.5, acao: 'move', dx: -9, vel: 55 },
+        { g: 'c', pisou: true, acao: 'cai', pousa: true, atraso: 200 },
+        { g: 'd', gatilho: 33, acao: 'move', dx: -9, vel: 50 }
+      ],
+      textos: [{ c: 2, r: 5, t: 'sobe' }, { c: 6, r: 3, t: 'sem pular!' }]
+    },
+    {
+      // 38 — Lua cheia: gravidade baixa longa; do alto do muro, pulo alto = espinho
+      nome: 'Lua cheia',
+      cores: { fundo: '#1c2233', chao: '#dfe6f5', pano: '#f2a11f' },
+      mapa: [
+        '..............................................###########.................',
+        '..............................................vvvvvvvvvvv.................',
+        '..........................................................................',
+        '..........................................................................',
+        '..........................................................................',
+        '........................##......................##........................',
+        '..............##........##......................##........................',
+        '..............##........##......................##........................',
+        '..............##........##......................##..........##............',
+        '..S...........##........##...............111....##..........##.....F......',
+        '#################################......###################################',
+        '#################################......###################################'
+      ],
+      armadilhas: [
+        { gatilho: 6, acao: 'gravidade', grav: 0.4, pulo: 0.85, ms: 10000 }
+      ],
+      grupos: { '1': { pisca: [1000, 1000, 0] } },
+      textos: [{ c: 2, r: 5, t: 'lua cheia' }, { c: 44, r: 4, t: 'lá em cima, não' }]
+    },
+    {
+      // 39 — Mentirosa: CONFIÁVEL que fala tudo ao contrário (e acerta o caminho)
+      nome: 'Mentirosa',
+      cores: { fundo: '#f2d0a9', chao: '#2e1a08', pano: '#fff6e5' },
+      mapa: [
+        '.............................................aa.........................',
+        '.............................................aa.........................',
+        '.............................................aa.........................',
+        '.............................................aa.........................',
+        '.............................................aa.........................',
+        '........................................................................',
+        '........................................................................',
+        '........................................................................',
+        '........................................................................',
+        '..S...........11.........2........................................F.....',
+        '###############################????????#################################',
+        '###############################........#################################'
+      ],
+      armadilhas: [
+        { g: '1', gatilho: 12, pulou: true, acao: 'aparece' },
+        { g: '2', gatilho: 23, pulou: false, acao: 'aparece' },
+        { g: 'a', gatilho: 42, acao: 'cai', mata: true, atraso: 300 }
+      ],
+      guias: [
+        { tipo: 'confiavel', c: 6, r: 9, ativa: 3, fim: 'Eu só minto quando falo.', morte: ['Ué, eu avisei...', 'Olha o que eu FAÇO'],
+          caminho: [
+            { c: 10.6 }, { fala: 'Pula agora!' }, { c: 20.6 }, { fala: 'Nem pensa em pular' }, { c: 21.4 }, { c: 24.8, r: 9 },
+            { c: 30.4 }, { fala: 'Aqui não tem chão' }, { c: 39 }, { c: 42.4 }, { fala: 'Corre!' }, { aguarda: 'a' },
+            { c: 62 }
+          ] }
+      ],
+      textos: []
+    },
+    {
+      // 40 — Grande final: um pouco de tudo
+      nome: 'Grande final',
+      cores: { fundo: '#f2a541', chao: '#2b1d14', pano: '#fff6e5' },
+      mapa: [
+        '................................................................................................................',
+        '................................................................................................................',
+        '................................................................................................................',
+        '..........................##....................................................................................',
+        '..........................##....................................................................................',
+        '..........................##............##......................................................................',
+        '..........................##............##......................................................................',
+        '..........................##....??......##...............................##????????.............................',
+        '..........................%%............##......................................................................',
+        '..S.......................%%..#.^^......##......................2222...#.................33.............F.......',
+        '##########.aa..bb..#########################.....#####cccccccccc###########dddddddd#############################',
+        '##########.........#########################.....#####..........###########........#############################'
+      ],
+      armadilhas: [
+        { g: 'a', pisou: true, acao: 'cai', atraso: 300 },
+        { g: 'b', pisou: true, acao: 'cai', atraso: 300 },
+        { gatilho: 37, acao: 'gravidade', grav: 0.45, pulo: 0.9, ms: 6000 },
+        { g: 'd', pisou: true, acao: 'cai', atraso: 100 },
+        { g: '3', gatilho: 87, pulou: true, acao: 'aparece' },
+        { g: 'bandeira', gatilho: 99, acao: 'move', dy: -5, vel: 200 },
+        { g: 'bandeira', gatilho: 99, acao: 'move', dy: 5, vel: 200, atraso: 2200 }
+      ],
+      grupos: { '2': { so: 'parado' }, c: { so: 'andando' } },
+      guias: [
+        { tipo: 'confiavel', c: 5, r: 9, ativa: 3, fala: 'Última! Me siga.',
+          caminho: [
+            { c: 7.6 }, { c: 11.6, r: 9 }, { c: 15.6, r: 9 }, { c: 19.4, r: 9 }, { c: 29.4 }, { c: 30.4, r: 8 },
+            { c: 32.4, r: 6 }, { c: 33.6 }, { c: 35, r: 9 }, { fala: 'Boa sorte!' }, { espera: 600 }, { some: true }
+          ] },
+        { tipo: 'traidora', c: 70, r: 9, ativa: 68, fala: 'Última, juro!', morte: ['Ha ha!', 'Última, juro!', 'Otário!'],
+          caminho: [
+            { c: 69.6 }, { c: 72.4, r: 9 }, { c: 83 }, { c: 86.6 }, { c: 90.6, r: 9 }, { c: 95 }
+          ] }
+      ],
+      textos: [{ c: 2, r: 5, t: 'tudo junto agora' }, { c: 92, r: 5, t: 'paciência...' }]
     }
   ];
 
@@ -600,7 +1357,7 @@
         else if (ch === 'v') perigos.push({ x: c * T + 3, y: r * T, w: 10, h: 7 });
         else if (ch === 'S') inicio = { x: c * T + (T - PW) / 2, y: (r + 1) * T - PH };
         else if (ch === 'F') bandeira = { x: c * T, y: (r + 1) * T };
-        else if (_ehGrupoBloco(ch)) gdef(ch).blocos.push({ c: c, r: r });
+        else if (_ehGrupoBloco(ch) || ch === '%' || ch === '?') gdef(ch).blocos.push({ c: c, r: r });
         else if (_ehGrupoEspinho(ch)) gdef(ch).espinhos.push({ c: c, r: r });
       }
     }
@@ -645,11 +1402,14 @@
   /* ── Vida nova (reset de fase: armadilhas e guias voltam ao lugar) ── */
   function _iniciarVida() {
     grupos = {};
-    var gd = nivel.gruposDef;
+    var gd = nivel.gruposDef, cfg = fase.grupos || {};
     for (var id in gd) {
+      var gc = cfg[id] || {};
       grupos[id] = { id: id, blocos: gd[id].blocos, espinhos: gd[id].espinhos,
                      ox: 0, oy: 0, vy: 0, visivel: true, caindo: false, mata: false,
-                     alvo: null, vel: 0, surgir: 1, dx: 0, dy: 0, feito: false };
+                     alvo: null, vel: 0, surgir: 1, dx: 0, dy: 0, feito: false,
+                     falso: id === '%', oculto: id === '?', pousa: false,
+                     so: gc.so || null, pisca: gc.pisca || null, aviso: 0 };
     }
     grupos.bandeira = { id: 'bandeira', blocos: [], espinhos: [], ox: 0, oy: 0, vy: 0, visivel: true,
                         caindo: false, mata: false, alvo: null, vel: 0, surgir: 1, dx: 0, dy: 0, feito: false };
@@ -657,19 +1417,21 @@
     var lista = fase.armadilhas || [];
     for (var i = 0; i < lista.length; i++) {
       var a = lista[i];
-      if (!grupos[a.g]) continue;
+      if (!grupos[a.g] && a.acao !== 'gravidade') continue;
       if (a.acao === 'aparece') grupos[a.g].visivel = false;
-      armadilhas.push({ def: a, disparada: false, armada: false, timer: -1 });
+      armadilhas.push({ def: a, disparada: false, armada: false, timer: -1, antes: null });
     }
     p = { x: nivel.inicio.x, y: nivel.inicio.y, w: PW, h: PH, vx: 0, vy: 0, noChao: false, coyote: 0, buffer: 0,
-          olhando: 1, chaoGrupo: null, pouso: 0, visivel: true };
+          olhando: 1, chaoGrupo: null, pouso: 0, visivel: true,
+          gravF: 1, puloF: 1, efeitoT: 0, efeitoMax: 0, mexeu: false, vidaT: 0, t: 0, paradoT: 0, chaoT: 0 };
     guias = [];
     var gl = fase.guias || [];
     for (i = 0; i < gl.length; i++) {
       var d = gl[i];
       guias.push({ def: d, x: d.c * T + (T - PW) / 2, y: (d.r + 1) * T - PH, olhando: -1,
                    ativa: false, passo: 0, t: 0, emPasso: false, andando: false, noAr: false,
-                   pausa: 0, fala: '', falaT: 0, falaIdade: 0, fim: false, agradeceu: false, zombou: false });
+                   pausa: 0, fala: '', falaT: 0, falaIdade: 0, fim: false, agradeceu: false, zombou: false,
+                   visivel: !d.aparece });
     }
     particulas = [];
     estado = 'jogando';
@@ -703,14 +1465,18 @@
     }
     for (var id in grupos) {
       var g = grupos[id];
-      if (!g.visivel || !g.blocos.length) continue;
+      if (!g.visivel || !g.blocos.length || g.falso) continue;
       for (var i = 0; i < g.blocos.length; i++) {
-        var b = g.blocos[i], rb = { x: b.c * T + g.ox, y: b.r * T + g.oy, w: T, h: T, g: g };
+        var b = g.blocos[i], rb = { x: b.c * T + g.ox, y: b.r * T + g.oy, w: T, h: T, g: g, b: b };
         if (_sobrepoe(ret, rb)) out.push(rb);
       }
     }
     return out;
   }
+
+  // Encostou num bloco invisível ('?'): ele passa a ser desenhado (e continua
+  // à mostra nas próximas vidas desta fase — aprender com a morte)
+  function _tocou(s) { if (s.g && s.g.oculto && s.b && !s.b.visto) { s.b.visto = true; _som('toque'); } }
 
   function _moverX(dx) {
     if (!dx) return;
@@ -723,7 +1489,7 @@
       // desce levando a coruja): não é parede — senão ela é empurrada pra fora
       if (p.y + PH - s.y < 0.05 || s.y + s.h - p.y < 0.05) continue;
       if (dx > 0) p.x = s.x - PW; else p.x = s.x + s.w;
-      p.vx = 0;
+      p.vx = 0; _tocou(s);
     }
     if (p.x < 0) { p.x = 0; p.vx = 0; }
     if (p.x > nivel.LW - PW) { p.x = nivel.LW - PW; p.vx = 0; }
@@ -738,8 +1504,70 @@
       if (!_sobrepoe(p, s)) continue;
       if (dy > 0) { p.y = s.y - PH; p.noChao = true; p.chaoGrupo = s.g; }
       else p.y = s.y + s.h;
-      p.vy = 0;
+      p.vy = 0; _tocou(s);
     }
+  }
+
+  // Algum sólido (fixo ou bloco de grupo) ocupando o mesmo espaço da coruja?
+  function _presa(ignorar) {
+    var hs = _solidosEm(p);
+    for (var i = 0; i < hs.length; i++) {
+      var s = hs[i];
+      if (s.g && s.g === ignorar) continue;
+      // folga de 0,02 px: encostar não é estar presa
+      if (p.x < s.x + s.w - 0.02 && p.x + PW > s.x + 0.02 && p.y < s.y + s.h - 0.02 && p.y + PH > s.y + 0.02) return true;
+    }
+    return p.x < -0.02 || p.x > nivel.LW - PW + 0.02;
+  }
+
+  /* CORREÇÃO v357 — bloco em movimento/queda é SÓLIDO de verdade.
+     1) Chão que anda/cai leva a coruja junto (dá pra ficar em cima de
+        torre caindo). Descendo, se encontrar outro chão, pousa nele;
+        subindo, se bater no teto, é esmagada.
+     2) Bloco que se mexeu e invadiu a coruja EMPURRA na direção em que
+        andou (caindo por cima = empurra pra baixo; subindo = levanta;
+        de lado = empurra de lado). Se o empurrão a prensar contra outro
+        sólido, morre esmagada. Nunca atravessa. Bloco que surge do nada
+        em cima dela (acao 'aparece') continua esmagando na hora. */
+  function _carregar(g, dt) {
+    if (g.dx) {
+      p.x += g.dx;
+      if (_presa(g)) { p.x -= g.dx; }            // parede na frente: escorrega, não morre
+    }
+    if (g.dy > 0) {
+      p.y += g.dy;
+      var hs = _solidosEm(p);
+      for (var i = 0; i < hs.length; i++) {
+        var s = hs[i];
+        if (s.g === g || !_sobrepoe(p, s)) continue;
+        if (s.y >= p.y + PH - g.dy - 0.05) { p.y = s.y - PH; p.chaoGrupo = s.g; }   // pousou em outro chão
+      }
+      p.vy = Math.max(p.vy, 0);
+    } else if (g.dy < 0) {
+      p.y += g.dy;
+      if (_presa(g)) { _morrer(); return false; }
+    }
+    return true;
+  }
+
+  function _empurroes(chao, dt) {
+    for (var volta = 0; volta < 3; volta++) {
+      var hs = _solidosEm(p), s = null;
+      for (var i = 0; i < hs.length; i++) {
+        if (hs[i].g && hs[i].g !== chao && _sobrepoe(p, hs[i])) { s = hs[i]; break; }
+      }
+      if (!s) return true;
+      var g = s.g;
+      if (!g.dx && !g.dy) { _morrer(); return false; }            // surgiu em cima: esmagada
+      if (Math.abs(g.dy) >= Math.abs(g.dx)) {
+        if (g.dy > 0) { p.y = s.y + s.h; p.vy = Math.max(p.vy, g.dy / dt); }
+        else { p.y = s.y - PH; p.vy = Math.min(p.vy, 0); p.noChao = true; p.chaoGrupo = g; chao = g; }
+      } else {
+        p.x = g.dx > 0 ? s.x + s.w : s.x - PW;
+      }
+      if (_presa(null)) { _morrer(); return false; }            // prensada contra outro sólido
+    }
+    return true;
   }
 
   function _tocaPerigo() {
@@ -765,29 +1593,101 @@
 
   /* ── Armadilhas ─────────────────────────────────────────────── */
   function _executar(a) {
+    if (a.acao === 'gravidade') {
+      // Trecho de gravidade/pulo diferente por alguns segundos
+      p.gravF = a.grav || 1; p.puloF = a.pulo || 1;
+      p.efeitoT = p.efeitoMax = (a.ms || 4000) / 1000;
+      _som('mola');
+      return;
+    }
     var g = grupos[a.g];
     if (!g) return;
     g.feito = true;
     if (a.mata) g.mata = true;
-    if (a.acao === 'cai') { g.caindo = true; g.vy = 0; }
+    if (a.acao === 'cai') { g.caindo = true; g.vy = 0; g.pousa = !!a.pousa; g.alvo = null; }
     else if (a.acao === 'some') g.visivel = false;
-    else if (a.acao === 'aparece') { g.visivel = true; g.surgir = 0; }
+    else if (a.acao === 'aparece') {
+      g.visivel = true; g.surgir = 0;
+      if (a.g === 'bandeira') _brilho(nivel.bandeira.x + 8 + g.ox, nivel.bandeira.y - 20 + g.oy);
+    }
     else if (a.acao === 'move') {
       g.alvo = { x: g.ox + (a.dx || 0) * T, y: g.oy + (a.dy || 0) * T };
       g.vel = a.vel || 120;
     }
   }
 
-  // Condição de disparo: coluna do centro (+ lado/altura opcionais)
+  // Condição de disparo: coluna do centro (+ lado/altura/pulo/pisou/tempo opcionais)
   function _gatilhoOk(a, centro) {
-    var d = a.def, gx = d.gatilho * T, pes = p.y + PH;
+    var d = a.def, pes = p.y + PH;
     if (d.abaixo !== undefined && !(pes > d.abaixo * T)) return false;
     if (d.acima !== undefined && !(pes < d.acima * T)) return false;
+    if (d.tempo !== undefined && !(p.vidaT * 1000 >= d.tempo)) return false;
+    if (d.pisou && !_pisaEm(grupos[d.g])) return false;
+    if (d.gatilho === undefined) return true;
+    var gx = d.gatilho * T;
     if (d.lado === 'esq') {
       if (centro > gx) a.armada = true;
       return a.armada && centro <= gx;
     }
+    if (d.pulou !== undefined) {
+      // Só vale NO INSTANTE em que cruza a coluna: cruzou no ar (pulou:true)
+      // ou no chão (pulou:false). Cruzou do jeito "errado" = não dispara
+      // (até voltar e cruzar de novo).
+      var antes = a.antes;
+      a.antes = centro < gx;
+      if (!(antes === true && centro >= gx)) return false;
+      return d.pulou ? !p.noChao : p.noChao;
+    }
     return centro >= gx;
+  }
+
+  // Grupo "condicional" (fase.grupos): liga/desliga conforme a coruja
+  // anda/para/pula, ou pisca num ritmo fixo. Bloco nunca religa em cima
+  // dela (espera ela sair); espinho religa — mas avisa antes (contorno).
+  function _grupoQuer(g) {
+    if (g.pisca) {
+      var lig = g.pisca[0], des = g.pisca[1], per = lig + des;
+      var t = (p.t * 1000 + (g.pisca[2] || 0)) % per;
+      g.aviso = (t >= per - 250) ? 1 : 0;
+      return t < lig;
+    }
+    // Folgas pequenas pra não piscar na virada de direção / no pouso
+    if (g.so === 'andando') return p.paradoT < 0.15;
+    if (g.so === 'parado') return p.paradoT >= 0.3;
+    if (g.so === 'noAr') return !p.noChao || p.chaoT < 0.12;
+    if (g.so === 'noChao') return p.noChao;
+    return g.visivel;
+  }
+  function _ocupaCoruja(g) {
+    for (var i = 0; i < g.blocos.length; i++) {
+      var b = g.blocos[i];
+      if (_sobrepoe({ x: p.x - 0.5, y: p.y - 0.5, w: PW + 1, h: PH + 1 }, { x: b.c * T + g.ox, y: b.r * T + g.oy, w: T, h: T })) return true;
+    }
+    return false;
+  }
+
+  // Coruja em pé (no chão) em cima de algum bloco do grupo?
+  function _pisaEm(g) {
+    if (!p.noChao || !g || !g.visivel) return false;
+    var pe = { x: p.x, y: p.y + PH - 0.5, w: PW, h: 1.5 };
+    for (var i = 0; i < g.blocos.length; i++) {
+      var b = g.blocos[i];
+      if (_sobrepoe(pe, { x: b.c * T + g.ox, y: b.r * T + g.oy, w: T, h: T })) return true;
+    }
+    return false;
+  }
+
+  // Torre que cai com pousa:true para ao bater no chão fixo (vira parede/degrau)
+  function _penetracaoChao(g) {
+    var pen = 0;
+    for (var i = 0; i < g.blocos.length; i++) {
+      var b = g.blocos[i], fundo = b.r * T + g.oy + T;
+      var r = Math.floor((fundo - 0.001) / T), c0 = Math.floor((b.c * T + g.ox) / T), c1 = Math.floor((b.c * T + g.ox + T - 0.001) / T);
+      for (var c = c0; c <= c1; c++) {
+        if (_solidoEstatico(c, r) && fundo - r * T <= g.dy + 0.001) pen = Math.max(pen, fundo - r * T);
+      }
+    }
+    return pen;
   }
 
   function _atualizarArmadilhas(dt) {
@@ -808,9 +1708,18 @@
       var g = grupos[id];
       g.dx = 0; g.dy = 0;
       if (g.surgir < 1) g.surgir = Math.min(1, g.surgir + dt / 0.08);
+      if ((g.so || g.pisca) && !g.caindo) {
+        var quer = _grupoQuer(g);
+        if (quer && !g.visivel && !(g.blocos.length && _ocupaCoruja(g))) { g.visivel = true; g.surgir = 0; }
+        else if (!quer && g.visivel) g.visivel = false;
+      }
       if (g.caindo) {
         g.vy = Math.min(g.vy + GRAV * dt, 900);
         g.oy += g.vy * dt; g.dy = g.vy * dt;
+        if (g.pousa) {
+          var pen = _penetracaoChao(g);
+          if (pen > 0) { g.oy -= pen; g.dy -= pen; g.caindo = false; g.vy = 0; tremor = 0.15; _som('toque'); }
+        }
         if (g.oy > nivel.LH + 480) { g.caindo = false; g.visivel = false; }
       } else if (g.alvo) {
         var ddx = g.alvo.x - g.ox, ddy = g.alvo.y - g.oy, dist = Math.sqrt(ddx * ddx + ddy * ddy);
@@ -829,7 +1738,15 @@
     var g = grupos[id];
     if (!g) return true;
     if (!g.feito) return false;
-    if (g.caindo) return g.oy > 7 * T;
+    if (!g.visivel) return true;
+    // Caindo: só segue quando o grupo INTEIRO já passou do chão (antes ela
+    // "atravessava" a torre que ainda estava descendo)
+    if (g.caindo) {
+      var topo = Infinity;
+      for (var i = 0; i < g.blocos.length; i++) topo = Math.min(topo, g.blocos[i].r * T);
+      for (i = 0; i < g.espinhos.length; i++) topo = Math.min(topo, g.espinhos[i].r * T);
+      return topo + g.oy > nivel.LH;
+    }
     return !g.alvo;
   }
 
@@ -839,17 +1756,21 @@
       var gu = guias[i], d = gu.def, cam_ = d.caminho || [];
       gu.andando = false;
       if (!gu.ativa) {
-        if (pc >= d.ativa * T) { gu.ativa = true; gu.pausa = 0.55; _falar(gu, d.fala || 'Me siga', 1.6); }
+        if (pc >= d.ativa * T) {
+          gu.ativa = true; gu.pausa = 0.55; _falar(gu, d.fala || 'Me siga', 1.6);
+          if (!gu.visivel) { gu.visivel = true; gu.pausa = 0.35; }
+        }
         else { gu.olhando = pc < gu.x + PW / 2 ? -1 : 1; continue; }
       }
       if (gu.pausa > 0) { gu.pausa -= dt; continue; }
+      if (!gu.visivel) continue;
       if (gu.passo >= cam_.length) {
         // Fim do caminho: espera virada pro jogador
         if (!gu.fim) gu.fim = true;
         if (!gu.noAr) gu.olhando = pc < gu.x + PW / 2 ? -1 : 1;
         var perto = Math.abs(pc - (gu.x + PW / 2)) < T * 1.6 && Math.abs(p.y - gu.y) < T * 1.5;
-        if (perto && d.tipo === 'confiavel' && !gu.agradeceu) { gu.agradeceu = true; _falar(gu, 'Obrigado pela confiança', 2.2); }
-        else if (perto && d.tipo === 'traidora' && !gu.zombou) { gu.zombou = true; _falar(gu, 'Sortudo...', 1.6); }
+        if (perto && d.tipo === 'confiavel' && !gu.agradeceu) { gu.agradeceu = true; _falar(gu, d.fim || 'Obrigado pela confiança', 2.2); }
+        else if (perto && d.tipo === 'traidora' && !gu.zombou) { gu.zombou = true; _falar(gu, d.fim || 'Sortudo...', 1.6); }
         continue;
       }
       var s = cam_[gu.passo];
@@ -857,6 +1778,7 @@
       if (!gu.emPasso && s.c !== undefined && (gu.x - p.x) > GUIA_LONGE * T) continue;
       var proximo = false;
       if (s.fala !== undefined) { _falar(gu, s.fala, (s.ms || 1500) / 1000); proximo = true; }
+      else if (s.some) { gu.visivel = false; gu.falaT = 0; proximo = true; }
       else if (s.espera !== undefined) {
         gu.emPasso = true; gu.t += dt;
         if (gu.t >= s.espera / 1000) proximo = true;
@@ -891,27 +1813,35 @@
     }
   }
 
-  // A guia "da vez" (a última que o jogador ativou) reage à morte
+  // A guia "da vez" reage à morte: a ativa (e visível) mais perto da coruja
   function _guiaDaVez() {
-    var melhor = null;
+    var melhor = null, dm = Infinity;
     for (var i = 0; i < guias.length; i++) {
       var gu = guias[i];
-      if (gu.ativa && (!melhor || gu.def.ativa > melhor.def.ativa)) melhor = gu;
+      if (!gu.ativa || !gu.visivel) continue;
+      var d = Math.abs(gu.x - p.x) + Math.abs(gu.y - p.y) * 0.5;
+      if (d < dm) { dm = d; melhor = gu; }
     }
     return melhor;
   }
 
   /* ── Passo de física ────────────────────────────────────────── */
   function _passo(dt) {
-    // Plataforma que se move (não a que cai) carrega a coruja junto
-    var chao = p.noChao ? p.chaoGrupo : null;
-    _atualizarArmadilhas(dt);
-    if (chao && !chao.caindo && (chao.dx || chao.dy)) { p.x += chao.dx; p.y += chao.dy; }
-    // Bloco que apareceu/andou por cima da coruja = esmagada
-    var sob = _solidosEm(p);
-    for (var i = 0; i < sob.length; i++) if (_sobrepoe(p, sob[i]) && sob[i].g && sob[i].g !== chao) { _morrer(); return; }
-
     var dir = (inp.dir ? 1 : 0) - (inp.esq ? 1 : 0);
+    // Relógio da vida (armadilhas por tempo começam a contar no 1º movimento)
+    p.t += dt;
+    if (dir || inp.pulo) p.mexeu = true;
+    if (p.mexeu) p.vidaT += dt;
+    if (p.efeitoT > 0) { p.efeitoT -= dt; if (p.efeitoT <= 0) { p.gravF = 1; p.puloF = 1; } }
+
+    // Chão que anda OU cai carrega a coruja junto (ver _carregar)
+    var chao = p.noChao ? p.chaoGrupo : null;
+    if (chao && !chao.visivel) chao = null;
+    _atualizarArmadilhas(dt);
+    if (chao && (chao.dx || chao.dy) && !_carregar(chao, dt)) return;
+    // Bloco que andou/caiu por cima empurra; se prensar (ou surgir em cima) = esmagada
+    if (!_empurroes(chao, dt)) return;
+
     if (dir) {
       p.vx += dir * (p.noChao ? ACEL_CHAO : ACEL_AR) * dt;
       if (p.vx > VEL) p.vx = VEL;
@@ -924,26 +1854,43 @@
     p.coyote = p.noChao ? COYOTE : p.coyote - dt;
     if (p.buffer > 0) p.buffer -= dt;
     if (p.buffer > 0 && p.coyote > 0) {
-      p.vy = -PULO_V; p.buffer = 0; p.coyote = 0; p.noChao = false;
+      p.vy = -PULO_V * p.puloF; p.buffer = 0; p.coyote = 0; p.noChao = false;
       _som('pulo');
     }
-    if (!inp.pulo && p.vy < -PULO_CORTE) p.vy = -PULO_CORTE;   // pulo variável
-    p.vy = Math.min(p.vy + GRAV * dt, QUEDA_MAX);
+    if (!inp.pulo && p.vy < -PULO_CORTE * p.puloF) p.vy = -PULO_CORTE * p.puloF;   // pulo variável
+    p.vy = Math.min(p.vy + GRAV * p.gravF * dt, QUEDA_MAX);
 
     var estavaNoChao = p.noChao;
     p.noChao = false; p.chaoGrupo = null;
     _moverX(p.vx * dt);
     _moverY(p.vy * dt);
     if (p.noChao && !estavaNoChao) p.pouso = 0.09;
+    p.chaoT = p.noChao ? p.chaoT + dt : 0;
+    p.paradoT = p.noChao && Math.abs(p.vx) < 20 ? p.paradoT + dt : 0;
     if (p.pouso > 0) p.pouso -= dt;
 
     if (p.y > nivel.LH + 24 || _tocaPerigo()) { _morrer(); return; }
 
     if (guias.length) _atualizarGuias(dt);
 
+    // Parede falsa ('%'): quem atravessa descobre (fica translúcida nesta fase)
+    var gf = grupos['%'];
+    if (gf) for (var fi = 0; fi < gf.blocos.length; fi++) {
+      var bf = gf.blocos[fi];
+      if (!bf.visto && _sobrepoe(p, { x: bf.c * T, y: bf.r * T, w: T, h: T })) bf.visto = true;
+    }
+
     var b = grupos.bandeira;
     var rb = { x: nivel.bandeira.x + b.ox + 3, y: nivel.bandeira.y + b.oy - 40, w: 10, h: 40 };
-    if (_sobrepoe(p, rb)) _vencerFase();
+    if (b.visivel && _sobrepoe(p, rb)) _vencerFase();
+  }
+
+  function _brilho(x, y) {
+    for (var i = 0; i < 14; i++) {
+      var ang = Math.random() * Math.PI * 2, v = 40 + Math.random() * 90;
+      particulas.push({ x: x, y: y, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v - 60,
+                        cor: i % 2 ? '#fff6e5' : '#f2a11f', vida: 0.5 + Math.random() * 0.3, t: 2 });
+    }
   }
 
   function _morrer() {
@@ -960,7 +1907,9 @@
     // Coruja guia reage: traidora ri, confiável lamenta
     var gu = _guiaDaVez();
     if (gu) {
-      if (gu.def.tipo === 'traidora') _falar(gu, RISADAS[risos++ % RISADAS.length], T_RESPAWN_FALA);
+      var mt = gu.def.morte;
+      if (mt) _falar(gu, typeof mt === 'string' ? mt : mt[risos++ % mt.length], T_RESPAWN_FALA);
+      else if (gu.def.tipo === 'traidora') _falar(gu, RISADAS[risos++ % RISADAS.length], T_RESPAWN_FALA);
       else _falar(gu, 'Era só me seguir...', T_RESPAWN_FALA);
       timerEstado = T_RESPAWN_FALA;
     }
@@ -973,8 +1922,8 @@
     estado = 'vitoria'; timerEstado = T_VITORIA;
     for (var i = 0; i < guias.length; i++) {
       var gu = guias[i];
-      if (gu.def.tipo === 'confiavel' && gu.ativa && !gu.agradeceu) {
-        gu.agradeceu = true; _falar(gu, 'Obrigado pela confiança', T_VITORIA_FALA); timerEstado = T_VITORIA_FALA;
+      if (gu.def.tipo === 'confiavel' && gu.ativa && gu.visivel && !gu.agradeceu) {
+        gu.agradeceu = true; _falar(gu, gu.def.fim || 'Obrigado pela confiança', T_VITORIA_FALA); timerEstado = T_VITORIA_FALA;
       }
     }
     var prox = faseIdx + 1;
@@ -1090,10 +2039,16 @@
     var EXT = 600;
     for (var id in grupos) {
       var g = grupos[id];
-      if (!g.visivel || id === 'bandeira') continue;
+      if (id === 'bandeira' || g.falso) continue;
       var gx = Math.round(g.ox), gy = Math.round(g.oy);
+      if (!g.visivel) {
+        // Grupo condicional desligado: só o contorno pontilhado (dá pra ler o padrão)
+        if ((g.so || g.pisca) && !g.caindo) _contornoGrupo(g, gx, gy, g.aviso ? 0.7 : 0.28);
+        continue;
+      }
       for (var i = 0; i < g.blocos.length; i++) {
         var b = g.blocos[i], bx = b.c * T + gx, by = b.r * T + gy;
+        if (g.oculto && !b.visto) continue;
         ctx.fillRect(bx, by, T, T);
         if (b.r === nivel.H - 1) ctx.fillRect(bx, by + T, T, EXT);
         if (b.r === 0) ctx.fillRect(bx, by - EXT, T, EXT);
@@ -1109,15 +2064,34 @@
     ctx.drawImage(nivel.camada, 0, 0);
     for (i = 0; i < nivel.extBaixo.length; i++) ctx.fillRect(nivel.extBaixo[i] * T, nivel.LH, T, EXT);
     for (i = 0; i < nivel.extCima.length; i++) ctx.fillRect(nivel.extCima[i] * T, -EXT, T, EXT);
+    // Parede falsa: igualzinha à de verdade até alguém atravessar
+    var gf = grupos['%'];
+    if (gf) {
+      for (i = 0; i < gf.blocos.length; i++) {
+        var bf = gf.blocos[i];
+        ctx.globalAlpha = bf.visto ? 0.3 : 1;
+        ctx.fillRect(bf.c * T, bf.r * T, T, T);
+        if (bf.r === nivel.H - 1) ctx.fillRect(bf.c * T, nivel.LH, T, EXT);
+      }
+      ctx.globalAlpha = 1;
+    }
 
-    _desenharBandeira(cores);
+    if (grupos.bandeira.visivel) _desenharBandeira(cores);
     // Guias: mesmo sprite, levemente "fantasma" (dá pra distinguir quando encosta na sua)
     if (guias.length) {
       ctx.globalAlpha = 0.82;
-      for (i = 0; i < guias.length; i++) _desenharCoruja(guias[i], _quadroGuia(guias[i]));
+      for (i = 0; i < guias.length; i++) if (guias[i].visivel) _desenharCoruja(guias[i], _quadroGuia(guias[i]));
       ctx.globalAlpha = 1;
     }
-    if (p && p.visivel) _desenharCoruja(p, _quadroCoruja());
+    if (p && p.visivel) {
+      _desenharCoruja(p, _quadroCoruja());
+      // Gravidade/pulo alterados: barrinha de tempo em cima da cabeça
+      if (p.efeitoT > 0) {
+        var bw = Math.max(1, Math.round(16 * p.efeitoT / p.efeitoMax)), bx0 = Math.round(p.x + PW / 2 - 8), by0 = Math.round(p.y + PH - SPR_H - 5);
+        ctx.fillStyle = cores.chao; ctx.fillRect(bx0 - 1, by0 - 1, 18, 4);
+        ctx.fillStyle = p.gravF < 1 || p.puloF > 1 ? '#7fd6ff' : '#ff4a4a'; ctx.fillRect(bx0, by0, bw, 2);
+      }
+    }
 
     for (i = 0; i < particulas.length; i++) {
       var q = particulas[i];
@@ -1127,8 +2101,25 @@
     // Balões por cima de tudo
     for (i = 0; i < guias.length; i++) {
       var gu = guias[i];
-      if (gu.falaT > 0 && gu.fala) _desenharBalao(gu.fala, gu.x + PW / 2, gu.y + PH - SPR_H, gu.falaIdade, cores.chao);
+      if (gu.visivel && gu.falaT > 0 && gu.fala) _desenharBalao(gu.fala, gu.x + PW / 2, gu.y + PH - SPR_H, gu.falaIdade, cores.chao);
     }
+  }
+
+  function _contornoGrupo(g, gx, gy, alfa) {
+    ctx.globalAlpha = alfa;
+    for (var i = 0; i < g.blocos.length; i++) {
+      var bx = g.blocos[i].c * T + gx, by = g.blocos[i].r * T + gy;
+      for (var k = 0; k < T; k += 4) {
+        ctx.fillRect(bx + k, by, 2, 1); ctx.fillRect(bx + k + 2, by + T - 1, 2, 1);
+        ctx.fillRect(bx, by + k + 2, 1, 2); ctx.fillRect(bx + T - 1, by + k, 1, 2);
+      }
+    }
+    for (i = 0; i < g.espinhos.length; i++) {
+      var ex = g.espinhos[i].c * T + gx, ey = g.espinhos[i].r * T + gy;
+      ctx.fillRect(ex + 3, ey + 14, 10, 2);
+      if (g.aviso) _pintarEspinho(ctx, ex, ey + 5, false);   // pontinha saindo do chão: vai nascer
+    }
+    ctx.globalAlpha = 1;
   }
 
   function _desenharBandeira(cores) {
@@ -1236,6 +2227,9 @@
     elFasesLista.innerHTML = html;
     _esconder(elFim); _esconder(elBanner);
     _mostrar(elMenu);
+    // 40 fases: já abre rolado até a última liberada (só o overlay rola, não a página)
+    var atual = elFasesLista.querySelector('[data-fase="' + liberada + '"]');
+    if (atual) elMenu.scrollTop = Math.max(0, atual.offsetTop - elMenu.clientHeight / 2);
   }
 
   function _mostrarFim() {
@@ -1306,8 +2300,8 @@
     var r = elDpad.getBoundingClientRect();
     return x < r.left + r.width / 2 ? 'esq' : 'dir';
   }
-  function _dentroDpad(x, y) {
-    var r = elDpad.getBoundingClientRect();
+  function _dentro(el, x, y) {
+    var r = el.getBoundingClientRect();
     return x >= r.left - TOQUE_FOLGA && x <= r.right + TOQUE_FOLGA && y >= r.top - TOQUE_FOLGA && y <= r.bottom + TOQUE_FOLGA;
   }
 
@@ -1322,10 +2316,13 @@
        dispara pointercancel — o ◀ soltava sozinho. Agora cada dedo é
        lido de ev.touches (fonte da verdade), com preventDefault no
        touchstart/touchmove, e fica "preso" à zona onde começou:
-       começou no direcional = anda (◀/▶ pelo lado), senão = pula. */
+       começou no direcional = anda (◀/▶ pelo lado); começou no ▲ = pula.
+       v357: toque no CENÁRIO não pula mais (pulava sem querer ao
+       reposicionar o dedo). Dedo que começou fora dos botões fica
+       "solto" e só vira controle se escorregar pra dentro do ◀▶ ou do ▲. */
     function tocar(ev) {
       if (!wrap.classList.contains('ar-toque')) { wrap.classList.add('ar-toque'); medida.cw = 0; }
-      var jogo = false, i, t, novos = ev.type === 'touchstart';
+      var jogo = false, i, t;
       for (i = 0; i < ev.changedTouches.length; i++) if (!_ehUi(ev.changedTouches[i].target)) jogo = true;
       if (!jogo) return;
       if (ev.cancelable) ev.preventDefault();
@@ -1335,11 +2332,12 @@
         t = ev.touches[i];
         if (_ehUi(t.target)) continue;
         var id = t.identifier, zona = toques[id];
-        if (zona === undefined) {
-          zona = _dentroDpad(t.clientX, t.clientY) ? 'dpad' : 'pulo';
-          if (zona === 'pulo' && novos) _apertarPulo();
+        if (zona === undefined || zona === 'solto') {
+          if (_dentro(elDpad, t.clientX, t.clientY)) zona = 'dpad';
+          else if (_dentro(bPulo, t.clientX, t.clientY)) { zona = 'pulo'; _apertarPulo(); }
+          else zona = 'solto';
         }
-        if (zona !== 'pulo') zona = _ladoDpad(t.clientX);
+        if (zona === 'dpad' || zona === 'esq' || zona === 'dir') zona = _ladoDpad(t.clientX);
         vivos[id] = zona;
       }
       toques = vivos;
@@ -1373,12 +2371,10 @@
       puloPonteiros[ev.pointerId] = true; _apertarPulo(); _recalcEntrada();
     }
     function soltaPulo(ev) { if (ehToque(ev)) return; delete puloPonteiros[ev.pointerId]; _recalcEntrada(); }
-    // Botão ▲ e também um clique em qualquer ponto do cenário = pular
-    [bPulo, canvas].forEach(function (el) {
-      el.addEventListener('pointerdown', apertaPulo);
-      el.addEventListener('pointerup', soltaPulo);
-      el.addEventListener('pointercancel', soltaPulo);
-    });
+    // Só o botão ▲ pula (v357: clique/toque no cenário não pula mais)
+    bPulo.addEventListener('pointerdown', apertaPulo);
+    bPulo.addEventListener('pointerup', soltaPulo);
+    bPulo.addEventListener('pointercancel', soltaPulo);
     wrap.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
   }
 
@@ -1455,7 +2451,7 @@
             '<div class="ar-titulo">Armadilha da Coruja</div>' +
             '<div class="ar-desc">Leve a coruja até a bandeira. Nada é o que parece: morreu, volta na hora. E cuidado com quem diz "me siga"...</div>' +
             '<div class="ar-fases" id="ar-fases"></div>' +
-            '<div class="ar-dica">◀ ▶ andar · ▲ ou toque na tela pula (segure = mais alto)<br>Teclado: setas/A D · espaço/↑/W · R reinicia</div>' +
+            '<div class="ar-dica">◀ ▶ andar · ▲ pula (segure = mais alto)<br>Teclado: setas/A D · espaço/↑/W · R reinicia</div>' +
           '</div>' +
         '</div>' +
         '<div class="ar-overlay" id="ar-fim" style="display:none">' +
@@ -1494,7 +2490,7 @@
     root.querySelector('#ar-btn-fases').addEventListener('click', _abrirMenu);
     elBtnGirar.addEventListener('click', function (ev) { ev.currentTarget.blur(); _deitarTela(); });
     root.querySelector('#ar-btn-girar-x').addEventListener('click', function () { girarFechado = true; _atualizarAvisoGirar(); });
-    // Botões do HUD/aviso não podem "vazar" o clique do mouse pro canvas (senão pula)
+    // Botões do HUD/aviso não "vazam" o clique do mouse pro jogo
     root.querySelectorAll('.ar-hud-btn, .ar-girar button').forEach(function (b) {
       b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
     });
@@ -1545,7 +2541,7 @@
       return { estado: estado, fase: faseIdx, mortes: mortesTotal, mortesFase: mortesFase,
                p: p ? { x: p.x, y: p.y, vx: p.vx, noChao: p.noChao } : null,
                inp: { esq: inp.esq, dir: inp.dir, pulo: inp.pulo },
-               guias: guias.map(function (g) { return { x: g.x, y: g.y, tipo: g.def.tipo, ativa: g.ativa, passo: g.passo, fala: g.falaT > 0 ? g.fala : '' }; }) };
+               guias: guias.map(function (g) { return { x: g.x, y: g.y, tipo: g.def.tipo, ativa: g.ativa, passo: g.passo, visivel: g.visivel, fala: g.falaT > 0 ? g.fala : '' }; }) };
     }
   };
 })();

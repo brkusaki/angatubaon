@@ -129,15 +129,18 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-armadilha .jogo-voltar {
 @keyframes arBanner { from { transform: translate(-50%, -50%) scale(.6); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
 
 /* ── Overlays (menu de fases / fim) ──────────────────────────── */
+/* align-items:flex-start + margin:auto na caixa = centraliza quando cabe e,
+   quando não cabe (40 fases em pé), rola a partir do topo — com
+   align-items:center o começo da lista ficava cortado e inalcançável */
 .ar-overlay {
   position: absolute; inset: 0; z-index: 7;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: flex-start; justify-content: center;
   padding: 60px 16px 24px;
   background: rgba(9, 14, 22, 0.55);
   overflow-y: auto;
 }
 .ar-caixa {
-  width: 100%; max-width: 380px;
+  width: 100%; max-width: 380px; margin: auto;
   display: flex; flex-direction: column; align-items: center; gap: 10px;
   padding: 18px 16px; border-radius: 20px;
   background: #16161d; color: #fff; text-align: center;
@@ -151,8 +154,8 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-armadilha .jogo-voltar {
 .ar-titulo { font: 900 20px/1.15 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .02em; }
 .ar-desc { font-size: 13px; line-height: 1.45; color: rgba(255, 255, 255, 0.78); }
 .ar-dica { font-size: 11px; line-height: 1.5; color: rgba(255, 255, 255, 0.55); }
-/* Fases em grade (são 15): cabe em pé e deitado sem rolar muito */
-.ar-fases { width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin: 4px 0; }
+/* Fases em grade (são 40): em pé 4 por linha, deitado 8 — o menu rola até a fase liberada */
+.ar-fases { width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; margin: 4px 0; }
 .ar-fases .ar-fase-btn { flex-direction: column; justify-content: center; gap: 5px; padding: 9px 6px; text-align: center; }
 .ar-fases .ar-fase-nome { font-size: 11px; line-height: 1.15; }
 .ar-fase-btn, .ar-btn {
@@ -180,6 +183,7 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-armadilha .jogo-voltar {
   .ar-caixa { max-width: 640px; padding: 12px 14px; gap: 8px; }
   .ar-menu-owl { display: none; }
   .ar-titulo { font-size: 17px; }
-  .ar-fases { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .ar-fases { grid-template-columns: repeat(8, 1fr); gap: 6px; }
+  .ar-fases .ar-fase-nome { font-size: 10px; }
   .ar-fases .ar-fase-btn { padding: 7px 4px; }
 }

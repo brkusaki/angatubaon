@@ -60,7 +60,9 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-armadilha .jogo-voltar {
 .ar-controles {
   position: absolute; z-index: 3; left: 0; right: 0;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
-  padding: 0 14px;
+  /* Longe da borda + área segura (notch/câmera quando deitado): a borda
+     esquerda é zona de gesto do sistema — o ◀ não pode ficar grudado nela */
+  padding: 0 calc(env(safe-area-inset-right, 0px) + 18px) 0 calc(env(safe-area-inset-left, 0px) + 18px);
   display: flex; justify-content: space-between; align-items: flex-end;
   pointer-events: none;
 }
@@ -77,10 +79,42 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-armadilha .jogo-voltar {
 .ar-pulo { width: 88px; height: 88px; border-radius: 50%; font-size: 30px; padding: 0; cursor: pointer; }
 .ar-seta.ar-on, .ar-pulo.ar-on { background: rgba(9, 14, 22, 0.7); transform: scale(.93); }
 
-/* Mouse + teclado (desktop): esconde os botões de toque */
+/* Mouse + teclado (desktop): esconde os botões de toque — a não ser que
+   a tela tenha recebido um toque de verdade (notebook/tablet híbrido) */
 @media (hover: hover) and (pointer: fine) {
-  .ar-controles { display: none; }
+  .ar-wrap:not(.ar-toque) .ar-controles { display: none; }
 }
+
+/* Deitado (celular): botões um pouco menores; a fase é desenhada acima deles */
+@media (orientation: landscape) and (max-height: 540px) {
+  .ar-controles { bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); }
+  .ar-seta { width: 64px; height: 58px; border-radius: 18px; font-size: 22px; }
+  .ar-pulo { width: 70px; height: 70px; font-size: 26px; }
+  .ar-dpad { gap: 8px; }
+}
+
+/* ── Aviso "gira o celular" (só aparece em pé, com controles de toque) ── */
+.ar-girar {
+  position: absolute; z-index: 8; left: 50%; transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top, 0px) + 50px);
+  display: flex; align-items: center; gap: 8px;
+  max-width: calc(100% - 24px); padding: 6px 6px 6px 12px;
+  background: rgba(9, 14, 22, 0.78); color: #fff; border-radius: 999px;
+  font: 700 12px/1.2 ui-monospace, Menlo, Consolas, monospace;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  animation: arGirarIn .3s ease;
+}
+.ar-girar-ico { display: inline-block; font-size: 15px; animation: arGirarIco 2.4s ease-in-out infinite; }
+.ar-girar-txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ar-girar-btn, .ar-girar-x {
+  flex: 0 0 auto; height: 28px; border: none; border-radius: 999px; cursor: pointer;
+  font: 800 12px/1 ui-monospace, Menlo, Consolas, monospace;
+}
+.ar-girar-btn { padding: 0 10px; background: #f2a541; color: #2b1d14; }
+.ar-girar-x { width: 28px; padding: 0; background: rgba(255, 255, 255, 0.12); color: #fff; }
+@keyframes arGirarIn { from { opacity: 0; transform: translate(-50%, -6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes arGirarIco { 0%, 55%, 100% { transform: rotate(0); } 70%, 90% { transform: rotate(-90deg); } }
 
 /* ── Banner "fase concluída" ─────────────────────────────────── */
 .ar-banner {
@@ -103,7 +137,7 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-armadilha .jogo-voltar {
   overflow-y: auto;
 }
 .ar-caixa {
-  width: 100%; max-width: 360px;
+  width: 100%; max-width: 380px;
   display: flex; flex-direction: column; align-items: center; gap: 10px;
   padding: 18px 16px; border-radius: 20px;
   background: #16161d; color: #fff; text-align: center;
@@ -117,7 +151,10 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-armadilha .jogo-voltar {
 .ar-titulo { font: 900 20px/1.15 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .02em; }
 .ar-desc { font-size: 13px; line-height: 1.45; color: rgba(255, 255, 255, 0.78); }
 .ar-dica { font-size: 11px; line-height: 1.5; color: rgba(255, 255, 255, 0.55); }
-.ar-fases { width: 100%; display: flex; flex-direction: column; gap: 8px; margin: 4px 0; }
+/* Fases em grade (são 15): cabe em pé e deitado sem rolar muito */
+.ar-fases { width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin: 4px 0; }
+.ar-fases .ar-fase-btn { flex-direction: column; justify-content: center; gap: 5px; padding: 9px 6px; text-align: center; }
+.ar-fases .ar-fase-nome { font-size: 11px; line-height: 1.15; }
 .ar-fase-btn, .ar-btn {
   width: 100%; display: flex; align-items: center; gap: 12px;
   padding: 11px 14px; border-radius: 14px; cursor: pointer;
@@ -136,3 +173,13 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-armadilha .jogo-voltar {
 .ar-fase-btn.ar-travada .ar-fase-num { background: #1b1b22; color: inherit; }
 .ar-btn { justify-content: center; text-align: center; }
 .ar-btn-sec { background: #2a2a33; color: #fff; box-shadow: 0 4px 0 #15151a; }
+
+/* Deitado e baixinho: menu mais largo e compacto (sem a coruja grande) */
+@media (orientation: landscape) and (max-height: 540px) {
+  .ar-overlay { padding: 52px 16px 12px; align-items: flex-start; }
+  .ar-caixa { max-width: 640px; padding: 12px 14px; gap: 8px; }
+  .ar-menu-owl { display: none; }
+  .ar-titulo { font-size: 17px; }
+  .ar-fases { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .ar-fases .ar-fase-btn { padding: 7px 4px; }
+}

@@ -14,8 +14,12 @@
      calculado da própria imagem (largura/4), então tanto a versão 1x
      quanto a ampliada funcionam.
    - Fases são DADOS (array FASES logo abaixo): mapa ASCII + lista de
-     armadilhas + textos. Nada de código novo pra criar uma fase.
+     armadilhas + textos + (opcional) corujas guia. Nada de código novo
+     pra criar uma fase.
    - Sem backend: progresso (fase liberada) fica no localStorage.
+   - Feito pra jogar DEITADO: em pé funciona, mas mostra um aviso leve
+     ("Gira o celular") e, onde o navegador deixa, um botão que trava a
+     orientação só enquanto o jogo está aberto.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -33,8 +37,13 @@
   var PW = 12, PH = 18;                         // hitbox da coruja
   var MIN_TILES_LARG = 15;                      // mínimo de tiles visíveis na largura
   var T_RESPAWN = 0.5, T_VITORIA = 1.1;
+  var T_RESPAWN_FALA = 1.05, T_VITORIA_FALA = 2.0;   // pausas maiores quando a guia fala
+  var GUIA_VEL = 115, GUIA_LONGE = 7;           // guia: px/s andando; espera se o jogador ficar > N tiles atrás
+  var FONTE = '700 7px ui-monospace, Menlo, Consolas, monospace';
+  var TOQUE_FOLGA = 22;                         // px CSS de folga em volta do ◀ ▶ (dedo gordo)
 
   var CORES_PENAS = ['#5b6b7f', '#d6bf9c', '#f2a11f', '#ff4a4a', '#1c212b', '#c4ab8a'];
+  var RISADAS = ['Ha ha!', 'Otário!', 'Ha ha ha!'];
 
   /* ══════════════════════════════════════════════════════════════
      FASES — edite aqui.
@@ -42,14 +51,33 @@
        .  vazio            #  chão/parede      ^  espinho (pra cima)
        v  espinho (pra baixo, no teto)         S  início da coruja
        F  bandeira         a-z  bloco de um GRUPO (pode cair/sumir/mover)
-       1-9  espinho de um GRUPO (pode aparecer/mover)
+       1-9  espinho de um GRUPO (pode aparecer/sumir/mover)
      armadilhas: { g: grupo ('a', '1'... ou 'bandeira'),
                    gatilho: coluna (dispara quando o CENTRO da coruja passa dela),
                    acao: 'cai' | 'some' | 'aparece' | 'move',
                    dx/dy: tiles (só 'move'), vel: px/s (só 'move'),
-                   atraso: ms (opcional), mata: true (bloco mata ao encostar) }
+                   atraso: ms (opcional), mata: true (bloco mata ao encostar),
+                   lado: 'esq' (opcional: só dispara VOLTANDO — depois de ter
+                         passado do gatilho pra direita, ao cruzar de volta),
+                   abaixo: linha (opcional: só se os pés estão ABAIXO do topo
+                         dessa linha — ex.: caiu no buraco),
+                   acima: linha (opcional: só se os pés estão ACIMA do topo
+                         dessa linha — ex.: está pulando / na plataforma de cima) }
      Grupo com alguma armadilha 'aparece' começa invisível.
+     Várias armadilhas podem mexer no mesmo grupo (ex.: vai e volta com atraso).
      textos: { c: coluna, r: linha, t: 'texto' } — dicas desenhadas no cenário.
+     guias (opcional): corujas "clone" que o jogador NÃO controla:
+       { tipo: 'traidora' | 'confiavel',
+         c, r: célula onde ela começa em pé,
+         ativa: coluna — quando o jogador passa, ela diz "Me siga" e sai andando,
+         caminho: [ passos, em ordem ]
+           { c }            anda até a coluna (mesma altura)
+           { c, r }         pula até a célula (arco)
+           { espera: ms }   para um tempo
+           { fala: 'txt' }  balão de fala
+           { aguarda: 'g' } espera o grupo g disparar e terminar (ex.: bloco cair) }
+       A guia atravessa tudo (não sofre armadilha): quem dispara é SEMPRE o
+       jogador. Traidora: ri quando o jogador morre. Confiável: agradece no fim.
   ══════════════════════════════════════════════════════════════ */
   var FASES = [
     {
@@ -137,21 +165,410 @@
       textos: [
         { c: 3, r: 5, t: 'boa sorte :)' }
       ]
+    },
+    {
+      nome: 'Não pare',
+      cores: { fundo: '#9bd17a', chao: '#1d2b16', pano: '#fff6e5' },
+      mapa: [
+        '....................................................',
+        '....................................................',
+        '....................................................',
+        '....................................................',
+        '....................................................',
+        '....................................................',
+        '....................................................',
+        '....................................................',
+        '....................................................',
+        '..S....................................11......F....',
+        '##########abcdefghijkl########...###################',
+        '##########............########...###################'
+      ],
+      armadilhas: [
+        { g: 'a', gatilho: 10.5, acao: 'cai', atraso: 150 },
+        { g: 'b', gatilho: 11.5, acao: 'cai', atraso: 150 },
+        { g: 'c', gatilho: 12.5, acao: 'cai', atraso: 150 },
+        { g: 'd', gatilho: 13.5, acao: 'cai', atraso: 150 },
+        { g: 'e', gatilho: 14.5, acao: 'cai', atraso: 150 },
+        { g: 'f', gatilho: 15.5, acao: 'cai', atraso: 150 },
+        { g: 'g', gatilho: 16.5, acao: 'cai', atraso: 150 },
+        { g: 'h', gatilho: 17.5, acao: 'cai', atraso: 150 },
+        { g: 'i', gatilho: 18.5, acao: 'cai', atraso: 150 },
+        { g: 'j', gatilho: 19.5, acao: 'cai', atraso: 150 },
+        { g: 'k', gatilho: 20.5, acao: 'cai', atraso: 150 },
+        { g: 'l', gatilho: 21.5, acao: 'cai', atraso: 150 },
+        { g: '1', gatilho: 36, acao: 'aparece' }
+      ],
+      textos: [{ c: 2, r: 5, t: 'o chão tá cansado' }, { c: 23, r: 5, t: 'ufa...' }]
+    },
+    {
+      nome: 'Pra trás',
+      cores: { fundo: '#b7a6e8', chao: '#221a3b', pano: '#fff6e5' },
+      mapa: [
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '..S.........1..............................F....',
+        '####################aaa#########################',
+        '####################aaa#########################'
+      ],
+      armadilhas: [
+        { g: 'bandeira', gatilho: 37, acao: 'move', dy: -6, vel: 220 },
+        { g: 'bandeira', gatilho: 37, acao: 'move', dx: -35, vel: 320, atraso: 450 },
+        { g: 'bandeira', gatilho: 37, acao: 'move', dy: 6, vel: 220, atraso: 2300 },
+        { g: 'a', gatilho: 26, lado: 'esq', acao: 'cai' },
+        { g: '1', gatilho: 16, lado: 'esq', acao: 'aparece' }
+      ],
+      textos: [{ c: 28, r: 5, t: 'tá quase!' }]
+    },
+    {
+      nome: 'Espinhos andantes',
+      cores: { fundo: '#f0c75e', chao: '#2e2410', pano: '#fff6e5' },
+      mapa: [
+        '............................................................',
+        '............................................................',
+        '............................................................',
+        '............................................................',
+        '............................................................',
+        '............................................................',
+        '............................................................',
+        '............................................................',
+        '............................................................',
+        '..S...........1.........22......3...........^...4......F....',
+        '############################################################',
+        '############################################################'
+      ],
+      armadilhas: [
+        { g: '1', gatilho: 6, acao: 'move', dx: -6, vel: 90 },
+        { g: '2', gatilho: 16, acao: 'move', dx: -7, vel: 150 },
+        { g: '3', gatilho: 29.5, acao: 'move', dx: 4, vel: 105 },
+        { g: '4', gatilho: 43.5, acao: 'aparece' }
+      ],
+      textos: [{ c: 2, r: 5, t: 'eles andam?' }]
+    },
+    {
+      nome: 'Chuva de teto',
+      cores: { fundo: '#8fb8de', chao: '#14202e', pano: '#fff6e5' },
+      mapa: [
+        '.........aa......bb......cc......dd..ee......ff.........',
+        '.........aa......bb......cc......dd..ee......ff.........',
+        '.........aa......bb......cc......dd..ee......ff.........',
+        '.........aa......bb......cc......dd..ee......ff.........',
+        '.........aa......bb......cc......dd..ee......ff.........',
+        '........................................................',
+        '........................................................',
+        '........................................................',
+        '........................................................',
+        '..S.................................................F...',
+        '########################################################',
+        '########################################################'
+      ],
+      armadilhas: [
+        { g: 'a', gatilho: 7, acao: 'cai', mata: true },
+        { g: 'b', gatilho: 14, acao: 'cai', mata: true, atraso: 250 },
+        { g: 'c', gatilho: 29, acao: 'cai', mata: true },
+        { g: 'd', gatilho: 31, acao: 'cai', mata: true },
+        { g: 'e', gatilho: 31, acao: 'cai', mata: true, atraso: 600 },
+        { g: 'f', gatilho: 47.2, acao: 'cai', mata: true }
+      ],
+      textos: [{ c: 2, r: 6, t: 'olha pra cima' }]
+    },
+    {
+      nome: 'Espinho tímido',
+      cores: { fundo: '#e89aa8', chao: '#2d141a', pano: '#fff6e5' },
+      mapa: [
+        '...........######..............#######................',
+        '...........######..............#######................',
+        '...........######..............#######................',
+        '...........######..............#######................',
+        '...........######..............#######................',
+        '...........######..............#######................',
+        '...........vvvvvv..............#######................',
+        '...............................vvvvvvv................',
+        '......................................................',
+        '..S.........111.........^^.......222.............F....',
+        '######################################################',
+        '######################################################'
+      ],
+      armadilhas: [
+        { g: '1', gatilho: 10.5, acao: 'some' },
+        { g: '2', gatilho: 31.5, acao: 'some' }
+      ],
+      textos: [{ c: 3, r: 4, t: 'espinho tímido...' }, { c: 20, r: 5, t: '...esse não' }]
+    },
+    {
+      nome: 'Plataforma fujona',
+      cores: { fundo: '#7fd6c2', chao: '#10281f', pano: '#fff6e5' },
+      mapa: [
+        '........................................................',
+        '........................................................',
+        '........................................................',
+        '........................................................',
+        '........................................................',
+        '........................................................',
+        '........................................................',
+        '........................................................',
+        '........................................##..............',
+        '..S.............aaa.................bb..............F...',
+        '##############........############...........###########',
+        '##############........############^^^^^^^^^^^###########'
+      ],
+      armadilhas: [
+        { g: 'a', gatilho: 11.5, acao: 'move', dx: 4, vel: 150 },
+        { g: 'a', gatilho: 11.5, acao: 'move', dx: -4, vel: 150, atraso: 1600 },
+        { g: 'b', gatilho: 36, acao: 'move', dy: 3, vel: 55 }
+      ],
+      textos: [{ c: 3, r: 5, t: 'paciência' }]
+    },
+    {
+      nome: 'Me siga',
+      cores: { fundo: '#c9b7e0', chao: '#221733', pano: '#fff6e5' },
+      mapa: [
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '...................##...##...##.................',
+        '................................................',
+        '..S............##..........................F....',
+        '#################aaaaaaaaaaaaaa#################',
+        '#################..............#################'
+      ],
+      armadilhas: [
+        { g: 'a', gatilho: 19.5, acao: 'cai' }
+      ],
+      guias: [
+        { tipo: 'traidora', c: 12, r: 9, ativa: 5,
+          caminho: [
+            { c: 13.6 },
+            { c: 15.6, r: 8 },
+            { c: 18, r: 9 },
+            { c: 34 },
+            { fala: 'Vem!' }
+          ] }
+      ],
+      textos: []
+    },
+    {
+      nome: 'Pula aqui',
+      cores: { fundo: '#f5a97f', chao: '#2e160c', pano: '#fff6e5' },
+      mapa: [
+        '........................................................',
+        '........................................................',
+        '........................................................',
+        '........................................................',
+        '........................................................',
+        '......................111111111111......................',
+        '................##################......................',
+        '........................................................',
+        '.............##.........................................',
+        '..S.......##.##......#.....#..........^...........F.....',
+        '########################################################',
+        '########################################################'
+      ],
+      armadilhas: [
+        { g: '1', gatilho: 21, acima: 7, acao: 'aparece' }
+      ],
+      guias: [
+        { tipo: 'traidora', c: 7, r: 9, ativa: 3,
+          caminho: [
+            { c: 8.6 },
+            { c: 10.6, r: 8 },
+            { c: 13.6, r: 7 },
+            { c: 16.6, r: 5 },
+            { c: 33 },
+            { c: 36, r: 9 },
+            { c: 40 }
+          ] }
+      ],
+      textos: []
+    },
+    {
+      nome: 'Confia?',
+      cores: { fundo: '#a8d8ea', chao: '#0f2530', pano: '#fff6e5' },
+      mapa: [
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '................................................',
+        '..................11............................',
+        '..................##............................',
+        '..S........................................F....',
+        '################........########################',
+        '################bbbbbbbb########################'
+      ],
+      armadilhas: [
+        { g: 'b', gatilho: 16, abaixo: 10, acao: 'aparece' },
+        { g: '1', gatilho: 16.8, acima: 10, acao: 'aparece' }
+      ],
+      guias: [
+        { tipo: 'confiavel', c: 12, r: 9, ativa: 4,
+          caminho: [
+            { c: 15.3 },
+            { c: 17, r: 10 },
+            { c: 22.6 },
+            { c: 25, r: 9 },
+            { c: 30 }
+          ] }
+      ],
+      textos: []
+    },
+    {
+      nome: 'Caminho de cima',
+      cores: { fundo: '#b5d99c', chao: '#18260f', pano: '#fff6e5' },
+      mapa: [
+        '.......................dd...........................',
+        '.......................dd...........................',
+        '.......................dd...........................',
+        '.......................dd...........................',
+        '.......................dd...........................',
+        '....................................................',
+        '....................................................',
+        '..................##...##...##......................',
+        '....................................................',
+        '..S...........##..............................F.....',
+        '##################aaaaaaaaaaaa######################',
+        '##################aaaaaaaaaaaa######################'
+      ],
+      armadilhas: [
+        { g: 'a', gatilho: 19.5, abaixo: 9, acao: 'cai' },
+        { g: 'd', gatilho: 18.8, acima: 8, acao: 'cai', mata: true, atraso: 400 }
+      ],
+      guias: [
+        { tipo: 'confiavel', c: 10, r: 9, ativa: 3,
+          caminho: [
+            { c: 12.6 },
+            { c: 14.5, r: 8 },
+            { c: 18.5, r: 6 },
+            { c: 19.4 },
+            { fala: 'Espera...' },
+            { aguarda: 'd' },
+            { c: 23.5, r: 6 },
+            { c: 28.5, r: 6 },
+            { c: 31.5, r: 9 },
+            { c: 34 }
+          ] }
+      ],
+      textos: []
+    },
+    {
+      nome: 'Duas corujas',
+      cores: { fundo: '#e0c3f0', chao: '#26143a', pano: '#fff6e5' },
+      mapa: [
+        '............######....aa..............................................',
+        '............######....aa..............................................',
+        '............######....aa..............................................',
+        '............######....aa..............................................',
+        '............######....aa..............................................',
+        '............######....................................................',
+        '............vvvvvv.............................22.....................',
+        '..........................................##...##...##................',
+        '......................................................................',
+        '..S..........111......................##..................^.......F...',
+        '######################################################################',
+        '######################################################################'
+      ],
+      armadilhas: [
+        { g: '1', gatilho: 11, acao: 'some' },
+        { g: 'a', gatilho: 18, acao: 'cai', mata: true, atraso: 400 },
+        { g: '2', gatilho: 45.5, acima: 9, acao: 'aparece' }
+      ],
+      guias: [
+        { tipo: 'confiavel', c: 8, r: 9, ativa: 2,
+          caminho: [
+            { c: 11.2 },
+            { aguarda: '1' },
+            { c: 19 },
+            { fala: 'Espera...' },
+            { aguarda: 'a' },
+            { c: 28 }
+          ] },
+        { tipo: 'traidora', c: 35, r: 9, ativa: 30,
+          caminho: [
+            { c: 36.6 },
+            { c: 38.5, r: 8 },
+            { c: 42.5, r: 6 },
+            { c: 47.5, r: 6 },
+            { c: 52.5, r: 6 },
+            { c: 55, r: 9 },
+            { c: 56 }
+          ] }
+      ],
+      textos: []
+    },
+    {
+      nome: 'Final',
+      cores: { fundo: '#f2a541', chao: '#2b1d14', pano: '#fff6e5' },
+      mapa: [
+        '.....................######.....ii..............................................',
+        '.....................######.....ii..............................................',
+        '.....................######.....ii..............................................',
+        '.....................######.....ii..............................................',
+        '.....................######.....ii..............................................',
+        '.....................######.....................................................',
+        '.....................vvvvvv.....................................................',
+        '.....................................................##...##....................',
+        '................................................................................',
+        '..S...................111...................2....##....................3...F....',
+        '########abcdefgh###################################xxxxxxxxxxxx#################',
+        '########........###################################............#################'
+      ],
+      armadilhas: [
+        { g: 'a', gatilho: 8.5, acao: 'cai', atraso: 150 },
+        { g: 'b', gatilho: 9.5, acao: 'cai', atraso: 150 },
+        { g: 'c', gatilho: 10.5, acao: 'cai', atraso: 150 },
+        { g: 'd', gatilho: 11.5, acao: 'cai', atraso: 150 },
+        { g: 'e', gatilho: 12.5, acao: 'cai', atraso: 150 },
+        { g: 'f', gatilho: 13.5, acao: 'cai', atraso: 150 },
+        { g: 'g', gatilho: 14.5, acao: 'cai', atraso: 150 },
+        { g: 'h', gatilho: 15.5, acao: 'cai', atraso: 150 },
+        { g: '1', gatilho: 20, acao: 'some' },
+        { g: 'i', gatilho: 29, acao: 'cai', mata: true, atraso: 250 },
+        { g: '2', gatilho: 37, acao: 'move', dx: -5, vel: 140 },
+        { g: 'x', gatilho: 53.5, acao: 'cai' },
+        { g: '3', gatilho: 68.5, acao: 'aparece' }
+      ],
+      guias: [
+        { tipo: 'traidora', c: 47, r: 9, ativa: 42,
+          caminho: [
+            { c: 48.6 },
+            { c: 50.5, r: 8 },
+            { c: 52, r: 9 },
+            { c: 64 },
+            { fala: 'Última, juro!' }
+          ] }
+      ],
+      textos: [{ c: 2, r: 5, t: 'tudo junto agora' }]
     }
   ];
 
   /* ── Estado do módulo ───────────────────────────────────────── */
   var root = null, wrap, canvas, ctx, elFase, elMortes, elMenu, elFim, elBanner, elControles, elFasesLista;
+  var elGirar, elBtnGirar, elDpad;
   var img = new Image(), imgOk = false;
   var montado = false, ativo = false, raf = 0, ultimoT = 0, acumulado = 0;
   var estado = 'menu';          // menu | jogando | morto | vitoria | fim
   var faseIdx = 0, fase = null, nivel = null;
-  var p = null, grupos = null, armadilhas = null, particulas = [];
+  var p = null, grupos = null, armadilhas = null, guias = [], particulas = [];
+  var risos = 0;                // quantas vezes a traidora já riu nesta fase (alterna a risada)
   var timerEstado = 0, tempoAnim = 0, tremor = 0;
   var mortesFase = 0, mortesTotal = 0;
   var cam = { x: 0, y: 0, s: 1, vw: 0, vh: 0, reservaBaixo: 0 };
   var inp = { esq: false, dir: false, pulo: false };
-  var puloPonteiros = {}, dpadPonteiros = {}, teclas = {};
+  var puloPonteiros = {}, dpadPonteiros = {}, toques = {}, teclas = {};
+  var girarFechado = false, girarVisivel = false, orientacaoTravada = false;
+  var medida = { cw: 0, ch: 0, toque: null, reservaCss: 0 };
 
   /* ── Utilidades ─────────────────────────────────────────────── */
   function _som(m, args) {
@@ -225,27 +642,35 @@
     return cv;
   }
 
-  /* ── Vida nova (reset de fase: armadilhas voltam ao lugar) ─── */
+  /* ── Vida nova (reset de fase: armadilhas e guias voltam ao lugar) ── */
   function _iniciarVida() {
     grupos = {};
     var gd = nivel.gruposDef;
     for (var id in gd) {
       grupos[id] = { id: id, blocos: gd[id].blocos, espinhos: gd[id].espinhos,
                      ox: 0, oy: 0, vy: 0, visivel: true, caindo: false, mata: false,
-                     alvo: null, vel: 0, surgir: 1, dx: 0, dy: 0 };
+                     alvo: null, vel: 0, surgir: 1, dx: 0, dy: 0, feito: false };
     }
     grupos.bandeira = { id: 'bandeira', blocos: [], espinhos: [], ox: 0, oy: 0, vy: 0, visivel: true,
-                        caindo: false, mata: false, alvo: null, vel: 0, surgir: 1, dx: 0, dy: 0 };
+                        caindo: false, mata: false, alvo: null, vel: 0, surgir: 1, dx: 0, dy: 0, feito: false };
     armadilhas = [];
     var lista = fase.armadilhas || [];
     for (var i = 0; i < lista.length; i++) {
       var a = lista[i];
       if (!grupos[a.g]) continue;
       if (a.acao === 'aparece') grupos[a.g].visivel = false;
-      armadilhas.push({ def: a, disparada: false, timer: -1 });
+      armadilhas.push({ def: a, disparada: false, armada: false, timer: -1 });
     }
     p = { x: nivel.inicio.x, y: nivel.inicio.y, w: PW, h: PH, vx: 0, vy: 0, noChao: false, coyote: 0, buffer: 0,
           olhando: 1, chaoGrupo: null, pouso: 0, visivel: true };
+    guias = [];
+    var gl = fase.guias || [];
+    for (i = 0; i < gl.length; i++) {
+      var d = gl[i];
+      guias.push({ def: d, x: d.c * T + (T - PW) / 2, y: (d.r + 1) * T - PH, olhando: -1,
+                   ativa: false, passo: 0, t: 0, emPasso: false, andando: false, noAr: false,
+                   pausa: 0, fala: '', falaT: 0, falaIdade: 0, fim: false, agradeceu: false, zombou: false });
+    }
     particulas = [];
     estado = 'jogando';
     _atualizarHud();
@@ -255,7 +680,7 @@
     faseIdx = Math.max(0, Math.min(FASES.length - 1, i));
     fase = FASES[faseIdx];
     try { nivel = _lerFase(fase); } catch (e) { if (window.console) console.error('[Armadilha]', e); return; }
-    mortesFase = 0;
+    mortesFase = 0; risos = 0;
     if (wrap) wrap.style.background = fase.cores.fundo;
     _esconder(elMenu); _esconder(elFim); _esconder(elBanner);
     _iniciarVida();
@@ -294,6 +719,9 @@
     for (var i = 0; i < hs.length; i++) {
       var s = hs[i];
       if (!_sobrepoe(p, s)) continue;
+      // Encostado por cima/baixo com erro de arredondamento (plataforma que
+      // desce levando a coruja): não é parede — senão ela é empurrada pra fora
+      if (p.y + PH - s.y < 0.05 || s.y + s.h - p.y < 0.05) continue;
       if (dx > 0) p.x = s.x - PW; else p.x = s.x + s.w;
       p.vx = 0;
     }
@@ -339,6 +767,7 @@
   function _executar(a) {
     var g = grupos[a.g];
     if (!g) return;
+    g.feito = true;
     if (a.mata) g.mata = true;
     if (a.acao === 'cai') { g.caindo = true; g.vy = 0; }
     else if (a.acao === 'some') g.visivel = false;
@@ -349,11 +778,24 @@
     }
   }
 
+  // Condição de disparo: coluna do centro (+ lado/altura opcionais)
+  function _gatilhoOk(a, centro) {
+    var d = a.def, gx = d.gatilho * T, pes = p.y + PH;
+    if (d.abaixo !== undefined && !(pes > d.abaixo * T)) return false;
+    if (d.acima !== undefined && !(pes < d.acima * T)) return false;
+    if (d.lado === 'esq') {
+      if (centro > gx) a.armada = true;
+      return a.armada && centro <= gx;
+    }
+    return centro >= gx;
+  }
+
   function _atualizarArmadilhas(dt) {
     var centro = p.x + PW / 2;
     for (var i = 0; i < armadilhas.length; i++) {
       var a = armadilhas[i];
-      if (!a.disparada && centro >= a.def.gatilho * T) {
+      if (a.def.lado === 'esq' && centro > a.def.gatilho * T) a.armada = true;
+      if (!a.disparada && _gatilhoOk(a, centro)) {
         a.disparada = true;
         a.timer = (a.def.atraso || 0) / 1000;
       }
@@ -379,6 +821,86 @@
     }
   }
 
+  /* ── Coruja guia (clone que o jogador só observa) ───────────── */
+  function _falar(gu, txt, seg) { gu.fala = txt; gu.falaT = seg; gu.falaIdade = 0; }
+
+  // Grupo já disparou e terminou (caiu pra longe / sumiu / chegou no alvo)?
+  function _grupoTerminou(id) {
+    var g = grupos[id];
+    if (!g) return true;
+    if (!g.feito) return false;
+    if (g.caindo) return g.oy > 7 * T;
+    return !g.alvo;
+  }
+
+  function _atualizarGuias(dt) {
+    var pc = p.x + PW / 2;
+    for (var i = 0; i < guias.length; i++) {
+      var gu = guias[i], d = gu.def, cam_ = d.caminho || [];
+      gu.andando = false;
+      if (!gu.ativa) {
+        if (pc >= d.ativa * T) { gu.ativa = true; gu.pausa = 0.55; _falar(gu, d.fala || 'Me siga', 1.6); }
+        else { gu.olhando = pc < gu.x + PW / 2 ? -1 : 1; continue; }
+      }
+      if (gu.pausa > 0) { gu.pausa -= dt; continue; }
+      if (gu.passo >= cam_.length) {
+        // Fim do caminho: espera virada pro jogador
+        if (!gu.fim) gu.fim = true;
+        if (!gu.noAr) gu.olhando = pc < gu.x + PW / 2 ? -1 : 1;
+        var perto = Math.abs(pc - (gu.x + PW / 2)) < T * 1.6 && Math.abs(p.y - gu.y) < T * 1.5;
+        if (perto && d.tipo === 'confiavel' && !gu.agradeceu) { gu.agradeceu = true; _falar(gu, 'Obrigado pela confiança', 2.2); }
+        else if (perto && d.tipo === 'traidora' && !gu.zombou) { gu.zombou = true; _falar(gu, 'Sortudo...', 1.6); }
+        continue;
+      }
+      var s = cam_[gu.passo];
+      // Não sai na frente sozinha: espera o jogador chegar perto (antes de começar um passo)
+      if (!gu.emPasso && s.c !== undefined && (gu.x - p.x) > GUIA_LONGE * T) continue;
+      var proximo = false;
+      if (s.fala !== undefined) { _falar(gu, s.fala, (s.ms || 1500) / 1000); proximo = true; }
+      else if (s.espera !== undefined) {
+        gu.emPasso = true; gu.t += dt;
+        if (gu.t >= s.espera / 1000) proximo = true;
+      } else if (s.aguarda !== undefined) {
+        gu.olhando = pc < gu.x + PW / 2 ? -1 : 1;
+        if (_grupoTerminou(s.aguarda)) proximo = true;
+      } else if (s.r === undefined) {
+        // anda até a coluna
+        var alvoX = s.c * T + (T - PW) / 2, dx = alvoX - gu.x, vel = (d.vel || GUIA_VEL) * dt;
+        gu.emPasso = true;
+        if (Math.abs(dx) <= vel) { gu.x = alvoX; proximo = true; }
+        else { gu.x += dx > 0 ? vel : -vel; gu.olhando = dx > 0 ? 1 : -1; gu.andando = true; }
+      } else {
+        // pulo em arco até a célula
+        if (!gu.emPasso) {
+          gu.emPasso = true; gu.t = 0;
+          gu.x0 = gu.x; gu.y0 = gu.y;
+          gu.x1 = s.c * T + (T - PW) / 2; gu.y1 = (s.r + 1) * T - PH;
+          var sobe = gu.y0 - gu.y1;
+          gu.alt = sobe > 0 ? sobe + 18 : 16;
+          gu.dur = 0.32 + Math.abs(gu.x1 - gu.x0) / 320 + Math.abs(sobe) / 500;
+          gu.olhando = gu.x1 >= gu.x0 ? 1 : -1;
+          _som('pulo');
+        }
+        gu.t += dt; gu.noAr = true;
+        var k = Math.min(1, gu.t / gu.dur);
+        gu.x = gu.x0 + (gu.x1 - gu.x0) * k;
+        gu.y = gu.y0 + (gu.y1 - gu.y0) * k - gu.alt * 4 * k * (1 - k);
+        if (k >= 1) { gu.noAr = false; proximo = true; }
+      }
+      if (proximo) { gu.passo++; gu.t = 0; gu.emPasso = false; }
+    }
+  }
+
+  // A guia "da vez" (a última que o jogador ativou) reage à morte
+  function _guiaDaVez() {
+    var melhor = null;
+    for (var i = 0; i < guias.length; i++) {
+      var gu = guias[i];
+      if (gu.ativa && (!melhor || gu.def.ativa > melhor.def.ativa)) melhor = gu;
+    }
+    return melhor;
+  }
+
   /* ── Passo de física ────────────────────────────────────────── */
   function _passo(dt) {
     // Plataforma que se move (não a que cai) carrega a coruja junto
@@ -392,7 +914,8 @@
     var dir = (inp.dir ? 1 : 0) - (inp.esq ? 1 : 0);
     if (dir) {
       p.vx += dir * (p.noChao ? ACEL_CHAO : ACEL_AR) * dt;
-      if (p.vx > VEL) p.vx = VEL; if (p.vx < -VEL) p.vx = -VEL;
+      if (p.vx > VEL) p.vx = VEL;
+      if (p.vx < -VEL) p.vx = -VEL;
       p.olhando = dir;
     } else {
       var fr = (p.noChao ? FREIO_CHAO : FREIO_AR) * dt;
@@ -416,6 +939,8 @@
 
     if (p.y > nivel.LH + 24 || _tocaPerigo()) { _morrer(); return; }
 
+    if (guias.length) _atualizarGuias(dt);
+
     var b = grupos.bandeira;
     var rb = { x: nivel.bandeira.x + b.ox + 3, y: nivel.bandeira.y + b.oy - 40, w: 10, h: 40 };
     if (_sobrepoe(p, rb)) _vencerFase();
@@ -432,6 +957,13 @@
       particulas.push({ x: cx, y: cy, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v - 120,
                         cor: CORES_PENAS[i % CORES_PENAS.length], vida: 0.7 + Math.random() * 0.3, t: i % 3 === 0 ? 3 : 2 });
     }
+    // Coruja guia reage: traidora ri, confiável lamenta
+    var gu = _guiaDaVez();
+    if (gu) {
+      if (gu.def.tipo === 'traidora') _falar(gu, RISADAS[risos++ % RISADAS.length], T_RESPAWN_FALA);
+      else _falar(gu, 'Era só me seguir...', T_RESPAWN_FALA);
+      timerEstado = T_RESPAWN_FALA;
+    }
     _som('dano'); _vibrar(35);
     _atualizarHud();
   }
@@ -439,6 +971,12 @@
   function _vencerFase() {
     if (estado !== 'jogando') return;
     estado = 'vitoria'; timerEstado = T_VITORIA;
+    for (var i = 0; i < guias.length; i++) {
+      var gu = guias[i];
+      if (gu.def.tipo === 'confiavel' && gu.ativa && !gu.agradeceu) {
+        gu.agradeceu = true; _falar(gu, 'Obrigado pela confiança', T_VITORIA_FALA); timerEstado = T_VITORIA_FALA;
+      }
+    }
     var prox = faseIdx + 1;
     if (prox < FASES.length && prox > _lerProgresso()) _salvarProgresso(prox);
     _som('nivelUp'); _vibrar([20, 40, 20]);
@@ -452,6 +990,9 @@
       var q = particulas[i];
       q.vida -= dt; q.vy += GRAV * 0.6 * dt; q.x += q.vx * dt; q.y += q.vy * dt;
       if (q.vida <= 0) particulas.splice(i, 1);
+    }
+    for (i = 0; i < guias.length; i++) {
+      if (guias[i].falaT > 0) { guias[i].falaT -= dt; guias[i].falaIdade += dt; }
     }
     if (estado === 'jogando') {
       acumulado += dt;
@@ -474,6 +1015,8 @@
   }
 
   /* ── Câmera + escala inteira ────────────────────────────────── */
+  function _controlesNaTela() { return !!(elControles && elControles.offsetParent !== null); }
+
   function _redimensionar() {
     var dpr = Math.min(window.devicePixelRatio || 1, 3);
     var cw = Math.max(1, Math.round(canvas.clientWidth * dpr));
@@ -481,12 +1024,20 @@
     if (canvas.width !== cw || canvas.height !== ch) {
       canvas.width = cw; canvas.height = ch;
     }
-    // Retrato + controles na tela: a fase fica acima dos botões
-    var reservaCss = 0;
-    if (elControles && elControles.offsetParent !== null && canvas.clientHeight > canvas.clientWidth) {
-      reservaCss = elControles.offsetHeight + 16;
+    // Controles de toque na tela (em pé OU deitado): a fase fica ACIMA dos
+    // botões, senão a coruja anda por baixo do ◀ e some. Mede só quando o
+    // tamanho muda (getBoundingClientRect todo quadro é desperdício).
+    var toque = _controlesNaTela();
+    if (cw !== medida.cw || ch !== medida.ch || toque !== medida.toque) {
+      medida.cw = cw; medida.ch = ch; medida.toque = toque;
+      medida.reservaCss = 0;
+      if (toque) {
+        var rw = wrap.getBoundingClientRect(), rc = elControles.getBoundingClientRect();
+        medida.reservaCss = Math.max(0, rw.bottom - rc.top + 6);
+      }
+      _atualizarAvisoGirar();
     }
-    var reservaDev = reservaCss * dpr;
+    var reservaDev = medida.reservaCss * dpr;
     var LH = nivel ? nivel.LH : 12 * T;
     var s = Math.floor(Math.min(cw / (MIN_TILES_LARG * T), Math.max(1, ch - reservaDev) / LH));
     cam.s = Math.max(1, s);
@@ -525,7 +1076,7 @@
     // Textos de dica (atrás de tudo)
     if (fase.textos) {
       ctx.fillStyle = cores.chao; ctx.globalAlpha = 0.55;
-      ctx.font = '700 7px ui-monospace, Menlo, Consolas, monospace';
+      ctx.font = FONTE;
       ctx.textBaseline = 'top';
       for (var ti = 0; ti < fase.textos.length; ti++) {
         var tx = fase.textos[ti];
@@ -560,12 +1111,23 @@
     for (i = 0; i < nivel.extCima.length; i++) ctx.fillRect(nivel.extCima[i] * T, -EXT, T, EXT);
 
     _desenharBandeira(cores);
-    if (p && p.visivel) _desenharCoruja();
+    // Guias: mesmo sprite, levemente "fantasma" (dá pra distinguir quando encosta na sua)
+    if (guias.length) {
+      ctx.globalAlpha = 0.82;
+      for (i = 0; i < guias.length; i++) _desenharCoruja(guias[i], _quadroGuia(guias[i]));
+      ctx.globalAlpha = 1;
+    }
+    if (p && p.visivel) _desenharCoruja(p, _quadroCoruja());
 
     for (i = 0; i < particulas.length; i++) {
       var q = particulas[i];
       ctx.fillStyle = q.cor;
       ctx.fillRect(Math.round(q.x), Math.round(q.y), q.t, q.t);
+    }
+    // Balões por cima de tudo
+    for (i = 0; i < guias.length; i++) {
+      var gu = guias[i];
+      if (gu.falaT > 0 && gu.fala) _desenharBalao(gu.fala, gu.x + PW / 2, gu.y + PH - SPR_H, gu.falaIdade, cores.chao);
     }
   }
 
@@ -582,6 +1144,28 @@
     }
   }
 
+  // Balão de fala pixel: caixa clara com borda, rabinho apontando pra guia
+  function _desenharBalao(txt, cx, topo, idade, corBorda) {
+    ctx.font = FONTE;
+    var w = Math.ceil(ctx.measureText(txt).width) + 8, h = 13;
+    var pop = idade < 0.12 ? Math.round((0.12 - idade) / 0.04) : 0;   // "pulinho" ao aparecer
+    var x = Math.round(cx - w / 2), y = Math.round(topo - h - 5) + pop;
+    var minX = Math.round(cam.x) + 2, maxX = Math.round(cam.x + cam.vw) - w - 2;
+    if (x > maxX) x = maxX;
+    if (x < minX) x = minX;
+    var tx = Math.round(cx);
+    ctx.fillStyle = corBorda;
+    ctx.fillRect(x + 1, y, w - 2, h); ctx.fillRect(x, y + 1, w, h - 2);
+    ctx.fillRect(tx - 3, y + h - 1, 7, 2); ctx.fillRect(tx - 2, y + h + 1, 5, 1); ctx.fillRect(tx - 1, y + h + 2, 3, 1);
+    ctx.fillStyle = '#fff6e5';
+    ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+    ctx.fillRect(tx - 2, y + h - 1, 5, 1); ctx.fillRect(tx - 1, y + h, 3, 1); ctx.fillRect(tx, y + h + 1, 1, 1);
+    ctx.fillStyle = corBorda;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(txt, x + 4, y + h / 2 + 0.5);
+    ctx.textBaseline = 'top';
+  }
+
   // Quadros do sheet: 0 normal, 1 abaixada (respira), 2 normal, 3 piscando
   var SEQ_IDLE = [0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 2, 3, 2, 0, 1, 1];
   function _quadroCoruja() {
@@ -590,15 +1174,20 @@
     if (Math.abs(p.vx) > 20) return Math.floor(tempoAnim / 0.09) % 2 === 0 ? 0 : 1;
     return SEQ_IDLE[Math.floor(tempoAnim / 0.17) % SEQ_IDLE.length];
   }
+  function _quadroGuia(gu) {
+    if (gu.noAr) return 0;
+    if (gu.andando) return Math.floor(tempoAnim / 0.09) % 2 === 0 ? 0 : 1;
+    return SEQ_IDLE[(Math.floor(tempoAnim / 0.17) + 5) % SEQ_IDLE.length];   // defasada: não pisca junto
+  }
 
-  function _desenharCoruja() {
-    var dx = Math.round(p.x + PW / 2 - SPR_W / 2), dy = Math.round(p.y + PH - SPR_H);
+  function _desenharCoruja(o, q) {
+    var dx = Math.round(o.x + PW / 2 - SPR_W / 2), dy = Math.round(o.y + PH - SPR_H);
     if (!imgOk) {
-      ctx.fillStyle = '#5b6b7f'; ctx.fillRect(Math.round(p.x), Math.round(p.y), PW, PH);
+      ctx.fillStyle = '#5b6b7f'; ctx.fillRect(Math.round(o.x), Math.round(o.y), PW, PH);
       return;
     }
-    var fw = img.naturalWidth / 4, fh = img.naturalHeight, q = _quadroCoruja();
-    if (p.olhando < 0) {
+    var fw = img.naturalWidth / 4, fh = img.naturalHeight;
+    if (o.olhando < 0) {
       ctx.save();
       ctx.translate(dx + SPR_W, dy); ctx.scale(-1, 1);
       ctx.drawImage(img, q * fw, 0, fw, fh, 0, 0, SPR_W, SPR_H);
@@ -660,48 +1249,131 @@
     if (G && G.efeitos) G.efeitos.confete(elFim, 60);
   }
 
-  /* ── Entrada: toque + teclado ───────────────────────────────── */
+  /* ── Aviso "gira o celular" (só dentro do jogo) ─────────────── */
+  function _atualizarAvisoGirar() {
+    if (!elGirar) return;
+    var emPe = wrap.clientHeight > wrap.clientWidth * 1.05;
+    var mostrar = emPe && _controlesNaTela() && !girarFechado;
+    if (mostrar !== girarVisivel) { girarVisivel = mostrar; elGirar.style.display = mostrar ? '' : 'none'; }
+  }
+  function _podeTravarOrientacao() {
+    return !!(window.screen && screen.orientation && typeof screen.orientation.lock === 'function');
+  }
+  // Só funciona com o hub em tela cheia (Android/Chrome). iOS não deixa:
+  // aí o botão some e fica só o texto pedindo pra girar.
+  function _deitarTela() {
+    if (!_podeTravarOrientacao()) { _esconder(elBtnGirar); return; }
+    try {
+      var pr = screen.orientation.lock('landscape');
+      orientacaoTravada = true;
+      if (pr && typeof pr.catch === 'function') pr.catch(function () { orientacaoTravada = false; _esconder(elBtnGirar); });
+    } catch (e) { _esconder(elBtnGirar); }
+  }
+  function _destravarOrientacao() {
+    if (!orientacaoTravada) return;
+    orientacaoTravada = false;
+    try { screen.orientation.unlock(); } catch (e) {}
+  }
+
+  /* ── Entrada: toque + mouse + teclado ───────────────────────── */
   function _limparEntrada() {
     inp.esq = inp.dir = inp.pulo = false;
-    puloPonteiros = {}; dpadPonteiros = {}; teclas = {};
+    puloPonteiros = {}; dpadPonteiros = {}; toques = {}; teclas = {};
     if (wrap) wrap.querySelectorAll('.ar-on').forEach(function (b) { b.classList.remove('ar-on'); });
   }
   function _apertarPulo() { inp.pulo = true; if (p && estado === 'jogando') p.buffer = BUFFER_PULO; }
-  function _recalcPulo() { inp.pulo = Object.keys(puloPonteiros).length > 0 || !!teclas.pulo; }
-  function _recalcDpad() {
-    var e = false, d = false;
-    for (var k in dpadPonteiros) { if (dpadPonteiros[k] < 0) e = true; else d = true; }
-    inp.esq = e || !!teclas.esq; inp.dir = d || !!teclas.dir;
-    var be = wrap.querySelector('.ar-esq'), bd = wrap.querySelector('.ar-dir');
-    if (be) be.classList.toggle('ar-on', e); if (bd) bd.classList.toggle('ar-on', d);
+
+  // Estado final = união de toque (toques), mouse/caneta (ponteiros) e teclado
+  function _recalcEntrada() {
+    var e = !!teclas.esq, d = !!teclas.dir, pu = !!teclas.pulo, k;
+    var te = false, td = false, tp = false;
+    for (k in toques) { var z = toques[k]; if (z === 'esq') te = true; else if (z === 'dir') td = true; else if (z === 'pulo') tp = true; }
+    for (k in dpadPonteiros) { if (dpadPonteiros[k] < 0) te = true; else td = true; }
+    if (Object.keys(puloPonteiros).length) tp = true;
+    inp.esq = e || te; inp.dir = d || td; inp.pulo = pu || tp;
+    if (!wrap) return;
+    var be = wrap.querySelector('.ar-esq'), bd = wrap.querySelector('.ar-dir'), bp = wrap.querySelector('.ar-pulo');
+    if (be) be.classList.toggle('ar-on', te);
+    if (bd) bd.classList.toggle('ar-on', td);
+    if (bp) bp.classList.toggle('ar-on', tp);
+  }
+
+  // Botões/menus por cima do jogo: toque neles NÃO é controle (deixa o clique passar)
+  function _ehUi(el) { return !!(el && el.closest && el.closest('.ar-hud, .ar-overlay, .ar-girar')); }
+
+  // Qual lado do direcional: divide no meio entre ◀ e ▶ (com folga em volta)
+  function _ladoDpad(x) {
+    var r = elDpad.getBoundingClientRect();
+    return x < r.left + r.width / 2 ? 'esq' : 'dir';
+  }
+  function _dentroDpad(x, y) {
+    var r = elDpad.getBoundingClientRect();
+    return x >= r.left - TOQUE_FOLGA && x <= r.right + TOQUE_FOLGA && y >= r.top - TOQUE_FOLGA && y <= r.bottom + TOQUE_FOLGA;
   }
 
   function _ligarToque() {
-    var dpad = wrap.querySelector('.ar-dpad'), bPulo = wrap.querySelector('.ar-pulo');
-    function lado(ev) { var r = dpad.getBoundingClientRect(); return ev.clientX < r.left + r.width / 2 ? -1 : 1; }
-    dpad.addEventListener('pointerdown', function (ev) {
+    var bPulo = wrap.querySelector('.ar-pulo');
+    elDpad = wrap.querySelector('.ar-dpad');
+
+    /* TOQUE — eventos touch com passive:false. Correção do "◀ não anda":
+       antes o direcional dependia de pointer events + setPointerCapture +
+       touch-action:none. No iOS o touch-action:none não é respeitado e
+       perto da borda esquerda o sistema toma o gesto (voltar/rolar) e
+       dispara pointercancel — o ◀ soltava sozinho. Agora cada dedo é
+       lido de ev.touches (fonte da verdade), com preventDefault no
+       touchstart/touchmove, e fica "preso" à zona onde começou:
+       começou no direcional = anda (◀/▶ pelo lado), senão = pula. */
+    function tocar(ev) {
+      if (!wrap.classList.contains('ar-toque')) { wrap.classList.add('ar-toque'); medida.cw = 0; }
+      var jogo = false, i, t, novos = ev.type === 'touchstart';
+      for (i = 0; i < ev.changedTouches.length; i++) if (!_ehUi(ev.changedTouches[i].target)) jogo = true;
+      if (!jogo) return;
+      if (ev.cancelable) ev.preventDefault();
+      // Reconstrói a partir dos dedos que ESTÃO na tela agora
+      var vivos = {};
+      for (i = 0; i < ev.touches.length; i++) {
+        t = ev.touches[i];
+        if (_ehUi(t.target)) continue;
+        var id = t.identifier, zona = toques[id];
+        if (zona === undefined) {
+          zona = _dentroDpad(t.clientX, t.clientY) ? 'dpad' : 'pulo';
+          if (zona === 'pulo' && novos) _apertarPulo();
+        }
+        if (zona !== 'pulo') zona = _ladoDpad(t.clientX);
+        vivos[id] = zona;
+      }
+      toques = vivos;
+      _recalcEntrada();
+    }
+    wrap.addEventListener('touchstart', tocar, { passive: false });
+    wrap.addEventListener('touchmove', tocar, { passive: false });
+    wrap.addEventListener('touchend', tocar, { passive: false });
+    wrap.addEventListener('touchcancel', tocar, { passive: false });
+
+    /* MOUSE / CANETA — pointer events, ignorando os de toque (já tratados acima) */
+    function ehToque(ev) { return ev.pointerType === 'touch'; }
+    elDpad.addEventListener('pointerdown', function (ev) {
+      if (ehToque(ev)) return;
       ev.preventDefault();
-      try { dpad.setPointerCapture(ev.pointerId); } catch (e) {}
-      dpadPonteiros[ev.pointerId] = lado(ev); _recalcDpad();
+      try { elDpad.setPointerCapture(ev.pointerId); } catch (e) {}
+      dpadPonteiros[ev.pointerId] = _ladoDpad(ev.clientX) === 'esq' ? -1 : 1; _recalcEntrada();
     });
-    dpad.addEventListener('pointermove', function (ev) {
-      if (dpadPonteiros[ev.pointerId] === undefined) return;
-      dpadPonteiros[ev.pointerId] = lado(ev); _recalcDpad();
+    elDpad.addEventListener('pointermove', function (ev) {
+      if (ehToque(ev) || dpadPonteiros[ev.pointerId] === undefined) return;
+      dpadPonteiros[ev.pointerId] = _ladoDpad(ev.clientX) === 'esq' ? -1 : 1; _recalcEntrada();
     });
-    function soltarDpad(ev) { delete dpadPonteiros[ev.pointerId]; _recalcDpad(); }
-    dpad.addEventListener('pointerup', soltarDpad);
-    dpad.addEventListener('pointercancel', soltarDpad);
+    function soltarDpad(ev) { if (ehToque(ev)) return; delete dpadPonteiros[ev.pointerId]; _recalcEntrada(); }
+    elDpad.addEventListener('pointerup', soltarDpad);
+    elDpad.addEventListener('pointercancel', soltarDpad);
 
     function apertaPulo(ev) {
+      if (ehToque(ev)) return;
       ev.preventDefault();
       try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) {}
-      puloPonteiros[ev.pointerId] = true; bPulo.classList.add('ar-on'); _apertarPulo();
+      puloPonteiros[ev.pointerId] = true; _apertarPulo(); _recalcEntrada();
     }
-    function soltaPulo(ev) {
-      delete puloPonteiros[ev.pointerId]; _recalcPulo();
-      if (!Object.keys(puloPonteiros).length) bPulo.classList.remove('ar-on');
-    }
-    // Botão ▲ e também um toque em qualquer ponto do cenário = pular
+    function soltaPulo(ev) { if (ehToque(ev)) return; delete puloPonteiros[ev.pointerId]; _recalcEntrada(); }
+    // Botão ▲ e também um clique em qualquer ponto do cenário = pular
     [bPulo, canvas].forEach(function (el) {
       el.addEventListener('pointerdown', apertaPulo);
       el.addEventListener('pointerup', soltaPulo);
@@ -710,25 +1382,38 @@
     wrap.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
   }
 
+  // ev.code (posição física) + ev.key (fallback: teclados virtuais/layouts
+  // que mandam code vazio). Os dois lados usam a MESMA função, então
+  // soltar a tecla sempre solta a ação certa.
   var TECLAS = {
     ArrowLeft: 'esq', KeyA: 'esq', ArrowRight: 'dir', KeyD: 'dir',
     Space: 'pulo', ArrowUp: 'pulo', KeyW: 'pulo', KeyZ: 'pulo', KeyR: 'reiniciar'
   };
+  var TECLAS_KEY = {
+    arrowleft: 'esq', left: 'esq', a: 'esq', arrowright: 'dir', right: 'dir', d: 'dir',
+    ' ': 'pulo', spacebar: 'pulo', arrowup: 'pulo', up: 'pulo', w: 'pulo', z: 'pulo', r: 'reiniciar'
+  };
+  function _acaoTecla(ev) {
+    return TECLAS[ev.code] || TECLAS_KEY[String(ev.key || '').toLowerCase()] || null;
+  }
   function _teclaDown(ev) {
-    if (!ativo) return;
-    var acao = TECLAS[ev.code];
+    if (!ativo || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    var acao = _acaoTecla(ev);
     if (!acao) return;
     ev.preventDefault();
     if (acao === 'reiniciar') { if (!ev.repeat) _reiniciar(); return; }
     if (acao === 'pulo') { if (!ev.repeat) { teclas.pulo = true; _apertarPulo(); } return; }
-    teclas[acao] = true; _recalcDpad();
+    teclas[acao] = true; _recalcEntrada();
   }
   function _teclaUp(ev) {
-    var acao = TECLAS[ev.code];
-    if (!acao || !ativo) return;
+    if (!ativo) return;
+    var acao = _acaoTecla(ev);
+    if (!acao) return;
     teclas[acao] = false;
-    if (acao === 'pulo') _recalcPulo(); else _recalcDpad();
+    _recalcEntrada();
   }
+  // Janela perdeu o foco com tecla apertada: não deixa a coruja andando sozinha
+  function _aoBlur() { if (ativo) _limparEntrada(); }
 
   function _reiniciar() {
     if (estado === 'jogando' || estado === 'morto') { _iniciarVida(); cam.x = null; }
@@ -753,6 +1438,12 @@
           '<button type="button" class="ar-hud-btn" id="ar-btn-reiniciar" aria-label="Reiniciar fase">↻</button>' +
           '<button type="button" class="ar-hud-btn" id="ar-btn-menu" aria-label="Escolher fase">☰</button>' +
         '</div>' +
+        '<div class="ar-girar" id="ar-girar" style="display:none" role="status">' +
+          '<span class="ar-girar-ico" aria-hidden="true">📱</span>' +
+          '<span class="ar-girar-txt">Gira o celular para jogar melhor</span>' +
+          '<button type="button" class="ar-girar-btn" id="ar-btn-girar">Deitar</button>' +
+          '<button type="button" class="ar-girar-x" id="ar-btn-girar-x" aria-label="Fechar aviso">✕</button>' +
+        '</div>' +
         '<div class="ar-controles">' +
           '<div class="ar-dpad"><span class="ar-seta ar-esq">◀</span><span class="ar-seta ar-dir">▶</span></div>' +
           '<button type="button" class="ar-pulo" aria-label="Pular">▲</button>' +
@@ -762,7 +1453,7 @@
           '<div class="ar-caixa">' +
             '<img src="/img/pixel/coruja-pixel-idle.png" alt="" class="ar-menu-owl" onerror="this.style.display=\'none\'">' +
             '<div class="ar-titulo">Armadilha da Coruja</div>' +
-            '<div class="ar-desc">Leve a coruja até a bandeira. Nada é o que parece: morreu, volta na hora.</div>' +
+            '<div class="ar-desc">Leve a coruja até a bandeira. Nada é o que parece: morreu, volta na hora. E cuidado com quem diz "me siga"...</div>' +
             '<div class="ar-fases" id="ar-fases"></div>' +
             '<div class="ar-dica">◀ ▶ andar · ▲ ou toque na tela pula (segure = mais alto)<br>Teclado: setas/A D · espaço/↑/W · R reinicia</div>' +
           '</div>' +
@@ -787,6 +1478,9 @@
     elBanner = root.querySelector('#ar-banner');
     elControles = root.querySelector('.ar-controles');
     elFasesLista = root.querySelector('#ar-fases');
+    elGirar = root.querySelector('#ar-girar');
+    elBtnGirar = root.querySelector('#ar-btn-girar');
+    if (!_podeTravarOrientacao()) _esconder(elBtnGirar);
 
     elFasesLista.addEventListener('click', function (ev) {
       var b = ev.target.closest('.ar-fase-btn');
@@ -798,8 +1492,10 @@
     root.querySelector('#ar-btn-menu').addEventListener('click', function (ev) { ev.currentTarget.blur(); _abrirMenu(); });
     root.querySelector('#ar-btn-denovo').addEventListener('click', function () { mortesTotal = 0; _comecarFase(0); });
     root.querySelector('#ar-btn-fases').addEventListener('click', _abrirMenu);
-    // Botões do HUD não podem "vazar" o toque pro canvas (senão pula)
-    root.querySelectorAll('.ar-hud-btn').forEach(function (b) {
+    elBtnGirar.addEventListener('click', function (ev) { ev.currentTarget.blur(); _deitarTela(); });
+    root.querySelector('#ar-btn-girar-x').addEventListener('click', function () { girarFechado = true; _atualizarAvisoGirar(); });
+    // Botões do HUD/aviso não podem "vazar" o clique do mouse pro canvas (senão pula)
+    root.querySelectorAll('.ar-hud-btn, .ar-girar button').forEach(function (b) {
       b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
     });
     _ligarToque();
@@ -816,10 +1512,13 @@
     if (!montado && !_montar()) return;
     if (!ativo) {
       ativo = true;
-      window.addEventListener('keydown', _teclaDown);
-      window.addEventListener('keyup', _teclaUp);
+      // Captura na janela: nenhum handler do app engole seta/A antes do jogo
+      window.addEventListener('keydown', _teclaDown, true);
+      window.addEventListener('keyup', _teclaUp, true);
+      window.addEventListener('blur', _aoBlur);
       document.addEventListener('visibilitychange', _aoVisibilidade);
     }
+    medida.cw = 0;
     // Cenário da fase liberada aparece atrás do menu
     _comecarFase(_lerProgresso());
     _abrirMenu();
@@ -831,8 +1530,10 @@
     ativo = false;
     _desligarLoop();
     _limparEntrada();
-    window.removeEventListener('keydown', _teclaDown);
-    window.removeEventListener('keyup', _teclaUp);
+    _destravarOrientacao();
+    window.removeEventListener('keydown', _teclaDown, true);
+    window.removeEventListener('keyup', _teclaUp, true);
+    window.removeEventListener('blur', _aoBlur);
     document.removeEventListener('visibilitychange', _aoVisibilidade);
     estado = 'menu';
   }
@@ -840,6 +1541,11 @@
   window.ArmadilhaGame = {
     preparar: preparar, parar: parar, FASES: FASES,
     // Leitura de estado para testes/depuração (não altera nada)
-    _estado: function () { return { estado: estado, fase: faseIdx, mortes: mortesTotal, p: p ? { x: p.x, y: p.y, noChao: p.noChao } : null }; }
+    _estado: function () {
+      return { estado: estado, fase: faseIdx, mortes: mortesTotal, mortesFase: mortesFase,
+               p: p ? { x: p.x, y: p.y, vx: p.vx, noChao: p.noChao } : null,
+               inp: { esq: inp.esq, dir: inp.dir, pulo: inp.pulo },
+               guias: guias.map(function (g) { return { x: g.x, y: g.y, tipo: g.def.tipo, ativa: g.ativa, passo: g.passo, fala: g.falaT > 0 ? g.fala : '' }; }) };
+    }
   };
 })();

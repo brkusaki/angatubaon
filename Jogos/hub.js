@@ -960,6 +960,7 @@
     if (window.BlocosGame    && typeof window.BlocosGame.parar    === 'function') window.BlocosGame.parar();
     if (window.DocesGame     && typeof window.DocesGame.parar     === 'function') window.DocesGame.parar();
     if (window.Game2048      && typeof window.Game2048.parar      === 'function') window.Game2048.parar();
+    if (window.ArmadilhaGame && typeof window.ArmadilhaGame.parar === 'function') window.ArmadilhaGame.parar();
     // Negócios da Cidade: parar() só mata timers e fecha modal — a partida
     // em andamento sobrevive de propósito, pra quem sai pro menu por engano
     // conseguir voltar de onde parou (ver _retomar em negocios.js).
@@ -1082,6 +1083,9 @@
     // 2048 da Coruja: solo sem fases (corrida única, sem "vitória final"
     // que trava o jogo) — ranking = maior pontuação, igual a Voo/Piano.
     '2048': { js: '/Jogos/2048.min.js', css: '/Jogos/2048.css', global: 'Game2048' },
+    // Armadilha da Coruja: platformer de armadilhas (estilo Level Devil),
+    // solo com 3 fases, sem ranking. Desenha tudo em #armadilha-root.
+    armadilha: { js: '/Jogos/armadilha.min.js', css: '/Jogos/armadilha.css', global: 'ArmadilhaGame' },
     // Negócios da Cidade: banco imobiliário de Angatuba, 2 a 8 pessoas no
     // MESMO aparelho (passa-o-celular). Não usa AngatubaMP (não é 1x1 em
     // rede) nem ranking: não existe pontuação individual, o placar é a

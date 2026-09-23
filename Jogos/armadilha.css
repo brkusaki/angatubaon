@@ -57,9 +57,13 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-armadilha .jogo-voltar {
 .ar-hud-btn:active { transform: scale(.92); }
 
 /* ── Controles de toque ──────────────────────────────────────── */
+/* v358: botões mais longe da borda de baixo. Ali fica a área de gesto do
+   sistema (barrinha "home" do iPhone / navegação por gestos): o sistema
+   segura o toque pra ver se é um gesto dele — segurar o ▲ só pulava depois
+   de ~1-2 s e um toque rápido chegava "aperta+solta" junto (pulinho). */
 .ar-controles {
   position: absolute; z-index: 3; left: 0; right: 0;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 30px);
   /* Longe da borda + área segura (notch/câmera quando deitado): a borda
      esquerda é zona de gesto do sistema — o ◀ não pode ficar grudado nela */
   padding: 0 calc(env(safe-area-inset-right, 0px) + 18px) 0 calc(env(safe-area-inset-left, 0px) + 18px);
@@ -87,7 +91,7 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-armadilha .jogo-voltar {
 
 /* Deitado (celular): botões um pouco menores; a fase é desenhada acima deles */
 @media (orientation: landscape) and (max-height: 540px) {
-  .ar-controles { bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); }
+  .ar-controles { bottom: calc(env(safe-area-inset-bottom, 0px) + 26px); }
   .ar-seta { width: 64px; height: 58px; border-radius: 18px; font-size: 22px; }
   .ar-pulo { width: 70px; height: 70px; font-size: 26px; }
   .ar-dpad { gap: 8px; }

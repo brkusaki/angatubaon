@@ -44,6 +44,11 @@
   var GUIA_VEL = 115, GUIA_LONGE = 7;           // guia: px/s andando; espera se o jogador ficar > N tiles atrás
   var FONTE = '700 7px ui-monospace, Menlo, Consolas, monospace';
   var TOQUE_FOLGA = 22;                         // px CSS de folga em volta do ◀ ▶ (dedo gordo)
+  // v358: toque no ▲ segura o pulo por pelo menos isto (s). Um toque de
+  // dedo dura ~40 ms (bem menos que uma tecla) e dava um pulinho de nada;
+  // 80 ms = ~2,2 tiles de altura (ainda passa por baixo de espinho de teto
+  // nas fases de "pulinho"). Segurando, vai até o pulo cheio como no PC.
+  var PULO_MIN_TOQUE = 0.08;
 
   var CORES_PENAS = ['#5b6b7f', '#d6bf9c', '#f2a11f', '#ff4a4a', '#1c212b', '#c4ab8a'];
   var RISADAS = ['Ha ha!', 'Otário!', 'Ha ha ha!'];
@@ -1324,6 +1329,7 @@
   var cam = { x: 0, y: 0, s: 1, vw: 0, vh: 0, reservaBaixo: 0 };
   var inp = { esq: false, dir: false, pulo: false };
   var puloPonteiros = {}, dpadPonteiros = {}, toques = {}, teclas = {};
+  var puloDeToque = false;      // o último aperto de pulo veio do ▲ na tela?
   var girarFechado = false, girarVisivel = false, orientacaoTravada = false;
   var medida = { cw: 0, ch: 0, toque: null, reservaCss: 0 };
 
@@ -1423,7 +1429,7 @@
     }
     p = { x: nivel.inicio.x, y: nivel.inicio.y, w: PW, h: PH, vx: 0, vy: 0, noChao: false, coyote: 0, buffer: 0,
           olhando: 1, chaoGrupo: null, pouso: 0, visivel: true,
-          gravF: 1, puloF: 1, efeitoT: 0, efeitoMax: 0, mexeu: false, vidaT: 0, t: 0, paradoT: 0, chaoT: 0 };
+          gravF: 1, puloF: 1, efeitoT: 0, efeitoMax: 0, mexeu: false, vidaT: 0, t: 0, paradoT: 0, chaoT: 0, seguraMin: 0 };
     guias = [];
     var gl = fase.guias || [];
     for (i = 0; i < gl.length; i++) {
@@ -1855,9 +1861,12 @@
     if (p.buffer > 0) p.buffer -= dt;
     if (p.buffer > 0 && p.coyote > 0) {
       p.vy = -PULO_V * p.puloF; p.buffer = 0; p.coyote = 0; p.noChao = false;
+      p.seguraMin = puloDeToque ? PULO_MIN_TOQUE : 0;
       _som('pulo');
     }
-    if (!inp.pulo && p.vy < -PULO_CORTE * p.puloF) p.vy = -PULO_CORTE * p.puloF;   // pulo variável
+    if (p.seguraMin > 0) p.seguraMin -= dt;
+    // pulo variável (no toque, só corta depois do mínimo)
+    if (!inp.pulo && p.seguraMin <= 0 && p.vy < -PULO_CORTE * p.puloF) p.vy = -PULO_CORTE * p.puloF;
     p.vy = Math.min(p.vy + GRAV * p.gravF * dt, QUEDA_MAX);
 
     var estavaNoChao = p.noChao;
@@ -2275,7 +2284,7 @@
     puloPonteiros = {}; dpadPonteiros = {}; toques = {}; teclas = {};
     if (wrap) wrap.querySelectorAll('.ar-on').forEach(function (b) { b.classList.remove('ar-on'); });
   }
-  function _apertarPulo() { inp.pulo = true; if (p && estado === 'jogando') p.buffer = BUFFER_PULO; }
+  function _apertarPulo(deToque) { inp.pulo = true; puloDeToque = !!deToque; if (p && estado === 'jogando') p.buffer = BUFFER_PULO; }
 
   // Estado final = união de toque (toques), mouse/caneta (ponteiros) e teclado
   function _recalcEntrada() {
@@ -2334,7 +2343,7 @@
         var id = t.identifier, zona = toques[id];
         if (zona === undefined || zona === 'solto') {
           if (_dentro(elDpad, t.clientX, t.clientY)) zona = 'dpad';
-          else if (_dentro(bPulo, t.clientX, t.clientY)) { zona = 'pulo'; _apertarPulo(); }
+          else if (_dentro(bPulo, t.clientX, t.clientY)) { zona = 'pulo'; _apertarPulo(true); }
           else zona = 'solto';
         }
         if (zona === 'dpad' || zona === 'esq' || zona === 'dir') zona = _ladoDpad(t.clientX);

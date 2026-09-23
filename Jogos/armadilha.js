@@ -70,9 +70,9 @@
        F  bandeira         a-z  bloco de um GRUPO (pode cair/sumir/mover)
        1-9  espinho de um GRUPO (pode aparecer/sumir/mover)
        %  PAREDE/CHÃO FALSO: desenhado igual ao '#', mas atravessável
-          (depois que alguém passa, fica translúcido até o fim da fase)
+          (depois que a coruja passa, fica translúcido até ela morrer)
        ?  BLOCO INVISÍVEL: sólido, mas só aparece depois que a coruja
-          encosta nele (e continua à mostra nas próximas vidas da fase)
+          encosta nele (morreu/↻ = invisível de novo: a fase volta do zero)
 
      armadilhas: [{ g: grupo ('a', '1'... ou 'bandeira'), acao, ...condições }]
        acao: 'cai' | 'some' | 'aparece' | 'move' | 'gravidade'
@@ -111,7 +111,12 @@
      BLOCO EM MOVIMENTO É SÓLIDO: chão que anda/cai carrega a coruja; bloco
      que invade empurra; se prensar contra outro sólido, esmaga.
 
-     textos: { c: coluna, r: linha, t: 'texto' } — dicas desenhadas no cenário.
+     textos: { c: coluna, r: linha, t: 'texto' } — dicas FIXAS desenhadas no
+       cenário (fazem parte da fase; não são fala de guia).
+
+     RESET: morrer, ↻ ou R = a fase volta exatamente como abriu (ver
+     _iniciarVida). Não guarde estado de jogo fora de grupos/armadilhas/
+     guias/p — o que ficar fora não é zerado.
 
      guias (opcional): corujas "clone" que o jogador NÃO controla:
        { tipo: 'traidora' | 'confiavel',
@@ -1405,13 +1410,21 @@
     return cv;
   }
 
-  /* ── Vida nova (reset de fase: armadilhas e guias voltam ao lugar) ── */
+  /* ── Vida nova = fase do zero (v359) ────────────────────────────
+     Usada na morte, no ↻ / tecla R e ao abrir a fase: TUDO que é
+     dinâmico é recriado a partir dos dados (FASES[i] nunca é alterado;
+     _lerFase só lê o mapa). Não sobra nada da tentativa anterior:
+     coruja, blocos (cópia nova de cada bloco — inclusive o "já visto"
+     dos '?' e '%'), armadilhas e seus timers, espinhos que nascem/piscam,
+     guias (posição, passo, falas, timers), bandeira, gravidade, partículas,
+     tremor e câmera. Só o contador de mortes e o progresso continuam. */
   function _iniciarVida() {
     grupos = {};
     var gd = nivel.gruposDef, cfg = fase.grupos || {};
+    function copia(lista) { var out = []; for (var k = 0; k < lista.length; k++) out.push({ c: lista[k].c, r: lista[k].r }); return out; }
     for (var id in gd) {
       var gc = cfg[id] || {};
-      grupos[id] = { id: id, blocos: gd[id].blocos, espinhos: gd[id].espinhos,
+      grupos[id] = { id: id, blocos: copia(gd[id].blocos), espinhos: copia(gd[id].espinhos),
                      ox: 0, oy: 0, vy: 0, visivel: true, caindo: false, mata: false,
                      alvo: null, vel: 0, surgir: 1, dx: 0, dy: 0, feito: false,
                      falso: id === '%', oculto: id === '?', pousa: false,
@@ -1440,6 +1453,8 @@
                    visivel: !d.aparece });
     }
     particulas = [];
+    tremor = 0; acumulado = 0; timerEstado = 0;
+    cam.x = null;   // câmera pula direto pro início (não desliza desde o lugar da morte)
     estado = 'jogando';
     _atualizarHud();
   }
@@ -1452,7 +1467,6 @@
     if (wrap) wrap.style.background = fase.cores.fundo;
     _esconder(elMenu); _esconder(elFim); _esconder(elBanner);
     _iniciarVida();
-    cam.x = null; // força a câmera a pular direto pra coruja
   }
 
   /* ── Colisão ────────────────────────────────────────────────── */
@@ -2059,8 +2073,13 @@
         var b = g.blocos[i], bx = b.c * T + gx, by = b.r * T + gy;
         if (g.oculto && !b.visto) continue;
         ctx.fillRect(bx, by, T, T);
-        if (b.r === nivel.H - 1) ctx.fillRect(bx, by + T, T, EXT);
-        if (b.r === 0) ctx.fillRect(bx, by - EXT, T, EXT);
+        // Encostado na borda do mapa: prolonga até fora da tela — mas só
+        // enquanto o grupo está no lugar. Antes o prolongamento ia junto
+        // com a torre que caía e parecia uma coluna que nunca saía dali.
+        if (!gx && !gy) {
+          if (b.r === nivel.H - 1) ctx.fillRect(bx, by + T, T, EXT);
+          if (b.r === 0) ctx.fillRect(bx, by - EXT, T, EXT);
+        }
       }
       var sub = Math.round((1 - g.surgir) * 10);
       for (i = 0; i < g.espinhos.length; i++) {
@@ -2421,7 +2440,7 @@
   function _aoBlur() { if (ativo) _limparEntrada(); }
 
   function _reiniciar() {
-    if (estado === 'jogando' || estado === 'morto') { _iniciarVida(); cam.x = null; }
+    if (estado === 'jogando' || estado === 'morto') _iniciarVida();   // mesmo reset da morte
   }
 
   function _aoVisibilidade() {
@@ -2551,6 +2570,24 @@
                p: p ? { x: p.x, y: p.y, vx: p.vx, noChao: p.noChao } : null,
                inp: { esq: inp.esq, dir: inp.dir, pulo: inp.pulo },
                guias: guias.map(function (g) { return { x: g.x, y: g.y, tipo: g.def.tipo, ativa: g.ativa, passo: g.passo, visivel: g.visivel, fala: g.falaT > 0 ? g.fala : '' }; }) };
+    },
+    // Foto de TODO o estado dinâmico da fase (testes do reset — não altera nada)
+    _foto: function () {
+      if (!nivel || !p) return null;
+      var gs = {}, id, i;
+      for (id in grupos) {
+        var g = grupos[id], vistos = 0;
+        for (i = 0; i < g.blocos.length; i++) if (g.blocos[i].visto) vistos++;
+        gs[id] = [g.ox, g.oy, g.vy, g.visivel, g.caindo, g.mata, g.alvo ? [g.alvo.x, g.alvo.y] : null, g.feito, g.pousa, g.surgir, vistos];
+      }
+      return {
+        p: [p.x, p.y, p.vx, p.vy, p.buffer, p.coyote, p.gravF, p.puloF, p.efeitoT, p.mexeu, p.vidaT, p.t, p.seguraMin, p.visivel],
+        grupos: gs,
+        armadilhas: armadilhas.map(function (a) { return [a.disparada, a.armada, a.timer, a.antes]; }),
+        guias: guias.map(function (g) { return [g.x, g.y, g.ativa, g.passo, g.t, g.emPasso, g.pausa, g.fala, g.falaT, g.fim, g.agradeceu, g.zombou, g.visivel]; }),
+        particulas: particulas.length, tremor: tremor > 0, camSnap: cam.x === null,
+        mapa: JSON.stringify(fase.mapa)
+      };
     }
   };
 })();

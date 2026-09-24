@@ -101,6 +101,7 @@
 
   var _ppCanvas = null, _ppCtx = null, _ppW = 0, _ppH = 0, _ppDpr = 1;
   var _ppRAF = 0, _ppUltimoTs = 0;
+  var _ppPausado = false;     // pausa do modo solo (menu unificado do hub — ver _ppRegistrarMenu)
   // Watchdog do convidado: modelo é host-autoritativo e o canal WebRTC não
   // avisa se o anfitrião só parou de simular (app em segundo plano, etc.) —
   // sem isto a bola congelava no ar sem nenhum aviso (ver A2.5).
@@ -200,6 +201,7 @@
     }
     _ppDimensionar();
     _ppAsset('cenario-arena.webp');   // dispara o carregamento do fundo cedo
+    _ppRegistrarMenu();
     _ppMostrarTela('inicio');
     _ppLimparErroMenu();
     _ppDesenhar();
@@ -251,6 +253,11 @@
      'jogando' nenhum aparece — só o HUD + canvas. */
   function _ppMostrarTela(qual) {
     _ppEstado = qual;
+    // Menu unificado do hub: botão ⏸/☰ no lugar do "Voltar aos jogos"
+    // só durante a partida. Qualquer troca de tela zera a pausa.
+    _ppPausado = false;
+    var M = _ppMenu();
+    if (M) M.partida('jogo-pingpong', qual === 'jogando');
     // Saiu da tela de sala (conectou, voltou ao menu, acabou): o teto de
     // espera do "Conectando…" não tem mais o que vigiar (ver _ppMostrarSala).
     if (qual !== 'sala') _ppPararTimerConectando();
@@ -275,6 +282,36 @@
     } else {
       _ppPararListaSalas();
     }
+  }
+
+  /* ── Menu unificado (hub.js → AngatubaGames.menu) ──────────────
+     Solo: pausa de verdade (para o loop; ao continuar o dt recomeça do
+     zero). Multiplayer: sem pausa — o modelo é host-autoritativo e uma
+     pausa local dessincronizaria os dois lados; o menu só cobre a tela
+     com a partida seguindo por trás (ícone ☰ em vez de ⏸). */
+  function _ppMenu() {
+    var G = window.AngatubaGames;
+    return (G && G.menu) || null;
+  }
+  function _ppRegistrarMenu() {
+    var M = _ppMenu();
+    if (!M) return;
+    M.registrar('jogo-pingpong', {
+      podePausar: function () { return _ppModo === 'solo'; },
+      pausar: function () {
+        _ppPausado = true;
+        if (_ppRAF) { cancelAnimationFrame(_ppRAF); _ppRAF = 0; }
+        _ppArrastoAnterior = null;
+      },
+      continuar: function () {
+        if (!_ppPausado) return;
+        _ppPausado = false;
+        if (_ppEstado === 'jogando' && !_ppRAF) {
+          _ppUltimoTs = 0;
+          _ppRAF = requestAnimationFrame(_ppLoop);
+        }
+      }
+    });
   }
 
   function _ppErroMenu(msg) {

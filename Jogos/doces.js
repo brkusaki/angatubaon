@@ -1072,6 +1072,9 @@
     var progEl = document.getElementById('dc-objetivo-progresso'); if (progEl) progEl.textContent = _dcObjetivoProgresso();
   }
   function _dcMostrarOverlay(nome) {
+    // Sem overlay do jogo = fase rolando → menu unificado do hub no canto.
+    var G = window.AngatubaGames;
+    if (G && G.menu) G.menu.partida('jogo-doces', !nome);
     var inicio = document.getElementById('dc-inicio');
     var fim = document.getElementById('dc-fim');
     if (inicio) inicio.style.display = (nome === 'inicio') ? 'flex' : 'none';
@@ -1153,8 +1156,22 @@
     _dcIniciarFase(_dcFaseAtual);
   }
 
+  // ── Menu unificado (hub.js → AngatubaGames.menu) ────────────
+  // Jogo por turnos, sem relógio: "pausar" só solta o doce que estiver
+  // sendo arrastado — o overlay do menu cobre o tabuleiro. Uma cascata
+  // que já estava caindo termina sozinha por trás (não gasta movimento).
+  function _dcRegistrarMenu() {
+    var G = window.AngatubaGames;
+    if (!G || !G.menu) return;
+    G.menu.registrar('jogo-doces', {
+      pausar: function () { _dcArraste = null; },
+      continuar: function () {}
+    });
+  }
+
   // ── Preparação da tela (chamada pelo _jogoLoader ao abrir) ──
   function _dcPrepararTela() {
+    _dcRegistrarMenu();
     _dcCanvas = document.getElementById('dc-grid');
     if (_dcCanvas && !_dcCanvas._dcPronto) {
       _dcCanvas._dcPronto = true;

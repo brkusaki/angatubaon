@@ -442,6 +442,7 @@
   // JANELA visível de cada jogador se adapta à própria tela.
   var _tqViewportLargura = TQ_VIEWPORT_LARGURA;
   var _tqRAF = 0, _tqUltimoTs = 0;
+  var _tqPausado = false;     // pausa do modo solo (menu unificado do hub — ver _tqRegistrarMenu)
   // Watchdog do convidado: mesmo problema do Ping Pong — o canal WebRTC
   // não avisa se o anfitrião só parou de simular, e sem isto o tanque e os
   // projéteis do adversário congelavam no lugar sem nenhum aviso (ver A2.5).
@@ -596,6 +597,7 @@
     // Pede ao sistema pra girar pra landscape (instalado/fullscreen);
     // em navegador comum é recusado e cai na rotação por CSS.
     _tqTravarLandscape();
+    _tqRegistrarMenu();
     _tqMostrarTela('inicio');
     _tqLimparErroMenu();
     _tqResetParedes();
@@ -656,6 +658,11 @@
      'jogando' nenhum aparece — só o HUD + canvas + controles. */
   function _tqMostrarTela(qual) {
     _tqEstado = qual;
+    // Menu unificado do hub: botão ⏸/☰ no lugar do "Voltar aos jogos"
+    // só durante a partida. Qualquer troca de tela zera a pausa.
+    _tqPausado = false;
+    var M = _tqMenu();
+    if (M) M.partida('jogo-tanques', qual === 'jogando');
     // Saiu da tela de sala (conectou, voltou ao menu, acabou): o teto de
     // espera do "Conectando…" não tem mais o que vigiar (ver _tqMostrarSala).
     if (qual !== 'sala') _tqPararTimerConectando();
@@ -680,6 +687,35 @@
     } else {
       _tqPararListaSalas();
     }
+  }
+
+  /* ── Menu unificado (hub.js → AngatubaGames.menu) ──────────────
+     Mesmo acordo do Ping Pong: solo pausa de verdade (para o loop e
+     solta joystick/gatilho); multiplayer não pausa — a partida segue por
+     trás do menu, senão os dois lados dessincronizariam. */
+  function _tqMenu() {
+    var G = window.AngatubaGames;
+    return (G && G.menu) || null;
+  }
+  function _tqRegistrarMenu() {
+    var M = _tqMenu();
+    if (!M) return;
+    M.registrar('jogo-tanques', {
+      podePausar: function () { return _tqModo === 'solo'; },
+      pausar: function () {
+        _tqPausado = true;
+        if (_tqRAF) { cancelAnimationFrame(_tqRAF); _tqRAF = 0; }
+        _tqResetJoystickVisual();
+      },
+      continuar: function () {
+        if (!_tqPausado) return;
+        _tqPausado = false;
+        if (_tqEstado === 'jogando' && !_tqRAF) {
+          _tqUltimoTs = 0;
+          _tqRAF = requestAnimationFrame(_tqLoop);
+        }
+      }
+    });
   }
 
   function _tqErroMenu(msg) {

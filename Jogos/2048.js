@@ -52,6 +52,7 @@
   var _t48Pontos = 0;
   var _t48Melhor = 0;             // maior peça já formada NESTA partida (pra HUD/objetivo)
   var _t48Rodando = false;
+  var _t48Pausado = false;        // menu unificado do hub (ver _t48RegistrarMenu)
   var _t48Animando = false;       // trava entrada durante a transição de uma jogada
   var _t48VenceuMostrado = false; // já comemorou o 2048 nesta partida? (só comemora 1x)
   var _t48Arraste = null;
@@ -346,6 +347,10 @@
   }
 
   function _t48MostrarOverlay(nome) {
+    // Sem overlay do jogo = partida rolando → menu unificado do hub no canto.
+    _t48Pausado = false;
+    var G = window.AngatubaGames;
+    if (G && G.menu) G.menu.partida('jogo-2048', !nome);
     var inicio = document.getElementById('t48-inicio');
     var fim = document.getElementById('t48-fim');
     if (inicio) inicio.style.display = (nome === 'inicio') ? 'flex' : 'none';
@@ -444,7 +449,7 @@
 
   var _T48_TECLAS = { ArrowLeft: 'esquerda', ArrowRight: 'direita', ArrowUp: 'cima', ArrowDown: 'baixo' };
   function _t48KeyDown(e) {
-    if (!_t48Rodando || _t48Animando) return;
+    if (!_t48Rodando || _t48Animando || _t48Pausado) return;
     var dir = _T48_TECLAS[e.key];
     if (!dir) return;
     e.preventDefault();
@@ -469,9 +474,22 @@
     window.addEventListener('orientationchange', _t48AoRedimensionar);
   }
 
+  // ── Menu unificado (hub.js → AngatubaGames.menu) ────────────
+  // Jogo por turnos: "pausar" é só travar a entrada (setas e arraste)
+  // enquanto o overlay do menu cobre o tabuleiro.
+  function _t48RegistrarMenu() {
+    var G = window.AngatubaGames;
+    if (!G || !G.menu) return;
+    G.menu.registrar('jogo-2048', {
+      pausar: function () { _t48Pausado = true; _t48CancelarArraste(); },
+      continuar: function () { _t48Pausado = false; }
+    });
+  }
+
   // ── Preparação da tela (chamada pelo _jogoLoader ao abrir) ──
   function _t48PrepararTela() {
     _t48CriarDOM();
+    _t48RegistrarMenu();
     _t48LigarListeners();
     _t48CancelarArraste();
     _t48Rodando = false;
@@ -484,6 +502,7 @@
   function _t48Parar() {
     _t48Rodando = false;
     _t48CancelarArraste();
+    _t48Pausado = false;
   }
 
   window._t48Comecar = _t48Comecar;

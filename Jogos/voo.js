@@ -154,6 +154,7 @@
   var _vooCanvas = null, _vooCtx = null;
   var _vooW = 0, _vooH = 0, _vooDpr = 1;
   var _vooRAF = 0, _vooLast = 0, _vooEstado = 'inicio';       // 'inicio'|'jogando'|'fim'
+  var _vooPausado = false;   // menu unificado do hub (ver _vooRegistrarMenu)
   var _vooListenersOn = false, _vooResizeOn = false;
 
   // Estado da partida
@@ -1233,7 +1234,7 @@
     // _vooLigarControles): sem essa guarda, as setas continuam mexendo em
     // _vooKeyDir (e no dir da coruja) mesmo com o jogo fechado ou fora da
     // tela do Voo — mesma correção do A2.1 na Corrida.
-    if (_vooEstado !== 'jogando') return;
+    if (_vooEstado !== 'jogando' || _vooPausado) return;
     if (e.key === 'ArrowLeft')  { _vooKeyDir = down ? -1 : 0; _vooOwl.dir = -1; }
     else if (e.key === 'ArrowRight') { _vooKeyDir = down ? 1 : 0; _vooOwl.dir = 1; }
   }
@@ -1268,6 +1269,8 @@
       _vooResizeOn = true;
     }
     _vooEstado = 'inicio';
+    _vooRegistrarMenu();
+    _vooMenuPartida(false);
     var rec = document.getElementById('vo-recorde'); if (rec) rec.textContent = _vooRec();
     var pts = document.getElementById('vo-pontos');  if (pts) pts.textContent = 0;
     _vooMostrarOverlay('inicio');
@@ -1311,6 +1314,7 @@
     _vooReset();
     _vooEstado = 'jogando';
     _vooLast = 0;
+    _vooMenuPartida(true);
     if (_vooRAF) cancelAnimationFrame(_vooRAF);
     _vooRAF = requestAnimationFrame(_vooLoop);
   }
@@ -1319,11 +1323,45 @@
     if (_vooRAF) { cancelAnimationFrame(_vooRAF); _vooRAF = 0; }
     if (_vooEstado === 'jogando') _vooEstado = 'inicio';
     _vooDragging = false; _vooKeyDir = 0;
+    _vooMenuPartida(false);
+  }
+
+  /* ── Menu unificado (hub.js → AngatubaGames.menu) ──────────────
+     ⏸ no canto durante o voo: para o loop e solta dedo/teclas; ao
+     continuar o relógio recomeça do zero (sem "pulo" de dt). */
+  function _vooMenu() {
+    var G = window.AngatubaGames;
+    return (G && G.menu) || null;
+  }
+  function _vooMenuPartida(ativa) {
+    _vooPausado = false;
+    var M = _vooMenu();
+    if (M) M.partida('jogo-voo', ativa);
+  }
+  function _vooRegistrarMenu() {
+    var M = _vooMenu();
+    if (!M) return;
+    M.registrar('jogo-voo', {
+      pausar: function () {
+        _vooPausado = true;
+        if (_vooRAF) { cancelAnimationFrame(_vooRAF); _vooRAF = 0; }
+        _vooDragging = false; _vooKeyDir = 0;
+      },
+      continuar: function () {
+        if (!_vooPausado) return;
+        _vooPausado = false;
+        if (_vooEstado === 'jogando' && !_vooRAF) {
+          _vooLast = 0;
+          _vooRAF = requestAnimationFrame(_vooLoop);
+        }
+      }
+    });
   }
 
   function _vooFim() {
     if (_vooRAF) { cancelAnimationFrame(_vooRAF); _vooRAF = 0; }
     _vooEstado = 'fim';
+    _vooMenuPartida(false);
     var score = _vooScore;
     var rec = _vooRec();
     var recorde = score > rec;

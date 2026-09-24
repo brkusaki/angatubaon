@@ -1325,6 +1325,7 @@
   var elGirar, elBtnGirar, elDpad;
   var img = new Image(), imgOk = false;
   var montado = false, ativo = false, raf = 0, ultimoT = 0, acumulado = 0;
+  var pausado = false, emPartida = false;   // menu unificado do hub (ver _registrarMenu)
   var estado = 'menu';          // menu | jogando | morto | vitoria | fim
   var faseIdx = 0, fase = null, nivel = null;
   var p = null, grupos = null, armadilhas = null, guias = [], particulas = [];
@@ -2219,11 +2220,46 @@
   /* ── Loop ───────────────────────────────────────────────────── */
   function _loop(t) {
     raf = 0;
-    if (!ativo) return;
+    if (!ativo || pausado) return;
     var dt = ultimoT ? Math.min(0.05, (t - ultimoT) / 1000) : 0;
     ultimoT = t;
     if (nivel) { _atualizar(dt); _desenhar(); }
+    _sincMenu();
     raf = requestAnimationFrame(_loop);
+  }
+
+  /* ── Menu unificado (hub.js → AngatubaGames.menu) ───────────────
+     Partida = qualquer estado fora do menu de fases e da tela de fim
+     (jogando, morto, vitória). Nela o "Voltar aos jogos" sai e entra o
+     ⏸ no canto; pausar desliga o loop e solta os controles, continuar
+     religa com o dt zerado. O ☰ do HUD continua sendo o "escolher fase". */
+  function _menu() {
+    var G = window.AngatubaGames;
+    return (G && G.menu) || null;
+  }
+  function _sincMenu() {
+    var em = ativo && estado !== 'menu' && estado !== 'fim';
+    if (em === emPartida) return;
+    emPartida = em;
+    pausado = false;
+    var M = _menu();
+    if (M) M.partida('jogo-armadilha', em);
+  }
+  function _registrarMenu() {
+    var M = _menu();
+    if (!M) return;
+    M.registrar('jogo-armadilha', {
+      pausar: function () {
+        pausado = true;
+        _desligarLoop();
+        _limparEntrada();
+      },
+      continuar: function () {
+        if (!pausado) return;
+        pausado = false;
+        if (!document.hidden) _ligarLoop();
+      }
+    });
   }
   function _ligarLoop() { if (!raf && ativo) { ultimoT = 0; raf = requestAnimationFrame(_loop); } }
   function _desligarLoop() { if (raf) cancelAnimationFrame(raf); raf = 0; }
@@ -2421,7 +2457,7 @@
     return TECLAS[ev.code] || TECLAS_KEY[String(ev.key || '').toLowerCase()] || null;
   }
   function _teclaDown(ev) {
-    if (!ativo || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (!ativo || pausado || ev.ctrlKey || ev.metaKey || ev.altKey) return;
     var acao = _acaoTecla(ev);
     if (!acao) return;
     ev.preventDefault();
@@ -2446,7 +2482,7 @@
   function _aoVisibilidade() {
     if (!ativo) return;
     if (document.hidden) { _desligarLoop(); _limparEntrada(); }
-    else _ligarLoop();
+    else if (!pausado) _ligarLoop();
   }
 
   /* ── Montagem do DOM ────────────────────────────────────────── */
@@ -2543,9 +2579,12 @@
       document.addEventListener('visibilitychange', _aoVisibilidade);
     }
     medida.cw = 0;
+    _registrarMenu();
+    pausado = false;
     // Cenário da fase liberada aparece atrás do menu
     _comecarFase(_lerProgresso());
     _abrirMenu();
+    _sincMenu();
     _ligarLoop();
   }
 
@@ -2560,6 +2599,8 @@
     window.removeEventListener('blur', _aoBlur);
     document.removeEventListener('visibilitychange', _aoVisibilidade);
     estado = 'menu';
+    pausado = false;
+    _sincMenu();
   }
 
   window.ArmadilhaGame = {

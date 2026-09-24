@@ -21,6 +21,8 @@
   var _sqAceitando = false; // true quando é a vez do jogador
   var _sqTocando = false;   // true durante o playback
   var _sqTimers = [];       // timeouts do playback (pra limpar)
+  var _sqPausado = false;   // menu unificado do hub (ver _sqRegistrarMenu)
+  var _sqVezAntesPausa = false; // era a vez do jogador quando pausou?
 
   function _sqRecordeGet() {
     try { return Number(localStorage.getItem('angatuba_seq_rec')) || 0; } catch(e) { return 0; }
@@ -71,6 +73,7 @@
   }
 
   function _sqPreparar() {
+    _sqMenuPartida(false);
     _sqLimparTimers();
     _sqApagarTodos();
     _sqAjustarGrade(4); // sempre começa com 4 corujas (2x2)
@@ -206,6 +209,7 @@
   }
 
   function _sqErrou() {
+    _sqMenuPartida(false);
     _sqAceitando = false;
     _sqTocando = false;
     _sqLimparTimers();
@@ -267,7 +271,53 @@
     var inicio = document.getElementById('sq-inicio'); if (inicio) inicio.style.display = 'none';
     var fim = document.getElementById('sq-fim'); if (fim) fim.style.display = 'none';
     var recEl = document.getElementById('sq-recorde'); if (recEl) recEl.textContent = _sqRecordeGet();
+    _sqMenuPartida(true);
     _sqProximaRodada();
+  }
+
+  /* ── Menu unificado (hub.js → AngatubaGames.menu) ──────────────
+     ⏸ no canto durante a partida. Pausar apaga as luzes e cancela os
+     timers; ao continuar:
+       - era a vez do jogador → devolve a vez, do passo em que parou;
+       - acabou de completar a rodada → segue pra próxima;
+       - estava no meio da demonstração → mostra a sequência de novo
+         desde o início (ninguém perde por ter pausado no meio dela).
+     No Coruja Party não pausa — o menu só cobre a tela. */
+  function _sqMenu() {
+    var G = window.AngatubaGames;
+    return (G && G.menu) || null;
+  }
+  function _sqNaParty() {
+    var G = window.AngatubaGames;
+    return !!(G && G.party && G.party.ativo());
+  }
+  function _sqMenuPartida(ativa) {
+    _sqPausado = false;
+    var M = _sqMenu();
+    if (M) M.partida('jogo-sequencia', ativa);
+  }
+  function _sqRegistrarMenu() {
+    var M = _sqMenu();
+    if (!M) return;
+    M.registrar('jogo-sequencia', {
+      podePausar: function () { return !_sqNaParty(); },
+      pausar: function () {
+        if (_sqPausado) return;
+        _sqPausado = true;
+        _sqVezAntesPausa = _sqAceitando;
+        _sqAceitando = false;
+        _sqTocando = false;
+        _sqLimparTimers();
+        _sqApagarTodos();
+      },
+      continuar: function () {
+        if (!_sqPausado) return;
+        _sqPausado = false;
+        if (_sqVezAntesPausa) { _sqAceitando = true; return; }
+        if (_sqSeq.length && _sqPasso >= _sqSeq.length) _sqProximaRodada();
+        else _sqPlayback();
+      }
+    });
   }
 
   // Liga os cliques nos botões uma única vez (delegação simples).
@@ -289,6 +339,7 @@
   // Preparação da tela: liga os botões (idempotente) e reseta o estado.
   function _sqPrepararTela() {
     _sqLigarBotoes();
+    _sqRegistrarMenu();
     _sqPreparar();
   }
 
@@ -304,11 +355,23 @@
     if (_sqAceitando || _sqTocando) _sqErrou();
   }
 
+  // Fix A2.12: parar() só limpava os timers e deixava _sqAceitando/
+  // _sqTocando como estavam — os botões da grade (listeners permanentes)
+  // continuavam aceitando toque num jogo que já deveria estar parado, e
+  // _sqForcarFimParty (que testa essas duas flags) podia disparar um
+  // _sqErrou() tardio reportando placar de uma rodada já encerrada.
+  function _sqParar() {
+    _sqLimparTimers();
+    _sqAceitando = false;
+    _sqTocando = false;
+    _sqMenuPartida(false);
+  }
+
   // API pública consumida pelo loader do app (_jogoLoader).
   window.SequenciaGame = {
     preparar: _sqPrepararTela,
     comecar:  _sqComecar,
-    parar:    _sqLimparTimers,
+    parar:    _sqParar,
     forcarFimParty: _sqForcarFimParty
   };
 })();

@@ -403,6 +403,7 @@
   var _pnW = 320, _pnH = 560, _pnDpr = 1;
   var _pnEstado = 'inicio';           // 'inicio' | 'jogando' | 'fim'
   var _pnRAF = 0, _pnLast = 0;
+  var _pnPausado = false;   // menu unificado do hub (ver _pnRegistrarMenu)
   var _pnListenersOn = false, _pnResizeOn = false;
 
   var _pnAzulejos = [];      // [0] é sempre o mais baixo
@@ -799,6 +800,7 @@
   function _pnGameOver(motivo) {
     if (_pnRAF) { cancelAnimationFrame(_pnRAF); _pnRAF = 0; }
     _pnEstado = 'fim';
+    _pnMenuPartida(false);
     _pnMovendo = false;
     _pnDraw();
 
@@ -879,7 +881,7 @@
     if (e.cancelable) e.preventDefault();
   }
   function _pnKey(e) {
-    if (_pnEstado !== 'jogando' || !_pnCanvas) return;
+    if (_pnEstado !== 'jogando' || _pnPausado || !_pnCanvas) return;
     var mapa = { '1': 0, '2': 1, '3': 2, '4': 3,
                  'a': 0, 's': 1, 'd': 2, 'f': 3,
                  'ArrowLeft': 0, 'ArrowDown': 1, 'ArrowUp': 2, 'ArrowRight': 3 };
@@ -936,6 +938,8 @@
       _pnResizeOn = true;
     }
     _pnEstado = 'inicio';
+    _pnRegistrarMenu();
+    _pnMenuPartida(false);
     _pnPontos = 0;
     if (!_pnMelodia) _pnMelodia = _PN_MELODIAS[(Math.random() * _PN_MELODIAS.length) | 0];
     _pnMontarSeletor();
@@ -970,6 +974,7 @@
     // último modo jogado.
     _pnReset(modo || _pnModo);
     _pnEstado = 'jogando'; _pnLast = 0;
+    _pnMenuPartida(true);
     if (_pnRAF) cancelAnimationFrame(_pnRAF);
     _pnRAF = requestAnimationFrame(_pnLoop);
   }
@@ -990,6 +995,45 @@
     // estiver vazia — reabrir o jogo desenhava por cima os da partida
     // anterior (alguns já "tocada", em posições intermediárias).
     _pnAzulejos.length = 0;
+    _pnMenuPartida(false);
+  }
+
+  /* ── Menu unificado (hub.js → AngatubaGames.menu) ──────────────
+     ⏸ no canto durante a música: para o loop (os azulejos congelam onde
+     estão) e ao continuar o dt recomeça do zero. Dentro de uma rodada do
+     Coruja Party não pausa — o relógio da rodada é do Party, igual pra
+     todo mundo; o menu só cobre a tela. */
+  function _pnMenu() {
+    var G = window.AngatubaGames;
+    return (G && G.menu) || null;
+  }
+  function _pnNaParty() {
+    var G = window.AngatubaGames;
+    return !!(G && G.party && G.party.ativo());
+  }
+  function _pnMenuPartida(ativa) {
+    _pnPausado = false;
+    var M = _pnMenu();
+    if (M) M.partida('jogo-piano', ativa);
+  }
+  function _pnRegistrarMenu() {
+    var M = _pnMenu();
+    if (!M) return;
+    M.registrar('jogo-piano', {
+      podePausar: function () { return !_pnNaParty(); },
+      pausar: function () {
+        _pnPausado = true;
+        if (_pnRAF) { cancelAnimationFrame(_pnRAF); _pnRAF = 0; }
+      },
+      continuar: function () {
+        if (!_pnPausado) return;
+        _pnPausado = false;
+        if (_pnEstado === 'jogando' && !_pnRAF) {
+          _pnLast = 0;
+          _pnRAF = requestAnimationFrame(_pnLoop);
+        }
+      }
+    });
   }
 
   // Teto de tempo do modo Coruja Party (ver Jogos/party.js): sobrevivência

@@ -981,6 +981,9 @@
 
   function _voltarAoMenu() {
     _pararJogosExternos();
+    // Menu unificado (AngatubaJogoMenu): nenhuma tela fica em modo partida
+    // nem com o overlay aberto ao voltar pro menu de jogos.
+    if (window.AngatubaJogoMenu) window.AngatubaJogoMenu.resetar();
     // Sai da tela cheia nativa ao voltar pro menu de jogos (o menu rola e
     // não precisa/quer tela cheia travada).
     _sairTelaCheia();
@@ -1241,6 +1244,215 @@
   }
   window._abrirJogo = _abrirJogo;
   window._voltarAoMenu = _voltarAoMenu;
+
+  /* ══════════════════════════════════════════════════════════════
+     MENU UNIFICADO DENTRO DOS JOGOS — window.AngatubaJogoMenu
+     (o mesmo objeto sai na ponte como AngatubaGames.menu).
+     Durante a PARTIDA a tela do jogo fica limpa: o "Voltar aos jogos"
+     (.jogo-voltar) some e no canto aparece um botão redondo — o mesmo
+     visual do antigo ⏸ do Hóquei. Tocar nele pausa o jogo (quando dá) e
+     abre um overlay com Continuar · Som · Voltar aos jogos. Fora da
+     partida (menu/lobby/fim do próprio jogo) o .jogo-voltar volta.
+     O botão e o overlay são criados aqui, uma vez por tela, dentro da
+     própria .jogo-tela — nenhum jogo precisa de markup novo.
+
+     Uso por um jogo (tudo opcional, menos o id da tela):
+       M.registrar('jogo-x', {
+         podePausar: fn → bool,  // padrão: true se houver pausar()
+         pausar: fn, continuar: fn,
+         descricao: fn → string, // linha abaixo do título
+         extra: { rotulo: 'Sair da partida', acao: fn }, // link secundário
+         teclaPropria: true,     // o jogo já trata Esc/P (não duplicar)
+         pausarAoOcultar: false  // padrão true: app foi pro 2º plano → abre pausado
+       });
+       M.partida('jogo-x', true|false);   // entrou / saiu da partida
+       M.sincronizar('jogo-x', aberto);   // pausa que nasce no próprio jogo
+                                          // (Hóquei: tecla P, pausa do outro jogador)
+     Sem pausa possível (ex.: multiplayer do Ping Pong/Tanques) o botão vira
+     ☰ e o overlay só cobre a tela — a partida segue rolando por trás.
+  ══════════════════════════════════════════════════════════════ */
+  (function () {
+    var _cfg = {};      // id da tela → config do jogo
+    var _est = {};      // id da tela → { partida, aberto, btn, ov }
+
+    function _st(id) { return _est[id] || (_est[id] = { partida: false, aberto: false, btn: null, ov: null }); }
+    function _pode(id) {
+      var c = _cfg[id] || {};
+      if (typeof c.podePausar === 'function') { try { return !!c.podePausar(); } catch (e) { return false; } }
+      return typeof c.pausar === 'function';
+    }
+    function _chamar(fn) { if (typeof fn === 'function') { try { fn(); } catch (e) {} } }
+
+    function _montar(id) {
+      var s = _st(id), tela = document.getElementById(id);
+      if (!tela) return null;
+      if (s.btn && s.btn.parentNode === tela) return s;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'jm-btn';
+      btn.innerHTML = '<i class="fa fa-pause"></i>';
+      btn.addEventListener('click', function () { btn.blur(); _abrir(id); });
+      var ov = document.createElement('div');
+      ov.className = 'jm-overlay';
+      ov.setAttribute('role', 'dialog');
+      ov.setAttribute('aria-modal', 'true');
+      ov.setAttribute('aria-label', 'Menu do jogo');
+      ov.innerHTML =
+        '<div class="jm-caixa">' +
+          '<div class="jm-titulo">Pausado</div>' +
+          '<div class="jm-desc"></div>' +
+          '<button type="button" class="jm-play" data-jm="continuar"><i class="fa fa-play"></i><span>Continuar</span></button>' +
+          '<button type="button" class="jm-opcao" data-jm="som"><i class="fa fa-volume-high"></i><span>Som ligado</span></button>' +
+          '<button type="button" class="jm-opcao" data-jm="sair"><i class="fa fa-chevron-left"></i><span>Voltar aos jogos</span></button>' +
+          '<button type="button" class="jm-link" data-jm="extra" style="display:none;"></button>' +
+        '</div>';
+      ov.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-jm]');
+        if (!b || b.disabled) return;
+        var acao = b.getAttribute('data-jm'), c = _cfg[id] || {};
+        if (acao === 'continuar') _fechar(id, true);
+        else if (acao === 'som') {
+          if (typeof window._alternarSomJogos === 'function') window._alternarSomJogos();
+          _render(id);
+        } else if (acao === 'sair') {
+          _fechar(id, false);
+          if (typeof c.sair === 'function') _chamar(c.sair); else _voltarAoMenu();
+        } else if (acao === 'extra') {
+          _fechar(id, false);
+          if (c.extra) _chamar(c.extra.acao);
+        }
+      });
+      tela.appendChild(btn);
+      tela.appendChild(ov);
+      s.btn = btn; s.ov = ov;
+      return s;
+    }
+
+    function _render(id) {
+      var s = _st(id);
+      var tela = document.getElementById(id);
+      if (tela) tela.classList.toggle('jm-partida', s.partida);
+      if (!s.btn) return;
+      var pode = _pode(id), c = _cfg[id] || {};
+      var ic = s.btn.querySelector('i');
+      if (ic) ic.className = 'fa ' + (pode ? 'fa-pause' : 'fa-bars');
+      s.btn.setAttribute('aria-label', pode ? 'Pausar e abrir o menu' : 'Abrir o menu');
+      var mostrar = s.partida && s.aberto;
+      s.ov.classList.toggle('jm-aberto', mostrar);
+      s.ov.setAttribute('aria-hidden', mostrar ? 'false' : 'true');
+      if (!mostrar) return;
+      var q = function (sel) { return s.ov.querySelector(sel); };
+      q('.jm-titulo').textContent = pode ? 'Pausado' : 'Menu';
+      var desc = '';
+      if (typeof c.descricao === 'function') { try { desc = c.descricao() || ''; } catch (e) {} }
+      if (!desc && !pode) desc = 'A partida continua rolando enquanto este menu está aberto.';
+      var d = q('.jm-desc');
+      d.textContent = desc;
+      d.style.display = desc ? '' : 'none';
+      var bc = q('[data-jm="continuar"]');
+      bc.querySelector('i').className = 'fa fa-play';
+      bc.querySelector('span').textContent = pode ? 'Continuar' : 'Voltar à partida';
+      var S = window.AngatubaSom, somOn = !!(S && S.ativo());
+      var bs = q('[data-jm="som"]');
+      bs.disabled = !S;
+      bs.classList.toggle('jm-som-off', !somOn);
+      bs.setAttribute('aria-pressed', somOn ? 'true' : 'false');
+      bs.querySelector('i').className = 'fa ' + (somOn ? 'fa-volume-high' : 'fa-volume-xmark');
+      bs.querySelector('span').textContent = somOn ? 'Som ligado' : 'Som desligado';
+      var bx = q('[data-jm="extra"]');
+      bx.style.display = c.extra ? '' : 'none';
+      if (c.extra) bx.textContent = c.extra.rotulo || '';
+    }
+
+    function _abrir(id) {
+      var s = _st(id), c = _cfg[id] || {};
+      if (!s.partida || s.aberto) return;
+      s.aberto = true;
+      if (_pode(id)) _chamar(c.pausar);
+      _render(id);
+      var bc = s.ov && s.ov.querySelector('[data-jm="continuar"]');
+      if (bc) { try { bc.focus({ preventScroll: true }); } catch (e) {} }
+    }
+
+    function _fechar(id, retomar) {
+      var s = _st(id), c = _cfg[id] || {};
+      if (!s.aberto) return;
+      s.aberto = false;
+      _render(id);
+      if (retomar && _pode(id)) _chamar(c.continuar);
+    }
+
+    var _AngatubaJogoMenu = {
+      registrar: function (id, cfg) {
+        _cfg[id] = cfg || {};
+        _montar(id);
+        _render(id);
+      },
+      // Liga/desliga o "modo partida". Sair da partida (fim, lobby, queda)
+      // fecha o overlay sem chamar continuar() — o jogo zera a própria pausa.
+      partida: function (id, ativa) {
+        var s = _st(id);
+        ativa = !!ativa;
+        if (ativa && !_montar(id)) return;
+        if (ativa && !s.partida) {
+          // .jogo-voltar em fluxo (Pega a Coruja, Sequência, 2048, Blocos,
+          // Doces): só fica invisível, guardando a altura dele — o layout
+          // do jogo não pula. Flutuante (Voo, Hóquei, Tanques…): some.
+          var tela = document.getElementById(id);
+          var v = tela && tela.querySelector('.jogo-voltar');
+          var fluxo = false;
+          try { fluxo = !!(v && window.getComputedStyle(v).position !== 'absolute'); } catch (e) {}
+          if (tela) tela.classList.toggle('jm-fluxo', fluxo);
+        }
+        s.partida = ativa;
+        if (!ativa) s.aberto = false;
+        _render(id);
+      },
+      sincronizar: function (id, aberto) {
+        var s = _st(id);
+        s.aberto = !!aberto && s.partida;
+        _render(id);
+      },
+      abrir: _abrir,
+      fechar: function (id, retomar) { _fechar(id, retomar !== false); },
+      aberto: function (id) { var s = _st(id); return s.partida && s.aberto; },
+      // Chamado por _voltarAoMenu: nenhuma tela fica presa em modo partida.
+      resetar: function () {
+        for (var id in _est) {
+          if (!_est.hasOwnProperty(id)) continue;
+          _est[id].partida = false;
+          _est[id].aberto = false;
+          _render(id);
+        }
+      }
+    };
+    window.AngatubaJogoMenu = _AngatubaJogoMenu;
+
+    // Tela em partida visível agora (só uma por vez).
+    function _telaAtiva() {
+      for (var id in _est) {
+        if (!_est.hasOwnProperty(id) || !_est[id].partida) continue;
+        var t = document.getElementById(id);
+        if (t && t.style.display !== 'none') return id;
+      }
+      return null;
+    }
+    // Esc abre/fecha o menu (quem já trata a tecla — Hóquei — fica de fora).
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' && e.key !== 'Esc') return;
+      var id = _telaAtiva();
+      if (!id || (_cfg[id] || {}).teclaPropria) return;
+      e.preventDefault();
+      if (_est[id].aberto) _fechar(id, true); else _abrir(id);
+    });
+    // App foi pro segundo plano no meio da partida → volta pausado.
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) return;
+      var id = _telaAtiva();
+      if (!id || _est[id].aberto || (_cfg[id] || {}).pausarAoOcultar === false || !_pode(id)) return;
+      _abrir(id);
+    });
+  })();
 
   /* ── Jogos extraídos para /Jogos/ (lazy load) ───────────────────
      Voo da Coruja      → /Jogos/voo.js        (window.VooGame)
@@ -2082,6 +2294,10 @@
     voltarAoMenu: function () {
       if (typeof _voltarAoMenu === 'function') return _voltarAoMenu();
     },
+    // Menu unificado dentro da partida (⏸ → Continuar · Som · Voltar aos
+    // jogos). Mesmo objeto de window.AngatubaJogoMenu — ver o bloco
+    // "MENU UNIFICADO DENTRO DOS JOGOS" acima.
+    menu: window.AngatubaJogoMenu,
     // Caminho base dos assets de jogos (imagens, sons).
     assetsBase: '/Jogos/assets/',
 

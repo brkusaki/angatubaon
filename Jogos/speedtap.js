@@ -19,6 +19,7 @@
   var _stTempo = 0, _stPontos = 0, _stCombo = 0, _stComboMax = 0;
   var _stNivel = 1, _stAcertos = 0, _stVidas = 0;
   var _stTimerRelogio = null, _stTimerCiclo = null, _stRodando = false;
+  var _stPausado = false;   // menu unificado do hub (ver _stRegistrarMenu)
 
   // Recordes separados por modo.
   function _stRecChave() {
@@ -104,6 +105,7 @@
   // Prepara a tela (estado inicial, mostra recorde). Não inicia o jogo ainda.
   function _stPreparar() {
     _stParar();
+    _stRegistrarMenu();
     var recEl = document.getElementById('st-recorde');
     if (recEl) recEl.textContent = _stRecordeGet();
     var pEl = document.getElementById('st-pontos'); if (pEl) pEl.textContent = '0';
@@ -122,6 +124,7 @@
   // Para tudo (timers, alvo). Seguro chamar a qualquer momento.
   function _stParar() {
     _stRodando = false;
+    _stMenuPartida(false);
     if (_stTimerRelogio) { clearInterval(_stTimerRelogio); _stTimerRelogio = null; }
     if (_stTimerCiclo)   { clearTimeout(_stTimerCiclo);   _stTimerCiclo = null; }
     var arena = document.getElementById('st-arena');
@@ -169,7 +172,7 @@
     _stPosicionar(alvo, arena, cfg.tamanho);
 
     alvo.addEventListener('click', function(){
-      if (!_stRodando) return;
+      if (!_stRodando || _stPausado) return;
       _stTocarCoruja(tipo, alvo, arena);
     });
 
@@ -265,22 +268,83 @@
     if (recEl) { recEl.textContent = _stRecordeGet(); recEl.classList.remove('st-recorde-novo'); }
 
     _stRodando = true;
+    _stMenuPartida(true);
     _stProximaCoruja();
 
     // Contagem regressiva só no modo clássico. Sobrevivência não tem relógio.
-    if (_stModo === 'classico') {
-      var tEl = document.getElementById('st-tempo');
-      _stTimerRelogio = setInterval(function(){
-        _stTempo--;
-        if (tEl) tEl.textContent = _stTempo;
-        if (_stTempo <= 5 && tEl) { tEl.classList.add('st-tempo-baixo'); }
-        if (_stTempo <= 0) { _stFim(); }
-      }, 1000);
+    if (_stModo === 'classico') _stLigarRelogio();
+  }
+
+  // Extraído de _stComecar pra também servir de "retomar" ao voltar do
+  // segundo plano (ver _stAoVisibilidade / A2.11).
+  function _stLigarRelogio() {
+    var tEl = document.getElementById('st-tempo');
+    _stTimerRelogio = setInterval(function(){
+      _stTempo--;
+      if (tEl) tEl.textContent = _stTempo;
+      if (_stTempo <= 5 && tEl) { tEl.classList.add('st-tempo-baixo'); }
+      if (_stTempo <= 0) { _stFim(); }
+    }, 1000);
+  }
+
+  // Fix A2.11: sem isto, o relógio seguia contando (a ~1Hz, sem travar)
+  // enquanto o app estava em segundo plano — quem recebia uma ligação no
+  // meio da partida voltava e via o jogo já encerrado e o placar
+  // submetido sem ter percebido. Pausa o relógio enquanto oculto e
+  // retoma de onde parou ao voltar.
+  // Pausado pelo menu unificado o relógio fica parado mesmo ao voltar —
+  // quem religa é o "Continuar" (ver _stRegistrarMenu).
+  document.addEventListener('visibilitychange', function () {
+    if (!_stRodando || _stModo !== 'classico') return;
+    if (document.hidden) {
+      if (_stTimerRelogio) { clearInterval(_stTimerRelogio); _stTimerRelogio = null; }
+    } else if (!_stTimerRelogio && !_stPausado) {
+      _stLigarRelogio();
     }
+  });
+
+  /* ── Menu unificado (hub.js → AngatubaGames.menu) ──────────────
+     ⏸ no canto durante a partida: para o relógio e a troca de corujas;
+     ao continuar o relógio volta de onde parou e uma coruja nova aparece.
+     Dentro de uma rodada do Coruja Party não pausa (o tempo da rodada é
+     igual pra todo mundo) — o menu só cobre a tela. */
+  function _stMenu() {
+    var G = window.AngatubaGames;
+    return (G && G.menu) || null;
+  }
+  function _stNaParty() {
+    var G = window.AngatubaGames;
+    return !!(G && G.party && G.party.ativo());
+  }
+  function _stMenuPartida(ativa) {
+    _stPausado = false;
+    var M = _stMenu();
+    if (M) M.partida('jogo-speedtap', ativa);
+  }
+  function _stRegistrarMenu() {
+    var M = _stMenu();
+    if (!M) return;
+    M.registrar('jogo-speedtap', {
+      podePausar: function () { return !_stNaParty(); },
+      pausar: function () {
+        if (!_stRodando) return;
+        _stPausado = true;
+        if (_stTimerRelogio) { clearInterval(_stTimerRelogio); _stTimerRelogio = null; }
+        if (_stTimerCiclo)   { clearTimeout(_stTimerCiclo);   _stTimerCiclo = null; }
+      },
+      continuar: function () {
+        if (!_stPausado) return;
+        _stPausado = false;
+        if (!_stRodando) return;
+        if (_stModo === 'classico' && !_stTimerRelogio) _stLigarRelogio();
+        _stProximaCoruja();
+      }
+    });
   }
 
   function _stFim() {
     _stRodando = false;
+    _stMenuPartida(false);
     if (_stTimerRelogio) { clearInterval(_stTimerRelogio); _stTimerRelogio = null; }
     if (_stTimerCiclo)   { clearTimeout(_stTimerCiclo);   _stTimerCiclo = null; }
     var arena = document.getElementById('st-arena');

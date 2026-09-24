@@ -92,6 +92,14 @@
       mudo global durante a partida, e é 100% opcional (sem o arquivo,
       o jogo segue normal). Crédito CC BY obrigatório na tela de fim
       (ver index.html). Ver bloco "MÚSICA DE FUNDO (BGM)" abaixo.
+   9) SFX AMBIENTE (tudo sintético, zero asset novo): rosnado curto
+      quando um zumbi fica perigoso (perto + na faixa que mata, mesma
+      conta do pulso vermelho — cooldown global 0.8-1.2s pra não virar
+      coro de horda), impacto seco/abafado ao morrer batendo em
+      obstáculo (diferente do impacto em carne), uivo distante e
+      abafado a cada 10-18s como ambiente, e um pouco mais de "corpo"
+      grave no esbarrão. Ver _corSomRosnado/_corSomImpactoObstaculo/
+      _corSomUivoDistante logo depois de _corSomMorte.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -514,6 +522,42 @@
     _corTom(ac, t, 'sawtooth', 210, 42, 0.55, 0.30);
     _corSopro(ac, t, 0.45, 1400, 130, 0.30);
   }
+  // Rosnado de PERIGO: zumbi perto e dentro da faixa que mata (ver gatilho
+  // em _corUpdate/_corRosnadoT). Duas vozes gravas quase na mesma frequência
+  // (leve batimento) + um sopro rouco por cima — mais "growl" orgânico do
+  // que um tom puro. f0/f1 sorteados a cada chamada pra não repetir igual.
+  function _corSomRosnado() {
+    if (!_corSomLigado()) return;
+    var ac = _corAudio(); if (!ac) return;
+    var t = ac.currentTime;
+    var dur = _corRand(0.15, 0.35);
+    var f0 = _corRand(70, 100), f1 = f0 * _corRand(0.45, 0.65);
+    _corTom(ac, t, 'sawtooth', f0, f1, dur, 0.15);
+    _corTom(ac, t, 'sawtooth', f0 * 1.04, f1 * 1.04, dur, 0.09);
+    _corSopro(ac, t, dur * 0.8, 500, 150, 0.09, 200);
+  }
+  // Impacto ao morrer batendo em OBSTÁCULO — seco/abafado, bem diferente
+  // do impacto em carne (_corSomImpacto usa 'triangle', mais macio). Aqui
+  // é ruído filtrado em faixa (highpass alto) + um 'square' curto: mais
+  // "crash" metálico que "soco".
+  function _corSomImpactoObstaculo() {
+    if (!_corSomLigado()) return;
+    var ac = _corAudio(); if (!ac) return;
+    var t = ac.currentTime;
+    _corSopro(ac, t, 0.10, 2200, 300, 0.38, 600);
+    _corTom(ac, t, 'square', 180, 60, 0.16, 0.20);
+  }
+  // Uivo/gemido DISTANTE (ambiente, ver _corUivoT/_corUivoTocandoT em
+  // _corUpdate) — bem mais baixo que o rosnado de perigo e SEM highpass
+  // no sopro (o oposto do rosnado): deixa mais grave/redondo, "longe e
+  // abafado" sem precisar de um filtro novo.
+  function _corSomUivoDistante(dur) {
+    if (!_corSomLigado()) return;
+    var ac = _corAudio(); if (!ac) return;
+    var t = ac.currentTime;
+    _corTom(ac, t, 'sawtooth', 130, 85, dur, 0.05);
+    _corSopro(ac, t, dur, 280, 100, 0.05);
+  }
 
   /* ══════════════════════════════════════════════════════════════
      MÚSICA DE FUNDO (BGM) — HTMLAudioElement simples, DE PROPÓSITO
@@ -577,6 +621,7 @@
   var _corW = 640, _corH = 360, _corDpr = 1;
   var _corEstado = 'inicio';
   var _corRAF = 0, _corLast = 0;
+  var _corPausado = false;   // menu unificado do hub (ver _corRegistrarMenu)
   var _corFontesTimer = 0; // handle do setInterval de _corPrepararFontes (evita duplicar)
   var _corListenersOn = false, _corResizeOn = false;
   var _corResizeTimers = []; // handles da cascata de remedição pós-rotação (ver A2.22)
@@ -605,6 +650,16 @@
   var _corSlowT = 0, _COR_SLOW_DUR = 1.2, _COR_SLOW_MUL = 0.5;
   function _corShakeY() { return _corShakeT > 0 ? Math.sin(_corShakeT * 80) * (_corShakeT / _COR_SHAKE_DUR) * 0.016 : 0; }
   function _corShakeX() { return _corShakeT > 0 ? Math.cos(_corShakeT * 65) * (_corShakeT / _COR_SHAKE_DUR) * 0.014 : 0; }
+
+  /* ── Throttle dos SFX ambiente novos (ver _corSomRosnado/_corSomUivoDistante) ──
+     _corRosnadoT: cooldown GLOBAL (não por zumbi) — qualquer zumbi perigoso
+     dispara, mas só 1 rosnado a cada 0.8-1.2s no total, senão uma horda
+     inteira perto viraria um coro.
+     _corUivoT: tempo até o próximo uivo distante poder soar (10-18s).
+     _corUivoTocandoT: > 0 enquanto o uivo atual ainda estaria soando —
+     evita empilhar um uivo em cima do outro. */
+  var _corRosnadoT = 0;
+  var _corUivoT = 0, _corUivoTocandoT = 0;
 
   /* ── Head-bob / passada (sensação de correr, estilo Into the Dead) ─
      A passada avança proporcional à velocidade. Dela derivamos:
@@ -761,6 +816,7 @@
     _corTiroT = 0; _corFlashT = 0; _corRecuo = 0;
     _corCamX = 0; _corCamVX = 0;
     _corShakeT = 0; _corIframesT = 0; _corSlowT = 0;
+    _corRosnadoT = 0; _corUivoT = _corRand(10, 18); _corUivoTocandoT = 0;
     _corPasso = 0; _corPassoUlt = 0;
     _corZumbis.length = 0; _corItens.length = 0; _corSangue.length = 0; _corObstaculos.length = 0;
     // 2.2s (era 0.9s) — dá tempo do jogador se situar antes do primeiro
@@ -951,6 +1007,10 @@
     _corIframesT = _COR_IFRAMES_DUR;
     _corSlowT = _COR_SLOW_DUR;
     _corSomImpacto(false);
+    // Corpo extra grave por baixo do impacto — o esbarrão é um "trombada",
+    // não só um tiro de raspão; dá mais peso sem trocar o som base.
+    var acEsb = _corAudio();
+    if (acEsb && _corSomLigado()) _corTom(acEsb, acEsb.currentTime, 'sine', 90, 35, 0.18, 0.20);
     if (window.AngatubaGames && window.AngatubaGames.efeitos) {
       var p = _corProj(zb.z, zb.faixa);
       window.AngatubaGames.efeitos.estrelas(p.x, p.y - 10 * p.s, 3, _corOpcoesFx());
@@ -995,7 +1055,20 @@
     if (_corRecuo > 0) _corRecuo = Math.max(0, _corRecuo - dt * 6);
     if (_corShakeT > 0) _corShakeT = Math.max(0, _corShakeT - dt);
     if (_corIframesT > 0) _corIframesT = Math.max(0, _corIframesT - dt);
+    if (_corRosnadoT > 0) _corRosnadoT = Math.max(0, _corRosnadoT - dt);
     _corCamVX *= Math.max(0, 1 - dt * 10);
+
+    // Uivo distante (ambiente): agenda independente de mudo — se estiver
+    // mudo o _corSomUivoDistante() só não soa, mas o relógio não emperra
+    // (senão desmutar no meio da partida disparava uma "fila" atrasada).
+    _corUivoT -= dt;
+    if (_corUivoTocandoT > 0) _corUivoTocandoT = Math.max(0, _corUivoTocandoT - dt);
+    if (_corUivoT <= 0 && _corUivoTocandoT <= 0) {
+      var durUivo = _corRand(0.9, 1.4);
+      _corSomUivoDistante(durUivo);
+      _corUivoTocandoT = durUivo;
+      _corUivoT = _corRand(10, 18);
+    }
 
     // Spawn por POPULAÇÃO: mantém entre POP_MIN e POP_MAX zumbis vivos na
     // tela (campo aberto cheio, estilo Into the Dead). Conta os vivos.
@@ -1051,6 +1124,14 @@
       // sway (acima) continua por cima, então o rumo nunca fica reto.
       var homingR = (zb.tipo === 'rapido') ? 0.32 : (zb.tipo === 'forte' ? 0.10 : 0.18);
       zb.faixa += (_corCamX - zb.faixa) * Math.min(1, homingR * dt);
+      // Rosnado de perigo: zumbi perto (z < 0.35) E na faixa que mata —
+      // mesma dupla condição do pulso vermelho em _corDrawZumbi, só que
+      // aqui é sonora. Cooldown GLOBAL (_corRosnadoT) evita coro de horda:
+      // o primeiro zumbi perigoso do frame dispara, os outros esperam.
+      if (_corRosnadoT <= 0 && zb.z < 0.35 && Math.abs(zb.faixa - _corCamX) < _corMeiaColisao(zb.tipo)) {
+        _corSomRosnado();
+        _corRosnadoT = _corRand(0.8, 1.2);
+      }
       if (zb.z <= 0.05) {
         // i-frame curtinho: só evita processar a MESMA colisão duas vezes
         // no mesmo lance (não é invulnerabilidade — ver comentário na
@@ -1081,7 +1162,10 @@
       ob.z -= _corVel * dt;
       if (ob.z <= 0.05) {
         // Sólido: sem esbarrão, sem i-frame — se está na faixa, morre.
-        if (Math.abs(ob.faixa - _corCamX) < _corMeiaObst(ob.tipo)) { _corGameOver(); return; }
+        // Som de impacto seco/abafado ANTES do game over (que ainda toca
+        // o rosnado de morte por cima) — diferencia claramente "bateu no
+        // carro" de "mordida de zumbi".
+        if (Math.abs(ob.faixa - _corCamX) < _corMeiaObst(ob.tipo)) { _corSomImpactoObstaculo(); _corGameOver(); return; }
         _corObstaculos.splice(i, 1);
       }
     }
@@ -1645,6 +1729,7 @@
   function _corGameOver() {
     if (_corRAF) { cancelAnimationFrame(_corRAF); _corRAF = 0; }
     _corEstado = 'fim';
+    _corMenuPartida(false);
     _corBgmParar();
     var score = Math.floor(_corDist), rec = _corRec(), recorde = score > rec;
     if (recorde) _corRecSet(score);
@@ -1689,7 +1774,7 @@
   function _corPointerDown(e) {
     // O AudioContext só acorda dentro de um gesto — este é o gesto.
     _corAudioDestravar();
-    if (_corEstado !== 'jogando') return;
+    if (_corEstado !== 'jogando' || _corPausado) return;
     _corDrag = true;
     _corLast2 = _corXY(e); _corDownXY = _corLast2; _corDownT = (e.timeStamp || Date.now()); _corMoveu = false;
     if (e.cancelable) e.preventDefault();
@@ -1723,7 +1808,7 @@
     // _corLigarControles): sem essa guarda, espaço/Enter continuam sendo
     // interceptados com preventDefault() em QUALQUER campo de texto do app
     // depois de abrir a Corrida uma única vez.
-    if (_corEstado !== 'jogando') return;
+    if (_corEstado !== 'jogando' || _corPausado) return;
     if (e.key === 'ArrowLeft') { if (down) { _corCamX = _corClamp(_corCamX - 0.08, -_COR_CAM_LIM, _COR_CAM_LIM); } }
     else if (e.key === 'ArrowRight') { if (down) { _corCamX = _corClamp(_corCamX + 0.08, -_COR_CAM_LIM, _COR_CAM_LIM); } }
     else if (down && (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'Enter')) { _corAudioDestravar(); _corAtirar(); if (e.preventDefault) e.preventDefault(); }
@@ -1878,6 +1963,8 @@
     // Pede ao sistema pra girar pra landscape (APK/instalado com manifest
     // "any"). No navegador comum é recusado e caímos na rotação CSS.
     _corTravarLandscape();
+    _corRegistrarMenu();
+    _corMenuPartida(false);
     _corMostrarOverlay('inicio');
     _corAplicarOrientacaoRepetido();
     _corDrawIdle();
@@ -1961,6 +2048,7 @@
     _corAplicarOrientacaoRepetido();
     _corReset();
     _corEstado = 'jogando'; _corLast = 0;
+    _corMenuPartida(true);
     if (_corRAF) cancelAnimationFrame(_corRAF);
     _corRAF = requestAnimationFrame(_corLoop);
     // Clique no botão = gesto do usuário → pode iniciar áudio de verdade.
@@ -1978,6 +2066,45 @@
     // algum passo pendente — mesma correção do Tanques.
     _corResizeTimers.forEach(clearTimeout);
     _corResizeTimers.length = 0;
+    _corMenuPartida(false);
+  }
+
+  /* ── Menu unificado (hub.js → AngatubaGames.menu) ──────────────
+     ⏸ no canto durante a corrida: para o loop, solta o arraste e pausa a
+     música SEM rebobinar; ao continuar o dt recomeça do zero e a música
+     volta de onde parou (se o som estiver ligado — o botão de som do
+     próprio menu pode ter mudado isso no meio da pausa). */
+  function _corMenu() {
+    var G = window.AngatubaGames;
+    return (G && G.menu) || null;
+  }
+  function _corMenuPartida(ativa) {
+    _corPausado = false;
+    var M = _corMenu();
+    if (M) M.partida('jogo-corrida', ativa);
+  }
+  function _corRegistrarMenu() {
+    var M = _corMenu();
+    if (!M) return;
+    M.registrar('jogo-corrida', {
+      pausar: function () {
+        _corPausado = true;
+        if (_corRAF) { cancelAnimationFrame(_corRAF); _corRAF = 0; }
+        _corDrag = false; _corCamVX = 0;
+        _corBgmParar_semRebobinar();
+      },
+      continuar: function () {
+        if (!_corPausado) return;
+        _corPausado = false;
+        if (_corEstado !== 'jogando') return;
+        _corBgmMudoAntes = _corSomLigado();
+        _corBgmTocar();
+        if (!_corRAF) {
+          _corLast = 0;
+          _corRAF = requestAnimationFrame(_corLoop);
+        }
+      }
+    });
   }
 
   function _corMostrarOverlay(qual) {

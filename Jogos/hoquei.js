@@ -268,6 +268,7 @@
       });
       _hqResizeOn = true;
     }
+    _hqRegistrarMenu();
     _hqMostrarTela('inicio');
     _hqLimparErroMenu();
     _hqAvisoMenu('');
@@ -320,8 +321,9 @@
 
   /* ── Telas (overlays) ─────────────────────────────────────────
      hq-menu (sozinho/criar/entrar/lista), hq-sala (aguardando ou
-     conectando), hq-fim (resultado) e hq-pausa (por cima da partida).
-     Durante 'jogando' só o HUD + canvas (+ pausa, se pausado). */
+     conectando) e hq-fim (resultado). A pausa é o overlay do menu
+     unificado do hub (ver _hqAtualizarPausaUI). Durante 'jogando' só o
+     HUD + canvas + o botão ⏸ do menu (+ o overlay, se pausado). */
   function _hqMostrarTela(qual) {
     _hqEstado = qual;
     if (qual !== 'sala') _hqPararTimerConectando();
@@ -336,6 +338,8 @@
     if (acoes) acoes.style.display = (qual === 'jogando') ? '' : 'none';
     var tela = document.getElementById('jogo-hoquei');
     if (tela) tela.classList.toggle('hq-jogando', qual === 'jogando');
+    var M = _hqMenu();
+    if (M) M.partida('jogo-hoquei', qual === 'jogando');
     _hqAtualizarPausaUI();
     _hqAtualizarMic();
     if (qual === 'inicio') {
@@ -621,19 +625,35 @@
     _hqTeclas = {};
     _hqAtualizarPausaUI();
   }
+  // A tela de pausa é o menu unificado do hub (AngatubaJogoMenu): o ⏸
+  // do canto abre ele pausado, com Continuar · Som · Voltar aos jogos
+  // (+ "Sair da partida", que volta pro lobby do Hóquei). Como a pausa
+  // também nasce aqui dentro (tecla P/Esc, app em 2º plano, pausa pedida
+  // pelo outro jogador), o overlay só ESPELHA _hqPausado.
+  function _hqMenu() {
+    var G = window.AngatubaGames;
+    return (G && G.menu) || window.AngatubaJogoMenu || null;
+  }
+  function _hqRegistrarMenu() {
+    var M = _hqMenu();
+    if (!M) return;
+    M.registrar('jogo-hoquei', {
+      teclaPropria: true,      // P/Esc já pausam (ver _hqKeyDown)
+      pausarAoOcultar: false,  // solo já pausa no visibilitychange; multi não pausa sozinho
+      podePausar: function () { return true; },
+      pausar: function () { if (!_hqPausado) _hqAlternarPausa(true); },
+      continuar: function () { if (_hqPausado) _hqAlternarPausa(false); },
+      descricao: function () {
+        return (_hqModo === 'multiplayer')
+          ? 'A partida está parada pros dois. Qualquer um pode continuar.'
+          : 'Respira. O disco espera você.';
+      },
+      extra: { rotulo: 'Sair da partida', acao: function () { _hqSairPartida(); } }
+    });
+  }
   function _hqAtualizarPausaUI() {
-    var el = document.getElementById('hq-pausa');
-    if (el) el.style.display = (_hqEstado === 'jogando' && _hqPausado) ? '' : 'none';
-    var btn = document.getElementById('hq-btn-pausa');
-    if (btn) {
-      var ic = btn.querySelector('i');
-      if (ic) ic.className = 'fa ' + (_hqPausado ? 'fa-play' : 'fa-pause');
-      btn.setAttribute('aria-label', _hqPausado ? 'Continuar' : 'Pausar');
-    }
-    var desc = document.getElementById('hq-pausa-desc');
-    if (desc) desc.textContent = (_hqModo === 'multiplayer')
-      ? 'A partida está parada pros dois. Qualquer um pode continuar.'
-      : 'Respira. O disco espera você.';
+    var M = _hqMenu();
+    if (M) M.sincronizar('jogo-hoquei', _hqEstado === 'jogando' && _hqPausado);
   }
 
   window._hqJogarSozinho = _hqJogarSozinho;

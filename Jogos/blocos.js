@@ -509,6 +509,9 @@
   }
 
   function _bbMostrarOverlay(nome) {
+    // Sem overlay do jogo = fase rolando → menu unificado do hub no canto.
+    var G = window.AngatubaGames;
+    if (G && G.menu) G.menu.partida('jogo-blocos', !nome);
     var inicio = document.getElementById('bb-inicio');
     var fim = document.getElementById('bb-fim');
     if (inicio) inicio.style.display = (nome === 'inicio') ? 'flex' : 'none';
@@ -592,9 +595,22 @@
     _bbIniciarFase(_bbFaseAtual);
   }
 
+  // ── Menu unificado (hub.js → AngatubaGames.menu) ────────────
+  // Jogo por turnos, sem relógio: "pausar" só solta a peça que estiver
+  // sendo arrastada — o overlay do menu cobre o tabuleiro e a bandeja.
+  function _bbRegistrarMenu() {
+    var G = window.AngatubaGames;
+    if (!G || !G.menu) return;
+    G.menu.registrar('jogo-blocos', {
+      pausar: function () { _bbCancelarArraste(); },
+      continuar: function () {}
+    });
+  }
+
   // ── Preparação da tela (chamada pelo _jogoLoader ao abrir) ──
   function _bbPrepararTela() {
     _bbCriarGridDOM();
+    _bbRegistrarMenu();
     _bbCriarTrayDOM();
     _bbCancelarArraste();
     _bbCarregarSpritesLimpeza();

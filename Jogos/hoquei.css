@@ -1,0 +1,101 @@
+/* ═══════════════════════════════════════════════════════════════
+   HÓQUEI DA CORUJA — estilos do módulo (carregado sob demanda)
+   Mesmo desenho de overlays/lobby do Ping Pong (pp-*), com o prefixo
+   hq-. As regras de TELA CHEIA ficam aqui (e não no styles.css) porque
+   só valem com o jogo aberto — e este arquivo só existe nessa hora.
+   ═══════════════════════════════════════════════════════════════ */
+.hq-card{position:relative;background:var(--card,#151d2b);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:12px;}
+
+/* ── Placar: "Você 3 × 2 CPU", números grandes ─────────────────── */
+.hq-hud{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;pointer-events:none;}
+.hq-hud-lado{display:flex;align-items:center;gap:8px;background:rgba(9,14,22,.62);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:4px 12px;}
+.hq-hud-nome{font-size:10.5px;font-weight:700;color:var(--muted,#8794a8);text-transform:uppercase;letter-spacing:.05em;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hq-hud-gols{font-family:'Syne',sans-serif;font-size:28px;font-weight:900;line-height:1.05;color:#fff;min-width:18px;text-align:center;}
+.hq-hud-eu .hq-hud-gols{color:#38bdf8;}
+.hq-hud-ele .hq-hud-gols{color:#ff5470;}
+.hq-hud-x{font-size:14px;color:rgba(255,255,255,.4);font-weight:800;}
+
+/* Botões de pausa e voz (canto direito, só durante a partida) */
+.hq-hud-acoes{position:absolute;top:12px;right:12px;z-index:6;display:flex;gap:8px;}
+.hq-btn-icone{width:40px;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(9,14,22,.62);color:#fff;font-size:15px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+.hq-btn-icone:active{transform:scale(.94);}
+
+.hq-arena{position:relative;width:100%;aspect-ratio:16/10;max-height:72vh;margin:0 auto;border-radius:14px;overflow:hidden;background:#050913;touch-action:none;}
+.hq-arena #hq-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;image-rendering:pixelated;}
+
+/* ── Overlays (menu / sala / pausa / fim) ──────────────────────── */
+.hq-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;background:rgba(9,14,22,.86);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:4;overflow-y:auto;}
+/* Menu comprido em tela baixa (celular deitado): começa do topo e rola */
+@media (max-height:520px){.hq-overlay{justify-content:flex-start;padding-top:56px;}}
+.hq-overlay-owl{width:84px;height:84px;object-fit:contain;margin-bottom:10px;image-rendering:pixelated;filter:drop-shadow(0 6px 18px rgba(0,0,0,.5));}
+.hq-overlay-titulo{font-size:21px;font-weight:800;color:#fff;font-family:'Syne',sans-serif;margin-bottom:8px;}
+.hq-overlay-desc{font-size:13.5px;line-height:1.5;color:#c7d1e0;max-width:300px;margin-bottom:14px;}
+.hq-dica{display:block;font-size:11.5px;color:rgba(251,191,36,.85);margin-top:4px;}
+
+.hq-aviso{width:100%;max-width:300px;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.45);color:#fde68a;font-size:13px;font-weight:700;line-height:1.4;}
+
+.hq-opcoes{display:flex;flex-direction:column;gap:10px;width:100%;max-width:300px;}
+.hq-btn-opcao{width:100%;padding:13px 16px;border-radius:14px;border:1px solid rgba(251,191,36,.45);background:rgba(251,191,36,.12);color:#fff;font-family:'Syne',sans-serif;font-size:15px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s ease,filter .12s ease;}
+.hq-btn-opcao:active{transform:scale(.97);}
+.hq-btn-opcao:disabled{opacity:.5;pointer-events:none;}
+.hq-btn-opcao-alt{border-color:rgba(255,255,255,.14);background:rgba(255,255,255,.05);}
+
+.hq-privada-toggle{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:2px 4px;font-size:12px;color:rgba(199,209,224,.75);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.hq-privada-toggle input{width:15px;height:15px;accent-color:#fbbf24;cursor:pointer;}
+
+.hq-divisor{display:flex;align-items:center;gap:10px;width:100%;max-width:300px;margin:6px 0;color:rgba(199,209,224,.5);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;}
+.hq-divisor::before,.hq-divisor::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.10);}
+
+.hq-lista-salas{display:flex;flex-direction:column;gap:7px;width:100%;max-width:300px;max-height:132px;overflow-y:auto;}
+.hq-lista-vazia{font-size:12px;color:rgba(199,209,224,.45);padding:6px 2px;}
+.hq-sala-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:9px 10px 9px 14px;}
+.hq-sala-item-nome{font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.hq-sala-item-btn{flex-shrink:0;padding:6px 14px;border-radius:9px;border:1px solid rgba(251,191,36,.45);background:rgba(251,191,36,.16);color:#fbbf24;font-weight:800;font-size:12.5px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.hq-sala-item-btn:active{transform:scale(.95);}
+
+.hq-entrar-wrap{display:flex;gap:8px;width:100%;max-width:300px;}
+.hq-codigo-input{flex:1;min-width:0;background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:11px 12px;font-size:18px;font-weight:800;letter-spacing:.18em;text-align:center;text-transform:uppercase;font-family:'Syne',sans-serif;}
+.hq-codigo-input::placeholder{color:rgba(255,255,255,.3);letter-spacing:.1em;}
+.hq-btn-entrar-mini{flex-shrink:0;padding:0 18px;border-radius:10px;border:1px solid rgba(251,191,36,.45);background:rgba(251,191,36,.16);color:#fbbf24;font-weight:800;font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.hq-btn-entrar-mini:disabled{opacity:.5;pointer-events:none;}
+.hq-menu-erro{margin-top:12px;font-size:12.5px;color:#ff6b81;max-width:300px;}
+
+.hq-sala-codigo{font-family:'Syne',sans-serif;font-size:44px;font-weight:900;letter-spacing:.14em;color:#fbbf24;margin:6px 0 16px;}
+.hq-sala-spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#fbbf24;animation:hqGirar .8s linear infinite;margin-bottom:16px;}
+@keyframes hqGirar{to{transform:rotate(360deg);}}
+.hq-btn-copiar{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:999px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;margin-bottom:14px;}
+.hq-link{margin-top:8px;background:none;border:none;color:rgba(199,209,224,.75);font-size:12.5px;font-weight:600;text-decoration:underline;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.hq-link:active{color:#fff;}
+
+.hq-fim-placar{font-family:'Syne',sans-serif;font-size:34px;font-weight:900;color:#fff;margin-bottom:8px;}
+.hq-play{background:linear-gradient(135deg,#fb923c,#f59e0b);color:#1a1205;border:none;border-radius:999px;padding:12px 34px;font-size:16px;font-weight:900;cursor:pointer;box-shadow:0 6px 18px rgba(245,158,11,.35);transition:transform .12s ease,filter .12s ease;margin-top:4px;}
+.hq-play:hover{filter:brightness(1.06);}
+.hq-play:active{transform:scale(.96);}
+.hq-play:disabled{opacity:.5;pointer-events:none;}
+
+/* ── Voz opcional (mesmos 3 estados do Ping Pong) ──────────────── */
+.hq-mic-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:9px 16px;margin-bottom:12px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:#c7d1e0;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.hq-mic-btn i{font-size:15px;}
+.hq-mic-btn:active{transform:scale(.96);}
+.hq-mic-btn:disabled{opacity:.65;pointer-events:none;}
+.hq-mic-btn[data-mic="on"]{border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.16);color:#34d399;}
+.hq-mic-btn[data-mic="mudo"]{border-color:rgba(255,176,32,.5);background:rgba(255,176,32,.14);color:#ffb020;}
+.hq-mic-btn-hud{width:40px;min-height:40px;padding:0;margin:0;background:rgba(9,14,22,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+.hq-mic-dot{position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 6px rgba(52,211,153,.8);display:none;}
+.hq-mic-aviso{position:absolute;top:60px;left:10px;right:10px;z-index:7;margin:0 auto;max-width:300px;background:rgba(0,0,0,.78);color:#ff9aa8;font-size:12px;font-weight:600;line-height:1.35;text-align:center;padding:8px 12px;border-radius:10px;pointer-events:none;}
+
+/* ── TELA CHEIA: arena colada nas bordas, placar flutuando no topo ── */
+body.games-fs-open #games-hub.jogo-ativo #jogo-hoquei{position:relative;}
+body.games-fs-open #games-hub.jogo-ativo #jogo-hoquei .hq-card{position:absolute;inset:0;padding:0;border:0;border-radius:0;background:#050913;}
+body.games-fs-open #games-hub.jogo-ativo #jogo-hoquei .hq-arena{position:absolute;inset:0;width:100%;height:100%;max-height:none;min-height:0;aspect-ratio:auto;margin:0;border-radius:0;}
+body.games-fs-open #games-hub.jogo-ativo #jogo-hoquei .jogo-voltar{position:absolute;top:calc(env(safe-area-inset-top,0px) + 8px);left:8px;z-index:6;margin:0;padding:8px 12px;background:rgba(9,14,22,.55);border-radius:999px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-size:13px;}
+body.games-fs-open #games-hub.jogo-ativo #jogo-hoquei .hq-hud{position:absolute;top:calc(env(safe-area-inset-top,0px) + 6px);left:50%;transform:translateX(-50%);z-index:5;margin:0;}
+body.games-fs-open #games-hub.jogo-ativo #jogo-hoquei .hq-hud-acoes{top:calc(env(safe-area-inset-top,0px) + 6px);right:8px;}
+/* Em pé, no celular: o botão voltar vira só a setinha durante a partida,
+   pra caber placar + pausa na mesma linha. */
+@media (max-width:480px){
+  body.games-fs-open #games-hub.jogo-ativo #jogo-hoquei.hq-jogando .hq-voltar-txt{display:none;}
+  .hq-hud-nome{max-width:56px;font-size:9.5px;}
+  .hq-hud-gols{font-size:24px;}
+  .hq-hud-lado{padding:3px 9px;gap:6px;}
+}

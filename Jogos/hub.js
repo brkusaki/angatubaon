@@ -951,6 +951,7 @@
     if (window.PianoGame     && typeof window.PianoGame.parar     === 'function') window.PianoGame.parar();
     if (window.PingPongGame  && typeof window.PingPongGame.parar  === 'function') window.PingPongGame.parar();
     if (window.TanquesGame   && typeof window.TanquesGame.parar   === 'function') window.TanquesGame.parar();
+    if (window.HoqueiGame    && typeof window.HoqueiGame.parar    === 'function') window.HoqueiGame.parar();
     // Puff/Ervilhas só existem dentro de uma rodada de Party (container,
     // não tela própria) — ver A2.2. PartyGame.parar(), logo abaixo, já
     // chama isto por conta própria; aqui cobre a saída pelo botão genérico
@@ -1066,6 +1067,9 @@
     // carregado sob demanda pelo _jogoLoader (ver flag mp abaixo) — mesma
     // infraestrutura do Ping Pong.
     tanques: { js: '/Jogos/tanques.min.js', css: '/Jogos/tanques.css', global: 'TanquesGame', mp: true },
+    // Hóquei da Coruja (air hockey 1x1): também depende de
+    // Jogos/multiplayer.js (AngatubaMP) — mesmo esquema do Ping Pong.
+    hoquei: { js: '/Jogos/hoquei.min.js', css: '/Jogos/hoquei.css', global: 'HoqueiGame', mp: true },
     // Coruja Party (2-4 jogadores): fala direto com o Firebase Realtime
     // Database, não usa AngatubaMP (que é só 1x1). Ver Jogos/party.js.
     party: { js: '/Jogos/party.min.js', css: '/Jogos/party.css', global: 'PartyGame' },

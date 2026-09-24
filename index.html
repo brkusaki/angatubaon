@@ -729,6 +729,18 @@
           </div>
         </button>
 
+        <!-- Hóquei da Coruja: as cores do card (--gc*) vão inline porque o
+             hoquei.css só carrega quando o jogo abre (lazy) e o card precisa
+             delas já no menu — sem mexer no styles.css por uma linha. -->
+        <button type="button" class="game-card gc-hoquei" style="--gc:#fbbf24;--gc-2:#f97316;--gc-a:rgba(251,191,36,.16);--gc-b:rgba(251,191,36,.34);" data-cat="multi" data-nome="hoquei da coruja air hockey" data-desc="air hockey sozinho contra a cpu ou 1x1 com um amigo em tempo real" onclick="_abrirJogo('hoquei')">
+          <div class="gc-media"><img src="/Jogos/assets/card-hoquei.webp" alt="" loading="lazy" class="gc-hero-img" style="image-rendering:pixelated;" onerror="this.style.display='none'"></div>
+          <div class="gc-body">
+            <div class="gc-title">Hóquei da Coruja</div>
+            <div class="gc-desc">Air hockey sozinho contra a CPU ou 1x1 com um amigo em tempo real.</div>
+            <span class="gc-cta">Jogar</span>
+          </div>
+        </button>
+
         <button type="button" class="game-card gc-party" data-cat="multi" data-nome="coruja party" data-desc="2 a 4 jogadores minigames em rodadas e placar geral" onclick="_abrirJogo('party')">
           <div class="gc-media"><img src="/Jogos/assets/card-party.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
@@ -1426,6 +1438,90 @@
               <!-- Sempre visível: leva ao menu completo do 2.1 (Criar sala /
                    Entrar com código / Salas abertas agora). -->
               <button type="button" class="tq-link" id="tq-btn-voltar-fim" onclick="_tqVoltarMenu()">Voltar ao menu</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TELA: Hóquei da Coruja (air hockey 1x1 em tempo real, via Jogos/multiplayer.js) -->
+      <div id="jogo-hoquei" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> <span class="hq-voltar-txt">Voltar aos jogos</span></button>
+        <div class="hq-card">
+          <div class="hq-hud" id="hq-hud" style="display:none;">
+            <div class="hq-hud-lado hq-hud-eu">
+              <span class="hq-hud-nome">Você</span>
+              <span class="hq-hud-gols" id="hq-hud-meu">0</span>
+            </div>
+            <span class="hq-hud-x">×</span>
+            <div class="hq-hud-lado hq-hud-ele">
+              <span class="hq-hud-gols" id="hq-hud-dele">0</span>
+              <span class="hq-hud-nome" id="hq-hud-nome-adversario">CPU</span>
+            </div>
+          </div>
+          <!-- Pausa + voz (a voz só aparece no multiplayer) -->
+          <div class="hq-hud-acoes" id="hq-hud-acoes" style="display:none;">
+            <button type="button" class="hq-mic-btn hq-mic-btn-hud" id="hq-mic-hud" onclick="_hqAlternarMic()" style="display:none;" aria-pressed="false" aria-label="Ligar microfone"><i class="fa fa-microphone-slash"></i><span class="hq-mic-dot"></span></button>
+            <button type="button" class="hq-btn-icone" id="hq-btn-pausa" onclick="_hqAlternarPausa()" aria-label="Pausar"><i class="fa fa-pause"></i></button>
+          </div>
+          <div class="hq-arena" id="hq-arena">
+            <canvas id="hq-canvas"></canvas>
+
+            <div class="hq-mic-aviso" id="hq-mic-erro" style="display:none;"></div>
+
+            <!-- Menu: jogar sozinho, criar sala, entrar com código, salas abertas -->
+            <div class="hq-overlay" id="hq-menu">
+              <div class="hq-aviso" id="hq-menu-aviso" style="display:none;"></div>
+              <img src="/img/pixel/coruja-pixel-idle.png" alt="" class="hq-overlay-owl" onerror="this.style.display='none'">
+              <div class="hq-overlay-titulo">🏒 Hóquei da Coruja</div>
+              <div class="hq-overlay-desc">Arraste a sua coruja pra rebater o disco. Primeiro a 7 gols vence (com 2 de vantagem).<span class="hq-dica">Fica melhor com o celular deitado.</span></div>
+              <div class="hq-opcoes">
+                <button type="button" class="hq-btn-opcao" onclick="_hqJogarSozinho()">Jogar sozinho</button>
+                <button type="button" class="hq-btn-opcao hq-btn-opcao-alt" id="hq-btn-criar" onclick="_hqCriarSala()">Criar sala</button>
+                <label class="hq-privada-toggle">
+                  <input type="checkbox" id="hq-publica-check" checked>
+                  <span>🌐 Sala pública (aparece na lista)</span>
+                </label>
+              </div>
+              <div class="hq-divisor">Entrar com código</div>
+              <div class="hq-entrar-wrap">
+                <input type="text" class="hq-codigo-input" id="hq-codigo-input" placeholder="CÓDIGO" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
+                <button type="button" class="hq-btn-entrar-mini" id="hq-btn-entrar" onclick="_hqEntrarSala()">Entrar</button>
+              </div>
+              <div class="hq-divisor">Salas abertas agora</div>
+              <div class="hq-lista-salas" id="hq-lista-salas">
+                <div class="hq-lista-vazia">Nenhuma sala aberta agora. Crie a primeira!</div>
+              </div>
+              <div class="hq-menu-erro" id="hq-menu-erro" style="display:none;"></div>
+            </div>
+
+            <!-- Sala: aguardando o amigo OU conectando -->
+            <div class="hq-overlay" id="hq-sala" style="display:none;">
+              <img src="/webp/owl-wave.webp" alt="" class="hq-overlay-owl" onerror="this.style.display='none'">
+              <div class="hq-overlay-titulo" id="hq-sala-titulo">Aguardando o amigo…</div>
+              <div class="hq-overlay-desc" id="hq-sala-desc"></div>
+              <div class="hq-sala-codigo" id="hq-sala-codigo" style="display:none;"></div>
+              <div class="hq-sala-spinner"></div>
+              <button type="button" class="hq-btn-copiar" id="hq-btn-copiar" onclick="_hqCopiarCodigo()">Copiar código</button>
+              <button type="button" class="hq-mic-btn" id="hq-mic-sala" onclick="_hqAlternarMic()" style="display:none;" aria-pressed="false" aria-label="Ligar microfone"><i class="fa fa-microphone-slash"></i><span class="hq-mic-txt">Ligar mic</span><span class="hq-mic-dot"></span></button>
+              <button type="button" class="hq-link" onclick="_hqVoltarMenu()">Voltar ao menu</button>
+            </div>
+
+            <!-- Pausa (por cima da partida) -->
+            <div class="hq-overlay" id="hq-pausa" style="display:none;">
+              <div class="hq-overlay-titulo">Pausado</div>
+              <div class="hq-overlay-desc" id="hq-pausa-desc"></div>
+              <button type="button" class="hq-play" onclick="_hqAlternarPausa()">Continuar</button>
+              <button type="button" class="hq-link" onclick="_hqSairPartida()">Sair da partida</button>
+            </div>
+
+            <!-- Fim: resultado (vira "Criar nova sala" se o outro sair) -->
+            <div class="hq-overlay" id="hq-fim" style="display:none;">
+              <img src="" alt="" class="hq-overlay-owl" id="hq-fim-owl" onerror="this.style.display='none'">
+              <div class="hq-overlay-titulo" id="hq-fim-titulo">Fim de jogo</div>
+              <div class="hq-fim-placar" id="hq-fim-placar"></div>
+              <div class="hq-overlay-desc" id="hq-fim-msg"></div>
+              <button type="button" class="hq-play" id="hq-btn-revanche" onclick="_hqPedirRevanche()">Jogar de novo</button>
+              <button type="button" class="hq-link" onclick="_hqVoltarMenu()">Voltar ao menu</button>
             </div>
           </div>
         </div>

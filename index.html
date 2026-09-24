@@ -1458,10 +1458,10 @@
               <span class="hq-hud-nome" id="hq-hud-nome-adversario">CPU</span>
             </div>
           </div>
-          <!-- Pausa + voz (a voz só aparece no multiplayer) -->
+          <!-- Voz (só no multiplayer). A pausa virou o botão do menu unificado
+               do hub (AngatubaJogoMenu, no canto esquerdo durante a partida). -->
           <div class="hq-hud-acoes" id="hq-hud-acoes" style="display:none;">
             <button type="button" class="hq-mic-btn hq-mic-btn-hud" id="hq-mic-hud" onclick="_hqAlternarMic()" style="display:none;" aria-pressed="false" aria-label="Ligar microfone"><i class="fa fa-microphone-slash"></i><span class="hq-mic-dot"></span></button>
-            <button type="button" class="hq-btn-icone" id="hq-btn-pausa" onclick="_hqAlternarPausa()" aria-label="Pausar"><i class="fa fa-pause"></i></button>
           </div>
           <div class="hq-arena" id="hq-arena">
             <canvas id="hq-canvas"></canvas>
@@ -1506,13 +1506,8 @@
               <button type="button" class="hq-link" onclick="_hqVoltarMenu()">Voltar ao menu</button>
             </div>
 
-            <!-- Pausa (por cima da partida) -->
-            <div class="hq-overlay" id="hq-pausa" style="display:none;">
-              <div class="hq-overlay-titulo">Pausado</div>
-              <div class="hq-overlay-desc" id="hq-pausa-desc"></div>
-              <button type="button" class="hq-play" onclick="_hqAlternarPausa()">Continuar</button>
-              <button type="button" class="hq-link" onclick="_hqSairPartida()">Sair da partida</button>
-            </div>
+            <!-- Pausa: é o overlay do menu unificado do hub (AngatubaJogoMenu),
+                 criado por Jogos/hub.js dentro de #jogo-hoquei. -->
 
             <!-- Fim: resultado (vira "Criar nova sala" se o outro sair) -->
             <div class="hq-overlay" id="hq-fim" style="display:none;">

@@ -995,6 +995,7 @@
     var telas = document.querySelectorAll('.jogo-tela');
     for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
     if (menu) menu.style.display = '';
+    _gamesFavAplicarOrdem();
     _gamesAplicarFiltro();
     // Atualiza a faixa de ofensiva; anima a chama se subiu nesta visita.
     _streakAtualizarFaixa(_streakAumentouAgora);
@@ -1020,7 +1021,11 @@
       var cat = c.getAttribute('data-cat') || '';
       var nome = c.getAttribute('data-nome') || '';
       var desc = c.getAttribute('data-desc') || '';
-      var passaCat = (_gamesCatAtual === 'todos' || cat === _gamesCatAtual);
+      var fav = c.querySelector('.gc-fav');
+      var jogoId = fav ? fav.getAttribute('data-jogo') : '';
+      var passaCat = _gamesCatAtual === 'favoritos'
+        ? _gamesFavIs(jogoId)
+        : (_gamesCatAtual === 'todos' || cat === _gamesCatAtual);
       var passaBusca = !termo || nome.indexOf(termo) !== -1 || desc.indexOf(termo) !== -1;
       var mostra = passaCat && passaBusca;
       c.style.display = mostra ? '' : 'none';
@@ -1042,10 +1047,92 @@
   function _gamesLimparFiltros() {
     var input = document.getElementById('games-search-input');
     if (input) input.value = '';
+    _gamesFavAplicarOrdem();
+    _gamesFavAtualizarEstrelas();
     var todosBtn = document.querySelector('.games-cat-chip[data-cat="todos"]');
     _gamesFiltrarCat('todos', todosBtn);
   }
   window._gamesLimparFiltros = _gamesLimparFiltros;
+
+  /* ══════════════════════════════════════════════════════════════
+     FAVORITOS DOS JOGOS (estrela nos cards)
+     Persistência local (localStorage) — sem Firestore. A pessoa
+     favorita/desfavorita pelo botão .gc-fav de cada card; os
+     favoritos sobem pro topo do menu "Todos" e ganham a categoria
+     própria "favoritos" nos chips (ver _gamesAplicarFiltro acima).
+  ══════════════════════════════════════════════════════════════ */
+  var GAMES_FAV_KEY = 'angatuba_jogos_favoritos';
+
+  function _gamesFavGet() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(GAMES_FAV_KEY) || '[]');
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+
+  function _gamesFavSet(arr) {
+    try { localStorage.setItem(GAMES_FAV_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+
+  function _gamesFavIs(id) {
+    return _gamesFavGet().indexOf(id) !== -1;
+  }
+
+  // Adiciona ou remove o id da lista de favoritos; devolve se ficou
+  // favorito (true) ou não (false) depois do toggle.
+  function _gamesFavToggle(id) {
+    var arr = _gamesFavGet();
+    var i = arr.indexOf(id);
+    if (i === -1) { arr.push(id); _gamesFavSet(arr); return true; }
+    arr.splice(i, 1);
+    _gamesFavSet(arr);
+    return false;
+  }
+
+  // Reordena os cards de #games-menu: favoritos primeiro (na ordem em
+  // que estão salvos), depois o resto na ordem original do DOM.
+  function _gamesFavAplicarOrdem() {
+    var menu = document.getElementById('games-menu');
+    if (!menu) return;
+    var cards = Array.prototype.slice.call(menu.querySelectorAll('.game-card'));
+    if (!cards.length) return;
+    var restantes = cards.slice();
+    var frag = document.createDocumentFragment();
+    _gamesFavGet().forEach(function (id) {
+      for (var i = 0; i < restantes.length; i++) {
+        var fav = restantes[i].querySelector('.gc-fav');
+        if (fav && fav.getAttribute('data-jogo') === id) {
+          frag.appendChild(restantes[i]);
+          restantes.splice(i, 1);
+          break;
+        }
+      }
+    });
+    restantes.forEach(function (c) { frag.appendChild(c); });
+    menu.appendChild(frag);
+  }
+  window._gamesFavAplicarOrdem = _gamesFavAplicarOrdem;
+
+  // Atualiza a classe visual (estrela dourada) de todos os botões de
+  // favorito conforme o estado salvo — usado ao (re)entrar no hub.
+  function _gamesFavAtualizarEstrelas() {
+    document.querySelectorAll('#games-menu .gc-fav').forEach(function (btn) {
+      btn.classList.toggle('favoritado', _gamesFavIs(btn.getAttribute('data-jogo')));
+    });
+  }
+  window._gamesFavAtualizarEstrelas = _gamesFavAtualizarEstrelas;
+
+  // Clique/toque na estrela de um card: favorita ou desfavorita,
+  // atualiza a estrela, reordena a lista e reaplica o filtro atual.
+  function _gamesFavToggleUI(btn) {
+    var id = btn && btn.getAttribute('data-jogo');
+    if (!id) return;
+    var ficouFav = _gamesFavToggle(id);
+    btn.classList.toggle('favoritado', ficouFav);
+    _gamesFavAplicarOrdem();
+    _gamesAplicarFiltro();
+  }
+  window._gamesFavToggleUI = _gamesFavToggleUI;
 
   /* ══════════════════════════════════════════════════════════════
      LOADER DE JOGOS SOB DEMANDA (_jogoLoader)

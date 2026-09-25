@@ -2296,7 +2296,11 @@
       var pos = i + 1;
       var eu  = (meuUid && it.uid === meuUid);
       var coroa = pos === 1 ? '👑' : (pos === 2 ? '🥈' : '🥉');
-      html += '<div class="rank-pod rank-pod-' + pos + (eu ? ' rank-pod-eu' : '') + '">' +
+      // Clicável → abre o perfil (o próprio ou o de outro jogador, ver
+      // perfilAbrirUid). Só existe quando há uid (evita quebrar o
+      // agregado "geral" se algum item vier sem uid por algum motivo).
+      var clique = it.uid ? ' rank-clicavel" onclick="perfilAbrirUid(\'' + it.uid + '\')' : '';
+      html += '<div class="rank-pod rank-pod-' + pos + (eu ? ' rank-pod-eu' : '') + clique + '">' +
                 '<div class="rank-pod-coroa" aria-hidden="true">' + coroa + '</div>' +
                 _rankAvatar(it, 'rank-pod-av') +
                 '<div class="rank-pod-nome">' + _rankEsc(it.nome) + '</div>' +
@@ -2357,7 +2361,8 @@
         for (var i = 3; i < exibir.length; i++) {
           var it = exibir[i], pos = i + 1;
           var eu = (meuUid && it.uid === meuUid) ? ' rank-linha-eu' : '';
-          html += '<div class="rank-linha' + eu + '">' +
+          var clique = it.uid ? ' rank-clicavel" onclick="perfilAbrirUid(\'' + it.uid + '\')' : '';
+          html += '<div class="rank-linha' + eu + clique + '">' +
                     '<div class="rank-pos-num">' + pos + '</div>' +
                     _rankAvatar(it, 'rank-av') +
                     '<div class="rank-nome">' + _rankEsc(it.nome) +
@@ -2621,6 +2626,9 @@
     eq[slot] = id;
     _equipadoSalvar(eq);
     _lojaRenderCorpo();
+    // Reflete o novo equipado no perfil público (Camada 3) — no-op se
+    // deslogado ou se a ponte ainda não carregou essa parte do arquivo.
+    if (typeof _perfilPublicoSyncDebounced === 'function') _perfilPublicoSyncDebounced();
     return { ok: true };
   }
 
@@ -2665,6 +2673,8 @@
     if (!isNaN(score) && score > (s.recorde || 0)) s.recorde = score;
     todos[jogoKey] = s;
     _statsSalvar(todos);
+    // Reflete as stats atualizadas no perfil público (Camada 3).
+    if (typeof _perfilPublicoSyncDebounced === 'function') _perfilPublicoSyncDebounced();
   }
 
   /* ── Loja da Coruja — tela cheia dentro do hub (mesmo esquema do
@@ -2799,6 +2809,17 @@
   // de coruja) é grande demais pra um badge; aqui é só o "selo".
   var PERFIL_BADGE_ICO = { badge_estrela: '⭐', badge_fogo: '🔥', badge_coroa: '👑' };
 
+  // 'eu' = tela mostrando o próprio perfil local; 'outro' = visitando o
+  // perfil público (Firestore) de outro jogador (Camada 3). Controla só
+  // a renderização — nunca a leitura/escrita dos dados locais.
+  var _perfilModo = 'eu';
+  // uid do perfil alheio sendo carregado/exibido no momento (null fora
+  // do modo 'outro') — usado pra descartar uma leitura atrasada do
+  // Firestore se a pessoa já trocou de tela ou abriu outro perfil.
+  var _perfilUidVisitado = null;
+  // Timer do debounce de _perfilPublicoSyncDebounced (ver Camada 3).
+  var _perfilSyncTimer = null;
+
   function _perfilLabelJogo(jogoKey) {
     var info = RANK_INFO[jogoKey];
     return (info && info.label) || jogoKey;
@@ -2854,10 +2875,18 @@
   }
 
   function _perfilStatsHtml() {
-    var todos = _statsLer();
+    return _perfilStatsHtmlDe(_statsLer(), false);
+  }
+  // Mesma renderização, mas a partir de um objeto de stats já em mãos —
+  // usado tanto pro próprio perfil (localStorage) quanto pro perfil
+  // público de outro jogador (dados vindos do Firestore em _perfilRenderPublico).
+  function _perfilStatsHtmlDe(todos, visitante) {
+    todos = (todos && typeof todos === 'object') ? todos : {};
     var chaves = Object.keys(todos).filter(function (k) { return todos[k] && todos[k].partidas > 0; });
     if (!chaves.length) {
-      return '<div class="perfil-stats-vazio">Você ainda não jogou nada por aqui. Bora jogar? 🦉</div>';
+      return '<div class="perfil-stats-vazio">' +
+        (visitante ? 'Esse jogador ainda não tem partidas registradas.' : 'Você ainda não jogou nada por aqui. Bora jogar? 🦉') +
+        '</div>';
     }
     chaves.sort(function (a, b) { return (todos[b].partidas || 0) - (todos[a].partidas || 0); });
     var html = '';
@@ -2955,7 +2984,15 @@
     var hubEl = document.getElementById('games-hub');
     if (hubEl) hubEl.classList.add('jogo-ativo');
 
+    _perfilModo = 'eu';
+    _perfilUidVisitado = null;
     _perfilRender();
+
+    // Sincroniza o perfil público (Firestore) com o estado local mais
+    // recente ao abrir o próprio perfil — debounce leve, ver Camada 3.
+    if (typeof _cliUser !== 'undefined' && _cliUser && typeof _perfilPublicoSyncDebounced === 'function') {
+      _perfilPublicoSyncDebounced();
+    }
 
     if (history.state && history.state.modal !== 'perfil') history.pushState({ modal: 'perfil' }, '');
     else if (!history.state) history.pushState({ modal: 'perfil' }, '');
@@ -2964,12 +3001,205 @@
   function perfilFechar(viaPopstate) {
     var tela = document.getElementById('jogo-perfil');
     if (tela) tela.classList.remove('perfil-open');
+    _perfilModo = 'eu';
+    _perfilUidVisitado = null;
     // Volta pro menu de jogos (esconde todas as .jogo-tela, incl. esta).
     if (typeof _voltarAoMenu === 'function') _voltarAoMenu();
     if (!viaPopstate && history.state?.modal === 'perfil') { _popstateNosso = true; history.back(); }
   }
   window.perfilAbrir  = perfilAbrir;
   window.perfilFechar = perfilFechar;
+
+  /* ── Perfil público de outro jogador (Camada 3) ─────────────────
+     Reusa a mesma tela (#jogo-perfil) em modo somente-leitura: busca
+     perfis/{uid} uma vez no Firestore e renderiza com _perfilRenderPublico.
+     Nunca lê/escreve localStorage do visitante — é só uma "vitrine". */
+
+  function _perfilRenderCarregando() {
+    var heroEl = document.getElementById('perfil-hero');
+    var corpo = document.getElementById('perfil-corpo');
+    if (!heroEl || !corpo) return;
+    heroEl.innerHTML = '<div class="perfil-hero"></div>';
+    corpo.innerHTML = '<div class="perfil-carregando"><span class="rank-spin"></span>Carregando perfil…</div>';
+  }
+
+  function _perfilRenderVazio() {
+    var heroEl = document.getElementById('perfil-hero');
+    var corpo = document.getElementById('perfil-corpo');
+    if (!heroEl || !corpo) return;
+    heroEl.innerHTML = '<div class="perfil-hero"></div>';
+    corpo.innerHTML =
+      '<div class="perfil-vazio">' +
+        '<img src="/webp/owl-search.webp" alt="" class="perfil-vazio-owl" onerror="this.style.display=\'none\'">' +
+        '<div class="perfil-vazio-tit">Esse jogador ainda não montou o perfil 🦉</div>' +
+      '</div>';
+  }
+
+  // Mesma estrutura visual de _perfilRender(), mas a partir do doc
+  // público (Firestore) de OUTRO jogador: sem saldo de moedas, sem
+  // botão "Ir à Loja" e sem convite de login (Camada 3 — regra: nunca
+  // expor moedas/inventário completo de quem quer que seja).
+  function _perfilRenderPublico(dados) {
+    var heroEl = document.getElementById('perfil-hero');
+    var corpo = document.getElementById('perfil-corpo');
+    if (!heroEl || !corpo || !dados) return;
+
+    var eq = (dados.equipado && typeof dados.equipado === 'object') ? dados.equipado : {};
+    var nome = (dados.nome && String(dados.nome)) || 'Jogador';
+
+    var avatarHtml = (typeof _rankAvatar === 'function')
+      ? _rankAvatar({ uid: dados.uid || '', nome: nome, photoURL: dados.photoURL || '' }, 'perfil-avatar')
+      : '<span class="perfil-avatar">' + _rankEsc(nome.charAt(0) || '?') + '</span>';
+
+    var badgeIco = eq.badge ? (PERFIL_BADGE_ICO[eq.badge] || '') : '';
+    var badgeItem = eq.badge ? _lojaItemPorId(eq.badge) : null;
+
+    heroEl.innerHTML =
+      '<div class="perfil-hero" style="' + _perfilBgEstilo(eq.bg) + '">' +
+        '<div class="perfil-identidade ' + _perfilCardClasse(eq.card) + '">' +
+          '<div class="perfil-avatar-wrap">' +
+            avatarHtml +
+            (badgeIco ? '<span class="perfil-badge" title="' + _rankEsc(badgeItem ? badgeItem.nome : '') + '">' + badgeIco + '</span>' : '') +
+          '</div>' +
+          '<div class="perfil-identidade-txt">' +
+            '<div class="perfil-nome">' + _rankEsc(nome) + '</div>' +
+            '<div class="perfil-visitando-tag">Perfil de jogador</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    corpo.innerHTML =
+      '<div class="perfil-secao">' +
+        '<div class="perfil-secao-titulo">Estatísticas</div>' +
+        _perfilStatsHtmlDe(dados.stats, true) +
+      '</div>' +
+      '<div class="perfil-secao">' +
+        '<div class="perfil-secao-titulo">Cosméticos equipados</div>' +
+        '<div class="perfil-equipados">' + _perfilChipsEquipados(eq) + '</div>' +
+      '</div>';
+  }
+
+  // Busca o doc público perfis/{uid} uma única vez (sem listener — a
+  // vitrine não precisa atualizar ao vivo). null se não existe, se o
+  // Firestore está indisponível (offline) ou se o uid é inválido.
+  function _perfilPublicoLer(uid) {
+    var db = _rankDb();
+    if (!db || !uid) return Promise.resolve(null);
+    return db.collection('perfis').doc(uid).get()
+      .then(function (doc) {
+        if (!doc || !doc.exists) return null;
+        var d = doc.data();
+        return (d && typeof d === 'object') ? d : null;
+      })
+      .catch(function (err) {
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[perfil] erro ao ler perfil público:', err && err.message);
+        return null;
+      });
+  }
+
+  // Abre o perfil de um uid: se for o próprio usuário logado, é
+  // simplesmente perfilAbrir(); se for outro jogador, abre a mesma tela
+  // em modo visitante (leitura única do Firestore, sem tocar em nada
+  // local). Chamado a partir do Ranking (pódio + lista).
+  function perfilAbrirUid(uid) {
+    if (!uid) return;
+    var souEu = (typeof _cliUser !== 'undefined' && _cliUser && uid === _cliUser.uid);
+    if (souEu) { perfilAbrir(); return; }
+
+    var tela = document.getElementById('jogo-perfil');
+    if (!tela) return;
+    if (typeof _gamesHubAberto === 'function' && !_gamesHubAberto()) {
+      if (typeof _abrirGamesHub === 'function') _abrirGamesHub();
+    }
+    if (typeof _pararJogosExternos === 'function') _pararJogosExternos();
+
+    var menu = document.getElementById('games-menu');
+    if (menu) menu.style.display = 'none';
+    var telas = document.querySelectorAll('.jogo-tela');
+    for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
+    tela.style.display = 'flex';
+    tela.classList.add('perfil-open');
+
+    var hubEl = document.getElementById('games-hub');
+    if (hubEl) hubEl.classList.add('jogo-ativo');
+
+    _perfilModo = 'outro';
+    _perfilUidVisitado = uid;
+    _perfilRenderCarregando();
+
+    if (history.state && history.state.modal !== 'perfil') history.pushState({ modal: 'perfil' }, '');
+    else if (!history.state) history.pushState({ modal: 'perfil' }, '');
+
+    _perfilPublicoLer(uid).then(function (dados) {
+      // Descarta se, enquanto carregava, a pessoa já fechou a tela ou
+      // abriu outro perfil (evita pisar num render mais novo).
+      if (_perfilModo !== 'outro' || _perfilUidVisitado !== uid) return;
+      if (!dados) { _perfilRenderVazio(); return; }
+      _perfilRenderPublico(dados);
+    });
+  }
+  window.perfilAbrirUid = perfilAbrirUid;
+
+  // Publica (merge) o estado LOCAL do próprio usuário em perfis/{uid} —
+  // só o que é público por natureza: nome, foto, cosméticos equipados
+  // (não os itens comprados, só os equipados) e stats por jogo. Nunca
+  // grava moedas nem inventário completo (ver firestore.rules).
+  function _perfilPublicoSync() {
+    if (typeof _cliUser === 'undefined' || !_cliUser) return;
+    var db = _rankDb();
+    if (!db) return;
+    var uid = _cliUser.uid;
+
+    var nome = (typeof cliNomeExibicao === 'function' && cliNomeExibicao()) || 'Jogador';
+    if (nome.length < 2) nome = 'Jogador';
+
+    var eqLocal = _equipadoLer();
+    var equipado = {
+      voo_owl: eqLocal.voo_owl || '',
+      badge:   eqLocal.badge   || '',
+      bg:      eqLocal.bg      || '',
+      card:    eqLocal.card    || ''
+    };
+
+    // Só entradas com partidas > 0 — mesmo filtro do "meu perfil" local,
+    // e mantém o doc pequeno (a lista de jogos com stats é fixa/curta).
+    var statsLocais = _statsLer();
+    var stats = {};
+    Object.keys(statsLocais).forEach(function (k) {
+      var s = statsLocais[k];
+      if (!s || !(s.partidas > 0)) return;
+      stats[k] = {
+        partidas: Math.max(0, Math.round(Number(s.partidas) || 0)),
+        segundos: Math.max(0, Math.round(Number(s.segundos) || 0)),
+        recorde:  Math.max(0, Math.round(Number(s.recorde) || 0))
+      };
+    });
+
+    db.collection('perfis').doc(uid).set({
+      uid: uid,
+      nome: nome,
+      photoURL: (_cliUser.photoURL || ''),
+      equipado: equipado,
+      stats: stats,
+      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) {
+        console.log('[perfil] servidor rejeitou sync do perfil público (verifique firestore.rules):', err && err.code);
+      }
+    });
+  }
+
+  // Debounce leve (~1.5s): equipar vários itens em sequência, ou
+  // registrar várias partidas rápidas, não deve disparar uma gravação
+  // por chamada — só a última, depois de a poeira baixar.
+  function _perfilPublicoSyncDebounced() {
+    if (typeof _cliUser === 'undefined' || !_cliUser) return;
+    if (_perfilSyncTimer) clearTimeout(_perfilSyncTimer);
+    _perfilSyncTimer = setTimeout(function () {
+      _perfilSyncTimer = null;
+      _perfilPublicoSync();
+    }, 1500);
+  }
 
   /* ══════════════════════════════════════════════════════════════
      PONTE DE JOGOS — window.AngatubaGames
@@ -3108,7 +3338,10 @@
 
     // ── Meu perfil (Camada 2) ────────────────────────────────
     perfilAbrir: function () { return perfilAbrir(); },
-    perfilFechar: function () { return perfilFechar(); }
+    perfilFechar: function () { return perfilFechar(); },
+
+    // ── Perfil público de outro jogador (Camada 3) ───────────
+    perfilAbrirUid: function (uid) { return perfilAbrirUid(uid); }
   };
 
   // Semeia os itens grátis no inventário e garante um "equipado" salvo

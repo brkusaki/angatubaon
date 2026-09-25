@@ -2884,22 +2884,45 @@
     todos = (todos && typeof todos === 'object') ? todos : {};
     var chaves = Object.keys(todos).filter(function (k) { return todos[k] && todos[k].partidas > 0; });
     if (!chaves.length) {
-      return '<div class="perfil-stats-vazio">' +
-        (visitante ? 'Esse jogador ainda não tem partidas registradas.' : 'Você ainda não jogou nada por aqui. Bora jogar? 🦉') +
-        '</div>';
+      if (visitante) {
+        return '<div class="perfil-stats-vazio">Esse jogador ainda não tem atividade registrada.</div>';
+      }
+      // Próprio perfil sem partidas: convite pra jogar, com um link
+      // discreto que só fecha o perfil e volta ao menu de jogos.
+      return '<div class="perfil-stats-vazio">Nenhuma partida ainda.<br>' +
+        'Jogue pra encher seu perfil — as horas aparecem aqui. 🦉<br>' +
+        '<button type="button" class="perfil-stats-vazio-btn" onclick="perfilFechar()">Ver jogos</button>' +
+      '</div>';
     }
-    chaves.sort(function (a, b) { return (todos[b].partidas || 0) - (todos[a].partidas || 0); });
+    // Ordena por tempo jogado (o que melhor mostra "dedicação" estilo
+    // Steam), com partidas como critério de desempate.
+    chaves.sort(function (a, b) {
+      var difSeg = (todos[b].segundos || 0) - (todos[a].segundos || 0);
+      if (difSeg !== 0) return difSeg;
+      return (todos[b].partidas || 0) - (todos[a].partidas || 0);
+    });
     var html = '';
-    chaves.forEach(function (k) {
+    chaves.forEach(function (k, i) {
       var s = todos[k];
-      html += '<div class="perfil-stat-row">' +
+      var maisJogado = (i === 0); // primeiro da lista = mais tempo jogado
+      html += '<div class="perfil-stat-row' + (maisJogado ? ' perfil-stat-row-top' : '') + '">' +
                 '<span class="perfil-stat-ico" aria-hidden="true">' + _perfilIcoJogo(k) + '</span>' +
-                '<span class="perfil-stat-nome">' + _rankEsc(_perfilLabelJogo(k)) + '</span>' +
-                '<span class="perfil-stat-valor">' + s.partidas + (s.partidas === 1 ? ' partida' : ' partidas') +
-                  ' · ' + _perfilFormatarTempo(s.segundos) + '</span>' +
+                '<span class="perfil-stat-nome">' + _rankEsc(_perfilLabelJogo(k)) +
+                  (maisJogado ? ' <span class="perfil-stat-top-tag">Mais jogado</span>' : '') + '</span>' +
+                '<span class="perfil-stat-valor">' + _perfilFormatarTempo(s.segundos) +
+                  ' · ' + s.partidas + (s.partidas === 1 ? ' partida' : ' partidas') + '</span>' +
               '</div>';
     });
     return html;
+  }
+
+  // Título sob o nome (estilo Steam): o badge equipado vira texto, não
+  // só um emoji no canto do avatar. '' quando não há badge equipado.
+  function _perfilTituloHtml(eq) {
+    var badgeItem = (eq && eq.badge) ? _lojaItemPorId(eq.badge) : null;
+    if (!badgeItem) return '';
+    var ico = PERFIL_BADGE_ICO[eq.badge] || '★';
+    return '<div class="perfil-titulo">' + ico + ' ' + _rankEsc(badgeItem.nome) + '</div>';
   }
 
   // Mesmo convite de login do Ranking (rankPedirLogin), só com o texto
@@ -2945,23 +2968,22 @@
           '</div>' +
           '<div class="perfil-identidade-txt">' +
             '<div class="perfil-nome">' + _rankEsc(nome) + '</div>' +
+            _perfilTituloHtml(eq) +
             '<div class="loja-hero-saldo perfil-saldo">🪙 ' + saldo + '</div>' +
           '</div>' +
         '</div>' +
         (!logado ? '<button type="button" class="perfil-login-cta" onclick="_perfilPedirLogin()">Entrar pra mostrar seu nome no ranking</button>' : '') +
       '</div>';
 
-    // Corpo rolável: estatísticas + resumo de cosméticos equipados.
+    // Corpo rolável: só estatísticas + "Ir à Loja" — nada de grid de
+    // slots equipados aqui (isso já aparece no hero: BG, moldura do
+    // card e título; a skin do Voo só aparece dentro do próprio jogo).
     corpo.innerHTML =
       '<div class="perfil-secao">' +
         '<div class="perfil-secao-titulo">Estatísticas</div>' +
         _perfilStatsHtml() +
       '</div>' +
-      '<div class="perfil-secao">' +
-        '<div class="perfil-secao-titulo">Cosméticos equipados</div>' +
-        '<div class="perfil-equipados">' + _perfilChipsEquipados(eq) + '</div>' +
-        '<button type="button" class="perfil-ir-loja" onclick="lojaAbrir()">Ir à Loja</button>' +
-      '</div>';
+      '<button type="button" class="perfil-ir-loja" onclick="lojaAbrir()">Ir à Loja</button>';
   }
 
   function perfilAbrir() {
@@ -3063,19 +3085,18 @@
           '</div>' +
           '<div class="perfil-identidade-txt">' +
             '<div class="perfil-nome">' + _rankEsc(nome) + '</div>' +
+            _perfilTituloHtml(eq) +
             '<div class="perfil-visitando-tag">Perfil de jogador</div>' +
           '</div>' +
         '</div>' +
       '</div>';
 
+    // Só estatísticas — sem saldo, sem "Ir à Loja", sem grid de slots
+    // (são dados pessoais; o que é público já aparece no hero acima).
     corpo.innerHTML =
       '<div class="perfil-secao">' +
         '<div class="perfil-secao-titulo">Estatísticas</div>' +
         _perfilStatsHtmlDe(dados.stats, true) +
-      '</div>' +
-      '<div class="perfil-secao">' +
-        '<div class="perfil-secao-titulo">Cosméticos equipados</div>' +
-        '<div class="perfil-equipados">' + _perfilChipsEquipados(eq) + '</div>' +
       '</div>';
   }
 

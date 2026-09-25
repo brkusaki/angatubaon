@@ -6221,6 +6221,9 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
       display: flex; flex-direction: column; align-items: center; text-align: center;
       animation: rankPodio .42s cubic-bezier(0.32,0.72,0,1) both;
     }
+    /* Pódio e lista clicáveis (Camada 3 — abrem o perfil do jogador) */
+    .rank-clicavel { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .rank-clicavel:active { transform: scale(0.97); }
     .rank-pod-2 { animation-delay: .02s; }
     .rank-pod-1 { animation-delay: .08s; }
     .rank-pod-3 { animation-delay: .14s; }
@@ -6611,6 +6614,35 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
       -webkit-tap-highlight-color: transparent; transition: transform 0.15s;
     }
     .perfil-ir-loja:active { transform: scale(0.98); }
+
+    /* ── Perfil de outro jogador (Camada 3): loading / vazio ──
+       Mesmo visual de .rank-loading/.rank-vazio pra não inventar um
+       segundo estilo — só troca o texto pro contexto de perfil. */
+    .perfil-carregando {
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      padding: 44px 20px; color: var(--muted); font-size: 13.5px; line-height: 1.5;
+    }
+    .perfil-vazio {
+      text-align: center; padding: 34px 20px; color: var(--muted);
+      font-size: 13px; line-height: 1.5;
+    }
+    .perfil-vazio-owl {
+      width: 88px; height: 88px; object-fit: contain; display: block;
+      margin: 0 auto 10px; animation: rankFlutua 3.4s ease-in-out infinite;
+    }
+    .perfil-vazio-tit {
+      font-family: var(--font-h); font-weight: 800; font-size: 1rem;
+      color: var(--text);
+    }
+    /* Selo no hero avisando que é o perfil de outra pessoa (sem saldo,
+       sem "Ir à Loja" — ver _perfilRenderPublico em Jogos/hub.js). */
+    .perfil-visitando-tag {
+      margin-top: 5px; font-size: 11px; font-weight: 700;
+      color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: .03em;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .perfil-vazio-owl { animation: none; }
+    }
 
     body.light-mode .perfil-identidade { background: rgba(255,255,255,.55); }
     body.light-mode .perfil-stat-row,

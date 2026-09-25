@@ -2874,6 +2874,21 @@
     return html;
   }
 
+  // Chaves de stats (só quem tem partidas > 0) ordenadas por tempo
+  // jogado — o que melhor mostra "dedicação" estilo Steam — com
+  // partidas como critério de desempate. Compartilhada entre a lista
+  // de jogos e a grade de resumo (pra achar o "mais jogado" dos dois).
+  function _perfilStatsChavesOrdenadas(todos) {
+    todos = (todos && typeof todos === 'object') ? todos : {};
+    var chaves = Object.keys(todos).filter(function (k) { return todos[k] && todos[k].partidas > 0; });
+    chaves.sort(function (a, b) {
+      var difSeg = (todos[b].segundos || 0) - (todos[a].segundos || 0);
+      if (difSeg !== 0) return difSeg;
+      return (todos[b].partidas || 0) - (todos[a].partidas || 0);
+    });
+    return chaves;
+  }
+
   function _perfilStatsHtml() {
     return _perfilStatsHtmlDe(_statsLer(), false);
   }
@@ -2882,7 +2897,7 @@
   // público de outro jogador (dados vindos do Firestore em _perfilRenderPublico).
   function _perfilStatsHtmlDe(todos, visitante) {
     todos = (todos && typeof todos === 'object') ? todos : {};
-    var chaves = Object.keys(todos).filter(function (k) { return todos[k] && todos[k].partidas > 0; });
+    var chaves = _perfilStatsChavesOrdenadas(todos);
     if (!chaves.length) {
       if (visitante) {
         return '<div class="perfil-stats-vazio">Esse jogador ainda não tem atividade registrada.</div>';
@@ -2894,13 +2909,6 @@
         '<button type="button" class="perfil-stats-vazio-btn" onclick="perfilFechar()">Ver jogos</button>' +
       '</div>';
     }
-    // Ordena por tempo jogado (o que melhor mostra "dedicação" estilo
-    // Steam), com partidas como critério de desempate.
-    chaves.sort(function (a, b) {
-      var difSeg = (todos[b].segundos || 0) - (todos[a].segundos || 0);
-      if (difSeg !== 0) return difSeg;
-      return (todos[b].partidas || 0) - (todos[a].partidas || 0);
-    });
     var html = '';
     chaves.forEach(function (k, i) {
       var s = todos[k];
@@ -2923,6 +2931,71 @@
     if (!badgeItem) return '';
     var ico = PERFIL_BADGE_ICO[eq.badge] || '★';
     return '<div class="perfil-titulo">' + ico + ' ' + _rankEsc(badgeItem.nome) + '</div>';
+  }
+
+  // Grade de resumo estilo Steam (2×2, ou 3 cards quando o chamador
+  // não manda o 4º item): número grande + rótulo pequeno. itens é
+  // [{ rotulo, valor }, ...] — valor já vem pronto pra exibir (número,
+  // texto formatado ou emoji), sem HTML embutido.
+  function _perfilGradeHtml(itens) {
+    var html = '<div class="perfil-grade">';
+    itens.forEach(function (it) {
+      html += '<div class="perfil-grade-item">' +
+                '<div class="perfil-grade-num">' + _rankEsc(String(it.valor)) + '</div>' +
+                '<div class="perfil-grade-label">' + _rankEsc(it.rotulo) + '</div>' +
+              '</div>';
+    });
+    return html + '</div>';
+  }
+
+  // Vitrine horizontal de insígnias — não é um grid de slots, é só uma
+  // fileira dos badges que a pessoa TEM (badgeIds), com destaque no
+  // equipado. '' (nada renderizado) quando a lista está vazia: no
+  // próprio perfil sem badge nenhum comprado, ou no de outro jogador
+  // sem badge equipado — nunca fingimos conhecer o inventário alheio.
+  function _perfilVitrineHtml(badgeIds, badgeEquipadoId) {
+    if (!badgeIds || !badgeIds.length) return '';
+    var html = '';
+    badgeIds.forEach(function (id) {
+      var item = _lojaItemPorId(id);
+      if (!item) return;
+      var ico = PERFIL_BADGE_ICO[id] || '★';
+      var equipada = (id === badgeEquipadoId);
+      html += '<div class="perfil-vitrine-item' + (equipada ? ' perfil-vitrine-item-equipada' : '') + '" title="' + _rankEsc(item.nome) + '">' +
+                '<span class="perfil-vitrine-ico" aria-hidden="true">' + ico + '</span>' +
+                '<span class="perfil-vitrine-nome">' + _rankEsc(item.nome) + '</span>' +
+              '</div>';
+    });
+    if (!html) return '';
+    return '<div class="perfil-secao">' +
+        '<div class="perfil-secao-titulo">Insígnias</div>' +
+        '<div class="perfil-vitrine">' + html + '</div>' +
+      '</div>';
+  }
+
+  // Corpo do perfil (grade de resumo + vitrine de insígnias + lista de
+  // jogos) — mesma estrutura pro próprio perfil e pro de outro jogador;
+  // só muda o que cada chamador passa (fonte dos badges, 4º item da
+  // grade, e o texto de empty state via "visitante").
+  function _perfilCorpoHtml(stats, badgeIds, badgeEquipadoId, quartoItem, visitante) {
+    stats = (stats && typeof stats === 'object') ? stats : {};
+    var chaves = _perfilStatsChavesOrdenadas(stats);
+    var totalSeg = 0;
+    chaves.forEach(function (k) { totalSeg += (stats[k].segundos || 0); });
+
+    var gradeItens = [
+      { rotulo: 'Jogos', valor: chaves.length },
+      { rotulo: 'Tempo', valor: chaves.length ? _perfilFormatarTempo(totalSeg) : '—' },
+      { rotulo: 'Insígnias', valor: badgeIds.length }
+    ];
+    if (quartoItem) gradeItens.push(quartoItem);
+
+    return _perfilGradeHtml(gradeItens) +
+      _perfilVitrineHtml(badgeIds, badgeEquipadoId) +
+      '<div class="perfil-secao">' +
+        '<div class="perfil-secao-titulo">Jogos</div>' +
+        _perfilStatsHtmlDe(stats, visitante) +
+      '</div>';
   }
 
   // Mesmo convite de login do Ranking (rankPedirLogin), só com o texto
@@ -2972,17 +3045,20 @@
             '<div class="loja-hero-saldo perfil-saldo">🪙 ' + saldo + '</div>' +
           '</div>' +
         '</div>' +
+        // Atalho secundário pra loja (complementa o CTA do rodapé, ver
+        // .perfil-ir-loja abaixo) — mesma ação, outro ponto de entrada.
+        '<button type="button" class="perfil-editar-btn" onclick="lojaAbrir()">Editar cosméticos</button>' +
         (!logado ? '<button type="button" class="perfil-login-cta" onclick="_perfilPedirLogin()">Entrar pra mostrar seu nome no ranking</button>' : '') +
       '</div>';
 
-    // Corpo rolável: só estatísticas + "Ir à Loja" — nada de grid de
-    // slots equipados aqui (isso já aparece no hero: BG, moldura do
-    // card e título; a skin do Voo só aparece dentro do próprio jogo).
+    // Corpo rolável: grade de resumo + vitrine de insígnias + lista de
+    // jogos + "Ir à Loja" — nada de grid de slots equipados aqui (isso
+    // já aparece no hero: BG, moldura do card e título; a skin do Voo
+    // só aparece dentro do próprio jogo).
+    var badgesInv = LOJA_CATALOGO.filter(function (it) { return it.tipo === 'badge' && _temItem(it.id); })
+      .map(function (it) { return it.id; });
     corpo.innerHTML =
-      '<div class="perfil-secao">' +
-        '<div class="perfil-secao-titulo">Estatísticas</div>' +
-        _perfilStatsHtml() +
-      '</div>' +
+      _perfilCorpoHtml(_statsLer(), badgesInv, eq.badge, { rotulo: 'Moedas', valor: '🪙 ' + saldo }, false) +
       '<button type="button" class="perfil-ir-loja" onclick="lojaAbrir()">Ir à Loja</button>';
   }
 
@@ -3091,13 +3167,17 @@
         '</div>' +
       '</div>';
 
-    // Só estatísticas — sem saldo, sem "Ir à Loja", sem grid de slots
-    // (são dados pessoais; o que é público já aparece no hero acima).
-    corpo.innerHTML =
-      '<div class="perfil-secao">' +
-        '<div class="perfil-secao-titulo">Estatísticas</div>' +
-        _perfilStatsHtmlDe(dados.stats, true) +
-      '</div>';
+    // Grade + insígnias + lista de jogos — sem saldo, sem "Ir à Loja",
+    // sem grid de slots (são dados pessoais; o que é público já aparece
+    // no hero acima). Insígnias mostra só o badge EQUIPADO (o doc
+    // público não guarda o inventário completo — nunca fingimos saber
+    // o que mais essa pessoa comprou). 4º item da grade é o recorde do
+    // jogo mais jogado, quando há pelo menos uma partida registrada.
+    var stats = (dados.stats && typeof dados.stats === 'object') ? dados.stats : {};
+    var badgesEquipados = eq.badge ? [eq.badge] : [];
+    var maisJogadoKey = _perfilStatsChavesOrdenadas(stats)[0];
+    var quartoItem = maisJogadoKey ? { rotulo: 'Recorde', valor: (stats[maisJogadoKey].recorde || 0) } : null;
+    corpo.innerHTML = _perfilCorpoHtml(stats, badgesEquipados, eq.badge, quartoItem, true);
   }
 
   // Busca o doc público perfis/{uid} uma única vez (sem listener — a

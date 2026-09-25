@@ -1198,6 +1198,159 @@
   };
   var _jogosCarregados = {};   // nome -> true quando js+css já injetados
 
+  /* ── Cache sob demanda dos assets dos jogos (offline de verdade) ──
+     Lista, por jogo, os arquivos pesados (sprites, sons, músicas,
+     vídeos) que vivem em /Jogos/assets/<jogo>/ (+ o js/css do próprio
+     jogo e o multiplayer.min.js quando o jogo usa AngatubaMP). Jogos
+     sem assets pesados (piano = Web Audio, speedtap, sequencia, quiz,
+     2048, truco, uno...) não precisam de entrada aqui — o SW já
+     cacheia js/css deles no cache principal via stale-while-revalidate.
+     Quem consome esta lista é o _jogosCacheAssets logo abaixo. */
+  var JOGOS_ASSETS = {
+    corrida: [
+      '/Jogos/corrida.min.js', '/Jogos/corrida.css',
+      '/Jogos/assets/corrida/arma.webp',
+      '/Jogos/assets/corrida/cenario-floresta.webp',
+      '/Jogos/assets/corrida/municao.webp',
+      '/Jogos/assets/corrida/musica-fundo.mp3',
+      '/Jogos/assets/corrida/zumbi-forte-sheet.webp',
+      '/Jogos/assets/corrida/zumbi-normal-sheet.webp',
+      '/Jogos/assets/corrida/zumbi-rapido-sheet.webp',
+      // partículas usadas pela corrida:
+      '/Jogos/assets/particulas/brilho/circle_01.webp',
+      '/Jogos/assets/particulas/brilho/circle_02.webp',
+      '/Jogos/assets/particulas/brilho/flare_01.webp',
+      '/Jogos/assets/particulas/brilho/magic_01.webp',
+      '/Jogos/assets/particulas/brilho/magic_04.webp',
+      '/Jogos/assets/particulas/brilho/muzzle_01.webp',
+      '/Jogos/assets/particulas/brilho/muzzle_03.webp',
+      '/Jogos/assets/particulas/brilho/spark_01.webp',
+      '/Jogos/assets/particulas/brilho/spark_02.webp',
+      '/Jogos/assets/particulas/brilho/spark_03.webp',
+      '/Jogos/assets/particulas/brilho/star_01.webp',
+      '/Jogos/assets/particulas/brilho/star_04.webp',
+      '/Jogos/assets/particulas/fumaca/whitePuff00.webp',
+      '/Jogos/assets/particulas/fumaca/whitePuff01.webp',
+      '/Jogos/assets/particulas/fumaca/whitePuff02.webp',
+      '/Jogos/assets/particulas/fumaca/whitePuff03.webp',
+      '/Jogos/assets/particulas/fumaca/whitePuff04.webp',
+      '/Jogos/assets/particulas/fumaca/whitePuff05.webp'
+    ],
+    voo: [
+      '/Jogos/voo.min.js', '/Jogos/voo.css',
+      '/Jogos/assets/voo/aviao.webp',
+      '/Jogos/assets/voo/balao.webp',
+      '/Jogos/assets/voo/buraconegro.webp',
+      '/Jogos/assets/voo/foguete.webp',
+      '/Jogos/assets/voo/ovni.webp',
+      '/Jogos/assets/voo/passaro.webp',
+      '/Jogos/assets/voo/plat-break-atm.webp',
+      '/Jogos/assets/voo/plat-break-ceu.webp',
+      '/Jogos/assets/voo/plat-break-esp.webp',
+      '/Jogos/assets/voo/plat-move-atm.webp',
+      '/Jogos/assets/voo/plat-move-ceu.webp',
+      '/Jogos/assets/voo/plat-move-esp.webp',
+      '/Jogos/assets/voo/plat-normal-atm.webp',
+      '/Jogos/assets/voo/plat-normal-ceu.png',
+      '/Jogos/assets/voo/plat-normal-ceu.webp',
+      '/Jogos/assets/voo/plat-normal-esp.webp'
+    ],
+    blocos: [
+      '/Jogos/blocos.min.js', '/Jogos/blocos.css',
+      '/Jogos/assets/blocos/bloco-amarelo.webp',
+      '/Jogos/assets/blocos/bloco-azul.webp',
+      '/Jogos/assets/blocos/bloco-ciano.webp',
+      '/Jogos/assets/blocos/bloco-rosa.webp',
+      '/Jogos/assets/blocos/bloco-roxo.webp',
+      '/Jogos/assets/blocos/bloco-verde.webp'
+    ],
+    doces: [
+      '/Jogos/doces.min.js', '/Jogos/doces.css',
+      '/Jogos/assets/doces/doce-amarelo.webp',
+      '/Jogos/assets/doces/doce-azul.webp',
+      '/Jogos/assets/doces/doce-roxo.webp',
+      '/Jogos/assets/doces/doce-verde.webp',
+      '/Jogos/assets/doces/doce-vermelho.webp',
+      '/Jogos/assets/doces/gelo.webp'
+    ],
+    tanques: [
+      '/Jogos/tanques.min.js', '/Jogos/tanques.css', '/Jogos/multiplayer.min.js',
+      '/Jogos/assets/tanques/barril.webp',
+      '/Jogos/assets/tanques/chao-arena.webp',
+      '/Jogos/assets/tanques/mato.webp',
+      '/Jogos/assets/tanques/parede-escombros.webp',
+      '/Jogos/assets/tanques/parede-metal.webp',
+      '/Jogos/assets/tanques/parede-tijolo.webp',
+      '/Jogos/assets/tanques/tank-azul.webp',
+      '/Jogos/assets/tanques/tank-vermelho.webp'
+    ],
+    pingpong: [
+      '/Jogos/pingpong.min.js', '/Jogos/pingpong.css', '/Jogos/multiplayer.min.js',
+      '/Jogos/assets/pingpong/cenario-arena.webp'
+    ],
+    hoquei: [
+      '/Jogos/hoquei.min.js', '/Jogos/hoquei.css', '/Jogos/multiplayer.min.js',
+      '/Jogos/assets/hoquei/disco.webp',
+      '/Jogos/assets/hoquei/mesa.webp',
+      '/Jogos/assets/hoquei/raquete-azul.webp',
+      '/Jogos/assets/hoquei/raquete-vermelha.webp'
+    ],
+    puff: [
+      '/Jogos/puff.min.js', '/Jogos/puff.css',
+      '/Jogos/assets/puff/coruja-puff-tossindo.webp',
+      '/Jogos/assets/puff/coruja-puff.webp',
+      '/Jogos/assets/puff/coruja-tossindo-loop.webm'
+    ],
+    ervilhas: [
+      '/Jogos/ervilhas.min.js', '/Jogos/ervilhas.css',
+      '/Jogos/assets/ervilhas/coruja-bico.webp',
+      '/Jogos/assets/ervilhas/olho-aberto.webp',
+      '/Jogos/assets/ervilhas/olho-fechado.webp'
+    ],
+    baralho: [
+      '/Jogos/baralho.min.js', '/Jogos/baralho.css',
+      '/Jogos/assets/baralho/owl-comemorando.webp',
+      '/Jogos/assets/baralho/owl-neutra.webp',
+      '/Jogos/assets/baralho/owl-provocando.webp',
+      '/Jogos/assets/baralho/verso-truco.webp',
+      '/Jogos/assets/baralho/verso-uno.webp'
+    ],
+    negocios: [
+      '/Jogos/negocios.min.js', '/Jogos/negocios.css',
+      '/Jogos/assets/negocios/dados-coruja.mp4',
+      '/Jogos/assets/negocios/token-bike-amarela.webp',
+      '/Jogos/assets/negocios/token-bike-colorida.webp',
+      '/Jogos/assets/negocios/token-caminhao-laranja.webp',
+      '/Jogos/assets/negocios/token-carrinho-colorido.webp',
+      '/Jogos/assets/negocios/token-carrinho-preto.webp',
+      '/Jogos/assets/negocios/token-onibus.webp',
+      '/Jogos/assets/negocios/token-trator-azul.webp',
+      '/Jogos/assets/negocios/token-trator-branco.webp'
+    ]
+  };
+
+  // Depois que um jogo termina de carregar (js/css injetados com
+  // sucesso), baixa em paralelo os assets pesados dele pro cache
+  // separado do Service Worker (CACHE_JOGOS = 'angatubaon-jogos-v1') —
+  // assim a próxima abertura funciona offline, mesmo depois de um
+  // update do app (o SW nunca apaga esse cache, ver service-worker.js).
+  // Fire-and-forget: não atrasa o "Jogar" nem trava se algum asset
+  // falhar (allSettled). Se o asset já está no cache, não baixa de novo.
+  function _jogosCacheAssets(nome) {
+    var urls = JOGOS_ASSETS[nome];
+    if (!urls || !urls.length) return;
+    if (typeof caches === 'undefined' || !caches.open) return;
+    caches.open('angatubaon-jogos-v1').then(function (c) {
+      return Promise.allSettled(urls.map(function (url) {
+        return c.match(url).then(function (jaTem) {
+          if (jaTem) return;
+          return fetch(url).then(function (resp) {
+            if (resp && resp.ok) return c.put(url, resp);
+          });
+        });
+      }));
+    }).catch(function () {});
+  }
 
   var _fbJogosCarregado = null;
   function _carregarFirebaseJogos() {
@@ -1260,6 +1413,8 @@
     var _pronto = _pMultiplayer ? Promise.all([_pMultiplayer, _pJogo]) : _pJogo;
     return _pronto.then(function () {
       _jogosCarregados[nome] = true;
+      // Assets pesados (sprites, sons) em paralelo — não trava a abertura.
+      _jogosCacheAssets(nome);
       _jogoLoadingMostrar(tela, false);
       var api = window[cfg.global];
       if (!api) throw new Error('Módulo ' + nome + ' não expôs ' + cfg.global);

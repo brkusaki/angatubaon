@@ -600,6 +600,16 @@
         <i class="fa fa-chevron-right rank-abrir-seta"></i>
       </button>
 
+      <!-- Botão do Meu Perfil (Camada 2 da economia) -->
+      <button type="button" class="perfil-abrir-btn" onclick="perfilAbrir()">
+        <span class="perfil-abrir-ico">👤</span>
+        <span class="rank-abrir-txt">
+          <span class="rank-abrir-titulo">Meu perfil</span>
+          <span class="rank-abrir-sub">Card, plano de fundo e estatísticas</span>
+        </span>
+        <i class="fa fa-chevron-right rank-abrir-seta"></i>
+      </button>
+
       <!-- Botão da Loja da Coruja (Camada 1 da economia) -->
       <button type="button" class="loja-abrir-btn" onclick="lojaAbrir()">
         <span class="loja-abrir-ico">🪙</span>
@@ -1722,6 +1732,13 @@
         <div class="rank-abas" id="loja-abas"></div>
         <div class="rank-corpo" id="loja-corpo"></div>
         <div class="loja-rodape">Em breve: cupons pras lojas de Angatuba 🦉</div>
+      </div>
+
+      <!-- TELA: Meu Perfil (estilo Steam, só o próprio — Camada 2 da economia) -->
+      <div id="jogo-perfil" class="jogo-tela rank-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="perfilFechar()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div id="perfil-hero"></div>
+        <div class="rank-corpo" id="perfil-corpo"></div>
       </div>
     </div>
 

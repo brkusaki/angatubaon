@@ -2787,6 +2787,191 @@
   window.lojaFechar = lojaFechar;
 
   /* ══════════════════════════════════════════════════════════════
+     MEU PERFIL — TELA ESTILO STEAM (Camada 2)
+     Só o próprio perfil (sem ver perfil de outros, sem Firestore de
+     perfil ainda) — lê exclusivamente o que a Camada 1 já grava
+     (angatuba_equipado / angatuba_stats_jogos / angatuba_moedas) e a
+     identidade do cliente (cliNomeExibicao/_cliUser, já usados pelo
+     Ranking). BG e card vêm do catálogo da loja — nunca upload.
+  ══════════════════════════════════════════════════════════════ */
+
+  // Emoji pequeno pro cantinho do avatar — o preview do catálogo (webp
+  // de coruja) é grande demais pra um badge; aqui é só o "selo".
+  var PERFIL_BADGE_ICO = { badge_estrela: '⭐', badge_fogo: '🔥', badge_coroa: '👑' };
+
+  function _perfilLabelJogo(jogoKey) {
+    var info = RANK_INFO[jogoKey];
+    return (info && info.label) || jogoKey;
+  }
+  function _perfilIcoJogo(jogoKey) {
+    var info = RANK_INFO[jogoKey];
+    return (info && info.ico) || '🎮';
+  }
+  // Segundos → texto curto ("45 s", "12 min", "1h 05"). Sem asset novo,
+  // só formatação — mesmo dado bruto de _statsJogo.
+  function _perfilFormatarTempo(seg) {
+    seg = Math.max(0, Math.round(Number(seg) || 0));
+    if (seg < 60) return seg + ' s';
+    var min = Math.floor(seg / 60);
+    if (min < 60) return min + ' min';
+    var h = Math.floor(min / 60), resto = min % 60;
+    return h + 'h' + (resto ? ' ' + (resto < 10 ? '0' : '') + resto : '');
+  }
+
+  // Estilo inline do herói com o BG equipado (imagem do catálogo). Sem
+  // preview (bg_padrao, bg_neon, ou nada equipado ainda) cai no
+  // gradiente padrão já definido em CSS pra .perfil-hero.
+  function _perfilBgEstilo(bgId) {
+    var item = bgId ? _lojaItemPorId(bgId) : null;
+    if (!item || !item.preview) return '';
+    return 'background-image:linear-gradient(180deg, rgba(11,15,23,.25), rgba(11,15,23,.92)), url(\'' + item.preview + '\');' +
+           'background-size:cover; background-position:center;';
+  }
+
+  // Moldura do card (CSS puro, sem asset novo) conforme o item equipado.
+  function _perfilCardClasse(cardId) {
+    if (cardId === 'card_ouro')  return 'perfil-card-ouro';
+    if (cardId === 'card_pixel') return 'perfil-card-pixel';
+    return '';
+  }
+
+  function _perfilChipsEquipados(eq) {
+    var linhas = [
+      { rotulo: 'Skin',  id: eq.voo_owl },
+      { rotulo: 'Badge', id: eq.badge },
+      { rotulo: 'Fundo', id: eq.bg },
+      { rotulo: 'Card',  id: eq.card }
+    ];
+    var html = '';
+    linhas.forEach(function (l) {
+      var item = l.id ? _lojaItemPorId(l.id) : null;
+      html += '<div class="perfil-chip">' +
+                '<span class="perfil-chip-rotulo">' + l.rotulo + '</span>' +
+                '<span class="perfil-chip-valor">' + _rankEsc(item ? item.nome : 'Nenhum') + '</span>' +
+              '</div>';
+    });
+    return html;
+  }
+
+  function _perfilStatsHtml() {
+    var todos = _statsLer();
+    var chaves = Object.keys(todos).filter(function (k) { return todos[k] && todos[k].partidas > 0; });
+    if (!chaves.length) {
+      return '<div class="perfil-stats-vazio">Você ainda não jogou nada por aqui. Bora jogar? 🦉</div>';
+    }
+    chaves.sort(function (a, b) { return (todos[b].partidas || 0) - (todos[a].partidas || 0); });
+    var html = '';
+    chaves.forEach(function (k) {
+      var s = todos[k];
+      html += '<div class="perfil-stat-row">' +
+                '<span class="perfil-stat-ico" aria-hidden="true">' + _perfilIcoJogo(k) + '</span>' +
+                '<span class="perfil-stat-nome">' + _rankEsc(_perfilLabelJogo(k)) + '</span>' +
+                '<span class="perfil-stat-valor">' + s.partidas + (s.partidas === 1 ? ' partida' : ' partidas') +
+                  ' · ' + _perfilFormatarTempo(s.segundos) + '</span>' +
+              '</div>';
+    });
+    return html;
+  }
+
+  // Mesmo convite de login do Ranking (rankPedirLogin), só com o texto
+  // voltado pro perfil — reusa o mesmo cuidado de sair da tela cheia
+  // antes de abrir o modal (senão o modal nasce por trás).
+  function _perfilPedirLogin() {
+    var estavaFs = (typeof _fsAtivo === 'function' && _fsAtivo());
+    if (typeof _sairTelaCheia === 'function') _sairTelaCheia();
+    var abrir = function () {
+      if (typeof cliAbrirLogin === 'function') cliAbrirLogin('Entre pra mostrar seu nome no ranking e no seu perfil!');
+    };
+    if (estavaFs) setTimeout(abrir, 220); else abrir();
+  }
+  window._perfilPedirLogin = _perfilPedirLogin;
+
+  function _perfilRender() {
+    var heroEl = document.getElementById('perfil-hero');
+    var corpo = document.getElementById('perfil-corpo');
+    if (!heroEl || !corpo) return;
+
+    var eq = _equipadoLer();
+    var saldo = _moedasLer();
+    var logado = (typeof _cliUser !== 'undefined' && !!_cliUser);
+    var nome = (typeof cliNomeExibicao === 'function' && cliNomeExibicao()) || (logado ? 'Jogador' : 'Visitante');
+
+    // Reusa o mesmo avatar do Ranking (foto se logado, senão iniciais
+    // com cor derivada do uid) — mesma identidade visual em todo hub.
+    var avatarHtml = (typeof _rankAvatar === 'function')
+      ? _rankAvatar({ uid: logado ? _cliUser.uid : '', nome: nome, photoURL: logado ? _cliUser.photoURL : '' }, 'perfil-avatar')
+      : '<span class="perfil-avatar">' + _rankEsc(nome.charAt(0) || '?') + '</span>';
+
+    var badgeIco = eq.badge ? (PERFIL_BADGE_ICO[eq.badge] || '') : '';
+    var badgeItem = eq.badge ? _lojaItemPorId(eq.badge) : null;
+
+    // Hero fixo no topo (BG equipado) — irmão do corpo rolável, mesmo
+    // esquema do herói do Ranking (não rola junto com o resto).
+    heroEl.innerHTML =
+      '<div class="perfil-hero" style="' + _perfilBgEstilo(eq.bg) + '">' +
+        '<div class="perfil-identidade ' + _perfilCardClasse(eq.card) + '">' +
+          '<div class="perfil-avatar-wrap">' +
+            avatarHtml +
+            (badgeIco ? '<span class="perfil-badge" title="' + _rankEsc(badgeItem ? badgeItem.nome : '') + '">' + badgeIco + '</span>' : '') +
+          '</div>' +
+          '<div class="perfil-identidade-txt">' +
+            '<div class="perfil-nome">' + _rankEsc(nome) + '</div>' +
+            '<div class="loja-hero-saldo perfil-saldo">🪙 ' + saldo + '</div>' +
+          '</div>' +
+        '</div>' +
+        (!logado ? '<button type="button" class="perfil-login-cta" onclick="_perfilPedirLogin()">Entrar pra mostrar seu nome no ranking</button>' : '') +
+      '</div>';
+
+    // Corpo rolável: estatísticas + resumo de cosméticos equipados.
+    corpo.innerHTML =
+      '<div class="perfil-secao">' +
+        '<div class="perfil-secao-titulo">Estatísticas</div>' +
+        _perfilStatsHtml() +
+      '</div>' +
+      '<div class="perfil-secao">' +
+        '<div class="perfil-secao-titulo">Cosméticos equipados</div>' +
+        '<div class="perfil-equipados">' + _perfilChipsEquipados(eq) + '</div>' +
+        '<button type="button" class="perfil-ir-loja" onclick="lojaAbrir()">Ir à Loja</button>' +
+      '</div>';
+  }
+
+  function perfilAbrir() {
+    var tela = document.getElementById('jogo-perfil');
+    if (!tela) return;
+    // Chamado de fora do hub (ponte/deep link): abre o hub antes.
+    if (typeof _gamesHubAberto === 'function' && !_gamesHubAberto()) {
+      if (typeof _abrirGamesHub === 'function') _abrirGamesHub();
+    }
+    if (typeof _pararJogosExternos === 'function') _pararJogosExternos();
+
+    // Esconde o menu e as outras telas; só o perfil fica visível.
+    var menu = document.getElementById('games-menu');
+    if (menu) menu.style.display = 'none';
+    var telas = document.querySelectorAll('.jogo-tela');
+    for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
+    tela.style.display = 'flex';
+    tela.classList.add('perfil-open');
+
+    var hubEl = document.getElementById('games-hub');
+    if (hubEl) hubEl.classList.add('jogo-ativo');
+
+    _perfilRender();
+
+    if (history.state && history.state.modal !== 'perfil') history.pushState({ modal: 'perfil' }, '');
+    else if (!history.state) history.pushState({ modal: 'perfil' }, '');
+  }
+
+  function perfilFechar(viaPopstate) {
+    var tela = document.getElementById('jogo-perfil');
+    if (tela) tela.classList.remove('perfil-open');
+    // Volta pro menu de jogos (esconde todas as .jogo-tela, incl. esta).
+    if (typeof _voltarAoMenu === 'function') _voltarAoMenu();
+    if (!viaPopstate && history.state?.modal === 'perfil') { _popstateNosso = true; history.back(); }
+  }
+  window.perfilAbrir  = perfilAbrir;
+  window.perfilFechar = perfilFechar;
+
+  /* ══════════════════════════════════════════════════════════════
      PONTE DE JOGOS — window.AngatubaGames
      Contrato único entre o app principal e os módulos de jogos que
      serão carregados sob demanda (lazy load) a partir de /jogos/.
@@ -2919,7 +3104,11 @@
     statsRegistrarPartida: function (jogoKey, dados) { return _statsRegistrarPartida(jogoKey, dados); },
     lojaCatalogo: function () { return _lojaCatalogo(); },
     lojaAbrir: function () { return lojaAbrir(); },
-    lojaFechar: function () { return lojaFechar(); }
+    lojaFechar: function () { return lojaFechar(); },
+
+    // ── Meu perfil (Camada 2) ────────────────────────────────
+    perfilAbrir: function () { return perfilAbrir(); },
+    perfilFechar: function () { return perfilFechar(); }
   };
 
   // Semeia os itens grátis no inventário e garante um "equipado" salvo

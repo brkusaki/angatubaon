@@ -6524,16 +6524,16 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
        hub quando nada tem preview (bg_padrao / bg_neon / nunca comprou). */
     .perfil-hero {
       position: relative; overflow: hidden;
-      margin: 0 14px 12px; padding: 18px 16px 16px;
-      border-radius: 20px;
+      margin: 0 14px 12px; padding: 26px 16px 20px;
+      border-radius: 20px; min-height: 148px;
       background: linear-gradient(135deg, #101b2e 0%, #151222 55%, #0d0f18 100%);
       border: 1px solid rgba(56,189,248,0.22);
       box-shadow: 0 10px 30px rgba(0,0,0,0.35);
     }
     .perfil-identidade {
       position: relative; z-index: 1;
-      display: flex; align-items: center; gap: 14px;
-      padding: 10px 12px; border-radius: 16px;
+      display: flex; align-items: center; gap: 16px;
+      padding: 12px 14px; border-radius: 16px;
       background: rgba(9,14,22,.38); border: 1px solid rgba(255,255,255,.08);
       backdrop-filter: blur(2px);
     }
@@ -6549,32 +6549,32 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     }
     .perfil-avatar-wrap { position: relative; flex-shrink: 0; }
     .perfil-avatar {
-      width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0;
+      width: 80px; height: 80px; border-radius: 50%; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center; overflow: hidden;
-      font-family: var(--font-h); font-weight: 800; font-size: 20px; color: #fff;
-      border: 2.5px solid rgba(255,255,255,0.22);
+      font-family: var(--font-h); font-weight: 800; font-size: 25px; color: #fff;
+      border: 3px solid rgba(255,255,255,0.22);
       box-shadow: 0 6px 16px rgba(0,0,0,0.4);
     }
     .perfil-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .perfil-badge {
       position: absolute; bottom: -2px; right: -2px;
-      width: 24px; height: 24px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center; font-size: 13px;
+      width: 27px; height: 27px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
       background: var(--surface2); border: 2px solid var(--bg, #0b0f17);
     }
     .perfil-identidade-txt { min-width: 0; }
     .perfil-nome {
-      font-family: var(--font-h); font-weight: 800; font-size: 16px; color: #fff;
+      font-family: var(--font-h); font-weight: 800; font-size: 18px; color: #fff;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 44vw;
     }
     /* Título estilo Steam (badge equipado, em texto, sob o nome) —
        o emoji no canto do avatar continua existindo, mas só como
        detalhe secundário; isto aqui é o indicador principal. */
     .perfil-titulo {
-      margin-top: 2px; font-weight: 700; font-size: 12.5px; color: #fbbf24;
+      margin-top: 3px; font-weight: 700; font-size: 13px; color: #fbbf24;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 44vw;
     }
-    .perfil-saldo { margin-top: 5px; }
+    .perfil-saldo { margin-top: 6px; }
     .perfil-login-cta {
       position: relative; z-index: 1; width: 100%; margin-top: 12px;
       padding: 10px; border-radius: 999px; cursor: pointer;
@@ -6583,13 +6583,69 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
       -webkit-tap-highlight-color: transparent; transition: transform 0.15s;
     }
     .perfil-login-cta:active { transform: scale(0.98); }
+    /* Atalho secundário pra loja, dentro do hero — complementa o CTA
+       vermelho grande no rodapé (mesma função, contexto diferente). */
+    .perfil-editar-btn {
+      position: relative; z-index: 1; margin-top: 12px;
+      padding: 7px 14px; border-radius: 999px; cursor: pointer;
+      background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.22);
+      color: #fff; font-family: var(--font-h); font-weight: 700; font-size: 11.5px;
+      -webkit-tap-highlight-color: transparent; transition: transform 0.15s;
+    }
+    .perfil-editar-btn:active { transform: scale(0.96); }
 
-    /* Seções do corpo rolável (estatísticas / cosméticos equipados) */
+    /* Seções do corpo rolável (grade de resumo / insígnias / jogos) */
     .perfil-secao { margin-bottom: 18px; }
     .perfil-secao-titulo {
       font-family: var(--font-h); font-weight: 800; font-size: 13.5px;
       color: var(--text); margin-bottom: 8px;
     }
+
+    /* Grade de resumo estilo Steam (Jogos / Tempo / Insígnias / 4º item) —
+       cards compactos com número grande + rótulo pequeno. Com 3 itens
+       (visitante sem partida nenhuma) o 3º card fica sozinho na 2ª linha,
+       ocupando metade da largura — layout ainda limpo, sem espaço morto. */
+    .perfil-grade {
+      display: flex; flex-wrap: wrap; gap: 8px; margin: 0 14px 18px;
+    }
+    .perfil-grade-item {
+      flex: 1 1 calc(50% - 4px); min-width: 76px; text-align: center;
+      padding: 12px 8px; border-radius: 14px;
+      background: var(--surface2); border: 1px solid var(--border);
+    }
+    .perfil-grade-num {
+      font-family: var(--font-h); font-weight: 800; font-size: 18px; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .perfil-grade-label {
+      margin-top: 2px; font-size: 11px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .03em; font-weight: 700;
+    }
+
+    /* Vitrine de insígnias — fileira horizontal com scroll, não um
+       grid de slots. Só aparece quando há algo pra mostrar (a função
+       que gera o HTML devolve '' quando a lista está vazia). */
+    .perfil-vitrine {
+      display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .perfil-vitrine::-webkit-scrollbar { display: none; }
+    .perfil-vitrine-item {
+      flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 10px 12px; min-width: 64px; border-radius: 14px;
+      background: var(--surface2); border: 1px solid var(--border);
+    }
+    .perfil-vitrine-item-equipada {
+      border-color: rgba(251,191,36,.5);
+      background: linear-gradient(135deg, rgba(251,191,36,.14), var(--surface2));
+    }
+    .perfil-vitrine-ico { font-size: 22px; line-height: 1; }
+    .perfil-vitrine-nome {
+      font-size: 10px; font-weight: 700; color: var(--muted); text-align: center;
+      max-width: 62px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .perfil-vitrine-item-equipada .perfil-vitrine-nome { color: #fbbf24; }
+
     .perfil-stats-vazio {
       text-align: center; color: var(--muted); font-size: 12.5px; line-height: 1.6;
       padding: 20px 16px; background: var(--surface2); border: 1px solid var(--border);
@@ -6668,9 +6724,13 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 
     body.light-mode .perfil-identidade { background: rgba(255,255,255,.55); }
     body.light-mode .perfil-stat-row,
-    body.light-mode .perfil-chip { background: var(--surface); }
+    body.light-mode .perfil-chip,
+    body.light-mode .perfil-grade-item,
+    body.light-mode .perfil-vitrine-item { background: var(--surface); }
     body.light-mode .perfil-titulo { color: #b45309; }
     body.light-mode .perfil-stat-row-top { background: rgba(180,83,9,.10); border-color: rgba(180,83,9,.35); }
+    body.light-mode .perfil-vitrine-item-equipada { background: rgba(180,83,9,.08); border-color: rgba(180,83,9,.4); }
+    body.light-mode .perfil-vitrine-item-equipada .perfil-vitrine-nome { color: #b45309; }
 
 /* ═════════════════════════════════════════════════════════════
    TELA CHEIA DOS JOGOS

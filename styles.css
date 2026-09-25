@@ -5301,6 +5301,18 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
 .game-card:active { transform: scale(.97); border-color: var(--gc-b); }
 .game-card:focus-visible { outline: 2px solid var(--gc); outline-offset: 2px; }
 
+/* Estrela de favoritar no canto do card (ver .gc-fav em index.html e
+   _gamesFavToggleUI em Jogos/hub.js). Fica sobre a .gc-media (foto). */
+.gc-fav {
+  position: absolute; top: 8px; right: 8px; z-index: 3;
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 999px;
+  background: rgba(0,0,0,.4);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.gc-fav i { font-size: 14px; color: #d1d5db; }
+.gc-fav.favoritado i { color: #fbbf24; }
+
 .gc-media {
   position: relative; width: 100%; aspect-ratio: 4 / 3.1; overflow: hidden;
   background: var(--surface2);

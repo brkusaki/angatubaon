@@ -613,6 +613,7 @@
       </div>
       <div class="scroll-x games-cat-chips" id="games-cat-chips">
         <button type="button" class="games-cat-chip games-cat-ativa" data-cat="todos" onclick="_gamesFiltrarCat('todos', this)"><i class="fa fa-table-cells"></i> Todos</button>
+        <button type="button" class="games-cat-chip" data-cat="favoritos" onclick="_gamesFiltrarCat('favoritos', this)"><i class="fa fa-star"></i> Favoritos</button>
         <button type="button" class="games-cat-chip" data-cat="acao" onclick="_gamesFiltrarCat('acao', this)"><i class="fa fa-bolt"></i> Ação</button>
         <button type="button" class="games-cat-chip" data-cat="puzzle" onclick="_gamesFiltrarCat('puzzle', this)"><i class="fa fa-puzzle-piece"></i> Puzzle</button>
         <button type="button" class="games-cat-chip" data-cat="multi" onclick="_gamesFiltrarCat('multi', this)"><i class="fa fa-users"></i> Multijogador</button>
@@ -622,6 +623,7 @@
       <!-- MENU: grade de jogos -->
       <div id="games-menu">
         <button type="button" class="game-card gc-quiz" data-cat="puzzle" data-nome="quiz da coruja" data-desc="5 perguntas por dia sobre angatuba" onclick="_abrirJogo('quiz')">
+          <span class="gc-fav" data-jogo="quiz" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-quiz.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Quiz da Coruja</div>
@@ -631,6 +633,7 @@
         </button>
 
         <button type="button" class="game-card gc-speed" data-cat="acao" data-nome="pega a coruja" data-desc="toque o mais rapido que conseguir em 20s" onclick="_abrirJogo('speedtap')">
+          <span class="gc-fav" data-jogo="speedtap" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-pegacoruja.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Pega a Coruja</div>
@@ -640,6 +643,7 @@
         </button>
 
         <button type="button" class="game-card gc-seq" data-cat="memoria" data-nome="sequencia da coruja" data-desc="memorize e repita a ordem das corujas" onclick="_abrirJogo('sequencia')">
+          <span class="gc-fav" data-jogo="sequencia" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-sequencia.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Sequência da Coruja</div>
@@ -649,6 +653,7 @@
         </button>
 
         <button type="button" class="game-card gc-voo" data-cat="acao" data-nome="voo da coruja" data-desc="suba nas nuvens o mais alto que conseguir" onclick="_abrirJogo('voo')">
+          <span class="gc-fav" data-jogo="voo" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-voo.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Voo da Coruja</div>
@@ -658,6 +663,7 @@
         </button>
 
         <button type="button" class="game-card gc-corrida" data-cat="acao" data-nome="corrida da coruja" data-desc="sobreviva aos zumbis em 1a pessoa vire o celular" onclick="_abrirJogo('corrida')">
+          <span class="gc-fav" data-jogo="corrida" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-corrida.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Corrida da Coruja</div>
@@ -667,6 +673,7 @@
         </button>
 
         <button type="button" class="game-card gc-piano" data-cat="puzzle" data-nome="piano da coruja" data-desc="toque os azulejos no ritmo e nao deixe nenhum passar" onclick="_abrirJogo('piano')">
+          <span class="gc-fav" data-jogo="piano" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-piano.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Piano da Coruja</div>
@@ -676,6 +683,7 @@
         </button>
 
         <button type="button" class="game-card gc-blocos" data-cat="puzzle" data-nome="blocos da coruja" data-desc="encaixe as pecas e complete linhas ou colunas" onclick="_abrirJogo('blocos')">
+          <span class="gc-fav" data-jogo="blocos" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-blocos.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Blocos da Coruja</div>
@@ -685,6 +693,7 @@
         </button>
 
         <button type="button" class="game-card gc-doces" data-cat="puzzle" data-nome="doces da coruja" data-desc="combine 3 ou mais doces da mesma cor" onclick="_abrirJogo('doces')">
+          <span class="gc-fav" data-jogo="doces" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-doces.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Doces da Coruja</div>
@@ -694,6 +703,7 @@
         </button>
 
         <button type="button" class="game-card gc-2048" data-cat="puzzle" data-nome="2048 da coruja" data-desc="deslize e combine as pecas ate chegar ao 2048" onclick="_abrirJogo('2048')">
+          <span class="gc-fav" data-jogo="2048" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-2048.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">2048 da Coruja</div>
@@ -703,6 +713,7 @@
         </button>
 
         <button type="button" class="game-card gc-armadilha" data-cat="acao" data-nome="armadilha da coruja level devil plataforma" data-desc="chegue na bandeira fases cheias de armadilhas" onclick="_abrirJogo('armadilha')">
+          <span class="gc-fav" data-jogo="armadilha" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/img/pixel/coruja-pixel-idle.png" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Armadilha da Coruja</div>
@@ -712,6 +723,7 @@
         </button>
 
         <button type="button" class="game-card gc-pingpong" data-cat="multi" data-nome="ping pong da coruja" data-desc="sozinho contra a cpu ou 1x1 com um amigo em tempo real" onclick="_abrirJogo('pingpong')">
+          <span class="gc-fav" data-jogo="pingpong" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-pingpong.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Ping Pong da Coruja</div>
@@ -721,6 +733,7 @@
         </button>
 
         <button type="button" class="game-card gc-tanques" data-cat="multi" data-nome="batalha de tanques" data-desc="arena top down com paredes destrutiveis sozinho contra a cpu ou 1x1 com um amigo" onclick="_abrirJogo('tanques')">
+          <span class="gc-fav" data-jogo="tanques" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-tanques.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Batalha de Tanques</div>
@@ -733,6 +746,7 @@
              hoquei.css só carrega quando o jogo abre (lazy) e o card precisa
              delas já no menu — sem mexer no styles.css por uma linha. -->
         <button type="button" class="game-card gc-hoquei" style="--gc:#fbbf24;--gc-2:#f97316;--gc-a:rgba(251,191,36,.16);--gc-b:rgba(251,191,36,.34);" data-cat="multi" data-nome="hoquei da coruja air hockey" data-desc="air hockey sozinho contra a cpu ou 1x1 com um amigo em tempo real" onclick="_abrirJogo('hoquei')">
+          <span class="gc-fav" data-jogo="hoquei" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-hoquei.webp" alt="" loading="lazy" class="gc-hero-img" style="image-rendering:pixelated;" onerror="this.style.display='none'"></div>
           <div class="gc-body">
             <div class="gc-title">Hóquei da Coruja</div>
@@ -742,6 +756,7 @@
         </button>
 
         <button type="button" class="game-card gc-party" data-cat="multi" data-nome="coruja party" data-desc="2 a 4 jogadores minigames em rodadas e placar geral" onclick="_abrirJogo('party')">
+          <span class="gc-fav" data-jogo="party" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-party.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Coruja Party</div>
@@ -751,6 +766,7 @@
         </button>
 
         <button type="button" class="game-card gc-negocios" data-cat="multi" data-nome="negocios da cidade banco imobiliario angatuba" data-desc="banco imobiliario ambientado em angatuba ate 8 jogadores no mesmo celular" onclick="_abrirJogo('negocios')">
+          <span class="gc-fav" data-jogo="negocios" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-negocios.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Negócios da Cidade</div>
@@ -760,6 +776,7 @@
         </button>
 
         <button type="button" class="game-card gc-baralho" data-cat="multi" data-nome="jogos de baralho truco paulista" data-desc="truco paulista online 2 ou 4 jogadores em sala com codigo" onclick="_abrirJogo('baralho')">
+          <span class="gc-fav" data-jogo="baralho" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-baralho.webp" alt="" loading="lazy" class="gc-hero-img" onerror="this.style.display='none'"></div>
           <div class="gc-body">
             <div class="gc-title">Jogos de Baralho</div>

@@ -66,7 +66,15 @@ self.addEventListener('notificationclick', function (event) {
   );
 });
 
-const CACHE = 'angatubaon-v363';
+const CACHE = 'angatubaon-v364';
+// Cache separado dos assets dos jogos (sprites, sons, músicas, vídeos
+// dos minigames). Fica de fora do CACHE principal de propósito: o
+// activate() abaixo NUNCA apaga o CACHE_JOGOS quando o app atualiza
+// (v364, v365...) — só quando os próprios assets de um jogo mudam é
+// que essa constante sobe de versão (ver Jogos/hub.js, JOGOS_ASSETS /
+// _jogosCacheAssets). Assim, quem já baixou um jogo continua jogando
+// offline mesmo depois de um deploy novo do app.
+const CACHE_JOGOS = 'angatubaon-jogos-v1';
 const STATIC = [
   '/',
   '/index.html',
@@ -127,11 +135,17 @@ self.addEventListener('install', e => {
   // "waiting" até o usuário clicar no banner de atualização (ver listener message abaixo).
 });
 
-// Remove caches antigos
+// Remove caches antigos — mas NUNCA o CACHE_JOGOS (ver comentário na
+// declaração dele acima): só apaga caches 'angatubaon-*' que não são
+// nem o CACHE atual nem o CACHE_JOGOS atual.
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter(k => k.startsWith('angatubaon-') && k !== CACHE && k !== CACHE_JOGOS)
+          .map(k => caches.delete(k))
+      )
     )
   );
   self.clients.claim();
@@ -159,6 +173,13 @@ self.addEventListener('fetch', e => {
   const url = e.request.url;
   const isDoc = e.request.destination === 'document';
   const isJsCss = url.endsWith('.js') || url.endsWith('.css');
+  // Assets dos jogos (sprites, sons, músicas, vídeos): /Jogos/assets/**
+  // ou áudio do próprio domínio. Cacheados à parte no CACHE_JOGOS (ver
+  // fetch abaixo) pra sobreviver a updates do CACHE principal.
+  const isJogoAsset = !isJsCss && (
+    new URL(url).pathname.startsWith('/Jogos/assets/') ||
+    /\.(mp3|wav|ogg)$/i.test(url)
+  );
 
   if (isDoc) {
     // HTML: network-first — reflete deploys imediatamente (detecta nova versão do app).
@@ -198,6 +219,23 @@ self.addEventListener('fetch', e => {
           .catch(() => cached || Response.error());
         return cached || net;
       })
+    );
+  } else if (isJogoAsset) {
+    // Assets dos jogos: cache-first no CACHE_JOGOS (separado do CACHE
+    // principal). Se não estiver no cache ainda, busca na rede e guarda
+    // pra próxima. Normalmente já chega aqui pré-populado pelo
+    // _jogosCacheAssets em Jogos/hub.js (cache sob demanda ao abrir um
+    // jogo); isto aqui é só o reforço/fallback do próprio SW.
+    e.respondWith(
+      caches.open(CACHE_JOGOS).then(c =>
+        c.match(e.request).then(r => {
+          if (r) return r;
+          return fetch(e.request).then(resp => {
+            if (resp && resp.ok) c.put(e.request, resp.clone());
+            return resp;
+          }).catch(() => r || Response.error());
+        })
+      )
     );
   } else {
     // Cache-first para imagens e outros assets estáticos DO PRÓPRIO DOMÍNIO

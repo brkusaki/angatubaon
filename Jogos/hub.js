@@ -2477,6 +2477,316 @@
   window.rankFimDeJogo    = rankFimDeJogo;
 
   /* ══════════════════════════════════════════════════════════════
+     ECONOMIA — MOEDAS, INVENTÁRIO E LOJA DA CORUJA (Camada 1)
+     100% local (localStorage), sem Firestore ainda. É a base de dados
+     de um futuro perfil estilo Steam: carteira de moedas, inventário
+     de cosméticos comprados e slots equipados (coruja do Voo, badge,
+     BG e card de perfil). BG/card NUNCA são upload — só catálogo.
+     Tudo síncrono e à prova de falha (try/catch em cada acesso ao
+     localStorage), no mesmo padrão do streak/favoritos acima.
+  ══════════════════════════════════════════════════════════════ */
+  var LOJA_KEY_MOEDAS     = 'angatuba_moedas';
+  var LOJA_KEY_INVENTARIO = 'angatuba_inventario';
+  var LOJA_KEY_EQUIPADO   = 'angatuba_equipado';
+  var LOJA_KEY_STATS      = 'angatuba_stats_jogos';
+
+  // Slots válidos de equipamento — mesmo formato que o perfil público vai usar depois.
+  var LOJA_SLOTS = ['voo_owl', 'badge', 'bg', 'card'];
+
+  function _equipadoPadrao() {
+    return { voo_owl: 'voo_skin_classica', badge: null, bg: 'bg_padrao', card: 'card_padrao' };
+  }
+
+  /* ── Catálogo (hardcoded) ──────────────────────────────────────
+     Cada item: { id, nome, desc, preco, slot, tipo, preview, jogo }.
+     Skins do Voo reusam o mesmo sprite (/webp/owl-flying.webp) e se
+     diferenciam por filtro CSS/canvas (filtroCss) — sem asset novo. */
+  var LOJA_CATALOGO = [
+    // Skins da coruja no Voo da Coruja
+    { id: 'voo_skin_classica', nome: 'Coruja Clássica', desc: 'O visual de sempre.',        preco: 0,   slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: '' },
+    { id: 'voo_skin_neon',     nome: 'Coruja Neon',      desc: 'Brilho neon nas asas.',      preco: 80,  slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'hue-rotate(150deg) saturate(2.4) brightness(1.15) drop-shadow(0 0 7px #22e3ff)' },
+    { id: 'voo_skin_dourada',  nome: 'Coruja Dourada',   desc: 'Reluz feito ouro.',          preco: 150, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'sepia(1) saturate(4.5) hue-rotate(-12deg) brightness(1.2) drop-shadow(0 0 7px rgba(255,200,60,.85))' },
+    { id: 'voo_skin_pixel',    nome: 'Coruja Pixel',     desc: 'Estilo 8-bit retrô.',        preco: 120, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'contrast(1.45) saturate(.5) brightness(1.05)', pixelado: true },
+
+    // Badges
+    { id: 'badge_estrela', nome: 'Estrela da Coruja', desc: 'Pra quem brilha nos jogos.',         preco: 50,  slot: 'badge', tipo: 'badge', preview: '/webp/owl-tada.webp',   jogo: null },
+    { id: 'badge_fogo',    nome: 'Chama da Ofensiva',  desc: 'Homenagem a quem não falta um dia.', preco: 100, slot: 'badge', tipo: 'badge', preview: '/webp/owl-tada.webp',   jogo: null },
+    { id: 'badge_coroa',   nome: 'Coroa de Angatuba',  desc: 'Pros campeões do ranking.',          preco: 200, slot: 'badge', tipo: 'badge', preview: '/webp/owl-trophy.webp', jogo: null },
+
+    // Planos de fundo de perfil (catálogo — sem upload)
+    { id: 'bg_padrao', nome: 'Céu de Angatuba', desc: 'O fundo padrão do seu perfil.', preco: 0,   slot: 'bg', tipo: 'bg', preview: null,               jogo: null },
+    { id: 'bg_noite',  nome: 'Noite na Praça',  desc: 'A cidade sob as estrelas.',     preco: 100, slot: 'bg', tipo: 'bg', preview: '/img/igreja-noite.jpg', jogo: null },
+    { id: 'bg_dia',    nome: 'Manhã na Igreja', desc: 'Angatuba ao amanhecer.',        preco: 100, slot: 'bg', tipo: 'bg', preview: '/img/igreja-dia.jpg',   jogo: null },
+    { id: 'bg_neon',   nome: 'Neon da Coruja',  desc: 'Gradiente roxo e neon.',        preco: 180, slot: 'bg', tipo: 'bg', preview: null,               jogo: null },
+
+    // Cards (moldura do perfil)
+    { id: 'card_padrao', nome: 'Card Simples', desc: 'Moldura padrão do seu perfil.', preco: 0,   slot: 'card', tipo: 'card', preview: null, jogo: null },
+    { id: 'card_ouro',   nome: 'Card Dourado', desc: 'Moldura dourada de destaque.',  preco: 150, slot: 'card', tipo: 'card', preview: null, jogo: null },
+    { id: 'card_pixel',  nome: 'Card Pixel',   desc: 'Moldura em estilo 8-bit.',      preco: 120, slot: 'card', tipo: 'card', preview: null, jogo: null }
+  ];
+
+  var LOJA_TIPO_ICO = { skin: '🦉', badge: '🎖️', bg: '🖼️', card: '🪪' };
+  var LOJA_ABAS = [
+    { tipo: 'skin',  label: 'Skins',            ico: '🦉' },
+    { tipo: 'badge', label: 'Badges',           ico: '🎖️' },
+    { tipo: 'bg',    label: 'Planos de fundo',  ico: '🖼️' },
+    { tipo: 'card',  label: 'Cards',            ico: '🪪' }
+  ];
+  var _lojaAbaAtual = 'skin';
+
+  function _lojaItemPorId(id) {
+    for (var i = 0; i < LOJA_CATALOGO.length; i++) { if (LOJA_CATALOGO[i].id === id) return LOJA_CATALOGO[i]; }
+    return null;
+  }
+
+  // ── Moedas ──────────────────────────────────────────────────────
+  function _moedasLer() {
+    try { return Math.max(0, Math.floor(Number(localStorage.getItem(LOJA_KEY_MOEDAS)) || 0)); }
+    catch (e) { return 0; }
+  }
+  function _moedasSalvar(v) {
+    try { localStorage.setItem(LOJA_KEY_MOEDAS, String(Math.max(0, Math.floor(v)))); } catch (e) {}
+  }
+  // Soma (ou subtrai) moedas do saldo; nunca deixa negativo. Retorna o novo saldo.
+  function _moedasAdd(qtd, motivo) {
+    qtd = Math.floor(Number(qtd) || 0);
+    var novo = Math.max(0, _moedasLer() + qtd);
+    if (qtd !== 0) {
+      _moedasSalvar(novo);
+      _lojaAtualizarSaldoUI();
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[loja] moedas +' + qtd + ' (' + (motivo || '?') + ') → ' + novo);
+    }
+    return novo;
+  }
+
+  // ── Inventário ──────────────────────────────────────────────────
+  function _invLer() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(LOJA_KEY_INVENTARIO) || '[]');
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function _invSalvar(arr) {
+    try { localStorage.setItem(LOJA_KEY_INVENTARIO, JSON.stringify(arr)); } catch (e) {}
+  }
+  function _temItem(id) { return _invLer().indexOf(id) !== -1; }
+
+  // ── Equipado ────────────────────────────────────────────────────
+  function _equipadoLer() {
+    var padrao = _equipadoPadrao();
+    try {
+      var raw = localStorage.getItem(LOJA_KEY_EQUIPADO);
+      var obj = raw ? JSON.parse(raw) : {};
+      if (!obj || typeof obj !== 'object') obj = {};
+      return {
+        voo_owl: obj.voo_owl || padrao.voo_owl,
+        badge:   (obj.badge !== undefined) ? obj.badge : padrao.badge,
+        bg:      obj.bg || padrao.bg,
+        card:    obj.card || padrao.card
+      };
+    } catch (e) { return padrao; }
+  }
+  function _equipadoSalvar(obj) {
+    try { localStorage.setItem(LOJA_KEY_EQUIPADO, JSON.stringify(obj)); } catch (e) {}
+  }
+
+  // Compra um item do catálogo: precisa existir, não ter ainda, e ter saldo.
+  function _comprarItem(id) {
+    var item = _lojaItemPorId(id);
+    if (!item) return { ok: false, motivo: 'item_invalido' };
+    if (_temItem(id)) return { ok: false, motivo: 'ja_possui' };
+    var saldo = _moedasLer();
+    if (saldo < item.preco) return { ok: false, motivo: 'saldo_insuficiente' };
+    _moedasSalvar(saldo - item.preco);
+    var inv = _invLer();
+    inv.push(id);
+    _invSalvar(inv);
+    _lojaAtualizarSaldoUI();
+    _lojaRenderCorpo();
+    return { ok: true };
+  }
+
+  // Equipa (ou desequipa, com id null) um item num slot — só se o item
+  // pertence ao slot e já está no inventário.
+  function _equiparItem(slot, id) {
+    if (LOJA_SLOTS.indexOf(slot) === -1) return { ok: false, motivo: 'slot_invalido' };
+    if (id !== null && id !== undefined) {
+      var item = _lojaItemPorId(id);
+      if (!item || item.slot !== slot) return { ok: false, motivo: 'item_invalido' };
+      if (!_temItem(id)) return { ok: false, motivo: 'nao_possui' };
+    } else {
+      id = null;
+    }
+    var eq = _equipadoLer();
+    eq[slot] = id;
+    _equipadoSalvar(eq);
+    _lojaRenderCorpo();
+    return { ok: true };
+  }
+
+  // Garante que os itens grátis (preço 0) já nascem no inventário — e que
+  // existe um "equipado" salvo desde a primeira visita. Idempotente: pode
+  // rodar em toda carga do hub sem custo (só grava se faltar algo).
+  function _lojaInit() {
+    var inv = _invLer();
+    var mudou = false;
+    LOJA_CATALOGO.forEach(function (item) {
+      if (item.preco === 0 && inv.indexOf(item.id) === -1) { inv.push(item.id); mudou = true; }
+    });
+    if (mudou) _invSalvar(inv);
+    var jaTemEquipado = false;
+    try { jaTemEquipado = !!localStorage.getItem(LOJA_KEY_EQUIPADO); } catch (e) {}
+    if (!jaTemEquipado) _equipadoSalvar(_equipadoPadrao());
+  }
+
+  // ── Stats locais por jogo (preparado pro perfil estilo Steam) ────
+  function _statsLer() {
+    try {
+      var obj = JSON.parse(localStorage.getItem(LOJA_KEY_STATS) || '{}');
+      return (obj && typeof obj === 'object') ? obj : {};
+    } catch (e) { return {}; }
+  }
+  function _statsSalvar(obj) {
+    try { localStorage.setItem(LOJA_KEY_STATS, JSON.stringify(obj)); } catch (e) {}
+  }
+  function _statsJogo(jogoKey) {
+    var s = _statsLer()[jogoKey];
+    return { partidas: (s && s.partidas) || 0, segundos: (s && s.segundos) || 0, recorde: (s && s.recorde) || 0 };
+  }
+  // Incrementa partidas, soma segundos, e atualiza recorde se score > atual.
+  function _statsRegistrarPartida(jogoKey, dados) {
+    if (!jogoKey) return;
+    dados = dados || {};
+    var todos = _statsLer();
+    var s = todos[jogoKey] || { partidas: 0, segundos: 0, recorde: 0 };
+    s.partidas = (s.partidas || 0) + 1;
+    s.segundos = (s.segundos || 0) + Math.max(0, Math.round(Number(dados.segundos) || 0));
+    var score = Number(dados.score);
+    if (!isNaN(score) && score > (s.recorde || 0)) s.recorde = score;
+    todos[jogoKey] = s;
+    _statsSalvar(todos);
+  }
+
+  /* ── Loja da Coruja — tela cheia dentro do hub (mesmo esquema do
+     Ranking: hero → abas → grade de itens rolável). ────────────── */
+  function _lojaCatalogo() { return LOJA_CATALOGO.slice(); }
+
+  function _lojaAtualizarSaldoUI() {
+    var saldo = _moedasLer();
+    var a = document.getElementById('loja-hero-saldo');
+    if (a) a.textContent = '🪙 ' + saldo;
+    var b = document.getElementById('loja-abrir-saldo');
+    if (b) b.textContent = '🪙 ' + saldo;
+  }
+
+  function _lojaRenderAbas() {
+    var wrap = document.getElementById('loja-abas');
+    if (!wrap) return;
+    var html = '';
+    LOJA_ABAS.forEach(function (aba) {
+      var ativa = (aba.tipo === _lojaAbaAtual) ? ' rank-aba-ativa' : '';
+      html += '<button class="rank-aba' + ativa + '" onclick="_lojaTrocarAba(\'' + aba.tipo + '\')">' +
+                '<span class="rank-aba-ico" aria-hidden="true">' + aba.ico + '</span>' +
+                '<span class="rank-aba-txt">' + _rankEsc(aba.label) + '</span>' +
+              '</button>';
+    });
+    wrap.innerHTML = html;
+  }
+
+  function _lojaTrocarAba(tipo) {
+    _lojaAbaAtual = tipo;
+    _lojaRenderAbas();
+    _lojaRenderCorpo();
+  }
+  window._lojaTrocarAba = _lojaTrocarAba;
+
+  function _lojaRenderCorpo() {
+    var corpo = document.getElementById('loja-corpo');
+    if (!corpo) return;
+    var itens = LOJA_CATALOGO.filter(function (it) { return it.tipo === _lojaAbaAtual; });
+    var saldo = _moedasLer();
+    var eq = _equipadoLer();
+    var html = '<div class="loja-grid">';
+    itens.forEach(function (item) {
+      var tem = _temItem(item.id);
+      var equipadoAgora = (eq[item.slot] === item.id);
+      var cta, ctaClasse, ctaAtributos;
+      if (equipadoAgora) {
+        cta = 'Equipado'; ctaClasse = 'loja-cta-equipado'; ctaAtributos = ' disabled';
+      } else if (tem) {
+        cta = 'Equipar'; ctaClasse = 'loja-cta-equipar';
+        ctaAtributos = ' onclick="_lojaEquiparUI(\'' + item.slot + '\',\'' + item.id + '\')"';
+      } else if (saldo >= item.preco) {
+        cta = 'Comprar · ' + item.preco; ctaClasse = 'loja-cta-comprar';
+        ctaAtributos = ' onclick="_lojaComprarUI(\'' + item.id + '\')"';
+      } else {
+        cta = 'Faltam ' + (item.preco - saldo); ctaClasse = 'loja-cta-bloqueado'; ctaAtributos = ' disabled';
+      }
+      var previewHtml = item.preview
+        ? '<img src="' + _rankEsc(item.preview) + '" alt=""' + (item.filtroCss ? ' style="filter:' + item.filtroCss + '"' : '') + ' loading="lazy" onerror="this.style.display=\'none\'">'
+        : '<span class="loja-item-ph" aria-hidden="true">' + (LOJA_TIPO_ICO[item.tipo] || '🦉') + '</span>';
+      html += '<div class="loja-item' + (equipadoAgora ? ' loja-item-equipado' : '') + '">' +
+                '<div class="loja-item-preview">' + previewHtml + '</div>' +
+                '<div class="loja-item-nome">' + _rankEsc(item.nome) + '</div>' +
+                '<div class="loja-item-desc">' + _rankEsc(item.desc) + '</div>' +
+                '<button type="button" class="loja-item-cta ' + ctaClasse + '"' + ctaAtributos + '>' + _rankEsc(cta) + '</button>' +
+              '</div>';
+    });
+    html += '</div>';
+    corpo.innerHTML = itens.length ? html :
+      '<div class="rank-vazio"><div class="rank-vazio-tit">Nada por aqui ainda</div></div>';
+  }
+
+  function _lojaComprarUI(id) {
+    var r = _comprarItem(id);
+    if (!r.ok && window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.erro();
+  }
+  function _lojaEquiparUI(slot, id) {
+    _equiparItem(slot, id);
+  }
+  window._lojaComprarUI = _lojaComprarUI;
+  window._lojaEquiparUI = _lojaEquiparUI;
+
+  function lojaAbrir() {
+    var tela = document.getElementById('jogo-loja');
+    if (!tela) return;
+    // Chamado de fora do hub (ponte/deep link): abre o hub antes.
+    if (typeof _gamesHubAberto === 'function' && !_gamesHubAberto()) {
+      if (typeof _abrirGamesHub === 'function') _abrirGamesHub();
+    }
+    if (typeof _pararJogosExternos === 'function') _pararJogosExternos();
+
+    // Esconde o menu e as outras telas; só a loja fica visível.
+    var menu = document.getElementById('games-menu');
+    if (menu) menu.style.display = 'none';
+    var telas = document.querySelectorAll('.jogo-tela');
+    for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
+    tela.style.display = 'flex';
+    tela.classList.add('loja-open');
+
+    // Mesmo estado das telas de jogo/ranking: esconde cabeçalho e afins.
+    var hubEl = document.getElementById('games-hub');
+    if (hubEl) hubEl.classList.add('jogo-ativo');
+
+    _lojaAtualizarSaldoUI();
+    _lojaRenderAbas();
+    _lojaRenderCorpo();
+
+    if (history.state && history.state.modal !== 'loja') history.pushState({ modal: 'loja' }, '');
+    else if (!history.state) history.pushState({ modal: 'loja' }, '');
+  }
+
+  function lojaFechar(viaPopstate) {
+    var tela = document.getElementById('jogo-loja');
+    if (tela) tela.classList.remove('loja-open');
+    // Volta pro menu de jogos (esconde todas as .jogo-tela, incl. esta).
+    if (typeof _voltarAoMenu === 'function') _voltarAoMenu();
+    if (!viaPopstate && history.state?.modal === 'loja') { _popstateNosso = true; history.back(); }
+  }
+  window.lojaAbrir  = lojaAbrir;
+  window.lojaFechar = lojaFechar;
+
+  /* ══════════════════════════════════════════════════════════════
      PONTE DE JOGOS — window.AngatubaGames
      Contrato único entre o app principal e os módulos de jogos que
      serão carregados sob demanda (lazy load) a partir de /jogos/.
@@ -2594,5 +2904,28 @@
     party: {
       ativo: function () { var P = window.AngatubaParty; return !!(P && P.ativo()); },
       reportarResultado: function (score) { var P = window.AngatubaParty; if (P) { try { P.reportarResultado(score); } catch (e) {} } }
-    }
+    },
+
+    // ── Economia — moedas, inventário e loja da Coruja (Camada 1) ──
+    // 100% local (localStorage); ver bloco "ECONOMIA" acima.
+    moedasSaldo: function () { return _moedasLer(); },
+    moedasAdd: function (qtd, motivo) { return _moedasAdd(qtd, motivo); },
+    inventario: function () { return _invLer(); },
+    temItem: function (id) { return _temItem(id); },
+    equipado: function (slot) { return _equipadoLer()[slot] || null; },
+    comprarItem: function (id) { return _comprarItem(id); },
+    equiparItem: function (slot, id) { return _equiparItem(slot, id); },
+    statsJogo: function (jogoKey) { return _statsJogo(jogoKey); },
+    statsRegistrarPartida: function (jogoKey, dados) { return _statsRegistrarPartida(jogoKey, dados); },
+    lojaCatalogo: function () { return _lojaCatalogo(); },
+    lojaAbrir: function () { return lojaAbrir(); },
+    lojaFechar: function () { return lojaFechar(); }
   };
+
+  // Semeia os itens grátis no inventário e garante um "equipado" salvo
+  // desde a primeira visita — roda uma vez, aqui, ao carregar o hub.
+  _lojaInit();
+  // Mostra o saldo no card da loja assim que o hub abre (sem precisar
+  // entrar na loja primeiro) — o mesmo elemento é atualizado de novo a
+  // cada moedasAdd/comprarItem.
+  _lojaAtualizarSaldoUI();

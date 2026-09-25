@@ -156,6 +156,32 @@
   var _vooRAF = 0, _vooLast = 0, _vooEstado = 'inicio';       // 'inicio'|'jogando'|'fim'
   var _vooPausado = false;   // menu unificado do hub (ver _vooRegistrarMenu)
   var _vooListenersOn = false, _vooResizeOn = false;
+  var _vooTempoJogado = 0;   // segundos jogados na partida atual (soma o dt do loop; zera ao começar)
+
+  // Skin equipada (loja da Coruja — Camada 1). Lida uma vez ao preparar
+  // e ao começar, não em todo frame. filtroCss vem do próprio catálogo
+  // (ver LOJA_CATALOGO em hub.js) — sem asset novo, só diferenciação
+  // visual via CSS filter aplicado no canvas. Vazio/null = clássica.
+  var _vooSkinFiltro = '';
+  var _vooSkinPixelado = false;
+  function _vooAtualizarSkin() {
+    _vooSkinFiltro = '';
+    _vooSkinPixelado = false;
+    var G = window.AngatubaGames;
+    if (!G || typeof G.equipado !== 'function' || typeof G.lojaCatalogo !== 'function') return;
+    try {
+      var equipadaId = G.equipado('voo_owl');
+      if (!equipadaId || equipadaId === 'voo_skin_classica') return;
+      var catalogo = G.lojaCatalogo() || [];
+      for (var i = 0; i < catalogo.length; i++) {
+        if (catalogo[i].id === equipadaId) {
+          _vooSkinFiltro = catalogo[i].filtroCss || '';
+          _vooSkinPixelado = !!catalogo[i].pixelado;
+          break;
+        }
+      }
+    } catch (e) {}
+  }
 
   // Estado da partida
   var _vooOwl = null, _vooPlats = [], _vooCamY = 0, _vooStartY = 0;
@@ -1167,8 +1193,16 @@
     ctx.rotate(o.dir < 0 ? -ang : ang);
     ctx.scale(sx, sy);
     if (_vooImgOk && _vooImg) {
+      // Skin equipada (Loja da Coruja): filtro CSS aplicado só no draw da
+      // coruja, sem mexer no resto da cena. 'pixelado' também desliga o
+      // suavizado pra um resultado mais quadriculado/retrô.
+      var filtroAntes = ctx.filter, suavAntes = ctx.imageSmoothingEnabled;
+      if (_vooSkinFiltro) ctx.filter = _vooSkinFiltro;
+      if (_vooSkinPixelado) ctx.imageSmoothingEnabled = false;
       try { ctx.drawImage(_vooImg, -ow / 2, -oh / 2, ow, oh); }
       catch (e) { _vooDrawFallback(ctx, ow); }
+      if (_vooSkinFiltro) ctx.filter = filtroAntes;
+      if (_vooSkinPixelado) ctx.imageSmoothingEnabled = suavAntes;
     } else {
       _vooDrawFallback(ctx, ow);
     }
@@ -1202,6 +1236,7 @@
     var dt = (ts - _vooLast) / 1000;
     _vooLast = ts;
     if (dt > 1 / 30) dt = 1 / 30;                    // clamp anti-tunneling
+    _vooTempoJogado += dt;
     var vivo = _vooStep(dt);
     if (!vivo) return;
     _vooDraw();
@@ -1261,6 +1296,7 @@
     _vooCtx = _vooCanvas.getContext('2d');
     _vooCarregarImg();
     _vooCarregarSpritesFx();
+    _vooAtualizarSkin();
     _vooLigarControles();
     if (!_vooResizeOn) {
       window.addEventListener('resize', function () {
@@ -1310,10 +1346,12 @@
     if (!_vooCanvas) return;
     if (!_vooCtx) _vooCtx = _vooCanvas.getContext('2d');
     _vooLigarControles();
+    _vooAtualizarSkin();
     _vooMostrarOverlay(null);
     _vooReset();
     _vooEstado = 'jogando';
     _vooLast = 0;
+    _vooTempoJogado = 0;
     _vooMenuPartida(true);
     if (_vooRAF) cancelAnimationFrame(_vooRAF);
     _vooRAF = requestAnimationFrame(_vooLoop);
@@ -1373,11 +1411,29 @@
     // Rank (silencioso se deslogado; o Firestore aplica recorde/teto)
     if (window.AngatubaGames) window.AngatubaGames.rankSubmeter('voo', score);
 
+    // Moedas da Loja da Coruja (teto 25 por partida) + stats locais
+    // (partidas/segundos/recorde), já no formato que o perfil vai usar.
+    var moedasGanhas = 0;
+    if (window.AngatubaGames) {
+      moedasGanhas = Math.max(0, Math.min(25, Math.floor(score / 50)));
+      if (moedasGanhas > 0 && typeof window.AngatubaGames.moedasAdd === 'function') {
+        window.AngatubaGames.moedasAdd(moedasGanhas, 'voo');
+      }
+      if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
+        window.AngatubaGames.statsRegistrarPartida('voo', { segundos: _vooTempoJogado, score: score });
+      }
+    }
+
     // Tela de fim
     var owlEl = document.getElementById('vo-fim-owl');
     var titEl = document.getElementById('vo-fim-titulo');
     var msgEl = document.getElementById('vo-fim-pontos');
     var subEl = document.getElementById('vo-fim-msg');
+    var moedasEl = document.getElementById('vo-fim-moedas');
+    if (moedasEl) {
+      if (moedasGanhas > 0) { moedasEl.textContent = '+' + moedasGanhas + ' 🪙'; moedasEl.style.display = ''; }
+      else moedasEl.style.display = 'none';
+    }
     if (owlEl) { owlEl.src = recorde ? '/webp/owl-celebrate-flying.webp' : '/webp/owl-flying.webp'; owlEl.style.display = ''; }
     if (titEl) titEl.textContent = recorde ? '🎉 Novo recorde!' : 'Fim do voo!';
     if (msgEl) msgEl.textContent = score + (score === 1 ? ' ponto' : ' pontos');

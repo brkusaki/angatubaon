@@ -2219,6 +2219,9 @@
     if (tela) tela.classList.remove('rank-open');
     // Volta pro menu de jogos (esconde todas as .jogo-tela, incl. esta).
     if (typeof _voltarAoMenu === 'function') _voltarAoMenu();
+    // Reavalia títulos de ranking com o que acabou de ser lido pro painel
+    // (silencioso — o perfil, se estiver aberto na próxima vez, já reflete).
+    if (typeof _titulosAtualizar === 'function') _titulosAtualizar();
     if (!viaPopstate && history.state?.modal === 'rank') { _popstateNosso = true; history.back(); }
   }
 
@@ -3044,12 +3047,14 @@
           '<div class="perfil-identidade-txt">' +
             '<div class="perfil-nome">' + _rankEsc(nome) + '</div>' +
             _perfilTituloHtml(eq) +
+            _perfilTitulosConquistaHtml(_titulosEquipadosLer()) +
             '<div class="loja-hero-saldo perfil-saldo">🪙 ' + saldo + '</div>' +
           '</div>' +
         '</div>' +
         // Atalho secundário pra loja (complementa o CTA do rodapé, ver
         // .perfil-ir-loja abaixo) — mesma ação, outro ponto de entrada.
         '<button type="button" class="perfil-editar-btn" onclick="lojaAbrir()">Editar cosméticos</button>' +
+        '<button type="button" class="perfil-editar-btn" onclick="_titulosAbrirSeletor()"><i class="fa fa-award" aria-hidden="true"></i> Títulos</button>' +
         (!logado ? '<button type="button" class="perfil-login-cta" onclick="_perfilPedirLogin()">Entrar pra mostrar seu nome no ranking</button>' : '') +
       '</div>';
 
@@ -3092,6 +3097,15 @@
     _perfilUidVisitado = null;
     _perfilRender();
 
+    // Reavalia títulos (ranking por jogo/geral + stats locais) ao abrir
+    // o próprio perfil — reusa o cache de tops (ver _titulosAtualizar,
+    // Polimento B). Só re-renderiza se algo novo desbloqueou.
+    if (typeof _titulosAtualizar === 'function') {
+      _titulosAtualizar().then(function (mudou) {
+        if (mudou && _perfilModo === 'eu') _perfilRender();
+      });
+    }
+
     // Sincroniza o perfil público (Firestore) com o estado local mais
     // recente ao abrir o próprio perfil — debounce leve, ver Camada 3.
     if (typeof _cliUser !== 'undefined' && _cliUser && typeof _perfilPublicoSyncDebounced === 'function') {
@@ -3105,6 +3119,7 @@
   function perfilFechar(viaPopstate) {
     var tela = document.getElementById('jogo-perfil');
     if (tela) tela.classList.remove('perfil-open');
+    if (typeof _titulosFecharSeletor === 'function') _titulosFecharSeletor();
     _perfilModo = 'eu';
     _perfilUidVisitado = null;
     // Volta pro menu de jogos (esconde todas as .jogo-tela, incl. esta).
@@ -3168,6 +3183,7 @@
         var texto = 'Perfil de jogador', classe = '';
         if (info.state === 'online') { texto = 'Online'; classe = ' perfil-presenca-online'; }
         else if (info.state === 'away') { texto = 'Ausente'; classe = ' perfil-presenca-away'; }
+        else if (info.state === 'offline') { texto = 'Offline'; classe = ' perfil-presenca-offline'; }
         tagEl.textContent = texto;
         tagEl.className = 'perfil-visitando-tag' + classe;
       });
@@ -3212,6 +3228,7 @@
           '<div class="perfil-identidade-txt">' +
             '<div class="perfil-nome">' + _rankEsc(nome) + '</div>' +
             _perfilTituloHtml(eq) +
+            _perfilTitulosConquistaHtml(dados.titulos) +
             '<div class="perfil-visitando-tag" id="perfil-presenca-tag">Perfil de jogador</div>' +
           '</div>' +
         '</div>' +
@@ -3331,12 +3348,17 @@
       };
     });
 
+    // Só os títulos EQUIPADOS (até 2) — o histórico completo de
+    // desbloqueados é local e não precisa ser público.
+    var titulos = (typeof _titulosEquipadosLer === 'function') ? _titulosEquipadosLer() : [];
+
     db.collection('perfis').doc(uid).set({
       uid: uid,
       nome: nome,
       photoURL: (_cliUser.photoURL || ''),
       equipado: equipado,
       stats: stats,
+      titulos: titulos,
       atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true }).catch(function (err) {
       if (typeof DEBUG !== 'undefined' && DEBUG) {
@@ -3356,6 +3378,275 @@
       _perfilPublicoSync();
     }, 1500);
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     TÍTULOS DO PERFIL — conquistas (Polimento B)
+     Além do badge cosmético da loja (comprado com moedas), o perfil
+     ganha "títulos" de CONQUISTA: ranking por jogo, ranking geral,
+     stats locais (partidas/tempo/ofensiva) e "Main" de um jogo.
+     100% local: angatuba_titulos_desbloqueados (tudo que já foi
+     conquistado, nunca removido — é histórico) e
+     angatuba_titulos_equipados (até 2 ids, ordem de exibição).
+     NÃO cria coleção nova no Firestore nem muda rankLerGeral/
+     _rankGeralPontos — só reusa o que essas funções já devolvem
+     pra decidir se o uid logado está numa posição de destaque.
+  ══════════════════════════════════════════════════════════════ */
+  var TITULOS_KEY_DESBLOQUEADOS = 'angatuba_titulos_desbloqueados';
+  var TITULOS_KEY_EQUIPADOS     = 'angatuba_titulos_equipados';
+  var TITULOS_MAX_EQUIPADOS = 2;
+
+  function _titulosDesbloqueadosLer() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(TITULOS_KEY_DESBLOQUEADOS) || '[]');
+      return Array.isArray(arr) ? arr.filter(function (id) { return typeof id === 'string'; }) : [];
+    } catch (e) { return []; }
+  }
+  function _titulosDesbloqueadosSalvar(arr) {
+    try { localStorage.setItem(TITULOS_KEY_DESBLOQUEADOS, JSON.stringify(arr)); } catch (e) {}
+  }
+  function _titulosEquipadosLer() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(TITULOS_KEY_EQUIPADOS) || '[]');
+      return Array.isArray(arr) ? arr.filter(function (id) { return typeof id === 'string'; }).slice(0, TITULOS_MAX_EQUIPADOS) : [];
+    } catch (e) { return []; }
+  }
+  function _titulosEquipadosSalvar(arr) {
+    try { localStorage.setItem(TITULOS_KEY_EQUIPADOS, JSON.stringify((arr || []).slice(0, TITULOS_MAX_EQUIPADOS))); } catch (e) {}
+  }
+
+  // Junta novos ids aos já desbloqueados — nunca remove (conquista é
+  // histórica: cair de posição no ranking depois não tira o título).
+  // Retorna true se algum id novo entrou (pra saber se vale re-renderizar).
+  function _titulosDesbloquear(ids) {
+    if (!ids || !ids.length) return false;
+    var atuais = _titulosDesbloqueadosLer();
+    var mudou = false;
+    ids.forEach(function (id) {
+      if (id && atuais.indexOf(id) === -1) { atuais.push(id); mudou = true; }
+    });
+    if (mudou) _titulosDesbloqueadosSalvar(atuais);
+    return mudou;
+  }
+
+  // Resolve o id de um título pro rótulo curto exibido (estilo Steam).
+  // Usado tanto no próprio perfil quanto no de visitante — id que não
+  // bate com nenhum padrão conhecido (ou jogo que não existe mais em
+  // RANK_INFO) devolve null, e quem chama simplesmente esconde o chip.
+  var TITULOS_STATS_LABEL = {
+    stats_partidas_10:  'Veterano · 10 partidas',
+    stats_partidas_50:  'Veterano · 50 partidas',
+    stats_partidas_100: 'Veterano · 100 partidas',
+    stats_tempo_60:     'Dedicado · 1h jogada',
+    stats_tempo_300:    'Dedicado · 5h jogadas',
+    ofensiva_3:         'Ofensiva · 3 dias',
+    ofensiva_7:         'Ofensiva · 7 dias',
+    ofensiva_30:        'Ofensiva · 30 dias'
+  };
+  function _titulosLabelDe(id) {
+    if (!id || typeof id !== 'string') return null;
+    if (id === 'rank_geral_top1')  return 'Top 1 · Angatuba';
+    if (id === 'rank_geral_top3')  return 'Top 3 · Angatuba';
+    if (id === 'rank_geral_top10') return 'Top 10 · Angatuba';
+    if (TITULOS_STATS_LABEL[id]) return TITULOS_STATS_LABEL[id];
+
+    var m = /^rank_top(1|3|10)_(.+)$/.exec(id);
+    if (m) {
+      var info = RANK_INFO[m[2]];
+      if (!info) return null;
+      return 'Top ' + m[1] + ' · ' + info.label + (info.sub ? ' · ' + info.sub : '');
+    }
+    m = /^main_(.+)$/.exec(id);
+    if (m) {
+      var infoM = RANK_INFO[m[1]];
+      if (!infoM) return null;
+      return 'Main · ' + infoM.label + (infoM.sub ? ' · ' + infoM.sub : '');
+    }
+    return null;
+  }
+
+  // Avalia os títulos de RANKING (por jogo + geral) a partir das MESMAS
+  // listas que o painel de Ranking já usa (_rankTopsTodosJogos/
+  // rankLerGeral) — sem leitura extra, sem fórmula nova. Só roda se
+  // houver uid logado (sem login não há como saber a posição).
+  function _titulosAvaliarRank(listasTops, listaGeral, uid) {
+    var novos = [];
+    (listasTops || []).forEach(function (entry) {
+      var top = entry.top || [];
+      var pos = -1;
+      for (var i = 0; i < top.length; i++) { if (top[i].uid === uid) { pos = i + 1; break; } }
+      if (pos === -1) return;
+      if (pos === 1) novos.push('rank_top1_' + entry.jogo);
+      if (pos <= 3)  novos.push('rank_top3_' + entry.jogo);
+      if (pos <= 10 && top.length >= 10) novos.push('rank_top10_' + entry.jogo);
+    });
+    if (listaGeral && listaGeral.length) {
+      var posG = -1;
+      for (var j = 0; j < listaGeral.length; j++) { if (listaGeral[j].uid === uid) { posG = j + 1; break; } }
+      if (posG !== -1) {
+        if (posG === 1) novos.push('rank_geral_top1');
+        if (posG <= 3)  novos.push('rank_geral_top3');
+        if (posG <= 10 && listaGeral.length >= 10) novos.push('rank_geral_top10');
+      }
+    }
+    return novos;
+  }
+
+  // Avalia os títulos LOCAIS (stats/ofensiva/main) — sem rede, sempre
+  // disponível mesmo deslogado.
+  function _titulosAvaliarStats() {
+    var novos = [];
+    var todos = _statsLer();
+    var totalPartidas = 0, totalSeg = 0;
+    Object.keys(todos).forEach(function (k) {
+      totalPartidas += (todos[k].partidas || 0);
+      totalSeg += (todos[k].segundos || 0);
+    });
+    if (totalPartidas >= 10)  novos.push('stats_partidas_10');
+    if (totalPartidas >= 50)  novos.push('stats_partidas_50');
+    if (totalPartidas >= 100) novos.push('stats_partidas_100');
+    if (totalSeg >= 3600)  novos.push('stats_tempo_60');   // 60 min
+    if (totalSeg >= 18000) novos.push('stats_tempo_300');  // 300 min
+
+    if (typeof _streakLer === 'function') {
+      var dias = _streakLer().dias || 0;
+      if (dias >= 3)  novos.push('ofensiva_3');
+      if (dias >= 7)  novos.push('ofensiva_7');
+      if (dias >= 30) novos.push('ofensiva_30');
+    }
+
+    // Main: jogo #1 em tempo jogado, com pelo menos 5 partidas nele.
+    var principal = _perfilStatsChavesOrdenadas(todos)[0];
+    if (principal && todos[principal] && todos[principal].partidas >= 5) {
+      novos.push('main_' + principal);
+    }
+    return novos;
+  }
+
+  // Roda ao abrir o próprio perfil (e, opcionalmente, ao fechar o
+  // Ranking): reavalia e faz merge dos títulos desbloqueados. Reusa o
+  // cache de 60s de _rankTopsTodosJogos — não dispara leitura extra
+  // toda vez que o perfil abre. Retorna Promise<boolean> (se algo novo
+  // desbloqueou, pra quem chamou decidir se re-renderiza).
+  function _titulosAtualizar() {
+    var mudouLocal = _titulosDesbloquear(_titulosAvaliarStats());
+    var logado = (typeof _cliUser !== 'undefined' && !!_cliUser);
+    if (!logado || typeof _rankTopsTodosJogos !== 'function' || typeof rankLerGeral !== 'function') {
+      return Promise.resolve(mudouLocal);
+    }
+    var uid = _cliUser.uid;
+    return Promise.all([_rankTopsTodosJogos(), rankLerGeral(20)]).then(function (res) {
+      var mudouRank = _titulosDesbloquear(_titulosAvaliarRank(res[0], res[1], uid));
+      return mudouLocal || mudouRank;
+    }).catch(function () { return mudouLocal; });
+  }
+
+  // Equipa/desequipa (toggle) um título — precisa estar desbloqueado.
+  // Trocar um dos 2 slots exige desequipar um antes (evita substituir
+  // a escolha da pessoa sem avisar).
+  function _titulosEquipar(id) {
+    if (_titulosDesbloqueadosLer().indexOf(id) === -1) return { ok: false, motivo: 'nao_desbloqueado' };
+    var eq = _titulosEquipadosLer();
+    var idx = eq.indexOf(id);
+    if (idx !== -1) {
+      eq.splice(idx, 1);
+    } else {
+      if (eq.length >= TITULOS_MAX_EQUIPADOS) return { ok: false, motivo: 'maximo' };
+      eq.push(id);
+    }
+    _titulosEquipadosSalvar(eq);
+    return { ok: true, equipados: eq };
+  }
+
+  // Linha de chips dos títulos EQUIPADOS, sob o nome — separada do
+  // badge cosmético da loja (_perfilTituloHtml). ids desconhecidos (ex.:
+  // visitante vendo um título de um jogo que não existe mais) são
+  // ignorados silenciosamente; '' (nada) se não sobrar nenhum válido.
+  function _perfilTitulosConquistaHtml(ids) {
+    if (!ids || !ids.length) return '';
+    var html = '';
+    ids.forEach(function (id) {
+      var label = _titulosLabelDe(id);
+      if (!label) return;
+      html += '<span class="perfil-titulo-conquista">' + _rankEsc(label) + '</span>';
+    });
+    if (!html) return '';
+    return '<div class="perfil-titulos-conquista">' + html + '</div>';
+  }
+
+  /* ── Seletor de títulos (só o próprio perfil) ────────────────────
+     Bottom-sheet leve (mesmo padrão visual do filtro de bairro),
+     criado sob demanda no primeiro uso — nada disso precisa existir
+     no index.html. */
+  var TITULOS_SHEET_ID = 'titulos-sheet-overlay';
+
+  function _titulosGarantirSheet() {
+    if (document.getElementById(TITULOS_SHEET_ID)) return;
+    var overlay = document.createElement('div');
+    overlay.id = TITULOS_SHEET_ID;
+    overlay.className = 'titulos-sheet-overlay';
+    overlay.innerHTML =
+      '<div class="titulos-sheet">' +
+        '<div class="titulos-sheet-grabber"></div>' +
+        '<div class="titulos-sheet-head">' +
+          '<div class="titulos-sheet-title"><i class="fa fa-award" aria-hidden="true"></i> Títulos <span class="titulos-sheet-count" id="titulos-sheet-count"></span></div>' +
+          '<button type="button" class="titulos-sheet-close" onclick="_titulosFecharSeletor()" aria-label="Fechar"><i class="fa fa-times"></i></button>' +
+        '</div>' +
+        '<div class="titulos-sheet-lista" id="titulos-sheet-lista"></div>' +
+      '</div>';
+    overlay.addEventListener('click', function (ev) {
+      if (ev.target === overlay) _titulosFecharSeletor();
+    });
+    document.body.appendChild(overlay);
+  }
+
+  function _titulosRenderSheet() {
+    var lista = document.getElementById('titulos-sheet-lista');
+    var contagem = document.getElementById('titulos-sheet-count');
+    if (!lista) return;
+    var desbloq = _titulosDesbloqueadosLer();
+    var equipados = _titulosEquipadosLer();
+    if (contagem) contagem.textContent = '(' + equipados.length + '/' + TITULOS_MAX_EQUIPADOS + ')';
+    if (!desbloq.length) {
+      lista.innerHTML = '<div class="titulos-sheet-vazio">Nenhum título ainda. Jogue e apareça no ranking pra desbloquear! 🦉</div>';
+      return;
+    }
+    // Equipados primeiro (mais fácil desequipar), resto na ordem em que foram conquistados.
+    var ordenados = desbloq.slice().sort(function (a, b) {
+      var ea = equipados.indexOf(a) !== -1, eb = equipados.indexOf(b) !== -1;
+      if (ea && !eb) return -1;
+      if (!ea && eb) return 1;
+      return 0;
+    });
+    lista.innerHTML = ordenados.map(function (id) {
+      var label = _titulosLabelDe(id) || id;
+      var equipado = equipados.indexOf(id) !== -1;
+      return '<button type="button" class="titulos-item' + (equipado ? ' titulos-item-equipado' : '') + '" onclick="_titulosToggleUI(\'' + id + '\')">' +
+          '<span class="titulos-item-txt">' + _rankEsc(label) + '</span>' +
+          (equipado ? '<span class="titulos-item-check"><i class="fa fa-check"></i></span>' : '') +
+        '</button>';
+    }).join('');
+  }
+
+  function _titulosAbrirSeletor() {
+    _titulosGarantirSheet();
+    _titulosRenderSheet();
+    var overlay = document.getElementById(TITULOS_SHEET_ID);
+    if (overlay) requestAnimationFrame(function () { overlay.classList.add('open'); });
+  }
+  function _titulosFecharSeletor() {
+    var overlay = document.getElementById(TITULOS_SHEET_ID);
+    if (overlay) overlay.classList.remove('open');
+  }
+  function _titulosToggleUI(id) {
+    var r = _titulosEquipar(id);
+    if (!r.ok && window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.erro();
+    _titulosRenderSheet();
+    if (typeof _perfilRender === 'function' && _perfilModo === 'eu') _perfilRender();
+    if (typeof _perfilPublicoSyncDebounced === 'function') _perfilPublicoSyncDebounced();
+  }
+  window._titulosAbrirSeletor = _titulosAbrirSeletor;
+  window._titulosFecharSeletor = _titulosFecharSeletor;
+  window._titulosToggleUI = _titulosToggleUI;
 
   /* ══════════════════════════════════════════════════════════════
      PONTE DE JOGOS — window.AngatubaGames

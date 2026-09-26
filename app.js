@@ -17362,10 +17362,12 @@ ${urlCard}`)}`;
       elLista.innerHTML = amigos.map(function (a) {
         var nome = _amNomeVivo[a.uid] || a.nome;
         return '<div class="cli-amigo-item" data-amigo="' + escHTML(a.uid) + '">' +
-          _amLinhaAvatar(a.uid, nome, false, a.foto) +
-          '<span class="cli-amigo-txt">' +
-            '<span class="cli-amigo-nome">' + escHTML(nome) + '</span>' +
-            '<span class="cli-amigo-sub" data-pres-txt="' + escHTML(a.uid) + '">—</span>' +
+          '<span class="cli-amigo-clicavel" onclick="cliAbrirPerfilAmigo(\'' + escHTML(a.uid) + '\')">' +
+            _amLinhaAvatar(a.uid, nome, false, a.foto) +
+            '<span class="cli-amigo-txt">' +
+              '<span class="cli-amigo-nome">' + escHTML(nome) + '</span>' +
+              '<span class="cli-amigo-sub" data-pres-txt="' + escHTML(a.uid) + '">—</span>' +
+            '</span>' +
           '</span>' +
           '<span class="cli-amigo-acoes">' +
             // Chamar pra jogar (4.4): abre a fileira de jogos logo
@@ -17399,10 +17401,12 @@ ${urlCard}`)}`;
       elPed.style.display = 'flex';
       elPed.innerHTML = pedidos.map(function (p) {
         return '<div class="cli-amigo-item pedido">' +
-          _amLinhaAvatar(p.uid, p.nome, false, p.foto) +
-          '<span class="cli-amigo-txt">' +
-            '<span class="cli-amigo-nome">' + escHTML(p.nome) + '</span>' +
-            '<span class="cli-amigo-sub">quer ser seu amigo</span>' +
+          '<span class="cli-amigo-clicavel" onclick="cliAbrirPerfilAmigo(\'' + escHTML(p.uid) + '\')">' +
+            _amLinhaAvatar(p.uid, p.nome, false, p.foto) +
+            '<span class="cli-amigo-txt">' +
+              '<span class="cli-amigo-nome">' + escHTML(p.nome) + '</span>' +
+              '<span class="cli-amigo-sub">quer ser seu amigo</span>' +
+            '</span>' +
           '</span>' +
           '<span class="cli-amigo-acoes">' +
             '<button type="button" class="cli-amigo-btn ok" onclick="cliAmigosAceitar(\'' +
@@ -18009,6 +18013,31 @@ ${urlCard}`)}`;
   window.cliConviteEnviar  = cliConviteEnviar;
   window.cliConviteEntrar  = cliConviteEntrar;
   window.cliConviteRecusar = cliConviteRecusar;
+
+  /* ── Abrir perfil a partir da lista de amigos/pedidos ──────────────
+     Toque no avatar/nome de um amigo (ou de um pedido) abre o perfil
+     daquela pessoa — mesmo destino do ranking (perfilAbrirUid, em
+     Jogos/hub.js). Segue o mesmo compasso do cliConviteEnviar: fecha o
+     painel de conta primeiro (ele dispara um history.back()) e só then
+     abre o perfil, que empilha o próprio history.pushState — sem a
+     folga, o popstate do fechamento derrubaria a tela do perfil que
+     acabou de abrir.
+     Se o hub de jogos ainda não carregou nesta sessão (perfilAbrirUid
+     não existe ainda), carrega ele sob demanda e só então abre —
+     perfilAbrirUid já cuida sozinho de exibir a tela do hub. */
+  function cliAbrirPerfilAmigo(uid) {
+    if (!uid) return;
+    cliFecharPainelConta();
+    setTimeout(function () {
+      if (typeof window.perfilAbrirUid === 'function') { window.perfilAbrirUid(uid); return; }
+      if (typeof _carregarHubJogos === 'function') {
+        _carregarHubJogos().then(function () {
+          if (typeof window.perfilAbrirUid === 'function') window.perfilAbrirUid(uid);
+        }).catch(function () {});
+      }
+    }, 220);
+  }
+  window.cliAbrirPerfilAmigo = cliAbrirPerfilAmigo;
 
   /* ══════════════════════════════════════════════════════════════
      AVISOS NO TOPO — polimento social P1

@@ -5904,6 +5904,16 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     }
     .cli-amigo-dot.online { background: #22c55e; }
     .cli-amigo-dot.away { background: #f59e0b; }
+    /* Bloco clicável (avatar + nome/presença) que abre o perfil da
+       pessoa — mesmo destino do ranking. Fica fora da fileira de
+       ações (Jogar / Remover / Aceitar / Recusar), que continua com
+       seus próprios botões e não deve disparar o perfil junto. */
+    .cli-amigo-clicavel {
+      display: flex; align-items: center; gap: 12px;
+      flex: 1; min-width: 0; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-amigo-clicavel:active { opacity: 0.7; }
     .cli-amigo-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
     .cli-amigo-nome {
       font-size: 14px; color: var(--text); font-weight: 600;

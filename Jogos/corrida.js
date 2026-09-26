@@ -622,6 +622,9 @@
   var _corEstado = 'inicio';
   var _corRAF = 0, _corLast = 0;
   var _corPausado = false;   // menu unificado do hub (ver _corRegistrarMenu)
+  var _corInicioMs = 0;      // Date.now() no início da corrida (segundos reais — P1-2)
+  var _corPausaTotalMs = 0;  // soma do tempo pausado, descontado do total
+  var _corPausaInicioMs = 0; // Date.now() de quando a pausa atual começou
   var _corFontesTimer = 0; // handle do setInterval de _corPrepararFontes (evita duplicar)
   var _corListenersOn = false, _corResizeOn = false;
   var _corResizeTimers = []; // handles da cascata de remedição pós-rotação (ver A2.22)
@@ -1741,13 +1744,14 @@
     // Moedas da Loja da Coruja (teto 25 por partida) + stats locais
     // (partidas/segundos/recorde), no mesmo padrão do Voo da Coruja.
     var moedasGanhas = 0;
+    var segundos = Math.max(0, Math.round((Date.now() - _corInicioMs - _corPausaTotalMs) / 1000));
     if (window.AngatubaGames) {
       moedasGanhas = Math.max(0, Math.min(25, Math.floor(score / 200)));
       if (moedasGanhas > 0 && typeof window.AngatubaGames.moedasAdd === 'function') {
         window.AngatubaGames.moedasAdd(moedasGanhas, 'corrida');
       }
       if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
-        window.AngatubaGames.statsRegistrarPartida('corrida', { segundos: 0, score: score });
+        window.AngatubaGames.statsRegistrarPartida('corrida', { segundos: segundos, score: score });
       }
     }
 
@@ -2065,6 +2069,7 @@
     _corTravarLandscape();
     _corAplicarOrientacaoRepetido();
     _corReset();
+    _corInicioMs = Date.now(); _corPausaTotalMs = 0; _corPausaInicioMs = 0;
     _corEstado = 'jogando'; _corLast = 0;
     _corMenuPartida(true);
     if (_corRAF) cancelAnimationFrame(_corRAF);
@@ -2107,6 +2112,7 @@
     M.registrar('jogo-corrida', {
       pausar: function () {
         _corPausado = true;
+        _corPausaInicioMs = Date.now();
         if (_corRAF) { cancelAnimationFrame(_corRAF); _corRAF = 0; }
         _corDrag = false; _corCamVX = 0;
         _corBgmParar_semRebobinar();
@@ -2114,6 +2120,7 @@
       continuar: function () {
         if (!_corPausado) return;
         _corPausado = false;
+        if (_corPausaInicioMs) { _corPausaTotalMs += Date.now() - _corPausaInicioMs; _corPausaInicioMs = 0; }
         if (_corEstado !== 'jogando') return;
         _corBgmMudoAntes = _corSomLigado();
         _corBgmTocar();

@@ -22,6 +22,9 @@
   var _sqTocando = false;   // true durante o playback
   var _sqTimers = [];       // timeouts do playback (pra limpar)
   var _sqPausado = false;   // menu unificado do hub (ver _sqRegistrarMenu)
+  var _sqInicioMs = 0;      // Date.now() no início da partida (segundos reais — P1-2)
+  var _sqPausaTotalMs = 0;  // soma do tempo pausado, descontado do total
+  var _sqPausaInicioMs = 0; // Date.now() de quando a pausa atual começou
   var _sqVezAntesPausa = false; // era a vez do jogador quando pausou?
 
   function _sqRecordeGet() {
@@ -242,7 +245,8 @@
         window.AngatubaGames.moedasAdd(moedasGanhas, 'sequencia');
       }
       if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
-        window.AngatubaGames.statsRegistrarPartida('sequencia', { segundos: 0, score: alcancado });
+        var segundos = Math.max(0, Math.round((Date.now() - _sqInicioMs - _sqPausaTotalMs) / 1000));
+        window.AngatubaGames.statsRegistrarPartida('sequencia', { segundos: segundos, score: alcancado });
       }
     }
 
@@ -286,6 +290,7 @@
     _sqApagarTodos();
     _sqAjustarGrade(4); // recomeça sempre na grade 2x2
     _sqSeq = []; _sqPasso = 0; _sqRodada = 0;
+    _sqInicioMs = Date.now(); _sqPausaTotalMs = 0; _sqPausaInicioMs = 0;
     _sqAceitando = false; _sqTocando = false;
     var inicio = document.getElementById('sq-inicio'); if (inicio) inicio.style.display = 'none';
     var fim = document.getElementById('sq-fim'); if (fim) fim.style.display = 'none';
@@ -323,6 +328,7 @@
       pausar: function () {
         if (_sqPausado) return;
         _sqPausado = true;
+        _sqPausaInicioMs = Date.now();
         _sqVezAntesPausa = _sqAceitando;
         _sqAceitando = false;
         _sqTocando = false;
@@ -332,6 +338,7 @@
       continuar: function () {
         if (!_sqPausado) return;
         _sqPausado = false;
+        if (_sqPausaInicioMs) { _sqPausaTotalMs += Date.now() - _sqPausaInicioMs; _sqPausaInicioMs = 0; }
         if (_sqVezAntesPausa) { _sqAceitando = true; return; }
         if (_sqSeq.length && _sqPasso >= _sqSeq.length) _sqProximaRodada();
         else _sqPlayback();

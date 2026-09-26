@@ -20,6 +20,9 @@
   var _stNivel = 1, _stAcertos = 0, _stVidas = 0;
   var _stTimerRelogio = null, _stTimerCiclo = null, _stRodando = false;
   var _stPausado = false;   // menu unificado do hub (ver _stRegistrarMenu)
+  var _stInicioMs = 0;      // Date.now() no início da partida — segundos reais do sobrevivência (P1-2)
+  var _stPausaTotalMs = 0;  // soma do tempo pausado, descontado do total
+  var _stPausaInicioMs = 0; // Date.now() de quando a pausa atual começou
 
   // Recordes separados por modo.
   function _stRecChave() {
@@ -267,6 +270,7 @@
     var recEl = document.getElementById('st-recorde');
     if (recEl) { recEl.textContent = _stRecordeGet(); recEl.classList.remove('st-recorde-novo'); }
 
+    _stInicioMs = Date.now(); _stPausaTotalMs = 0; _stPausaInicioMs = 0;
     _stRodando = true;
     _stMenuPartida(true);
     _stProximaCoruja();
@@ -329,12 +333,14 @@
       pausar: function () {
         if (!_stRodando) return;
         _stPausado = true;
+        _stPausaInicioMs = Date.now();
         if (_stTimerRelogio) { clearInterval(_stTimerRelogio); _stTimerRelogio = null; }
         if (_stTimerCiclo)   { clearTimeout(_stTimerCiclo);   _stTimerCiclo = null; }
       },
       continuar: function () {
         if (!_stPausado) return;
         _stPausado = false;
+        if (_stPausaInicioMs) { _stPausaTotalMs += Date.now() - _stPausaInicioMs; _stPausaInicioMs = 0; }
         if (!_stRodando) return;
         if (_stModo === 'classico' && !_stTimerRelogio) _stLigarRelogio();
         _stProximaCoruja();
@@ -378,8 +384,9 @@
         window.AngatubaGames.moedasAdd(moedasGanhas, _stJogoKey);
       }
       if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
+        var _stSegundosSurv = Math.max(0, Math.round((Date.now() - _stInicioMs - _stPausaTotalMs) / 1000));
         window.AngatubaGames.statsRegistrarPartida(_stJogoKey, {
-          segundos: _stModo === 'sobrevivencia' ? 0 : _ST_DURACAO,
+          segundos: _stModo === 'sobrevivencia' ? _stSegundosSurv : _ST_DURACAO,
           score: _stPontos
         });
       }

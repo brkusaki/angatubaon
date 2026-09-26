@@ -2765,6 +2765,10 @@
     dados = dados || {};
     var todos = _statsLer();
     var s = todos[jogoKey] || { partidas: 0, segundos: 0, recorde: 0 };
+    // P2-4: se as stats ainda não têm recorde (ex. jogo já jogado antes
+    // da Camada 4 existir), semeia com o recorde local já existente pra
+    // o perfil não divergir do ranking sem motivo.
+    if (!s.recorde) s.recorde = _rankRecordeLocal(jogoKey);
     s.partidas = (s.partidas || 0) + 1;
     s.segundos = (s.segundos || 0) + Math.max(0, Math.round(Number(dados.segundos) || 0));
     var score = Number(dados.score);

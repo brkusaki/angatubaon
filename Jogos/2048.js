@@ -53,6 +53,9 @@
   var _t48Melhor = 0;             // maior peça já formada NESTA partida (pra HUD/objetivo)
   var _t48Rodando = false;
   var _t48Pausado = false;        // menu unificado do hub (ver _t48RegistrarMenu)
+  var _t48InicioMs = 0;           // Date.now() no início da partida (segundos reais — P1-2)
+  var _t48PausaTotalMs = 0;       // soma do tempo pausado, descontado do total
+  var _t48PausaInicioMs = 0;      // Date.now() de quando a pausa atual começou
   var _t48Animando = false;       // trava entrada durante a transição de uma jogada
   var _t48VenceuMostrado = false; // já comemorou o 2048 nesta partida? (só comemora 1x)
   var _t48Arraste = null;
@@ -373,6 +376,7 @@
     _t48VenceuMostrado = false;
     _t48Animando = false;
     _t48Rodando = true;
+    _t48InicioMs = Date.now(); _t48PausaTotalMs = 0; _t48PausaInicioMs = 0;
     _t48Spawn();
     _t48Spawn();
     _t48AtualizarHud();
@@ -411,7 +415,8 @@
         window.AngatubaGames.moedasAdd(moedasGanhas, '2048');
       }
       if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
-        window.AngatubaGames.statsRegistrarPartida('2048', { segundos: 0, score: _t48Pontos });
+        var segundos = Math.max(0, Math.round((Date.now() - _t48InicioMs - _t48PausaTotalMs) / 1000));
+        window.AngatubaGames.statsRegistrarPartida('2048', { segundos: segundos, score: _t48Pontos });
       }
       var moedasEl = document.getElementById('t48-fim-moedas');
       if (moedasEl) {
@@ -497,8 +502,11 @@
     var G = window.AngatubaGames;
     if (!G || !G.menu) return;
     G.menu.registrar('jogo-2048', {
-      pausar: function () { _t48Pausado = true; _t48CancelarArraste(); },
-      continuar: function () { _t48Pausado = false; }
+      pausar: function () { _t48Pausado = true; _t48PausaInicioMs = Date.now(); _t48CancelarArraste(); },
+      continuar: function () {
+        _t48Pausado = false;
+        if (_t48PausaInicioMs) { _t48PausaTotalMs += Date.now() - _t48PausaInicioMs; _t48PausaInicioMs = 0; }
+      }
     });
   }
 

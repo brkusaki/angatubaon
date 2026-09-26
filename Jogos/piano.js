@@ -404,6 +404,9 @@
   var _pnEstado = 'inicio';           // 'inicio' | 'jogando' | 'fim'
   var _pnRAF = 0, _pnLast = 0;
   var _pnPausado = false;   // menu unificado do hub (ver _pnRegistrarMenu)
+  var _pnInicioMs = 0;      // Date.now() no início da partida (segundos reais — P1-2)
+  var _pnPausaTotalMs = 0;  // soma do tempo pausado, descontado do total
+  var _pnPausaInicioMs = 0; // Date.now() de quando a pausa atual começou
   var _pnListenersOn = false, _pnResizeOn = false;
 
   var _pnAzulejos = [];      // [0] é sempre o mais baixo
@@ -826,6 +829,10 @@
         : (_pnErros > 0 ? 'Você tocou ' + _pnMelodia.nome + ' com ' + _pnErros + (_pnErros === 1 ? ' erro' : ' erros') + '.' + comboExtra + ' Sem pressa, tenta de novo!'
                         : 'Você tocou ' + _pnMelodia.nome + '.' + comboExtra + ' Sem pressa, tenta de novo!');
       if (slot) { slot.style.display = 'none'; slot.innerHTML = ''; }
+      // P2-2: modo normal não paga moeda — some com o "+N 🪙" que podia
+      // ter ficado visível de uma partida anterior de sobrevivência.
+      var moedasElNormal = document.getElementById('pn-fim-moedas');
+      if (moedasElNormal) moedasElNormal.style.display = 'none';
       _pnMostrarOverlay('fim');
       _pnAtualizarHUD(true);
       if (perfeito && window.AngatubaGames && window.AngatubaGames.efeitos) window.AngatubaGames.efeitos.confete('pn-fim', 90);
@@ -850,13 +857,14 @@
     // Moedas da Loja da Coruja (teto 25 por partida) + stats locais
     // (partidas/segundos/recorde), no mesmo padrão do Voo da Coruja.
     var moedasGanhas = 0;
+    var segundos = Math.max(0, Math.round((Date.now() - _pnInicioMs - _pnPausaTotalMs) / 1000));
     if (window.AngatubaGames) {
       moedasGanhas = Math.max(0, Math.min(25, Math.floor(score / 40)));
       if (moedasGanhas > 0 && typeof window.AngatubaGames.moedasAdd === 'function') {
         window.AngatubaGames.moedasAdd(moedasGanhas, 'piano');
       }
       if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
-        window.AngatubaGames.statsRegistrarPartida('piano', { segundos: 0, score: score });
+        window.AngatubaGames.statsRegistrarPartida('piano', { segundos: segundos, score: score });
       }
     }
     var moedasEl = document.getElementById('pn-fim-moedas');
@@ -991,6 +999,7 @@
     // Sem argumento (ponte do hub ou "jogar de novo"), repete o
     // último modo jogado.
     _pnReset(modo || _pnModo);
+    _pnInicioMs = Date.now(); _pnPausaTotalMs = 0; _pnPausaInicioMs = 0;
     _pnEstado = 'jogando'; _pnLast = 0;
     _pnMenuPartida(true);
     if (_pnRAF) cancelAnimationFrame(_pnRAF);
@@ -1041,11 +1050,13 @@
       podePausar: function () { return !_pnNaParty(); },
       pausar: function () {
         _pnPausado = true;
+        _pnPausaInicioMs = Date.now();
         if (_pnRAF) { cancelAnimationFrame(_pnRAF); _pnRAF = 0; }
       },
       continuar: function () {
         if (!_pnPausado) return;
         _pnPausado = false;
+        if (_pnPausaInicioMs) { _pnPausaTotalMs += Date.now() - _pnPausaInicioMs; _pnPausaInicioMs = 0; }
         if (_pnEstado === 'jogando' && !_pnRAF) {
           _pnLast = 0;
           _pnRAF = requestAnimationFrame(_pnLoop);

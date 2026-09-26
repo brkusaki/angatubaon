@@ -129,6 +129,7 @@
   var _dcUltimoResultado = null;  // 'venceu' | 'perdeu'
   var _dcSelecionado = null;      // { r, c } escolhida por toque
   var _dcArraste = null;
+  var _dcInicioFaseMs = 0;        // Date.now() no início da fase (segundos reais — P1-2)
 
   // ── Estado só do RENDER em canvas ──────────────────────────
   var _dcCanvas = null, _dcCtx = null;
@@ -1089,6 +1090,7 @@
     _dcMovimentosRestantes = cfg.movimentos;
     _dcPontosFase = 0; _dcMatchesCorFase = 0; _dcObstaculosQuebrados = 0;
     _dcRng = _dcMulberry32(2000 + _dcFaseAtual * 131);
+    _dcInicioFaseMs = Date.now();
     _dcFormato = _dcGerarFormato(_dcFaseAtual);
     _dcAplicarTemaFase(_dcFaseAtual);
     _dcComboMsg = null;
@@ -1134,18 +1136,21 @@
 
     _dcMostrarOverlay('fim');
 
+    var segundos = Math.max(0, Math.round((Date.now() - _dcInicioFaseMs) / 1000));
+
     if (window.AngatubaGames) {
       window.AngatubaGames.rankSubmeter('doces', recorde);
 
       // Moedas da Loja da Coruja (teto 25 por partida) + stats locais
       // (partidas/segundos/recorde), no mesmo padrão do Voo da Coruja.
-      // Usa o mesmo valor (recorde) que já vai pro rank.
-      var moedasGanhas = Math.max(0, Math.min(25, Math.floor(recorde * 3)));
+      // Só paga vencendo a fase, pela fase recém-concluída — não pelo
+      // recorde histórico (senão dava pra "farmar" perdendo, P1-1).
+      var moedasGanhas = venceu ? Math.max(0, Math.min(25, Math.floor(_dcFaseAtual * 3))) : 0;
       if (moedasGanhas > 0 && typeof window.AngatubaGames.moedasAdd === 'function') {
         window.AngatubaGames.moedasAdd(moedasGanhas, 'doces');
       }
       if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
-        window.AngatubaGames.statsRegistrarPartida('doces', { segundos: 0, score: recorde });
+        window.AngatubaGames.statsRegistrarPartida('doces', { segundos: segundos, score: recorde });
       }
       var moedasEl = document.getElementById('dc-fim-moedas');
       if (moedasEl) {

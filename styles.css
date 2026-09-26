@@ -6521,20 +6521,36 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     }
 
     /* Herói: BG equipado (imagem do catálogo) ou gradiente padrão do
-       hub quando nada tem preview (bg_padrao / bg_neon / nunca comprou). */
+       hub quando nada tem preview (bg_padrao / bg_neon / nunca comprou).
+       Full-bleed (sem margem lateral) e mais alto que os heróis
+       "cartão" do Ranking/Loja — é um banner de perfil, não um card
+       flutuando no preto. A identidade fica ancorada embaixo (flex +
+       justify-end), deixando o banner respirar por cima; o gradiente
+       escuro de _perfilBgEstilo() já escurece mais a base, exatamente
+       onde o texto precisa de contraste. */
     .perfil-hero {
       position: relative; overflow: hidden;
-      margin: 0 14px 12px; padding: 26px 16px 20px;
-      border-radius: 20px; min-height: 148px;
+      display: flex; flex-direction: column; justify-content: flex-end;
+      margin: 0 0 14px; padding: 34px 16px 20px;
+      min-height: 188px;
+      border-radius: 0 0 22px 22px;
       background: linear-gradient(135deg, #101b2e 0%, #151222 55%, #0d0f18 100%);
-      border: 1px solid rgba(56,189,248,0.22);
+      border-bottom: 1px solid rgba(56,189,248,0.22);
       box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+    /* Brilho decorativo — só aparece de verdade quando não há BG equipado
+       com preview (senão a foto já preenche o espaço); dá vida ao
+       gradiente padrão sem inventar nenhum dado novo. */
+    .perfil-hero::before {
+      content: ''; position: absolute; top: -60px; right: -40px; z-index: 0;
+      width: 220px; height: 220px; border-radius: 50%; pointer-events: none;
+      background: radial-gradient(circle, rgba(56,189,248,0.20), transparent 68%);
     }
     .perfil-identidade {
       position: relative; z-index: 1;
       display: flex; align-items: center; gap: 16px;
       padding: 12px 14px; border-radius: 16px;
-      background: rgba(9,14,22,.38); border: 1px solid rgba(255,255,255,.08);
+      background: rgba(9,14,22,.42); border: 1px solid rgba(255,255,255,.08);
       backdrop-filter: blur(2px);
     }
     /* Molduras do card (só CSS — vêm do item equipado no slot 'card') */
@@ -6595,54 +6611,64 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
     .perfil-editar-btn:active { transform: scale(0.96); }
 
     /* Seções do corpo rolável (grade de resumo / insígnias / jogos) */
-    .perfil-secao { margin-bottom: 18px; }
+    .perfil-secao { margin-bottom: 16px; }
     .perfil-secao-titulo {
       font-family: var(--font-h); font-weight: 800; font-size: 13.5px;
       color: var(--text); margin-bottom: 8px;
     }
 
     /* Grade de resumo estilo Steam (Jogos / Tempo / Insígnias / 4º item) —
-       cards compactos com número grande + rótulo pequeno. Com 3 itens
-       (visitante sem partida nenhuma) o 3º card fica sozinho na 2ª linha,
-       ocupando metade da largura — layout ainda limpo, sem espaço morto. */
+       cards com número GRANDE + rótulo pequeno em uppercase, é o que dá
+       peso visual estilo Steam. Com 3 itens (visitante sem partida
+       nenhuma) o 3º card fica sozinho na 2ª linha, ocupando metade da
+       largura — layout ainda limpo, sem espaço morto. */
     .perfil-grade {
-      display: flex; flex-wrap: wrap; gap: 8px; margin: 0 14px 18px;
+      display: flex; flex-wrap: wrap; gap: 8px; margin: 0 14px 16px;
     }
     .perfil-grade-item {
       flex: 1 1 calc(50% - 4px); min-width: 76px; text-align: center;
-      padding: 12px 8px; border-radius: 14px;
+      padding: 14px 8px; border-radius: 14px;
       background: var(--surface2); border: 1px solid var(--border);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
     }
     .perfil-grade-num {
-      font-family: var(--font-h); font-weight: 800; font-size: 18px; color: var(--text);
+      font-family: var(--font-h); font-weight: 800; font-size: 22px; color: var(--text);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .perfil-grade-label {
-      margin-top: 2px; font-size: 11px; color: var(--muted);
+      margin-top: 3px; font-size: 11px; color: var(--muted);
       text-transform: uppercase; letter-spacing: .03em; font-weight: 700;
     }
+    /* Valor "0" ou "—" (sem dado ainda) — mais discreto, sem gritar zero. */
+    .perfil-grade-item-vazio { box-shadow: none; }
+    .perfil-grade-item-vazio .perfil-grade-num { color: var(--muted); font-weight: 700; }
 
-    /* Vitrine de insígnias — fileira horizontal com scroll, não um
-       grid de slots. Só aparece quando há algo pra mostrar (a função
-       que gera o HTML devolve '' quando a lista está vazia). */
+    /* Vitrine de insígnias — "prateleira" com fundo próprio (nunca um
+       chip solto flutuando no preto, mesmo com 1 item só) e itens
+       maiores que a versão anterior. Só aparece quando há algo pra
+       mostrar (a função que gera o HTML devolve '' se a lista está
+       vazia — sem inventar inventário alheio no perfil de visitante). */
     .perfil-vitrine {
-      display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px;
+      display: flex; gap: 10px; overflow-x: auto;
+      padding: 12px; border-radius: 16px;
+      background: var(--surface2); border: 1px solid var(--border);
       -webkit-overflow-scrolling: touch; scrollbar-width: none;
     }
     .perfil-vitrine::-webkit-scrollbar { display: none; }
     .perfil-vitrine-item {
       flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 4px;
-      padding: 10px 12px; min-width: 64px; border-radius: 14px;
-      background: var(--surface2); border: 1px solid var(--border);
+      padding: 12px 14px; min-width: 72px; border-radius: 14px;
+      background: var(--surface); border: 1px solid var(--border);
     }
     .perfil-vitrine-item-equipada {
-      border-color: rgba(251,191,36,.5);
-      background: linear-gradient(135deg, rgba(251,191,36,.14), var(--surface2));
+      border-color: rgba(251,191,36,.55);
+      background: linear-gradient(135deg, rgba(251,191,36,.18), var(--surface));
+      box-shadow: 0 0 0 1px rgba(251,191,36,.18);
     }
-    .perfil-vitrine-ico { font-size: 22px; line-height: 1; }
+    .perfil-vitrine-ico { font-size: 26px; line-height: 1; }
     .perfil-vitrine-nome {
-      font-size: 10px; font-weight: 700; color: var(--muted); text-align: center;
-      max-width: 62px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-size: 10.5px; font-weight: 700; color: var(--muted); text-align: center;
+      max-width: 68px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .perfil-vitrine-item-equipada .perfil-vitrine-nome { color: #fbbf24; }
 
@@ -6713,11 +6739,24 @@ body.light-mode .bairro-sheet-close { background: rgba(0,0,0,0.06); }
       color: var(--text);
     }
     /* Selo no hero avisando que é o perfil de outra pessoa (sem saldo,
-       sem "Ir à Loja" — ver _perfilRenderPublico em Jogos/hub.js). */
+       sem "Ir à Loja" — ver _perfilRenderPublico em Jogos/hub.js). Vira
+       status de presença (online/ausente) quando AngatubaPresenca está
+       disponível — ver _perfilAtualizarPresenca; senão fica só o texto
+       genérico abaixo, sem quebrar nada. */
     .perfil-visitando-tag {
       margin-top: 5px; font-size: 11px; font-weight: 700;
       color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: .03em;
     }
+    .perfil-presenca-online,
+    .perfil-presenca-away { display: inline-flex; align-items: center; gap: 5px; }
+    .perfil-presenca-online::before,
+    .perfil-presenca-away::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    }
+    .perfil-presenca-online { color: #4ade80; }
+    .perfil-presenca-online::before { background: #4ade80; box-shadow: 0 0 6px rgba(74,222,128,.7); }
+    .perfil-presenca-away { color: #fbbf24; }
+    .perfil-presenca-away::before { background: #fbbf24; }
     @media (prefers-reduced-motion: reduce) {
       .perfil-vazio-owl { animation: none; }
     }

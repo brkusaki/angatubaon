@@ -2824,7 +2824,16 @@
       var equipadoAgora = (eq[item.slot] === item.id);
       var cta, ctaClasse, ctaAtributos;
       if (equipadoAgora) {
-        cta = 'Equipado'; ctaClasse = 'loja-cta-equipado'; ctaAtributos = ' disabled';
+        // P2-3: badge equipado tinha só "Equipado" desabilitado, sem
+        // caminho pra tirar. Demais slots (skin, fundo, card) sempre têm
+        // algo equipado por padrão, então continuam só mostrando o
+        // estado; badge é o único opcional (pode ficar sem nenhum).
+        if (item.slot === 'badge') {
+          cta = 'Remover'; ctaClasse = 'loja-cta-remover';
+          ctaAtributos = ' onclick="_lojaEquiparUI(\'badge\', null)"';
+        } else {
+          cta = 'Equipado'; ctaClasse = 'loja-cta-equipado'; ctaAtributos = ' disabled';
+        }
       } else if (tem) {
         cta = 'Equipar'; ctaClasse = 'loja-cta-equipar';
         ctaAtributos = ' onclick="_lojaEquiparUI(\'' + item.slot + '\',\'' + item.id + '\')"';
@@ -2834,9 +2843,16 @@
       } else {
         cta = 'Faltam ' + (item.preco - saldo); ctaClasse = 'loja-cta-bloqueado'; ctaAtributos = ' disabled';
       }
+      // P1-3: 'bg_neon' não tem preview de imagem (preview: null), então
+      // sem isso caía no mesmo emoji-placeholder dos outros fundos sem
+      // imagem — a loja não mostrava nada do que a pessoa ia comprar.
+      // Mostra a miniatura do gradiente de verdade (mesma cor de
+      // _perfilBgEstilo), em vez do placeholder morto.
       var previewHtml = item.preview
         ? '<img src="' + _rankEsc(item.preview) + '" alt=""' + (item.filtroCss ? ' style="filter:' + item.filtroCss + '"' : '') + ' loading="lazy" onerror="this.style.display=\'none\'">'
-        : '<span class="loja-item-ph" aria-hidden="true">' + (LOJA_TIPO_ICO[item.tipo] || '🦉') + '</span>';
+        : (item.id === 'bg_neon')
+          ? '<span class="loja-item-preview-neon" aria-hidden="true"></span>'
+          : '<span class="loja-item-ph" aria-hidden="true">' + (LOJA_TIPO_ICO[item.tipo] || '🦉') + '</span>';
       html += '<div class="loja-item' + (equipadoAgora ? ' loja-item-equipado' : '') + '">' +
                 '<div class="loja-item-preview">' + previewHtml + '</div>' +
                 '<div class="loja-item-nome">' + _rankEsc(item.nome) + '</div>' +
@@ -2941,10 +2957,22 @@
     return h + 'h' + (resto ? ' ' + (resto < 10 ? '0' : '') + resto : '');
   }
 
-  // Estilo inline do herói com o BG equipado (imagem do catálogo). Sem
-  // preview (bg_padrao, bg_neon, ou nada equipado ainda) cai no
+  // Gradiente roxo/neon do 'bg_neon' — mesma string usada aqui (herói do
+  // perfil) e na miniatura da loja (.loja-item-preview-neon em
+  // styles.css), pra ficar idêntico nos dois lugares.
+  var BG_NEON_GRADIENTE = 'linear-gradient(135deg, #2e1065 0%, #86198f 45%, #c026d3 70%, #22d3ee 100%)';
+
+  // Estilo inline do herói com o BG equipado. 'bg_neon' não tem imagem
+  // (preview: null no catálogo) — antes isso caía no gradiente padrão do
+  // CSS e o item mais caro da loja não mudava nada no perfil; agora usa
+  // um gradiente roxo/neon próprio, sem depender de imagem externa. Sem
+  // preview de verdade (bg_padrao, ou nada equipado ainda) cai no
   // gradiente padrão já definido em CSS pra .perfil-hero.
   function _perfilBgEstilo(bgId) {
+    if (bgId === 'bg_neon') {
+      return 'background-image:linear-gradient(180deg, rgba(11,15,23,.15), rgba(11,15,23,.85)), ' + BG_NEON_GRADIENTE + ';' +
+             'background-size:cover; background-position:center;';
+    }
     var item = bgId ? _lojaItemPorId(bgId) : null;
     if (!item || !item.preview) return '';
     return 'background-image:linear-gradient(180deg, rgba(11,15,23,.25), rgba(11,15,23,.92)), url(\'' + item.preview + '\');' +

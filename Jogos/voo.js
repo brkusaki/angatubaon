@@ -21,6 +21,26 @@
   var _VOO_OWL_SRC = '/webp/owl-flying.webp';
   var _vooImg = null, _vooImgOk = false, _vooImgRatio = 1;   // ratio = h/w
 
+  // P1-4: Safari/iOS em muitas versões aceita a atribuição a ctx.filter
+  // (não lança erro, o valor fica lá) mas não aplica o efeito no
+  // desenho — resultado: compra a skin Dourada/Neon e joga com a
+  // clássica. Teste real (não só "typeof"): pinta preto, aplica
+  // invert(1), redesenha e confere se o pixel virou branco de verdade.
+  var _vooFilterSuportado = (function () {
+    try {
+      var c = document.createElement('canvas');
+      c.width = 2; c.height = 2;
+      var cx = c.getContext('2d');
+      if (!cx || typeof cx.filter !== 'string') return false;
+      cx.fillStyle = '#000';
+      cx.fillRect(0, 0, 2, 2);
+      cx.filter = 'invert(1)';
+      cx.fillRect(0, 0, 2, 2);
+      var d = cx.getImageData(0, 0, 1, 1).data;
+      return d[0] > 200 && d[1] > 200 && d[2] > 200;
+    } catch (e) { return false; }
+  })();
+
   /* ══════════════════════════════════════════════════════════════
      SISTEMA DE ASSETS (plataformas + decoração de fundo)
      — Cada asset é OPCIONAL: se o arquivo não existe/falha, o jogo
@@ -162,9 +182,11 @@
   // e ao começar, não em todo frame. filtroCss vem do próprio catálogo
   // (ver LOJA_CATALOGO em hub.js) — sem asset novo, só diferenciação
   // visual via CSS filter aplicado no canvas. Vazio/null = clássica.
+  var _vooSkinId = '';       // id da skin equipada (catálogo) — usado só no fallback sem ctx.filter
   var _vooSkinFiltro = '';
   var _vooSkinPixelado = false;
   function _vooAtualizarSkin() {
+    _vooSkinId = '';
     _vooSkinFiltro = '';
     _vooSkinPixelado = false;
     var G = window.AngatubaGames;
@@ -175,6 +197,7 @@
       var catalogo = G.lojaCatalogo() || [];
       for (var i = 0; i < catalogo.length; i++) {
         if (catalogo[i].id === equipadaId) {
+          _vooSkinId = equipadaId;
           _vooSkinFiltro = catalogo[i].filtroCss || '';
           _vooSkinPixelado = !!catalogo[i].pixelado;
           break;
@@ -209,6 +232,52 @@
      offscreen e o loop só faz drawImage. Mesma aparência, uma fração do
      custo. O cache é jogado fora quando o canvas muda de tamanho. ── */
   var _vooSprites = {};        // chave -> { cv, padX, padTop, w, h }
+
+  // P1-4 (fallback sem ctx.filter): em vez de tentar reproduzir o
+  // filtro CSS por trás (hue-rotate etc. não dá pra "ler" de volta),
+  // cada skin tem sua própria receita de tingimento — cor sólida
+  // aplicada com globalCompositeOperation e recortada pelo alfa do
+  // próprio sprite (source-atop), pré-renderizada uma vez por
+  // skin+tamanho num canvas offscreen e cacheada (mesmo esquema das
+  // plataformas acima). 'pixel' não muda de cor — só desliga o
+  // suavizado — então não precisa de receita aqui.
+  var VOO_SKIN_TINTURA = {
+    voo_skin_neon:    'rgba(34,227,255,0.55)',
+    voo_skin_dourada: 'rgba(255,196,60,0.55)'
+  };
+  var _vooOwlSprites = {};     // chave -> { cv }
+
+  // Monta (ou reaproveita) o sprite da coruja pré-tingido pra uma skin.
+  // Usado só quando _vooFilterSuportado é false (Safari/iOS que não
+  // aplica ctx.filter de verdade).
+  function _vooOwlSpriteColorido(skinId, pixelado, ow, oh) {
+    if (!_vooImgOk || !_vooImg || !(ow > 0) || !(oh > 0)) return null;
+    var chave = skinId + '|' + (pixelado ? 'P' : '-') + '|' + Math.round(ow) + 'x' + Math.round(oh) + '|' + _vooDpr;
+    var sp = _vooOwlSprites[chave];
+    if (sp) return sp;
+    var cv, c;
+    try {
+      cv = document.createElement('canvas');
+      cv.width  = Math.max(1, Math.round(ow * _vooDpr));
+      cv.height = Math.max(1, Math.round(oh * _vooDpr));
+      c = cv.getContext('2d');
+      if (!c) return null;
+    } catch (e) { return null; }
+    c.scale(_vooDpr, _vooDpr);
+    if (pixelado) c.imageSmoothingEnabled = false;
+    try { c.drawImage(_vooImg, 0, 0, ow, oh); } catch (e) { return null; }
+    var cor = VOO_SKIN_TINTURA[skinId];
+    if (cor) {
+      c.globalCompositeOperation = 'source-atop';
+      c.fillStyle = cor;
+      c.fillRect(0, 0, ow, oh);
+      c.globalCompositeOperation = 'source-over';
+    }
+    sp = { cv: cv };
+    _vooOwlSprites[chave] = sp;
+    return sp;
+  }
+
   var _vooCeuGrad = null;      // gradiente do céu reaproveitado entre frames
   var _vooCeuGradAlt = -1;     // altitude com que _vooCeuGrad foi montado
   var _vooCeuGradH = -1;       // altura com que _vooCeuGrad foi montado
@@ -228,6 +297,7 @@
 
   function _vooSpriteInvalidar() {
     _vooSprites = {};
+    _vooOwlSprites = {};
     _vooCeuGrad = null; _vooCeuGradAlt = -1; _vooCeuGradH = -1;
     _vooAstroGrad = null; _vooAstroAlt = -1; _vooAstroH = -1;
   }
@@ -1193,16 +1263,31 @@
     ctx.rotate(o.dir < 0 ? -ang : ang);
     ctx.scale(sx, sy);
     if (_vooImgOk && _vooImg) {
-      // Skin equipada (Loja da Coruja): filtro CSS aplicado só no draw da
-      // coruja, sem mexer no resto da cena. 'pixelado' também desliga o
-      // suavizado pra um resultado mais quadriculado/retrô.
-      var filtroAntes = ctx.filter, suavAntes = ctx.imageSmoothingEnabled;
-      if (_vooSkinFiltro) ctx.filter = _vooSkinFiltro;
-      if (_vooSkinPixelado) ctx.imageSmoothingEnabled = false;
-      try { ctx.drawImage(_vooImg, -ow / 2, -oh / 2, ow, oh); }
-      catch (e) { _vooDrawFallback(ctx, ow); }
-      if (_vooSkinFiltro) ctx.filter = filtroAntes;
-      if (_vooSkinPixelado) ctx.imageSmoothingEnabled = suavAntes;
+      // Skin equipada (Loja da Coruja): normalmente aplica ctx.filter só
+      // no draw da coruja, sem mexer no resto da cena. Safari/iOS em
+      // muitas versões aceita a atribuição mas não aplica o filtro de
+      // verdade (_vooFilterSuportado detecta isso uma vez, no carregar) —
+      // nesse caso usa um sprite pré-tingido em canvas offscreen
+      // (cacheado por skin+tamanho) em vez de confiar no filter.
+      // 'pixelado' (desligar suavizado) funciona nos dois caminhos.
+      if (_vooSkinId && !_vooFilterSuportado) {
+        var _spOwl = _vooOwlSpriteColorido(_vooSkinId, _vooSkinPixelado, ow, oh);
+        var suavAntesP = ctx.imageSmoothingEnabled;
+        if (_vooSkinPixelado) ctx.imageSmoothingEnabled = false;
+        try {
+          if (_spOwl) ctx.drawImage(_spOwl.cv, -ow / 2, -oh / 2, ow, oh);
+          else ctx.drawImage(_vooImg, -ow / 2, -oh / 2, ow, oh);
+        } catch (e) { _vooDrawFallback(ctx, ow); }
+        if (_vooSkinPixelado) ctx.imageSmoothingEnabled = suavAntesP;
+      } else {
+        var filtroAntes = ctx.filter, suavAntes = ctx.imageSmoothingEnabled;
+        if (_vooSkinFiltro) ctx.filter = _vooSkinFiltro;
+        if (_vooSkinPixelado) ctx.imageSmoothingEnabled = false;
+        try { ctx.drawImage(_vooImg, -ow / 2, -oh / 2, ow, oh); }
+        catch (e) { _vooDrawFallback(ctx, ow); }
+        if (_vooSkinFiltro) ctx.filter = filtroAntes;
+        if (_vooSkinPixelado) ctx.imageSmoothingEnabled = suavAntes;
+      }
     } else {
       _vooDrawFallback(ctx, ow);
     }

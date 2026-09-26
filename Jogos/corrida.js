@@ -1738,10 +1738,28 @@
     if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.fim(recorde);
     if (window.AngatubaGames) window.AngatubaGames.rankSubmeter('corrida', score);
 
+    // Moedas da Loja da Coruja (teto 25 por partida) + stats locais
+    // (partidas/segundos/recorde), no mesmo padrão do Voo da Coruja.
+    var moedasGanhas = 0;
+    if (window.AngatubaGames) {
+      moedasGanhas = Math.max(0, Math.min(25, Math.floor(score / 200)));
+      if (moedasGanhas > 0 && typeof window.AngatubaGames.moedasAdd === 'function') {
+        window.AngatubaGames.moedasAdd(moedasGanhas, 'corrida');
+      }
+      if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
+        window.AngatubaGames.statsRegistrarPartida('corrida', { segundos: 0, score: score });
+      }
+    }
+
     var owlEl = document.getElementById('cor-fim-owl');
     var titEl = document.getElementById('cor-fim-titulo');
     var ptsEl = document.getElementById('cor-fim-pontos');
     var msgEl = document.getElementById('cor-fim-msg');
+    var moedasEl = document.getElementById('cor-fim-moedas');
+    if (moedasEl) {
+      if (moedasGanhas > 0) { moedasEl.textContent = '+' + moedasGanhas + ' 🪙'; moedasEl.style.display = ''; }
+      else moedasEl.style.display = 'none';
+    }
     if (owlEl) { owlEl.src = recorde ? '/webp/owl-celebrate-flying.webp' : '/webp/owl-surprised.webp'; owlEl.style.display = ''; }
     if (titEl) titEl.textContent = recorde ? '🎉 Novo recorde!' : 'Fim da linha!';
     if (ptsEl) ptsEl.textContent = score + ' metros';

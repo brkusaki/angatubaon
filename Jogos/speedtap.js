@@ -363,8 +363,26 @@
     var bateuRecorde = _stPontos > rec;
     if (bateuRecorde) { _stRecordeSet(_stPontos); }
     // Ranking: submete ao Firestore (se logado). Modo define a coleção.
+    var _stJogoKey = _stModo === 'sobrevivencia' ? 'pegacoruja_surv' : 'pegacoruja';
     if (window.AngatubaGames) {
-      window.AngatubaGames.rankSubmeter(_stModo === 'sobrevivencia' ? 'pegacoruja_surv' : 'pegacoruja', _stPontos);
+      window.AngatubaGames.rankSubmeter(_stJogoKey, _stPontos);
+    }
+
+    // Moedas da Loja da Coruja (teto 25 por partida) + stats locais
+    // (partidas/segundos/recorde), no mesmo padrão do Voo da Coruja.
+    var moedasGanhas = 0;
+    if (window.AngatubaGames) {
+      var _stDivisor = _stModo === 'sobrevivencia' ? 80 : 30;
+      moedasGanhas = Math.max(0, Math.min(25, Math.floor(_stPontos / _stDivisor)));
+      if (moedasGanhas > 0 && typeof window.AngatubaGames.moedasAdd === 'function') {
+        window.AngatubaGames.moedasAdd(moedasGanhas, _stJogoKey);
+      }
+      if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
+        window.AngatubaGames.statsRegistrarPartida(_stJogoKey, {
+          segundos: _stModo === 'sobrevivencia' ? 0 : _ST_DURACAO,
+          score: _stPontos
+        });
+      }
     }
 
     var fim = document.getElementById('st-fim');
@@ -392,9 +410,14 @@
       }
     }
     if (bateuRecorde && recEl) recEl.classList.add('st-recorde-novo');
+    var fimMoedas = document.getElementById('st-fim-moedas');
+    if (fimMoedas) {
+      if (moedasGanhas > 0) { fimMoedas.textContent = '+' + moedasGanhas + ' 🪙'; fimMoedas.style.display = ''; }
+      else fimMoedas.style.display = 'none';
+    }
     if (fim) fim.style.display = 'flex';
     if (window.AngatubaGames) {
-      window.AngatubaGames.rankFimDeJogo(_stModo === 'sobrevivencia' ? 'pegacoruja_surv' : 'pegacoruja', 'st-rank-slot', _stPontos);
+      window.AngatubaGames.rankFimDeJogo(_stJogoKey, 'st-rank-slot', _stPontos);
     }
   }
 

@@ -575,6 +575,23 @@
 
     if (window.AngatubaGames) {
       window.AngatubaGames.rankSubmeter('blocos', recorde);
+
+      // Moedas da Loja da Coruja (teto 25 por partida) + stats locais
+      // (partidas/segundos/recorde), no mesmo padrão do Voo da Coruja.
+      // Usa o mesmo valor (recorde) que já vai pro rank.
+      var moedasGanhas = Math.max(0, Math.min(25, Math.floor(recorde * 3)));
+      if (moedasGanhas > 0 && typeof window.AngatubaGames.moedasAdd === 'function') {
+        window.AngatubaGames.moedasAdd(moedasGanhas, 'blocos');
+      }
+      if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
+        window.AngatubaGames.statsRegistrarPartida('blocos', { segundos: 0, score: recorde });
+      }
+      var moedasEl = document.getElementById('bb-fim-moedas');
+      if (moedasEl) {
+        if (moedasGanhas > 0) { moedasEl.textContent = '+' + moedasGanhas + ' 🪙'; moedasEl.style.display = ''; }
+        else moedasEl.style.display = 'none';
+      }
+
       window.AngatubaGames.rankFimDeJogo('blocos', 'bb-rank-slot', recorde);
     }
   }

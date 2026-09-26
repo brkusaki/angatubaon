@@ -403,6 +403,22 @@
 
     if (window.AngatubaGames) {
       window.AngatubaGames.rankSubmeter('2048', _t48Pontos);
+
+      // Moedas da Loja da Coruja (teto 25 por partida) + stats locais
+      // (partidas/segundos/recorde), no mesmo padrão do Voo da Coruja.
+      var moedasGanhas = Math.max(0, Math.min(25, Math.floor(_t48Pontos / 500)));
+      if (moedasGanhas > 0 && typeof window.AngatubaGames.moedasAdd === 'function') {
+        window.AngatubaGames.moedasAdd(moedasGanhas, '2048');
+      }
+      if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
+        window.AngatubaGames.statsRegistrarPartida('2048', { segundos: 0, score: _t48Pontos });
+      }
+      var moedasEl = document.getElementById('t48-fim-moedas');
+      if (moedasEl) {
+        if (moedasGanhas > 0) { moedasEl.textContent = '+' + moedasGanhas + ' 🪙'; moedasEl.style.display = ''; }
+        else moedasEl.style.display = 'none';
+      }
+
       window.AngatubaGames.rankFimDeJogo('2048', 't48-rank-slot', _t48Pontos);
     }
   }

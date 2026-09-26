@@ -232,6 +232,20 @@
     var bateu = alcancado > rec;
     if (bateu) _sqRecordeSet(alcancado);
     if (window.AngatubaGames) window.AngatubaGames.rankSubmeter('sequencia', alcancado);
+
+    // Moedas da Loja da Coruja (teto 25 por partida) + stats locais
+    // (partidas/segundos/recorde), no mesmo padrão do Voo da Coruja.
+    var moedasGanhas = 0;
+    if (window.AngatubaGames) {
+      moedasGanhas = Math.max(0, Math.min(25, Math.floor(alcancado * 2)));
+      if (moedasGanhas > 0 && typeof window.AngatubaGames.moedasAdd === 'function') {
+        window.AngatubaGames.moedasAdd(moedasGanhas, 'sequencia');
+      }
+      if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
+        window.AngatubaGames.statsRegistrarPartida('sequencia', { segundos: 0, score: alcancado });
+      }
+    }
+
     if (_som()) { if (bateu) _som().fim(true); else _som().erro(); }
     if (bateu && window.AngatubaGames && window.AngatubaGames.efeitos) {
       window.AngatubaGames.efeitos.confete('sq-card');
@@ -252,6 +266,11 @@
     if (fimMsg) {
       if (alcancado <= 0) fimMsg.textContent = 'Você chegou na rodada 1. Bora tentar de novo!';
       else fimMsg.textContent = 'Você memorizou ' + alcancado + (alcancado === 1 ? ' rodada' : ' rodadas') + '!' + (bateu ? ' Melhor marca!' : '');
+    }
+    var fimMoedas = document.getElementById('sq-fim-moedas');
+    if (fimMoedas) {
+      if (moedasGanhas > 0) { fimMoedas.textContent = '+' + moedasGanhas + ' 🪙'; fimMoedas.style.display = ''; }
+      else fimMoedas.style.display = 'none';
     }
     var st = document.getElementById('sq-status');
     if (st) st.textContent = 'Fim de jogo';

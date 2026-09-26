@@ -2940,7 +2940,9 @@
   function _perfilGradeHtml(itens) {
     var html = '<div class="perfil-grade">';
     itens.forEach(function (it) {
-      html += '<div class="perfil-grade-item">' +
+      // Sem dado ainda (0 partidas, "—") — card mais discreto, não grita zero.
+      var vazio = (it.valor === 0 || it.valor === '0' || it.valor === '—');
+      html += '<div class="perfil-grade-item' + (vazio ? ' perfil-grade-item-vazio' : '') + '">' +
                 '<div class="perfil-grade-num">' + _rankEsc(String(it.valor)) + '</div>' +
                 '<div class="perfil-grade-label">' + _rankEsc(it.rotulo) + '</div>' +
               '</div>';
@@ -3054,11 +3056,15 @@
     // Corpo rolável: grade de resumo + vitrine de insígnias + lista de
     // jogos + "Ir à Loja" — nada de grid de slots equipados aqui (isso
     // já aparece no hero: BG, moldura do card e título; a skin do Voo
-    // só aparece dentro do próprio jogo).
+    // só aparece dentro do próprio jogo). Moedas NÃO se repete aqui —
+    // já está no hero; o 4º item vira Ofensiva (dado real, já gravado
+    // pelo streak diário — nada inventado).
     var badgesInv = LOJA_CATALOGO.filter(function (it) { return it.tipo === 'badge' && _temItem(it.id); })
       .map(function (it) { return it.id; });
+    var streak = (typeof _streakLer === 'function') ? _streakLer() : { dias: 0 };
     corpo.innerHTML =
-      _perfilCorpoHtml(_statsLer(), badgesInv, eq.badge, { rotulo: 'Moedas', valor: '🪙 ' + saldo }, false) +
+      _perfilCorpoHtml(_statsLer(), badgesInv, eq.badge,
+        { rotulo: 'Ofensiva', valor: streak.dias + (streak.dias === 1 ? ' dia' : ' dias') }, false) +
       '<button type="button" class="perfil-ir-loja" onclick="lojaAbrir()">Ir à Loja</button>';
   }
 
@@ -3133,6 +3139,50 @@
       '</div>';
   }
 
+  // Presença (online/ausente) no perfil de outro jogador — opcional e
+  // best-effort: window.AngatubaPresenca só existe em app.js, que hub.js
+  // nunca importa; se não estiver no escopo global (ou se qualquer coisa
+  // der errado), a tag estática "Perfil de jogador" já deixada no HTML
+  // continua valendo, sem quebrar nada. É uma leitura pontual (observa
+  // uma vez e cancela a inscrição), não um listener vivo — a vitrine de
+  // presença não precisa atualizar em tempo real.
+  function _perfilAtualizarPresenca(uid) {
+    if (!uid) return;
+    if (typeof window === 'undefined' || !window.AngatubaPresenca ||
+        typeof window.AngatubaPresenca.observar !== 'function') return;
+    var uidAlvo = uid; // snapshot — descarta se o visitante já trocou de perfil
+    var unsub = null;
+    var recebeu = false; // true assim que o callback rodar (síncrono ou não)
+    try {
+      unsub = window.AngatubaPresenca.observar(uid, function (info) {
+        recebeu = true;
+        // Se observar() já tinha retornado quando o callback rodou, 'unsub'
+        // já existe aqui e cancela na hora. Se o callback rodou de forma
+        // SÍNCRONA (antes de observar() retornar), 'unsub' ainda é null
+        // neste ponto — o cancelamento acontece logo abaixo, depois que
+        // observar() retorna e 'unsub' passa a existir.
+        if (typeof unsub === 'function') { try { unsub(); } catch (e) {} }
+        if (_perfilModo !== 'outro' || _perfilUidVisitado !== uidAlvo) return;
+        var tagEl = document.getElementById('perfil-presenca-tag');
+        if (!tagEl || !info) return;
+        var texto = 'Perfil de jogador', classe = '';
+        if (info.state === 'online') { texto = 'Online'; classe = ' perfil-presenca-online'; }
+        else if (info.state === 'away') { texto = 'Ausente'; classe = ' perfil-presenca-away'; }
+        tagEl.textContent = texto;
+        tagEl.className = 'perfil-visitando-tag' + classe;
+      });
+      // Cobre o caso do callback síncrono: nesse instante 'unsub' já existe
+      // e 'recebeu' já é true, então cancela agora (dentro do callback a
+      // checagem acima não conseguiu, pois 'unsub' ainda não tinha sido
+      // atribuído). Se o callback ainda não rodou (caso assíncrono normal),
+      // 'recebeu' é false e nada acontece aqui — o cancelamento fica por
+      // conta do próprio callback quando ele rodar.
+      if (recebeu && typeof unsub === 'function') { try { unsub(); } catch (e) {} }
+    } catch (e) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[perfil] presença indisponível, mantendo a tag padrão:', e && e.message);
+    }
+  }
+
   // Mesma estrutura visual de _perfilRender(), mas a partir do doc
   // público (Firestore) de OUTRO jogador: sem saldo de moedas, sem
   // botão "Ir à Loja" e sem convite de login (Camada 3 — regra: nunca
@@ -3162,10 +3212,15 @@
           '<div class="perfil-identidade-txt">' +
             '<div class="perfil-nome">' + _rankEsc(nome) + '</div>' +
             _perfilTituloHtml(eq) +
-            '<div class="perfil-visitando-tag">Perfil de jogador</div>' +
+            '<div class="perfil-visitando-tag" id="perfil-presenca-tag">Perfil de jogador</div>' +
           '</div>' +
         '</div>' +
       '</div>';
+
+    // Presença é opcional (só existe em app.js) — tenta upgradar a tag
+    // estática acima pra "Online"/"Ausente" sem bloquear o render nem
+    // quebrar nada se a API não estiver disponível (ver função abaixo).
+    _perfilAtualizarPresenca(dados.uid);
 
     // Grade + insígnias + lista de jogos — sem saldo, sem "Ir à Loja",
     // sem grid de slots (são dados pessoais; o que é público já aparece

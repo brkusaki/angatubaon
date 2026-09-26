@@ -1331,7 +1331,7 @@
 
   // Depois que um jogo termina de carregar (js/css injetados com
   // sucesso), baixa em paralelo os assets pesados dele pro cache
-  // separado do Service Worker (CACHE_JOGOS = 'angatubaon-jogos-v1') —
+  // separado do Service Worker (CACHE_JOGOS = 'angatubaon-jogos-v2') —
   // assim a próxima abertura funciona offline, mesmo depois de um
   // update do app (o SW nunca apaga esse cache, ver service-worker.js).
   // Fire-and-forget: não atrasa o "Jogar" nem trava se algum asset
@@ -1340,7 +1340,9 @@
     var urls = JOGOS_ASSETS[nome];
     if (!urls || !urls.length) return;
     if (typeof caches === 'undefined' || !caches.open) return;
-    caches.open('angatubaon-jogos-v1').then(function (c) {
+    // Mesmo nome do CACHE_JOGOS em service-worker.js — mudou lá, muda aqui.
+    // (v2: o v1 congelava o js/css dos jogos — ver P0-1 no SW.)
+    caches.open('angatubaon-jogos-v2').then(function (c) {
       return Promise.allSettled(urls.map(function (url) {
         return c.match(url).then(function (jaTem) {
           if (jaTem) return;
@@ -1851,6 +1853,23 @@
     return _fbDb;
   }
 
+  // P0-2: Firestore PRONTO (Promise). Numa sessão fria o hub.min.js pode
+  // ter sido carregado pelo painel de conta/amigos, que não injeta o SDK
+  // do Firestore — aí _rankDb() ainda é null e isso virava "perfil não
+  // existe" / "ninguém pontuou". Aqui espera o _carregarFirebaseJogos()
+  // (idempotente, Promise cacheada) e só rejeita se o SDK não vier
+  // mesmo (offline) — quem chama trata a rejeição como erro, não como
+  // "vazio".
+  function _rankDbPronto() {
+    var db = _rankDb();
+    if (db) return Promise.resolve(db);
+    return _carregarFirebaseJogos().then(function () {
+      var d = _rankDb();
+      if (!d) throw new Error('Firestore indisponível');
+      return d;
+    });
+  }
+
   // Mapa jogo -> coleção no Firestore. Mantém os nomes das regras.
   var RANK_COLECOES = {
     pegacoruja:      'ranking_pegacoruja',
@@ -1902,8 +1921,6 @@
   function rankSubmeter(jogoKey, score) {
     // Só faz sentido se houver cliente logado (camada 1).
     if (typeof _cliUser === 'undefined' || !_cliUser) return;
-    var db = _rankDb();
-    if (!db) return;
     var colecao = RANK_COLECOES[jogoKey];
     if (!colecao) return;
 
@@ -1919,42 +1936,52 @@
     // o MAIOR entre a pontuação da partida e o melhor recorde já salvo no
     // localStorage. Assim, um recorde feito DESLOGADO sobe sozinho na
     // primeira partida jogada logado — sem depender do fluxo de login.
-    var val = Math.max(0, Math.round(Number(score) || 0), _rankRecordeLocal(jogoKey));
+    // Celular compartilhado (decisão A): o recorde local só entra se o
+    // progresso deste aparelho é DESTA conta (ver _progressoGarantirDono).
+    var recLocal = _progressoGarantirDono() ? _rankRecordeLocal(jogoKey) : 0;
+    var val = Math.max(0, Math.round(Number(score) || 0), recLocal);
+    var foto = _cliUser.photoURL || '';
 
     // Read-before-write: lê o score atual do próprio doc e só grava se o
     // novo for MAIOR. Isso garante o comportamento correto mesmo que as
     // regras do Firestore não estejam barrando downgrade — uma partida
     // pior nunca sobrescreve o recorde. (A regra do servidor continua
     // sendo a defesa final; aqui é a defesa do cliente.)
-    var ref = db.collection(colecao).doc(uid);
-    ref.get().then(function (doc) {
-      var atual = 0;
-      if (doc && doc.exists) {
-        var d = doc.data() || {};
-        atual = (typeof d.score === 'number') ? d.score : 0;
-      }
-      // Não é recorde: não grava (evita downgrade e escrita desnecessária).
-      if (val <= atual) {
-        if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] não é recorde (' + val + ' <= ' + atual + '):', colecao);
-        return;
-      }
-      ref.set({
-        uid: uid,
-        nome: nome,
-        score: val,
-        photoURL: (_cliUser.photoURL || ''),
-        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true }).catch(function (err) {
-        // permission-denied aqui = regra do servidor rejeitou (ex.: teto
-        // por jogo nas security rules do Firestore menor que o score).
-        // Se um recorde legítimo não sobe, é o teto do servidor que precisa
-        // ser revisto no console do Firebase — não há o que fazer no cliente.
-        if (typeof DEBUG !== 'undefined' && DEBUG) {
-          console.log('[rank] servidor rejeitou gravação (verifique teto nas regras do Firestore):', colecao, val, err && err.code);
+    // P0-2: espera o Firestore carregar (sessão fria) em vez de desistir
+    // em silêncio com db null.
+    _rankDbPronto().then(function (db) {
+      // Trocou de conta enquanto o SDK carregava: não grava no uid antigo.
+      if (typeof _cliUser === 'undefined' || !_cliUser || _cliUser.uid !== uid) return;
+      var ref = db.collection(colecao).doc(uid);
+      return ref.get().then(function (doc) {
+        var atual = 0;
+        if (doc && doc.exists) {
+          var d = doc.data() || {};
+          atual = (typeof d.score === 'number') ? d.score : 0;
         }
+        // Não é recorde: não grava (evita downgrade e escrita desnecessária).
+        if (val <= atual) {
+          if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] não é recorde (' + val + ' <= ' + atual + '):', colecao);
+          return;
+        }
+        ref.set({
+          uid: uid,
+          nome: nome,
+          score: val,
+          photoURL: foto,
+          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true }).catch(function (err) {
+          // permission-denied aqui = regra do servidor rejeitou (ex.: teto
+          // por jogo nas security rules do Firestore menor que o score).
+          // Se um recorde legítimo não sobe, é o teto do servidor que precisa
+          // ser revisto no console do Firebase — não há o que fazer no cliente.
+          if (typeof DEBUG !== 'undefined' && DEBUG) {
+            console.log('[rank] servidor rejeitou gravação (verifique teto nas regras do Firestore):', colecao, val, err && err.code);
+          }
+        });
       });
     }).catch(function (err) {
-      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] falha ao ler antes de gravar:', err && err.message);
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] falha ao ler antes de gravar (ou SDK ausente):', err && err.message);
     });
   }
 
@@ -1963,27 +1990,31 @@
      do maior pro menor, limitado a `limite` (default 20).
      Leitura é pública (regra allow read: true), funciona logado ou
      não. */
-  function rankLerTop(jogoKey, limite) {
-    var db = _rankDb();
+  // Versão que PROPAGA o erro (SDK ausente, offline, permission-denied) —
+  // usada pelo cache dos tops pra não guardar "vazio" falso (P0-2).
+  function _rankLerTopOuErro(jogoKey, limite) {
     var colecao = RANK_COLECOES[jogoKey];
-    if (!db || !colecao) return Promise.resolve([]);
+    if (!colecao) return Promise.resolve([]);
     var n = limite || 20;
-    return db.collection(colecao)
-      .orderBy('score', 'desc')
-      .limit(n)
-      .get()
-      .then(function (snap) {
-        var out = [];
-        snap.forEach(function (doc) {
-          var d = doc.data() || {};
-          out.push({ uid: d.uid || doc.id, nome: d.nome || 'Jogador', score: d.score || 0, photoURL: d.photoURL || '' });
-        });
-        return out;
-      })
-      .catch(function (err) {
-        if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] erro ao ler:', err && err.message);
-        return [];
+    return _rankDbPronto().then(function (db) {
+      return db.collection(colecao)
+        .orderBy('score', 'desc')
+        .limit(n)
+        .get();
+    }).then(function (snap) {
+      var out = [];
+      snap.forEach(function (doc) {
+        var d = doc.data() || {};
+        out.push({ uid: d.uid || doc.id, nome: d.nome || 'Jogador', score: d.score || 0, photoURL: d.photoURL || '' });
       });
+      return out;
+    });
+  }
+  function rankLerTop(jogoKey, limite) {
+    return _rankLerTopOuErro(jogoKey, limite).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] erro ao ler:', err && err.message);
+      return [];
+    });
   }
 
   /* ── Ler a própria posição/pontuação num ranking ────────────
@@ -1991,10 +2022,11 @@
      Retorna Promise<number|null>. */
   function rankMinhaPontuacao(jogoKey) {
     if (typeof _cliUser === 'undefined' || !_cliUser) return Promise.resolve(null);
-    var db = _rankDb();
     var colecao = RANK_COLECOES[jogoKey];
-    if (!db || !colecao) return Promise.resolve(null);
-    return db.collection(colecao).doc(_cliUser.uid).get()
+    if (!colecao) return Promise.resolve(null);
+    var uid = _cliUser.uid;
+    return _rankDbPronto()
+      .then(function (db) { return db.collection(colecao).doc(uid).get(); })
       .then(function (doc) {
         if (!doc.exists) return null;
         var d = doc.data() || {};
@@ -2033,10 +2065,24 @@
     var agora = Date.now();
     if (_rankTopsCache && (agora - _rankTopsCacheEm) < 60000) return _rankTopsCache;
     _rankTopsCacheEm = agora;
-    _rankTopsCache = Promise.all(Object.keys(RANK_COLECOES).map(function (k) {
-      return rankLerTop(k, 20).then(function (top) { return { jogo: k, top: top }; });
-    }));
-    return _rankTopsCache;
+    var falhou = false;
+    var p = Promise.all(Object.keys(RANK_COLECOES).map(function (k) {
+      return _rankLerTopOuErro(k, 20).then(function (top) {
+        return { jogo: k, top: top };
+      }, function (err) {
+        falhou = true;
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] erro ao ler:', k, err && err.message);
+        return { jogo: k, top: [] };
+      });
+    })).then(function (listas) {
+      // P0-2: resultado com falha (SDK ausente, offline, erro) volta pra
+      // tela como hoje, mas NÃO fica no cache — senão seriam 60 s de
+      // "ninguém pontuou" falso pra todas as telas.
+      if (falhou && _rankTopsCache === p) _rankTopsCache = null;
+      return listas;
+    });
+    _rankTopsCache = p;
+    return p;
   }
 
   function rankLerGeral(limite) {
@@ -2077,41 +2123,48 @@
      pessoa já tem, pra não ficar com identidade desatualizada até
      bater um novo recorde (a regra do Firestore só aceita update com
      score igual quando nome OU foto mudam — ver rankUpdateOk).
-     - Sem login ou sem Firestore → não faz nada (silencioso).
+     - Sem login → não faz nada. Firestore ainda não carregado → espera
+       (_rankDbPronto); se não vier (offline) → não faz nada (silencioso).
      - Doc inexistente pra um jogo → ignora esse jogo (nada a fazer;
        o primeiro recorde ainda cria o doc normalmente).
      - Falha por jogo não quebra os demais nem o painel (catch por
        coleção). */
   function rankAtualizarIdentidade() {
     if (typeof _cliUser === 'undefined' || !_cliUser) return;
-    var db = _rankDb();
-    if (!db) return;
 
     var nome = (typeof cliNomeExibicao === 'function' && cliNomeExibicao()) || 'Jogador';
     if (nome.length < 2) nome = 'Jogador';
     var foto = _cliUser.photoURL || '';
     if (foto.length >= 300) foto = foto.slice(0, 299);
+    var uid = _cliUser.uid;
 
-    Object.keys(RANK_COLECOES).forEach(function (jogoKey) {
-      var colecao = RANK_COLECOES[jogoKey];
-      var ref = db.collection(colecao).doc(_cliUser.uid);
-      ref.get().then(function (doc) {
-        if (!doc || !doc.exists) return;
-        var d = doc.data() || {};
-        if (d.nome === nome && (d.photoURL || '') === foto) return;
-        var scoreAtual = (typeof d.score === 'number') ? d.score : 0;
-        ref.set({
-          uid: _cliUser.uid,
-          nome: nome,
-          score: scoreAtual,
-          photoURL: foto,
-          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true }).catch(function (err) {
-          if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] falha ao espelhar identidade:', colecao, err && err.code);
+    // P0-2: o painel de conta carrega o hub sem o SDK do Firestore —
+    // espera ele em vez de desistir em silêncio.
+    _rankDbPronto().then(function (db) {
+      if (typeof _cliUser === 'undefined' || !_cliUser || _cliUser.uid !== uid) return;
+      Object.keys(RANK_COLECOES).forEach(function (jogoKey) {
+        var colecao = RANK_COLECOES[jogoKey];
+        var ref = db.collection(colecao).doc(uid);
+        ref.get().then(function (doc) {
+          if (!doc || !doc.exists) return;
+          var d = doc.data() || {};
+          if (d.nome === nome && (d.photoURL || '') === foto) return;
+          var scoreAtual = (typeof d.score === 'number') ? d.score : 0;
+          ref.set({
+            uid: uid,
+            nome: nome,
+            score: scoreAtual,
+            photoURL: foto,
+            atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true }).catch(function (err) {
+            if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] falha ao espelhar identidade:', colecao, err && err.code);
+          });
+        }).catch(function (err) {
+          if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] falha ao ler antes de espelhar identidade:', colecao, err && err.message);
         });
-      }).catch(function (err) {
-        if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] falha ao ler antes de espelhar identidade:', colecao, err && err.message);
       });
+    }).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] Firestore indisponível ao espelhar identidade:', err && err.message);
     });
 
     // Docs podem ter mudado de nome/foto: invalida o cache dos tops.
@@ -2497,6 +2550,48 @@
   var LOJA_KEY_INVENTARIO = 'angatuba_inventario';
   var LOJA_KEY_EQUIPADO   = 'angatuba_equipado';
   var LOJA_KEY_STATS      = 'angatuba_stats_jogos';
+
+  /* ── Dono do progresso local (celular compartilhado — decisão A) ──
+     Moedas, inventário, equipado, stats, títulos, ofensiva e recordes
+     locais de rank são de UMA conta por vez neste aparelho.
+     angatuba_progresso_uid guarda de quem é. Quando entra outra conta
+     nomeada, o progresso atual é guardado à parte
+     (angatuba_progresso_de_<uid antigo>), as chaves são limpas e, se a
+     conta nova já tinha progresso guardado aqui, ele volta. 1º login
+     depois deste deploy (sem dono gravado): adota o que já está no
+     aparelho. Deslogado: não mexe em nada.
+     Retorna true se o progresso local é da conta logada. */
+  var PROGRESSO_UID_KEY = 'angatuba_progresso_uid';
+  var PROGRESSO_GUARDADO_PREFIXO = 'angatuba_progresso_de_';
+  function _progressoGarantirDono() {
+    if (typeof _cliUser === 'undefined' || !_cliUser || !_cliUser.uid) return false;
+    var uid = _cliUser.uid;
+    try {
+      var dono = localStorage.getItem(PROGRESSO_UID_KEY);
+      if (dono === uid) return true;
+      if (dono) {
+        var chaves = [LOJA_KEY_MOEDAS, LOJA_KEY_INVENTARIO, LOJA_KEY_EQUIPADO, LOJA_KEY_STATS,
+                      TITULOS_KEY_DESBLOQUEADOS, TITULOS_KEY_EQUIPADOS, 'angatuba_streak'];
+        Object.keys(RANK_REC_LOCAL).forEach(function (k) { chaves.push(RANK_REC_LOCAL[k]); });
+        var pacote = {};
+        chaves.forEach(function (c) { var v = localStorage.getItem(c); if (v !== null) pacote[c] = v; });
+        localStorage.setItem(PROGRESSO_GUARDADO_PREFIXO + dono, JSON.stringify(pacote));
+        chaves.forEach(function (c) { localStorage.removeItem(c); });
+        localStorage.setItem(PROGRESSO_UID_KEY, uid);
+        var meu = JSON.parse(localStorage.getItem(PROGRESSO_GUARDADO_PREFIXO + uid) || 'null');
+        if (meu && typeof meu === 'object') {
+          chaves.forEach(function (c) { if (typeof meu[c] === 'string') localStorage.setItem(c, meu[c]); });
+          localStorage.removeItem(PROGRESSO_GUARDADO_PREFIXO + uid);
+        }
+        _lojaInit();              // itens grátis + equipado padrão pra quem chegou zerado
+        _lojaAtualizarSaldoUI();
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[progresso] trocou de conta: progresso local isolado por uid');
+      } else {
+        localStorage.setItem(PROGRESSO_UID_KEY, uid);
+      }
+      return true;
+    } catch (e) { return false; }
+  }
 
   // Slots válidos de equipamento — mesmo formato que o perfil público vai usar depois.
   var LOJA_SLOTS = ['voo_owl', 'badge', 'bg', 'card'];
@@ -3256,9 +3351,11 @@
   // vitrine não precisa atualizar ao vivo). null se não existe, se o
   // Firestore está indisponível (offline) ou se o uid é inválido.
   function _perfilPublicoLer(uid) {
-    var db = _rankDb();
-    if (!db || !uid) return Promise.resolve(null);
-    return db.collection('perfis').doc(uid).get()
+    if (!uid) return Promise.resolve(null);
+    // P0-2: espera o SDK (sessão fria via Amigos) — enquanto isso a tela
+    // continua em "Carregando perfil…" (_perfilRenderCarregando).
+    return _rankDbPronto()
+      .then(function (db) { return db.collection('perfis').doc(uid).get(); })
       .then(function (doc) {
         if (!doc || !doc.exists) return null;
         var d = doc.data();
@@ -3319,9 +3416,13 @@
   // grava moedas nem inventário completo (ver firestore.rules).
   function _perfilPublicoSync() {
     if (typeof _cliUser === 'undefined' || !_cliUser) return;
-    var db = _rankDb();
-    if (!db) return;
+    // Celular compartilhado (decisão A): só publica stats/equipado/títulos
+    // se o progresso local é desta conta. Se não deu pra confirmar (ex.:
+    // localStorage bloqueado), não publica nada — o create exige
+    // equipado/stats, e mandar os de outra pessoa é pior que não sincronizar.
+    if (!_progressoGarantirDono()) return;
     var uid = _cliUser.uid;
+    var foto = _cliUser.photoURL || '';
 
     var nome = (typeof cliNomeExibicao === 'function' && cliNomeExibicao()) || 'Jogador';
     if (nome.length < 2) nome = 'Jogador';
@@ -3352,17 +3453,21 @@
     // desbloqueados é local e não precisa ser público.
     var titulos = (typeof _titulosEquipadosLer === 'function') ? _titulosEquipadosLer() : [];
 
-    db.collection('perfis').doc(uid).set({
-      uid: uid,
-      nome: nome,
-      photoURL: (_cliUser.photoURL || ''),
-      equipado: equipado,
-      stats: stats,
-      titulos: titulos,
-      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true }).catch(function (err) {
+    // P0-2: espera o Firestore (sessão fria) em vez de desistir com db null.
+    _rankDbPronto().then(function (db) {
+      if (typeof _cliUser === 'undefined' || !_cliUser || _cliUser.uid !== uid) return;
+      return db.collection('perfis').doc(uid).set({
+        uid: uid,
+        nome: nome,
+        photoURL: foto,
+        equipado: equipado,
+        stats: stats,
+        titulos: titulos,
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }).catch(function (err) {
       if (typeof DEBUG !== 'undefined' && DEBUG) {
-        console.log('[perfil] servidor rejeitou sync do perfil público (verifique firestore.rules):', err && err.code);
+        console.log('[perfil] sync do perfil público falhou (SDK ausente ou firestore.rules):', err && (err.code || err.message));
       }
     });
   }
@@ -3793,6 +3898,10 @@
 
   // Semeia os itens grátis no inventário e garante um "equipado" salvo
   // desde a primeira visita — roda uma vez, aqui, ao carregar o hub.
+  // Antes, confere o dono do progresso local (hub carregado depois do
+  // login — ver _progressoGarantirDono; o login com o hub já aberto é
+  // coberto por app.js, no onAuthStateChanged).
+  _progressoGarantirDono();
   _lojaInit();
   // Mostra o saldo no card da loja assim que o hub abre (sem precisar
   // entrar na loja primeiro) — o mesmo elemento é atualizado de novo a

@@ -15942,6 +15942,12 @@ ${urlCard}`)}`;
         // sem nome ainda), caímos no apelido salvo localmente.
         _cliApelido = (user.displayName || _cliApelido || '').trim().slice(0, CLI_NOME_MAX) || null;
         if (_cliApelido) localStorage.setItem(CLI_APELIDO_KEY, _cliApelido);
+        // Celular compartilhado (decisão A): progresso local dos jogos é de
+        // uma conta por vez — outra conta entrando isola o da anterior (ver
+        // _progressoGarantirDono em Jogos/hub.js). Antes do _rankPendente
+        // abaixo, pra ele não subir recorde local de outra pessoa. Hub
+        // ainda não carregado: ele mesmo confere ao carregar.
+        if (typeof _progressoGarantirDono === 'function') _progressoGarantirDono();
         // Acabou de logar e havia uma pontuação feita deslogado? Submete
         // agora. O rankSubmeter já reconcilia com o recorde local do
         // dispositivo (sobe o maior entre a partida e o recorde salvo),

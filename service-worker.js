@@ -66,7 +66,7 @@ self.addEventListener('notificationclick', function (event) {
   );
 });
 
-const CACHE = 'angatubaon-v374';
+const CACHE = 'angatubaon-v375';
 // Cache separado dos assets dos jogos (sprites, sons, músicas, vídeos
 // dos minigames). Fica de fora do CACHE principal de propósito: o
 // activate() abaixo NUNCA apaga o CACHE_JOGOS quando o app atualiza
@@ -74,13 +74,25 @@ const CACHE = 'angatubaon-v374';
 // que essa constante sobe de versão (ver Jogos/hub.js, JOGOS_ASSETS /
 // _jogosCacheAssets). Assim, quem já baixou um jogo continua jogando
 // offline mesmo depois de um deploy novo do app.
-const CACHE_JOGOS = 'angatubaon-jogos-v1';
+// v2 (P0-1 da auditoria): o v1 guardava o .js/.css dos jogos e, como o
+// ramo JS/CSS do fetch usava caches.match() em TODOS os caches, a cópia
+// velha do v1 ganhava do CACHE novo — quem já tinha aberto um jogo nunca
+// recebia deploy. Agora o JS/CSS é lido só do CACHE atual e o
+// CACHE_JOGOS vira só fallback offline (ver fetch). Subir para v2 faz o
+// activate() apagar o v1 envenenado. O nome é repetido em Jogos/hub.js
+// (_jogosCacheAssets) — mudou aqui, muda lá.
+const CACHE_JOGOS = 'angatubaon-jogos-v2';
 const STATIC = [
   '/',
   '/index.html',
   '/offline.html',
   '/styles.css',
   '/app_min.js',
+  // Hub de jogos + som/efeitos compartilhados: sem eles no precache, o
+  // hub não abria offline depois de um update até ser aberto online uma vez.
+  '/Jogos/hub.min.js',
+  '/Jogos/assets/som.min.js',
+  '/Jogos/assets/efeitos.min.js',
   '/img/igreja-noite.jpg',
   '/img/igreja-dia.jpg',
   '/webp/owl-badge.webp',
@@ -118,12 +130,16 @@ const STATIC = [
 // Instala e cacheia arquivos estáticos — best-effort:
 // se um asset falhar (404, rede), o SW ainda instala com os demais.
 // addAll() é atômico e abortaria tudo; allSettled() é resiliente.
+// cache: 'reload' pula o cache HTTP do navegador (o GitHub Pages manda
+// max-age=600): sem isso o precache do deploy novo podia gravar o
+// app_min.js/styles.css de até 10 min antes. c.add() já recusa resposta
+// que não seja 2xx, então erro nunca entra no cache.
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(c =>
       Promise.allSettled(
         STATIC.map(url =>
-          c.add(url).catch(err =>
+          c.add(new Request(url, { cache: 'reload' })).catch(err =>
             console.warn('[SW] cache ignorado:', url, err.message)
           )
         )
@@ -187,8 +203,12 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       fetch(e.request)
         .then(r => {
-          const clone = r.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+          // Só guarda resposta ok — um 404/500 no cache viraria o
+          // "offline" daquela página.
+          if (r && r.ok) {
+            const clone = r.clone();
+            caches.open(CACHE).then(c => c.put(e.request, clone));
+          }
           return r;
         })
         .catch(() =>
@@ -208,15 +228,40 @@ self.addEventListener('fetch', e => {
     // window.X") em vez do erro tratado. Response.error() falha como erro de
     // rede de verdade, então o onerror do loader roda e a mensagem certa
     // ("Não foi possível carregar... verifique a conexão") aparece.
+    //
+    // P0-1: lê SÓ do CACHE atual (nunca caches.match() genérico, que
+    // achava primeiro a cópia congelada no CACHE_JOGOS e servia o JS
+    // antigo do jogo pra sempre). Se o arquivo não está no CACHE atual,
+    // vai direto na rede — o jogo abre com o código do deploy novo.
+    // O CACHE_JOGOS só entra como fallback quando a rede falha (offline).
+    const req = e.request;
     e.respondWith(
-      caches.match(e.request).then(cached => {
-        const net = fetch(e.request)
+      caches.open(CACHE).then(c => c.match(req)).then(cached => {
+        const net = fetch(req)
           .then(r => {
-            const clone = r.clone();
-            caches.open(CACHE).then(c => c.put(e.request, clone));
+            if (r && r.ok) {
+              const clone = r.clone();
+              caches.open(CACHE).then(c => c.put(req, clone));
+              // Se o arquivo também mora no CACHE_JOGOS (js/css de jogo
+              // pré-baixado pelo _jogosCacheAssets, sempre em /Jogos/),
+              // atualiza lá também: senão o offline continuaria servindo
+              // a versão velha.
+              if (new URL(url).pathname.startsWith('/Jogos/')) {
+                const cloneJogos = r.clone();
+                caches.open(CACHE_JOGOS).then(cj =>
+                  cj.match(req).then(tem => { if (tem) return cj.put(req, cloneJogos); })
+                ).catch(() => {});
+              }
+            }
             return r;
           })
-          .catch(() => cached || Response.error());
+          .catch(() =>
+            cached ||
+            caches.open(CACHE_JOGOS)
+              .then(cj => cj.match(req))
+              .then(r => r || Response.error())
+              .catch(() => Response.error())
+          );
         return cached || net;
       })
     );

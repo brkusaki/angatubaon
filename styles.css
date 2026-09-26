@@ -6578,6 +6578,13 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
     }
     .loja-item-preview img { width: 100%; height: 100%; object-fit: contain; }
     .loja-item-ph { font-size: 28px; line-height: 1; }
+    /* P1-3: miniatura do 'bg_neon' (sem preview de imagem) — mesmo
+       gradiente de BG_NEON_GRADIENTE em Jogos/hub.js (_perfilBgEstilo),
+       pra loja e perfil combinarem. */
+    .loja-item-preview-neon {
+      display: block; width: 100%; height: 100%;
+      background-image: linear-gradient(135deg, #2e1065 0%, #86198f 45%, #c026d3 70%, #22d3ee 100%);
+    }
     .loja-item-nome {
       font-family: var(--font-h); font-weight: 800; font-size: 13px; color: var(--text);
       margin-bottom: 2px;
@@ -6596,6 +6603,8 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
     .loja-cta-equipar  { background: rgba(168,85,247,.18); border: 1px solid rgba(168,85,247,.4); color: #c084fc; }
     .loja-cta-equipado { background: rgba(34,197,94,.18); border: 1px solid rgba(34,197,94,.4); color: #4ade80; cursor: default; }
     .loja-cta-bloqueado { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); cursor: not-allowed; opacity: .7; }
+    /* P2-3: CTA de tirar o badge equipado (único slot opcional). */
+    .loja-cta-remover { background: rgba(248,113,113,.14); border: 1px solid rgba(248,113,113,.4); color: #f87171; }
 
     body.light-mode .loja-item { background: var(--surface); }
 
@@ -6622,9 +6631,11 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
       background: rgba(56,189,248,.15); border: 1px solid rgba(56,189,248,.32);
     }
 
-    /* Herói: BG equipado (imagem do catálogo) ou gradiente padrão do
-       hub quando nada tem preview (bg_padrao / bg_neon / nunca comprou).
-       Full-bleed (sem margem lateral) e mais alto que os heróis
+    /* Herói: BG equipado (imagem do catálogo, ou o gradiente próprio do
+       'bg_neon' — ver BG_NEON_GRADIENTE em Jogos/hub.js) ou o gradiente
+       padrão abaixo quando não há nada equipado com efeito (bg_padrao,
+       ou nunca comprou nada). Full-bleed (sem margem lateral) e mais
+       alto que os heróis
        "cartão" do Ranking/Loja — é um banner de perfil, não um card
        flutuando no preto. A identidade fica ancorada embaixo (flex +
        justify-end), deixando o banner respirar por cima; o gradiente

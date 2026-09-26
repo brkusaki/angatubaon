@@ -17362,7 +17362,10 @@ ${urlCard}`)}`;
       elLista.innerHTML = amigos.map(function (a) {
         var nome = _amNomeVivo[a.uid] || a.nome;
         return '<div class="cli-amigo-item" data-amigo="' + escHTML(a.uid) + '">' +
-          '<span class="cli-amigo-clicavel" onclick="cliAbrirPerfilAmigo(\'' + escHTML(a.uid) + '\')">' +
+          '<span class="cli-amigo-clicavel" role="button" tabindex="0" ' +
+            'onclick="cliAbrirPerfilAmigo(\'' + escHTML(a.uid) + '\')" ' +
+            'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();cliAbrirPerfilAmigo(\'' +
+              escHTML(a.uid) + '\');}">' +
             _amLinhaAvatar(a.uid, nome, false, a.foto) +
             '<span class="cli-amigo-txt">' +
               '<span class="cli-amigo-nome">' + escHTML(nome) + '</span>' +
@@ -17401,7 +17404,10 @@ ${urlCard}`)}`;
       elPed.style.display = 'flex';
       elPed.innerHTML = pedidos.map(function (p) {
         return '<div class="cli-amigo-item pedido">' +
-          '<span class="cli-amigo-clicavel" onclick="cliAbrirPerfilAmigo(\'' + escHTML(p.uid) + '\')">' +
+          '<span class="cli-amigo-clicavel" role="button" tabindex="0" ' +
+            'onclick="cliAbrirPerfilAmigo(\'' + escHTML(p.uid) + '\')" ' +
+            'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();cliAbrirPerfilAmigo(\'' +
+              escHTML(p.uid) + '\');}">' +
             _amLinhaAvatar(p.uid, p.nome, false, p.foto) +
             '<span class="cli-amigo-txt">' +
               '<span class="cli-amigo-nome">' + escHTML(p.nome) + '</span>' +
@@ -17935,10 +17941,15 @@ ${urlCard}`)}`;
     el.innerHTML = _convLista.map(function (c) {
       var j = CONV_JOGOS[c.jogo];
       return '<div class="cli-amigo-item convite">' +
-        _amLinhaAvatar(c.de, c.nome, true) +
-        '<span class="cli-amigo-txt">' +
-          '<span class="cli-amigo-nome">' + escHTML(c.nome) + '</span>' +
-          '<span class="cli-amigo-sub">te chamou pro ' + j.emoji + ' ' + escHTML(j.nome) + '</span>' +
+        '<span class="cli-amigo-clicavel" role="button" tabindex="0" ' +
+          'onclick="cliAbrirPerfilAmigo(\'' + escHTML(c.de) + '\')" ' +
+          'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();cliAbrirPerfilAmigo(\'' +
+            escHTML(c.de) + '\');}">' +
+          _amLinhaAvatar(c.de, c.nome, true) +
+          '<span class="cli-amigo-txt">' +
+            '<span class="cli-amigo-nome">' + escHTML(c.nome) + '</span>' +
+            '<span class="cli-amigo-sub">te chamou pro ' + j.emoji + ' ' + escHTML(j.nome) + '</span>' +
+          '</span>' +
         '</span>' +
         '<span class="cli-amigo-acoes">' +
           '<button type="button" class="cli-amigo-btn ok" onclick="cliConviteEntrar(\'' +
@@ -18014,28 +18025,43 @@ ${urlCard}`)}`;
   window.cliConviteEntrar  = cliConviteEntrar;
   window.cliConviteRecusar = cliConviteRecusar;
 
-  /* ── Abrir perfil a partir da lista de amigos/pedidos ──────────────
-     Toque no avatar/nome de um amigo (ou de um pedido) abre o perfil
-     daquela pessoa — mesmo destino do ranking (perfilAbrirUid, em
-     Jogos/hub.js). Segue o mesmo compasso do cliConviteEnviar: fecha o
-     painel de conta primeiro (ele dispara um history.back()) e só then
-     abre o perfil, que empilha o próprio history.pushState — sem a
-     folga, o popstate do fechamento derrubaria a tela do perfil que
-     acabou de abrir.
-     Se o hub de jogos ainda não carregou nesta sessão (perfilAbrirUid
-     não existe ainda), carrega ele sob demanda e só então abre —
-     perfilAbrirUid já cuida sozinho de exibir a tela do hub. */
+  /* ── Abrir perfil a partir da lista de amigos/pedidos/convites ─────
+     Toque no avatar/nome abre o perfil daquela pessoa — mesmo destino
+     do ranking (perfilAbrirUid, em Jogos/hub.js).
+
+     A primeira versão fechava o painel com history.back() e só abria
+     o perfil 220ms depois — no celular o popstate do back costuma
+     chegar DEPOIS desses 220ms (ou depois do pushState do próprio
+     perfil), derrubando a tela que acabara de abrir. Aqui a gente evita
+     a corrida de outro jeito: fecha o overlay SEM back (viaPopstate),
+     limpa a entrada 'cli-conta' no lugar (replaceState) pra não deixar
+     lixo no histórico embaixo do perfil, e só então chama
+     perfilAbrirUid — que empilha o próprio pushState({modal:'perfil'})
+     em cima do estado já neutro. Não existe mais history.back()
+     nenhum nesse caminho, então não tem popstate atrasado pra
+     atrapalhar. */
   function cliAbrirPerfilAmigo(uid) {
     if (!uid) return;
-    cliFecharPainelConta();
-    setTimeout(function () {
+    cliFecharPainelConta(true); // true = viaPopstate: só esconde, sem history.back()
+    if (history.state && history.state.modal === 'cli-conta') {
+      // Troca a entrada 'cli-conta' (que já não corresponde a nada na
+      // tela, o painel acabou de fechar) por uma neutra, no MESMO
+      // degrau do histórico — sem empilhar nada novo.
+      try {
+        history.replaceState({}, '', location.pathname + location.search + location.hash);
+      } catch (e) {}
+    }
+    var abrirPerfil = function () {
       if (typeof window.perfilAbrirUid === 'function') { window.perfilAbrirUid(uid); return; }
       if (typeof _carregarHubJogos === 'function') {
         _carregarHubJogos().then(function () {
           if (typeof window.perfilAbrirUid === 'function') window.perfilAbrirUid(uid);
         }).catch(function () {});
       }
-    }, 220);
+    };
+    // Só 1 frame de folga pro overlay sumir visualmente antes do
+    // perfil entrar por cima — nada a ver com o back de antes.
+    setTimeout(abrirPerfil, 30);
   }
   window.cliAbrirPerfilAmigo = cliAbrirPerfilAmigo;
 

@@ -570,6 +570,39 @@
   // comentário acima: hub.js troca este stub pela versão real ao carregar.
   window._abrirAprender = _abrirAprender;
 
+  /* ── Biblioteca da Coruja: Biblioteca/hub.min.js + biblioteca.css
+     carregados sob demanda ──────────────────────────────────────
+     Mesmo padrão do Aprender: só baixa quem toca em "Livros" na bottom
+     nav do modo cliente. O CSS vai junto (fica fora do styles.css pra
+     não pesar o boot de ninguém). O texto de cada livro é outro arquivo
+     (Biblioteca/livros/<id>.json), baixado só quando o livro abre.
+     Uma vez carregado, hub.js SUBSTITUI a função abaixo pela versão
+     real (mesmo nome — ver window._abrirBiblioteca em Biblioteca/hub.js). */
+  var _bibliotecaCarregada = null;
+  function _carregarBiblioteca() {
+    if (_bibliotecaCarregada) return _bibliotecaCarregada;
+    _injetarCSS('/Biblioteca/biblioteca.css');
+    _bibliotecaCarregada = _injetarScript('/Biblioteca/hub.min.js').catch(function (err) {
+      _bibliotecaCarregada = null; // permite tentar de novo no próximo toque
+      throw err;
+    });
+    return _bibliotecaCarregada;
+  }
+
+  function _abrirBiblioteca() {
+    if (typeof showToastSimples === 'function') showToastSimples('Abrindo a biblioteca…', '/webp/owl-search.webp');
+    _carregarBiblioteca().then(function () {
+      // Aqui o Biblioteca/hub.js já rodou e trocou window._abrirBiblioteca
+      // pela implementação real — chamar de novo já abre a biblioteca.
+      if (typeof window._abrirBiblioteca === 'function') window._abrirBiblioteca();
+    }).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[biblioteca] falha ao carregar Biblioteca/hub.min.js:', err && err.message);
+      if (typeof showToastSimples === 'function') showToastSimples('Não foi possível abrir a biblioteca. Verifique a conexão.', '/webp/owl-sign.webp');
+    });
+  }
+  // Exposto pro botão "Livros" da bottom nav no modo cliente.
+  window._abrirBiblioteca = _abrirBiblioteca;
+
   /* ── Máscara de WhatsApp progressiva: (15) 9 9999-9999 ──────────
      Fonte única usada tanto no cadastro quanto no login de loja. */
   function mascararWppBR(valorBruto) {
@@ -4099,7 +4132,7 @@
   });
 
   /* ── Bottom nav do modo cliente (slide Utilidades / body.feed-mode) ──
-     Jogos · Aprender · Conta. Os três abrem overlays em tela cheia
+     Jogos · Aprender · Livros · Conta. Abrem overlays em tela cheia
      (hubs) ou modal (conta), não "abas" da home — por isso NÃO mexem no
      .active da nav: quem estava marcado (Início) continua marcado quando
      o overlay fecha, sem estado preso. Só disparam os fluxos que já
@@ -4113,6 +4146,11 @@
   document.getElementById('nav-aprender').addEventListener('click', () => {
     if (typeof _gamesHubAberto === 'function' && _gamesHubAberto()) { _fecharGamesHub(); }
     _abrirAprender();
+  });
+
+  // Biblioteca da Coruja: ela mesma fecha os outros hubs ao abrir.
+  document.getElementById('nav-biblioteca').addEventListener('click', () => {
+    _abrirBiblioteca();
   });
 
   document.getElementById('nav-conta').addEventListener('click', () => {
@@ -11330,6 +11368,14 @@
     if (typeof _aprenderAberto === 'function' && _aprenderAberto()) {
       if (typeof _fecharAprender === 'function') _fecharAprender(true); return;
     }
+    // Biblioteca da Coruja — desce UM nível por "voltar" (folha do
+    // leitor → leitor → página do livro → acervo → fecha), ver _bibVoltar.
+    // O login do cliente pode abrir por cima dela, por isso o login é
+    // conferido antes (ele empilha a própria entrada 'cli-login').
+    if (typeof _bibliotecaAberta === 'function' && _bibliotecaAberta()
+        && !document.getElementById('modal-cli-login')?.classList.contains('open')) {
+      if (typeof _bibVoltar === 'function') _bibVoltar(true); return;
+    }
     // Lobby social (5.2) — abre EM CIMA do painel de conta, então sai antes
     if (document.getElementById('modal-lobby')?.classList.contains('open')) {
       if (typeof cliFecharLobby === 'function') cliFecharLobby(true); return;
@@ -15937,6 +15983,9 @@ ${urlCard}`)}`;
       // Sessão anônima (sala de multiplayer) NÃO é identidade: entra
       // aqui como deslogado. Ver o bloco de comentário lá em cima.
       _cliUser = _cliContaReal(user) ? user : null;
+      // Biblioteca: troca listas/progresso pro dono certo (só age se ela
+      // já foi aberta nesta sessão — ver _bibAoMudarConta em Biblioteca/hub.js).
+      if (typeof _bibAoMudarConta === 'function') { try { _bibAoMudarConta(); } catch (e) {} }
       if (_cliUser) {
         // Preferimos o displayName do Firebase; se não houver (ex.: e-mail
         // sem nome ainda), caímos no apelido salvo localmente.

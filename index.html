@@ -1749,6 +1749,13 @@
       </div>
     </div>
 
+    <!-- ═══ BIBLIOTECA DA CORUJA (botão "Livros") — escondida até abrir ══
+         Tudo dentro dela (acervo, página do livro) é desenhado pelo
+         Biblioteca/hub.js, carregado sob demanda (ver _carregarBiblioteca
+         em app.js); o leitor é um overlay próprio que o hub.js cria no
+         <body>. Este bloco é só o contêiner. ══ -->
+    <div id="biblioteca-hub" style="display:none;"></div>
+
     <!-- ═══ HUB DE APRENDIZADO (aba Aprender) — escondido até abrir a pill ══
          Conteúdo (unidades/lições/exercícios) e toda a lógica vêm de
          Aprender/hub.js + Aprender/conteudo.js, carregados sob demanda (ver
@@ -3591,6 +3598,7 @@
     <button class="nav-item nav-item--loja nav-item--cadastrar" id="nav-cadastrar"><i class="fa fa-plus-circle"></i><span>Cadastrar</span></button>
     <button class="nav-item nav-item--cli" id="nav-jogos"><i class="fa fa-gamepad"></i><span>Jogos</span></button>
     <button class="nav-item nav-item--cli" id="nav-aprender"><i class="fa fa-graduation-cap"></i><span>Aprender</span></button>
+    <button class="nav-item nav-item--cli" id="nav-biblioteca"><i class="fa fa-book-open"></i><span>Livros</span></button>
     <button class="nav-item nav-item--cli" id="nav-conta"><i class="fa fa-circle-user"></i><span>Conta</span></button>
   </nav>
 

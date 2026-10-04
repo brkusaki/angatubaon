@@ -66,7 +66,7 @@ self.addEventListener('notificationclick', function (event) {
   );
 });
 
-const CACHE = 'angatubaon-v377';
+const CACHE = 'angatubaon-v378';
 // Cache separado dos assets dos jogos (sprites, sons, músicas, vídeos
 // dos minigames). Fica de fora do CACHE principal de propósito: o
 // activate() abaixo NUNCA apaga o CACHE_JOGOS quando o app atualiza
@@ -82,6 +82,13 @@ const CACHE = 'angatubaon-v377';
 // activate() apagar o v1 envenenado. O nome é repetido em Jogos/hub.js
 // (_jogosCacheAssets) — mudou aqui, muda lá.
 const CACHE_JOGOS = 'angatubaon-jogos-v2';
+// Cache dos TEXTOS da Biblioteca da Coruja (Biblioteca/livros/*.json).
+// Mesma lógica do CACHE_JOGOS: o activate() nunca apaga, então quem abriu
+// um livro continua lendo offline depois de qualquer deploy do app. Os
+// livros são cache-first (cada um tem centenas de KB — não faz sentido
+// baixar de novo a cada abertura): mudou o texto de algum livro? sobe
+// esta versão, e o activate() descarta a cópia velha.
+const CACHE_BIB = 'angatubaon-biblioteca-v1';
 const STATIC = [
   '/',
   '/index.html',
@@ -93,6 +100,10 @@ const STATIC = [
   '/Jogos/hub.min.js',
   '/Jogos/assets/som.min.js',
   '/Jogos/assets/efeitos.min.js',
+  // Biblioteca: o leitor (JS+CSS) entra no precache pra abrir offline
+  // depois de um update; os livros moram no CACHE_BIB (ver acima).
+  '/Biblioteca/hub.min.js',
+  '/Biblioteca/biblioteca.css',
   '/img/igreja-noite.jpg',
   '/img/igreja-dia.jpg',
   '/webp/owl-badge.webp',
@@ -152,14 +163,14 @@ self.addEventListener('install', e => {
 });
 
 // Remove caches antigos — mas NUNCA o CACHE_JOGOS (ver comentário na
-// declaração dele acima): só apaga caches 'angatubaon-*' que não são
-// nem o CACHE atual nem o CACHE_JOGOS atual.
+// declaração dele acima) nem o CACHE_BIB: só apaga caches 'angatubaon-*'
+// que não são o CACHE, o CACHE_JOGOS nem o CACHE_BIB atuais.
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
         keys
-          .filter(k => k.startsWith('angatubaon-') && k !== CACHE && k !== CACHE_JOGOS)
+          .filter(k => k.startsWith('angatubaon-') && k !== CACHE && k !== CACHE_JOGOS && k !== CACHE_BIB)
           .map(k => caches.delete(k))
       )
     )
@@ -197,7 +208,22 @@ self.addEventListener('fetch', e => {
     /\.(mp3|wav|ogg)$/i.test(url)
   );
 
-  if (isDoc) {
+  // Textos da Biblioteca: cache-first no CACHE_BIB (ver declaração).
+  const isLivro = new URL(url).pathname.startsWith('/Biblioteca/livros/');
+
+  if (isLivro) {
+    e.respondWith(
+      caches.open(CACHE_BIB).then(c =>
+        c.match(e.request).then(r => {
+          if (r) return r;
+          return fetch(e.request).then(resp => {
+            if (resp && resp.ok) c.put(e.request, resp.clone());
+            return resp;
+          });
+        })
+      ).catch(() => Response.error())
+    );
+  } else if (isDoc) {
     // HTML: network-first — reflete deploys imediatamente (detecta nova versão do app).
     // Fallback para cache e, por fim, offline.html.
     e.respondWith(

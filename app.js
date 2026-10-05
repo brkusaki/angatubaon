@@ -16652,7 +16652,12 @@ ${urlCard}`)}`;
     try {
       var eq = _equipadoLer() || {};
       if (hero && typeof _perfilBgEstilo === 'function') hero.setAttribute('style', _perfilBgEstilo(eq.bg) || '');
-      if (ident && typeof _perfilCardClasse === 'function') ident.className = ('perfil-identidade ' + _perfilCardClasse(eq.card)).trim();
+      if (ident && typeof _perfilCardClasse === 'function') {
+        ident.className = ('perfil-identidade ' + _perfilCardClasse(eq.card)).trim();
+        // Card com moldura por imagem: as variáveis CSS (--card-img/--card-fatia)
+        // vêm de _perfilCardEstilo (Jogos/hub.js); vazio nos cards só-CSS.
+        ident.style.cssText = (typeof _perfilCardEstilo === 'function') ? _perfilCardEstilo(eq.card) : '';
+      }
       if (tits) {
         tits.innerHTML =
           (typeof _perfilTituloHtml === 'function' ? _perfilTituloHtml(eq) : '') +

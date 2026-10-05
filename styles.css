@@ -5386,6 +5386,17 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
 .gc-negocios { --gc:#38e1b0; --gc-2:#f59e0b; --gc-a:rgba(56,225,176,.16); --gc-b:rgba(56,225,176,.34); }
 .gc-baralho  { --gc:#d9a441; --gc-2:#8a2f23; --gc-a:rgba(217,164,65,.16); --gc-b:rgba(217,164,65,.34); }
 .gc-armadilha { --gc:#f2a541; --gc-2:#c2410c; --gc-a:rgba(242,165,65,.16); --gc-b:rgba(242,165,65,.34); }
+/* Corujinha: sem arte de card ainda — mídia só com CSS/emoji (3 "rolos"). */
+.gc-corujinha { --gc:#fbbf24; --gc-2:#f97316; --gc-a:rgba(251,191,36,.16); --gc-b:rgba(251,191,36,.34); }
+.gc-corujinha-media {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: linear-gradient(135deg, #2a1450 0%, #150a2b 70%);
+}
+.gc-corujinha-media span {
+  width: 27%; aspect-ratio: 3 / 4; display: flex; align-items: center; justify-content: center;
+  font-size: 28px; line-height: 1; border-radius: 10px;
+  background: rgba(255,255,255,.07); border: 1px solid rgba(251,191,36,.38);
+}
 .gc-armadilha .gc-media { background: #f2a541; }
 .gc-armadilha .gc-hero-img { object-fit: contain; image-rendering: pixelated; box-sizing: border-box; padding: 12% 0 6%; }
 
@@ -6703,6 +6714,132 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
 
     body.light-mode .loja-item { background: var(--surface); }
 
+    /* Atalho "Jogar Corujinha" no topo da Loja. Visual igual ao .loja-abrir-btn,
+       mas com classe própria: o .loja-abrir-btn some quando o hub está em
+       "jogo-ativo" (e a Loja é uma tela dessas). */
+    .loja-corujinha-btn {
+      width: 100%; display: flex; align-items: center; gap: 13px;
+      padding: 13px 14px; margin-bottom: 14px;
+      border-radius: 14px; cursor: pointer; text-align: left; font-family: inherit; color: var(--text);
+      background: linear-gradient(135deg, rgba(168,85,247,0.18), rgba(251,191,36,0.10));
+      border: 1px solid rgba(251,191,36,0.38);
+      transition: transform 0.15s; -webkit-tap-highlight-color: transparent;
+    }
+    .loja-corujinha-btn:active { transform: scale(0.98); }
+    .loja-corujinha-btn .rank-abrir-seta { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+    .loja-corujinha-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .loja-corujinha-tit { font-family: var(--font-h); font-weight: 800; font-size: 14px; color: var(--text); }
+    .loja-corujinha-sub { font-size: 11.5px; color: var(--muted); }
+
+    /* Miniaturas largas: fundos com foto (cover) e cards com moldura por imagem */
+    .loja-item-preview-bg,
+    .loja-item-preview-card { width: 100%; height: auto; aspect-ratio: 16 / 10; }
+    .loja-item-preview-bg img { object-fit: cover; }
+    .loja-item-preview-card { background: linear-gradient(135deg, #1a1230, #0d0f18); }
+    .loja-mini-card.perfil-identidade.perfil-card-img {
+      --card-borda: 13px; box-sizing: border-box; width: 100%; height: 100%;
+      padding: 0 2px; gap: 6px;
+    }
+    .loja-mini-avatar {
+      flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; font-size: 15px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,.14); border: 1.5px solid rgba(255,255,255,.3);
+    }
+    .loja-mini-linhas { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .loja-mini-linhas i { display: block; height: 4px; border-radius: 3px; background: rgba(255,255,255,.4); }
+    .loja-mini-linhas i + i { width: 60%; background: rgba(251,191,36,.6); }
+
+    /* ════════════════════════════════════════════
+       CORUJINHA — slot temático (Jogos/hub.js, bloco CORUJINHA).
+       Mesma moldura .rank-tela da Loja; a máquina é sempre escura/roxa
+       (legível nos dois temas), o resto usa as variáveis do tema.
+    ════════════════════════════════════════════ */
+    .cj-corpo { display: flex; flex-direction: column; gap: 10px; }
+    .cj-corpo > * { flex-shrink: 0; }
+    .cj-maquina {
+      padding: 14px; border-radius: 20px;
+      background: linear-gradient(160deg, #2a1450 0%, #150a2b 100%);
+      border: 1px solid rgba(251,191,36,.45);
+      box-shadow: inset 0 0 28px rgba(168,85,247,.22), 0 10px 26px rgba(0,0,0,.35);
+    }
+    .cj-reels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .cj-reel {
+      --cj-h: 96px;
+      height: var(--cj-h); overflow: hidden; position: relative; border-radius: 14px;
+      background: linear-gradient(#0c0720, #1a0f33 50%, #0c0720);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: inset 0 6px 14px rgba(0,0,0,.55), inset 0 -6px 14px rgba(0,0,0,.55);
+    }
+    .cj-strip { will-change: transform; }
+    .cj-sim {
+      height: var(--cj-h, 96px); display: flex; align-items: center; justify-content: center;
+      font-size: 48px; line-height: 1;
+    }
+    .cj-msg {
+      min-height: 58px; margin-top: 12px; text-align: center;
+      display: flex; flex-direction: column; justify-content: center; gap: 3px;
+    }
+    .cj-msg-tit { font-family: var(--font-h); font-weight: 800; font-size: 17px; color: #fff; }
+    .cj-msg-sub { font-size: 12.5px; line-height: 1.35; color: rgba(255,255,255,.72); }
+    .cj-msg-sub b { color: #fff; }
+    .cj-msg-vitoria .cj-msg-tit { color: #fbbf24; }
+    .cj-msg-derrota .cj-msg-tit { color: rgba(255,255,255,.8); }
+    .cj-maquina.cj-vitoria {
+      border-color: #fbbf24;
+      box-shadow: inset 0 0 34px rgba(251,191,36,.35), 0 0 14px rgba(251,191,36,.5);
+      animation: cjBrilho .9s ease-in-out 2;
+    }
+    .cj-maquina.cj-derrota .cj-reels { animation: cjTrem .35s; }
+    @keyframes cjBrilho {
+      50% { box-shadow: inset 0 0 46px rgba(251,191,36,.6), 0 0 14px rgba(251,191,36,.85); }
+    }
+    @keyframes cjTrem { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+    @media (prefers-reduced-motion: reduce) {
+      .cj-maquina.cj-vitoria, .cj-maquina.cj-derrota .cj-reels { animation: none; }
+    }
+
+    .cj-rotulo {
+      margin-top: 4px; font-size: 11px; font-weight: 800; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .08em;
+    }
+    .cj-apostas { display: flex; gap: 8px; }
+    .cj-aposta {
+      flex: 1; min-height: 44px; border-radius: 12px; cursor: pointer;
+      font-family: var(--font-h); font-weight: 800; font-size: 14px;
+      background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      -webkit-tap-highlight-color: transparent; transition: transform .12s, background .15s, border-color .15s;
+    }
+    .cj-aposta:active:not(:disabled) { transform: scale(.95); }
+    .cj-aposta:disabled { opacity: .4; cursor: not-allowed; }
+    .cj-aposta-ativa {
+      background: linear-gradient(135deg, #fbbf24, #f97316); border-color: transparent; color: #2a1450;
+      box-shadow: 0 4px 14px rgba(249,115,22,.35);
+    }
+    .cj-girar {
+      width: 100%; min-height: 54px; border: none; border-radius: 999px; cursor: pointer;
+      font-family: var(--font-h); font-weight: 800; font-size: 17px; color: #fff;
+      background: linear-gradient(135deg, #ff4d4d, #c81e1e); box-shadow: 0 6px 20px rgba(200,30,30,.4);
+      -webkit-tap-highlight-color: transparent; transition: transform .12s, opacity .15s;
+    }
+    .cj-girar:active:not(:disabled) { transform: scale(.97); }
+    .cj-girar:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+
+    .cj-premios { border: 1px solid var(--border); border-radius: 14px; background: var(--surface2); overflow: hidden; }
+    .cj-premios summary {
+      display: flex; align-items: center; justify-content: space-between; list-style: none; cursor: pointer;
+      padding: 13px 14px; font-family: var(--font-h); font-weight: 800; font-size: 13.5px; color: var(--text);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cj-premios summary::-webkit-details-marker { display: none; }
+    .cj-premios summary::after { content: '▾'; color: var(--muted); }
+    .cj-premios[open] summary::after { content: '▴'; }
+    #cj-premios-lista { padding: 0 14px 12px; }
+    .cj-premio { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+    .cj-premio-sim { flex: 0 0 104px; font-size: 16px; line-height: 1.3; white-space: nowrap; }
+    .cj-premio-txt { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text); }
+    .cj-premio-chance { font-size: 11.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+    .cj-premios-nota { margin-top: 8px; font-size: 11px; line-height: 1.45; color: var(--muted); }
+
     /* ════════════════════════════════════════════
        MEU PERFIL — ESTILO STEAM, SÓ O PRÓPRIO (Camada 2)
        Mesmo esquema do Ranking/Loja: .rank-tela + .rank-corpo rolável.
@@ -6774,6 +6911,22 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
       padding: 12px 14px; border-radius: 6px; border: 2px solid rgba(255,255,255,.55);
       box-shadow: 3px 3px 0 rgba(0,0,0,.4);
     }
+    /* Card com MOLDURA POR IMAGEM (item do catálogo com `preview`): border-image
+       9-slice — os 4 cantos ficam intactos e só as bordas esticam. Mesmo
+       com o centro da imagem transparente, o BG do herói aparece por dentro.
+       --card-img / --card-fatia vêm inline de _perfilCardEstilo() (Jogos/hub.js).
+       A borda em si é transparente: se a imagem não carregar, sobra só o
+       respiro (o card vira "simples"), nunca uma borda sólida feia. */
+    .perfil-identidade.perfil-card-img {
+      --card-borda: 38px;
+      gap: 12px; padding: 6px 8px; border-radius: 0;
+      border: var(--card-borda) solid transparent;
+      border-image-source: var(--card-img);
+      border-image-slice: var(--card-fatia, 20% 20%);
+      border-image-width: var(--card-borda);
+      border-image-repeat: stretch;
+    }
+    .perfil-card-img .perfil-avatar { width: 72px; height: 72px; font-size: 24px; }
     .perfil-avatar-wrap { position: relative; flex-shrink: 0; }
     .perfil-avatar {
       width: 92px; height: 92px; border-radius: 50%; flex-shrink: 0;
@@ -6994,6 +7147,7 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
     }
 
     body.light-mode .perfil-identidade { background: rgba(255,255,255,.55); }
+    body.light-mode .perfil-identidade.perfil-card-img { background: none; }
     body.light-mode .perfil-stat-row,
     body.light-mode .perfil-chip,
     body.light-mode .perfil-grade-item,

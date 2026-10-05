@@ -6823,6 +6823,21 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
     }
     .perfil-editar-btn:active { transform: scale(0.96); }
 
+    /* Adicionar amigo no perfil de outro jogador (via Ranking). */
+    .perfil-amigo-slot { position: relative; z-index: 1; }
+    .perfil-amigo-slot:empty { display: none; }
+    .perfil-amigo-btn {
+      margin-top: 12px; padding: 8px 16px; border-radius: 999px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 7px;
+      background: var(--red); border: 1px solid transparent; color: #fff;
+      font-family: var(--font-h); font-weight: 700; font-size: 12px;
+      -webkit-tap-highlight-color: transparent; transition: transform 0.15s;
+    }
+    .perfil-amigo-btn:active:not(:disabled) { transform: scale(0.96); }
+    .perfil-amigo-btn:disabled { cursor: default; }
+    .perfil-amigo-btn.perfil-amigo-feito { background: rgba(255,255,255,.10); border-color: rgba(255,255,255,.22); color: rgba(255,255,255,.8); }
+    .perfil-amigo-btn.perfil-amigo-ok { background: rgba(34,197,94,.16); border-color: rgba(34,197,94,.45); color: #4ade80; }
+
     /* Seções do corpo rolável (grade de resumo / insígnias / jogos) */
     .perfil-secao { margin-bottom: 13px; }
     .perfil-secao-titulo {

@@ -1740,6 +1740,8 @@
 
     function montar(dados) {
       var jogados = dados.filter(function (d) { return d.valor > 0; });
+      // Contagem pro resumo 2×2 do painel de conta (app.js).
+      if (typeof cliContaResumoSet === 'function') cliContaResumoSet('recordes', jogados.length);
       if (!jogados.length) {
         wrap.innerHTML = '';
         wrap.style.display = 'none';

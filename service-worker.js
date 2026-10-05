@@ -66,7 +66,7 @@ self.addEventListener('notificationclick', function (event) {
   );
 });
 
-const CACHE = 'angatubaon-v378';
+const CACHE = 'angatubaon-v379';
 // Cache separado dos assets dos jogos (sprites, sons, músicas, vídeos
 // dos minigames). Fica de fora do CACHE principal de propósito: o
 // activate() abaixo NUNCA apaga o CACHE_JOGOS quando o app atualiza
@@ -82,12 +82,14 @@ const CACHE = 'angatubaon-v378';
 // activate() apagar o v1 envenenado. O nome é repetido em Jogos/hub.js
 // (_jogosCacheAssets) — mudou aqui, muda lá.
 const CACHE_JOGOS = 'angatubaon-jogos-v2';
-// Cache dos TEXTOS da Biblioteca da Coruja (Biblioteca/livros/*.json).
+// Cache dos TEXTOS e das CAPAS da Biblioteca da Coruja
+// (Biblioteca/livros/*.json e Biblioteca/capas/*.jpg).
 // Mesma lógica do CACHE_JOGOS: o activate() nunca apaga, então quem abriu
 // um livro continua lendo offline depois de qualquer deploy do app. Os
 // livros são cache-first (cada um tem centenas de KB — não faz sentido
 // baixar de novo a cada abertura): mudou o texto de algum livro? sobe
-// esta versão, e o activate() descarta a cópia velha.
+// esta versão, e o activate() descarta a cópia velha. Vale o mesmo para
+// as capas: trocou a imagem de alguma? sobe a versão (ou muda o nome).
 const CACHE_BIB = 'angatubaon-biblioteca-v1';
 const STATIC = [
   '/',
@@ -208,8 +210,9 @@ self.addEventListener('fetch', e => {
     /\.(mp3|wav|ogg)$/i.test(url)
   );
 
-  // Textos da Biblioteca: cache-first no CACHE_BIB (ver declaração).
-  const isLivro = new URL(url).pathname.startsWith('/Biblioteca/livros/');
+  // Textos e capas da Biblioteca: cache-first no CACHE_BIB (ver declaração).
+  const pathBib = new URL(url).pathname;
+  const isLivro = pathBib.startsWith('/Biblioteca/livros/') || pathBib.startsWith('/Biblioteca/capas/');
 
   if (isLivro) {
     e.respondWith(

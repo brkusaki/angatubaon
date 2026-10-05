@@ -389,6 +389,8 @@
   }
 
   function _bibRerender() {
+    // Painel "Minha conta" (app.js) mostra as listas — atualiza junto.
+    if (typeof cliRenderBiblioteca === 'function') cliRenderBiblioteca();
     if (!_bibliotecaAberta()) return;
     if (_bibTela === 'catalogo') _bibRenderCatalogo();
     else if (_bibTela === 'livro') _bibRenderLivro();
@@ -406,6 +408,27 @@
       (tam === 'g' ? '' : ' loading="lazy"') + ' onerror="this.remove()">' +
       '</div>';
   }
+
+  /* ── Resumo pro painel "Minha conta" (app.js, cliRenderBiblioteca) ──
+     Só leitura: lendo agora (mesma regra de "Continuar lendo"),
+     favoritos e quero ler, já com o HTML da capa pequena; mais o total
+     de livros distintos nas listas e quantos já foram lidos. */
+  function _bibContaDados() {
+    _bibCarregarEstado();
+    var e = _bibEstado;
+    function info(id) {
+      var l = _bibLivro(id);
+      if (!l) return null;
+      var p = e.prog[id];
+      return { id: l.id, titulo: l.titulo, autor: l.autor, pct: p ? p.pct : 0, capa: _bibCapaHtml(l, 'p') };
+    }
+    function lista(ids) { return ids.map(info).filter(Boolean); }
+    var lendo = _bibContinuar();
+    var todos = {};
+    [lendo, e.fav, e.quero, e.lidos].forEach(function (a) { a.forEach(function (id) { todos[id] = 1; }); });
+    return { lendo: lista(lendo), fav: lista(e.fav), quero: lista(e.quero), lidos: e.lidos.length, total: Object.keys(todos).length };
+  }
+  window.bibContaDados = _bibContaDados;
 
   /* ══ Catálogo ═══════════════════════════════════════════════════ */
   var _bibFiltro = { aba: 'acervo', cat: '', autor: '', busca: '' };

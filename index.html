@@ -807,10 +807,9 @@
           </div>
         </button>
 
-        <!-- Corujinha: slot da coruja (Jogos/hub.js, bloco CORUJINHA). Abre pela
-             própria corujinhaAbrir() (tela inline #jogo-corujinha, igual à Loja)
-             — não passa por _abrirJogo, então não conta ofensiva nem pede tela
-             cheia. Sem arte de card ainda: a mídia é só CSS/emoji (.gc-corujinha-media). -->
+        <!-- Corujinha: slot 3×3 da coruja (Jogos/corujinha.js). corujinhaAbrir()
+             (hub.js) → _abrirJogo('corujinha'), sem contar ofensiva. Sem arte de
+             card ainda: a mídia é só CSS/emoji (.gc-corujinha-media). -->
         <button type="button" class="game-card gc-corujinha" data-cat="sorte" data-nome="corujinha slot caca niquel sorte gire ganhe cosmeticos moedas" data-desc="gire e ganhe cosmeticos ou moedas" onclick="corujinhaAbrir()">
           <span class="gc-fav" data-jogo="corujinha" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media gc-corujinha-media" aria-hidden="true"><span>🦉</span><span>🪙</span><span>👑</span></div>
@@ -1756,35 +1755,12 @@
         <div class="loja-rodape">Em breve: cupons pras lojas de Angatuba 🦉</div>
       </div>
 
-      <!-- TELA: Corujinha (slot temático — lógica em Jogos/hub.js, bloco CORUJINHA) -->
-      <div id="jogo-corujinha" class="jogo-tela rank-tela" style="display:none;">
-        <button type="button" class="jogo-voltar" onclick="corujinhaFechar()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
-        <div class="rank-hero">
-          <img src="/webp/owl-tada.webp" alt="" class="rank-hero-owl" onerror="this.style.display='none'">
-          <div class="rank-hero-txt">
-            <div class="rank-hero-eyebrow">🎰 Mini-jogo</div>
-            <h2 class="rank-hero-titulo"><span>Corujinha</span></h2>
-            <div class="rank-hero-sub">Gire e ganhe cosméticos ou moedas</div>
-          </div>
-          <div class="loja-hero-saldo" id="cj-saldo">🪙 0</div>
-        </div>
-        <div class="rank-corpo cj-corpo">
-          <div class="cj-maquina" id="cj-maquina">
-            <div class="cj-reels" aria-hidden="true">
-              <div class="cj-reel" id="cj-reel-0"><div class="cj-strip"></div></div>
-              <div class="cj-reel" id="cj-reel-1"><div class="cj-strip"></div></div>
-              <div class="cj-reel" id="cj-reel-2"><div class="cj-strip"></div></div>
-            </div>
-            <div class="cj-msg" id="cj-msg" role="status" aria-live="polite"></div>
-          </div>
-          <div class="cj-rotulo">Aposta</div>
-          <div class="cj-apostas" id="cj-apostas"></div>
-          <button type="button" class="cj-girar" id="cj-girar" onclick="corujinhaGirar()">Girar</button>
-          <details class="cj-premios">
-            <summary>Ver prêmios</summary>
-            <div id="cj-premios-lista"></div>
-          </details>
-        </div>
+      <!-- TELA: Corujinha (slot 3×3) — Jogos/corujinha.js (sob demanda) monta
+           tudo em #corujinha-root; o .jogo-voltar abaixo só aparece enquanto
+           o módulo carrega (o corujinha.css esconde, o jogo tem botão próprio). -->
+      <div id="jogo-corujinha" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div id="corujinha-root"></div>
       </div>
 
       <!-- TELA: Meu Perfil (estilo Steam, só o próprio — Camada 2 da economia) -->

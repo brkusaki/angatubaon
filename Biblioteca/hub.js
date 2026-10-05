@@ -36,7 +36,9 @@
 ══════════════════════════════════════════════════════════════ */
 
   /* ── Acervo (v1: fixo, só domínio público) ─────────────────────
-     cor: [fundo 1, fundo 2, destaque] da capa gerada em CSS.
+     cor: [fundo 1, fundo 2, destaque] — fundo da capa enquanto a imagem
+     carrega (ou se ela falhar) e brilho atrás da capa na página do livro.
+     Capa ilustrada: /Biblioteca/capas/<id>.jpg.
      trad: de onde veio o texto (aparece em "Sobre esta edição").    */
   var BIB_TRAD_EN = 'Tradução nova do inglês, feita para a Biblioteca da Coruja com auxílio de inteligência artificial, a partir do texto original em domínio público.';
   var BIB_TRAD_DE = 'Tradução nova do alemão, feita para a Biblioteca da Coruja com auxílio de inteligência artificial, a partir do texto original em domínio público.';
@@ -44,49 +46,49 @@
 
   var BIB_LIVROS = [
     { id: '1984', titulo: '1984', autor: 'George Orwell', ano: 1949, cats: ['Distopia', 'Ficção científica', 'Estrangeiros'],
-      cor: ['#1f2937', '#7f1d1d', '#fca5a5'], icone: 'fa-eye', trad: BIB_TRAD_EN,
+      cor: ['#1f2937', '#7f1d1d', '#fca5a5'], trad: BIB_TRAD_EN,
       sinopse: 'Na Oceânia, o Partido controla tudo — até o passado. Winston Smith passa os dias reescrevendo notícias antigas no Ministério da Verdade e, em segredo, começa a duvidar. O romance que deu ao mundo o Grande Irmão, a teletela e o duplipensamento.' },
     { id: 'revolucao-dos-bichos', titulo: 'A Revolução dos Bichos', autor: 'George Orwell', ano: 1945, cats: ['Distopia', 'Sátira', 'Leitura rápida', 'Estrangeiros'],
-      cor: ['#14532d', '#a16207', '#fde68a'], icone: 'fa-horse-head', trad: BIB_TRAD_EN,
+      cor: ['#14532d', '#a16207', '#fde68a'], trad: BIB_TRAD_EN,
       sinopse: 'Cansados dos maus-tratos do sr. Jones, os animais da Granja do Solar se rebelam e prometem uma sociedade onde todos são iguais. Uma fábula curta e afiada sobre como uma revolução pode ser traída por quem chega ao poder.' },
     { id: 'metamorfose', titulo: 'A Metamorfose', autor: 'Franz Kafka', ano: 1915, cats: ['Absurdo', 'Leitura rápida', 'Estrangeiros'],
-      cor: ['#3f3f46', '#1e3a2f', '#bef264'], icone: 'fa-bug', trad: BIB_TRAD_DE,
+      cor: ['#3f3f46', '#1e3a2f', '#bef264'], trad: BIB_TRAD_DE,
       sinopse: 'Gregor Samsa acorda certa manhã transformado num inseto monstruoso — e sua primeira preocupação é ter perdido o trem para o trabalho. Uma novela curta, estranha e comovente sobre família, trabalho e solidão.' },
     { id: 'processo', titulo: 'O Processo', autor: 'Franz Kafka', ano: 1925, cats: ['Absurdo', 'Estrangeiros'],
-      cor: ['#292524', '#57534e', '#e7e5e4'], icone: 'fa-scale-balanced', trad: BIB_TRAD_DE,
+      cor: ['#292524', '#57534e', '#e7e5e4'], trad: BIB_TRAD_DE,
       sinopse: 'Josef K. é detido numa manhã sem ter feito nada de errado — e nunca descobre do que é acusado. Tribunais escondidos em sótãos, advogados inúteis e regras sem lógica: o pesadelo burocrático que virou adjetivo, kafkiano.' },
     { id: 'frankenstein', titulo: 'Frankenstein', autor: 'Mary Shelley', ano: 1818, cats: ['Gótico', 'Terror', 'Ficção científica', 'Estrangeiros'],
-      cor: ['#134e4a', '#0f172a', '#5eead4'], icone: 'fa-bolt', trad: BIB_TRAD_EN + ' Texto-base: edição revista de 1831.',
+      cor: ['#134e4a', '#0f172a', '#5eead4'], trad: BIB_TRAD_EN + ' Texto-base: edição revista de 1831.',
       sinopse: 'O jovem cientista Victor Frankenstein descobre como dar vida à matéria morta, cria um ser — e o abandona. Rejeitada por todos, a criatura vai atrás de quem a criou. O livro que fundou a ficção científica.' },
     { id: 'dracula', titulo: 'Drácula', autor: 'Bram Stoker', ano: 1897, cats: ['Gótico', 'Terror', 'Estrangeiros'],
-      cor: ['#450a0a', '#0b0b0b', '#f87171'], icone: 'fa-moon', trad: BIB_TRAD_EN,
+      cor: ['#450a0a', '#0b0b0b', '#f87171'], trad: BIB_TRAD_EN,
       sinopse: 'O advogado Jonathan Harker viaja à Transilvânia para fechar negócio com um misterioso conde. Contado em diários, cartas e recortes de jornal, o romance que transformou o vampiro em lenda moderna.' },
     { id: 'maquina-do-tempo', titulo: 'A Máquina do Tempo', autor: 'H. G. Wells', ano: 1895, cats: ['Ficção científica', 'Aventura', 'Leitura rápida', 'Estrangeiros'],
-      cor: ['#1e3a8a', '#0e7490', '#a5f3fc'], icone: 'fa-hourglass-half', trad: BIB_TRAD_EN,
+      cor: ['#1e3a8a', '#0e7490', '#a5f3fc'], trad: BIB_TRAD_EN,
       sinopse: 'Um inventor constrói uma máquina capaz de atravessar os séculos e chega ao ano 802.701, onde a humanidade se dividiu em dois povos muito diferentes. Aventura e crítica social num clássico curto da ficção científica.' },
     { id: 'guerra-dos-mundos', titulo: 'A Guerra dos Mundos', autor: 'H. G. Wells', ano: 1898, cats: ['Ficção científica', 'Aventura', 'Estrangeiros'],
-      cor: ['#7c2d12', '#1c1917', '#fdba74'], icone: 'fa-meteor', trad: BIB_TRAD_EN,
+      cor: ['#7c2d12', '#1c1917', '#fdba74'], trad: BIB_TRAD_EN,
       sinopse: 'Cilindros caem do céu no interior da Inglaterra e deles saem marcianos armados com um raio de calor devastador. Narrado por um sobrevivente, o primeiro grande romance de invasão alienígena.' },
     { id: 'dorian-gray', titulo: 'O Retrato de Dorian Gray', autor: 'Oscar Wilde', ano: 1890, cats: ['Gótico', 'Drama', 'Estrangeiros'],
-      cor: ['#4c1d95', '#831843', '#f9a8d4'], icone: 'fa-palette', trad: BIB_TRAD_EN,
+      cor: ['#4c1d95', '#831843', '#f9a8d4'], trad: BIB_TRAD_EN,
       sinopse: 'Um jovem de beleza extraordinária deseja que seu retrato envelheça no lugar dele — e o desejo se cumpre. Enquanto Dorian mergulha em prazeres e crueldades, a pintura escondida registra cada pecado.' },
     { id: 'coracao-das-trevas', titulo: 'Coração das Trevas', autor: 'Joseph Conrad', ano: 1899, cats: ['Aventura', 'Drama', 'Leitura rápida', 'Estrangeiros'],
-      cor: ['#022c22', '#030712', '#86efac'], icone: 'fa-ship', trad: BIB_TRAD_EN,
+      cor: ['#022c22', '#030712', '#86efac'], trad: BIB_TRAD_EN,
       sinopse: 'Marlow sobe um rio na África colonial à procura de Kurtz, um agente do marfim que ganhou fama e um poder sombrio no interior. Uma viagem curta e intensa ao horror do colonialismo e à escuridão humana.' },
     { id: 'chamado-da-floresta', titulo: 'O Chamado da Floresta', autor: 'Jack London', ano: 1903, cats: ['Aventura', 'Leitura rápida', 'Estrangeiros'],
-      cor: ['#0c4a6e', '#1e293b', '#bae6fd'], icone: 'fa-paw', trad: BIB_TRAD_EN,
+      cor: ['#0c4a6e', '#1e293b', '#bae6fd'], trad: BIB_TRAD_EN,
       sinopse: 'Buck, um cão grande e mimado da Califórnia, é roubado e vendido para puxar trenós no gelo do Yukon, em plena corrida do ouro. Para sobreviver, vai ter de reencontrar o instinto selvagem.' },
     { id: 'dom-casmurro', titulo: 'Dom Casmurro', autor: 'Machado de Assis', ano: 1899, cats: ['Romance', 'Realismo', 'Brasileiros'],
-      cor: ['#1e1b4b', '#0f766e', '#99f6e4'], icone: 'fa-water', trad: BIB_ORIG_BR,
+      cor: ['#1e1b4b', '#0f766e', '#99f6e4'], trad: BIB_ORIG_BR,
       sinopse: 'Já velho, Bentinho resolve contar sua história: o amor de infância por Capitu, a amizade com Escobar e o ciúme que tomou conta de tudo. Capitu traiu ou não traiu? Quem julga é o leitor.' },
     { id: 'bras-cubas', titulo: 'Memórias Póstumas de Brás Cubas', autor: 'Machado de Assis', ano: 1881, cats: ['Realismo', 'Sátira', 'Brasileiros'],
-      cor: ['#18181b', '#44403c', '#d6d3d1'], icone: 'fa-feather-pointed', trad: BIB_ORIG_BR,
+      cor: ['#18181b', '#44403c', '#d6d3d1'], trad: BIB_ORIG_BR,
       sinopse: 'Um defunto autor resolve escrever suas memórias depois de morto e, livre de qualquer vergonha, conta uma vida de privilégios, amores e fracassos com ironia afiada. O livro que inaugurou o Realismo no Brasil.' },
     { id: 'cortico', titulo: 'O Cortiço', autor: 'Aluísio Azevedo', ano: 1890, cats: ['Naturalismo', 'Drama', 'Brasileiros'],
-      cor: ['#78350f', '#b45309', '#fde68a'], icone: 'fa-house-chimney', trad: BIB_ORIG_BR,
+      cor: ['#78350f', '#b45309', '#fde68a'], trad: BIB_ORIG_BR,
       sinopse: 'João Romão enriquece à custa de um cortiço no Rio de Janeiro do século XIX, onde se amontoam lavadeiras, operários e imigrantes. Um retrato coletivo, vivo e brutal da vida popular — marco do Naturalismo brasileiro.' },
     { id: 'policarpo', titulo: 'Triste Fim de Policarpo Quaresma', autor: 'Lima Barreto', ano: 1915, cats: ['Sátira', 'Drama', 'Brasileiros'],
-      cor: ['#166534', '#a16207', '#fef08a'], icone: 'fa-guitar', trad: BIB_ORIG_BR,
+      cor: ['#166534', '#a16207', '#fef08a'], trad: BIB_ORIG_BR,
       sinopse: 'O major Quaresma ama o Brasil acima de tudo: toca modinhas ao violão, quer o tupi como língua oficial e se entrega à lavoura e à pátria. Seu patriotismo ingênuo esbarra numa realidade nada heroica.' }
   ];
   // Contagem de palavras (para o tempo de leitura) — gerada no build.
@@ -392,15 +394,17 @@
     else if (_bibTela === 'livro') _bibRenderLivro();
   }
 
-  /* ══ Capa gerada (sem imagem: leve e funciona offline) ══════════ */
+  /* ══ Capa ilustrada (/Biblioteca/capas/<id>.jpg) ═══════════════
+     O SW guarda as capas no CACHE_BIB (cache-first): vista uma vez,
+     aparece offline. Se a imagem falhar, o onerror remove o <img> e
+     fica o fallback por baixo: gradiente do livro + título e autor. */
   function _bibCapaHtml(l, tam) {
-    return '<div class="bib-capa bib-capa-' + (tam || 'm') + '" style="--c1:' + l.cor[0] + ';--c2:' + l.cor[1] + ';--c3:' + l.cor[2] + '" aria-hidden="true">' +
-      '<div class="bib-capa-moldura">' +
-      '<div class="bib-capa-autor">' + _bibEsc(l.autor) + '</div>' +
-      '<i class="fa-solid ' + l.icone + ' bib-capa-icone"></i>' +
-      '<div class="bib-capa-titulo">' + _bibEsc(l.titulo) + '</div>' +
-      '<div class="bib-capa-selo">🦉 Biblioteca da Coruja</div>' +
-      '</div></div>';
+    tam = tam || 'm';
+    return '<div class="bib-capa bib-capa-' + tam + '" style="--c1:' + l.cor[0] + ';--c2:' + l.cor[1] + ';--c3:' + l.cor[2] + '" aria-hidden="true">' +
+      '<div class="bib-capa-alt"><div class="bib-capa-titulo">' + _bibEsc(l.titulo) + '</div><div class="bib-capa-autor">' + _bibEsc(l.autor) + '</div></div>' +
+      '<img class="bib-capa-img" src="/Biblioteca/capas/' + l.id + '.jpg" alt="" width="480" height="715" decoding="async"' +
+      (tam === 'g' ? '' : ' loading="lazy"') + ' onerror="this.remove()">' +
+      '</div>';
   }
 
   /* ══ Catálogo ═══════════════════════════════════════════════════ */
@@ -1392,22 +1396,26 @@
     _bibSheetTipo = tipo;
     sheet.hidden = false; fundo.hidden = false;
     requestAnimationFrame(function () { sheet.classList.add('aberto'); fundo.classList.add('aberto'); });
-    _bibRenderSheet();
+    _bibRenderSheet(true);
     clearTimeout(_bibBarrasTimer);
   }
 
   function _bibFecharSheet() {
     var sheet = document.getElementById('bib-sheet');
     var fundo = document.getElementById('bib-sheet-fundo');
+    _bibPreviaParar();
     if (!sheet || !_bibSheetTipo) { _bibSheetTipo = null; return; }
     _bibSheetTipo = null;
     sheet.classList.remove('aberto'); fundo.classList.remove('aberto');
     setTimeout(function () { if (!_bibSheetTipo) { sheet.hidden = true; fundo.hidden = true; } }, 260);
   }
 
-  function _bibRenderSheet() {
+  function _bibRenderSheet(doTopo) {
     var corpo = document.getElementById('bib-sheet-corpo');
     if (!corpo || !_bibL) return;
+    var rolaAnt = corpo.querySelector('.bib-sheet-rola');
+    var topoAnt = (doTopo !== true && rolaAnt && corpo.dataset.tipo === _bibSheetTipo) ? rolaAnt.scrollTop : 0;
+    corpo.dataset.tipo = _bibSheetTipo || '';
     if (_bibSheetTipo === 'sumario') {
       var tx = _bibL.tx;
       corpo.innerHTML = '<div class="bib-sheet-head"><h3>Sumário</h3><button type="button" class="bib-l-btn" data-fechar aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button></div>' +
@@ -1431,7 +1439,6 @@
           return '<button type="button" data-v="' + o[0] + '" class="' + (String(P[nome]) === String(o[0]) ? 'ativo' : '') + '">' + o[1] + '</button>';
         }).join('') + '</div>';
       };
-      var vozes = _bibVozesPt();
       corpo.innerHTML = '<div class="bib-sheet-head"><h3>Ajustes de leitura</h3><button type="button" class="bib-l-btn" data-fechar aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button></div>' +
         '<div class="bib-sheet-rola">' +
         '<div class="bib-aj"><div class="bib-aj-rot">Modo de leitura</div>' + seg('modo', [['v', '<i class="fa-solid fa-arrows-up-down"></i> Rolagem'], ['h', '<i class="fa-solid fa-book-open"></i> Páginas']]) + '</div>' +
@@ -1446,9 +1453,7 @@
         '<label class="bib-aj bib-aj-lin"><span>Texto justificado</span><input type="checkbox" data-bool="justificar"' + (P.justificar ? ' checked' : '') + '><i class="bib-sw"></i></label>' +
         '<label class="bib-aj bib-aj-lin"><span>Manter tela ligada' + ('wakeLock' in navigator ? '' : ' <small>(não suportado aqui)</small>') + '</span><input type="checkbox" data-bool="tela"' + (P.tela ? ' checked' : '') + ('wakeLock' in navigator ? '' : ' disabled') + '><i class="bib-sw"></i></label>' +
         (_bibTtsSuportado()
-          ? '<div class="bib-aj"><div class="bib-aj-rot">Voz da leitura em voz alta</div><select id="bib-voz"><option value="">Padrão do aparelho</option>' +
-            vozes.map(function (v) { return '<option value="' + _bibEsc(v.name) + '"' + (P.voz === v.name ? ' selected' : '') + '>' + _bibEsc(v.name.replace(/^(Google|Microsoft)\s*/, '')) + ' (' + v.lang + ')</option>'; }).join('') +
-            '</select></div>' +
+          ? _bibVozesHtml() +
             '<div class="bib-aj"><div class="bib-aj-rot">Velocidade da voz</div>' + seg('rate', [['0.8', '0,8×'], ['1', '1×'], ['1.2', '1,2×'], ['1.5', '1,5×'], ['2', '2×']]) + '</div>'
           : '') +
         '</div>';
@@ -1466,8 +1471,17 @@
       corpo.querySelectorAll('[data-bool]').forEach(function (c) {
         c.addEventListener('change', function () { _bibMudarPref(c.dataset.bool, c.checked); });
       });
-      var sv = document.getElementById('bib-voz');
-      if (sv) sv.addEventListener('change', function () { _bibPrefs.voz = sv.value; _bibSalvarPrefs(); if (_bibTts.tocando) { _bibTtsPausar(); _bibTtsRetomar(); } });
+      corpo.querySelectorAll('[data-voz]').forEach(function (b) {
+        b.addEventListener('click', function () { _bibEscolherVoz(b.dataset.voz); });
+      });
+      corpo.querySelectorAll('[data-prev]').forEach(function (b) {
+        b.addEventListener('click', function () { _bibPreviaTocar(b.dataset.prev); });
+      });
+      var outras = corpo.querySelector('.bib-vozes-outras');
+      if (outras) outras.addEventListener('toggle', function () { _bibVozesOutrasAberto = outras.open; });
+      _bibPreviaUI();
+      var rola = corpo.querySelector('.bib-sheet-rola');
+      if (rola && topoAnt) rola.scrollTop = topoAnt;
     }
     var f = corpo.querySelector('[data-fechar]');
     if (f) f.addEventListener('click', _bibFecharSheet);
@@ -1515,18 +1529,167 @@
   }
   if (_bibTtsSuportado()) { try { speechSynthesis.getVoices(); speechSynthesis.addEventListener('voiceschanged', function () { if (_bibSheetTipo === 'ajustes') _bibRenderSheet(); }); } catch (e) {} }
 
-  function _bibVozesPt() {
+  /* ── Vozes ──────────────────────────────────────────────────────
+     A lista chega assíncrona (Chrome: getVoices() vem vazio até o
+     'voiceschanged'). Na preferência guardamos o NOME da voz; se ela
+     sumir do aparelho, cai na padrão — a voz em português que o
+     sistema marca como padrão (ou a 1ª pt-BR). Nada de apagar a
+     preferência: em alguns aparelhos a voz volta quando a lista
+     termina de carregar. */
+  function _bibLangNorm(l) { return String(l || '').replace('_', '-'); }
+  function _bibTodasVozes() {
     if (!_bibTtsSuportado()) return [];
-    try {
-      return (speechSynthesis.getVoices() || []).filter(function (v) { return /^pt/i.test(v.lang); })
-        .sort(function (a, b) { return (b.lang === 'pt-BR') - (a.lang === 'pt-BR') || a.name.localeCompare(b.name); });
-    } catch (e) { return []; }
+    try { return (speechSynthesis.getVoices() || []).slice(); } catch (e) { return []; }
   }
-  function _bibVozEscolhida() {
-    var vs = _bibVozesPt();
-    for (var i = 0; i < vs.length; i++) if (vs[i].name === _bibPrefs.voz) return vs[i];
-    for (var j = 0; j < vs.length; j++) if (vs[j].lang === 'pt-BR') return vs[j];
+  function _bibOrdemLang(l) { l = _bibLangNorm(l); return l === 'pt-BR' ? 0 : l === 'pt-PT' ? 1 : 2; }
+  function _bibVozesPt() {
+    return _bibTodasVozes().filter(function (v) { return /^pt/i.test(v.lang); })
+      .sort(function (a, b) { return _bibOrdemLang(a.lang) - _bibOrdemLang(b.lang) || (a.localService === false) - (b.localService === false) || a.name.localeCompare(b.name); });
+  }
+  function _bibVozPorNome(nome) {
+    if (!nome) return null;
+    var vs = _bibTodasVozes();
+    for (var i = 0; i < vs.length; i++) if (vs[i].name === nome) return vs[i];
+    return null;
+  }
+  function _bibVozPadrao() {
+    var vs = _bibVozesPt(), i;
+    for (i = 0; i < vs.length; i++) if (vs[i].default && _bibLangNorm(vs[i].lang) === 'pt-BR') return vs[i];
+    for (i = 0; i < vs.length; i++) if (_bibLangNorm(vs[i].lang) === 'pt-BR') return vs[i];
+    for (i = 0; i < vs.length; i++) if (vs[i].default) return vs[i];
     return vs[0] || null;
+  }
+  function _bibVozEscolhida() { return _bibVozPorNome(_bibPrefs.voz) || _bibVozPadrao(); }
+
+  // Espera a lista de vozes (no máx. 1,5 s, uma vez só) — senão o 1º
+  // "Ouvir" do Chrome sairia na voz errada antes do 'voiceschanged'.
+  var _bibVozesEsperou = false;
+  function _bibEsperarVozes(cb) {
+    if (_bibVozesEsperou || _bibTodasVozes().length) { cb(); return; }
+    _bibVozesEsperou = true;
+    var feito = false;
+    var ok = function () {
+      if (feito) return; feito = true;
+      try { speechSynthesis.removeEventListener('voiceschanged', ok); } catch (e) {}
+      cb();
+    };
+    try { speechSynthesis.addEventListener('voiceschanged', ok); } catch (e) {}
+    setTimeout(ok, 1500);
+  }
+
+  function _bibVozNome(v) {
+    var n = String(v.name || '').replace(/^(Microsoft|Google|Apple)\s+/i, '').replace(/\s+-\s+[^-]+$/, '').replace(/\s+Online(?=\s*\(Natural\))/i, '').trim();
+    return n ? n.charAt(0).toUpperCase() + n.slice(1) : _bibLangNorm(v.lang);
+  }
+  var _bibNomesLang = null;
+  function _bibLangNome(lang) {
+    var l = _bibLangNorm(lang);
+    if (l === 'pt-BR') return 'Português (Brasil)';
+    if (l === 'pt-PT') return 'Português (Portugal)';
+    try {
+      if (!_bibNomesLang) _bibNomesLang = new Intl.DisplayNames(['pt-BR'], { type: 'language' });
+      var r = _bibNomesLang.of(l);
+      if (r) return r.charAt(0).toUpperCase() + r.slice(1);
+    } catch (e) {}
+    return l;
+  }
+
+  /* ── Seletor de vozes (cards na folha de ajustes) ─────────────── */
+  var _bibVozesOutrasAberto = false;
+  function _bibVozCardHtml(chave, nome, sub, sel, pt) {
+    return '<div class="bib-voz' + (sel ? ' ativo' : '') + (pt ? ' bib-voz-pt' : '') + '">' +
+      '<button type="button" class="bib-voz-esc" role="radio" aria-checked="' + (sel ? 'true' : 'false') + '" data-voz="' + _bibEsc(chave) + '">' +
+      '<span class="bib-voz-marca" aria-hidden="true"><i class="fa-solid fa-check"></i></span>' +
+      '<span class="bib-voz-txt"><span class="bib-voz-nome">' + _bibEsc(nome) + '</span><span class="bib-voz-sub">' + sub + '</span></span>' +
+      '</button>' +
+      '<button type="button" class="bib-voz-prev" data-prev="' + _bibEsc(chave) + '" data-rot="' + _bibEsc(nome) + '" aria-label="Ouvir prévia: ' + _bibEsc(nome) + '"><i class="fa-solid fa-play"></i></button>' +
+      '</div>';
+  }
+  function _bibVozSub(v) {
+    return '<span class="bib-voz-lang">' + _bibEsc(_bibLangNorm(v.lang)) + '</span>' + _bibEsc(_bibLangNome(v.lang)) +
+      (v.localService === false ? ' <span class="bib-voz-tag" title="Precisa de internet"><i class="fa-solid fa-wifi"></i> Online</span>' : '');
+  }
+  function _bibVozesHtml() {
+    var todas = _bibTodasVozes(), pt = _bibVozesPt();
+    var outras = todas.filter(function (v) { return !/^pt/i.test(v.lang); })
+      .sort(function (a, b) { return _bibLangNome(a.lang).localeCompare(_bibLangNome(b.lang), 'pt') || a.name.localeCompare(b.name); });
+    var salva = _bibVozPorNome(_bibPrefs.voz);
+    var padrao = _bibVozPadrao();
+    var aviso = '';
+    if (!todas.length) aviso = '<i class="fa-solid fa-spinner fa-spin"></i> Carregando as vozes do aparelho…';
+    else if (_bibPrefs.voz && !salva) aviso = '<i class="fa-solid fa-circle-info"></i> A voz que você tinha escolhido não está disponível neste aparelho. Usando a padrão.';
+    else if (!pt.length) aviso = '<i class="fa-solid fa-circle-info"></i> Nenhuma voz em português instalada. Dá para baixar uma nas configurações de voz (texto para fala) do aparelho.';
+    var abrirOutras = _bibVozesOutrasAberto || (salva && !/^pt/i.test(salva.lang));
+    return '<div class="bib-aj"><div class="bib-aj-rot">Voz da leitura em voz alta</div>' +
+      (aviso ? '<p class="bib-voz-aviso">' + aviso + '</p>' : '') +
+      '<div class="bib-vozes" role="radiogroup" aria-label="Voz da leitura em voz alta">' +
+      _bibVozCardHtml('', 'Padrão do aparelho', padrao ? 'Agora: ' + _bibEsc(_bibVozNome(padrao)) + ' · ' + _bibEsc(_bibLangNorm(padrao.lang)) : 'A voz que o sistema escolher', !salva, true) +
+      pt.map(function (v) { return _bibVozCardHtml(v.name, _bibVozNome(v), _bibVozSub(v), !!salva && salva.name === v.name, true); }).join('') +
+      '</div>' +
+      (outras.length
+        ? '<details class="bib-vozes-outras"' + (abrirOutras ? ' open' : '') + '><summary>Vozes de outros idiomas <span>' + outras.length + '</span></summary>' +
+          '<p class="bib-voz-nota">Leem o texto com sotaque do idioma delas — as em português soam bem melhor.</p>' +
+          '<div class="bib-vozes" role="radiogroup" aria-label="Vozes de outros idiomas">' +
+          outras.map(function (v) { return _bibVozCardHtml(v.name, _bibVozNome(v), _bibVozSub(v), !!salva && salva.name === v.name, false); }).join('') +
+          '</div></details>'
+        : '') +
+      '</div>';
+  }
+
+  function _bibEscolherVoz(nome) {
+    _bibPrefs.voz = nome || '';
+    _bibSalvarPrefs();
+    if (_bibTts.tocando) { _bibTtsPausar(); _bibTtsRetomar(); }
+    _bibRenderSheet();
+  }
+
+  /* ── Prévia de voz: fala uma frase curta com a voz do card ────── */
+  var BIB_TXT_PREVIA = 'Olá, esta é a voz disponível para leitura na Biblioteca da Coruja.';
+  var _bibPrevia = { chave: null, token: 0, u: null };
+
+  function _bibPreviaUI() {
+    document.querySelectorAll('#bib-sheet-corpo [data-prev]').forEach(function (b) {
+      var on = _bibPrevia.chave !== null && b.dataset.prev === _bibPrevia.chave;
+      if (b.classList.contains('tocando') === on && b.firstChild) return;
+      b.classList.toggle('tocando', on);
+      b.innerHTML = '<i class="fa-solid fa-' + (on ? 'stop' : 'play') + '"></i>';
+      b.setAttribute('aria-label', (on ? 'Parar prévia: ' : 'Ouvir prévia: ') + (b.dataset.rot || ''));
+    });
+  }
+
+  function _bibPreviaParar() {
+    if (_bibPrevia.chave === null) return;
+    _bibPrevia.chave = null;
+    _bibPrevia.token++;
+    try { speechSynthesis.cancel(); } catch (e) {}
+    _bibPreviaUI();
+  }
+
+  function _bibPreviaTocar(chave) {
+    if (!_bibTtsSuportado()) return;
+    chave = chave || '';
+    if (_bibPrevia.chave === chave) { _bibPreviaParar(); return; }
+    // Para qualquer fala em andamento: a leitura do livro fica pausada
+    // (o mini-player mostra "play" para continuar de onde estava).
+    if (_bibTts.tocando) _bibTtsPausar();
+    var token = ++_bibPrevia.token;
+    _bibPrevia.chave = chave;
+    _bibPreviaUI();
+    try {
+      speechSynthesis.cancel();
+      var v = chave ? _bibVozPorNome(chave) : _bibVozPadrao();
+      var u = new SpeechSynthesisUtterance(BIB_TXT_PREVIA);
+      u.lang = 'pt-BR';
+      u.rate = _bibPrefs.rate || 1;
+      if (v) { u.voice = v; u.lang = v.lang; }
+      u.onend = u.onerror = function () {
+        if (token !== _bibPrevia.token) return;
+        _bibPrevia.chave = null;
+        _bibPreviaUI();
+      };
+      _bibPrevia.u = u; // mesma proteção contra o GC do Chrome
+      speechSynthesis.speak(u);
+    } catch (e) { _bibPrevia.chave = null; _bibPreviaUI(); }
   }
 
   function _bibTtsQuebrar(txt) {
@@ -1558,11 +1721,14 @@
     document.getElementById('bib-tts').hidden = false;
     document.getElementById('bib-leitor').classList.add('bib-tts-on');
     _bibWakeLock();
-    _bibTtsRetomar();
+    if (_bibTodasVozes().length || _bibVozesEsperou) { _bibTtsRetomar(); return; }
+    _bibTtsDesbloquear(); // mantém o "toque" do iOS valendo durante a espera
+    _bibEsperarVozes(_bibTtsRetomar);
   }
 
   function _bibTtsRetomar() {
     if (!_bibTts.ativo || !_bibL || !_bibL.tx) return;
+    _bibPreviaParar();
     _bibTts.tocando = true;
     _bibTtsAtualizarUI();
     _bibTtsFalar();

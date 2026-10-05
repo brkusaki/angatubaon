@@ -1,0 +1,338 @@
+/* ═══════════════════════════════════════════════════════════════
+   CORUJINHA — slot 3×3 (ver Jogos/corujinha.js). Tela cheia, tema
+   próprio (noite roxa + ouro), sempre escuro nos dois temas do app.
+   Arte em pixel: image-rendering: pixelated em tudo que vem de
+   /Jogos/assets/corujinha/.
+   ═══════════════════════════════════════════════════════════════ */
+#jogo-corujinha > .jogo-voltar { display: none; }
+#corujinha-root { flex: 1 1 auto; min-height: 0; display: flex; }
+
+.cjx {
+  --g: min(80vw, 44vh, 380px);
+  --g: min(80vw, 44dvh, 380px);
+  --cel: calc((var(--g) - 16px) / 3);
+  --masc: clamp(78px, 16vh, 150px);
+  --ouro: #ffd23f; --ouro2: #f4a300; --roxo: #5a189a; --tinta: #1a0b2e;
+  position: relative; flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  color: #fff; font-family: var(--font-b, system-ui, sans-serif);
+  background: linear-gradient(180deg, #2a0f57 0%, #3b1a73 32%, #1d0b3d 62%, #0d0520 100%);
+  -webkit-user-select: none; user-select: none; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.cjx button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+.cjx-s i, .cjx-coruja, .cjx-skyline, .cjx-splash-coruja, .cjx-big-coruja,
+.cjx-moldura, .cjx-big-moedas i, .cjx-splash-lista i, .cjx-ganhobar img, .cjx-big-item-card img {
+  image-rendering: pixelated; image-rendering: crisp-edges;
+}
+
+/* Céu: estrelas piscando + horizonte com a Matriz */
+.cjx-ceu { position: absolute; inset: 0; pointer-events: none; }
+.cjx-ceu i {
+  position: absolute; width: 3px; height: 3px; background: #fff6c4;
+  box-shadow: 0 0 4px rgba(255,246,196,.8);
+  animation: cjxPisca 2.4s steps(2) infinite;
+}
+.cjx-ceu i:nth-child(3n) { width: 2px; height: 2px; background: #c77dff; }
+@keyframes cjxPisca { 50% { opacity: .2; } }
+.cjx-skyline {
+  position: absolute; left: 0; right: 0; top: 9%; height: min(32vw, 130px);
+  background: url('/Jogos/assets/corujinha/skyline.png') center bottom / auto 100% repeat-x;
+  opacity: .85;
+}
+
+/* Topo */
+.cjx-topo {
+  position: relative; z-index: 4; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 2px;
+}
+.cjx-ico {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+  color: #fff; background: rgba(10,4,24,.45); border: 2px solid rgba(255,210,63,.35);
+}
+.cjx-ico:active { transform: scale(.92); }
+.cjx-logo {
+  font-family: var(--font-h, system-ui); font-weight: 900; font-size: 24px; letter-spacing: .06em;
+  background: linear-gradient(180deg, #fffbe0 0%, #ffd23f 45%, #f08c00 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 0 #5a189a) drop-shadow(0 3px 0 #2a0f57) drop-shadow(0 0 10px rgba(255,210,63,.35));
+}
+
+/* Palco: mascote + máquina + barra de ganho */
+.cjx-palco {
+  position: relative; z-index: 2; flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 0 8px;
+}
+.cjx-mascote { position: relative; z-index: 3; width: var(--masc); height: var(--masc); margin-bottom: calc(var(--masc) * -0.2); }
+.cjx-coruja {
+  width: 100%; height: 100%;
+  background: url('/Jogos/assets/corujinha/coruja-sheet.png') 0 0 / 400% 100% no-repeat;
+  animation: cjxBob 1.4s steps(2) infinite;
+  filter: drop-shadow(0 6px 6px rgba(0,0,0,.45));
+}
+.cjx-coruja-gira { animation-duration: .45s; }
+.cjx-coruja-festa { animation: cjxFesta .5s ease-in-out infinite; }
+.cjx-coruja-voo { animation: cjxVoo 1.6s ease-in-out 1; }
+@keyframes cjxBob { 50% { transform: translateY(-4px); } }
+@keyframes cjxFesta { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-12px) scale(1.06); } }
+@keyframes cjxVoo {
+  0% { transform: translateY(0); } 25% { transform: translateY(-60px) rotate(-8deg) scale(.9); }
+  55% { transform: translate(18px,-40px) rotate(8deg) scale(1.05); } 100% { transform: translateY(0); }
+}
+.cjx-balao {
+  position: absolute; left: 88%; top: 6%; z-index: 4; white-space: nowrap;
+  padding: 6px 10px; border-radius: 10px; font-weight: 800; font-size: 12.5px;
+  color: var(--tinta); background: #fffbe0; border: 2px solid var(--tinta);
+  box-shadow: 3px 3px 0 rgba(0,0,0,.35);
+  transform: scale(0); transform-origin: 0 100%; transition: transform .18s cubic-bezier(.3,1.6,.5,1);
+}
+.cjx-balao::before {
+  content: ''; position: absolute; left: -7px; bottom: 6px; width: 10px; height: 10px;
+  background: #fffbe0; border-left: 2px solid var(--tinta); border-bottom: 2px solid var(--tinta);
+  transform: rotate(45deg);
+}
+.cjx-balao-on { transform: scale(1); }
+
+/* Máquina: marcadores de linha + moldura + grade */
+.cjx-maquina { position: relative; display: flex; align-items: center; gap: 4px; }
+.cjx-marcas { display: flex; flex-direction: column; gap: 4px; padding-top: 18px; padding-bottom: 18px; }
+.cjx-marcas > div { height: var(--cel); display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+.cjx-marcas span {
+  width: 18px; height: 18px; border-radius: 5px; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 900; color: rgba(255,255,255,.55);
+  background: rgba(10,4,24,.55); border: 1px solid rgba(255,210,63,.3);
+}
+.cjx-marcas span.on { color: var(--tinta); background: var(--ouro); border-color: #fff6c4; box-shadow: 0 0 10px var(--ouro); }
+.cjx-moldura {
+  position: relative; border: 18px solid transparent;
+  border-image: url('/Jogos/assets/corujinha/moldura.png') 8 / 18px stretch;
+  filter: drop-shadow(0 8px 14px rgba(0,0,0,.5));
+  transition: filter .2s;
+}
+.cjx-maquina-suspense .cjx-moldura { animation: cjxTreme .12s linear infinite; filter: drop-shadow(0 0 16px #ff4fd8); }
+.cjx-maquina-voo .cjx-moldura { filter: drop-shadow(0 0 18px #4cc9f0); }
+@keyframes cjxTreme { 25% { transform: translateX(-1.5px); } 75% { transform: translateX(1.5px); } }
+
+.cjx-grade {
+  position: relative; width: var(--g); height: var(--g);
+  display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 4px; padding: 4px;
+  background: #12062a; box-sizing: border-box;
+}
+.cjx-cel {
+  position: relative; overflow: hidden; border-radius: 8px;
+  background: radial-gradient(circle at 50% 40%, #43207a 0%, #261147 70%, #1a0b33 100%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), inset 0 -6px 10px rgba(0,0,0,.35);
+  transition: filter .25s, box-shadow .25s;
+}
+.cjx-fita { will-change: transform; }
+.cjx-borrao { filter: blur(1.4px) brightness(1.12); }
+.cjx-s { position: relative; height: var(--cel); }
+.cjx-s i { position: absolute; inset: 11%; background: center / contain no-repeat; }
+.cjx-s b {
+  position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%);
+  padding: 1px 5px; border-radius: 4px; font-size: clamp(7px, 2.1vw, 9.5px); font-weight: 900; letter-spacing: .04em;
+  color: var(--tinta); background: linear-gradient(#fff6b0, var(--ouro)); border: 1px solid var(--tinta);
+}
+.cjx-tem-ganho .cjx-cel:not(.cjx-ganha) { filter: brightness(.4) saturate(.5); }
+.cjx-ganha { z-index: 1; box-shadow: inset 0 0 0 2px var(--ouro), 0 0 16px rgba(255,210,63,.8); }
+.cjx-ganha .cjx-s i { animation: cjxPulsa .6s ease-in-out infinite; }
+.cjx-ovo-on { box-shadow: inset 0 0 0 2px #fff6c4, 0 0 22px #ffb703; }
+@keyframes cjxPulsa { 50% { transform: scale(1.14); } }
+.cjx-trava { box-shadow: inset 0 0 0 3px #4cc9f0, 0 0 14px rgba(76,201,240,.8); }
+.cjx-trava::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.35) 50%, transparent 70%) -100% 0 / 200% 100% no-repeat;
+  animation: cjxBrilho 1.2s linear infinite;
+}
+@keyframes cjxBrilho { to { background-position: 100% 0; } }
+.cjx-suspense { box-shadow: inset 0 0 0 2px #ff4fd8, 0 0 18px #ff4fd8; }
+.cjx-linhas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; overflow: visible; }
+.cjx-ln, .cjx-ln-brilho { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.cjx-ln { stroke: #fff6c4; stroke-width: 4; stroke-dasharray: 900; stroke-dashoffset: 900; animation: cjxTraco .45s ease-out forwards; }
+.cjx-ln-brilho { stroke: #ffb703; stroke-width: 12; opacity: .55; filter: blur(3px); }
+@keyframes cjxTraco { to { stroke-dashoffset: 0; } }
+
+/* Barra de ganho */
+.cjx-ganhobar {
+  margin-top: 10px; width: calc(var(--g) + 36px); max-width: 94vw; height: 42px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: 12px; font-weight: 800; font-size: 15px; text-align: center;
+  color: #fff; background: linear-gradient(180deg, #2b1452, #1a0b33);
+  border: 2px solid rgba(255,210,63,.45); box-shadow: inset 0 2px 0 rgba(255,255,255,.08), 0 4px 0 rgba(0,0,0,.35);
+}
+.cjx-ganhobar b { font-size: 19px; }
+.cjx-ganhobar img { width: 24px; height: 24px; }
+.cjx-ganhobar-ganho { color: var(--tinta); background: linear-gradient(180deg, #fff3a0, var(--ouro) 55%, var(--ouro2)); border-color: #fff6c4; animation: cjxPop .3s ease-out; }
+.cjx-ganhobar-forte { box-shadow: 0 0 20px rgba(255,210,63,.75), 0 4px 0 rgba(0,0,0,.35); }
+.cjx-ganhobar-voo { background: linear-gradient(180deg, #4cc9f0, #4361ee); border-color: #caf0f8; color: #fff; animation: cjxPop .3s ease-out; }
+.cjx-ganhobar-erro { font-size: 12px; color: #ffb4b4; border-color: rgba(248,113,113,.5); }
+@keyframes cjxPop { 0% { transform: scale(.85); } 70% { transform: scale(1.06); } 100% { transform: scale(1); } }
+
+/* Rodapé: saldo/aposta/ganho + controles */
+.cjx-rodape {
+  position: relative; z-index: 3; flex-shrink: 0;
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(13,5,32,0) 0%, rgba(13,5,32,.92) 22%);
+}
+.cjx-painel { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cjx-painel > div {
+  padding: 6px 8px; border-radius: 10px; text-align: center;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,210,63,.22);
+}
+.cjx-painel small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.55); }
+.cjx-painel b { display: block; font-family: var(--font-h, system-ui); font-size: 17px; font-weight: 800; line-height: 1.25; }
+.cjx-painel > div:first-child b { color: var(--ouro); }
+.cjx-controles { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; }
+.cjx-redondo {
+  width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  font-size: 17px; color: #fff; background: rgba(255,255,255,.08); border: 2px solid rgba(255,210,63,.38);
+  box-shadow: 0 3px 0 rgba(0,0,0,.4); transition: transform .1s, background .15s;
+}
+.cjx-redondo small { font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.cjx-redondo:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.4); }
+.cjx-redondo:disabled { opacity: .35; cursor: not-allowed; }
+.cjx-redondo.on { color: var(--tinta); background: linear-gradient(var(--ouro), var(--ouro2)); border-color: #fff6c4; }
+.cjx-girar {
+  position: relative; width: 88px; height: 88px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px; color: var(--roxo);
+  background: radial-gradient(circle at 35% 30%, #fffbe0 0%, var(--ouro) 38%, var(--ouro2) 75%, #b8620e 100%);
+  border: 4px solid #fff3b0;
+  box-shadow: 0 6px 0 #8a4a0a, 0 0 26px rgba(255,210,63,.55);
+  transition: transform .1s, box-shadow .1s, filter .2s;
+}
+.cjx-girar:active { transform: translateY(4px); box-shadow: 0 2px 0 #8a4a0a, 0 0 18px rgba(255,210,63,.5); }
+.cjx-girar-roda i { animation: cjxRoda .7s cubic-bezier(.3,.7,.3,1); }
+@keyframes cjxRoda { to { transform: rotate(360deg); } }
+.cjx-girar-ocupado { filter: saturate(.55) brightness(.85); }
+.cjx-girar span {
+  position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+  font-family: var(--font-h, system-ui); font-size: 26px; font-weight: 900; color: var(--roxo);
+}
+.cjx-girar-auto i { opacity: 0; }
+.cjx-girar-auto span { display: flex; }
+.cjx-girar-auto::after {
+  content: ''; position: absolute; inset: -8px; border-radius: 50%;
+  border: 3px dashed rgba(255,210,63,.75); animation: cjxRoda 3s linear infinite;
+}
+.cjx-autopop {
+  position: absolute; right: 12px; bottom: calc(100% - 8px); z-index: 5;
+  display: none; flex-direction: column; gap: 6px; padding: 8px; border-radius: 14px;
+  background: #1a0b33; border: 2px solid rgba(255,210,63,.45); box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+.cjx-autopop.on { display: flex; }
+.cjx-autopop button {
+  min-width: 64px; padding: 9px 10px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 15px;
+  color: var(--tinta); background: linear-gradient(var(--ouro), var(--ouro2)); border: none;
+}
+
+/* Overlays (abertura, grande ganho, tabela) */
+.cjx-over { position: absolute; inset: 0; z-index: 20; display: none; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+.cjx-over.on { display: flex; }
+
+.cjx-splash {
+  padding: 20px; text-align: center; gap: 10px;
+  background: radial-gradient(circle at 50% 30%, #6a2bb8 0%, #3b1a73 40%, #160830 100%);
+}
+.cjx-splash.cjx-sai { animation: cjxSome .38s ease-in forwards; }
+@keyframes cjxSome { to { opacity: 0; transform: scale(1.06); } }
+.cjx-splash-raios, .cjx-big-raios {
+  position: absolute; left: 50%; top: 32%; width: 220vmax; height: 220vmax; margin: -110vmax 0 0 -110vmax;
+  background: repeating-conic-gradient(rgba(255,210,63,.13) 0 10deg, transparent 10deg 20deg);
+  animation: cjxGira 18s linear infinite; pointer-events: none;
+}
+.cjx-big-raios { top: 42%; background: repeating-conic-gradient(rgba(255,210,63,.28) 0 9deg, transparent 9deg 18deg); animation-duration: 9s; }
+@keyframes cjxGira { to { transform: rotate(360deg); } }
+.cjx-splash-coruja, .cjx-big-coruja {
+  position: relative; width: clamp(120px, 24vh, 190px); height: clamp(120px, 24vh, 190px);
+  background: url('/Jogos/assets/corujinha/coruja-sheet.png') 66.666% 0 / 400% 100% no-repeat;
+  animation: cjxAsas .34s steps(1) infinite, cjxBob 1.2s ease-in-out infinite;
+  filter: drop-shadow(0 10px 10px rgba(0,0,0,.5));
+}
+.cjx-big-coruja { width: clamp(90px, 17vh, 140px); height: clamp(90px, 17vh, 140px); }
+@keyframes cjxAsas { 0% { background-position: 66.666% 0; } 50% { background-position: 100% 0; } }
+.cjx-logo-grande { position: relative; font-size: clamp(34px, 11vw, 52px); margin-top: -6px; }
+.cjx-splash-sub { position: relative; font-weight: 800; font-size: 15px; color: #fff6c4; }
+.cjx-splash-lista {
+  position: relative; list-style: none; margin: 6px 0 4px; padding: 10px 14px; border-radius: 14px;
+  display: flex; flex-direction: column; gap: 7px; text-align: left;
+  background: rgba(10,4,24,.5); border: 1px solid rgba(255,210,63,.3);
+}
+.cjx-splash-lista li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 700; }
+.cjx-splash-lista i { width: 28px; height: 28px; flex-shrink: 0; background: center / contain no-repeat; }
+.cjx-comecar {
+  position: relative; margin-top: 8px; padding: 15px 46px; border-radius: 999px; cursor: pointer;
+  font-family: var(--font-h, system-ui); font-size: 20px; font-weight: 900; letter-spacing: .06em;
+  color: var(--tinta); background: linear-gradient(180deg, #fff3a0, var(--ouro) 50%, var(--ouro2));
+  border: 3px solid #fffbe0; box-shadow: 0 6px 0 #8a4a0a, 0 0 30px rgba(255,210,63,.55);
+  animation: cjxChama 1.2s ease-in-out infinite;
+}
+.cjx-comecar:active { transform: translateY(4px); box-shadow: 0 2px 0 #8a4a0a; }
+@keyframes cjxChama { 50% { transform: scale(1.05); } }
+.cjx-splash-nota { position: relative; font-size: 11px; color: rgba(255,255,255,.55); }
+
+.cjx-big { background: rgba(10,4,24,.86); cursor: pointer; text-align: center; gap: 4px; }
+.cjx-big-moedas { position: absolute; inset: 0; pointer-events: none; }
+.cjx-big-moedas i {
+  position: absolute; top: -50px; aspect-ratio: 1;
+  background: url('/Jogos/assets/corujinha/sim-moeda.png') center / contain no-repeat;
+  animation: cjxCai 2s linear infinite;
+}
+@keyframes cjxCai { to { transform: translateY(115vh) rotate(var(--g, 360deg)); } }
+.cjx-big-tit {
+  position: relative; padding: 0 10px;
+  font-family: var(--font-h, system-ui); font-weight: 900; font-size: clamp(30px, 10vw, 50px); letter-spacing: .03em; line-height: 1.05;
+  background: linear-gradient(180deg, #fffbe0 0%, #ffd23f 45%, #f08c00 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 3px 0 #5a189a) drop-shadow(0 5px 0 #2a0f57) drop-shadow(0 0 18px rgba(255,210,63,.6));
+}
+.cjx-pulo { animation: cjxPulo .5s cubic-bezier(.3,1.7,.5,1); }
+@keyframes cjxPulo { 0% { transform: scale(.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+.cjx-big-num {
+  position: relative; font-family: var(--font-h, system-ui); font-weight: 900; font-size: clamp(40px, 14vw, 66px); color: #fff;
+  text-shadow: 0 3px 0 #b8620e, 0 0 24px rgba(255,210,63,.8);
+}
+.cjx-big-item { position: relative; }
+.cjx-big-item-card {
+  display: flex; align-items: center; gap: 12px; margin: 8px 16px; padding: 10px 14px; border-radius: 14px; text-align: left;
+  background: rgba(255,255,255,.08); border: 2px solid rgba(255,210,63,.5);
+}
+.cjx-big-item-card img { width: 72px; height: 48px; object-fit: contain; border-radius: 8px; background: rgba(0,0,0,.3); }
+.cjx-big-item-ico { font-size: 36px; }
+.cjx-big-item-card b { display: block; font-size: 16px; color: var(--ouro); }
+.cjx-big-item-card small { display: block; font-size: 12px; color: rgba(255,255,255,.75); }
+.cjx-big-dica { position: relative; margin-top: 10px; font-size: 11px; color: rgba(255,255,255,.5); }
+
+.cjx-tabela { background: rgba(10,4,24,.78); padding: 16px; }
+.cjx-tabela-box {
+  position: relative; width: min(440px, 100%); max-height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 16px; border-radius: 18px; background: #1a0b33; border: 2px solid rgba(255,210,63,.45);
+  box-shadow: 0 12px 40px rgba(0,0,0,.6);
+}
+.cjx-tabela-x { position: absolute; top: 10px; right: 10px; }
+.cjx-tabela-tit { font-family: var(--font-h, system-ui); font-weight: 900; font-size: 20px; color: var(--ouro); margin-bottom: 6px; }
+.cjx-tabela-p { font-size: 12.5px; color: rgba(255,255,255,.75); margin: 0 0 8px; }
+.cjx-tabela-sub { margin: 14px 0 6px; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.55); }
+.cjx-tp { display: flex; align-items: center; gap: 10px; padding: 5px 0; border-top: 1px solid rgba(255,255,255,.08); }
+.cjx-tp-sims { display: flex; gap: 2px; flex-shrink: 0; }
+.cjx-tp .cjx-s { width: 30px; height: 30px; border-radius: 6px; background: #2b1452; }
+.cjx-tp .cjx-s i { inset: 8%; }
+.cjx-tp .cjx-s b { display: none; }
+.cjx-tp-nome { flex: 1; font-size: 13px; font-weight: 700; }
+.cjx-tp > b { font-family: var(--font-h, system-ui); font-size: 16px; color: var(--ouro); }
+.cjx-minis { display: flex; justify-content: space-between; gap: 6px; }
+.cjx-mini { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-weight: 800; color: rgba(255,255,255,.7); }
+.cjx-mini-g { display: grid; grid-template-columns: repeat(3, 12px); gap: 2px; }
+.cjx-mini-g i { width: 12px; height: 12px; border-radius: 2px; background: rgba(255,255,255,.12); }
+.cjx-mini-g i.on { background: var(--ouro); }
+.cjx-tabela-ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: rgba(255,255,255,.82); }
+.cjx-tabela-ul li { margin-bottom: 5px; }
+.cjx-tabela-ul b { color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cjx-coruja, .cjx-ceu i, .cjx-splash-raios, .cjx-big-raios, .cjx-comecar, .cjx-ganha .cjx-s i, .cjx-trava::after { animation: none !important; }
+}

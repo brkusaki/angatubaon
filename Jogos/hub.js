@@ -962,6 +962,7 @@
     if (window.DocesGame     && typeof window.DocesGame.parar     === 'function') window.DocesGame.parar();
     if (window.Game2048      && typeof window.Game2048.parar      === 'function') window.Game2048.parar();
     if (window.ArmadilhaGame && typeof window.ArmadilhaGame.parar === 'function') window.ArmadilhaGame.parar();
+    if (window.CorujinhaGame && typeof window.CorujinhaGame.parar === 'function') window.CorujinhaGame.parar();
     // Negócios da Cidade: parar() só mata timers e fecha modal — a partida
     // em andamento sobrevive de propósito, pra quem sai pro menu por engano
     // conseguir voltar de onde parou (ver _retomar em negocios.js).
@@ -1177,6 +1178,9 @@
     // 2048 da Coruja: solo sem fases (corrida única, sem "vitória final"
     // que trava o jogo) — ranking = maior pontuação, igual a Voo/Piano.
     '2048': { js: '/Jogos/2048.min.js', css: '/Jogos/2048.css', global: 'Game2048' },
+    // Corujinha: slot 3×3 da coruja (moedas/cosméticos, 100% local). Monta
+    // tudo em #corujinha-root — ver Jogos/corujinha.js.
+    corujinha: { js: '/Jogos/corujinha.min.js', css: '/Jogos/corujinha.css', global: 'CorujinhaGame' },
     // Armadilha da Coruja: platformer de armadilhas (estilo Level Devil),
     // solo com 3 fases, sem ranking. Desenha tudo em #armadilha-root.
     armadilha: { js: '/Jogos/armadilha.min.js', css: '/Jogos/armadilha.css', global: 'ArmadilhaGame' },
@@ -1207,6 +1211,15 @@
      cacheia js/css deles no cache principal via stale-while-revalidate.
      Quem consome esta lista é o _jogosCacheAssets logo abaixo. */
   var JOGOS_ASSETS = {
+    corujinha: [
+      '/Jogos/corujinha.min.js', '/Jogos/corujinha.css',
+      '/Jogos/assets/corujinha/coruja-sheet.png', '/Jogos/assets/corujinha/moldura.png',
+      '/Jogos/assets/corujinha/skyline.png',
+      '/Jogos/assets/corujinha/sim-coruja.png', '/Jogos/assets/corujinha/sim-coroa.png',
+      '/Jogos/assets/corujinha/sim-igreja.png', '/Jogos/assets/corujinha/sim-livro.png',
+      '/Jogos/assets/corujinha/sim-estrela.png', '/Jogos/assets/corujinha/sim-milho.png',
+      '/Jogos/assets/corujinha/sim-moeda.png', '/Jogos/assets/corujinha/sim-ovo.png'
+    ],
     corrida: [
       '/Jogos/corrida.min.js', '/Jogos/corrida.css',
       '/Jogos/assets/corrida/arma.webp',
@@ -1438,7 +1451,8 @@
   function _abrirJogo(nome) {
     // Registra a ofensiva do dia (qualquer jogo conta). Guarda se aumentou
     // pra animar a chama quando a pessoa voltar ao menu de jogos.
-    _streakAumentouAgora = _streakRegistrar();
+    // A Corujinha (jogo de sorte) não conta pra ofensiva.
+    _streakAumentouAgora = (nome === 'corujinha') ? false : _streakRegistrar();
     // Tela cheia NATIVA: estamos dentro do gesto de toque no card do jogo,
     // então o navegador aceita. (No menu não pedimos — só ao abrir um jogo.)
     _entrarTelaCheia();
@@ -2963,346 +2977,24 @@
   window.lojaAbrir  = lojaAbrir;
   window.lojaFechar = lojaFechar;
 
-  /* ══════════════════════════════════════════════════════════════
-     CORUJINHA — slot temático da coruja (mini-jogo de sorte)
-     100% local, como o resto da economia: debita a aposta e credita o
-     prêmio com _moedasAdd/_invSalvar. O resultado é sorteado ANTES de o
-     giro começar e já vale no saldo/inventário — a animação é só visual,
-     então fechar a tela no meio não perde nem duplica prêmio.
-     NÃO grava stats (_statsRegistrarPartida): as regras do Firestore só
-     aceitam chaves de jogos conhecidas em stats e rejeitariam o perfil
-     público inteiro. Também não conta pra ofensiva diária.
-  ══════════════════════════════════════════════════════════════ */
-  var CJ_APOSTA_MIN = 5;
-  var CJ_APOSTA_MAX = 50;
-  var CJ_APOSTAS = [5, 10, 25, 50];   // botões rápidos (+ "Máx" = min(50, saldo))
-
-  /* ── TABELA DE PESOS E PAYOUTS (mexer aqui = mexer na economia) ──────
-     Cada giro: 1º sorteia o OVO DOURADO (cosmético) com chance
-     aposta × CJ_OVO_POR_MOEDA (5 → 0,1% · 50 → 1%) — proporcional à
-     aposta pra o valor esperado do cosmético ficar ~3% da aposta em
-     qualquer faixa (item médio ≈ 150 🪙). Se não saiu, sorteia uma linha
-     abaixo por peso; payout = floor(aposta × mult).
-     Retorno esperado (RTP) ≈ 82% (simulado; pior caso = item sempre novo,
-     valendo o preço cheio): a casa fica com ~18% por giro, então a
-     Corujinha drena moedas em vez de criá-las. Como cada partida dos
-     jogos paga no máx. 25 🪙, o teto em moedas é 10× (nada de jackpot de
-     milhares de moedas) — o prêmio grande raro é o cosmético.
-       peso  mult  símbolos
-        465   0×   sem prêmio (pode mostrar um "quase": par de símbolos)
-        170  0,5×  1 🪙
-        180   1×   2 🪙
-        110   2×   ⛪⛪⛪ ou 📚📚📚
-         45   3×   🦉🦉🦉
-         25   5×   ⭐⭐⭐
-          5  10×   👑👑👑            (total 1000)               */
-  var CJ_OVO_POR_MOEDA = 0.0002;
-  var CJ_CONVERSAO = 0.45;            // cosmético repetido → 45% do preço em moedas
-  var CJ_TABELA = [
-    { id: 'perde',   peso: 465, mult: 0   },
-    { id: 'moeda1',  peso: 170, mult: 0.5 },
-    { id: 'moeda2',  peso: 180, mult: 1   },
-    { id: 'trinca2', peso: 110, mult: 2   },
-    { id: 'coruja',  peso: 45,  mult: 3   },
-    { id: 'estrela', peso: 25,  mult: 5   },
-    { id: 'coroa',   peso: 5,   mult: 10  }
-  ];
-  var CJ_PESO_TOTAL = CJ_TABELA.reduce(function (t, l) { return t + l.peso; }, 0);
-
-  var CJ_MOEDA = '🪙';
-  var CJ_FILLER = ['🦉', '⭐', '⛪', '📚', '🥚', '👑', '🔥'];   // símbolos "sem moeda"
-  var CJ_TODOS = CJ_FILLER.concat([CJ_MOEDA]);                   // o que gira na animação
-  var CJ_TIPO_ROTULO = { skin: 'Skin', badge: 'Badge', bg: 'Plano de fundo', card: 'Card' };
-
-  var _cjAposta = 10;
-  var _cjGirando = false;
-  var _cjTimers = [];
-  var _cjPendente = 0;                      // prêmio já creditado, ainda não "revelado" no saldo da tela
-  var _cjAtuais = ['🦉', '🪙', '⭐'];       // o que cada rolo está mostrando
-  var _cjPremiosPronto = false;
-
-  function _cjEl(id) { return document.getElementById(id); }
-  function _cjRand(n) { return Math.floor(Math.random() * n); }
-  function _cjEscolher(arr) { return arr[_cjRand(arr.length)]; }
-  function _cjEmbaralhar(arr) {
-    for (var i = arr.length - 1; i > 0; i--) { var j = _cjRand(i + 1); var t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
-    return arr;
-  }
-  function _cjFillerSem(excl) {
-    return _cjEscolher(CJ_FILLER.filter(function (x) { return excl.indexOf(x) === -1; }));
-  }
-  function _cjSimbolos(id) {
-    var a, b, f;
-    switch (id) {
-      case 'ovo':     return ['🥚', '🥚', '🥚'];
-      case 'coroa':   return ['👑', '👑', '👑'];
-      case 'estrela': return ['⭐', '⭐', '⭐'];
-      case 'coruja':  return ['🦉', '🦉', '🦉'];
-      case 'trinca2': f = _cjEscolher(['⛪', '📚']); return [f, f, f];
-      case 'moeda2':  return _cjEmbaralhar([CJ_MOEDA, CJ_MOEDA, _cjEscolher(CJ_FILLER)]);
-      case 'moeda1':  a = _cjEscolher(CJ_FILLER); b = _cjFillerSem([a]); return _cjEmbaralhar([CJ_MOEDA, a, b]);
-      default:        // sem prêmio: nunca moeda nem trinca; 35% das vezes um par ("quase!")
-        a = _cjEscolher(CJ_FILLER); b = _cjFillerSem([a]);
-        if (Math.random() < 0.35) return _cjEmbaralhar([a, a, b]);
-        return [a, b, _cjFillerSem([a, b])];
-    }
-  }
-
-  // Decide TUDO do giro de uma vez (símbolos, prêmio, item). Não mexe em saldo.
-  function _cjSortear(aposta) {
-    var r = { aposta: aposta, id: 'perde', mult: 0, moedas: 0, item: null, itemNovo: false, simbolos: null };
-    if (Math.random() < aposta * CJ_OVO_POR_MOEDA) {
-      r.id = 'ovo';
-      var pool = LOJA_CATALOGO.filter(function (it) { return it.preco > 0; });
-      var naoTem = pool.filter(function (it) { return !_temItem(it.id); });
-      r.item = _cjEscolher(naoTem.length ? naoTem : pool);   // prefere o que ainda não tem
-      r.itemNovo = !_temItem(r.item.id);
-      r.moedas = r.itemNovo ? 0 : Math.floor(r.item.preco * CJ_CONVERSAO);
-    } else {
-      var x = Math.random() * CJ_PESO_TOTAL, linha = CJ_TABELA[0];
-      for (var i = 0; i < CJ_TABELA.length; i++) {
-        if (x < CJ_TABELA[i].peso) { linha = CJ_TABELA[i]; break; }
-        x -= CJ_TABELA[i].peso;
-      }
-      r.id = linha.id; r.mult = linha.mult; r.moedas = Math.floor(aposta * linha.mult);
-    }
-    r.simbolos = _cjSimbolos(r.id);
-    return r;
-  }
-
-  // Débito da aposta + crédito do prêmio (moedas e/ou item) — tudo no início do giro.
-  function _cjAplicar(r) {
-    _moedasAdd(-r.aposta, 'corujinha-aposta');
-    if (r.item && r.itemNovo) {
-      var inv = _invLer();
-      if (inv.indexOf(r.item.id) === -1) { inv.push(r.item.id); _invSalvar(inv); }
-    }
-    if (r.moedas > 0) _moedasAdd(r.moedas, 'corujinha-premio');
-  }
-
-  // ── Tela ─────────────────────────────────────────────────────────
-  function _cjSaldoVisivel() { return Math.max(0, _moedasLer() - _cjPendente); }
-
-  // Aposta efetiva: entre 5 e min(50, saldo). 0 = sem saldo pra apostar.
-  function _cjClamp() {
-    var teto = Math.min(CJ_APOSTA_MAX, _cjSaldoVisivel());
-    if (teto < CJ_APOSTA_MIN) return 0;
-    if (_cjAposta > teto) _cjAposta = teto;
-    if (_cjAposta < CJ_APOSTA_MIN) _cjAposta = CJ_APOSTA_MIN;
-    return _cjAposta;
-  }
-
-  function _cjMsg(tit, sub, tipo) {
-    var el = _cjEl('cj-msg');
-    if (!el) return;
-    el.className = 'cj-msg' + (tipo ? ' cj-msg-' + tipo : '');
-    el.innerHTML = '<div class="cj-msg-tit">' + tit + '</div>' + (sub ? '<div class="cj-msg-sub">' + sub + '</div>' : '');
-  }
-
-  function _cjAtualizarUI() {
-    var saldo = _cjSaldoVisivel();
-    var s = _cjEl('cj-saldo');
-    if (s) s.textContent = '🪙 ' + saldo;
-    var aposta = _cjClamp();
-    var teto = Math.min(CJ_APOSTA_MAX, saldo);
-    var wrap = _cjEl('cj-apostas');
-    if (wrap) {
-      var html = '';
-      CJ_APOSTAS.forEach(function (v) {
-        html += '<button type="button" class="cj-aposta' + (v === aposta ? ' cj-aposta-ativa' : '') + '"' +
-                (_cjGirando || v > saldo ? ' disabled' : '') + ' onclick="corujinhaApostar(' + v + ')">' + v + '</button>';
-      });
-      html += '<button type="button" class="cj-aposta cj-aposta-max' + (aposta && aposta === teto && CJ_APOSTAS.indexOf(teto) === -1 ? ' cj-aposta-ativa' : '') + '"' +
-              (_cjGirando || teto < CJ_APOSTA_MIN ? ' disabled' : '') + ' onclick="corujinhaApostar(0)">Máx</button>';
-      wrap.innerHTML = html;
-    }
-    var g = _cjEl('cj-girar');
-    if (g) {
-      g.disabled = _cjGirando || !aposta;
-      g.textContent = _cjGirando ? 'Girando…' : (aposta ? 'Girar · ' + aposta + ' 🪙' : 'Sem moedas');
-    }
-  }
-
-  function corujinhaApostar(v) {
-    if (_cjGirando) return;
-    _cjAposta = v ? v : Math.min(CJ_APOSTA_MAX, _moedasLer());   // 0 = "Máx"
-    _cjAtualizarUI();
-  }
-
-  function _cjPct(p) { return (Math.round(p * 10) / 10).toString().replace('.', ','); }
-
-  // Painel "Ver prêmios" — gerado da própria tabela (nunca sai de sincronia).
-  function _cjMontarPremios() {
-    var lista = _cjEl('cj-premios-lista');
-    if (!lista) return;
-    var chance = function (id) {
-      for (var i = 0; i < CJ_TABELA.length; i++) if (CJ_TABELA[i].id === id) return _cjPct(CJ_TABELA[i].peso / CJ_PESO_TOTAL * 100) + '%';
-      return '';
-    };
-    var linhas = [
-      ['🥚🥚🥚',     'Cosmético!', _cjPct(CJ_APOSTA_MIN * CJ_OVO_POR_MOEDA * 100) + '% a ' + _cjPct(CJ_APOSTA_MAX * CJ_OVO_POR_MOEDA * 100) + '%'],
-      ['👑👑👑',     '10× a aposta', chance('coroa')],
-      ['⭐⭐⭐',     '5× a aposta',  chance('estrela')],
-      ['🦉🦉🦉',     '3× a aposta',  chance('coruja')],
-      ['⛪⛪⛪<br>📚📚📚', '2× a aposta', chance('trinca2')],
-      ['🪙🪙',       'Aposta de volta (1×)', chance('moeda2')],
-      ['🪙',         'Metade de volta (0,5×)', chance('moeda1')]
-    ];
-    var html = '';
-    linhas.forEach(function (l) {
-      html += '<div class="cj-premio"><span class="cj-premio-sim">' + l[0] + '</span><span class="cj-premio-txt">' + l[1] + '</span><span class="cj-premio-chance">' + l[2] + '</span></div>';
-    });
-    html += '<div class="cj-premios-nota">O ovo dourado fica mais provável quanto maior a aposta. ' +
-            'Se o cosmético já for seu, vira ' + Math.round(CJ_CONVERSAO * 100) + '% do preço em moedas. ' +
-            'Só moedas e trincas pagam — pares de outros símbolos não. As moedas do app não valem dinheiro.</div>';
-    lista.innerHTML = html;
-  }
-
-  function _cjSimEl(sym) { return '<div class="cj-sim">' + sym + '</div>'; }
-  function _cjStrip(i) {
-    var r = _cjEl('cj-reel-' + i);
-    return r ? r.firstElementChild : null;
-  }
-  function _cjMostrarFixo(i, sym) {
-    var st = _cjStrip(i);
-    if (!st) return;
-    st.style.transition = 'none';
-    st.style.transform = 'none';
-    st.innerHTML = _cjSimEl(sym);
-    _cjAtuais[i] = sym;
-  }
-  // Monta a fita (símbolo atual → vários aleatórios → alvo) e desliza até o alvo.
-  function _cjGirarReel(i, alvo, ms) {
-    var st = _cjStrip(i);
-    if (!st) return;
-    var n = 10 + i * 4;                       // rolos da direita "passam" mais símbolos
-    var h = _cjSimEl(_cjAtuais[i]);
-    for (var k = 0; k < n; k++) h += _cjSimEl(_cjEscolher(CJ_TODOS));
-    h += _cjSimEl(alvo);
-    st.style.transition = 'none';
-    st.style.transform = 'translateY(0)';
-    st.innerHTML = h;
-    void st.offsetHeight;                     // força o reflow antes da transição
-    st.style.transition = 'transform ' + ms + 'ms cubic-bezier(.12,.6,.18,1)';
-    st.style.transform = 'translateY(-' + ((n + 1) * 100 / (n + 2)) + '%)';
-  }
-
-  function _cjSom(nome) {
-    var S = window.AngatubaGames && window.AngatubaGames.som;
-    if (S && typeof S[nome] === 'function') { try { S[nome](); } catch (e) {} }
-  }
-
-  function _cjRevelar(r) {
-    _cjGirando = false;
-    _cjPendente = 0;
-    _cjTimers = [];
-    var maq = _cjEl('cj-maquina');
-    var tipo, tit, sub = '';
-    if (r.id === 'ovo') {
-      tipo = 'vitoria'; tit = '🥚 Ovo dourado!';
-      sub = r.itemNovo
-        ? 'Novo no seu inventário: <b>' + _rankEsc(r.item.nome) + '</b> (' + (CJ_TIPO_ROTULO[r.item.tipo] || 'item') + ')'
-        : 'Você já tinha <b>' + _rankEsc(r.item.nome) + '</b> → +' + r.moedas + ' 🪙';
-      _cjSom('nivelUp');
-    } else if (r.mult > 1) {
-      tipo = 'vitoria'; tit = 'Você ganhou +' + r.moedas + ' 🪙!'; sub = r.mult + '× a aposta';
-      _cjSom(r.mult >= 3 ? 'bonus' : 'acerto');
-    } else if (r.mult === 1) {
-      tipo = 'neutro'; tit = 'Aposta de volta'; sub = '+' + r.moedas + ' 🪙';
-      _cjSom('toque');
-    } else if (r.mult > 0) {
-      tipo = 'neutro'; tit = 'Quase! Metade de volta'; sub = '+' + r.moedas + ' 🪙';
-      _cjSom('toque');
-    } else {
-      var par = r.simbolos[0] === r.simbolos[1] || r.simbolos[1] === r.simbolos[2] || r.simbolos[0] === r.simbolos[2];
-      tipo = 'derrota'; tit = par ? 'Quase!' : 'Não foi dessa vez'; sub = 'Tente de novo.';
-    }
-    if (maq) { maq.classList.remove('cj-girando'); maq.classList.add('cj-' + tipo); }
-    _cjMsg(tit, sub, tipo);
-    _cjAtualizarUI();
-  }
-
-  function corujinhaGirar() {
-    if (_cjGirando) return;
-    var aposta = _cjClamp();
-    if (!aposta || _moedasLer() < aposta) {
-      _cjMsg('Faltam moedas', 'Você precisa de pelo menos ' + CJ_APOSTA_MIN + ' 🪙 — jogue um mini-jogo pra ganhar mais.', 'derrota');
-      _cjSom('erro');
-      _cjAtualizarUI();
-      return;
-    }
-    var r = _cjSortear(aposta);       // resultado decidido AQUI, antes de qualquer animação
-    _cjPendente = r.moedas;           // o saldo da tela só "sobe" quando os rolos param
-    _cjAplicar(r);
-    _cjGirando = true;
-
-    var maq = _cjEl('cj-maquina');
-    if (maq) { maq.classList.remove('cj-vitoria', 'cj-neutro', 'cj-derrota'); maq.classList.add('cj-girando'); }
-    _cjMsg('Girando…', '', '');
-    _cjAtualizarUI();
-    _cjSom('toque');
-
-    var reduzido = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    var base = reduzido ? 150 : 1000, passo = reduzido ? 120 : 450;
-    r.simbolos.forEach(function (sim, i) {
-      var ms = base + i * passo;
-      _cjGirarReel(i, sim, ms);
-      _cjTimers.push(setTimeout(function () { _cjMostrarFixo(i, sim); _cjSom('toque'); }, ms + 30));
-    });
-    _cjTimers.push(setTimeout(function () { _cjRevelar(r); }, base + 2 * passo + 90));
-  }
-
-  function _cjPrepararTela() {
-    if (!_cjPremiosPronto) { _cjMontarPremios(); _cjPremiosPronto = true; }
-    if (!_cjGirando) {
-      for (var i = 0; i < 3; i++) _cjMostrarFixo(i, _cjAtuais[i]);
-      var maq = _cjEl('cj-maquina');
-      if (maq) maq.classList.remove('cj-girando', 'cj-vitoria', 'cj-neutro', 'cj-derrota');
-      _cjMsg('Escolha a aposta e gire!', 'Três 🥚 dão um cosmético.', '');
-    }
-    _cjAtualizarUI();
-  }
-
+  /* ── Corujinha (slot 3×3) — o jogo mora em Jogos/corujinha.js (módulo
+     sob demanda, ver JOGOS_EXTERNOS). Aqui só as portas de entrada: card
+     do menu, atalho da Loja e a ponte. Vindo da Loja, SUBSTITUI a entrada
+     'loja' do histórico pela do jogo (em vez de empilhar), pra o "voltar"
+     levar ao menu sem deixar entrada órfã. Não conta ofensiva (ver
+     _abrirJogo). */
   function corujinhaAbrir() {
-    var tela = document.getElementById('jogo-corujinha');
-    if (!tela) return;
-    // Chamado de fora do hub (ponte/deep link): abre o hub antes.
     if (typeof _gamesHubAberto === 'function' && !_gamesHubAberto()) {
       if (typeof _abrirGamesHub === 'function') _abrirGamesHub();
     }
-    if (typeof _pararJogosExternos === 'function') _pararJogosExternos();
-
-    // Mesmo esquema da Loja: esconde o menu e as outras telas.
-    var menu = document.getElementById('games-menu');
-    if (menu) menu.style.display = 'none';
-    var telas = document.querySelectorAll('.jogo-tela');
-    for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
-    tela.style.display = 'flex';
-
-    var hubEl = document.getElementById('games-hub');
-    if (hubEl) hubEl.classList.add('jogo-ativo');
-
-    _cjPrepararTela();
-
-    // Vindo da Loja, SUBSTITUI a entrada do histórico (em vez de empilhar)
-    // — assim o "voltar" leva ao menu de jogos sem deixar uma entrada
-    // 'loja' órfã pra trás.
-    var st = history.state && history.state.modal;
-    if (st === 'loja') history.replaceState({ modal: 'corujinha' }, '');
-    else if (st !== 'corujinha') history.pushState({ modal: 'corujinha' }, '');
+    if (history.state && history.state.modal === 'loja') history.replaceState({ modal: 'jogo' }, '');
+    _abrirJogo('corujinha');
   }
-
-  function corujinhaFechar(viaPopstate) {
-    // Volta pro menu de jogos (esconde todas as .jogo-tela, incl. esta). Um
-    // giro em andamento termina sozinho em segundo plano — o prêmio já foi
-    // aplicado no início, então nada se perde.
+  function corujinhaFechar() {
     if (typeof _voltarAoMenu === 'function') _voltarAoMenu();
-    if (!viaPopstate && history.state && history.state.modal === 'corujinha') { _popstateNosso = true; history.back(); }
   }
   window.corujinhaAbrir  = corujinhaAbrir;
   window.corujinhaFechar = corujinhaFechar;
-  window.corujinhaGirar  = corujinhaGirar;
-  window.corujinhaApostar = corujinhaApostar;
 
   /* ══════════════════════════════════════════════════════════════
      MEU PERFIL — TELA ESTILO STEAM (Camada 2)
@@ -4423,6 +4115,14 @@
     temItem: function (id) { return _temItem(id); },
     equipado: function (slot) { return _equipadoLer()[slot] || null; },
     comprarItem: function (id) { return _comprarItem(id); },
+    // Dá um item do catálogo de graça (prêmio — ex.: ovo dourado da Corujinha).
+    // Só ids do catálogo; não equipa. Retorna false se o id não existe.
+    ganharItem: function (id) {
+      if (!_lojaItemPorId(id)) return false;
+      var inv = _invLer();
+      if (inv.indexOf(id) === -1) { inv.push(id); _invSalvar(inv); }
+      return true;
+    },
     equiparItem: function (slot, id) { return _equiparItem(slot, id); },
     statsJogo: function (jogoKey) { return _statsJogo(jogoKey); },
     statsRegistrarPartida: function (jogoKey, dados) { return _statsRegistrarPartida(jogoKey, dados); },

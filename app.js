@@ -16321,14 +16321,21 @@ ${urlCard}`)}`;
     // cliRenderRecordes vive no Jogos/hub.js (lazy) — quem abre a conta sem
     // nunca ter aberto os jogos nesta sessão ainda não tem essa função;
     // carrega o hub em paralelo e preenche assim que estiver pronto.
+    // Junto com os recordes vêm os cosméticos do banner (fundo, moldura e
+    // títulos equipados), que também moram no hub.
+    _cliContaResumo = { amigos: null, recordes: null, lojas: null, livros: null };
+    _cliContaGradePintar();
+    _cliContaHeroCosmeticos();
     if (typeof cliRenderRecordes === 'function') {
       cliRenderRecordes();
     } else if (typeof _carregarHubJogos === 'function') {
       _carregarHubJogos().then(function () {
         if (typeof cliRenderRecordes === 'function') cliRenderRecordes();
+        _cliContaHeroCosmeticos();
       }).catch(function () {});
     }
     cliRenderFavoritos();
+    cliRenderBiblioteca();
     // Amigos (4.3): liga os listeners só enquanto o painel está aberto.
     cliAmigosRender();
     // Garante o binding do seletor de foto (idempotente).
@@ -16576,6 +16583,7 @@ ${urlCard}`)}`;
       }
       if (loja) itens.push({ idx: idx, loja: loja });
     });
+    cliContaResumoSet('lojas', itens.length);
     if (!itens.length) {
       wrap.innerHTML = '';
       if (vazio) vazio.style.display = 'block';
@@ -16600,6 +16608,147 @@ ${urlCard}`)}`;
         '<span class="cli-fav-nome">' + nome + '</span>' +
         '<i class="fa fa-chevron-right cli-fav-seta"></i></div>';
     }).join('');
+  }
+
+  /* ── Resumo 2×2 do painel (mesma grade do "Meu perfil" dos jogos) ──
+     Cada seção do painel avisa a sua contagem via cliContaResumoSet
+     quando termina de carregar; enquanto não chega, o card mostra "—".
+     Mesmo HTML/classes de _perfilGradeHtml (Jogos/hub.js), mas montado
+     aqui porque o painel não depende do hub de jogos estar carregado. */
+  var _cliContaResumo = { amigos: null, recordes: null, lojas: null, livros: null };
+  var CLI_CONTA_GRADE = [
+    ['amigos', 'Amigos'], ['recordes', 'Recordes'], ['lojas', 'Lojas'], ['livros', 'Livros']
+  ];
+  function cliContaResumoSet(chave, valor) {
+    if (_cliContaResumo[chave] === valor) return;
+    _cliContaResumo[chave] = valor;
+    _cliContaGradePintar();
+  }
+  function _cliContaGradePintar() {
+    var el = document.getElementById('cli-conta-grade');
+    if (!el) return;
+    el.innerHTML = CLI_CONTA_GRADE.map(function (g) {
+      var v = _cliContaResumo[g[0]];
+      var txt = (v == null) ? '—' : String(v);
+      var vazio = (v == null || v === 0);
+      return '<div class="perfil-grade-item' + (vazio ? ' perfil-grade-item-vazio' : '') + '">' +
+        '<div class="perfil-grade-num">' + txt + '</div>' +
+        '<div class="perfil-grade-label">' + g[1] + '</div></div>';
+    }).join('');
+  }
+
+  /* ── Banner do painel com os cosméticos dos jogos ──
+     Reaproveita as funções do "Meu perfil" (Jogos/hub.js) pra o banner
+     ficar idêntico ao de lá: fundo (_perfilBgEstilo), moldura do card
+     (_perfilCardClasse), badge em texto (_perfilTituloHtml) e títulos de
+     conquista (_perfilTitulosConquistaHtml). Sem o hub carregado ainda,
+     fica o gradiente padrão do .perfil-hero — e é chamada de novo assim
+     que ele chega (ver cliAbrirPainelConta). */
+  function _cliContaHeroCosmeticos() {
+    if (typeof _equipadoLer !== 'function') return;
+    var hero = document.getElementById('cli-conta-hero');
+    var ident = document.getElementById('cli-conta-identidade');
+    var tits = document.getElementById('cli-conta-titulos');
+    try {
+      var eq = _equipadoLer() || {};
+      if (hero && typeof _perfilBgEstilo === 'function') hero.setAttribute('style', _perfilBgEstilo(eq.bg) || '');
+      if (ident && typeof _perfilCardClasse === 'function') ident.className = ('perfil-identidade ' + _perfilCardClasse(eq.card)).trim();
+      if (tits) {
+        tits.innerHTML =
+          (typeof _perfilTituloHtml === 'function' ? _perfilTituloHtml(eq) : '') +
+          ((typeof _perfilTitulosConquistaHtml === 'function' && typeof _titulosEquipadosLer === 'function')
+            ? _perfilTitulosConquistaHtml(_titulosEquipadosLer()) : '');
+      }
+    } catch (e) {}
+  }
+
+  /* ── Minha biblioteca (Biblioteca da Coruja) ───────────────
+     Lendo agora / Favoritos / Quero ler, em prateleiras horizontais de
+     capas. Os dados (e o HTML da capa) vêm de bibContaDados, em
+     Biblioteca/hub.js — carregado sob demanda aqui, igual aos recordes
+     com o hub de jogos. Biblioteca/hub.js chama esta função de novo
+     quando o estado muda (ex.: terminou de ler a cópia do Firestore). */
+  var CLI_BIB_GRUPOS = [
+    { k: 'lendo', tit: 'Lendo agora', ico: 'fa-book-open-reader' },
+    { k: 'fav',   tit: 'Favoritos',   ico: 'fa-heart' },
+    { k: 'quero', tit: 'Quero ler',   ico: 'fa-bookmark' }
+  ];
+  function cliRenderBiblioteca() {
+    var wrap = document.getElementById('cli-conta-bib');
+    if (!wrap) return;
+    if (typeof window.bibContaDados !== 'function') {
+      if (!wrap.innerHTML) wrap.innerHTML = '<div class="cli-bib-carregando">Carregando…</div>';
+      _carregarBiblioteca().then(function () {
+        if (typeof window.bibContaDados === 'function') cliRenderBiblioteca();
+      }).catch(function () {
+        wrap.innerHTML = '<div class="cli-bib-carregando">Não deu pra carregar sua biblioteca agora.</div>';
+      });
+      return;
+    }
+    var d;
+    try { d = window.bibContaDados(); } catch (e) { return; }
+    cliContaResumoSet('livros', d.total);
+    var html = '';
+    CLI_BIB_GRUPOS.forEach(function (g) {
+      var itens = d[g.k] || [];
+      if (!itens.length) return;
+      html += '<div class="cli-bib-grupo">' +
+        '<div class="cli-bib-grupo-tit"><i class="fa ' + g.ico + '" aria-hidden="true"></i> ' + g.tit +
+          ' <span class="cli-bib-n">' + itens.length + '</span></div>' +
+        '<div class="cli-bib-prateleira">' +
+        itens.map(function (l) {
+          var pct = Math.round((l.pct || 0) * 100);
+          var prog = (g.k === 'lendo')
+            ? '<span class="cli-bib-prog"><span style="width:' + pct + '%"></span></span>' +
+              '<span class="cli-bib-pct">' + pct + '%</span>'
+            : '<span class="cli-bib-autor">' + escHTML(l.autor) + '</span>';
+          return '<button type="button" class="cli-bib-livro" onclick="cliAbrirLivroConta(\'' + escHTML(l.id) + '\')" ' +
+            'aria-label="' + escHTML(l.titulo) + '">' +
+            '<span class="cli-bib-capa">' + l.capa + '</span>' +
+            '<span class="cli-bib-tit">' + escHTML(l.titulo) + '</span>' + prog +
+          '</button>';
+        }).join('') +
+        '</div></div>';
+    });
+    if (!html) {
+      wrap.innerHTML =
+        '<div class="cli-conta-fav-vazio">' +
+          '<i class="fa fa-book-open cli-conta-fav-vazio-ico" aria-hidden="true"></i>' +
+          '<p>Nenhum livro nas suas listas ainda.<br>Favorite um clássico ou comece a ler.</p>' +
+          '<button type="button" class="empty-action" onclick="cliAbrirLivroConta()">' +
+            '<i class="fa fa-book" aria-hidden="true"></i> Abrir biblioteca</button>' +
+        '</div>';
+      return;
+    }
+    if (d.lidos > 0) {
+      html += '<button type="button" class="cli-bib-lidos" onclick="cliAbrirLivroConta()">' +
+        '<i class="fa fa-circle-check" aria-hidden="true"></i> ' + d.lidos +
+        (d.lidos === 1 ? ' livro lido' : ' livros lidos') + '<i class="fa fa-chevron-right"></i></button>';
+    }
+    wrap.innerHTML = html;
+  }
+
+  // Abre a biblioteca (e o livro, se veio id) a partir do painel. Fecha
+  // o painel antes e espera o history.back() dele assentar — mesmo
+  // intervalo de cliAbrirLojaFav.
+  function cliAbrirLivroConta(id) {
+    cliFecharPainelConta();
+    setTimeout(function () {
+      _carregarBiblioteca().then(function () {
+        if (typeof window._abrirBiblioteca === 'function') window._abrirBiblioteca();
+        if (id && typeof window._bibAbrirLivro === 'function') window._bibAbrirLivro(id);
+      }).catch(function () {
+        if (typeof showToastSimples === 'function') showToastSimples('Não foi possível abrir a biblioteca. Verifique a conexão.', '/webp/owl-sign.webp');
+      });
+    }, 220);
+  }
+
+  // "Ver jogos" do vazio de recordes: fecha o painel e abre o hub.
+  function cliAbrirJogosConta() {
+    cliFecharPainelConta();
+    setTimeout(function () {
+      if (typeof window._abrirGamesHub === 'function') window._abrirGamesHub();
+    }, 220);
   }
 
   function cliAbrirLojaFav(idx) {
@@ -17393,6 +17542,7 @@ ${urlCard}`)}`;
       elLista.innerHTML = '';
       if (elPed) { elPed.innerHTML = ''; elPed.style.display = 'none'; }
       if (elVazio) elVazio.style.display = 'block';
+      cliContaResumoSet('amigos', 0);
       return;
     }
 
@@ -17408,6 +17558,7 @@ ${urlCard}`)}`;
 
     _amUnsubLista = window.AngatubaAmigos.observarAmigos(function (amigos) {
       _amSoltarPresencas();
+      cliContaResumoSet('amigos', amigos.length);
       if (!amigos.length) {
         elLista.innerHTML = '';
         if (elVazio) elVazio.style.display = 'block';

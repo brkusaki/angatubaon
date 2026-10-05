@@ -3758,12 +3758,17 @@
         <button class="modal-close" onclick="cliFecharPainelConta()" aria-label="Fechar">✕</button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;">
-        <!-- Cabeçalho: avatar grande (foto ou inicial) + nome/email -->
-        <div class="cli-conta-head">
+        <!-- Cabeçalho no mesmo visual do "Meu perfil" dos jogos: banner
+             (.perfil-hero) com avatar + nome/email. Quando o hub de jogos
+             está carregado, o banner ganha o fundo e a moldura equipados
+             na Loja e os títulos sob o nome (ver _cliContaHeroCosmeticos
+             em app.js). -->
+        <div class="perfil-hero cli-conta-hero" id="cli-conta-hero">
+         <div class="perfil-identidade" id="cli-conta-identidade">
           <div class="cli-conta-avatar" id="cli-conta-avatar">
             <span class="cli-conta-avatar-ini2" id="cli-conta-avatar-ini">?</span>
           </div>
-          <div class="cli-conta-info">
+          <div class="cli-conta-info perfil-identidade-txt">
             <!-- Nome (modo visualização) -->
             <div class="cli-conta-apelido-view" id="cli-conta-apelido-view">
               <div class="nome" id="cli-conta-nome">—</div>
@@ -3778,8 +3783,14 @@
               <button type="button" class="cli-conta-apelido-cancel" onclick="cliCancelarApelido()" aria-label="Cancelar"><i class="fa fa-xmark"></i></button>
             </div>
             <div class="email" id="cli-conta-email"></div>
+            <div id="cli-conta-titulos"></div>
           </div>
+         </div>
         </div>
+
+        <!-- Resumo 2×2 (Amigos / Recordes / Lojas / Livros), igual à
+             grade do perfil de jogos. Preenchida por _cliContaGradePintar. -->
+        <div class="perfil-grade cli-conta-grade" id="cli-conta-grade"></div>
 
         <!-- input de arquivo oculto para a foto -->
         <input type="file" id="cli-conta-foto-input" accept="image/*" style="display:none;" />
@@ -3836,11 +3847,19 @@
         <div class="cli-conta-secao">
           <div class="cli-conta-secao-tit"><i class="fa fa-trophy"></i> Meus recordes</div>
           <div class="cli-conta-recordes" id="cli-conta-recordes"></div>
+          <!-- Sem recorde nenhum ainda: cliRenderRecordes (Jogos/hub.js) mostra este -->
+          <div class="cli-conta-fav-vazio" id="cli-conta-recordes-vazio" style="display:none;">
+            <i class="fa fa-trophy cli-conta-fav-vazio-ico" aria-hidden="true"></i>
+            <p>Nenhum recorde ainda.<br>Jogue e seus recordes aparecem aqui.</p>
+            <button type="button" class="empty-action" onclick="cliAbrirJogosConta()">
+              <i class="fa fa-gamepad" aria-hidden="true"></i> Ver jogos
+            </button>
+          </div>
         </div>
 
         <!-- Lojas favoritas -->
         <div class="cli-conta-secao">
-          <div class="cli-conta-secao-tit"><i class="fa fa-heart"></i> Minhas lojas</div>
+          <div class="cli-conta-secao-tit"><i class="fa fa-heart"></i> Lojas favoritas</div>
           <div class="cli-conta-favoritos" id="cli-conta-favoritos"></div>
           <div class="cli-conta-fav-vazio" id="cli-conta-favoritos-vazio" style="display:none;">
             <i class="fa fa-heart cli-conta-fav-vazio-ico" aria-hidden="true"></i>
@@ -3849,6 +3868,14 @@
               <i class="ti ti-compass" aria-hidden="true"></i> Explorar lojas
             </button>
           </div>
+        </div>
+
+        <!-- Biblioteca da Coruja: lendo agora / favoritos / quero ler.
+             Os dados vêm de Biblioteca/hub.js (bibContaDados), carregado
+             sob demanda ao abrir o painel — ver cliRenderBiblioteca. -->
+        <div class="cli-conta-secao">
+          <div class="cli-conta-secao-tit"><i class="fa fa-book-open"></i> Minha biblioteca</div>
+          <div id="cli-conta-bib"></div>
         </div>
 
         <!-- Configurações: agrupadas e destacadas do conteúdo acima -->

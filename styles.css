@@ -5897,46 +5897,53 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
     .cli-conta-apelido-ok:active, .cli-conta-apelido-cancel:active { opacity: 0.6; }
     .cli-conta-apelido-ok:disabled { opacity: 0.5; cursor: default; }
 
-    /* ── Seções (recordes / favoritas) ── */
-    .cli-conta-secao { padding: 20px 0 4px; border-top: 1px solid var(--border); }
+    /* ── Seções (amigos / recordes / favoritas / biblioteca) ──
+       Mesmo título do "Meu perfil" dos jogos (.perfil-secao-titulo):
+       texto normal em negrito, sem caixa-alta nem linha divisória. */
+    .cli-conta-secao { padding: 4px 0 0; }
     .cli-conta-secao-tit {
-      font-family: var(--font-h); font-weight: 800; font-size: 13px;
-      text-transform: uppercase; letter-spacing: 0.05em;
-      color: var(--muted); margin-bottom: 12px;
+      font-family: var(--font-h); font-weight: 800; font-size: 13.5px;
+      color: var(--text); margin-bottom: 9px;
       display: flex; align-items: center; gap: 8px;
     }
     .cli-conta-secao-tit i { color: var(--red); font-size: 13px; }
 
-    /* ── Recordes: grid de cards (2 colunas no mobile) ── */
-    .cli-conta-recordes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    /* ── Recordes: linhas iguais à lista "Jogos" do perfil (.perfil-stat-row).
+       O markup vem de cliRenderRecordes (Jogos/hub.js) com .cli-rec-top
+       envolvendo ícone+valor; display:contents solta os dois pra grade da
+       linha, e "order" põe o valor no fim. ── */
+    .cli-conta-recordes { display: flex; flex-direction: column; gap: 6px; }
     .cli-rec-item {
-      display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
-      padding: 14px; border-radius: var(--r-md);
+      display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center; gap: 10px;
+      padding: 8px 12px; border-radius: 14px;
       background: var(--surface2); border: 1px solid var(--border);
     }
-    .cli-rec-top { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+    .cli-rec-top { display: contents; }
     .cli-rec-ico {
+      order: 1;
       display: flex; align-items: center; justify-content: center;
-      width: 34px; height: 34px; border-radius: 10px;
-      font-size: 17px; line-height: 1; background: var(--bg);
+      width: 30px; height: 30px; border-radius: 9px;
+      font-size: 15px; line-height: 1; background: var(--bg);
       flex-shrink: 0;
     }
-    .cli-rec-nome { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+    .cli-rec-nome { order: 2; min-width: 0; font-size: 13px; color: var(--text); font-weight: 600; }
     .cli-rec-sub {
       font-size: 10.5px; color: var(--muted); font-weight: 500;
       margin-left: 5px; padding: 1px 7px; border-radius: 999px;
       background: rgba(255,255,255,0.06);
     }
     .cli-rec-val {
-      font-family: var(--font-h); font-weight: 800; font-size: 24px;
-      color: var(--red); flex-shrink: 0; line-height: 1;
+      order: 3;
+      font-family: var(--font-h); font-weight: 800; font-size: 19px;
+      color: var(--rc, var(--red)); flex-shrink: 0; line-height: 1;
     }
 
     /* ── Favoritas (mini-cards) ── */
     .cli-conta-favoritos { display: flex; flex-direction: column; gap: 8px; }
     .cli-fav-item {
       display: flex; align-items: center; gap: 12px;
-      padding: 10px 12px; border-radius: var(--r-md); cursor: pointer;
+      padding: 10px 12px; border-radius: 14px; cursor: pointer;
       background: var(--surface2); border: 1px solid var(--border);
       -webkit-tap-highlight-color: transparent;
     }
@@ -5957,6 +5964,94 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .cli-fav-seta { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+
+    /* ── Banner do painel = .perfil-hero do "Meu perfil" dos jogos ──
+       Aqui ele é um card dentro da sheet (com borda e cantos), não
+       full-bleed. Fundo/moldura equipados entram via inline style e
+       classe (ver _cliContaHeroCosmeticos em app.js). */
+    /* .perfil-hero.cli-conta-hero (2 classes): as regras do .perfil-hero
+       vêm mais abaixo no arquivo e ganhariam num empate. */
+    .perfil-hero.cli-conta-hero {
+      margin: 0; min-height: 172px; padding: 30px 16px 18px;
+      border-radius: 20px; border: 1px solid rgba(56,189,248,0.22);
+    }
+    .cli-conta-hero .cli-conta-avatar {
+      width: 84px; height: 84px;
+      border: 3px solid rgba(255,255,255,0.28);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    }
+    .cli-conta-hero .cli-conta-info .nome { color: #fff; font-size: 19px; }
+    .cli-conta-hero .cli-conta-info .email { color: rgba(255,255,255,0.65); }
+    .cli-conta-hero .cli-conta-apelido-btn { color: #fff; opacity: 0.7; }
+    .cli-conta-hero .perfil-titulo,
+    .cli-conta-hero .perfil-titulos-conquista { max-width: none; }
+    body.light-mode .cli-conta-hero .perfil-identidade { background: none; }
+    body.light-mode .cli-conta-hero .perfil-identidade.perfil-card-ouro {
+      background: linear-gradient(135deg, rgba(251,191,36,.16), rgba(9,14,22,.42));
+    }
+    body.light-mode .cli-conta-hero .perfil-titulo { color: #fbbf24; }
+    body.light-mode .cli-conta-hero .perfil-titulo-conquista {
+      background: rgba(56,189,248,0.16); border-color: rgba(56,189,248,0.4); color: #7dd3fc;
+    }
+    .perfil-grade.cli-conta-grade { margin: 0; }
+
+    /* ── Minha biblioteca: prateleiras de capas (mesma "prateleira com
+       fundo próprio" da vitrine de insígnias do perfil de jogos) ── */
+    .cli-bib-grupo { margin-bottom: 10px; }
+    .cli-bib-grupo-tit {
+      display: flex; align-items: center; gap: 6px; margin: 0 0 6px 2px;
+      font-size: 12px; font-weight: 700; color: var(--muted);
+    }
+    .cli-bib-grupo-tit i { color: #f59e0b; font-size: 12px; }
+    .cli-bib-n {
+      padding: 0 7px; border-radius: 999px; font-size: 10.5px;
+      background: var(--surface2); border: 1px solid var(--border);
+    }
+    .cli-bib-prateleira {
+      display: flex; gap: 10px; overflow-x: auto;
+      padding: 10px; border-radius: 16px;
+      background: var(--surface2); border: 1px solid var(--border);
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .cli-bib-prateleira::-webkit-scrollbar { display: none; }
+    .cli-bib-livro {
+      flex: 0 0 auto; width: 72px; padding: 0; border: none; background: none;
+      display: flex; flex-direction: column; gap: 4px; text-align: left;
+      color: var(--text); cursor: pointer; font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-bib-livro:active .cli-bib-capa { transform: scale(0.96); }
+    /* Caixa da capa com tamanho fixo aqui no styles.css: o biblioteca.css
+       chega depois (lazy) e, sem isto, o <img> 480×715 nasceria gigante. */
+    .cli-bib-capa {
+      position: relative; display: block; width: 72px; aspect-ratio: 2 / 3;
+      border-radius: 4px 8px 8px 4px; overflow: hidden; background: var(--bg);
+      transition: transform 0.15s;
+    }
+    .cli-bib-capa .bib-capa { width: 100%; height: 100%; }
+    .cli-bib-capa img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .cli-bib-tit {
+      font-size: 11px; font-weight: 700; line-height: 1.25;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .cli-bib-autor {
+      font-size: 10px; color: var(--muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .cli-bib-prog { display: block; height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; }
+    .cli-bib-prog > span { display: block; height: 100%; background: #f59e0b; }
+    .cli-bib-pct { font-size: 10px; font-weight: 700; color: #f59e0b; }
+    .cli-bib-lidos {
+      width: 100%; display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; border-radius: 14px; cursor: pointer;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); font-size: 13px; font-weight: 600; font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cli-bib-lidos .fa-circle-check { color: #f59e0b; }
+    .cli-bib-lidos .fa-chevron-right { margin-left: auto; color: var(--muted); font-size: 12px; }
+    .cli-bib-lidos:active { opacity: 0.7; }
+    .cli-bib-carregando { font-size: 12.5px; color: var(--muted); padding: 6px 2px; }
 
     /* ── Amigos (4.3) ──
        Mesma linguagem dos mini-cards de "Minhas lojas": linha com

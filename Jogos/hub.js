@@ -3328,6 +3328,106 @@
     }
   }
 
+  /* ── Adicionar amigo pelo perfil de outro jogador (via Ranking) ──
+     Usa a MESMA API da lista de amigos (window.AngatubaAmigos, em
+     app.js): pedir() com o código longo "AON-<uid>" — que ela já
+     aceita e resolve sem tocar no banco — então não há regra nem
+     backend novo. Estados do botão:
+       · sem login          → "Entrar pra adicionar" (abre o login)
+       · padrão             → "Adicionar amigo"
+       · já são amigos      → "Amigos" (só informativo)
+       · pedido enviado     → "Pedido enviado" (desabilitado)
+       · ele já me pediu    → "Aceitar pedido" (aceita na hora)
+     Amigos/pedidos recebidos são lidos UMA vez (observa e cancela),
+     como a presença; pedido enviado só existe na memória desta sessão
+     (ele mora no ramo de quem recebe, que não dá pra ler daqui). */
+  var _perfilPedidosEnviados = {};
+
+  function _perfilAmigoSlot(uid) {
+    if (_perfilModo !== 'outro' || _perfilUidVisitado !== uid) return null;
+    return document.getElementById('perfil-amigo-slot');
+  }
+
+  function _perfilAmigoBtn(uid, estado) {
+    var el = _perfilAmigoSlot(uid);
+    if (!el) return;
+    var u = _rankEsc(uid);
+    var b = {
+      deslogado: '<button type="button" class="perfil-amigo-btn" onclick="_perfilPedirLogin()"><i class="fa fa-user-plus" aria-hidden="true"></i> Entrar pra adicionar</button>',
+      padrao:    '<button type="button" class="perfil-amigo-btn" onclick="perfilAmigoPedir(\'' + u + '\')"><i class="fa fa-user-plus" aria-hidden="true"></i> Adicionar amigo</button>',
+      enviando:  '<button type="button" class="perfil-amigo-btn" disabled><i class="fa fa-user-plus" aria-hidden="true"></i> Enviando…</button>',
+      enviado:   '<button type="button" class="perfil-amigo-btn perfil-amigo-feito" disabled><i class="fa fa-paper-plane" aria-hidden="true"></i> Pedido enviado</button>',
+      amigos:    '<button type="button" class="perfil-amigo-btn perfil-amigo-ok" disabled><i class="fa fa-user-check" aria-hidden="true"></i> Amigos</button>',
+      aceitar:   '<button type="button" class="perfil-amigo-btn" onclick="perfilAmigoAceitar(\'' + u + '\')"><i class="fa fa-user-check" aria-hidden="true"></i> Aceitar pedido</button>'
+    };
+    el.innerHTML = b[estado] || '';
+  }
+
+  // Lê uma lista de AngatubaAmigos uma única vez e cancela a escuta —
+  // mesmo cuidado de _perfilAtualizarPresenca com callback síncrono.
+  function _perfilAmigoUmaVez(metodo, cb) {
+    var unsub = null, recebeu = false;
+    try {
+      unsub = window.AngatubaAmigos[metodo](function (lista) {
+        if (recebeu) return;
+        recebeu = true;
+        if (typeof unsub === 'function') { try { unsub(); } catch (e) {} }
+        cb(lista || []);
+      });
+      if (recebeu && typeof unsub === 'function') { try { unsub(); } catch (e) {} }
+    } catch (e) {}
+  }
+
+  function _perfilAmigoRender(uid) {
+    var el = _perfilAmigoSlot(uid);
+    if (!el) return;
+    var logado = (typeof _cliUser !== 'undefined' && !!_cliUser &&
+                  typeof _cliContaReal === 'function' && _cliContaReal(_cliUser));
+    if (!uid) return;
+    if (!logado) { _perfilAmigoBtn(uid, 'deslogado'); return; }
+    if (!window.AngatubaAmigos) return; // sem a API (app.js) não oferece o botão
+    if (_perfilPedidosEnviados[uid]) { _perfilAmigoBtn(uid, 'enviado'); return; }
+    _perfilAmigoBtn(uid, 'padrao');
+    _perfilAmigoUmaVez('observarAmigos', function (amigos) {
+      if (amigos.some(function (a) { return a.uid === uid; })) { _perfilAmigoBtn(uid, 'amigos'); return; }
+      _perfilAmigoUmaVez('observarPedidos', function (pedidos) {
+        if (pedidos.some(function (p) { return p.uid === uid; })) _perfilAmigoBtn(uid, 'aceitar');
+      });
+    });
+  }
+
+  function _perfilAmigoToast(msg, ok) {
+    if (typeof showToastSimples === 'function') showToastSimples(msg, ok ? '/webp/owl-thumbsup.webp' : '/webp/owl-idea.webp');
+  }
+
+  function perfilAmigoPedir(uid) {
+    if (!uid || !window.AngatubaAmigos) return;
+    _perfilAmigoBtn(uid, 'enviando');
+    window.AngatubaAmigos.pedir('AON-' + uid).then(function () {
+      _perfilPedidosEnviados[uid] = true;
+      _perfilAmigoBtn(uid, 'enviado');
+      _perfilAmigoToast('Pedido enviado! Agora é só a pessoa aceitar.', true);
+    }).catch(function (err) {
+      var msg = (err && err.message) || 'Não deu pra enviar o pedido.';
+      if (/já são amigos/i.test(msg)) { _perfilAmigoBtn(uid, 'amigos'); return; }
+      _perfilAmigoBtn(uid, 'padrao');
+      _perfilAmigoToast(msg, false);
+    });
+  }
+  function perfilAmigoAceitar(uid) {
+    if (!uid || !window.AngatubaAmigos) return;
+    _perfilAmigoBtn(uid, 'enviando');
+    window.AngatubaAmigos.aceitar(uid).then(function () {
+      _perfilAmigoBtn(uid, 'amigos');
+      _perfilAmigoToast('Amizade confirmada!', true);
+    }).catch(function (err) {
+      _perfilAmigoBtn(uid, 'aceitar');
+      _perfilAmigoToast((err && err.message) || 'Não deu pra aceitar.', false);
+    });
+  }
+  window.perfilAmigoPedir = perfilAmigoPedir;
+  window.perfilAmigoAceitar = perfilAmigoAceitar;
+
   // Mesma estrutura visual de _perfilRender(), mas a partir do doc
   // público (Firestore) de OUTRO jogador: sem saldo de moedas, sem
   // botão "Ir à Loja" e sem convite de login (Camada 3 — regra: nunca
@@ -3361,7 +3461,11 @@
             '<div class="perfil-visitando-tag" id="perfil-presenca-tag">Perfil de jogador</div>' +
           '</div>' +
         '</div>' +
+        '<div class="perfil-amigo-slot" id="perfil-amigo-slot"></div>' +
       '</div>';
+
+    // Botão de amizade (pedido / aceitar / já são amigos) — ver _perfilAmigoRender.
+    _perfilAmigoRender(dados.uid || _perfilUidVisitado);
 
     // Presença é opcional (só existe em app.js) — tenta upgradar a tag
     // estática acima pra "Online"/"Ausente" sem bloquear o render nem

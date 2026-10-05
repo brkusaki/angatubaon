@@ -2623,11 +2623,36 @@
     { id: 'bg_noite',  nome: 'Noite na Praça',  desc: 'A cidade sob as estrelas.',     preco: 100, slot: 'bg', tipo: 'bg', preview: '/img/igreja-noite.jpg', jogo: null },
     { id: 'bg_dia',    nome: 'Manhã na Igreja', desc: 'Angatuba ao amanhecer.',        preco: 100, slot: 'bg', tipo: 'bg', preview: '/img/igreja-dia.jpg',   jogo: null },
     { id: 'bg_neon',   nome: 'Neon da Coruja',  desc: 'Gradiente roxo e neon.',        preco: 180, slot: 'bg', tipo: 'bg', preview: null,               jogo: null },
+    // Fotos geradas (Gemini) em /img/cosmeticos/ — 1024px, JPG. O preview É o fundo
+    // do perfil (ver _perfilBgEstilo); se o arquivo faltar, a loja esconde a <img>
+    // (onerror) e o perfil cai no gradiente padrão do CSS.
+    { id: 'bg_neblina',           nome: 'Neblina na Praça',        desc: 'Manhã enevoada na Matriz.',      preco: 80,  slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-neblina.jpg',           jogo: null },
+    { id: 'bg_estadio',           nome: 'Campinho do Bairro',      desc: 'Pôr do sol no campo de terra.',  preco: 90,  slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-estadio.jpg',           jogo: null },
+    { id: 'bg_milho',             nome: 'Milharal',                desc: 'Neblina sobre a lavoura.',       preco: 100, slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-milho.jpg',             jogo: null },
+    { id: 'bg_igreja_chuva',      nome: 'Chuva na Matriz',         desc: 'Noite de chuva na praça.',       preco: 120, slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-igreja-chuva.jpg',      jogo: null },
+    { id: 'bg_igreja_tempestade', nome: 'Tempestade na Matriz',    desc: 'Nuvens pesadas sobre a torre.',  preco: 140, slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-igreja-tempestade.jpg', jogo: null },
+    { id: 'bg_rua_estrelada',     nome: 'Rua das Estrelas',        desc: 'Via Láctea sobre o centro.',     preco: 160, slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-rua-estrelada.jpg',     jogo: null },
+    { id: 'bg_igreja_estrelada',  nome: 'Matriz sob a Via Láctea', desc: 'Céu roxo e janelas acesas.',     preco: 180, slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-igreja-estrelada.jpg',  jogo: null },
+    { id: 'bg_festa_junina',      nome: 'Festa Junina',            desc: 'Fogueira e bandeirinhas.',       preco: 200, slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-festa-junina.jpg',      jogo: null },
+    { id: 'bg_neon2',             nome: 'Beco Neon',               desc: 'Corujas de neon na viela.',      preco: 220, slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-neon2.jpg',             jogo: null },
 
     // Cards (moldura do perfil)
     { id: 'card_padrao', nome: 'Card Simples', desc: 'Moldura padrão do seu perfil.', preco: 0,   slot: 'card', tipo: 'card', preview: null, jogo: null },
     { id: 'card_ouro',   nome: 'Card Dourado', desc: 'Moldura dourada de destaque.',  preco: 150, slot: 'card', tipo: 'card', preview: null, jogo: null },
-    { id: 'card_pixel',  nome: 'Card Pixel',   desc: 'Moldura em estilo 8-bit.',      preco: 120, slot: 'card', tipo: 'card', preview: null, jogo: null }
+    { id: 'card_pixel',  nome: 'Card Pixel',   desc: 'Moldura em estilo 8-bit.',      preco: 120, slot: 'card', tipo: 'card', preview: null, jogo: null },
+    // Cards com MOLDURA POR IMAGEM: preview = PNG/WebP com o centro transparente
+    // (ver _perfilCardEstilo). 'fatia' = border-image-slice (cantos que NÃO esticam,
+    // "vertical horizontal"): mede a espessura da moldura na imagem — se trocar o
+    // arquivo por outro de proporção/espessura diferente, ajuste esse valor.
+    { id: 'card_madeira',         nome: 'Madeira Entalhada', desc: 'Corujas esculpidas à mão.',     preco: 130, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-madeira.webp',         fatia: '19% 20%', jogo: null },
+    { id: 'card_pixel_pro',       nome: 'Pixel Pro',         desc: '8-bit em roxo e dourado.',      preco: 150, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-pixel-pro.webp',       fatia: '20% 12%', jogo: null },
+    { id: 'card_coruja_classica', nome: 'Coruja Clássica',   desc: 'Roxo e ouro, com coruja.',      preco: 160, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-coruja-classica.webp', fatia: '17% 17%', jogo: null },
+    { id: 'card_estrelas',        nome: 'Constelações',      desc: 'Azul-noite com estrelas.',      preco: 180, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-estrelas.webp',        fatia: '16% 16%', jogo: null },
+    { id: 'card_tech_verde',      nome: 'Tech Verde',        desc: 'Circuitos verdes brilhantes.',  preco: 190, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-tech-verde.webp',      fatia: '17% 10%', jogo: null },
+    { id: 'card_neon_roxo',       nome: 'Neon Roxo',         desc: 'Corujas cibernéticas.',         preco: 200, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-neon-roxo.webp',       fatia: '18% 12%', jogo: null },
+    { id: 'card_fogo',            nome: 'Fogo Ardente',      desc: 'Moldura em chamas.',            preco: 220, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-fogo.webp',            fatia: '13% 13%', jogo: null },
+    { id: 'card_holografico',     nome: 'Holográfico',       desc: 'Reflexos de arco-íris.',        preco: 230, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-holografico.webp',     fatia: '11% 11%', jogo: null },
+    { id: 'card_ouro_premium',    nome: 'Ouro Premium',      desc: 'Corujas de ouro nos cantos.',   preco: 250, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-ouro-premium.webp',    fatia: '16% 16%', jogo: null }
   ];
 
   var LOJA_TIPO_ICO = { skin: '🦉', badge: '🎖️', bg: '🖼️', card: '🪪' };
@@ -2820,7 +2845,15 @@
     var itens = LOJA_CATALOGO.filter(function (it) { return it.tipo === _lojaAbaAtual; });
     var saldo = _moedasLer();
     var eq = _equipadoLer();
-    var html = '<div class="loja-grid">';
+    // Atalho pro mini-jogo Corujinha (ganhar moedas/cosméticos) — fica no
+    // topo do corpo rolável, em todas as abas.
+    var html = '<button type="button" class="loja-corujinha-btn" onclick="corujinhaAbrir()">' +
+                 '<span class="loja-abrir-ico">🎰</span>' +
+                 '<span class="loja-corujinha-txt"><span class="loja-corujinha-tit">Jogar Corujinha</span>' +
+                 '<span class="loja-corujinha-sub">Gire e ganhe cosméticos ou moedas</span></span>' +
+                 '<i class="fa fa-chevron-right rank-abrir-seta"></i>' +
+               '</button>';
+    html += '<div class="loja-grid">';
     itens.forEach(function (item) {
       var tem = _temItem(item.id);
       var equipadoAgora = (eq[item.slot] === item.id);
@@ -2850,13 +2883,27 @@
       // imagem — a loja não mostrava nada do que a pessoa ia comprar.
       // Mostra a miniatura do gradiente de verdade (mesma cor de
       // _perfilBgEstilo), em vez do placeholder morto.
-      var previewHtml = item.preview
-        ? '<img src="' + _rankEsc(item.preview) + '" alt=""' + (item.filtroCss ? ' style="filter:' + item.filtroCss + '"' : '') + ' loading="lazy" onerror="this.style.display=\'none\'">'
-        : (item.id === 'bg_neon')
-          ? '<span class="loja-item-preview-neon" aria-hidden="true"></span>'
-          : '<span class="loja-item-ph" aria-hidden="true">' + (LOJA_TIPO_ICO[item.tipo] || '🦉') + '</span>';
+      // Cards com moldura por imagem: miniatura = o próprio card (mesma
+      // moldura 9-slice do perfil) com avatar/linhas de mentira, pra a
+      // pessoa ver como vai ficar. Fundos com foto: miniatura larga (cover).
+      var previewClasse = '';
+      var previewHtml;
+      if (item.tipo === 'card' && _perfilCardItemImg(item.id)) {
+        previewClasse = ' loja-item-preview-card';
+        previewHtml = '<div class="perfil-identidade perfil-card-img loja-mini-card" style="' + _perfilCardEstilo(item.id) + '">' +
+                        '<span class="loja-mini-avatar" aria-hidden="true">🦉</span>' +
+                        '<span class="loja-mini-linhas" aria-hidden="true"><i></i><i></i></span>' +
+                      '</div>';
+      } else if (item.preview) {
+        if (item.tipo === 'bg') previewClasse = ' loja-item-preview-bg';
+        previewHtml = '<img src="' + _rankEsc(item.preview) + '" alt=""' + (item.filtroCss ? ' style="filter:' + item.filtroCss + '"' : '') + ' loading="lazy" onerror="this.style.display=\'none\'">';
+      } else if (item.id === 'bg_neon') {
+        previewHtml = '<span class="loja-item-preview-neon" aria-hidden="true"></span>';
+      } else {
+        previewHtml = '<span class="loja-item-ph" aria-hidden="true">' + (LOJA_TIPO_ICO[item.tipo] || '🦉') + '</span>';
+      }
       html += '<div class="loja-item' + (equipadoAgora ? ' loja-item-equipado' : '') + '">' +
-                '<div class="loja-item-preview">' + previewHtml + '</div>' +
+                '<div class="loja-item-preview' + previewClasse + '">' + previewHtml + '</div>' +
                 '<div class="loja-item-nome">' + _rankEsc(item.nome) + '</div>' +
                 '<div class="loja-item-desc">' + _rankEsc(item.desc) + '</div>' +
                 '<button type="button" class="loja-item-cta ' + ctaClasse + '"' + ctaAtributos + '>' + _rankEsc(cta) + '</button>' +
@@ -2915,6 +2962,347 @@
   }
   window.lojaAbrir  = lojaAbrir;
   window.lojaFechar = lojaFechar;
+
+  /* ══════════════════════════════════════════════════════════════
+     CORUJINHA — slot temático da coruja (mini-jogo de sorte)
+     100% local, como o resto da economia: debita a aposta e credita o
+     prêmio com _moedasAdd/_invSalvar. O resultado é sorteado ANTES de o
+     giro começar e já vale no saldo/inventário — a animação é só visual,
+     então fechar a tela no meio não perde nem duplica prêmio.
+     NÃO grava stats (_statsRegistrarPartida): as regras do Firestore só
+     aceitam chaves de jogos conhecidas em stats e rejeitariam o perfil
+     público inteiro. Também não conta pra ofensiva diária.
+  ══════════════════════════════════════════════════════════════ */
+  var CJ_APOSTA_MIN = 5;
+  var CJ_APOSTA_MAX = 50;
+  var CJ_APOSTAS = [5, 10, 25, 50];   // botões rápidos (+ "Máx" = min(50, saldo))
+
+  /* ── TABELA DE PESOS E PAYOUTS (mexer aqui = mexer na economia) ──────
+     Cada giro: 1º sorteia o OVO DOURADO (cosmético) com chance
+     aposta × CJ_OVO_POR_MOEDA (5 → 0,1% · 50 → 1%) — proporcional à
+     aposta pra o valor esperado do cosmético ficar ~3% da aposta em
+     qualquer faixa (item médio ≈ 150 🪙). Se não saiu, sorteia uma linha
+     abaixo por peso; payout = floor(aposta × mult).
+     Retorno esperado (RTP) ≈ 82% (simulado; pior caso = item sempre novo,
+     valendo o preço cheio): a casa fica com ~18% por giro, então a
+     Corujinha drena moedas em vez de criá-las. Como cada partida dos
+     jogos paga no máx. 25 🪙, o teto em moedas é 10× (nada de jackpot de
+     milhares de moedas) — o prêmio grande raro é o cosmético.
+       peso  mult  símbolos
+        465   0×   sem prêmio (pode mostrar um "quase": par de símbolos)
+        170  0,5×  1 🪙
+        180   1×   2 🪙
+        110   2×   ⛪⛪⛪ ou 📚📚📚
+         45   3×   🦉🦉🦉
+         25   5×   ⭐⭐⭐
+          5  10×   👑👑👑            (total 1000)               */
+  var CJ_OVO_POR_MOEDA = 0.0002;
+  var CJ_CONVERSAO = 0.45;            // cosmético repetido → 45% do preço em moedas
+  var CJ_TABELA = [
+    { id: 'perde',   peso: 465, mult: 0   },
+    { id: 'moeda1',  peso: 170, mult: 0.5 },
+    { id: 'moeda2',  peso: 180, mult: 1   },
+    { id: 'trinca2', peso: 110, mult: 2   },
+    { id: 'coruja',  peso: 45,  mult: 3   },
+    { id: 'estrela', peso: 25,  mult: 5   },
+    { id: 'coroa',   peso: 5,   mult: 10  }
+  ];
+  var CJ_PESO_TOTAL = CJ_TABELA.reduce(function (t, l) { return t + l.peso; }, 0);
+
+  var CJ_MOEDA = '🪙';
+  var CJ_FILLER = ['🦉', '⭐', '⛪', '📚', '🥚', '👑', '🔥'];   // símbolos "sem moeda"
+  var CJ_TODOS = CJ_FILLER.concat([CJ_MOEDA]);                   // o que gira na animação
+  var CJ_TIPO_ROTULO = { skin: 'Skin', badge: 'Badge', bg: 'Plano de fundo', card: 'Card' };
+
+  var _cjAposta = 10;
+  var _cjGirando = false;
+  var _cjTimers = [];
+  var _cjPendente = 0;                      // prêmio já creditado, ainda não "revelado" no saldo da tela
+  var _cjAtuais = ['🦉', '🪙', '⭐'];       // o que cada rolo está mostrando
+  var _cjPremiosPronto = false;
+
+  function _cjEl(id) { return document.getElementById(id); }
+  function _cjRand(n) { return Math.floor(Math.random() * n); }
+  function _cjEscolher(arr) { return arr[_cjRand(arr.length)]; }
+  function _cjEmbaralhar(arr) {
+    for (var i = arr.length - 1; i > 0; i--) { var j = _cjRand(i + 1); var t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
+    return arr;
+  }
+  function _cjFillerSem(excl) {
+    return _cjEscolher(CJ_FILLER.filter(function (x) { return excl.indexOf(x) === -1; }));
+  }
+  function _cjSimbolos(id) {
+    var a, b, f;
+    switch (id) {
+      case 'ovo':     return ['🥚', '🥚', '🥚'];
+      case 'coroa':   return ['👑', '👑', '👑'];
+      case 'estrela': return ['⭐', '⭐', '⭐'];
+      case 'coruja':  return ['🦉', '🦉', '🦉'];
+      case 'trinca2': f = _cjEscolher(['⛪', '📚']); return [f, f, f];
+      case 'moeda2':  return _cjEmbaralhar([CJ_MOEDA, CJ_MOEDA, _cjEscolher(CJ_FILLER)]);
+      case 'moeda1':  a = _cjEscolher(CJ_FILLER); b = _cjFillerSem([a]); return _cjEmbaralhar([CJ_MOEDA, a, b]);
+      default:        // sem prêmio: nunca moeda nem trinca; 35% das vezes um par ("quase!")
+        a = _cjEscolher(CJ_FILLER); b = _cjFillerSem([a]);
+        if (Math.random() < 0.35) return _cjEmbaralhar([a, a, b]);
+        return [a, b, _cjFillerSem([a, b])];
+    }
+  }
+
+  // Decide TUDO do giro de uma vez (símbolos, prêmio, item). Não mexe em saldo.
+  function _cjSortear(aposta) {
+    var r = { aposta: aposta, id: 'perde', mult: 0, moedas: 0, item: null, itemNovo: false, simbolos: null };
+    if (Math.random() < aposta * CJ_OVO_POR_MOEDA) {
+      r.id = 'ovo';
+      var pool = LOJA_CATALOGO.filter(function (it) { return it.preco > 0; });
+      var naoTem = pool.filter(function (it) { return !_temItem(it.id); });
+      r.item = _cjEscolher(naoTem.length ? naoTem : pool);   // prefere o que ainda não tem
+      r.itemNovo = !_temItem(r.item.id);
+      r.moedas = r.itemNovo ? 0 : Math.floor(r.item.preco * CJ_CONVERSAO);
+    } else {
+      var x = Math.random() * CJ_PESO_TOTAL, linha = CJ_TABELA[0];
+      for (var i = 0; i < CJ_TABELA.length; i++) {
+        if (x < CJ_TABELA[i].peso) { linha = CJ_TABELA[i]; break; }
+        x -= CJ_TABELA[i].peso;
+      }
+      r.id = linha.id; r.mult = linha.mult; r.moedas = Math.floor(aposta * linha.mult);
+    }
+    r.simbolos = _cjSimbolos(r.id);
+    return r;
+  }
+
+  // Débito da aposta + crédito do prêmio (moedas e/ou item) — tudo no início do giro.
+  function _cjAplicar(r) {
+    _moedasAdd(-r.aposta, 'corujinha-aposta');
+    if (r.item && r.itemNovo) {
+      var inv = _invLer();
+      if (inv.indexOf(r.item.id) === -1) { inv.push(r.item.id); _invSalvar(inv); }
+    }
+    if (r.moedas > 0) _moedasAdd(r.moedas, 'corujinha-premio');
+  }
+
+  // ── Tela ─────────────────────────────────────────────────────────
+  function _cjSaldoVisivel() { return Math.max(0, _moedasLer() - _cjPendente); }
+
+  // Aposta efetiva: entre 5 e min(50, saldo). 0 = sem saldo pra apostar.
+  function _cjClamp() {
+    var teto = Math.min(CJ_APOSTA_MAX, _cjSaldoVisivel());
+    if (teto < CJ_APOSTA_MIN) return 0;
+    if (_cjAposta > teto) _cjAposta = teto;
+    if (_cjAposta < CJ_APOSTA_MIN) _cjAposta = CJ_APOSTA_MIN;
+    return _cjAposta;
+  }
+
+  function _cjMsg(tit, sub, tipo) {
+    var el = _cjEl('cj-msg');
+    if (!el) return;
+    el.className = 'cj-msg' + (tipo ? ' cj-msg-' + tipo : '');
+    el.innerHTML = '<div class="cj-msg-tit">' + tit + '</div>' + (sub ? '<div class="cj-msg-sub">' + sub + '</div>' : '');
+  }
+
+  function _cjAtualizarUI() {
+    var saldo = _cjSaldoVisivel();
+    var s = _cjEl('cj-saldo');
+    if (s) s.textContent = '🪙 ' + saldo;
+    var aposta = _cjClamp();
+    var teto = Math.min(CJ_APOSTA_MAX, saldo);
+    var wrap = _cjEl('cj-apostas');
+    if (wrap) {
+      var html = '';
+      CJ_APOSTAS.forEach(function (v) {
+        html += '<button type="button" class="cj-aposta' + (v === aposta ? ' cj-aposta-ativa' : '') + '"' +
+                (_cjGirando || v > saldo ? ' disabled' : '') + ' onclick="corujinhaApostar(' + v + ')">' + v + '</button>';
+      });
+      html += '<button type="button" class="cj-aposta cj-aposta-max' + (aposta && aposta === teto && CJ_APOSTAS.indexOf(teto) === -1 ? ' cj-aposta-ativa' : '') + '"' +
+              (_cjGirando || teto < CJ_APOSTA_MIN ? ' disabled' : '') + ' onclick="corujinhaApostar(0)">Máx</button>';
+      wrap.innerHTML = html;
+    }
+    var g = _cjEl('cj-girar');
+    if (g) {
+      g.disabled = _cjGirando || !aposta;
+      g.textContent = _cjGirando ? 'Girando…' : (aposta ? 'Girar · ' + aposta + ' 🪙' : 'Sem moedas');
+    }
+  }
+
+  function corujinhaApostar(v) {
+    if (_cjGirando) return;
+    _cjAposta = v ? v : Math.min(CJ_APOSTA_MAX, _moedasLer());   // 0 = "Máx"
+    _cjAtualizarUI();
+  }
+
+  function _cjPct(p) { return (Math.round(p * 10) / 10).toString().replace('.', ','); }
+
+  // Painel "Ver prêmios" — gerado da própria tabela (nunca sai de sincronia).
+  function _cjMontarPremios() {
+    var lista = _cjEl('cj-premios-lista');
+    if (!lista) return;
+    var chance = function (id) {
+      for (var i = 0; i < CJ_TABELA.length; i++) if (CJ_TABELA[i].id === id) return _cjPct(CJ_TABELA[i].peso / CJ_PESO_TOTAL * 100) + '%';
+      return '';
+    };
+    var linhas = [
+      ['🥚🥚🥚',     'Cosmético!', _cjPct(CJ_APOSTA_MIN * CJ_OVO_POR_MOEDA * 100) + '% a ' + _cjPct(CJ_APOSTA_MAX * CJ_OVO_POR_MOEDA * 100) + '%'],
+      ['👑👑👑',     '10× a aposta', chance('coroa')],
+      ['⭐⭐⭐',     '5× a aposta',  chance('estrela')],
+      ['🦉🦉🦉',     '3× a aposta',  chance('coruja')],
+      ['⛪⛪⛪<br>📚📚📚', '2× a aposta', chance('trinca2')],
+      ['🪙🪙',       'Aposta de volta (1×)', chance('moeda2')],
+      ['🪙',         'Metade de volta (0,5×)', chance('moeda1')]
+    ];
+    var html = '';
+    linhas.forEach(function (l) {
+      html += '<div class="cj-premio"><span class="cj-premio-sim">' + l[0] + '</span><span class="cj-premio-txt">' + l[1] + '</span><span class="cj-premio-chance">' + l[2] + '</span></div>';
+    });
+    html += '<div class="cj-premios-nota">O ovo dourado fica mais provável quanto maior a aposta. ' +
+            'Se o cosmético já for seu, vira ' + Math.round(CJ_CONVERSAO * 100) + '% do preço em moedas. ' +
+            'Só moedas e trincas pagam — pares de outros símbolos não. As moedas do app não valem dinheiro.</div>';
+    lista.innerHTML = html;
+  }
+
+  function _cjSimEl(sym) { return '<div class="cj-sim">' + sym + '</div>'; }
+  function _cjStrip(i) {
+    var r = _cjEl('cj-reel-' + i);
+    return r ? r.firstElementChild : null;
+  }
+  function _cjMostrarFixo(i, sym) {
+    var st = _cjStrip(i);
+    if (!st) return;
+    st.style.transition = 'none';
+    st.style.transform = 'none';
+    st.innerHTML = _cjSimEl(sym);
+    _cjAtuais[i] = sym;
+  }
+  // Monta a fita (símbolo atual → vários aleatórios → alvo) e desliza até o alvo.
+  function _cjGirarReel(i, alvo, ms) {
+    var st = _cjStrip(i);
+    if (!st) return;
+    var n = 10 + i * 4;                       // rolos da direita "passam" mais símbolos
+    var h = _cjSimEl(_cjAtuais[i]);
+    for (var k = 0; k < n; k++) h += _cjSimEl(_cjEscolher(CJ_TODOS));
+    h += _cjSimEl(alvo);
+    st.style.transition = 'none';
+    st.style.transform = 'translateY(0)';
+    st.innerHTML = h;
+    void st.offsetHeight;                     // força o reflow antes da transição
+    st.style.transition = 'transform ' + ms + 'ms cubic-bezier(.12,.6,.18,1)';
+    st.style.transform = 'translateY(-' + ((n + 1) * 100 / (n + 2)) + '%)';
+  }
+
+  function _cjSom(nome) {
+    var S = window.AngatubaGames && window.AngatubaGames.som;
+    if (S && typeof S[nome] === 'function') { try { S[nome](); } catch (e) {} }
+  }
+
+  function _cjRevelar(r) {
+    _cjGirando = false;
+    _cjPendente = 0;
+    _cjTimers = [];
+    var maq = _cjEl('cj-maquina');
+    var tipo, tit, sub = '';
+    if (r.id === 'ovo') {
+      tipo = 'vitoria'; tit = '🥚 Ovo dourado!';
+      sub = r.itemNovo
+        ? 'Novo no seu inventário: <b>' + _rankEsc(r.item.nome) + '</b> (' + (CJ_TIPO_ROTULO[r.item.tipo] || 'item') + ')'
+        : 'Você já tinha <b>' + _rankEsc(r.item.nome) + '</b> → +' + r.moedas + ' 🪙';
+      _cjSom('nivelUp');
+    } else if (r.mult > 1) {
+      tipo = 'vitoria'; tit = 'Você ganhou +' + r.moedas + ' 🪙!'; sub = r.mult + '× a aposta';
+      _cjSom(r.mult >= 3 ? 'bonus' : 'acerto');
+    } else if (r.mult === 1) {
+      tipo = 'neutro'; tit = 'Aposta de volta'; sub = '+' + r.moedas + ' 🪙';
+      _cjSom('toque');
+    } else if (r.mult > 0) {
+      tipo = 'neutro'; tit = 'Quase! Metade de volta'; sub = '+' + r.moedas + ' 🪙';
+      _cjSom('toque');
+    } else {
+      var par = r.simbolos[0] === r.simbolos[1] || r.simbolos[1] === r.simbolos[2] || r.simbolos[0] === r.simbolos[2];
+      tipo = 'derrota'; tit = par ? 'Quase!' : 'Não foi dessa vez'; sub = 'Tente de novo.';
+    }
+    if (maq) { maq.classList.remove('cj-girando'); maq.classList.add('cj-' + tipo); }
+    _cjMsg(tit, sub, tipo);
+    _cjAtualizarUI();
+  }
+
+  function corujinhaGirar() {
+    if (_cjGirando) return;
+    var aposta = _cjClamp();
+    if (!aposta || _moedasLer() < aposta) {
+      _cjMsg('Faltam moedas', 'Você precisa de pelo menos ' + CJ_APOSTA_MIN + ' 🪙 — jogue um mini-jogo pra ganhar mais.', 'derrota');
+      _cjSom('erro');
+      _cjAtualizarUI();
+      return;
+    }
+    var r = _cjSortear(aposta);       // resultado decidido AQUI, antes de qualquer animação
+    _cjPendente = r.moedas;           // o saldo da tela só "sobe" quando os rolos param
+    _cjAplicar(r);
+    _cjGirando = true;
+
+    var maq = _cjEl('cj-maquina');
+    if (maq) { maq.classList.remove('cj-vitoria', 'cj-neutro', 'cj-derrota'); maq.classList.add('cj-girando'); }
+    _cjMsg('Girando…', '', '');
+    _cjAtualizarUI();
+    _cjSom('toque');
+
+    var reduzido = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    var base = reduzido ? 150 : 1000, passo = reduzido ? 120 : 450;
+    r.simbolos.forEach(function (sim, i) {
+      var ms = base + i * passo;
+      _cjGirarReel(i, sim, ms);
+      _cjTimers.push(setTimeout(function () { _cjMostrarFixo(i, sim); _cjSom('toque'); }, ms + 30));
+    });
+    _cjTimers.push(setTimeout(function () { _cjRevelar(r); }, base + 2 * passo + 90));
+  }
+
+  function _cjPrepararTela() {
+    if (!_cjPremiosPronto) { _cjMontarPremios(); _cjPremiosPronto = true; }
+    if (!_cjGirando) {
+      for (var i = 0; i < 3; i++) _cjMostrarFixo(i, _cjAtuais[i]);
+      var maq = _cjEl('cj-maquina');
+      if (maq) maq.classList.remove('cj-girando', 'cj-vitoria', 'cj-neutro', 'cj-derrota');
+      _cjMsg('Escolha a aposta e gire!', 'Três 🥚 dão um cosmético.', '');
+    }
+    _cjAtualizarUI();
+  }
+
+  function corujinhaAbrir() {
+    var tela = document.getElementById('jogo-corujinha');
+    if (!tela) return;
+    // Chamado de fora do hub (ponte/deep link): abre o hub antes.
+    if (typeof _gamesHubAberto === 'function' && !_gamesHubAberto()) {
+      if (typeof _abrirGamesHub === 'function') _abrirGamesHub();
+    }
+    if (typeof _pararJogosExternos === 'function') _pararJogosExternos();
+
+    // Mesmo esquema da Loja: esconde o menu e as outras telas.
+    var menu = document.getElementById('games-menu');
+    if (menu) menu.style.display = 'none';
+    var telas = document.querySelectorAll('.jogo-tela');
+    for (var i = 0; i < telas.length; i++) telas[i].style.display = 'none';
+    tela.style.display = 'flex';
+
+    var hubEl = document.getElementById('games-hub');
+    if (hubEl) hubEl.classList.add('jogo-ativo');
+
+    _cjPrepararTela();
+
+    // Vindo da Loja, SUBSTITUI a entrada do histórico (em vez de empilhar)
+    // — assim o "voltar" leva ao menu de jogos sem deixar uma entrada
+    // 'loja' órfã pra trás.
+    var st = history.state && history.state.modal;
+    if (st === 'loja') history.replaceState({ modal: 'corujinha' }, '');
+    else if (st !== 'corujinha') history.pushState({ modal: 'corujinha' }, '');
+  }
+
+  function corujinhaFechar(viaPopstate) {
+    // Volta pro menu de jogos (esconde todas as .jogo-tela, incl. esta). Um
+    // giro em andamento termina sozinho em segundo plano — o prêmio já foi
+    // aplicado no início, então nada se perde.
+    if (typeof _voltarAoMenu === 'function') _voltarAoMenu();
+    if (!viaPopstate && history.state && history.state.modal === 'corujinha') { _popstateNosso = true; history.back(); }
+  }
+  window.corujinhaAbrir  = corujinhaAbrir;
+  window.corujinhaFechar = corujinhaFechar;
+  window.corujinhaGirar  = corujinhaGirar;
+  window.corujinhaApostar = corujinhaApostar;
 
   /* ══════════════════════════════════════════════════════════════
      MEU PERFIL — TELA ESTILO STEAM (Camada 2)
@@ -2981,11 +3369,27 @@
            'background-size:cover; background-position:center;';
   }
 
-  // Moldura do card (CSS puro, sem asset novo) conforme o item equipado.
+  // Moldura do card conforme o item equipado. card_ouro/card_pixel (e o
+  // padrão) seguem CSS puro; item do catálogo COM preview (caminho de
+  // imagem) vira moldura por imagem → classe .perfil-card-img + o estilo
+  // inline de _perfilCardEstilo(). Só lê o catálogo hardcoded (nunca uma
+  // URL vinda do Firestore), então um perfil alheio não injeta imagem.
+  function _perfilCardItemImg(cardId) {
+    var item = cardId ? _lojaItemPorId(cardId) : null;
+    return (item && item.slot === 'card' && item.preview) ? item : null;
+  }
   function _perfilCardClasse(cardId) {
     if (cardId === 'card_ouro')  return 'perfil-card-ouro';
     if (cardId === 'card_pixel') return 'perfil-card-pixel';
-    return '';
+    return _perfilCardItemImg(cardId) ? 'perfil-card-img' : '';
+  }
+  // Variáveis CSS da moldura por imagem (consumidas por .perfil-card-img
+  // em styles.css via border-image 9-slice: cantos intactos, bordas esticam).
+  // String já pronta pra style="..." (vazia se o card não usa imagem).
+  function _perfilCardEstilo(cardId) {
+    var item = _perfilCardItemImg(cardId);
+    if (!item) return '';
+    return '--card-img:url(\'' + item.preview + '\');--card-fatia:' + (item.fatia || '20% 20%') + ';';
   }
 
   function _perfilChipsEquipados(eq) {
@@ -3168,7 +3572,7 @@
     // esquema do herói do Ranking (não rola junto com o resto).
     heroEl.innerHTML =
       '<div class="perfil-hero" style="' + _perfilBgEstilo(eq.bg) + '">' +
-        '<div class="perfil-identidade ' + _perfilCardClasse(eq.card) + '">' +
+        '<div class="perfil-identidade ' + _perfilCardClasse(eq.card) + '" style="' + _perfilCardEstilo(eq.card) + '">' +
           '<div class="perfil-avatar-wrap">' +
             avatarHtml +
             (badgeIco ? '<span class="perfil-badge" title="' + _rankEsc(badgeItem ? badgeItem.nome : '') + '">' + badgeIco + '</span>' : '') +
@@ -3449,7 +3853,7 @@
 
     heroEl.innerHTML =
       '<div class="perfil-hero" style="' + _perfilBgEstilo(eq.bg) + '">' +
-        '<div class="perfil-identidade ' + _perfilCardClasse(eq.card) + '">' +
+        '<div class="perfil-identidade ' + _perfilCardClasse(eq.card) + '" style="' + _perfilCardEstilo(eq.card) + '">' +
           '<div class="perfil-avatar-wrap">' +
             avatarHtml +
             (badgeIco ? '<span class="perfil-badge" title="' + _rankEsc(badgeItem ? badgeItem.nome : '') + '">' + badgeIco + '</span>' : '') +
@@ -4025,6 +4429,8 @@
     lojaCatalogo: function () { return _lojaCatalogo(); },
     lojaAbrir: function () { return lojaAbrir(); },
     lojaFechar: function () { return lojaFechar(); },
+    corujinhaAbrir: function () { return corujinhaAbrir(); },
+    corujinhaFechar: function () { return corujinhaFechar(); },
 
     // ── Meu perfil (Camada 2) ────────────────────────────────
     perfilAbrir: function () { return perfilAbrir(); },

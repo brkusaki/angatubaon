@@ -808,11 +808,11 @@
         </button>
 
         <!-- Corujinha: slot 3×3 da coruja (Jogos/corujinha.js). corujinhaAbrir()
-             (hub.js) → _abrirJogo('corujinha'), sem contar ofensiva. Sem arte de
-             card ainda: a mídia é só CSS/emoji (.gc-corujinha-media). -->
+             (hub.js) → _abrirJogo('corujinha'), sem contar ofensiva. Arte do card:
+             /Jogos/assets/card-corujinha.webp. -->
         <button type="button" class="game-card gc-corujinha" data-cat="sorte" data-nome="corujinha slot caca niquel sorte gire ganhe cosmeticos moedas" data-desc="gire e ganhe cosmeticos ou moedas" onclick="corujinhaAbrir()">
           <span class="gc-fav" data-jogo="corujinha" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
-          <div class="gc-media gc-corujinha-media" aria-hidden="true"><span>🦉</span><span>🪙</span><span>👑</span></div>
+          <div class="gc-media"><img src="/Jogos/assets/card-corujinha.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Corujinha</div>
             <div class="gc-desc">Gire e ganhe cosméticos ou moedas.</div>

@@ -5386,17 +5386,8 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
 .gc-negocios { --gc:#38e1b0; --gc-2:#f59e0b; --gc-a:rgba(56,225,176,.16); --gc-b:rgba(56,225,176,.34); }
 .gc-baralho  { --gc:#d9a441; --gc-2:#8a2f23; --gc-a:rgba(217,164,65,.16); --gc-b:rgba(217,164,65,.34); }
 .gc-armadilha { --gc:#f2a541; --gc-2:#c2410c; --gc-a:rgba(242,165,65,.16); --gc-b:rgba(242,165,65,.34); }
-/* Corujinha: sem arte de card ainda — mídia só com CSS/emoji (3 "rolos"). */
-.gc-corujinha { --gc:#fbbf24; --gc-2:#f97316; --gc-a:rgba(251,191,36,.16); --gc-b:rgba(251,191,36,.34); }
-.gc-corujinha-media {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  background: linear-gradient(135deg, #2a1450 0%, #150a2b 70%);
-}
-.gc-corujinha-media span {
-  width: 27%; aspect-ratio: 3 / 4; display: flex; align-items: center; justify-content: center;
-  font-size: 28px; line-height: 1; border-radius: 10px;
-  background: rgba(255,255,255,.07); border: 1px solid rgba(251,191,36,.38);
-}
+/* Corujinha: card com arte (card-corujinha.webp), cores roxo/ouro de "sorte". */
+.gc-corujinha { --gc:#f5c542; --gc-2:#7c3aed; --gc-a:rgba(245,197,66,.16); --gc-b:rgba(245,197,66,.34); }
 .gc-armadilha .gc-media { background: #f2a541; }
 .gc-armadilha .gc-hero-img { object-fit: contain; image-rendering: pixelated; box-sizing: border-box; padding: 12% 0 6%; }
 

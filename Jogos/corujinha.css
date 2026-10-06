@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════
    CORUJINHA — slot 3×3 (ver Jogos/corujinha.js). Tela cheia, tema
    próprio (noite roxa + ouro), sempre escuro nos dois temas do app.
-   Arte em pixel: image-rendering: pixelated em tudo que vem de
-   /Jogos/assets/corujinha/.
+   Arte 3D suave (PNG RGBA) em /Jogos/assets/corujinha/: renderização
+   normal do navegador, sem image-rendering: pixelated.
    ═══════════════════════════════════════════════════════════════ */
 #jogo-corujinha > .jogo-voltar { display: none; }
 #corujinha-root { flex: 1 1 auto; min-height: 0; display: flex; }
@@ -21,10 +21,6 @@
   -webkit-tap-highlight-color: transparent;
 }
 .cjx button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
-.cjx-s i, .cjx-coruja, .cjx-skyline, .cjx-splash-coruja, .cjx-big-coruja,
-.cjx-moldura, .cjx-big-moedas i, .cjx-splash-lista i, .cjx-ganhobar img, .cjx-big-item-card img {
-  image-rendering: pixelated; image-rendering: crisp-edges;
-}
 
 /* Céu: estrelas piscando + horizonte com a Matriz */
 .cjx-ceu { position: absolute; inset: 0; pointer-events: none; }
@@ -70,7 +66,7 @@
 .cjx-coruja {
   width: 100%; height: 100%;
   background: url('/Jogos/assets/corujinha/coruja-sheet.png') 0 0 / 400% 100% no-repeat;
-  animation: cjxBob 1.4s steps(2) infinite;
+  animation: cjxBob 1.4s ease-in-out infinite;
   filter: drop-shadow(0 6px 6px rgba(0,0,0,.45));
 }
 .cjx-coruja-gira { animation-duration: .45s; }
@@ -108,7 +104,7 @@
 .cjx-marcas span.on { color: var(--tinta); background: var(--ouro); border-color: #fff6c4; box-shadow: 0 0 10px var(--ouro); }
 .cjx-moldura {
   position: relative; border: 18px solid transparent;
-  border-image: url('/Jogos/assets/corujinha/moldura.png') 8 / 18px stretch;
+  border-image: url('/Jogos/assets/corujinha/moldura.png') 16 / 18px round;
   filter: drop-shadow(0 8px 14px rgba(0,0,0,.5));
   transition: filter .2s;
 }

@@ -2567,6 +2567,19 @@
   var LOJA_KEY_EQUIPADO   = 'angatuba_equipado';
   var LOJA_KEY_STATS      = 'angatuba_stats_jogos';
 
+  /* ── Teto diário de GANHO de moedas ────────────────────────────
+     Economia local por decisão (moedas/inventário NÃO vão pro
+     Firestore). Este teto só mitiga farm trivial no aparelho (console,
+     auto-play): é do aparelho, não da conta, e não é gravado no
+     servidor. Jogos pagam no máx. ~25 por partida; 500 ≈ dia muito
+     ativo. Gasto/aposta (qtd <= 0) nunca é limitado.
+     O prêmio da Corujinha fica fora do teto (e da soma do dia): ele só
+     devolve aposta já debitada, com RTP < 100% e teto por giro — se
+     contasse, quem passasse do teto perderia a aposta sem poder receber. */
+  var TETO_DIARIO_MOEDAS = 500;
+  var LOJA_KEY_MOEDAS_DIA = 'angatuba_moedas_dia';
+  var TETO_MOTIVOS_ISENTOS = { 'corujinha-premio': true };
+
   /* ── Dono do progresso local (celular compartilhado — decisão A) ──
      Moedas, inventário, equipado, stats, títulos, ofensiva e recordes
      locais de rank são de UMA conta por vez neste aparelho.
@@ -2691,9 +2704,37 @@
   function _moedasSalvar(v) {
     try { localStorage.setItem(LOJA_KEY_MOEDAS, String(Math.max(0, Math.floor(v)))); } catch (e) {}
   }
+  // Ganho do dia no aparelho: { dia: 'YYYY-MM-DD' (local), ganho: N }.
+  function _diaLocal() {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function _ganhoDiaLer() {
+    var hoje = _diaLocal();
+    try {
+      var o = JSON.parse(localStorage.getItem(LOJA_KEY_MOEDAS_DIA) || 'null');
+      if (o && o.dia === hoje) return { dia: hoje, ganho: Math.max(0, Math.floor(Number(o.ganho) || 0)) };
+    } catch (e) {}
+    return { dia: hoje, ganho: 0 };   // dia mudou (ou sem registro): zera
+  }
+  function _ganhoDiaSalvar(o) {
+    try { localStorage.setItem(LOJA_KEY_MOEDAS_DIA, JSON.stringify(o)); } catch (e) {}
+  }
   // Soma (ou subtrai) moedas do saldo; nunca deixa negativo. Retorna o novo saldo.
+  // Ganhos (qtd > 0) respeitam TETO_DIARIO_MOEDAS (ver comentário no topo do bloco).
   function _moedasAdd(qtd, motivo) {
     qtd = Math.floor(Number(qtd) || 0);
+    if (qtd > 0 && !TETO_MOTIVOS_ISENTOS[motivo]) {
+      var dia = _ganhoDiaLer();
+      var efetivo = Math.min(qtd, TETO_DIARIO_MOEDAS - dia.ganho);
+      if (efetivo <= 0) {
+        if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[loja] teto diário atingido — +' + qtd + ' (' + (motivo || '?') + ') não creditado');
+        return _moedasLer();
+      }
+      dia.ganho += efetivo;
+      _ganhoDiaSalvar(dia);
+      qtd = efetivo;
+    }
     var novo = Math.max(0, _moedasLer() + qtd);
     if (qtd !== 0) {
       _moedasSalvar(novo);
@@ -3661,12 +3702,19 @@
     var nome = (typeof cliNomeExibicao === 'function' && cliNomeExibicao()) || 'Jogador';
     if (nome.length < 2) nome = 'Jogador';
 
+    // Só ids do catálogo (mesma whitelist de equipadoValido em
+    // firestore.rules): id velho/inválido no localStorage cai no padrão do
+    // slot, senão o set() inteiro falharia com permission-denied.
     var eqLocal = _equipadoLer();
+    function _eqOk(slot, id, padrao) {
+      var it = id ? _lojaItemPorId(id) : null;
+      return (it && it.slot === slot) ? id : padrao;
+    }
     var equipado = {
-      voo_owl: eqLocal.voo_owl || '',
-      badge:   eqLocal.badge   || '',
-      bg:      eqLocal.bg      || '',
-      card:    eqLocal.card    || ''
+      voo_owl: _eqOk('voo_owl', eqLocal.voo_owl, 'voo_skin_classica'),
+      badge:   _eqOk('badge',   eqLocal.badge,   ''),
+      bg:      _eqOk('bg',      eqLocal.bg,      'bg_padrao'),
+      card:    _eqOk('card',    eqLocal.card,    'card_padrao')
     };
 
     // Só entradas com partidas > 0 — mesmo filtro do "meu perfil" local,

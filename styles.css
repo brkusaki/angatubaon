@@ -5389,7 +5389,6 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
 /* Corujinha: card com arte (card-corujinha.webp), cores roxo/ouro de "sorte". */
 .gc-corujinha { --gc:#f5c542; --gc-2:#7c3aed; --gc-a:rgba(245,197,66,.16); --gc-b:rgba(245,197,66,.34); }
 .gc-armadilha .gc-media { background: #f2a541; }
-.gc-armadilha .gc-hero-img { object-fit: contain; image-rendering: pixelated; box-sizing: border-box; padding: 12% 0 6%; }
 
 .game-card:active { transform: scale(.97); border-color: var(--gc-b); }
 .game-card:focus-visible { outline: 2px solid var(--gc); outline-offset: 2px; }

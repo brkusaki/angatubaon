@@ -95,6 +95,23 @@
     return grade.querySelectorAll('.sq-btn');
   }
 
+  // Skin (paleta das corujas) — loja dentro do jogo (hub.js). Tema com
+  // 'paleta' (6 cores, na ordem sq-btn-0..5) sobrescreve a --sqc inline;
+  // clássico remove o inline e volta às cores do sequencia.css.
+  function _sqAplicarSkin() {
+    var G = window.AngatubaGames, it = null;
+    try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('sq_tema') : null; } catch (e) {}
+    var pal = (it && it.paleta && it.paleta.length >= 6) ? it.paleta : null;
+    var btns = _sqBotoes();
+    for (var i = 0; i < btns.length; i++) {
+      if (pal && pal[i]) btns[i].style.setProperty('--sqc', pal[i]);
+      else btns[i].style.removeProperty('--sqc');
+    }
+  }
+  window.addEventListener('angatuba:equipado', function (e) {
+    if (e && e.detail && e.detail.slot === 'sq_tema') _sqAplicarSkin();
+  });
+
   // Acende uma coruja (visual + vibração leve).
   function _sqAcender(idx, dur) {
     var btns = _sqBotoes();
@@ -286,6 +303,7 @@
   }
 
   function _sqComecar() {
+    _sqAplicarSkin();
     _sqLimparTimers();
     _sqApagarTodos();
     _sqAjustarGrade(4); // recomeça sempre na grade 2x2
@@ -365,6 +383,7 @@
   // Preparação da tela: liga os botões (idempotente) e reseta o estado.
   function _sqPrepararTela() {
     _sqLigarBotoes();
+    _sqAplicarSkin();
     _sqRegistrarMenu();
     _sqPreparar();
   }

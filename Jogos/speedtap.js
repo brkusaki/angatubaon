@@ -105,9 +105,31 @@
     }
   }
 
+  // Skin da coruja BOA — loja dentro do jogo (hub.js). Filtro CSS na <img>
+  // (igual ao Voo); a brava e a dourada nunca mudam, pra skin não confundir
+  // o que vale ponto. 'arcoiris' usa a classe .skin-arcoiris-anim (styles.css).
+  var _stSkinFiltro = '', _stSkinArco = false;
+  function _stAplicarSkin() {
+    var G = window.AngatubaGames, it = null;
+    try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('st_tema') : null; } catch (e) {}
+    _stSkinFiltro = (it && it.filtroCss) || '';
+    _stSkinArco = !!(it && it.animado === 'arcoiris');
+    var boa = document.querySelector('#st-arena .st-boa img');
+    if (boa) _stPintarBoa(boa);
+  }
+  function _stPintarBoa(img) {
+    img.style.filter = _stSkinFiltro;
+    if (_stSkinArco) img.classList.add('skin-arcoiris-anim');
+    else img.classList.remove('skin-arcoiris-anim');
+  }
+  window.addEventListener('angatuba:equipado', function (e) {
+    if (e && e.detail && e.detail.slot === 'st_tema') _stAplicarSkin();
+  });
+
   // Prepara a tela (estado inicial, mostra recorde). Não inicia o jogo ainda.
   function _stPreparar() {
     _stParar();
+    _stAplicarSkin();
     _stRegistrarMenu();
     var recEl = document.getElementById('st-recorde');
     if (recEl) recEl.textContent = _stRecordeGet();
@@ -170,6 +192,7 @@
     img.src = tipo === 'fake' ? _ST_FAKE : (tipo === 'bonus' ? _ST_BONUS : _ST_OWL);
     img.alt = 'coruja';
     img.onerror = function(){ this.style.visibility = 'hidden'; };
+    if (tipo === 'boa') _stPintarBoa(img);
     alvo.appendChild(img);
     arena.appendChild(alvo);
     _stPosicionar(alvo, arena, cfg.tamanho);
@@ -255,6 +278,7 @@
     var arena = document.getElementById('st-arena');
     if (!arena) return;
     _stParar();
+    _stAplicarSkin();
     // Define o modo (default: mantém o atual, ou clássico se indefinido).
     if (modo === 'classico' || modo === 'sobrevivencia') _stModo = modo;
     _stPontos = 0; _stCombo = 0; _stComboMax = 0;

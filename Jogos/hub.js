@@ -2648,10 +2648,18 @@
   }
 
   // Slots válidos de equipamento — mesmo formato que o perfil público vai usar depois.
-  var LOJA_SLOTS = ['voo_owl', 'badge', 'bg', 'card'];
+  // Slots de skin por jogo (t48_tema ... dc_tema): vendidos só na loja
+  // dentro de cada jogo (lojaJogoAbrir) e NÃO publicados no perfil
+  // público (_perfilPublicoSync só manda voo_owl/badge/bg/card).
+  var LOJA_SLOTS = ['voo_owl', 'badge', 'bg', 'card',
+    't48_tema', 'piano_tema', 'pp_skin', 'sq_tema', 'st_tema',
+    'bb_tema', 'tq_skin', 'dc_tema'];
 
   function _equipadoPadrao() {
-    return { voo_owl: 'voo_skin_classica', badge: null, bg: 'bg_padrao', card: 'card_padrao' };
+    return { voo_owl: 'voo_skin_classica', badge: null, bg: 'bg_padrao', card: 'card_padrao',
+      t48_tema: 't48_classico', piano_tema: 'piano_classico', pp_skin: 'pp_classico',
+      sq_tema: 'sq_classico', st_tema: 'st_classico', bb_tema: 'bb_classico',
+      tq_skin: 'tq_classico', dc_tema: 'dc_classico' };
   }
 
   /* ── Catálogo (hardcoded) ──────────────────────────────────────
@@ -2676,6 +2684,64 @@
     // frame (ver _vooDesenharCoruja); na loja, a classe .skin-arcoiris-anim
     // (styles.css) faz o mesmo giro na miniatura.
     { id: 'voo_skin_arcoiris', nome: 'Coruja Arco-íris', desc: 'Muda de cor sem parar.',     preco: 200, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'sepia(1) saturate(5) hue-rotate(0deg) brightness(1.08) drop-shadow(0 0 6px rgba(255,255,255,.55))', animado: 'arcoiris' },
+
+    // ── Skins dos outros jogos (loja dentro de cada jogo) ─────────────
+    // Sem asset novo: o jogo lê os dados visuais do próprio item
+    // (paleta/cores/filtroCss/tinta) via AngatubaGames.skinEquipada(slot).
+    // 'amostra' = cores mostradas na miniatura da loja in-game. O clássico
+    // de cada slot não traz dados visuais → o jogo usa o visual de sempre.
+    // 2048 — paleta: 12 cores, peças 2,4,8,...,2048 + "super" (>2048).
+    { id: 't48_classico', nome: 'Clássico',  desc: 'As cores de sempre.',      preco: 0,   slot: 't48_tema', tipo: 'skin', preview: null, jogo: '2048', amostra: ['#eee4da', '#f2b179', '#f65e3b', '#edc850', '#fbbf24', '#64748b'] },
+    { id: 't48_oceano',   nome: 'Oceano',    desc: 'Azuis e verde-água.',      preco: 85,  slot: 't48_tema', tipo: 'skin', preview: null, jogo: '2048', paleta: ['#e0f2fe', '#bae6fd', '#7dd3fc', '#38bdf8', '#0ea5e9', '#0284c7', '#2dd4bf', '#14b8a6', '#0d9488', '#0f766e', '#06b6d4', '#1e3a8a'] },
+    { id: 't48_floresta', nome: 'Floresta',  desc: 'Do broto à mata fechada.', preco: 120, slot: 't48_tema', tipo: 'skin', preview: null, jogo: '2048', paleta: ['#ecfccb', '#d9f99d', '#bef264', '#a3e635', '#84cc16', '#65a30d', '#4ade80', '#22c55e', '#16a34a', '#15803d', '#166534', '#3f2a14'] },
+    { id: 't48_neon',     nome: 'Neon',      desc: 'Rosa, ciano e limão.',     preco: 150, slot: 't48_tema', tipo: 'skin', preview: null, jogo: '2048', paleta: ['#f5d0fe', '#f0abfc', '#e879f9', '#d946ef', '#c026d3', '#a21caf', '#22d3ee', '#06b6d4', '#a3e635', '#facc15', '#f472b6', '#0f172a'] },
+    { id: 't48_galaxia',  nome: 'Galáxia',   desc: 'Roxo profundo e ouro.',    preco: 200, slot: 't48_tema', tipo: 'skin', preview: null, jogo: '2048', paleta: ['#e0e7ff', '#c7d2fe', '#a5b4fc', '#818cf8', '#6366f1', '#4f46e5', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95', '#fbbf24', '#020617'] },
+    // Piano — cores: azulejo, azulejo tocado ('r,g,b'), onda do acerto e fundo.
+    { id: 'piano_classico', nome: 'Clássico',      desc: 'Vermelho e verde-água.', preco: 0,   slot: 'piano_tema', tipo: 'skin', preview: null, jogo: 'piano', amostra: ['#e3354f', '#21a67b', '#0d1420'] },
+    { id: 'piano_oceano',   nome: 'Oceano',        desc: 'Teclas azul-marinho.',   preco: 85,  slot: 'piano_tema', tipo: 'skin', preview: null, jogo: 'piano', cores: { tecla: '#2563eb', tocada: '56,189,248',  onda: '#a5f3fc', fundo: '#071426' }, amostra: ['#2563eb', '#38bdf8', '#071426'] },
+    { id: 'piano_algodao',  nome: 'Algodão-doce',  desc: 'Rosa com lilás.',        preco: 120, slot: 'piano_tema', tipo: 'skin', preview: null, jogo: 'piano', cores: { tecla: '#ec4899', tocada: '196,181,253', onda: '#fbcfe8', fundo: '#1a0d1f' }, amostra: ['#ec4899', '#c4b5fd', '#1a0d1f'] },
+    { id: 'piano_ouro',     nome: 'Ouro',          desc: 'Teclas douradas.',       preco: 150, slot: 'piano_tema', tipo: 'skin', preview: null, jogo: 'piano', cores: { tecla: '#d97706', tocada: '250,204,21',  onda: '#fde68a', fundo: '#140f05' }, amostra: ['#d97706', '#facc15', '#140f05'] },
+    { id: 'piano_neon',     nome: 'Neon',          desc: 'Roxo e ciano elétrico.', preco: 200, slot: 'piano_tema', tipo: 'skin', preview: null, jogo: 'piano', cores: { tecla: '#a855f7', tocada: '34,211,238',  onda: '#67e8f9', fundo: '#05010d' }, amostra: ['#a855f7', '#22d3ee', '#05010d'] },
+    // Ping Pong — só a SUA raquete e a bola (local; o adversário não vê).
+    { id: 'pp_classico', nome: 'Clássico',     desc: 'Raquete azul, bola branca.', preco: 0,   slot: 'pp_skin', tipo: 'skin', preview: null, jogo: 'pingpong', amostra: ['#38bdf8', '#ffffff'] },
+    { id: 'pp_limao',    nome: 'Verde Limão',  desc: 'Raquete limão.',             preco: 85,  slot: 'pp_skin', tipo: 'skin', preview: null, jogo: 'pingpong', corRaquete: '#84cc16', corBola: '#fef08a', amostra: ['#84cc16', '#fef08a'] },
+    { id: 'pp_roxo',     nome: 'Roxo Neon',    desc: 'Raquete roxa brilhante.',    preco: 120, slot: 'pp_skin', tipo: 'skin', preview: null, jogo: 'pingpong', corRaquete: '#a855f7', corBola: '#f0abfc', amostra: ['#a855f7', '#f0abfc'] },
+    { id: 'pp_fogo',     nome: 'Laranja Fogo', desc: 'Raquete em brasa.',          preco: 150, slot: 'pp_skin', tipo: 'skin', preview: null, jogo: 'pingpong', corRaquete: '#f97316', corBola: '#fde047', amostra: ['#f97316', '#fde047'] },
+    { id: 'pp_ouro',     nome: 'Ouro',         desc: 'Raquete e bola douradas.',   preco: 200, slot: 'pp_skin', tipo: 'skin', preview: null, jogo: 'pingpong', corRaquete: '#fbbf24', corBola: '#fff3c4', amostra: ['#fbbf24', '#fff3c4'] },
+    // Sequência — paleta das 6 corujas (as 2 últimas destravam na rodada 6).
+    { id: 'sq_classico', nome: 'Clássico', desc: 'As 6 cores de sempre.',  preco: 0,   slot: 'sq_tema', tipo: 'skin', preview: null, jogo: 'sequencia', amostra: ['#a855f7', '#f59e0b', '#4ade80', '#3b82f6', '#ec4899', '#14b8a6'] },
+    { id: 'sq_pastel',   nome: 'Pastel',   desc: 'Tons suaves.',           preco: 85,  slot: 'sq_tema', tipo: 'skin', preview: null, jogo: 'sequencia', paleta: ['#c4b5fd', '#fcd34d', '#86efac', '#93c5fd', '#f9a8d4', '#5eead4'] },
+    { id: 'sq_neon',     nome: 'Neon',     desc: 'Cores elétricas.',       preco: 120, slot: 'sq_tema', tipo: 'skin', preview: null, jogo: 'sequencia', paleta: ['#d946ef', '#facc15', '#22c55e', '#06b6d4', '#f43f5e', '#a3e635'] },
+    { id: 'sq_doces',    nome: 'Doces',    desc: 'Cores de confeitaria.',  preco: 150, slot: 'sq_tema', tipo: 'skin', preview: null, jogo: 'sequencia', paleta: ['#fb7185', '#fbbf24', '#34d399', '#60a5fa', '#c084fc', '#f97316'] },
+    { id: 'sq_galaxia',  nome: 'Galáxia',  desc: 'Nebulosas e estrelas.',  preco: 200, slot: 'sq_tema', tipo: 'skin', preview: null, jogo: 'sequencia', paleta: ['#8b5cf6', '#f472b6', '#22d3ee', '#facc15', '#34d399', '#fb923c'] },
+    // Pega a Coruja — filtro só na coruja BOA (brava e dourada ficam iguais,
+    // pra skin nunca confundir o jogo).
+    { id: 'st_classico', nome: 'Clássica',          desc: 'A coruja de sempre.',   preco: 0,   slot: 'st_tema', tipo: 'skin', preview: '/webp/owl-portrait.webp', jogo: 'speedtap', filtroCss: '' },
+    { id: 'st_neon',     nome: 'Coruja Neon',       desc: 'Brilho ciano.',         preco: 85,  slot: 'st_tema', tipo: 'skin', preview: '/webp/owl-portrait.webp', jogo: 'speedtap', filtroCss: 'hue-rotate(150deg) saturate(2.4) brightness(1.15) drop-shadow(0 0 7px #22e3ff)' },
+    { id: 'st_dourada',  nome: 'Coruja Dourada',    desc: 'Reluz feito ouro.',     preco: 120, slot: 'st_tema', tipo: 'skin', preview: '/webp/owl-portrait.webp', jogo: 'speedtap', filtroCss: 'sepia(1) saturate(4.5) hue-rotate(-12deg) brightness(1.2) drop-shadow(0 0 7px rgba(255,200,60,.85))' },
+    { id: 'st_gelo',     nome: 'Coruja Gelo',       desc: 'Azul congelante.',      preco: 150, slot: 'st_tema', tipo: 'skin', preview: '/webp/owl-portrait.webp', jogo: 'speedtap', filtroCss: 'hue-rotate(165deg) saturate(1.2) brightness(1.4) drop-shadow(0 0 7px rgba(170,230,255,.9))' },
+    { id: 'st_arcoiris', nome: 'Coruja Arco-íris',  desc: 'Muda de cor sem parar.', preco: 200, slot: 'st_tema', tipo: 'skin', preview: '/webp/owl-portrait.webp', jogo: 'speedtap', filtroCss: 'sepia(1) saturate(5) hue-rotate(0deg) brightness(1.08) drop-shadow(0 0 6px rgba(255,255,255,.55))', animado: 'arcoiris' },
+    // Blocos — paleta: 6 cores das peças (sem as texturas do clássico).
+    { id: 'bb_classico', nome: 'Clássico', desc: 'Peças com textura.',     preco: 0,   slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', amostra: ['#a855f7', '#38bdf8', '#34d399', '#fbbf24', '#fb7185', '#22d3ee'] },
+    { id: 'bb_pastel',   nome: 'Pastel',   desc: 'Tons suaves.',           preco: 85,  slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', paleta: ['#c4b5fd', '#93c5fd', '#86efac', '#fde68a', '#fda4af', '#a5f3fc'] },
+    { id: 'bb_neon',     nome: 'Neon',     desc: 'Cores elétricas.',       preco: 120, slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', paleta: ['#d946ef', '#3b82f6', '#22c55e', '#facc15', '#f43f5e', '#06b6d4'] },
+    { id: 'bb_madeira',  nome: 'Madeira',  desc: 'Blocos de marcenaria.',  preco: 150, slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', paleta: ['#7c4a24', '#a0632f', '#c08552', '#8b5a2b', '#d4a373', '#5c3a1e'] },
+    { id: 'bb_galaxia',  nome: 'Galáxia',  desc: 'Roxos, rosas e ouro.',   preco: 200, slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', paleta: ['#7c3aed', '#4f46e5', '#db2777', '#0ea5e9', '#9333ea', '#f59e0b'] },
+    // Batalha de Tanques — tinta sobre o sprite do SEU tanque (local; o
+    // adversário continua vendo a cor padrão). Sem vermelho/azul puros,
+    // pra não confundir com as cores dos dois lados.
+    { id: 'tq_classico', nome: 'Clássico',      desc: 'A pintura de fábrica.', preco: 0,   slot: 'tq_skin', tipo: 'skin', preview: null, jogo: 'tanques', amostra: ['#3b82f6', '#ef4444'] },
+    { id: 'tq_militar',  nome: 'Verde Militar', desc: 'Verde-oliva.',          preco: 85,  slot: 'tq_skin', tipo: 'skin', preview: null, jogo: 'tanques', tinta: 'rgba(77,124,15,0.62)',  amostra: ['#4d7c0f'] },
+    { id: 'tq_deserto',  nome: 'Deserto',       desc: 'Camuflagem de areia.',  preco: 120, slot: 'tq_skin', tipo: 'skin', preview: null, jogo: 'tanques', tinta: 'rgba(194,164,107,0.66)', amostra: ['#c2a46b'] },
+    { id: 'tq_onix',     nome: 'Ônix',          desc: 'Preto fosco.',          preco: 150, slot: 'tq_skin', tipo: 'skin', preview: null, jogo: 'tanques', tinta: 'rgba(24,28,36,0.72)',   amostra: ['#1f2937'] },
+    { id: 'tq_ouro',     nome: 'Ouro',          desc: 'Blindagem dourada.',    preco: 200, slot: 'tq_skin', tipo: 'skin', preview: null, jogo: 'tanques', tinta: 'rgba(245,183,10,0.62)', amostra: ['#f5b70a'] },
+    // Doces — paleta: 5 cores (cada uma com formato próprio) + nomes pro
+    // objetivo "Faça N combinações <cor>".
+    { id: 'dc_classico', nome: 'Clássico', desc: 'Os doces de sempre.',     preco: 0,   slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', amostra: ['#ef4444', '#a855f7', '#4ade80', '#fbbf24', '#38bdf8'] },
+    { id: 'dc_frutas',   nome: 'Frutas',   desc: 'Balas sabor fruta.',      preco: 85,  slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', paleta: ['#e11d48', '#f97316', '#84cc16', '#facc15', '#8b5cf6'], nomes: ['🍓 morango', '🍊 laranja', '🍏 maçã', '🍋 limão', '🍇 uva'] },
+    { id: 'dc_pastel',   nome: 'Pastel',   desc: 'Confeitos suaves.',       preco: 120, slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', paleta: ['#fda4af', '#c4b5fd', '#86efac', '#fde68a', '#93c5fd'], nomes: ['🌸 rosa', '💜 lilás', '🌿 menta', '🌼 baunilha', '💙 céu'] },
+    { id: 'dc_neon',     nome: 'Neon',     desc: 'Balas que brilham.',      preco: 150, slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', paleta: ['#f43f5e', '#d946ef', '#22c55e', '#facc15', '#06b6d4'], nomes: ['🔴 pink', '🟣 magenta', '🟢 verde', '🟡 amarelo', '🔵 ciano'] },
+    { id: 'dc_joias',    nome: 'Joias',    desc: 'Rubi, safira e cia.',     preco: 200, slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', paleta: ['#dc2626', '#7c3aed', '#059669', '#f59e0b', '#2563eb'], nomes: ['❤️ rubi', '💜 ametista', '💚 esmeralda', '💛 topázio', '💙 safira'] },
 
     // Badges
     { id: 'badge_estrela', nome: 'Estrela da Coruja', desc: 'Pra quem brilha nos jogos.',         preco: 50,  slot: 'badge', tipo: 'badge', preview: '/webp/owl-tada.webp',   jogo: null },
@@ -2852,12 +2918,19 @@
       var raw = localStorage.getItem(LOJA_KEY_EQUIPADO);
       var obj = raw ? JSON.parse(raw) : {};
       if (!obj || typeof obj !== 'object') obj = {};
-      return {
+      var eq = {
         voo_owl: obj.voo_owl || padrao.voo_owl,
         badge:   (obj.badge !== undefined) ? obj.badge : padrao.badge,
         bg:      obj.bg || padrao.bg,
         card:    obj.card || padrao.card
       };
+      // Slots de skin dos jogos: id inválido/sumido do catálogo cai no
+      // clássico do slot (salvo antes desta versão = sem a chave = clássico).
+      for (var s = 4; s < LOJA_SLOTS.length; s++) {
+        var slot = LOJA_SLOTS[s], it = obj[slot] ? _lojaItemPorId(obj[slot]) : null;
+        eq[slot] = (it && it.slot === slot) ? obj[slot] : padrao[slot];
+      }
+      return eq;
     } catch (e) { return padrao; }
   }
   function _equipadoSalvar(obj) {
@@ -3141,14 +3214,24 @@
     var estilo = (item.filtroCss ? 'filter:' + item.filtroCss + ';' : '') + (item.pixelado ? 'image-rendering:pixelated;' : '');
     var preco = tem ? '<span class="lojajogo-preco lojajogo-preco-tem">✓ Na coleção</span>'
                     : '<span class="lojajogo-preco">🪙 ' + item.preco + '</span>';
+    // Skin sem imagem (paleta/cores): miniatura = quadradinhos das cores.
+    var cores = item.amostra || item.paleta;
+    var amostraHtml = '';
+    if (!item.preview && cores && cores.length) {
+      var n = cores.length, cols = n <= 3 ? n : (n <= 6 ? 3 : 4);
+      amostraHtml = '<span class="lojajogo-amostra" style="grid-template-columns:repeat(' + cols + ',1fr)" aria-hidden="true">';
+      for (var ci = 0; ci < n; ci++) amostraHtml += '<i style="background:' + _rankEsc(cores[ci]) + '"></i>';
+      amostraHtml += '</span>';
+    }
     return '<div class="loja-item' + (equipadoAgora ? ' loja-item-equipado' : '') + '">' +
              '<div class="loja-item-preview">' +
-               (item.preview
+               (amostraHtml ? amostraHtml : item.preview
                  ? '<img src="' + _rankEsc(item.preview) + '" alt=""' + (item.animado === 'arcoiris' ? ' class="skin-arcoiris-anim"' : '') +
                    (estilo ? ' style="' + estilo + '"' : '') + ' loading="lazy" onerror="this.style.display=\'none\'">'
                  : '<span class="loja-item-ph" aria-hidden="true">' + (LOJA_TIPO_ICO[item.tipo] || '🦉') + '</span>') +
              '</div>' +
              '<div class="loja-item-nome">' + _rankEsc(item.nome) + '</div>' +
+             (item.desc ? '<div class="lojajogo-desc">' + _rankEsc(item.desc) + '</div>' : '') +
              preco +
              '<button type="button" class="loja-item-cta ' + ctaClasse + '"' + ctaAtributos + '>' + _rankEsc(cta) + '</button>' +
            '</div>';
@@ -4391,6 +4474,12 @@
     inventario: function () { return _invLer(); },
     temItem: function (id) { return _temItem(id); },
     equipado: function (slot) { return _equipadoLer()[slot] || null; },
+    // Item do catálogo equipado no slot (já com fallback pro clássico) —
+    // os jogos leem paleta/cores/filtroCss/tinta direto daqui.
+    skinEquipada: function (slot) {
+      var id = _equipadoLer()[slot];
+      return (id && _lojaItemPorId(id)) || null;
+    },
     comprarItem: function (id) { return _comprarItem(id); },
     // Dá um item do catálogo de graça (prêmio — ex.: ovo dourado da Corujinha).
     // Só ids do catálogo; não equipa. Retorna false se o id não existe.

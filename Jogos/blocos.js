@@ -72,8 +72,29 @@
     '/Jogos/assets/blocos/bloco-rosa.webp',
     '/Jogos/assets/blocos/bloco-ciano.webp'
   ];
+  // Skin (paleta das peças) — loja dentro do jogo (hub.js). Tema com
+  // 'paleta' (6 cores) troca _bbCores e desliga as texturas (que são de
+  // cor fixa) — no lugar, um brilho em gradiente dá o relevo da peça.
+  var _BB_CORES_CLASSICAS = _bbCores.slice();
+  var _bbTemaPaleta = false;
+  function _bbAplicarSkin() {
+    var G = window.AngatubaGames, it = null;
+    try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('bb_tema') : null; } catch (e) {}
+    var pal = (it && it.paleta && it.paleta.length >= _BB_CORES_CLASSICAS.length) ? it.paleta : null;
+    _bbTemaPaleta = !!pal;
+    _bbCores = pal ? pal.slice(0, _BB_CORES_CLASSICAS.length) : _BB_CORES_CLASSICAS.slice();
+    if (_bbCelEls) _bbRenderGrid();
+    if (_bbTrayEls) _bbRenderTray();
+  }
+  window.addEventListener('angatuba:equipado', function (e) {
+    if (e && e.detail && e.detail.slot === 'bb_tema') _bbAplicarSkin();
+  });
   function _bbAplicarCor(el, corIdx) {
     el.style.background = _bbCores[corIdx];
+    if (_bbTemaPaleta) {
+      el.style.backgroundImage = 'linear-gradient(145deg, rgba(255,255,255,0.32), rgba(255,255,255,0) 45%, rgba(0,0,0,0.22))';
+      return;
+    }
     var tex = _bbTexturas[corIdx];
     if (tex) {
       el.style.backgroundImage = 'url(' + tex + ')';
@@ -605,6 +626,7 @@
     if (_bbUltimoResultado === 'venceu') _bbProximaFase(); else _bbRetry();
   }
   function _bbComecar() {
+    _bbAplicarSkin();
     _bbMostrarOverlay(null);
     _bbIniciarFase(_bbRecordeGet() + 1);
   }
@@ -634,6 +656,7 @@
     _bbCriarGridDOM();
     _bbRegistrarMenu();
     _bbCriarTrayDOM();
+    _bbAplicarSkin();
     _bbCancelarArraste();
     _bbCarregarSpritesLimpeza();
     _bbRodando = false;

@@ -81,6 +81,69 @@
   var _DC_TEX_GELO = '/Jogos/assets/doces/gelo.webp';
   var _dcCoresNome = ['🔴 vermelho', '🟣 roxo', '🟢 verde', '🟡 amarelo', '🔵 azul'];
 
+  // Skin (paleta dos doces) — loja dentro do jogo (hub.js). Tema com
+  // 'paleta' (5 cores) troca _dcCores/_dcCoresNome e desenha cada doce
+  // como um sprite gerado em canvas (1x por tema, cache) no lugar das
+  // imagens de cor fixa — cada cor com um FORMATO próprio (bala, losango,
+  // quadrado, estrela, hexágono) pra seguir fácil de distinguir.
+  var _DC_CORES_CLASSICAS = _dcCores.slice(), _DC_NOMES_CLASSICOS = _dcCoresNome.slice();
+  var _dcSkinSprites = null;
+  function _dcAplicarSkin() {
+    var G = window.AngatubaGames, it = null;
+    try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('dc_tema') : null; } catch (e) {}
+    var n = _DC_CORES_CLASSICAS.length;
+    var pal = (it && it.paleta && it.paleta.length >= n) ? it.paleta.slice(0, n) : null;
+    if (!pal) {
+      _dcCores = _DC_CORES_CLASSICAS.slice(); _dcCoresNome = _DC_NOMES_CLASSICOS.slice(); _dcSkinSprites = null;
+    } else {
+      _dcCores = pal;
+      _dcCoresNome = (it.nomes && it.nomes.length >= n) ? it.nomes.slice(0, n) : _DC_NOMES_CLASSICOS.slice();
+      _dcSkinSprites = pal.map(function (cor, i) { return _dcSpriteDoce(cor, i); });
+    }
+    var objEl = document.getElementById('dc-objetivo-texto');
+    if (objEl && _dcObjetivo) objEl.textContent = _dcObjetivoTexto();
+  }
+  function _dcSpriteDoce(cor, forma) {
+    var T = 128, cv, c;
+    try { cv = document.createElement('canvas'); cv.width = T; cv.height = T; c = cv.getContext('2d'); } catch (e) { return null; }
+    if (!c) return null;
+    var n = parseInt(String(cor).slice(1), 16), rr = n >> 16 & 255, gg = n >> 8 & 255, bb = n & 255;
+    var claro = 'rgb(' + Math.round(rr + (255 - rr) * 0.6) + ',' + Math.round(gg + (255 - gg) * 0.6) + ',' + Math.round(bb + (255 - bb) * 0.6) + ')';
+    var escuro = 'rgb(' + Math.round(rr * 0.6) + ',' + Math.round(gg * 0.6) + ',' + Math.round(bb * 0.6) + ')';
+    var m = T / 2, R = T * 0.42, k, ang, raio;
+    c.beginPath();
+    switch (forma % 5) {
+      case 0: c.arc(m, m, R, 0, Math.PI * 2); break;                       // bala redonda
+      case 1: c.moveTo(m, m - R * 1.05); c.lineTo(m + R * 0.9, m);         // losango
+              c.lineTo(m, m + R * 1.05); c.lineTo(m - R * 0.9, m); c.closePath(); break;
+      case 2: var q = R * 0.86, cr = R * 0.36;                             // quadrado arredondado
+              c.moveTo(m - q + cr, m - q); c.arcTo(m + q, m - q, m + q, m + q, cr);
+              c.arcTo(m + q, m + q, m - q, m + q, cr); c.arcTo(m - q, m + q, m - q, m - q, cr);
+              c.arcTo(m - q, m - q, m + q, m - q, cr); c.closePath(); break;
+      case 3: for (k = 0; k < 10; k++) {                                   // estrela
+                ang = -Math.PI / 2 + k * Math.PI / 5; raio = (k % 2) ? R * 0.52 : R * 1.04;
+                if (k) c.lineTo(m + Math.cos(ang) * raio, m + Math.sin(ang) * raio);
+                else c.moveTo(m + Math.cos(ang) * raio, m + Math.sin(ang) * raio);
+              } c.closePath(); break;
+      default: for (k = 0; k < 6; k++) {                                   // hexágono
+                ang = Math.PI / 6 + k * Math.PI / 3;
+                if (k) c.lineTo(m + Math.cos(ang) * R, m + Math.sin(ang) * R);
+                else c.moveTo(m + Math.cos(ang) * R, m + Math.sin(ang) * R);
+              } c.closePath();
+    }
+    var g = c.createRadialGradient(m - R * 0.35, m - R * 0.4, R * 0.08, m, m, R * 1.15);
+    g.addColorStop(0, claro); g.addColorStop(0.45, cor); g.addColorStop(1, escuro);
+    c.fillStyle = g; c.fill();
+    c.lineWidth = T * 0.035; c.strokeStyle = escuro; c.stroke();
+    c.beginPath();
+    c.ellipse(m - R * 0.3, m - R * 0.42, R * 0.3, R * 0.15, -0.5, 0, Math.PI * 2);
+    c.fillStyle = 'rgba(255,255,255,0.5)'; c.fill();
+    return cv;
+  }
+  window.addEventListener('angatuba:equipado', function (e) {
+    if (e && e.detail && e.detail.slot === 'dc_tema') _dcAplicarSkin();
+  });
+
   // Formatos de tabuleiro por fase — no Candy Crush de verdade cada fase
   // tem um layout diferente, não é sempre uma grade 8×8 cheia. Fase 1-2
   // ficam cheias (tutorial); da 3 em diante alterna entre os formatos
@@ -652,7 +715,7 @@
     }
 
     if (gelo) { try { ctx.filter = gelo === 2 ? 'saturate(0.5) brightness(1.05)' : 'saturate(0.3) brightness(1.12)'; } catch (e) {} }
-    var img = _dcImgs[corIdx - 1];
+    var img = _dcSkinSprites ? _dcSkinSprites[corIdx - 1] : _dcImgs[corIdx - 1];
     if (img) {
       var lado = r * 1.9; // quase o diâmetro (2r) inteiro da célula
       try { ctx.drawImage(img, x - lado / 2, cy - lado / 2, lado, lado); } catch (e) {}
@@ -1166,6 +1229,7 @@
     if (_dcUltimoResultado === 'venceu') _dcProximaFase(); else _dcRetry();
   }
   function _dcComecar() {
+    _dcAplicarSkin();
     _dcMostrarOverlay(null);
     _dcIniciarFase(_dcRecordeGet() + 1);
   }
@@ -1203,6 +1267,7 @@
     }
     _dcCarregarImagens();
     _dcCarregarSpritesMatch();
+    _dcAplicarSkin();
     try {
       var corBorda = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
       if (corBorda) _dcCorBorda = corBorda;

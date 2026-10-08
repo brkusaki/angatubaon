@@ -181,11 +181,27 @@
   /* ── Ponte com o app (fachada segura — no-op se não existir) ──── */
   function _ppBridge() { return window.AngatubaGames || null; }
 
+  // Skin (loja dentro do jogo, hub.js): cor da MINHA raquete e da bola,
+  // só no desenho local — nada disso vai pela rede, então o adversário
+  // continua vendo as cores padrão (multiplayer intacto).
+  var _ppCorRaquete = '#38bdf8', _ppCorBola = '#fff';
+  function _ppAplicarSkin() {
+    var G = _ppBridge(), it = null;
+    try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('pp_skin') : null; } catch (e) {}
+    _ppCorRaquete = (it && it.corRaquete) || '#38bdf8';
+    _ppCorBola = (it && it.corBola) || '#fff';
+    if (_ppCtx) _ppDesenhar();
+  }
+  window.addEventListener('angatuba:equipado', function (e) {
+    if (e && e.detail && e.detail.slot === 'pp_skin') _ppAplicarSkin();
+  });
+
   /* ── Ciclo de vida ─────────────────────────────────────────────*/
   function _ppPreparar() {
     _ppCanvas = document.getElementById('pp-canvas');
     if (!_ppCanvas) return;
     _ppCtx = _ppCanvas.getContext('2d');
+    _ppAplicarSkin();
     _ppLigarControles();
     _ppLigarEventosRede();
     if (!_ppResizeOn) {
@@ -857,6 +873,7 @@
   }
 
   function _ppComecarPartida() {
+    _ppAplicarSkin();
     _ppMostrarTela('jogando');
     _ppUltimoTs = 0;
     if (_ppRAF) cancelAnimationFrame(_ppRAF);
@@ -1155,7 +1172,7 @@
     if (jogando && renderDBola < 0.5) _ppDesenharBola(renderDBola);
     _ppDesenharRede();
     if (jogando && renderDBola >= 0.5) _ppDesenharBola(renderDBola);
-    _ppDesenharRaquete(_ppMinhaRaqueteX, _ppMinhaRaqueteH, 0, '#38bdf8');
+    _ppDesenharRaquete(_ppMinhaRaqueteX, _ppMinhaRaqueteH, 0, _ppCorRaquete);
 
     if (jogando && _ppAguardandoSaque) _ppDesenharPromptSaque();
     if (jogando && !_ppSouAnfitriao && _ppModo === 'multiplayer' && _ppUltimoEEm
@@ -1284,8 +1301,8 @@
 
     ctx.beginPath();
     ctx.arc(bola.x, bola.y, Math.max(2, 6 * bola.escala), 0, Math.PI * 2);
-    ctx.fillStyle = '#fff';
-    ctx.shadowColor = 'rgba(255,255,255,0.6)';
+    ctx.fillStyle = _ppCorBola;
+    ctx.shadowColor = (_ppCorBola === '#fff') ? 'rgba(255,255,255,0.6)' : _ppCorBola;
     ctx.shadowBlur = 8;
     ctx.fill();
     ctx.shadowBlur = 0;

@@ -409,6 +409,23 @@
   var _pnPausaInicioMs = 0; // Date.now() de quando a pausa atual começou
   var _pnListenersOn = false, _pnResizeOn = false;
 
+  // Skin (tema das teclas) — loja dentro do jogo (hub.js). Clássico =
+  // estes valores; tema com 'cores' troca azulejo, tocado ('r,g,b'),
+  // onda do acerto e fundo. Lido ao preparar/começar e quando o
+  // equipado muda (evento 'angatuba:equipado').
+  var _PN_SKIN_CLASSICA = { tecla: '#e3354f', tocada: '33,166,123', onda: '#8ffdd6', fundo: '#0d1420' };
+  var _pnSkin = _PN_SKIN_CLASSICA;
+  function _pnAplicarSkin() {
+    var G = window.AngatubaGames, it = null;
+    try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('piano_tema') : null; } catch (e) {}
+    var c = it && it.cores;
+    _pnSkin = (c && c.tecla && c.tocada && c.onda && c.fundo) ? c : _PN_SKIN_CLASSICA;
+    if (_pnCtx && _pnEstado !== 'jogando') _pnDraw();
+  }
+  window.addEventListener('angatuba:equipado', function (e) {
+    if (e && e.detail && e.detail.slot === 'piano_tema') _pnAplicarSkin();
+  });
+
   var _pnAzulejos = [];      // [0] é sempre o mais baixo
   var _pnMovendo = false;    // só anda depois do primeiro toque certo
   var _pnPontos = 0;
@@ -701,7 +718,7 @@
     var lh = _pnLinhaH(), cw = _pnColW(), x0 = _pnX0();
 
     // Fundo + trilhos das colunas
-    ctx.fillStyle = '#0d1420';
+    ctx.fillStyle = _pnSkin.fundo;
     ctx.fillRect(0, 0, W, H);
     // Tela larga: escurece as laterais fora do campo pra marcar a pista
     if (x0 > 1) {
@@ -738,12 +755,12 @@
         // Android mais fraco. Uma cor só, recalculada por número, é
         // igual de viva no efeito de flash e não aloca nada extra.
         var f = az.flash;
-        ctx.fillStyle = 'rgba(33,166,123,' + (0.13 + f * 0.475) + ')';
+        ctx.fillStyle = 'rgba(' + _pnSkin.tocada + ',' + (0.13 + f * 0.475) + ')';
         _pnRoundRect(ctx, bx, by, bw, bh, raio); ctx.fill();
       } else {
         // Idem: era gradiente #ff4d63→#c81e3c recriado por azulejo
         // por frame; agora é o tom médio fixo, sem alocação.
-        ctx.fillStyle = '#e3354f';
+        ctx.fillStyle = _pnSkin.tecla;
         _pnRoundRect(ctx, bx, by, bw, bh, raio); ctx.fill();
         if (az === alvo) {
           ctx.strokeStyle = 'rgba(255,255,255,0.85)';
@@ -765,7 +782,7 @@
       var on = _pnOndas[i];
       var p = on.t / 0.4;
       ctx.globalAlpha = (1 - p) * 0.55;
-      ctx.strokeStyle = '#8ffdd6';
+      ctx.strokeStyle = _pnSkin.onda;
       ctx.lineWidth = Math.max(1.5, cw * 0.03) * (1 - p);
       ctx.beginPath();
       ctx.arc(on.x, on.y, cw * (0.15 + p * 0.55), 0, Math.PI * 2);
@@ -964,6 +981,7 @@
     _pnCanvas = document.getElementById('pn-canvas');
     if (!_pnCanvas) return;
     _pnCtx = _pnCanvas.getContext('2d');
+    _pnAplicarSkin();
     _pnLigarControles();
     if (!_pnResizeOn) {
       var reaval = function () {
@@ -1006,6 +1024,7 @@
     if (!_pnCanvas) return;
     if (!_pnCtx) _pnCtx = _pnCanvas.getContext('2d');
     _pnAudioDestravar();            // veio de um clique: acorda o áudio
+    _pnAplicarSkin();
     _pnLigarControles();
     _pnMostrarOverlay(null);
     _pnDimensionar();

@@ -62,6 +62,32 @@
   var _t48TilesEl = null;
   var _t48ListenersProntos = false;
 
+  // ── Skin (tema das peças) — loja dentro do jogo (hub.js) ────
+  // Tema com 'paleta' (12 cores: 2,4,...,2048 + "super") pinta a face
+  // inline por cima da classe t48-tile-vN; clássico (sem paleta) limpa o
+  // inline e volta às cores do 2048.css.
+  var _t48Paleta = null;
+  function _t48AplicarSkin() {
+    var G = window.AngatubaGames, it = null;
+    try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('t48_tema') : null; } catch (e) {}
+    _t48Paleta = (it && it.paleta && it.paleta.length >= 12) ? it.paleta : null;
+    Object.keys(_t48Tiles).forEach(function (id) { if (_t48Tiles[id].faceEl) _t48PintarFace(_t48Tiles[id]); });
+  }
+  function _t48PintarFace(tile) {
+    var f = tile.faceEl;
+    if (!_t48Paleta) { f.style.background = ''; f.style.color = ''; return; }
+    var idx = tile.valor > 2048 ? 11 : Math.max(0, Math.min(10, Math.round(Math.log(tile.valor) / Math.LN2) - 1));
+    var cor = _t48Paleta[idx];
+    f.style.background = cor;
+    // Texto escuro em cor clara, branco em cor escura (luminância simples).
+    var n = parseInt(cor.slice(1), 16);
+    var lum = (0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255;
+    f.style.color = lum > 0.62 ? '#3a2e24' : '#ffffff';
+  }
+  window.addEventListener('angatuba:equipado', function (e) {
+    if (e && e.detail && e.detail.slot === 't48_tema') _t48AplicarSkin();
+  });
+
   // ── localStorage: MELHOR PONTUAÇÃO já feita (não é fase) ───
   function _t48RecordeGet() {
     try { return Math.max(0, Math.round(Number(localStorage.getItem('angatuba_2048_rec')) || 0)); }
@@ -126,6 +152,7 @@
     var v = tile.valor <= 2048 ? tile.valor : 'super';
     tile.faceEl.className = 't48-tile-face t48-tile-v' + v;
     tile.faceEl.textContent = tile.valor;
+    _t48PintarFace(tile);
     var digitos = String(tile.valor).length;
     var fonte = cellPx * (digitos <= 2 ? 0.42 : digitos === 3 ? 0.34 : digitos === 4 ? 0.27 : 0.22);
     tile.faceEl.style.fontSize = Math.max(11, fonte) + 'px';
@@ -429,6 +456,7 @@
   }
 
   function _t48Comecar() {
+    _t48AplicarSkin();
     _t48MostrarOverlay(null);
     _t48NovoJogo();
   }
@@ -513,6 +541,7 @@
   // ── Preparação da tela (chamada pelo _jogoLoader ao abrir) ──
   function _t48PrepararTela() {
     _t48CriarDOM();
+    _t48AplicarSkin();
     _t48RegistrarMenu();
     _t48LigarListeners();
     _t48CancelarArraste();

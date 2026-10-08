@@ -592,10 +592,42 @@
   function _tqBridge() { return window.AngatubaGames || null; }
 
   /* ── Ciclo de vida ─────────────────────────────────────────────*/
+  // Skin do PRÓPRIO tanque — loja dentro do jogo (hub.js). 'tinta' é uma
+  // cor aplicada por cima do sprite (source-atop, recortada pelo alfa do
+  // próprio sprite) num canvas offscreen, 1x por sprite+tinta (cache).
+  // Só no desenho local: nada vai pela rede, o adversário vê a cor padrão.
+  var _tqSkinTinta = '';
+  var _tqSkinSprites = {};   // 'arquivo|tinta' -> canvas
+  function _tqAplicarSkin() {
+    var G = window.AngatubaGames, it = null;
+    try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('tq_skin') : null; } catch (e) {}
+    _tqSkinTinta = (it && it.tinta) || '';
+  }
+  function _tqSpriteTingido(reg, arquivo) {
+    var chave = arquivo + '|' + _tqSkinTinta;
+    if (_tqSkinSprites[chave]) return _tqSkinSprites[chave];
+    try {
+      var cv = document.createElement('canvas');
+      cv.width = reg.w; cv.height = reg.h;
+      var c = cv.getContext('2d');
+      if (!c) return null;
+      c.drawImage(reg.img, 0, 0, reg.w, reg.h);
+      c.globalCompositeOperation = 'source-atop';
+      c.fillStyle = _tqSkinTinta;
+      c.fillRect(0, 0, reg.w, reg.h);
+      _tqSkinSprites[chave] = cv;
+      return cv;
+    } catch (e) { return null; }
+  }
+  window.addEventListener('angatuba:equipado', function (e) {
+    if (e && e.detail && e.detail.slot === 'tq_skin') _tqAplicarSkin();
+  });
+
   function _tqPreparar() {
     _tqCanvas = document.getElementById('tq-canvas');
     if (!_tqCanvas) return;
     _tqCtx = _tqCanvas.getContext('2d');
+    _tqAplicarSkin();
     _tqLigarJoystick();
     _tqLigarBotaoFogo();
     _tqLigarEventosRede();
@@ -1698,6 +1730,7 @@
   }
 
   function _tqComecarPartida() {
+    _tqAplicarSkin();
     _tqMostrarTela('jogando');
     // Reforça o pedido de landscape aqui (a tela cheia do hub muitas
     // vezes só termina de abrir agora) — mesmo padrão da Corrida.
@@ -2752,7 +2785,10 @@
     if (reg && reg.ok && reg.img && reg.w && reg.h) {
       var altura = diametroTela / (TQ_PIVO_Y * 1.32); // casco ocupa ~1.32x o raio em altura
       var largura = altura * (reg.w / reg.h);
-      ctx.drawImage(reg.img, -largura / 2, -altura * TQ_PIVO_Y, largura, altura);
+      // Skin: só o MEU tanque (anfitrião se eu sou o anfitrião, senão o convidado).
+      var meu = (t === (_tqSouAnfitriao ? _tqTanqueAnfitriao : _tqTanqueConvidado));
+      var fonte = (meu && _tqSkinTinta) ? (_tqSpriteTingido(reg, arquivo) || reg.img) : reg.img;
+      ctx.drawImage(fonte, -largura / 2, -altura * TQ_PIVO_Y, largura, altura);
     } else {
       ctx.fillStyle = corFallback;
       ctx.beginPath();

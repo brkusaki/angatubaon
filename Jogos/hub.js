@@ -981,6 +981,15 @@
   var _quizJaCarregadoNaTela = false; // lazy-load do quiz só quando abre a tela dele
 
   function _voltarAoMenu() {
+    // Loja de skins aberta dentro do jogo: o "voltar" do Android (entrada
+    // 'lojajogo' já consumida) fecha só a loja e fica no jogo. Saída por
+    // outro caminho fecha a loja e desfaz as 2 entradas (lojajogo + jogo).
+    var _saiuDaLojaJogo = false;
+    if (_lojaJogoAtual) {
+      if (!(history.state && history.state.modal === 'lojajogo')) { lojaJogoFechar(true); return; }
+      lojaJogoFechar(true);
+      _saiuDaLojaJogo = true;
+    }
     _pararJogosExternos();
     // Menu unificado (AngatubaJogoMenu): nenhuma tela fica em modo partida
     // nem com o overlay aberto ao voltar pro menu de jogos.
@@ -1005,6 +1014,7 @@
     // jogo por qualquer caminho que não seja o botão "voltar" do Android
     // (que já consumiu a entrada sozinho) — mesmo padrão dos outros modais.
     if (history.state?.modal === 'jogo') { _popstateNosso = true; history.back(); }
+    else if (_saiuDaLojaJogo && history.state?.modal === 'lojajogo') { _popstateNosso = true; history.go(-2); }
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -2583,10 +2593,17 @@
      ativo. Gasto/aposta (qtd <= 0) nunca é limitado.
      O prêmio da Corujinha fica fora do teto (e da soma do dia): ele só
      devolve aposta já debitada, com RTP < 100% e teto por giro — se
-     contasse, quem passasse do teto perderia a aposta sem poder receber. */
+     contasse, quem passasse do teto perderia a aposta sem poder receber.
+     O resgate diário ('diario', 100 fixas, 1x por dia civil) também fica
+     fora: é bônus de presença, não ganho de partida. */
   var TETO_DIARIO_MOEDAS = 500;
   var LOJA_KEY_MOEDAS_DIA = 'angatuba_moedas_dia';
-  var TETO_MOTIVOS_ISENTOS = { 'corujinha-premio': true };
+  var TETO_MOTIVOS_ISENTOS = { 'corujinha-premio': true, 'diario': true };
+  // Resgate diário: guarda o dia civil local ('YYYY-MM-DD') do último resgate.
+  // É do APARELHO (fica fora do pacote por conta em _progressoGarantirDono),
+  // pra trocar de conta no mesmo celular não render um 2º resgate no dia.
+  var LOJA_KEY_DAILY_CLAIM = 'angatuba_moedas_daily_claim';
+  var MOEDAS_DIARIO_QTD = 100;
 
   /* ── Dono do progresso local (celular compartilhado — decisão A) ──
      Moedas, inventário, equipado, stats, títulos, ofensiva e recordes
@@ -2640,13 +2657,25 @@
   /* ── Catálogo (hardcoded) ──────────────────────────────────────
      Cada item: { id, nome, desc, preco, slot, tipo, preview, jogo }.
      Skins do Voo reusam o mesmo sprite (/webp/owl-flying.webp) e se
-     diferenciam por filtro CSS/canvas (filtroCss) — sem asset novo. */
+     diferenciam por filtro CSS/canvas (filtroCss) — sem asset novo.
+     Item com 'jogo' preenchido é vendido SÓ na loja dentro do próprio
+     jogo (lojaJogoAbrir) — a Loja da Coruja principal não lista. Id novo
+     de skin precisa entrar também em equipadoValido (firestore.rules). */
   var LOJA_CATALOGO = [
     // Skins da coruja no Voo da Coruja
     { id: 'voo_skin_classica', nome: 'Coruja Clássica', desc: 'O visual de sempre.',        preco: 0,   slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: '' },
     { id: 'voo_skin_neon',     nome: 'Coruja Neon',      desc: 'Brilho neon nas asas.',      preco: 80,  slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'hue-rotate(150deg) saturate(2.4) brightness(1.15) drop-shadow(0 0 7px #22e3ff)' },
     { id: 'voo_skin_dourada',  nome: 'Coruja Dourada',   desc: 'Reluz feito ouro.',          preco: 150, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'sepia(1) saturate(4.5) hue-rotate(-12deg) brightness(1.2) drop-shadow(0 0 7px rgba(255,200,60,.85))' },
     { id: 'voo_skin_pixel',    nome: 'Coruja Pixel',     desc: 'Estilo 8-bit retrô.',        preco: 120, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'contrast(1.45) saturate(.5) brightness(1.05)', pixelado: true },
+    { id: 'voo_skin_rosa',     nome: 'Coruja Magenta',   desc: 'Rosa choque com brilho.',    preco: 90,  slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'hue-rotate(285deg) saturate(2.2) brightness(1.12) drop-shadow(0 0 6px rgba(255,80,200,.75))' },
+    { id: 'voo_skin_floresta', nome: 'Coruja Floresta',  desc: 'Verde de mata fechada.',     preco: 110, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'sepia(.6) hue-rotate(60deg) saturate(2.2) brightness(.9) drop-shadow(0 0 5px rgba(60,200,90,.6))' },
+    { id: 'voo_skin_sombra',   nome: 'Coruja Sombra',    desc: 'Preta, com aura roxa.',      preco: 130, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'grayscale(1) brightness(.45) contrast(1.4) drop-shadow(0 0 7px rgba(150,90,255,.85))' },
+    { id: 'voo_skin_gelo',     nome: 'Coruja Gelo',      desc: 'Azul-claro congelante.',     preco: 140, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'hue-rotate(165deg) saturate(1.2) brightness(1.4) drop-shadow(0 0 7px rgba(170,230,255,.9))' },
+    { id: 'voo_skin_fogo',     nome: 'Coruja Fogo',      desc: 'Asas em brasa.',             preco: 160, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'sepia(1) saturate(7) hue-rotate(-28deg) brightness(1.05) drop-shadow(0 0 8px rgba(255,90,20,.9))' },
+    // animado: 'arcoiris' → o Voo gira o hue-rotate(0deg) do filtro a cada
+    // frame (ver _vooDesenharCoruja); na loja, a classe .skin-arcoiris-anim
+    // (styles.css) faz o mesmo giro na miniatura.
+    { id: 'voo_skin_arcoiris', nome: 'Coruja Arco-íris', desc: 'Muda de cor sem parar.',     preco: 200, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'sepia(1) saturate(5) hue-rotate(0deg) brightness(1.08) drop-shadow(0 0 6px rgba(255,255,255,.55))', animado: 'arcoiris' },
 
     // Badges
     { id: 'badge_estrela', nome: 'Estrela da Coruja', desc: 'Pra quem brilha nos jogos.',         preco: 50,  slot: 'badge', tipo: 'badge', preview: '/webp/owl-tada.webp',   jogo: null },
@@ -2691,13 +2720,13 @@
   ];
 
   var LOJA_TIPO_ICO = { skin: '🦉', badge: '🎖️', bg: '🖼️', card: '🪪' };
+  // Skins não têm aba aqui: são vendidas dentro de cada jogo (lojaJogoAbrir).
   var LOJA_ABAS = [
-    { tipo: 'skin',  label: 'Skins',            ico: '🦉' },
     { tipo: 'badge', label: 'Badges',           ico: '🎖️' },
     { tipo: 'bg',    label: 'Planos de fundo',  ico: '🖼️' },
     { tipo: 'card',  label: 'Cards',            ico: '🪪' }
   ];
-  var _lojaAbaAtual = 'skin';
+  var _lojaAbaAtual = 'badge';
 
   function _lojaItemPorId(id) {
     for (var i = 0; i < LOJA_CATALOGO.length; i++) { if (LOJA_CATALOGO[i].id === id) return LOJA_CATALOGO[i]; }
@@ -2751,6 +2780,58 @@
     }
     return novo;
   }
+
+  // ── Resgate diário (100 moedas, 1x por dia civil local) ─────────
+  // Grava o dia ANTES de creditar e confere a gravação: com localStorage
+  // bloqueado/cheio, não credita (senão daria pra resgatar sem limite).
+  function _moedasDiarioDisponivel() {
+    try { return localStorage.getItem(LOJA_KEY_DAILY_CLAIM) !== _diaLocal(); }
+    catch (e) { return false; }
+  }
+  function _moedasResgatarDiario() {
+    if (!_moedasDiarioDisponivel()) return { ok: false, msg: 'Já resgatou hoje' };
+    var hoje = _diaLocal();
+    try {
+      localStorage.setItem(LOJA_KEY_DAILY_CLAIM, hoje);
+      if (localStorage.getItem(LOJA_KEY_DAILY_CLAIM) !== hoje) return { ok: false, msg: 'Não foi possível salvar' };
+    } catch (e) { return { ok: false, msg: 'Não foi possível salvar' }; }
+    var novoSaldo = _moedasAdd(MOEDAS_DIARIO_QTD, 'diario');
+    return { ok: true, saldo: novoSaldo };
+  }
+  // Botão do resgate (Loja da Coruja, Meu Perfil e loja dentro do jogo).
+  function _moedasDiarioBtnHtml() {
+    var disp = _moedasDiarioDisponivel();
+    return '<button type="button" class="moedas-diario-btn' + (disp ? '' : ' moedas-diario-feito') + '"' +
+             (disp ? ' onclick="_moedasDiarioUI()"' : ' disabled') + '>' +
+             (disp ? '🎁 Resgatar ' + MOEDAS_DIARIO_QTD + ' 🪙' : '✓ Resgatado hoje') +
+           '</button>';
+  }
+  function _moedasDiarioUI() {
+    var r = _moedasResgatarDiario();
+    var S = window.AngatubaGames && window.AngatubaGames.som;
+    if (S) { if (r.ok) S.bonus(); else S.erro(); }
+    // Re-renderiza o que mostra saldo/CTAs (o saldo dos heróis já foi
+    // atualizado por _moedasAdd → _lojaAtualizarSaldoUI).
+    _lojaRenderCorpo();
+    _lojaJogoRender();
+    var telaPerfil = document.getElementById('jogo-perfil');
+    if (telaPerfil && telaPerfil.classList.contains('perfil-open') && _perfilModo === 'eu') _perfilRender();
+    // Feedback curto no próprio botão (já re-renderizado como "resgatado").
+    var btns = document.querySelectorAll('.moedas-diario-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].textContent = r.ok ? '+' + MOEDAS_DIARIO_QTD + ' 🪙 na carteira!' : (r.msg || 'Tente de novo');
+      if (r.ok) btns[i].classList.add('moedas-diario-pop');
+    }
+    setTimeout(function () {
+      var bs = document.querySelectorAll('.moedas-diario-btn');
+      for (var j = 0; j < bs.length; j++) {
+        bs[j].classList.remove('moedas-diario-pop');
+        if (bs[j].disabled) bs[j].textContent = '✓ Resgatado hoje';
+      }
+    }, 1800);
+    return r;
+  }
+  window._moedasDiarioUI = _moedasDiarioUI;
 
   // ── Inventário ──────────────────────────────────────────────────
   function _invLer() {
@@ -2814,6 +2895,8 @@
     eq[slot] = id;
     _equipadoSalvar(eq);
     _lojaRenderCorpo();
+    // Avisa o jogo aberto (ex.: voo.js aplica a skin na hora, sem reabrir).
+    try { window.dispatchEvent(new CustomEvent('angatuba:equipado', { detail: { slot: slot, id: id } })); } catch (e) {}
     // Reflete o novo equipado no perfil público (Camada 3) — no-op se
     // deslogado ou se a ponte ainda não carregou essa parte do arquivo.
     if (typeof _perfilPublicoSyncDebounced === 'function') _perfilPublicoSyncDebounced();
@@ -2879,6 +2962,8 @@
     if (a) a.textContent = '🪙 ' + saldo;
     var b = document.getElementById('loja-abrir-saldo');
     if (b) b.textContent = '🪙 ' + saldo;
+    var c = document.getElementById('lojajogo-saldo');
+    if (c) c.textContent = '🪙 ' + saldo;
   }
 
   function _lojaRenderAbas() {
@@ -2905,12 +2990,13 @@
   function _lojaRenderCorpo() {
     var corpo = document.getElementById('loja-corpo');
     if (!corpo) return;
-    var itens = LOJA_CATALOGO.filter(function (it) { return it.tipo === _lojaAbaAtual; });
+    var itens = LOJA_CATALOGO.filter(function (it) { return it.tipo === _lojaAbaAtual && !it.jogo; });
     var saldo = _moedasLer();
     var eq = _equipadoLer();
     // Atalho pro mini-jogo Corujinha (ganhar moedas/cosméticos) — fica no
     // topo do corpo rolável, em todas as abas.
-    var html = '<button type="button" class="loja-corujinha-btn" onclick="corujinhaAbrir()">' +
+    var html = _moedasDiarioBtnHtml() +
+               '<button type="button" class="loja-corujinha-btn" onclick="corujinhaAbrir()">' +
                  '<span class="loja-abrir-ico">🎰</span>' +
                  '<span class="loja-corujinha-txt"><span class="loja-corujinha-tit">Jogar Corujinha</span>' +
                  '<span class="loja-corujinha-sub">Gire e ganhe cosméticos ou moedas</span></span>' +
@@ -3025,6 +3111,137 @@
   }
   window.lojaAbrir  = lojaAbrir;
   window.lojaFechar = lojaFechar;
+
+  /* ── Loja de skins DENTRO do jogo (genérica; 1º uso: Voo) ─────────
+     Overlay montado sob demanda dentro de #jogo-<jogoId> (não sai pro
+     hub): saldo no topo + grade só dos itens com item.jogo === jogoId.
+     Compra/equipa pelas mesmas _comprarItem/_equiparItem da Loja da
+     Coruja; o jogo escuta 'angatuba:equipado' e aplica a skin na hora.
+     Histórico: empilha {modal:'lojajogo'} SOBRE o {modal:'jogo'}; o
+     "voltar" do Android cai em _voltarAoMenu (handler de popstate do
+     app.js), que fecha só a loja — ver o guarda no topo de _voltarAoMenu. */
+  var _lojaJogoAtual = null;        // jogoId com a loja aberta (null = fechada)
+  var _lojaJogoEmpilhou = false;    // true se esta abertura fez pushState
+
+  function _lojaJogoItemHtml(item, saldo, eq) {
+    var tem = _temItem(item.id);
+    var equipadoAgora = (eq[item.slot] === item.id);
+    var cta, ctaClasse, ctaAtributos = '';
+    if (equipadoAgora) {
+      cta = 'Equipado'; ctaClasse = 'loja-cta-equipado'; ctaAtributos = ' disabled';
+    } else if (tem) {
+      cta = 'Equipar'; ctaClasse = 'loja-cta-equipar';
+      ctaAtributos = ' onclick="_lojaJogoEquiparUI(\'' + item.slot + '\',\'' + item.id + '\')"';
+    } else if (saldo >= item.preco) {
+      cta = 'Comprar'; ctaClasse = 'loja-cta-comprar';
+      ctaAtributos = ' onclick="_lojaJogoComprarUI(\'' + item.id + '\')"';
+    } else {
+      cta = 'Faltam ' + (item.preco - saldo); ctaClasse = 'loja-cta-bloqueado'; ctaAtributos = ' disabled';
+    }
+    var estilo = (item.filtroCss ? 'filter:' + item.filtroCss + ';' : '') + (item.pixelado ? 'image-rendering:pixelated;' : '');
+    var preco = tem ? '<span class="lojajogo-preco lojajogo-preco-tem">✓ Na coleção</span>'
+                    : '<span class="lojajogo-preco">🪙 ' + item.preco + '</span>';
+    return '<div class="loja-item' + (equipadoAgora ? ' loja-item-equipado' : '') + '">' +
+             '<div class="loja-item-preview">' +
+               (item.preview
+                 ? '<img src="' + _rankEsc(item.preview) + '" alt=""' + (item.animado === 'arcoiris' ? ' class="skin-arcoiris-anim"' : '') +
+                   (estilo ? ' style="' + estilo + '"' : '') + ' loading="lazy" onerror="this.style.display=\'none\'">'
+                 : '<span class="loja-item-ph" aria-hidden="true">' + (LOJA_TIPO_ICO[item.tipo] || '🦉') + '</span>') +
+             '</div>' +
+             '<div class="loja-item-nome">' + _rankEsc(item.nome) + '</div>' +
+             preco +
+             '<button type="button" class="loja-item-cta ' + ctaClasse + '"' + ctaAtributos + '>' + _rankEsc(cta) + '</button>' +
+           '</div>';
+  }
+
+  function _lojaJogoRender() {
+    if (!_lojaJogoAtual) return;
+    var corpo = document.getElementById('lojajogo-corpo');
+    if (!corpo) return;
+    var jogoId = _lojaJogoAtual;
+    var itens = LOJA_CATALOGO.filter(function (it) { return it.jogo === jogoId; });
+    var saldo = _moedasLer();
+    var eq = _equipadoLer();
+    var html = _moedasDiarioBtnHtml() + '<div class="loja-grid">';
+    itens.forEach(function (item) { html += _lojaJogoItemHtml(item, saldo, eq); });
+    html += '</div>';
+    corpo.innerHTML = itens.length ? html :
+      '<div class="rank-vazio"><div class="rank-vazio-tit">Nada por aqui ainda</div></div>';
+    _lojaAtualizarSaldoUI();
+  }
+
+  function _lojaJogoComprarUI(id) {
+    var r = _comprarItem(id);
+    var S = window.AngatubaGames && window.AngatubaGames.som;
+    if (!r.ok) { if (S) S.erro(); _lojaJogoRender(); return; }
+    if (S) S.bonus();
+    // Comprou → já veste (é pra isso que a pessoa comprou).
+    var item = _lojaItemPorId(id);
+    if (item) _equiparItem(item.slot, id);
+    _lojaJogoRender();
+  }
+  function _lojaJogoEquiparUI(slot, id) {
+    var r = _equiparItem(slot, id);
+    if (!r.ok && window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.erro();
+    _lojaJogoRender();
+  }
+  window._lojaJogoComprarUI = _lojaJogoComprarUI;
+  window._lojaJogoEquiparUI = _lojaJogoEquiparUI;
+
+  function lojaJogoAbrir(jogoId) {
+    jogoId = String(jogoId || '');
+    var temItens = LOJA_CATALOGO.some(function (it) { return it.jogo === jogoId; });
+    if (!temItens) return false;
+    var tela = document.getElementById('jogo-' + jogoId) || document.body;
+    var ov = document.getElementById('lojajogo-overlay');
+    if (ov && ov.parentNode !== tela) { ov.parentNode.removeChild(ov); ov = null; }
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'lojajogo-overlay';
+      ov.className = 'lojajogo-overlay';
+      ov.setAttribute('role', 'dialog');
+      ov.setAttribute('aria-modal', 'true');
+      ov.setAttribute('aria-label', 'Loja de skins');
+      ov.innerHTML =
+        '<div class="lojajogo-caixa">' +
+          '<div class="lojajogo-topo">' +
+            '<div class="lojajogo-titulo">🎨 Skins</div>' +
+            '<div class="loja-hero-saldo" id="lojajogo-saldo">🪙 0</div>' +
+            '<button type="button" class="lojajogo-fechar" onclick="lojaJogoFechar()" aria-label="Fechar">✕</button>' +
+          '</div>' +
+          '<div class="lojajogo-corpo" id="lojajogo-corpo"></div>' +
+        '</div>';
+      // Toque no fundo escuro (fora da caixa) fecha.
+      ov.addEventListener('click', function (e) { if (e.target === ov) lojaJogoFechar(); });
+      tela.appendChild(ov);
+    }
+    _lojaJogoAtual = jogoId;
+    ov.style.display = 'flex';
+    _lojaJogoRender();
+    // Só empilha quando o topo é a entrada do jogo (layout previsível pro
+    // "voltar"); fora disso, o "voltar" segue o fluxo normal do jogo.
+    _lojaJogoEmpilhou = false;
+    if (history.state && history.state.modal === 'jogo') {
+      history.pushState({ modal: 'lojajogo' }, '');
+      _lojaJogoEmpilhou = true;
+    }
+    return true;
+  }
+
+  // semHistorico=true: já veio do "voltar" (a entrada foi consumida) ou
+  // quem chama cuida do histórico (_voltarAoMenu).
+  function lojaJogoFechar(semHistorico) {
+    var ov = document.getElementById('lojajogo-overlay');
+    if (ov) ov.style.display = 'none';
+    var estava = !!_lojaJogoAtual;
+    _lojaJogoAtual = null;
+    if (estava && !semHistorico && _lojaJogoEmpilhou && history.state && history.state.modal === 'lojajogo') {
+      _popstateNosso = true; history.back();
+    }
+    _lojaJogoEmpilhou = false;
+  }
+  window.lojaJogoAbrir  = lojaJogoAbrir;
+  window.lojaJogoFechar = lojaJogoFechar;
 
   /* ── Corujinha (slot 3×3) — o jogo mora em Jogos/corujinha.js (módulo
      sob demanda, ver JOGOS_EXTERNOS). Aqui só as portas de entrada: card
@@ -3325,6 +3542,7 @@
             '<div class="loja-hero-saldo perfil-saldo">🪙 ' + saldo + '</div>' +
           '</div>' +
         '</div>' +
+        _moedasDiarioBtnHtml() +
         // Atalho secundário pra loja (complementa o CTA do rodapé, ver
         // .perfil-ir-loja abaixo) — mesma ação, outro ponto de entrada.
         '<button type="button" class="perfil-editar-btn" onclick="lojaAbrir()">Editar cosméticos</button>' +
@@ -4167,6 +4385,9 @@
     // 100% local (localStorage); ver bloco "ECONOMIA" acima.
     moedasSaldo: function () { return _moedasLer(); },
     moedasAdd: function (qtd, motivo) { return _moedasAdd(qtd, motivo); },
+    // Resgate diário: { ok:true, saldo } ou { ok:false, msg:'Já resgatou hoje' }.
+    moedasResgatarDiario: function () { return _moedasResgatarDiario(); },
+    moedasDiarioDisponivel: function () { return _moedasDiarioDisponivel(); },
     inventario: function () { return _invLer(); },
     temItem: function (id) { return _temItem(id); },
     equipado: function (slot) { return _equipadoLer()[slot] || null; },
@@ -4185,6 +4406,9 @@
     lojaCatalogo: function () { return _lojaCatalogo(); },
     lojaAbrir: function () { return lojaAbrir(); },
     lojaFechar: function () { return lojaFechar(); },
+    // Loja de skins dentro do jogo (só itens com item.jogo === jogoId).
+    lojaJogoAbrir: function (jogoId) { return lojaJogoAbrir(jogoId); },
+    lojaJogoFechar: function () { return lojaJogoFechar(); },
     corujinhaAbrir: function () { return corujinhaAbrir(); },
     corujinhaFechar: function () { return corujinhaFechar(); },
 

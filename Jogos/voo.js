@@ -185,26 +185,48 @@
   var _vooSkinId = '';       // id da skin equipada (catálogo) — usado só no fallback sem ctx.filter
   var _vooSkinFiltro = '';
   var _vooSkinPixelado = false;
+  var _vooSkinAnimado = false;   // 'arcoiris': gira o hue-rotate(0deg) do filtro a cada frame
   function _vooAtualizarSkin() {
     _vooSkinId = '';
     _vooSkinFiltro = '';
     _vooSkinPixelado = false;
+    _vooSkinAnimado = false;
     var G = window.AngatubaGames;
-    if (!G || typeof G.equipado !== 'function' || typeof G.lojaCatalogo !== 'function') return;
-    try {
-      var equipadaId = G.equipado('voo_owl');
-      if (!equipadaId || equipadaId === 'voo_skin_classica') return;
-      var catalogo = G.lojaCatalogo() || [];
-      for (var i = 0; i < catalogo.length; i++) {
-        if (catalogo[i].id === equipadaId) {
-          _vooSkinId = equipadaId;
-          _vooSkinFiltro = catalogo[i].filtroCss || '';
-          _vooSkinPixelado = !!catalogo[i].pixelado;
-          break;
+    if (G && typeof G.equipado === 'function' && typeof G.lojaCatalogo === 'function') {
+      try {
+        var equipadaId = G.equipado('voo_owl');
+        if (equipadaId && equipadaId !== 'voo_skin_classica') {
+          var catalogo = G.lojaCatalogo() || [];
+          for (var i = 0; i < catalogo.length; i++) {
+            if (catalogo[i].id === equipadaId) {
+              _vooSkinId = equipadaId;
+              _vooSkinFiltro = catalogo[i].filtroCss || '';
+              _vooSkinPixelado = !!catalogo[i].pixelado;
+              _vooSkinAnimado = (catalogo[i].animado === 'arcoiris');
+              break;
+            }
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
+    _vooSkinNasTelas();
   }
+  // Mesma skin nas corujas das telas de início/fim (é o que se vê com o
+  // jogo parado — sem isso, equipar pela loja in-game não mudava nada na tela).
+  function _vooSkinNasTelas() {
+    var imgs = document.querySelectorAll('#jogo-voo .vo-overlay-owl');
+    for (var i = 0; i < imgs.length; i++) {
+      var im = imgs[i];
+      im.style.filter = _vooSkinFiltro ? _vooSkinFiltro + ' drop-shadow(0 6px 18px rgba(0,0,0,.5))' : '';
+      im.style.imageRendering = _vooSkinPixelado ? 'pixelated' : '';
+      if (_vooSkinAnimado) im.classList.add('skin-arcoiris-anim');
+      else im.classList.remove('skin-arcoiris-anim');
+    }
+  }
+  // Loja de skins in-game (hub.js → _equiparItem) avisa quando o equipado muda.
+  window.addEventListener('angatuba:equipado', function (e) {
+    if (e && e.detail && e.detail.slot === 'voo_owl') _vooAtualizarSkin();
+  });
 
   // Estado da partida
   var _vooOwl = null, _vooPlats = [], _vooCamY = 0, _vooStartY = 0;
@@ -242,8 +264,14 @@
   // plataformas acima). 'pixel' não muda de cor — só desliga o
   // suavizado — então não precisa de receita aqui.
   var VOO_SKIN_TINTURA = {
-    voo_skin_neon:    'rgba(34,227,255,0.55)',
-    voo_skin_dourada: 'rgba(255,196,60,0.55)'
+    voo_skin_neon:     'rgba(34,227,255,0.55)',
+    voo_skin_dourada:  'rgba(255,196,60,0.55)',
+    voo_skin_rosa:     'rgba(255,70,190,0.5)',
+    voo_skin_floresta: 'rgba(40,160,70,0.5)',
+    voo_skin_sombra:   'rgba(20,12,40,0.72)',
+    voo_skin_gelo:     'rgba(160,225,255,0.55)',
+    voo_skin_fogo:     'rgba(255,90,20,0.55)',
+    voo_skin_arcoiris: 'rgba(200,80,255,0.5)'
   };
   var _vooOwlSprites = {};     // chave -> { cv }
 
@@ -1288,7 +1316,11 @@
         if (_vooSkinPixelado) ctx.imageSmoothingEnabled = suavAntesP;
       } else {
         var filtroAntes = ctx.filter, suavAntes = ctx.imageSmoothingEnabled;
-        if (_vooSkinFiltro) ctx.filter = _vooSkinFiltro;
+        if (_vooSkinFiltro) {
+          ctx.filter = _vooSkinAnimado
+            ? _vooSkinFiltro.replace('hue-rotate(0deg)', 'hue-rotate(' + Math.round((_vooTempo * 160) % 360) + 'deg)')
+            : _vooSkinFiltro;
+        }
         if (_vooSkinPixelado) ctx.imageSmoothingEnabled = false;
         try { ctx.drawImage(_vooImg, -ow / 2, -oh / 2, ow, oh); }
         catch (e) { _vooDrawFallback(ctx, ow); }
@@ -1355,7 +1387,7 @@
     _vooOwl.vx = dx;                                  // p/ decidir espelhamento
     if (e.cancelable) e.preventDefault();
   }
-  function _vooPointerUp() { _vooDragging = false; _vooOwl.vx = 0; }
+  function _vooPointerUp() { _vooDragging = false; if (_vooOwl) _vooOwl.vx = 0; }   // mouseup é no window: antes da 1ª partida _vooOwl ainda é null
   function _vooKey(down, e) {
     // Os listeners de keydown/keyup ficam presos em window pra sempre (ver
     // _vooLigarControles): sem essa guarda, as setas continuam mexendo em

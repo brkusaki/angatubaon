@@ -46,6 +46,16 @@
   border-radius: 12px;
   touch-action: none;
 }
+/* Tela grande (PC/tablet): o tabuleiro cresce com a altura disponível
+   em vez de ficar preso em 340px. Nunca menor que 340px (celular não
+   muda); desconta HUD + botão voltar. O JS lê o tamanho real pelo
+   getBoundingClientRect e reajusta a resolução no resize. */
+@media (min-width: 600px) and (min-height: 600px) {
+  .dc-grid {
+    max-width: max(340px, min(640px, calc(100vh - 240px)));
+    max-width: max(340px, min(640px, calc(100dvh - 240px)));
+  }
+}
 
 /* Telas de início e fim (mesmo padrão dos outros jogos) */
 .dc-overlay {

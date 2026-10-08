@@ -410,16 +410,23 @@
   // Constantes de física em função de H (mesma sensação em qualquer tela).
   // Gravidade um pouco maior + impulso um pouco menor → menos tempo no ar,
   // pressão real de climber em vez de "flutuar" entre plataformas.
+  // Unidade de TAMANHO (coruja, plataformas, nuvens, enfeites, sol).
+  // Em celular em pé é a própria largura (nada muda). Em tela larga (PC,
+  // celular deitado) a largura não cresce o tamanho das coisas além de 3/4
+  // da altura — antes a coruja e as nuvens-plataforma ficavam gigantes,
+  // esticadas pela largura da tela. Posições, velocidades horizontais e
+  // vento continuam em _vooW (a arena inteira é jogável).
+  function _vooU()     { return Math.min(_vooW, 0.75 * _vooH); }
   function _vooGrav()  { return 2.55 * _vooH; }    // px/s² (era 2.3)
   function _vooJump()  { return -0.93 * _vooH; }   // px/s (era -1.0)
   // Plataformas encolhem com a altura: 28% da tela no chão → 17% no alto
   // (curva t², mesma escala de dificuldade que o gap, score/3200).
   function _vooPlatW() {
     var t = Math.min(1, _vooScore / 3200); t = t * t;
-    return (0.28 - 0.11 * t) * _vooW;
+    return (0.28 - 0.11 * t) * _vooU();
   }
   function _vooPlatH() { return Math.max(8, 0.028 * _vooH); }
-  function _vooOwlW()  { return 0.15 * _vooW; }
+  function _vooOwlW()  { return 0.15 * _vooU(); }
   function _vooOwlH()  { return _vooOwlW() * (_vooImgOk ? _vooImgRatio : 1); }
 
   // Gap vertical entre plataformas, cresce com a pontuação (mais difícil).
@@ -568,7 +575,7 @@
       _vooNuvens.push({
         x: Math.random() * _vooW,
         y: _vooStartY - Math.random() * 3 * _vooH,
-        r: (0.14 + Math.random() * 0.16) * _vooW,
+        r: (0.14 + Math.random() * 0.16) * _vooU(),
         op: 0.5 + Math.random() * 0.5
       });
     }
@@ -630,7 +637,7 @@
         d.giro += dt * 0.4;                     // buraco negro: gira devagar
       }
       // Descarte quando sai bem fora da tela (com folga).
-      var margem = d.tam * _vooW;
+      var margem = d.tam * _vooU();
       var foraX = (d.x < -margem * 1.5) || (d.x > _vooW + margem * 1.5);
       var foraY = (d.y < -margem * 1.5) || (d.y > _vooH + margem * 1.5);
       var venceuFlutua = (d.modo === 'flutua' && d.idade > 9);   // some após um tempo
@@ -700,12 +707,12 @@
       var daEsq = Math.random() < 0.5;
       d.dir = daEsq ? 1 : -1;
       d.vx = vel * d.dir;
-      d.x = daEsq ? -tam * _vooW : _vooW + tam * _vooW;
+      d.x = daEsq ? -tam * _vooU() : _vooW + tam * _vooU();
       d.y = (0.12 + Math.random() * 0.5) * _vooH;
     } else if (def.modo === 'sobe') {
       // Sobe de baixo pra cima; leve deriva.
       d.x = (0.1 + Math.random() * 0.8) * _vooW;
-      d.y = _vooH + tam * _vooW;
+      d.y = _vooH + tam * _vooU();
       d.vsobe = vel;
       d.vx = (Math.random() - 0.5) * 0.04 * _vooW;
     } else { // flutua (buraco negro)
@@ -898,7 +905,7 @@
     var astroOp = Math.max(0, 1 - alt * 1.7);
     if (astroOp > 0.02) {
       var ax = W * 0.74;
-      var ar = W * 0.14;
+      var ar = _vooU() * 0.14;
       // Mesma ideia do gradiente do céu: o halo do sol/lua só muda quando
       // a altitude muda de verdade, então guardamos ele entre frames.
       if (!_vooAstroGrad || _vooAstroH !== H || Math.abs(alt - _vooAstroAlt) > 0.004) {
@@ -967,7 +974,7 @@
   function _vooDesenharDecor(ctx) {
     for (var i = 0; i < _vooDecor.length; i++) {
       var d = _vooDecor[i];
-      var w = d.tam * _vooW;
+      var w = d.tam * _vooU();
       var reg = _vooAssets[d.nome];
       // Fade suave na entrada/saída pra não "piscar" na borda.
       var op = 1;
@@ -1419,7 +1426,7 @@
     grad.addColorStop(1, _vooRgb(par[1]));
     ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
     // Sol quente da manhã, canto superior.
-    var ax = W * 0.74, ay = H * 0.2, ar = W * 0.14, q = [255, 236, 180];
+    var ax = W * 0.74, ay = H * 0.2, ar = _vooU() * 0.14, q = [255, 236, 180];
     var gA = ctx.createRadialGradient(ax, ay, ar * 0.2, ax, ay, ar * 2.4);
     gA.addColorStop(0, _vooRgba(q, 0.9)); gA.addColorStop(0.4, _vooRgba(q, 0.35)); gA.addColorStop(1, _vooRgba(q, 0));
     ctx.fillStyle = gA; ctx.beginPath(); ctx.arc(ax, ay, ar * 2.4, 0, Math.PI * 2); ctx.fill();

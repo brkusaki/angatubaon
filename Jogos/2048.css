@@ -57,6 +57,17 @@
   border-radius: 8px;
   background: rgba(255,255,255,0.05);
 }
+/* Tela grande (PC/tablet): a grade cresce com a altura disponível em vez
+   de ficar presa em 340px no meio da tela. Nunca fica MENOR que 340px
+   (celular não muda) e desconta HUD + botão voltar + mascote embaixo.
+   gap/padding ficam iguais: o 2048.js usa os mesmos valores (_T48_GAP/
+   _T48_PAD) pra posicionar as peças. */
+@media (min-width: 600px) and (min-height: 600px) {
+  .t48-grid {
+    max-width: max(340px, min(600px, calc(100vh - 330px)));
+    max-width: max(340px, min(600px, calc(100dvh - 330px)));
+  }
+}
 .t48-tiles {
   position: absolute; inset: 0;
   pointer-events: none;

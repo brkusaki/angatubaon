@@ -108,6 +108,15 @@ body.games-fs-open .sq-grade {
   max-width: min(336px, calc((100vh - 260px) / 1.5 + 40px));
   max-width: min(336px, calc((100dvh - 260px) / 1.5 + 40px));
 }
+/* Tela grande (PC/tablet): mesmo cálculo pela altura, mas com teto maior —
+   em 1080p a grade ficava presa em 336px, pequena no meio da tela. Celular
+   (largura < 600px ou altura < 600px) continua exatamente como acima. */
+@media (min-width: 600px) and (min-height: 600px) {
+  body.games-fs-open .sq-grade {
+    max-width: min(480px, calc((100vh - 260px) / 1.5 + 40px));
+    max-width: min(480px, calc((100dvh - 260px) / 1.5 + 40px));
+  }
+}
 
 .sq-grade.sq-erro { animation: sqErro .4s ease; }
 @keyframes sqErro {

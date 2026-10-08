@@ -75,6 +75,16 @@
   cursor: grab;
 }
 .bb-peca.bb-peca-vazia { background: transparent; }
+/* Tela grande (PC/tablet): grade e bandeja crescem com a altura
+   disponível em vez de ficarem presas em 340px. Nunca menores que 340px
+   (celular não muda); desconta HUD + botão voltar + bandeja de peças. */
+@media (min-width: 600px) and (min-height: 600px) {
+  .bb-grid,
+  .bb-tray {
+    max-width: max(340px, min(600px, calc(100vh - 320px)));
+    max-width: max(340px, min(600px, calc(100dvh - 320px)));
+  }
+}
 .bb-peca.bb-peca-arrastando { opacity: .35; }
 .bb-peca-mini {
   /* largura/altura/grid-template vêm do JS (blocos.js), calculados por

@@ -496,7 +496,12 @@
     if (_pnCtx) _pnCtx.setTransform(_pnDpr, 0, 0, _pnDpr, 0, 0);
   }
   function _pnLinhaH() { return _pnH / _PN_LINHAS_TELA; }
-  function _pnColW() { return _pnW / _PN_COLS; }
+  // Em tela larga (PC, celular deitado) as 4 colunas não esticam pela
+  // largura inteira — viravam azulejos "deitados" de quase meio metro.
+  // O campo fica com no máximo 3/4 da altura de largura, centralizado
+  // (_pnX0 = sobra de cada lado). Em celular em pé: campo = canvas.
+  function _pnColW() { return Math.min(_pnW, _pnH * 0.75) / _PN_COLS; }
+  function _pnX0() { return (_pnW - _pnColW() * _PN_COLS) / 2; }
 
   /* ── Geração dos azulejos ─────────────────────────────────────
      Uma coluna por linha. Evitamos três seguidas na mesma coluna:
@@ -583,7 +588,9 @@
     if (!r.width || !r.height) return;
     var x = clientX - r.left;
     if (x < 0 || x > r.width) return;
-    var col = Math.floor((x / r.width) * _PN_COLS);
+    // Converte pra coordenada do campo (centralizado em tela larga).
+    // Toque nas laterais vazias conta como a coluna da borda mais próxima.
+    var col = Math.floor(((x * (_pnW / r.width)) - _pnX0()) / _pnColW());
     if (col < 0) col = 0; if (col >= _PN_COLS) col = _PN_COLS - 1;
 
     var alvo = _pnAlvo();
@@ -623,7 +630,7 @@
 
     var lh = _pnLinhaH(), cw = _pnColW();
     _pnOndas.push({
-      x: (alvo.col + 0.5) * cw,
+      x: _pnX0() + (alvo.col + 0.5) * cw,
       y: (alvo.y + 0.5) * lh,
       t: 0
     });
@@ -691,16 +698,22 @@
   function _pnDraw() {
     if (!_pnCtx) return;
     var ctx = _pnCtx, W = _pnW, H = _pnH;
-    var lh = _pnLinhaH(), cw = _pnColW();
+    var lh = _pnLinhaH(), cw = _pnColW(), x0 = _pnX0();
 
     // Fundo + trilhos das colunas
     ctx.fillStyle = '#0d1420';
     ctx.fillRect(0, 0, W, H);
+    // Tela larga: escurece as laterais fora do campo pra marcar a pista
+    if (x0 > 1) {
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.fillRect(0, 0, x0, H);
+      ctx.fillRect(W - x0, 0, x0, H);
+    }
     ctx.strokeStyle = 'rgba(255,255,255,0.05)';
     ctx.lineWidth = 1;
-    for (var c = 1; c < _PN_COLS; c++) {
+    for (var c = (x0 > 1 ? 0 : 1); c <= (x0 > 1 ? _PN_COLS : _PN_COLS - 1); c++) {
       ctx.beginPath();
-      ctx.moveTo(c * cw, 0); ctx.lineTo(c * cw, H);
+      ctx.moveTo(x0 + c * cw, 0); ctx.lineTo(x0 + c * cw, H);
       ctx.stroke();
     }
 
@@ -714,7 +727,7 @@
       var az = _pnAzulejos[i];
       var y = az.y * lh;
       if (y > H || y + lh < 0) continue;          // fora da tela
-      var x = az.col * cw;
+      var x = x0 + az.col * cw;
       var bx = x + pad, by = y + pad, bw = cw - pad * 2, bh = lh - pad * 2;
 
       if (az.tocada) {
@@ -744,7 +757,7 @@
     // não encerra — precisa de um retorno visual no lugar do fim).
     if (_pnFlashErro > 0 && _pnColErro >= 0) {
       ctx.fillStyle = 'rgba(255,60,80,' + (_pnFlashErro * 0.20) + ')';
-      ctx.fillRect(_pnColErro * cw, 0, cw, H);
+      ctx.fillRect(x0 + _pnColErro * cw, 0, cw, H);
     }
 
     // Ondas do acerto
@@ -916,7 +929,7 @@
     if (col === undefined) return;
     _pnAudioDestravar();
     var r = _pnCanvas.getBoundingClientRect();
-    _pnTocar(r.left + (col + 0.5) * (r.width / _PN_COLS), r.top + r.height * 0.5);
+    _pnTocar(r.left + (_pnX0() + (col + 0.5) * _pnColW()) * (r.width / _pnW), r.top + r.height * 0.5);
     if (e.preventDefault) e.preventDefault();
   }
   function _pnLigarControles() {

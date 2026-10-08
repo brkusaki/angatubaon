@@ -6739,6 +6739,76 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
     .loja-mini-linhas i { display: block; height: 4px; border-radius: 3px; background: rgba(255,255,255,.4); }
     .loja-mini-linhas i + i { width: 60%; background: rgba(251,191,36,.6); }
 
+    /* ── Resgate diário (100 🪙/dia) — Loja da Coruja, Meu Perfil e loja
+       dentro do jogo. Dourado quando disponível; cinza depois. */
+    .moedas-diario-btn {
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 12px 14px; margin-bottom: 14px; border-radius: 14px; border: none; cursor: pointer;
+      font-family: var(--font-h); font-weight: 800; font-size: 15px; color: #3b2600;
+      background: linear-gradient(135deg, #ffe27a, #fbbf24 55%, #f59e0b);
+      box-shadow: 0 6px 18px rgba(251,191,36,.35), inset 0 1px 0 rgba(255,255,255,.5);
+      -webkit-tap-highlight-color: transparent; transition: transform .15s, filter .15s;
+      animation: moedasDiarioBrilho 2.4s ease-in-out infinite;
+    }
+    .moedas-diario-btn:active { transform: scale(0.97); }
+    .moedas-diario-btn.moedas-diario-feito {
+      background: var(--surface2); color: var(--muted); border: 1px solid var(--border);
+      box-shadow: none; cursor: default; animation: none;
+    }
+    .moedas-diario-btn.moedas-diario-pop {
+      background: rgba(255,215,64,.16); color: #ffd740; border: 1px solid rgba(255,215,64,.45);
+      animation: moedasDiarioPop .45s ease-out;
+    }
+    @keyframes moedasDiarioBrilho { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.12); } }
+    @keyframes moedasDiarioPop { 0% { transform: scale(.94); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
+    /* No hero do perfil o botão fica abaixo do card de identidade. */
+    .perfil-hero .moedas-diario-btn { margin: 12px 0 0; }
+
+    /* ── Loja de skins DENTRO do jogo (overlay montado por lojaJogoAbrir) ── */
+    .lojajogo-overlay {
+      position: fixed; inset: 0; z-index: 9600;
+      display: flex; align-items: flex-end; justify-content: center;
+      background: rgba(5,8,14,.72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    }
+    .lojajogo-caixa {
+      width: 100%; max-width: 520px; max-height: 88vh; max-height: 88dvh;
+      display: flex; flex-direction: column;
+      background: var(--surface, #151d2b); border: 1px solid var(--border, rgba(255,255,255,.08));
+      border-radius: 20px 20px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,.45);
+      padding-bottom: env(safe-area-inset-bottom);
+      animation: lojajogoSobe .22s ease-out;
+    }
+    @keyframes lojajogoSobe { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .lojajogo-topo {
+      flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+      padding: 14px 14px 12px; border-bottom: 1px solid var(--border, rgba(255,255,255,.08));
+    }
+    .lojajogo-titulo { flex: 1; min-width: 0; font-family: var(--font-h); font-weight: 800; font-size: 18px; color: var(--text, #fff); }
+    .lojajogo-fechar {
+      flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+      background: var(--surface2, rgba(255,255,255,.06)); border: 1px solid var(--border, rgba(255,255,255,.1));
+      color: var(--text, #fff); -webkit-tap-highlight-color: transparent;
+    }
+    .lojajogo-corpo { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px; overscroll-behavior: contain; }
+    .lojajogo-preco {
+      font-family: var(--font-h); font-weight: 800; font-size: 12.5px; color: #ffd740; margin: 2px 0 10px;
+    }
+    .lojajogo-preco-tem { color: var(--muted); font-weight: 700; }
+    @media (min-width: 560px) {
+      .lojajogo-overlay { align-items: center; }
+      .lojajogo-caixa { border-radius: 20px; }
+      .lojajogo-overlay .loja-grid { grid-template-columns: 1fr 1fr 1fr; }
+    }
+
+    /* Skin animada (Coruja Arco-íris): gira o matiz da miniatura. Animação
+       vence o filter inline do catálogo — mesma receita do canvas do Voo. */
+    .skin-arcoiris-anim { animation: skinArcoiris 2.2s linear infinite; }
+    @keyframes skinArcoiris {
+      from { filter: sepia(1) saturate(5) hue-rotate(0deg) brightness(1.08) drop-shadow(0 0 6px rgba(255,255,255,.55)); }
+      to   { filter: sepia(1) saturate(5) hue-rotate(360deg) brightness(1.08) drop-shadow(0 0 6px rgba(255,255,255,.55)); }
+    }
+
 
     /* ════════════════════════════════════════════
        MEU PERFIL — ESTILO STEAM, SÓ O PRÓPRIO (Camada 2)

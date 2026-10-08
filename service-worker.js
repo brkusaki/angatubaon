@@ -66,7 +66,7 @@ self.addEventListener('notificationclick', function (event) {
   );
 });
 
-const CACHE = 'angatubaon-v388';
+const CACHE = 'angatubaon-v389';
 // Cache separado dos assets dos jogos (sprites, sons, músicas, vídeos
 // dos minigames). Fica de fora do CACHE principal de propósito: o
 // activate() abaixo NUNCA apaga o CACHE_JOGOS quando o app atualiza
@@ -81,7 +81,9 @@ const CACHE = 'angatubaon-v388';
 // CACHE_JOGOS vira só fallback offline (ver fetch). Subir para v2 faz o
 // activate() apagar o v1 envenenado. O nome é repetido em Jogos/hub.js
 // (_jogosCacheAssets) — mudou aqui, muda lá.
-const CACHE_JOGOS = 'angatubaon-jogos-v2';
+// v3: tema floresta do Tanques (barril.webp / parede-metal.webp trocaram
+// de conteúdo mantendo o nome).
+const CACHE_JOGOS = 'angatubaon-jogos-v3';
 // Cache dos TEXTOS e das CAPAS da Biblioteca da Coruja
 // (Biblioteca/livros/*.json e Biblioteca/capas/*.jpg).
 // Mesma lógica do CACHE_JOGOS: o activate() nunca apaga, então quem abriu

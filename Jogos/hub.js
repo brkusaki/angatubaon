@@ -1288,12 +1288,16 @@
     ],
     tanques: [
       '/Jogos/tanques.min.js', '/Jogos/tanques.css', '/Jogos/multiplayer.min.js',
+      '/Jogos/assets/tanques/arbusto-1.webp',
+      '/Jogos/assets/tanques/arbusto-2.webp',
+      '/Jogos/assets/tanques/arvore-1.webp',
+      '/Jogos/assets/tanques/arvore-2.webp',
       '/Jogos/assets/tanques/barril.webp',
-      '/Jogos/assets/tanques/chao-arena.webp',
-      '/Jogos/assets/tanques/mato.webp',
-      '/Jogos/assets/tanques/parede-escombros.webp',
+      '/Jogos/assets/tanques/chao-floresta.webp',
+      '/Jogos/assets/tanques/escombro-floresta.webp',
       '/Jogos/assets/tanques/parede-metal.webp',
-      '/Jogos/assets/tanques/parede-tijolo.webp',
+      '/Jogos/assets/tanques/rocha-parede.webp',
+      '/Jogos/assets/tanques/tronco-parede.webp',
       '/Jogos/assets/tanques/tank-azul.webp',
       '/Jogos/assets/tanques/tank-vermelho.webp'
     ],
@@ -1344,7 +1348,7 @@
 
   // Depois que um jogo termina de carregar (js/css injetados com
   // sucesso), baixa em paralelo os assets pesados dele pro cache
-  // separado do Service Worker (CACHE_JOGOS = 'angatubaon-jogos-v2') —
+  // separado do Service Worker (CACHE_JOGOS = 'angatubaon-jogos-v3') —
   // assim a próxima abertura funciona offline, mesmo depois de um
   // update do app (o SW nunca apaga esse cache, ver service-worker.js).
   // Fire-and-forget: não atrasa o "Jogar" nem trava se algum asset
@@ -1355,7 +1359,10 @@
     if (typeof caches === 'undefined' || !caches.open) return;
     // Mesmo nome do CACHE_JOGOS em service-worker.js — mudou lá, muda aqui.
     // (v2: o v1 congelava o js/css dos jogos — ver P0-1 no SW.)
-    caches.open('angatubaon-jogos-v2').then(function (c) {
+    // (v3: tema floresta do Tanques — barril.webp e parede-metal.webp
+    // mudaram de conteúdo com o MESMO nome; sem subir, o cache-first
+    // serviria a imagem velha pra sempre.)
+    caches.open('angatubaon-jogos-v3').then(function (c) {
       return Promise.allSettled(urls.map(function (url) {
         return c.match(url).then(function (jaTem) {
           if (jaTem) return;

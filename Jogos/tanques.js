@@ -252,7 +252,12 @@
      à mão. Um mapa é sorteado por PARTIDA (não por rodada), ver
      _tqEscolherMapa e o campo "mapa" nas mensagens 'oi'/'rr'. Cada
      mapa tem paredes (bloqueiam e levam dano) e moitas (não bloqueiam
-     — escondem o tanque que estiver dentro, ver _tqEmMoita/_tqEscondido*). */
+     — escondem o tanque que estiver dentro, ver _tqEmMoita/_tqEscondido*).
+     arvores: SÓ VISUAL (tema floresta) — nenhuma colisão, física, IA ou
+     rede lê esta lista; só _tqDesenharArvores. Posições escolhidas fora
+     de paredes/moitas/barris/spawns, a maioria encostada na borda do
+     mundo (metade da copa "pra fora") pra dar clima de clareira na mata
+     sem atrapalhar a leitura do combate. */
   function _tqMontarMapa(metade, centro) {
     var e = TQ_MUNDO_ESCALA, lista = [], i, b, bx, by, bw, bh, tipo;
     for (i = 0; i < metade.length; i++) {
@@ -287,7 +292,12 @@
         { x: 0.40, y: 0.66, w: 0.20, h: 0.08 }
       ], { x: 0.8439, y: 0.46, w: 0.09, h: 0.09, tipo: 'metal' }),
       moitas: _tqMontarMapa([{ x: 0.26, y: 0.40, w: 0.13, h: 0.18 }]),
-      barris: _tqMontarPontos([{ x: 0.60, y: 0.20 }])
+      barris: _tqMontarPontos([{ x: 0.60, y: 0.20 }]),
+      arvores: _tqMontarMapa([
+        { x: 1.26, y: -0.035, w: 0.14, h: 0.14 },
+        { x: -0.035, y: 0.23, w: 0.14, h: 0.14 },
+        { x: 0.145, y: 0.245, w: 0.11, h: 0.11 }
+      ])
     },
     // 2. Corredores — paredes verticais formando 2 corredores
     // (+ 1 parede metálica perto do centro)
@@ -299,7 +309,12 @@
         { x: 0.64, y: 0.44, w: 0.08, h: 0.14, tipo: 'metal' }
       ]),
       moitas: _tqMontarMapa([{ x: 0.30, y: 0.62, w: 0.14, h: 0.16 }]),
-      barris: _tqMontarPontos([{ x: 0.30, y: 0.15 }])
+      barris: _tqMontarPontos([{ x: 0.30, y: 0.15 }]),
+      arvores: _tqMontarMapa([
+        { x: -0.035, y: 0.63, w: 0.14, h: 0.14 },
+        { x: 0.61, y: -0.035, w: 0.14, h: 0.14 },
+        { x: 0.145, y: 0.245, w: 0.11, h: 0.11 }
+      ])
     },
     // 3. Cantos — blocos protegendo os 4 cantos do centro
     // (+ 1 parede metálica na lateral)
@@ -311,7 +326,12 @@
         { x: 0.86, y: 0.42, w: 0.08, h: 0.16, tipo: 'metal' }
       ]),
       moitas: _tqMontarMapa([{ x: 0.28, y: 0.28, w: 0.12, h: 0.14 }]),
-      barris: _tqMontarPontos([{ x: 0.50, y: 0.75 }])
+      barris: _tqMontarPontos([{ x: 0.50, y: 0.75 }]),
+      arvores: _tqMontarMapa([
+        { x: -0.035, y: 0.23, w: 0.14, h: 0.14 },
+        { x: 1.05, y: -0.035, w: 0.14, h: 0.14 },
+        { x: 0.565, y: 0.145, w: 0.11, h: 0.11 }
+      ])
     },
     // 4. Cruz — pilar vertical no centro + 2 blocos laterais
     // (pilar central agora é metálico — ricocheteia em vez de quebrar)
@@ -320,7 +340,12 @@
         { x: 0.62, y: 0.42, w: 0.20, h: 0.16 }
       ], { x: 0.8389, y: 0.10, w: 0.10, h: 0.80, tipo: 'metal' }),
       moitas: _tqMontarMapa([{ x: 0.32, y: 0.66, w: 0.14, h: 0.16 }]),
-      barris: _tqMontarPontos([{ x: 0.30, y: 0.20 }])
+      barris: _tqMontarPontos([{ x: 0.30, y: 0.20 }]),
+      arvores: _tqMontarMapa([
+        { x: 0.38, y: -0.035, w: 0.14, h: 0.14 },
+        { x: -0.035, y: 0.63, w: 0.14, h: 0.14 },
+        { x: 0.565, y: 0.145, w: 0.11, h: 0.11 }
+      ])
     },
     // 5. Zigue-zague — blocos escalonados
     // (+ 1 parede metálica isolada)
@@ -332,7 +357,12 @@
         { x: 1.35, y: 0.10, w: 0.08, h: 0.16, tipo: 'metal' }
       ]),
       moitas: _tqMontarMapa([{ x: 0.26, y: 0.44, w: 0.12, h: 0.14 }]),
-      barris: _tqMontarPontos([{ x: 0.20, y: 0.75 }])
+      barris: _tqMontarPontos([{ x: 0.20, y: 0.75 }]),
+      arvores: _tqMontarMapa([
+        { x: -0.035, y: 0.23, w: 0.14, h: 0.14 },
+        { x: 0.61, y: -0.035, w: 0.14, h: 0.14 },
+        { x: 0.565, y: 0.145, w: 0.11, h: 0.11 }
+      ])
     },
     // 6. Aberto — poucos obstáculos, mapa rápido (2 moitas — mais espaço livre)
     // (+ 1 parede metálica)
@@ -345,7 +375,12 @@
         { x: 0.30, y: 0.20, w: 0.15, h: 0.17 },
         { x: 0.34, y: 0.64, w: 0.13, h: 0.15 }
       ]),
-      barris: _tqMontarPontos([{ x: 0.20, y: 0.55 }])
+      barris: _tqMontarPontos([{ x: 0.20, y: 0.55 }]),
+      arvores: _tqMontarMapa([
+        { x: 1.26, y: -0.035, w: 0.14, h: 0.14 },
+        { x: -0.035, y: 0.63, w: 0.14, h: 0.14 },
+        { x: 0.145, y: 0.245, w: 0.11, h: 0.11 }
+      ])
     }
   ];
   var _tqMapaAtualIdx = 0;
@@ -586,14 +621,20 @@
       _tqResizeOn = true;
     }
     _tqDimensionar();
-    _tqAsset('chao-arena.webp');
+    // Tema floresta. chao-arena/parede-tijolo/parede-escombros/mato
+    // continuam no disco, mas o código ativo não usa mais.
+    _tqAsset('chao-floresta.webp');
     _tqAsset('tank-azul.webp');
     _tqAsset('tank-vermelho.webp');
-    _tqAsset('parede-tijolo.webp');
-    _tqAsset('parede-escombros.webp');
+    _tqAsset('tronco-parede.webp');
+    _tqAsset('rocha-parede.webp');
+    _tqAsset('escombro-floresta.webp');
     _tqAsset('parede-metal.webp');
     _tqAsset('barril.webp');
-    _tqAsset('mato.webp');
+    _tqAsset('arbusto-1.webp');
+    _tqAsset('arbusto-2.webp');
+    _tqAsset('arvore-1.webp');
+    _tqAsset('arvore-2.webp');
     // Pede ao sistema pra girar pra landscape (instalado/fullscreen);
     // em navegador comum é recusado e cai na rotação por CSS.
     _tqTravarLandscape();
@@ -2318,6 +2359,7 @@
     ctx.translate(-_tqCamera.x * _tqH, -_tqCamera.y * _tqH);
     _tqDesenharChao();
     _tqDesenharRastro();
+    _tqDesenharArvores();
     _tqDesenharMoitas();
     _tqDesenharZona();
     _tqDesenharParedes();
@@ -2436,7 +2478,8 @@
     var ctx = _tqCtx;
     var vx = _tqCamera.x * _tqH - TQ_CHAO_FOLGA_PX, vy = _tqCamera.y * _tqH - TQ_CHAO_FOLGA_PX;
     var vw = _tqViewportLargura * _tqH + TQ_CHAO_FOLGA_PX * 2, vh = TQ_VIEWPORT_ALTURA * _tqH + TQ_CHAO_FOLGA_PX * 2;
-    var reg = _tqAsset('chao-arena.webp');
+    // PLACEHOLDER pixel — substituir por asset Gemini do user
+    var reg = _tqAsset('chao-floresta.webp');
     if (reg && reg.ok && reg.img && reg.w && reg.h) {
       try {
         if (!_tqChaoPatternCache || _tqChaoPatternCache.img !== reg.img || _tqChaoPatternCache.h !== _tqH || _tqChaoPatternCache.vw !== _tqViewportLargura) {
@@ -2461,18 +2504,51 @@
       ctx.drawImage(reg.img, 0, 0, MUNDO_LARGURA * _tqH, MUNDO_ALTURA * _tqH);
       return;
     }
-    ctx.fillStyle = '#3a3d42';
+    ctx.fillStyle = '#2d4a32'; // verde musgo (fallback sem imagem)
     ctx.fillRect(vx, vy, vw, vh);
   }
 
-  // Moitas: elipse verde translúcida — desenhada depois do rastro e
-  // antes das paredes/tanques (fica no chão, sob quem passa por cima).
-  // Puramente visual: quem esconde é a checagem em _tqEmMoita.
+  // Árvores: SÓ decoração (ver "arvores" em _TQ_MAPAS) — desenhadas
+  // depois do chão/rastro e antes de moitas/paredes/tanques, então nunca
+  // cobrem tanque nem projétil. Sprite sorteado de forma estável pelo
+  // índice (o par espelhado usa o mesmo), sem piscar entre quadros.
+  // Sem imagem: copa vetorial (círculo verde escuro + sombra).
+  function _tqDesenharArvores() {
+    var arvores = _TQ_MAPAS[_tqMapaAtualIdx].arvores;
+    if (!arvores || !arvores.length) return;
+    var ctx = _tqCtx;
+    // PLACEHOLDER pixel — substituir por asset Gemini do user
+    var regs = [_tqAsset('arvore-1.webp'), _tqAsset('arvore-2.webp')];
+    for (var i = 0; i < arvores.length; i++) {
+      var a = arvores[i];
+      var reg = regs[(Math.floor(i / 2) + _tqMapaAtualIdx) % 2];
+      var ax = a.x * _tqH, ay = a.y * _tqH, aw = a.w * _tqH, ah = a.h * _tqH;
+      if (reg && reg.ok && reg.img) {
+        ctx.drawImage(reg.img, ax, ay, aw, ah);
+      } else {
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath();
+        ctx.ellipse(ax + aw * 0.55, ay + ah * 0.56, aw * 0.44, ah * 0.44, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1f3f20';
+        ctx.beginPath();
+        ctx.ellipse(ax + aw / 2, ay + ah / 2, aw * 0.44, ah * 0.44, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // Moitas: arbusto-1/arbusto-2 (sorteio estável pelo índice, mesmo
+  // critério das árvores) esticado no retângulo da moita — desenhada
+  // depois do rastro e antes das paredes/tanques (fica no chão, sob
+  // quem passa por cima). Puramente visual: quem esconde é a checagem
+  // em _tqEmMoita. Sem imagem: elipse verde translúcida.
   function _tqDesenharMoitas() {
     var moitas = _TQ_MAPAS[_tqMapaAtualIdx].moitas;
     if (!moitas.length) return;
     var ctx = _tqCtx;
-    var reg = _tqAsset('mato.webp');
+    // PLACEHOLDER pixel — substituir por asset Gemini do user
+    var regs = [_tqAsset('arbusto-1.webp'), _tqAsset('arbusto-2.webp')];
     ctx.save();
     ctx.fillStyle = 'rgba(46,125,50,0.55)';
     ctx.strokeStyle = 'rgba(27,79,31,0.65)';
@@ -2481,6 +2557,7 @@
       var m = moitas[i];
       var cx = (m.x + m.w / 2) * _tqH, cy = (m.y + m.h / 2) * _tqH;
       var rx = (m.w / 2) * _tqH, ry = (m.h / 2) * _tqH;
+      var reg = regs[(Math.floor(i / 2) + _tqMapaAtualIdx) % 2];
       if (reg && reg.ok && reg.img) {
         ctx.drawImage(reg.img, cx - rx, cy - ry, rx * 2, ry * 2);
       } else {
@@ -2493,10 +2570,21 @@
     ctx.restore();
   }
 
+  // Paredes (tema floresta) — só troca o drawImage; HP/destruída/
+  // colisão continuam iguais. Escolha do sprite pelo FORMATO do
+  // retângulo (determinístico, igual nos dois lados da rede):
+  //   metal                      -> parede-metal.webp (oxidada)
+  //   destruída (não bloqueia)   -> escombro-floresta.webp
+  //   comprida (lado maior >= 1,5× o menor) -> tronco-parede.webp
+  //   quase quadrada             -> rocha-parede.webp
+  // O desenho é feito por _tqDesenharSpriteParede (repete o sprite ao
+  // longo do lado maior e gira 90° quando a parede é vertical).
   function _tqDesenharParedes() {
     var ctx = _tqCtx;
-    var regTijolo = _tqAsset('parede-tijolo.webp');
-    var regEscombro = _tqAsset('parede-escombros.webp');
+    // PLACEHOLDER pixel — substituir por asset Gemini do user
+    var regTronco = _tqAsset('tronco-parede.webp');
+    var regRocha = _tqAsset('rocha-parede.webp');
+    var regEscombro = _tqAsset('escombro-floresta.webp');
     var regMetal = _tqAsset('parede-metal.webp');
     for (var i = 0; i < _tqParedes.length; i++) {
       var p = _tqParedes[i];
@@ -2506,25 +2594,52 @@
         // ver comentário no cabeçalho) — mesmo esquema de fallback
         // vetorial das outras paredes se a imagem faltar/falhar.
         if (regMetal && regMetal.ok && regMetal.img) {
-          ctx.drawImage(regMetal.img, px, py, pw, ph);
+          _tqDesenharSpriteParede(regMetal, px, py, pw, ph);
         } else {
-          ctx.fillStyle = '#7a828c';
+          ctx.fillStyle = '#5f5a52';
           ctx.fillRect(px, py, pw, ph);
-          ctx.fillStyle = 'rgba(255,255,255,0.35)';
+          ctx.fillStyle = 'rgba(150,85,40,0.45)';
           if (pw >= ph) ctx.fillRect(px, py + ph * 0.4, pw, ph * 0.2);
           else ctx.fillRect(px + pw * 0.4, py, pw * 0.2, ph);
-          ctx.strokeStyle = '#4a4f56';
+          ctx.strokeStyle = '#33302b';
           ctx.lineWidth = 2;
           ctx.strokeRect(px, py, pw, ph);
         }
         continue;
       }
-      var reg = p.destruida ? regEscombro : regTijolo;
+      var comprida = Math.max(pw, ph) >= Math.min(pw, ph) * 1.5;
+      var reg = p.destruida ? regEscombro : (comprida ? regTronco : regRocha);
       if (reg && reg.ok && reg.img) {
-        ctx.drawImage(reg.img, px, py, pw, ph);
+        _tqDesenharSpriteParede(reg, px, py, pw, ph);
       } else {
-        ctx.fillStyle = p.destruida ? 'rgba(120,90,70,0.35)' : '#8a4a3a';
+        ctx.fillStyle = p.destruida ? 'rgba(90,70,45,0.35)' : (comprida ? '#5a3d22' : '#55554c');
         ctx.fillRect(px, py, pw, ph);
+      }
+    }
+  }
+
+  // Desenha um sprite de parede no retângulo (px,py,pw,ph) em pixels.
+  // O sprite é pensado DEITADO (lado maior na horizontal — ex.: o
+  // tronco); em parede vertical ele gira 90°. Ao longo do lado maior ele
+  // se repete o suficiente pra não esticar demais (um tronco 3:1 numa
+  // parede 6:1 vira 2 troncos; uma placa de metal 1:1 num pilar 8:1 vira
+  // 8 placas).
+  function _tqDesenharSpriteParede(reg, px, py, pw, ph) {
+    var ctx = _tqCtx;
+    var deitada = pw >= ph;
+    var longo = deitada ? pw : ph, curto = deitada ? ph : pw;
+    var prop = (reg.w && reg.h) ? Math.max(reg.w, reg.h) / Math.min(reg.w, reg.h) : 1;
+    var n = Math.max(1, Math.round(longo / curto / prop));
+    var passo = longo / n;
+    for (var k = 0; k < n; k++) {
+      if (deitada) {
+        ctx.drawImage(reg.img, px + k * passo, py, passo, ph);
+      } else {
+        ctx.save();
+        ctx.translate(px + pw / 2, py + k * passo + passo / 2);
+        ctx.rotate(Math.PI / 2);
+        ctx.drawImage(reg.img, -passo / 2, -pw / 2, passo, pw);
+        ctx.restore();
       }
     }
   }
@@ -2538,6 +2653,7 @@
     if (!_tqBarris.length) return;
     var ctx = _tqCtx;
     var r = TQ_BARRIL_RAIO * _tqH;
+    // PLACEHOLDER pixel — substituir por asset Gemini do user
     var reg = _tqAsset('barril.webp');
     for (var i = 0; i < _tqBarris.length; i++) {
       var b = _tqBarris[i];

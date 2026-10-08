@@ -6795,6 +6795,22 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
       font-family: var(--font-h); font-weight: 800; font-size: 12.5px; color: #ffd740; margin: 2px 0 10px;
     }
     .lojajogo-preco-tem { color: var(--muted); font-weight: 700; }
+    .lojajogo-desc { font-size: 11px; color: var(--muted); line-height: 1.3; margin-bottom: 2px; }
+    /* Miniatura de skin sem imagem (paleta/cores): grade de quadradinhos. */
+    .lojajogo-amostra { display: grid; gap: 3px; width: 100%; height: 100%; padding: 6px; box-sizing: border-box; }
+    .lojajogo-amostra i { display: block; border-radius: 4px; min-height: 8px; box-shadow: inset 0 -2px 0 rgba(0,0,0,.18); }
+
+    /* Botão "🎨 Skins" nas telas de início/fim dos jogos (abre a loja do
+       jogo). Pílula escura translúcida com texto branco: legível tanto
+       nos overlays escuros quanto nos claros (modo claro). */
+    .jogo-btn-skins {
+      margin-top: 10px; padding: 9px 22px; border-radius: 999px; cursor: pointer;
+      font-family: var(--font-h); font-weight: 800; font-size: 14px; line-height: 1.2;
+      color: #fff; background: rgba(20,24,34,.55); border: 1px solid rgba(255,255,255,.25);
+      -webkit-tap-highlight-color: transparent; transition: transform .12s ease, background .12s ease;
+    }
+    .jogo-btn-skins:hover { background: rgba(20,24,34,.7); }
+    .jogo-btn-skins:active { transform: scale(.96); }
     @media (min-width: 560px) {
       .lojajogo-overlay { align-items: center; }
       .lojajogo-caixa { border-radius: 20px; }

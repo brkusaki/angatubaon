@@ -987,6 +987,7 @@
                   <span class="st-btn-modo-sub">Acaba se errar 3 corujas bravas</span>
                 </button>
               </div>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('speedtap')">🎨 Skins</button>
             </div>
             <!-- A coruja-alvo é injetada aqui durante o jogo -->
             <!-- Tela de fim -->
@@ -997,6 +998,7 @@
               <div class="st-fim-moedas" id="st-fim-moedas" style="display:none; margin:-8px 0 14px; font-size:15px; font-weight:800; color:#ffd740;"></div>
               <div class="rank-slot" id="st-rank-slot" style="display:none;"></div>
               <button type="button" class="st-btn" onclick="_stComecar()">Jogar de novo</button>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('speedtap')">🎨 Skins</button>
             </div>
           </div>
         </div>
@@ -1025,6 +1027,7 @@
             <div class="sq-overlay-titulo">Sequência da Coruja</div>
             <div class="sq-overlay-desc">As corujas piscam numa ordem. Repita tocando na mesma sequência. A cada rodada entra mais um passo — e na rodada 6 as duas corujas trancadas destravam.</div>
             <button type="button" class="sq-play" onclick="_sqComecar()">Começar</button>
+            <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('sequencia')">🎨 Skins</button>
           </div>
           <!-- Tela de fim -->
           <div class="sq-overlay" id="sq-fim" style="display:none;">
@@ -1034,6 +1037,7 @@
             <div class="sq-overlay-moedas" id="sq-fim-moedas" style="display:none; margin:-8px 0 14px; font-size:15px; font-weight:800; color:#ffd740;"></div>
             <div class="rank-slot" id="sq-rank-slot" style="display:none;"></div>
             <button type="button" class="sq-play" onclick="_sqComecar()">Tentar de novo</button>
+            <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('sequencia')">🎨 Skins</button>
           </div>
         </div>
       </div>
@@ -1144,6 +1148,7 @@
                   <span class="pn-btn-modo-sub">Acelera sem parar &middot; vale ranking</span>
                 </button>
               </div>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('piano')">🎨 Skins</button>
               <div class="pn-creditos">Melodias de domínio público &mdash; Chiquinha Gonzaga, cantigas de roda, Beethoven, Mozart e Pachelbel &mdash; tocadas ao vivo pelo próprio app.</div>
             </div>
             <!-- Tela de fim -->
@@ -1155,6 +1160,7 @@
               <div class="pn-overlay-moedas" id="pn-fim-moedas" style="display:none; margin:-8px 0 14px; font-size:15px; font-weight:800; color:#ffd740;"></div>
               <div class="rank-slot" id="pn-rank-slot" style="display:none;"></div>
               <button type="button" class="pn-play" onclick="_pnComecar()">Tocar de novo</button>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('piano')">🎨 Skins</button>
               <button type="button" class="pn-link" onclick="_pnVoltarInicio()">Trocar música ou modo</button>
             </div>
           </div>
@@ -1187,6 +1193,7 @@
               <div class="bb-overlay-fase">Fase <b id="bb-fase-inicio">1</b></div>
               <div class="bb-overlay-rec">Recorde: fase <span id="bb-recorde-inicio">0</span></div>
               <button type="button" class="bb-btn" onclick="_bbComecar()">Jogar</button>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('blocos')">🎨 Skins</button>
             </div>
 
             <!-- Tela de fim (fase concluída OU sem espaço — conteúdo trocado por JS) -->
@@ -1197,6 +1204,7 @@
               <div class="bb-overlay-moedas" id="bb-fim-moedas" style="display:none; margin:-8px 0 14px; font-size:15px; font-weight:800; color:#ffd740;"></div>
               <div class="rank-slot" id="bb-rank-slot" style="display:none;"></div>
               <button type="button" class="bb-btn" id="bb-fim-btn" onclick="_bbBotaoPrincipal()">Continuar</button>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('blocos')">🎨 Skins</button>
               <button type="button" class="bb-link" onclick="_voltarAoMenu()">Voltar aos jogos</button>
             </div>
           </div>
@@ -1228,6 +1236,7 @@
               <div class="dc-overlay-fase">Fase <b id="dc-fase-inicio">1</b></div>
               <div class="dc-overlay-rec">Recorde: fase <span id="dc-recorde-inicio">0</span></div>
               <button type="button" class="dc-btn" onclick="_dcComecar()">Jogar</button>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('doces')">🎨 Skins</button>
             </div>
 
             <!-- Tela de fim (fase concluída OU movimentos esgotados — conteúdo trocado por JS) -->
@@ -1238,6 +1247,7 @@
               <div class="dc-overlay-moedas" id="dc-fim-moedas" style="display:none; margin:-8px 0 14px; font-size:15px; font-weight:800; color:#ffd740;"></div>
               <div class="rank-slot" id="dc-rank-slot" style="display:none;"></div>
               <button type="button" class="dc-btn" id="dc-fim-btn" onclick="_dcBotaoPrincipal()">Continuar</button>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('doces')">🎨 Skins</button>
               <button type="button" class="dc-link" onclick="_voltarAoMenu()">Voltar aos jogos</button>
             </div>
           </div>
@@ -1269,6 +1279,7 @@
               <div class="t48-overlay-desc">Deslize (arraste) as peças pra juntar dois números iguais e formar peças cada vez maiores. Chegue ao 2048 antes que o tabuleiro lote!</div>
               <div class="t48-overlay-rec">Recorde: <span id="t48-recorde-inicio">0</span> pontos</div>
               <button type="button" class="t48-btn" onclick="_t48Comecar()">Jogar</button>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('2048')">🎨 Skins</button>
             </div>
 
             <!-- Tela de fim (chegou ao 2048 OU sem jogadas — conteúdo trocado por JS) -->
@@ -1279,6 +1290,7 @@
               <div class="t48-overlay-moedas" id="t48-fim-moedas" style="display:none; margin:-8px 0 14px; font-size:15px; font-weight:800; color:#ffd740;"></div>
               <div class="rank-slot" id="t48-rank-slot" style="display:none;"></div>
               <button type="button" class="t48-btn" onclick="_t48Retry()">Tentar de novo</button>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('2048')">🎨 Skins</button>
               <button type="button" class="t48-link" onclick="_voltarAoMenu()">Voltar aos jogos</button>
             </div>
           </div>
@@ -1325,6 +1337,7 @@
                   <span>🌐 Sala pública (aparece na lista)</span>
                 </label>
               </div>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('pingpong')">🎨 Skins</button>
               <div class="pp-divisor">Entrar com código</div>
               <div class="pp-entrar-wrap">
                 <input type="text" class="pp-codigo-input" id="pp-codigo-input" placeholder="CÓDIGO" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
@@ -1362,6 +1375,7 @@
                    abrindo uma sala — ver _ppMostrarFim/'desconexao' e
                    _ppPedirRevanche. -->
               <button type="button" class="pp-play" id="pp-btn-revanche" onclick="_ppPedirRevanche()">Jogar de novo</button>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('pingpong')">🎨 Skins</button>
               <!-- Sempre visível: leva ao menu completo do 2.1 (Criar sala /
                    Entrar com código / Salas abertas agora). -->
               <button type="button" class="pp-link" id="pp-btn-voltar-fim" onclick="_ppVoltarMenu()">Voltar ao menu</button>
@@ -1461,6 +1475,7 @@
                   <span>🌐 Sala pública (aparece na lista)</span>
                 </label>
               </div>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('tanques')">🎨 Skins</button>
               <div class="tq-divisor">Entrar com código</div>
               <div class="tq-entrar-wrap">
                 <input type="text" class="tq-codigo-input" id="tq-codigo-input" placeholder="CÓDIGO" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
@@ -1497,6 +1512,7 @@
                    lado vira "Criar nova sala" (ver _tqMostrarFim/'desconexao'
                    e _tqPedirRevanche). -->
               <button type="button" class="tq-play" id="tq-btn-revanche" onclick="_tqPedirRevanche()">Jogar de novo</button>
+              <button type="button" class="jogo-btn-skins" onclick="lojaJogoAbrir('tanques')">🎨 Skins</button>
               <!-- Sempre visível: leva ao menu completo do 2.1 (Criar sala /
                    Entrar com código / Salas abertas agora). -->
               <button type="button" class="tq-link" id="tq-btn-voltar-fim" onclick="_tqVoltarMenu()">Voltar ao menu</button>

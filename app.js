@@ -1075,6 +1075,9 @@
     return _favoritos.indexOf(favNormNome(idOuNome)) !== -1;
   }
   function _salvarFavoritos() {
+    // Logado (Fase 2): a lista é da conta — guarda com os tempos e
+    // agenda a sincronia (ver FAVORITOS SINCRONIZADOS, logo abaixo).
+    if (_favDono && _favEstado) { _favRegistrarLista(); return; }
     try { localStorage.setItem(FAVORITOS_KEY, JSON.stringify(_favoritos)); } catch (e) {}
   }
   // Alterna o favorito de uma loja (recebe o id estável, não o nome).
@@ -1169,6 +1172,251 @@
       atualizarBadgeFavoritos();
     }
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     FAVORITOS SINCRONIZADOS (Firestore) — Fase 2, item 3
+     ------------------------------------------------------------
+     Visitante (deslogado): exatamente como sempre — array em
+     angatuba_favoritos, só no aparelho.
+
+     Conta nomeada: a lista passa a ser DA CONTA.
+       · local:  angatuba_favoritos_u_<uid> = { fav:{id:t}, rem:{id:t} }
+       · nuvem:  favoritos/{uid}            = { fav, rem, atualizadoEm }
+     `t` = quando o id entrou (fav) ou saiu (rem). O `rem` é a
+     "lápide": sem ela, juntar dois aparelhos ressuscitaria o favorito
+     que a pessoa tirou no outro. Mesclagem = por id, vence o `t` mais
+     novo (lápides com mais de FAV_REM_DIAS somem).
+
+     SINCRONIA SEMPRE POR TRANSAÇÃO (lê → mescla → grava): o set()
+     substitui o doc inteiro, e a transação garante que o que vai pra
+     nuvem já contém o que outro aparelho gravou um segundo antes.
+     Roda no login, 2s depois de cada mudança e quando a rede volta.
+     Offline: a mudança fica no local (com o `t` dela) e sobe na
+     próxima sincronia — o `t` decide quem ganha.
+
+     1º login desta conta NESTE aparelho: os favoritos do visitante
+     são adotados pela conta (com `t` antigo — perdem pra qualquer
+     decisão já registrada na nuvem) e a lista do visitante é limpa.
+     Ao sair, a tela volta pra lista do visitante (decisão do Bruno:
+     celular compartilhado não vaza os favoritos de quem saiu).
+  ══════════════════════════════════════════════════════════════ */
+  const FAV_CHAVE_CONTA = 'angatuba_favoritos_u_';
+  const FAV_MAX = 300;                       // = favoritosValido em firestore.rules
+  const FAV_REM_DIAS = 90;
+  let _favDono = null;                       // uid dono da lista em uso (null = visitante)
+  let _favEstado = null;                     // { fav, rem } da conta em uso
+  let _favNuvemTimer = null;
+  let _favPendente = false;                  // mudança local ainda não confirmada na nuvem
+  let _favSincronizando = null;
+  let _favConfirmado = false;                // login confirmado pelo Firebase nesta sessão
+  const FAV_ULTIMO_UID = 'angatuba_favoritos_ultimo_uid';
+
+  function _favLerVisitante() {
+    try {
+      const arr = JSON.parse(localStorage.getItem(FAVORITOS_KEY) || '[]');
+      return Array.isArray(arr) ? arr.map(favNormNome).filter(Boolean) : [];
+    } catch (e) { return []; }
+  }
+
+  // Limpa um { fav, rem } vindo do disco ou da nuvem: chaves válidas,
+  // `t` numérico, cada id num lado só (o mais novo), lápide velha fora
+  // e tetos de tamanho (sai o mais antigo).
+  function _favNormEstado(o) {
+    o = (o && typeof o === 'object') ? o : {};
+    const out = { fav: {}, rem: {} };
+    const limite = Date.now() - FAV_REM_DIAS * 86400000;
+    ['fav', 'rem'].forEach(function (lado) {
+      const m = (o[lado] && typeof o[lado] === 'object') ? o[lado] : {};
+      Object.keys(m).forEach(function (k) {
+        const id = favNormNome(k);
+        const t = Math.floor(Number(m[k]) || 0);
+        if (!id || /^__.*__$/.test(id) || t <= 0) return;
+        if (lado === 'rem' && t < limite) return;
+        const outro = lado === 'fav' ? 'rem' : 'fav';
+        if (out[outro][id] && out[outro][id] >= t) return;
+        delete out[outro][id];
+        if (!out[lado][id] || out[lado][id] < t) out[lado][id] = t;
+      });
+    });
+    ['fav', 'rem'].forEach(function (lado) {
+      const ids = Object.keys(out[lado]);
+      if (ids.length <= FAV_MAX) return;
+      ids.sort(function (a, b) { return out[lado][b] - out[lado][a]; })
+        .slice(FAV_MAX).forEach(function (id) { delete out[lado][id]; });
+    });
+    return out;
+  }
+  function _favMesclar(a, b) {
+    const junto = { fav: {}, rem: {} };
+    [a, b].forEach(function (e) {
+      if (!e) return;
+      ['fav', 'rem'].forEach(function (lado) {
+        Object.keys(e[lado] || {}).forEach(function (id) {
+          if (!junto[lado][id] || junto[lado][id] < e[lado][id]) junto[lado][id] = e[lado][id];
+        });
+      });
+    });
+    return _favNormEstado(junto);
+  }
+  // Ordem da lista = ordem em que entrou (igual ao push de antes).
+  function _favListaDe(est) {
+    return Object.keys(est.fav).sort(function (a, b) { return est.fav[a] - est.fav[b]; });
+  }
+  function _favAssinatura(est) {
+    const s = function (m) { return Object.keys(m).sort().map(function (k) { return k + '=' + m[k]; }).join('|'); };
+    return s(est.fav) + '#' + s(est.rem);
+  }
+  function _favGravarLocalConta() {
+    if (!_favDono || !_favEstado) return;
+    try { localStorage.setItem(FAV_CHAVE_CONTA + _favDono, JSON.stringify(_favEstado)); } catch (e) {}
+  }
+
+  // Traduz o array _favoritos (que o resto do app mexe) pro estado com
+  // tempos: entrou = fav agora, saiu = lápide agora. Genérico de
+  // propósito — cobre o toggle e a migração nome→id do mesmo jeito.
+  function _favRegistrarLista() {
+    if (!_favEstado) return;
+    const agora = Date.now(), na = {};
+    _favoritos.forEach(function (id) {
+      na[id] = true;
+      if (!_favEstado.fav[id]) { _favEstado.fav[id] = agora; delete _favEstado.rem[id]; }
+    });
+    Object.keys(_favEstado.fav).forEach(function (id) {
+      if (!na[id]) { delete _favEstado.fav[id]; _favEstado.rem[id] = agora; }
+    });
+    _favGravarLocalConta();
+    _favPendente = true;
+    clearTimeout(_favNuvemTimer);
+    _favNuvemTimer = setTimeout(_favSincronizar, 2000);
+  }
+
+  let _favFbCarregado = null;
+  function _favCarregarFirestore() {
+    if (_favFbCarregado) return _favFbCarregado;
+    _favFbCarregado = _carregarFirebaseAuthCore().then(function () {
+      return _injetarScript(FIREBASE_SDK_BASE + 'firebase-firestore-compat.js');
+    }).then(function () {
+      return new Promise(function (resolve, reject) {
+        let n = 0;
+        (function checar() {
+          if (window.firebase && firebase.firestore) { resolve(firebase.firestore()); return; }
+          if (++n > 100) { reject(new Error('Firestore indisponível')); return; }
+          setTimeout(checar, 50);
+        })();
+      });
+    }).catch(function (err) { _favFbCarregado = null; throw err; });
+    return _favFbCarregado;
+  }
+
+  // Lê → mescla → grava, numa transação. Atualiza a tela se a nuvem
+  // trouxe algo de outro aparelho. Silencioso: sem rede, tenta de novo
+  // no evento 'online' (ou na próxima mudança/login).
+  function _favSincronizar() {
+    const uid = _favDono;
+    if (!uid || !_favEstado || !_favConfirmado) return Promise.resolve(false);
+    if (_favSincronizando) return _favSincronizando;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return Promise.resolve(false);
+    let mesclado = null;
+    _favSincronizando = _favCarregarFirestore().then(function (db) {
+      const ref = db.collection('favoritos').doc(uid);
+      return db.runTransaction(function (tx) {
+        return tx.get(ref).then(function (doc) {
+          const remoto = (doc && doc.exists) ? _favNormEstado(doc.data()) : null;
+          mesclado = _favMesclar(_favEstado, remoto);
+          if (!remoto || _favAssinatura(remoto) !== _favAssinatura(mesclado)) {
+            tx.set(ref, { fav: mesclado.fav, rem: mesclado.rem, atualizadoEm: firebase.firestore.FieldValue.serverTimestamp() });
+          }
+        });
+      });
+    }).then(function () {
+      if (_favDono !== uid || !mesclado) return false;
+      // O que mudou localmente DURANTE a transação também entra.
+      const antes = _favAssinatura(_favEstado);
+      _favEstado = _favMesclar(_favEstado, mesclado);
+      _favPendente = (_favAssinatura(_favEstado) !== _favAssinatura(mesclado));
+      _favGravarLocalConta();
+      const novaLista = _favListaDe(_favEstado);
+      const mudouTela = novaLista.join('\n') !== _favoritos.join('\n');
+      _favoritos = novaLista;
+      if (mudouTela) _favRepintar();
+      if (_favPendente) { clearTimeout(_favNuvemTimer); _favNuvemTimer = setTimeout(_favSincronizar, 2000); }
+      return antes !== _favAssinatura(_favEstado) || mudouTela;
+    }).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[favoritos] sync falhou:', err && (err.code || err.message));
+      return false;
+    }).then(function (r) { _favSincronizando = null; return r; });
+    return _favSincronizando;
+  }
+
+  // Redesenha o que mostra favoritos: contador do pill, lista filtrada
+  // e a seção do painel de conta.
+  function _favRepintar() {
+    atualizarBadgeFavoritos();
+    if (typeof activePillFilter !== 'undefined' && activePillFilter === 'favoritos' && typeof renderLojas === 'function') renderLojas();
+    const conta = document.getElementById('modal-cli-conta');
+    if (conta && conta.classList.contains('open') && typeof cliRenderFavoritos === 'function') cliRenderFavoritos();
+  }
+
+  // Login / logout / troca de conta (onAuthStateChanged).
+  function _favAoMudarConta() {
+    const uid = (typeof _cliUser !== 'undefined' && _cliContaReal(_cliUser) && _cliUser.uid) || null;
+    // Mesma conta que o boot já tinha aberto (ver o fim deste bloco): só
+    // confirma e sincroniza, sem trocar a lista na tela.
+    if (uid && uid === _favDono) {
+      if (!_favConfirmado) { _favConfirmado = true; _favSincronizar(); }
+      return;
+    }
+    if (!uid && !_favDono) return;
+    clearTimeout(_favNuvemTimer);
+    _favDono = uid;
+    _favConfirmado = !!uid;
+    _favPendente = false;
+    try {
+      if (uid) localStorage.setItem(FAV_ULTIMO_UID, uid);
+      else localStorage.removeItem(FAV_ULTIMO_UID);
+    } catch (e) {}
+    if (uid) {
+      let est = null;
+      try { const raw = localStorage.getItem(FAV_CHAVE_CONTA + uid); if (raw) est = _favNormEstado(JSON.parse(raw)); } catch (e) {}
+      if (!est) {
+        // 1º login desta conta aqui: adota a lista do visitante. `t`
+        // pequeno de propósito (1, 2, 3...): mantém a ordem e perde pra
+        // qualquer decisão que a conta já tenha na nuvem.
+        est = { fav: {}, rem: {} };
+        _favLerVisitante().forEach(function (id, i) { if (!est.fav[id]) est.fav[id] = i + 1; });
+        try { localStorage.removeItem(FAVORITOS_KEY); } catch (e) {}
+        _favPendente = Object.keys(est.fav).length > 0;
+      }
+      _favEstado = est;
+      _favoritos = _favListaDe(est);
+      _favGravarLocalConta();
+      _favSincronizar();
+    } else {
+      _favEstado = null;
+      _favoritos = _favLerVisitante();
+    }
+    _favRepintar();
+  }
+
+  // Boot: quem estava logado no último uso já abre com a lista da conta
+  // (o Firebase Auth leva um instante pra reidratar a sessão; sem isto
+  // os corações piscariam com a lista errada). Até o login se confirmar
+  // (_favConfirmado), mudanças ficam só no local da conta; se a sessão
+  // tiver caído, o _favAoMudarConta volta pra lista do visitante.
+  (function () {
+    try {
+      const u = localStorage.getItem(FAV_ULTIMO_UID);
+      const raw = u ? localStorage.getItem(FAV_CHAVE_CONTA + u) : null;
+      if (!raw) return;
+      _favDono = u;
+      _favEstado = _favNormEstado(JSON.parse(raw));
+      _favoritos = _favListaDe(_favEstado);
+    } catch (e) {}
+  })();
+
+  window.addEventListener('online', function () {
+    if (_favDono && _favPendente) _favSincronizar();
+  });
 
   const BAIRROS_ANGATUBA = [
     // Urbanos
@@ -11566,6 +11814,12 @@
     if (document.getElementById('aviso-post-overlay')?.style.display === 'flex') {
       if (typeof _fecharAvisoPost === 'function') _fecharAvisoPost(true); return;
     }
+    // Chat 1x1 (Fase 2) — abre por cima do painel de conta e do perfil
+    // do amigo (que vive no hub de jogos), então sai antes de todos eles.
+    // Conversa aberta a partir da lista desce pra lista (ver cliChatVoltar).
+    if (document.getElementById('modal-chat')?.classList.contains('open')) {
+      if (typeof cliChatVoltar === 'function') cliChatVoltar(true); return;
+    }
     // Tela de ranking (dentro da hub de jogos)
     if (document.getElementById('jogo-ranking')?.classList.contains('rank-open')) {
       if (typeof rankFecharPainel === 'function') rankFecharPainel(true); return;
@@ -16210,6 +16464,9 @@ ${urlCard}`)}`;
       // Biblioteca: troca listas/progresso pro dono certo (só age se ela
       // já foi aberta nesta sessão — ver _bibAoMudarConta em Biblioteca/hub.js).
       if (typeof _bibAoMudarConta === 'function') { try { _bibAoMudarConta(); } catch (e) {} }
+      // Lojas favoritas (Fase 2): troca pra lista da conta que entrou (e
+      // sincroniza) ou volta pra do visitante ao sair.
+      try { _favAoMudarConta(); } catch (e) {}
       // Aprender: mescla o progresso com o lang_progress da conta que entrou
       // (só age se o módulo já foi aberto nesta sessão — ver _aprAoMudarConta
       // em Aprender/hub.js; senão a 1ª abertura sincroniza sozinha).
@@ -16264,6 +16521,9 @@ ${urlCard}`)}`;
         // Nó diferente (lobbyInvites), assunto diferente — ver o bloco
         // "CONVIDAR AMIGO PRO LOBBY".
         setTimeout(_lobConvObservar, 2900);
+        // Chat 1x1 (Fase 2): caixa de conversas — contadores e aviso de
+        // mensagem nova, mesmo esquema das escutas acima.
+        setTimeout(_chatObservarCaixa, 2950);
         // Push (FCM, preparação): por último — pede permissão (se ainda
         // não decidida) e guarda o token. Só depois de todo o resto do
         // social ter assentado, pelo mesmo motivo dos timers acima.
@@ -16273,6 +16533,9 @@ ${urlCard}`)}`;
         _presencaParar();
         _convPararCaixa();
         _pedPararGlobal();
+        // Chat 1x1: nada da conta anterior fica na tela.
+        if (_chatAberto()) cliFecharChat();
+        _chatPararCaixa();
         // Lobby social (5.1): sai do lobby ANTES de o token morrer —
         // depois do signOut as regras recusam a escrita e a entrada só
         // sumiria quando a conexão caísse. A UI (5.2) solta primeiro: o
@@ -16336,6 +16599,8 @@ ${urlCard}`)}`;
         '</button>';
       slot.style.display = 'flex';
       if (themeBtn) themeBtn.style.display = 'none';
+      // Contador de mensagens do chat 1x1 (o avatar acabou de ser refeito).
+      _chatPintarBadges();
     } else {
       // Deslogado: sem avatar; botão de tema volta ao header.
       slot.innerHTML = '';
@@ -16884,8 +17149,9 @@ ${urlCard}`)}`;
       if (tits) {
         tits.innerHTML =
           (typeof _perfilTituloHtml === 'function' ? _perfilTituloHtml(eq) : '') +
-          ((typeof _perfilTitulosConquistaHtml === 'function' && typeof _titulosEquipadosLer === 'function')
-            ? _perfilTitulosConquistaHtml(_titulosEquipadosLer()) : '');
+          // Fase 2: destaque + chips (sem repetir) — ver _perfilTitulosHeroHtml.
+          ((typeof _perfilTitulosHeroHtml === 'function' && typeof _titulosEquipadosLer === 'function')
+            ? _perfilTitulosHeroHtml(_titulosDestaqueLer(), _titulosEquipadosLer()) : '');
       }
     } catch (e) {}
   }
@@ -17030,6 +17296,9 @@ ${urlCard}`)}`;
     // Pedidos de amizade e a pilha de avisos do topo (P1) saem pelo
     // mesmo motivo: nada da conta anterior pode sobrar na tela.
     _pedPararGlobal();
+    // Chat 1x1 (Fase 2): idem.
+    if (_chatAberto()) cliFecharChat();
+    _chatPararCaixa();
     // Lobby social (5.1/5.2): pelo mesmo motivo da presença acima, e a
     // UI solta antes do sair (ver o onAuthStateChanged).
     _lobUiSoltar();
@@ -17876,6 +18145,7 @@ ${urlCard}`)}`;
       if (elVazio) elVazio.style.display = 'none';
       elLista.innerHTML = amigos.map(function (a) {
         var nome = _amNomeVivo[a.uid] || a.nome;
+        _chatLembrarPessoa(a.uid, nome, a.foto);
         return '<div class="cli-amigo-item" data-amigo="' + escHTML(a.uid) + '">' +
           '<span class="cli-amigo-clicavel" role="button" tabindex="0" ' +
             'onclick="cliAbrirPerfilAmigo(\'' + escHTML(a.uid) + '\')" ' +
@@ -17888,6 +18158,12 @@ ${urlCard}`)}`;
             '</span>' +
           '</span>' +
           '<span class="cli-amigo-acoes">' +
+            // Chat 1x1 (Fase 2): conversa direta, com o contador de
+            // não lidas desse amigo (pintado por _chatPintarBadges).
+            '<button type="button" class="cli-amigo-btn chat" data-chat="' + escHTML(a.uid) + '" ' +
+              'onclick="cliAbrirChat(\'' + escHTML(a.uid) + '\')" ' +
+              'aria-label="Conversar" title="Conversar">' +
+              '<i class="fa fa-comment"></i><span class="cli-amigo-chat-n" style="display:none"></span></button>' +
             // Chamar pra jogar (4.4): abre a fileira de jogos logo
             // abaixo desta linha. Ganha destaque quando a presença
             // diz que a pessoa está online.
@@ -17900,6 +18176,7 @@ ${urlCard}`)}`;
               '<i class="fa fa-user-minus"></i></button>' +
           '</span></div>';
       }).join('');
+      _chatPintarBadges();
       // Uma escuta de presença por amigo (AngatubaPresenca.observar).
       // As regras só deixam ler presence/{uid} um a um — é exatamente
       // este acesso, e é o que impede varrer a cidade inteira.
@@ -18581,6 +18858,561 @@ ${urlCard}`)}`;
     setTimeout(abrirPerfil, 30);
   }
   window.cliAbrirPerfilAmigo = cliAbrirPerfilAmigo;
+
+  /* ══════════════════════════════════════════════════════════════
+     CHAT 1x1 ENTRE AMIGOS (Realtime Database) — Fase 2, item 1
+     ------------------------------------------------------------
+     POR QUE NO RTDB E NÃO NO FIRESTORE: a amizade mora no RTDB
+     (friends/{uid}/{amigo}, Etapa 4.3) e as regras do Firestore não
+     enxergam o RTDB. Aqui a regra checa a amizade NO SERVIDOR a cada
+     mensagem — mesma trava do gameInvites/lobbyInvites. Desfez a
+     amizade, o envio trava na hora (o histórico continua legível pros
+     dois, que já tinham lido).
+
+     Nós (ver database.rules.json):
+       chats/{A_B}/msgs/{pushId} = { de, txt, em }   A_B = uids em ordem
+       chats/{A_B}/lido/{uid}    = timestamp          "visto" de cada um
+       chatInbox/{dono}/{outro}  = {
+         ultima, de, em, naoLidas, nome, foto?        lista de conversas
+       }
+
+     ENVIO NUM update() MULTI-CAMINHO (atômico): a mensagem, a minha
+     entrada na caixa (naoLidas 0) e a do amigo (naoLidas +1 via
+     ServerValue.increment). Ou entra tudo, ou nada — sem conversa
+     "meio enviada" e sem Cloud Function. `nome`/`foto` da entrada
+     descrevem sempre o OUTRO lado (cada um escreve o próprio na caixa
+     do amigo).
+
+     LEITURA BARATA: a conversa aberta escuta só as últimas
+     CHAT_JANELA mensagens (limitToLast). A caixa é uma escuta global
+     (irmã de _convObservarCaixa/_pedObservarGlobal), viva enquanto
+     logado: é ela que pinta os contadores e o aviso do topo.
+
+     Só texto: sem mídia, sem áudio, sem figurinha. Sempre textContent/
+     escHTML na tela — o texto vem de outra pessoa.
+
+     API (window.AngatubaChat):
+       idConversa(a, b)       -> 'A_B'
+       observarCaixa(cb)      -> lista [{uid,nome,foto,ultima,de,em,naoLidas}]
+       observarConversa(uid, cb) -> cb({ msgs:[{id,de,txt,em}], lidoDele })
+       enviar(uid, texto)     -> Promise
+       marcarLida(uid)        -> Promise
+       naoLidasTotal()
+  ══════════════════════════════════════════════════════════════ */
+  var CHAT_MAX = 500;            // = teto de database.rules.json (txt)
+  var CHAT_PREVIA = 80;          // = teto de chatInbox/.../ultima
+  var CHAT_JANELA = 50;          // mensagens carregadas por conversa
+  var _chatCaixa = {};           // uid -> entrada da caixa (cache da escuta global)
+  var _chatCaixaUnsub = null;
+  var _chatCaixaUid = null;
+  var _chatCaixaPrimeira = true;
+  var _chatVistoEm = {};         // uid -> em da última mensagem já avisada
+  var _chatPessoas = {};         // uid -> { nome, foto } (amigos/caixa/perfil)
+
+  function _chatDb() {
+    if (typeof firebase === 'undefined' || !firebase.database) return null;
+    try { return firebase.database(); } catch (e) { return null; }
+  }
+  function _chatId(a, b) { return (a < b) ? (a + '_' + b) : (b + '_' + a); }
+  function _chatEu() { return (_cliContaReal(_cliUser) && _cliUser.uid) || null; }
+  function _chatNomeDe(uid) {
+    var p = _chatPessoas[uid] || {};
+    var n = (typeof _amNomeVivo !== 'undefined' && _amNomeVivo[uid]) || p.nome || (_chatCaixa[uid] && _chatCaixa[uid].nome) || 'Amigo';
+    return String(n).trim().slice(0, CLI_NOME_MAX) || 'Amigo';
+  }
+  function _chatFotoDe(uid) {
+    var p = _chatPessoas[uid] || {};
+    return _amigosFotoValida(p.foto || (_chatCaixa[uid] && _chatCaixa[uid].foto));
+  }
+  // Quem fala o nome/foto de um uid ao app (lista de amigos, perfil).
+  function _chatLembrarPessoa(uid, nome, foto) {
+    if (!uid) return;
+    var p = _chatPessoas[uid] || (_chatPessoas[uid] = {});
+    if (nome) p.nome = String(nome).slice(0, CLI_NOME_MAX);
+    if (foto) p.foto = foto;
+  }
+  function _chatErro(err) {
+    var code = String((err && (err.code || err.message)) || '').toLowerCase();
+    if (code.indexOf('permission') !== -1) return new Error('Só dá pra conversar com quem é seu amigo.');
+    return new Error('Não deu pra enviar agora. Confira a conexão.');
+  }
+
+  window.AngatubaChat = {
+    idConversa: _chatId,
+
+    observarCaixa: function (cb) {
+      var eu = _chatEu();
+      if (!eu || typeof cb !== 'function') return function () {};
+      var parado = false, off = function () {};
+      _carregarFirebaseDb().then(function () {
+        if (parado) return;
+        var db = _chatDb();
+        if (!db) return;
+        var ref = db.ref('chatInbox/' + eu);
+        var h = function (snap) {
+          var val = snap.val() || {};
+          var lista = Object.keys(val).map(function (uid) {
+            var e = val[uid] || {};
+            return {
+              uid: uid,
+              nome: String(e.nome || 'Amigo').slice(0, CLI_NOME_MAX),
+              foto: _amigosFotoValida(e.foto),
+              ultima: String(e.ultima || '').slice(0, CHAT_PREVIA),
+              de: String(e.de || ''),
+              em: Number(e.em) || 0,
+              naoLidas: Math.max(0, Math.floor(Number(e.naoLidas) || 0))
+            };
+          });
+          lista.sort(function (a, b) { return b.em - a.em; });
+          try { cb(lista); } catch (e) {}
+        };
+        ref.on('value', h, function () { try { cb([]); } catch (e) {} });
+        off = function () { try { ref.off('value', h); } catch (e) {} };
+      }).catch(function () {});
+      return function () { parado = true; off(); };
+    },
+
+    observarConversa: function (uid, cb) {
+      var eu = _chatEu();
+      if (!eu || !uid || typeof cb !== 'function') return function () {};
+      var parado = false, offs = [];
+      var msgs = [], lidoDele = 0, erro = false;
+      var emitir = function () { try { cb({ msgs: msgs, lidoDele: lidoDele, erro: erro }); } catch (e) {} };
+      _carregarFirebaseDb().then(function () {
+        if (parado) return;
+        var db = _chatDb();
+        if (!db) return;
+        var base = db.ref('chats/' + _chatId(eu, uid));
+        var q = base.child('msgs').limitToLast(CHAT_JANELA);
+        var hm = function (snap) {
+          var val = snap.val() || {};
+          msgs = Object.keys(val).map(function (id) {
+            var m = val[id] || {};
+            return { id: id, de: String(m.de || ''), txt: String(m.txt || '').slice(0, CHAT_MAX), em: Number(m.em) || 0 };
+          }).filter(function (m) { return m.de && m.txt; });
+          msgs.sort(function (a, b) { return (a.em - b.em) || (a.id < b.id ? -1 : 1); });
+          emitir();
+        };
+        var lref = base.child('lido/' + uid);
+        var hl = function (snap) { lidoDele = Number(snap.val()) || 0; emitir(); };
+        q.on('value', hm, function () { erro = true; emitir(); });
+        lref.on('value', hl, function () {});
+        offs.push(function () { try { q.off('value', hm); } catch (e) {} });
+        offs.push(function () { try { lref.off('value', hl); } catch (e) {} });
+      }).catch(function () { if (!parado) { erro = true; emitir(); } });
+      return function () { parado = true; offs.forEach(function (f) { f(); }); };
+    },
+
+    enviar: function (uid, texto) {
+      var eu = _chatEu();
+      var t = String(texto == null ? '' : texto).replace(/\r\n?/g, '\n').replace(/[ \t]+/g, ' ')
+        .replace(/\n{3,}/g, '\n\n').trim().slice(0, CHAT_MAX);
+      if (!t) return Promise.resolve(null);
+      if (!eu || !uid || uid === eu) return Promise.reject(new Error('Entre na sua conta pra conversar.'));
+      return _carregarFirebaseDb().then(function () {
+        var db = _chatDb();
+        if (!db) throw new Error('Sem conexão com o chat agora.');
+        var TS = firebase.database.ServerValue.TIMESTAMP;
+        var cid = _chatId(eu, uid);
+        var key = db.ref('chats/' + cid + '/msgs').push().key;
+        var previa = t.replace(/\s+/g, ' ').slice(0, CHAT_PREVIA);
+        var meuNome = String(cliNomeExibicao() || 'Jogador').slice(0, CLI_NOME_MAX);
+        var minhaFoto = _amigosMinhaFoto();
+        var up = {};
+        up['chats/' + cid + '/msgs/' + key] = { de: eu, txt: t, em: TS };
+        up['chats/' + cid + '/lido/' + eu] = TS;
+        var minha = { ultima: previa, de: eu, em: TS, naoLidas: 0, nome: _chatNomeDe(uid) };
+        var fotoDele = _chatFotoDe(uid);
+        if (fotoDele) minha.foto = fotoDele;
+        up['chatInbox/' + eu + '/' + uid] = minha;
+        var dele = 'chatInbox/' + uid + '/' + eu + '/';
+        up[dele + 'ultima'] = previa;
+        up[dele + 'de'] = eu;
+        up[dele + 'em'] = TS;
+        up[dele + 'nome'] = meuNome;
+        up[dele + 'naoLidas'] = firebase.database.ServerValue.increment(1);
+        if (minhaFoto) up[dele + 'foto'] = minhaFoto;
+        return db.ref().update(up).then(function () { return key; });
+      }).catch(function (err) { throw (err && err.message && !err.code) ? err : _chatErro(err); });
+    },
+
+    // Zera o contador da minha entrada e carimba o "visto". Só mexe na
+    // caixa se a entrada existe (senão o validate da entrada recusaria
+    // o update inteiro por faltar campo).
+    marcarLida: function (uid) {
+      var eu = _chatEu();
+      if (!eu || !uid) return Promise.resolve();
+      return _carregarFirebaseDb().then(function () {
+        var db = _chatDb();
+        if (!db) return;
+        var up = {};
+        up['chats/' + _chatId(eu, uid) + '/lido/' + eu] = firebase.database.ServerValue.TIMESTAMP;
+        if (_chatCaixa[uid] && _chatCaixa[uid].naoLidas > 0) up['chatInbox/' + eu + '/' + uid + '/naoLidas'] = 0;
+        return db.ref().update(up);
+      }).catch(function () {});
+    },
+
+    naoLidasTotal: function () {
+      var n = 0;
+      Object.keys(_chatCaixa).forEach(function (u) { n += _chatCaixa[u].naoLidas || 0; });
+      return n;
+    }
+  };
+
+  /* ── Escuta global da caixa (login → logout) ──────────────────── */
+  function _chatObservarCaixa() {
+    var eu = _chatEu();
+    if (!eu || _chatCaixaUid === eu) return;
+    _chatPararCaixa();
+    _chatCaixaUid = eu;
+    _chatCaixaUnsub = window.AngatubaChat.observarCaixa(function (lista) {
+      var novo = {};
+      lista.forEach(function (e) { novo[e.uid] = e; if (e.nome) _chatLembrarPessoa(e.uid, e.nome, e.foto); });
+      _chatCaixa = novo;
+      var primeira = _chatCaixaPrimeira;
+      _chatCaixaPrimeira = false;
+      // Aviso do topo pra mensagem NOVA de alguém (não no 1º snapshot:
+      // entrar no app com mensagens paradas mostra só os contadores).
+      var vivas = {};
+      lista.forEach(function (e) {
+        if (e.naoLidas > 0 && e.de !== eu) vivas['chat:' + e.uid] = true;
+        var visto = _chatVistoEm[e.uid] || 0;
+        _chatVistoEm[e.uid] = Math.max(visto, e.em);
+        if (primeira || e.de === eu || !(e.naoLidas > 0) || e.em <= visto) return;
+        if (_chatCom === e.uid && _chatAberto()) { window.AngatubaChat.marcarLida(e.uid); return; }
+        _chatAvisar(e);
+      });
+      if (typeof _avisoSincronizar === 'function') _avisoSincronizar('chat:', vivas);
+      _chatPintarBadges();
+      if (_chatAberto() && !_chatCom) _chatRenderLista();
+    });
+  }
+  function _chatPararCaixa() {
+    if (_chatCaixaUnsub) { try { _chatCaixaUnsub(); } catch (e) {} _chatCaixaUnsub = null; }
+    _chatCaixaUid = null;
+    _chatCaixa = {};
+    _chatVistoEm = {};
+    _chatCaixaPrimeira = true;
+    if (typeof _avisoSincronizar === 'function') _avisoSincronizar('chat:', {});
+    _chatPintarBadges();
+  }
+
+  function _chatAvisar(e) {
+    if (typeof _avisoMostrar !== 'function') return;
+    _avisoMostrar({
+      chave: 'chat:' + e.uid,
+      tipo: 'chat',
+      nome: e.nome,
+      foto: e.foto,
+      owl: '/webp/owl-phone.webp',
+      texto: escHTML(e.ultima),
+      acoes: [{ rotulo: 'Responder', classe: 'ok', fn: function () { cliAbrirChat(e.uid); } }]
+    });
+  }
+
+  // Contadores: avatar do header, botão "Conversas" e o balão de cada amigo.
+  function _chatBadgeHtml(n) { return n > 0 ? String(n > 99 ? '99+' : n) : ''; }
+  function _chatPintarBadges() {
+    var total = window.AngatubaChat ? window.AngatubaChat.naoLidasTotal() : 0;
+    // O balão mora no #cli-account-slot (irmão do botão): o botão do
+    // avatar tem overflow:hidden por causa da foto redonda e cortaria.
+    var slot = document.getElementById('cli-account-slot');
+    var av = document.getElementById('cli-avatar-btn');
+    if (slot && av) {
+      var b = slot.querySelector('.cli-avatar-badge');
+      if (total > 0) {
+        if (!b) { b = document.createElement('span'); b.className = 'cli-avatar-badge'; b.setAttribute('aria-hidden', 'true'); slot.appendChild(b); }
+        b.textContent = _chatBadgeHtml(total);
+        av.setAttribute('aria-label', 'Minha conta — ' + total + (total === 1 ? ' mensagem nova' : ' mensagens novas'));
+      } else {
+        if (b) b.parentNode.removeChild(b);
+        av.setAttribute('aria-label', 'Minha conta');
+      }
+    }
+    var conv = document.getElementById('cli-chat-abrir-n');
+    if (conv) { conv.textContent = _chatBadgeHtml(total); conv.style.display = total > 0 ? '' : 'none'; }
+    document.querySelectorAll('.cli-amigo-btn.chat[data-chat]').forEach(function (btn) {
+      var e = _chatCaixa[btn.getAttribute('data-chat')];
+      var n = (e && e.naoLidas) || 0;
+      var s = btn.querySelector('.cli-amigo-chat-n');
+      if (s) { s.textContent = _chatBadgeHtml(n); s.style.display = n > 0 ? '' : 'none'; }
+      btn.classList.toggle('on', n > 0);
+    });
+  }
+
+  /* ── Tela (#modal-chat) ────────────────────────────────────────
+     Duas vistas na mesma casca: a lista de conversas (_chatCom null)
+     e uma conversa (_chatCom = uid). Abre POR CIMA do painel de conta
+     ou do perfil do amigo; o popstate testa o chat antes de tudo que
+     pode estar por baixo. Histórico: 'chat' ao abrir o overlay e
+     'chat-conversa' quando a conversa foi aberta a partir da lista —
+     aí o "voltar" desce pra lista em vez de fechar tudo. */
+  var _chatCom = null;           // uid da conversa aberta (null = lista)
+  var _chatVeioDaLista = false;
+  var _chatConvUnsub = null;
+  var _chatConvDados = { msgs: [], lidoDele: 0 };
+  var _chatRascunhos = {};       // uid -> texto digitado e não enviado
+  var _chatEnviando = false;
+
+  function _chatEl() { return document.getElementById('modal-chat'); }
+  function _chatAberto() { var o = _chatEl(); return !!(o && o.classList.contains('open')); }
+
+  function _chatSoltarConversa() {
+    if (_chatConvUnsub) { try { _chatConvUnsub(); } catch (e) {} _chatConvUnsub = null; }
+    _chatConvDados = { msgs: [], lidoDele: 0 };
+  }
+
+  function _chatHora(em) {
+    var d = new Date(em);
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  function _chatDia(em) {
+    var d = new Date(em), h = new Date();
+    var ini = function (x) { return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); };
+    var dif = Math.round((ini(h) - ini(d)) / 86400000);
+    if (dif === 0) return 'Hoje';
+    if (dif === 1) return 'Ontem';
+    return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + (d.getFullYear() !== h.getFullYear() ? '/' + d.getFullYear() : '');
+  }
+  // Hora na lista: hoje = HH:MM; antes = Ontem / dd/mm.
+  function _chatQuando(em) {
+    if (!em) return '';
+    var dia = _chatDia(em);
+    return dia === 'Hoje' ? _chatHora(em) : dia;
+  }
+
+  function _chatAvatarHtml(uid, nome, foto) {
+    var ini = escHTML((String(nome).trim()[0] || '?').toUpperCase());
+    var f = _amigosFotoValida(foto);
+    return '<span class="cli-amigo-av dm-av">' +
+      (f
+        ? '<img src="' + escHTML(f) + '" alt="" class="cli-amigo-av-img" ' +
+          'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" />' +
+          '<span class="cli-amigo-av-ini" style="display:none">' + ini + '</span>'
+        : ini) + '</span>';
+  }
+
+  function _chatPintarTopo() {
+    var nomeEl = document.getElementById('dm-topo-nome');
+    var subEl = document.getElementById('dm-topo-sub');
+    var voltar = document.getElementById('dm-voltar');
+    var barra = document.getElementById('dm-barra');
+    if (voltar) voltar.style.visibility = (_chatCom && _chatVeioDaLista) ? '' : 'hidden';
+    if (barra) barra.hidden = !_chatCom;
+    if (!_chatCom) {
+      if (nomeEl) nomeEl.textContent = 'Conversas';
+      if (subEl) subEl.textContent = 'Só entre amigos';
+      return;
+    }
+    if (nomeEl) nomeEl.textContent = _chatNomeDe(_chatCom);
+    if (subEl) subEl.textContent = '';
+  }
+
+  function _chatRenderLista() {
+    var corpo = document.getElementById('dm-corpo');
+    if (!corpo || _chatCom) return;
+    var eu = _chatEu();
+    var lista = Object.keys(_chatCaixa).map(function (u) { return _chatCaixa[u]; })
+      .sort(function (a, b) { return b.em - a.em; });
+    if (!lista.length) {
+      corpo.innerHTML =
+        '<div class="dm-vazio">' +
+          '<img src="/webp/owl-phone.webp" alt="" class="dm-vazio-owl" onerror="this.style.display=\'none\'" />' +
+          '<p>Nenhuma conversa ainda.</p>' +
+          '<p class="dm-vazio-sub">Abra "Meus amigos" e toque no balão ao lado de um amigo pra mandar a primeira mensagem.</p>' +
+        '</div>';
+      return;
+    }
+    corpo.innerHTML = '<div class="dm-lista">' + lista.map(function (e) {
+      var nome = _chatNomeDe(e.uid);
+      var prefixo = (e.de === eu) ? 'Você: ' : '';
+      return '<button type="button" class="dm-conv' + (e.naoLidas > 0 ? ' nova' : '') + '" ' +
+          'onclick="cliChatAbrirConversa(\'' + escHTML(e.uid) + '\', true)">' +
+          _chatAvatarHtml(e.uid, nome, e.foto || _chatFotoDe(e.uid)) +
+          '<span class="dm-conv-txt">' +
+            '<span class="dm-conv-linha"><span class="dm-conv-nome">' + escHTML(nome) + '</span>' +
+              '<span class="dm-conv-em">' + escHTML(_chatQuando(e.em)) + '</span></span>' +
+            '<span class="dm-conv-linha"><span class="dm-conv-ultima">' + escHTML(prefixo + e.ultima) + '</span>' +
+              (e.naoLidas > 0 ? '<span class="dm-conv-n">' + _chatBadgeHtml(e.naoLidas) + '</span>' : '') + '</span>' +
+          '</span>' +
+        '</button>';
+    }).join('') + '</div>';
+  }
+
+  function _chatRenderConversa() {
+    var corpo = document.getElementById('dm-corpo');
+    if (!corpo || !_chatCom) return;
+    var eu = _chatEu();
+    var msgs = _chatConvDados.msgs || [];
+    var box = document.getElementById('dm-msgs');
+    if (!box) {
+      corpo.innerHTML = '<div class="dm-msgs" id="dm-msgs" aria-live="polite"></div>';
+      box = document.getElementById('dm-msgs');
+    }
+    var pertoDoFim = (box.scrollHeight - box.scrollTop - box.clientHeight) < 80;
+    if (!msgs.length) {
+      box.innerHTML = _chatConvDados.erro
+        ? '<p class="dm-msgs-vazio">Não deu pra carregar a conversa.<br>Confira a conexão e tente de novo.</p>'
+        : '<p class="dm-msgs-vazio">Diga oi pra ' + escHTML(_chatNomeDe(_chatCom)) + '! 👋</p>';
+      return;
+    }
+    // Última mensagem MINHA que ele já viu (lido dele >= em dela).
+    var ultimaMinha = null;
+    for (var i = msgs.length - 1; i >= 0; i--) { if (msgs[i].de === eu) { ultimaMinha = msgs[i]; break; } }
+    var visto = ultimaMinha && _chatConvDados.lidoDele && _chatConvDados.lidoDele >= ultimaMinha.em;
+    var html = '', diaAnterior = '';
+    msgs.forEach(function (m) {
+      var dia = m.em ? _chatDia(m.em) : '';
+      if (dia && dia !== diaAnterior) { html += '<div class="dm-dia">' + escHTML(dia) + '</div>'; diaAnterior = dia; }
+      var minha = m.de === eu;
+      html += '<div class="dm-msg' + (minha ? ' minha' : '') + '">' +
+          '<span class="dm-msg-txt">' + escHTML(m.txt) + '</span>' +
+          '<span class="dm-msg-em">' + (m.em ? _chatHora(m.em) : '') +
+            (minha && m === ultimaMinha ? (visto ? ' · Visto' : ' · Enviada') : '') + '</span>' +
+        '</div>';
+    });
+    box.innerHTML = html;
+    if (pertoDoFim || box.getAttribute('data-primeira') !== '0') {
+      box.scrollTop = box.scrollHeight;
+      box.setAttribute('data-primeira', '0');
+    }
+  }
+
+  function _chatLigarConversa(uid) {
+    _chatSoltarConversa();
+    _chatConvUnsub = window.AngatubaChat.observarConversa(uid, function (dados) {
+      if (_chatCom !== uid) return;
+      _chatConvDados = dados || { msgs: [], lidoDele: 0 };
+      _chatRenderConversa();
+      // Chegou mensagem com a conversa aberta e o app visível: já leu.
+      var ult = _chatConvDados.msgs[_chatConvDados.msgs.length - 1];
+      if (ult && ult.de !== _chatEu() && !document.hidden) window.AngatubaChat.marcarLida(uid);
+    });
+  }
+
+  function _chatMostrarConversa(uid) {
+    _chatCom = uid;
+    _chatPintarTopo();
+    var corpo = document.getElementById('dm-corpo');
+    if (corpo) corpo.innerHTML = '<div class="dm-msgs" id="dm-msgs" aria-live="polite"><p class="dm-msgs-vazio">Carregando…</p></div>';
+    var inp = document.getElementById('dm-input');
+    if (inp) inp.value = _chatRascunhos[uid] || '';
+    _chatLigarConversa(uid);
+    window.AngatubaChat.marcarLida(uid);
+    if (typeof _avisoFecharChave === 'function') _avisoFecharChave('chat:' + uid);
+  }
+
+  function _chatMostrarLista() {
+    _chatGuardarRascunho();
+    _chatSoltarConversa();
+    _chatCom = null;
+    _chatPintarTopo();
+    _chatRenderLista();
+  }
+
+  function _chatGuardarRascunho() {
+    var inp = document.getElementById('dm-input');
+    if (inp && _chatCom) _chatRascunhos[_chatCom] = inp.value;
+  }
+
+  // Abre o overlay. uid = conversa direta (painel de amigos, perfil,
+  // aviso do topo); sem uid = lista de conversas.
+  function cliAbrirChat(uid, nome, foto) {
+    if (!_cliContaReal(_cliUser)) {
+      if (typeof cliAbrirLogin === 'function') cliAbrirLogin('Entre na sua conta pra conversar com seus amigos.');
+      return;
+    }
+    var overlay = _chatEl();
+    if (!overlay) return;
+    if (uid && nome) _chatLembrarPessoa(uid, nome, foto);
+    // O chat é overlay do documento: com o hub em tela cheia nativa ele
+    // ficaria por trás (mesmo cuidado do _perfilPedirLogin).
+    if (typeof _sairTelaCheia === 'function') { try { _sairTelaCheia(); } catch (e) {} }
+    _chatObservarCaixa();
+    var jaAberto = _chatAberto();
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    if (!jaAberto && (!history.state || history.state.modal !== 'chat')) history.pushState({ modal: 'chat' }, '');
+    _chatVeioDaLista = false;
+    if (uid) _chatMostrarConversa(uid);
+    else _chatMostrarLista();
+  }
+
+  // Da lista pra uma conversa: empilha 'chat-conversa' pro "voltar"
+  // descer pra lista.
+  function cliChatAbrirConversa(uid, daLista) {
+    if (!uid) return;
+    _chatVeioDaLista = !!daLista;
+    if (daLista) history.pushState({ modal: 'chat-conversa' }, '');
+    _chatMostrarConversa(uid);
+    _chatPintarTopo();
+  }
+
+  function cliChatVoltar(viaPopstate) {
+    if (_chatCom && _chatVeioDaLista) {
+      _chatVeioDaLista = false;
+      _chatMostrarLista();
+      if (!viaPopstate && history.state && history.state.modal === 'chat-conversa') { _popstateNosso = true; history.back(); }
+      return;
+    }
+    cliFecharChat(viaPopstate);
+  }
+
+  function cliFecharChat(viaPopstate) {
+    var overlay = _chatEl();
+    if (overlay) overlay.classList.remove('open');
+    _chatGuardarRascunho();
+    _chatSoltarConversa();
+    _chatCom = null;
+    _chatVeioDaLista = false;
+    // Painel de conta (ou lobby) por baixo mantém o scroll travado.
+    var conta = document.getElementById('modal-cli-conta');
+    document.body.style.overflow = (conta && conta.classList.contains('open')) ? 'hidden' : '';
+    if (!viaPopstate && history.state) {
+      if (history.state.modal === 'chat-conversa') { _popstateNosso = true; history.go(-2); }
+      else if (history.state.modal === 'chat') { _popstateNosso = true; history.back(); }
+    }
+  }
+
+  // Enviar: limpa o campo na hora e devolve o texto se o banco recusar
+  // (mesmo cuidado do chat do lobby — ninguém perde a frase).
+  function cliChatEnviar() {
+    var inp = document.getElementById('dm-input');
+    if (!inp || !_chatCom || _chatEnviando) return;
+    var txt = inp.value;
+    if (!String(txt || '').trim()) return;
+    var uid = _chatCom;
+    inp.value = '';
+    _chatRascunhos[uid] = '';
+    _chatEnviando = true;
+    window.AngatubaChat.enviar(uid, txt).then(function () {
+      _chatEnviando = false;
+    }).catch(function (err) {
+      _chatEnviando = false;
+      if (_chatCom === uid) {
+        var el = document.getElementById('dm-input');
+        if (el && !el.value) el.value = txt;
+      } else { _chatRascunhos[uid] = txt; }
+      if (typeof showToastSimples === 'function') showToastSimples((err && err.message) || 'Não deu pra enviar agora.', '/webp/owl-sign.webp');
+    });
+    try { inp.focus(); } catch (e) {}
+  }
+  // Enter envia; Shift+Enter quebra a linha.
+  function cliChatTecla(ev) {
+    if (ev && ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); cliChatEnviar(); }
+  }
+
+  // Voltou pro app com uma conversa aberta: marca como lida o que chegou.
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && _chatCom && _chatAberto()) window.AngatubaChat.marcarLida(_chatCom);
+  });
+
+  window.cliAbrirChat = cliAbrirChat;
+  window.cliFecharChat = cliFecharChat;
+  window.cliChatVoltar = cliChatVoltar;
+  window.cliChatAbrirConversa = cliChatAbrirConversa;
+  window.cliChatEnviar = cliChatEnviar;
+  window.cliChatTecla = cliChatTecla;
 
   /* ══════════════════════════════════════════════════════════════
      AVISOS NO TOPO — polimento social P1

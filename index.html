@@ -3856,6 +3856,15 @@
             <i class="fa fa-chevron-right"></i>
           </button>
 
+          <!-- Chat 1x1 (Fase 2): lista de conversas com amigos. O
+               contador (#cli-chat-abrir-n) é pintado por _chatPintarBadges. -->
+          <button type="button" class="cli-amigos-lobby-btn cli-chat-abrir-btn" onclick="cliAbrirChat()">
+            <i class="fa fa-comments"></i>
+            <span>Conversas</span>
+            <span class="cli-chat-abrir-n" id="cli-chat-abrir-n" style="display:none"></span>
+            <i class="fa fa-chevron-right"></i>
+          </button>
+
           <!-- Convites pra jogar (4.4): só aparece quando há algum.
                Quem preenche é a escuta de gameInvites/{uid}, que fica
                viva enquanto a conta estiver logada. -->
@@ -3965,6 +3974,32 @@
       <button class="modal-close lobby-x" onclick="cliFecharLobby()" aria-label="Fechar">✕</button>
       <div class="modal-body">
         <div class="lobby-corpo" id="lobby-corpo"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Chat 1x1 entre amigos (Fase 2) ══
+       Casca só: lista de conversas e conversa aberta são desenhadas por
+       _chatRenderLista/_chatRenderConversa (bloco CHAT 1x1 em app.js).
+       Abre por cima do painel de conta e do perfil do amigo. -->
+  <div class="modal-overlay" id="modal-chat" role="dialog" aria-modal="true" aria-label="Conversas">
+    <div class="modal-sheet">
+      <div class="dm-topo">
+        <button type="button" class="dm-voltar" id="dm-voltar" onclick="cliChatVoltar()" aria-label="Voltar pras conversas" style="visibility:hidden">
+          <i class="fa fa-chevron-left"></i>
+        </button>
+        <div class="dm-topo-txt">
+          <div class="dm-topo-nome" id="dm-topo-nome">Conversas</div>
+          <div class="dm-topo-sub" id="dm-topo-sub"></div>
+        </div>
+        <button type="button" class="modal-close" onclick="cliFecharChat()" aria-label="Fechar">✕</button>
+      </div>
+      <div class="dm-corpo" id="dm-corpo"></div>
+      <div class="dm-barra" id="dm-barra" hidden>
+        <textarea id="dm-input" class="dm-input" rows="1" maxlength="500" placeholder="Mensagem"
+                  autocomplete="off" onkeydown="cliChatTecla(event)"
+                  oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+        <button type="button" class="dm-enviar" onclick="cliChatEnviar()" aria-label="Enviar"><i class="fa fa-paper-plane"></i></button>
       </div>
     </div>
   </div>

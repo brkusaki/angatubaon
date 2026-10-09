@@ -3984,13 +3984,15 @@
        Abre por cima do painel de conta e do perfil do amigo. -->
   <div class="modal-overlay" id="modal-chat" role="dialog" aria-modal="true" aria-label="Conversas">
     <div class="modal-sheet">
-      <div class="dm-topo">
-        <button type="button" class="dm-voltar" id="dm-voltar" onclick="cliChatVoltar()" aria-label="Voltar pras conversas" style="visibility:hidden">
+      <div class="dm-topo" id="dm-topo">
+        <button type="button" class="dm-voltar" id="dm-voltar" onclick="cliChatVoltar()" aria-label="Voltar pras conversas" hidden>
           <i class="fa fa-chevron-left"></i>
         </button>
+        <!-- Chat v2: foto do amigo (só na conversa); status vivo em #dm-topo-sub. -->
+        <span class="dm-topo-av" id="dm-topo-av" hidden></span>
         <div class="dm-topo-txt">
           <div class="dm-topo-nome" id="dm-topo-nome">Conversas</div>
-          <div class="dm-topo-sub" id="dm-topo-sub"></div>
+          <div class="dm-topo-sub" id="dm-topo-sub" aria-live="polite"></div>
         </div>
         <button type="button" class="modal-close" onclick="cliFecharChat()" aria-label="Fechar">✕</button>
       </div>
@@ -3998,8 +4000,12 @@
       <div class="dm-barra" id="dm-barra" hidden>
         <textarea id="dm-input" class="dm-input" rows="1" maxlength="500" placeholder="Mensagem"
                   autocomplete="off" onkeydown="cliChatTecla(event)"
-                  oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
-        <button type="button" class="dm-enviar" onclick="cliChatEnviar()" aria-label="Enviar"><i class="fa fa-paper-plane"></i></button>
+                  oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px';cliChatDigitou()"></textarea>
+        <!-- Chat v2: seta "enviar" desenhada aqui (sem depender da fonte de
+             ícones); desabilitado com o campo vazio (ver _chatAtualizarBotao). -->
+        <button type="button" class="dm-enviar" id="dm-enviar" onclick="cliChatEnviar()" aria-label="Enviar" disabled>
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3.4 20.4 21.85 12.5a.55.55 0 0 0 0-1L3.4 3.6a.55.55 0 0 0-.76.62L4.5 11l9.5 1-9.5 1-1.86 6.78a.55.55 0 0 0 .76.62Z" fill="currentColor"/></svg>
+        </button>
       </div>
     </div>
   </div>

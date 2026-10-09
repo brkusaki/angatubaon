@@ -18872,6 +18872,7 @@ ${urlCard}`)}`;
      Nós (ver database.rules.json):
        chats/{A_B}/msgs/{pushId} = { de, txt, em }   A_B = uids em ordem
        chats/{A_B}/lido/{uid}    = timestamp          "visto" de cada um
+       chats/{A_B}/typing/{uid}  = timestamp          "digitando…" (chat v2)
        chatInbox/{dono}/{outro}  = {
          ultima, de, em, naoLidas, nome, foto?        lista de conversas
        }
@@ -18897,11 +18898,17 @@ ${urlCard}`)}`;
        observarConversa(uid, cb) -> cb({ msgs:[{id,de,txt,em}], lidoDele })
        enviar(uid, texto)     -> Promise
        marcarLida(uid)        -> Promise
+       digitando(uid, bool)   -> grava/apaga o meu "digitando…"
+       observarDigitando(uid, cb) -> cb(true|false) do outro lado
        naoLidasTotal()
   ══════════════════════════════════════════════════════════════ */
   var CHAT_MAX = 500;            // = teto de database.rules.json (txt)
   var CHAT_PREVIA = 80;          // = teto de chatInbox/.../ultima
   var CHAT_JANELA = 50;          // mensagens carregadas por conversa
+  var CHAT_DIG_INTERVALO_MS = 2000; // no máx. 1 gravação de "digitando" a cada 2s
+  var CHAT_DIG_PARADO_MS = 2500;    // sem tecla por 2,5s = parou de digitar
+  var CHAT_DIG_EXPIRA_MS = 6000;    // leitor esconde se não renovar em 6s
+  var _chatDigOnDisc = {};          // cid -> onDisconnect já registrado
   var _chatCaixa = {};           // uid -> entrada da caixa (cache da escuta global)
   var _chatCaixaUnsub = null;
   var _chatCaixaUid = null;
@@ -19021,6 +19028,9 @@ ${urlCard}`)}`;
         var up = {};
         up['chats/' + cid + '/msgs/' + key] = { de: eu, txt: t, em: TS };
         up['chats/' + cid + '/lido/' + eu] = TS;
+        // Enviou = parou de digitar, no mesmo update (o "digitando…" do
+        // outro lado some junto com a mensagem chegando).
+        up['chats/' + cid + '/typing/' + eu] = null;
         var minha = { ultima: previa, de: eu, em: TS, naoLidas: 0, nome: _chatNomeDe(uid) };
         var fotoDele = _chatFotoDe(uid);
         if (fotoDele) minha.foto = fotoDele;
@@ -19050,6 +19060,53 @@ ${urlCard}`)}`;
         if (_chatCaixa[uid] && _chatCaixa[uid].naoLidas > 0) up['chatInbox/' + eu + '/' + uid + '/naoLidas'] = 0;
         return db.ref().update(up);
       }).catch(function () {});
+    },
+
+    /* "digitando…" (chat v2). Quem chama controla a frequência (no máx.
+       1 gravação a cada CHAT_DIG_INTERVALO_MS enquanto digita — ver
+       cliChatDigitou); aqui é só gravar/apagar. O onDisconnect é
+       registrado uma vez por conversa: fechou o app no meio da frase,
+       o servidor apaga sozinho. */
+    digitando: function (uid, ligado) {
+      var eu = _chatEu();
+      if (!eu || !uid) return;
+      var db = _chatDb();
+      if (!db) return;
+      var cid = _chatId(eu, uid);
+      var ref = db.ref('chats/' + cid + '/typing/' + eu);
+      try {
+        if (ligado) {
+          if (!_chatDigOnDisc[cid]) { _chatDigOnDisc[cid] = true; ref.onDisconnect().remove(); }
+          ref.set(firebase.database.ServerValue.TIMESTAMP).catch(function () {});
+        } else {
+          ref.remove().catch(function () {});
+        }
+      } catch (e) {}
+    },
+    // cb(true) quando o outro grava (cada gravação renova), cb(false) quando
+    // apaga — ou sozinho, CHAT_DIG_EXPIRA_MS depois da última renovação
+    // (rede caiu do lado de lá sem o remove chegar). Sem comparar relógio.
+    observarDigitando: function (uid, cb) {
+      var eu = _chatEu();
+      if (!eu || !uid || typeof cb !== 'function') return function () {};
+      var parado = false, off = function () {}, timer = null;
+      var avisar = function (v) { try { cb(v); } catch (e) {} };
+      _carregarFirebaseDb().then(function () {
+        if (parado) return;
+        var db = _chatDb();
+        if (!db) return;
+        var ref = db.ref('chats/' + _chatId(eu, uid) + '/typing/' + uid);
+        var h = function (snap) {
+          clearTimeout(timer);
+          if (snap.val()) {
+            avisar(true);
+            timer = setTimeout(function () { avisar(false); }, CHAT_DIG_EXPIRA_MS);
+          } else avisar(false);
+        };
+        ref.on('value', h, function () {});
+        off = function () { clearTimeout(timer); try { ref.off('value', h); } catch (e) {} };
+      }).catch(function () {});
+      return function () { parado = true; off(); };
     },
 
     naoLidasTotal: function () {
@@ -19157,9 +19214,103 @@ ${urlCard}`)}`;
   function _chatEl() { return document.getElementById('modal-chat'); }
   function _chatAberto() { var o = _chatEl(); return !!(o && o.classList.contains('open')); }
 
+  // Chat v2 — cabeçalho vivo (presença + "digitando…") e o meu digitando.
+  var _chatPresUnsub = null;     // escuta da presença do amigo da conversa
+  var _chatPres = null;          // último nó de presença dele
+  var _chatDigOutroUnsub = null; // escuta do "digitando" dele
+  var _chatDigOutro = false;
+  var _chatDigCom = null;        // conversa onde EU marquei "digitando"
+  var _chatDigUltima = 0;        // quando gravei pela última vez
+  var _chatDigTimer = null;      // "parou de digitar"
+
+  function _chatPararDigitando() {
+    clearTimeout(_chatDigTimer); _chatDigTimer = null;
+    if (_chatDigCom) { window.AngatubaChat.digitando(_chatDigCom, false); _chatDigCom = null; }
+    _chatDigUltima = 0;
+  }
+
+  // oninput do campo: liga/desliga o botão de enviar e cuida do
+  // "digitando…" com freio — grava no máx. 1x a cada 2s enquanto a
+  // pessoa digita e apaga 2,5s depois da última tecla (ou ao enviar).
+  function cliChatDigitou() {
+    _chatAtualizarBotao();
+    var inp = document.getElementById('dm-input');
+    if (!inp || !_chatCom) return;
+    if (!inp.value.trim()) { _chatPararDigitando(); return; }
+    var agora = Date.now();
+    if (_chatDigCom !== _chatCom || agora - _chatDigUltima >= CHAT_DIG_INTERVALO_MS) {
+      if (_chatDigCom && _chatDigCom !== _chatCom) _chatPararDigitando();
+      _chatDigCom = _chatCom;
+      _chatDigUltima = agora;
+      window.AngatubaChat.digitando(_chatCom, true);
+    }
+    clearTimeout(_chatDigTimer);
+    _chatDigTimer = setTimeout(_chatPararDigitando, CHAT_DIG_PARADO_MS);
+  }
+
+  function _chatAtualizarBotao() {
+    var inp = document.getElementById('dm-input');
+    var btn = document.getElementById('dm-enviar');
+    if (btn) btn.disabled = !(inp && inp.value.trim());
+  }
+
+  // "hoje às 14:32" / "ontem às 09:10" / "07/10 às 22:05"
+  function _chatVistoPorUltimo(em) {
+    if (!em) return '';
+    var dia = _chatDia(em);
+    var d = dia === 'Hoje' ? 'hoje' : (dia === 'Ontem' ? 'ontem' : dia);
+    return 'Visto por último ' + d + ' às ' + _chatHora(em);
+  }
+
+  // Linha de baixo do cabeçalho: digitando > presença (mesmo rótulo da
+  // lista de amigos, ver AngatubaPresenca.rotulo) > visto por último.
+  function _chatPintarStatus() {
+    var subEl = document.getElementById('dm-topo-sub');
+    if (!subEl || !_chatCom) return;
+    var txt = '', cls = '';
+    if (_chatDigOutro) { txt = 'digitando…'; cls = 'digitando'; }
+    else if (_chatPres && window.AngatubaPresenca && typeof window.AngatubaPresenca.rotulo === 'function') {
+      var r = window.AngatubaPresenca.rotulo(_chatPres);
+      if (r.estado === 'offline') txt = _chatVistoPorUltimo(_chatPres.atualizadoEm) || 'Offline';
+      else { txt = r.texto; cls = r.estado; }
+    }
+    subEl.textContent = txt;
+    subEl.className = 'dm-topo-sub' + (cls ? ' ' + cls : '');
+  }
+
+  function _chatLigarCabecalho(uid) {
+    _chatSoltarCabecalho();
+    if (window.AngatubaPresenca && typeof window.AngatubaPresenca.observar === 'function') {
+      _chatPresUnsub = window.AngatubaPresenca.observar(uid, function (p) {
+        if (_chatCom !== uid) return;
+        _chatPres = p || null;
+        // Nome vivo (renomeou depois de virar amigo) — igual à lista de amigos.
+        if (p && p.nome) {
+          _chatLembrarPessoa(uid, p.nome);
+          var nomeEl = document.getElementById('dm-topo-nome');
+          if (nomeEl) nomeEl.textContent = _chatNomeDe(uid);
+        }
+        _chatPintarStatus();
+      });
+    }
+    _chatDigOutroUnsub = window.AngatubaChat.observarDigitando(uid, function (sim) {
+      if (_chatCom !== uid) return;
+      _chatDigOutro = !!sim;
+      _chatPintarStatus();
+    });
+  }
+  function _chatSoltarCabecalho() {
+    if (_chatPresUnsub) { try { _chatPresUnsub(); } catch (e) {} _chatPresUnsub = null; }
+    if (_chatDigOutroUnsub) { try { _chatDigOutroUnsub(); } catch (e) {} _chatDigOutroUnsub = null; }
+    _chatPres = null;
+    _chatDigOutro = false;
+  }
+
   function _chatSoltarConversa() {
     if (_chatConvUnsub) { try { _chatConvUnsub(); } catch (e) {} _chatConvUnsub = null; }
     _chatConvDados = { msgs: [], lidoDele: 0 };
+    _chatSoltarCabecalho();
+    _chatPararDigitando();
   }
 
   function _chatHora(em) {
@@ -19197,15 +19348,22 @@ ${urlCard}`)}`;
     var subEl = document.getElementById('dm-topo-sub');
     var voltar = document.getElementById('dm-voltar');
     var barra = document.getElementById('dm-barra');
-    if (voltar) voltar.style.visibility = (_chatCom && _chatVeioDaLista) ? '' : 'hidden';
+    var av = document.getElementById('dm-topo-av');
+    var topo = document.getElementById('dm-topo');
+    // Lista: o botão de voltar some (e não ocupa espaço). Conversa aberta
+    // direto (amigo/perfil/aviso): ele também some, o X fecha.
+    if (voltar) voltar.hidden = !(_chatCom && _chatVeioDaLista);
     if (barra) barra.hidden = !_chatCom;
+    if (topo) topo.classList.toggle('conversa', !!_chatCom);
     if (!_chatCom) {
+      if (av) { av.hidden = true; av.innerHTML = ''; }
       if (nomeEl) nomeEl.textContent = 'Conversas';
-      if (subEl) subEl.textContent = 'Só entre amigos';
+      if (subEl) { subEl.textContent = 'Só entre amigos'; subEl.className = 'dm-topo-sub'; }
       return;
     }
+    if (av) { av.innerHTML = _chatAvatarHtml(_chatCom, _chatNomeDe(_chatCom), _chatFotoDe(_chatCom)); av.hidden = false; }
     if (nomeEl) nomeEl.textContent = _chatNomeDe(_chatCom);
-    if (subEl) subEl.textContent = '';
+    _chatPintarStatus();
   }
 
   function _chatRenderLista() {
@@ -19256,10 +19414,9 @@ ${urlCard}`)}`;
         : '<p class="dm-msgs-vazio">Diga oi pra ' + escHTML(_chatNomeDe(_chatCom)) + '! 👋</p>';
       return;
     }
-    // Última mensagem MINHA que ele já viu (lido dele >= em dela).
-    var ultimaMinha = null;
-    for (var i = msgs.length - 1; i >= 0; i--) { if (msgs[i].de === eu) { ultimaMinha = msgs[i]; break; } }
-    var visto = ultimaMinha && _chatConvDados.lidoDele && _chatConvDados.lidoDele >= ultimaMinha.em;
+    // Chat v2: tique em TODA mensagem minha, estilo WhatsApp — um tique
+    // cinza = enviada; dois azuis = ele já viu (lido dele >= em dela).
+    var lidoDele = _chatConvDados.lidoDele || 0;
     var html = '', diaAnterior = '';
     msgs.forEach(function (m) {
       var dia = m.em ? _chatDia(m.em) : '';
@@ -19268,7 +19425,7 @@ ${urlCard}`)}`;
       html += '<div class="dm-msg' + (minha ? ' minha' : '') + '">' +
           '<span class="dm-msg-txt">' + escHTML(m.txt) + '</span>' +
           '<span class="dm-msg-em">' + (m.em ? _chatHora(m.em) : '') +
-            (minha && m === ultimaMinha ? (visto ? ' · Visto' : ' · Enviada') : '') + '</span>' +
+            (minha ? _chatTiqueHtml(!!(lidoDele && m.em && lidoDele >= m.em)) : '') + '</span>' +
         '</div>';
     });
     box.innerHTML = html;
@@ -19276,6 +19433,12 @@ ${urlCard}`)}`;
       box.scrollTop = box.scrollHeight;
       box.setAttribute('data-primeira', '0');
     }
+  }
+
+  function _chatTiqueHtml(visto) {
+    return visto
+      ? '<svg class="dm-tique visto" viewBox="0 0 18 11" width="17" height="11" role="img" aria-label="Visto"><path d="M1 6l3.2 3.2L11 2.2M6.8 8.4l.9.8L14.5 2.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      : '<svg class="dm-tique" viewBox="0 0 18 11" width="17" height="11" role="img" aria-label="Enviada"><path d="M3.5 6l3.2 3.2L13.5 2.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
   function _chatLigarConversa(uid) {
@@ -19291,12 +19454,16 @@ ${urlCard}`)}`;
   }
 
   function _chatMostrarConversa(uid) {
+    if (_chatCom && _chatCom !== uid) _chatPararDigitando();
     _chatCom = uid;
     _chatPintarTopo();
     var corpo = document.getElementById('dm-corpo');
     if (corpo) corpo.innerHTML = '<div class="dm-msgs" id="dm-msgs" aria-live="polite"><p class="dm-msgs-vazio">Carregando…</p></div>';
     var inp = document.getElementById('dm-input');
-    if (inp) inp.value = _chatRascunhos[uid] || '';
+    if (inp) { inp.value = _chatRascunhos[uid] || ''; inp.style.height = ''; }
+    _chatAtualizarBotao();
+    _chatLigarCabecalho(uid);
+    _chatPintarStatus();
     _chatLigarConversa(uid);
     window.AngatubaChat.marcarLida(uid);
     if (typeof _avisoFecharChave === 'function') _avisoFecharChave('chat:' + uid);
@@ -19383,7 +19550,12 @@ ${urlCard}`)}`;
     if (!String(txt || '').trim()) return;
     var uid = _chatCom;
     inp.value = '';
+    inp.style.height = '';
     _chatRascunhos[uid] = '';
+    // O update do envio já apaga o meu "digitando" no banco; aqui só
+    // desarma os timers locais (sem gravar de novo).
+    clearTimeout(_chatDigTimer); _chatDigTimer = null; _chatDigCom = null; _chatDigUltima = 0;
+    _chatAtualizarBotao();
     _chatEnviando = true;
     window.AngatubaChat.enviar(uid, txt).then(function () {
       _chatEnviando = false;
@@ -19392,6 +19564,7 @@ ${urlCard}`)}`;
       if (_chatCom === uid) {
         var el = document.getElementById('dm-input');
         if (el && !el.value) el.value = txt;
+        _chatAtualizarBotao();
       } else { _chatRascunhos[uid] = txt; }
       if (typeof showToastSimples === 'function') showToastSimples((err && err.message) || 'Não deu pra enviar agora.', '/webp/owl-sign.webp');
     });
@@ -19404,7 +19577,8 @@ ${urlCard}`)}`;
 
   // Voltou pro app com uma conversa aberta: marca como lida o que chegou.
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && _chatCom && _chatAberto()) window.AngatubaChat.marcarLida(_chatCom);
+    if (document.hidden) { _chatPararDigitando(); return; }   // saiu do app = parou de digitar
+    if (_chatCom && _chatAberto()) window.AngatubaChat.marcarLida(_chatCom);
   });
 
   window.cliAbrirChat = cliAbrirChat;
@@ -19413,6 +19587,7 @@ ${urlCard}`)}`;
   window.cliChatAbrirConversa = cliChatAbrirConversa;
   window.cliChatEnviar = cliChatEnviar;
   window.cliChatTecla = cliChatTecla;
+  window.cliChatDigitou = cliChatDigitou;
 
   /* ══════════════════════════════════════════════════════════════
      AVISOS NO TOPO — polimento social P1

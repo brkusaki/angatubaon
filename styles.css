@@ -9029,12 +9029,26 @@ body.aprender-fs-open .apr-tela-licao {
   font-size: 13px; -webkit-tap-highlight-color: transparent;
 }
 .dm-voltar:active { opacity: 0.6; }
+.dm-voltar[hidden], .dm-topo-av[hidden] { display: none; }
+/* Chat v2 — foto do amigo no cabeçalho (só na conversa). */
+.dm-topo-av { flex-shrink: 0; display: flex; }
+.dm-topo-av .dm-av { width: 40px; height: 40px; font-size: 15px; }
+.dm-topo.conversa { padding-top: calc(8px + env(safe-area-inset-top)); padding-bottom: 8px; }
+.dm-topo.conversa .dm-topo-nome { font-size: 1rem; }
 .dm-topo-txt { flex: 1; min-width: 0; }
 .dm-topo-nome {
   font-family: var(--font-h); font-weight: 800; font-size: 1.05rem; letter-spacing: -0.01em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.dm-topo-sub { font-size: 12px; color: var(--muted); }
+.dm-topo-sub {
+  font-size: 12px; color: var(--muted); line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Status vivo (presença) e "digitando…" — mesmas cores da lista de amigos. */
+.dm-topo-sub.online { color: #22c55e; }
+.dm-topo-sub.jogando { color: #c084fc; }
+.dm-topo-sub.ausente { color: #f59e0b; }
+.dm-topo-sub.digitando { color: #22c55e; font-style: italic; }
 .dm-topo-sub:empty { display: none; }
 .dm-corpo { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 
@@ -9099,7 +9113,14 @@ body.aprender-fs-open .apr-tela-licao {
   font-size: 14px; line-height: 1.4; color: var(--text);
   white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word;
 }
-.dm-msg-em { align-self: flex-end; font-size: 10.5px; color: var(--muted); }
+.dm-msg-em {
+  align-self: flex-end; display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; line-height: 1; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+/* Chat v2 — tiques estilo WhatsApp: cinza = enviada, azul = visto. */
+.dm-tique { flex-shrink: 0; color: var(--muted); }
+.dm-tique.visto { color: #53bdeb; }
+body.light-mode .dm-tique.visto { color: #0284c7; }
 
 .dm-barra {
   flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px;
@@ -9117,9 +9138,16 @@ body.aprender-fs-open .apr-tela-licao {
 .dm-input::placeholder { color: var(--muted); }
 .dm-input:focus { outline: none; border-color: rgba(34,197,94,0.5); }
 .dm-enviar {
-  width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; cursor: pointer;
+  width: 46px; height: 46px; flex-shrink: 0; border-radius: 50%; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  background: #22c55e; color: #fff; border: none; font-size: 16px;
+  background: #00a884; color: #fff; border: none; padding: 0 0 0 3px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  transition: background 0.15s, transform 0.1s, opacity 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
-.dm-enviar:active { opacity: 0.7; }
+.dm-enviar:active:not(:disabled) { transform: scale(0.92); }
+/* Campo vazio: cinza e sem toque — mas no mesmo lugar, sem pular layout. */
+.dm-enviar:disabled {
+  background: var(--surface2); color: var(--muted); box-shadow: none; cursor: default;
+  border: 1px solid var(--border);
+}

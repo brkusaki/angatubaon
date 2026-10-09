@@ -332,6 +332,10 @@
     hub.style.display = 'block';
     document.body.classList.add('biblioteca-fs-open');
     _bibMostrarTela('catalogo');
+    // Presença rica: amigos veem "Na Biblioteca" (ver AngatubaPresenca em app.js).
+    if (window.AngatubaPresenca && typeof window.AngatubaPresenca.atividade === 'function') {
+      window.AngatubaPresenca.atividade('biblioteca', null, 'Na Biblioteca');
+    }
     if (history.state?.modal !== 'biblioteca-hub') history.pushState({ modal: 'biblioteca-hub' }, '');
   }
   window._abrirBiblioteca = _abrirBiblioteca;
@@ -344,6 +348,9 @@
     hub.style.display = 'none';
     document.body.classList.remove('biblioteca-fs-open');
     _bibTela = 'catalogo';
+    if (window.AngatubaPresenca && typeof window.AngatubaPresenca.limparAtividade === 'function') {
+      window.AngatubaPresenca.limparAtividade('biblioteca');
+    }
     if (!viaPopstate && history.state?.modal === 'biblioteca-hub') { _popstateNosso = true; history.back(); }
   }
   window._fecharBiblioteca = _fecharBiblioteca;

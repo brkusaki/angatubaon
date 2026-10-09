@@ -2290,6 +2290,7 @@
 
   function _tqMostrarFim(motivo) {
     if (_tqRAF) { cancelAnimationFrame(_tqRAF); _tqRAF = 0; }
+    var jaNoFim = (_tqEstado === 'fim'); // reentrada (estado repetido da rede): não conta 2x
     _tqMostrarTela('fim');
     var titulo = document.getElementById('tq-fim-titulo');
     var msg = document.getElementById('tq-fim-msg');
@@ -2322,6 +2323,12 @@
     }
     if (btnVoltar) { btnVoltar.className = 'tq-link'; btnVoltar.textContent = 'Voltar ao menu'; }
     var venceu = meu > dele;
+    // Histórico de partidas do perfil (ver historicoRegistrar em hub.js).
+    // Desconexão (acima) não entra: a partida não teve resultado.
+    var hb = _tqBridge();
+    if (!jaNoFim && hb && typeof hb.historicoRegistrar === 'function') {
+      hb.historicoRegistrar('tanques', { resultado: venceu ? 'vitoria' : (meu === dele ? 'empate' : 'derrota'), score: meu, placar: meu + ' x ' + dele });
+    }
     if (titulo) titulo.textContent = venceu ? 'Você venceu! 🏆' : 'Não foi dessa vez';
     if (msg) msg.textContent = venceu ? 'Mandou bem contra ' + (_tqApelidoAdversario || 'seu adversário') + '!'
                                        : (_tqApelidoAdversario || 'Seu adversário') + ' levou essa.';

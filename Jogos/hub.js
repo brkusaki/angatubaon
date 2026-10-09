@@ -810,6 +810,10 @@
     // em paralelo assim que o hub abre, bem antes de terminar uma partida
     // ou entrar numa sala. Ver _carregarFirebaseJogos.
     if (typeof _carregarFirebaseJogos === 'function') _carregarFirebaseJogos().catch(function () {});
+    // Remote Config (app.js): banner de evento, Corujinha e multiplicador
+    // de moedas. Aplica o cache na hora e busca no Firebase em segundo
+    // plano (no máx. 1x/h) — nunca trava a abertura do hub.
+    if (window.AngatubaConfig && typeof window.AngatubaConfig.atualizar === 'function') window.AngatubaConfig.atualizar();
     // Fix A1.18/A1.20: se o hub fechou antes suspendeu o áudio (ver
     // _fecharGamesHub) — reabrir é, ele mesmo, um gesto do usuário, então dá
     // pra acordar o contexto na hora (cobre 'suspended' e o 'interrupted' do
@@ -943,7 +947,34 @@
 
   // Para todos os jogos externos que possam estar rodando. Cada módulo
   // só existe depois de carregado sob demanda; por isso o guard typeof.
+  /* ── Presença rica (Fase 1, item 4) ───────────────────────────
+     Nome legível de cada jogo do menu, pro "Jogando <nome>" que os
+     amigos veem (AngatubaPresenca em app.js) e pro histórico de
+     partidas do perfil (jogos sem RANK_INFO: Ping Pong, Tanques...).
+     Chaves = os mesmos ids de _abrirJogo(). */
+  var JOGO_NOMES = {
+    quiz: 'Quiz da Coruja', speedtap: 'Pega a Coruja', sequencia: 'Sequência da Coruja',
+    voo: 'Voo da Coruja', corrida: 'Corrida da Coruja', piano: 'Piano da Coruja',
+    blocos: 'Blocos da Coruja', doces: 'Doces da Coruja', '2048': '2048 da Coruja',
+    armadilha: 'Armadilha da Coruja', pingpong: 'Ping Pong da Coruja',
+    tanques: 'Batalha de Tanques', hoquei: 'Hóquei da Coruja', party: 'Coruja Party',
+    negocios: 'Negócios da Cidade', baralho: 'Baralho', corujinha: 'Corujinha'
+  };
+  var JOGO_ICOS = { pingpong: '🏓', tanques: '💥', hoquei: '🏒' };
+
+  // nome = id do jogo aberto, ou null pra limpar. Só mexe na atividade
+  // de origem 'jogo' — não apaga um "Na Biblioteca" de outra origem.
+  function _presencaJogo(nome) {
+    var P = window.AngatubaPresenca;
+    if (!P || typeof P.atividade !== 'function') return;
+    if (nome) P.atividade('jogo', nome, 'Jogando ' + (JOGO_NOMES[nome] || 'na Coruja'));
+    else P.limparAtividade('jogo');
+  }
+
   function _pararJogosExternos() {
+    // Toda saída de jogo passa por aqui (voltar ao menu, fechar o hub,
+    // abrir perfil/ranking/loja) — é o ponto único pra tirar o "Jogando".
+    _presencaJogo(null);
     if (window.SpeedTapGame  && typeof window.SpeedTapGame.parar  === 'function') window.SpeedTapGame.parar();
     if (window.SequenciaGame && typeof window.SequenciaGame.parar === 'function') window.SequenciaGame.parar();
     if (window.VooGame       && typeof window.VooGame.parar       === 'function') window.VooGame.parar();
@@ -1038,7 +1069,8 @@
         ? _gamesFavIs(jogoId)
         : (_gamesCatAtual === 'todos' || cat === _gamesCatAtual);
       var passaBusca = !termo || nome.indexOf(termo) !== -1 || desc.indexOf(termo) !== -1;
-      var mostra = passaCat && passaBusca;
+      // .rc-oculto: jogo desligado pelo Remote Config (ver _rcAplicar em app.js).
+      var mostra = passaCat && passaBusca && !c.classList.contains('rc-oculto');
       c.style.display = mostra ? '' : 'none';
       if (mostra) visiveis++;
     });
@@ -1513,6 +1545,8 @@
       }).catch(function () {});
     }
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
+    // Presença rica: amigos passam a ver "Jogando <nome>".
+    _presencaJogo(nome);
     // Fix A1.15: empilha uma entrada própria pro jogo — sem isto, o botão
     // "voltar" do Android saía do hub inteiro em vez de só fechar o jogo
     // (ver ramo "jogo-ativo" no handler de popstate, mais abaixo).
@@ -2584,6 +2618,9 @@
   var LOJA_KEY_INVENTARIO = 'angatuba_inventario';
   var LOJA_KEY_EQUIPADO   = 'angatuba_equipado';
   var LOJA_KEY_STATS      = 'angatuba_stats_jogos';
+  // Histórico das últimas partidas (Fase 1, item 2) — ver bloco
+  // "HISTÓRICO DE PARTIDAS" logo depois de _statsRegistrarPartida.
+  var HIST_KEY            = 'angatuba_historico_jogos';
 
   /* ── Teto diário de GANHO de moedas ────────────────────────────
      Economia local por decisão (moedas/inventário NÃO vão pro
@@ -2625,7 +2662,8 @@
       if (dono === uid) return true;
       if (dono) {
         var chaves = [LOJA_KEY_MOEDAS, LOJA_KEY_INVENTARIO, LOJA_KEY_EQUIPADO, LOJA_KEY_STATS,
-                      TITULOS_KEY_DESBLOQUEADOS, TITULOS_KEY_EQUIPADOS, 'angatuba_streak'];
+                      TITULOS_KEY_DESBLOQUEADOS, TITULOS_KEY_EQUIPADOS, 'angatuba_streak',
+                      HIST_KEY];
         Object.keys(RANK_REC_LOCAL).forEach(function (k) { chaves.push(RANK_REC_LOCAL[k]); });
         var pacote = {};
         chaves.forEach(function (c) { var v = localStorage.getItem(c); if (v !== null) pacote[c] = v; });
@@ -2827,9 +2865,19 @@
   // Ganhos (qtd > 0) respeitam TETO_DIARIO_MOEDAS (ver comentário no topo do bloco).
   function _moedasAdd(qtd, motivo) {
     qtd = Math.floor(Number(qtd) || 0);
+    var bonusEvento = 0;
     if (qtd > 0 && !TETO_MOTIVOS_ISENTOS[motivo]) {
+      // Evento de moedas (Remote Config, moedas_multiplicador — ver
+      // AngatubaConfig em app.js): multiplica o GANHO de partida na hora
+      // de creditar; o teto do dia acompanha o multiplicador pra o evento
+      // valer de verdade. Nada muda no armazenamento (continua 100% local),
+      // e prêmio da Corujinha / resgate diário (isentos) ficam de fora.
+      var C = window.AngatubaConfig;
+      var mult = (C && typeof C.multiplicadorMoedas === 'function') ? C.multiplicadorMoedas() : 1;
+      var base = qtd;
+      if (mult > 1) qtd = Math.floor(qtd * mult);
       var dia = _ganhoDiaLer();
-      var efetivo = Math.min(qtd, TETO_DIARIO_MOEDAS - dia.ganho);
+      var efetivo = Math.min(qtd, Math.floor(TETO_DIARIO_MOEDAS * mult) - dia.ganho);
       if (efetivo <= 0) {
         if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[loja] teto diário atingido — +' + qtd + ' (' + (motivo || '?') + ') não creditado');
         return _moedasLer();
@@ -2837,12 +2885,18 @@
       dia.ganho += efetivo;
       _ganhoDiaSalvar(dia);
       qtd = efetivo;
+      bonusEvento = Math.max(0, efetivo - base);
     }
     var novo = Math.max(0, _moedasLer() + qtd);
     if (qtd !== 0) {
       _moedasSalvar(novo);
       _lojaAtualizarSaldoUI();
       if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[loja] moedas +' + qtd + ' (' + (motivo || '?') + ') → ' + novo);
+    }
+    // A tela de fim de cada jogo mostra o ganho BASE (calculado lá); o
+    // extra do evento aparece aqui, sem precisar mexer em cada jogo.
+    if (bonusEvento > 0 && typeof showToastSimples === 'function') {
+      showToastSimples('Bônus do evento: +' + bonusEvento + ' 🪙', '/webp/owl-tada.webp');
     }
     return novo;
   }
@@ -3018,11 +3072,155 @@
     s.partidas = (s.partidas || 0) + 1;
     s.segundos = (s.segundos || 0) + Math.max(0, Math.round(Number(dados.segundos) || 0));
     var score = Number(dados.score);
-    if (!isNaN(score) && score > (s.recorde || 0)) s.recorde = score;
+    var bateuRecorde = !isNaN(score) && score > (s.recorde || 0);
+    if (bateuRecorde) s.recorde = score;
     todos[jogoKey] = s;
     _statsSalvar(todos);
+    // Histórico das últimas partidas: os jogos solo não têm vitória/
+    // derrota, então o "resultado" marca só o recorde batido.
+    _histRegistrar(jogoKey, {
+      resultado: dados.resultado || (bateuRecorde ? 'recorde' : ''),
+      score: score,
+      segundos: dados.segundos
+    }, true);
     // Reflete as stats atualizadas no perfil público (Camada 3).
     if (typeof _perfilPublicoSyncDebounced === 'function') _perfilPublicoSyncDebounced();
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     HISTÓRICO DE PARTIDAS (Fase 1, item 2)
+     Lista leve das últimas HIST_MAX partidas, de TODOS os jogos juntos
+     (mais nova primeiro), em angatuba_historico_jogos. Mesmo esquema
+     das stats: vive no localStorage (é progresso desta conta neste
+     aparelho — entra no pacote de _progressoGarantirDono) e é
+     publicada em perfis/{uid}.historico pelo _perfilPublicoSync.
+     Por que uma lista única e não "N por jogo": é o que o perfil mostra
+     ("Últimas partidas"), cabe num array curto com tamanho FIXO no doc
+     (as regras validam item a item até 15 — teto escolhido pelo limite
+     de 1.000 expressões por request das regras) e não cresce com o
+     número de jogos do hub.
+     Cada item: { jogo, resultado, score, segundos, em, placar? }
+       resultado: 'vitoria' | 'derrota' | 'empate' | 'recorde' | ''
+       em: Date.now() do fim da partida (ms)
+     Entradas:
+       · _statsRegistrarPartida (jogos solo com stats) — automático;
+       · AngatubaGames.historicoRegistrar (jogos 1x1: Ping Pong,
+         Tanques, Hóquei) — que não têm stats, mas têm vencedor.
+  ══════════════════════════════════════════════════════════════ */
+  var HIST_MAX = 15;            // = teto de firestore.rules (historicoValido)
+  var HIST_RESULTADOS = { vitoria: 1, derrota: 1, empate: 1, recorde: 1 };
+
+  // Normaliza um item (do localStorage OU do Firestore de outra pessoa):
+  // devolve null se não serve. Mesmos tetos de historicoItemValido.
+  function _histNormalizar(h) {
+    if (!h || typeof h !== 'object') return null;
+    var jogo = String(h.jogo || '').slice(0, 20);
+    if (!/^[a-z0-9_]+$/.test(jogo)) return null;
+    var em = Math.round(Number(h.em) || 0);
+    if (!(em > 0)) return null;
+    var out = {
+      jogo: jogo,
+      resultado: HIST_RESULTADOS[h.resultado] ? h.resultado : '',
+      score: Math.max(0, Math.min(1000000, Math.round(Number(h.score) || 0))),
+      segundos: Math.max(0, Math.min(86400, Math.round(Number(h.segundos) || 0))),
+      em: em
+    };
+    var placar = String(h.placar || '').slice(0, 12);
+    if (placar) out.placar = placar;
+    return out;
+  }
+  function _histLer() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+      if (!Array.isArray(arr)) return [];
+      return arr.map(_histNormalizar).filter(Boolean).slice(0, HIST_MAX);
+    } catch (e) { return []; }
+  }
+  function _histSalvar(arr) {
+    try { localStorage.setItem(HIST_KEY, JSON.stringify(arr.slice(0, HIST_MAX))); } catch (e) {}
+  }
+  // semSync: _statsRegistrarPartida já dispara o sync do perfil logo depois.
+  function _histRegistrar(jogoKey, dados, semSync) {
+    dados = dados || {};
+    var item = _histNormalizar({
+      jogo: jogoKey, resultado: dados.resultado, score: dados.score,
+      segundos: dados.segundos, placar: dados.placar, em: Date.now()
+    });
+    if (!item) return false;
+    var arr = _histLer();
+    arr.unshift(item);
+    _histSalvar(arr);
+    if (!semSync && typeof _perfilPublicoSyncDebounced === 'function') _perfilPublicoSyncDebounced();
+    return true;
+  }
+  // Junta dois históricos (local + o publicado por OUTRO aparelho da
+  // mesma conta): sem repetir a mesma partida, mais nova primeiro.
+  function _histMesclar(a, b) {
+    var vistos = {}, out = [];
+    (a || []).concat(b || []).forEach(function (h) {
+      var n = _histNormalizar(h);
+      if (!n) return;
+      var chave = n.jogo + '|' + n.em;
+      if (vistos[chave]) return;
+      vistos[chave] = true;
+      out.push(n);
+    });
+    out.sort(function (x, y) { return y.em - x.em; });
+    return out.slice(0, HIST_MAX);
+  }
+
+  // "há 5 min", "há 3 h", "ontem", "12/10" — data relativa curta.
+  function _histQuando(em) {
+    var dif = Math.max(0, Date.now() - em);
+    var min = Math.floor(dif / 60000);
+    if (min < 1) return 'agora';
+    if (min < 60) return 'há ' + min + ' min';
+    var h = Math.floor(min / 60);
+    if (h < 24) return 'há ' + h + ' h';
+    var d = new Date(em), hoje = new Date();
+    var ontem = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1);
+    if (d.getFullYear() === ontem.getFullYear() && d.getMonth() === ontem.getMonth() && d.getDate() === ontem.getDate()) return 'ontem';
+    return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
+  }
+  // Valor da partida na unidade de cada jogo (fase, metros, pontos).
+  function _histValor(h) {
+    if (h.placar) return h.placar;
+    if (h.jogo === 'blocos' || h.jogo === 'doces') return 'Fase ' + h.score;
+    if (h.jogo === 'corrida') return h.score + ' m';
+    return h.score + ' pts';
+  }
+  var HIST_RES_ROTULO = { vitoria: 'Vitória', derrota: 'Derrota', empate: 'Empate', recorde: 'Recorde' };
+
+  // Seção "Últimas partidas" do perfil (próprio ou público). Mostra 6 e
+  // o resto atrás de um "Ver todas" (só CSS: a classe abre a lista).
+  // '' quando não há partida nenhuma — a seção "Jogos" já tem o vazio.
+  function _histHtml(lista) {
+    lista = (lista || []).map(_histNormalizar).filter(Boolean).slice(0, HIST_MAX);
+    if (!lista.length) return '';
+    var VISIVEIS = 6;
+    var html = '';
+    lista.forEach(function (h, i) {
+      var res = h.resultado ? '<span class="perfil-hist-res perfil-hist-res-' + h.resultado + '">' + HIST_RES_ROTULO[h.resultado] + '</span>' : '';
+      var tempo = h.segundos ? ' · ' + _perfilFormatarTempo(h.segundos) : '';
+      html += '<div class="perfil-stat-row perfil-hist-row' + (i >= VISIVEIS ? ' perfil-hist-extra' : '') + '">' +
+                '<span class="perfil-stat-ico" aria-hidden="true">' + _perfilIcoJogo(h.jogo) + '</span>' +
+                '<span class="perfil-hist-txt">' +
+                  '<span class="perfil-stat-nome">' + _rankEsc(_perfilLabelJogo(h.jogo)) + '</span>' +
+                  '<span class="perfil-hist-quando">' + _rankEsc(_histQuando(h.em) + tempo) + '</span>' +
+                '</span>' +
+                res +
+                '<span class="perfil-stat-valor">' + _rankEsc(_histValor(h)) + '</span>' +
+              '</div>';
+    });
+    if (lista.length > VISIVEIS) {
+      html += '<button type="button" class="perfil-hist-mais" ' +
+        'onclick="this.parentNode.classList.add(\'perfil-hist-aberto\'); this.remove();">' +
+        'Ver todas (' + lista.length + ')</button>';
+    }
+    return '<div class="perfil-secao">' +
+        '<div class="perfil-secao-titulo">Últimas partidas</div>' +
+        '<div class="perfil-hist">' + html + '</div>' +
+      '</div>';
   }
 
   /* ── Loja da Coruja — tela cheia dentro do hub (mesmo esquema do
@@ -3069,12 +3267,13 @@
     // Atalho pro mini-jogo Corujinha (ganhar moedas/cosméticos) — fica no
     // topo do corpo rolável, em todas as abas.
     var html = _moedasDiarioBtnHtml() +
+               (!_corujinhaLiberada() ? '' :
                '<button type="button" class="loja-corujinha-btn" onclick="corujinhaAbrir()">' +
                  '<span class="loja-abrir-ico">🎰</span>' +
                  '<span class="loja-corujinha-txt"><span class="loja-corujinha-tit">Jogar Corujinha</span>' +
                  '<span class="loja-corujinha-sub">Gire e ganhe cosméticos ou moedas</span></span>' +
                  '<i class="fa fa-chevron-right rank-abrir-seta"></i>' +
-               '</button>';
+               '</button>');
     html += '<div class="loja-grid">';
     itens.forEach(function (item) {
       var tem = _temItem(item.id);
@@ -3332,7 +3531,16 @@
      'loja' do histórico pela do jogo (em vez de empilhar), pra o "voltar"
      levar ao menu sem deixar entrada órfã. Não conta ofensiva (ver
      _abrirJogo). */
+  // Remote Config (mostrar_corujinha): sem a API, liberada (padrão de sempre).
+  function _corujinhaLiberada() {
+    var C = window.AngatubaConfig;
+    return !(C && typeof C.corujinhaLiberada === 'function') || C.corujinhaLiberada();
+  }
   function corujinhaAbrir() {
+    if (!_corujinhaLiberada()) {
+      if (typeof showToastSimples === 'function') showToastSimples('A Corujinha está descansando agora. Volte mais tarde! 🦉', '/webp/owl-sleeping.webp');
+      return;
+    }
     if (typeof _gamesHubAberto === 'function' && !_gamesHubAberto()) {
       if (typeof _abrirGamesHub === 'function') _abrirGamesHub();
     }
@@ -3368,14 +3576,16 @@
   var _perfilUidVisitado = null;
   // Timer do debounce de _perfilPublicoSyncDebounced (ver Camada 3).
   var _perfilSyncTimer = null;
+  // uid cujo histórico remoto já foi mesclado no local nesta sessão.
+  var _histMescladoUid = null;
 
   function _perfilLabelJogo(jogoKey) {
     var info = RANK_INFO[jogoKey];
-    return (info && info.label) || jogoKey;
+    return (info && info.label) || JOGO_NOMES[jogoKey] || jogoKey;
   }
   function _perfilIcoJogo(jogoKey) {
     var info = RANK_INFO[jogoKey];
-    return (info && info.ico) || '🎮';
+    return (info && info.ico) || JOGO_ICOS[jogoKey] || '🎮';
   }
   // Segundos → texto curto ("45 s", "12 min", "1h 05"). Sem asset novo,
   // só formatação — mesmo dado bruto de _statsJogo.
@@ -3556,7 +3766,7 @@
   // jogos) — mesma estrutura pro próprio perfil e pro de outro jogador;
   // só muda o que cada chamador passa (fonte dos badges, 4º item da
   // grade, e o texto de empty state via "visitante").
-  function _perfilCorpoHtml(stats, badgeIds, badgeEquipadoId, quartoItem, visitante) {
+  function _perfilCorpoHtml(stats, badgeIds, badgeEquipadoId, quartoItem, visitante, historico) {
     stats = (stats && typeof stats === 'object') ? stats : {};
     var chaves = _perfilStatsChavesOrdenadas(stats);
     var totalSeg = 0;
@@ -3571,6 +3781,7 @@
 
     return _perfilGradeHtml(gradeItens) +
       _perfilVitrineHtml(badgeIds, badgeEquipadoId) +
+      _histHtml(historico) +
       '<div class="perfil-secao">' +
         '<div class="perfil-secao-titulo">Jogos</div>' +
         _perfilStatsHtmlDe(stats, visitante) +
@@ -3644,7 +3855,7 @@
     var streak = (typeof _streakLer === 'function') ? _streakLer() : { dias: 0 };
     corpo.innerHTML =
       _perfilCorpoHtml(_statsLer(), badgesInv, eq.badge,
-        { rotulo: 'Ofensiva', valor: streak.dias + (streak.dias === 1 ? ' dia' : ' dias') }, false) +
+        { rotulo: 'Ofensiva', valor: streak.dias + (streak.dias === 1 ? ' dia' : ' dias') }, false, _histLer()) +
       '<button type="button" class="perfil-ir-loja" onclick="lojaAbrir()">Ir à Loja</button>';
   }
 
@@ -3756,7 +3967,14 @@
         var tagEl = document.getElementById('perfil-presenca-tag');
         if (!tagEl || !info) return;
         var texto = 'Perfil de jogador', classe = '';
-        if (info.state === 'online') { texto = 'Online'; classe = ' perfil-presenca-online'; }
+        // Presença rica: "Jogando Voo da Coruja" / "Na Biblioteca" (rótulo
+        // único de app.js); sem a função nova, cai no online/ausente antigo.
+        var rot = (typeof window.AngatubaPresenca.rotulo === 'function') ? window.AngatubaPresenca.rotulo(info) : null;
+        if (rot) {
+          texto = rot.texto;
+          classe = ' perfil-presenca-' + ({ online: 'online', jogando: 'jogando', ausente: 'away', offline: 'offline' }[rot.estado] || 'offline');
+        }
+        else if (info.state === 'online') { texto = 'Online'; classe = ' perfil-presenca-online'; }
         else if (info.state === 'away') { texto = 'Ausente'; classe = ' perfil-presenca-away'; }
         else if (info.state === 'offline') { texto = 'Offline'; classe = ' perfil-presenca-offline'; }
         tagEl.textContent = texto;
@@ -3928,7 +4146,8 @@
     var badgesEquipados = eq.badge ? [eq.badge] : [];
     var maisJogadoKey = _perfilStatsChavesOrdenadas(stats)[0];
     var quartoItem = maisJogadoKey ? { rotulo: 'Recorde', valor: (stats[maisJogadoKey].recorde || 0) } : null;
-    corpo.innerHTML = _perfilCorpoHtml(stats, badgesEquipados, eq.badge, quartoItem, true);
+    var historico = Array.isArray(dados.historico) ? dados.historico : [];
+    corpo.innerHTML = _perfilCorpoHtml(stats, badgesEquipados, eq.badge, quartoItem, true, historico);
   }
 
   // Busca o doc público perfis/{uid} uma única vez (sem listener — a
@@ -4047,15 +4266,38 @@
     // P0-2: espera o Firestore (sessão fria) em vez de desistir com db null.
     _rankDbPronto().then(function (db) {
       if (typeof _cliUser === 'undefined' || !_cliUser || _cliUser.uid !== uid) return;
-      return db.collection('perfis').doc(uid).set({
-        uid: uid,
-        nome: nome,
-        photoURL: foto,
-        equipado: equipado,
-        stats: stats,
-        titulos: titulos,
-        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
+      // Histórico (Fase 1): na 1ª publicação da sessão por conta, lê o
+      // que OUTRO aparelho já publicou e mescla com o local antes de
+      // gravar — senão o celular e o PC ficariam sobrescrevendo a lista
+      // um do outro. Depois disso, o local já contém tudo e a leitura
+      // extra não se repete. Falhou a leitura? Grava sem o histórico
+      // (o campo antigo fica como está, graças ao merge).
+      var prep = (_histMescladoUid === uid)
+        ? Promise.resolve(true)
+        : db.collection('perfis').doc(uid).get().then(function (doc) {
+            var remoto = (doc && doc.exists && Array.isArray((doc.data() || {}).historico)) ? doc.data().historico : [];
+            var antes = _histLer().length;
+            _histSalvar(_histMesclar(_histLer(), remoto));
+            _histMescladoUid = uid;
+            // Veio partida de outro aparelho com o próprio perfil aberto: redesenha.
+            var tela = document.getElementById('jogo-perfil');
+            if (_histLer().length !== antes && _perfilModo === 'eu' && tela && tela.classList.contains('perfil-open')) _perfilRender();
+            return true;
+          }).catch(function () { return false; });
+      return prep.then(function (comHistorico) {
+        if (typeof _cliUser === 'undefined' || !_cliUser || _cliUser.uid !== uid) return;
+        var doc = {
+          uid: uid,
+          nome: nome,
+          photoURL: foto,
+          equipado: equipado,
+          stats: stats,
+          titulos: titulos,
+          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        if (comHistorico) doc.historico = _histLer();
+        return db.collection('perfis').doc(uid).set(doc, { merge: true });
+      });
     }).catch(function (err) {
       if (typeof DEBUG !== 'undefined' && DEBUG) {
         console.log('[perfil] sync do perfil público falhou (SDK ausente ou firestore.rules):', err && (err.code || err.message));
@@ -4492,6 +4734,11 @@
     equiparItem: function (slot, id) { return _equiparItem(slot, id); },
     statsJogo: function (jogoKey) { return _statsJogo(jogoKey); },
     statsRegistrarPartida: function (jogoKey, dados) { return _statsRegistrarPartida(jogoKey, dados); },
+    // Histórico de partidas pros jogos SEM stats (1x1: Ping Pong, Tanques,
+    // Hóquei). dados: { resultado: 'vitoria'|'derrota'|'empate', score,
+    // segundos?, placar? ('3 x 1') }. Jogos com stats NÃO chamam isto —
+    // statsRegistrarPartida já registra no histórico.
+    historicoRegistrar: function (jogoKey, dados) { return _histRegistrar(jogoKey, dados); },
     lojaCatalogo: function () { return _lojaCatalogo(); },
     lojaAbrir: function () { return lojaAbrir(); },
     lojaFechar: function () { return lojaFechar(); },

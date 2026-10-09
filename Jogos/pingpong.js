@@ -1053,6 +1053,7 @@
 
   function _ppMostrarFim(motivo) {
     if (_ppRAF) { cancelAnimationFrame(_ppRAF); _ppRAF = 0; }
+    var jaNoFim = (_ppEstado === 'fim'); // reentrada (estado repetido da rede): não conta 2x
     _ppMostrarTela('fim');
     var titulo = document.getElementById('pp-fim-titulo');
     var msg = document.getElementById('pp-fim-msg');
@@ -1088,6 +1089,12 @@
     }
     if (btnVoltar) { btnVoltar.className = 'pp-link'; btnVoltar.textContent = 'Voltar ao menu'; }
     var venceu = meu > dele;
+    // Histórico de partidas do perfil (ver historicoRegistrar em hub.js).
+    // Desconexão (acima) não entra: a partida não teve resultado.
+    var hb = _ppBridge();
+    if (!jaNoFim && hb && typeof hb.historicoRegistrar === 'function') {
+      hb.historicoRegistrar('pingpong', { resultado: venceu ? 'vitoria' : (meu === dele ? 'empate' : 'derrota'), score: meu, placar: meu + ' x ' + dele });
+    }
     if (titulo) titulo.textContent = venceu ? 'Você venceu! 🏆' : 'Não foi dessa vez';
     if (msg) msg.textContent = venceu ? 'Mandou bem contra ' + (_ppApelidoAdversario || 'seu adversário') + '!'
                                        : (_ppApelidoAdversario || 'Seu adversário') + ' levou essa.';

@@ -1455,10 +1455,16 @@
   function _hqMostrarFim() {
     if (_hqRAF) { cancelAnimationFrame(_hqRAF); _hqRAF = 0; }
     _hqPausado = false;
+    var jaNoFim = (_hqEstado === 'fim'); // reentrada (estado repetido da rede): não conta 2x
     _hqMostrarTela('fim');
     var eu = _hqEu();
     var meu = _hqGols[eu], dele = _hqGols[1 - eu];
     var venceu = _hqVencedor === eu;
+    // Histórico de partidas do perfil (ver historicoRegistrar em hub.js).
+    var hb = _hqBridge();
+    if (!jaNoFim && hb && typeof hb.historicoRegistrar === 'function') {
+      hb.historicoRegistrar('hoquei', { resultado: venceu ? 'vitoria' : 'derrota', score: meu, placar: meu + ' x ' + dele });
+    }
     var titulo = document.getElementById('hq-fim-titulo');
     var msg = document.getElementById('hq-fim-msg');
     var placar = document.getElementById('hq-fim-placar');

@@ -2663,7 +2663,7 @@
       if (dono) {
         var chaves = [LOJA_KEY_MOEDAS, LOJA_KEY_INVENTARIO, LOJA_KEY_EQUIPADO, LOJA_KEY_STATS,
                       TITULOS_KEY_DESBLOQUEADOS, TITULOS_KEY_EQUIPADOS, 'angatuba_streak',
-                      HIST_KEY];
+                      HIST_KEY, TITULOS_KEY_DESTAQUE];
         Object.keys(RANK_REC_LOCAL).forEach(function (k) { chaves.push(RANK_REC_LOCAL[k]); });
         var pacote = {};
         chaves.forEach(function (c) { var v = localStorage.getItem(c); if (v !== null) pacote[c] = v; });
@@ -3766,7 +3766,7 @@
   // jogos) — mesma estrutura pro próprio perfil e pro de outro jogador;
   // só muda o que cada chamador passa (fonte dos badges, 4º item da
   // grade, e o texto de empty state via "visitante").
-  function _perfilCorpoHtml(stats, badgeIds, badgeEquipadoId, quartoItem, visitante, historico) {
+  function _perfilCorpoHtml(stats, badgeIds, badgeEquipadoId, quartoItem, visitante, historico, conquistasHtml) {
     stats = (stats && typeof stats === 'object') ? stats : {};
     var chaves = _perfilStatsChavesOrdenadas(stats);
     var totalSeg = 0;
@@ -3780,6 +3780,7 @@
     if (quartoItem) gradeItens.push(quartoItem);
 
     return _perfilGradeHtml(gradeItens) +
+      (conquistasHtml || '') +
       _perfilVitrineHtml(badgeIds, badgeEquipadoId) +
       _histHtml(historico) +
       '<div class="perfil-secao">' +
@@ -3832,7 +3833,7 @@
           '<div class="perfil-identidade-txt">' +
             '<div class="perfil-nome">' + _rankEsc(nome) + '</div>' +
             _perfilTituloHtml(eq) +
-            _perfilTitulosConquistaHtml(_titulosEquipadosLer()) +
+            _perfilTitulosHeroHtml(_titulosDestaqueLer(), _titulosEquipadosLer()) +
             '<div class="loja-hero-saldo perfil-saldo">🪙 ' + saldo + '</div>' +
           '</div>' +
         '</div>' +
@@ -3855,7 +3856,8 @@
     var streak = (typeof _streakLer === 'function') ? _streakLer() : { dias: 0 };
     corpo.innerHTML =
       _perfilCorpoHtml(_statsLer(), badgesInv, eq.badge,
-        { rotulo: 'Ofensiva', valor: streak.dias + (streak.dias === 1 ? ' dia' : ' dias') }, false, _histLer()) +
+        { rotulo: 'Ofensiva', valor: streak.dias + (streak.dias === 1 ? ' dia' : ' dias') }, false, _histLer(),
+        _perfilConquistasHtml(_titulosDesbloqueadosLer(), _titulosDestaqueLer(), true)) +
       '<button type="button" class="perfil-ir-loja" onclick="lojaAbrir()">Ir à Loja</button>';
   }
 
@@ -4021,7 +4023,11 @@
       padrao:    '<button type="button" class="perfil-amigo-btn" onclick="perfilAmigoPedir(\'' + u + '\')"><i class="fa fa-user-plus" aria-hidden="true"></i> Adicionar amigo</button>',
       enviando:  '<button type="button" class="perfil-amigo-btn" disabled><i class="fa fa-user-plus" aria-hidden="true"></i> Enviando…</button>',
       enviado:   '<button type="button" class="perfil-amigo-btn perfil-amigo-feito" disabled><i class="fa fa-paper-plane" aria-hidden="true"></i> Pedido enviado</button>',
-      amigos:    '<button type="button" class="perfil-amigo-btn perfil-amigo-ok" disabled><i class="fa fa-user-check" aria-hidden="true"></i> Amigos</button>',
+      // Já são amigos: o selo + o atalho pro chat 1x1 (Fase 2, cliAbrirChat em app.js).
+      amigos:    '<button type="button" class="perfil-amigo-btn perfil-amigo-ok" disabled><i class="fa fa-user-check" aria-hidden="true"></i> Amigos</button>' +
+                 (typeof window.cliAbrirChat === 'function'
+                   ? '<button type="button" class="perfil-amigo-btn perfil-amigo-msg" onclick="perfilAbrirChat(\'' + u + '\')"><i class="fa fa-comment" aria-hidden="true"></i> Mensagem</button>'
+                   : ''),
       aceitar:   '<button type="button" class="perfil-amigo-btn" onclick="perfilAmigoAceitar(\'' + u + '\')"><i class="fa fa-user-check" aria-hidden="true"></i> Aceitar pedido</button>'
     };
     el.innerHTML = b[estado] || '';
@@ -4092,6 +4098,16 @@
   window.perfilAmigoPedir = perfilAmigoPedir;
   window.perfilAmigoAceitar = perfilAmigoAceitar;
 
+  // Chat 1x1 a partir do perfil do amigo: leva nome e foto do doc
+  // público já carregado (a conversa abre com o nome certo de cara).
+  var _perfilDadosVisitado = null;
+  function perfilAbrirChat(uid) {
+    if (!uid || typeof window.cliAbrirChat !== 'function') return;
+    var d = (_perfilDadosVisitado && _perfilDadosVisitado.uid === uid) ? _perfilDadosVisitado : {};
+    window.cliAbrirChat(uid, d.nome || '', d.photoURL || '');
+  }
+  window.perfilAbrirChat = perfilAbrirChat;
+
   // Mesma estrutura visual de _perfilRender(), mas a partir do doc
   // público (Firestore) de OUTRO jogador: sem saldo de moedas, sem
   // botão "Ir à Loja" e sem convite de login (Camada 3 — regra: nunca
@@ -4103,6 +4119,7 @@
 
     var eq = (dados.equipado && typeof dados.equipado === 'object') ? dados.equipado : {};
     var nome = (dados.nome && String(dados.nome)) || 'Jogador';
+    _perfilDadosVisitado = { uid: dados.uid || _perfilUidVisitado, nome: nome, photoURL: dados.photoURL || '' };
 
     var avatarHtml = (typeof _rankAvatar === 'function')
       ? _rankAvatar({ uid: dados.uid || '', nome: nome, photoURL: dados.photoURL || '' }, 'perfil-avatar')
@@ -4121,7 +4138,7 @@
           '<div class="perfil-identidade-txt">' +
             '<div class="perfil-nome">' + _rankEsc(nome) + '</div>' +
             _perfilTituloHtml(eq) +
-            _perfilTitulosConquistaHtml(dados.titulos) +
+            _perfilTitulosHeroHtml(String(dados.tituloDestaque || ''), Array.isArray(dados.titulos) ? dados.titulos : []) +
             '<div class="perfil-visitando-tag" id="perfil-presenca-tag">Perfil de jogador</div>' +
           '</div>' +
         '</div>' +
@@ -4147,7 +4164,8 @@
     var maisJogadoKey = _perfilStatsChavesOrdenadas(stats)[0];
     var quartoItem = maisJogadoKey ? { rotulo: 'Recorde', valor: (stats[maisJogadoKey].recorde || 0) } : null;
     var historico = Array.isArray(dados.historico) ? dados.historico : [];
-    corpo.innerHTML = _perfilCorpoHtml(stats, badgesEquipados, eq.badge, quartoItem, true, historico);
+    var conquistasHtml = _perfilConquistasHtml(_titulosConquistasDeString(dados.conquistas), String(dados.tituloDestaque || ''), false);
+    corpo.innerHTML = _perfilCorpoHtml(stats, badgesEquipados, eq.badge, quartoItem, true, historico, conquistasHtml);
   }
 
   // Busca o doc público perfis/{uid} uma única vez (sem listener — a
@@ -4293,6 +4311,9 @@
           equipado: equipado,
           stats: stats,
           titulos: titulos,
+          // Fase 2: vitrine pública de conquistas + o título em destaque.
+          tituloDestaque: (typeof _titulosDestaqueLer === 'function') ? _titulosDestaqueLer() : '',
+          conquistas: (typeof _titulosConquistasString === 'function') ? _titulosConquistasString(_titulosDesbloqueadosLer()) : '',
           atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
         };
         if (comHistorico) doc.historico = _histLer();
@@ -4332,6 +4353,12 @@
   var TITULOS_KEY_DESBLOQUEADOS = 'angatuba_titulos_desbloqueados';
   var TITULOS_KEY_EQUIPADOS     = 'angatuba_titulos_equipados';
   var TITULOS_MAX_EQUIPADOS = 2;
+  // Fase 2: UM título em destaque (o grandão sob o nome, estilo Steam).
+  // Independe dos 2 equipados (chips) — pode ou não ser um deles.
+  var TITULOS_KEY_DESTAQUE      = 'angatuba_titulo_destaque';
+  // Teto do campo `conquistas` em perfis/{uid} (string "id,id,...") —
+  // = conquistasValido em firestore.rules.
+  var TITULOS_CONQUISTAS_MAX_CHARS = 1500;
 
   function _titulosDesbloqueadosLer() {
     try {
@@ -4350,6 +4377,76 @@
   }
   function _titulosEquipadosSalvar(arr) {
     try { localStorage.setItem(TITULOS_KEY_EQUIPADOS, JSON.stringify((arr || []).slice(0, TITULOS_MAX_EQUIPADOS))); } catch (e) {}
+  }
+  // Destaque: só vale se ainda estiver entre os desbloqueados.
+  function _titulosDestaqueLer() {
+    var id = '';
+    try { id = String(localStorage.getItem(TITULOS_KEY_DESTAQUE) || ''); } catch (e) {}
+    return (id && _titulosDesbloqueadosLer().indexOf(id) !== -1) ? id : '';
+  }
+  function _titulosDestaqueSalvar(id) {
+    try {
+      if (id) localStorage.setItem(TITULOS_KEY_DESTAQUE, id);
+      else localStorage.removeItem(TITULOS_KEY_DESTAQUE);
+    } catch (e) {}
+  }
+  // Toque na estrela do seletor: escolhe (ou tira) o destaque.
+  function _titulosDefinirDestaque(id) {
+    if (!id || _titulosDesbloqueadosLer().indexOf(id) === -1) return { ok: false };
+    var novo = (_titulosDestaqueLer() === id) ? '' : id;
+    _titulosDestaqueSalvar(novo);
+    return { ok: true, destaque: novo };
+  }
+
+  /* Ícone e "raridade" de cada conquista — só apresentação (vitrine e
+     destaque). Peso maior = mais difícil = aparece primeiro. */
+  function _titulosIcone(id) {
+    if (/^rank_geral_top1$/.test(id)) return '👑';
+    if (/^rank_geral_/.test(id)) return '🏆';
+    if (/^rank_top1_/.test(id)) return '🥇';
+    if (/^rank_top3_/.test(id)) return '🥈';
+    if (/^rank_top10_/.test(id)) return '🏅';
+    if (/^main_/.test(id)) return '🎮';
+    if (/^ofensiva_/.test(id)) return '🔥';
+    if (/^stats_tempo_/.test(id)) return '⏳';
+    return '🎯';
+  }
+  var TITULOS_PESO = {
+    rank_geral_top1: 100, rank_geral_top3: 90, rank_geral_top10: 80,
+    ofensiva_30: 36, stats_partidas_100: 35, stats_tempo_300: 34,
+    ofensiva_7: 26, stats_partidas_50: 25, stats_tempo_60: 24,
+    ofensiva_3: 16, stats_partidas_10: 15
+  };
+  function _titulosPeso(id) {
+    if (TITULOS_PESO[id]) return TITULOS_PESO[id];
+    if (/^rank_top1_/.test(id)) return 70;
+    if (/^rank_top3_/.test(id)) return 60;
+    if (/^rank_top10_/.test(id)) return 50;
+    if (/^main_/.test(id)) return 40;
+    return 1;
+  }
+  // Ids válidos e conhecidos, do mais raro pro mais comum.
+  function _titulosOrdenarPorRaridade(ids) {
+    var vistos = {};
+    return (ids || []).filter(function (id) {
+      if (typeof id !== 'string' || vistos[id] || !/^[a-z0-9_]{1,40}$/.test(id) || !_titulosLabelDe(id)) return false;
+      vistos[id] = true;
+      return true;
+    }).sort(function (a, b) { return _titulosPeso(b) - _titulosPeso(a); });
+  }
+  // Campo público `conquistas`: "id,id,..." (string única de propósito —
+  // as regras validam com UM regex, sem item a item). Se passar do teto,
+  // os mais comuns saem primeiro.
+  function _titulosConquistasString(ids) {
+    var out = '';
+    _titulosOrdenarPorRaridade(ids).forEach(function (id) {
+      var prox = out ? out + ',' + id : id;
+      if (prox.length <= TITULOS_CONQUISTAS_MAX_CHARS) out = prox;
+    });
+    return out;
+  }
+  function _titulosConquistasDeString(str) {
+    return _titulosOrdenarPorRaridade(String(str || '').split(','));
   }
 
   // Junta novos ids aos já desbloqueados — nunca remove (conquista é
@@ -4499,6 +4596,51 @@
   // badge cosmético da loja (_perfilTituloHtml). ids desconhecidos (ex.:
   // visitante vendo um título de um jogo que não existe mais) são
   // ignorados silenciosamente; '' (nada) se não sobrar nenhum válido.
+  // Fase 2: título em DESTAQUE (faixa dourada sob o nome) + os chips
+  // dos equipados, sem repetir o que já está no destaque. Usado no
+  // próprio perfil, no perfil público e no painel de conta (app.js).
+  function _perfilTitulosHeroHtml(destaque, equipados) {
+    var lbl = destaque ? _titulosLabelDe(destaque) : null;
+    var html = lbl
+      ? '<div class="perfil-destaque" title="Título em destaque">' +
+          '<span class="perfil-destaque-ico" aria-hidden="true">' + _titulosIcone(destaque) + '</span>' +
+          '<span class="perfil-destaque-txt">' + _rankEsc(lbl) + '</span>' +
+        '</div>'
+      : '';
+    var chips = (equipados || []).filter(function (id) { return !lbl || id !== destaque; });
+    return html + _perfilTitulosConquistaHtml(chips);
+  }
+
+  // Vitrine "Conquistas" (estilo Steam): todas as desbloqueadas, da mais
+  // rara pra mais comum; 6 visíveis + "Ver todas". '' sem nenhuma.
+  function _perfilConquistasHtml(ids, destaque, proprio) {
+    var lista = _titulosOrdenarPorRaridade(ids);
+    if (!lista.length) {
+      return proprio
+        ? '<div class="perfil-secao"><div class="perfil-secao-titulo">Conquistas</div>' +
+            '<div class="perfil-stats-vazio">Nenhuma conquista ainda. Jogue, mantenha a ofensiva e apareça no ranking pra desbloquear! 🦉</div></div>'
+        : '';
+    }
+    var VISIVEIS = 6;
+    var html = lista.map(function (id, i) {
+      return '<div class="perfil-conq' + (id === destaque ? ' perfil-conq-destaque' : '') + (i >= VISIVEIS ? ' perfil-conq-extra' : '') + '">' +
+          '<span class="perfil-conq-ico" aria-hidden="true">' + _titulosIcone(id) + '</span>' +
+          '<span class="perfil-conq-txt">' + _rankEsc(_titulosLabelDe(id)) + '</span>' +
+          (id === destaque ? '<span class="perfil-conq-tag">Destaque</span>' : '') +
+        '</div>';
+    }).join('');
+    if (lista.length > VISIVEIS) {
+      html += '<button type="button" class="perfil-hist-mais perfil-conq-mais" ' +
+        'onclick="this.parentNode.classList.add(\'perfil-conq-aberto\'); this.remove();">' +
+        'Ver todas (' + lista.length + ')</button>';
+    }
+    return '<div class="perfil-secao">' +
+        '<div class="perfil-secao-titulo">Conquistas · ' + lista.length + '</div>' +
+        '<div class="perfil-conq-grade">' + html + '</div>' +
+        (proprio ? '<button type="button" class="perfil-conq-escolher" onclick="_titulosAbrirSeletor()"><i class="fa fa-star" aria-hidden="true"></i> Escolher destaque e títulos</button>' : '') +
+      '</div>';
+  }
+
   function _perfilTitulosConquistaHtml(ids) {
     if (!ids || !ids.length) return '';
     var html = '';
@@ -4543,6 +4685,7 @@
     if (!lista) return;
     var desbloq = _titulosDesbloqueadosLer();
     var equipados = _titulosEquipadosLer();
+    var destaque = _titulosDestaqueLer();
     if (contagem) contagem.textContent = '(' + equipados.length + '/' + TITULOS_MAX_EQUIPADOS + ')';
     if (!desbloq.length) {
       lista.innerHTML = '<div class="titulos-sheet-vazio">Nenhum título ainda. Jogue e apareça no ranking pra desbloquear! 🦉</div>';
@@ -4555,13 +4698,25 @@
       if (!ea && eb) return 1;
       return 0;
     });
-    lista.innerHTML = ordenados.map(function (id) {
+    // Fase 2: cada linha = o título (toque equipa/desequipa, como antes)
+    // + a estrela que escolhe o DESTAQUE (um só, faixa grande no perfil).
+    lista.innerHTML =
+      '<div class="titulos-sheet-dica">Toque pra mostrar até ' + TITULOS_MAX_EQUIPADOS + ' sob o nome · <i class="fa fa-star" aria-hidden="true"></i> = destaque do perfil</div>' +
+      ordenados.map(function (id) {
       var label = _titulosLabelDe(id) || id;
       var equipado = equipados.indexOf(id) !== -1;
-      return '<button type="button" class="titulos-item' + (equipado ? ' titulos-item-equipado' : '') + '" onclick="_titulosToggleUI(\'' + id + '\')">' +
-          '<span class="titulos-item-txt">' + _rankEsc(label) + '</span>' +
-          (equipado ? '<span class="titulos-item-check"><i class="fa fa-check"></i></span>' : '') +
-        '</button>';
+      var ehDestaque = (id === destaque);
+      var idEsc = _rankEsc(id);
+      return '<div class="titulos-linha">' +
+          '<button type="button" class="titulos-item' + (equipado ? ' titulos-item-equipado' : '') + '" onclick="_titulosToggleUI(\'' + idEsc + '\')">' +
+            '<span class="titulos-item-txt">' + _titulosIcone(id) + ' ' + _rankEsc(label) + '</span>' +
+            (equipado ? '<span class="titulos-item-check"><i class="fa fa-check"></i></span>' : '') +
+          '</button>' +
+          '<button type="button" class="titulos-destaque-btn' + (ehDestaque ? ' on' : '') + '" ' +
+            'onclick="_titulosDestaqueUI(\'' + idEsc + '\')" aria-pressed="' + (ehDestaque ? 'true' : 'false') + '" ' +
+            'aria-label="' + (ehDestaque ? 'Tirar do destaque' : 'Pôr em destaque') + '" title="Destaque do perfil">' +
+            '<i class="fa' + (ehDestaque ? ' fa-solid' : ' fa-regular') + ' fa-star"></i></button>' +
+        '</div>';
     }).join('');
   }
 
@@ -4585,6 +4740,14 @@
   window._titulosAbrirSeletor = _titulosAbrirSeletor;
   window._titulosFecharSeletor = _titulosFecharSeletor;
   window._titulosToggleUI = _titulosToggleUI;
+  function _titulosDestaqueUI(id) {
+    _titulosDefinirDestaque(id);
+    _titulosRenderSheet();
+    if (typeof _perfilRender === 'function' && _perfilModo === 'eu') _perfilRender();
+    if (typeof _cliContaHeroCosmeticos === 'function') _cliContaHeroCosmeticos();
+    if (typeof _perfilPublicoSyncDebounced === 'function') _perfilPublicoSyncDebounced();
+  }
+  window._titulosDestaqueUI = _titulosDestaqueUI;
 
   /* ══════════════════════════════════════════════════════════════
      PONTE DE JOGOS — window.AngatubaGames

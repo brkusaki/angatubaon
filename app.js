@@ -19442,7 +19442,12 @@ ${urlCard}`)}`;
   }
 
   function _chatLigarConversa(uid) {
-    _chatSoltarConversa();
+    // Solta SÓ a escuta das mensagens. Não chamar _chatSoltarConversa()
+    // aqui: desde o chat v2 ela também solta o cabeçalho (presença +
+    // "digitando…"), que _chatMostrarConversa acabou de ligar logo antes —
+    // era isso que deixava o status e o "digitando…" sempre vazios.
+    if (_chatConvUnsub) { try { _chatConvUnsub(); } catch (e) {} _chatConvUnsub = null; }
+    _chatConvDados = { msgs: [], lidoDele: 0 };
     _chatConvUnsub = window.AngatubaChat.observarConversa(uid, function (dados) {
       if (_chatCom !== uid) return;
       _chatConvDados = dados || { msgs: [], lidoDele: 0 };

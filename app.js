@@ -19355,6 +19355,9 @@ ${urlCard}`)}`;
     if (voltar) voltar.hidden = !(_chatCom && _chatVeioDaLista);
     if (barra) barra.hidden = !_chatCom;
     if (topo) topo.classList.toggle('conversa', !!_chatCom);
+    // O fundo escolhido (tema/foto) vale só atrás das mensagens.
+    var corpoEl = document.getElementById('dm-corpo');
+    if (corpoEl) corpoEl.classList.toggle('conversa', !!_chatCom);
     if (!_chatCom) {
       if (av) { av.hidden = true; av.innerHTML = ''; }
       if (nomeEl) nomeEl.textContent = 'Conversas';
@@ -19417,13 +19420,22 @@ ${urlCard}`)}`;
     // Chat v2: tique em TODA mensagem minha, estilo WhatsApp — um tique
     // cinza = enviada; dois azuis = ele já viu (lido dele >= em dela).
     var lidoDele = _chatConvDados.lidoDele || 0;
-    var html = '', diaAnterior = '';
+    var html = '', diaAnterior = '', anterior = null;
     msgs.forEach(function (m) {
       var dia = m.em ? _chatDia(m.em) : '';
-      if (dia && dia !== diaAnterior) { html += '<div class="dm-dia">' + escHTML(dia) + '</div>'; diaAnterior = dia; }
+      var virouDia = !!(dia && dia !== diaAnterior);
+      if (virouDia) { html += '<div class="dm-dia">' + escHTML(dia) + '</div>'; diaAnterior = dia; }
       var minha = m.de === eu;
-      html += '<div class="dm-msg' + (minha ? ' minha' : '') + '">' +
-          '<span class="dm-msg-txt">' + escHTML(m.txt) + '</span>' +
+      // Visual v3 (estilo WhatsApp): mensagens seguidas da mesma pessoa,
+      // com menos de 5 min entre elas, formam um GRUPO — colam umas nas
+      // outras e só a primeira ganha o "bico" da bolha.
+      var continua = !!(anterior && !virouDia && anterior.de === m.de && m.em - anterior.em < 300000);
+      anterior = m;
+      // A hora (e os tiques) ficam no canto de baixo da bolha, por cima
+      // de um espaçador invisível no fim do texto — a última linha
+      // reserva o lugar dela, como no WhatsApp.
+      html += '<div class="dm-msg' + (minha ? ' minha' : '') + (continua ? ' cont' : ' cauda') + '">' +
+          '<span class="dm-msg-txt">' + escHTML(m.txt) + '<span class="dm-msg-espaco" aria-hidden="true"></span></span>' +
           '<span class="dm-msg-em">' + (m.em ? _chatHora(m.em) : '') +
             (minha ? _chatTiqueHtml(!!(lidoDele && m.em && lidoDele >= m.em)) : '') + '</span>' +
         '</div>';
@@ -19504,7 +19516,14 @@ ${urlCard}`)}`;
     var jaAberto = _chatAberto();
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
-    if (!jaAberto && (!history.state || history.state.modal !== 'chat')) history.pushState({ modal: 'chat' }, '');
+    if (!jaAberto) {
+      if (!history.state || history.state.modal !== 'chat') history.pushState({ modal: 'chat' }, '');
+      _chatHist = 1;
+      // Fundo (tema/foto) da conta + teclado do celular (ver CHAT v3).
+      _chatFundoAplicar();
+      _chatFundoSincronizar();
+      _chatViewportLigar(true);
+    }
     _chatVeioDaLista = false;
     if (uid) _chatMostrarConversa(uid);
     else _chatMostrarLista();
@@ -19515,15 +19534,18 @@ ${urlCard}`)}`;
   function cliChatAbrirConversa(uid, daLista) {
     if (!uid) return;
     _chatVeioDaLista = !!daLista;
-    if (daLista) history.pushState({ modal: 'chat-conversa' }, '');
+    if (daLista) { history.pushState({ modal: 'chat-conversa' }, ''); _chatHist++; }
     _chatMostrarConversa(uid);
     _chatPintarTopo();
   }
 
   function cliChatVoltar(viaPopstate) {
+    // Folha "Fundo das conversas" aberta: o voltar fecha só ela.
+    if (_chatFundoAberta()) { cliChatFundoFechar(viaPopstate); return; }
     if (_chatCom && _chatVeioDaLista) {
       _chatVeioDaLista = false;
       _chatMostrarLista();
+      _chatHist = Math.max(1, _chatHist - 1);
       if (!viaPopstate && history.state && history.state.modal === 'chat-conversa') { _popstateNosso = true; history.back(); }
       return;
     }
@@ -19533,6 +19555,8 @@ ${urlCard}`)}`;
   function cliFecharChat(viaPopstate) {
     var overlay = _chatEl();
     if (overlay) overlay.classList.remove('open');
+    _chatFundoFolha(false);
+    _chatViewportLigar(false);
     _chatGuardarRascunho();
     _chatSoltarConversa();
     _chatCom = null;
@@ -19540,10 +19564,12 @@ ${urlCard}`)}`;
     // Painel de conta (ou lobby) por baixo mantém o scroll travado.
     var conta = document.getElementById('modal-cli-conta');
     document.body.style.overflow = (conta && conta.classList.contains('open')) ? 'hidden' : '';
-    if (!viaPopstate && history.state) {
-      if (history.state.modal === 'chat-conversa') { _popstateNosso = true; history.go(-2); }
-      else if (history.state.modal === 'chat') { _popstateNosso = true; history.back(); }
+    // Desfaz TODAS as entradas que o chat empilhou ('chat', 'chat-conversa',
+    // 'chat-fundo') de uma vez — _chatHist conta quantas são.
+    if (!viaPopstate && _chatHist > 0 && history.state && /^chat/.test(history.state.modal || '')) {
+      _popstateNosso = true; history.go(-_chatHist);
     }
+    _chatHist = 0;
   }
 
   // Enviar: limpa o campo na hora e devolve o texto se o banco recusar
@@ -19585,6 +19611,269 @@ ${urlCard}`)}`;
     if (document.hidden) { _chatPararDigitando(); return; }   // saiu do app = parou de digitar
     if (_chatCom && _chatAberto()) window.AngatubaChat.marcarLida(_chatCom);
   });
+
+
+  /* ══════════════════════════════════════════════════════════════
+     CHAT v3 — FUNDO DAS CONVERSAS (temas + foto) e teclado no celular
+     ------------------------------------------------------------
+     Preferência GLOBAL da pessoa (vale pra todas as conversas):
+       { tema: 'padrao'|'escuro'|'claro'|'pontos'|'linhas'|'noite',
+         foto: '' | URL do Cloudinary, t: ms da última mudança }
+       · local:  angatuba_chat_fundo_u_<uid>   (o chat só existe logado)
+       · nuvem:  Firestore preferencias/{uid} = { chatTema, chatFoto, t,
+                 atualizadoEm } — mesmo padrão dos docs privados
+                 (lang_progress, biblioteca, favoritos). Vence o `t` mais
+                 novo; lida 1x por sessão ao abrir o chat.
+     A foto, quando existe, ganha do tema (e "Remover foto" volta pro
+     tema). Sobe pelo MESMO fluxo da foto de perfil: comprime no
+     aparelho (_mlRedimensionarImagem, 1280px) e manda pro Cloudinary com
+     o preset unsigned do cliente; a URL guardada já pede a versão
+     otimizada (c_limit,w_1280,q_auto,f_auto).
+     Visual: o tema mexe só em variáveis CSS (--dm-*) do #modal-chat;
+     com foto, as bolhas passam pra paleta escura semitransparente e a
+     foto ganha um véu escuro — o texto fica legível em foto clara ou
+     escura.
+  ══════════════════════════════════════════════════════════════ */
+  var CHAT_TEMAS = [
+    { id: 'padrao', nome: 'Padrão' },
+    { id: 'escuro', nome: 'Escuro' },
+    { id: 'claro',  nome: 'Claro' },
+    { id: 'pontos', nome: 'Pontilhado' },
+    { id: 'linhas', nome: 'Listras' },
+    { id: 'noite',  nome: 'Noite' }
+  ];
+  var CHAT_FUNDO_KEY = 'angatuba_chat_fundo_u_';
+  var CHAT_FOTO_RE = /^https:\/\/res\.cloudinary\.com\/[A-Za-z0-9_\-\/.,:]+$/;
+  var _chatHist = 0;             // entradas de histórico empilhadas pelo chat
+  var _chatFundoSincUid = null;  // uid já conferido com o Firestore nesta sessão
+
+  function _chatFundoValido(o) {
+    o = (o && typeof o === 'object') ? o : {};
+    var tema = String(o.tema || '');
+    var foto = String(o.foto || '');
+    return {
+      tema: CHAT_TEMAS.some(function (t) { return t.id === tema; }) ? tema : 'padrao',
+      foto: (foto.length < 300 && CHAT_FOTO_RE.test(foto)) ? foto : '',
+      t: Math.max(0, Math.floor(Number(o.t) || 0))
+    };
+  }
+  function _chatFundoLer() {
+    var eu = _chatEu();
+    if (!eu) return _chatFundoValido(null);
+    try { return _chatFundoValido(JSON.parse(localStorage.getItem(CHAT_FUNDO_KEY + eu) || 'null')); }
+    catch (e) { return _chatFundoValido(null); }
+  }
+  function _chatFundoGravarLocal(f) {
+    var eu = _chatEu();
+    if (!eu) return;
+    try { localStorage.setItem(CHAT_FUNDO_KEY + eu, JSON.stringify(f)); } catch (e) {}
+  }
+
+  // Pinta o fundo atual no #modal-chat (atributo do tema + foto).
+  function _chatFundoAplicar() {
+    var o = _chatEl();
+    if (!o) return;
+    var f = _chatFundoLer();
+    o.setAttribute('data-dm-tema', f.tema);
+    if (f.foto) {
+      o.style.setProperty('--dm-foto', 'url("' + f.foto + '")');
+      o.classList.add('dm-com-foto');
+    } else {
+      o.style.removeProperty('--dm-foto');
+      o.classList.remove('dm-com-foto');
+    }
+    _chatFundoPintarFolha();
+  }
+
+  // Muda e salva (local na hora + nuvem em segundo plano).
+  function _chatFundoMudar(parcial) {
+    var f = _chatFundoLer();
+    if (parcial && 'tema' in parcial) f.tema = parcial.tema;
+    if (parcial && 'foto' in parcial) f.foto = parcial.foto;
+    f = _chatFundoValido(f);
+    f.t = Date.now();
+    _chatFundoGravarLocal(f);
+    _chatFundoAplicar();
+    _chatFundoGravarNuvem(f);
+  }
+
+  function _chatFundoGravarNuvem(f) {
+    var eu = _chatEu();
+    if (!eu || typeof _favCarregarFirestore !== 'function') return;
+    _favCarregarFirestore().then(function (db) {
+      return db.collection('preferencias').doc(eu).set({
+        chatTema: f.tema, chatFoto: f.foto, t: f.t,
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[chat] fundo na nuvem falhou:', err && (err.code || err.message));
+    });
+  }
+
+  // 1x por sessão (por conta): o lado com `t` mais novo vence.
+  function _chatFundoSincronizar() {
+    var eu = _chatEu();
+    if (!eu || _chatFundoSincUid === eu || typeof _favCarregarFirestore !== 'function') return;
+    _chatFundoSincUid = eu;
+    _favCarregarFirestore().then(function (db) {
+      return db.collection('preferencias').doc(eu).get();
+    }).then(function (doc) {
+      if (_chatEu() !== eu) return;
+      var d = (doc && doc.exists) ? (doc.data() || {}) : null;
+      var remoto = d ? _chatFundoValido({ tema: d.chatTema, foto: d.chatFoto, t: d.t }) : null;
+      var local = _chatFundoLer();
+      if (remoto && remoto.t > local.t) { _chatFundoGravarLocal(remoto); _chatFundoAplicar(); }
+      else if (local.t > 0 && (!remoto || local.t > remoto.t)) _chatFundoGravarNuvem(local);
+    }).catch(function () { _chatFundoSincUid = null; });
+  }
+
+  /* ── Folha "Fundo das conversas" ─────────────────────────────── */
+  function _chatFundoAberta() {
+    var f = document.getElementById('dm-fundo-folha');
+    return !!(f && !f.hidden);
+  }
+  function _chatFundoFolha(abrir) {
+    var f = document.getElementById('dm-fundo-folha');
+    if (!f) return;
+    f.hidden = !abrir;
+    if (abrir) _chatFundoPintarFolha();
+  }
+  function _chatFundoPintarFolha() {
+    var grade = document.getElementById('dm-fundo-grade');
+    if (!grade) return;
+    var f = _chatFundoLer();
+    grade.innerHTML = CHAT_TEMAS.map(function (t) {
+      var on = !f.foto && f.tema === t.id;
+      return '<button type="button" class="dm-fundo-op' + (on ? ' on' : '') + '" ' +
+          'onclick="cliChatFundoTema(\'' + t.id + '\')" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+          '<span class="dm-fundo-amostra" data-dm-tema="' + t.id + '">' +
+            '<span class="dm-fundo-b"></span><span class="dm-fundo-b minha"></span>' +
+          '</span>' +
+          '<span class="dm-fundo-nome">' + escHTML(t.nome) + '</span>' +
+        '</button>';
+    }).join('') +
+      '<button type="button" class="dm-fundo-op dm-fundo-op-foto' + (f.foto ? ' on' : '') + '" onclick="cliChatFundoEscolherFoto()">' +
+        '<span class="dm-fundo-amostra dm-fundo-amostra-foto"' + (f.foto ? ' style="background-image:url(&quot;' + escHTML(f.foto) + '&quot;)"' : '') + '>' +
+          (f.foto ? '' : '<span class="dm-fundo-mais" aria-hidden="true">+</span>') +
+        '</span>' +
+        '<span class="dm-fundo-nome">' + (f.foto ? 'Sua foto' : 'Usar foto') + '</span>' +
+      '</button>';
+    var rem = document.getElementById('dm-fundo-remover');
+    if (rem) rem.hidden = !f.foto;
+  }
+  function _chatFundoStatus(txt, erro) {
+    var el = document.getElementById('dm-fundo-status');
+    if (!el) return;
+    el.textContent = txt || '';
+    el.classList.toggle('erro', !!erro);
+  }
+
+  function cliChatFundoAbrir() {
+    if (_chatFundoAberta()) return;
+    _chatFundoStatus('');
+    _chatFundoFolha(true);
+    history.pushState({ modal: 'chat-fundo' }, '');
+    _chatHist++;
+  }
+  function cliChatFundoFechar(viaPopstate) {
+    if (!_chatFundoAberta()) return;
+    _chatFundoFolha(false);
+    _chatHist = Math.max(1, _chatHist - 1);
+    if (!viaPopstate && history.state && history.state.modal === 'chat-fundo') { _popstateNosso = true; history.back(); }
+  }
+  function cliChatFundoTema(id) {
+    // Escolher um tema pronto tira a foto (é o "voltar pros temas").
+    _chatFundoMudar({ tema: id, foto: '' });
+    _chatFundoStatus('');
+  }
+  function cliChatFundoRemoverFoto() {
+    _chatFundoMudar({ foto: '' });
+    _chatFundoStatus('Foto removida. Voltou pro tema ' + ((CHAT_TEMAS.filter(function (t) { return t.id === _chatFundoLer().tema; })[0] || {}).nome || 'Padrão') + '.');
+  }
+  function cliChatFundoEscolherFoto() {
+    var inp = document.getElementById('dm-fundo-input');
+    if (!inp) return;
+    if (!inp._ligado) {
+      inp._ligado = true;
+      inp.addEventListener('change', function () {
+        var file = inp.files && inp.files[0];
+        inp.value = '';
+        if (file) _chatFundoEnviarFoto(file);
+      });
+    }
+    inp.click();
+  }
+
+  var _chatFundoEnviando = false;
+  async function _chatFundoEnviarFoto(file) {
+    if (_chatFundoEnviando) return;
+    if (!file || !/^image\//.test(file.type)) { _chatFundoStatus('Escolha uma imagem.', true); return; }
+    _chatFundoEnviando = true;
+    try {
+      _chatFundoStatus('Otimizando a foto…');
+      // Fundo de tela: 1280px no lado maior dá conta de qualquer celular.
+      if (typeof _mlRedimensionarImagem === 'function') file = await _mlRedimensionarImagem(file, 1280, 0.8);
+      if (file.size > 5 * 1024 * 1024) { _chatFundoStatus('Imagem muito grande (máx 5MB).', true); return; }
+      _chatFundoStatus('Enviando…');
+      var fd = new FormData();
+      fd.append('file', file);
+      fd.append('upload_preset', CLI_UPLOAD_PRESET);
+      fd.append('tags', 'chat_fundo');
+      var resp = await fetch('https://api.cloudinary.com/v1_1/' + CLI_CLOUD_NAME + '/image/upload',
+        { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) });
+      var json = await resp.json();
+      if (!json || !json.secure_url) throw new Error((json && json.error && json.error.message) || 'Falha no upload');
+      // Entrega otimizada: limita a 1280px e deixa o Cloudinary escolher
+      // formato/qualidade pro aparelho (webp/avif onde der).
+      var url = String(json.secure_url).replace('/image/upload/', '/image/upload/c_limit,w_1280,q_auto,f_auto/');
+      if (!CHAT_FOTO_RE.test(url) || url.length >= 300) throw new Error('Endereço da foto inesperado');
+      // Pré-carrega antes de trocar: sem "piscar" fundo vazio.
+      await new Promise(function (ok) { var im = new Image(); im.onload = im.onerror = function () { ok(); }; im.src = url; });
+      _chatFundoMudar({ foto: url });
+      _chatFundoStatus('Pronto! A foto vale pra todas as suas conversas.');
+    } catch (err) {
+      _chatFundoStatus('Não deu pra enviar: ' + ((err && err.message) || 'tente de novo') + '.', true);
+    } finally {
+      _chatFundoEnviando = false;
+    }
+  }
+
+  /* ── Teclado do celular ─────────────────────────────────────────
+     Com o teclado aberto, a área VISÍVEL (visualViewport) encolhe mas a
+     tela "de layout" não (iOS, e Chrome com resizes-visual). Sem isto a
+     barra de digitar ficava escondida atrás do teclado. O chat passa a
+     ocupar exatamente a área visível, e a conversa desce pro fim. */
+  function _chatViewportAjustar() {
+    var o = _chatEl(), vv = window.visualViewport;
+    if (!o || !vv || !o.classList.contains('open')) return;
+    o.style.setProperty('--dm-altura', vv.height + 'px');
+    o.style.setProperty('--dm-topo-vv', vv.offsetTop + 'px');
+    var inp = document.getElementById('dm-input');
+    var box = document.getElementById('dm-msgs');
+    if (box && inp && document.activeElement === inp) box.scrollTop = box.scrollHeight;
+  }
+  var _chatVvLigado = false;
+  function _chatViewportLigar(ligar) {
+    var vv = window.visualViewport, o = _chatEl();
+    if (!vv) return;
+    if (ligar && !_chatVvLigado) {
+      vv.addEventListener('resize', _chatViewportAjustar);
+      vv.addEventListener('scroll', _chatViewportAjustar);
+      _chatVvLigado = true;
+      _chatViewportAjustar();
+    } else if (!ligar && _chatVvLigado) {
+      vv.removeEventListener('resize', _chatViewportAjustar);
+      vv.removeEventListener('scroll', _chatViewportAjustar);
+      _chatVvLigado = false;
+      if (o) { o.style.removeProperty('--dm-altura'); o.style.removeProperty('--dm-topo-vv'); }
+    }
+  }
+
+  window.cliChatFundoAbrir = cliChatFundoAbrir;
+  window.cliChatFundoFechar = cliChatFundoFechar;
+  window.cliChatFundoTema = cliChatFundoTema;
+  window.cliChatFundoRemoverFoto = cliChatFundoRemoverFoto;
+  window.cliChatFundoEscolherFoto = cliChatFundoEscolherFoto;
 
   window.cliAbrirChat = cliAbrirChat;
   window.cliFecharChat = cliFecharChat;

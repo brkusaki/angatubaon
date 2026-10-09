@@ -3994,6 +3994,10 @@
           <div class="dm-topo-nome" id="dm-topo-nome">Conversas</div>
           <div class="dm-topo-sub" id="dm-topo-sub" aria-live="polite"></div>
         </div>
+        <!-- Chat v3: fundo das conversas (temas prontos ou foto) — vale pra todas. -->
+        <button type="button" class="dm-topo-btn" onclick="cliChatFundoAbrir()" aria-label="Fundo das conversas" title="Fundo das conversas">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8Zm-5.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z" fill="currentColor"/></svg>
+        </button>
         <button type="button" class="modal-close" onclick="cliFecharChat()" aria-label="Fechar">✕</button>
       </div>
       <div class="dm-corpo" id="dm-corpo"></div>
@@ -4006,6 +4010,27 @@
         <button type="button" class="dm-enviar" id="dm-enviar" onclick="cliChatEnviar()" aria-label="Enviar" disabled>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3.4 20.4 21.85 12.5a.55.55 0 0 0 0-1L3.4 3.6a.55.55 0 0 0-.76.62L4.5 11l9.5 1-9.5 1-1.86 6.78a.55.55 0 0 0 .76.62Z" fill="currentColor"/></svg>
         </button>
+      </div>
+
+      <!-- Chat v3: folha "Fundo das conversas" (por cima da conversa).
+           A grade é desenhada por _chatFundoPintarFolha em app.js. -->
+      <div class="dm-fundo-folha" id="dm-fundo-folha" hidden>
+        <div class="dm-fundo-veu" onclick="cliChatFundoFechar()"></div>
+        <div class="dm-fundo-caixa" role="dialog" aria-label="Fundo das conversas">
+          <div class="dm-fundo-topo">
+            <div>
+              <div class="dm-fundo-tit">Fundo das conversas</div>
+              <div class="dm-fundo-sub">Vale pra todos os seus chats.</div>
+            </div>
+            <button type="button" class="modal-close" onclick="cliChatFundoFechar()" aria-label="Fechar">✕</button>
+          </div>
+          <div class="dm-fundo-grade" id="dm-fundo-grade"></div>
+          <button type="button" class="dm-fundo-remover" id="dm-fundo-remover" onclick="cliChatFundoRemoverFoto()" hidden>
+            Remover foto de fundo
+          </button>
+          <div class="dm-fundo-status" id="dm-fundo-status" aria-live="polite"></div>
+          <input type="file" id="dm-fundo-input" accept="image/*" style="display:none;" />
+        </div>
       </div>
     </div>
   </div>

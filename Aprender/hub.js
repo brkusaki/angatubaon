@@ -25,7 +25,11 @@
 
   /* ── Estado em memória (carregado de localStorage/Firestore) ── */
   var _aprEstado = null;   // { en: { totalXp, streak, lastDate, placementDone, placementLevel, units:{u1:{completedLessons:[],xp:0}, ...} } }
-  var _aprSincronizado = false; // true depois da 1ª mesclagem com o Firestore nesta sessão
+  // uid que JÁ foi mesclado com o Firestore nesta sessão (null = nenhum).
+  // Guardar o uid (e não só um true/false) faz a troca de conta no mesmo
+  // aparelho disparar uma mesclagem nova pra conta que entrou.
+  var _aprSincUid = null;
+  var _aprSincEmCurso = null;  // uid com leitura/mesclagem em andamento
 
   function _aprEstadoPadrao() {
     var units = {};
@@ -160,22 +164,29 @@
     return _aprNormalizarPlacement(out);
   }
 
-  // Chamado ao abrir o hub, se houver cliente logado: lê o doc do Firestore
-  // uma vez, mescla com o local e regrava dos dois lados. Falha silenciosa
-  // — sem Firestore, o módulo segue 100% funcional só com localStorage.
+  // Chamado ao abrir o hub, ao logar (ver _aprAoMudarConta) e antes da
+  // 1ª gravação de cada conta: lê o doc do Firestore uma vez, mescla com o
+  // local e regrava dos dois lados. Falha silenciosa — sem Firestore, o
+  // módulo segue 100% funcional só com localStorage (e tenta de novo na
+  // próxima lição concluída ou na próxima abertura do hub).
   function _aprSincronizarNuvem() {
-    if (_aprSincronizado) return;
     if (typeof _cliUser === 'undefined' || !_cliUser) return;
+    var uid = _cliUser.uid;
+    if (_aprSincUid === uid || _aprSincEmCurso === uid) return;
+    if (!_aprEstado) _aprEstado = _aprLerLocal();
+    _aprSincEmCurso = uid;
     _carregarFirebaseAprender().then(function () {
       var db = _aprDb();
       if (!db) return;
-      return db.collection('lang_progress').doc(_cliUser.uid).get().then(function (doc) {
+      return db.collection('lang_progress').doc(uid).get().then(function (doc) {
+        // Saiu (ou trocou de conta) enquanto lia: descarta, não mistura.
+        if (typeof _cliUser === 'undefined' || !_cliUser || _cliUser.uid !== uid) return;
         var remoto = (doc && doc.exists) ? (doc.data() || {}).en : null;
         var mesclado = _aprMesclar(_aprEstado.en, remoto);
         _aprEstado.en = mesclado;
         _aprSalvarLocal();
+        _aprSincUid = uid;
         _aprSalvarNuvem();
-        _aprSincronizado = true;
         // Se a mesclagem trouxe progresso de outro aparelho, atualiza a tela.
         if (_aprenderAberto()) {
           _aprRenderStats();
@@ -191,13 +202,21 @@
       });
     }).catch(function (err) {
       if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[aprender] sync falhou:', err && err.message);
+    }).then(function () {
+      if (_aprSincEmCurso === uid) _aprSincEmCurso = null;
     });
   }
 
   // Grava o estado atual no Firestore (best-effort, silencioso). Chamado
-  // depois de cada lição concluída e depois da 1ª mesclagem no login.
+  // depois de cada lição concluída, do nivelamento e da 1ª mesclagem.
+  // NUNCA grava antes de mesclar com a nuvem nesta conta: o set(merge)
+  // troca os arrays completedLessons INTEIROS, então gravar o local cru
+  // (ex.: a 1ª leitura falhou por estar offline) apagaria da nuvem as
+  // lições feitas em outro aparelho. Sem mesclagem ainda, pede a
+  // mesclagem — ela mesma grava no fim, já com tudo junto.
   function _aprSalvarNuvem() {
     if (typeof _cliUser === 'undefined' || !_cliUser) return;
+    if (_aprSincUid !== _cliUser.uid) { _aprSincronizarNuvem(); return; }
     var db = _aprDb();
     if (!db) return;
     db.collection('lang_progress').doc(_cliUser.uid).set({
@@ -207,6 +226,16 @@
       if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[aprender] gravação na nuvem falhou:', err && err.message);
     });
   }
+
+  // Login/logout/troca de conta (chamado pelo onAuthStateChanged em
+  // app.js — mesmo esquema do _bibAoMudarConta da Biblioteca). Só age se
+  // o módulo já foi aberto nesta sessão; senão a 1ª abertura sincroniza.
+  function _aprAoMudarConta() {
+    if (!_aprEstado) return;
+    _aprSincUid = null;
+    _aprSincronizarNuvem();
+  }
+  window._aprAoMudarConta = _aprAoMudarConta;
 
   /* ── Conteúdo: helpers de leitura ──────────────────────────── */
   function _aprUnidades() { return (window.APRENDER_CONTEUDO && APRENDER_CONTEUDO.unidades) || []; }
@@ -356,6 +385,11 @@
     else _aprVoltarMenu(); // já renderiza os cards
     _aprRenderStats();
     _aprSincronizarNuvem();
+    // Presença rica: amigos veem "Aprendendo inglês" (ver AngatubaPresenca
+    // em app.js — só publica se houver conta nomeada logada).
+    if (window.AngatubaPresenca && typeof window.AngatubaPresenca.atividade === 'function') {
+      window.AngatubaPresenca.atividade('aprender', null, 'Aprendendo inglês');
+    }
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
     if (history.state?.modal !== 'aprender-hub') history.pushState({ modal: 'aprender-hub' }, '');
   }
@@ -378,6 +412,10 @@
     if (siga) siga.style.display = '';
     var pill = document.getElementById('pill-aprender-btn');
     if (pill) pill.classList.remove('active');
+    // Só limpa se a atividade publicada for a do Aprender.
+    if (window.AngatubaPresenca && typeof window.AngatubaPresenca.limparAtividade === 'function') {
+      window.AngatubaPresenca.limparAtividade('aprender');
+    }
     if (!viaPopstate && history.state?.modal === 'aprender-hub') { _popstateNosso = true; history.back(); }
   }
   window._fecharAprender = _fecharAprender;
@@ -969,6 +1007,12 @@
       var botaoAudioEx = _aprCriarBotaoAudio(passo.exemplo.en);
       if (slotEx && botaoAudioEx) slotEx.appendChild(botaoAudioEx);
     }
+    // Fala sozinho ao abrir a tela (o exemplo, ou as palavras do bloco).
+    // Re-sincronizado do hub.min.js em produção: o build publicado já
+    // tinha este trecho, mas ele não estava neste fonte.
+    var falaAuto = (passo.exemplo && passo.exemplo.en) || vocab.map(function (p) { return p.en; }).join(', ');
+    var idxFala = _aprLicaoAtual ? _aprLicaoAtual.idx : -1;
+    if (falaAuto) setTimeout(function () { if (_aprLicaoAtual && _aprLicaoAtual.idx === idxFala) _aprFalar(falaAuto); }, 350);
 
     // O botão "Continuar" mora em #apr-licao-rodape — elemento IRMÃO de
     // #apr-exercicio-corpo (ver index.html), fora da área que rola. Sem
@@ -1138,7 +1182,10 @@
         '<div class="apr-ex-pergunta">' + ex.pergunta + '</div>';
     }
     area.innerHTML = '<div class="apr-ex-opcoes" id="apr-ex-opcoes"></div>';
-    _aprMontarOpcoes(ex.opcoes, ex.correta, /* opcoesEmIngles */ enPt);
+    // en-pt: pergunta em inglês, opções em português — então as opções
+    // só são em inglês (e ganham áudio) no sentido pt-en. Mesmo valor do
+    // hub.min.js publicado (o fonte passava enPt, invertido).
+    _aprMontarOpcoes(ex.opcoes, ex.correta, /* opcoesEmIngles */ !enPt);
   }
 
   // Monta os botões de opção (reaproveitado por escolha).
@@ -1162,6 +1209,7 @@
       btn.textContent = opt;
       btn.addEventListener('click', function () {
         if (btn.disabled) return;
+        if (comAudio) _aprFalar(opt); // idem: estava no hub.min.js publicado
         botoes.forEach(function (b) { b.classList.remove('apr-ex-opt-selecionada'); });
         btn.classList.add('apr-ex-opt-selecionada');
         selecionada = opt;

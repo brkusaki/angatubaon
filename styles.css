@@ -5338,6 +5338,29 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
   color: #fb923c; line-height: 1.15;
 }
 .streak-sub { font-size: 11.5px; color: var(--muted); line-height: 1.3; margin-top: 1px; }
+/* Banner de evento (Remote Config — ver _rcAplicar em app.js). Mesma
+   anatomia da faixa de ofensiva logo acima dele, em roxo/dourado. */
+.rc-evento-banner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; margin-bottom: 10px; border-radius: 14px;
+  background: linear-gradient(135deg, rgba(168,85,247,0.18), rgba(251,191,36,0.10));
+  border: 1px solid rgba(168,85,247,0.35);
+}
+.rc-evento-banner[hidden] { display: none; }
+.rc-evento-ico { font-size: 24px; line-height: 1; flex-shrink: 0; }
+.rc-evento-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.rc-evento-titulo { font-family: var(--font-h); font-weight: 800; font-size: 15px; color: var(--text); line-height: 1.2; }
+.rc-evento-sub { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
+.rc-evento-chip {
+  flex-shrink: 0; padding: 4px 10px; border-radius: 999px;
+  background: rgba(251,191,36,.18); color: #fbbf24;
+  font-size: 12px; font-weight: 800;
+}
+body.light-mode .rc-evento-chip { color: #b45309; }
+/* Card/chip desligado pelo Remote Config (ex.: mostrar_corujinha=false). */
+.games-cat-chip.rc-oculto,
+#games-menu .game-card.rc-oculto { display: none !important; }
+
 /* Ofensiva esfriada: tons apagados/cinza */
 .streak-faixa.streak-apagada {
   background: var(--surface); border-color: var(--border);
@@ -6091,6 +6114,8 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
     }
     .cli-amigo-dot.online { background: #22c55e; }
     .cli-amigo-dot.away { background: #f59e0b; }
+    /* Presença rica: online + com jogo aberto ("Jogando ..."). */
+    .cli-amigo-dot.online.jogando { background: #a855f7; }
     /* Bloco clicável (avatar + nome/presença) que abre o perfil da
        pessoa — mesmo destino do ranking. Fica fora da fileira de
        ações (Jogar / Remover / Aceitar / Recusar), que continua com
@@ -7128,6 +7153,37 @@ body.light-mode .perfil-titulo-conquista { background: rgba(37,99,235,0.10); bor
     .perfil-presenca-away::before { background: #fbbf24; }
     .perfil-presenca-offline { color: rgba(255,255,255,0.45); }
     .perfil-presenca-offline::before { background: rgba(255,255,255,0.4); }
+    /* Presença rica: "Jogando Voo da Coruja" — mesmo roxo do pontinho
+       da lista de amigos (.cli-amigo-dot.jogando). Sem caixa-alta: o
+       texto é uma frase, não um selo. */
+    .perfil-presenca-jogando { display: inline-flex; align-items: center; gap: 5px; color: #c084fc; text-transform: none; }
+    .perfil-presenca-jogando::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+      background: #c084fc; box-shadow: 0 0 6px rgba(192,132,252,.7);
+    }
+
+    /* ── Histórico de partidas (Fase 1) — reusa .perfil-stat-row ── */
+    .perfil-hist-row .perfil-hist-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .perfil-hist-row .perfil-stat-nome { flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .perfil-hist-quando { font-size: 11px; color: var(--muted); }
+    .perfil-hist-res {
+      flex-shrink: 0; padding: 2px 8px; border-radius: 999px;
+      font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em;
+      background: rgba(148,163,184,.16); color: var(--muted);
+    }
+    .perfil-hist-res-vitoria { background: rgba(34,197,94,.16); color: #4ade80; }
+    .perfil-hist-res-derrota { background: rgba(248,113,113,.14); color: #f87171; }
+    .perfil-hist-res-recorde { background: rgba(251,191,36,.18); color: #fbbf24; }
+    .perfil-hist-extra { display: none; }
+    .perfil-hist.perfil-hist-aberto .perfil-hist-extra { display: flex; }
+    .perfil-hist-mais {
+      width: 100%; padding: 9px; margin-top: 2px; border-radius: 12px; cursor: pointer;
+      background: transparent; border: 1px dashed var(--border); color: var(--muted);
+      font-family: inherit; font-size: 12px; font-weight: 700;
+    }
+    body.light-mode .perfil-hist-res-vitoria { color: #15803d; }
+    body.light-mode .perfil-hist-res-derrota { color: #b91c1c; }
+    body.light-mode .perfil-hist-res-recorde { color: #b45309; }
     @media (prefers-reduced-motion: reduce) {
       .perfil-vazio-owl { animation: none; }
     }
@@ -7181,6 +7237,7 @@ body.games-fs-open #games-hub {
 /* Cabeçalho do hub e faixa de ofensiva ganham respiro do topo em tela cheia */
 body.games-fs-open .games-hub-head { padding: 14px 16px 0; }
 body.games-fs-open .streak-faixa   { margin: 0 16px 10px; }
+body.games-fs-open .rc-evento-banner { margin: 0 16px 10px; }
 body.games-fs-open #games-menu     { padding: 0 16px 24px; }
 
 /* Cada tela de jogo ocupa a altura toda, em coluna: botão voltar no topo,
@@ -7314,6 +7371,7 @@ body.games-fs-open .quiz-coruja {
    sobra só a arena + HUD + botão voltar, ocupando a tela inteira. */
 #games-hub.jogo-ativo .games-hub-head,
 #games-hub.jogo-ativo .streak-faixa,
+#games-hub.jogo-ativo .rc-evento-banner,
 #games-hub.jogo-ativo .rank-abrir-btn,
 #games-hub.jogo-ativo .perfil-abrir-btn,
 #games-hub.jogo-ativo .loja-abrir-btn,

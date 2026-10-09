@@ -501,6 +501,230 @@
     return _fbMsgCarregado;
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     REMOTE CONFIG (Firebase) — Fase 1, item 3
+     ------------------------------------------------------------
+     Textos de evento, flags e valores simples que dá pra mudar pelo
+     Console do Firebase sem deploy. Regra de ouro: o app NUNCA depende
+     do Remote Config pra funcionar.
+       1. Valores em uso = cache local (angatuba_rc) ou, sem cache, os
+          padrões de RC_PADROES abaixo — aplicados na hora, no boot,
+          sem rede nenhuma.
+       2. A busca no Firebase só acontece quando o hub de jogos abre
+          (único lugar que usa os valores hoje — quem só vê o cardápio
+          nunca baixa o SDK), no máx. 1x por hora (RC_INTERVALO_MS; o
+          próprio SDK respeita esse intervalo e devolve o que já tem).
+       3. Falhou (offline, SDK bloqueado, timeout de 8s, parâmetro com
+          lixo)? Fica o que já estava. Todo valor passa por _rcSanear
+          (tipo certo, texto curto, multiplicador entre 1 e 3) e data
+          inválida desliga o evento (fail-closed).
+
+     Parâmetros (criar no Console › Remote Config com estes nomes):
+       evento_ativo          bool    liga o banner de evento no hub de jogos
+       evento_titulo         string  título do banner (máx. 60)
+       evento_texto          string  linha de baixo do banner (máx. 140)
+       evento_inicio         string  'AAAA-MM-DD' (ou ISO), opcional
+       evento_fim            string  'AAAA-MM-DD' (inclusive) ou ISO, opcional
+       mostrar_corujinha     bool    false esconde a Corujinha (card + atalho)
+       moedas_multiplicador  number  1 = normal; 2 = moedas em dobro nos
+                                     jogos (1 a 3; vale só dentro da janela
+                                     evento_inicio–evento_fim, se houver)
+
+     API (window.AngatubaConfig): get(chave), eventoAtivo(),
+     multiplicadorMoedas(), corujinhaLiberada(), atualizar(),
+     aoMudar(cb).
+  ══════════════════════════════════════════════════════════════ */
+  var RC_CACHE_KEY = 'angatuba_rc';
+  var RC_PADROES = {
+    evento_ativo: false,
+    evento_titulo: '',
+    evento_texto: '',
+    evento_inicio: '',
+    evento_fim: '',
+    mostrar_corujinha: true,
+    moedas_multiplicador: 1
+  };
+  var RC_TEXTO_MAX = { evento_titulo: 60, evento_texto: 140, evento_inicio: 25, evento_fim: 25 };
+  var RC_INTERVALO_MS = 60 * 60 * 1000;
+  var RC_TIMEOUT_MS = 8000;
+  var RC_MULT_MAX = 3;
+  var _rcValores = null;
+  var _rcBuscando = null;
+  var _rcOuvintes = [];
+
+  // Força cada chave pro tipo do padrão; chave ausente/estranha = padrão.
+  function _rcSanear(bruto) {
+    bruto = (bruto && typeof bruto === 'object') ? bruto : {};
+    var out = {};
+    Object.keys(RC_PADROES).forEach(function (k) {
+      var pad = RC_PADROES[k], v = bruto[k];
+      if (typeof pad === 'boolean') {
+        out[k] = (v === true || v === 'true') ? true : ((v === false || v === 'false') ? false : pad);
+      } else if (typeof pad === 'number') {
+        var n = Number(v);
+        out[k] = isFinite(n) ? n : pad;
+      } else {
+        out[k] = (v == null) ? pad : String(v).trim().slice(0, RC_TEXTO_MAX[k] || 140);
+      }
+    });
+    var m = out.moedas_multiplicador;
+    out.moedas_multiplicador = (m >= 1) ? Math.min(RC_MULT_MAX, Math.round(m * 10) / 10) : 1;
+    return out;
+  }
+
+  function _rcLerCache() {
+    try {
+      var o = JSON.parse(localStorage.getItem(RC_CACHE_KEY) || 'null');
+      return _rcSanear(o && o.v);
+    } catch (e) { return _rcSanear(null); }
+  }
+
+  function _rcVal() {
+    if (!_rcValores) _rcValores = _rcLerCache();
+    return _rcValores;
+  }
+
+  // 'AAAA-MM-DD' = dia local (fimDoDia: até 23:59:59); senão Date.parse.
+  // null = sem data; NaN = data inválida.
+  function _rcData(str, fimDoDia) {
+    str = String(str || '').trim();
+    if (!str) return null;
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+    if (m) {
+      var d = new Date(+m[1], +m[2] - 1, +m[3]);
+      if (fimDoDia) d.setHours(23, 59, 59, 999);
+      return d.getTime();
+    }
+    var t = Date.parse(str);
+    return isNaN(t) ? NaN : t;
+  }
+  function _rcDentroDaJanela() {
+    var v = _rcVal(), agora = Date.now();
+    var ini = _rcData(v.evento_inicio, false), fim = _rcData(v.evento_fim, true);
+    if (ini !== null && (isNaN(ini) || agora < ini)) return false;
+    if (fim !== null && (isNaN(fim) || agora > fim)) return false;
+    return true;
+  }
+  function _rcEventoAtivo() {
+    var v = _rcVal();
+    return !!(v.evento_ativo && v.evento_titulo && _rcDentroDaJanela());
+  }
+  function _rcMultiplicadorMoedas() {
+    var v = _rcVal();
+    return (v.moedas_multiplicador > 1 && _rcDentroDaJanela()) ? v.moedas_multiplicador : 1;
+  }
+  function _rcCorujinhaLiberada() { return _rcVal().mostrar_corujinha !== false; }
+
+  /* Aplica os valores na tela: banner do hub de jogos e Corujinha.
+     Idempotente — roda no boot (cache), depois de cada busca e quando o
+     hub abre (a janela de datas pode ter virado com o app aberto). */
+  function _rcAplicar() {
+    var v = _rcVal();
+    var mult = _rcMultiplicadorMoedas();
+    var banner = document.getElementById('rc-evento-banner');
+    if (banner) {
+      var ativo = _rcEventoAtivo();
+      if (ativo || mult > 1) {
+        var multTxt = String(mult).replace('.', ',');
+        var titulo = ativo ? v.evento_titulo : 'Evento de moedas! 🪙';
+        var texto = ativo ? v.evento_texto : ('Moedas x' + multTxt + ' nas partidas dos jogos.');
+        banner.innerHTML = '';
+        var ico = document.createElement('span');
+        ico.className = 'rc-evento-ico'; ico.setAttribute('aria-hidden', 'true'); ico.textContent = '🎉';
+        var txt = document.createElement('span');
+        txt.className = 'rc-evento-txt';
+        var t1 = document.createElement('span');
+        t1.className = 'rc-evento-titulo'; t1.textContent = titulo;
+        txt.appendChild(t1);
+        if (texto) {
+          var t2 = document.createElement('span');
+          t2.className = 'rc-evento-sub'; t2.textContent = texto;
+          txt.appendChild(t2);
+        }
+        banner.appendChild(ico);
+        banner.appendChild(txt);
+        if (mult > 1) {
+          var chip = document.createElement('span');
+          chip.className = 'rc-evento-chip'; chip.textContent = '🪙 x' + multTxt;
+          banner.appendChild(chip);
+        }
+        banner.hidden = false;
+      } else {
+        banner.hidden = true;
+        banner.innerHTML = '';
+      }
+    }
+    // Corujinha: card do menu + chip "Sorte" (só ela mora lá). O filtro
+    // do hub (_gamesAplicarFiltro) pula card com .rc-oculto.
+    var liberada = _rcCorujinhaLiberada();
+    document.querySelectorAll('#games-menu .gc-corujinha').forEach(function (c) {
+      c.classList.toggle('rc-oculto', !liberada);
+    });
+    var chipSorte = document.querySelector('#games-cat-chips [data-cat="sorte"]');
+    if (chipSorte) chipSorte.classList.toggle('rc-oculto', !liberada);
+    if (typeof window._gamesFiltrar === 'function') { try { window._gamesFiltrar(); } catch (e) {} }
+    _rcOuvintes.forEach(function (cb) { try { cb(v); } catch (e) {} });
+  }
+
+  var _fbRcCarregado = null;
+  function _carregarFirebaseRC() {
+    if (_fbRcCarregado) return _fbRcCarregado;
+    _fbRcCarregado = _carregarFirebaseApp().then(function () {
+      return _injetarScript(FIREBASE_SDK_BASE + 'firebase-remote-config-compat.js');
+    }).then(function () {
+      return new Promise(function (resolve, reject) {
+        var tentativas = 0;
+        (function checar() {
+          if (window.firebase && firebase.remoteConfig) { resolve(); return; }
+          if (++tentativas > 100) { reject(new Error('Remote Config não carregou.')); return; }
+          setTimeout(checar, 50);
+        })();
+      });
+    }).catch(function (err) { _fbRcCarregado = null; throw err; });
+    return _fbRcCarregado;
+  }
+
+  // Busca + ativa no Firebase. Resolve true se aplicou valores da nuvem,
+  // false em qualquer falha (nunca rejeita — quem chama não precisa catch).
+  function _rcAtualizar() {
+    _rcAplicar();   // janela de datas pode ter virado desde o boot
+    if (_rcBuscando) return _rcBuscando;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return Promise.resolve(false);
+    _rcBuscando = _carregarFirebaseRC().then(function () {
+      var rc = firebase.remoteConfig();
+      rc.settings = { minimumFetchIntervalMillis: RC_INTERVALO_MS, fetchTimeoutMillis: RC_TIMEOUT_MS };
+      // Padrão do SDK = o que já está em uso: parâmetro que não existir no
+      // Console mantém o valor atual em vez de "zerar".
+      rc.defaultConfig = _rcVal();
+      return rc.fetchAndActivate().then(function () {
+        var novo = {};
+        Object.keys(RC_PADROES).forEach(function (k) {
+          var val = rc.getValue(k), tipo = typeof RC_PADROES[k];
+          novo[k] = (tipo === 'boolean') ? val.asBoolean() : (tipo === 'number' ? val.asNumber() : val.asString());
+        });
+        _rcValores = _rcSanear(novo);
+        try { localStorage.setItem(RC_CACHE_KEY, JSON.stringify({ v: _rcValores, em: Date.now() })); } catch (e) {}
+        _rcAplicar();
+        return true;
+      });
+    }).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[remote-config] usando cache/padrão:', err && (err.code || err.message));
+      return false;
+    }).then(function (r) { _rcBuscando = null; return r; });
+    return _rcBuscando;
+  }
+
+  window.AngatubaConfig = {
+    get: function (chave) { return _rcVal()[chave]; },
+    eventoAtivo: _rcEventoAtivo,
+    multiplicadorMoedas: _rcMultiplicadorMoedas,
+    corujinhaLiberada: _rcCorujinhaLiberada,
+    atualizar: _rcAtualizar,
+    aoMudar: function (cb) { if (typeof cb === 'function') _rcOuvintes.push(cb); }
+  };
+  // Boot: aplica o cache (ou os padrões) já — sem rede, sem esperar nada.
+  try { _rcAplicar(); } catch (e) {}
+
   /* ── Hub de jogos: Jogos/hub.js carregado sob demanda ──────────────
      O hub inteiro (menu, streak, quiz, ranking, loader dos jogos
      externos) foi extraído pra Jogos/hub.js — quem só quer ver o
@@ -15986,6 +16210,10 @@ ${urlCard}`)}`;
       // Biblioteca: troca listas/progresso pro dono certo (só age se ela
       // já foi aberta nesta sessão — ver _bibAoMudarConta em Biblioteca/hub.js).
       if (typeof _bibAoMudarConta === 'function') { try { _bibAoMudarConta(); } catch (e) {} }
+      // Aprender: mescla o progresso com o lang_progress da conta que entrou
+      // (só age se o módulo já foi aberto nesta sessão — ver _aprAoMudarConta
+      // em Aprender/hub.js; senão a 1ª abertura sincroniza sozinha).
+      if (typeof _aprAoMudarConta === 'function') { try { _aprAoMudarConta(); } catch (e) {} }
       if (_cliUser) {
         // Preferimos o displayName do Firebase; se não houver (ex.: e-mail
         // sem nome ainda), caímos no apelido salvo localmente.
@@ -16652,12 +16880,7 @@ ${urlCard}`)}`;
     try {
       var eq = _equipadoLer() || {};
       if (hero && typeof _perfilBgEstilo === 'function') hero.setAttribute('style', _perfilBgEstilo(eq.bg) || '');
-      if (ident && typeof _perfilCardClasse === 'function') {
-        ident.className = ('perfil-identidade ' + _perfilCardClasse(eq.card)).trim();
-        // Card com moldura por imagem: as variáveis CSS (--card-img/--card-fatia)
-        // vêm de _perfilCardEstilo (Jogos/hub.js); vazio nos cards só-CSS.
-        ident.style.cssText = (typeof _perfilCardEstilo === 'function') ? _perfilCardEstilo(eq.card) : '';
-      }
+      if (ident && typeof _perfilCardClasse === 'function') ident.className = ('perfil-identidade ' + _perfilCardClasse(eq.card)).trim();
       if (tits) {
         tits.innerHTML =
           (typeof _perfilTituloHtml === 'function' ? _perfilTituloHtml(eq) : '') +
@@ -16878,8 +17101,22 @@ ${urlCard}`)}`;
        presence/{uid} = {
          state:        'online' | 'away' | 'offline',
          nome:         string (cliNomeExibicao, máx 20),
-         atualizadoEm: timestamp do servidor
+         atualizadoEm: timestamp do servidor,
+         jogo?:        string (máx 20) — id do jogo aberto (ex.: 'voo')
+         texto?:       string (máx 40) — "Jogando Voo da Coruja",
+                       "Na Biblioteca", "Aprendendo inglês"
        }
+
+     PRESENÇA RICA (Fase 1, item 4): "jogando" NÃO é um valor novo de
+     `state` — de propósito. Aparelhos com o bundle antigo em cache
+     pintam qualquer state desconhecido como "Offline" (ver
+     _amPintarPresenca antigo) e o botão "Chamar pra jogar" só acende
+     com 'online'. Então o state segue online/away/offline e a
+     atividade vem nos campos opcionais jogo/texto: o app novo mostra
+     "Jogando Voo da Coruja", o velho continua vendo "Online". O rótulo
+     final sai de AngatubaPresenca.rotulo(p) — fonte única pra lista de
+     amigos, lobby e perfil. 'offline' nunca carrega atividade (o
+     onDisconnect grava o nó limpo).
 
      `atualizadoEm` (e não `atualmenteEm`) pra casar com o nome que os
      docs de ranking no Firestore já usam.
@@ -16910,6 +17147,16 @@ ${urlCard}`)}`;
                               Devolve uma função pra parar de ouvir.
        atualizarNome()     -> reescreve o nome (chamado ao trocar o
                               apelido), sem mexer no state
+       atividade(origem, jogo, texto)
+                           -> publica a atividade atual ('jogo',
+                              'aprender', 'biblioteca'...). Sem conta
+                              logada só guarda em memória.
+       limparAtividade(origem)
+                           -> tira a atividade, mas SÓ se ela for da
+                              mesma origem (fechar a Biblioteca não
+                              apaga um "Jogando" que veio depois)
+       rotulo(p)           -> { estado: 'online'|'ausente'|'jogando'|
+                              'offline', texto } pra pintar a UI
      As regras não permitem LISTAR presence/ — só ler presence/{uid}
      um a um. Isso é proposital: impede o feed "toda Angatuba online"
      mesmo que alguém tente pelo console.
@@ -16924,6 +17171,12 @@ ${urlCard}`)}`;
   var _presAwayTimer = null;
   var _presVisBind = false;      // visibilitychange ligado uma única vez
   var _presIniciando = false;    // evita dois _presencaIniciar em paralelo
+  // Atividade atual (presença rica): { origem, jogo, texto } ou null.
+  // Vive em memória mesmo sem presença ligada — quando a presença liga
+  // (login depois de abrir um jogo), o 1º _presPublicar já leva junto.
+  var _presAtividade = null;
+  var PRES_JOGO_MAX = 20;        // mesmos tetos de database.rules.json
+  var PRES_TEXTO_MAX = 40;
 
   function _presDb() {
     if (typeof firebase === 'undefined' || !firebase.database) return null;
@@ -16933,11 +17186,40 @@ ${urlCard}`)}`;
   // Objeto gravado no nó. nome sempre pelo cliNomeExibicao (mesma
   // identidade do header, do painel e do ranking).
   function _presValor(state) {
-    return {
+    var v = {
       state: state,
       nome: cliNomeExibicao() || 'Jogador',
       atualizadoEm: firebase.database.ServerValue.TIMESTAMP
     };
+    // Atividade só acompanha quem está no app ('offline' sai limpo —
+    // inclusive o valor que o onDisconnect deixa registrado).
+    if (state !== 'offline' && _presAtividade) {
+      if (_presAtividade.jogo) v.jogo = _presAtividade.jogo;
+      if (_presAtividade.texto) v.texto = _presAtividade.texto;
+    }
+    return v;
+  }
+
+  /* Rótulo de exibição de um nó de presença (de qualquer pessoa).
+     'jogando' só vale com state 'online' — ausente/offline ganham do
+     jogo (quem minimizou o app no meio da partida não está jogando). */
+  function _presRotulo(p) {
+    var st = (p && p.state) || 'offline';
+    if (st === 'online') {
+      var texto = (p.texto && String(p.texto).slice(0, PRES_TEXTO_MAX)) || '';
+      if (p.jogo) return { estado: 'jogando', texto: texto || 'Jogando' };
+      return { estado: 'online', texto: texto || 'Online' };
+    }
+    if (st === 'away') return { estado: 'ausente', texto: 'Ausente' };
+    return { estado: 'offline', texto: 'Offline' };
+  }
+  // Classe do pontinho (.cli-amigo-dot) — 'jogando' é um verde com anel.
+  function _presClasseDot(p) {
+    var e = _presRotulo(p).estado;
+    if (e === 'jogando') return ' online jogando';
+    if (e === 'online') return ' online';
+    if (e === 'ausente') return ' away';
+    return '';
   }
 
   // Publica um state no nó do próprio usuário. Silencioso: presença é
@@ -17068,7 +17350,29 @@ ${urlCard}`)}`;
     // Trocou o apelido: reescreve o nome mantendo o state atual.
     atualizarNome: function () {
       if (_presRef && _presEstado) _presPublicar(_presEstado);
-    }
+    },
+    // Presença rica: o que a pessoa está fazendo agora. Só reescreve o
+    // nó se algo mudou de verdade (abrir/fechar telas chama isto várias
+    // vezes seguidas).
+    atividade: function (origem, jogo, texto) {
+      if (!origem) return;
+      var nova = {
+        origem: String(origem),
+        jogo: jogo ? String(jogo).slice(0, PRES_JOGO_MAX) : '',
+        texto: texto ? String(texto).trim().slice(0, PRES_TEXTO_MAX) : ''
+      };
+      var a = _presAtividade;
+      if (a && a.origem === nova.origem && a.jogo === nova.jogo && a.texto === nova.texto) return;
+      _presAtividade = nova;
+      if (_presRef && _presEstado && _presEstado !== 'offline') _presPublicar(_presEstado);
+    },
+    limparAtividade: function (origem) {
+      if (!_presAtividade) return;
+      if (origem && _presAtividade.origem !== origem) return;
+      _presAtividade = null;
+      if (_presRef && _presEstado && _presEstado !== 'offline') _presPublicar(_presEstado);
+    },
+    rotulo: function (p) { return _presRotulo(p); }
   };
 
   /* ══════════════════════════════════════════════════════════════
@@ -17639,9 +17943,11 @@ ${urlCard}`)}`;
   function _amPintarPresenca(uid, p) {
     var estado = (p && p.state) || 'offline';
     var dot = document.querySelector('.cli-amigo-dot[data-pres="' + uid + '"]');
-    if (dot) dot.className = 'cli-amigo-dot' + (estado === 'online' ? ' online' : (estado === 'away' ? ' away' : ''));
+    if (dot) dot.className = 'cli-amigo-dot' + _presClasseDot(p);
+    // Presença rica: "Jogando Voo da Coruja", "Na Biblioteca"... (textContent:
+    // o texto vem do nó de outra pessoa, nunca vira HTML).
     var txt = document.querySelector('.cli-amigo-sub[data-pres-txt="' + uid + '"]');
-    if (txt) txt.textContent = (estado === 'online') ? 'Online' : (estado === 'away' ? 'Ausente' : 'Offline');
+    if (txt) txt.textContent = _presRotulo(p).texto;
     // Botão de chamar pra jogar (4.4) em destaque só pra quem está
     // online — offline continua clicável, o convite espera na caixa.
     var jg = document.querySelector('.cli-amigo-btn.jogar[data-jogar="' + uid + '"]');
@@ -19806,11 +20112,10 @@ ${urlCard}`)}`;
   }
 
   function _lobUiPintarPresenca(uid, p) {
-    var estado = (p && p.state) || 'offline';
     var dot = document.querySelector('.cli-amigo-dot[data-lobpres="' + uid + '"]');
     if (dot) {
-      dot.className = 'cli-amigo-dot' +
-        (estado === 'online' ? ' online' : (estado === 'away' ? ' away' : ''));
+      dot.className = 'cli-amigo-dot' + _presClasseDot(p);
+      dot.title = _presRotulo(p).texto;
     }
   }
 
@@ -20921,8 +21226,8 @@ ${urlCard}`)}`;
         _lobAmiPres[uid] = agora;
         var dot = document.querySelector('.cli-amigo-dot[data-lobami="' + uid + '"]');
         if (dot) {
-          dot.className = 'cli-amigo-dot' +
-            (agora === 'online' ? ' online' : (agora === 'away' ? ' away' : ''));
+          dot.className = 'cli-amigo-dot' + _presClasseDot(p);
+          dot.title = _presRotulo(p).texto;
         }
         // Só redesenha quando a ORDEM muda (entrou ou saiu do grupo
         // "online"): o pontinho acima já resolveu o resto.

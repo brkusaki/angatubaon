@@ -72,6 +72,9 @@
     { id: 'dorian-gray', titulo: 'O Retrato de Dorian Gray', autor: 'Oscar Wilde', ano: 1890, cats: ['Gótico', 'Drama', 'Estrangeiros'],
       cor: ['#4c1d95', '#831843', '#f9a8d4'], trad: BIB_TRAD_EN,
       sinopse: 'Um jovem de beleza extraordinária deseja que seu retrato envelheça no lugar dele — e o desejo se cumpre. Enquanto Dorian mergulha em prazeres e crueldades, a pintura escondida registra cada pecado.' },
+    { id: 'medico-e-o-monstro', titulo: 'O Médico e o Monstro', autor: 'Robert Louis Stevenson', ano: 1886, cats: ['Gótico', 'Terror', 'Leitura rápida', 'Estrangeiros'],
+      cor: ['#14281d', '#0c0a09', '#a3e635'], trad: BIB_TRAD_EN,
+      sinopse: 'Numa madrugada de Londres, um homenzinho repulsivo pisoteia uma criança e paga o estrago com um cheque assinado pelo respeitadíssimo dr. Jekyll. O advogado Utterson decide descobrir o que une os dois — e esbarra num dos segredos mais sombrios da literatura. Uma novela curta e eletrizante sobre o monstro que cada um esconde.' },
     { id: 'coracao-das-trevas', titulo: 'Coração das Trevas', autor: 'Joseph Conrad', ano: 1899, cats: ['Aventura', 'Drama', 'Leitura rápida', 'Estrangeiros'],
       cor: ['#022c22', '#030712', '#86efac'], trad: BIB_TRAD_EN,
       sinopse: 'Marlow sobe um rio na África colonial à procura de Kurtz, um agente do marfim que ganhou fama e um poder sombrio no interior. Uma viagem curta e intensa ao horror do colonialismo e à escuridão humana.' },
@@ -95,7 +98,7 @@
   var BIB_PALAVRAS = { '1984': 100926, 'revolucao-dos-bichos': 29138, 'metamorfose': 20096, 'processo': 74405,
     'frankenstein': 70953, 'dracula': 157380, 'maquina-do-tempo': 31939, 'guerra-dos-mundos': 59788,
     'dorian-gray': 74555, 'coracao-das-trevas': 36472, 'chamado-da-floresta': 30623, 'cortico': 80573,
-    'dom-casmurro': 65464, 'bras-cubas': 60304, 'policarpo': 66515 };
+    'dom-casmurro': 65464, 'bras-cubas': 60304, 'policarpo': 66515, 'medico-e-o-monstro': 25080 };
   var BIB_PPM = 220; // palavras por minuto (leitura silenciosa média)
 
   var BIB_CHAVE_ANON = 'angatuba_biblioteca';

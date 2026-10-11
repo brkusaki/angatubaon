@@ -1,0 +1,179 @@
+/* ═══════════════════════════════════════════════════════════════
+   RITMO DA CORUJA — estilos do módulo (carregado sob demanda)
+   Tudo é desenhado dentro de #ritmo-root (ver Jogos/ritmo.js).
+   Paleta: fundo escuro do app, roxo-coruja (#a78bfa) e âmbar (#fbbf24).
+   ═══════════════════════════════════════════════════════════════ */
+#ritmo-root {
+  position: relative;
+  display: flex; flex-direction: column;
+  height: min(82vh, 760px);           /* fora da tela cheia */
+  border-radius: 16px; overflow: hidden;
+  background: radial-gradient(120% 70% at 50% 0%, #1d1336 0%, #0b0f17 60%);
+  color: #fff;
+}
+body.games-fs-open #ritmo-root { flex: 1; min-height: 0; height: auto; border-radius: 0; }
+
+/* "Voltar aos jogos" flutua no canto (mesmo esquema do Piano) pra
+   seleção e arena usarem a altura toda. */
+body.games-fs-open #games-hub.jogo-ativo #jogo-ritmo .jogo-voltar {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 8px); left: 8px;
+  z-index: 6; margin: 0; padding: 8px 12px;
+  background: rgba(9, 14, 22, .55); border-radius: 999px;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  font-size: 13px;
+}
+
+/* ── Seleção ─────────────────────────────────────────────────── */
+.rt-sel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.rt-sel-topo { padding: 16px 16px 10px; text-align: center; }
+body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px) + 54px); }
+.rt-sel-titulo { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; }
+.rt-sel-sub { font-size: 13px; color: #c7d1e0; margin-top: 4px; }
+.rt-aviso-som {
+  margin-top: 10px; width: 100%; max-width: 420px;
+  border: 1px solid rgba(248,113,113,.4); background: rgba(248,113,113,.12);
+  color: #fecaca; border-radius: 12px; padding: 8px 12px;
+  font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+
+.rt-lista {
+  flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 4px 16px 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.rt-musica {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 11px 12px; border-radius: 14px; text-align: left; cursor: pointer;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+  color: #fff; -webkit-tap-highlight-color: transparent;
+  transition: background .15s, border-color .15s, transform .12s;
+}
+.rt-musica:active { transform: scale(.985); }
+.rt-musica-sel { background: rgba(167,139,250,.14); border-color: rgba(167,139,250,.55); }
+.rt-musica-ico {
+  flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.06); color: #fbbf24; font-size: 15px;
+}
+.rt-musica-sel .rt-musica-ico { background: #a78bfa; color: #120b24; }
+.rt-musica-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rt-musica-tit { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-musica-meta { font-size: 12px; color: rgba(199,209,224,.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-musica-ranks { display: flex; gap: 5px; flex-shrink: 0; }
+.rt-badge {
+  min-width: 26px; height: 26px; padding: 0 5px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif; font-weight: 900; font-size: 12px;
+  background: rgba(255,255,255,.05); color: rgba(199,209,224,.3);
+  border: 1px solid rgba(255,255,255,.08);
+}
+.rt-badge-h { border-color: rgba(248,113,113,.25); }
+
+/* Cores dos ranks (badges e tela de resultado) */
+.rt-r-SS { color: #fde68a !important; }
+.rt-r-S  { color: #fbbf24 !important; }
+.rt-r-A  { color: #5eead4 !important; }
+.rt-r-B  { color: #7cc4ff !important; }
+.rt-r-C  { color: #c4b5fd !important; }
+.rt-r-D  { color: #f87171 !important; }
+
+.rt-painel {
+  flex-shrink: 0; padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 14px);
+  background: linear-gradient(180deg, rgba(11,15,23,0) 0%, rgba(11,15,23,.92) 22%);
+  border-top: 1px solid rgba(255,255,255,.06);
+  display: flex; flex-direction: column; gap: 10px; align-items: center;
+}
+.rt-difs { display: flex; gap: 8px; width: 100%; max-width: 420px; }
+.rt-dif {
+  flex: 1; display: flex; flex-direction: column; gap: 2px; align-items: center;
+  padding: 9px 8px; border-radius: 12px; cursor: pointer; color: #fff;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(94,234,212,.25);
+  -webkit-tap-highlight-color: transparent;
+}
+.rt-dif-hard { border-color: rgba(248,113,113,.25); }
+.rt-dif-ativa { background: rgba(94,234,212,.14); border-color: #5eead4; }
+.rt-dif-hard.rt-dif-ativa { background: rgba(248,113,113,.14); border-color: #f87171; }
+.rt-dif-nome { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; }
+.rt-dif-info { font-size: 11px; color: rgba(199,209,224,.75); }
+
+.rt-ajustes { display: flex; gap: 8px; width: 100%; max-width: 420px; }
+.rt-ajuste {
+  flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 4px;
+  padding: 5px 6px 6px; border-radius: 12px; background: rgba(255,255,255,.04);
+}
+/* rótulo em cima, − valor + embaixo: cabe em 2 colunas até em 320 px */
+.rt-ajuste-rot { width: 100%; text-align: center; font-size: 10px; color: rgba(199,209,224,.7); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.rt-ajuste-val { flex: 1; font-weight: 800; font-size: 13px; text-align: center; white-space: nowrap; }
+.rt-step {
+  width: 30px; height: 30px; border-radius: 9px; border: none; cursor: pointer;
+  background: rgba(255,255,255,.08); color: #fff; font-size: 17px; font-weight: 800; line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+.rt-step:active { background: rgba(255,255,255,.18); }
+
+.rt-jogar {
+  width: 100%; max-width: 420px; border: none; border-radius: 999px; cursor: pointer;
+  padding: 14px 20px; font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800;
+  color: #120b24; background: linear-gradient(90deg, #a78bfa, #fbbf24);
+  box-shadow: 0 8px 24px rgba(167,139,250,.35);
+  -webkit-tap-highlight-color: transparent; transition: transform .12s, filter .12s;
+}
+.rt-jogar:active { transform: scale(.97); filter: brightness(1.05); }
+.rt-link {
+  margin-top: 4px; background: none; border: none; color: rgba(199,209,224,.75);
+  font-size: 13px; font-weight: 600; text-decoration: underline; cursor: pointer;
+}
+
+/* ── Partida ─────────────────────────────────────────────────── */
+.rt-jogo { position: relative; flex: 1; min-height: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+.rt-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.rt-progresso {
+  position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  background: rgba(255,255,255,.06); pointer-events: none;
+}
+.rt-progresso-barra { height: 100%; width: 0; background: linear-gradient(90deg, #a78bfa, #fbbf24); }
+.rt-hud {
+  position: absolute; top: calc(env(safe-area-inset-top, 0px) + 10px); right: 12px;
+  text-align: right; pointer-events: none;
+}
+.rt-hud-score { font-family: 'Syne', sans-serif; font-weight: 900; font-size: 20px; font-variant-numeric: tabular-nums; }
+.rt-hud-acc { font-size: 12px; font-weight: 700; color: rgba(199,209,224,.85); font-variant-numeric: tabular-nums; }
+.rt-aviso {
+  position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%);
+  padding: 12px 18px; border-radius: 14px; background: rgba(9,14,22,.8);
+  font-weight: 700; font-size: 14px; text-align: center; max-width: 80%;
+  pointer-events: none;
+}
+
+/* ── Resultado ───────────────────────────────────────────────── */
+.rt-res {
+  position: relative; flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 56px) 20px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  text-align: center;
+}
+.rt-res > :first-child { margin-top: auto; }   /* centraliza sem cortar o topo quando rola */
+.rt-res > :last-child { margin-bottom: auto; }
+.rt-res-musica { font-size: 13px; color: #c7d1e0; font-weight: 600; }
+.rt-res-rank {
+  font-family: 'Syne', sans-serif; font-weight: 900; font-size: 96px; line-height: 1;
+  text-shadow: 0 0 32px currentColor; animation: rtRankEntra .5s cubic-bezier(.2,1.6,.4,1);
+}
+@keyframes rtRankEntra { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.rt-res-recorde { font-size: 13px; font-weight: 800; color: #fbbf24; }
+.rt-res-score { font-family: 'Syne', sans-serif; font-weight: 900; font-size: 30px; font-variant-numeric: tabular-nums; }
+.rt-res-grade { display: flex; gap: 10px; width: 100%; max-width: 360px; }
+.rt-res-grade > div {
+  flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 10px;
+  border-radius: 14px; background: rgba(255,255,255,.05);
+}
+.rt-res-grade span { font-size: 11px; color: rgba(199,209,224,.7); text-transform: uppercase; letter-spacing: .04em; }
+.rt-res-grade b { font-size: 20px; font-family: 'Syne', sans-serif; }
+.rt-res-cont { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; font-size: 12.5px; font-weight: 700; max-width: 360px; }
+.rt-res-cont b { color: #fff; margin-left: 2px; }
+.rt-res-moedas { font-size: 18px; font-weight: 900; color: #ffd740; margin: 4px 0 6px; }
+.rt-res-moedas-zero { font-size: 12.5px; font-weight: 600; color: rgba(199,209,224,.7); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rt-res-rank { animation: none; }
+}

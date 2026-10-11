@@ -958,9 +958,10 @@
     blocos: 'Blocos da Coruja', doces: 'Doces da Coruja', '2048': '2048 da Coruja',
     armadilha: 'Armadilha da Coruja', pingpong: 'Ping Pong da Coruja',
     tanques: 'Batalha de Tanques', hoquei: 'Hóquei da Coruja', party: 'Coruja Party',
-    negocios: 'Negócios da Cidade', baralho: 'Baralho', corujinha: 'Corujinha'
+    negocios: 'Negócios da Cidade', baralho: 'Baralho', corujinha: 'Corujinha',
+    ritmo: 'Ritmo da Coruja'
   };
-  var JOGO_ICOS = { pingpong: '🏓', tanques: '💥', hoquei: '🏒' };
+  var JOGO_ICOS = { pingpong: '🏓', tanques: '💥', hoquei: '🏒', ritmo: '🎵' };
 
   // nome = id do jogo aberto, ou null pra limpar. Só mexe na atividade
   // de origem 'jogo' — não apaga um "Na Biblioteca" de outra origem.
@@ -980,6 +981,7 @@
     if (window.VooGame       && typeof window.VooGame.parar       === 'function') window.VooGame.parar();
     if (window.CorridaGame   && typeof window.CorridaGame.parar   === 'function') window.CorridaGame.parar();
     if (window.PianoGame     && typeof window.PianoGame.parar     === 'function') window.PianoGame.parar();
+    if (window.RitmoGame     && typeof window.RitmoGame.parar     === 'function') window.RitmoGame.parar();
     if (window.PingPongGame  && typeof window.PingPongGame.parar  === 'function') window.PingPongGame.parar();
     if (window.TanquesGame   && typeof window.TanquesGame.parar   === 'function') window.TanquesGame.parar();
     if (window.HoqueiGame    && typeof window.HoqueiGame.parar    === 'function') window.HoqueiGame.parar();
@@ -1191,6 +1193,10 @@
     sequencia: { js: '/Jogos/sequencia.min.js', css: '/Jogos/sequencia.css', global: 'SequenciaGame' },
     corrida: { js: '/Jogos/corrida.min.js', css: '/Jogos/corrida.css', global: 'CorridaGame' },
     piano: { js: '/Jogos/piano.min.js', css: '/Jogos/piano.css', global: 'PianoGame' },
+    // Ritmo da Coruja (estilo osu!mania, 4 colunas). As músicas (/musicas/*.mp3)
+    // e os beatmaps (/Jogos/ritmo/beatmaps/*.json) são baixados só quando a
+    // pessoa escolhe a música — o SW guarda o MP3 no CACHE_JOGOS sozinho.
+    ritmo: { js: '/Jogos/ritmo.min.js', css: '/Jogos/ritmo.css', global: 'RitmoGame' },
     // Ping Pong depende de Jogos/multiplayer.js (AngatubaMP), carregado
     // sob demanda pelo _jogoLoader (ver flag mp abaixo) — infraestrutura
     // leve e compartilhável com futuros jogos, sem custar nada em quem
@@ -2663,7 +2669,7 @@
       if (dono) {
         var chaves = [LOJA_KEY_MOEDAS, LOJA_KEY_INVENTARIO, LOJA_KEY_EQUIPADO, LOJA_KEY_STATS,
                       TITULOS_KEY_DESBLOQUEADOS, TITULOS_KEY_EQUIPADOS, 'angatuba_streak',
-                      HIST_KEY, TITULOS_KEY_DESTAQUE];
+                      HIST_KEY, TITULOS_KEY_DESTAQUE, 'angatuba_ritmo_recordes'];
         Object.keys(RANK_REC_LOCAL).forEach(function (k) { chaves.push(RANK_REC_LOCAL[k]); });
         var pacote = {};
         chaves.forEach(function (c) { var v = localStorage.getItem(c); if (v !== null) pacote[c] = v; });

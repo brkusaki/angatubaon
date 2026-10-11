@@ -708,6 +708,20 @@
           </div>
         </button>
 
+        <!-- Ritmo da Coruja (estilo osu!mania, 4 colunas) — Jogos/ritmo.js sob demanda.
+             Cores do card inline (mesmo motivo do Hóquei: o ritmo.css só carrega
+             ao abrir o jogo). Sem arte própria ainda: se /Jogos/assets/card-ritmo.webp
+             não existir, a imagem some e fica o fundo em degradê com o 🎵. -->
+        <button type="button" class="game-card gc-ritmo" style="--gc:#a78bfa;--gc-2:#fbbf24;--gc-a:rgba(167,139,250,.16);--gc-b:rgba(167,139,250,.34);" data-cat="acao" data-nome="ritmo da coruja osu mania musica ritmo" data-desc="toque as notas no tempo da musica 4 colunas" onclick="_abrirJogo('ritmo')">
+          <span class="gc-fav" data-jogo="ritmo" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
+          <div class="gc-media" style="background:linear-gradient(135deg,#2a1a52,#a78bfa 55%,#fbbf24);display:flex;align-items:center;justify-content:center;font-size:44px;"><img src="/Jogos/assets/card-ritmo.webp" alt="" loading="lazy" class="gc-hero-img" onerror="this.style.display='none';this.parentNode.textContent='🎵'"></div>
+          <div class="gc-body">
+            <div class="gc-title">Ritmo da Coruja</div>
+            <div class="gc-desc">Toque as notas no tempo da música. 4 colunas, Normal e Hard!</div>
+            <span class="gc-cta">Jogar</span>
+          </div>
+        </button>
+
         <button type="button" class="game-card gc-blocos" data-cat="puzzle" data-nome="blocos da coruja" data-desc="encaixe as pecas e complete linhas ou colunas" onclick="_abrirJogo('blocos')">
           <span class="gc-fav" data-jogo="blocos" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-blocos.webp" alt="" loading="lazy" class="gc-hero-img"></div>
@@ -1169,6 +1183,13 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- TELA: Ritmo da Coruja (estilo osu!mania) — Jogos/ritmo.js (sob demanda)
+           monta seleção de música, arena e resultado dentro de #ritmo-root. -->
+      <div id="jogo-ritmo" class="jogo-tela" style="display:none;">
+        <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
+        <div id="ritmo-root"></div>
       </div>
 
       <!-- TELA: Blocos da Coruja (block puzzle estilo Block Blast/1010!) -->

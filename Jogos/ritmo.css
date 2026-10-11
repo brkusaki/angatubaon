@@ -59,15 +59,43 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
 .rt-musica-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .rt-musica-tit { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rt-musica-meta { font-size: 12px; color: rgba(199,209,224,.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rt-musica-ranks { display: flex; gap: 5px; flex-shrink: 0; }
-.rt-badge {
-  min-width: 26px; height: 26px; padding: 0 5px; border-radius: 8px;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-family: 'Syne', sans-serif; font-weight: 900; font-size: 12px;
-  background: rgba(255,255,255,.05); color: rgba(199,209,224,.3);
-  border: 1px solid rgba(255,255,255,.08);
+.rt-musica-ranks { display: flex; gap: 6px; flex-shrink: 0; }
+/* Melhor rank por dificuldade: rótulo pequeno em cima, letra embaixo.
+   Sem borda (antes eram 2 caixinhas "N"/"H" que pareciam botões). */
+.rt-rk {
+  width: 44px; padding: 4px 0 5px; border-radius: 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  background: rgba(255,255,255,.05);
 }
-.rt-badge-h { border-color: rgba(248,113,113,.25); }
+.rt-rk-dif { font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.rt-rk-n .rt-rk-dif { color: #5eead4; }
+.rt-rk-h .rt-rk-dif { color: #fca5a5; }
+.rt-rk-val { font-family: 'Syne', sans-serif; font-weight: 900; font-size: 16px; line-height: 1.1; color: #fff; }
+.rt-rk-vazio { background: rgba(255,255,255,.03); }
+.rt-rk-vazio .rt-rk-dif { opacity: .7; }
+.rt-rk-vazio .rt-rk-val { color: rgba(199,209,224,.35); font-weight: 700; }
+
+/* Ícone do card: ▶ selecionado · girando = baixando a prévia · barrinhas = tocando */
+.rt-ico-carregando::after {
+  content: ''; width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid rgba(18,11,36,.35); border-top-color: #120b24;
+  animation: rtGira .8s linear infinite;
+}
+.rt-musica:not(.rt-musica-sel) .rt-ico-carregando::after { border-color: rgba(251,191,36,.3); border-top-color: #fbbf24; }
+@keyframes rtGira { to { transform: rotate(360deg); } }
+.rt-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+.rt-eq i { width: 3px; height: 100%; background: currentColor; border-radius: 2px; animation: rtEq .9s ease-in-out infinite; }
+.rt-eq i:nth-child(2) { animation-delay: -.3s; }
+.rt-eq i:nth-child(3) { animation-delay: -.6s; }
+@keyframes rtEq { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+.rt-eq i { transform-origin: bottom; }
+
+/* Erro de carregamento, visível na própria tela de seleção */
+.rt-erro {
+  margin: 10px auto 0; max-width: 420px; padding: 9px 12px; border-radius: 12px;
+  background: rgba(248,113,113,.12); border: 1px solid rgba(248,113,113,.45);
+  color: #fecaca; font-size: 12.5px; font-weight: 700; line-height: 1.4;
+}
 
 /* Cores dos ranks (badges e tela de resultado) */
 .rt-r-SS { color: #fde68a !important; }
@@ -104,6 +132,19 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
 /* rótulo em cima, − valor + embaixo: cabe em 2 colunas até em 320 px */
 .rt-ajuste-rot { width: 100%; text-align: center; font-size: 10px; color: rgba(199,209,224,.7); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
 .rt-ajuste-val { flex: 1; font-weight: 800; font-size: 13px; text-align: center; white-space: nowrap; }
+.rt-ajuda {
+  width: 16px; height: 16px; margin-left: 3px; padding: 0; border-radius: 50%;
+  border: 1px solid rgba(199,209,224,.5); background: none; color: rgba(199,209,224,.9);
+  font-size: 10px; font-weight: 800; line-height: 14px; cursor: pointer; vertical-align: 1px;
+}
+.rt-ajuda[aria-expanded="true"] { background: #a78bfa; border-color: #a78bfa; color: #120b24; }
+.rt-ajuda-txt {
+  width: 100%; max-width: 420px; padding: 9px 12px; border-radius: 12px;
+  background: rgba(167,139,250,.10); border: 1px solid rgba(167,139,250,.3);
+  font-size: 12px; line-height: 1.45; color: #ddd6fe;
+}
+.rt-ajuda-txt b { color: #fff; }
+.rt-ajuste-val-mudado { color: #fbbf24; }
 .rt-step {
   width: 30px; height: 30px; border-radius: 9px; border: none; cursor: pointer;
   background: rgba(255,255,255,.08); color: #fff; font-size: 17px; font-weight: 800; line-height: 1;
@@ -174,6 +215,23 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
 .rt-res-moedas { font-size: 18px; font-weight: 900; color: #ffd740; margin: 4px 0 6px; }
 .rt-res-moedas-zero { font-size: 12.5px; font-weight: 600; color: rgba(199,209,224,.7); }
 
+.rt-res-dica {
+  max-width: 340px; padding: 9px 12px; border-radius: 12px; font-size: 12.5px; line-height: 1.45;
+  background: rgba(167,139,250,.10); border: 1px solid rgba(167,139,250,.3); color: #ddd6fe;
+}
+.rt-res-dica b { color: #fff; }
+.rt-res-dica-btn {
+  margin-left: 4px; padding: 3px 10px; border: none; border-radius: 999px; cursor: pointer;
+  background: #a78bfa; color: #120b24; font-weight: 800; font-size: 12px;
+}
+
+/* Menu de pausa: "Escolher outra música" virou botão .jm-opcao (ver
+   _rtRegistrarMenu); o ícone vem do Font Awesome 6 já carregado no app. */
+#jogo-ritmo .rt-jm-musica::before {
+  content: "\f001"; font-family: "Font Awesome 6 Free"; font-weight: 900; font-size: 14px;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .rt-eq i, .rt-ico-carregando::after { animation: none; }
   .rt-res-rank { animation: none; }
 }

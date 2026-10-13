@@ -109,7 +109,7 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
   flex-shrink: 0; padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 14px);
   background: linear-gradient(180deg, rgba(11,15,23,0) 0%, rgba(11,15,23,.92) 22%);
   border-top: 1px solid rgba(255,255,255,.06);
-  display: flex; flex-direction: column; gap: 10px; align-items: center;
+  display: flex; flex-direction: column; gap: 8px; align-items: center;
 }
 .rt-difs { display: flex; gap: 8px; width: 100%; max-width: 420px; }
 .rt-dif {
@@ -231,7 +231,81 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
   content: "\f001"; font-family: "Font Awesome 6 Free"; font-weight: 900; font-size: 14px;
 }
 
+/* ── Linha do ranking da cidade + colunas + skin (painel da seleção) ── */
+.rt-rank-linha {
+  width: 100%; max-width: 420px; display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; border-radius: 12px; cursor: pointer; text-align: left;
+  background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.22);
+  color: #fde68a; font-size: 12.5px; font-weight: 600; -webkit-tap-highlight-color: transparent;
+}
+.rt-rank-linha b { color: #fff; }
+.rt-rank-txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-rank-seta { font-size: 18px; line-height: 1; color: rgba(253,230,138,.7); }
+.rt-linha2 { display: flex; gap: 8px; width: 100%; max-width: 420px; }
+.rt-ks { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: rgba(255,255,255,.05); }
+.rt-k {
+  min-width: 42px; padding: 7px 8px; border: none; border-radius: 9px; cursor: pointer;
+  background: none; color: rgba(199,209,224,.75); font-family: 'Syne', sans-serif; font-weight: 800; font-size: 13px;
+  -webkit-tap-highlight-color: transparent;
+}
+.rt-k-ativa { background: #a78bfa; color: #120b24; }
+.rt-skin-btn {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 6px;
+  border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05);
+  color: #fff; font-size: 12.5px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.rt-skin-btn canvas { width: 72px; height: 28px; flex-shrink: 0; }
+.rt-skin-btn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-skin-btn span::before { content: '🎨 '; }
+
+/* ── Top 10 do mapa ── */
+.rt-top-ov {
+  position: absolute; inset: 0; z-index: 8; align-items: flex-end; justify-content: center;
+  background: rgba(5,8,14,.72); padding: 16px;
+}
+.rt-top-caixa {
+  width: 100%; max-width: 420px; max-height: 80%; display: flex; flex-direction: column;
+  background: #111826; border: 1px solid rgba(255,255,255,.08); border-radius: 18px; overflow: hidden;
+  margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+}
+.rt-top-cab { display: flex; align-items: center; gap: 10px; padding: 14px 14px 8px; }
+.rt-top-tit { flex: 1; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; }
+.rt-top-fechar { width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(255,255,255,.08); color: #fff; font-size: 14px; cursor: pointer; }
+.rt-top-lista { list-style: none; margin: 0; padding: 0 10px; overflow-y: auto; }
+.rt-top-item { display: flex; align-items: center; gap: 10px; padding: 9px 6px; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 13.5px; }
+.rt-top-item:nth-child(1) .rt-top-pos { background: #fbbf24; color: #1a1205; }
+.rt-top-item:nth-child(2) .rt-top-pos { background: #cbd5e1; color: #0f172a; }
+.rt-top-item:nth-child(3) .rt-top-pos { background: #d97706; color: #1a1205; }
+.rt-top-pos { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,.08); font-weight: 800; font-size: 12px; flex-shrink: 0; }
+.rt-top-nome { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-top-score { font-family: 'Syne', sans-serif; font-weight: 800; font-variant-numeric: tabular-nums; }
+.rt-top-eu { background: rgba(167,139,250,.14); border-radius: 10px; }
+.rt-top-vazio { padding: 18px 6px; text-align: center; color: rgba(199,209,224,.7); font-size: 13px; }
+.rt-top-rodape { padding: 10px 14px 14px; font-size: 12.5px; color: #c7d1e0; text-align: center; }
+.rt-top-rodape:empty { display: none; }
+.rt-top-login, .rt-res-cidade-login {
+  border: none; background: none; padding: 0; color: #a78bfa; font: inherit; font-weight: 800;
+  text-decoration: underline; cursor: pointer;
+}
+
+/* ── Barra de vida (Hard) — topo, entre o ⏸ e o placar ── */
+.rt-vida {
+  position: absolute; top: calc(env(safe-area-inset-top, 0px) + 20px); left: 60px; right: 128px;
+  display: flex; align-items: center; gap: 6px; pointer-events: none; max-width: 260px;
+}
+.rt-vida i { font-style: normal; font-size: 12px; color: #f87171; }
+.rt-vida-trilho { flex: 1; height: 8px; border-radius: 999px; background: rgba(255,255,255,.1); overflow: hidden; }
+.rt-vida-barra { height: 100%; width: 100%; border-radius: 999px; background: #5eead4; transition: width .15s linear, background .3s; }
+.rt-vida-baixa .rt-vida-trilho { animation: rtVidaPisca .6s ease-in-out infinite alternate; }
+@keyframes rtVidaPisca { from { box-shadow: 0 0 0 rgba(248,113,113,0); } to { box-shadow: 0 0 10px rgba(248,113,113,.8); } }
+
+/* ── Resultado: falhou + posição no ranking ── */
+.rt-res-rank-falhou { font-size: 64px !important; color: #f87171; }
+.rt-res-falhou-msg { max-width: 320px; font-size: 13px; line-height: 1.45; color: #fecaca; }
+.rt-res-cidade { max-width: 340px; font-size: 13px; line-height: 1.45; color: #fde68a; }
+.rt-res-cidade b { color: #fff; }
+
 @media (prefers-reduced-motion: reduce) {
-  .rt-eq i, .rt-ico-carregando::after { animation: none; }
+  .rt-eq i, .rt-ico-carregando::after, .rt-vida-baixa .rt-vida-trilho { animation: none; }
   .rt-res-rank { animation: none; }
 }

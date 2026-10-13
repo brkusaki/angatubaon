@@ -2109,6 +2109,70 @@
       .catch(function () { return null; });
   }
 
+  /* ── Ranking por MAPA (Ritmo da Coruja) ──────────────────────
+     Um ranking pra cada música + dificuldade + nº de colunas, numa
+     subcoleção: ranking_ritmo/{mapa}/scores/{uid}, com
+     mapa = "<musica>_<normal|hard>_<4|5|7>k" (ex.: "mare-alta_hard_4k").
+     Doc igual ao dos outros rankings (uid, nome, score, photoURL,
+     atualizadoEm) e mesmo read-before-write do rankSubmeter. Teto
+     1.000.000 = score máximo possível no jogo (ver firestore.rules).
+     Não entra no Ranking GERAL nem nas abas do painel (são dezenas de
+     mapas) — o Ritmo mostra a posição na própria tela de seleção. */
+  var RANK_MAPA_RE = /^[a-z0-9-]{1,40}_(normal|hard)_(4|5|7)k$/;
+  function _rankMapaCol(db, mapa) {
+    return db.collection('ranking_ritmo').doc(mapa).collection('scores');
+  }
+  // Promise<boolean>: true se gravou um recorde novo.
+  function rankMapaSubmeter(mapa, score) {
+    if (!RANK_MAPA_RE.test(String(mapa || ''))) return Promise.resolve(false);
+    if (typeof _cliUser === 'undefined' || !_cliUser) return Promise.resolve(false);
+    var uid = _cliUser.uid;
+    var nome = (typeof cliNomeExibicao === 'function' && cliNomeExibicao()) || 'Jogador';
+    if (nome.length < 2) nome = 'Jogador';
+    var foto = _cliUser.photoURL || '';
+    var val = Math.max(0, Math.min(1000000, Math.round(Number(score) || 0)));
+    return _rankDbPronto().then(function (db) {
+      if (typeof _cliUser === 'undefined' || !_cliUser || _cliUser.uid !== uid) return false;
+      var ref = _rankMapaCol(db, mapa).doc(uid);
+      return ref.get().then(function (doc) {
+        var atual = (doc && doc.exists && typeof (doc.data() || {}).score === 'number') ? doc.data().score : 0;
+        if (val <= atual) return false;
+        return ref.set({
+          uid: uid, nome: nome, score: val, photoURL: foto,
+          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true }).then(function () { return true; });
+      });
+    }).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank-mapa] não gravou:', mapa, err && (err.code || err.message));
+      return false;
+    });
+  }
+  // Promise<{ top:[{uid,nome,score,photoURL}], pos:number|null, meu:number|null }>
+  // top = até 50 melhores; pos = sua colocação se estiver neles; meu = seu
+  // score (mesmo fora do top 50). Erro/offline → top vazio (nunca rejeita).
+  function rankMapaPosicao(mapa) {
+    var vazio = { top: [], pos: null, meu: null, erro: true };
+    if (!RANK_MAPA_RE.test(String(mapa || ''))) return Promise.resolve(vazio);
+    var uid = (typeof _cliUser !== 'undefined' && _cliUser) ? _cliUser.uid : null;
+    return _rankDbPronto().then(function (db) {
+      var col = _rankMapaCol(db, mapa);
+      return col.orderBy('score', 'desc').limit(50).get().then(function (snap) {
+        var top = [], pos = null, meu = null;
+        snap.forEach(function (doc) {
+          var d = doc.data() || {};
+          var item = { uid: d.uid || doc.id, nome: d.nome || 'Jogador', score: d.score || 0, photoURL: d.photoURL || '' };
+          top.push(item);
+          if (uid && item.uid === uid) { pos = top.length; meu = item.score; }
+        });
+        if (!uid || pos) return { top: top, pos: pos, meu: meu };
+        return col.doc(uid).get().then(function (doc) {
+          var d = doc && doc.exists ? (doc.data() || {}) : null;
+          return { top: top, pos: null, meu: d && typeof d.score === 'number' ? d.score : null };
+        });
+      });
+    }).catch(function () { return vazio; });
+  }
+
   /* ── Ranking GERAL (agregado dos 7 jogos) ────────────────────
      Pontuação estilo F1: cada jogo dá pontos pela colocação da
      pessoa no seu próprio Top 20 (1º = 25, 2º = 18 ... 10º = 1,
@@ -2697,13 +2761,13 @@
   // público (_perfilPublicoSync só manda voo_owl/badge/bg/card).
   var LOJA_SLOTS = ['voo_owl', 'badge', 'bg', 'card',
     't48_tema', 'piano_tema', 'pp_skin', 'sq_tema', 'st_tema',
-    'bb_tema', 'tq_skin', 'dc_tema'];
+    'bb_tema', 'tq_skin', 'dc_tema', 'rt_nota'];
 
   function _equipadoPadrao() {
     return { voo_owl: 'voo_skin_classica', badge: null, bg: 'bg_padrao', card: 'card_padrao',
       t48_tema: 't48_classico', piano_tema: 'piano_classico', pp_skin: 'pp_classico',
       sq_tema: 'sq_classico', st_tema: 'st_classico', bb_tema: 'bb_classico',
-      tq_skin: 'tq_classico', dc_tema: 'dc_classico' };
+      tq_skin: 'tq_classico', dc_tema: 'dc_classico', rt_nota: 'rt_classico' };
   }
 
   /* ── Catálogo (hardcoded) ──────────────────────────────────────
@@ -2786,6 +2850,15 @@
     { id: 'dc_pastel',   nome: 'Pastel',   desc: 'Confeitos suaves.',       preco: 120, slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', paleta: ['#fda4af', '#c4b5fd', '#86efac', '#fde68a', '#93c5fd'], nomes: ['🌸 rosa', '💜 lilás', '🌿 menta', '🌼 baunilha', '💙 céu'] },
     { id: 'dc_neon',     nome: 'Neon',     desc: 'Balas que brilham.',      preco: 150, slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', paleta: ['#f43f5e', '#d946ef', '#22c55e', '#facc15', '#06b6d4'], nomes: ['🔴 pink', '🟣 magenta', '🟢 verde', '🟡 amarelo', '🔵 ciano'] },
     { id: 'dc_joias',    nome: 'Joias',    desc: 'Rubi, safira e cia.',     preco: 200, slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', paleta: ['#dc2626', '#7c3aed', '#059669', '#f59e0b', '#2563eb'], nomes: ['❤️ rubi', '💜 ametista', '💚 esmeralda', '💛 topázio', '💙 safira'] },
+    // Ritmo da Coruja — skin das notas E dos receptores (slot rt_nota).
+    // nota.estilo diz COMO desenhar (ver _rtDesenharNota em Jogos/ritmo.js:
+    // gema | flat | olho | neon | ouro); nota.cores = [pistas de fora,
+    // pistas de dentro, pista do meio (5K/7K)]. Vale pra todas as músicas.
+    { id: 'rt_classico', nome: 'Clássica',       desc: 'Gemas roxas e âmbar.',          preco: 0,   slot: 'rt_nota', tipo: 'skin', preview: null, jogo: 'ritmo', nota: { estilo: 'gema', cores: ['#a78bfa', '#fbbf24', '#5eead4'] }, amostra: ['#a78bfa', '#fbbf24', '#5eead4'] },
+    { id: 'rt_minimal',  nome: 'Minimal',        desc: 'Discos lisos, sem firula.',     preco: 85,  slot: 'rt_nota', tipo: 'skin', preview: null, jogo: 'ritmo', nota: { estilo: 'flat', cores: ['#e2e8f0', '#94a3b8', '#f8fafc'] }, amostra: ['#e2e8f0', '#94a3b8', '#f8fafc'] },
+    { id: 'rt_coruja',   nome: 'Olho de Coruja', desc: 'Cada nota é um olhão âmbar.',   preco: 130, slot: 'rt_nota', tipo: 'skin', preview: null, jogo: 'ritmo', nota: { estilo: 'olho', cores: ['#f59e0b', '#fb923c', '#fde047'] }, amostra: ['#f59e0b', '#fb923c', '#1c1206'] },
+    { id: 'rt_neon',     nome: 'Neon',           desc: 'Anéis que brilham no escuro.',  preco: 160, slot: 'rt_nota', tipo: 'skin', preview: null, jogo: 'ritmo', nota: { estilo: 'neon', cores: ['#f0abfc', '#22d3ee', '#a3e635'] }, amostra: ['#f0abfc', '#22d3ee', '#a3e635'] },
+    { id: 'rt_ouro',     nome: 'Ouro Real',      desc: 'Ouro com brilho que corre.',    preco: 250, slot: 'rt_nota', tipo: 'skin', preview: null, jogo: 'ritmo', nota: { estilo: 'ouro', cores: ['#f59e0b', '#fbbf24', '#fde68a'] }, amostra: ['#b45309', '#fbbf24', '#fef3c7'] },
 
     // Badges
     { id: 'badge_estrela', nome: 'Estrela da Coruja', desc: 'Pra quem brilha nos jogos.',         preco: 50,  slot: 'badge', tipo: 'badge', preview: '/webp/owl-tada.webp',   jogo: null },
@@ -4782,6 +4855,9 @@
     rankAbrirPainel: function (jogoKey) {
       if (typeof rankAbrirPainel === 'function') return rankAbrirPainel(jogoKey);
     },
+    // Ranking por mapa (Ritmo da Coruja): ver rankMapaSubmeter/rankMapaPosicao.
+    rankMapaSubmeter: function (mapa, score) { return rankMapaSubmeter(mapa, score); },
+    rankMapaPosicao: function (mapa) { return rankMapaPosicao(mapa); },
 
     // ── Sessão do cliente ───────────────────────────────────
     // true se há usuário logado (pra decidir convite de login etc.).

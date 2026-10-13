@@ -1,15 +1,22 @@
 /* ═══════════════════════════════════════════════════════════════
    RITMO DA CORUJA — módulo de jogo (lazy-loaded)
-   Jogo de ritmo estilo osu!mania com 4 colunas: as notas descem pelas
-   pistas e a pessoa toca na coluna certa quando a nota passa pela
-   linha de acerto, no tempo da música.
+   Jogo de ritmo estilo osu!mania com 4, 5 ou 7 colunas: as notas descem
+   pelas pistas e a pessoa toca na coluna certa quando a nota passa pela
+   linha de acerto, no tempo da música. Notas longas ("length" no
+   beatmap) precisam ser seguradas até o fim; no Hard há barra de vida.
 
    Fluxo:  seleção (música + dificuldade) → partida → resultado → 🪙
 
    Peças principais:
    - RT_CATALOGO ........ lista das músicas (arquivo, BPM, duração, níveis)
    - Beatmaps ........... /Jogos/ritmo/beatmaps/<id>.<normal|hard>.json
-                          { songId, difficulty, bpm, offset, notes:[{time,column}] }
+                          { songId, difficulty, bpm, offset, keys?,
+                            notes:[{time, column, length?}] }
+                          time/length em ms; column 0..keys-1 (keys = 4
+                          se omitido). 5K/7K saem do mapa 4K (_rtConverterK).
+   - Skins .............. Loja da Coruja, slot rt_nota (hub.js) → _rtSkin()
+   - Ranking ............ por mapa (música+dificuldade+colunas), via
+                          AngatubaGames.rankMapaSubmeter / rankMapaPosicao
    - Relógio ............ Web Audio (AudioContext). A música é decodificada
                           inteira e tocada por um AudioBufferSourceNode; o
                           tempo da música sai do ctx.currentTime (preciso,
@@ -36,22 +43,22 @@
      dois beatmaps em /Jogos/ritmo/beatmaps/ e acrescente uma linha aqui.
   ══════════════════════════════════════════════════════════════ */
   var RT_CATALOGO = [
-    { id: 'ninguem-te-repara', previa: 76,      titulo: 'Ninguém Te Repara', sub: 'Brega romântico',        arquivo: '/musicas/Ninguém Te Repara.mp3',               bpm: 92,  duracao: 212, dif: { normal: { notas: 322, nivel: 3 }, hard: { notas: 689, nivel: 7 } } },
-    { id: 'estatica', previa: 121,               titulo: 'Estática',          sub: 'Rock alternativo',       arquivo: '/musicas/Estática.mp3',                        bpm: 131, duracao: 167, dif: { normal: { notas: 263, nivel: 4 }, hard: { notas: 560, nivel: 7 } } },
-    { id: 'estatica-v2', previa: 147,            titulo: 'Estática',          sub: 'Versão 2',               arquivo: '/musicas/Estática versao 2.mp3',               bpm: 131, duracao: 199, dif: { normal: { notas: 312, nivel: 4 }, hard: { notas: 684, nivel: 8 } } },
-    { id: 'estatica-eletronica', previa: 37,    titulo: 'Estática',          sub: 'Eletrônica',             arquivo: '/musicas/Estática eletronica.mp3',             bpm: 109, duracao: 162, dif: { normal: { notas: 254, nivel: 3 }, hard: { notas: 543, nivel: 7 } } },
-    { id: 'estatica-eletronica-v2', previa: 128, titulo: 'Estática',          sub: 'Eletrônica · versão 2',  arquivo: '/musicas/Estática eletronica versao 2.mp3',    bpm: 110, duracao: 176, dif: { normal: { notas: 276, nivel: 3 }, hard: { notas: 604, nivel: 7 } } },
-    { id: 'transborda', previa: 58,             titulo: 'Transborda',        sub: 'Melodic house',          arquivo: '/musicas/Transborda.mp3',                      bpm: 125, duracao: 240, dif: { normal: { notas: 379, nivel: 4 }, hard: { notas: 833, nivel: 8 } } },
-    { id: 'plateia', previa: 56,                titulo: 'Plateia',           sub: 'Pop / R&B',              arquivo: '/musicas/Plateia.mp3',                         bpm: 101, duracao: 180, dif: { normal: { notas: 281, nivel: 3 }, hard: { notas: 604, nivel: 7 } } },
-    { id: 'plateia-v2', previa: 127,             titulo: 'Plateia',           sub: 'Versão 2',               arquivo: '/musicas/Plateia versao 2.mp3',                bpm: 101, duracao: 218, dif: { normal: { notas: 344, nivel: 3 }, hard: { notas: 745, nivel: 7 } } },
-    { id: 'bateria-fraca', previa: 86,          titulo: 'Bateria Fraca',     sub: 'Neo-soul',               arquivo: '/musicas/Bateria Fraca.mp3',                   bpm: 92,  duracao: 206, dif: { normal: { notas: 314, nivel: 3 }, hard: { notas: 656, nivel: 7 } } },
-    { id: 'mare-alta', previa: 132,              titulo: 'Maré Alta',         sub: 'Trap',                   arquivo: '/musicas/Maré Alta.mp3',                       bpm: 138, duracao: 187, dif: { normal: { notas: 296, nivel: 4 }, hard: { notas: 655, nivel: 8 } } }
+    { id: 'ninguem-te-repara', previa: 76,      titulo: 'Ninguém Te Repara', sub: 'Brega romântico',        arquivo: '/musicas/Ninguém Te Repara.mp3',               bpm: 92,  duracao: 212, dif: { normal: { notas: 276, nivel: 3 }, hard: { notas: 689, nivel: 7 } } },
+    { id: 'estatica', previa: 121,               titulo: 'Estática',          sub: 'Rock alternativo',       arquivo: '/musicas/Estática.mp3',                        bpm: 131, duracao: 167, dif: { normal: { notas: 231, nivel: 4 }, hard: { notas: 560, nivel: 7 } } },
+    { id: 'estatica-v2', previa: 147,            titulo: 'Estática',          sub: 'Versão 2',               arquivo: '/musicas/Estática versao 2.mp3',               bpm: 131, duracao: 199, dif: { normal: { notas: 279, nivel: 4 }, hard: { notas: 684, nivel: 8 } } },
+    { id: 'estatica-eletronica', previa: 37,    titulo: 'Estática',          sub: 'Eletrônica',             arquivo: '/musicas/Estática eletronica.mp3',             bpm: 109, duracao: 162, dif: { normal: { notas: 233, nivel: 3 }, hard: { notas: 543, nivel: 7 } } },
+    { id: 'estatica-eletronica-v2', previa: 128, titulo: 'Estática',          sub: 'Eletrônica · versão 2',  arquivo: '/musicas/Estática eletronica versao 2.mp3',    bpm: 110, duracao: 176, dif: { normal: { notas: 256, nivel: 3 }, hard: { notas: 604, nivel: 7 } } },
+    { id: 'transborda', previa: 58,             titulo: 'Transborda',        sub: 'Melodic house',          arquivo: '/musicas/Transborda.mp3',                      bpm: 125, duracao: 240, dif: { normal: { notas: 344, nivel: 4 }, hard: { notas: 833, nivel: 8 } } },
+    { id: 'plateia', previa: 56,                titulo: 'Plateia',           sub: 'Pop / R&B',              arquivo: '/musicas/Plateia.mp3',                         bpm: 101, duracao: 180, dif: { normal: { notas: 238, nivel: 3 }, hard: { notas: 604, nivel: 7 } } },
+    { id: 'plateia-v2', previa: 127,             titulo: 'Plateia',           sub: 'Versão 2',               arquivo: '/musicas/Plateia versao 2.mp3',                bpm: 101, duracao: 218, dif: { normal: { notas: 298, nivel: 3 }, hard: { notas: 745, nivel: 7 } } },
+    { id: 'bateria-fraca', previa: 86,          titulo: 'Bateria Fraca',     sub: 'Neo-soul',               arquivo: '/musicas/Bateria Fraca.mp3',                   bpm: 92,  duracao: 206, dif: { normal: { notas: 286, nivel: 3 }, hard: { notas: 656, nivel: 7 } } },
+    { id: 'mare-alta', previa: 132,              titulo: 'Maré Alta',         sub: 'Trap',                   arquivo: '/musicas/Maré Alta.mp3',                       bpm: 138, duracao: 187, dif: { normal: { notas: 277, nivel: 4 }, hard: { notas: 655, nivel: 8 } } }
   ];
 
   // Sobe este número sempre que editar QUALQUER beatmap: ele entra na URL
   // (?v=N) e faz o navegador/Service Worker buscar a versão nova em vez
   // da cópia guardada (os beatmaps ficam no cache pra jogar offline).
-  var RT_MAPAS_VERSAO = 1;
+  var RT_MAPAS_VERSAO = 2;   // v2: notas longas (campo length)
   var RT_MAPAS_PASTA = '/Jogos/ritmo/beatmaps/';
   // Mesmo nome do CACHE_JOGOS do service-worker.js (o MP3 já cai lá
   // sozinho pelo SW; aqui guardamos também o JSON do beatmap).
@@ -66,16 +73,35 @@
   var RT_ROTULO  = { perfeito: 'PERFEITO', otimo: 'ÓTIMO', bom: 'BOM', erro: 'ERRO' };
   var RT_COR_JULG = { perfeito: '#7cf5ff', otimo: '#5eead4', bom: '#fbbf24', erro: '#f87171' };
 
-  // Cores das pistas (externas roxo-coruja, internas âmbar).
-  var RT_COR_COL = ['#a78bfa', '#fbbf24', '#fbbf24', '#a78bfa'];
-  // Teclado (PC): D F J K.
-  var RT_TECLAS = { d: 0, f: 1, j: 2, k: 3 };
+  /* ── Colunas: 4K (padrão), 5K e 7K ─────────────────────────────
+     Os beatmaps são escritos em 4K; 5K e 7K são gerados na hora a partir
+     deles (_rtConverterK). Um mapa feito à mão pra N colunas declara
+     "keys": N no JSON, fica em <id>.<dif>.<N>k.json e entra em
+     RT_MAPAS_NATIVOS — aí é usado direto, sem conversão.
+     RT_PADRAO_COR: qual das 3 cores da skin vai em cada pista
+     (0 = de fora, 1 = de dentro, 2 = do meio). */
+  var RT_MODOS_K = [4, 5, 7];
+  var RT_PADRAO_COR = { 4: [0, 1, 1, 0], 5: [0, 1, 2, 1, 0], 7: [0, 1, 0, 2, 0, 1, 0] };
+  var RT_TECLAS_K = { 4: 'dfjk', 5: 'df jk', 7: 'sdf jkl' };   // ' ' = barra de espaço
+  var RT_LARGURA_MAX = { 4: 110, 5: 96, 7: 80 };                  // px por pista em tela larga
+  var RT_MAPAS_NATIVOS = {};   // ex.: { 'mare-alta|hard|7': true } → mare-alta.hard.7k.json
+
+  /* ── Skin das notas (Loja da Coruja, slot rt_nota — ver hub.js) ──
+     estilo: gema | flat | olho | neon | ouro  (ver _rtDesenharNota) */
+  var RT_SKIN_PADRAO = { estilo: 'gema', cores: ['#a78bfa', '#fbbf24', '#5eead4'] };
+
+  /* ── Barra de vida (só no Hard) ─────────────────────────────────
+     Começa cheia (1). Cada julgamento soma/subtrai; zerou → falhou.
+     "solto" = soltou a nota longa antes da hora. Com estes valores,
+     ~12 erros seguidos derrubam; uma sequência de acertos recupera. */
+  var RT_VIDA = { perfeito: 0.012, otimo: 0.006, bom: -0.02, erro: -0.08, solto: -0.05 };
 
   var RT_LEAD_S = 2.2;         // silêncio antes da música começar (as notas já vêm descendo)
   var RT_RETOMAR_S = 2.0;      // ao continuar da pausa, a música volta com esse "respiro"
 
-  var RT_KEY_REC = 'angatuba_ritmo_recordes';  // { "<id>|<dif>": {score, acc, rank, combo} }
-  var RT_KEY_CFG = 'angatuba_ritmo_cfg';       // { dif, velocidade, ajuste, ultima }
+  // { "<id>|<dif>" (4K) ou "<id>|<dif>|<k>k" (5K/7K): {score, acc, rank, combo} }
+  var RT_KEY_REC = 'angatuba_ritmo_recordes';
+  var RT_KEY_CFG = 'angatuba_ritmo_cfg';       // { dif, velocidade, ajuste, ultima, colunas }
 
   /* ── Estado ──────────────────────────────────────────────────── */
   var _rtRoot = null;            // #ritmo-root
@@ -98,9 +124,18 @@
 
   // Partida
   var _rtMusica = null, _rtDif = 'normal', _rtMapa = null;
-  var _rtNotas = [];           // todas, ordenadas por tempo: {t, c, j:null|'perfeito'...}
+  var _rtK = 4;                // colunas da partida atual
+  // Notas, ordenadas por tempo: { t, c, fim (0 = toque simples), j (julgamento
+  // da cabeça), jc (julgamento do fim da longa), seg (segurando agora),
+  // solto (soltou cedo), pausado (estava segurando quando pausou) }
+  var _rtNotas = [];
   var _rtPorCol = [[], [], [], []];
   var _rtPonteiro = [0, 0, 0, 0];  // próxima nota não julgada por coluna
+  var _rtSegurando = [];       // coluna → nota longa sendo segurada
+  var _rtLongasPausadas = [];  // longas interrompidas pela pausa (dá pra "pegar de volta")
+  var _rtTotal = 0;            // julgamentos possíveis: toques + 2 por longa (cabeça + fim)
+  var _rtVida = 1, _rtFalhou = false, _rtFalhaEm = 0, _rtFalhaPos = 0;
+  var _rtSkinAtual = null;     // skin lida no começo da partida (não a cada frame)
   var _rtDesenhoIni = 0;       // primeira nota que ainda pode aparecer na tela
   var _rtCont = null;          // contadores {perfeito, otimo, bom, erro}
   var _rtSoma = 0, _rtJulgadas = 0, _rtCombo = 0, _rtComboMax = 0;
@@ -141,7 +176,8 @@
       dif: c.dif === 'hard' ? 'hard' : 'normal',
       velocidade: Math.max(1, Math.min(10, Math.round(Number(c.velocidade) || 6))),
       ajuste: Math.max(-200, Math.min(200, Math.round(Number(c.ajuste) || 0))),
-      ultima: typeof c.ultima === 'string' ? c.ultima : ''
+      ultima: typeof c.ultima === 'string' ? c.ultima : '',
+      colunas: RT_MODOS_K.indexOf(Number(c.colunas)) !== -1 ? Number(c.colunas) : 4
     };
   }
   function _rtCfgSalvar() {
@@ -154,6 +190,18 @@
   function _rtRecSalvar(o) {
     try { localStorage.setItem(RT_KEY_REC, JSON.stringify(o)); } catch (e) {}
   }
+  // Chave do recorde local: a de 4K continua igual à de antes (compatível).
+  function _rtChaveRec(id, dif, k) { return id + '|' + dif + (k && k !== 4 ? '|' + k + 'k' : ''); }
+  // Id do mapa no ranking da cidade (mesmo formato validado nas regras).
+  function _rtMapaId(id, dif, k) { return id + '_' + dif + '_' + (k || 4) + 'k'; }
+  // Skin equipada (Loja da Coruja). Fallback: clássica.
+  function _rtSkin() {
+    var G = _rtG_(), it = null;
+    try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('rt_nota') : null; } catch (e) {}
+    var n = it && it.nota;
+    return (n && n.estilo && n.cores && n.cores.length >= 3) ? { estilo: n.estilo, cores: n.cores, nome: it.nome } : { estilo: RT_SKIN_PADRAO.estilo, cores: RT_SKIN_PADRAO.cores, nome: 'Clássica' };
+  }
+  function _rtCorCol(skin, c, k) { return skin.cores[(RT_PADRAO_COR[k] || RT_PADRAO_COR[4])[c] || 0]; }
   // Velocidade 1..10 → tempo (ms) que a nota leva do topo até a linha de acerto.
   function _rtTempoQueda() { return 2100 - _rtCfg.velocidade * 150; }
 
@@ -392,10 +440,13 @@
     _rtCarga = carga;
     return carga.p;
   }
-  function _rtCarregarMapa(id, dif) {
-    var chave = id + '|' + dif;
+  // k: colunas pedidas. Se existe mapa feito à mão pra k (RT_MAPAS_NATIVOS)
+  // carrega ele; senão o 4K de sempre (convertido depois em _rtIniciar).
+  function _rtCarregarMapa(id, dif, k) {
+    var nativo = k && k !== 4 && RT_MAPAS_NATIVOS[id + '|' + dif + '|' + k];
+    var chave = id + '|' + dif + (nativo ? '|' + k : '');
     if (_rtMapas[chave]) return Promise.resolve(_rtMapas[chave]);
-    var url = RT_MAPAS_PASTA + id + '.' + dif + '.json?v=' + RT_MAPAS_VERSAO;
+    var url = RT_MAPAS_PASTA + id + '.' + dif + (nativo ? '.' + k + 'k' : '') + '.json?v=' + RT_MAPAS_VERSAO;
     return fetch(url).then(function (r) {
       if (!r.ok) throw _rtErro('mapa', 'HTTP ' + r.status);
       // Guarda uma cópia no cache dos jogos pra abrir offline depois.
@@ -427,12 +478,21 @@
       '<div class="rt-sel" id="rt-sel">' +
         '<div class="rt-sel-topo">' +
           '<div class="rt-sel-titulo">🎵 Ritmo da Coruja</div>' +
-          '<div class="rt-sel-sub">Toque nas 4 colunas quando as notas chegarem na linha.</div>' +
+          '<div class="rt-sel-sub" id="rt-sel-sub"></div>' +
           '<button type="button" class="rt-aviso-som" id="rt-aviso-som" style="display:none;">🔇 O som dos jogos está desligado — toque para ligar</button>' +
           '<div class="rt-erro" id="rt-erro" role="alert" style="display:none;"></div>' +
         '</div>' +
         '<div class="rt-lista" id="rt-lista"></div>' +
         '<div class="rt-painel">' +
+          '<button type="button" class="rt-rank-linha" id="rt-rank-linha"></button>' +
+          '<div class="rt-linha2">' +
+            '<div class="rt-ks" role="radiogroup" aria-label="Colunas">' +
+              '<button type="button" class="rt-k" data-k="4" role="radio">4K</button>' +
+              '<button type="button" class="rt-k" data-k="5" role="radio">5K</button>' +
+              '<button type="button" class="rt-k" data-k="7" role="radio">7K</button>' +
+            '</div>' +
+            '<button type="button" class="rt-skin-btn" id="rt-skin-btn" aria-label="Trocar a skin das notas"><canvas id="rt-skin-cv" width="72" height="28" aria-hidden="true"></canvas><span id="rt-skin-nome">Skin</span></button>' +
+          '</div>' +
           '<div class="rt-difs" role="radiogroup" aria-label="Dificuldade">' +
             '<button type="button" class="rt-dif" data-dif="normal" role="radio"><span class="rt-dif-nome">Normal</span><span class="rt-dif-info" id="rt-dif-normal"></span></button>' +
             '<button type="button" class="rt-dif rt-dif-hard" data-dif="hard" role="radio"><span class="rt-dif-nome">Hard</span><span class="rt-dif-info" id="rt-dif-hard"></span></button>' +
@@ -458,6 +518,7 @@
       '<div class="rt-jogo" id="rt-jogo" style="display:none;">' +
         '<canvas class="rt-canvas" id="rt-canvas"></canvas>' +
         '<div class="rt-progresso"><div class="rt-progresso-barra" id="rt-prog"></div></div>' +
+        '<div class="rt-vida" id="rt-vida" style="display:none;" aria-label="Vida"><i>❤</i><div class="rt-vida-trilho"><div class="rt-vida-barra" id="rt-vida-barra"></div></div></div>' +
         '<div class="rt-hud">' +
           '<div class="rt-hud-score" id="rt-score">0</div>' +
           '<div class="rt-hud-acc" id="rt-acc">100,00%</div>' +
@@ -468,6 +529,7 @@
       '<div class="rt-res" id="rt-res" style="display:none;">' +
         '<div class="rt-res-musica" id="rt-res-musica"></div>' +
         '<div class="rt-res-rank" id="rt-res-rank">A</div>' +
+        '<div class="rt-res-falhou-msg" id="rt-res-falhou-msg" style="display:none;"></div>' +
         '<div class="rt-res-recorde" id="rt-res-recorde" style="display:none;">🏆 Novo recorde!</div>' +
         '<div class="rt-res-score" id="rt-res-score">0</div>' +
         '<div class="rt-res-grade">' +
@@ -477,8 +539,17 @@
         '<div class="rt-res-cont" id="rt-res-cont"></div>' +
         '<div class="rt-res-moedas" id="rt-res-moedas" style="display:none;"></div>' +
         '<div class="rt-res-dica" id="rt-res-dica" style="display:none;"></div>' +
+        '<div class="rt-res-cidade" id="rt-res-cidade" style="display:none;"></div>' +
         '<button type="button" class="rt-jogar" id="rt-res-denovo">Jogar de novo</button>' +
         '<button type="button" class="rt-link" id="rt-res-voltar">Escolher outra música</button>' +
+      '</div>' +
+      // ── Top 10 do mapa (ranking da cidade) ──
+      '<div class="rt-top-ov" id="rt-top-ov" style="display:none;" role="dialog" aria-modal="true" aria-label="Ranking da música">' +
+        '<div class="rt-top-caixa">' +
+          '<div class="rt-top-cab"><div class="rt-top-tit" id="rt-top-tit"></div><button type="button" class="rt-top-fechar" id="rt-top-fechar" aria-label="Fechar">✕</button></div>' +
+          '<ol class="rt-top-lista" id="rt-top-lista"></ol>' +
+          '<div class="rt-top-rodape" id="rt-top-rodape"></div>' +
+        '</div>' +
       '</div>';
 
     var q = function (id) { return document.getElementById(id); };
@@ -486,7 +557,9 @@
       sel: q('rt-sel'), lista: q('rt-lista'), jogo: q('rt-jogo'), res: q('rt-res'),
       difN: q('rt-dif-normal'), difH: q('rt-dif-hard'), vel: q('rt-vel'), sync: q('rt-sync'),
       avisoSom: q('rt-aviso-som'), score: q('rt-score'), acc: q('rt-acc'), prog: q('rt-prog'),
-      aviso: q('rt-aviso'), erro: q('rt-erro')
+      aviso: q('rt-aviso'), erro: q('rt-erro'),
+      rankLinha: q('rt-rank-linha'), skinCv: q('rt-skin-cv'), skinNome: q('rt-skin-nome'),
+      vida: q('rt-vida'), vidaBarra: q('rt-vida-barra'), topOv: q('rt-top-ov')
     };
     _rtCanvas = q('rt-canvas');
     _rtG = _rtCanvas.getContext('2d');
@@ -520,6 +593,26 @@
       _rtCfgSalvar();
       _rtRenderAjustes();
     });
+    _rtRoot.querySelector('.rt-ks').addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('[data-k]');
+      if (!b) return;
+      _rtCfg.colunas = Number(b.getAttribute('data-k'));
+      _rtCfgSalvar();
+      _rtRenderSelecao();
+    });
+    q('rt-skin-btn').addEventListener('click', function () {
+      _rtPreviaParar();
+      var G = _rtG_();
+      if (G && typeof G.lojaJogoAbrir === 'function') G.lojaJogoAbrir('ritmo');
+      else if (typeof window.lojaJogoAbrir === 'function') window.lojaJogoAbrir('ritmo');
+    });
+    // Equipou outra skin (loja dentro do jogo): atualiza a amostra na hora.
+    window.addEventListener('angatuba:equipado', function (e) {
+      if (e && e.detail && e.detail.slot === 'rt_nota') _rtRenderSkinBtn();
+    });
+    _rtEls.rankLinha.addEventListener('click', _rtTopAbrir);
+    q('rt-top-fechar').addEventListener('click', _rtTopFechar);
+    _rtEls.topOv.addEventListener('click', function (e) { if (e.target === _rtEls.topOv) _rtTopFechar(); });
     q('rt-ajuda').addEventListener('click', function (e) {
       e.stopPropagation();
       var t = q('rt-ajuda-txt'), abrir = t.style.display === 'none';
@@ -560,7 +653,7 @@
     var html = '';
     for (var i = 0; i < RT_CATALOGO.length; i++) {
       var m = RT_CATALOGO[i];
-      var rn = rec[m.id + '|normal'], rh = rec[m.id + '|hard'];
+      var rn = rec[_rtChaveRec(m.id, 'normal', _rtCfg.colunas)], rh = rec[_rtChaveRec(m.id, 'hard', _rtCfg.colunas)];
       var sel = m.id === _rtSelId;
       html += '<button type="button" class="rt-musica' + (sel ? ' rt-musica-sel' : '') + '" data-musica="' + _rtEsc(m.id) + '" data-titulo="' + _rtEsc(m.titulo + (m.sub ? ' (' + m.sub + ')' : '')) + '" aria-pressed="' + sel + '">' +
         '<span class="rt-musica-ico">' + (sel ? '▶' : '♪') + '</span>' +
@@ -588,9 +681,100 @@
       difs[j].classList.toggle('rt-dif-ativa', ativo);
       difs[j].setAttribute('aria-checked', ativo ? 'true' : 'false');
     }
+    var sub = document.getElementById('rt-sel-sub');
+    if (sub) sub.textContent = 'Toque nas ' + _rtCfg.colunas + ' colunas quando as notas chegarem na linha. Notas longas: segure até o fim.';
+    var ks = _rtRoot.querySelectorAll('.rt-k');
+    for (var kk = 0; kk < ks.length; kk++) {
+      var kAtivo = Number(ks[kk].getAttribute('data-k')) === _rtCfg.colunas;
+      ks[kk].classList.toggle('rt-k-ativa', kAtivo);
+      ks[kk].setAttribute('aria-checked', kAtivo ? 'true' : 'false');
+    }
     _rtRenderAjustes();
     _rtRenderAvisoSom();
+    _rtRenderSkinBtn();
+    _rtRankAtualizar();
   }
+
+  /* ── Botão da skin (amostra desenhada com a skin equipada) ────── */
+  function _rtRenderSkinBtn() {
+    var cv = _rtEls.skinCv;
+    if (!cv) return;
+    var sk = _rtSkin();
+    _rtEls.skinNome.textContent = sk.nome;
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = 72 * dpr; cv.height = 28 * dpr;
+    var g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, 72, 28);
+    for (var i = 0; i < 3; i++) _rtDesenharNota(g, 13 + i * 23, 14, 10, sk.cores[i], sk.estilo);
+  }
+
+  /* ── Ranking da cidade do mapa selecionado ──────────────────────
+     Uma leitura por mapa a cada 60 s (cache em memória); depois de
+     gravar um recorde o cache daquele mapa é descartado. */
+  var _rtRankCache = {};
+  function _rtRankMapaSel() { return _rtMapaId(_rtSelId, _rtCfg.dif, _rtCfg.colunas); }
+  function _rtRankLer(mapa, forcar) {
+    var c = _rtRankCache[mapa];
+    if (c && !forcar && Date.now() - c.em < 60000) return c.p;
+    var G = _rtG_();
+    var falha = { top: [], pos: null, meu: null, erro: true };
+    var p = (G && typeof G.rankMapaPosicao === 'function') ? G.rankMapaPosicao(mapa) : Promise.resolve(falha);
+    // Offline/SDK do Firebase não carregou: não fica "carregando" pra sempre.
+    p = Promise.race([p, new Promise(function (ok) { setTimeout(function () { ok(falha); }, 8000); })]);
+    _rtRankCache[mapa] = { em: Date.now(), p: p };
+    return p;
+  }
+  function _rtRankAtualizar() {
+    var el = _rtEls.rankLinha;
+    if (!el) return;
+    var mapa = _rtRankMapaSel();
+    el.setAttribute('data-mapa', mapa);
+    el.innerHTML = '<span class="rt-rank-ico">🏆</span><span class="rt-rank-txt">Ranking da cidade…</span>';
+    _rtRankLer(mapa).then(function (r) {
+      if (el.getAttribute('data-mapa') !== mapa) return;     // trocou de mapa no meio
+      var txt;
+      if (r.erro) txt = 'Ranking da cidade indisponível agora';
+      else if (!r.top.length) txt = 'Ninguém jogou este mapa ainda — seja o 1º!';
+      else {
+        var lider = r.top[0];
+        txt = (r.pos ? '<b>Você: #' + r.pos + '</b> · ' : (r.meu != null ? '<b>Você: 50+</b> · ' : '')) +
+          '1º ' + _rtEsc(lider.nome) + ' ' + _rtFmtNum(lider.score);
+      }
+      el.innerHTML = '<span class="rt-rank-ico">🏆</span><span class="rt-rank-txt">' + txt + '</span>' + (r.top.length ? '<span class="rt-rank-seta">›</span>' : '');
+    });
+  }
+  function _rtTopAbrir() {
+    var mapa = _rtRankMapaSel(), m = _rtMusicaPorId(_rtSelId);
+    var G = _rtG_(), uid = null;
+    document.getElementById('rt-top-tit').textContent = (m ? m.titulo + (m.sub ? ' · ' + m.sub : '') : '') + ' — ' + (_rtCfg.dif === 'hard' ? 'Hard' : 'Normal') + ' ' + _rtCfg.colunas + 'K';
+    var lista = document.getElementById('rt-top-lista'), rod = document.getElementById('rt-top-rodape');
+    lista.innerHTML = '<li class="rt-top-vazio">Carregando…</li>';
+    rod.innerHTML = '';
+    _rtEls.topOv.style.display = 'flex';
+    _rtRankLer(mapa, true).then(function (r) {
+      if (_rtEls.topOv.style.display === 'none') return;
+      var logado = !!(G && typeof G.estaLogado === 'function' && G.estaLogado());
+      if (r.erro) { lista.innerHTML = '<li class="rt-top-vazio">Sem conexão com o ranking agora.</li>'; return; }
+      if (!r.top.length) { lista.innerHTML = '<li class="rt-top-vazio">Ninguém jogou este mapa ainda.</li>'; }
+      else {
+        var html = '';
+        for (var i = 0; i < Math.min(10, r.top.length); i++) {
+          var it = r.top[i], eu = r.pos === i + 1;
+          html += '<li class="rt-top-item' + (eu ? ' rt-top-eu' : '') + '"><span class="rt-top-pos">' + (i + 1) + '</span>' +
+            '<span class="rt-top-nome">' + _rtEsc(it.nome) + (eu ? ' (você)' : '') + '</span><span class="rt-top-score">' + _rtFmtNum(it.score) + '</span></li>';
+        }
+        lista.innerHTML = html;
+      }
+      if (!logado) rod.innerHTML = '<button type="button" class="rt-top-login">Entre na sua conta pra aparecer aqui</button>';
+      else if (r.pos && r.pos > 10) rod.textContent = 'Sua posição: #' + r.pos + ' · ' + _rtFmtNum(r.meu);
+      else if (!r.pos && r.meu != null) rod.textContent = 'Seu melhor: ' + _rtFmtNum(r.meu) + ' (fora do top 50)';
+      else if (!r.pos) rod.textContent = 'Termine este mapa pra entrar no ranking.';
+      var bl = rod.querySelector('.rt-top-login');
+      if (bl) bl.onclick = function () { _rtTopFechar(); if (G && typeof G.abrirLogin === 'function') G.abrirLogin('Entre pra aparecer no ranking do Ritmo da Coruja!'); };
+    });
+  }
+  function _rtTopFechar() { if (_rtEls.topOv) _rtEls.topOv.style.display = 'none'; }
   function _rtRankChip(rotulo, cls, rec) {
     return '<span class="rt-rk ' + cls + (rec ? '' : ' rt-rk-vazio') + '" title="' + (rec ? 'Melhor no ' + rotulo + ': ' + rec.rank + ' (' + _rtFmtAcc(rec.acc || 0) + ')' : 'Ainda não jogou no ' + rotulo) + '">' +
       '<span class="rt-rk-dif">' + rotulo + '</span>' +
@@ -638,7 +822,7 @@
       _rtCarregarAudio(m, function (p) {
         if (token === _rtTokenCarga) _rtAviso('Carregando ' + m.titulo + '… ' + Math.round(p * 100) + '%');
       }),
-      _rtCarregarMapa(m.id, dif)
+      _rtCarregarMapa(m.id, dif, _rtCfg.colunas)
     ]).then(function (r) {
       if (token !== _rtTokenCarga || _rtEstado !== 'carregando') return;
       _rtBuf = r[0]; _rtBufId = m.id;
@@ -675,29 +859,89 @@
     _rtSoma = 0; _rtJulgadas = 0; _rtCombo = 0; _rtComboMax = 0;
     _rtDesvioSoma = 0; _rtDesvioN = 0;
     _rtJulgVis = null;
-    _rtApertada = [0, 0, 0, 0]; _rtBrilho = [0, 0, 0, 0]; _rtPonteiros = {};
+    _rtK = _rtCfg.colunas;
+    _rtApertada = []; _rtBrilho = []; _rtSegurando = []; _rtPonteiros = {}; _rtTeclasDown = {};
+    for (var c = 0; c < _rtK; c++) { _rtApertada.push(0); _rtBrilho.push(0); _rtSegurando.push(null); }
+    _rtLongasPausadas = [];
+    _rtVida = 1; _rtFalhou = false; _rtFalhaEm = 0; _rtFalhaPos = 0;
+    _rtSkinAtual = _rtSkin();
     _rtEls.score.textContent = '0';
     _rtEls.acc.textContent = '100,00%';
     _rtEls.prog.style.width = '0%';
+    _rtEls.vida.style.display = _rtCfg.dif === 'hard' ? '' : 'none';
+    _rtVidaRender();
+  }
+
+  /* ── 4K → 5K/7K ──────────────────────────────────────────────────
+     Espalha as 4 colunas do mapa original pelas N novas, de forma
+     determinística (o mesmo mapa sai sempre igual — o ranking é justo):
+       5K: 0→0 · 1→1 ou meio · 2→3 ou meio · 3→4
+       7K: 0→0/1 · 1→2/1/3 · 2→4/3/5 · 3→6/5
+     Uma coluna só recebe nota se estiver livre (sem longa em andamento
+     e sem nota no mesmo instante); senão tenta a vizinha, depois a base. */
+  var RT_K_OPCOES = {
+    5: [[0], [1, 2], [3, 2], [4]],
+    7: [[0, 1], [2, 1, 3], [4, 3, 5], [6, 5]]
+  };
+  function _rtConverterK(notas, k) {
+    var opcoes = RT_K_OPCOES[k];
+    if (!opcoes) return notas;
+    var livreApos = [];
+    for (var i = 0; i < k; i++) livreApos.push(-1e9);
+    var saida = [];
+    for (var j = 0; j < notas.length; j++) {
+      var n = notas[j], ops = opcoes[n.c];
+      // "sorteio" fixo pelo tempo da nota (hash inteiro, sem Math.random)
+      var h = ((Math.floor(n.t / 7) * 2654435761) >>> 0) % 1000 / 1000;
+      var pref = ops[Math.min(ops.length - 1, Math.floor(h * ops.length))];
+      var ordem = [pref].concat(ops, opcoes[n.c][0]);
+      var col = -1;
+      for (var o = 0; o < ordem.length; o++) {
+        if (livreApos[ordem[o]] < n.t - 30) { col = ordem[o]; break; }
+      }
+      if (col === -1) {                       // tudo ocupado ali perto: pega a coluna livre mais próxima
+        for (var d = 0; d < k && col === -1; d++) {
+          var a = pref - d, b = pref + d;
+          if (a >= 0 && livreApos[a] < n.t - 30) col = a;
+          else if (b < k && livreApos[b] < n.t - 30) col = b;
+        }
+      }
+      if (col === -1) continue;              // não cabe em lugar nenhum: some (raríssimo)
+      livreApos[col] = Math.max(n.t, n.fim || 0);
+      saida.push({ t: n.t, c: col, fim: n.fim, j: null, jc: null, seg: false, solto: false, pausado: false });
+    }
+    return saida;
   }
 
   function _rtIniciar(mapa) {
     _rtMapa = mapa;
     var off = Number(mapa.offset) || 0;
-    _rtNotas = [];
-    _rtPorCol = [[], [], [], []];
+    var keysMapa = RT_MODOS_K.indexOf(Number(mapa.keys)) !== -1 ? Number(mapa.keys) : 4;
+    var notas = [];
     for (var i = 0; i < mapa.notes.length; i++) {
       var n = mapa.notes[i];
       var c = Math.round(Number(n.column));
       var t = Number(n.time) + off;
-      if (!(c >= 0 && c <= 3) || !isFinite(t)) continue;
-      _rtNotas.push({ t: t, c: c, j: null });
+      if (!(c >= 0 && c < keysMapa) || !isFinite(t)) continue;
+      // nota longa: "length" em ms; menos de 120 ms vira toque simples
+      var len = Math.round(Number(n.length) || 0);
+      notas.push({ t: t, c: c, fim: len >= 120 ? t + len : 0, j: null, jc: null, seg: false, solto: false, pausado: false });
     }
-    _rtNotas.sort(function (a, b) { return a.t - b.t || a.c - b.c; });
-    for (var k = 0; k < _rtNotas.length; k++) _rtPorCol[_rtNotas[k].c].push(_rtNotas[k]);
-    _rtPonteiro = [0, 0, 0, 0];
+    notas.sort(function (a, b) { return a.t - b.t || a.c - b.c; });
+    if (keysMapa !== _rtK) notas = (keysMapa === 4) ? _rtConverterK(notas, _rtK) : [];
+    _rtNotas = notas;
+    _rtPorCol = [];
+    _rtPonteiro = [];
+    for (var cc = 0; cc < _rtK; cc++) { _rtPorCol.push([]); _rtPonteiro.push(0); }
+    _rtTotal = 0;
+    var ultima = 0;
+    for (var k = 0; k < _rtNotas.length; k++) {
+      var nk = _rtNotas[k];
+      _rtPorCol[nk.c].push(nk);
+      _rtTotal += nk.fim ? 2 : 1;
+      ultima = Math.max(ultima, nk.fim || nk.t);
+    }
     _rtDesenhoIni = 0;
-    var ultima = _rtNotas.length ? _rtNotas[_rtNotas.length - 1].t : 0;
     // Termina 2,5 s depois da última nota (ou no fim do áudio, o que vier
     // primeiro) — músicas com outro longo não prendem a pessoa à toa.
     _rtFim = Math.min(_rtBuf.duration * 1000, ultima + 2500);
@@ -732,8 +976,9 @@
     var agora = _rtAgoraMs();
     var dt = _rtUltimoFrame ? Math.min(100, ts - _rtUltimoFrame) : 16;
     _rtUltimoFrame = ts;
-    if (!_rtPausado) {
+    if (!_rtPausado && !_rtFalhou) {
       _rtVerificarPassadas(agora);
+      _rtVerificarLongas(agora);
       // som ligado/desligado pelo menu de pausa vale na hora
       if (_rtGanho && !_rtSaindo) {
         var alvo = _rtSomAtivo() ? 1 : 0;
@@ -741,28 +986,63 @@
       }
       if (agora >= _rtFim && !_rtSaindo) _rtTerminar();
     }
-    for (var i = 0; i < 4; i++) _rtBrilho[i] = Math.max(0, _rtBrilho[i] - dt / 180);
+    for (var i = 0; i < _rtK; i++) {
+      // segurando uma longa: a pista fica acesa (brilho mínimo 0,55)
+      _rtBrilho[i] = Math.max(_rtSegurando[i] ? 0.55 : 0, _rtBrilho[i] - dt / 180);
+    }
     _rtDesenhar(agora);
     _rtRAF = requestAnimationFrame(_rtLoop);
   }
 
-  // Notas que passaram da janela sem toque viram Erro.
+  // Notas que passaram da janela sem toque viram Erro (a longa perde a
+  // cabeça E o fim — 2 erros, não dá pra "pegar no meio").
   function _rtVerificarPassadas(agora) {
-    for (var c = 0; c < 4; c++) {
+    for (var c = 0; c < _rtK; c++) {
       var lista = _rtPorCol[c];
       while (_rtPonteiro[c] < lista.length) {
         var n = lista[_rtPonteiro[c]];
         if (n.j) { _rtPonteiro[c]++; continue; }
-        if (agora - n.t > RT_JANELAS.erro) { _rtJulgar(n, 'erro', agora - n.t); _rtPonteiro[c]++; }
-        else break;
+        if (agora - n.t > RT_JANELAS.erro) {
+          _rtJulgar(n, 'erro', agora - n.t);
+          if (n.fim) _rtFinalizarLonga(n, 'erro', true);
+          _rtPonteiro[c]++;
+        } else break;
       }
+    }
+  }
+
+  // Longas: segurou até o fim → Perfeito automático. Longa interrompida
+  // pela pausa e não "pega de volta" até o fim → Bom (a pausa não pune).
+  function _rtVerificarLongas(agora) {
+    for (var c = 0; c < _rtK; c++) {
+      var n = _rtSegurando[c];
+      if (n && agora >= n.fim) {
+        _rtSegurando[c] = null;
+        n.seg = false;
+        _rtFinalizarLonga(n, 'perfeito');
+        _rtBrilho[c] = 1;
+      }
+    }
+    for (var i = _rtLongasPausadas.length - 1; i >= 0; i--) {
+      var p = _rtLongasPausadas[i];
+      if (p.jc) { _rtLongasPausadas.splice(i, 1); continue; }
+      if (agora >= p.fim) { p.pausado = false; _rtFinalizarLonga(p, 'bom'); _rtLongasPausadas.splice(i, 1); }
     }
   }
 
   // Toque numa coluna: pega a nota mais antiga ainda não julgada dela.
   function _rtTocar(c) {
-    if (_rtEstado !== 'jogando' || _rtPausado) return;
+    if (_rtEstado !== 'jogando' || _rtPausado || _rtFalhou) return;
     var agora = _rtAgoraMs();
+    // Voltou da pausa no meio de uma longa: tocar de novo na coluna "pega" ela.
+    for (var i = 0; i < _rtLongasPausadas.length; i++) {
+      var p = _rtLongasPausadas[i];
+      if (p.c === c && !p.jc && agora < p.fim) {
+        p.pausado = false; p.seg = true; _rtSegurando[c] = p;
+        _rtLongasPausadas.splice(i, 1);
+        return;
+      }
+    }
     var lista = _rtPorCol[c];
     while (_rtPonteiro[c] < lista.length && lista[_rtPonteiro[c]].j) _rtPonteiro[c]++;
     var n = lista[_rtPonteiro[c]];
@@ -776,27 +1056,93 @@
     else tipo = 'erro';
     _rtJulgar(n, tipo, dt);
     _rtPonteiro[c]++;
-    if (tipo !== 'erro') { _rtBrilho[c] = 1; _rtDesvioSoma += dt; _rtDesvioN++; }
+    if (tipo !== 'erro') {
+      _rtBrilho[c] = 1; _rtDesvioSoma += dt; _rtDesvioN++;
+      if (n.fim) { n.seg = true; _rtSegurando[c] = n; }       // começou a segurar
+    } else if (n.fim) {
+      _rtFinalizarLonga(n, 'erro', true);                       // errou a cabeça: perde a longa
+    }
+  }
+
+  // Soltou o dedo/tecla: se estava segurando uma longa, julga o fim.
+  // Até 90 ms antes do fim = Perfeito; até 170 ms = Bom; antes disso = Erro
+  // ("SOLTOU CEDO" — quebra o combo e, no Hard, tira vida).
+  function _rtSoltar(c) {
+    var n = _rtSegurando[c];
+    if (!n || _rtPausado) return;
+    _rtSegurando[c] = null;
+    n.seg = false;
+    var cedo = n.fim - _rtAgoraMs();
+    if (cedo <= RT_JANELAS.otimo) _rtFinalizarLonga(n, 'perfeito');
+    else if (cedo <= RT_JANELAS.erro) _rtFinalizarLonga(n, 'bom');
+    else { n.solto = true; _rtFinalizarLonga(n, 'erro'); }
   }
 
   function _rtJulgar(n, tipo, desvio) {
     n.j = tipo;
+    _rtContar(tipo, desvio, null);
+  }
+  // semAviso: o erro da cabeça já apareceu na tela; o do fim conta calado.
+  function _rtFinalizarLonga(n, tipo, semAviso) {
+    if (n.jc) return;
+    n.jc = tipo;
+    _rtContar(tipo, null, n.solto ? 'SOLTOU CEDO' : null, semAviso, semAviso ? 'nenhuma' : (n.solto ? 'solto' : null));
+  }
+  // Contabiliza UM julgamento (cabeça de nota, toque ou fim de longa).
+  function _rtContar(tipo, desvio, rotulo, semAviso, chaveVida) {
     _rtCont[tipo]++;
     _rtJulgadas++;
     _rtSoma += RT_VALOR[tipo];
     if (tipo === 'erro') _rtCombo = 0;
     else { _rtCombo++; if (_rtCombo > _rtComboMax) _rtComboMax = _rtCombo; }
-    _rtJulgVis = { tipo: tipo, ate: performance.now() + 420, desvio: desvio };
+    if (!semAviso) _rtJulgVis = { tipo: tipo, ate: performance.now() + 420, desvio: desvio, rotulo: rotulo };
     _rtEls.score.textContent = _rtFmtNum(_rtScoreAtual());
     _rtEls.acc.textContent = _rtFmtAcc(_rtPrecisao());
+    if (_rtDif === 'hard' && !_rtFalhou && !_rtSaindo) {
+      var dv = chaveVida === 'nenhuma' ? 0 : (RT_VIDA[chaveVida || tipo] || 0);
+      _rtVida = Math.max(0, Math.min(1, _rtVida + dv));
+      _rtVidaRender();
+      if (_rtVida <= 0) _rtFalhar();
+    }
+  }
+
+  /* ── Barra de vida (Hard) ─────────────────────────────────────── */
+  function _rtVidaRender() {
+    var b = _rtEls.vidaBarra;
+    if (!b) return;
+    var v = Math.max(0, Math.min(1, _rtVida));
+    b.style.width = (v * 100).toFixed(1) + '%';
+    b.style.background = v > 0.5 ? '#5eead4' : v > 0.25 ? '#fbbf24' : '#f87171';
+    _rtEls.vida.classList.toggle('rt-vida-baixa', v <= 0.25);
+  }
+  // Vida zerou: a música "desliga" (desacelera + some) e vem a tela de Falhou.
+  function _rtFalhar() {
+    _rtFalhou = true;
+    _rtSaindo = true;
+    _rtFalhaEm = performance.now();
+    _rtFalhaPos = _rtAgoraMs();
+    for (var c = 0; c < _rtK; c++) _rtSegurando[c] = null;
+    try {
+      var t0 = _rtCtx.currentTime;
+      if (_rtFonte && _rtFonte.playbackRate) {
+        _rtFonte.playbackRate.setValueAtTime(1, t0);
+        _rtFonte.playbackRate.linearRampToValueAtTime(0.35, t0 + 1.3);
+      }
+      _rtGanho.gain.cancelScheduledValues(t0);
+      _rtGanho.gain.setValueAtTime(_rtGanho.gain.value, t0);
+      _rtGanho.gain.linearRampToValueAtTime(0, t0 + 1.3);
+    } catch (e) {}
+    setTimeout(function () { if (_rtEstado === 'jogando') _rtResultado(); }, 1400);
   }
 
   /* ── Pontuação ───────────────────────────────────────────────────
      Estilo osu!mania: teto de 1.000.000. 90% vem da precisão de cada
      nota (Perfeito 100%, Ótimo 70%, Bom 40%, Erro 0) e 10% do combo
-     máximo em relação ao total de notas. */
+     máximo em relação ao total. Nota longa vale 2 julgamentos (cabeça e
+     fim). */
+  // Total = julgamentos possíveis (toques + cabeça e fim de cada longa).
   function _rtScoreAtual() {
-    var total = _rtNotas.length || 1;
+    var total = _rtTotal || 1;
     return Math.round(900000 * (_rtSoma / total) + 100000 * (_rtComboMax / total));
   }
   function _rtPrecisao() { return _rtJulgadas ? (_rtSoma / _rtJulgadas) * 100 : 100; }
@@ -812,14 +1158,15 @@
   }
 
   /* ── Recompensa 🪙 ──────────────────────────────────────────────
-     Base pelo rank × dificuldade (Hard vale 1,5×) × fator de precisão
-     (0,5 a 1,0). Rank D só paga com pelo menos 50% de precisão — sem
+     Base pelo rank × dificuldade (Hard vale 1,5×) × colunas (5K 1,1×,
+     7K 1,2×) × fator de precisão (0,5 a 1,0). Falhou (vida zerou) = 0. Rank D só paga com pelo menos 50% de precisão — sem
      isso, deixar a música tocando sozinha renderia moeda. O teto diário
      (500) e o multiplicador de evento ficam a cargo do moedasAdd. */
   var RT_MOEDAS_BASE = { SS: 30, S: 25, A: 20, B: 14, C: 9, D: 4 };
-  function _rtMoedas(rank, acc, dif) {
+  var RT_MOEDAS_K = { 4: 1, 5: 1.1, 7: 1.2 };
+  function _rtMoedas(rank, acc, dif, k) {
     if (rank === 'D' && acc < 50) return 0;
-    var mult = dif === 'hard' ? 1.5 : 1;
+    var mult = (dif === 'hard' ? 1.5 : 1) * (RT_MOEDAS_K[k] || 1);
     return Math.max(0, Math.round(RT_MOEDAS_BASE[rank] * mult * (0.5 + 0.5 * acc / 100)));
   }
 
@@ -843,15 +1190,54 @@
     _rtPararFonte();
     _rtMenuPartida(false);
     _rtEstado = 'resultado';
+    var segundos = Math.max(0, Math.round((Date.now() - _rtInicioReal - _rtPausaMs) / 1000));
+    var progresso = Math.max(0, Math.min(100, Math.round(_rtFalhaPos / (_rtFim || 1) * 100)));
+    var G = _rtG_();
+    var q = function (id) { return document.getElementById(id); };
+    var nomeMapa = _rtMusica.titulo + (_rtMusica.sub ? ' · ' + _rtMusica.sub : '') + ' — ' + (_rtDif === 'hard' ? 'Hard' : 'Normal') + ' · ' + _rtK + 'K';
+    q('rt-res-musica').textContent = nomeMapa;
+    q('rt-res-cidade').style.display = 'none';
+    q('rt-res-dica').style.display = 'none';
+    q('rt-res-denovo').textContent = _rtFalhou ? 'Tentar de novo' : 'Jogar de novo';
+
+    /* ── Falhou (Hard, vida zerou): sem moedas, recorde nem ranking.
+       Conta a partida nas stats (tempo jogado), com score 0 e 'derrota'
+       no histórico — não mexe no recorde. */
+    if (_rtFalhou) {
+      if (G && typeof G.statsRegistrarPartida === 'function') G.statsRegistrarPartida('ritmo', { segundos: segundos, score: 0, resultado: 'derrota' });
+      var rkF = q('rt-res-rank');
+      rkF.textContent = 'Falhou';
+      rkF.className = 'rt-res-rank rt-res-rank-falhou';
+      var fm = q('rt-res-falhou-msg');
+      fm.textContent = 'A vida acabou em ' + progresso + '% da música. No Hard, cada erro tira vida e cada acerto devolve um pouco.';
+      fm.style.display = '';
+      q('rt-res-recorde').style.display = 'none';
+      q('rt-res-score').textContent = _rtFmtNum(_rtScoreAtual());
+      q('rt-res-acc').textContent = _rtFmtAcc(_rtPrecisao());
+      q('rt-res-combo').textContent = _rtComboMax + 'x';
+      _rtResContagem();
+      var meF = q('rt-res-moedas');
+      meF.textContent = 'Sem moedas desta vez — termine a música pra ganhar 🪙';
+      meF.style.display = '';
+      meF.classList.add('rt-res-moedas-zero');
+      _rtMostrar('res');
+      if (G && G.som && typeof G.som.fim === 'function') { try { G.som.fim(false); } catch (e) {} }
+      return;
+    }
+    q('rt-res-falhou-msg').style.display = 'none';
+
     // Garante que toda nota foi contada (quem saiu antes do fim já foi tratado).
-    for (var i = 0; i < _rtNotas.length; i++) if (!_rtNotas[i].j) _rtJulgar(_rtNotas[i], 'erro', 0);
+    for (var i = 0; i < _rtNotas.length; i++) {
+      var ni = _rtNotas[i];
+      if (!ni.j) _rtJulgar(ni, 'erro', 0);
+      if (ni.fim && !ni.jc) _rtFinalizarLonga(ni, ni.seg ? 'perfeito' : 'erro', true);
+    }
     var acc = _rtPrecisao();
     var score = _rtScoreAtual();
     var rank = _rtRank(acc, _rtCont);
-    var segundos = Math.max(0, Math.round((Date.now() - _rtInicioReal - _rtPausaMs) / 1000));
 
     // Recorde local por música + dificuldade
-    var rec = _rtRecLer(), chave = _rtMusica.id + '|' + _rtDif;
+    var rec = _rtRecLer(), chave = _rtChaveRec(_rtMusica.id, _rtDif, _rtK);
     var antes = rec[chave];
     var novo = !antes || score > (antes.score || 0);
     if (novo) {
@@ -860,16 +1246,13 @@
     }
 
     // Moedas + stats (mesmo padrão dos outros jogos do hub)
-    var G = _rtG_();
-    var moedas = _rtMoedas(rank, acc, _rtDif);
+    var moedas = _rtMoedas(rank, acc, _rtDif, _rtK);
     if (G) {
       if (moedas > 0 && typeof G.moedasAdd === 'function') G.moedasAdd(moedas, 'ritmo');
       if (typeof G.statsRegistrarPartida === 'function') G.statsRegistrarPartida('ritmo', { segundos: segundos, score: score });
     }
 
     // Tela
-    var q = function (id) { return document.getElementById(id); };
-    q('rt-res-musica').textContent = _rtMusica.titulo + (_rtMusica.sub ? ' · ' + _rtMusica.sub : '') + ' — ' + (_rtDif === 'hard' ? 'Hard' : 'Normal');
     var rk = q('rt-res-rank');
     rk.textContent = rank;
     rk.className = 'rt-res-rank rt-r-' + rank;
@@ -877,19 +1260,49 @@
     q('rt-res-score').textContent = _rtFmtNum(score);
     q('rt-res-acc').textContent = _rtFmtAcc(acc);
     q('rt-res-combo').textContent = _rtComboMax + 'x';
-    q('rt-res-cont').innerHTML =
-      '<span style="color:' + RT_COR_JULG.perfeito + '">Perfeito <b>' + _rtCont.perfeito + '</b></span>' +
-      '<span style="color:' + RT_COR_JULG.otimo + '">Ótimo <b>' + _rtCont.otimo + '</b></span>' +
-      '<span style="color:' + RT_COR_JULG.bom + '">Bom <b>' + _rtCont.bom + '</b></span>' +
-      '<span style="color:' + RT_COR_JULG.erro + '">Erro <b>' + _rtCont.erro + '</b></span>';
+    _rtResContagem();
     var me = q('rt-res-moedas');
     if (moedas > 0) { me.textContent = '+' + moedas + ' 🪙'; me.style.display = ''; }
     else { me.textContent = 'Acerte mais da metade das notas pra ganhar 🪙'; me.style.display = ''; }
     me.classList.toggle('rt-res-moedas-zero', moedas <= 0);
     _rtDicaCalibrar();
+    _rtResRankCidade(score);
     _rtMostrar('res');
     if (G && G.som && typeof G.som.fim === 'function') { try { G.som.fim(RT_ORDEM_RANK[rank] >= 5); } catch (e) {} }
     if (RT_ORDEM_RANK[rank] >= 5 && G && G.efeitos) G.efeitos.confete('rt-res', 90);
+  }
+
+  function _rtResContagem() {
+    document.getElementById('rt-res-cont').innerHTML =
+      '<span style="color:' + RT_COR_JULG.perfeito + '">Perfeito <b>' + _rtCont.perfeito + '</b></span>' +
+      '<span style="color:' + RT_COR_JULG.otimo + '">Ótimo <b>' + _rtCont.otimo + '</b></span>' +
+      '<span style="color:' + RT_COR_JULG.bom + '">Bom <b>' + _rtCont.bom + '</b></span>' +
+      '<span style="color:' + RT_COR_JULG.erro + '">Erro <b>' + _rtCont.erro + '</b></span>';
+  }
+
+  // Ranking da cidade deste mapa: grava (se logado) e mostra a posição.
+  function _rtResRankCidade(score) {
+    var el = document.getElementById('rt-res-cidade');
+    var G = _rtG_();
+    if (!el || !G || typeof G.rankMapaSubmeter !== 'function') return;
+    var mapa = _rtMapaId(_rtMusica.id, _rtDif, _rtK);
+    var logado = typeof G.estaLogado === 'function' && G.estaLogado();
+    if (!logado) {
+      el.innerHTML = '🏆 <button type="button" class="rt-res-cidade-login">Entre na sua conta</button> pra aparecer no ranking desta música.';
+      el.style.display = '';
+      el.querySelector('button').onclick = function () { if (typeof G.abrirLogin === 'function') G.abrirLogin('Entre pra aparecer no ranking do Ritmo da Coruja!'); };
+      return;
+    }
+    el.textContent = '🏆 Enviando pro ranking da cidade…';
+    el.style.display = '';
+    G.rankMapaSubmeter(mapa, score).then(function (gravou) {
+      delete _rtRankCache[mapa];
+      return _rtRankLer(mapa, true).then(function (r) {
+        if (r.erro) { el.textContent = '🏆 Ranking indisponível agora — seu recorde fica salvo neste aparelho.'; return; }
+        el.innerHTML = '🏆 ' + (r.pos ? 'Você está em <b>#' + r.pos + '</b> na cidade neste mapa' : 'Seu melhor neste mapa: <b>' + _rtFmtNum(r.meu || score) + '</b> (fora do top 50)') +
+          (gravou ? ' · <b>novo recorde!</b>' : '');
+      });
+    });
   }
 
   // Se os toques acertados vieram em média bem atrasados/adiantados, sugere
@@ -923,7 +1336,7 @@
       podePausar: function () { return _rtEstado === 'jogando' && !_rtSaindo; },
       pausar: _rtPausar,
       continuar: _rtContinuar,
-      descricao: function () { return _rtMusica ? _rtMusica.titulo + ' · ' + (_rtDif === 'hard' ? 'Hard' : 'Normal') : ''; },
+      descricao: function () { return _rtMusica ? _rtMusica.titulo + ' · ' + (_rtDif === 'hard' ? 'Hard' : 'Normal') + ' · ' + _rtK + 'K' : ''; },
       extra: { rotulo: 'Escolher outra música', acao: _rtMostrarSelecao }
     });
     // O hub desenha o "extra" como link de texto (.jm-link). Aqui ele vira
@@ -939,13 +1352,20 @@
     }
   }
   function _rtPausar() {
-    if (_rtEstado !== 'jogando' || _rtPausado) return;
+    if (_rtEstado !== 'jogando' || _rtPausado || _rtFalhou) return;
     _rtPosPausa = _rtAgoraMs();
     _rtPausado = true;
     _rtPausaDesde = Date.now();
     _rtPararFonte();
     _rtAudioSuspender();
-    _rtApertada = [0, 0, 0, 0]; _rtPonteiros = {};
+    // Longa sendo segurada: fica "pausada" — ao voltar, é só tocar de novo
+    // na coluna pra continuar segurando (ver _rtTocar). Sem penalidade.
+    for (var c = 0; c < _rtK; c++) {
+      var n = _rtSegurando[c];
+      if (n) { n.seg = false; n.pausado = true; _rtLongasPausadas.push(n); _rtSegurando[c] = null; }
+      _rtApertada[c] = 0;
+    }
+    _rtPonteiros = {}; _rtTeclasDown = {};
   }
   function _rtContinuar() {
     if (!_rtPausado || _rtEstado !== 'jogando') return;
@@ -970,7 +1390,7 @@
     var L = _rtLayout();
     var x = (clientX - r.left) - L.x0;
     // fora das pistas (telas largas) conta como a pista mais perto
-    return Math.max(0, Math.min(3, Math.floor(x / L.lw)));
+    return Math.max(0, Math.min(_rtK - 1, Math.floor(x / L.lw)));
   }
   function _rtPointerDown(e) {
     if (_rtEstado !== 'jogando') return;
@@ -986,12 +1406,21 @@
     if (c === undefined) return;
     delete _rtPonteiros[e.pointerId];
     _rtApertada[c] = Math.max(0, _rtApertada[c] - 1);
+    if (!_rtApertada[c]) _rtSoltar(c);      // último dedo saiu da pista
+  }
+  // Tecla → coluna, conforme o modo (D F J K · D F espaço J K · S D F espaço J K L).
+  function _rtColunaDaTecla(e) {
+    var tecla = e.key === ' ' || e.key === 'Spacebar' ? ' ' : (e.key || '').toLowerCase();
+    if (tecla.length !== 1) return undefined;
+    var i = (RT_TECLAS_K[_rtK] || '').indexOf(tecla);
+    return i === -1 ? undefined : i;
   }
   var _rtTeclasDown = {};
   function _rtKeyDown(e) {
-    if (_rtEstado !== 'jogando' || e.repeat) return;
-    var c = RT_TECLAS[(e.key || '').toLowerCase()];
+    if (_rtEstado !== 'jogando') return;
+    var c = _rtColunaDaTecla(e);
     if (c === undefined) return;
+    if (e.repeat) { e.preventDefault(); return; }
     var tela = document.getElementById('jogo-ritmo');
     if (!tela || tela.style.display === 'none') return;
     e.preventDefault();
@@ -1001,10 +1430,11 @@
     _rtTocar(c);
   }
   function _rtKeyUp(e) {
-    var c = RT_TECLAS[(e.key || '').toLowerCase()];
+    var c = _rtColunaDaTecla(e);
     if (c === undefined || !_rtTeclasDown[c]) return;
     _rtTeclasDown[c] = false;
     _rtApertada[c] = Math.max(0, _rtApertada[c] - 1);
+    if (!_rtApertada[c]) _rtSoltar(c);
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -1020,41 +1450,108 @@
     _rtCanvas.height = Math.round(_rtH * _rtDpr);
   }
   // Pistas centralizadas: no celular ocupam a largura toda; em tela
-  // larga ficam com no máximo 110 px cada.
+  // larga ficam com no máximo RT_LARGURA_MAX[k] px cada.
   function _rtLayout() {
-    var lw = Math.min(_rtW / 4, 110);
-    var x0 = (_rtW - lw * 4) / 2;
+    var k = _rtK || 4;
+    var lw = Math.min(_rtW / k, RT_LARGURA_MAX[k] || 110);
+    var x0 = (_rtW - lw * k) / 2;
     var hitY = _rtH - Math.max(96, Math.min(150, _rtH * 0.15));
     return { lw: lw, x0: x0, hitY: hitY };
   }
   // Raio das notas/receptores: cabe na pista com folga, nunca gigante.
-  function _rtRaioNota(lw) { return Math.max(14, Math.min(lw * 0.36, 40)); }
-  // Nota redonda ("gema"): borda na cor da pista, anel escuro e miolo
-  // claro, com um brilho no alto — lê bem em qualquer velocidade.
-  function _rtDesenharNota(g, x, y, r, cor) {
-    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2);
+  function _rtRaioNota(lw) { return Math.max(12, Math.min(lw * 0.36, 40)); }
+
+  /* ── Nota redonda, no estilo da skin ─────────────────────────────
+     gema  : borda colorida, anel escuro e miolo claro (clássica)
+     flat  : disco liso com contorno fino (minimal)
+     olho  : íris colorida, pupila preta e brilho (Olho de Coruja)
+     neon  : anel brilhante, miolo escuro (Neon) — brilho feito com um
+             círculo translúcido maior em vez de shadowBlur (pesado no celular)
+     ouro  : gradiente metálico + estrelinha que gira (Ouro Real) */
+  function _rtDesenharNota(g, x, y, r, cor, estilo) {
+    var PI2 = Math.PI * 2;
+    function disco(rr, f) { g.beginPath(); g.arc(x, y, rr, 0, PI2); g.fillStyle = f; g.fill(); }
+    if (estilo === 'flat') {
+      disco(r, cor);
+      g.lineWidth = Math.max(1.5, r * 0.1); g.strokeStyle = 'rgba(0,0,0,0.28)';
+      g.beginPath(); g.arc(x, y, r * 0.92, 0, PI2); g.stroke();
+      return;
+    }
+    if (estilo === 'olho') {
+      disco(r, '#1c1206');
+      var gi = g.createRadialGradient(x, y, r * 0.2, x, y, r * 0.88);
+      gi.addColorStop(0, '#fde68a'); gi.addColorStop(1, cor);
+      disco(r * 0.86, gi);
+      disco(r * 0.4, '#0b0b0b');
+      disco(r * 0.14, 'rgba(255,255,255,0.9)');
+      g.beginPath(); g.arc(x - r * 0.22, y - r * 0.24, r * 0.12, 0, PI2); g.fillStyle = '#fff'; g.fill();
+      return;
+    }
+    if (estilo === 'neon') {
+      var a0 = g.globalAlpha;
+      g.globalAlpha = a0 * 0.22; disco(r * 1.3, cor);
+      g.globalAlpha = a0;
+      disco(r, 'rgba(8,4,20,0.85)');
+      g.lineWidth = Math.max(2.5, r * 0.2); g.strokeStyle = cor;
+      g.beginPath(); g.arc(x, y, r * 0.8, 0, PI2); g.stroke();
+      disco(r * 0.22, cor);
+      return;
+    }
+    if (estilo === 'ouro') {
+      var go = g.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
+      go.addColorStop(0, '#fffbeb'); go.addColorStop(0.45, cor); go.addColorStop(1, '#78350f');
+      disco(r, go);
+      g.lineWidth = Math.max(1.5, r * 0.09); g.strokeStyle = '#fde68a';
+      g.beginPath(); g.arc(x, y, r * 0.93, 0, PI2); g.stroke();
+      // estrelinha de 4 pontas girando
+      var ang = (performance.now() / 600) % PI2, sr = r * 0.42;
+      g.save(); g.translate(x + r * 0.28, y - r * 0.3); g.rotate(ang);
+      g.beginPath();
+      for (var i = 0; i < 8; i++) {
+        var rr = i % 2 ? sr * 0.28 : sr, ai = i * Math.PI / 4;
+        g.lineTo(Math.cos(ai) * rr, Math.sin(ai) * rr);
+      }
+      g.closePath(); g.fillStyle = 'rgba(255,255,255,0.85)'; g.fill();
+      g.restore();
+      return;
+    }
+    // gema (padrão)
+    disco(r, cor);
+    disco(r * 0.66, 'rgba(12,8,28,0.55)');
+    disco(r * 0.42, cor);
+    disco(r * 0.42, 'rgba(255,255,255,0.55)');
+    g.beginPath(); g.arc(x - r * 0.3, y - r * 0.35, r * 0.22, 0, PI2); g.fillStyle = 'rgba(255,255,255,0.7)'; g.fill();
+  }
+
+  // Corpo da nota longa: faixa arredondada entre a cabeça (y1) e o fim (y0).
+  function _rtDesenharCorpo(g, x, y0, y1, larg, cor, alfa) {
+    if (y1 <= y0) return;
+    var a0 = g.globalAlpha;
+    g.globalAlpha = a0 * alfa;
+    var rr = larg / 2;
+    g.beginPath();
+    g.moveTo(x - rr, y1);
+    g.lineTo(x - rr, y0 + rr);
+    g.arc(x, y0 + rr, rr, Math.PI, 0);
+    g.lineTo(x + rr, y1);
+    g.closePath();
     g.fillStyle = cor; g.fill();
-    g.beginPath(); g.arc(x, y, r * 0.66, 0, Math.PI * 2);
-    g.fillStyle = 'rgba(12,8,28,0.55)'; g.fill();
-    g.beginPath(); g.arc(x, y, r * 0.42, 0, Math.PI * 2);
-    g.fillStyle = cor; g.fill();
-    g.beginPath(); g.arc(x, y, r * 0.42, 0, Math.PI * 2);
-    g.fillStyle = 'rgba(255,255,255,0.55)'; g.fill();
-    g.beginPath(); g.arc(x - r * 0.3, y - r * 0.35, r * 0.22, 0, Math.PI * 2);
-    g.fillStyle = 'rgba(255,255,255,0.7)'; g.fill();
+    g.globalAlpha = a0;
   }
 
   function _rtDesenhar(agora) {
     var g = _rtG;
     if (!g || !_rtW) return;
     g.setTransform(_rtDpr, 0, 0, _rtDpr, 0, 0);
+    var K = _rtK || 4;
     var L = _rtLayout(), lw = L.lw, x0 = L.x0, hitY = L.hitY;
     var queda = _rtTempoQueda();
     var px = hitY / queda;          // pixels por ms
+    var skin = _rtSkinAtual || _rtSkin();
     g.clearRect(0, 0, _rtW, _rtH);
 
     // Fundo das pistas
-    for (var c = 0; c < 4; c++) {
+    for (var c = 0; c < K; c++) {
       var x = x0 + c * lw;
       g.fillStyle = c % 2 ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.02)';
       g.fillRect(x, 0, lw, _rtH);
@@ -1068,23 +1565,23 @@
     }
     g.strokeStyle = 'rgba(255,255,255,0.07)';
     g.lineWidth = 1;
-    for (var s = 0; s <= 4; s++) {
+    for (var s = 0; s <= K; s++) {
       g.beginPath(); g.moveTo(x0 + s * lw + 0.5, 0); g.lineTo(x0 + s * lw + 0.5, _rtH); g.stroke();
     }
 
-    // Linha de acerto + receptores (anéis redondos, estilo Guitar Hero)
+    // Linha de acerto + receptores (anéis redondos na cor da skin)
     var raio = _rtRaioNota(lw);
     g.strokeStyle = 'rgba(255,255,255,0.10)';
     g.lineWidth = 2;
-    g.beginPath(); g.moveTo(x0, hitY); g.lineTo(x0 + lw * 4, hitY); g.stroke();
-    for (var r = 0; r < 4; r++) {
-      var cxr = x0 + r * lw + lw / 2, apertada = _rtApertada[r] > 0;
+    g.beginPath(); g.moveTo(x0, hitY); g.lineTo(x0 + lw * K, hitY); g.stroke();
+    for (var r = 0; r < K; r++) {
+      var cxr = x0 + r * lw + lw / 2, apertada = _rtApertada[r] > 0, corR = _rtCorCol(skin, r, K);
       var rr = raio * (apertada ? 0.92 : 1);
       g.beginPath(); g.arc(cxr, hitY, rr, 0, Math.PI * 2);
       g.fillStyle = apertada ? 'rgba(255,255,255,0.18)' : 'rgba(9,14,22,0.75)';
       g.fill();
       g.lineWidth = Math.max(3, raio * 0.16);
-      g.strokeStyle = RT_COR_COL[r];
+      g.strokeStyle = corR;
       g.globalAlpha = apertada ? 1 : 0.6;
       g.stroke();
       g.globalAlpha = 1;
@@ -1093,10 +1590,10 @@
         var b = _rtBrilho[r];
         g.globalAlpha = b;
         g.lineWidth = 3;
-        g.strokeStyle = RT_COR_COL[r];
+        g.strokeStyle = corR;
         g.beginPath(); g.arc(cxr, hitY, raio * (1 + (1 - b) * 0.7), 0, Math.PI * 2); g.stroke();
         var fg = g.createLinearGradient(0, hitY, 0, hitY - 130);
-        fg.addColorStop(0, RT_COR_COL[r]);
+        fg.addColorStop(0, corR);
         fg.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = fg;
         g.globalAlpha = b * 0.35;
@@ -1105,48 +1602,78 @@
       }
     }
 
-    // Notas visíveis: do ponteiro de desenho até sair pelo topo
+    // Notas visíveis: do ponteiro de desenho até sair pelo topo.
+    // Uma nota sai da lista quando já foi resolvida e passou da linha
+    // (longas: quando o FIM passou, ou foi completada).
     while (_rtDesenhoIni < _rtNotas.length) {
-      var n0 = _rtNotas[_rtDesenhoIni];
-      if (n0.j && (agora - n0.t) > 0) _rtDesenhoIni++;
-      else if (agora - n0.t > RT_JANELAS.erro + 400) _rtDesenhoIni++;
+      var n0 = _rtNotas[_rtDesenhoIni], fim0 = n0.fim || n0.t;
+      var resolvida = n0.fim ? (n0.jc && (n0.jc !== 'erro' || agora - fim0 > 400)) : (n0.j && agora > n0.t);
+      if (resolvida || agora - fim0 > RT_JANELAS.erro + 400) _rtDesenhoIni++;
       else break;
     }
+    var larg = raio * 1.05;
     for (var i = _rtDesenhoIni; i < _rtNotas.length; i++) {
       var n = _rtNotas[i];
       var dtn = n.t - agora;
       if (dtn > queda * 1.05) break;
-      if (n.j && n.j !== 'erro') continue;
+      var cx = x0 + n.c * lw + lw / 2, cor = _rtCorCol(skin, n.c, K);
       var y = hitY - dtn * px;
+      if (n.fim) {
+        if (n.jc && n.jc !== 'erro') continue;               // completada: some
+        var yFim = Math.max(-raio, hitY - (n.fim - agora) * px);
+        var morta = n.solto || n.j === 'erro' || n.jc === 'erro';
+        var yCab = n.seg ? hitY : y;                         // segurando: cabeça presa na linha
+        if (morta) {
+          _rtDesenharCorpo(g, cx, yFim, yCab, larg, 'rgba(148,163,184,1)', 0.28);
+        } else {
+          _rtDesenharCorpo(g, cx, yFim, yCab, larg, cor, n.seg ? 0.85 : 0.5);
+          if (n.seg) {
+            // brilho correndo pelo corpo enquanto segura
+            var faixa = (performance.now() / 4) % 60;
+            g.globalAlpha = 0.35; g.fillStyle = '#fff';
+            for (var fy = yCab - faixa; fy > yFim + 6; fy -= 60) g.fillRect(cx - larg * 0.18, fy - 10, larg * 0.36, 10);
+            g.globalAlpha = 1;
+          }
+        }
+        // ponta do fim
+        g.globalAlpha = morta ? 0.3 : 1;
+        g.beginPath(); g.arc(cx, yFim, raio * 0.42, 0, Math.PI * 2);
+        g.fillStyle = morta ? '#94a3b8' : cor; g.fill();
+        g.globalAlpha = morta ? 0.3 : 1;
+        if (yCab > -raio && yCab < _rtH + raio) _rtDesenharNota(g, cx, yCab, raio, morta ? '#64748b' : cor, skin.estilo);
+        g.globalAlpha = 1;
+        continue;
+      }
+      if (n.j && n.j !== 'erro') continue;
       if (y < -raio || y > _rtH + raio) continue;
       g.globalAlpha = n.j === 'erro' ? 0.25 : 1;
-      _rtDesenharNota(g, x0 + n.c * lw + lw / 2, y, raio, RT_COR_COL[n.c]);
+      _rtDesenharNota(g, cx, y, raio, cor, skin.estilo);
       g.globalAlpha = 1;
     }
 
     // Julgamento + combo (centro)
-    var cx = _rtW / 2, cy = hitY - Math.min(_rtH * 0.33, 230);
+    var ccx = _rtW / 2, cy = hitY - Math.min(_rtH * 0.33, 230);
     var pn = performance.now();
     if (_rtCombo >= 3) {
       g.font = '800 ' + Math.round(Math.min(46, _rtW * 0.11)) + 'px Syne, system-ui, sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillStyle = 'rgba(255,255,255,0.92)';
-      g.fillText(String(_rtCombo), cx, cy);
+      g.fillText(String(_rtCombo), ccx, cy);
       g.font = '700 11px system-ui, sans-serif';
       g.fillStyle = 'rgba(199,209,224,0.7)';
-      g.fillText('COMBO', cx, cy + Math.min(30, _rtW * 0.07));
+      g.fillText('COMBO', ccx, cy + Math.min(30, _rtW * 0.07));
     }
     if (_rtJulgVis && pn < _rtJulgVis.ate) {
       var resto = (_rtJulgVis.ate - pn) / 420;          // 1 → 0
       var esc = 1 + (1 - Math.min(1, (1 - resto) * 5)) * 0.25;
       g.save();
-      g.translate(cx, cy + 52);
+      g.translate(ccx, cy + 52);
       g.scale(esc, esc);
       g.globalAlpha = Math.min(1, resto * 2);
       g.font = '900 ' + Math.round(Math.min(26, _rtW * 0.065)) + 'px Syne, system-ui, sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillStyle = RT_COR_JULG[_rtJulgVis.tipo];
-      g.fillText(RT_ROTULO[_rtJulgVis.tipo], 0, 0);
+      g.fillText(_rtJulgVis.rotulo || RT_ROTULO[_rtJulgVis.tipo], 0, 0);
       if (_rtJulgVis.tipo !== 'perfeito' && _rtJulgVis.tipo !== 'erro' && _rtJulgVis.desvio) {
         g.font = '700 11px system-ui, sans-serif';
         g.fillStyle = 'rgba(199,209,224,0.85)';
@@ -1160,7 +1687,20 @@
       g.font = '800 18px Syne, system-ui, sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillStyle = 'rgba(255,255,255,' + Math.min(1, -agora / 600).toFixed(2) + ')';
-      g.fillText(_rtPausado ? '' : 'Prepare-se!', cx, _rtH * 0.3);
+      g.fillText(_rtPausado ? '' : 'Prepare-se!', ccx, _rtH * 0.3);
+    }
+
+    // Falhou: tela escurece em vermelho
+    if (_rtFalhou) {
+      var f = Math.min(1, (pn - _rtFalhaEm) / 1200);
+      g.fillStyle = 'rgba(60,6,12,' + (f * 0.75).toFixed(3) + ')';
+      g.fillRect(0, 0, _rtW, _rtH);
+      g.globalAlpha = f;
+      g.font = '900 ' + Math.round(Math.min(40, _rtW * 0.1)) + 'px Syne, system-ui, sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = '#f87171';
+      g.fillText('FALHOU', ccx, _rtH * 0.42);
+      g.globalAlpha = 1;
     }
 
     // Barra de progresso

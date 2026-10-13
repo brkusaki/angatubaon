@@ -305,7 +305,43 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
 .rt-res-cidade { max-width: 340px; font-size: 13px; line-height: 1.45; color: #fde68a; }
 .rt-res-cidade b { color: #fff; }
 
+.rt-hud-combo {
+  margin-top: 4px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: rgba(253,230,138,.85); font-variant-numeric: tabular-nums; min-height: 15px;
+  opacity: 0; transform-origin: right center; transition: opacity .2s;
+}
+.rt-hud-combo b { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 900; color: #fde68a; letter-spacing: 0; }
+.rt-hud-combo.rt-combo-vivo { opacity: 1; }
+.rt-hud-combo.rt-combo-marco { animation: rtComboMarco .45s cubic-bezier(.2,1.6,.4,1); }
+@keyframes rtComboMarco { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+.rt-hud-pad { margin-top: 2px; font-size: 13px; opacity: .7; }
+/* o placar fica por cima da última pista: sombra pra ler sobre as notas */
+.rt-hud { text-shadow: 0 1px 3px rgba(0,0,0,.85), 0 0 8px rgba(0,0,0,.5); }
+
+/* ── Controle (gamepad) ── */
+.rt-pad {
+  margin: 10px auto 0; max-width: 420px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 6px 6px 6px 12px; border-radius: 12px; font-size: 12.5px; font-weight: 700;
+  background: rgba(94,234,212,.10); border: 1px solid rgba(94,234,212,.35); color: #99f6e4;
+}
+.rt-pad-cfg {
+  flex-shrink: 0; padding: 6px 10px; border: none; border-radius: 9px; cursor: pointer;
+  background: rgba(94,234,212,.2); color: #ccfbf1; font-size: 12px; font-weight: 800;
+}
+.rt-pad-caixa { padding-bottom: 14px; }
+.rt-pad-caixa .rt-link { align-self: center; }
+.rt-pad-msg { padding: 4px 16px 12px; font-size: 13.5px; color: #c7d1e0; text-align: center; }
+.rt-pad-msg b { color: #fff; }
+.rt-pad-slots { display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; padding: 0 12px 12px; }
+.rt-pad-slot {
+  min-width: 34px; height: 38px; padding: 0 5px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.05); border: 1px dashed rgba(255,255,255,.2); color: rgba(199,209,224,.6);
+  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 13px;
+}
+.rt-pad-slot-agora { border: 2px solid #a78bfa; color: #fff; animation: rtVidaPisca .6s ease-in-out infinite alternate; }
+.rt-pad-slot-ok { border-style: solid; border-color: rgba(94,234,212,.6); background: rgba(94,234,212,.12); color: #ccfbf1; }
+
 @media (prefers-reduced-motion: reduce) {
-  .rt-eq i, .rt-ico-carregando::after, .rt-vida-baixa .rt-vida-trilho { animation: none; }
+  .rt-eq i, .rt-ico-carregando::after, .rt-vida-baixa .rt-vida-trilho, .rt-hud-combo.rt-combo-marco, .rt-pad-slot-agora { animation: none; }
   .rt-res-rank { animation: none; }
 }

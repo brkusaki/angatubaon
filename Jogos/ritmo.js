@@ -17,6 +17,8 @@
    - Skins .............. Loja da Coruja, slot rt_nota (hub.js) → _rtSkin()
    - Ranking ............ por mapa (música+dificuldade+colunas), via
                           AngatubaGames.rankMapaSubmeter / rankMapaPosicao
+   - Entrada ............ toque (multitoque), teclado e controle (Gamepad API,
+                          ver bloco CONTROLE) — todos somam em _rtApertada
    - Relógio ............ Web Audio (AudioContext). A música é decodificada
                           inteira e tocada por um AudioBufferSourceNode; o
                           tempo da música sai do ctx.currentTime (preciso,
@@ -177,8 +179,19 @@
       velocidade: Math.max(1, Math.min(10, Math.round(Number(c.velocidade) || 6))),
       ajuste: Math.max(-200, Math.min(200, Math.round(Number(c.ajuste) || 0))),
       ultima: typeof c.ultima === 'string' ? c.ultima : '',
-      colunas: RT_MODOS_K.indexOf(Number(c.colunas)) !== -1 ? Number(c.colunas) : 4
+      colunas: RT_MODOS_K.indexOf(Number(c.colunas)) !== -1 ? Number(c.colunas) : 4,
+      pad: _rtCfgPad(c.pad)
     };
+  }
+  // Botões personalizados do controle: { 4:[b,b,b,b], 5:[...], 7:[...] } (um por coluna).
+  function _rtCfgPad(p) {
+    var out = {};
+    if (!p || typeof p !== 'object') return out;
+    RT_MODOS_K.forEach(function (k) {
+      var l = p[k];
+      if (Array.isArray(l) && l.length === k && l.every(function (b) { return b === Math.round(b) && b >= 0 && b < 32; })) out[k] = l.slice();
+    });
+    return out;
   }
   function _rtCfgSalvar() {
     try { localStorage.setItem(RT_KEY_CFG, JSON.stringify(_rtCfg)); } catch (e) {}
@@ -481,6 +494,7 @@
           '<div class="rt-sel-sub" id="rt-sel-sub"></div>' +
           '<button type="button" class="rt-aviso-som" id="rt-aviso-som" style="display:none;">🔇 O som dos jogos está desligado — toque para ligar</button>' +
           '<div class="rt-erro" id="rt-erro" role="alert" style="display:none;"></div>' +
+          '<div class="rt-pad" id="rt-pad" style="display:none;"><span>🎮 <span id="rt-pad-txt">Controle conectado</span></span><button type="button" class="rt-pad-cfg" id="rt-pad-cfg">Configurar botões</button></div>' +
         '</div>' +
         '<div class="rt-lista" id="rt-lista"></div>' +
         '<div class="rt-painel">' +
@@ -522,6 +536,8 @@
         '<div class="rt-hud">' +
           '<div class="rt-hud-score" id="rt-score">0</div>' +
           '<div class="rt-hud-acc" id="rt-acc">100,00%</div>' +
+          '<div class="rt-hud-combo" id="rt-combo" aria-live="off"></div>' +
+          '<div class="rt-hud-pad" id="rt-hud-pad" style="display:none;" title="Controle conectado">🎮</div>' +
         '</div>' +
         '<div class="rt-aviso" id="rt-aviso" style="display:none;"></div>' +
       '</div>' +
@@ -543,6 +559,15 @@
         '<button type="button" class="rt-jogar" id="rt-res-denovo">Jogar de novo</button>' +
         '<button type="button" class="rt-link" id="rt-res-voltar">Escolher outra música</button>' +
       '</div>' +
+      // ── Configurar botões do controle ──
+      '<div class="rt-top-ov" id="rt-pad-ov" style="display:none;" role="dialog" aria-modal="true" aria-label="Configurar controle">' +
+        '<div class="rt-top-caixa rt-pad-caixa">' +
+          '<div class="rt-top-cab"><div class="rt-top-tit" id="rt-pad-tit"></div><button type="button" class="rt-top-fechar" id="rt-pad-fechar" aria-label="Fechar">✕</button></div>' +
+          '<div class="rt-pad-msg" id="rt-pad-msg"></div>' +
+          '<div class="rt-pad-slots" id="rt-pad-slots"></div>' +
+          '<button type="button" class="rt-link" id="rt-pad-padrao">Voltar pro mapa padrão</button>' +
+        '</div>' +
+      '</div>' +
       // ── Top 10 do mapa (ranking da cidade) ──
       '<div class="rt-top-ov" id="rt-top-ov" style="display:none;" role="dialog" aria-modal="true" aria-label="Ranking da música">' +
         '<div class="rt-top-caixa">' +
@@ -559,7 +584,8 @@
       avisoSom: q('rt-aviso-som'), score: q('rt-score'), acc: q('rt-acc'), prog: q('rt-prog'),
       aviso: q('rt-aviso'), erro: q('rt-erro'),
       rankLinha: q('rt-rank-linha'), skinCv: q('rt-skin-cv'), skinNome: q('rt-skin-nome'),
-      vida: q('rt-vida'), vidaBarra: q('rt-vida-barra'), topOv: q('rt-top-ov')
+      vida: q('rt-vida'), vidaBarra: q('rt-vida-barra'), topOv: q('rt-top-ov'),
+      combo: q('rt-combo'), hudPad: q('rt-hud-pad'), pad: q('rt-pad'), padOv: q('rt-pad-ov')
     };
     _rtCanvas = q('rt-canvas');
     _rtG = _rtCanvas.getContext('2d');
@@ -611,6 +637,9 @@
       if (e && e.detail && e.detail.slot === 'rt_nota') _rtRenderSkinBtn();
     });
     _rtEls.rankLinha.addEventListener('click', _rtTopAbrir);
+    q('rt-pad-cfg').addEventListener('click', _rtPadCalAbrir);
+    q('rt-pad-fechar').addEventListener('click', _rtPadCalFechar);
+    q('rt-pad-padrao').addEventListener('click', _rtPadCalPadrao);
     q('rt-top-fechar').addEventListener('click', _rtTopFechar);
     _rtEls.topOv.addEventListener('click', function (e) { if (e.target === _rtEls.topOv) _rtTopFechar(); });
     q('rt-ajuda').addEventListener('click', function (e) {
@@ -693,6 +722,7 @@
     _rtRenderAvisoSom();
     _rtRenderSkinBtn();
     _rtRankAtualizar();
+    _rtPadIndicador();
   }
 
   /* ── Botão da skin (amostra desenhada com a skin equipada) ────── */
@@ -860,13 +890,14 @@
     _rtDesvioSoma = 0; _rtDesvioN = 0;
     _rtJulgVis = null;
     _rtK = _rtCfg.colunas;
-    _rtApertada = []; _rtBrilho = []; _rtSegurando = []; _rtPonteiros = {}; _rtTeclasDown = {};
+    _rtApertada = []; _rtBrilho = []; _rtSegurando = []; _rtPonteiros = {}; _rtTeclasDown = {}; _rtPadCols = {};
     for (var c = 0; c < _rtK; c++) { _rtApertada.push(0); _rtBrilho.push(0); _rtSegurando.push(null); }
     _rtLongasPausadas = [];
     _rtVida = 1; _rtFalhou = false; _rtFalhaEm = 0; _rtFalhaPos = 0;
     _rtSkinAtual = _rtSkin();
     _rtEls.score.textContent = '0';
     _rtEls.acc.textContent = '100,00%';
+    _rtComboRender();
     _rtEls.prog.style.width = '0%';
     _rtEls.vida.style.display = _rtCfg.dif === 'hard' ? '' : 'none';
     _rtVidaRender();
@@ -1010,6 +1041,7 @@
     var agora = _rtAgoraMs();
     var dt = _rtUltimoFrame ? Math.min(100, ts - _rtUltimoFrame) : 16;
     _rtUltimoFrame = ts;
+    _rtPadPoll();
     if (!_rtPausado && !_rtFalhou) {
       _rtVerificarPassadas(agora);
       _rtVerificarLongas(agora);
@@ -1129,15 +1161,33 @@
     _rtSoma += RT_VALOR[tipo];
     if (tipo === 'erro') _rtCombo = 0;
     else { _rtCombo++; if (_rtCombo > _rtComboMax) _rtComboMax = _rtCombo; }
-    if (!semAviso) _rtJulgVis = { tipo: tipo, ate: performance.now() + 420, desvio: desvio, rotulo: rotulo };
+    if (!semAviso) _rtJulgVis = { tipo: tipo, ate: performance.now() + 520, desvio: desvio, rotulo: rotulo };
     _rtEls.score.textContent = _rtFmtNum(_rtScoreAtual());
     _rtEls.acc.textContent = _rtFmtAcc(_rtPrecisao());
+    _rtComboRender();
     if (_rtDif === 'hard' && !_rtFalhou && !_rtSaindo) {
       var dv = chaveVida === 'nenhuma' ? 0 : (RT_VIDA[chaveVida || tipo] || 0);
       _rtVida = Math.max(0, Math.min(1, _rtVida + dv));
       _rtVidaRender();
       if (_rtVida <= 0) _rtFalhar();
     }
+  }
+
+  /* ── Combo no canto (HUD), longe do julgamento ───────────────────
+     Estilo Guitar Hero: o "PERFEITO" grande fica no alto da pista e o
+     contador de acertos seguidos vive discreto sob o placar. A cada 50
+     ele dá um pulinho (classe rt-combo-marco). */
+  var _rtComboUlt = 0;
+  function _rtComboRender() {
+    var el = _rtEls.combo;
+    if (!el) return;
+    if (_rtCombo < 3) { el.textContent = ''; el.classList.remove('rt-combo-vivo'); _rtComboUlt = _rtCombo; return; }
+    el.innerHTML = '<b>' + _rtCombo + '</b>x combo';
+    el.classList.add('rt-combo-vivo');
+    if (Math.floor(_rtCombo / 50) > Math.floor(_rtComboUlt / 50)) {
+      el.classList.remove('rt-combo-marco'); void el.offsetWidth; el.classList.add('rt-combo-marco');
+    }
+    _rtComboUlt = _rtCombo;
   }
 
   /* ── Barra de vida (Hard) ─────────────────────────────────────── */
@@ -1399,7 +1449,7 @@
       if (n) { n.seg = false; n.pausado = true; _rtLongasPausadas.push(n); _rtSegurando[c] = null; }
       _rtApertada[c] = 0;
     }
-    _rtPonteiros = {}; _rtTeclasDown = {};
+    _rtPonteiros = {}; _rtTeclasDown = {}; _rtPadCols = {};
   }
   function _rtContinuar() {
     if (!_rtPausado || _rtEstado !== 'jogando') return;
@@ -1469,6 +1519,180 @@
     _rtTeclasDown[c] = false;
     _rtApertada[c] = Math.max(0, _rtApertada[c] - 1);
     if (!_rtApertada[c]) _rtSoltar(c);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     CONTROLE (Gamepad API) — ex.: Ipega 9076 no modo gamepad
+     Lido a cada frame no _rtLoop (a Gamepad API não tem eventos de
+     botão). Funciona junto com o toque e o teclado: cada fonte soma no
+     mesmo _rtApertada[c], então segurar nota longa vale igual.
+     Mapa padrão = layout "standard" do navegador (o que o Ipega 9076
+     manda no modo Android/X-input). Cada coluna aceita mais de um
+     botão, pra servir tanto pra quem usa gatilhos quanto D-pad + A/B/X/Y.
+     Índices standard: 0 A · 1 B · 2 X · 3 Y · 4 LB · 5 RB · 6 LT · 7 RT ·
+     8 Select · 9 Start · 10 L3 · 11 R3 · 12 ↑ · 13 ↓ · 14 ← · 15 →
+     Se o controle não for "standard" (ou a pessoa preferir), dá pra
+     escolher um botão por coluna em "Configurar botões" (salvo por modo
+     em _rtCfg.pad). Start pausa/continua.
+  ══════════════════════════════════════════════════════════════ */
+  var RT_PAD_PADRAO = {
+    4: [[4, 14, 12], [6, 15, 13], [7, 2, 0], [5, 1, 3]],
+    5: [[4, 14], [6, 15, 13], [0, 12], [7, 2, 3], [5, 1]],
+    7: [[4, 14], [6, 13], [15], [12, 0], [2], [7, 3], [5, 1]]
+  };
+  var RT_PAD_NOMES = { 0: 'A', 1: 'B', 2: 'X', 3: 'Y', 4: 'LB', 5: 'RB', 6: 'LT', 7: 'RT', 8: 'Select', 9: 'Start', 10: 'L3', 11: 'R3', 12: '↑', 13: '↓', 14: '←', 15: '→' };
+  var RT_PAD_START = 9;
+  var _rtPadAntes = {};   // "gp_botão" → estava apertado no frame anterior
+  var _rtPadCols = {};    // "gp_botão" → coluna que esse botão está segurando
+  var _rtPadUsado = false;
+
+  function _rtPadLista() {
+    var out = [];
+    try {
+      var l = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (var i = 0; i < l.length; i++) if (l[i] && l[i].connected !== false) out.push(l[i]);
+    } catch (e) {}
+    return out;
+  }
+  function _rtPadNome(b) { return RT_PAD_NOMES[b] || ('B' + b); }
+  function _rtBotaoApertado(gp, b) {
+    var x = gp.buttons && gp.buttons[b];
+    return !!x && (x.pressed || x.value > 0.5);
+  }
+  // Mapa da coluna → botões, pro modo k (personalizado tem prioridade).
+  function _rtPadMapa(k) {
+    var p = _rtCfg.pad && _rtCfg.pad[k];
+    if (p && p.length === k) return p.map(function (b) { return [b]; });
+    return RT_PAD_PADRAO[k] || RT_PAD_PADRAO[4];
+  }
+
+  // Lido todo frame durante a partida.
+  function _rtPadPoll() {
+    var pads = _rtPadLista();
+    if (!pads.length) return;
+    var mapa = _rtPadMapa(_rtK), M = _rtMenu();
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i];
+      // Start: pausa / continua (abre/fecha o menu unificado)
+      var kS = gp.index + '_' + RT_PAD_START, apS = _rtBotaoApertado(gp, RT_PAD_START);
+      if (apS && !_rtPadAntes[kS] && M && _rtEstado === 'jogando') {
+        if (M.aberto && M.aberto('jogo-ritmo')) M.fechar('jogo-ritmo', true);
+        else if (M.abrir) M.abrir('jogo-ritmo');
+      }
+      _rtPadAntes[kS] = apS;
+      for (var c = 0; c < mapa.length; c++) {
+        for (var j = 0; j < mapa[c].length; j++) {
+          var b = mapa[c][j];
+          if (b === RT_PAD_START) continue;
+          var chave = gp.index + '_' + b, ap = _rtBotaoApertado(gp, b);
+          if (ap && !_rtPadAntes[chave]) {
+            _rtPadUsado = true;
+            if (!_rtPausado && !_rtFalhou && _rtPadCols[chave] === undefined) {
+              _rtPadCols[chave] = c;
+              _rtApertada[c]++;
+              _rtTocar(c);
+            }
+          } else if (!ap && _rtPadAntes[chave] && _rtPadCols[chave] !== undefined) {
+            var col = _rtPadCols[chave];
+            delete _rtPadCols[chave];
+            _rtApertada[col] = Math.max(0, _rtApertada[col] - 1);
+            if (!_rtApertada[col]) _rtSoltar(col);
+          }
+          _rtPadAntes[chave] = ap;
+        }
+      }
+    }
+  }
+
+  // Indicadores "🎮 Controle conectado" (seleção) e 🎮 (HUD da partida).
+  function _rtPadIndicador() {
+    var tem = _rtPadLista().length > 0;
+    if (_rtEls.hudPad) _rtEls.hudPad.style.display = tem ? '' : 'none';
+    if (_rtEls.pad) {
+      _rtEls.pad.style.display = tem ? '' : 'none';
+      var p = _rtPadLista()[0];
+      var pers = _rtCfg.pad && _rtCfg.pad[_rtCfg.colunas];
+      var txt = document.getElementById('rt-pad-txt');
+      if (txt && p) txt.textContent = 'Controle conectado' + (p.mapping !== 'standard' && !pers ? ' — configure os botões' : (pers ? ' · botões personalizados' : ''));
+    }
+  }
+  window.addEventListener('gamepadconnected', function () { _rtPadIndicador(); });
+  window.addEventListener('gamepaddisconnected', function (e) {
+    // Caiu no meio da música: pausa (as longas ficam "pausadas", sem
+    // penalidade) e esquece os botões daquele controle.
+    var idx = e && e.gamepad ? e.gamepad.index : null;
+    if (_rtEstado === 'jogando' && !_rtPausado && !_rtSaindo && _rtPadUsado) {
+      var M = _rtMenu();
+      if (M && M.abrir) M.abrir('jogo-ritmo'); else _rtPausar();
+    }
+    for (var k in _rtPadAntes) if (idx === null || k.indexOf(idx + '_') === 0) delete _rtPadAntes[k];
+    for (var k2 in _rtPadCols) {
+      if (idx !== null && k2.indexOf(idx + '_') !== 0) continue;
+      var col = _rtPadCols[k2];
+      delete _rtPadCols[k2];
+      if (_rtApertada[col]) _rtApertada[col] = Math.max(0, _rtApertada[col] - 1);
+    }
+    _rtPadIndicador();
+  });
+
+  /* ── Configurar botões (um botão por coluna, salvo por modo) ───── */
+  var _rtPadCal = null;   // { k, botoes:[], antes:{}, raf }
+  function _rtPadCalAbrir() {
+    _rtPreviaParar();
+    var k = _rtCfg.colunas;
+    _rtPadCal = { k: k, botoes: [], antes: {}, raf: 0, primeiro: true };
+    _rtEls.padOv.style.display = 'flex';
+    _rtPadCalRender();
+    _rtPadCal.raf = requestAnimationFrame(_rtPadCalPoll);
+  }
+  function _rtPadCalFechar() {
+    if (_rtPadCal && _rtPadCal.raf) cancelAnimationFrame(_rtPadCal.raf);
+    _rtPadCal = null;
+    if (_rtEls.padOv) _rtEls.padOv.style.display = 'none';
+    _rtPadIndicador();
+  }
+  function _rtPadCalRender() {
+    var c = _rtPadCal; if (!c) return;
+    document.getElementById('rt-pad-tit').textContent = 'Configurar controle · ' + c.k + 'K';
+    var faltam = c.k - c.botoes.length;
+    document.getElementById('rt-pad-msg').innerHTML = faltam > 0
+      ? 'Aperte o botão da <b>coluna ' + (c.botoes.length + 1) + '</b> (da esquerda pra direita).'
+      : '✔ Pronto! Botões salvos pro modo ' + c.k + 'K.';
+    var html = '';
+    for (var i = 0; i < c.k; i++) {
+      var b = c.botoes[i];
+      html += '<span class="rt-pad-slot' + (i === c.botoes.length ? ' rt-pad-slot-agora' : '') + (b !== undefined ? ' rt-pad-slot-ok' : '') + '">' + (b !== undefined ? _rtEsc(_rtPadNome(b)) : (i + 1)) + '</span>';
+    }
+    document.getElementById('rt-pad-slots').innerHTML = html;
+  }
+  function _rtPadCalPoll() {
+    var c = _rtPadCal; if (!c) return;
+    var pads = _rtPadLista();
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i];
+      for (var b = 0; b < gp.buttons.length; b++) {
+        var chave = gp.index + '_' + b, ap = _rtBotaoApertado(gp, b);
+        // no 1º frame só registra o que já estava apertado (não conta)
+        if (ap && !c.antes[chave] && !c.primeiro && b !== RT_PAD_START && c.botoes.length < c.k && c.botoes.indexOf(b) === -1) {
+          c.botoes.push(b);
+          if (c.botoes.length === c.k) {
+            if (!_rtCfg.pad) _rtCfg.pad = {};
+            _rtCfg.pad[c.k] = c.botoes.slice();
+            _rtCfgSalvar();
+            setTimeout(_rtPadCalFechar, 900);
+          }
+          _rtPadCalRender();
+        }
+        c.antes[chave] = ap;
+      }
+    }
+    c.primeiro = false;
+    c.raf = requestAnimationFrame(_rtPadCalPoll);
+  }
+  function _rtPadCalPadrao() {
+    if (_rtCfg.pad) delete _rtCfg.pad[_rtCfg.colunas];
+    _rtCfgSalvar();
+    _rtPadCalFechar();
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -1685,33 +1909,32 @@
       g.globalAlpha = 1;
     }
 
-    // Julgamento + combo (centro)
-    var ccx = _rtW / 2, cy = hitY - Math.min(_rtH * 0.33, 230);
+    // Julgamento no alto da pista (o combo agora fica no HUD, no canto).
+    // Animação: entra grande (1,5×) e assenta em 1× com um leve quique,
+    // sobe uns pixels e some. Erro treme de lado em vez de quicar.
+    var ccx = _rtW / 2, jy = Math.max(118, Math.min(_rtH * 0.24, hitY - 260));
     var pn = performance.now();
-    if (_rtCombo >= 3) {
-      g.font = '800 ' + Math.round(Math.min(46, _rtW * 0.11)) + 'px Syne, system-ui, sans-serif';
-      g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillStyle = 'rgba(255,255,255,0.92)';
-      g.fillText(String(_rtCombo), ccx, cy);
-      g.font = '700 11px system-ui, sans-serif';
-      g.fillStyle = 'rgba(199,209,224,0.7)';
-      g.fillText('COMBO', ccx, cy + Math.min(30, _rtW * 0.07));
-    }
     if (_rtJulgVis && pn < _rtJulgVis.ate) {
-      var resto = (_rtJulgVis.ate - pn) / 420;          // 1 → 0
-      var esc = 1 + (1 - Math.min(1, (1 - resto) * 5)) * 0.25;
+      var DUR = 520, vida = 1 - (_rtJulgVis.ate - pn) / DUR;      // 0 → 1
+      var entra = Math.min(1, vida / 0.18);                        // primeiros ~90 ms
+      var esc = vida < 0.18 ? 1.5 - 0.6 * entra : 0.9 + 0.1 * Math.min(1, (vida - 0.18) / 0.12);
+      var dx = _rtJulgVis.tipo === 'erro' ? Math.sin(vida * 40) * 6 * (1 - vida) : 0;
       g.save();
-      g.translate(ccx, cy + 52);
+      g.translate(ccx + dx, jy - vida * 10);
       g.scale(esc, esc);
-      g.globalAlpha = Math.min(1, resto * 2);
-      g.font = '900 ' + Math.round(Math.min(26, _rtW * 0.065)) + 'px Syne, system-ui, sans-serif';
+      g.globalAlpha = vida > 0.7 ? (1 - vida) / 0.3 : 1;
+      var tam = Math.round(Math.min(36, Math.max(26, _rtW * 0.085)));
+      g.font = '900 ' + tam + 'px Syne, system-ui, sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillStyle = RT_COR_JULG[_rtJulgVis.tipo];
-      g.fillText(_rtJulgVis.rotulo || RT_ROTULO[_rtJulgVis.tipo], 0, 0);
+      var corJ = RT_COR_JULG[_rtJulgVis.tipo], txtJ = _rtJulgVis.rotulo || RT_ROTULO[_rtJulgVis.tipo];
+      g.lineWidth = 5; g.strokeStyle = 'rgba(5,8,14,0.75)'; g.lineJoin = 'round';
+      g.strokeText(txtJ, 0, 0);                                    // contorno: lê bem sobre as notas
+      g.fillStyle = corJ;
+      g.fillText(txtJ, 0, 0);
       if (_rtJulgVis.tipo !== 'perfeito' && _rtJulgVis.tipo !== 'erro' && _rtJulgVis.desvio) {
-        g.font = '700 11px system-ui, sans-serif';
-        g.fillStyle = 'rgba(199,209,224,0.85)';
-        g.fillText(_rtJulgVis.desvio < 0 ? 'cedo' : 'tarde', 0, 20);
+        g.font = '800 12px system-ui, sans-serif';
+        g.fillStyle = 'rgba(226,232,240,0.9)';
+        g.fillText(_rtJulgVis.desvio < 0 ? 'cedo' : 'tarde', 0, tam * 0.75);
       }
       g.restore();
     }
@@ -1721,7 +1944,7 @@
       g.font = '800 18px Syne, system-ui, sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillStyle = 'rgba(255,255,255,' + Math.min(1, -agora / 600).toFixed(2) + ')';
-      g.fillText(_rtPausado ? '' : 'Prepare-se!', ccx, _rtH * 0.3);
+      g.fillText(_rtPausado ? '' : 'Prepare-se!', ccx, _rtH * 0.36);
     }
 
     // Falhou: tela escurece em vermelho
@@ -1759,6 +1982,7 @@
   // Ao sair pro menu de jogos / fechar o hub: para tudo e libera o áudio.
   function _rtParar() {
     _rtPreviaParar();
+    _rtPadCalFechar();
     _rtCarga = null;
     _rtPararPartida();
     _rtAudioSuspender();

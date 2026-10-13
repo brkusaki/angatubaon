@@ -43,22 +43,22 @@
      dois beatmaps em /Jogos/ritmo/beatmaps/ e acrescente uma linha aqui.
   ══════════════════════════════════════════════════════════════ */
   var RT_CATALOGO = [
-    { id: 'ninguem-te-repara', previa: 76,      titulo: 'Ninguém Te Repara', sub: 'Brega romântico',        arquivo: '/musicas/Ninguém Te Repara.mp3',               bpm: 92,  duracao: 212, dif: { normal: { notas: 276, nivel: 3 }, hard: { notas: 689, nivel: 7 } } },
-    { id: 'estatica', previa: 121,               titulo: 'Estática',          sub: 'Rock alternativo',       arquivo: '/musicas/Estática.mp3',                        bpm: 131, duracao: 167, dif: { normal: { notas: 231, nivel: 4 }, hard: { notas: 560, nivel: 7 } } },
-    { id: 'estatica-v2', previa: 147,            titulo: 'Estática',          sub: 'Versão 2',               arquivo: '/musicas/Estática versao 2.mp3',               bpm: 131, duracao: 199, dif: { normal: { notas: 279, nivel: 4 }, hard: { notas: 684, nivel: 8 } } },
-    { id: 'estatica-eletronica', previa: 37,    titulo: 'Estática',          sub: 'Eletrônica',             arquivo: '/musicas/Estática eletronica.mp3',             bpm: 109, duracao: 162, dif: { normal: { notas: 233, nivel: 3 }, hard: { notas: 543, nivel: 7 } } },
+    { id: 'ninguem-te-repara', previa: 76,      titulo: 'Ninguém Te Repara', sub: 'Brega romântico',        arquivo: '/musicas/Ninguém Te Repara.mp3',               bpm: 92,  duracao: 212, dif: { normal: { notas: 276, nivel: 3 }, hard: { notas: 679, nivel: 7 } } },
+    { id: 'estatica', previa: 121,               titulo: 'Estática',          sub: 'Rock alternativo',       arquivo: '/musicas/Estática.mp3',                        bpm: 131, duracao: 167, dif: { normal: { notas: 231, nivel: 4 }, hard: { notas: 555, nivel: 7 } } },
+    { id: 'estatica-v2', previa: 147,            titulo: 'Estática',          sub: 'Versão 2',               arquivo: '/musicas/Estática versao 2.mp3',               bpm: 131, duracao: 199, dif: { normal: { notas: 279, nivel: 4 }, hard: { notas: 673, nivel: 8 } } },
+    { id: 'estatica-eletronica', previa: 37,    titulo: 'Estática',          sub: 'Eletrônica',             arquivo: '/musicas/Estática eletronica.mp3',             bpm: 109, duracao: 162, dif: { normal: { notas: 233, nivel: 3 }, hard: { notas: 541, nivel: 7 } } },
     { id: 'estatica-eletronica-v2', previa: 128, titulo: 'Estática',          sub: 'Eletrônica · versão 2',  arquivo: '/musicas/Estática eletronica versao 2.mp3',    bpm: 110, duracao: 176, dif: { normal: { notas: 256, nivel: 3 }, hard: { notas: 604, nivel: 7 } } },
-    { id: 'transborda', previa: 58,             titulo: 'Transborda',        sub: 'Melodic house',          arquivo: '/musicas/Transborda.mp3',                      bpm: 125, duracao: 240, dif: { normal: { notas: 344, nivel: 4 }, hard: { notas: 833, nivel: 8 } } },
-    { id: 'plateia', previa: 56,                titulo: 'Plateia',           sub: 'Pop / R&B',              arquivo: '/musicas/Plateia.mp3',                         bpm: 101, duracao: 180, dif: { normal: { notas: 238, nivel: 3 }, hard: { notas: 604, nivel: 7 } } },
-    { id: 'plateia-v2', previa: 127,             titulo: 'Plateia',           sub: 'Versão 2',               arquivo: '/musicas/Plateia versao 2.mp3',                bpm: 101, duracao: 218, dif: { normal: { notas: 298, nivel: 3 }, hard: { notas: 745, nivel: 7 } } },
-    { id: 'bateria-fraca', previa: 86,          titulo: 'Bateria Fraca',     sub: 'Neo-soul',               arquivo: '/musicas/Bateria Fraca.mp3',                   bpm: 92,  duracao: 206, dif: { normal: { notas: 286, nivel: 3 }, hard: { notas: 656, nivel: 7 } } },
-    { id: 'mare-alta', previa: 132,              titulo: 'Maré Alta',         sub: 'Trap',                   arquivo: '/musicas/Maré Alta.mp3',                       bpm: 138, duracao: 187, dif: { normal: { notas: 277, nivel: 4 }, hard: { notas: 655, nivel: 8 } } }
+    { id: 'transborda', previa: 58,             titulo: 'Transborda',        sub: 'Melodic house',          arquivo: '/musicas/Transborda.mp3',                      bpm: 125, duracao: 240, dif: { normal: { notas: 344, nivel: 4 }, hard: { notas: 820, nivel: 8 } } },
+    { id: 'plateia', previa: 56,                titulo: 'Plateia',           sub: 'Pop / R&B',              arquivo: '/musicas/Plateia.mp3',                         bpm: 101, duracao: 180, dif: { normal: { notas: 238, nivel: 3 }, hard: { notas: 599, nivel: 7 } } },
+    { id: 'plateia-v2', previa: 127,             titulo: 'Plateia',           sub: 'Versão 2',               arquivo: '/musicas/Plateia versao 2.mp3',                bpm: 101, duracao: 218, dif: { normal: { notas: 298, nivel: 3 }, hard: { notas: 733, nivel: 7 } } },
+    { id: 'bateria-fraca', previa: 86,          titulo: 'Bateria Fraca',     sub: 'Neo-soul',               arquivo: '/musicas/Bateria Fraca.mp3',                   bpm: 92,  duracao: 206, dif: { normal: { notas: 286, nivel: 3 }, hard: { notas: 647, nivel: 7 } } },
+    { id: 'mare-alta', previa: 132,              titulo: 'Maré Alta',         sub: 'Trap',                   arquivo: '/musicas/Maré Alta.mp3',                       bpm: 138, duracao: 187, dif: { normal: { notas: 277, nivel: 4 }, hard: { notas: 643, nivel: 8 } } }
   ];
 
   // Sobe este número sempre que editar QUALQUER beatmap: ele entra na URL
   // (?v=N) e faz o navegador/Service Worker buscar a versão nova em vez
   // da cópia guardada (os beatmaps ficam no cache pra jogar offline).
-  var RT_MAPAS_VERSAO = 2;   // v2: notas longas (campo length)
+  var RT_MAPAS_VERSAO = 3;   // v2: notas longas · v3: longas ajustadas pra 2 polegares
   var RT_MAPAS_PASTA = '/Jogos/ritmo/beatmaps/';
   // Mesmo nome do CACHE_JOGOS do service-worker.js (o MP3 já cai lá
   // sozinho pelo SW; aqui guardamos também o JSON do beatmap).
@@ -913,6 +913,39 @@
     return saida;
   }
 
+  /* ── Feito pra 2 polegares ──────────────────────────────────────
+     No celular, enquanto um polegar segura a nota longa, só o OUTRO está
+     livre. Então, durante cada longa (até 100 ms depois do fim):
+       · nota do MESMO lado da longa vai pro lado oposto (espelho c → k-1-c);
+       · nunca 2 notas juntas (acorde vira nota única);
+       · nunca outra longa por cima (a de dentro vira toque simples).
+     Se o espelho cair num lugar ocupado, a nota sai. Longa na coluna do
+     meio (5K/7K) deixa os dois lados livres, mas continua sem acorde.
+     Os mapas 4K já vêm assim (adicionar_holds.py faz o mesmo); aqui
+     garante o 5K/7K convertido e qualquer mapa feito à mão. */
+  function _rtLado(c, k) { var m = (k - 1) / 2; return c < m ? 'e' : (c > m ? 'd' : 'meio'); }
+  function _rtAjustarDedos(notas, k) {
+    var fora = {};
+    for (var i = 0; i < notas.length; i++) {
+      var h = notas[i];
+      if (fora[i] || !h.fim) continue;
+      var lh = _rtLado(h.c, k), usados = {};
+      for (var j = 0; j < notas.length; j++) {
+        var n = notas[j];
+        if (j === i || fora[j] || n.t < h.t) continue;
+        if (n.t > h.fim + 100) break;
+        if (n.fim) n.fim = 0;                                  // longa dentro de longa: vira toque
+        if (lh !== 'meio' && _rtLado(n.c, k) === lh) n.c = k - 1 - n.c;  // pro outro polegar
+        if (usados[n.t] || n.c === h.c) { fora[j] = true; continue; }    // acorde/colisão: sai
+        usados[n.t] = true;
+      }
+    }
+    var saida = [];
+    for (var x = 0; x < notas.length; x++) if (!fora[x]) saida.push(notas[x]);
+    saida.sort(function (a, b) { return a.t - b.t || a.c - b.c; });
+    return saida;
+  }
+
   function _rtIniciar(mapa) {
     _rtMapa = mapa;
     var off = Number(mapa.offset) || 0;
@@ -929,6 +962,7 @@
     }
     notas.sort(function (a, b) { return a.t - b.t || a.c - b.c; });
     if (keysMapa !== _rtK) notas = (keysMapa === 4) ? _rtConverterK(notas, _rtK) : [];
+    notas = _rtAjustarDedos(notas, _rtK);
     _rtNotas = notas;
     _rtPorCol = [];
     _rtPonteiro = [];

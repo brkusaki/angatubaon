@@ -18,7 +18,9 @@
    - Ranking ............ por mapa (música+dificuldade+colunas), via
                           AngatubaGames.rankMapaSubmeter / rankMapaPosicao
    - Entrada ............ toque (multitoque), teclado e controle (Gamepad API,
-                          ver bloco CONTROLE) — todos somam em _rtApertada
+                          ver bloco CONTROLE) — todos somam em _rtApertada.
+                          Fora da partida o controle navega (NAVEGAÇÃO COM O
+                          CONTROLE): seleção, pausa, resultado.
    - Relógio ............ Web Audio (AudioContext). A música é decodificada
                           inteira e tocada por um AudioBufferSourceNode; o
                           tempo da música sai do ctx.currentTime (preciso,
@@ -526,6 +528,7 @@
             'Se aparece <b>“cedo”</b>, diminua (−). Fone Bluetooth costuma precisar de +100 a +200 ms. Deixe em 0 ms se estiver tudo certo.' +
           '</div>' +
           '<button type="button" class="rt-jogar" id="rt-jogar">Jogar</button>' +
+          '<div class="rt-pad-dicas" id="rt-pad-dicas" style="display:none;"><span><b>Ⓐ</b> jogar</span><span><b>Ⓑ</b> voltar</span><span><b>↑↓</b> música</span><span><b>←→</b> dificuldade</span><span><b>LB RB</b> colunas</span><span><b>Ⓨ</b> ranking</span><span><b>Select</b> botões</span></div>' +
         '</div>' +
       '</div>' +
       // ── Partida ──
@@ -1013,6 +1016,7 @@
     _rtSaindo = false;
     _rtPausado = false; _rtPausaMs = 0; _rtPausaDesde = 0;
     _rtInicioReal = Date.now();
+    _rtPadSnapshot();
     _rtTocarDe(-RT_LEAD_S * 1000, 0);
     _rtEstado = 'jogando';
     _rtAviso('');
@@ -1434,6 +1438,18 @@
       bx.classList.add('jm-opcao', 'rt-jm-musica');
       if (sair && sair.parentNode === bx.parentNode) sair.parentNode.insertBefore(bx, sair);
     }
+    // "Recomeçar a música": botão nosso, sem data-jm (o hub ignora o clique
+    // dele e não mexe nele ao redesenhar). Fica logo depois de Continuar.
+    var caixa = tela && tela.querySelector('.jm-overlay .jm-caixa');
+    if (caixa && !caixa.querySelector('.rt-jm-recomecar')) {
+      var br = document.createElement('button');
+      br.type = 'button';
+      br.className = 'jm-opcao rt-jm-recomecar';
+      br.innerHTML = '<i class="fa fa-rotate-left"></i><span>Recomeçar a música</span>';
+      br.addEventListener('click', function (e) { e.stopPropagation(); br.blur(); _rtRecomecar(); });
+      var cont = caixa.querySelector('[data-jm="continuar"]');
+      caixa.insertBefore(br, cont ? cont.nextSibling : caixa.firstChild);
+    }
   }
   function _rtPausar() {
     if (_rtEstado !== 'jogando' || _rtPausado || _rtFalhou) return;
@@ -1566,6 +1582,16 @@
     return RT_PAD_PADRAO[k] || RT_PAD_PADRAO[4];
   }
 
+  // Marca como "já apertado" tudo que está pressionado agora: o Start/A
+  // que acabou de começar a música não vira pausa nem toque no 1º frame.
+  function _rtPadSnapshot() {
+    _rtPadAntes = {}; _rtPadCols = {};
+    var pads = _rtPadLista();
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i];
+      for (var b = 0; b < (gp.buttons || []).length; b++) if (_rtBotaoApertado(gp, b)) _rtPadAntes[gp.index + '_' + b] = true;
+    }
+  }
   // Lido todo frame durante a partida.
   function _rtPadPoll() {
     var pads = _rtPadLista();
@@ -1608,6 +1634,8 @@
   function _rtPadIndicador() {
     var tem = _rtPadLista().length > 0;
     if (_rtEls.hudPad) _rtEls.hudPad.style.display = tem ? '' : 'none';
+    var dicas = document.getElementById('rt-pad-dicas');
+    if (dicas) dicas.style.display = tem ? '' : 'none';
     if (_rtEls.pad) {
       _rtEls.pad.style.display = tem ? '' : 'none';
       var p = _rtPadLista()[0];
@@ -1693,6 +1721,183 @@
     if (_rtCfg.pad) delete _rtCfg.pad[_rtCfg.colunas];
     _rtCfgSalvar();
     _rtPadCalFechar();
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     NAVEGAÇÃO COM O CONTROLE (fora da partida)
+     Um laço leve (_rtNavLoop) roda enquanto a tela do Ritmo está aberta
+     e lê ↑↓←→ (D-pad ou analógico esquerdo), A, B, Y, LB/RB e Start.
+     Cada tela tem seu "contexto":
+       selecao  ↑↓ música (com prévia) · ←→ Normal/Hard · LB/RB 4K/5K/7K
+                A jogar · B para a prévia, ou volta aos jogos · Y ranking
+       pausa    ↑↓ opção · A confirma · B continua (Start é tratado no
+                _rtPadPoll da partida, que segue rodando durante a pausa)
+       resultado ↑↓ botão · A confirma · B escolher outra música
+       top / loja / carregando: B fecha/cancela (A também fecha o top)
+     Durante a partida (sem pausa) não faz nada — as colunas são do
+     _rtPadPoll. Na troca de contexto, o que já estava apertado é
+     ignorado até soltar (sem "A" fantasma vindo da última nota).
+     O foco do controle aparece com a classe .rt-foco.
+  ══════════════════════════════════════════════════════════════ */
+  var RT_NAV = { cima: 12, baixo: 13, esq: 14, dir: 15, a: 0, b: 1, y: 3, lb: 4, rb: 5, select: 8 };
+  var _rtNav = { raf: 0, ctx: '', antes: {}, desde: {}, rep: {}, foco: 0, previaT: 0 };
+
+  function _rtNavIniciar() {
+    if (_rtNav.raf) return;
+    _rtNav.raf = requestAnimationFrame(_rtNavLoop);
+  }
+  function _rtNavCtx() {
+    var tela = document.getElementById('jogo-ritmo');
+    if (!tela || tela.style.display === 'none' || !_rtRoot) return null;
+    if (_rtPadCal) return 'cal';
+    var loja = document.getElementById('lojajogo-overlay');
+    if (loja && loja.style.display !== 'none' && loja.parentNode === tela) return 'loja';
+    if (_rtEls.topOv && _rtEls.topOv.style.display !== 'none') return 'top';
+    if (_rtEstado === 'jogando') { var M = _rtMenu(); return (M && M.aberto && M.aberto('jogo-ritmo')) ? 'pausa' : 'jogo'; }
+    if (_rtEstado === 'carregando') return 'carregando';
+    if (_rtEstado === 'resultado') return 'resultado';
+    return 'selecao';
+  }
+  // Estado "lógico" de cada comando juntando todos os controles + analógico.
+  function _rtNavLer() {
+    var st = {}, pads = _rtPadLista();
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i], ax = gp.axes || [];
+      for (var nome in RT_NAV) if (_rtBotaoApertado(gp, RT_NAV[nome])) st[nome] = true;
+      if (_rtBotaoApertado(gp, RT_PAD_START)) st.start = true;
+      if ((ax[1] || 0) < -0.6) st.cima = true;
+      if ((ax[1] || 0) > 0.6) st.baixo = true;
+      if ((ax[0] || 0) < -0.6) st.esq = true;
+      if ((ax[0] || 0) > 0.6) st.dir = true;
+    }
+    return st;
+  }
+  function _rtNavLoop() {
+    _rtNav.raf = 0;
+    var ctx = _rtNavCtx();
+    if (!ctx) { _rtNavFocoLimpar(); _rtNav.ctx = ''; return; }   // tela fechada: o laço para (preparar() religa)
+    var st = _rtNavLer(), agora = performance.now();
+    if (ctx !== _rtNav.ctx) {
+      // trocou de tela: o que já está apertado não conta até soltar
+      _rtNav.antes = {}; for (var k0 in st) _rtNav.antes[k0] = true;
+      _rtNav.ctx = ctx; _rtNav.foco = 0;
+      _rtNavFocoLimpar();
+      if (ctx === 'resultado') {                                   // foco inicial: "Jogar de novo"
+        var li = _rtNavItens(ctx), d = document.getElementById('rt-res-denovo');
+        if (li.indexOf(d) !== -1) _rtNav.foco = li.indexOf(d);
+      }
+      if (ctx === 'pausa' || ctx === 'resultado') _rtNavFocoAplicar();
+    }
+    var ev = [];
+    ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'y', 'lb', 'rb', 'select', 'start'].forEach(function (n) {
+      var ap = !!st[n];
+      if (ap && !_rtNav.antes[n]) { ev.push(n); _rtNav.desde[n] = agora; _rtNav.rep[n] = agora; }
+      else if (ap && (n === 'cima' || n === 'baixo') && agora - _rtNav.desde[n] > 420 && agora - _rtNav.rep[n] > 120) {
+        ev.push(n); _rtNav.rep[n] = agora;                       // segurar ↑/↓ rola a lista
+      }
+      _rtNav.antes[n] = ap;
+    });
+    for (var i = 0; i < ev.length; i++) _rtNavAcao(ctx, ev[i]);
+    if (_rtNav.previaT && agora >= _rtNav.previaT && _rtEstado === 'selecao') {
+      _rtNav.previaT = 0;
+      var m = _rtMusicaPorId(_rtSelId);
+      if (m && _rtPrev.id !== m.id && _rtPrev.carregando !== m.id) _rtPreviaTocar(m);
+    }
+    _rtNav.raf = requestAnimationFrame(_rtNavLoop);
+  }
+
+  // Botões navegáveis de cada contexto (só os visíveis).
+  function _rtNavItens(ctx) {
+    var tela = document.getElementById('jogo-ritmo'), sel;
+    if (ctx === 'pausa') sel = '.jm-overlay .jm-caixa button';
+    else if (ctx === 'resultado') sel = '#rt-res button';
+    else return [];
+    var l = Array.prototype.slice.call(tela.querySelectorAll(sel)).filter(function (b) {
+      return b.offsetParent !== null && !b.disabled;
+    });
+    if (ctx === 'resultado') {
+      var v = tela.querySelector('.jogo-voltar');                // "Voltar aos jogos" no topo
+      if (v && v.offsetParent !== null) l.push(v);
+    }
+    return l;
+  }
+  function _rtNavFocoLimpar() {
+    var l = document.querySelectorAll('#jogo-ritmo .rt-foco');
+    for (var i = 0; i < l.length; i++) l[i].classList.remove('rt-foco');
+  }
+  function _rtNavFocoAplicar() {
+    _rtNavFocoLimpar();
+    var l = _rtNavItens(_rtNav.ctx);
+    if (!l.length) return;
+    _rtNav.foco = Math.max(0, Math.min(l.length - 1, _rtNav.foco));
+    l[_rtNav.foco].classList.add('rt-foco');
+    try { l[_rtNav.foco].scrollIntoView({ block: 'nearest' }); } catch (e) {}
+  }
+
+  function _rtNavAcao(ctx, n) {
+    var M = _rtMenu();
+    if (ctx === 'jogo' || ctx === 'cal') return;
+    if (ctx === 'loja') { if (n === 'b' && typeof window.lojaJogoFechar === 'function') window.lojaJogoFechar(); return; }
+    if (ctx === 'top') { if (n === 'b' || n === 'a' || n === 'y') _rtTopFechar(); return; }
+    if (ctx === 'carregando') { if (n === 'b') _rtMostrarSelecao(); return; }
+    if (ctx === 'pausa' || ctx === 'resultado') {
+      var l = _rtNavItens(ctx);
+      if (n === 'cima' || n === 'baixo') {
+        if (!l.length) return;
+        _rtNav.foco = (_rtNav.foco + (n === 'baixo' ? 1 : -1) + l.length) % l.length;
+        _rtNavFocoAplicar();
+      } else if (n === 'a') {
+        var alvo = l[_rtNav.foco];
+        if (alvo) { _rtNavFocoLimpar(); alvo.click(); }
+      } else if (n === 'b') {
+        if (ctx === 'pausa' && M && M.fechar) M.fechar('jogo-ritmo', true);
+        else if (ctx === 'resultado') _rtMostrarSelecao();
+      }
+      return;
+    }
+    // ── seleção ──
+    if (n === 'cima' || n === 'baixo') {
+      var i = 0;
+      for (var j = 0; j < RT_CATALOGO.length; j++) if (RT_CATALOGO[j].id === _rtSelId) i = j;
+      i = Math.max(0, Math.min(RT_CATALOGO.length - 1, i + (n === 'baixo' ? 1 : -1)));
+      if (RT_CATALOGO[i].id !== _rtSelId) {
+        _rtPreviaParar();
+        _rtSelId = RT_CATALOGO[i].id;
+        _rtMostrarErro('');
+        _rtRenderSelecao();
+        var card = _rtEls.lista.querySelector('.rt-musica-sel');
+        if (card) { try { card.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
+        _rtNav.previaT = performance.now() + 450;                // prévia depois de parar de rolar
+      }
+    } else if (n === 'esq' || n === 'dir') {
+      var dif = n === 'dir' ? 'hard' : 'normal';
+      if (dif !== _rtCfg.dif) { _rtCfg.dif = dif; _rtCfgSalvar(); _rtRenderSelecao(); }
+    } else if (n === 'lb' || n === 'rb') {
+      var ik = RT_MODOS_K.indexOf(_rtCfg.colunas);
+      ik = Math.max(0, Math.min(RT_MODOS_K.length - 1, ik + (n === 'rb' ? 1 : -1)));
+      if (RT_MODOS_K[ik] !== _rtCfg.colunas) { _rtCfg.colunas = RT_MODOS_K[ik]; _rtCfgSalvar(); _rtRenderSelecao(); }
+    } else if (n === 'a' || n === 'start') {
+      _rtNav.previaT = 0;
+      _rtComecar(_rtSelId, _rtCfg.dif);
+    } else if (n === 'b') {
+      _rtNav.previaT = 0;
+      if (_rtPrev.id || _rtPrev.carregando) _rtPreviaParar();      // 1º B: para a prévia
+      else if (typeof window._voltarAoMenu === 'function') window._voltarAoMenu();   // 2º B: sai
+    } else if (n === 'y') {
+      _rtTopAbrir();
+    } else if (n === 'select') {
+      _rtPadCalAbrir();
+    }
+  }
+
+  /* ── Recomeçar a música (menu de pausa) ──────────────────────────
+     Mesma música, mesma dificuldade e mesmo nº de colunas, do zero.
+     A música já está decodificada na memória → começa na hora. */
+  function _rtRecomecar() {
+    if (!_rtMusica) return;
+    var M = _rtMenu();
+    if (M && M.fechar) M.fechar('jogo-ritmo', false);            // fecha o menu SEM continuar
+    _rtComecar(_rtMusica.id, _rtDif);
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -1978,6 +2183,7 @@
     if (!_rtMontar()) return;
     _rtRegistrarMenu();
     _rtMostrarSelecao();
+    _rtNavIniciar();
   }
   // Ao sair pro menu de jogos / fechar o hub: para tudo e libera o áudio.
   function _rtParar() {

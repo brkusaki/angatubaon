@@ -18392,7 +18392,20 @@ ${urlCard}`)}`;
      Serve de rede de segurança pro embrulho de criarSala — ver
      `_lobVigiarSala`. Não é API nova em jogo nenhum: Party e Baralho
      já expunham `codigoSala()`, e Ping Pong/Tanques já escrevem o
-     código no próprio elemento que mostram pro anfitrião. */
+     código no próprio elemento que mostram pro anfitrião.
+
+     CATÁLOGO ÚNICO (Lobby de seleção). Cada entrada carrega também o
+     que o lobby precisa saber do jogo, pra adicionar um jogo novo ser
+     UMA entrada aqui (+ o id na lista de database.rules.json):
+       max          -> teto de jogadores do jogo (LOB_JOGO_MAX)
+       exato        -> true = 1x1, não aceita sobra (LOB_JOGO_EXATO)
+       publicaCheck -> id do "sala pública" na tela do jogo (o lobby
+                       desmarca: sala do lobby é do grupo)
+       criar        -> nome do global que o botão "Criar sala" chama;
+                       sem ele o anfitrião cria à mão (Baralho)
+     NÃO confundir com os modos da Coruja Party (Minigames / Hex
+     Arena): esses são escolhidos DENTRO da sala da Party, em party.js.
+     Aqui a Party é uma opção como as outras. */
 
   /* Lê o código da sala do elemento que o jogo já pinta pro anfitrião.
      Só vale o que está VISÍVEL: o texto sobrevive ao fim da sala, e um
@@ -18423,7 +18436,8 @@ ${urlCard}`)}`;
         return !!document.getElementById('pp-btn-entrar') && typeof window._ppEntrarSala === 'function';
       },
       entrar: function (codigo) { window._ppEntrarSala(codigo); },
-      codigoAtual: function () { return _convCodigoNoDom('pp-sala-codigo'); }
+      codigoAtual: function () { return _convCodigoNoDom('pp-sala-codigo'); },
+      max: 2, exato: true, publicaCheck: 'pp-publica-check', criar: '_ppCriarSala'
     },
     tanques: {
       nome: 'Tanques', emoji: '💥', api: 'AngatubaMP',
@@ -18431,7 +18445,20 @@ ${urlCard}`)}`;
         return !!document.getElementById('tq-btn-entrar') && typeof window._tqEntrarSala === 'function';
       },
       entrar: function (codigo) { window._tqEntrarSala(codigo); },
-      codigoAtual: function () { return _convCodigoNoDom('tq-sala-codigo'); }
+      codigoAtual: function () { return _convCodigoNoDom('tq-sala-codigo'); },
+      max: 2, exato: true, publicaCheck: 'tq-publica-check', criar: '_tqCriarSala'
+    },
+    // Hóquei da Coruja: 1x1 em tempo real pelo AngatubaMP, igual Ping
+    // Pong/Tanques — a tela já expunha _hqCriarSala/_hqEntrarSala(codigo)
+    // e pinta o código em #hq-sala-codigo. Nada mudou em hoquei.js.
+    hoquei: {
+      nome: 'Hóquei', emoji: '🏒', api: 'AngatubaMP',
+      pronto: function () {
+        return !!document.getElementById('hq-btn-entrar') && typeof window._hqEntrarSala === 'function';
+      },
+      entrar: function (codigo) { window._hqEntrarSala(codigo); },
+      codigoAtual: function () { return _convCodigoNoDom('hq-sala-codigo'); },
+      max: 2, exato: true, publicaCheck: 'hq-publica-check', criar: '_hqCriarSala'
     },
     party: {
       nome: 'Party', emoji: '🎉', api: 'AngatubaParty',
@@ -18439,7 +18466,8 @@ ${urlCard}`)}`;
         return !!document.getElementById('pty-codigo-input') && typeof window._ptyEntrarSala === 'function';
       },
       entrar: function (codigo) { window._ptyEntrarSala(codigo); },
-      codigoAtual: function () { return _convCodigoDaApi('AngatubaParty'); }
+      codigoAtual: function () { return _convCodigoDaApi('AngatubaParty'); },
+      max: 4, publicaCheck: 'pty-publica-check', criar: '_ptyCriarSala'
     },
     baralho: {
       nome: 'Baralho', emoji: '🃏', api: 'AngatubaBaralho',
@@ -18461,7 +18489,10 @@ ${urlCard}`)}`;
       // entrarPorCodigo devolve Promise: o `return` é o que deixa o
       // lobby saber que a entrada falhou (ver _lobEntrarNaSala).
       entrar: function (codigo) { return window.BaralhoGame.entrarPorCodigo(codigo); },
-      codigoAtual: function () { return _convCodigoDaApi('AngatubaBaralho'); }
+      codigoAtual: function () { return _convCodigoDaApi('AngatubaBaralho'); },
+      // Sem `criar`: o modo (Truco/Uno) e o nº de jogadores são escolhidos
+      // na tela do baralho, e o anfitrião toca "Criar sala" lá.
+      max: 8
     }
   };
 
@@ -20183,7 +20214,7 @@ ${urlCard}`)}`;
          anfitriao:      { uid, nome },
          criadoEm:       timestamp do servidor,
          status:         'aberto' | 'em_jogo' | 'fechado',
-         jogoSugerido:   null | 'pingpong'|'tanques'|'party'|'baralho',
+         jogoSugerido:   null | 'pingpong'|'tanques'|'hoquei'|'party'|'baralho',
          codigoSalaJogo: null | 'ABCD'   <- só a 5.3 preenche
          membros: {
            {uid}: { nome, foto?, entrouEm, pronto }
@@ -20280,8 +20311,14 @@ ${urlCard}`)}`;
      LOB_JOGO_EXATO marca quem NÃO aceita sobra: Ping Pong e Tanques
      são 1x1: o terceiro não fica de fora, ele simplesmente não tem
      onde entrar — então ali a gente barra em vez de avisar. */
-  var LOB_JOGO_MAX   = { pingpong: 2, tanques: 2, party: 4, baralho: 8 };
-  var LOB_JOGO_EXATO = { pingpong: true, tanques: true };
+  // Derivados do catálogo (CONV_JOGOS.max/.exato) — antes eram duas
+  // listas à mão que precisavam ser lembradas a cada jogo novo.
+  var LOB_JOGO_MAX   = {};
+  var LOB_JOGO_EXATO = {};
+  Object.keys(CONV_JOGOS).forEach(function (k) {
+    LOB_JOGO_MAX[k] = CONV_JOGOS[k].max || 0;
+    if (CONV_JOGOS[k].exato) LOB_JOGO_EXATO[k] = true;
+  });
   var LOB_MIN_MEMBROS = 2;                 // sozinho não é partida em grupo
   var LOB_CHAT_MAX    = 160;               // teto do texto de uma mensagem (bate com a regra)
   var LOB_CHAT_JANELA = 40;                // últimas mensagens que a tela carrega
@@ -20685,15 +20722,13 @@ ${urlCard}`)}`;
      criada por fora nasce órfã). Devolve true se deu pra disparar
      sozinho; false quando a escolha é do anfitrião (baralho). */
   function _lobDispararCriar(jogo) {
-    var idCheck = jogo === 'pingpong' ? 'pp-publica-check'
-                : jogo === 'tanques'  ? 'tq-publica-check'
-                : jogo === 'party'    ? 'pty-publica-check' : '';
-    var chk = idCheck ? document.getElementById(idCheck) : null;
+    var cfg = CONV_JOGOS[jogo];
+    if (!cfg) return false;
+    var chk = cfg.publicaCheck ? document.getElementById(cfg.publicaCheck) : null;
     if (chk) chk.checked = false;   // sala do lobby é do grupo
-    if (jogo === 'pingpong' && typeof window._ppCriarSala  === 'function') { window._ppCriarSala();  return true; }
-    if (jogo === 'tanques'  && typeof window._tqCriarSala  === 'function') { window._tqCriarSala();  return true; }
-    if (jogo === 'party'    && typeof window._ptyCriarSala === 'function') { window._ptyCriarSala(); return true; }
-    return false;
+    var criar = cfg.criar ? window[cfg.criar] : null;
+    if (typeof criar === 'function') { criar(); return true; }
+    return false;                    // jogo em que o anfitrião cria à mão (Baralho)
   }
 
   /* Chamado pelo embrulho de criarSala da 4.4 toda vez que uma sala
@@ -20967,7 +21002,12 @@ ${urlCard}`)}`;
       return 'Falta gente: chame pelo menos mais uma pessoa pro lobby.';
     }
     if (LOB_JOGO_EXATO[jogo] && n > LOB_JOGO_MAX[jogo]) {
-      return CONV_JOGOS[jogo].nome + ' é 1x1 e vocês são ' + n + '. Escolham Party ou Baralho — ou fiquem só em 2 no lobby.';
+      // Sugere os jogos do catálogo que aceitam mais gente (hoje Party e
+      // Baralho) — sai do próprio catálogo, sem nome fixo no texto.
+      var cabem = Object.keys(CONV_JOGOS).filter(function (k) { return !LOB_JOGO_EXATO[k] && LOB_JOGO_MAX[k] > 2; })
+        .map(function (k) { return CONV_JOGOS[k].nome; });
+      return CONV_JOGOS[jogo].nome + ' é 1x1 e vocês são ' + n + '. Escolham ' +
+        (cabem.length ? cabem.join(' ou ') : 'outro jogo') + ' — ou fiquem só em 2 no lobby.';
     }
     /* O anfitrião conta junto: ele também tem o botão "Pronto", e
        começar sem ter marcado o próprio seria a mesma pressa por

@@ -795,12 +795,12 @@
           </div>
         </button>
 
-        <button type="button" class="game-card gc-party" data-cat="multi" data-nome="coruja party" data-desc="2 a 4 jogadores minigames em rodadas e placar geral" onclick="_abrirJogo('party')">
+        <button type="button" class="game-card gc-party" data-cat="multi" data-nome="coruja party hex arena" data-desc="2 a 4 jogadores minigames em rodadas ou hex arena placar geral" onclick="_abrirJogo('party')">
           <span class="gc-fav" data-jogo="party" role="button" tabindex="0" aria-label="Favoritar" onclick="event.stopPropagation(); _gamesFavToggleUI(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();_gamesFavToggleUI(this);}"><i class="fa fa-star"></i></span>
           <div class="gc-media"><img src="/Jogos/assets/card-party.webp" alt="" loading="lazy" class="gc-hero-img"></div>
           <div class="gc-body">
             <div class="gc-title">Coruja Party</div>
-            <div class="gc-desc">2 a 4 jogadores, minigames em rodadas e placar geral. Chame a turma!</div>
+            <div class="gc-desc">2 a 4 jogadores: minigames em rodadas ou Hex Arena. Chame a turma!</div>
             <span class="gc-cta">Jogar</span>
           </div>
         </button>
@@ -1636,7 +1636,7 @@
           <div class="pty-sub" id="pty-menu" style="display:flex;">
             <img src="/webp/owl-wave.webp" alt="" class="pty-owl" onerror="this.style.display='none'">
             <div class="pty-titulo">🦉 Coruja Party</div>
-            <div class="pty-desc">Chame de 2 a 4 amigos pra jogar minigames em rodadas — cada um no próprio celular, placar geral no fim.</div>
+            <div class="pty-desc">Chame de 2 a 4 amigos. Na sala, o anfitrião escolhe o jogo: minigames em rodadas ou a Hex Arena, todo mundo na mesma arena.</div>
             <div class="pty-opcoes">
               <button type="button" class="pty-btn" onclick="_ptyCriarSala()">Criar Party</button>
               <label class="pty-privada-toggle">
@@ -1665,6 +1665,9 @@
             </div>
             <div id="pty-lobby-jogadores"></div>
             <div class="pty-lobby-contador" id="pty-lobby-contador">1/4 jogadores (mínimo 2 pra começar)</div>
+            <!-- Qual jogo a sala vai rodar (Minigames / Hex Arena / …).
+                 Desenhado por _renderModos em party.js a partir de MODOS. -->
+            <div class="pty-modo-escolha" id="pty-modo-escolha"></div>
             <div class="pty-rodadas-escolha" id="pty-rodadas-escolha">
               <span class="pty-rodadas-label">Rodadas por sessão</span>
               <div class="pty-rodadas-chips">
@@ -1717,6 +1720,7 @@
             <img src="/webp/owl-celebrate-flying.webp" alt="" class="pty-owl" onerror="this.style.display='none'">
             <div class="pty-titulo" id="pty-campeao-titulo">🏆 Fim da Party!</div>
             <div id="pty-campeao-podio"></div>
+            <div class="pty-campeao-moedas" id="pty-campeao-moedas" style="display:none;"></div>
             <button type="button" class="pty-btn" id="pty-btn-revanche" onclick="_ptyRevanche()">Revanchinha</button>
             <div class="pty-desc" id="pty-campeao-espera-anfitriao" style="display:none;">Esperando o anfitrião chamar a revanchinha…</div>
             <button type="button" class="pty-link" onclick="_ptyVoltarMenuLobby()">Sair da sala</button>

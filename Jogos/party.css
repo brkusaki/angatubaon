@@ -235,3 +235,26 @@ body.games-fs-open .pty-card {
    document.body.classList em party.js: _iniciarRodadaLocal/
    reportarResultado). Usar a controle própria da Party pra sair. */
 body.angatuba-party-ativo .jogo-voltar { display: none !important; }
+
+/* ── Lobby: escolha do jogo da sala (modos) ──────────────────────
+   Chips desenhados por _renderModos (party.js) a partir de MODOS. Só o
+   anfitrião toca; pros outros os chips ficam desabilitados, mas o
+   ativo continua destacado (é assim que sabem o que vem por aí). */
+.pty-modo-escolha { display: flex; flex-direction: column; gap: 6px; align-items: center; width: 100%; max-width: 320px; margin-top: 4px; }
+.pty-modo-chips { display: flex; gap: 8px; width: 100%; }
+.pty-modo-chip {
+  flex: 1; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 10px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface2, var(--surface)); color: var(--text);
+  font-family: var(--font-h); font-weight: 800; font-size: 13.5px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pty-modo-chip:disabled { cursor: default; opacity: .6; }
+.pty-modo-chip.pty-modo-ativo {
+  background: linear-gradient(135deg, #ec4899, #f59e0b); color: #fff; border-color: transparent; opacity: 1;
+}
+.pty-modo-emoji { font-size: 17px; line-height: 1; }
+.pty-modo-desc { font-size: 12px; color: var(--muted); line-height: 1.45; max-width: 300px; }
+
+/* Moedas da partida no pódio (só modos que pagam, ex.: Hex Arena) */
+.pty-campeao-moedas { font-family: var(--font-h); font-weight: 800; font-size: 18px; color: #f59e0b; }

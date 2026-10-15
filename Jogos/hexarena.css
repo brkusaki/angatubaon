@@ -1,0 +1,110 @@
+/* ═══════════════════════════════════════════════════════════════
+   HEX ARENA — jogo da Coruja Party (ver Jogos/hexarena.js).
+   Injetado sob demanda pelo _jogoLoader('hexarena'). Desenha dentro
+   de #pty-arena-container (sub-tela "arena" do Party). O tabuleiro é
+   sempre escuro (é o "palco" do jogo, igual em tema claro e escuro);
+   o HUD em volta segue as variáveis do app.
+   ═══════════════════════════════════════════════════════════════ */
+
+.hx-root {
+  width: 100%; flex: 1; min-height: 420px;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 12px 12px; box-sizing: border-box;
+  text-align: left;
+}
+
+/* ── Topo: round, tempo, recado ─────────────────────────────── */
+.hx-topo { display: flex; flex-direction: column; gap: 6px; }
+.hx-linha1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.hx-round { font-family: var(--font-h); font-weight: 800; font-size: 15px; color: var(--text); }
+.hx-tempo { font-family: var(--font-h); font-weight: 800; font-size: 15px; color: #ec4899; font-variant-numeric: tabular-nums; }
+.hx-timer { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.hx-timer-barra {
+  height: 100%; width: 0%; border-radius: 999px;
+  background: linear-gradient(90deg, #ec4899, #f59e0b);
+  transition: width .25s linear;
+}
+.hx-timer-barra.urgente { background: #f43f5e; animation: hxPisca .5s ease-in-out infinite alternate; }
+@keyframes hxPisca { to { opacity: .45; } }
+.hx-msg {
+  font-size: 13px; line-height: 1.4; color: var(--text);
+  min-height: 2.8em;                 /* não pula o layout quando o texto muda */
+}
+
+/* ── Chips dos jogadores ───────────────────────────────────── */
+.hx-jogadores { display: flex; flex-wrap: wrap; gap: 6px; }
+.hx-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface2, var(--surface)); color: var(--text);
+  font-size: 12px; font-weight: 600;
+}
+.hx-chip i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.hx-chip small { color: var(--muted); font-weight: 500; }
+.hx-chip b { font-weight: 800; }
+.hx-chip.eu { border-color: rgba(236,72,153,.6); }
+.hx-chip.morto { opacity: .5; text-decoration: line-through; }
+
+/* ── Palco (canvas) ────────────────────────────────────────── */
+.hx-palco {
+  position: relative; flex: 1; min-height: 260px;
+  border-radius: 14px; overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, #1d1733 0%, #110d1f 70%);
+  border: 1px solid rgba(255,255,255,.06);
+}
+.hx-canvas {
+  position: absolute; inset: 0; display: block;
+  touch-action: none;                /* toque é jogo, não rolagem */
+  -webkit-tap-highlight-color: transparent;
+  user-select: none; -webkit-user-select: none;
+}
+
+/* Fim da partida (por cima do tabuleiro, antes do pódio da Party) */
+.hx-fim {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: rgba(10,7,20,.78); color: #fff; text-align: center; padding: 16px;
+  animation: hxEntra .35s ease both;
+}
+@keyframes hxEntra { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+.hx-fim-tit { font-family: var(--font-h); font-weight: 800; font-size: 22px; }
+.hx-fim-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.hx-fim-lista li { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+.hx-fim-lista li i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.hx-fim-lista li span { font-family: var(--font-h); font-weight: 800; min-width: 26px; color: #f59e0b; }
+.hx-fim-moedas { font-family: var(--font-h); font-weight: 800; font-size: 20px; color: #fbbf24; min-height: 1em; }
+.hx-fim-sub { font-size: 12px; color: rgba(255,255,255,.65); }
+
+/* ── Controles (embaixo, ao alcance do polegar) ────────────── */
+.hx-controles { display: flex; gap: 8px; align-items: stretch; }
+.hx-seg {
+  display: flex; flex: 1; padding: 3px; gap: 3px;
+  border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface2, var(--surface));
+}
+.hx-seg-btn {
+  flex: 1; min-height: 44px; border: none; border-radius: 9px; cursor: pointer;
+  background: transparent; color: var(--muted);
+  font-family: var(--font-h); font-weight: 800; font-size: 13px;
+  -webkit-tap-highlight-color: transparent;
+}
+.hx-seg-btn.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+.hx-confirmar {
+  flex: 1; min-height: 50px; border: none; border-radius: 12px; cursor: pointer;
+  font-family: var(--font-h); font-weight: 800; font-size: 15px; color: #fff;
+  background: linear-gradient(135deg, #ec4899, #f59e0b);
+  box-shadow: 0 4px 14px rgba(236,72,153,.35);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .1s, opacity .15s;
+}
+.hx-confirmar:active { transform: scale(.97); }
+.hx-confirmar:disabled { opacity: .45; box-shadow: none; cursor: not-allowed; }
+
+@media (max-width: 360px) {
+  .hx-root { padding: 8px; }
+  .hx-seg-btn { font-size: 12px; }
+  .hx-confirmar { font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hx-timer-barra.urgente, .hx-fim { animation: none; }
+}

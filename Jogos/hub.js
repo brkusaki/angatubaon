@@ -959,9 +959,9 @@
     armadilha: 'Armadilha da Coruja', pingpong: 'Ping Pong da Coruja',
     tanques: 'Batalha de Tanques', hoquei: 'Hóquei da Coruja', party: 'Coruja Party',
     negocios: 'Negócios da Cidade', baralho: 'Baralho', corujinha: 'Corujinha',
-    ritmo: 'Ritmo da Coruja'
+    ritmo: 'Ritmo da Coruja', hexarena: 'Hex Arena'
   };
-  var JOGO_ICOS = { pingpong: '🏓', tanques: '💥', hoquei: '🏒', ritmo: '🎵' };
+  var JOGO_ICOS = { pingpong: '🏓', tanques: '💥', hoquei: '🏒', ritmo: '🎵', hexarena: '⬡' };
 
   // nome = id do jogo aberto, ou null pra limpar. Só mexe na atividade
   // de origem 'jogo' — não apaga um "Na Biblioteca" de outra origem.
@@ -991,6 +991,7 @@
     // quando por algum motivo o Party não tiver rodado sua própria limpeza.
     if (window.PuffGame      && typeof window.PuffGame.parar      === 'function') window.PuffGame.parar();
     if (window.ErvilhasGame  && typeof window.ErvilhasGame.parar  === 'function') window.ErvilhasGame.parar();
+    if (window.HexArenaGame  && typeof window.HexArenaGame.parar  === 'function') window.HexArenaGame.parar();
     if (window.BlocosGame    && typeof window.BlocosGame.parar    === 'function') window.BlocosGame.parar();
     if (window.DocesGame     && typeof window.DocesGame.parar     === 'function') window.DocesGame.parar();
     if (window.Game2048      && typeof window.Game2048.parar      === 'function') window.Game2048.parar();
@@ -1219,6 +1220,10 @@
     // Ervilhas da Coruja: mesmo esquema do Puff acima — minigame só da
     // pool do Coruja Party, carregado via window._jogoLoader('ervilhas').
     ervilhas: { js: '/Jogos/ervilhas.min.js', css: '/Jogos/ervilhas.css', global: 'ErvilhasGame' },
+    // Hex Arena: modo "módulo" do Coruja Party (todo mundo no mesmo jogo,
+    // arena hexagonal). Sem tela nem card próprios — party.js carrega via
+    // window._jogoLoader('hexarena') e monta em #pty-arena-container.
+    hexarena: { js: '/Jogos/hexarena.min.js', css: '/Jogos/hexarena.css', global: 'HexArenaGame' },
     // Blocos da Coruja e Doces da Coruja: solo com fases (não entram na
     // pool do Coruja Party). Ranking = maior fase concluída.
     blocos: { js: '/Jogos/blocos.min.js', css: '/Jogos/blocos.css', global: 'BlocosGame' },

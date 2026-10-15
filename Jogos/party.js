@@ -36,6 +36,23 @@
        Ervilhas), que recebem um <div> vazio e desenham tudo sozinhos
        (não têm tela própria em index.html).
    Exposto ao app pela ponte window.AngatubaGames.party (ver app.js).
+
+   MODOS DA SALA (o anfitrião escolhe qual jogo a Party vai rodar):
+   A sala sempre foi "um minigame surpresa por rodada". Agora isso é
+   UM dos modos (MODOS.minigames, o padrão — nada muda pra quem não
+   mexer). O outro tipo de modo é um "módulo": um jogo em que todo
+   mundo joga JUNTO, na mesma partida (o primeiro é a Hex Arena,
+   Jogos/hexarena.js). O anfitrião toca no modo no lobby (campo
+   salasParty/{codigo}/modo) e "Começar" leva todo mundo pro mesmo
+   jogo. Pra adicionar um jogo novo: uma entrada em MODOS + um módulo
+   que exponha montar(container, ctx) — ver _iniciarModoLocal e o
+   ctx montado lá. O módulo conversa pela MESMA sala do RTDB, em dois
+   nós genéricos que valem pra qualquer modo futuro (as regras já
+   cobrem, ver database.rules.json):
+     modoEstado              -> só o anfitrião grava (fonte da verdade)
+     modoJogadas/{n}/{uid}   -> cada um grava a própria jogada, 1 vez
+   No fim, o anfitrião chama ctx.fim(colocacoes) e a Party segue pro
+   pódio de sempre (status 'campeao', revanchinha etc.).
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -83,6 +100,24 @@
     return null;
   }
 
+  /* ── Modos da sala (ver cabeçalho) ───────────────────────────────
+     tipo 'pool'   -> o fluxo clássico de rodadas da POOL acima.
+     tipo 'modulo' -> um jogo só, com todo mundo junto. `modulo` é o
+                      nome no JOGOS_EXTERNOS do hub (window._jogoLoader). */
+  var MODOS = {
+    minigames: {
+      chave: 'minigames', tipo: 'pool', nome: 'Minigames', emoji: '🎲', min: 2, max: 4,
+      desc: 'Um minigame surpresa por rodada — cada um joga no seu celular.'
+    },
+    hexarena: {
+      chave: 'hexarena', tipo: 'modulo', modulo: 'hexarena', nome: 'Hex Arena', emoji: '⬡', min: 2, max: 4,
+      desc: 'Todos na mesma arena: escolham onde parar e pra onde atirar sem ver os outros. A arena encolhe a cada round.'
+    }
+  };
+  var MODO_PADRAO = 'minigames';
+  var MODOS_ORDEM = ['minigames', 'hexarena'];
+  function _modoDaSala(sala) { return (sala && sala.modo && MODOS[sala.modo]) ? MODOS[sala.modo] : MODOS[MODO_PADRAO]; }
+
   /* ── Estado local ────────────────────────────────────────────── */
   var _codigo = null;          // código da sala atual (4 letras)
   var _salaRef = null;         // referência RTDB da sala atual
@@ -99,6 +134,11 @@
   var _totalRodadasEscolhidas = TOTAL_RODADAS_PADRAO; // ajustável no lobby, só o anfitrião
   var _apiAtual = null;        // módulo do minigame em andamento — sair() chama .parar() nele (ver A2.2)
   var _contagemHandle = null;  // setTimeout em andamento de _contagemRegressiva — sair() cancela (ver A2.6)
+  var _modoSeedVisto = null;   // seed da partida de módulo já aberta (igual _rodadaVistaEm, pros modos)
+  var _modoApi = null;         // instância do módulo rodando (ex.: Hex Arena) — _pararModo() desmonta
+  var _modoListeners = [];     // escutas abertas pelo módulo — saem junto com ele, não com a sala
+  var _modoEmAndamento = false;
+  var _recompensaModo = null;  // moedas que o módulo pagou nesta partida (mostra no pódio)
 
   function disponivel() {
     return typeof firebase !== 'undefined' && !!firebase.database && !!firebase.auth;
@@ -292,9 +332,19 @@
     // comecarParty() punha rodadaAtual = 1 de novo, _rodadaVistaEm ainda
     // valia 1 da revanche anterior, a comparação abaixo dava "igual" e o
     // minigame nunca abria — todo mundo ficava olhando o lobby.
-    if (sala.status === 'lobby') _rodadaVistaEm = -1;
+    if (sala.status === 'lobby') { _rodadaVistaEm = -1; _modoSeedVisto = null; _recompensaModo = null; }
+    // Saiu do jogo-módulo (pódio, revanchinha): desmonta ele aqui.
+    if (sala.status !== 'modo' && _modoEmAndamento) _pararModo();
 
-    if (sala.status === 'rodada' && sala.rodadaAtual !== _rodadaVistaEm) {
+    if (sala.status === 'modo') {
+      if (sala.seed !== _modoSeedVisto) {
+        _modoSeedVisto = sala.seed;
+        _iniciarModoLocal(sala);
+      } else if (_modoApi && typeof _modoApi.salaMudou === 'function') {
+        // Alguém saiu no meio: o módulo (anfitrião) decide o que fazer.
+        try { _modoApi.salaMudou(sala); } catch (e) {}
+      }
+    } else if (sala.status === 'rodada' && sala.rodadaAtual !== _rodadaVistaEm) {
       _rodadaVistaEm = sala.rodadaAtual;
       _iniciarRodadaLocal(sala);
     } else if (sala.status === 'rodada' && _souAnfitriao) {
@@ -370,6 +420,7 @@
     // outros já se auto-limpam por outros caminhos) continuava rodando
     // timers sobre uma tela já abandonada (ver A2.2).
     if (_apiAtual && typeof _apiAtual.parar === 'function') { try { _apiAtual.parar(); } catch (e) {} }
+    _pararModo();
     document.body.classList.remove('angatuba-party-ativo');
   }
 
@@ -417,6 +468,73 @@
         if (_rodadaEmAndamento) reportarResultado(0);
       }, limiteMs);
     });
+  }
+
+  /* ── Modo "módulo": todo mundo no MESMO jogo ─────────────────────
+     Mesmo compasso da rodada (3, 2, 1, Vai!), mas em vez de cada um
+     abrir o próprio minigame, todos montam o módulo na arena da Party
+     e ele conversa pela sala. O ctx abaixo é TUDO que o módulo vê da
+     Party — nada de Firebase direto além das duas refs genéricas. */
+  function _iniciarModoLocal(sala) {
+    var modo = _modoDaSala(sala);
+    _pararModo();
+    _modoEmAndamento = true;
+    _recompensaModo = null;
+    _emit('countdown', { jogo: modo, sala: sala });
+    _contagemRegressiva(3, function () {
+      if (!_modoEmAndamento || !_salaRef) return;
+      _mostrarTelaJogo('party');
+      _emit('mostrarArena');
+      var seedDaPartida = sala.seed;
+      window._jogoLoader(modo.modulo).then(function (api) {
+        // Sala caiu / voltou pro lobby enquanto o módulo baixava.
+        if (!_modoEmAndamento || !_salaRef || _modoSeedVisto !== seedDaPartida) return;
+        var container = document.getElementById('pty-arena-container');
+        if (!container || typeof api.montar !== 'function') throw new Error('Módulo ' + modo.modulo + ' inválido.');
+        var salaRef = _salaRef;
+        _modoApi = api.montar(container, {
+          seed: seedDaPartida,
+          meuUid: _meuUid,
+          souAnfitriao: function () { return _souAnfitriao; },
+          jogadores: function () { return (_sala && _sala.jogadores) || {}; },
+          estadoRef: salaRef.child('modoEstado'),
+          jogadasRef: salaRef.child('modoJogadas'),
+          agora: firebase.database.ServerValue.TIMESTAMP,
+          escutar: function (ref, evento, cb) {
+            ref.on(evento, cb);
+            _modoListeners.push({ ref: ref, evento: evento, cb: cb });
+          },
+          fim: function (colocacoes) { _anfitriaoFimModo(colocacoes); },
+          recompensa: function (qtd) { _recompensaModo = Math.max(0, Math.floor(Number(qtd) || 0)); }
+        }) || null;
+      }).catch(function () {
+        // Módulo não carregou: avisa e deixa sair — o anfitrião ainda
+        // pode voltar todo mundo pro lobby pela Revanchinha.
+        _emit('salaFechada', { emAndamento: true });
+      });
+    });
+  }
+
+  function _pararModo() {
+    _modoEmAndamento = false;
+    _modoListeners.forEach(function (l) { try { l.ref.off(l.evento, l.cb); } catch (e) {} });
+    _modoListeners = [];
+    if (_modoApi && typeof _modoApi.parar === 'function') { try { _modoApi.parar(); } catch (e) {} }
+    _modoApi = null;
+  }
+
+  /* O módulo terminou (só o anfitrião chama): colocação vira ponto
+     pelo mesmo PONTOS_POR_COLOCACAO das rodadas e a Party vai pro
+     pódio de sempre. Empatados no mesmo lugar ganham os mesmos pontos. */
+  function _anfitriaoFimModo(colocacoes) {
+    if (!_souAnfitriao || !_salaRef || !_sala || _sala.status !== 'modo') return;
+    var jogadores = _sala.jogadores || {};
+    var updates = { status: 'campeao' };
+    Object.keys(jogadores).forEach(function (uid) {
+      var c = Math.floor(Number(colocacoes && colocacoes[uid]) || 0);
+      updates['jogadores/' + uid + '/pontosTotal'] = c > 0 ? (PONTOS_POR_COLOCACAO[c - 1] || 0) : 0;
+    });
+    _salaRef.update(updates).catch(function () {});
   }
 
   function _contagemRegressiva(n, aoFim) {
@@ -545,6 +663,14 @@
     _totalRodadasEscolhidas = Math.max(2, Math.min(20, Number(n) || TOTAL_RODADAS_PADRAO));
   }
 
+  // Anfitrião escolhe o modo no lobby. Grava na sala pra todo mundo ver
+  // (e pra "Começar" saber qual fluxo rodar).
+  function definirModo(chave) {
+    if (!_souAnfitriao || !_salaRef || !_sala || _sala.status !== 'lobby') return;
+    if (!MODOS[chave]) return;
+    _salaRef.child('modo').set(chave).catch(function () {});
+  }
+
   function _sortearProximoJogo() {
     var opcoes = POOL.filter(function (j) { return j.chave !== _ultimoJogoUsado; });
     if (!opcoes.length) opcoes = POOL;
@@ -559,7 +685,21 @@
   function comecarParty() {
     if (!_souAnfitriao || !_sala || !_salaRef) return;
     var qtd = Object.keys(_sala.jogadores || {}).length;
-    if (qtd < MIN_JOGADORES) return;
+    var modo = _modoDaSala(_sala);
+    if (qtd < Math.max(MIN_JOGADORES, modo.min || 0)) return;
+    if (modo.tipo === 'modulo') {
+      // Um jogo só, todo mundo junto: limpa a partida anterior (se
+      // houver) no mesmo update atômico que dá a largada.
+      _salaRef.update({
+        status: 'modo',
+        modoEstado: null,
+        modoJogadas: null,
+        seed: Math.floor(Math.random() * 1e9),
+        rodadaIniciadaEm: firebase.database.ServerValue.TIMESTAMP
+      }).catch(function () {});
+      _tirarDaListaPublica();
+      return;
+    }
     var baseRodada = _sala.rodadaAtual || 0;
     _salaRef.update({
       totalRodadas: baseRodada + _totalRodadasEscolhidas,
@@ -574,16 +714,19 @@
     // senão ela ficava visível em "Parties abertas agora" com um
     // "Entrar" que sempre falhava, até o anfitrião sair de vez ou
     // desconectar (podia demorar bastante em segundo plano).
-    if (_sala.publica) {
-      try {
-        var db = _db();
-        if (db) {
-          var refPublicaIniciada = db.ref('salasPartyPublicas/' + _codigo);
-          refPublicaIniciada.onDisconnect().cancel();
-          refPublicaIniciada.remove();
-        }
-      } catch (e) {}
-    }
+    _tirarDaListaPublica();
+  }
+
+  function _tirarDaListaPublica() {
+    if (!_sala || !_sala.publica) return;
+    try {
+      var db = _db();
+      if (db) {
+        var refPublicaIniciada = db.ref('salasPartyPublicas/' + _codigo);
+        refPublicaIniciada.onDisconnect().cancel();
+        refPublicaIniciada.remove();
+      }
+    } catch (e) {}
   }
 
   // "Próxima rodada" (dentro da MESMA sessão): só avança rodadaAtual em 1.
@@ -612,7 +755,7 @@
   function revanche() {
     if (!_souAnfitriao || !_sala || !_salaRef) return;
     var jogadores = _sala.jogadores || {};
-    var updates = { status: 'lobby', rodadaAtual: 0, resultados: null, placarRodadas: null };
+    var updates = { status: 'lobby', rodadaAtual: 0, resultados: null, placarRodadas: null, modoEstado: null, modoJogadas: null };
     Object.keys(jogadores).forEach(function (uid) { updates['jogadores/' + uid + '/pontosTotal'] = 0; });
     _salaRef.update(updates).catch(function () {});
   }
@@ -668,6 +811,7 @@
     _rodadaEmAndamento = false; _rodadaVistaEm = -1;
     _apiAtual = null;
     _reentrando = false; _tentativasReentrada = 0; // ver _reentrarNoLobbySePreciso
+    _modoSeedVisto = null; _recompensaModo = null;
   }
 
   function estado() { return _sala; }
@@ -675,6 +819,7 @@
   function souAnfitriao() { return _souAnfitriao; }
   function codigoSala() { return _codigo; }
   function pool() { return POOL; }
+  function modos() { return MODOS; }
 
   window.AngatubaParty = {
     disponivel: disponivel,
@@ -682,6 +827,8 @@
     entrarSala: entrarSala,
     listarSalas: listarSalas,
     definirTotalRodadas: definirTotalRodadas,
+    definirModo: definirModo,
+    modos: modos,
     comecarParty: comecarParty,
     proximaRodada: proximaRodada,
     revanche: revanche,
@@ -825,6 +972,34 @@
   }
   window._ptyEscolherRodadas = _ptyEscolherRodadas;
 
+  function _ptyEscolherModo(chave) { window.AngatubaParty.definirModo(chave); }
+  window._ptyEscolherModo = _ptyEscolherModo;
+
+  // Chips do modo: o anfitrião toca; os outros só veem qual está valendo.
+  // Desenhado a partir de MODOS — modo novo aparece aqui sozinho.
+  var _ptyModoListenerOn = false;
+  function _renderModos(sala, souAnf) {
+    var wrap = _q('pty-modo-escolha');
+    if (!wrap) return;
+    if (!_ptyModoListenerOn) {
+      wrap.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-pty-modo]');
+        if (b && !b.disabled) _ptyEscolherModo(b.getAttribute('data-pty-modo'));
+      });
+      _ptyModoListenerOn = true;
+    }
+    var atual = _modoDaSala(sala);
+    var chips = MODOS_ORDEM.map(function (k) {
+      var m = MODOS[k], on = (m.chave === atual.chave);
+      return '<button type="button" class="pty-modo-chip' + (on ? ' pty-modo-ativo' : '') + '" data-pty-modo="' + k + '"' +
+        (souAnf ? '' : ' disabled') + ' aria-pressed="' + (on ? 'true' : 'false') + '">' +
+        '<span class="pty-modo-emoji">' + m.emoji + '</span><span>' + _escHTML(m.nome) + '</span></button>';
+    }).join('');
+    wrap.innerHTML = '<span class="pty-rodadas-label">' + (souAnf ? 'Qual jogo?' : 'Jogo da sala') + '</span>' +
+      '<div class="pty-modo-chips">' + chips + '</div>' +
+      '<div class="pty-modo-desc">' + _escHTML(atual.desc) + '</div>';
+  }
+
   function _ptyComecarParty() { window.AngatubaParty.comecarParty(); }
   window._ptyComecarParty = _ptyComecarParty;
 
@@ -867,8 +1042,15 @@
       }
       var esperaAnf = _q('pty-lobby-espera-anfitriao');
       if (esperaAnf) esperaAnf.style.display = souAnf ? 'none' : '';
+      var modoSala = _modoDaSala(sala);
+      _renderModos(sala, souAnf);
+      // "Rodadas por sessão" só existe no modo de minigames.
       var rodadasWrap = _q('pty-rodadas-escolha');
-      if (rodadasWrap) rodadasWrap.style.display = souAnf ? '' : 'none';
+      if (rodadasWrap) rodadasWrap.style.display = (souAnf && modoSala.tipo === 'pool') ? '' : 'none';
+      if (btnComecar) {
+        btnComecar.textContent = modoSala.tipo === 'pool' ? 'Começar Party' : 'Começar ' + modoSala.nome;
+        btnComecar.disabled = lista.length < Math.max(2, modoSala.min || 0);
+      }
       _mostrarSub('lobby');
     }
   });
@@ -963,16 +1145,31 @@
     var medalhas = ['🥇', '🥈', '🥉', '🎖️'];
     var podioEl = _q('pty-campeao-podio');
     if (podioEl) {
-      podioEl.innerHTML = geral.map(function (j, i) {
+      podioEl.innerHTML = geral.map(function (j) {
+        // Lugar = 1 + quantos fizeram MAIS pontos: empatados dividem a medalha.
+        var i = geral.filter(function (o) { return o.pontosTotal > j.pontosTotal; }).length;
         return '<div class="pty-podio-item pty-podio-' + (i + 1) + '"><span class="pty-podio-medalha">' + (medalhas[i] || '') + '</span>' +
           '<span class="pty-podio-nome">' + _escHTML(j.nome) + '</span><span class="pty-podio-pts">' + j.pontosTotal + ' pts</span></div>';
       }).join('');
     }
     var tituloEl = _q('pty-campeao-titulo');
     if (tituloEl && geral[0]) {
-      tituloEl.textContent = '🏆 ' + geral[0].nome + ' venceu a Party!';
+      // Empate no topo acontece de verdade na Hex Arena (dois caem no
+      // mesmo round / dois sobrevivem até o fim).
+      var empatados = geral.filter(function (j) { return j.pontosTotal === geral[0].pontosTotal; });
+      tituloEl.textContent = (empatados.length > 1 && geral.length > 1)
+        ? '🤝 Empate: ' + empatados.map(function (j) { return j.nome; }).join(' e ') + '!'
+        : '🏆 ' + geral[0].nome + ' venceu a Party!';
       // Entrada mais festiva do título (mesmo padrão de "pulse" do countdown).
       tituloEl.classList.remove('pty-campeao-titulo-anim'); void tituloEl.offsetWidth; tituloEl.classList.add('pty-campeao-titulo-anim');
+    }
+
+    // Moedas: só os modos-módulo pagam (a Hex Arena credita no próprio
+    // aparelho e conta pra cá quanto foi). Minigames seguem sem moeda.
+    var moedasEl = _q('pty-campeao-moedas');
+    if (moedasEl) {
+      moedasEl.textContent = _recompensaModo ? '+' + _recompensaModo + ' 🪙' : '';
+      moedasEl.style.display = _recompensaModo ? '' : 'none';
     }
 
     var souAnf = window.AngatubaParty.souAnfitriao();

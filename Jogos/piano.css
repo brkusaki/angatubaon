@@ -48,3 +48,9 @@
 .pn-btn-modo-surv{border-color:rgba(255,77,99,.40);background:rgba(255,77,99,.12);}
 .pn-btn-modo-tit{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;}
 .pn-btn-modo-sub{font-size:11.5px;color:rgba(199,209,224,.75);font-weight:500;}
+
+/* ── Foco do controle nos menus (início, fim, pausa) — mesmo visual do .rt-foco do Ritmo ── */
+#jogo-piano .pn-foco {
+  outline: 3px solid #a78bfa !important; outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(167,139,250,.25), 0 8px 24px rgba(167,139,250,.35) !important;
+}

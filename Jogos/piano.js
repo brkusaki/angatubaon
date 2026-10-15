@@ -825,6 +825,8 @@
     if (!_pnLast) _pnLast = ts;
     var dt = (ts - _pnLast) / 1000; _pnLast = ts;
     if (dt > 0.05) dt = 0.05;
+    _pnPadPoll();                     // controle (Gamepad API) — não tem eventos de botão
+    if (_pnEstado !== 'jogando' || _pnPausado) return;   // Start pausou / errou a nota: o loop para aqui
     _pnUpdate(dt);
     if (_pnEstado === 'jogando') { _pnDraw(); _pnRAF = requestAnimationFrame(_pnLoop); }
   }
@@ -958,6 +960,280 @@
     _pnListenersOn = true;
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     CONTROLE (Gamepad API) — mesmo padrão do Ritmo (ritmo.js)
+     Lido a cada frame no _pnLoop (a Gamepad API não tem eventos de
+     botão). Soma com toque e teclado: cada aperto vira um toque no
+     centro da coluna, igual ao _pnKey.
+     Mapa = o MESMO do Ritmo no 4K (RT_PAD_PADRAO[4]), pra quem joga
+     os dois não ter que reaprender — layout "standard" (Ipega 9076 no
+     modo Android/X-input):
+       coluna 1: LB (4) · ← (14) · ↑ (12)
+       coluna 2: LT (6) · → (15) · ↓ (13)
+       coluna 3: RT (7) · X (2)  · A (0)
+       coluna 4: RB (5) · B (1)  · Y (3)
+       Start (9): pausa (no Coruja Party só abre o menu)
+     Cada botão conta sozinho (borda por botão, como no Ritmo): dois
+     botões da mesma coluna no mesmo frame = dois toques, igual a dois
+     polegares no mesmo azulejo da fila.
+     Fora da partida (início, fim, pausa) quem lê o controle é o
+     _pnNavLoop (navegação nos menus — ver abaixo).
+     Pra ter "Configurar botões" igual ao Ritmo, é trocar PN_PAD_MAPA
+     por um mapa salvo (ver _rtPadMapa no ritmo.js).
+  ══════════════════════════════════════════════════════════════ */
+  var PN_PAD_MAPA = [[4, 14, 12], [6, 15, 13], [7, 2, 0], [5, 1, 3]];
+  var PN_PAD_START = 9;
+  var _pnPadAntes = {};   // "gp_botão" → estava apertado no frame anterior
+  var _pnPadUsado = false;
+
+  function _pnPadLista() {
+    var out = [];
+    try {
+      var l = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (var i = 0; i < l.length; i++) if (l[i] && l[i].connected !== false) out.push(l[i]);
+    } catch (e) {}
+    return out;
+  }
+  function _pnBotaoApertado(gp, b) {
+    var x = gp.buttons && gp.buttons[b];
+    return !!x && (x.pressed || x.value > 0.5);
+  }
+  // Marca como "já apertado" tudo que está pressionado agora: o Ⓐ que
+  // começou a música não vira toque na coluna 3 no 1º frame.
+  function _pnPadSnapshot() {
+    _pnPadAntes = {};
+    var pads = _pnPadLista();
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i];
+      for (var b = 0; b < (gp.buttons || []).length; b++) if (_pnBotaoApertado(gp, b)) _pnPadAntes[gp.index + '_' + b] = true;
+    }
+  }
+  // Lido todo frame durante a música.
+  function _pnPadPoll() {
+    var pads = _pnPadLista();
+    if (!pads.length || !_pnCanvas) return;
+    var M = _pnMenu(), aberto = !!(M && M.aberto && M.aberto('jogo-piano'));
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i];
+      // Start: abre o menu (pausa fora do Party). Fechar é com o _pnNavLoop.
+      var kS = gp.index + '_' + PN_PAD_START, apS = _pnBotaoApertado(gp, PN_PAD_START);
+      if (apS && !_pnPadAntes[kS] && M && !aberto && _pnEstado === 'jogando') {
+        M.abrir('jogo-piano');
+        aberto = !!(M.aberto && M.aberto('jogo-piano'));
+      }
+      _pnPadAntes[kS] = apS;
+      for (var c = 0; c < PN_PAD_MAPA.length; c++) {
+        for (var j = 0; j < PN_PAD_MAPA[c].length; j++) {
+          var b = PN_PAD_MAPA[c][j], chave = gp.index + '_' + b, ap = _pnBotaoApertado(gp, b);
+          if (ap && !_pnPadAntes[chave] && !aberto && !_pnPausado && _pnEstado === 'jogando') {
+            _pnPadUsado = true;
+            _pnAudioDestravar();
+            var r = _pnCanvas.getBoundingClientRect();
+            _pnTocar(r.left + (_pnX0() + (c + 0.5) * _pnColW()) * (r.width / _pnW), r.top + r.height * 0.5);
+          }
+          _pnPadAntes[chave] = ap;
+        }
+      }
+    }
+  }
+
+  // 🎮 no HUD quando tem controle conectado (criado na 1ª vez, pra não
+  // precisar mexer no index.html).
+  function _pnPadIndicador() {
+    var tem = _pnPadLista().length > 0;
+    var el = document.getElementById('pn-pad');
+    if (!el && tem) {
+      var hud = document.querySelector('#jogo-piano .pn-hud');
+      if (!hud) return;
+      el = document.createElement('span');
+      el.id = 'pn-pad';
+      el.title = 'Controle conectado';
+      el.setAttribute('aria-label', 'Controle conectado');
+      el.textContent = '🎮';
+      el.style.cssText = 'align-self:center;font-size:16px;opacity:.85;line-height:1;';
+      hud.appendChild(el);
+    }
+    if (el) el.style.display = tem ? '' : 'none';
+  }
+  window.addEventListener('gamepadconnected', function () { _pnPadIndicador(); });
+  window.addEventListener('gamepaddisconnected', function (e) {
+    // Caiu no meio da música: esquece os botões daquele controle e, se
+    // ele estava sendo usado, pausa (no Party não dá pra pausar).
+    var idx = e && e.gamepad ? e.gamepad.index : null;
+    for (var k in _pnPadAntes) if (idx === null || k.indexOf(idx + '_') === 0) delete _pnPadAntes[k];
+    if (_pnEstado === 'jogando' && !_pnPausado && _pnPadUsado && !_pnNaParty()) {
+      var M = _pnMenu();
+      if (M && M.abrir) M.abrir('jogo-piano');
+    }
+    if (!_pnPadLista().length) _pnPadUsado = false;
+    _pnPadIndicador();
+  });
+
+  /* ══════════════════════════════════════════════════════════════
+     NAVEGAÇÃO COM O CONTROLE (fora da partida) — mesmo esquema do
+     _rtNavLoop do Ritmo. Um laço leve (_pnNavLoop) roda enquanto a
+     tela do Piano está aberta; cada tela é um "contexto":
+       inicio  ↑↓←→ item · na Música, ←→ trocam a música · Ⓐ/Start
+               confirma (Normal / Sobrevivência / Skins / 🥁) · Ⓑ volta aos jogos
+       fim     ↑↓ botão · Ⓐ/Start confirma ("Tocar de novo") ·
+               Ⓑ trocar música ou modo
+       pausa   ↑↓ opção · Ⓐ confirma · Ⓑ/Start continua
+       loja    Ⓑ fecha
+       jogo    nada — a música é do _pnPadPoll
+     ↑↓←→ = D-pad ou analógico; segurar repete. O foco anda pro item
+     mais próximo naquela direção e aparece com .pn-foco. Na troca de
+     contexto, o que já estava apertado é ignorado até soltar — e, fora
+     da partida, o _pnPadAntes acompanha o controle.
+  ══════════════════════════════════════════════════════════════ */
+  var _pnNav = { raf: 0, ctx: '', antes: {}, desde: {}, rep: {}, foco: null };
+
+  function _pnNavIniciar() { if (!_pnNav.raf) _pnNav.raf = requestAnimationFrame(_pnNavLoop); }
+  function _pnNavCtx() {
+    var tela = document.getElementById('jogo-piano');
+    if (!tela || tela.style.display === 'none' || !_pnCanvas) return null;
+    var loja = document.getElementById('lojajogo-overlay');
+    if (loja && loja.parentNode === tela && loja.style.display !== 'none') return 'loja';
+    if (_pnEstado === 'jogando') {
+      var M = _pnMenu();
+      return (M && M.aberto && M.aberto('jogo-piano')) ? 'pausa' : 'jogo';
+    }
+    return _pnEstado === 'fim' ? 'fim' : 'inicio';
+  }
+  // Estado "lógico" de cada comando juntando todos os controles + analógico.
+  function _pnNavLer(pads) {
+    var st = {};
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i], ax = gp.axes || [];
+      if (_pnBotaoApertado(gp, 12) || (ax[1] || 0) < -0.6) st.cima = true;
+      if (_pnBotaoApertado(gp, 13) || (ax[1] || 0) > 0.6) st.baixo = true;
+      if (_pnBotaoApertado(gp, 14) || (ax[0] || 0) < -0.6) st.esq = true;
+      if (_pnBotaoApertado(gp, 15) || (ax[0] || 0) > 0.6) st.dir = true;
+      if (_pnBotaoApertado(gp, 0)) st.a = true;
+      if (_pnBotaoApertado(gp, 1)) st.b = true;
+      if (_pnBotaoApertado(gp, PN_PAD_START)) st.start = true;
+    }
+    return st;
+  }
+  // Itens navegáveis do contexto (só os visíveis e habilitados). No
+  // início/fim entram também a lista de música e o 🥁 da batida.
+  function _pnNavItens(ctx) {
+    var cx = ctx === 'pausa' ? document.querySelector('#jogo-piano .jm-overlay .jm-caixa')
+           : document.getElementById(ctx === 'fim' ? 'pn-fim' : 'pn-inicio');
+    if (!cx) return [];
+    var l = Array.prototype.slice.call(cx.querySelectorAll('button, select'));
+    var bat = document.getElementById('pn-batida-btn');
+    if (ctx !== 'pausa' && bat) l.unshift(bat);
+    return l.filter(function (b) { return b.offsetParent !== null && !b.disabled; });
+  }
+  // Foco inicial de cada tela: o botão "principal".
+  function _pnNavPadrao(ctx, l) {
+    var sel = ctx === 'pausa' ? '[data-jm="continuar"]' : ctx === 'fim' ? '.pn-play' : '.pn-btn-modo';
+    for (var i = 0; i < l.length; i++) if (l[i].matches(sel)) return l[i];
+    return l[0] || null;
+  }
+  // Próximo item na direção n. Primeiro os "alinhados" (mesma linha pra
+  // ←→, mesma coluna pra ↑↓), o mais perto ganha. ←→ sem ninguém na linha
+  // fica parado; ↑↓ sem ninguém na coluna vai pro mais perto, penalizando
+  // o desvio lateral.
+  function _pnNavMover(l, el, n) {
+    var r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    var horiz = n === 'dir' || n === 'esq', melhor = null, nota = Infinity, alinhado = false;
+    for (var i = 0; i < l.length; i++) {
+      if (l[i] === el) continue;
+      var q = l[i].getBoundingClientRect(), dx = q.left + q.width / 2 - cx, dy = q.top + q.height / 2 - cy;
+      var frente = n === 'dir' ? dx : n === 'esq' ? -dx : n === 'baixo' ? dy : -dy;
+      if (frente <= 4) continue;
+      var al = horiz ? (q.top < r.bottom && q.bottom > r.top) : (q.left < r.right && q.right > r.left);
+      if (horiz && !al) continue;
+      var v = al ? frente : frente + (horiz ? Math.abs(dy) : Math.abs(dx)) * 2;
+      if ((al && !alinhado) || (al === alinhado && v < nota)) { nota = v; melhor = l[i]; alinhado = al; }
+    }
+    return melhor || el;
+  }
+  function _pnNavFocoLimpar() {
+    var l = document.querySelectorAll('#jogo-piano .pn-foco');
+    for (var i = 0; i < l.length; i++) l[i].classList.remove('pn-foco');
+  }
+  function _pnNavFocar(el) {
+    _pnNavFocoLimpar();
+    _pnNav.foco = el;
+    if (!el) return;
+    el.classList.add('pn-foco');
+    try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+  }
+  // Lista de música com o controle: ←→ (ou Ⓐ) troca a opção — o <select>
+  // nativo não abre pelo controle. O jogo lê o valor ao começar.
+  function _pnNavTrocarOpcao(sel, passo, girar) {
+    var n = sel.options.length;
+    if (!n) return;
+    var i = sel.selectedIndex + passo;
+    if (girar) i = (i + n) % n; else i = Math.max(0, Math.min(n - 1, i));
+    if (i === sel.selectedIndex) return;
+    sel.selectedIndex = i;
+    try { sel.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+  }
+
+  function _pnNavLoop() {
+    _pnNav.raf = 0;
+    var ctx = _pnNavCtx();
+    if (!ctx) { _pnNavFocoLimpar(); _pnNav.ctx = ''; _pnNav.foco = null; return; }   // tela fechada: o laço para (preparar religa)
+    var pads = _pnPadLista();
+    if (!pads.length) {
+      if (_pnNav.ctx) { _pnNavFocoLimpar(); _pnNav.ctx = ''; _pnNav.foco = null; }
+      _pnNav.raf = requestAnimationFrame(_pnNavLoop);
+      return;
+    }
+    var st = _pnNavLer(pads), agora = performance.now();
+    if (ctx !== _pnNav.ctx) {
+      // trocou de tela: o que já está apertado não conta até soltar
+      _pnNav.antes = {}; for (var k0 in st) _pnNav.antes[k0] = true;
+      _pnNav.ctx = ctx; _pnNav.foco = null;
+      _pnNavFocoLimpar();
+    }
+    if (ctx === 'jogo' || ctx === 'loja') {
+      if (ctx === 'loja' && st.b && !_pnNav.antes.b && typeof window.lojaJogoFechar === 'function') window.lojaJogoFechar();
+      _pnNav.antes = {}; for (var k1 in st) _pnNav.antes[k1] = true;
+    } else {
+      var l = _pnNavItens(ctx), ev = [];
+      if (!_pnNav.foco || l.indexOf(_pnNav.foco) === -1) _pnNavFocar(_pnNavPadrao(ctx, l));
+      ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'start'].forEach(function (n) {
+        var ap = !!st[n], seta = n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir';
+        if (ap && !_pnNav.antes[n]) { ev.push(n); _pnNav.desde[n] = agora; _pnNav.rep[n] = agora; }
+        else if (ap && seta && agora - _pnNav.desde[n] > 420 && agora - _pnNav.rep[n] > 120) { ev.push(n); _pnNav.rep[n] = agora; }   // segurar rola
+        _pnNav.antes[n] = ap;
+      });
+      for (var i = 0; i < ev.length; i++) {
+        _pnNavAcao(ctx, ev[i], l);
+        if (ev[i] === 'a' || ev[i] === 'b' || ev[i] === 'start') break;   // trocou de tela: o resto do frame não vale
+      }
+    }
+    if (ctx !== 'jogo') _pnPadSnapshot();
+    _pnNav.raf = requestAnimationFrame(_pnNavLoop);
+  }
+
+  function _pnNavAcao(ctx, n, l) {
+    var el = _pnNav.foco, ehSel = !!(el && el.tagName === 'SELECT');
+    if (ehSel && (n === 'esq' || n === 'dir')) { _pnNavTrocarOpcao(el, n === 'dir' ? 1 : -1, false); return; }
+    if (n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir') {
+      if (el) _pnNavFocar(_pnNavMover(l, el, n));
+      return;
+    }
+    if (ctx === 'pausa' && (n === 'b' || n === 'start')) {
+      var M = _pnMenu();
+      if (M && M.fechar) M.fechar('jogo-piano', true);
+      return;
+    }
+    if (n === 'a' || n === 'start') {
+      if (ehSel) _pnNavTrocarOpcao(el, 1, true);
+      else if (el) el.click();      // o foco fica nele (ex.: 🥁); se a tela mudar, o loop refaz
+      return;
+    }
+    if (n === 'b') {
+      if (ctx === 'fim') _pnVoltarInicio();
+      else if (typeof window._voltarAoMenu === 'function') window._voltarAoMenu();
+    }
+  }
+
   /* ── Overlays ─────────────────────────────────────────────────── */
   function _pnMostrarOverlay(qual) {
     var ini = document.getElementById('pn-inicio');
@@ -1004,6 +1280,8 @@
     _pnBatidaBotao();
     _pnMostrarOverlay('inicio');
     _pnDrawIdle();
+    _pnPadIndicador();
+    _pnNavIniciar();
   }
 
   // Preenche o seletor de música a partir da própria lista de
@@ -1034,6 +1312,9 @@
     _pnInicioMs = Date.now(); _pnPausaTotalMs = 0; _pnPausaInicioMs = 0;
     _pnEstado = 'jogando'; _pnLast = 0;
     _pnMenuPartida(true);
+    _pnPadSnapshot();
+    _pnPadIndicador();
+    _pnNavIniciar();
     if (_pnRAF) cancelAnimationFrame(_pnRAF);
     _pnRAF = requestAnimationFrame(_pnLoop);
   }

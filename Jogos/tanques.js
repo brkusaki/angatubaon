@@ -90,7 +90,11 @@
    batata (campo "bt", mesma autoridade dos spawns); encostar no
    adversário passa ela pro outro (com um respiro de imunidade); quem
    estiver com ela quando o timer estourar perde a rodada (ver
-   _tqAtualizarBatata).
+   _tqAtualizarBatata). Quem está com a batata anda TQ_BATATA_VEL_MUL
+   mais rápido e vê uma seta pro adversário; ela só troca de lado num
+   encostão NOVO (os tanques colidem — ver _tqBloqueiaTanque). No Rei do
+   Pedaço, os dois nascem à mesma distância do pedaço (_tqSortearSpawns).
+   A CPU sabe jogar os dois modos (ver _tqAtualizarIA).
 
    ARENA, MUNDO E CÂMERA: o MUNDO (onde tanques/paredes/moitas vivem)
    agora é bem maior que a TELA — TQ_VIEWPORT_LARGURA/ALTURA (16/9 × 1,
@@ -120,10 +124,23 @@
    converter toque em tela pra espaço local antes de calcular direção
    (_tqDeltaLocal).
 
-   OCULTAÇÃO POR DISTÂNCIA: como o mapa é grande, o adversário também
-   fica escondido (não desenhado, IA não mira) quando está longe demais
-   (> TQ_VISAO_RAIO), somado à ocultação por moita que já existia — ver
-   _tqEscondido* em _tqSimularMundo.
+   OCULTAÇÃO: o adversário só some do desenho dentro de moita (e sem ter
+   atirado há pouco). Longe demais ele simplesmente fica fora da tela —
+   a antiga regra de "sumir além de TQ_VISAO_RAIO" fazia o tanque piscar
+   DENTRO da tela quando a câmera travava na borda do mapa (ou em celular
+   largo), então ela ficou só pra IA (não mira o que está longe). O
+   rastro de esteira de quem está escondido também não é desenhado (ver
+   _tqAtualizarGameFeel), senão a trilha entregava a moita.
+
+   SETAS FORA DA TELA (_tqDesenharSetas): o pedaço (Rei do Pedaço), as
+   caixas de suprimento e — só pra quem está com a batata — o adversário
+   ganham uma seta na borda da tela quando estão fora dela.
+
+   REDE — NÚMERO DA RODADA: o anfitrião numera cada rodada (_tqRodadaNum,
+   campo "rd" em 'oi'/'rr'/'e'); o convidado devolve o número em 'p'. No
+   começo de rodada o anfitrião ignora posições com número velho — antes,
+   o 'p' que ainda vinha do lugar onde o convidado morreu sobrescrevia o
+   ponto de nascimento recém-sorteado até o convidado receber o novo.
 
    SPAWNS INTELIGENTES: no início de cada RODADA, o anfitrião sorteia um
    par de pontos nas bordas/cantos do mapa com distância mínima de
@@ -157,10 +174,14 @@
   // TQ_MUNDO_ESCALA e o comentário "ARENA, MUNDO E CÂMERA" no topo.
   var TQ_VIEWPORT_LARGURA = 16 / 9;
   var TQ_VIEWPORT_ALTURA  = 1;
-  var TQ_MUNDO_ESCALA = 4;      // mundo tem 4× a largura E 4× a altura do viewport (16× a área)
+  // 2,5 (era 4): com 16× a área da tela a rodada virava "procurar o outro"
+  // (~21 s pra atravessar o mapa, obstáculos esparsos, caixas que ninguém
+  // achava, Batata Quente decidida no sorteio). 2,5 = ~6× a área, ~13 s
+  // pra atravessar. Os mapas são frações × escala, então só isto muda.
+  var TQ_MUNDO_ESCALA = 2.5;    // mundo tem 2,5× a largura E 2,5× a altura do viewport
   var MUNDO_LARGURA = TQ_VIEWPORT_LARGURA * TQ_MUNDO_ESCALA;
   var MUNDO_ALTURA  = TQ_VIEWPORT_ALTURA * TQ_MUNDO_ESCALA;
-  var TQ_VISAO_RAIO = 1.5;      // distância além da qual o adversário fica escondido (independe de moita)
+  var TQ_VISAO_RAIO = 1.5;      // até onde a IA "enxerga" o jogador (o desenho usa a própria tela — ver _tqSimularMundo)
   var TQ_IA_DIST_ENGAJAR = 0.86; // distância (mundo largo) até a IA trocar patrulha por engajar — de propósito NÃO escala com o mapa, senão a CPU nunca precisaria caçar
 
   /* ── Classes de tanque: escolhida no menu (ver _tqEscolherClasse),
@@ -221,9 +242,11 @@
   var TQ_BATATA_DURACAO = 20;                          // segundos até a batata estourar
   var TQ_BATATA_IMUNIDADE = 1.2;                        // segundos de imunidade após RECEBER a batata
   var TQ_BATATA_RAIO_PASSE = TQ_RAIO_TANQUE * 2 + 0.02; // distância pra encostar e passar
+  var TQ_BATATA_VEL_MUL = 1.18;                         // quem está com a batata anda 18% mais rápido
   var _tqBatataCom = null;       // 'anfitriao' | 'convidado' | null
   var _tqBatataTimer = 0;        // segundos restantes na rodada
   var _tqBatataImunidade = 0;    // segundos restantes de imunidade de quem acabou de receber
+  var _tqBatataSoltos = true;    // os dois se separaram desde o último passe (só passa de novo num encostão NOVO)
 
   /* ── Caixas de suprimento: só o ANFITRIÃO gera e detecta coleta (tem
      as duas posições) — geometria/estado viajam pro convidado dentro
@@ -397,6 +420,7 @@
      _tqReceberMensagem e _tqEnviarEstado/_tqEnviarReinicio). */
   var TQ_SPAWN_MARGEM = 0.35;
   var TQ_SPAWN_DIST_MIN = Math.hypot(MUNDO_LARGURA, MUNDO_ALTURA) * 0.55;
+  var TQ_SPAWN_REI_FOLGA = 0.3; // diferença máx. de distância até o pedaço entre os dois spawns (Rei do Pedaço)
 
   // Valor inicial/fallback (antes do 1º sorteio de spawn de verdade) —
   // só usado no instante entre o módulo carregar e a 1ª rodada começar.
@@ -455,6 +479,16 @@
       }
       pares.push(melhor);
     }
+    // Rei do Pedaço: só pares com a mesma distância (±TQ_SPAWN_REI_FOLGA)
+    // até o pedaço — sem isso ~1 em 3 sorteios deixava um tanque com
+    // vários segundos de vantagem num modo em que 10 s sozinho já vencem.
+    if (_tqModoJogo === 'rei') {
+      var z = _tqAcharCentroZona();
+      var justos = pares.filter(function (pr) {
+        return Math.abs(Math.hypot(pr[0].x - z.x, pr[0].y - z.y) - Math.hypot(pr[1].x - z.x, pr[1].y - z.y)) <= TQ_SPAWN_REI_FOLGA;
+      });
+      if (justos.length) pares = justos;
+    }
     var par = pares[Math.floor(Math.random() * pares.length)].slice();
     if (Math.random() < 0.5) par.reverse();
     var cx = MUNDO_LARGURA / 2, cy = MUNDO_ALTURA / 2;
@@ -483,6 +517,12 @@
   // projéteis do adversário congelavam no lugar sem nenhum aviso (ver A2.5).
   var _tqUltimoEEm = 0;
   var TQ_CONGELADO_AVISO_MS = 3000, TQ_CONGELADO_FIM_MS = 20000;
+  // Mesmo watchdog do lado do ANFITRIÃO: o convidado minimizou o app (o
+  // requestAnimationFrame dele para e o 'p' deixa de chegar). Antes ele
+  // virava alvo parado sem aviso; agora o anfitrião congela a rodada
+  // (não anda nem simula, só segue mandando o estado), mostra o aviso e,
+  // depois de TQ_CONGELADO_FIM_MS, encerra como desconexão.
+  var _tqUltimoPEm = 0;
   var _tqEstado = 'inicio';   // inicio | sala | jogando | fim
   var _tqModo = null;         // 'solo' | 'multiplayer'
   var _tqSouAnfitriao = false;
@@ -520,7 +560,11 @@
   var _tqBarris = [];         // { x,y,destruido } — geometria de _TQ_MAPAS[_tqMapaAtualIdx].barris + estado
   var _tqPlacarAnfitriao = 0, _tqPlacarConvidado = 0; // rodadas vencidas na partida
   var _tqRodadaEstado = 'jogando'; // 'jogando' | 'pausa'
-  var _tqPausaTimer = 0, _tqPausaVencedor = null, _tqPausaMotivo = null; // motivo: 'acerto' | 'zona' | 'batata' (ver _tqFimDeRodada/_tqDesenharAvisoRodada)
+  // Número da rodada (só o anfitrião incrementa, ver _tqIniciarRodada) —
+  // viaja em 'oi'/'rr'/'e' (campo "rd") e volta do convidado em 'p'. Ver
+  // "REDE — NÚMERO DA RODADA" no cabeçalho.
+  var _tqRodadaNum = 0;
+  var _tqPausaTimer = 0, _tqPausaVencedor = null, _tqPausaMotivo = null; // motivo: 'acerto' | 'zona' | 'batata' | 'empate' (ver _tqFimDeRodada/_tqDesenharAvisoRodada)
   var _tqCooldownAnfitriao = 0, _tqCooldownConvidado = 0;
 
   /* ── Moitas (furtividade): só o ANFITRIÃO calcula (tem as duas
@@ -595,16 +639,22 @@
   // Skin do PRÓPRIO tanque — loja dentro do jogo (hub.js). 'tinta' é uma
   // cor aplicada por cima do sprite (source-atop, recortada pelo alfa do
   // próprio sprite) num canvas offscreen, 1x por sprite+tinta (cache).
-  // Só no desenho local: nada vai pela rede, o adversário vê a cor padrão.
+  // A tinta vai no 'oi' (campo "tinta") e o adversário também vê a sua
+  // skin — só o valor da cor viaja, validado em _tqTintaValida.
   var _tqSkinTinta = '';
+  var _tqSkinTintaAdv = '';  // tinta do adversário (multiplayer) — '' = cor de fábrica
+  function _tqTintaValida(t) {
+    return typeof t === 'string' && t.length <= 40
+      && /^rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(0|1|0?\.\d{1,3})\s*\)$/.test(t);
+  }
   var _tqSkinSprites = {};   // 'arquivo|tinta' -> canvas
   function _tqAplicarSkin() {
     var G = window.AngatubaGames, it = null;
     try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('tq_skin') : null; } catch (e) {}
     _tqSkinTinta = (it && it.tinta) || '';
   }
-  function _tqSpriteTingido(reg, arquivo) {
-    var chave = arquivo + '|' + _tqSkinTinta;
+  function _tqSpriteTingido(reg, arquivo, tinta) {
+    var chave = arquivo + '|' + tinta;
     if (_tqSkinSprites[chave]) return _tqSkinSprites[chave];
     try {
       var cv = document.createElement('canvas');
@@ -613,7 +663,7 @@
       if (!c) return null;
       c.drawImage(reg.img, 0, 0, reg.w, reg.h);
       c.globalCompositeOperation = 'source-atop';
-      c.fillStyle = _tqSkinTinta;
+      c.fillStyle = tinta;
       c.fillRect(0, 0, reg.w, reg.h);
       _tqSkinSprites[chave] = cv;
       return cv;
@@ -916,7 +966,7 @@
       if (codEl) { codEl.textContent = codigo; codEl.style.display = ''; }
     } else {
       if (titulo) titulo.textContent = 'Conectando…';
-      if (desc) desc.textContent = 'Aguardando o anfitrião confirmar a conexão.';
+      if (desc) desc.textContent = 'Aguardando o anfitrião confirmar a conexão. O modo de jogo é o que ele escolheu.';
       if (codEl) codEl.style.display = 'none';
       _tqTimerConectando = setTimeout(function () {
         _tqTimerConectando = null;
@@ -1095,7 +1145,9 @@
       btns[i].classList.toggle('tq-modo-ativo', btns[i].getAttribute('data-modo') === modo);
     }
     var desc = document.getElementById('tq-modos-desc');
-    if (desc) desc.textContent = TQ_MODO_DESC[modo] || '';
+    // O convidado não escolhe o modo (é ajuste de partida, do anfitrião) —
+    // sem este aviso ele marcava Batata e caía no Clássico sem entender.
+    if (desc) desc.textContent = (TQ_MODO_DESC[modo] || '') + ' Entrando na sala de alguém, vale o modo de quem criou.';
   };
   window._tqPedirRevanche = function () {
     // 2.2: sem ninguém do outro lado este botão não é revanche — está
@@ -1118,7 +1170,8 @@
       _tqSemAdversario = false;
       var bridge = _tqBridge();
       var meuNome = (bridge && bridge.apelido && bridge.apelido()) || 'Jogador';
-      var msg = { t: 'oi', nome: meuNome, classe: _tqMinhaClasse };
+      _tqSkinTintaAdv = '';
+      var msg = { t: 'oi', nome: meuNome, classe: _tqMinhaClasse, tinta: _tqSkinTinta };
       if (_tqSouAnfitriao) {
         _tqClasseAnfitriao = _tqMinhaClasse;
         _tqModoJogo = _tqMeuModoEscolhido;
@@ -1133,11 +1186,14 @@
         msg.gsp = _tqUltimoSpawnConvidado;
         msg.modo = _tqModoJogo;
         msg.bt = _tqBatataCom;
+        msg.rd = _tqRodadaNum;
       } else {
         _tqClasseConvidado = _tqMinhaClasse;
       }
       window.AngatubaMP.enviar(msg);
       _tqUltimoEEm = performance.now();
+      _tqUltimoPEm = performance.now();
+      _tqAlvoRemoto = null;
       _tqComecarPartida();
     });
 
@@ -1172,6 +1228,7 @@
     switch (dado.t) {
       case 'oi':
         _tqApelidoAdversario = String(dado.nome || 'Adversário').slice(0, 20);
+        _tqSkinTintaAdv = _tqTintaValida(dado.tinta) ? dado.tinta : '';
         // Modo de jogo: quem decide é o ANFITRIÃO (ajuste de PARTIDA,
         // não por jogador — ver TQ_MODOS/_tqModoJogo). Aplica ANTES do
         // mapa, porque achar o centro do "pedaço" (Rei do Pedaço) já
@@ -1202,6 +1259,7 @@
         if (!_tqSouAnfitriao && dado.gsp && typeof dado.gsp.x === 'number') {
           _tqTanqueConvidado.x = dado.gsp.x; _tqTanqueConvidado.y = dado.gsp.y; _tqTanqueConvidado.ang = dado.gsp.ang;
         }
+        if (!_tqSouAnfitriao && typeof dado.rd === 'number') _tqRodadaNum = dado.rd;
         // Batata Quente: quem começa com ela — só o anfitrião sorteia
         // (ver _tqIniciarRodada), o convidado aplica o valor recebido.
         if (!_tqSouAnfitriao && typeof dado.bt === 'string') _tqBatataCom = dado.bt;
@@ -1220,6 +1278,12 @@
         _tqAtualizarHUD();
         break;
       case 'p': // convidado -> anfitrião: posição/ângulo do tanque do convidado
+        // Posição da rodada anterior (o convidado ainda não recebeu o spawn
+        // novo): ignora, senão desfaz o ponto de nascimento recém-sorteado.
+        // Sem "rd" (cliente antigo) segue aceitando como antes. Mesmo
+        // descartado, o pacote prova que o convidado está vivo (watchdog).
+        _tqUltimoPEm = performance.now();
+        if (typeof dado.rd === 'number' && dado.rd !== _tqRodadaNum) break;
         if (_tqSouAnfitriao) {
           if (typeof dado.x === 'number') _tqTanqueConvidado.x = _tqClamp(dado.x, 0, MUNDO_LARGURA);
           if (typeof dado.y === 'number') _tqTanqueConvidado.y = _tqClamp(dado.y, 0, MUNDO_ALTURA);
@@ -1240,7 +1304,16 @@
       case 'e': // anfitrião -> convidado: estado do mundo inteiro
         if (!_tqSouAnfitriao) {
           _tqUltimoEEm = performance.now();
-          _tqTanqueAnfitriao.x = dado.hx; _tqTanqueAnfitriao.y = dado.hy; _tqTanqueAnfitriao.ang = dado.hang;
+          // Tanque do anfitrião: vira ALVO da suavização (ver
+          // _tqSuavizarRemoto) em vez de pular direto — o estado chega a
+          // ~30 Hz e o desenho anda a 60. Salto grande (respawn) é aplicado
+          // na hora.
+          if (typeof dado.hx === 'number' && typeof dado.hy === 'number' && typeof dado.hang === 'number') {
+            _tqAlvoRemoto = { x: dado.hx, y: dado.hy, ang: dado.hang };
+            if (Math.hypot(dado.hx - _tqTanqueAnfitriao.x, dado.hy - _tqTanqueAnfitriao.y) > TQ_SUAVIZAR_SALTO) {
+              _tqTanqueAnfitriao.x = dado.hx; _tqTanqueAnfitriao.y = dado.hy; _tqTanqueAnfitriao.ang = dado.hang;
+            }
+          }
           if (typeof dado.hhp === 'number') _tqTanqueAnfitriao.hp = dado.hhp;
           if (typeof dado.ghp === 'number') _tqTanqueConvidado.hp = dado.ghp;
           _tqProjeteis = dado.pj || [];
@@ -1271,7 +1344,7 @@
             // em _tqAtualizarProjeteis, que só roda nele).
             for (var i = 0; i < _tqParedes.length && i < dado.pd.length; i++) {
               var novaDestruida = !!dado.pd[i];
-              if (novaDestruida && !_tqParedes[i].destruida) _tqAcionarShake(TQ_SHAKE_PAREDE_DUR, TQ_SHAKE_PAREDE_FORCA);
+              if (novaDestruida && !_tqParedes[i].destruida) _tqAcionarShake(TQ_SHAKE_PAREDE_DUR, TQ_SHAKE_PAREDE_FORCA, _tqParedes[i].x + _tqParedes[i].w / 2, _tqParedes[i].y + _tqParedes[i].h / 2);
               _tqParedes[i].destruida = novaDestruida;
             }
           }
@@ -1296,9 +1369,25 @@
           // nascimento recebido no PRÓPRIO tanque; fora dessa borda o
           // campo "gsp" é ignorado (senão brigaria com a previsão local
           // do movimento do convidado durante a rodada).
-          if (dado.re === 'jogando' && _tqRodadaEstado === 'pausa' && dado.gsp && typeof dado.gsp.x === 'number') {
-            _tqTanqueConvidado.x = dado.gsp.x; _tqTanqueConvidado.y = dado.gsp.y; _tqTanqueConvidado.ang = dado.gsp.ang;
+          // Com "rd" a borda é a TROCA do número da rodada (mais robusto que
+          // depender de ter visto a pausa); sem ele (anfitrião antigo), a
+          // borda pausa→jogando de sempre.
+          var rodadaNova = (typeof dado.rd === 'number')
+            ? dado.rd !== _tqRodadaNum
+            : (dado.re === 'jogando' && _tqRodadaEstado === 'pausa');
+          if (rodadaNova) {
+            if (dado.gsp && typeof dado.gsp.x === 'number') {
+              _tqTanqueConvidado.x = dado.gsp.x; _tqTanqueConvidado.y = dado.gsp.y; _tqTanqueConvidado.ang = dado.gsp.ang;
+            }
+            // O convidado não passa por _tqIniciarRodada entre rodadas: limpa
+            // aqui o "game feel" da rodada anterior (rastro, explosões, recuo).
+            _tqRastro = []; _tqExplosoes = [];
+            _tqUltimaPosAnfitriao = null; _tqUltimaPosConvidado = null;
+            _tqRecuoAnfitriao = 0; _tqRecuoConvidado = 0;
+            _tqMeuCooldown = 0;
+            if (_tqAlvoRemoto) { _tqTanqueAnfitriao.x = _tqAlvoRemoto.x; _tqTanqueAnfitriao.y = _tqAlvoRemoto.y; _tqTanqueAnfitriao.ang = _tqAlvoRemoto.ang; }
           }
+          if (typeof dado.rd === 'number') _tqRodadaNum = dado.rd;
           _tqRodadaEstado = dado.re || 'jogando';
           _tqAtualizarHUD();
           if (dado.fim) _tqMostrarFim('fim');
@@ -1319,17 +1408,21 @@
           // Batata Quente: modo em si não muda na revanche (persiste
           // do 'oi' original), só quem começa com ela de novo.
           if (typeof dado.bt === 'string') _tqBatataCom = dado.bt;
+          if (typeof dado.rd === 'number') _tqRodadaNum = dado.rd;
           _tqComecarPartida();
         }
         break;
       case 'pr':
-        if (_tqSouAnfitriao) { _tqReiniciarPartida(); _tqEnviarReinicio(); _tqComecarPartida(); }
+        // Só na tela de fim: se os dois tocam "Jogar de novo" quase juntos,
+        // o pedido do convidado chega com a revanche já rolando — sem esta
+        // guarda o anfitrião reiniciava de novo no meio (mapa novo, placar zerado).
+        if (_tqSouAnfitriao && _tqEstado === 'fim') { _tqReiniciarPartida(); _tqEnviarReinicio(); _tqComecarPartida(); }
         break;
     }
   }
 
   function _tqEnviarReinicio() {
-    if (_tqModo === 'multiplayer' && window.AngatubaMP) window.AngatubaMP.enviar({ t: 'rr', mapa: _tqMapaAtualIdx, gsp: _tqUltimoSpawnConvidado, bt: _tqBatataCom });
+    if (_tqModo === 'multiplayer' && window.AngatubaMP) window.AngatubaMP.enviar({ t: 'rr', mapa: _tqMapaAtualIdx, gsp: _tqUltimoSpawnConvidado, bt: _tqBatataCom, rd: _tqRodadaNum });
   }
 
   /* ── Controles: joystick FLUTUANTE (DOM) + botão de fogo ──────────
@@ -1449,7 +1542,8 @@
   // Zona de fogo: metade direita inteira atira (não só o círculo
   // tq-fire-btn, que agora é só o indicador visual) — mesmo padrão
   // do joystick (zona invisível maior que o círculo que ela controla),
-  // pra não exigir precisão de mirar o dedo num alvo pequeno.
+  // pra não exigir precisão de mirar o dedo num alvo pequeno. Segurar
+  // o dedo continua atirando no ritmo do cooldown (ver _tqLoop).
   var _tqFireId = null;
   function _tqLigarBotaoFogo() {
     var zona = document.getElementById('tq-fire-zona');
@@ -1482,7 +1576,7 @@
      Mapa fixo, layout "standard" (Ipega 9076 no modo Android/X-input):
        analógico esquerdo (axes 0/1, deadzone radial) ... direção
        D-pad ↑↓←→ (12–15) .............................. direção (digital)
-       A (0) / RT (7) / RB (5) ......................... atira (1 tiro por aperto)
+       A (0) / RT (7) / RB (5) ......................... atira (segurar = tiro contínuo)
        Start (9) ....................................... pausa (solo) ou abre o
                                                          menu (multi); com o menu
                                                          aberto, Start/Ⓑ continuam
@@ -1499,6 +1593,7 @@
   var _tqPadAntes = {};     // comando → estava apertado no frame anterior (borda)
   var _tqPadMovendo = false; // o controle é quem pôs o valor atual no _tqInputVec
   var _tqPadUsado = false;
+  var _tqPadFogo = false;    // gatilho do controle segurado agora (tiro contínuo — ver _tqLoop)
 
   function _tqPadLista() {
     var out = [];
@@ -1543,7 +1638,7 @@
 
   function _tqPadPoll() {
     var st = _tqPadLer();
-    if (!st) return;
+    if (!st) { _tqPadFogo = false; return; }
     var antes = _tqPadAntes;
     _tqPadAntes = st;
     var M = _tqMenu(), aberto = !!(M && M.aberto && M.aberto('jogo-tanques'));
@@ -1558,6 +1653,7 @@
       if (x || y) { _tqInputVec.x = x; _tqInputVec.y = y; _tqPadMovendo = true; _tqPadUsado = true; }
       else if (_tqPadMovendo) { _tqInputVec.x = 0; _tqInputVec.y = 0; _tqPadMovendo = false; }
     }
+    _tqPadFogo = !aberto && !!st.fogo;
     if (!aberto && st.fogo && !antes.fogo) { _tqPadUsado = true; _tqTentarAtirar(); }
   }
 
@@ -1738,6 +1834,7 @@
     // estava dirigindo), esquece o tiro e, no solo, pausa.
     if (_tqPadMovendo && _tqJoyId === null) { _tqInputVec.x = 0; _tqInputVec.y = 0; }
     _tqPadMovendo = false;
+    _tqPadFogo = false;
     _tqPadAntes = _tqPadLer() || {};
     if (_tqEstado === 'jogando' && _tqModo === 'solo' && !_tqPausado && _tqPadUsado) {
       var M = _tqMenu();
@@ -1879,7 +1976,21 @@
   // tremor já está em andamento simplesmente substitui pelos novos
   // valores (o de fim de rodada, mais forte, "vence" um de parede que
   // esteja tocando ao mesmo tempo — é o comportamento certo).
-  function _tqAcionarShake(duracao, forcaPx) {
+  // x/y (opcionais, unidades de mundo): onde aconteceu. Com eles, a
+  // força cai com a distância até o MEU tanque (some além de ~2) — senão
+  // uma parede ou barril estourando do outro lado do mapa tremia a tela
+  // e entregava que o adversário estava atirando lá. Sem x/y (fim de
+  // rodada) treme cheio, como sempre.
+  function _tqAcionarShake(duracao, forcaPx, x, y) {
+    if (typeof x === 'number' && typeof y === 'number') {
+      var meu = _tqMeuTanque();
+      var d = Math.hypot(meu.x - x, meu.y - y);
+      var fator = _tqClamp(1 - (d - 0.6) / 1.4, 0, 1);
+      if (fator <= 0) return;
+      forcaPx *= fator;
+      // Não deixa um tremor fraco e distante cortar um forte em andamento.
+      if (_tqShakeTimer > 0 && _tqShakeForcaBase * (_tqShakeTimer / (_tqShakeDuracaoBase || 1)) > forcaPx) return;
+    }
     _tqShakeTimer = duracao; _tqShakeDuracaoBase = duracao; _tqShakeForcaBase = forcaPx;
   }
 
@@ -1960,6 +2071,7 @@
     // convidado NÃO sorteia o próprio (senão desincroniza do anfitrião);
     // ele recebe o ponto pela rede e aplica direto (ver 'oi'/'rr'/'e').
     if (_tqSouAnfitriao) {
+      _tqRodadaNum++;
       var spawns = _tqSortearSpawns();
       _tqTanqueAnfitriao.x = spawns.anfitriao.x; _tqTanqueAnfitriao.y = spawns.anfitriao.y; _tqTanqueAnfitriao.ang = spawns.anfitriao.ang;
       _tqTanqueConvidado.x = spawns.convidado.x; _tqTanqueConvidado.y = spawns.convidado.y; _tqTanqueConvidado.ang = spawns.convidado.ang;
@@ -1977,6 +2089,7 @@
     _tqZonaTempoAnfitriao = 0; _tqZonaTempoConvidado = 0;
     _tqBatataTimer = TQ_BATATA_DURACAO;
     _tqBatataImunidade = 0;
+    _tqBatataSoltos = true;
     // HP de cada lado vem da classe escolhida (Pesado aguenta mais de 1 tiro).
     _tqTanqueAnfitriao.hp = TQ_CLASSES[_tqClasseAnfitriao] ? TQ_CLASSES[_tqClasseAnfitriao].hpMax : 1;
     _tqTanqueConvidado.hp = TQ_CLASSES[_tqClasseConvidado] ? TQ_CLASSES[_tqClasseConvidado].hpMax : 1;
@@ -2013,6 +2126,14 @@
     _tqTravarLandscape();
     _tqAplicarOrientacaoRepetido();
     _tqUltimoTs = 0;
+    _tqBannerAte = performance.now() + TQ_BANNER_MS;
+    _tqPartidaInicioEm = Date.now();
+    _tqGanhoPartida = 0;
+    // Watchdogs partem do zero a cada partida: na revanche, o último 'e'/'p'
+    // é da partida anterior — quem ficou mais de 20 s na tela de resultado
+    // caía direto em "Conexão perdida" no 1º quadro da revanche.
+    _tqUltimoEEm = performance.now();
+    _tqUltimoPEm = performance.now();
     _tqPadSnapshot();
     _tqPadIndicador();
     if (_tqRAF) cancelAnimationFrame(_tqRAF);
@@ -2020,6 +2141,24 @@
   }
 
   function _tqMeuTanque() { return _tqSouAnfitriao ? _tqTanqueAnfitriao : _tqTanqueConvidado; }
+
+  // Faixa no começo da partida com o modo e a classe do adversário (no
+  // convidado o modo chega pelo 'oi' logo depois — a faixa lê na hora
+  // de desenhar, então já aparece certa).
+  var TQ_BANNER_MS = 2800;
+  // Moedas por partida (a loja vende skins de tanque de 85 a 200 🪙 e o
+  // jogo não pagava nada). Vitória sobre gente paga mais que sobre a CPU;
+  // perder ainda paga um pouco. Abaixo do teto de 25 por partida dos
+  // outros jogos e sujeito ao teto diário (_moedasAdd no hub).
+  var TQ_MOEDAS = { cpu_vitoria: 8, cpu_derrota: 2, mp_vitoria: 12, mp_derrota: 4 };
+  var _tqGanhoPartida = 0;
+  var _tqBannerAte = 0;
+  var _tqPartidaInicioEm = 0;   // Date.now() do começo da partida (segundos no histórico)
+
+  function _tqConvidadoParado() {
+    return _tqSouAnfitriao && _tqModo === 'multiplayer' && _tqUltimoPEm
+      && (performance.now() - _tqUltimoPEm) > TQ_CONGELADO_AVISO_MS;
+  }
 
   // Câmera: centraliza no PRÓPRIO tanque (cada lado segue o seu, sem
   // precisar sincronizar nada pela rede — é só desenho local) e trava
@@ -2040,15 +2179,27 @@
       _tqMostrarFim('desconexao');
       return;
     }
+    var convidadoParado = _tqConvidadoParado();
+    if (convidadoParado && (performance.now() - _tqUltimoPEm) > TQ_CONGELADO_FIM_MS) {
+      _tqMostrarFim('desconexao');
+      return;
+    }
     var dt = _tqUltimoTs ? Math.min(0.05, (ts - _tqUltimoTs) / 1000) : 0;
     _tqUltimoTs = ts;
     _tqPadPoll();                    // controle (Gamepad API) — não tem eventos de botão
     if (_tqPausado) return;          // Start acabou de pausar (solo): o loop para aqui
     if (dt) {
       _tqMeuCooldown = Math.max(0, _tqMeuCooldown - dt);
-      if (_tqRodadaEstado === 'jogando') _tqAtualizarTanque(_tqMeuTanque(), _tqInputVec.x, _tqInputVec.y, dt);
-      if (_tqSouAnfitriao) _tqSimularMundo(dt);
-      else _tqEnviarMeuTanque();
+      if (convidadoParado) {
+        _tqEnviarEstado(false);   // rodada congelada: só mantém o convidado atualizado
+      } else {
+        if (_tqRodadaEstado === 'jogando') _tqAtualizarTanque(_tqMeuTanque(), _tqInputVec.x, _tqInputVec.y, dt);
+        // Segurar = tiro contínuo (dedo na zona de fogo ou gatilho do
+        // controle); o cooldown de cada lado continua limitando o ritmo.
+        if (_tqFireId !== null || _tqPadFogo) _tqTentarAtirar();
+        if (_tqSouAnfitriao) _tqSimularMundo(dt);
+        else { _tqEnviarMeuTanque(); _tqSuavizarRemoto(dt); }
+      }
       _tqAtualizarGameFeel(dt);
     }
     _tqDesenhar();
@@ -2065,8 +2216,15 @@
     if (_tqRecuoConvidado > 0) _tqRecuoConvidado = Math.max(0, _tqRecuoConvidado - dt * TQ_RECUO_DECAI);
 
     if (_tqRodadaEstado === 'jogando') {
-      _tqUltimaPosAnfitriao = _tqRegistrarRastro(_tqTanqueAnfitriao, _tqUltimaPosAnfitriao);
-      _tqUltimaPosConvidado = _tqRegistrarRastro(_tqTanqueConvidado, _tqUltimaPosConvidado);
+      // Adversário escondido na moita não deixa marca (senão a trilha
+      // entregava onde ele está) — só acompanha a posição, pra não
+      // "pular" uma marca quando ele sair de lá.
+      _tqUltimaPosAnfitriao = (_tqSouAnfitriao || !_tqEscondidoAnfitriao)
+        ? _tqRegistrarRastro(_tqTanqueAnfitriao, _tqUltimaPosAnfitriao)
+        : { x: _tqTanqueAnfitriao.x, y: _tqTanqueAnfitriao.y };
+      _tqUltimaPosConvidado = (!_tqSouAnfitriao || !_tqEscondidoConvidado)
+        ? _tqRegistrarRastro(_tqTanqueConvidado, _tqUltimaPosConvidado)
+        : { x: _tqTanqueConvidado.x, y: _tqTanqueConvidado.y };
     }
     for (var i = _tqRastro.length - 1; i >= 0; i--) {
       _tqRastro[i].vida -= dt;
@@ -2103,29 +2261,60 @@
     var maxDelta = TQ_GIRO_VEL * dt;
     if (diff > maxDelta) diff = maxDelta; else if (diff < -maxDelta) diff = -maxDelta;
     t.ang += diff;
-    var v = TQ_VELOCIDADE * _tqClasseDoTanque(t).velMul * mag * dt;
+    var v = TQ_VELOCIDADE * _tqClasseDoTanque(t).velMul * _tqVelBatata(t) * mag * dt;
     var dx = Math.sin(t.ang) * v, dy = -Math.cos(t.ang) * v;
     var novoX = _tqClamp(t.x + dx, TQ_RAIO_TANQUE, MUNDO_LARGURA - TQ_RAIO_TANQUE);
-    if (!_tqColideParede(novoX, t.y, TQ_RAIO_TANQUE) && !_tqColideBarril(novoX, t.y, TQ_RAIO_TANQUE)) t.x = novoX;
+    if (!_tqColideParede(novoX, t.y, TQ_RAIO_TANQUE) && !_tqColideBarril(novoX, t.y, TQ_RAIO_TANQUE) && !_tqBloqueiaTanque(t, novoX, t.y)) t.x = novoX;
     var novoY = _tqClamp(t.y + dy, TQ_RAIO_TANQUE, MUNDO_ALTURA - TQ_RAIO_TANQUE);
-    if (!_tqColideParede(t.x, novoY, TQ_RAIO_TANQUE) && !_tqColideBarril(t.x, novoY, TQ_RAIO_TANQUE)) t.y = novoY;
+    if (!_tqColideParede(t.x, novoY, TQ_RAIO_TANQUE) && !_tqColideBarril(t.x, novoY, TQ_RAIO_TANQUE) && !_tqBloqueiaTanque(t, t.x, novoY)) t.y = novoY;
   }
 
-  // Rei do Pedaço: acha o ponto livre mais próximo do centro do mundo
-  // pra virar "o pedaço" (testa o centro exato primeiro; se cair em
-  // cima de parede/barril — caso do pilar central do mapa 4 — testa
-  // uma espiral de pontos ao redor até achar um livre). Evita ter que
-  // sortear/autorar um ponto por mapa; funciona pra qualquer mapa
-  // futuro sem dado extra. Determinístico (sem Math.random), então os
-  // dois lados chegam no MESMO ponto só de saberem o mesmo mapa.
+  // Colisão tanque × tanque: cada lado só move o PRÓPRIO tanque, então
+  // basta não deixar ele entrar no outro (antes se atravessavam — dava
+  // pra atirar de dentro do adversário e, na Batata Quente, ficar em
+  // cima dele trocando a batata sem parar). Se já estiverem sobrepostos
+  // (latência da rede, por exemplo), só deixa o movimento que afasta.
+  function _tqBloqueiaTanque(t, x, y) {
+    var o = (t === _tqTanqueAnfitriao) ? _tqTanqueConvidado : _tqTanqueAnfitriao;
+    var dNovo = Math.hypot(x - o.x, y - o.y);
+    if (dNovo >= TQ_RAIO_TANQUE * 2) return false;
+    return dNovo < Math.hypot(t.x - o.x, t.y - o.y);
+  }
+
+  // Batata Quente: quem está com ela anda TQ_BATATA_VEL_MUL mais rápido
+  // (senão quem está sem ela só fugia, com a mesma velocidade, e a rodada
+  // era decidida no sorteio de quem começa com a batata).
+  function _tqVelBatata(t) {
+    if (_tqModoJogo !== 'batata') return 1;
+    var dono = (t === _tqTanqueAnfitriao) ? 'anfitriao' : 'convidado';
+    return _tqBatataCom === dono ? TQ_BATATA_VEL_MUL : 1;
+  }
+
+  // Rei do Pedaço: "o pedaço" fica no CENTRO do mundo sempre que der pra
+  // um tanque ficar lá dentro — como todo mapa é simétrico em 180° em
+  // volta do centro, isso deixa o pedaço à mesma distância dos dois
+  // lados. Parede dentro do círculo não atrapalha (só vira cobertura, ex.:
+  // o pilar do mapa Cruz). Antes exigia o círculo INTEIRO livre e, nos
+  // mapas com parede perto do meio, o pedaço ia parar ~1 unidade pro lado
+  // — mais perto de um dos spawns. Se o centro não tiver nenhum lugar pra
+  // tanque (mapa futuro), cai na espiral de antes. Determinístico (sem
+  // Math.random): os dois lados chegam no MESMO ponto só pelo mapa.
   function _tqAcharCentroZona() {
     var cx = MUNDO_LARGURA / 2, cy = MUNDO_ALTURA / 2;
-    if (_tqPontoLivre(cx, cy, TQ_ZONA_RAIO)) return { x: cx, y: cy };
+    var k, q, rq, ang;
+    if (_tqPontoLivre(cx, cy, TQ_RAIO_TANQUE)) return { x: cx, y: cy };
+    for (q = 1; q <= 3; q++) {
+      rq = TQ_ZONA_RAIO * (0.3 + q * 0.18);   // 0,48 / 0,66 / 0,84 do raio: o tanque fica DENTRO do círculo
+      for (k = 0; k < 16; k++) {
+        ang = (k / 16) * Math.PI * 2;
+        if (_tqPontoLivre(cx + Math.cos(ang) * rq, cy + Math.sin(ang) * rq, TQ_RAIO_TANQUE)) return { x: cx, y: cy };
+      }
+    }
     var passo = 0.15, maxRaio = 2.2;
     for (var r = passo; r <= maxRaio; r += passo) {
       var passos = Math.max(8, Math.round(r * 14));
       for (var i = 0; i < passos; i++) {
-        var ang = (i / passos) * Math.PI * 2;
+        ang = (i / passos) * Math.PI * 2;
         var x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r;
         if (x - TQ_ZONA_RAIO < 0 || x + TQ_ZONA_RAIO > MUNDO_LARGURA || y - TQ_ZONA_RAIO < 0 || y + TQ_ZONA_RAIO > MUNDO_ALTURA) continue;
         if (_tqPontoLivre(x, y, TQ_ZONA_RAIO)) return { x: x, y: y };
@@ -2159,9 +2348,11 @@
   function _tqAtualizarBatata(dt) {
     if (_tqBatataImunidade > 0) _tqBatataImunidade = Math.max(0, _tqBatataImunidade - dt);
     var dist = Math.hypot(_tqTanqueAnfitriao.x - _tqTanqueConvidado.x, _tqTanqueAnfitriao.y - _tqTanqueConvidado.y);
-    if (_tqBatataImunidade <= 0 && dist < TQ_BATATA_RAIO_PASSE) {
+    if (dist > TQ_BATATA_RAIO_PASSE + 0.03) _tqBatataSoltos = true;
+    if (_tqBatataImunidade <= 0 && _tqBatataSoltos && dist < TQ_BATATA_RAIO_PASSE) {
       _tqBatataCom = (_tqBatataCom === 'anfitriao') ? 'convidado' : 'anfitriao';
       _tqBatataImunidade = TQ_BATATA_IMUNIDADE;
+      _tqBatataSoltos = false;
     }
     _tqBatataTimer -= dt;
     if (_tqBatataTimer <= 0) {
@@ -2179,15 +2370,14 @@
     // Ocultação: só o anfitrião calcula (tem as duas posições) — decai o
     // timer de "revelado" e recalcula quem está escondido. Sempre
     // atualizado (mesmo em pausa) pra já valer no respawn seguinte.
-    // Dois motivos pra ficar escondido, com "ou" entre eles: dentro de
-    // moita e não revelado (como sempre), OU longe demais um do outro
-    // (TQ_VISAO_RAIO — necessário agora que o mapa é grande, senão dava
-    // pra ver o adversário do outro lado do mundo).
     if (_tqRevelarAnfitriao > 0) _tqRevelarAnfitriao = Math.max(0, _tqRevelarAnfitriao - dt);
     if (_tqRevelarConvidado > 0) _tqRevelarConvidado = Math.max(0, _tqRevelarConvidado - dt);
-    var foraDeAlcance = Math.hypot(_tqTanqueAnfitriao.x - _tqTanqueConvidado.x, _tqTanqueAnfitriao.y - _tqTanqueConvidado.y) > TQ_VISAO_RAIO;
-    _tqEscondidoAnfitriao = foraDeAlcance || (_tqRevelarAnfitriao <= 0 && _tqEmMoita(_tqTanqueAnfitriao));
-    _tqEscondidoConvidado = foraDeAlcance || (_tqRevelarConvidado <= 0 && _tqEmMoita(_tqTanqueConvidado));
+    // Só moita esconde do desenho: longe demais já fica fora da tela (a
+    // regra antiga por TQ_VISAO_RAIO fazia o tanque sumir DENTRO da tela
+    // perto das bordas do mapa — ver cabeçalho, "OCULTAÇÃO"). A IA
+    // continua limitada pela distância em _tqAtualizarIA.
+    _tqEscondidoAnfitriao = _tqRevelarAnfitriao <= 0 && _tqEmMoita(_tqTanqueAnfitriao);
+    _tqEscondidoConvidado = _tqRevelarConvidado <= 0 && _tqEmMoita(_tqTanqueConvidado);
 
     // Power-ups: decai tiro rápido/duplo (o escudo não tem timer — dura
     // até absorver um hit, ver _tqAplicarDano).
@@ -2304,7 +2494,7 @@
             break;
           }
           p.hp--;
-          if (p.hp <= 0) { p.destruida = true; _tqAcionarShake(TQ_SHAKE_PAREDE_DUR, TQ_SHAKE_PAREDE_FORCA); }
+          if (p.hp <= 0) { p.destruida = true; _tqAcionarShake(TQ_SHAKE_PAREDE_DUR, TQ_SHAKE_PAREDE_FORCA, p.x + p.w / 2, p.y + p.h / 2); }
           atingiuParede = true;
           break;
         }
@@ -2347,21 +2537,23 @@
   // Aplica um hit num tanque: escudo absorve inteiro (sem gastar HP);
   // senão desconta 1 HP e, se zerar, encerra a rodada. Retorna true
   // quando a rodada terminou (fatal), false caso contrário.
-  function _tqAplicarDano(quem) {
+  // semFim = true: só desconta (quem chama decide a rodada — usado pelo
+  // barril, que pode pegar os dois tanques de uma vez).
+  function _tqAplicarDano(quem, semFim) {
     var souAnfitriao = quem === 'anfitriao';
+    var t = souAnfitriao ? _tqTanqueAnfitriao : _tqTanqueConvidado;
     var temEscudo = souAnfitriao ? _tqEscudoAnfitriao : _tqEscudoConvidado;
     if (temEscudo) {
       if (souAnfitriao) _tqEscudoAnfitriao = false; else _tqEscudoConvidado = false;
-      _tqAcionarShake(TQ_SHAKE_PAREDE_DUR, TQ_SHAKE_PAREDE_FORCA); // tremor leve — absorvido, não feriu
+      _tqAcionarShake(TQ_SHAKE_PAREDE_DUR, TQ_SHAKE_PAREDE_FORCA, t.x, t.y); // tremor leve — absorvido, não feriu
       return false;
     }
-    var t = souAnfitriao ? _tqTanqueAnfitriao : _tqTanqueConvidado;
     t.hp = Math.max(0, (typeof t.hp === 'number' ? t.hp : 1) - 1);
     if (t.hp <= 0) {
-      _tqFimDeRodada(souAnfitriao ? 'convidado' : 'anfitriao');
+      if (!semFim) _tqFimDeRodada(souAnfitriao ? 'convidado' : 'anfitriao');
       return true;
     }
-    _tqAcionarShake(TQ_SHAKE_ACERTO_DUR * 0.6, TQ_SHAKE_ACERTO_FORCA * 0.6); // atingido mas sobreviveu (Pesado)
+    _tqAcionarShake(TQ_SHAKE_ACERTO_DUR * 0.6, TQ_SHAKE_ACERTO_FORCA * 0.6, t.x, t.y); // atingido mas sobreviveu (Pesado)
     return false;
   }
 
@@ -2406,25 +2598,29 @@
     var br = _tqBarris[idx];
     if (!br || br.destruido) return false;
     br.destruido = true;
-    _tqAcionarShake(TQ_SHAKE_BARRIL_DUR, TQ_SHAKE_BARRIL_FORCA);
+    _tqAcionarShake(TQ_SHAKE_BARRIL_DUR, TQ_SHAKE_BARRIL_FORCA, br.x, br.y);
     _tqDispararExplosaoVisual(br.x, br.y);
-    var fatal = false;
-    if (Math.hypot(_tqTanqueAnfitriao.x - br.x, _tqTanqueAnfitriao.y - br.y) < TQ_BARRIL_RAIO_EXPLOSAO) {
-      if (_tqAplicarDano('anfitriao')) fatal = true;
-    }
-    if (!fatal && Math.hypot(_tqTanqueConvidado.x - br.x, _tqTanqueConvidado.y - br.y) < TQ_BARRIL_RAIO_EXPLOSAO) {
-      if (_tqAplicarDano('convidado')) fatal = true;
-    }
-    return fatal;
+    // Aplica nos DOIS antes de decidir a rodada — antes o anfitrião era
+    // checado primeiro e, se morresse, o convidado nem levava o dano
+    // (a explosão que pegava os dois virava sempre ponto do vermelho).
+    var morreuA = Math.hypot(_tqTanqueAnfitriao.x - br.x, _tqTanqueAnfitriao.y - br.y) < TQ_BARRIL_RAIO_EXPLOSAO && _tqAplicarDano('anfitriao', true);
+    var morreuC = Math.hypot(_tqTanqueConvidado.x - br.x, _tqTanqueConvidado.y - br.y) < TQ_BARRIL_RAIO_EXPLOSAO && _tqAplicarDano('convidado', true);
+    if (morreuA && morreuC) { _tqFimDeRodada('empate', 'empate'); return true; }
+    if (morreuA) { _tqFimDeRodada('convidado'); return true; }
+    if (morreuC) { _tqFimDeRodada('anfitriao'); return true; }
+    return false;
   }
 
+  // vencedor: 'anfitriao' | 'convidado' | 'empate' (os dois morreram na
+  // mesma explosão — ninguém pontua, a rodada só recomeça).
   function _tqFimDeRodada(vencedor, motivo) {
-    if (vencedor === 'anfitriao') _tqPlacarAnfitriao++; else _tqPlacarConvidado++;
+    if (vencedor === 'anfitriao') _tqPlacarAnfitriao++;
+    else if (vencedor === 'convidado') _tqPlacarConvidado++;
     _tqAcionarShake(TQ_SHAKE_ACERTO_DUR, TQ_SHAKE_ACERTO_FORCA);
     _tqRodadaEstado = 'pausa';
     _tqPausaTimer = TQ_PAUSA_RODADA;
     _tqPausaVencedor = vencedor;
-    _tqPausaMotivo = motivo || 'acerto'; // 'acerto' (HP zerou) | 'zona' | 'batata' — ver _tqDesenharAvisoRodada
+    _tqPausaMotivo = motivo || 'acerto'; // 'acerto' (HP zerou) | 'zona' | 'batata' | 'empate' — ver _tqDesenharAvisoRodada
     _tqAtualizarHUD();
 
     var partidaAcabou = (_tqPlacarAnfitriao >= TQ_RODADAS_PARA_VENCER || _tqPlacarConvidado >= TQ_RODADAS_PARA_VENCER);
@@ -2471,7 +2667,7 @@
   }
 
   function _tqTentarAtirar() {
-    if (_tqEstado !== 'jogando' || _tqRodadaEstado !== 'jogando' || _tqMeuCooldown > 0) return;
+    if (_tqEstado !== 'jogando' || _tqRodadaEstado !== 'jogando' || _tqMeuCooldown > 0 || _tqConvidadoParado()) return;
     var meuPapel = _tqSouAnfitriao ? 'anfitriao' : 'convidado';
     _tqMeuCooldown = _tqCooldownEfetivo(meuPapel);
     if (_tqSouAnfitriao) _tqRecuoAnfitriao = 1; else _tqRecuoConvidado = 1;
@@ -2486,6 +2682,34 @@
     }
   }
 
+  /* ── Suavização no convidado ──────────────────────────────────
+     O estado do anfitrião chega a ~30 Hz. Entre um pacote e outro: o
+     tanque dele desliza até a última posição recebida (_tqAlvoRemoto) e
+     os projéteis seguem andando pela própria velocidade (vx/vy) — o
+     próximo pacote corrige. Só até TQ_EXTRAPOLAR_MAX_MS sem pacote, pra
+     tiro não atravessar parede se a rede engasgar. */
+  var _tqAlvoRemoto = null;          // { x, y, ang } — última posição recebida do anfitrião
+  var TQ_SUAVIZAR_SALTO = 0.35;      // acima disso (respawn) aplica direto, sem deslizar
+  var TQ_EXTRAPOLAR_MAX_MS = 150;
+  function _tqSuavizarRemoto(dt) {
+    if (_tqAlvoRemoto) {
+      var k = 1 - Math.exp(-dt * 20);
+      var t = _tqTanqueAnfitriao;
+      t.x += (_tqAlvoRemoto.x - t.x) * k;
+      t.y += (_tqAlvoRemoto.y - t.y) * k;
+      var da = _tqAlvoRemoto.ang - t.ang;
+      while (da > Math.PI) da -= Math.PI * 2;
+      while (da < -Math.PI) da += Math.PI * 2;
+      t.ang += da * k;
+    }
+    if (_tqRodadaEstado === 'jogando' && _tqUltimoEEm && (performance.now() - _tqUltimoEEm) < TQ_EXTRAPOLAR_MAX_MS) {
+      for (var i = 0; i < _tqProjeteis.length; i++) {
+        var pr = _tqProjeteis[i];
+        if (typeof pr.vx === 'number' && typeof pr.vy === 'number') { pr.x += pr.vx * dt; pr.y += pr.vy * dt; }
+      }
+    }
+  }
+
   var _tqUltimoEnvioTanque = 0;
   function _tqEnviarMeuTanque() {
     if (_tqModo !== 'multiplayer' || !window.AngatubaMP) return;
@@ -2493,7 +2717,7 @@
     if ((agora - _tqUltimoEnvioTanque) < 33) return;
     _tqUltimoEnvioTanque = agora;
     var t = _tqMeuTanque();
-    window.AngatubaMP.enviar({ t: 'p', x: t.x, y: t.y, ang: t.ang });
+    window.AngatubaMP.enviar({ t: 'p', x: t.x, y: t.y, ang: t.ang, rd: _tqRodadaNum });
   }
 
   var _tqUltimoEnvioEstado = 0;
@@ -2513,7 +2737,8 @@
       gsp: _tqUltimoSpawnConvidado,
       za: _tqZonaTempoAnfitriao, zg: _tqZonaTempoConvidado,
       bt: _tqBatataCom, btt: _tqBatataTimer,
-      pv: _tqPausaVencedor, pm: _tqPausaMotivo
+      pv: _tqPausaVencedor, pm: _tqPausaMotivo,
+      rd: _tqRodadaNum
     });
   }
 
@@ -2528,30 +2753,81 @@
     return true;
   }
 
+  // Modos da IA: 'engajar' (mira e atira), 'patrulha' (ponto aleatório
+  // ou o pedaço), 'segurar' (Rei: parada dentro do pedaço), 'cacar'
+  // (Batata: está com a batata e vai encostar no jogador — sabe onde ele
+  // está, igual à seta que o jogador humano ganha nessa situação) e
+  // 'fugir' (Batata: o jogador está com ela e chegou perto).
+  // Um ponto ALCANÇÁVEL dentro do pedaço (o centro pode estar dentro de
+  // uma parede — ex.: o pilar do mapa Cruz — e a CPU ficava empurrando).
+  function _tqIAPontoNaZona() {
+    for (var k = 0; k < 16; k++) {
+      var ang = Math.random() * Math.PI * 2, r = Math.random() * TQ_ZONA_RAIO * 0.7;
+      var x = _tqZonaCentro.x + Math.cos(ang) * r, y = _tqZonaCentro.y + Math.sin(ang) * r;
+      if (!_tqColideParede(x, y, TQ_RAIO_TANQUE) && !_tqColideBarril(x, y, TQ_RAIO_TANQUE)) return { x: x, y: y, zona: true };
+    }
+    return { x: _tqZonaCentro.x, y: _tqZonaCentro.y, zona: true };
+  }
+
   function _tqAtualizarIA(dt) {
     var eu = _tqTanqueConvidado, alvo = _tqTanqueAnfitriao;
+    var dist = Math.hypot(alvo.x - eu.x, alvo.y - eu.y);
+    var batata = _tqModoJogo === 'batata';
+    var cpuComBatata = batata && _tqBatataCom === 'convidado';
+    var jogadorComBatata = batata && _tqBatataCom === 'anfitriao';
+    var naZona = _tqModoJogo === 'rei' && _tqZonaCentro
+      && Math.hypot(_tqZonaCentro.x - eu.x, _tqZonaCentro.y - eu.y) < TQ_ZONA_RAIO * 0.85;
     _tqIATimer -= dt;
     if (_tqIATimer <= 0) {
       _tqIATimer = 0.4 + Math.random() * 0.5;
-      var dist = Math.hypot(alvo.x - eu.x, alvo.y - eu.y);
-      if (dist < TQ_IA_DIST_ENGAJAR && !_tqEscondidoAnfitriao && _tqLinhaLivre(eu, alvo)) {
+      var vejo = !_tqEscondidoAnfitriao && dist < TQ_VISAO_RAIO;
+      if (jogadorComBatata && vejo && dist < 0.7) {
+        _tqIAModo = 'fugir';
+      } else if (dist < TQ_IA_DIST_ENGAJAR && !_tqEscondidoAnfitriao && _tqLinhaLivre(eu, alvo)) {
         _tqIAModo = 'engajar';
+      } else if (cpuComBatata) {
+        _tqIAModo = 'cacar';
+      } else if (jogadorComBatata && vejo) {
+        _tqIAModo = 'fugir';
+      } else if (naZona && !(vejo && dist < TQ_ZONA_RAIO * 2.2)) {
+        // No pedaço e sem ninguém disputando por perto: fica parada. Com
+        // o jogador disputando atrás de parede, cai na patrulha abaixo e
+        // contorna atrás de linha de tiro (senão ficavam os dois parados).
+        _tqIAModo = 'segurar';
       } else {
         _tqIAModo = 'patrulha';
-        // Rei do Pedaço: metade das vezes patrulha em direção ao
-        // pedaço em vez de um ponto aleatório — não é uma IA
-        // estratégica de verdade, só evita que a CPU ignore o pedaço
-        // por completo.
-        _tqIAAlvoPatrulha = (_tqModoJogo === 'rei' && _tqZonaCentro && Math.random() < 0.5)
-          ? { x: _tqZonaCentro.x, y: _tqZonaCentro.y }
-          : { x: 0.18 + Math.random() * (MUNDO_LARGURA - 0.36), y: 0.18 + Math.random() * (MUNDO_ALTURA - 0.36) };
+        // Rei do Pedaço: na maioria das vezes vai pro pedaço (e fica lá,
+        // ver 'segurar').
+        // Fora disso: se o jogador está por perto mas sem linha de tiro
+        // (atrás de parede), contorna por um dos lados dele; de longe, às
+        // vezes sai à caça pela região dele — antes só sorteava pontos e
+        // ficava parada do outro lado de um pilar metálico.
+        var perto = vejo && dist >= TQ_IA_DIST_ENGAJAR * 0.5;
+        if (_tqModoJogo === 'rei' && _tqZonaCentro && !naZona && Math.random() < 0.75) {
+          _tqIAAlvoPatrulha = _tqIAPontoNaZona();
+        } else if (vejo || Math.random() < 0.4) {
+          var lado = Math.random() < 0.5 ? 1 : -1, nd = dist || 1, desvio = perto || vejo ? 0.45 : 0.9;
+          for (var tent = 0; tent < 4; tent++) {
+            _tqIAAlvoPatrulha = {
+              x: _tqClamp(alvo.x + (-(alvo.y - eu.y) / nd) * desvio * lado + (Math.random() - 0.5) * 0.3, 0.18, MUNDO_LARGURA - 0.18),
+              y: _tqClamp(alvo.y + ((alvo.x - eu.x) / nd) * desvio * lado + (Math.random() - 0.5) * 0.3, 0.18, MUNDO_ALTURA - 0.18)
+            };
+            if (!_tqColideParede(_tqIAAlvoPatrulha.x, _tqIAAlvoPatrulha.y, TQ_RAIO_TANQUE)) break;
+            lado = -lado; desvio += 0.25;   // caiu dentro de parede: tenta o outro lado, mais aberto
+          }
+        } else {
+          _tqIAAlvoPatrulha = { x: 0.18 + Math.random() * (MUNDO_LARGURA - 0.36), y: 0.18 + Math.random() * (MUNDO_ALTURA - 0.36) };
+        }
       }
     }
 
-    var ix = 0, iy = 0;
+    var ix = 0, iy = 0, dx, dy, d;
     if (_tqIAModo === 'engajar') {
       var angMira = Math.atan2(alvo.x - eu.x, -(alvo.y - eu.y));
-      ix = Math.sin(angMira) * 0.7; iy = -Math.cos(angMira) * 0.7;
+      // Com o jogador segurando a batata, mira sem avançar (só o mínimo
+      // acima da zona morta pra conseguir girar) — encostar seria perder.
+      var forca = jogadorComBatata ? TQ_DEADZONE + 0.04 : 0.7;
+      ix = Math.sin(angMira) * forca; iy = -Math.cos(angMira) * forca;
       var diff = angMira - eu.ang;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
@@ -2559,11 +2835,24 @@
         _tqCooldownConvidado = _tqCooldownEfetivo('convidado') * (1.1 + Math.random() * 0.6);
         _tqCriarProjetil(eu.x, eu.y, eu.ang, 'convidado');
       }
+    } else if (_tqIAModo === 'cacar') {
+      d = dist || 1;
+      ix = (alvo.x - eu.x) / d; iy = (alvo.y - eu.y) / d;
+    } else if (_tqIAModo === 'fugir') {
+      // Pra longe do jogador, puxando um pouco pro centro do mapa pra não
+      // se encurralar num canto.
+      d = dist || 1;
+      var cx = MUNDO_LARGURA / 2 - eu.x, cy = MUNDO_ALTURA / 2 - eu.y, dc = Math.hypot(cx, cy) || 1;
+      ix = (eu.x - alvo.x) / d + 0.45 * cx / dc; iy = (eu.y - alvo.y) / d + 0.45 * cy / dc;
+      var m = Math.hypot(ix, iy) || 1;
+      ix /= m; iy /= m;
+    } else if (_tqIAModo === 'segurar') {
+      if (!naZona) _tqIATimer = 0; // foi empurrada pra fora: decide de novo
     } else {
-      var dx = _tqIAAlvoPatrulha.x - eu.x, dy = _tqIAAlvoPatrulha.y - eu.y;
-      var d = Math.hypot(dx, dy) || 1;
+      dx = _tqIAAlvoPatrulha.x - eu.x; dy = _tqIAAlvoPatrulha.y - eu.y;
+      d = Math.hypot(dx, dy) || 1;
       ix = dx / d; iy = dy / d;
-      if (d < 0.06) _tqIATimer = 0; // chegou: escolhe outro alvo já no próximo quadro
+      if (d < 0.06 || (naZona && _tqIAAlvoPatrulha.zona)) _tqIATimer = 0; // chegou: decide de novo já no próximo quadro
     }
     _tqAtualizarTanque(eu, ix, iy, dt);
   }
@@ -2603,15 +2892,30 @@
     }
     if (btnVoltar) { btnVoltar.className = 'tq-link'; btnVoltar.textContent = 'Voltar ao menu'; }
     var venceu = meu > dele;
+    var solo = _tqModo === 'solo';
     // Histórico de partidas do perfil (ver historicoRegistrar em hub.js).
-    // Desconexão (acima) não entra: a partida não teve resultado.
+    // Desconexão (acima) não entra: a partida não teve resultado. Contra
+    // a CPU o placar leva "CPU " na frente (cabe nos 12 caracteres do
+    // historicoItemValido) pra não parecer vitória sobre alguém.
     var hb = _tqBridge();
     if (!jaNoFim && hb && typeof hb.historicoRegistrar === 'function') {
-      hb.historicoRegistrar('tanques', { resultado: venceu ? 'vitoria' : (meu === dele ? 'empate' : 'derrota'), score: meu, placar: meu + ' x ' + dele });
+      hb.historicoRegistrar('tanques', {
+        resultado: venceu ? 'vitoria' : (meu === dele ? 'empate' : 'derrota'), score: meu,
+        segundos: _tqPartidaInicioEm ? Math.round((Date.now() - _tqPartidaInicioEm) / 1000) : 0,
+        placar: (solo ? 'CPU ' : '') + meu + ' x ' + dele
+      });
     }
+    // Moedas: 1x por partida (a reentrada pelo estado repetido da rede não
+    // paga de novo). Valores em TQ_MOEDAS; o teto diário do hub vale.
+    if (!jaNoFim) {
+      _tqGanhoPartida = TQ_MOEDAS[(solo ? 'cpu_' : 'mp_') + (venceu ? 'vitoria' : 'derrota')] || 0;
+      if (_tqGanhoPartida && hb && typeof hb.moedasAdd === 'function') hb.moedasAdd(_tqGanhoPartida, 'tanques');
+      else _tqGanhoPartida = 0;
+    }
+    var txtMoedas = _tqGanhoPartida ? ' +' + _tqGanhoPartida + ' 🪙' : '';
     if (titulo) titulo.textContent = venceu ? 'Você venceu! 🏆' : 'Não foi dessa vez';
-    if (msg) msg.textContent = venceu ? 'Mandou bem contra ' + (_tqApelidoAdversario || 'seu adversário') + '!'
-                                       : (_tqApelidoAdversario || 'Seu adversário') + ' levou essa.';
+    if (msg) msg.textContent = (venceu ? 'Mandou bem contra ' + (_tqApelidoAdversario || 'seu adversário') + '!'
+                                       : (_tqApelidoAdversario || 'Seu adversário') + ' levou essa.') + txtMoedas;
     if (placar) { placar.textContent = meu + ' x ' + dele; placar.style.display = ''; }
     // O rótulo é reposto (e não só o display): numa partida anterior a
     // tela de desconexão pode ter deixado este botão como "Criar nova sala".
@@ -2705,10 +3009,12 @@
     }
     _tqDesenharExplosoes();
     ctx.restore();
+    if (jogando) _tqDesenharSetas();
     if (jogando) _tqDesenharBatataHUD();
+    if (jogando && _tqRodadaEstado === 'jogando' && performance.now() < _tqBannerAte) _tqDesenharBanner();
     if (jogando && _tqRodadaEstado === 'pausa') _tqDesenharAvisoRodada();
-    if (jogando && !_tqSouAnfitriao && _tqModo === 'multiplayer' && _tqUltimoEEm
-        && (performance.now() - _tqUltimoEEm) > TQ_CONGELADO_AVISO_MS) {
+    if (jogando && ((!_tqSouAnfitriao && _tqModo === 'multiplayer' && _tqUltimoEEm
+        && (performance.now() - _tqUltimoEEm) > TQ_CONGELADO_AVISO_MS) || _tqConvidadoParado())) {
       _tqDesenharAvisoCongelado();
     }
     ctx.restore();
@@ -3074,7 +3380,8 @@
       var largura = altura * (reg.w / reg.h);
       // Skin: só o MEU tanque (anfitrião se eu sou o anfitrião, senão o convidado).
       var meu = (t === (_tqSouAnfitriao ? _tqTanqueAnfitriao : _tqTanqueConvidado));
-      var fonte = (meu && _tqSkinTinta) ? (_tqSpriteTingido(reg, arquivo) || reg.img) : reg.img;
+      var tinta = meu ? _tqSkinTinta : (_tqModo === 'multiplayer' ? _tqSkinTintaAdv : '');
+      var fonte = tinta ? (_tqSpriteTingido(reg, arquivo, tinta) || reg.img) : reg.img;
       ctx.drawImage(fonte, -largura / 2, -altura * TQ_PIVO_Y, largura, altura);
     } else {
       ctx.fillStyle = corFallback;
@@ -3135,6 +3442,71 @@
     ctx.restore();
   }
 
+  // Setas na borda da tela apontando pro que está FORA dela: o pedaço
+  // (Rei do Pedaço), as caixas de suprimento e — só pra quem está com a
+  // batata — o adversário. Espaço de TELA (fora do translate da câmera).
+  function _tqDesenharSetas() {
+    if (_tqRodadaEstado !== 'jogando') return;
+    var alvos = [];
+    if (_tqModoJogo === 'rei' && _tqZonaCentro) alvos.push({ x: _tqZonaCentro.x, y: _tqZonaCentro.y, r: TQ_ZONA_RAIO, cor: '#ffd04a' });
+    for (var i = 0; i < _tqCaixas.length; i++) {
+      alvos.push({ x: _tqCaixas[i].x, y: _tqCaixas[i].y, r: TQ_CAIXA_RAIO, cor: TQ_CAIXA_CORES[_tqCaixas[i].tipo] || '#fff' });
+    }
+    if (_tqModoJogo === 'batata' && _tqBatataCom === (_tqSouAnfitriao ? 'anfitriao' : 'convidado')) {
+      var adv = _tqSouAnfitriao ? _tqTanqueConvidado : _tqTanqueAnfitriao;
+      alvos.push({ x: adv.x, y: adv.y, r: TQ_RAIO_TANQUE, cor: _tqSouAnfitriao ? TQ_COR_CONVIDADO : TQ_COR_ANFITRIAO });
+    }
+    if (!alvos.length) return;
+    var ctx = _tqCtx, cxT = _tqW / 2, cyT = _tqH / 2, margem = 22, tam = 9;
+    for (var k = 0; k < alvos.length; k++) {
+      var a = alvos[k];
+      var sx = (a.x - _tqCamera.x) * _tqH, sy = (a.y - _tqCamera.y) * _tqH, rr = a.r * _tqH;
+      if (sx + rr > 0 && sx - rr < _tqW && sy + rr > 0 && sy - rr < _tqH) continue; // já aparece na tela
+      var dx = sx - cxT, dy = sy - cyT;
+      var esc = Math.min(Math.abs(dx) > 0.001 ? (cxT - margem) / Math.abs(dx) : Infinity,
+                         Math.abs(dy) > 0.001 ? (cyT - margem) / Math.abs(dy) : Infinity);
+      var px = cxT + dx * esc, py = cyT + dy * esc, ang = Math.atan2(dy, dx);
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(ang);
+      ctx.beginPath();
+      ctx.moveTo(tam, 0);
+      ctx.lineTo(-tam * 0.8, -tam * 0.75);
+      ctx.lineTo(-tam * 0.8, tam * 0.75);
+      ctx.closePath();
+      ctx.fillStyle = a.cor;
+      ctx.globalAlpha = 0.9;
+      ctx.shadowColor = 'rgba(0,0,0,0.7)';
+      ctx.shadowBlur = 6;
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  var TQ_BANNER_TEXTO = {
+    classico: '💥 Clássico — destrua o adversário',
+    rei: '👑 Rei do Pedaço — fique ' + TQ_ZONA_TEMPO_VITORIA + ' s sozinho no pedaço',
+    batata: '🥔 Batata Quente — encoste pra passar a batata'
+  };
+  function _tqDesenharBanner() {
+    var ctx = _tqCtx;
+    var falta = _tqBannerAte - performance.now();
+    var alpha = Math.max(0, Math.min(1, falta / 400));
+    var classeAdv = TQ_CLASSES[_tqSouAnfitriao ? _tqClasseConvidado : _tqClasseAnfitriao] || TQ_CLASSES.padrao;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,0.75)';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.font = "700 15px 'Syne', sans-serif";
+    ctx.fillText(TQ_BANNER_TEXTO[_tqModoJogo] || TQ_BANNER_TEXTO.classico, _tqW / 2, _tqH * 0.2);
+    ctx.font = "600 12px 'Syne', sans-serif";
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillText((_tqModo === 'solo' ? 'Computador' : (_tqApelidoAdversario || 'Adversário')) + ': tanque ' + classeAdv.nome, _tqW / 2, _tqH * 0.2 + 20);
+    ctx.restore();
+  }
+
   function _tqDesenharAvisoRodada() {
     var ctx = _tqCtx;
     var euGanhei = _tqPausaVencedor === (_tqSouAnfitriao ? 'anfitriao' : 'convidado');
@@ -3143,7 +3515,9 @@
     // convidado tinha perdido, mesmo quando ele venceu.
     var nomeAdversario = _tqModo === 'solo' ? 'O computador' : (_tqApelidoAdversario || 'Adversário');
     var texto;
-    if (_tqPausaMotivo === 'zona') {
+    if (_tqPausaMotivo === 'empate') {
+      texto = 'Os dois explodiram! Ninguém pontua.';
+    } else if (_tqPausaMotivo === 'zona') {
       texto = euGanhei ? 'Você controlou o pedaço!' : nomeAdversario + ' controlou o pedaço!';
     } else if (_tqPausaMotivo === 'batata') {
       texto = euGanhei ? 'A batata estourou no adversário!' : 'A batata estourou em você!';
@@ -3199,8 +3573,10 @@
     var cx = t.x * _tqH, cy = t.y * _tqH;
     var diametroTela = TQ_RAIO_TANQUE * 2 * _tqH;
     var pulso = 1 + 0.12 * Math.sin(performance.now() / 120);
+    // Pesado tem as bolinhas de HP nessa mesma altura — sobe a batata.
+    var acima = _tqClasseDoTanque(t).hpMax > 1 ? 1.45 : 1.05;
     ctx.save();
-    ctx.translate(cx, cy - diametroTela * 1.05);
+    ctx.translate(cx, cy - diametroTela * acima);
     ctx.scale(pulso, pulso);
     ctx.beginPath();
     ctx.arc(0, 0, diametroTela * 0.16, 0, Math.PI * 2);

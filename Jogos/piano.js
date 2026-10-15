@@ -978,8 +978,8 @@
      polegares no mesmo azulejo da fila.
      Fora da partida (início, fim, pausa) quem lê o controle é o
      _pnNavLoop (navegação nos menus — ver abaixo).
-     Pra ter "Configurar botões" igual ao Ritmo, é trocar PN_PAD_MAPA
-     por um mapa salvo (ver _rtPadMapa no ritmo.js).
+     Esse é o mapa PADRÃO: em "Configurar botões" (tela inicial, ou
+     Select nela) a pessoa escolhe um botão por coluna — ver PN_PAD_ACOES.
   ══════════════════════════════════════════════════════════════ */
   var PN_PAD_MAPA = [[4, 14, 12], [6, 15, 13], [7, 2, 0], [5, 1, 3]];
   var PN_PAD_START = 9;
@@ -998,6 +998,145 @@
     var x = gp.buttons && gp.buttons[b];
     return !!x && (x.pressed || x.value > 0.5);
   }
+
+  /* ── Configurar botões (igual ao "Configurar botões" do Ritmo) ──────
+     Um botão por ação, na ordem de PN_PAD_ACOES, salvo neste aparelho
+     (PN_PAD_KEY). Com mapa salvo, ele manda; sem, vale o "padrao" de
+     cada ação. O analógico continua valendo sempre e o Start fica de
+     fora (é sempre pausa). Abre pela linha "🎮 Controle conectado" da
+     tela inicial (ou Select nela); durante a configuração, Start cancela.
+  ─────────────────────────────────────────────────────────────────── */
+  var PN_PAD_ACOES = [
+    { k: 'c1', nome: 'Coluna 1', padrao: PN_PAD_MAPA[0] },
+    { k: 'c2', nome: 'Coluna 2', padrao: PN_PAD_MAPA[1] },
+    { k: 'c3', nome: 'Coluna 3', padrao: PN_PAD_MAPA[2] },
+    { k: 'c4', nome: 'Coluna 4', padrao: PN_PAD_MAPA[3] }
+  ];
+  var PN_PAD_KEY = 'angatuba_pad_piano';
+  var PN_PAD_NOMES = { 0: 'A', 1: 'B', 2: 'X', 3: 'Y', 4: 'LB', 5: 'RB', 6: 'LT', 7: 'RT', 8: 'Select', 9: 'Start', 10: 'L3', 11: 'R3', 12: '↑', 13: '↓', 14: '←', 15: '→' };
+  var _pnPadCfg = _pnPadCfgLer();   // { ação: botão } ou null (= padrão)
+  var _pnPadCal = null;              // configuração aberta: { botoes, antes, raf, primeiro, el }
+
+  function _pnPadCfgLer() {
+    try {
+      var c = JSON.parse(localStorage.getItem(PN_PAD_KEY) || 'null');
+      if (!c || typeof c !== 'object') return null;
+      for (var i = 0; i < PN_PAD_ACOES.length; i++) if (typeof c[PN_PAD_ACOES[i].k] !== 'number') return null;
+      return c;
+    } catch (e) { return null; }
+  }
+  // Botões que valem pra ação a agora (personalizado tem prioridade).
+  function _pnPadBotoes(a) {
+    if (_pnPadCfg) return [_pnPadCfg[a]];
+    for (var i = 0; i < PN_PAD_ACOES.length; i++) if (PN_PAD_ACOES[i].k === a) return PN_PAD_ACOES[i].padrao;
+    return [];
+  }
+  function _pnPadAlgum(gp, a) {
+    var l = _pnPadBotoes(a);
+    for (var i = 0; i < l.length; i++) if (_pnBotaoApertado(gp, l[i])) return true;
+    return false;
+  }
+
+  function _pnPadCalAbrir() {
+    if (_pnPadCal) return;
+    var tela = document.getElementById('jogo-piano');
+    if (!tela) return;
+    var ov = document.createElement('div');
+    ov.className = 'jpad-ov';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-label', 'Configurar controle');
+    ov.innerHTML = '<div class="jpad-caixa"><div class="jpad-tit">Configurar controle · Piano</div>' +
+      '<div class="jpad-msg"></div><div class="jpad-slots"></div>' +
+      '<div class="jpad-rodape">O analógico continua valendo. Start cancela.</div>' +
+      '<button type="button" class="jpad-link">Cancelar</button></div>';
+    ov.querySelector('.jpad-link').addEventListener('click', _pnPadCalFechar);
+    tela.appendChild(ov);
+    _pnPadCal = { botoes: [], antes: {}, raf: 0, primeiro: true, el: ov };
+    _pnPadCalRender();
+    _pnPadCal.raf = requestAnimationFrame(_pnPadCalPoll);
+  }
+  function _pnPadCalFechar() {
+    var c = _pnPadCal;
+    _pnPadCal = null;
+    if (c) {
+      if (c.raf) cancelAnimationFrame(c.raf);
+      if (c.el && c.el.parentNode) c.el.parentNode.removeChild(c.el);
+    }
+    _pnPadLinhaAtualizar();
+  }
+  function _pnPadCalRender() {
+    var c = _pnPadCal;
+    if (!c) return;
+    var A = PN_PAD_ACOES, n = c.botoes.length, h = '';
+    c.el.querySelector('.jpad-msg').innerHTML = n < A.length
+      ? 'Aperte o botão pra <b>' + A[n].nome + '</b>.'
+      : '✔ Pronto! Botões salvos neste aparelho.';
+    for (var i = 0; i < A.length; i++) {
+      var b = c.botoes[i];
+      h += '<span class="jpad-slot' + (i === n ? ' jpad-slot-agora' : '') + (b !== undefined ? ' jpad-slot-ok' : '') + '">' +
+           A[i].nome + '<b>' + (b !== undefined ? (PN_PAD_NOMES[b] || ('B' + b)) : '?') + '</b></span>';
+    }
+    c.el.querySelector('.jpad-slots').innerHTML = h;
+  }
+  function _pnPadCalPoll() {
+    var c = _pnPadCal;
+    if (!c) return;
+    c.raf = 0;
+    var A = PN_PAD_ACOES, pads = _pnPadLista();
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i];
+      for (var b = 0; b < (gp.buttons || []).length; b++) {
+        var chave = gp.index + '_' + b, ap = _pnBotaoApertado(gp, b);
+        // no 1º frame só registra o que já estava apertado (não conta)
+        if (ap && !c.antes[chave] && !c.primeiro && c.botoes.length < A.length) {
+          if (b === PN_PAD_START) { _pnPadCalFechar(); return; }
+          if (c.botoes.indexOf(b) === -1) {
+            c.botoes.push(b);
+            if (c.botoes.length === A.length) {
+              var cfg = {};
+              for (var j = 0; j < A.length; j++) cfg[A[j].k] = c.botoes[j];
+              _pnPadCfg = cfg;
+              try { localStorage.setItem(PN_PAD_KEY, JSON.stringify(cfg)); } catch (e) {}
+              setTimeout(function () { if (_pnPadCal === c) _pnPadCalFechar(); }, 900);
+            }
+            _pnPadCalRender();
+          }
+        }
+        c.antes[chave] = ap;
+      }
+    }
+    c.primeiro = false;
+    if (c.botoes.length < A.length) c.raf = requestAnimationFrame(_pnPadCalPoll);
+  }
+  function _pnPadUsarPadrao() {
+    _pnPadCfg = null;
+    try { localStorage.removeItem(PN_PAD_KEY); } catch (e) {}
+    _pnPadLinhaAtualizar();
+  }
+  // Linha "🎮 Controle conectado · Configurar botões" na tela inicial
+  // (criada na 1ª vez, pra não mexer no HTML; só aparece com controle).
+  function _pnPadLinhaAtualizar() {
+    var pads = _pnPadLista(), cx = document.getElementById('pn-inicio');
+    if (!cx) return;
+    var el = cx.querySelector('.jpad-linha');
+    if (!el) {
+      if (!pads.length) return;
+      el = document.createElement('div');
+      el.className = 'jpad-linha';
+      el.innerHTML = '<span>🎮 <span class="jpad-txt">Controle conectado</span></span>' +
+        '<button type="button" class="jpad-btn" data-jpad="cfg">Configurar botões</button>' +
+        '<button type="button" class="jpad-btn" data-jpad="padrao">Usar padrão</button>';
+      el.querySelector('[data-jpad="cfg"]').addEventListener('click', function (ev) { ev.currentTarget.blur(); _pnPadCalAbrir(); });
+      el.querySelector('[data-jpad="padrao"]').addEventListener('click', function (ev) { ev.currentTarget.blur(); _pnPadUsarPadrao(); });
+      cx.insertBefore(el, cx.querySelector('.jogo-btn-skins'));
+    }
+    el.style.display = pads.length ? '' : 'none';
+    el.querySelector('[data-jpad="padrao"]').style.display = _pnPadCfg ? '' : 'none';
+    var p = pads[0];
+    el.querySelector('.jpad-txt').textContent = 'Controle conectado' +
+      (_pnPadCfg ? ' · botões personalizados' : (p && p.mapping !== 'standard' ? ' — configure os botões' : ''));
+  }
   // Marca como "já apertado" tudo que está pressionado agora: o Ⓐ que
   // começou a música não vira toque na coluna 3 no 1º frame.
   function _pnPadSnapshot() {
@@ -1013,6 +1152,7 @@
     var pads = _pnPadLista();
     if (!pads.length || !_pnCanvas) return;
     var M = _pnMenu(), aberto = !!(M && M.aberto && M.aberto('jogo-piano'));
+    var mapa = PN_PAD_ACOES.map(function (a) { return _pnPadBotoes(a.k); });   // coluna → botões (padrão ou personalizado)
     for (var i = 0; i < pads.length; i++) {
       var gp = pads[i];
       // Start: abre o menu (pausa fora do Party). Fechar é com o _pnNavLoop.
@@ -1022,9 +1162,9 @@
         aberto = !!(M.aberto && M.aberto('jogo-piano'));
       }
       _pnPadAntes[kS] = apS;
-      for (var c = 0; c < PN_PAD_MAPA.length; c++) {
-        for (var j = 0; j < PN_PAD_MAPA[c].length; j++) {
-          var b = PN_PAD_MAPA[c][j], chave = gp.index + '_' + b, ap = _pnBotaoApertado(gp, b);
+      for (var c = 0; c < mapa.length; c++) {
+        for (var j = 0; j < mapa[c].length; j++) {
+          var b = mapa[c][j], chave = gp.index + '_' + b, ap = _pnBotaoApertado(gp, b);
           if (ap && !_pnPadAntes[chave] && !aberto && !_pnPausado && _pnEstado === 'jogando') {
             _pnPadUsado = true;
             _pnAudioDestravar();
@@ -1040,6 +1180,7 @@
   // 🎮 no HUD quando tem controle conectado (criado na 1ª vez, pra não
   // precisar mexer no index.html).
   function _pnPadIndicador() {
+    _pnPadLinhaAtualizar();
     var tem = _pnPadLista().length > 0;
     var el = document.getElementById('pn-pad');
     if (!el && tem) {
@@ -1092,6 +1233,7 @@
     var tela = document.getElementById('jogo-piano');
     if (!tela || tela.style.display === 'none' || !_pnCanvas) return null;
     var loja = document.getElementById('lojajogo-overlay');
+    if (_pnPadCal) return 'cal';                // configurando botões: é com o _pnPadCalPoll
     if (loja && loja.parentNode === tela && loja.style.display !== 'none') return 'loja';
     if (_pnEstado === 'jogando') {
       var M = _pnMenu();
@@ -1110,6 +1252,7 @@
       if (_pnBotaoApertado(gp, 15) || (ax[0] || 0) > 0.6) st.dir = true;
       if (_pnBotaoApertado(gp, 0)) st.a = true;
       if (_pnBotaoApertado(gp, 1)) st.b = true;
+      if (_pnBotaoApertado(gp, 8)) st.select = true;
       if (_pnBotaoApertado(gp, PN_PAD_START)) st.start = true;
     }
     return st;
@@ -1190,13 +1333,13 @@
       _pnNav.ctx = ctx; _pnNav.foco = null;
       _pnNavFocoLimpar();
     }
-    if (ctx === 'jogo' || ctx === 'loja') {
+    if (ctx === 'jogo' || ctx === 'loja' || ctx === 'cal') {
       if (ctx === 'loja' && st.b && !_pnNav.antes.b && typeof window.lojaJogoFechar === 'function') window.lojaJogoFechar();
       _pnNav.antes = {}; for (var k1 in st) _pnNav.antes[k1] = true;
     } else {
       var l = _pnNavItens(ctx), ev = [];
       if (!_pnNav.foco || l.indexOf(_pnNav.foco) === -1) _pnNavFocar(_pnNavPadrao(ctx, l));
-      ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'start'].forEach(function (n) {
+      ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'start', 'select'].forEach(function (n) {
         var ap = !!st[n], seta = n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir';
         if (ap && !_pnNav.antes[n]) { ev.push(n); _pnNav.desde[n] = agora; _pnNav.rep[n] = agora; }
         else if (ap && seta && agora - _pnNav.desde[n] > 420 && agora - _pnNav.rep[n] > 120) { ev.push(n); _pnNav.rep[n] = agora; }   // segurar rola
@@ -1204,7 +1347,7 @@
       });
       for (var i = 0; i < ev.length; i++) {
         _pnNavAcao(ctx, ev[i], l);
-        if (ev[i] === 'a' || ev[i] === 'b' || ev[i] === 'start') break;   // trocou de tela: o resto do frame não vale
+        if (ev[i] !== 'cima' && ev[i] !== 'baixo' && ev[i] !== 'esq' && ev[i] !== 'dir') break;   // trocou de tela: o resto do frame não vale
       }
     }
     if (ctx !== 'jogo') _pnPadSnapshot();
@@ -1212,6 +1355,7 @@
   }
 
   function _pnNavAcao(ctx, n, l) {
+    if (n === 'select') { if (ctx === 'inicio') _pnPadCalAbrir(); return; }   // igual ao Select do Ritmo
     var el = _pnNav.foco, ehSel = !!(el && el.tagName === 'SELECT');
     if (ehSel && (n === 'esq' || n === 'dir')) { _pnNavTrocarOpcao(el, n === 'dir' ? 1 : -1, false); return; }
     if (n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir') {

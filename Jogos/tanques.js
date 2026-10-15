@@ -727,6 +727,7 @@
     _tqResetBarris();
     _tqAplicarOrientacaoRepetido();
     _tqDesenhar();
+    _tqPadIndicador();
     _tqNavIniciar();
   }
   var _tqResizeOn = false;
@@ -1585,8 +1586,8 @@
      O vetor é no espaço do JOGO: com a arena girada por CSS (retrato)
      não precisa do _tqDeltaLocal — "pra cima" no controle é "pra cima"
      na arena que a pessoa está vendo.
-     Pra ter "Configurar botões" igual ao Ritmo, é trocar os índices
-     fixos do _tqPadLer por um mapa salvo (ver _rtPadMapa no ritmo.js).
+     Esse é o mapa PADRÃO: em "Configurar botões" (tela inicial, ou
+     Select nela) a pessoa escolhe um botão por ação — ver TQ_PAD_ACOES.
   ══════════════════════════════════════════════════════════════ */
   var TQ_PAD_ZONA = 0.25;   // deadzone do analógico (sem drift)
   var TQ_PAD_START = 9;
@@ -1607,6 +1608,146 @@
     var x = gp.buttons && gp.buttons[b];
     return !!x && (x.pressed || x.value > 0.5);
   }
+
+  /* ── Configurar botões (igual ao "Configurar botões" do Ritmo) ──────
+     Um botão por ação, na ordem de TQ_PAD_ACOES, salvo neste aparelho
+     (TQ_PAD_KEY). Com mapa salvo, ele manda; sem, vale o "padrao" de
+     cada ação. O analógico continua valendo sempre e o Start fica de
+     fora (é sempre pausa). Abre pela linha "🎮 Controle conectado" da
+     tela inicial (ou Select nela); durante a configuração, Start cancela.
+  ─────────────────────────────────────────────────────────────────── */
+  var TQ_PAD_ACOES = [
+    { k: 'cima', nome: 'Cima', padrao: [12] },
+    { k: 'baixo', nome: 'Baixo', padrao: [13] },
+    { k: 'esq', nome: 'Esquerda', padrao: [14] },
+    { k: 'dir', nome: 'Direita', padrao: [15] },
+    { k: 'fogo', nome: 'Atirar', padrao: [0, 7, 5] }
+  ];
+  var TQ_PAD_KEY = 'angatuba_pad_tanques';
+  var TQ_PAD_NOMES = { 0: 'A', 1: 'B', 2: 'X', 3: 'Y', 4: 'LB', 5: 'RB', 6: 'LT', 7: 'RT', 8: 'Select', 9: 'Start', 10: 'L3', 11: 'R3', 12: '↑', 13: '↓', 14: '←', 15: '→' };
+  var _tqPadCfg = _tqPadCfgLer();   // { ação: botão } ou null (= padrão)
+  var _tqPadCal = null;              // configuração aberta: { botoes, antes, raf, primeiro, el }
+
+  function _tqPadCfgLer() {
+    try {
+      var c = JSON.parse(localStorage.getItem(TQ_PAD_KEY) || 'null');
+      if (!c || typeof c !== 'object') return null;
+      for (var i = 0; i < TQ_PAD_ACOES.length; i++) if (typeof c[TQ_PAD_ACOES[i].k] !== 'number') return null;
+      return c;
+    } catch (e) { return null; }
+  }
+  // Botões que valem pra ação a agora (personalizado tem prioridade).
+  function _tqPadBotoes(a) {
+    if (_tqPadCfg) return [_tqPadCfg[a]];
+    for (var i = 0; i < TQ_PAD_ACOES.length; i++) if (TQ_PAD_ACOES[i].k === a) return TQ_PAD_ACOES[i].padrao;
+    return [];
+  }
+  function _tqPadAlgum(gp, a) {
+    var l = _tqPadBotoes(a);
+    for (var i = 0; i < l.length; i++) if (_tqBotaoApertado(gp, l[i])) return true;
+    return false;
+  }
+
+  function _tqPadCalAbrir() {
+    if (_tqPadCal) return;
+    var tela = document.getElementById('jogo-tanques');
+    if (!tela) return;
+    var ov = document.createElement('div');
+    ov.className = 'jpad-ov';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-label', 'Configurar controle');
+    ov.innerHTML = '<div class="jpad-caixa"><div class="jpad-tit">Configurar controle · Tanques</div>' +
+      '<div class="jpad-msg"></div><div class="jpad-slots"></div>' +
+      '<div class="jpad-rodape">O analógico continua valendo. Start cancela.</div>' +
+      '<button type="button" class="jpad-link">Cancelar</button></div>';
+    ov.querySelector('.jpad-link').addEventListener('click', _tqPadCalFechar);
+    tela.appendChild(ov);
+    _tqPadCal = { botoes: [], antes: {}, raf: 0, primeiro: true, el: ov };
+    _tqPadCalRender();
+    _tqPadCal.raf = requestAnimationFrame(_tqPadCalPoll);
+  }
+  function _tqPadCalFechar() {
+    var c = _tqPadCal;
+    _tqPadCal = null;
+    if (c) {
+      if (c.raf) cancelAnimationFrame(c.raf);
+      if (c.el && c.el.parentNode) c.el.parentNode.removeChild(c.el);
+    }
+    _tqPadLinhaAtualizar();
+  }
+  function _tqPadCalRender() {
+    var c = _tqPadCal;
+    if (!c) return;
+    var A = TQ_PAD_ACOES, n = c.botoes.length, h = '';
+    c.el.querySelector('.jpad-msg').innerHTML = n < A.length
+      ? 'Aperte o botão pra <b>' + A[n].nome + '</b>.'
+      : '✔ Pronto! Botões salvos neste aparelho.';
+    for (var i = 0; i < A.length; i++) {
+      var b = c.botoes[i];
+      h += '<span class="jpad-slot' + (i === n ? ' jpad-slot-agora' : '') + (b !== undefined ? ' jpad-slot-ok' : '') + '">' +
+           A[i].nome + '<b>' + (b !== undefined ? (TQ_PAD_NOMES[b] || ('B' + b)) : '?') + '</b></span>';
+    }
+    c.el.querySelector('.jpad-slots').innerHTML = h;
+  }
+  function _tqPadCalPoll() {
+    var c = _tqPadCal;
+    if (!c) return;
+    c.raf = 0;
+    var A = TQ_PAD_ACOES, pads = _tqPadLista();
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i];
+      for (var b = 0; b < (gp.buttons || []).length; b++) {
+        var chave = gp.index + '_' + b, ap = _tqBotaoApertado(gp, b);
+        // no 1º frame só registra o que já estava apertado (não conta)
+        if (ap && !c.antes[chave] && !c.primeiro && c.botoes.length < A.length) {
+          if (b === TQ_PAD_START) { _tqPadCalFechar(); return; }
+          if (c.botoes.indexOf(b) === -1) {
+            c.botoes.push(b);
+            if (c.botoes.length === A.length) {
+              var cfg = {};
+              for (var j = 0; j < A.length; j++) cfg[A[j].k] = c.botoes[j];
+              _tqPadCfg = cfg;
+              try { localStorage.setItem(TQ_PAD_KEY, JSON.stringify(cfg)); } catch (e) {}
+              setTimeout(function () { if (_tqPadCal === c) _tqPadCalFechar(); }, 900);
+            }
+            _tqPadCalRender();
+          }
+        }
+        c.antes[chave] = ap;
+      }
+    }
+    c.primeiro = false;
+    if (c.botoes.length < A.length) c.raf = requestAnimationFrame(_tqPadCalPoll);
+  }
+  function _tqPadUsarPadrao() {
+    _tqPadCfg = null;
+    try { localStorage.removeItem(TQ_PAD_KEY); } catch (e) {}
+    _tqPadLinhaAtualizar();
+  }
+  // Linha "🎮 Controle conectado · Configurar botões" na tela inicial
+  // (criada na 1ª vez, pra não mexer no HTML; só aparece com controle).
+  function _tqPadLinhaAtualizar() {
+    var pads = _tqPadLista(), cx = document.getElementById('tq-menu');
+    if (!cx) return;
+    var el = cx.querySelector('.jpad-linha');
+    if (!el) {
+      if (!pads.length) return;
+      el = document.createElement('div');
+      el.className = 'jpad-linha';
+      el.innerHTML = '<span>🎮 <span class="jpad-txt">Controle conectado</span></span>' +
+        '<button type="button" class="jpad-btn" data-jpad="cfg">Configurar botões</button>' +
+        '<button type="button" class="jpad-btn" data-jpad="padrao">Usar padrão</button>';
+      el.querySelector('[data-jpad="cfg"]').addEventListener('click', function (ev) { ev.currentTarget.blur(); _tqPadCalAbrir(); });
+      el.querySelector('[data-jpad="padrao"]').addEventListener('click', function (ev) { ev.currentTarget.blur(); _tqPadUsarPadrao(); });
+      cx.insertBefore(el, cx.querySelector('#tq-classes'));
+    }
+    el.style.display = pads.length ? '' : 'none';
+    el.querySelector('[data-jpad="padrao"]').style.display = _tqPadCfg ? '' : 'none';
+    var p = pads[0];
+    el.querySelector('.jpad-txt').textContent = 'Controle conectado' +
+      (_tqPadCfg ? ' · botões personalizados' : (p && p.mapping !== 'standard' ? ' — configure os botões' : ''));
+  }
   // Estado lógico juntando todos os controles (null = nenhum conectado).
   function _tqPadLer() {
     var pads = _tqPadLista();
@@ -1614,8 +1755,8 @@
     var st = { x: 0, y: 0, fogo: false, start: false };
     for (var i = 0; i < pads.length; i++) {
       var gp = pads[i], ax = gp.axes || [];
-      var dx = (_tqBotaoApertado(gp, 15) ? 1 : 0) - (_tqBotaoApertado(gp, 14) ? 1 : 0);
-      var dy = (_tqBotaoApertado(gp, 13) ? 1 : 0) - (_tqBotaoApertado(gp, 12) ? 1 : 0);
+      var dx = (_tqPadAlgum(gp, 'dir') ? 1 : 0) - (_tqPadAlgum(gp, 'esq') ? 1 : 0);
+      var dy = (_tqPadAlgum(gp, 'baixo') ? 1 : 0) - (_tqPadAlgum(gp, 'cima') ? 1 : 0);
       if (dx || dy) {
         var dl = Math.hypot(dx, dy);
         st.x = dx / dl; st.y = dy / dl;
@@ -1628,13 +1769,13 @@
           st.x = ax0 / mag * m; st.y = ax1 / mag * m;
         }
       }
-      if (_tqBotaoApertado(gp, 0) || _tqBotaoApertado(gp, 7) || _tqBotaoApertado(gp, 5)) st.fogo = true;
+      if (_tqPadAlgum(gp, 'fogo')) st.fogo = true;
       if (_tqBotaoApertado(gp, TQ_PAD_START)) st.start = true;
     }
     return st;
   }
   // O que já está apertado ao começar a partida não vira tiro/pausa no 1º frame.
-  function _tqPadSnapshot() { _tqPadAntes = _tqPadLer() || {}; _tqPadMovendo = false; }
+  function _tqPadSnapshot() { _tqPadAntes = _tqPadLer() || {}; _tqPadMovendo = false; _tqPadFogo = false; }
 
   function _tqPadPoll() {
     var st = _tqPadLer();
@@ -1653,7 +1794,9 @@
       if (x || y) { _tqInputVec.x = x; _tqInputVec.y = y; _tqPadMovendo = true; _tqPadUsado = true; }
       else if (_tqPadMovendo) { _tqInputVec.x = 0; _tqInputVec.y = 0; _tqPadMovendo = false; }
     }
-    _tqPadFogo = !aberto && !!st.fogo;
+    // Tiro contínuo só pra um aperto feito JÁ na partida: o Ⓐ de "Jogar
+    // sozinho"/"Continuar" ainda segurado não sai atirando sozinho.
+    _tqPadFogo = !aberto && !!st.fogo && (!antes.fogo || _tqPadFogo);
     if (!aberto && st.fogo && !antes.fogo) { _tqPadUsado = true; _tqTentarAtirar(); }
   }
 
@@ -1683,6 +1826,7 @@
     var tela = document.getElementById('jogo-tanques');
     if (!tela || tela.style.display === 'none' || !_tqCanvas) return null;
     var loja = document.getElementById('lojajogo-overlay');
+    if (_tqPadCal) return 'cal';                // configurando botões: é com o _tqPadCalPoll
     if (loja && loja.parentNode === tela && loja.style.display !== 'none') return 'loja';
     if (_tqEstado === 'jogando') {
       var M = _tqMenu();
@@ -1701,6 +1845,7 @@
       if (_tqBotaoApertado(gp, 15) || (ax[0] || 0) > 0.6) st.dir = true;
       if (_tqBotaoApertado(gp, 0)) st.a = true;
       if (_tqBotaoApertado(gp, 1)) st.b = true;
+      if (_tqBotaoApertado(gp, 8)) st.select = true;
       if (_tqBotaoApertado(gp, TQ_PAD_START)) st.start = true;
     }
     return st;
@@ -1768,13 +1913,13 @@
       _tqNav.ctx = ctx; _tqNav.foco = null;
       _tqNavFocoLimpar();
     }
-    if (ctx === 'jogo' || ctx === 'loja') {
+    if (ctx === 'jogo' || ctx === 'loja' || ctx === 'cal') {
       if (ctx === 'loja' && st.b && !_tqNav.antes.b && typeof window.lojaJogoFechar === 'function') window.lojaJogoFechar();
       _tqNav.antes = {}; for (var k1 in st) _tqNav.antes[k1] = true;
     } else {
       var l = _tqNavItens(ctx), ev = [];
       if (!_tqNav.foco || l.indexOf(_tqNav.foco) === -1) _tqNavFocar(_tqNavPadrao(ctx, l));
-      ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'start'].forEach(function (n) {
+      ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'start', 'select'].forEach(function (n) {
         var ap = !!st[n], seta = n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir';
         if (ap && !_tqNav.antes[n]) { ev.push(n); _tqNav.desde[n] = agora; _tqNav.rep[n] = agora; }
         else if (ap && seta && agora - _tqNav.desde[n] > 420 && agora - _tqNav.rep[n] > 120) { ev.push(n); _tqNav.rep[n] = agora; }   // segurar rola
@@ -1782,14 +1927,15 @@
       });
       for (var i = 0; i < ev.length; i++) {
         _tqNavAcao(ctx, ev[i], l);
-        if (ev[i] === 'a' || ev[i] === 'b' || ev[i] === 'start') break;   // trocou de tela: o resto do frame não vale
+        if (ev[i] !== 'cima' && ev[i] !== 'baixo' && ev[i] !== 'esq' && ev[i] !== 'dir') break;   // trocou de tela: o resto do frame não vale
       }
     }
-    if (ctx !== 'jogo') _tqPadAntes = _tqPadLer() || {};
+    if (ctx !== 'jogo') { _tqPadAntes = _tqPadLer() || {}; _tqPadFogo = false; }
     _tqNav.raf = requestAnimationFrame(_tqNavLoop);
   }
 
   function _tqNavAcao(ctx, n, l) {
+    if (n === 'select') { if (ctx === 'inicio') _tqPadCalAbrir(); return; }   // igual ao Select do Ritmo
     if (n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir') {
       if (_tqNav.foco) _tqNavFocar(_tqNavMover(l, _tqNav.foco, n));
       return;
@@ -1813,6 +1959,7 @@
   // 🎮 no HUD da partida quando tem controle conectado (criado na 1ª vez,
   // pra não precisar mexer no index.html).
   function _tqPadIndicador() {
+    _tqPadLinhaAtualizar();
     var tem = _tqPadLista().length > 0;
     var el = document.getElementById('tq-pad');
     if (!el && tem) {

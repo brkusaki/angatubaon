@@ -2492,8 +2492,8 @@
        Start (9) ............................... pausa / continua
      Fora da partida (fases, fim, pausa) quem lê o controle é o
      _arNavLoop (navegação nos menus — ver abaixo).
-     Pra ter "Configurar botões" igual ao Ritmo, é trocar os índices
-     fixos do _arPadLer por um mapa salvo (ver _rtPadMapa no ritmo.js).
+     Esse é o mapa PADRÃO: em "Configurar botões" (tela inicial, ou
+     Select nela) a pessoa escolhe um botão por ação — ver AR_PAD_ACOES.
   ══════════════════════════════════════════════════════════════ */
   var AR_PAD_ZONA = 0.25;   // deadzone do analógico (sem drift)
   var AR_PAD_START = 9;
@@ -2513,6 +2513,146 @@
     var x = gp.buttons && gp.buttons[b];
     return !!x && (x.pressed || x.value > 0.5);
   }
+
+  /* ── Configurar botões (igual ao "Configurar botões" do Ritmo) ──────
+     Um botão por ação, na ordem de AR_PAD_ACOES, salvo neste aparelho
+     (AR_PAD_KEY). Com mapa salvo, ele manda; sem, vale o "padrao" de
+     cada ação. O analógico continua valendo sempre e o Start fica de
+     fora (é sempre pausa). Abre pela linha "🎮 Controle conectado" da
+     tela inicial (ou Select nela); durante a configuração, Start cancela.
+  ─────────────────────────────────────────────────────────────────── */
+  var AR_PAD_ACOES = [
+    { k: 'esq', nome: 'Esquerda', padrao: [14] },
+    { k: 'dir', nome: 'Direita', padrao: [15] },
+    { k: 'pulo', nome: 'Pular', padrao: [0, 12, 7] },
+    { k: 'reiniciar', nome: 'Reiniciar', padrao: [3] },
+    { k: 'fases', nome: 'Escolher fase', padrao: [8] }
+  ];
+  var AR_PAD_KEY = 'angatuba_pad_armadilha';
+  var AR_PAD_NOMES = { 0: 'A', 1: 'B', 2: 'X', 3: 'Y', 4: 'LB', 5: 'RB', 6: 'LT', 7: 'RT', 8: 'Select', 9: 'Start', 10: 'L3', 11: 'R3', 12: '↑', 13: '↓', 14: '←', 15: '→' };
+  var _arPadCfg = _arPadCfgLer();   // { ação: botão } ou null (= padrão)
+  var _arPadCal = null;              // configuração aberta: { botoes, antes, raf, primeiro, el }
+
+  function _arPadCfgLer() {
+    try {
+      var c = JSON.parse(localStorage.getItem(AR_PAD_KEY) || 'null');
+      if (!c || typeof c !== 'object') return null;
+      for (var i = 0; i < AR_PAD_ACOES.length; i++) if (typeof c[AR_PAD_ACOES[i].k] !== 'number') return null;
+      return c;
+    } catch (e) { return null; }
+  }
+  // Botões que valem pra ação a agora (personalizado tem prioridade).
+  function _arPadBotoes(a) {
+    if (_arPadCfg) return [_arPadCfg[a]];
+    for (var i = 0; i < AR_PAD_ACOES.length; i++) if (AR_PAD_ACOES[i].k === a) return AR_PAD_ACOES[i].padrao;
+    return [];
+  }
+  function _arPadAlgum(gp, a) {
+    var l = _arPadBotoes(a);
+    for (var i = 0; i < l.length; i++) if (_arBotaoApertado(gp, l[i])) return true;
+    return false;
+  }
+
+  function _arPadCalAbrir() {
+    if (_arPadCal) return;
+    var tela = document.getElementById('jogo-armadilha');
+    if (!tela) return;
+    var ov = document.createElement('div');
+    ov.className = 'jpad-ov';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-label', 'Configurar controle');
+    ov.innerHTML = '<div class="jpad-caixa"><div class="jpad-tit">Configurar controle · Armadilha</div>' +
+      '<div class="jpad-msg"></div><div class="jpad-slots"></div>' +
+      '<div class="jpad-rodape">O analógico continua valendo. Start cancela.</div>' +
+      '<button type="button" class="jpad-link">Cancelar</button></div>';
+    ov.querySelector('.jpad-link').addEventListener('click', _arPadCalFechar);
+    tela.appendChild(ov);
+    _arPadCal = { botoes: [], antes: {}, raf: 0, primeiro: true, el: ov };
+    _arPadCalRender();
+    _arPadCal.raf = requestAnimationFrame(_arPadCalPoll);
+  }
+  function _arPadCalFechar() {
+    var c = _arPadCal;
+    _arPadCal = null;
+    if (c) {
+      if (c.raf) cancelAnimationFrame(c.raf);
+      if (c.el && c.el.parentNode) c.el.parentNode.removeChild(c.el);
+    }
+    _arPadLinhaAtualizar();
+  }
+  function _arPadCalRender() {
+    var c = _arPadCal;
+    if (!c) return;
+    var A = AR_PAD_ACOES, n = c.botoes.length, h = '';
+    c.el.querySelector('.jpad-msg').innerHTML = n < A.length
+      ? 'Aperte o botão pra <b>' + A[n].nome + '</b>.'
+      : '✔ Pronto! Botões salvos neste aparelho.';
+    for (var i = 0; i < A.length; i++) {
+      var b = c.botoes[i];
+      h += '<span class="jpad-slot' + (i === n ? ' jpad-slot-agora' : '') + (b !== undefined ? ' jpad-slot-ok' : '') + '">' +
+           A[i].nome + '<b>' + (b !== undefined ? (AR_PAD_NOMES[b] || ('B' + b)) : '?') + '</b></span>';
+    }
+    c.el.querySelector('.jpad-slots').innerHTML = h;
+  }
+  function _arPadCalPoll() {
+    var c = _arPadCal;
+    if (!c) return;
+    c.raf = 0;
+    var A = AR_PAD_ACOES, pads = _arPadLista();
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i];
+      for (var b = 0; b < (gp.buttons || []).length; b++) {
+        var chave = gp.index + '_' + b, ap = _arBotaoApertado(gp, b);
+        // no 1º frame só registra o que já estava apertado (não conta)
+        if (ap && !c.antes[chave] && !c.primeiro && c.botoes.length < A.length) {
+          if (b === AR_PAD_START) { _arPadCalFechar(); return; }
+          if (c.botoes.indexOf(b) === -1) {
+            c.botoes.push(b);
+            if (c.botoes.length === A.length) {
+              var cfg = {};
+              for (var j = 0; j < A.length; j++) cfg[A[j].k] = c.botoes[j];
+              _arPadCfg = cfg;
+              try { localStorage.setItem(AR_PAD_KEY, JSON.stringify(cfg)); } catch (e) {}
+              setTimeout(function () { if (_arPadCal === c) _arPadCalFechar(); }, 900);
+            }
+            _arPadCalRender();
+          }
+        }
+        c.antes[chave] = ap;
+      }
+    }
+    c.primeiro = false;
+    if (c.botoes.length < A.length) c.raf = requestAnimationFrame(_arPadCalPoll);
+  }
+  function _arPadUsarPadrao() {
+    _arPadCfg = null;
+    try { localStorage.removeItem(AR_PAD_KEY); } catch (e) {}
+    _arPadLinhaAtualizar();
+  }
+  // Linha "🎮 Controle conectado · Configurar botões" na tela inicial
+  // (criada na 1ª vez, pra não mexer no HTML; só aparece com controle).
+  function _arPadLinhaAtualizar() {
+    var pads = _arPadLista(), cx = (elMenu && elMenu.querySelector('.ar-caixa'));
+    if (!cx) return;
+    var el = cx.querySelector('.jpad-linha');
+    if (!el) {
+      if (!pads.length) return;
+      el = document.createElement('div');
+      el.className = 'jpad-linha';
+      el.innerHTML = '<span>🎮 <span class="jpad-txt">Controle conectado</span></span>' +
+        '<button type="button" class="jpad-btn" data-jpad="cfg">Configurar botões</button>' +
+        '<button type="button" class="jpad-btn" data-jpad="padrao">Usar padrão</button>';
+      el.querySelector('[data-jpad="cfg"]').addEventListener('click', function (ev) { ev.currentTarget.blur(); _arPadCalAbrir(); });
+      el.querySelector('[data-jpad="padrao"]').addEventListener('click', function (ev) { ev.currentTarget.blur(); _arPadUsarPadrao(); });
+      cx.insertBefore(el, cx.querySelector('#ar-fases'));
+    }
+    el.style.display = pads.length ? '' : 'none';
+    el.querySelector('[data-jpad="padrao"]').style.display = _arPadCfg ? '' : 'none';
+    var p = pads[0];
+    el.querySelector('.jpad-txt').textContent = 'Controle conectado' +
+      (_arPadCfg ? ' · botões personalizados' : (p && p.mapping !== 'standard' ? ' — configure os botões' : ''));
+  }
   // Estado lógico juntando todos os controles (null = nenhum conectado).
   function _arPadLer() {
     var pads = _arPadLista();
@@ -2520,12 +2660,12 @@
     var st = { esq: false, dir: false, pulo: false, start: false, y: false, select: false };
     for (var i = 0; i < pads.length; i++) {
       var gp = pads[i], x = (gp.axes && gp.axes[0]) || 0;
-      if (_arBotaoApertado(gp, 14) || x < -AR_PAD_ZONA) st.esq = true;
-      if (_arBotaoApertado(gp, 15) || x > AR_PAD_ZONA) st.dir = true;
-      if (_arBotaoApertado(gp, 0) || _arBotaoApertado(gp, 12) || _arBotaoApertado(gp, 7)) st.pulo = true;
+      if (_arPadAlgum(gp, 'esq') || x < -AR_PAD_ZONA) st.esq = true;
+      if (_arPadAlgum(gp, 'dir') || x > AR_PAD_ZONA) st.dir = true;
+      if (_arPadAlgum(gp, 'pulo')) st.pulo = true;
       if (_arBotaoApertado(gp, AR_PAD_START)) st.start = true;
-      if (_arBotaoApertado(gp, 3)) st.y = true;
-      if (_arBotaoApertado(gp, 8)) st.select = true;
+      if (_arPadAlgum(gp, 'reiniciar')) st.y = true;
+      if (_arPadAlgum(gp, 'fases')) st.select = true;
     }
     return st;
   }
@@ -2574,6 +2714,7 @@
     var tela = document.getElementById('jogo-armadilha');
     if (!ativo || (tela && tela.style.display === 'none')) return null;
     var loja = document.getElementById('lojajogo-overlay');
+    if (_arPadCal) return 'cal';                // configurando botões: é com o _arPadCalPoll
     if (loja && tela && loja.parentNode === tela && loja.style.display !== 'none') return 'loja';
     var M = _menu();
     if (M && M.aberto && M.aberto('jogo-armadilha')) return 'pausa';
@@ -2591,6 +2732,7 @@
       if (_arBotaoApertado(gp, 15) || (ax[0] || 0) > 0.6) st.dir = true;
       if (_arBotaoApertado(gp, 0)) st.a = true;
       if (_arBotaoApertado(gp, 1)) st.b = true;
+      if (_arBotaoApertado(gp, 8)) st.select = true;
       if (_arBotaoApertado(gp, AR_PAD_START)) st.start = true;
     }
     return st;
@@ -2658,13 +2800,13 @@
       _arNav.ctx = ctx; _arNav.foco = null;
       _arNavFocoLimpar();
     }
-    if (ctx === 'jogo' || ctx === 'loja') {
+    if (ctx === 'jogo' || ctx === 'loja' || ctx === 'cal') {
       if (ctx === 'loja' && st.b && !_arNav.antes.b && typeof window.lojaJogoFechar === 'function') window.lojaJogoFechar();
       _arNav.antes = {}; for (var k1 in st) _arNav.antes[k1] = true;
     } else {
       var l = _arNavItens(ctx), ev = [];
       if (!_arNav.foco || l.indexOf(_arNav.foco) === -1) _arNavFocar(_arNavPadrao(ctx, l));
-      ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'start'].forEach(function (n) {
+      ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'start', 'select'].forEach(function (n) {
         var ap = !!st[n], seta = n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir';
         if (ap && !_arNav.antes[n]) { ev.push(n); _arNav.desde[n] = agora; _arNav.rep[n] = agora; }
         else if (ap && seta && agora - _arNav.desde[n] > 420 && agora - _arNav.rep[n] > 120) { ev.push(n); _arNav.rep[n] = agora; }   // segurar rola
@@ -2672,7 +2814,7 @@
       });
       for (var i = 0; i < ev.length; i++) {
         _arNavAcao(ctx, ev[i], l);
-        if (ev[i] === 'a' || ev[i] === 'b' || ev[i] === 'start') break;   // trocou de tela: o resto do frame não vale
+        if (ev[i] !== 'cima' && ev[i] !== 'baixo' && ev[i] !== 'esq' && ev[i] !== 'dir') break;   // trocou de tela: o resto do frame não vale
       }
     }
     if (ctx !== 'jogo') _arPadAntes = _arPadLer() || {};
@@ -2680,6 +2822,7 @@
   }
 
   function _arNavAcao(ctx, n, l) {
+    if (n === 'select') { if (ctx === 'menu') _arPadCalAbrir(); return; }   // igual ao Select do Ritmo
     if (n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir') {
       if (_arNav.foco) _arNavFocar(_arNavMover(l, _arNav.foco, n));
       return;
@@ -2702,6 +2845,7 @@
 
   // 🎮 no HUD quando tem controle conectado.
   function _arPadIndicador() {
+    _arPadLinhaAtualizar();
     var el = root && root.querySelector('#ar-pad');
     if (el) el.style.display = _arPadLista().length ? '' : 'none';
   }

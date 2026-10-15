@@ -1869,8 +1869,8 @@
      teclado repete ~30x/s com a tecla segurada, então D-pad segurado =
      0.08 × 30 por segundo; o analógico é proporcional (0..1 depois da
      zona morta). Sem conversão de rotação: o motor já pensa em paisagem.
-     Pra ter "Configurar botões" igual ao Ritmo, é trocar os índices
-     fixos do _corPadLer por um mapa salvo (ver _rtPadMapa no ritmo.js).
+     Esse é o mapa PADRÃO: em "Configurar botões" (tela inicial, ou
+     Select nela) a pessoa escolhe um botão por ação — ver COR_PAD_ACOES.
   ══════════════════════════════════════════════════════════════ */
   var COR_PAD_ZONA = 0.25;        // deadzone do analógico (sem drift)
   var COR_PAD_VEL = 0.08 * 30;    // = seta do teclado segurada (por segundo)
@@ -1890,6 +1890,144 @@
     var x = gp.buttons && gp.buttons[b];
     return !!x && (x.pressed || x.value > 0.5);
   }
+
+  /* ── Configurar botões (igual ao "Configurar botões" do Ritmo) ──────
+     Um botão por ação, na ordem de COR_PAD_ACOES, salvo neste aparelho
+     (COR_PAD_KEY). Com mapa salvo, ele manda; sem, vale o "padrao" de
+     cada ação. O analógico continua valendo sempre e o Start fica de
+     fora (é sempre pausa). Abre pela linha "🎮 Controle conectado" da
+     tela inicial (ou Select nela); durante a configuração, Start cancela.
+  ─────────────────────────────────────────────────────────────────── */
+  var COR_PAD_ACOES = [
+    { k: 'esq', nome: 'Esquerda', padrao: [14] },
+    { k: 'dir', nome: 'Direita', padrao: [15] },
+    { k: 'tiro', nome: 'Atirar', padrao: [0, 7, 12] }
+  ];
+  var COR_PAD_KEY = 'angatuba_pad_corrida';
+  var COR_PAD_NOMES = { 0: 'A', 1: 'B', 2: 'X', 3: 'Y', 4: 'LB', 5: 'RB', 6: 'LT', 7: 'RT', 8: 'Select', 9: 'Start', 10: 'L3', 11: 'R3', 12: '↑', 13: '↓', 14: '←', 15: '→' };
+  var _corPadCfg = _corPadCfgLer();   // { ação: botão } ou null (= padrão)
+  var _corPadCal = null;              // configuração aberta: { botoes, antes, raf, primeiro, el }
+
+  function _corPadCfgLer() {
+    try {
+      var c = JSON.parse(localStorage.getItem(COR_PAD_KEY) || 'null');
+      if (!c || typeof c !== 'object') return null;
+      for (var i = 0; i < COR_PAD_ACOES.length; i++) if (typeof c[COR_PAD_ACOES[i].k] !== 'number') return null;
+      return c;
+    } catch (e) { return null; }
+  }
+  // Botões que valem pra ação a agora (personalizado tem prioridade).
+  function _corPadBotoes(a) {
+    if (_corPadCfg) return [_corPadCfg[a]];
+    for (var i = 0; i < COR_PAD_ACOES.length; i++) if (COR_PAD_ACOES[i].k === a) return COR_PAD_ACOES[i].padrao;
+    return [];
+  }
+  function _corPadAlgum(gp, a) {
+    var l = _corPadBotoes(a);
+    for (var i = 0; i < l.length; i++) if (_corBotaoApertado(gp, l[i])) return true;
+    return false;
+  }
+
+  function _corPadCalAbrir() {
+    if (_corPadCal) return;
+    var tela = document.getElementById('jogo-corrida');
+    if (!tela) return;
+    var ov = document.createElement('div');
+    ov.className = 'jpad-ov';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-label', 'Configurar controle');
+    ov.innerHTML = '<div class="jpad-caixa"><div class="jpad-tit">Configurar controle · Corrida</div>' +
+      '<div class="jpad-msg"></div><div class="jpad-slots"></div>' +
+      '<div class="jpad-rodape">O analógico continua valendo. Start cancela.</div>' +
+      '<button type="button" class="jpad-link">Cancelar</button></div>';
+    ov.querySelector('.jpad-link').addEventListener('click', _corPadCalFechar);
+    tela.appendChild(ov);
+    _corPadCal = { botoes: [], antes: {}, raf: 0, primeiro: true, el: ov };
+    _corPadCalRender();
+    _corPadCal.raf = requestAnimationFrame(_corPadCalPoll);
+  }
+  function _corPadCalFechar() {
+    var c = _corPadCal;
+    _corPadCal = null;
+    if (c) {
+      if (c.raf) cancelAnimationFrame(c.raf);
+      if (c.el && c.el.parentNode) c.el.parentNode.removeChild(c.el);
+    }
+    _corPadLinhaAtualizar();
+  }
+  function _corPadCalRender() {
+    var c = _corPadCal;
+    if (!c) return;
+    var A = COR_PAD_ACOES, n = c.botoes.length, h = '';
+    c.el.querySelector('.jpad-msg').innerHTML = n < A.length
+      ? 'Aperte o botão pra <b>' + A[n].nome + '</b>.'
+      : '✔ Pronto! Botões salvos neste aparelho.';
+    for (var i = 0; i < A.length; i++) {
+      var b = c.botoes[i];
+      h += '<span class="jpad-slot' + (i === n ? ' jpad-slot-agora' : '') + (b !== undefined ? ' jpad-slot-ok' : '') + '">' +
+           A[i].nome + '<b>' + (b !== undefined ? (COR_PAD_NOMES[b] || ('B' + b)) : '?') + '</b></span>';
+    }
+    c.el.querySelector('.jpad-slots').innerHTML = h;
+  }
+  function _corPadCalPoll() {
+    var c = _corPadCal;
+    if (!c) return;
+    c.raf = 0;
+    var A = COR_PAD_ACOES, pads = _corPadLista();
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i];
+      for (var b = 0; b < (gp.buttons || []).length; b++) {
+        var chave = gp.index + '_' + b, ap = _corBotaoApertado(gp, b);
+        // no 1º frame só registra o que já estava apertado (não conta)
+        if (ap && !c.antes[chave] && !c.primeiro && c.botoes.length < A.length) {
+          if (b === COR_PAD_START) { _corPadCalFechar(); return; }
+          if (c.botoes.indexOf(b) === -1) {
+            c.botoes.push(b);
+            if (c.botoes.length === A.length) {
+              var cfg = {};
+              for (var j = 0; j < A.length; j++) cfg[A[j].k] = c.botoes[j];
+              _corPadCfg = cfg;
+              try { localStorage.setItem(COR_PAD_KEY, JSON.stringify(cfg)); } catch (e) {}
+              setTimeout(function () { if (_corPadCal === c) _corPadCalFechar(); }, 900);
+            }
+            _corPadCalRender();
+          }
+        }
+        c.antes[chave] = ap;
+      }
+    }
+    c.primeiro = false;
+    if (c.botoes.length < A.length) c.raf = requestAnimationFrame(_corPadCalPoll);
+  }
+  function _corPadUsarPadrao() {
+    _corPadCfg = null;
+    try { localStorage.removeItem(COR_PAD_KEY); } catch (e) {}
+    _corPadLinhaAtualizar();
+  }
+  // Linha "🎮 Controle conectado · Configurar botões" na tela inicial
+  // (criada na 1ª vez, pra não mexer no HTML; só aparece com controle).
+  function _corPadLinhaAtualizar() {
+    var pads = _corPadLista(), cx = document.getElementById('cor-inicio');
+    if (!cx) return;
+    var el = cx.querySelector('.jpad-linha');
+    if (!el) {
+      if (!pads.length) return;
+      el = document.createElement('div');
+      el.className = 'jpad-linha';
+      el.innerHTML = '<span>🎮 <span class="jpad-txt">Controle conectado</span></span>' +
+        '<button type="button" class="jpad-btn" data-jpad="cfg">Configurar botões</button>' +
+        '<button type="button" class="jpad-btn" data-jpad="padrao">Usar padrão</button>';
+      el.querySelector('[data-jpad="cfg"]').addEventListener('click', function (ev) { ev.currentTarget.blur(); _corPadCalAbrir(); });
+      el.querySelector('[data-jpad="padrao"]').addEventListener('click', function (ev) { ev.currentTarget.blur(); _corPadUsarPadrao(); });
+      cx.insertBefore(el, cx.querySelector('.cor-play'));
+    }
+    el.style.display = pads.length ? '' : 'none';
+    el.querySelector('[data-jpad="padrao"]').style.display = _corPadCfg ? '' : 'none';
+    var p = pads[0];
+    el.querySelector('.jpad-txt').textContent = 'Controle conectado' +
+      (_corPadCfg ? ' · botões personalizados' : (p && p.mapping !== 'standard' ? ' — configure os botões' : ''));
+  }
   // Estado lógico juntando todos os controles (null = nenhum conectado).
   function _corPadLer() {
     var pads = _corPadLista();
@@ -1897,12 +2035,12 @@
     var st = { x: 0, tiro: false, start: false };
     for (var i = 0; i < pads.length; i++) {
       var gp = pads[i], ax = (gp.axes && gp.axes[0]) || 0;
-      var d = (_corBotaoApertado(gp, 15) ? 1 : 0) - (_corBotaoApertado(gp, 14) ? 1 : 0);
+      var d = (_corPadAlgum(gp, 'dir') ? 1 : 0) - (_corPadAlgum(gp, 'esq') ? 1 : 0);
       if (d) st.x = d;
       else if (!st.x && Math.abs(ax) > COR_PAD_ZONA) {
         st.x = (ax < 0 ? -1 : 1) * Math.min(1, (Math.abs(ax) - COR_PAD_ZONA) / (1 - COR_PAD_ZONA));
       }
-      if (_corBotaoApertado(gp, 0) || _corBotaoApertado(gp, 7) || _corBotaoApertado(gp, 12)) st.tiro = true;
+      if (_corPadAlgum(gp, 'tiro')) st.tiro = true;
       if (_corBotaoApertado(gp, COR_PAD_START)) st.start = true;
     }
     return st;
@@ -1946,6 +2084,7 @@
   function _corNavCtx() {
     var tela = document.getElementById('jogo-corrida');
     if (!tela || tela.style.display === 'none' || !_corCanvas) return null;
+    if (_corPadCal) return 'cal';                // configurando botões: é com o _corPadCalPoll
     if (_corEstado === 'jogando') {
       var M = _corMenu();
       return (M && M.aberto && M.aberto('jogo-corrida')) ? 'pausa' : 'jogo';
@@ -1963,6 +2102,7 @@
       if (_corBotaoApertado(gp, 15) || (ax[0] || 0) > 0.6) st.dir = true;
       if (_corBotaoApertado(gp, 0)) st.a = true;
       if (_corBotaoApertado(gp, 1)) st.b = true;
+      if (_corBotaoApertado(gp, 8)) st.select = true;
       if (_corBotaoApertado(gp, COR_PAD_START)) st.start = true;
     }
     return st;
@@ -2030,12 +2170,12 @@
       _corNav.ctx = ctx; _corNav.foco = null;
       _corNavFocoLimpar();
     }
-    if (ctx === 'jogo') {
+    if (ctx === 'jogo' || ctx === 'cal') {
       _corNav.antes = {}; for (var k1 in st) _corNav.antes[k1] = true;
     } else {
       var l = _corNavItens(ctx), ev = [];
       if (!_corNav.foco || l.indexOf(_corNav.foco) === -1) _corNavFocar(_corNavPadrao(ctx, l));
-      ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'start'].forEach(function (n) {
+      ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'start', 'select'].forEach(function (n) {
         var ap = !!st[n], seta = n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir';
         if (ap && !_corNav.antes[n]) { ev.push(n); _corNav.desde[n] = agora; _corNav.rep[n] = agora; }
         else if (ap && seta && agora - _corNav.desde[n] > 420 && agora - _corNav.rep[n] > 120) { ev.push(n); _corNav.rep[n] = agora; }   // segurar rola
@@ -2043,7 +2183,7 @@
       });
       for (var i = 0; i < ev.length; i++) {
         _corNavAcao(ctx, ev[i], l);
-        if (ev[i] === 'a' || ev[i] === 'b' || ev[i] === 'start') break;   // trocou de tela: o resto do frame não vale
+        if (ev[i] !== 'cima' && ev[i] !== 'baixo' && ev[i] !== 'esq' && ev[i] !== 'dir') break;   // trocou de tela: o resto do frame não vale
       }
     }
     if (ctx !== 'jogo') _corPadAntes = _corPadLer() || {};
@@ -2051,6 +2191,7 @@
   }
 
   function _corNavAcao(ctx, n, l) {
+    if (n === 'select') { if (ctx === 'inicio') _corPadCalAbrir(); return; }   // igual ao Select do Ritmo
     if (n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir') {
       if (_corNav.foco) _corNavFocar(_corNavMover(l, _corNav.foco, n));
       return;
@@ -2071,6 +2212,7 @@
   // 🎮 no HUD quando tem controle conectado (criado na 1ª vez, pra não
   // precisar mexer no index.html).
   function _corPadIndicador() {
+    _corPadLinhaAtualizar();
     var tem = _corPadLista().length > 0;
     var el = document.getElementById('cor-pad');
     if (!el && tem) {
@@ -2238,6 +2380,7 @@
     _corMostrarOverlay('inicio');
     _corAplicarOrientacaoRepetido();
     _corDrawIdle();
+    _corPadIndicador();
     _corNavIniciar();
   }
 

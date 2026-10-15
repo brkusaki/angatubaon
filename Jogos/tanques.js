@@ -677,6 +677,7 @@
     _tqResetBarris();
     _tqAplicarOrientacaoRepetido();
     _tqDesenhar();
+    _tqNavIniciar();
   }
   var _tqResizeOn = false;
   var _tqResizeTimers = []; // handles da cascata de remedição pós-rotação (ver A2.22)
@@ -1471,6 +1472,281 @@
     zona.addEventListener('pointercancel', soltar);
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     CONTROLE (Gamepad API) — mesmo padrão do Ritmo (ritmo.js)
+     Lido a cada frame no _tqLoop (a Gamepad API não tem eventos de
+     botão). Alimenta o MESMO _tqInputVec do joystick de toque — a
+     rotação do tanque continua sendo a do _tqAtualizarTanque, o vetor
+     só aponta a direção desejada. Com o dedo no joystick de toque
+     (_tqJoyId), o toque manda; soltou, o controle volta a mandar.
+     Mapa fixo, layout "standard" (Ipega 9076 no modo Android/X-input):
+       analógico esquerdo (axes 0/1, deadzone radial) ... direção
+       D-pad ↑↓←→ (12–15) .............................. direção (digital)
+       A (0) / RT (7) / RB (5) ......................... atira (1 tiro por aperto)
+       Start (9) ....................................... pausa (solo) ou abre o
+                                                         menu (multi); com o menu
+                                                         aberto, Start/Ⓑ continuam
+     Fora da partida (menu, sala, fim, pausa) quem lê o controle é o
+     _tqNavLoop (navegação nos menus — ver abaixo).
+     O vetor é no espaço do JOGO: com a arena girada por CSS (retrato)
+     não precisa do _tqDeltaLocal — "pra cima" no controle é "pra cima"
+     na arena que a pessoa está vendo.
+     Pra ter "Configurar botões" igual ao Ritmo, é trocar os índices
+     fixos do _tqPadLer por um mapa salvo (ver _rtPadMapa no ritmo.js).
+  ══════════════════════════════════════════════════════════════ */
+  var TQ_PAD_ZONA = 0.25;   // deadzone do analógico (sem drift)
+  var TQ_PAD_START = 9;
+  var _tqPadAntes = {};     // comando → estava apertado no frame anterior (borda)
+  var _tqPadMovendo = false; // o controle é quem pôs o valor atual no _tqInputVec
+  var _tqPadUsado = false;
+
+  function _tqPadLista() {
+    var out = [];
+    try {
+      var l = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (var i = 0; i < l.length; i++) if (l[i] && l[i].connected !== false) out.push(l[i]);
+    } catch (e) {}
+    return out;
+  }
+  function _tqBotaoApertado(gp, b) {
+    var x = gp.buttons && gp.buttons[b];
+    return !!x && (x.pressed || x.value > 0.5);
+  }
+  // Estado lógico juntando todos os controles (null = nenhum conectado).
+  function _tqPadLer() {
+    var pads = _tqPadLista();
+    if (!pads.length) return null;
+    var st = { x: 0, y: 0, fogo: false, start: false };
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i], ax = gp.axes || [];
+      var dx = (_tqBotaoApertado(gp, 15) ? 1 : 0) - (_tqBotaoApertado(gp, 14) ? 1 : 0);
+      var dy = (_tqBotaoApertado(gp, 13) ? 1 : 0) - (_tqBotaoApertado(gp, 12) ? 1 : 0);
+      if (dx || dy) {
+        var dl = Math.hypot(dx, dy);
+        st.x = dx / dl; st.y = dy / dl;
+      } else if (!st.x && !st.y) {
+        // Deadzone radial: abaixo de TQ_PAD_ZONA é zero; acima, reescala
+        // pra 0..1 (sem "degrau" na borda da zona morta).
+        var ax0 = ax[0] || 0, ax1 = ax[1] || 0, mag = Math.hypot(ax0, ax1);
+        if (mag > TQ_PAD_ZONA) {
+          var m = Math.min(1, (mag - TQ_PAD_ZONA) / (1 - TQ_PAD_ZONA));
+          st.x = ax0 / mag * m; st.y = ax1 / mag * m;
+        }
+      }
+      if (_tqBotaoApertado(gp, 0) || _tqBotaoApertado(gp, 7) || _tqBotaoApertado(gp, 5)) st.fogo = true;
+      if (_tqBotaoApertado(gp, TQ_PAD_START)) st.start = true;
+    }
+    return st;
+  }
+  // O que já está apertado ao começar a partida não vira tiro/pausa no 1º frame.
+  function _tqPadSnapshot() { _tqPadAntes = _tqPadLer() || {}; _tqPadMovendo = false; }
+
+  function _tqPadPoll() {
+    var st = _tqPadLer();
+    if (!st) return;
+    var antes = _tqPadAntes;
+    _tqPadAntes = st;
+    var M = _tqMenu(), aberto = !!(M && M.aberto && M.aberto('jogo-tanques'));
+    if (st.start && !antes.start && M && !aberto) {
+      M.abrir('jogo-tanques');               // fechar o menu é com o _tqNavLoop
+      return;
+    }
+    // Menu aberto no multiplayer (a partida segue por trás): o controle
+    // fica quieto, igual ao toque que o overlay bloqueia.
+    var x = aberto ? 0 : st.x, y = aberto ? 0 : st.y;
+    if (_tqJoyId === null) {
+      if (x || y) { _tqInputVec.x = x; _tqInputVec.y = y; _tqPadMovendo = true; _tqPadUsado = true; }
+      else if (_tqPadMovendo) { _tqInputVec.x = 0; _tqInputVec.y = 0; _tqPadMovendo = false; }
+    }
+    if (!aberto && st.fogo && !antes.fogo) { _tqPadUsado = true; _tqTentarAtirar(); }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     NAVEGAÇÃO COM O CONTROLE (fora da partida) — mesmo esquema do
+     _rtNavLoop do Ritmo. Um laço leve (_tqNavLoop) roda enquanto a tela
+     do Tanques está aberta; cada tela é um "contexto":
+       inicio  ↑↓←→ botão (tanque, modo, sala pública, jogar, salas
+               abertas…) · Ⓐ/Start confirma · Ⓑ volta aos jogos
+       sala    ↑↓ botão · Ⓐ/Start confirma · Ⓑ volta ao menu
+       fim     ↑↓ botão · Ⓐ/Start confirma · Ⓑ volta ao menu
+       pausa   ↑↓ opção · Ⓐ confirma · Ⓑ/Start continua (no multi o
+               menu só fecha — a partida nunca parou)
+       loja    Ⓑ fecha
+       jogo    nada — a partida é do _tqPadPoll
+     O campo de código (digitar) continua sendo pelo toque/teclado.
+     ↑↓←→ = D-pad ou analógico; segurar repete. O foco anda pro botão
+     mais próximo naquela direção e aparece com .tq-foco. Na troca de
+     contexto, o que já estava apertado é ignorado até soltar — e, fora
+     da partida, o _tqPadAntes acompanha o controle (o Ⓐ de "Jogar
+     sozinho" não sai atirando).
+  ══════════════════════════════════════════════════════════════ */
+  var _tqNav = { raf: 0, ctx: '', antes: {}, desde: {}, rep: {}, foco: null };
+
+  function _tqNavIniciar() { if (!_tqNav.raf) _tqNav.raf = requestAnimationFrame(_tqNavLoop); }
+  function _tqNavCtx() {
+    var tela = document.getElementById('jogo-tanques');
+    if (!tela || tela.style.display === 'none' || !_tqCanvas) return null;
+    var loja = document.getElementById('lojajogo-overlay');
+    if (loja && loja.parentNode === tela && loja.style.display !== 'none') return 'loja';
+    if (_tqEstado === 'jogando') {
+      var M = _tqMenu();
+      return (M && M.aberto && M.aberto('jogo-tanques')) ? 'pausa' : 'jogo';
+    }
+    return _tqEstado;   // 'inicio' | 'sala' | 'fim'
+  }
+  // Estado "lógico" de cada comando juntando todos os controles + analógico.
+  function _tqNavLer(pads) {
+    var st = {};
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i], ax = gp.axes || [];
+      if (_tqBotaoApertado(gp, 12) || (ax[1] || 0) < -0.6) st.cima = true;
+      if (_tqBotaoApertado(gp, 13) || (ax[1] || 0) > 0.6) st.baixo = true;
+      if (_tqBotaoApertado(gp, 14) || (ax[0] || 0) < -0.6) st.esq = true;
+      if (_tqBotaoApertado(gp, 15) || (ax[0] || 0) > 0.6) st.dir = true;
+      if (_tqBotaoApertado(gp, 0)) st.a = true;
+      if (_tqBotaoApertado(gp, 1)) st.b = true;
+      if (_tqBotaoApertado(gp, TQ_PAD_START)) st.start = true;
+    }
+    return st;
+  }
+  // Botões navegáveis do contexto (só os visíveis e habilitados).
+  function _tqNavItens(ctx) {
+    var cx = ctx === 'pausa' ? document.querySelector('#jogo-tanques .jm-overlay .jm-caixa')
+           : document.getElementById(ctx === 'inicio' ? 'tq-menu' : ctx === 'sala' ? 'tq-sala' : ctx === 'fim' ? 'tq-fim' : '');
+    if (!cx) return [];
+    return Array.prototype.slice.call(cx.querySelectorAll('button, label.tq-privada-toggle')).filter(function (b) {
+      return b.offsetParent !== null && !b.disabled;
+    });
+  }
+  // Foco inicial de cada tela: o botão "principal".
+  function _tqNavPadrao(ctx, l) {
+    var sel = ctx === 'pausa' ? '[data-jm="continuar"]' : ctx === 'inicio' ? '[onclick^="_tqJogarSozinho"]' : ctx === 'fim' ? '#tq-btn-revanche' : '';
+    for (var i = 0; sel && i < l.length; i++) if (l[i].matches(sel)) return l[i];
+    return l[0] || null;
+  }
+  // Próximo botão na direção n. Primeiro os "alinhados" (mesma linha pra
+  // ←→, mesma coluna pra ↑↓), o mais perto ganha. ←→ sem ninguém na linha
+  // fica parado (não pula na diagonal pra outra linha da grade); ↑↓ sem
+  // ninguém na coluna vai pro mais perto, penalizando o desvio lateral.
+  function _tqNavMover(l, el, n) {
+    var r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    var horiz = n === 'dir' || n === 'esq', melhor = null, nota = Infinity, alinhado = false;
+    for (var i = 0; i < l.length; i++) {
+      if (l[i] === el) continue;
+      var q = l[i].getBoundingClientRect(), dx = q.left + q.width / 2 - cx, dy = q.top + q.height / 2 - cy;
+      var frente = n === 'dir' ? dx : n === 'esq' ? -dx : n === 'baixo' ? dy : -dy;
+      if (frente <= 4) continue;
+      var al = horiz ? (q.top < r.bottom && q.bottom > r.top) : (q.left < r.right && q.right > r.left);
+      if (horiz && !al) continue;
+      var v = al ? frente : frente + (horiz ? Math.abs(dy) : Math.abs(dx)) * 2;
+      if ((al && !alinhado) || (al === alinhado && v < nota)) { nota = v; melhor = l[i]; alinhado = al; }
+    }
+    return melhor || el;
+  }
+  function _tqNavFocoLimpar() {
+    var l = document.querySelectorAll('#jogo-tanques .tq-foco');
+    for (var i = 0; i < l.length; i++) l[i].classList.remove('tq-foco');
+  }
+  function _tqNavFocar(el) {
+    _tqNavFocoLimpar();
+    _tqNav.foco = el;
+    if (!el) return;
+    el.classList.add('tq-foco');
+    try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+  }
+
+  function _tqNavLoop() {
+    _tqNav.raf = 0;
+    var ctx = _tqNavCtx();
+    if (!ctx) { _tqNavFocoLimpar(); _tqNav.ctx = ''; _tqNav.foco = null; return; }   // tela fechada: o laço para (preparar religa)
+    var pads = _tqPadLista();
+    if (!pads.length) {
+      if (_tqNav.ctx) { _tqNavFocoLimpar(); _tqNav.ctx = ''; _tqNav.foco = null; }
+      _tqNav.raf = requestAnimationFrame(_tqNavLoop);
+      return;
+    }
+    var st = _tqNavLer(pads), agora = performance.now();
+    if (ctx !== _tqNav.ctx) {
+      // trocou de tela: o que já está apertado não conta até soltar
+      _tqNav.antes = {}; for (var k0 in st) _tqNav.antes[k0] = true;
+      _tqNav.ctx = ctx; _tqNav.foco = null;
+      _tqNavFocoLimpar();
+    }
+    if (ctx === 'jogo' || ctx === 'loja') {
+      if (ctx === 'loja' && st.b && !_tqNav.antes.b && typeof window.lojaJogoFechar === 'function') window.lojaJogoFechar();
+      _tqNav.antes = {}; for (var k1 in st) _tqNav.antes[k1] = true;
+    } else {
+      var l = _tqNavItens(ctx), ev = [];
+      if (!_tqNav.foco || l.indexOf(_tqNav.foco) === -1) _tqNavFocar(_tqNavPadrao(ctx, l));
+      ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'start'].forEach(function (n) {
+        var ap = !!st[n], seta = n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir';
+        if (ap && !_tqNav.antes[n]) { ev.push(n); _tqNav.desde[n] = agora; _tqNav.rep[n] = agora; }
+        else if (ap && seta && agora - _tqNav.desde[n] > 420 && agora - _tqNav.rep[n] > 120) { ev.push(n); _tqNav.rep[n] = agora; }   // segurar rola
+        _tqNav.antes[n] = ap;
+      });
+      for (var i = 0; i < ev.length; i++) {
+        _tqNavAcao(ctx, ev[i], l);
+        if (ev[i] === 'a' || ev[i] === 'b' || ev[i] === 'start') break;   // trocou de tela: o resto do frame não vale
+      }
+    }
+    if (ctx !== 'jogo') _tqPadAntes = _tqPadLer() || {};
+    _tqNav.raf = requestAnimationFrame(_tqNavLoop);
+  }
+
+  function _tqNavAcao(ctx, n, l) {
+    if (n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir') {
+      if (_tqNav.foco) _tqNavFocar(_tqNavMover(l, _tqNav.foco, n));
+      return;
+    }
+    if (ctx === 'pausa' && (n === 'b' || n === 'start')) {
+      var M = _tqMenu();
+      if (M && M.fechar) M.fechar('jogo-tanques', true);
+      return;
+    }
+    if (n === 'a' || n === 'start') {
+      var alvo = _tqNav.foco;
+      if (alvo) alvo.click();      // o foco fica nele (ex.: escolher o tanque); se a tela mudar, o loop refaz
+      return;
+    }
+    if (n === 'b') {
+      if (ctx === 'inicio') { if (typeof window._voltarAoMenu === 'function') window._voltarAoMenu(); }
+      else _tqVoltarMenu();
+    }
+  }
+
+  // 🎮 no HUD da partida quando tem controle conectado (criado na 1ª vez,
+  // pra não precisar mexer no index.html).
+  function _tqPadIndicador() {
+    var tem = _tqPadLista().length > 0;
+    var el = document.getElementById('tq-pad');
+    if (!el && tem) {
+      var hud = document.getElementById('tq-hud');
+      if (!hud) return;
+      el = document.createElement('span');
+      el.id = 'tq-pad';
+      el.title = 'Controle conectado';
+      el.setAttribute('aria-label', 'Controle conectado');
+      el.textContent = '🎮';
+      el.style.cssText = 'font-size:15px;opacity:.85;line-height:1;';
+      hud.appendChild(el);
+    }
+    if (el) el.style.display = tem ? '' : 'none';
+  }
+  window.addEventListener('gamepadconnected', function () { _tqPadIndicador(); });
+  window.addEventListener('gamepaddisconnected', function () {
+    // Caiu no meio da partida: zera o vetor (se era o controle que
+    // estava dirigindo), esquece o tiro e, no solo, pausa.
+    if (_tqPadMovendo && _tqJoyId === null) { _tqInputVec.x = 0; _tqInputVec.y = 0; }
+    _tqPadMovendo = false;
+    _tqPadAntes = _tqPadLer() || {};
+    if (_tqEstado === 'jogando' && _tqModo === 'solo' && !_tqPausado && _tqPadUsado) {
+      var M = _tqMenu();
+      if (M && M.abrir) M.abrir('jogo-tanques');
+    }
+    if (!_tqPadLista().length) _tqPadUsado = false;
+    _tqPadIndicador();
+  });
+
   /* ── Dimensionamento (mesmo padrão dos outros jogos em canvas) ─ */
   function _tqDimensionar() {
     if (!_tqCanvas) return;
@@ -1737,6 +2013,8 @@
     _tqTravarLandscape();
     _tqAplicarOrientacaoRepetido();
     _tqUltimoTs = 0;
+    _tqPadSnapshot();
+    _tqPadIndicador();
     if (_tqRAF) cancelAnimationFrame(_tqRAF);
     _tqRAF = requestAnimationFrame(_tqLoop);
   }
@@ -1764,6 +2042,8 @@
     }
     var dt = _tqUltimoTs ? Math.min(0.05, (ts - _tqUltimoTs) / 1000) : 0;
     _tqUltimoTs = ts;
+    _tqPadPoll();                    // controle (Gamepad API) — não tem eventos de botão
+    if (_tqPausado) return;          // Start acabou de pausar (solo): o loop para aqui
     if (dt) {
       _tqMeuCooldown = Math.max(0, _tqMeuCooldown - dt);
       if (_tqRodadaEstado === 'jogando') _tqAtualizarTanque(_tqMeuTanque(), _tqInputVec.x, _tqInputVec.y, dt);

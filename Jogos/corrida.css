@@ -40,16 +40,7 @@
 
 /* ── Overlays (início/fim): SOBRE o palco, NÃO rotacionados, texto
    sempre em pé. ── */
-.cor-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:22px;background:rgba(9,12,10,.85);backdrop-filter:blur(3px);z-index:4;overflow-y:auto;-webkit-overflow-scrolling:touch;}
-/* Tela de fim com ranking (Top 5) costuma ficar mais alta que o palco em
-   telas curtas (celular deitado) — sem isto o conteúdo estourava pra fora
-   do .cor-palco (que tem overflow:hidden) e o botão "Correr de novo"
-   ficava inacessível. overflow-y:auto acima resolve o corte; os
-   pseudo-elementos abaixo são o truque padrão pra manter centralizado
-   quando cabe E, quando não cabe, começar do topo com scroll até o fim em
-   vez de cortar justo o topo do conteúdo (bug clássico de flex
-   justify-content:center + overflow). */
-.cor-overlay::before,.cor-overlay::after{content:'';margin:auto 0;}
+.cor-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:22px;background:rgba(9,12,10,.85);backdrop-filter:blur(3px);z-index:4;}
 .cor-overlay-owl{width:88px;height:88px;object-fit:contain;margin-bottom:10px;filter:drop-shadow(0 6px 18px rgba(0,0,0,.5));}
 .cor-overlay-titulo{font-size:21px;font-weight:800;color:#fff;font-family:'Syne',sans-serif;margin-bottom:8px;}
 .cor-overlay-pontos{font-size:28px;font-weight:900;color:var(--red,#ff3355);font-family:'Syne',sans-serif;margin-bottom:6px;}
@@ -65,3 +56,9 @@
 /* Crédito da música de fundo (CC BY — obrigatório, discreto). Mesmo
    tratamento visual do .pn-creditos do Piano da Coruja. */
 .cor-creditos{font-size:11px;line-height:1.5;color:rgba(199,209,224,.55);max-width:300px;margin-top:14px;}
+
+/* ── Foco do controle nos menus (fases/início, fim, pausa) — mesmo visual do .rt-foco do Ritmo ── */
+#jogo-corrida .cor-foco {
+  outline: 3px solid #a78bfa !important; outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(167,139,250,.25), 0 8px 24px rgba(167,139,250,.35) !important;
+}

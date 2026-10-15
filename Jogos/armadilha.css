@@ -191,3 +191,9 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-armadilha .jogo-voltar {
   .ar-fases .ar-fase-nome { font-size: 10px; }
   .ar-fases .ar-fase-btn { padding: 7px 4px; }
 }
+
+/* ── Foco do controle nos menus (fases/início, fim, pausa) — mesmo visual do .rt-foco do Ritmo ── */
+#jogo-armadilha .ar-foco {
+  outline: 3px solid #a78bfa !important; outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(167,139,250,.25), 0 8px 24px rgba(167,139,250,.35) !important;
+}

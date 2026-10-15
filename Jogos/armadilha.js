@@ -2223,6 +2223,8 @@
     if (!ativo || pausado) return;
     var dt = ultimoT ? Math.min(0.05, (t - ultimoT) / 1000) : 0;
     ultimoT = t;
+    _arPadPoll();                    // controle (Gamepad API) — não tem eventos de botão
+    if (pausado) return;             // Start acabou de pausar: o loop para aqui
     if (nivel) { _atualizar(dt); _desenhar(); }
     _sincMenu();
     raf = requestAnimationFrame(_loop);
@@ -2337,13 +2339,14 @@
   function _limparEntrada() {
     inp.esq = inp.dir = inp.pulo = false;
     puloPonteiros = {}; dpadPonteiros = {}; toques = {}; teclas = {};
+    _arPad.esq = _arPad.dir = _arPad.pulo = false;
     if (wrap) wrap.querySelectorAll('.ar-on').forEach(function (b) { b.classList.remove('ar-on'); });
   }
   function _apertarPulo(deToque) { inp.pulo = true; puloDeToque = !!deToque; if (p && estado === 'jogando') p.buffer = BUFFER_PULO; }
 
-  // Estado final = união de toque (toques), mouse/caneta (ponteiros) e teclado
+  // Estado final = união de toque (toques), mouse/caneta (ponteiros), teclado e controle
   function _recalcEntrada() {
-    var e = !!teclas.esq, d = !!teclas.dir, pu = !!teclas.pulo, k;
+    var e = !!teclas.esq || _arPad.esq, d = !!teclas.dir || _arPad.dir, pu = !!teclas.pulo || _arPad.pulo, k;
     var te = false, td = false, tp = false;
     for (k in toques) { var z = toques[k]; if (z === 'esq') te = true; else if (z === 'dir') td = true; else if (z === 'pulo') tp = true; }
     for (k in dpadPonteiros) { if (dpadPonteiros[k] < 0) te = true; else td = true; }
@@ -2475,6 +2478,250 @@
   // Janela perdeu o foco com tecla apertada: não deixa a coruja andando sozinha
   function _aoBlur() { if (ativo) _limparEntrada(); }
 
+  /* ══════════════════════════════════════════════════════════════
+     CONTROLE (Gamepad API) — mesmo padrão do Ritmo (ritmo.js)
+     Lido a cada frame no _loop (a Gamepad API não tem eventos de
+     botão). Soma com toque e teclado: o estado vai pro _arPad e entra
+     na união do _recalcEntrada, igual ao teclas.* do teclado.
+     Mapa fixo, layout "standard" (Ipega 9076 no modo Android/X-input):
+       ← (14) / analógico esquerdo X < -zona ... anda pra esquerda
+       → (15) / analógico esquerdo X > +zona ... anda pra direita
+       A (0) / ↑ (12) / RT (7) ................. pula (segurar = mais alto)
+       Y (3) ................................... reinicia a fase (= ↻ / tecla R)
+       Select (8) .............................. escolher fase (= ☰)
+       Start (9) ............................... pausa / continua
+     Fora da partida (fases, fim, pausa) quem lê o controle é o
+     _arNavLoop (navegação nos menus — ver abaixo).
+     Pra ter "Configurar botões" igual ao Ritmo, é trocar os índices
+     fixos do _arPadLer por um mapa salvo (ver _rtPadMapa no ritmo.js).
+  ══════════════════════════════════════════════════════════════ */
+  var AR_PAD_ZONA = 0.25;   // deadzone do analógico (sem drift)
+  var AR_PAD_START = 9;
+  var _arPad = { esq: false, dir: false, pulo: false };
+  var _arPadAntes = {};     // comando → estava apertado no frame anterior (borda)
+  var _arPadUsado = false;
+
+  function _arPadLista() {
+    var out = [];
+    try {
+      var l = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (var i = 0; i < l.length; i++) if (l[i] && l[i].connected !== false) out.push(l[i]);
+    } catch (e) {}
+    return out;
+  }
+  function _arBotaoApertado(gp, b) {
+    var x = gp.buttons && gp.buttons[b];
+    return !!x && (x.pressed || x.value > 0.5);
+  }
+  // Estado lógico juntando todos os controles (null = nenhum conectado).
+  function _arPadLer() {
+    var pads = _arPadLista();
+    if (!pads.length) return null;
+    var st = { esq: false, dir: false, pulo: false, start: false, y: false, select: false };
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i], x = (gp.axes && gp.axes[0]) || 0;
+      if (_arBotaoApertado(gp, 14) || x < -AR_PAD_ZONA) st.esq = true;
+      if (_arBotaoApertado(gp, 15) || x > AR_PAD_ZONA) st.dir = true;
+      if (_arBotaoApertado(gp, 0) || _arBotaoApertado(gp, 12) || _arBotaoApertado(gp, 7)) st.pulo = true;
+      if (_arBotaoApertado(gp, AR_PAD_START)) st.start = true;
+      if (_arBotaoApertado(gp, 3)) st.y = true;
+      if (_arBotaoApertado(gp, 8)) st.select = true;
+    }
+    return st;
+  }
+  // O que já está apertado ao abrir o jogo não vira pulo/pausa no 1º frame.
+  function _arPadSnapshot() { _arPadAntes = _arPadLer() || {}; }
+
+  function _arPadPoll() {
+    var st = _arPadLer();
+    if (!st) return;
+    var antes = _arPadAntes;
+    _arPadAntes = st;
+    if (estado === 'menu' || estado === 'fim') return;   // menus: é com o _arNavLoop
+    if (st.start && !antes.start && emPartida) {
+      var M = _menu();
+      if (M && M.abrir) { M.abrir('jogo-armadilha'); return; }
+    }
+    if (st.select && !antes.select) { _abrirMenu(); return; }
+    if (st.y && !antes.y) _reiniciar();
+    if (st.pulo && !antes.pulo) { _arPadUsado = true; _apertarPulo(); }
+    if (st.esq || st.dir) _arPadUsado = true;
+    if (st.esq !== _arPad.esq || st.dir !== _arPad.dir || st.pulo !== _arPad.pulo) {
+      _arPad.esq = st.esq; _arPad.dir = st.dir; _arPad.pulo = st.pulo;
+      _recalcEntrada();
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     NAVEGAÇÃO COM O CONTROLE (fora da partida) — mesmo esquema do
+     _rtNavLoop do Ritmo. Um laço leve (_arNavLoop) roda enquanto o jogo
+     está aberto; cada tela é um "contexto":
+       menu   (fases)  ↑↓←→ fase · Ⓐ/Start joga · Ⓑ volta aos jogos
+       fim             ↑↓ botão · Ⓐ/Start confirma · Ⓑ escolher fase
+       pausa  (hub)    ↑↓ opção · Ⓐ confirma · Ⓑ/Start continua
+       jogo            nada — a partida é do _arPadPoll
+     ↑↓←→ = D-pad ou analógico; segurar repete (rola a lista de fases).
+     O foco anda pro botão mais próximo naquela direção (serve tanto pra
+     grade de fases quanto pra lista vertical) e aparece com .ar-foco.
+     Na troca de contexto, o que já estava apertado é ignorado até
+     soltar — e, fora da partida, o _arPadAntes acompanha o controle:
+     o Ⓐ que escolheu a fase não vira pulo no 1º frame.
+  ══════════════════════════════════════════════════════════════ */
+  var _arNav = { raf: 0, ctx: '', antes: {}, desde: {}, rep: {}, foco: null };
+
+  function _arNavIniciar() { if (!_arNav.raf) _arNav.raf = requestAnimationFrame(_arNavLoop); }
+  function _arNavCtx() {
+    var tela = document.getElementById('jogo-armadilha');
+    if (!ativo || (tela && tela.style.display === 'none')) return null;
+    var loja = document.getElementById('lojajogo-overlay');
+    if (loja && tela && loja.parentNode === tela && loja.style.display !== 'none') return 'loja';
+    var M = _menu();
+    if (M && M.aberto && M.aberto('jogo-armadilha')) return 'pausa';
+    if (estado === 'menu' || estado === 'fim') return estado;
+    return 'jogo';
+  }
+  // Estado "lógico" de cada comando juntando todos os controles + analógico.
+  function _arNavLer(pads) {
+    var st = {};
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i], ax = gp.axes || [];
+      if (_arBotaoApertado(gp, 12) || (ax[1] || 0) < -0.6) st.cima = true;
+      if (_arBotaoApertado(gp, 13) || (ax[1] || 0) > 0.6) st.baixo = true;
+      if (_arBotaoApertado(gp, 14) || (ax[0] || 0) < -0.6) st.esq = true;
+      if (_arBotaoApertado(gp, 15) || (ax[0] || 0) > 0.6) st.dir = true;
+      if (_arBotaoApertado(gp, 0)) st.a = true;
+      if (_arBotaoApertado(gp, 1)) st.b = true;
+      if (_arBotaoApertado(gp, AR_PAD_START)) st.start = true;
+    }
+    return st;
+  }
+  // Botões navegáveis do contexto (só os visíveis e habilitados).
+  function _arNavItens(ctx) {
+    var cx = ctx === 'pausa' ? document.querySelector('#jogo-armadilha .jm-overlay .jm-caixa')
+           : ctx === 'menu' ? elMenu : ctx === 'fim' ? elFim : null;
+    if (!cx) return [];
+    return Array.prototype.slice.call(cx.querySelectorAll('button')).filter(function (b) {
+      return b.offsetParent !== null && !b.disabled;
+    });
+  }
+  // Foco inicial de cada tela: o botão "principal".
+  function _arNavPadrao(ctx, l) {
+    var sel = ctx === 'pausa' ? '[data-jm="continuar"]' : ctx === 'fim' ? '#ar-btn-denovo' : '[data-fase="' + _lerProgresso() + '"]';
+    for (var i = 0; i < l.length; i++) if (l[i].matches(sel)) return l[i];
+    return l[0] || null;
+  }
+  // Próximo botão na direção n. Primeiro os "alinhados" (mesma linha pra
+  // ←→, mesma coluna pra ↑↓), o mais perto ganha. ←→ sem ninguém na linha
+  // fica parado (não pula na diagonal pra outra linha da grade); ↑↓ sem
+  // ninguém na coluna vai pro mais perto, penalizando o desvio lateral.
+  function _arNavMover(l, el, n) {
+    var r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    var horiz = n === 'dir' || n === 'esq', melhor = null, nota = Infinity, alinhado = false;
+    for (var i = 0; i < l.length; i++) {
+      if (l[i] === el) continue;
+      var q = l[i].getBoundingClientRect(), dx = q.left + q.width / 2 - cx, dy = q.top + q.height / 2 - cy;
+      var frente = n === 'dir' ? dx : n === 'esq' ? -dx : n === 'baixo' ? dy : -dy;
+      if (frente <= 4) continue;
+      var al = horiz ? (q.top < r.bottom && q.bottom > r.top) : (q.left < r.right && q.right > r.left);
+      if (horiz && !al) continue;
+      var v = al ? frente : frente + (horiz ? Math.abs(dy) : Math.abs(dx)) * 2;
+      if ((al && !alinhado) || (al === alinhado && v < nota)) { nota = v; melhor = l[i]; alinhado = al; }
+    }
+    return melhor || el;
+  }
+  function _arNavFocoLimpar() {
+    var l = document.querySelectorAll('#jogo-armadilha .ar-foco');
+    for (var i = 0; i < l.length; i++) l[i].classList.remove('ar-foco');
+  }
+  function _arNavFocar(el) {
+    _arNavFocoLimpar();
+    _arNav.foco = el;
+    if (!el) return;
+    el.classList.add('ar-foco');
+    try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+  }
+
+  function _arNavLoop() {
+    _arNav.raf = 0;
+    var ctx = _arNavCtx();
+    if (!ctx) { _arNavFocoLimpar(); _arNav.ctx = ''; _arNav.foco = null; return; }   // jogo fechado: o laço para (preparar() religa)
+    var pads = _arPadLista();
+    if (!pads.length) {
+      if (_arNav.ctx) { _arNavFocoLimpar(); _arNav.ctx = ''; _arNav.foco = null; }
+      _arNav.raf = requestAnimationFrame(_arNavLoop);
+      return;
+    }
+    var st = _arNavLer(pads), agora = performance.now();
+    if (ctx !== _arNav.ctx) {
+      // trocou de tela: o que já está apertado não conta até soltar
+      _arNav.antes = {}; for (var k0 in st) _arNav.antes[k0] = true;
+      _arNav.ctx = ctx; _arNav.foco = null;
+      _arNavFocoLimpar();
+    }
+    if (ctx === 'jogo' || ctx === 'loja') {
+      if (ctx === 'loja' && st.b && !_arNav.antes.b && typeof window.lojaJogoFechar === 'function') window.lojaJogoFechar();
+      _arNav.antes = {}; for (var k1 in st) _arNav.antes[k1] = true;
+    } else {
+      var l = _arNavItens(ctx), ev = [];
+      if (!_arNav.foco || l.indexOf(_arNav.foco) === -1) _arNavFocar(_arNavPadrao(ctx, l));
+      ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'start'].forEach(function (n) {
+        var ap = !!st[n], seta = n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir';
+        if (ap && !_arNav.antes[n]) { ev.push(n); _arNav.desde[n] = agora; _arNav.rep[n] = agora; }
+        else if (ap && seta && agora - _arNav.desde[n] > 420 && agora - _arNav.rep[n] > 120) { ev.push(n); _arNav.rep[n] = agora; }   // segurar rola
+        _arNav.antes[n] = ap;
+      });
+      for (var i = 0; i < ev.length; i++) {
+        _arNavAcao(ctx, ev[i], l);
+        if (ev[i] === 'a' || ev[i] === 'b' || ev[i] === 'start') break;   // trocou de tela: o resto do frame não vale
+      }
+    }
+    if (ctx !== 'jogo') _arPadAntes = _arPadLer() || {};
+    _arNav.raf = requestAnimationFrame(_arNavLoop);
+  }
+
+  function _arNavAcao(ctx, n, l) {
+    if (n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir') {
+      if (_arNav.foco) _arNavFocar(_arNavMover(l, _arNav.foco, n));
+      return;
+    }
+    if (ctx === 'pausa' && (n === 'b' || n === 'start')) {
+      var M = _menu();
+      if (M && M.fechar) M.fechar('jogo-armadilha', true);
+      return;
+    }
+    if (n === 'a' || n === 'start') {
+      var alvo = _arNav.foco;
+      if (alvo) alvo.click();      // o foco fica nele (ex.: escolher o tanque); se a tela mudar, o loop refaz
+      return;
+    }
+    if (n === 'b') {
+      if (ctx === 'fim') _abrirMenu();
+      else if (ctx === 'menu' && typeof window._voltarAoMenu === 'function') window._voltarAoMenu();
+    }
+  }
+
+  // 🎮 no HUD quando tem controle conectado.
+  function _arPadIndicador() {
+    var el = root && root.querySelector('#ar-pad');
+    if (el) el.style.display = _arPadLista().length ? '' : 'none';
+  }
+  window.addEventListener('gamepadconnected', function () { _arPadIndicador(); });
+  window.addEventListener('gamepaddisconnected', function () {
+    // Caiu no meio da fase: solta tudo (a coruja não fica andando
+    // sozinha) e, se o controle estava sendo usado, pausa.
+    _arPad.esq = _arPad.dir = _arPad.pulo = false;
+    _arPadAntes = _arPadLer() || {};
+    if (ativo) {
+      _recalcEntrada();
+      if (!pausado && estado === 'jogando' && _arPadUsado) {
+        var M = _menu();
+        if (M && M.abrir) M.abrir('jogo-armadilha');
+      }
+    }
+    if (!_arPadLista().length) _arPadUsado = false;
+    _arPadIndicador();
+  });
+
   function _reiniciar() {
     if (estado === 'jogando' || estado === 'morto') _iniciarVida();   // mesmo reset da morte
   }
@@ -2495,6 +2742,7 @@
         '<div class="ar-hud">' +
           '<span class="ar-pill" id="ar-fase">Fase 1/' + FASES.length + '</span>' +
           '<span class="ar-pill" id="ar-mortes">☠ 0</span>' +
+          '<span class="ar-pill" id="ar-pad" style="display:none" title="Controle conectado" aria-label="Controle conectado">🎮</span>' +
           '<button type="button" class="ar-hud-btn" id="ar-btn-reiniciar" aria-label="Reiniciar fase">↻</button>' +
           '<button type="button" class="ar-hud-btn" id="ar-btn-menu" aria-label="Escolher fase">☰</button>' +
         '</div>' +
@@ -2515,7 +2763,7 @@
             '<div class="ar-titulo">Armadilha da Coruja</div>' +
             '<div class="ar-desc">Leve a coruja até a bandeira. Nada é o que parece: morreu, volta na hora. E cuidado com quem diz "me siga"...</div>' +
             '<div class="ar-fases" id="ar-fases"></div>' +
-            '<div class="ar-dica">◀ ▶ andar · ▲ pula (segure = mais alto)<br>Teclado: setas/A D · espaço/↑/W · R reinicia</div>' +
+            '<div class="ar-dica">◀ ▶ andar · ▲ pula (segure = mais alto)<br>Teclado: setas/A D · espaço/↑/W · R reinicia<br>Controle: ◀▶/analógico · Ⓐ/↑/RT pula · Ⓨ reinicia · Select fases · Start pausa</div>' +
           '</div>' +
         '</div>' +
         '<div class="ar-overlay" id="ar-fim" style="display:none">' +
@@ -2581,6 +2829,9 @@
     medida.cw = 0;
     _registrarMenu();
     pausado = false;
+    _arPadSnapshot();
+    _arPadIndicador();
+    _arNavIniciar();
     // Cenário da fase liberada aparece atrás do menu
     _comecarFase(_lerProgresso());
     _abrirMenu();
@@ -2592,6 +2843,8 @@
     if (!ativo) return;
     ativo = false;
     _desligarLoop();
+    if (_arNav.raf) { cancelAnimationFrame(_arNav.raf); _arNav.raf = 0; }
+    _arNavFocoLimpar(); _arNav.ctx = ''; _arNav.foco = null;
     _limparEntrada();
     _destravarOrientacao();
     window.removeEventListener('keydown', _teclaDown, true);

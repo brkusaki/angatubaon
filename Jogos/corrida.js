@@ -1722,6 +1722,8 @@
     var dt = (ts - _corLast) / 1000; _corLast = ts;
     if (dt > 0.05) dt = 0.05;
     _corRelogio = ts;                 // relógio p/ animação dos webp
+    _corPadPoll(dt);                  // controle (Gamepad API) — não tem eventos de botão
+    if (_corPausado) return;          // Start acabou de pausar: o loop para aqui
     _corUpdate(dt);
     if (_corEstado === 'jogando') { _corDraw(); _corRAF = requestAnimationFrame(_corLoop); }
   }
@@ -1850,6 +1852,252 @@
     window.addEventListener('keyup', _corCanvas.__coKU);
     _corListenersOn = true;
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     CONTROLE (Gamepad API) — mesmo padrão do Ritmo (ritmo.js)
+     Lido a cada frame no _corLoop (a Gamepad API não tem eventos de
+     botão). Soma com toque e teclado: mexe no mesmo _corCamX que as
+     setas e chama o mesmo _corAtirar.
+     Mapa fixo, layout "standard" (Ipega 9076 no modo Android/X-input):
+       ← (14) / analógico esquerdo X < -zona ... desvia pra esquerda
+       → (15) / analógico esquerdo X > +zona ... desvia pra direita
+       A (0) / RT (7) / ↑ (12) ................. atira (1 tiro por aperto)
+       Start (9) ............................... pausa / continua
+     Fora da partida (Começar, fim, pausa) quem lê o controle é o
+     _corNavLoop (navegação nos menus — ver abaixo).
+     Escala: a MESMA do teclado — cada repetição da seta anda 0.08 e o
+     teclado repete ~30x/s com a tecla segurada, então D-pad segurado =
+     0.08 × 30 por segundo; o analógico é proporcional (0..1 depois da
+     zona morta). Sem conversão de rotação: o motor já pensa em paisagem.
+     Pra ter "Configurar botões" igual ao Ritmo, é trocar os índices
+     fixos do _corPadLer por um mapa salvo (ver _rtPadMapa no ritmo.js).
+  ══════════════════════════════════════════════════════════════ */
+  var COR_PAD_ZONA = 0.25;        // deadzone do analógico (sem drift)
+  var COR_PAD_VEL = 0.08 * 30;    // = seta do teclado segurada (por segundo)
+  var COR_PAD_START = 9;
+  var _corPadAntes = {};          // comando → estava apertado no frame anterior (borda)
+  var _corPadUsado = false;
+
+  function _corPadLista() {
+    var out = [];
+    try {
+      var l = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (var i = 0; i < l.length; i++) if (l[i] && l[i].connected !== false) out.push(l[i]);
+    } catch (e) {}
+    return out;
+  }
+  function _corBotaoApertado(gp, b) {
+    var x = gp.buttons && gp.buttons[b];
+    return !!x && (x.pressed || x.value > 0.5);
+  }
+  // Estado lógico juntando todos os controles (null = nenhum conectado).
+  function _corPadLer() {
+    var pads = _corPadLista();
+    if (!pads.length) return null;
+    var st = { x: 0, tiro: false, start: false };
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i], ax = (gp.axes && gp.axes[0]) || 0;
+      var d = (_corBotaoApertado(gp, 15) ? 1 : 0) - (_corBotaoApertado(gp, 14) ? 1 : 0);
+      if (d) st.x = d;
+      else if (!st.x && Math.abs(ax) > COR_PAD_ZONA) {
+        st.x = (ax < 0 ? -1 : 1) * Math.min(1, (Math.abs(ax) - COR_PAD_ZONA) / (1 - COR_PAD_ZONA));
+      }
+      if (_corBotaoApertado(gp, 0) || _corBotaoApertado(gp, 7) || _corBotaoApertado(gp, 12)) st.tiro = true;
+      if (_corBotaoApertado(gp, COR_PAD_START)) st.start = true;
+    }
+    return st;
+  }
+  // O que já está apertado ao começar a corrida não vira tiro/pausa no 1º frame.
+  function _corPadSnapshot() { _corPadAntes = _corPadLer() || {}; }
+
+  function _corPadPoll(dt) {
+    var st = _corPadLer();
+    if (!st) return;
+    var antes = _corPadAntes;
+    _corPadAntes = st;
+    if (st.start && !antes.start) {
+      var M = _corMenu();
+      if (M && M.abrir) { M.abrir('jogo-corrida'); return; }
+    }
+    if (st.x) {
+      _corPadUsado = true;
+      _corCamX = _corClamp(_corCamX + st.x * COR_PAD_VEL * dt, -_COR_CAM_LIM, _COR_CAM_LIM);
+    }
+    if (st.tiro && !antes.tiro) { _corPadUsado = true; _corAudioDestravar(); _corAtirar(); }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     NAVEGAÇÃO COM O CONTROLE (fora da partida) — mesmo esquema do
+     _rtNavLoop do Ritmo. Um laço leve (_corNavLoop) roda enquanto a
+     tela da Corrida está aberta; cada tela é um "contexto":
+       inicio  Ⓐ/Start "Começar" · Ⓑ volta aos jogos
+       fim     ↑↓ botão · Ⓐ/Start confirma ("Correr de novo") · Ⓑ volta aos jogos
+       pausa   ↑↓ opção · Ⓐ confirma · Ⓑ/Start continua
+       jogo    nada — a corrida é do _corPadPoll
+     ↑↓←→ = D-pad ou analógico; segurar repete. O foco anda pro botão
+     mais próximo naquela direção e aparece com .cor-foco. Na troca de
+     contexto, o que já estava apertado é ignorado até soltar — e, fora
+     da partida, o _corPadAntes acompanha o controle (o Ⓐ de "Começar"
+     não sai atirando).
+  ══════════════════════════════════════════════════════════════ */
+  var _corNav = { raf: 0, ctx: '', antes: {}, desde: {}, rep: {}, foco: null };
+
+  function _corNavIniciar() { if (!_corNav.raf) _corNav.raf = requestAnimationFrame(_corNavLoop); }
+  function _corNavCtx() {
+    var tela = document.getElementById('jogo-corrida');
+    if (!tela || tela.style.display === 'none' || !_corCanvas) return null;
+    if (_corEstado === 'jogando') {
+      var M = _corMenu();
+      return (M && M.aberto && M.aberto('jogo-corrida')) ? 'pausa' : 'jogo';
+    }
+    return _corEstado === 'fim' ? 'fim' : 'inicio';
+  }
+  // Estado "lógico" de cada comando juntando todos os controles + analógico.
+  function _corNavLer(pads) {
+    var st = {};
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i], ax = gp.axes || [];
+      if (_corBotaoApertado(gp, 12) || (ax[1] || 0) < -0.6) st.cima = true;
+      if (_corBotaoApertado(gp, 13) || (ax[1] || 0) > 0.6) st.baixo = true;
+      if (_corBotaoApertado(gp, 14) || (ax[0] || 0) < -0.6) st.esq = true;
+      if (_corBotaoApertado(gp, 15) || (ax[0] || 0) > 0.6) st.dir = true;
+      if (_corBotaoApertado(gp, 0)) st.a = true;
+      if (_corBotaoApertado(gp, 1)) st.b = true;
+      if (_corBotaoApertado(gp, COR_PAD_START)) st.start = true;
+    }
+    return st;
+  }
+  // Botões navegáveis do contexto (só os visíveis e habilitados).
+  function _corNavItens(ctx) {
+    var cx = ctx === 'pausa' ? document.querySelector('#jogo-corrida .jm-overlay .jm-caixa')
+           : document.getElementById(ctx === 'fim' ? 'cor-fim' : 'cor-inicio');
+    if (!cx) return [];
+    return Array.prototype.slice.call(cx.querySelectorAll('button')).filter(function (b) {
+      return b.offsetParent !== null && !b.disabled;
+    });
+  }
+  // Foco inicial de cada tela: o botão "principal".
+  function _corNavPadrao(ctx, l) {
+    var sel = ctx === 'pausa' ? '[data-jm="continuar"]' : '.cor-play';
+    for (var i = 0; i < l.length; i++) if (l[i].matches(sel)) return l[i];
+    return l[0] || null;
+  }
+  // Próximo botão na direção n. Primeiro os "alinhados" (mesma linha pra
+  // ←→, mesma coluna pra ↑↓), o mais perto ganha. ←→ sem ninguém na linha
+  // fica parado (não pula na diagonal pra outra linha da grade); ↑↓ sem
+  // ninguém na coluna vai pro mais perto, penalizando o desvio lateral.
+  function _corNavMover(l, el, n) {
+    var r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    var horiz = n === 'dir' || n === 'esq', melhor = null, nota = Infinity, alinhado = false;
+    for (var i = 0; i < l.length; i++) {
+      if (l[i] === el) continue;
+      var q = l[i].getBoundingClientRect(), dx = q.left + q.width / 2 - cx, dy = q.top + q.height / 2 - cy;
+      var frente = n === 'dir' ? dx : n === 'esq' ? -dx : n === 'baixo' ? dy : -dy;
+      if (frente <= 4) continue;
+      var al = horiz ? (q.top < r.bottom && q.bottom > r.top) : (q.left < r.right && q.right > r.left);
+      if (horiz && !al) continue;
+      var v = al ? frente : frente + (horiz ? Math.abs(dy) : Math.abs(dx)) * 2;
+      if ((al && !alinhado) || (al === alinhado && v < nota)) { nota = v; melhor = l[i]; alinhado = al; }
+    }
+    return melhor || el;
+  }
+  function _corNavFocoLimpar() {
+    var l = document.querySelectorAll('#jogo-corrida .cor-foco');
+    for (var i = 0; i < l.length; i++) l[i].classList.remove('cor-foco');
+  }
+  function _corNavFocar(el) {
+    _corNavFocoLimpar();
+    _corNav.foco = el;
+    if (!el) return;
+    el.classList.add('cor-foco');
+    try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+  }
+
+  function _corNavLoop() {
+    _corNav.raf = 0;
+    var ctx = _corNavCtx();
+    if (!ctx) { _corNavFocoLimpar(); _corNav.ctx = ''; _corNav.foco = null; return; }   // tela fechada: o laço para (preparar religa)
+    var pads = _corPadLista();
+    if (!pads.length) {
+      if (_corNav.ctx) { _corNavFocoLimpar(); _corNav.ctx = ''; _corNav.foco = null; }
+      _corNav.raf = requestAnimationFrame(_corNavLoop);
+      return;
+    }
+    var st = _corNavLer(pads), agora = performance.now();
+    if (ctx !== _corNav.ctx) {
+      // trocou de tela: o que já está apertado não conta até soltar
+      _corNav.antes = {}; for (var k0 in st) _corNav.antes[k0] = true;
+      _corNav.ctx = ctx; _corNav.foco = null;
+      _corNavFocoLimpar();
+    }
+    if (ctx === 'jogo') {
+      _corNav.antes = {}; for (var k1 in st) _corNav.antes[k1] = true;
+    } else {
+      var l = _corNavItens(ctx), ev = [];
+      if (!_corNav.foco || l.indexOf(_corNav.foco) === -1) _corNavFocar(_corNavPadrao(ctx, l));
+      ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'start'].forEach(function (n) {
+        var ap = !!st[n], seta = n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir';
+        if (ap && !_corNav.antes[n]) { ev.push(n); _corNav.desde[n] = agora; _corNav.rep[n] = agora; }
+        else if (ap && seta && agora - _corNav.desde[n] > 420 && agora - _corNav.rep[n] > 120) { ev.push(n); _corNav.rep[n] = agora; }   // segurar rola
+        _corNav.antes[n] = ap;
+      });
+      for (var i = 0; i < ev.length; i++) {
+        _corNavAcao(ctx, ev[i], l);
+        if (ev[i] === 'a' || ev[i] === 'b' || ev[i] === 'start') break;   // trocou de tela: o resto do frame não vale
+      }
+    }
+    if (ctx !== 'jogo') _corPadAntes = _corPadLer() || {};
+    _corNav.raf = requestAnimationFrame(_corNavLoop);
+  }
+
+  function _corNavAcao(ctx, n, l) {
+    if (n === 'cima' || n === 'baixo' || n === 'esq' || n === 'dir') {
+      if (_corNav.foco) _corNavFocar(_corNavMover(l, _corNav.foco, n));
+      return;
+    }
+    if (ctx === 'pausa' && (n === 'b' || n === 'start')) {
+      var M = _corMenu();
+      if (M && M.fechar) M.fechar('jogo-corrida', true);
+      return;
+    }
+    if (n === 'a' || n === 'start') {
+      var alvo = _corNav.foco;
+      if (alvo) alvo.click();      // o foco fica nele; se a tela mudar, o loop refaz
+      return;
+    }
+    if (n === 'b' && typeof window._voltarAoMenu === 'function') window._voltarAoMenu();
+  }
+
+  // 🎮 no HUD quando tem controle conectado (criado na 1ª vez, pra não
+  // precisar mexer no index.html).
+  function _corPadIndicador() {
+    var tem = _corPadLista().length > 0;
+    var el = document.getElementById('cor-pad');
+    if (!el && tem) {
+      var hud = document.querySelector('#jogo-corrida .cor-hud');
+      if (!hud) return;
+      el = document.createElement('span');
+      el.id = 'cor-pad';
+      el.title = 'Controle conectado';
+      el.setAttribute('aria-label', 'Controle conectado');
+      el.textContent = '🎮';
+      el.style.cssText = 'align-self:center;font-size:16px;opacity:.85;line-height:1;';
+      hud.appendChild(el);
+    }
+    if (el) el.style.display = tem ? '' : 'none';
+  }
+  window.addEventListener('gamepadconnected', function () { _corPadIndicador(); });
+  window.addEventListener('gamepaddisconnected', function () {
+    // Caiu no meio da corrida: o movimento já para sozinho (sem controle
+    // não tem o que ler), esquece os botões e, se estava sendo usado, pausa.
+    _corPadAntes = _corPadLer() || {};
+    if (_corEstado === 'jogando' && !_corPausado && _corPadUsado) {
+      var M = _corMenu();
+      if (M && M.abrir) M.abrir('jogo-corrida');
+    }
+    if (!_corPadLista().length) _corPadUsado = false;
+    _corPadIndicador();
+  });
 
   /* ══════════════════════════════════════════════════════════════
      ORIENTAÇÃO NATIVA — pede ao sistema pra girar pra landscape (só
@@ -1990,6 +2238,7 @@
     _corMostrarOverlay('inicio');
     _corAplicarOrientacaoRepetido();
     _corDrawIdle();
+    _corNavIniciar();
   }
 
   /* Adianta o trabalho pesado de tirar o fundo chapado dos sprites (flood
@@ -2072,6 +2321,8 @@
     _corInicioMs = Date.now(); _corPausaTotalMs = 0; _corPausaInicioMs = 0;
     _corEstado = 'jogando'; _corLast = 0;
     _corMenuPartida(true);
+    _corPadSnapshot();
+    _corPadIndicador();
     if (_corRAF) cancelAnimationFrame(_corRAF);
     _corRAF = requestAnimationFrame(_corLoop);
     // Clique no botão = gesto do usuário → pode iniciar áudio de verdade.

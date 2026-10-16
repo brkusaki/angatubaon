@@ -10836,7 +10836,13 @@
     transito: { label: 'Trânsito',  cor: '#f87171' },
     feira:    { label: 'Feira',     cor: '#fb923c' },
     noticia:  { label: 'Notícia',   cor: '#38bdf8' },
+    // posts automáticos do Worker de notícias
+    novidade: { label: 'Novidade',  cor: '#00d084' },
+    jogos:    { label: 'Jogos',     cor: '#a78bfa' },
+    clima:    { label: 'Clima',     cor: '#22d3ee' },
   };
+  // tipo gravado pelo Worker → tipo do badge acima
+  var TIPO_POST_WORKER = { noticia: 'noticia', loja: 'novidade', jogos: 'jogos', clima: 'clima' };
   function _normalizarTipoAviso(tipo) {
     var s = String(tipo || '').trim().toLowerCase();
     return s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s;
@@ -10926,15 +10932,19 @@
           var f = l.document.fields || {};
           var txt = function (k) { return (f[k] && (f[k].stringValue || f[k].timestampValue)) || ''; };
           var img = txt('imagemUrl');
+          // alerta de clima vale só no dia: some sozinho mesmo antes do Worker arquivar
+          var expira = txt('expiraEm');
+          if (expira && new Date(expira).getTime() < Date.now()) return null;
           return {
             nid: l.document.name.split('/').pop(),
-            emoji: '📰', tipo: 'noticia',
+            emoji: txt('emoji') || '📰', tipo: TIPO_POST_WORKER[txt('tipo')] || 'noticia',
             titulo: txt('titulo'), texto: txt('texto'),
             criadoEm: txt('publicadoEm'), likes: 0,
             fonteNome: txt('fonteNome'), fonteUrl: txt('fonteUrl'),
+            rodapeCard: txt('rodapeCard'), linkUrl: txt('linkUrl'), linkTexto: txt('linkTexto'),
             midias: /^https:\/\/res\.cloudinary\.com\//.test(img) ? [{ tipo: 'foto', url: img }] : [],
           };
-        }).filter(function (n) { return n.titulo; });
+        }).filter(function (n) { return n && n.titulo; });
       })
       .catch(function () { return []; });
   }
@@ -11019,7 +11029,7 @@
         (tempoRel ? '<span class="aviso-tempo">' + _escHtmlAviso(tempoRel) + '</span>' : '') +
         // Notícia: título e resumo já estão desenhados na imagem — embaixo
         // vai só o crédito, pra não repetir o mesmo texto duas vezes.
-        '<span class="aviso-desc">' + _escHtmlAviso(a.nid && a.fonteNome ? 'Fonte: ' + a.fonteNome : a.texto) + '</span></div></div>' +
+        '<span class="aviso-desc">' + _escHtmlAviso(a.nid ? (a.rodapeCard || (a.fonteNome ? 'Fonte: ' + a.fonteNome : a.texto)) : a.texto) + '</span></div></div>' +
         acoesHtml + '</div>';
     }).join('');
     _avisoInitVideoObserver();
@@ -11063,13 +11073,31 @@
       elData.style.display = dataCompleta ? 'block' : 'none';
     }
     // Notícia: crédito + link pra matéria original
+    // Notícia: link pra matéria original. Post automático: link interno
+    // (loja nova → abre a loja; campeões → abre os jogos), sem sair do app.
     var elFonte = document.getElementById('aviso-post-fonte');
     if (elFonte) {
-      var temFonte = !!(aviso.fonteUrl && /^https:\/\//.test(aviso.fonteUrl));
+      var linkPost = aviso.fonteUrl || aviso.linkUrl || '';
+      var temFonte = /^https:\/\//.test(linkPost);
       elFonte.style.display = temFonte ? 'inline-flex' : 'none';
+      elFonte.onclick = null;
       if (temFonte) {
-        elFonte.href = aviso.fonteUrl;
-        elFonte.querySelector('span').textContent = 'Ler na fonte: ' + (aviso.fonteNome || 'notícia original');
+        var interno = linkPost.indexOf(location.origin + '/') === 0 || linkPost.indexOf('https://angatubaon.com.br/') === 0;
+        elFonte.href = linkPost;
+        elFonte.target = interno ? '' : '_blank';
+        elFonte.querySelector('span').textContent = aviso.linkTexto || ('Ler na fonte: ' + (aviso.fonteNome || 'notícia original'));
+        if (interno) {
+          elFonte.onclick = function (e) {
+            e.preventDefault();
+            var u = new URL(linkPost);
+            _fecharAvisoPost();
+            // espera o history.back() do fechamento antes de navegar
+            setTimeout(function () {
+              if (u.hash) location.hash = u.hash;
+              else if (typeof _fcmAbrirDestino === 'function') _fcmAbrirDestino(linkPost);
+            }, 350);
+          };
+        }
       }
     }
 

@@ -10835,6 +10835,7 @@
     oficial:  { label: 'Oficial',   cor: '#60a5fa' },
     transito: { label: 'Trânsito',  cor: '#f87171' },
     feira:    { label: 'Feira',     cor: '#fb923c' },
+    noticia:  { label: 'Notícia',   cor: '#38bdf8' },
   };
   function _normalizarTipoAviso(tipo) {
     var s = String(tipo || '').trim().toLowerCase();
@@ -10884,13 +10885,58 @@
   function _carregarAvisosReal() {
     var params = new URLSearchParams();
     params.append('payload', JSON.stringify({ action: 'avisosListar' }));
-    fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(10000) })
+    var avisosGas = fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(10000) })
       .then(function (r) { return r.json(); })
-      .then(function (json) {
-        if (json && json.status === 'ok' && Array.isArray(json.data)) _renderAvisosHoje(json.data);
-        else _renderAvisosHoje(AVISOS_HOJE_MOCK);
+      .then(function (json) { return (json && json.status === 'ok' && Array.isArray(json.data)) ? json.data : null; })
+      .catch(function () { return null; });
+    // Notícias aprovadas (Worker angatubaon-noticias) — falhar aqui nunca
+    // derruba os avisos: no pior caso a lista sai só com os do GAS.
+    Promise.all([avisosGas, _carregarNoticiasPublicadas()]).then(function (res) {
+      var avisos = res[0], noticias = res[1];
+      if (!avisos && !noticias.length) { _renderAvisosHoje(AVISOS_HOJE_MOCK); return; }
+      // Notícias entram na linha do tempo pela data de publicação, misturadas
+      // com os avisos (sort estável: a ordem do GAS entre si não muda).
+      var lista = (avisos || []).concat(noticias);
+      if (noticias.length) {
+        lista.sort(function (a, b) {
+          return (new Date(b.criadoEm || b.data || 0).getTime() || 0) - (new Date(a.criadoEm || a.data || 0).getTime() || 0);
+        });
+      }
+      _renderAvisosHoje(lista);
+    });
+  }
+
+  /* Lê as notícias com status "publicado" direto do Firestore pela API
+     REST (sem carregar o SDK do Firestore só pra isso). As regras só
+     deixam ler o que está publicado; o Worker tira do ar sozinho o que
+     passa de 7 dias. Cada notícia vira um "aviso" com a imagem do post
+     como mídia — reaproveita card, modal, curtir e compartilhar. */
+  function _carregarNoticiasPublicadas() {
+    var url = 'https://firestore.googleapis.com/v1/projects/' + _fbConfig.projectId +
+      '/databases/(default)/documents:runQuery?key=' + encodeURIComponent(_fbConfig.apiKey);
+    var corpo = { structuredQuery: {
+      from: [{ collectionId: 'noticias' }],
+      where: { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'publicado' } } },
+      limit: 10,
+    } };
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo), signal: AbortSignal.timeout(6000) })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (linhas) {
+        return (Array.isArray(linhas) ? linhas : []).filter(function (l) { return l && l.document; }).map(function (l) {
+          var f = l.document.fields || {};
+          var txt = function (k) { return (f[k] && (f[k].stringValue || f[k].timestampValue)) || ''; };
+          var img = txt('imagemUrl');
+          return {
+            nid: l.document.name.split('/').pop(),
+            emoji: '📰', tipo: 'noticia',
+            titulo: txt('titulo'), texto: txt('texto'),
+            criadoEm: txt('publicadoEm'), likes: 0,
+            fonteNome: txt('fonteNome'), fonteUrl: txt('fonteUrl'),
+            midias: /^https:\/\/res\.cloudinary\.com\//.test(img) ? [{ tipo: 'foto', url: img }] : [],
+          };
+        }).filter(function (n) { return n.titulo; });
       })
-      .catch(function () { _renderAvisosHoje(AVISOS_HOJE_MOCK); });
+      .catch(function () { return []; });
   }
   window._carregarAvisosReal = _carregarAvisosReal;
 
@@ -10971,7 +11017,9 @@
         '<div class="aviso-card-body"><span class="aviso-emoji">' + _escHtmlAviso(a.emoji || '📌') + '</span>' +
         '<div class="aviso-txt"><div class="aviso-txt-head"><strong>' + _escHtmlAviso(a.titulo) + '</strong>' + _badgeTipoAvisoHtml(a.tipo) + '</div>' +
         (tempoRel ? '<span class="aviso-tempo">' + _escHtmlAviso(tempoRel) + '</span>' : '') +
-        '<span class="aviso-desc">' + _escHtmlAviso(a.texto) + '</span></div></div>' +
+        // Notícia: título e resumo já estão desenhados na imagem — embaixo
+        // vai só o crédito, pra não repetir o mesmo texto duas vezes.
+        '<span class="aviso-desc">' + _escHtmlAviso(a.nid && a.fonteNome ? 'Fonte: ' + a.fonteNome : a.texto) + '</span></div></div>' +
         acoesHtml + '</div>';
     }).join('');
     _avisoInitVideoObserver();
@@ -11013,6 +11061,16 @@
       var dataCompleta = _dataCompletaAviso(aviso.criadoEm || aviso.data);
       elData.textContent = dataCompleta;
       elData.style.display = dataCompleta ? 'block' : 'none';
+    }
+    // Notícia: crédito + link pra matéria original
+    var elFonte = document.getElementById('aviso-post-fonte');
+    if (elFonte) {
+      var temFonte = !!(aviso.fonteUrl && /^https:\/\//.test(aviso.fonteUrl));
+      elFonte.style.display = temFonte ? 'inline-flex' : 'none';
+      if (temFonte) {
+        elFonte.href = aviso.fonteUrl;
+        elFonte.querySelector('span').textContent = 'Ler na fonte: ' + (aviso.fonteNome || 'notícia original');
+      }
     }
 
     var mediaWrap = document.getElementById('aviso-post-media-wrap');
@@ -11159,7 +11217,9 @@
   // Posts do mock (sem id do GAS) usam o índice como chave local — dá pra
   // curtir na hora (só não persiste no servidor, não tem o que salvar).
   function _avisoChaveCurtida(aviso, idx) {
-    return (aviso && aviso.id) ? aviso.id : ('m' + idx);
+    if (aviso && aviso.id) return aviso.id;
+    if (aviso && aviso.nid) return 'n_' + aviso.nid; // notícia: curtida só local (não há GAS pra persistir)
+    return 'm' + idx;
   }
 
   // Atualiza o coração + contador em todo lugar que o post aparece (card da
@@ -11233,7 +11293,9 @@
     var lista = window._avisosAtuais || AVISOS_HOJE_MOCK;
     var aviso = lista[idx];
     if (!aviso) return;
-    var url    = aviso.id ? (location.origin + '/?post=' + encodeURIComponent(aviso.id)) : (location.origin + '/');
+    var url    = aviso.id ? (location.origin + '/?post=' + encodeURIComponent(aviso.id))
+               : aviso.nid ? (location.origin + '/?post=n_' + encodeURIComponent(aviso.nid))
+               : (location.origin + '/');
     var titulo = aviso.titulo || 'Hoje em Angatuba';
     var texto  = aviso.texto || aviso.textoCompleto || '';
 
@@ -11371,7 +11433,9 @@
     if (!_avisoDeepLinkId) return;
     var lista = window._avisosAtuais || AVISOS_HOJE_MOCK;
     var idx = -1;
-    for (var i = 0; i < lista.length; i++) { if (lista[i] && lista[i].id === _avisoDeepLinkId) { idx = i; break; } }
+    for (var i = 0; i < lista.length; i++) {
+      if (lista[i] && (lista[i].id === _avisoDeepLinkId || (lista[i].nid && 'n_' + lista[i].nid === _avisoDeepLinkId))) { idx = i; break; }
+    }
     if (idx === -1) return; // ainda não achou (pode ser a lista mock) — tenta de novo no próximo render real
     _avisoDeepLinkId = null; // consome uma única vez
     setTimeout(function () { _abrirAvisoPost(idx); }, 50);

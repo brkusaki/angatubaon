@@ -3479,6 +3479,187 @@
   var _lojaJogoAtual = null;        // jogoId com a loja aberta (null = fechada)
   var _lojaJogoEmpilhou = false;    // true se esta abertura fez pushState
 
+  /* Miniatura de skin SEM imagem: desenha o que a skin muda dentro do
+     jogo (nota do Ritmo, coruja-botão da Sequência, doce, peça, azulejo,
+     raquete, tanque), com a mesma receita de cor/forma que o próprio jogo
+     usa — em vez de só quadradinhos de cor. Ao mexer no visual de um jogo,
+     conferir aqui. Jogo sem desenho próprio cai na grade de cores. */
+  var _LJ_T48_CLASSICA = ['#eee4da', '#ede0c8', '#f2b179', '#f59563', '#f67c5f', '#f65e3b', '#edcf72', '#edcc61', '#edc850', '#edc53f', '#fbbf24', '#64748b'];
+  var _LJ_PIANO_CLASSICA = { tecla: '#e3354f', tocada: '33,166,123', onda: '#8ffdd6', fundo: '#0d1420' };
+  var _LJ_BB_TEX = ['roxo', 'azul', 'verde', 'amarelo', 'rosa', 'ciano'];
+  var _LJ_DC_TEX = ['vermelho', 'roxo', 'verde', 'amarelo', 'azul'];
+  function _ljN(v) { return Math.round(v * 100) / 100; }
+  // Mistura um #rrggbb com branco (alvo 255) ou preto (alvo 0).
+  function _ljMix(cor, alvo, k) {
+    var n = parseInt(String(cor).slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+    return 'rgb(' + Math.round(r + (alvo - r) * k) + ',' + Math.round(g + (alvo - g) * k) + ',' + Math.round(b + (alvo - b) * k) + ')';
+  }
+  function _ljCirc(x, y, r, fill, extra) {
+    return '<circle cx="' + _ljN(x) + '" cy="' + _ljN(y) + '" r="' + _ljN(r) + '" fill="' + fill + '"' + (extra || '') + '/>';
+  }
+  function _ljSvg(corpo) {
+    return '<svg class="ljm" viewBox="0 0 88 64" aria-hidden="true">' + corpo + '</svg>';
+  }
+  // Nota do Ritmo — espelha _rtDesenharNota (Jogos/ritmo.js).
+  function _ljNota(x, y, r, cor, estilo, uid) {
+    if (estilo === 'flat') {
+      return _ljCirc(x, y, r, cor) + _ljCirc(x, y, r * 0.92, 'none', ' stroke="rgba(0,0,0,.28)" stroke-width="' + _ljN(Math.max(1.5, r * 0.1)) + '"');
+    }
+    if (estilo === 'olho') {
+      return _ljCirc(x, y, r, '#1c1206') +
+        '<radialGradient id="' + uid + '" gradientUnits="userSpaceOnUse" cx="' + x + '" cy="' + y + '" r="' + _ljN(r * 0.88) + '">' +
+          '<stop offset=".23" stop-color="#fde68a"/><stop offset="1" stop-color="' + cor + '"/></radialGradient>' +
+        _ljCirc(x, y, r * 0.86, 'url(#' + uid + ')') + _ljCirc(x, y, r * 0.4, '#0b0b0b') +
+        _ljCirc(x, y, r * 0.14, 'rgba(255,255,255,.9)') + _ljCirc(x - r * 0.22, y - r * 0.24, r * 0.12, '#fff');
+    }
+    if (estilo === 'neon') {
+      return _ljCirc(x, y, r * 1.3, cor, ' opacity=".22"') + _ljCirc(x, y, r, 'rgba(8,4,20,.85)') +
+        _ljCirc(x, y, r * 0.8, 'none', ' stroke="' + cor + '" stroke-width="' + _ljN(Math.max(2.5, r * 0.2)) + '"') +
+        _ljCirc(x, y, r * 0.22, cor);
+    }
+    if (estilo === 'ouro') {
+      var pts = [], sr = r * 0.42;
+      for (var i = 0; i < 8; i++) {
+        var rr = i % 2 ? sr * 0.28 : sr, ai = i * Math.PI / 4;
+        pts.push(_ljN(Math.cos(ai) * rr) + ',' + _ljN(Math.sin(ai) * rr));
+      }
+      return '<radialGradient id="' + uid + '" gradientUnits="userSpaceOnUse" cx="' + x + '" cy="' + y + '" r="' + r + '" fx="' + _ljN(x - r * 0.35) + '" fy="' + _ljN(y - r * 0.35) + '">' +
+          '<stop offset=".1" stop-color="#fffbeb"/><stop offset=".45" stop-color="' + cor + '"/><stop offset="1" stop-color="#78350f"/></radialGradient>' +
+        _ljCirc(x, y, r, 'url(#' + uid + ')') +
+        _ljCirc(x, y, r * 0.93, 'none', ' stroke="#fde68a" stroke-width="' + _ljN(Math.max(1.5, r * 0.09)) + '"') +
+        '<g transform="translate(' + _ljN(x + r * 0.28) + ' ' + _ljN(y - r * 0.3) + ')"><polygon points="' + pts.join(' ') + '" fill="rgba(255,255,255,.85)">' +
+          '<animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="3.77s" repeatCount="indefinite"/></polygon></g>';
+    }
+    // gema (padrão)
+    return _ljCirc(x, y, r, cor) + _ljCirc(x, y, r * 0.66, 'rgba(12,8,28,.55)') + _ljCirc(x, y, r * 0.42, cor) +
+      _ljCirc(x, y, r * 0.42, 'rgba(255,255,255,.55)') + _ljCirc(x - r * 0.3, y - r * 0.35, r * 0.22, 'rgba(255,255,255,.7)');
+  }
+  // Doce de tema com paleta — espelha _dcSpriteDoce (Jogos/doces.js).
+  function _ljDoce(m, n, R, cor, forma, uid) {
+    var claro = _ljMix(cor, 255, 0.6), escuro = _ljMix(cor, 0, 0.4), k, ang, raio, p = [], shape;
+    switch (forma % 5) {
+      case 0: shape = '<circle cx="' + m + '" cy="' + n + '" r="' + R + '"'; break;
+      case 1: shape = '<polygon points="' + m + ',' + _ljN(n - R * 1.05) + ' ' + _ljN(m + R * 0.9) + ',' + n + ' ' + m + ',' + _ljN(n + R * 1.05) + ' ' + _ljN(m - R * 0.9) + ',' + n + '"'; break;
+      case 2: var q = R * 0.86;
+              shape = '<rect x="' + _ljN(m - q) + '" y="' + _ljN(n - q) + '" width="' + _ljN(q * 2) + '" height="' + _ljN(q * 2) + '" rx="' + _ljN(R * 0.36) + '"'; break;
+      case 3: for (k = 0; k < 10; k++) {
+                ang = -Math.PI / 2 + k * Math.PI / 5; raio = (k % 2) ? R * 0.52 : R * 1.04;
+                p.push(_ljN(m + Math.cos(ang) * raio) + ',' + _ljN(n + Math.sin(ang) * raio));
+              }
+              shape = '<polygon points="' + p.join(' ') + '"'; break;
+      default: for (k = 0; k < 6; k++) {
+                ang = Math.PI / 6 + k * Math.PI / 3;
+                p.push(_ljN(m + Math.cos(ang) * R) + ',' + _ljN(n + Math.sin(ang) * R));
+              }
+              shape = '<polygon points="' + p.join(' ') + '"';
+    }
+    return '<radialGradient id="' + uid + '" gradientUnits="userSpaceOnUse" cx="' + m + '" cy="' + n + '" r="' + _ljN(R * 1.15) + '" fx="' + _ljN(m - R * 0.35) + '" fy="' + _ljN(n - R * 0.4) + '">' +
+        '<stop offset=".07" stop-color="' + claro + '"/><stop offset=".45" stop-color="' + cor + '"/><stop offset="1" stop-color="' + escuro + '"/></radialGradient>' +
+      shape + ' fill="url(#' + uid + ')" stroke="' + escuro + '" stroke-width="' + _ljN(R * 0.083) + '" stroke-linejoin="round"/>' +
+      '<ellipse cx="' + _ljN(m - R * 0.3) + '" cy="' + _ljN(n - R * 0.42) + '" rx="' + _ljN(R * 0.3) + '" ry="' + _ljN(R * 0.15) + '" fill="rgba(255,255,255,.5)" transform="rotate(-28.6 ' + _ljN(m - R * 0.3) + ' ' + _ljN(n - R * 0.42) + ')"/>';
+  }
+  function _lojaJogoMiniHtml(item) {
+    var uid = 'lj-' + item.id, cores = item.paleta || item.amostra || [], h = '', i;
+    var jogo = item.jogo;
+    if (jogo === 'ritmo' && item.nota && item.nota.cores) {
+      // 3 pistas com as notas descendo, linha de acerto embaixo.
+      var nc = item.nota.cores, xs = [17.3, 44, 70.7], ys = [42, 15, 29];
+      h = '<rect x="4" y="0" width="80" height="64" rx="8" fill="rgba(6,8,20,.7)"/>' +
+          '<path d="M30.7 0V64M57.3 0V64" stroke="rgba(255,255,255,.07)"/>' +
+          '<path d="M6 55H82" stroke="rgba(255,255,255,.22)" stroke-width="1.5"/>';
+      for (i = 0; i < 3; i++) h += _ljNota(xs[i], ys[i], 9.5, nc[i % nc.length], item.nota.estilo, uid + '-' + i);
+      return _ljSvg(h);
+    }
+    if (jogo === 'sequencia' && cores.length) {
+      // Grade de corujas-botão (como no jogo), uma acesa.
+      for (i = 0; i < 6; i++) {
+        h += '<i' + (i === 1 ? ' class="ljm-on"' : '') + ' style="--sqc:' + _rankEsc(cores[i % cores.length]) + '">' +
+             '<img src="/webp/owl-portrait.webp" alt="" loading="lazy" onerror="this.style.display=\'none\'"></i>';
+      }
+      return '<span class="ljm ljm-sq" aria-hidden="true">' + h + '</span>';
+    }
+    if (jogo === 'doces' && cores.length) {
+      // 3×2 casas do tabuleiro; clássico usa as texturas do jogo.
+      var cx = [18, 44, 70], cy = [18, 46];
+      for (i = 0; i < 6; i++) {
+        var m = cx[i % 3], n = cy[i < 3 ? 0 : 1], ci = i % 5;
+        h += '<rect x="' + (m - 12.5) + '" y="' + (n - 12.5) + '" width="25" height="25" rx="5" fill="rgba(255,255,255,.06)"/>';
+        h += item.paleta
+          ? _ljDoce(m, n, 10, item.paleta[ci % item.paleta.length], ci, uid + '-' + i)
+          : '<image href="/Jogos/assets/doces/doce-' + _LJ_DC_TEX[ci] + '.webp" x="' + (m - 12) + '" y="' + (n - 12) + '" width="24" height="24"/>';
+      }
+      return _ljSvg(h);
+    }
+    if (jogo === 'blocos' && cores.length) {
+      // Pedaço do tabuleiro 7×5 com peças encaixadas.
+      var mapa = '000..11' + '0..2.11' + '...2...' + '3332.4.' + '.3.2544';
+      for (i = 0; i < mapa.length; i++) {
+        var d = mapa.charAt(i);
+        if (d === '.') { h += '<i></i>'; continue; }
+        var k = +d, bg = item.paleta
+          ? 'background:' + _rankEsc(item.paleta[k % item.paleta.length]) + ' linear-gradient(145deg,rgba(255,255,255,.32),rgba(255,255,255,0) 45%,rgba(0,0,0,.22))'
+          : 'background:' + _rankEsc(cores[k % cores.length]) + ' url(/Jogos/assets/blocos/bloco-' + _LJ_BB_TEX[k] + '.webp) center/cover';
+        h += '<i class="ljm-cheio" style="' + bg + '"></i>';
+      }
+      return '<span class="ljm ljm-bb" aria-hidden="true">' + h + '</span>';
+    }
+    if (jogo === '2048') {
+      // Peças 2…2048 na paleta do tema (texto claro/escuro como no jogo).
+      var pal = item.paleta || _LJ_T48_CLASSICA, vals = [2, 8, 32, 128, 512, 2048];
+      for (i = 0; i < 6; i++) {
+        var idx = i * 2, cor = pal[idx], tx;
+        if (item.paleta) {
+          var nn = parseInt(cor.slice(1), 16);
+          tx = (0.299 * (nn >> 16 & 255) + 0.587 * (nn >> 8 & 255) + 0.114 * (nn & 255)) / 255 > 0.62 ? '#3a2e24' : '#fff';
+        } else {
+          tx = idx < 2 ? '#6b6055' : (idx === 10 ? '#3a2410' : '#fff7ee');
+        }
+        h += '<i style="background:' + _rankEsc(cor) + ';color:' + tx + (vals[i] > 999 ? ';font-size:8px' : '') + '">' + vals[i] + '</i>';
+      }
+      return '<span class="ljm ljm-48" aria-hidden="true">' + h + '</span>';
+    }
+    if (jogo === 'piano') {
+      // Pista com azulejos caindo: alvo com contorno, um já tocado + onda.
+      var pc = item.cores || _LJ_PIANO_CLASSICA;
+      h = '<rect width="88" height="64" rx="8" fill="' + pc.fundo + '"/>' +
+          '<path d="M22 0V64M44 0V64M66 0V64" stroke="rgba(255,255,255,.08)"/>' +
+          '<rect x="1.5" y="-6" width="19" height="22" rx="3" fill="' + pc.tecla + '"/>' +
+          '<rect x="45.5" y="17" width="19" height="22" rx="3" fill="' + pc.tecla + '" stroke="rgba(255,255,255,.85)" stroke-width="1.5"/>' +
+          '<rect x="67.5" y="-14" width="19" height="22" rx="3" fill="' + pc.tecla + '"/>' +
+          '<rect x="23.5" y="40" width="19" height="22" rx="3" fill="rgba(' + pc.tocada + ',.55)"/>' +
+          _ljCirc(33, 51, 10, 'none', ' stroke="' + pc.onda + '" stroke-width="1.5" opacity=".6"');
+      return _ljSvg(h);
+    }
+    if (jogo === 'pingpong') {
+      // Mesa em perspectiva + raquete e bola nas cores da skin.
+      var rq = item.corRaquete || '#38bdf8', bl = item.corBola || '#fff';
+      h = '<linearGradient id="' + uid + '-m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#123863"/><stop offset="1" stop-color="#2f7fe0"/></linearGradient>' +
+          '<radialGradient id="' + uid + '-b" cx=".35" cy=".35" r=".8"><stop offset="0" stop-color="rgba(255,255,255,.4)"/><stop offset="1" stop-color="rgba(255,255,255,0)"/></radialGradient>' +
+          '<polygon points="6,60 82,60 66,12 22,12" fill="url(#' + uid + '-m)" stroke="rgba(255,255,255,.92)" stroke-width="1.5" stroke-linejoin="round"/>' +
+          '<path d="M44 60V12" stroke="rgba(255,255,255,.6)"/>' +
+          '<rect x="13" y="30" width="62" height="4" fill="rgba(255,255,255,.3)"/><path d="M13 30H75" stroke="#fff" stroke-width="1.2"/>' +
+          _ljCirc(58, 21, 6, bl, ' opacity=".35"') + _ljCirc(58, 21, 3.5, bl) +
+          '<rect x="27.5" y="52" width="5" height="10" rx="2.5" fill="#3a2a1a"/>' +
+          '<ellipse cx="30" cy="45" rx="16" ry="13.5" fill="' + rq + '" opacity=".3"/>' +
+          '<ellipse cx="30" cy="45" rx="13" ry="10.7" fill="' + rq + '" stroke="rgba(255,255,255,.55)" stroke-width="1.2"/>' +
+          '<ellipse cx="30" cy="45" rx="13" ry="10.7" fill="url(#' + uid + '-b)"/>';
+      return _ljSvg(h);
+    }
+    if (jogo === 'tanques') {
+      // O próprio sprite do tanque, com a tinta da skin por cima (mesmo
+      // "source-atop" do jogo, aqui via máscara CSS).
+      var tk = '/Jogos/assets/tanques/tank-azul.webp';
+      return '<span class="ljm ljm-tq" aria-hidden="true"><img src="' + tk + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' +
+        (item.tinta ? '<i style="background:' + _rankEsc(item.tinta) + ';-webkit-mask-image:url(' + tk + ');mask-image:url(' + tk + ')"></i>' : '') + '</span>';
+    }
+    // Fallback: grade de quadradinhos das cores.
+    if (!cores.length) return '';
+    var nc2 = cores.length, cols = nc2 <= 3 ? nc2 : (nc2 <= 6 ? 3 : 4);
+    h = '<span class="lojajogo-amostra" style="grid-template-columns:repeat(' + cols + ',1fr)" aria-hidden="true">';
+    for (i = 0; i < nc2; i++) h += '<i style="background:' + _rankEsc(cores[i]) + '"></i>';
+    return h + '</span>';
+  }
+
   function _lojaJogoItemHtml(item, saldo, eq) {
     var tem = _temItem(item.id);
     var equipadoAgora = (eq[item.slot] === item.id);
@@ -3497,15 +3678,8 @@
     var estilo = (item.filtroCss ? 'filter:' + item.filtroCss + ';' : '') + (item.pixelado ? 'image-rendering:pixelated;' : '');
     var preco = tem ? '<span class="lojajogo-preco lojajogo-preco-tem">✓ Na coleção</span>'
                     : '<span class="lojajogo-preco">🪙 ' + item.preco + '</span>';
-    // Skin sem imagem (paleta/cores): miniatura = quadradinhos das cores.
-    var cores = item.amostra || item.paleta;
-    var amostraHtml = '';
-    if (!item.preview && cores && cores.length) {
-      var n = cores.length, cols = n <= 3 ? n : (n <= 6 ? 3 : 4);
-      amostraHtml = '<span class="lojajogo-amostra" style="grid-template-columns:repeat(' + cols + ',1fr)" aria-hidden="true">';
-      for (var ci = 0; ci < n; ci++) amostraHtml += '<i style="background:' + _rankEsc(cores[ci]) + '"></i>';
-      amostraHtml += '</span>';
-    }
+    // Skin sem imagem (paleta/cores): miniatura do que muda no jogo.
+    var amostraHtml = item.preview ? '' : _lojaJogoMiniHtml(item);
     return '<div class="loja-item' + (equipadoAgora ? ' loja-item-equipado' : '') + '">' +
              '<div class="loja-item-preview">' +
                (amostraHtml ? amostraHtml : item.preview

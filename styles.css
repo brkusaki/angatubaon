@@ -6889,6 +6889,46 @@ body.light-mode .rc-evento-chip { color: #b45309; }
     /* Miniatura de skin sem imagem (paleta/cores): grade de quadradinhos. */
     .lojajogo-amostra { display: grid; gap: 3px; width: 100%; height: 100%; padding: 6px; box-sizing: border-box; }
     .lojajogo-amostra i { display: block; border-radius: 4px; min-height: 8px; box-shadow: inset 0 -2px 0 rgba(0,0,0,.18); }
+    /* Miniatura que mostra o que a skin muda no jogo (_lojaJogoMiniHtml
+       em Jogos/hub.js): moldura mais larga que alta, cabe a cena. */
+    .lojajogo-overlay .loja-item-preview { width: 88px; height: 64px; }
+    .ljm { display: block; width: 100%; height: 100%; box-sizing: border-box; }
+    .ljm-sq { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 4px; }
+    .ljm-sq i {
+      display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 7px;
+      border: 1px solid color-mix(in srgb, var(--sqc) 40%, transparent);
+      background:
+        radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--sqc) 30%, transparent) 0%, transparent 70%),
+        linear-gradient(180deg, rgba(255,255,255,.055), rgba(0,0,0,.3));
+    }
+    .ljm-sq i img { width: 74%; height: 74%; object-fit: contain; opacity: .72; filter: grayscale(.35) brightness(.85); }
+    .ljm-sq i.ljm-on {
+      border-color: color-mix(in srgb, var(--sqc) 92%, #fff);
+      box-shadow: 0 0 9px 1px color-mix(in srgb, var(--sqc) 60%, transparent);
+      background: radial-gradient(circle at 50% 44%, #fff 0%, color-mix(in srgb, var(--sqc) 92%, #fff) 22%, var(--sqc) 44%, color-mix(in srgb, var(--sqc) 45%, #000) 100%);
+    }
+    .ljm-sq i.ljm-on img { opacity: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+    .ljm-bb { display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(5, 1fr); gap: 1.5px; padding: 5px; }
+    .ljm-bb i { border-radius: 2.5px; background: rgba(255,255,255,.06); }
+    .ljm-bb i.ljm-cheio { box-shadow: inset 0 -1.5px 0 rgba(0,0,0,.22); }
+    .ljm-48 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 5px; background: rgba(0,0,0,.22); border-radius: 14px; }
+    .ljm-48 i {
+      display: flex; align-items: center; justify-content: center; border-radius: 5px;
+      font-style: normal; font-family: var(--font-h); font-weight: 800; font-size: 10px; line-height: 1;
+      box-shadow: inset 0 -2px 0 rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.25);
+    }
+    /* Sprite do tanque é alto e fino: deitado (90°) pra encher a moldura. */
+    .ljm-tq { position: relative; }
+    .loja-item-preview .ljm-tq img,
+    .ljm-tq i {
+      position: absolute; left: 50%; top: 50%; width: 58px; height: 84px;
+      transform: translate(-50%, -50%) rotate(90deg);
+    }
+    .loja-item-preview .ljm-tq img { display: block; object-fit: contain; }
+    .ljm-tq i {
+      -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-position: center; mask-position: center;
+    }
 
     /* Botão "🎨 Skins" nas telas de início/fim dos jogos (abre a loja do
        jogo). Pílula escura translúcida com texto branco: legível tanto

@@ -14,7 +14,10 @@
                             notes:[{time, column, length?}] }
                           time/length em ms; column 0..keys-1 (keys = 4
                           se omitido). 5K/7K saem do mapa 4K (_rtConverterK).
-   - Skins .............. Loja da Coruja, slot rt_nota (hub.js) → _rtSkin()
+   - Skins .............. Loja da Coruja (hub.js): slot rt_nota → _rtSkin()
+                          (notas e receptores), rt_fundo → _rtFundoUrl()
+                          (imagem atrás das pistas), rt_pista → _rtPista()
+                          (cores das faixas, divisórias e linha de acerto)
    - Ranking ............ por mapa (música+dificuldade+colunas), via
                           AngatubaGames.rankMapaSubmeter / rankMapaPosicao
    - Entrada ............ toque (multitoque), teclado e controle (Gamepad API,
@@ -93,6 +96,22 @@
   /* ── Skin das notas (Loja da Coruja, slot rt_nota — ver hub.js) ──
      estilo: gema | flat | olho | neon | ouro  (ver _rtDesenharNota) */
   var RT_SKIN_PADRAO = { estilo: 'gema', cores: ['#a78bfa', '#fbbf24', '#5eead4'] };
+  /* ── Pista (slot rt_pista) — mesmos campos de item.pista no hub.js:
+     faixa [pares, ímpares], linha (divisórias), acerto (linha de acerto),
+     aperto ('r,g,b' do realce da coluna pressionada) e brilho opcional
+     (halo largo translúcido por baixo das linhas, no lugar de shadowBlur).
+     O padrão é exatamente o visual de antes das skins de pista. */
+  var RT_PISTA_PADRAO = { faixa: ['rgba(255,255,255,0.02)', 'rgba(255,255,255,0.035)'], linha: 'rgba(255,255,255,0.07)', acerto: 'rgba(255,255,255,0.10)', aperto: '167,139,250' };
+  // Fundo com imagem: véu escuro "assado" na cópia escalada (legibilidade
+  // geral) + um véu extra só sobre as pistas, onde as notas passam.
+  var RT_FUNDO_VEU = 'rgba(4,5,12,0.22)';
+  var RT_FUNDO_VEU_PISTA = 'rgba(4,5,12,0.30)';
+  /* ── Efeitos de acerto: partículas num pool FIXO (nada é criado
+     durante a partida). Cada uma guarda origem, velocidade e hora de
+     nascimento; a posição sai da fórmula (sem update por frame). */
+  var RT_PART_MAX = 48;
+  var RT_PART_QTD = { perfeito: 8, otimo: 6, bom: 4 };   // por acerto
+  var RT_ANEL_MS = 300;                                    // duração do anel de acerto
 
   /* ── Barra de vida (só no Hard) ─────────────────────────────────
      Começa cheia (1). Cada julgamento soma/subtrai; zerou → falhou.
@@ -140,6 +159,8 @@
   var _rtTotal = 0;            // julgamentos possíveis: toques + 2 por longa (cabeça + fim)
   var _rtVida = 1, _rtFalhou = false, _rtFalhaEm = 0, _rtFalhaPos = 0;
   var _rtSkinAtual = null;     // skin lida no começo da partida (não a cada frame)
+  var _rtPistaAtual = null;    // idem, skin da pista (rt_pista)
+  var _rtFundoAtual = null;    // idem, URL do fundo (rt_fundo); null = fundo escuro padrão
   var _rtDesenhoIni = 0;       // primeira nota que ainda pode aparecer na tela
   var _rtCont = null;          // contadores {perfeito, otimo, bom, erro}
   var _rtSoma = 0, _rtJulgadas = 0, _rtCombo = 0, _rtComboMax = 0;
@@ -151,6 +172,13 @@
   var _rtCanvas = null, _rtG = null, _rtW = 0, _rtH = 0, _rtDpr = 1;
   var _rtApertada = [0, 0, 0, 0];      // pista pressionada (contagem de dedos/teclas)
   var _rtBrilho = [0, 0, 0, 0];        // flash de acerto por pista (0..1)
+  var _rtAperto = [0, 0, 0, 0];        // receptor afundado (0..1, suavizado a cada frame)
+  var _rtAnel = [0, 0, 0, 0];          // performance.now() do último acerto por pista (anel)
+  var _rtAnelForca = [0, 0, 0, 0];     // 1 perfeito · 0,8 ótimo · 0,6 bom
+  var _rtParts = [], _rtPartProx = 0;  // pool de partículas (ver _rtEfeitoAcerto)
+  for (var _rtPi = 0; _rtPi < RT_PART_MAX; _rtPi++) _rtParts.push({ t0: 0, x: 0, y: 0, vx: 0, vy: 0, dur: 1, tam: 1, cor: '#fff' });
+  var _rtFundoImgs = {};               // url -> Image() (carrega uma vez só)
+  var _rtFundoCv = null, _rtFundoChave = '';   // fundo já escalado (cover) no tamanho do canvas
   var _rtPonteiros = {};               // pointerId -> coluna
   var _rtJulgVis = null;               // {tipo, ate, desvio}
   var _rtUltimoFrame = 0;
@@ -217,6 +245,49 @@
     return (n && n.estilo && n.cores && n.cores.length >= 3) ? { estilo: n.estilo, cores: n.cores, nome: it.nome } : { estilo: RT_SKIN_PADRAO.estilo, cores: RT_SKIN_PADRAO.cores, nome: 'Clássica' };
   }
   function _rtCorCol(skin, c, k) { return skin.cores[(RT_PADRAO_COR[k] || RT_PADRAO_COR[4])[c] || 0]; }
+  // Item equipado em outro slot do Ritmo (rt_fundo / rt_pista).
+  function _rtItemSlot(slot) {
+    var G = _rtG_();
+    try { return (G && typeof G.skinEquipada === 'function') ? G.skinEquipada(slot) : null; } catch (e) { return null; }
+  }
+  function _rtPista() {
+    var p = (_rtItemSlot('rt_pista') || {}).pista;
+    return (p && p.faixa && p.faixa.length >= 2 && p.linha && p.acerto && p.aperto) ? p : RT_PISTA_PADRAO;
+  }
+  // Fundo: o preview do item É a imagem (fundo padrão não tem → null).
+  function _rtFundoUrl() { return (_rtItemSlot('rt_fundo') || {}).preview || null; }
+  // Image() do fundo, criada uma vez por URL e reaproveitada.
+  function _rtFundoImg(url) {
+    if (!url) return null;
+    var im = _rtFundoImgs[url];
+    if (!im) { im = new Image(); im.decoding = 'async'; im.src = url; _rtFundoImgs[url] = im; }
+    return im;
+  }
+  function _rtFundoCarregou(im) { return !!(im && im.complete && im.naturalWidth); }
+  /* Cópia do fundo já escalada (cover, centralizada) e escurecida no
+     tamanho exato do canvas: o frame só faz UM drawImage 1:1, sem escala.
+     Refeita só quando muda a imagem ou o tamanho do canvas. null enquanto
+     a imagem não carregou (ou falhou) — aí vale o fundo escuro padrão. */
+  function _rtFundoPronto(url) {
+    var im = _rtFundoImg(url);
+    if (!_rtFundoCarregou(im) || !_rtCanvas) return null;
+    var cw = _rtCanvas.width, ch = _rtCanvas.height, chave = url + '|' + cw + 'x' + ch;
+    if (_rtFundoCv && _rtFundoChave === chave) return _rtFundoCv;
+    try {
+      var cv = _rtFundoCv || document.createElement('canvas');
+      cv.width = cw; cv.height = ch;
+      var g = cv.getContext('2d');
+      var iw = im.naturalWidth, ih = im.naturalHeight, esc = Math.max(cw / iw, ch / ih);
+      var dw = iw * esc, dh = ih * esc;
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(im, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+      g.fillStyle = RT_FUNDO_VEU;
+      g.fillRect(0, 0, cw, ch);
+      _rtFundoCv = cv; _rtFundoChave = chave;
+      return cv;
+    } catch (e) { return null; }
+  }
   // Velocidade 1..10 → tempo (ms) que a nota leva do topo até a linha de acerto.
   function _rtTempoQueda() { return 2100 - _rtCfg.velocidade * 150; }
 
@@ -507,7 +578,7 @@
               '<button type="button" class="rt-k" data-k="5" role="radio">5K</button>' +
               '<button type="button" class="rt-k" data-k="7" role="radio">7K</button>' +
             '</div>' +
-            '<button type="button" class="rt-skin-btn" id="rt-skin-btn" aria-label="Trocar a skin das notas"><canvas id="rt-skin-cv" width="72" height="28" aria-hidden="true"></canvas><span id="rt-skin-nome">Skin</span></button>' +
+            '<button type="button" class="rt-skin-btn" id="rt-skin-btn" aria-label="Trocar skins: notas, fundo e pista"><canvas id="rt-skin-cv" width="72" height="28" aria-hidden="true"></canvas><span id="rt-skin-nome">Skin</span></button>' +
           '</div>' +
           '<div class="rt-difs" role="radiogroup" aria-label="Dificuldade">' +
             '<button type="button" class="rt-dif" data-dif="normal" role="radio"><span class="rt-dif-nome">Normal</span><span class="rt-dif-info" id="rt-dif-normal"></span></button>' +
@@ -635,9 +706,11 @@
       if (G && typeof G.lojaJogoAbrir === 'function') G.lojaJogoAbrir('ritmo');
       else if (typeof window.lojaJogoAbrir === 'function') window.lojaJogoAbrir('ritmo');
     });
-    // Equipou outra skin (loja dentro do jogo): atualiza a amostra na hora.
+    // Equipou outra skin (loja dentro do jogo ou da Coruja): atualiza a
+    // amostra na hora; fundo novo já começa a baixar pra próxima partida.
     window.addEventListener('angatuba:equipado', function (e) {
-      if (e && e.detail && e.detail.slot === 'rt_nota') _rtRenderSkinBtn();
+      var s = e && e.detail && e.detail.slot;
+      if (s === 'rt_nota' || s === 'rt_fundo' || s === 'rt_pista') _rtRenderSkinBtn();
     });
     _rtEls.rankLinha.addEventListener('click', _rtTopAbrir);
     q('rt-pad-cfg').addEventListener('click', _rtPadCalAbrir);
@@ -728,17 +801,38 @@
     _rtPadIndicador();
   }
 
-  /* ── Botão da skin (amostra desenhada com a skin equipada) ────── */
+  /* ── Botão da skin (amostra desenhada com as skins equipadas) ────
+     Notas da rt_nota; por trás, o fundo (rt_fundo) e as divisórias da
+     pista (rt_pista) quando não são os padrões. Fundo ainda baixando:
+     redesenha sozinho quando a imagem chega. */
   function _rtRenderSkinBtn() {
     var cv = _rtEls.skinCv;
     if (!cv) return;
-    var sk = _rtSkin();
+    var sk = _rtSkin(), pista = _rtPista(), url = _rtFundoUrl(), im = _rtFundoImg(url);
     _rtEls.skinNome.textContent = sk.nome;
     var dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = 72 * dpr; cv.height = 28 * dpr;
     var g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, 72, 28);
+    if (im || pista !== RT_PISTA_PADRAO) {
+      g.save();
+      g.beginPath();                                   // cantos arredondados (r = 6)
+      g.moveTo(6, 0); g.arcTo(72, 0, 72, 28, 6); g.arcTo(72, 28, 0, 28, 6); g.arcTo(0, 28, 0, 0, 6); g.arcTo(0, 0, 72, 0, 6);
+      g.closePath(); g.clip();
+      g.fillStyle = 'rgba(6,8,20,0.7)'; g.fillRect(0, 0, 72, 28);
+      if (_rtFundoCarregou(im)) {
+        var iw = im.naturalWidth, ih = im.naturalHeight, esc = Math.max(72 / iw, 28 / ih);
+        g.drawImage(im, (72 - iw * esc) / 2, (28 - ih * esc) * 0.4, iw * esc, ih * esc);
+        g.fillStyle = RT_FUNDO_VEU; g.fillRect(0, 0, 72, 28);
+      } else if (im && !im._rtEsperaBtn) {
+        im._rtEsperaBtn = true;
+        im.addEventListener('load', function () { im._rtEsperaBtn = false; _rtRenderSkinBtn(); }, { once: true });
+      }
+      for (var f = 0; f < 3; f++) { g.fillStyle = pista.faixa[f % 2]; g.fillRect(f * 24, 0, 24, 28); }
+      g.fillStyle = pista.linha; g.fillRect(23.5, 0, 1, 28); g.fillRect(47.5, 0, 1, 28);
+      g.restore();
+    }
     for (var i = 0; i < 3; i++) _rtDesenharNota(g, 13 + i * 23, 14, 10, sk.cores[i], sk.estilo);
   }
 
@@ -894,10 +988,15 @@
     _rtJulgVis = null;
     _rtK = _rtCfg.colunas;
     _rtApertada = []; _rtBrilho = []; _rtSegurando = []; _rtPonteiros = {}; _rtTeclasDown = {}; _rtPadCols = {};
-    for (var c = 0; c < _rtK; c++) { _rtApertada.push(0); _rtBrilho.push(0); _rtSegurando.push(null); }
+    _rtAperto = []; _rtAnel = []; _rtAnelForca = [];
+    for (var c = 0; c < _rtK; c++) { _rtApertada.push(0); _rtBrilho.push(0); _rtSegurando.push(null); _rtAperto.push(0); _rtAnel.push(0); _rtAnelForca.push(0); }
+    for (var p = 0; p < _rtParts.length; p++) _rtParts[p].t0 = 0;   // apaga partículas da partida anterior
     _rtLongasPausadas = [];
     _rtVida = 1; _rtFalhou = false; _rtFalhaEm = 0; _rtFalhaPos = 0;
     _rtSkinAtual = _rtSkin();
+    _rtPistaAtual = _rtPista();
+    _rtFundoAtual = _rtFundoUrl();
+    _rtFundoImg(_rtFundoAtual);   // começa a carregar (se já não estiver no cache)
     _rtEls.score.textContent = '0';
     _rtEls.acc.textContent = '100,00%';
     _rtComboRender();
@@ -1059,6 +1158,9 @@
     for (var i = 0; i < _rtK; i++) {
       // segurando uma longa: a pista fica acesa (brilho mínimo 0,55)
       _rtBrilho[i] = Math.max(_rtSegurando[i] ? 0.55 : 0, _rtBrilho[i] - dt / 180);
+      // receptor afunda rápido ao tocar (~35 ms) e volta um pouco mais devagar
+      var alvoAp = _rtApertada[i] > 0 ? 1 : 0;
+      _rtAperto[i] += (alvoAp - _rtAperto[i]) * Math.min(1, dt / (alvoAp ? 35 : 70));
     }
     _rtDesenhar(agora);
     _rtRAF = requestAnimationFrame(_rtLoop);
@@ -1090,7 +1192,7 @@
         _rtSegurando[c] = null;
         n.seg = false;
         _rtFinalizarLonga(n, 'perfeito');
-        _rtBrilho[c] = 1;
+        _rtEfeitoAcerto(c, 'perfeito');
       }
     }
     for (var i = _rtLongasPausadas.length - 1; i >= 0; i--) {
@@ -1127,7 +1229,7 @@
     _rtJulgar(n, tipo, dt);
     _rtPonteiro[c]++;
     if (tipo !== 'erro') {
-      _rtBrilho[c] = 1; _rtDesvioSoma += dt; _rtDesvioN++;
+      _rtEfeitoAcerto(c, tipo); _rtDesvioSoma += dt; _rtDesvioN++;
       if (n.fim) { n.seg = true; _rtSegurando[c] = n; }       // começou a segurar
     } else if (n.fim) {
       _rtFinalizarLonga(n, 'erro', true);                       // errou a cabeça: perde a longa
@@ -1143,9 +1245,39 @@
     _rtSegurando[c] = null;
     n.seg = false;
     var cedo = n.fim - _rtAgoraMs();
-    if (cedo <= RT_JANELAS.otimo) _rtFinalizarLonga(n, 'perfeito');
-    else if (cedo <= RT_JANELAS.erro) _rtFinalizarLonga(n, 'bom');
+    if (cedo <= RT_JANELAS.otimo) { _rtFinalizarLonga(n, 'perfeito'); _rtEfeitoAcerto(c, 'perfeito'); }
+    else if (cedo <= RT_JANELAS.erro) { _rtFinalizarLonga(n, 'bom'); _rtEfeitoAcerto(c, 'bom'); }
     else { n.solto = true; _rtFinalizarLonga(n, 'erro'); }
+  }
+
+  /* ── Efeito de acerto: acende a pista, dispara o anel e solta
+     poucas partículas (4–8) do receptor, que somem em ~0,4 s. As
+     partículas vêm de um pool fixo de RT_PART_MAX objetos, reusado em
+     roda (o mais antigo é sobrescrito) — nunca cresce, nunca gera lixo. */
+  function _rtEfeitoAcerto(c, tipo) {
+    _rtBrilho[c] = 1;
+    var agora = performance.now();
+    _rtAnel[c] = agora;
+    _rtAnelForca[c] = tipo === 'perfeito' ? 1 : (tipo === 'otimo' ? 0.8 : 0.6);
+    if (!_rtW) return;
+    var L = _rtLayout(), cx = L.x0 + c * L.lw + L.lw / 2, raio = _rtRaioNota(L.lw);
+    var cor = _rtCorCol(_rtSkinAtual || RT_SKIN_PADRAO, c, _rtK);
+    var qtd = RT_PART_QTD[tipo] || 4;
+    for (var i = 0; i < qtd; i++) {
+      var p = _rtParts[_rtPartProx];
+      _rtPartProx = (_rtPartProx + 1) % RT_PART_MAX;
+      // leque pra cima (±65°) a partir da borda do receptor
+      var ang = -Math.PI / 2 + ((i + Math.random()) / qtd - 0.5) * 2.3;
+      var vel = 0.16 + Math.random() * 0.2;              // px/ms
+      p.x = cx + Math.cos(ang) * raio * 0.7;
+      p.y = L.hitY + Math.sin(ang) * raio * 0.7;
+      p.vx = Math.cos(ang) * vel;
+      p.vy = Math.sin(ang) * vel;
+      p.dur = 260 + Math.random() * 160;                  // ms de vida
+      p.tam = 1.6 + Math.random() * 2.2;                  // raio em px
+      p.cor = (tipo === 'perfeito' && i % 3 === 0) ? '#ffffff' : cor;
+      p.t0 = agora;
+    }
   }
 
   function _rtJulgar(n, tipo, desvio) {
@@ -2011,50 +2143,82 @@
     var queda = _rtTempoQueda();
     var px = hitY / queda;          // pixels por ms
     var skin = _rtSkinAtual || _rtSkin();
-    g.clearRect(0, 0, _rtW, _rtH);
+    var pista = _rtPistaAtual || RT_PISTA_PADRAO;
+    var PI2 = Math.PI * 2;
+    var pn = performance.now();
 
-    // Fundo das pistas
+    // Fundo: imagem equipada (cópia já escalada → 1 drawImage 1:1) ou,
+    // no padrão / enquanto a imagem carrega, o fundo escuro do CSS.
+    var fundo = _rtFundoAtual ? _rtFundoPronto(_rtFundoAtual) : null;
+    if (fundo) {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.drawImage(fundo, 0, 0);
+      g.setTransform(_rtDpr, 0, 0, _rtDpr, 0, 0);
+      g.fillStyle = RT_FUNDO_VEU_PISTA;          // véu extra só onde as notas passam
+      g.fillRect(x0, 0, lw * K, _rtH);
+    } else {
+      g.clearRect(0, 0, _rtW, _rtH);
+    }
+
+    // Fundo das pistas (cores da skin de pista)
     for (var c = 0; c < K; c++) {
       var x = x0 + c * lw;
-      g.fillStyle = c % 2 ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.02)';
+      g.fillStyle = pista.faixa[c % 2];
       g.fillRect(x, 0, lw, _rtH);
       if (_rtApertada[c] > 0) {
         var grad = g.createLinearGradient(0, hitY, 0, hitY - _rtH * 0.45);
-        grad.addColorStop(0, 'rgba(167,139,250,0.22)');
-        grad.addColorStop(1, 'rgba(167,139,250,0)');
+        grad.addColorStop(0, 'rgba(' + pista.aperto + ',0.22)');
+        grad.addColorStop(1, 'rgba(' + pista.aperto + ',0)');
         g.fillStyle = grad;
         g.fillRect(x, 0, lw, hitY);
       }
     }
-    g.strokeStyle = 'rgba(255,255,255,0.07)';
-    g.lineWidth = 1;
-    for (var s = 0; s <= K; s++) {
-      g.beginPath(); g.moveTo(x0 + s * lw + 0.5, 0); g.lineTo(x0 + s * lw + 0.5, _rtH); g.stroke();
+    // Divisórias: halo largo e translúcido por baixo (skins com brilho) + linha fina
+    if (pista.brilho) {
+      g.fillStyle = pista.brilho;
+      for (var sb = 0; sb <= K; sb++) g.fillRect(x0 + sb * lw - 2.5, 0, 5, _rtH);
     }
+    g.fillStyle = pista.linha;
+    for (var s = 0; s <= K; s++) g.fillRect(x0 + s * lw, 0, 1, _rtH);
 
-    // Linha de acerto + receptores (anéis redondos na cor da skin)
+    // Linha de acerto + receptores (no estilo da skin de nota)
     var raio = _rtRaioNota(lw);
-    g.strokeStyle = 'rgba(255,255,255,0.10)';
+    if (pista.brilho) { g.fillStyle = pista.brilho; g.fillRect(x0, hitY - 4, lw * K, 8); }
+    g.strokeStyle = pista.acerto;
     g.lineWidth = 2;
     g.beginPath(); g.moveTo(x0, hitY); g.lineTo(x0 + lw * K, hitY); g.stroke();
     for (var r = 0; r < K; r++) {
-      var cxr = x0 + r * lw + lw / 2, apertada = _rtApertada[r] > 0, corR = _rtCorCol(skin, r, K);
-      var rr = raio * (apertada ? 0.92 : 1);
-      g.beginPath(); g.arc(cxr, hitY, rr, 0, Math.PI * 2);
-      g.fillStyle = apertada ? 'rgba(255,255,255,0.18)' : 'rgba(9,14,22,0.75)';
-      g.fill();
-      g.lineWidth = Math.max(3, raio * 0.16);
+      var cxr = x0 + r * lw + lw / 2, corR = _rtCorCol(skin, r, K);
+      var ap = _rtAperto[r] || 0;                                   // 0 solto → 1 pressionado
+      var idadeA = pn - (_rtAnel[r] || 0);                          // ms desde o último acerto
+      var pop = idadeA < 140 ? (1 - idadeA / 140) * 0.1 : 0;        // "quique" no acerto
+      var rr = raio * (1 - 0.1 * ap + pop);
+      // halo da cor da pista quando pressiona (círculo translúcido, sem shadowBlur)
+      if (ap > 0.02) {
+        g.globalAlpha = 0.2 * ap;
+        g.beginPath(); g.arc(cxr, hitY, raio * 1.28, 0, PI2); g.fillStyle = corR; g.fill();
+      }
+      // base escura + "fantasma" da própria nota (gema, neon, ouro, olho, flat)
+      g.globalAlpha = 1;
+      g.beginPath(); g.arc(cxr, hitY, rr, 0, PI2); g.fillStyle = 'rgba(6,9,16,0.82)'; g.fill();
+      g.globalAlpha = 0.24 + 0.46 * ap;
+      _rtDesenharNota(g, cxr, hitY, rr * 0.74, corR, skin.estilo);
+      // anel grosso na cor da skin
+      g.globalAlpha = 0.72 + 0.28 * ap;
+      g.lineWidth = Math.max(3.5, raio * 0.19);
       g.strokeStyle = corR;
-      g.globalAlpha = apertada ? 1 : 0.6;
-      g.stroke();
+      g.beginPath(); g.arc(cxr, hitY, rr * 0.93, 0, PI2); g.stroke();
+      // fio claro por dentro do anel quando pressionado
+      if (ap > 0.02) {
+        g.globalAlpha = 0.55 * ap;
+        g.lineWidth = Math.max(1.5, raio * 0.06);
+        g.strokeStyle = '#ffffff';
+        g.beginPath(); g.arc(cxr, hitY, rr * 0.8, 0, PI2); g.stroke();
+      }
       g.globalAlpha = 1;
       if (_rtBrilho[r] > 0) {
-        // anel que se expande no acerto + faísca subindo pela pista
+        // faísca subindo pela pista (também acesa enquanto segura uma longa)
         var b = _rtBrilho[r];
-        g.globalAlpha = b;
-        g.lineWidth = 3;
-        g.strokeStyle = corR;
-        g.beginPath(); g.arc(cxr, hitY, raio * (1 + (1 - b) * 0.7), 0, Math.PI * 2); g.stroke();
         var fg = g.createLinearGradient(0, hitY, 0, hitY - 130);
         fg.addColorStop(0, corR);
         fg.addColorStop(1, 'rgba(0,0,0,0)');
@@ -2063,7 +2227,21 @@
         g.fillRect(x0 + r * lw + lw * 0.18, hitY - 130, lw * 0.64, 130);
         g.globalAlpha = 1;
       }
+      if (idadeA < RT_ANEL_MS) {
+        // anel de acerto: clarão no receptor + onda que abre e afina
+        var va = idadeA / RT_ANEL_MS, fa = _rtAnelForca[r] || 0.6, sai = 1 - (1 - va) * (1 - va);
+        if (va < 0.35) {
+          g.globalAlpha = (1 - va / 0.35) * 0.45 * fa;
+          g.beginPath(); g.arc(cxr, hitY, raio * (0.95 + 0.2 * va), 0, PI2); g.fillStyle = '#ffffff'; g.fill();
+        }
+        g.globalAlpha = (1 - va) * fa;
+        g.lineWidth = Math.max(1, raio * 0.22 * (1 - va));
+        g.strokeStyle = corR;
+        g.beginPath(); g.arc(cxr, hitY, raio * (1 + sai * (0.55 + 0.35 * fa)), 0, PI2); g.stroke();
+        g.globalAlpha = 1;
+      }
     }
+
 
     // Notas visíveis: do ponteiro de desenho até sair pelo topo.
     // Uma nota sai da lista quando já foi resolvida e passou da linha
@@ -2114,11 +2292,25 @@
       g.globalAlpha = 1;
     }
 
+    // Partículas do acerto (pool fixo; posição calculada pela idade)
+    for (var pi = 0; pi < RT_PART_MAX; pi++) {
+      var pt = _rtParts[pi];
+      if (!pt.t0) continue;
+      var ip = pn - pt.t0;
+      if (ip >= pt.dur || ip < 0) { pt.t0 = 0; continue; }
+      var vp = ip / pt.dur;
+      g.globalAlpha = 1 - vp;
+      g.fillStyle = pt.cor;
+      g.beginPath();
+      g.arc(pt.x + pt.vx * ip, pt.y + pt.vy * ip + 0.00045 * ip * ip, pt.tam * (1 - vp * 0.6), 0, PI2);
+      g.fill();
+    }
+    g.globalAlpha = 1;
+
     // Julgamento no alto da pista (o combo agora fica no HUD, no canto).
     // Animação: entra grande (1,5×) e assenta em 1× com um leve quique,
     // sobe uns pixels e some. Erro treme de lado em vez de quicar.
     var ccx = _rtW / 2, jy = Math.max(118, Math.min(_rtH * 0.24, hitY - 260));
-    var pn = performance.now();
     if (_rtJulgVis && pn < _rtJulgVis.ate) {
       var DUR = 520, vida = 1 - (_rtJulgVis.ate - pn) / DUR;      // 0 → 1
       var entra = Math.min(1, vida / 0.18);                        // primeiros ~90 ms
@@ -2195,6 +2387,9 @@
     // Solta a música decodificada (~50–90 MB de PCM): fora do jogo ela só
     // ocuparia memória do celular. Reabrir baixa do cache do SW, rápido.
     _rtBuf = null; _rtBufId = null;
+    // Idem a cópia escalada do fundo (do tamanho da tela). As Image() dos
+    // fundos ficam: são pequenas e reabrir o jogo não baixa de novo.
+    _rtFundoCv = null; _rtFundoChave = '';
     _rtEstado = 'selecao';
   }
 

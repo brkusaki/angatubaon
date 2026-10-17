@@ -2778,14 +2778,18 @@
   // público (_perfilPublicoSync só manda voo_owl/badge/bg/card).
   var LOJA_SLOTS = ['voo_owl', 'badge', 'bg', 'card',
     't48_tema', 'piano_tema', 'pp_skin', 'sq_tema', 'st_tema',
-    'bb_tema', 'tq_skin', 'dc_tema', 'rt_nota'];
+    'bb_tema', 'tq_skin', 'dc_tema', 'rt_nota', 'rt_fundo', 'rt_pista'];
 
   function _equipadoPadrao() {
     return { voo_owl: 'voo_skin_classica', badge: null, bg: 'bg_padrao', card: 'card_padrao',
       t48_tema: 't48_classico', piano_tema: 'piano_classico', pp_skin: 'pp_classico',
       sq_tema: 'sq_classico', st_tema: 'st_classico', bb_tema: 'bb_classico',
-      tq_skin: 'tq_classico', dc_tema: 'dc_classico', rt_nota: 'rt_classico' };
+      tq_skin: 'tq_classico', dc_tema: 'dc_classico', rt_nota: 'rt_classico',
+      rt_fundo: 'rtf_padrao', rt_pista: 'rtp_padrao' };
   }
+  // Título de cada slot na loja dentro do jogo — só aparece quando o jogo
+  // vende mais de um slot (hoje só o Ritmo: notas, fundo e pista).
+  var LOJA_SLOT_ROTULO = { rt_nota: '🎵 Notas e receptores', rt_fundo: '🖼️ Fundo', rt_pista: '🎸 Pista' };
 
   /* ── Catálogo (hardcoded) ──────────────────────────────────────
      Cada item: { id, nome, desc, preco, slot, tipo, preview, jogo }.
@@ -2876,6 +2880,27 @@
     { id: 'rt_coruja',   nome: 'Olho de Coruja', desc: 'Cada nota é um olhão âmbar.',   preco: 130, slot: 'rt_nota', tipo: 'skin', preview: null, jogo: 'ritmo', nota: { estilo: 'olho', cores: ['#f59e0b', '#fb923c', '#fde047'] }, amostra: ['#f59e0b', '#fb923c', '#1c1206'] },
     { id: 'rt_neon',     nome: 'Neon',           desc: 'Anéis que brilham no escuro.',  preco: 160, slot: 'rt_nota', tipo: 'skin', preview: null, jogo: 'ritmo', nota: { estilo: 'neon', cores: ['#f0abfc', '#22d3ee', '#a3e635'] }, amostra: ['#f0abfc', '#22d3ee', '#a3e635'] },
     { id: 'rt_ouro',     nome: 'Ouro Real',      desc: 'Ouro com brilho que corre.',    preco: 250, slot: 'rt_nota', tipo: 'skin', preview: null, jogo: 'ritmo', nota: { estilo: 'ouro', cores: ['#f59e0b', '#fbbf24', '#fde68a'] }, amostra: ['#b45309', '#fbbf24', '#fef3c7'] },
+    // Ritmo — fundo da partida (slot rt_fundo). O preview É a imagem que o
+    // jogo desenha atrás das pistas (cover, ver _rtFundoPronto em ritmo.js);
+    // sem preview = o fundo escuro de sempre. Artes em pé (9:16) com o terço
+    // de baixo escuro, pra não brigar com as notas na linha de acerto.
+    { id: 'rtf_padrao', nome: 'Padrão',      desc: 'Fundo escuro limpo.',           preco: 0,   slot: 'rt_fundo', tipo: 'bg', preview: null,                              jogo: 'ritmo' },
+    { id: 'rtf_anime',  nome: 'Anime Night', desc: 'Garota anime, cidade neon.',    preco: 140, slot: 'rt_fundo', tipo: 'bg', preview: '/img/cosmeticos/rtf-anime.jpg',  jogo: 'ritmo' },
+    { id: 'rtf_anime2', nome: 'Anime Boy',   desc: 'Garoto anime, luzes azuis.',    preco: 140, slot: 'rt_fundo', tipo: 'bg', preview: '/img/cosmeticos/rtf-anime2.jpg', jogo: 'ritmo' },
+    { id: 'rtf_carro',  nome: 'Night Drive', desc: 'Carro esportivo em rua neon.',  preco: 160, slot: 'rt_fundo', tipo: 'bg', preview: '/img/cosmeticos/rtf-carro.jpg',  jogo: 'ritmo' },
+    { id: 'rtf_jdm',    nome: 'JDM Garage',  desc: 'Carro JDM com underglow.',      preco: 160, slot: 'rt_fundo', tipo: 'bg', preview: '/img/cosmeticos/rtf-jdm.jpg',    jogo: 'ritmo' },
+    { id: 'rtf_espaco', nome: 'Espaço',      desc: 'Nebulosa roxa e azul.',         preco: 130, slot: 'rt_fundo', tipo: 'bg', preview: '/img/cosmeticos/rtf-espaco.jpg', jogo: 'ritmo' },
+    { id: 'rtf_cyber',  nome: 'Cyberpunk',   desc: 'Cidade cyberpunk chuvosa.',     preco: 150, slot: 'rt_fundo', tipo: 'bg', preview: '/img/cosmeticos/rtf-cyber.jpg',  jogo: 'ritmo' },
+    // Ritmo — pista / fretboard (slot rt_pista), só cor (sem imagem).
+    // pista.faixa = [pistas pares, pistas ímpares]; linha = divisórias;
+    // acerto = linha de acerto; aperto = 'r,g,b' do realce da coluna
+    // pressionada; brilho (opcional) = halo largo e translúcido por baixo
+    // das linhas (no lugar de shadowBlur). Padrão sem 'pista' = visual de sempre.
+    { id: 'rtp_padrao', nome: 'Padrão',        desc: 'Pistas sutis de sempre.',   preco: 0,   slot: 'rt_pista', tipo: 'skin', preview: null, jogo: 'ritmo', amostra: ['#1e1b2e', '#a78bfa'] },
+    { id: 'rtp_neon',   nome: 'Neon',          desc: 'Colunas com brilho neon.',  preco: 110, slot: 'rt_pista', tipo: 'skin', preview: null, jogo: 'ritmo', pista: { faixa: ['rgba(217,70,239,0.06)', 'rgba(34,211,238,0.06)'], linha: 'rgba(240,171,252,0.6)', acerto: '#22d3ee', aperto: '34,211,238', brilho: 'rgba(217,70,239,0.2)' }, amostra: ['#d946ef', '#22d3ee'] },
+    { id: 'rtp_ouro',   nome: 'Dourado',       desc: 'Tons dourados metálicos.',  preco: 130, slot: 'rt_pista', tipo: 'skin', preview: null, jogo: 'ritmo', pista: { faixa: ['rgba(251,191,36,0.05)', 'rgba(146,64,14,0.12)'], linha: 'rgba(253,230,138,0.45)', acerto: '#fbbf24', aperto: '251,191,36', brilho: 'rgba(245,158,11,0.16)' }, amostra: ['#92400e', '#fbbf24'] },
+    { id: 'rtp_gelo',   nome: 'Gelo',          desc: 'Azul claro e frio.',        preco: 120, slot: 'rt_pista', tipo: 'skin', preview: null, jogo: 'ritmo', pista: { faixa: ['rgba(186,230,253,0.06)', 'rgba(125,211,252,0.1)'], linha: 'rgba(186,230,253,0.38)', acerto: '#e0f2fe', aperto: '125,211,252', brilho: 'rgba(125,211,252,0.14)' }, amostra: ['#0c4a6e', '#bae6fd'] },
+    { id: 'rtp_roxo',   nome: 'Roxo Profundo', desc: 'Roxo escuro elegante.',     preco: 100, slot: 'rt_pista', tipo: 'skin', preview: null, jogo: 'ritmo', pista: { faixa: ['rgba(76,29,149,0.24)', 'rgba(46,16,101,0.32)'], linha: 'rgba(167,139,250,0.24)', acerto: 'rgba(196,181,253,0.65)', aperto: '139,92,246' }, amostra: ['#2e1065', '#8b5cf6'] },
 
     // Badges
     { id: 'badge_estrela', nome: 'Estrela da Coruja', desc: 'Pra quem brilha nos jogos.',         preco: 50,  slot: 'badge', tipo: 'badge', preview: '/webp/owl-tada.webp',   jogo: null },
@@ -3573,13 +3598,25 @@
   function _lojaJogoMiniHtml(item) {
     var uid = 'lj-' + item.id, cores = item.paleta || item.amostra || [], h = '', i;
     var jogo = item.jogo;
-    if (jogo === 'ritmo' && item.nota && item.nota.cores) {
-      // 3 pistas com as notas descendo, linha de acerto embaixo.
-      var nc = item.nota.cores, xs = [17.3, 44, 70.7], ys = [42, 15, 29];
-      h = '<rect x="4" y="0" width="80" height="64" rx="8" fill="rgba(6,8,20,.7)"/>' +
-          '<path d="M30.7 0V64M57.3 0V64" stroke="rgba(255,255,255,.07)"/>' +
-          '<path d="M6 55H82" stroke="rgba(255,255,255,.22)" stroke-width="1.5"/>';
-      for (i = 0; i < 3; i++) h += _ljNota(xs[i], ys[i], 9.5, nc[i % nc.length], item.nota.estilo, uid + '-' + i);
+    if (jogo === 'ritmo') {
+      // 3 pistas com as notas descendo, linha de acerto embaixo. Itens de
+      // fundo (rt_fundo) mostram a arte atrás; itens de pista (rt_pista)
+      // pintam as faixas/linhas — nesses dois, as notas são as clássicas.
+      var nt = (item.nota && item.nota.cores) ? item.nota : { estilo: 'gema', cores: ['#a78bfa', '#fbbf24', '#5eead4'] };
+      var pt = item.pista || { faixa: ['rgba(255,255,255,0)', 'rgba(255,255,255,.03)'], linha: 'rgba(255,255,255,.07)', acerto: 'rgba(255,255,255,.22)' };
+      var nc = nt.cores, xs = [17.3, 44, 70.7], ys = [42, 15, 29];
+      h = '<clipPath id="' + uid + '-c"><rect x="4" y="0" width="80" height="64" rx="8"/></clipPath>' +
+          '<g clip-path="url(#' + uid + '-c)">' +
+          '<rect x="4" y="0" width="80" height="64" fill="rgba(6,8,20,.7)"/>' +
+          (item.preview ? '<image href="' + _rankEsc(item.preview) + '" x="4" y="-32" width="80" height="143" preserveAspectRatio="xMidYMid slice"/>' +
+                          '<rect x="4" y="0" width="80" height="64" fill="rgba(4,5,12,.22)"/>' : '') +
+          '<rect x="4" y="0" width="26.7" height="64" fill="' + pt.faixa[0] + '"/>' +
+          '<rect x="30.7" y="0" width="26.6" height="64" fill="' + pt.faixa[1] + '"/>' +
+          '<rect x="57.3" y="0" width="26.7" height="64" fill="' + pt.faixa[0] + '"/>' +
+          (pt.brilho ? '<path d="M30.7 0V64M57.3 0V64M4 55H84" stroke="' + pt.brilho + '" stroke-width="4"/>' : '') +
+          '<path d="M30.7 0V64M57.3 0V64" stroke="' + pt.linha + '"/>' +
+          '<path d="M6 55H82" stroke="' + pt.acerto + '" stroke-width="1.5"/></g>';
+      for (i = 0; i < 3; i++) h += _ljNota(xs[i], ys[i], 9.5, nc[i % nc.length], nt.estilo, uid + '-' + i);
       return _ljSvg(h);
     }
     if (jogo === 'sequencia' && cores.length) {
@@ -3690,8 +3727,9 @@
     var estilo = (item.filtroCss ? 'filter:' + item.filtroCss + ';' : '') + (item.pixelado ? 'image-rendering:pixelated;' : '');
     var preco = tem ? '<span class="lojajogo-preco lojajogo-preco-tem">✓ Na coleção</span>'
                     : '<span class="lojajogo-preco">🪙 ' + item.preco + '</span>';
-    // Skin sem imagem (paleta/cores): miniatura do que muda no jogo.
-    var amostraHtml = item.preview ? '' : _lojaJogoMiniHtml(item);
+    // Skin sem imagem (paleta/cores): miniatura do que muda no jogo. No
+    // Ritmo, até o fundo com imagem vira miniatura (arte atrás das pistas).
+    var amostraHtml = (item.preview && item.jogo !== 'ritmo') ? '' : _lojaJogoMiniHtml(item);
     return '<div class="loja-item' + (equipadoAgora ? ' loja-item-equipado' : '') + '">' +
              '<div class="loja-item-preview">' +
                (amostraHtml ? amostraHtml : item.preview
@@ -3714,9 +3752,17 @@
     var itens = LOJA_CATALOGO.filter(function (it) { return it.jogo === jogoId; });
     var saldo = _moedasLer();
     var eq = _equipadoLer();
-    var html = _moedasDiarioBtnHtml() + '<div class="loja-grid">';
-    itens.forEach(function (item) { html += _lojaJogoItemHtml(item, saldo, eq); });
-    html += '</div>';
+    // Jogo com mais de um slot (Ritmo: notas, fundo, pista): uma seção
+    // com título por slot, na ordem do catálogo. Um slot só: grade única.
+    var slots = [];
+    itens.forEach(function (item) { if (slots.indexOf(item.slot) === -1) slots.push(item.slot); });
+    var html = _moedasDiarioBtnHtml();
+    slots.forEach(function (slot) {
+      if (slots.length > 1) html += '<div class="perfil-secao"><div class="perfil-secao-titulo">' + _rankEsc(LOJA_SLOT_ROTULO[slot] || slot) + '</div>';
+      html += '<div class="loja-grid">';
+      itens.forEach(function (item) { if (item.slot === slot) html += _lojaJogoItemHtml(item, saldo, eq); });
+      html += '</div>' + (slots.length > 1 ? '</div>' : '');
+    });
     corpo.innerHTML = itens.length ? html :
       '<div class="rank-vazio"><div class="rank-vazio-tit">Nada por aqui ainda</div></div>';
     _lojaAtualizarSaldoUI();

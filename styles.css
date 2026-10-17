@@ -5376,6 +5376,85 @@ body.light-mode .perfil-conq-escolher { color: #b45309; border-color: rgba(180,8
 .games-hub-title span { color: var(--red); }
 .games-hub-sub { font-size: 12.5px; color: var(--muted); margin: 0; text-align: center; }
 
+/* ═════ Header "de app de jogo" do hub (Jogos da Coruja) ═════════
+   Uma linha só: voltar · título · saldo + avatar (estilo loja de
+   jogos). Classes gh-* só existem no #games-hub — o Aprender continua
+   usando .games-hub-head/.games-hub-bar/.games-hub-title como antes. */
+.gh-head { margin-bottom: 10px; }
+.gh-bar {
+  margin-bottom: 0; gap: 10px;
+  padding: 6px 6px 6px 6px; border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(168,85,247,0.16), rgba(255,68,68,0.06) 60%, rgba(255,215,64,0.06)),
+    var(--surface);
+  border: 1px solid rgba(168,85,247,0.26);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.gh-title {
+  flex: 1; min-width: 0; margin: 0; text-align: left;
+  font-size: 1.18rem; line-height: 1.1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gh-title span {
+  background: linear-gradient(90deg, #ff4444, #fb923c 55%, #fbbf24);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent; -webkit-text-fill-color: transparent;
+}
+.gh-conta { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+.gh-saldo {
+  height: 34px; padding: 0 11px; border-radius: 999px; cursor: pointer;
+  display: inline-flex; align-items: center;
+  font-family: var(--font-h); font-weight: 800; font-size: 13px; white-space: nowrap;
+  color: #ffd740; background: rgba(255,215,64,.14); border: 1px solid rgba(255,215,64,.34);
+  -webkit-tap-highlight-color: transparent; transition: transform .12s, filter .15s;
+}
+.gh-avatar-btn {
+  width: 38px; height: 38px; padding: 2px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
+  border: 0; background: linear-gradient(135deg, #a855f7, #ff4444 55%, #fbbf24);
+  -webkit-tap-highlight-color: transparent; transition: transform .12s, filter .15s;
+}
+.gh-avatar {
+  width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface2); box-shadow: 0 0 0 2px var(--surface);
+  font-family: var(--font-h); font-weight: 800; font-size: 12.5px; color: #fff; line-height: 1;
+}
+.gh-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gh-saldo:active, .gh-avatar-btn:active { transform: scale(0.92); }
+.gh-saldo:hover,  .gh-avatar-btn:hover  { filter: brightness(1.1); }
+body.light-mode .gh-bar { box-shadow: 0 4px 14px rgba(15,26,46,0.12); }
+body.light-mode .gh-title span { background-image: linear-gradient(90deg, #e11d48, #ea580c); }
+body.light-mode .gh-saldo { color: #b45309; }
+
+/* Atalhos compactos logo abaixo do header (ofensiva · Ranking ·
+   Perfil · Loja) — substituem os 4 cards grandes. */
+.gh-chips { gap: 6px; margin-bottom: 12px; padding-bottom: 2px; }
+.gh-chip {
+  flex-shrink: 0; height: 30px; padding: 0 10px;
+  display: inline-flex; align-items: center; gap: 5px;
+  border-radius: 999px; font-family: var(--font-b);
+  font-size: 12px; font-weight: 700; white-space: nowrap; line-height: 1;
+  border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .1s, filter .15s;
+}
+button.gh-chip { cursor: pointer; }
+button.gh-chip:active { transform: scale(0.95); }
+button.gh-chip:hover  { filter: brightness(1.1); }
+.gh-chip-txt { display: inline-flex; align-items: center; gap: 4px; }
+.gh-chip-streak {
+  background: linear-gradient(135deg, rgba(249,115,22,0.18), rgba(239,68,68,0.07));
+  border-color: rgba(249,115,22,0.32);
+}
+.gh-chip-streak .streak-chama { font-size: 13px; filter: drop-shadow(0 1px 4px rgba(249,115,22,0.5)); }
+.gh-chip-streak b { font-weight: 800; color: #fb923c; }
+.gh-chip-streak #streak-sub { font-weight: 600; color: var(--muted); }
+.gh-chip-sep { color: var(--muted); opacity: .7; }
+.gh-chip-streak.streak-apagada { background: var(--surface2); border-color: var(--border); opacity: .85; }
+.gh-chip-streak.streak-apagada .streak-chama { filter: grayscale(.7) brightness(.8); }
+.gh-chip-streak.streak-apagada b { color: var(--muted); }
+body.light-mode .gh-chip-streak b { color: #c2410c; }
+
 /* ═════ Faixa de ofensiva (streak diário) ══════════════════════
    Compacta de propósito: no hub o elemento "alto" é o Ranking. */
 .streak-faixa {
@@ -7346,6 +7425,7 @@ body.games-fs-open #games-hub {
 body.games-fs-open .games-hub-head { padding: 14px 16px 0; }
 body.games-fs-open .streak-faixa   { margin: 0 16px 10px; }
 body.games-fs-open .rc-evento-banner { margin: 0 16px 10px; }
+body.games-fs-open .gh-chips       { margin: 0 16px 10px; padding: 0 0 2px; }
 body.games-fs-open #games-menu     { padding: 0 16px 24px; }
 
 /* Cada tela de jogo ocupa a altura toda, em coluna: botão voltar no topo,
@@ -7480,6 +7560,7 @@ body.games-fs-open .quiz-coruja {
 #games-hub.jogo-ativo .games-hub-head,
 #games-hub.jogo-ativo .streak-faixa,
 #games-hub.jogo-ativo .rc-evento-banner,
+#games-hub.jogo-ativo .gh-chips,
 #games-hub.jogo-ativo .rank-abrir-btn,
 #games-hub.jogo-ativo .perfil-abrir-btn,
 #games-hub.jogo-ativo .loja-abrir-btn,

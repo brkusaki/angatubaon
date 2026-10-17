@@ -557,74 +557,42 @@
 
     <!-- ═══ HUB DE MINI-GAMES (aba Jogos) — escondido até abrir a pill ══ -->
     <div id="games-hub" style="display:none;">
-      <div class="games-hub-head">
-        <div class="games-hub-bar">
+      <!-- Cabeçalho "de app de jogo": voltar · título · saldo + avatar.
+           Avatar → Meu Perfil; saldo → Loja da Coruja. O botão de som saiu
+           (cada jogo já tem o próprio controle no menu da partida). -->
+      <div class="games-hub-head gh-head">
+        <div class="games-hub-bar gh-bar">
           <button type="button" id="games-sair-btn" class="games-sair-btn" onclick="_sairDosJogos()" aria-label="Voltar para a tela inicial" title="Voltar ao início">
             <i class="fa fa-chevron-left"></i>
           </button>
-          <button type="button" id="games-som-btn" class="games-som-btn" onclick="_alternarSomJogos()" aria-label="Ligar ou desligar som dos jogos" title="Som">
-            <i class="fa fa-volume-high"></i>
-          </button>
+          <h2 class="games-hub-title gh-title">Jogos da <span>Coruja</span></h2>
+          <div class="gh-conta">
+            <button type="button" class="gh-saldo" onclick="lojaAbrir()" aria-label="Abrir a Loja da Coruja" title="Loja da Coruja">
+              <span id="loja-abrir-saldo">🪙 0</span>
+            </button>
+            <button type="button" class="gh-avatar-btn" id="gh-avatar" onclick="perfilAbrir()" aria-label="Abrir meu perfil" title="Meu perfil">
+              <span class="gh-avatar">?</span>
+            </button>
+          </div>
         </div>
-        <h2 class="games-hub-title">Jogos da <span>Coruja</span></h2>
-        <p class="games-hub-sub">Escolha um jogo e divirta-se! 🦉</p>
       </div>
 
-      <!-- Faixa de ofensiva (streak diário) — preenchida via JS -->
-      <div id="streak-faixa" class="streak-faixa" style="display:none;">
-        <div class="streak-chama" id="streak-chama">🔥</div>
-        <div class="streak-txt">
-          <div class="streak-num" id="streak-num">0 dias</div>
-          <div class="streak-sub" id="streak-sub">Jogue todo dia pra manter a ofensiva!</div>
+      <!-- Atalhos compactos (substituem os cards de ofensiva, Ranking,
+           Meu perfil e Loja). O chip de ofensiva mantém os ids
+           streak-faixa/-chama/-num/-sub lidos por _streakAtualizarFaixa. -->
+      <div class="scroll-x gh-chips">
+        <div id="streak-faixa" class="gh-chip gh-chip-streak" style="display:none;" title="Ofensiva diária">
+          <span class="streak-chama" id="streak-chama">🔥</span>
+          <span class="gh-chip-txt"><b id="streak-num">0 dias</b><span class="gh-chip-sep" aria-hidden="true">·</span><span id="streak-sub">Jogue todo dia!</span></span>
         </div>
+        <button type="button" class="gh-chip" onclick="rankAbrirPainel()"><span aria-hidden="true">🏆</span><span class="gh-chip-txt">Ranking</span></button>
+        <button type="button" class="gh-chip" onclick="perfilAbrir()"><span aria-hidden="true">👤</span><span class="gh-chip-txt">Perfil</span></button>
+        <button type="button" class="gh-chip" onclick="lojaAbrir()"><span aria-hidden="true">🛒</span><span class="gh-chip-txt">Loja</span></button>
       </div>
 
       <!-- Banner de evento (Remote Config) — preenchido por _rcAplicar em
            app.js; fica escondido sem evento ativo nem multiplicador. -->
       <div id="rc-evento-banner" class="rc-evento-banner" role="status" hidden></div>
-
-      <!-- Botão de Ranking da cidade -->
-      <button type="button" class="rank-abrir-btn" onclick="rankAbrirPainel()">
-        <span class="rank-abrir-ico">🏆</span>
-        <span class="rank-abrir-txt">
-          <span class="rank-abrir-titulo">Ranking de Angatuba</span>
-          <span class="rank-abrir-sub">Veja quem manda nos jogos!</span>
-        </span>
-        <span class="rank-abrir-owl" aria-hidden="true">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8 10 L10.5 3.5 L13.5 9.5 Z" fill="currentColor"/>
-            <path d="M24 10 L21.5 3.5 L18.5 9.5 Z" fill="currentColor"/>
-            <path d="M16 7.5c-5.2 0-9.3 4.2-9.3 10.3 0 5.2 4.1 9.2 9.3 9.2s9.3-4 9.3-9.2c0-6.1-4.1-10.3-9.3-10.3z" fill="currentColor"/>
-            <circle cx="12" cy="17.3" r="3.5" fill="#1a0b2e"/>
-            <circle cx="20" cy="17.3" r="3.5" fill="#1a0b2e"/>
-            <circle cx="12" cy="17.3" r="1.6" fill="currentColor"/>
-            <circle cx="20" cy="17.3" r="1.6" fill="currentColor"/>
-            <path d="M16 20.3l-1.7 2.5h3.4z" fill="#1a0b2e"/>
-          </svg>
-        </span>
-        <i class="fa fa-chevron-right rank-abrir-seta"></i>
-      </button>
-
-      <!-- Botão do Meu Perfil (Camada 2 da economia) -->
-      <button type="button" class="perfil-abrir-btn" onclick="perfilAbrir()">
-        <span class="perfil-abrir-ico">👤</span>
-        <span class="rank-abrir-txt">
-          <span class="rank-abrir-titulo">Meu perfil</span>
-          <span class="rank-abrir-sub">Card, plano de fundo e estatísticas</span>
-        </span>
-        <i class="fa fa-chevron-right rank-abrir-seta"></i>
-      </button>
-
-      <!-- Botão da Loja da Coruja (Camada 1 da economia) -->
-      <button type="button" class="loja-abrir-btn" onclick="lojaAbrir()">
-        <span class="loja-abrir-ico">🪙</span>
-        <span class="rank-abrir-txt">
-          <span class="rank-abrir-titulo">Loja da Coruja</span>
-          <span class="rank-abrir-sub">Troque moedas por cosméticos!</span>
-        </span>
-        <span class="loja-abrir-saldo" id="loja-abrir-saldo">🪙 0</span>
-        <i class="fa fa-chevron-right rank-abrir-seta"></i>
-      </button>
 
       <!-- Busca + filtro de categoria -->
       <div class="games-search-row">

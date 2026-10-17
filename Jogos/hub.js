@@ -665,7 +665,8 @@
     return null;
   }
 
-  // Atualiza a faixa visual no hub conforme o estado do streak.
+  // Atualiza o chip de ofensiva do hub conforme o estado do streak
+  // (textos curtos: o chip fica na barra de atalhos, ex. "1 dia · Faltam 2 pra 3").
   function _streakAtualizarFaixa(comAnimacao) {
     var faixa = document.getElementById('streak-faixa');
     if (!faixa) return;
@@ -688,14 +689,14 @@
 
     if (subEl) {
       if (!vivo) {
-        subEl.textContent = 'Sua ofensiva esfriou! Jogue pra reacender 🔥';
+        subEl.textContent = 'Esfriou! Jogue pra reacender';
       } else if (s.ultimoDia === hoje) {
         var proxMarco = _streakProxMarco(s.dias);
         subEl.textContent = proxMarco
-          ? ('Voltou hoje! Faltam ' + (proxMarco - s.dias) + ' pra ' + proxMarco + ' dias 🎯')
-          : 'Você está on fire! 🔥';
+          ? ('Faltam ' + (proxMarco - s.dias) + ' pra ' + proxMarco)
+          : 'On fire!';
       } else {
-        subEl.textContent = 'Jogue hoje pra manter a ofensiva!';
+        subEl.textContent = 'Jogue hoje!';
       }
     }
 
@@ -1014,6 +1015,16 @@
   /* -- Roteador de jogos: menu <-> tela de cada jogo -- */
   var _quizJaCarregadoNaTela = false; // lazy-load do quiz só quando abre a tela dele
 
+  // Avatar do header do hub (abre Meu Perfil). Mesmo avatar do Ranking/
+  // Perfil: foto se logado, senão iniciais com cor derivada do uid.
+  function _ghAvatarAtualizar() {
+    var el = document.getElementById('gh-avatar');
+    if (!el || typeof _rankAvatar !== 'function') return;
+    var logado = (typeof _cliUser !== 'undefined' && !!_cliUser);
+    var nome = (typeof cliNomeExibicao === 'function' && cliNomeExibicao()) || (logado ? 'Jogador' : 'Visitante');
+    el.innerHTML = _rankAvatar({ uid: logado ? _cliUser.uid : '', nome: nome, photoURL: logado ? _cliUser.photoURL : '' }, 'gh-avatar');
+  }
+
   function _voltarAoMenu() {
     // Loja de skins aberta dentro do jogo: o "voltar" do Android (entrada
     // 'lojajogo' já consumida) fecha só a loja e fica no jogo. Saída por
@@ -1044,6 +1055,7 @@
     // Atualiza a faixa de ofensiva; anima a chama se subiu nesta visita.
     _streakAtualizarFaixa(_streakAumentouAgora);
     _streakAumentouAgora = false;
+    _ghAvatarAtualizar(); // avatar do header (reflete login feito no Ranking/Perfil)
     // Fix A1.15: desfaz o pushState({modal:'jogo'}) de _abrirJogo ao sair do
     // jogo por qualquer caminho que não seja o botão "voltar" do Android
     // (que já consumiu a entrada sozinho) — mesmo padrão dos outros modais.

@@ -441,7 +441,7 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
 .rt-energia-btn img { position: absolute; inset: 3px; width: calc(100% - 6px); height: calc(100% - 6px); object-fit: contain; border-radius: 50%; }
 .rt-energia-btn:active { transform: scale(.92); }
 .rt-energia-trilho {
-  position: relative; width: 84px; height: 7px; border-radius: 999px; overflow: hidden;
+  position: relative; width: 60px; height: 7px; border-radius: 999px; overflow: hidden;
   background: rgba(255,255,255,.1);
 }
 .rt-energia-trilho::after {      /* marca da metade: dá pra soltar a partir daqui */
@@ -488,6 +488,14 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
 }
 .rt-car-banda-txt b { font-family: 'Syne', sans-serif; font-weight: 900; font-size: 18px; }
 .rt-car-banda-txt span { font-size: 12.5px; font-weight: 800; color: #fde68a; white-space: nowrap; }
+
+/* Escolha do fundo da pista no Carreira (só pra quem tem fundo da loja) */
+.rt-car-fundo {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0;
+  padding: 6px 6px 6px 12px; border-radius: 12px; background: rgba(255,255,255,.04);
+  font-size: 12.5px; font-weight: 700; color: #c7d1e0;
+}
+.rt-car-fundo .rt-k { min-width: 0; padding: 6px 10px; font-size: 12px; }
 
 /* Palco: faixa com a imagem do palco + músicas embaixo */
 .rt-palco { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }

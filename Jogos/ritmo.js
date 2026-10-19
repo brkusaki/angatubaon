@@ -38,6 +38,8 @@
    - Medidor ............ em todas as dificuldades; só falha no modo Carreira
    - Carreira ........... RT_PALCOS: palcos com setlist + bis, abertos por
                           palco concluído + estrelas; progresso em rec._c
+   - Palco vivo ......... banda no fim da pista (/img/ritmo/banda/*.webp), canhões
+                          de luz e flashes da plateia reagindo ao medidor e à Energia
    - Estrelas ........... 1–5 pela precisão (RT_ESTRELAS); a 5ª é dourada com FC
    - Pista 3D ........... projeção em perspectiva (_rtPj*): a linha de acerto e
                           os receptores ficam onde sempre estiveram (toque igual)
@@ -193,6 +195,26 @@
   var RT_PALCOS_PASTA = '/img/ritmo/palcos/';     // <id>.jpg, 572×1024
   var RT_IMG_BANDA = '/img/ritmo/carreira-banda.webp';
   var RT_VIDA_NORMAL = 0.6;    // no Normal, as perdas do medidor valem 60% (Carreira mais justa)
+  /* ── Palco vivo (Fase 3) ───────────────────────────────────────────
+     A banda fica no fim da pista (vocalista no centro, bateria à esquerda,
+     baixo à direita, menores por estarem "mais longe"). Pose escolhida
+     por frame: triste com o medidor no vermelho, festa com a Energia ou o
+     multiplicador no máximo, e o vocalista alterna parado/cantando a cada
+     batida. Pose que não existe cai na pose base (…-parada / …-toca); sem
+     a base do vocalista, não tem banda e a pista volta a nascer mais alto.
+     Canhões de luz e flashes de celular da plateia reagem ao medidor e à
+     Energia; se o aparelho engasgar (média > 24 ms/frame depois de 4 s),
+     luzes e flashes desligam sozinhos naquela música (_rtLeve). */
+  var RT_BANDA_PASTA = '/img/ritmo/banda/';
+  var RT_BANDA_POSES = ['vocal-parada', 'vocal-canta', 'vocal-festa', 'vocal-triste', 'bateria-toca', 'bateria-festa', 'baixo-toca', 'baixo-festa', 'vocal-canta-anim'];
+  // vocal-canta-anim: tira horizontal com RT_ANIM_QUADROS quadros iguais (do
+  // vídeo da coruja cantando), tocada em ida e volta enquanto a música rola.
+  var RT_ANIM_QUADROS = 7, RT_ANIM_MS = 110;
+  // Nas poses de festa a arte sobe (asas/baixo pro alto) e a coruja fica
+  // menor no mesmo quadro: compensa pra ela ter o mesmo tamanho.
+  var RT_BANDA_ESC = { 'vocal-festa': 1.2, 'baixo-festa': 1.18 };
+  var RT_TOPO_BANDA_MIN = 150, RT_TOPO_BANDA_FRAC = 0.19;   // onde a pista nasce quando há banda
+  var RT_FLASH_MAX = 28;
   var RT_SVG_CADEADO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7.5a5 5 0 0 1 10 0V10h.5A1.5 1.5 0 0 1 19 11.5v8A1.5 1.5 0 0 1 17.5 21h-11A1.5 1.5 0 0 1 5 19.5v-8A1.5 1.5 0 0 1 6.5 10H7zm2 0h6V7.5a3 3 0 0 0-6 0V10z"/></svg>';
 
   var RT_LEAD_S = 2.2;         // silêncio antes da música começar (as notas já vêm descendo)
@@ -208,7 +230,7 @@
   // nos docs antigos e não competem com os novos. Continua batendo com a
   // regex das regras ([a-z0-9-]{1,40}_(normal|hard)_(4|5|7)k).
   var RT_RANK_SUFIXO = '-2';
-  var RT_KEY_CFG = 'angatuba_ritmo_cfg';       // { dif, velocidade, ajuste, ultima, colunas, pad, dicaE, aba }
+  var RT_KEY_CFG = 'angatuba_ritmo_cfg';       // { dif, velocidade, ajuste, ultima, colunas, pad, dicaE, aba, fundoCar }
 
   /* ── Estado ──────────────────────────────────────────────────── */
   var _rtRoot = null;            // #ritmo-root
@@ -258,6 +280,12 @@
   var _rtBatida = 0, _rtFase = 0;   // ms por batida e fase da grade (linhas da pista)
   var _rtFaixa = null;         // aviso grande no canvas: { txt, cor, ate, dur }
   var _rtTeclaUsada = false;   // pra dica certa da Energia (teclado / controle / toque)
+  var _rtBandaImgs = {};       // pose -> Image() (carrega uma vez)
+  var _rtComBanda = false;     // decidido no começo da música (o layout não muda no meio)
+  var _rtLeve = false, _rtDtMedia = 16, _rtJogoMs = 0;   // modo leve automático
+  var _rtFlashes = [], _rtFlashProx = 0, _rtFlashAcum = 0, _rtFlashUlt = 0;
+  for (var _rtFi = 0; _rtFi < RT_FLASH_MAX; _rtFi++) _rtFlashes.push({ x: 0, y: 0, t0: 0, dur: 1, tam: 1 });
+  var _rtGradLuzC = {}, _rtVinhetaC = null, _rtHaloC = null;
 
   // Visual
   var _rtCanvas = null, _rtG = null, _rtW = 0, _rtH = 0, _rtDpr = 1;
@@ -304,7 +332,8 @@
       colunas: RT_MODOS_K.indexOf(Number(c.colunas)) !== -1 ? Number(c.colunas) : 4,
       pad: _rtCfgPad(c.pad),
       dicaE: Math.max(0, Math.min(9, Math.round(Number(c.dicaE) || 0))),  // vezes que soltou a Energia (dica some depois de 3)
-      aba: c.aba === 'livre' ? 'livre' : 'carreira'                         // aba da seleção
+      aba: c.aba === 'livre' ? 'livre' : 'carreira',                        // aba da seleção
+      fundoCar: c.fundoCar === 'meu' ? 'meu' : 'palco'                      // fundo da pista no Carreira
     };
   }
   // Botões personalizados do controle: { 4:[b,b,b,b], 5:[...], 7:[...] } (um por coluna).
@@ -821,6 +850,8 @@
 
     // Lista de músicas (clique escolhe; duplo toque/“Jogar” começa).
     _rtEls.lista.addEventListener('click', function (e) {
+      var bf = e.target.closest && e.target.closest('[data-fundo]');
+      if (bf) { _rtCfg.fundoCar = bf.getAttribute('data-fundo') === 'meu' ? 'meu' : 'palco'; _rtCfgSalvar(); _rtRenderSelecao(); return; }
       var b = e.target.closest && e.target.closest('[data-musica]');
       if (!b) return;
       var id = b.getAttribute('data-musica');
@@ -871,6 +902,7 @@
     window.addEventListener('angatuba:equipado', function (e) {
       var s = e && e.detail && e.detail.slot;
       if (s === 'rt_nota' || s === 'rt_fundo' || s === 'rt_pista') _rtRenderSkinBtn();
+      if (s === 'rt_fundo' && _rtEstado === 'selecao' && _rtCfg.aba === 'carreira') _rtRenderSelecao();   // mostra/esconde a escolha de fundo
     });
     _rtEls.rankLinha.addEventListener('click', _rtTopAbrir);
     q('rt-pad-cfg').addEventListener('click', _rtPadCalAbrir);
@@ -965,7 +997,7 @@
     if (sub) sub.textContent = _rtCfg.aba === 'carreira'
       ? 'Leve a banda da garagem ao show da cidade. No Carreira, se o medidor 👏 zerar, a música para.'
       : 'Toque nas ' + _rtCfg.colunas + ' colunas quando as notas chegarem na linha. Notas com luar enchem a Energia 🦉: deslize pra cima pra dobrar os pontos.';
-    var ks = _rtRoot.querySelectorAll('.rt-k');
+    var ks = _rtRoot.querySelectorAll('.rt-k[data-k]');
     for (var kk = 0; kk < ks.length; kk++) {
       var kAtivo = Number(ks[kk].getAttribute('data-k')) === _rtCfg.colunas;
       ks[kk].classList.toggle('rt-k-ativa', kAtivo);
@@ -1060,6 +1092,13 @@
     st.forEach(function (e) { maxTot += e.max; });
     var html = '<div class="rt-car-banda"><img src="' + RT_IMG_BANDA + '" alt="" decoding="async" draggable="false">' +
       '<div class="rt-car-banda-txt"><b>Turnê da Coruja</b><span>★ ' + st.total + ' de ' + maxTot + ' · ' + (dif === 'hard' ? 'Hard' : 'Normal') + '</span></div></div>';
+    // Só aparece pra quem tem um fundo da loja equipado (o padrão não tem imagem).
+    if (_rtFundoUrl()) {
+      var fm = _rtCfg.fundoCar === 'meu';
+      html += '<div class="rt-car-fundo"><span>🖼️ Fundo da pista no Carreira</span><span class="rt-ks" role="radiogroup" aria-label="Fundo no Carreira">' +
+        '<button type="button" class="rt-k' + (fm ? '' : ' rt-k-ativa') + '" data-fundo="palco" role="radio" aria-checked="' + !fm + '">Palco</button>' +
+        '<button type="button" class="rt-k' + (fm ? ' rt-k-ativa' : '') + '" data-fundo="meu" role="radio" aria-checked="' + fm + '">Meu fundo</button></span></div>';
+    }
     for (var i = 0; i < st.length; i++) {
       var e = st[i], p = e.p;
       var info = !e.aberto ? '<span class="rt-cad">' + RT_SVG_CADEADO + '</span>' + (e.antConcl ? p.precisa + ' ★' : 'Conclua o anterior')
@@ -1245,6 +1284,7 @@
     _rtPararPartida();
     _rtMusica = m; _rtDif = dif;
     _rtCfg.ultima = m.id; _rtCfgSalvar();
+    _rtBandaCarregar();          // baixa as poses enquanto a música carrega
     _rtEstado = 'carregando';
     _rtMostrar('jogo');
     _rtRedimensionar();
@@ -1302,11 +1342,15 @@
     _rtVida = 1; _rtFalhou = false; _rtFalhaEm = 0; _rtFalhaPos = 0;
     _rtPontos = 0; _rtEnergia = 0; _rtEnergiaAtiva = false; _rtEnergiaUsos = 0;
     _rtFrases = []; _rtBatida = 0; _rtFase = 0; _rtFaixa = null; _rtGesto = {};
+    _rtLeve = false; _rtDtMedia = 16; _rtJogoMs = 0; _rtFlashAcum = 0; _rtFlashUlt = 0;
+    for (var fl = 0; fl < _rtFlashes.length; fl++) _rtFlashes[fl].t0 = 0;
     _rtEls.jogo.classList.remove('rt-energia-on');
     _rtSkinAtual = _rtSkin();
     _rtPistaAtual = _rtPista();
     // No Carreira a pista fica na frente do palco da música; no livre, o fundo equipado.
+    // Quem comprou um fundo pode escolher usar ele no Carreira (cfg.fundoCar = 'meu').
     var infP = _rtModo === 'carreira' && _rtMusica ? _rtCarInfo(_rtMusica.id) : null;
+    if (infP && _rtCfg.fundoCar === 'meu' && _rtFundoUrl()) infP = null;
     _rtFundoAtual = infP ? RT_PALCOS_PASTA + RT_PALCOS[infP.i].id + '.jpg' : _rtFundoUrl();
     _rtFundoImg(_rtFundoAtual);   // começa a carregar (se já não estiver no cache)
     _rtEls.score.textContent = '0';
@@ -1452,6 +1496,7 @@
     if (keysMapa !== _rtK) notas = (keysMapa === 4) ? _rtConverterK(notas, _rtK) : [];
     notas = _rtAjustarDedos(notas, _rtK);
     _rtMarcarFrases(notas, mapa);
+    _rtComBanda = !!_rtBandaPose('vocal-parada', null);
     _rtNotas = notas;
     _rtPorCol = [];
     _rtPonteiro = [];
@@ -1500,6 +1545,14 @@
     var agora = _rtAgoraMs();
     var dt = _rtUltimoFrame ? Math.min(100, ts - _rtUltimoFrame) : 16;
     _rtUltimoFrame = ts;
+    if (!_rtPausado && agora > 0 && !_rtLeve) {
+      _rtDtMedia = _rtDtMedia * 0.97 + dt * 0.03;
+      _rtJogoMs += dt;
+      if (_rtJogoMs > 4000 && _rtDtMedia > 24) {
+        _rtLeve = true;
+        try { console.info('[ritmo] modo leve: luzes e flashes desligados (' + _rtDtMedia.toFixed(1) + ' ms/frame)'); } catch (e) {}
+      }
+    }
     _rtPadPoll();
     if (!_rtPausado && !_rtFalhou) {
       _rtVerificarPassadas(agora);
@@ -2740,6 +2793,154 @@
     g.globalAlpha = 1;
   }
 
+  /* ── Palco vivo: banda, canhões de luz e flashes da plateia ────────
+     Chamado logo depois do fundo, antes das faixas da pista. */
+  function _rtBandaCarregar() {
+    RT_BANDA_POSES.forEach(function (n) {
+      if (_rtBandaImgs[n]) return;
+      var im = new Image();
+      im.decoding = 'async';
+      im.src = RT_BANDA_PASTA + n + '.webp';
+      _rtBandaImgs[n] = im;
+    });
+  }
+  // Pose pronta, ou a alternativa (pose base), ou null.
+  function _rtBandaPose(n, alt) {
+    var im = _rtBandaImgs[n];
+    if (_rtFundoCarregou(im)) return im;
+    im = alt && _rtBandaImgs[alt];
+    return _rtFundoCarregou(im) ? im : null;
+  }
+  // Desenha a pose n (ou a base alt) apoiada em "base", com a escala da pose.
+  // quadro >= 0: desenha só aquele quadro da tira (RT_ANIM_QUADROS).
+  function _rtPose(g, n, alt, cx, base, h, alfa, quadro) {
+    var im = _rtBandaPose(n, null), nome = n;
+    if (!im) { im = _rtBandaPose(alt, null); nome = alt; quadro = -1; }
+    if (!im) return;
+    var hh = h * (RT_BANDA_ESC[nome] || 1);
+    var sw = quadro >= 0 ? im.naturalWidth / RT_ANIM_QUADROS : im.naturalWidth, nh = im.naturalHeight;
+    var w = hh * sw / nh;
+    g.globalAlpha = alfa;
+    if (quadro >= 0) g.drawImage(im, Math.floor(quadro * sw), 0, Math.floor(sw), nh, cx - w / 2, base - hh, w, hh);
+    else g.drawImage(im, cx - w / 2, base - hh, w, hh);
+    g.globalAlpha = 1;
+  }
+  // Gradiente do canhão de luz (guardado por cor + comprimento)
+  function _rtGradLuz(g, cor, len) {
+    var k = cor + '|' + Math.round(len), gr = _rtGradLuzC[k];
+    if (!gr) {
+      gr = g.createLinearGradient(0, 0, 0, len);
+      gr.addColorStop(0, 'rgba(' + cor + ',0.85)');
+      gr.addColorStop(0.55, 'rgba(' + cor + ',0.22)');
+      gr.addColorStop(1, 'rgba(' + cor + ',0)');
+      _rtGradLuzC[k] = gr;
+    }
+    return gr;
+  }
+  function _rtPalcoVivo(g, agora, pn, topo, x0, x1, hitY) {
+    var v = _rtVida, en = _rtEnergiaAtiva;
+    var fase = _rtBatida ? ((((agora - _rtFase) / _rtBatida) % 1) + 1) % 1 : 0;   // 0 = em cima da batida
+    var pulso = 1 - fase;
+    if (!_rtLeve) {
+      // 3 canhões varrendo de cima, no ritmo; cor = humor da plateia
+      var cor = en ? '224,242,254' : v > 2 / 3 ? null : v > 1 / 3 ? '251,191,36' : '248,113,113';
+      var len = hitY * 1.15;
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      for (var i = 0; i < 3; i++) {
+        var c = cor || (i % 2 ? '94,234,212' : '167,139,250');
+        g.setTransform(_rtDpr, 0, 0, _rtDpr, 0, 0);
+        g.translate(_rtW * (0.12 + 0.38 * i), -24);
+        g.rotate((i - 1) * 0.3 + Math.sin(pn / 1700 + i * 2.1) * 0.3);
+        g.globalAlpha = (en ? 0.5 : 0.3) * (0.65 + 0.35 * pulso) * (v <= 1 / 3 && !en ? 0.6 : 1);
+        g.fillStyle = _rtGradLuz(g, c, len);
+        g.beginPath(); g.moveTo(-5, 0); g.lineTo(5, 0); g.lineTo(len * 0.16, len); g.lineTo(-len * 0.16, len); g.closePath();
+        g.fill();
+      }
+      g.restore();
+      _rtFlashesDesenhar(g, pn, topo, x0, x1, hitY, v, en);
+    }
+    if (_rtComBanda) _rtBandaDesenhar(g, agora, pn, topo, x0, x1, fase);
+  }
+  // Flashes de celular nas laterais da pista: mais flashes quanto melhor o
+  // medidor; com a Energia, chuva de flashes em luar. Pool fixo.
+  function _rtFlashesDesenhar(g, pn, topo, x0, x1, hitY, v, en) {
+    var dt = _rtFlashUlt ? Math.min(100, pn - _rtFlashUlt) : 16;
+    _rtFlashUlt = pn;
+    var taxa = (_rtPausado || _rtEstado !== 'jogando' || _rtFalhou) ? 0 : (v <= 1 / 3 ? 0.6 : 2 + 12 * v) * (en ? 3 : 1);   // por segundo
+    _rtFlashAcum = Math.min(4, _rtFlashAcum + taxa * dt / 1000);
+    var cx = (x0 + x1) / 2, hw0 = (x1 - x0) / 2;
+    while (_rtFlashAcum >= 1) {
+      _rtFlashAcum -= 1;
+      var y = topo + Math.random() * (hitY - topo) * 0.55, hw = hw0 * _rtPjSdoY(y) + 8;
+      var esq = Math.random() < 0.5, livre = esq ? cx - hw : _rtW - (cx + hw);
+      if (livre < 10) continue;
+      var f = _rtFlashes[_rtFlashProx];
+      _rtFlashProx = (_rtFlashProx + 1) % RT_FLASH_MAX;
+      f.x = esq ? Math.random() * livre : cx + hw + Math.random() * livre;
+      f.y = y; f.t0 = pn; f.dur = 260 + Math.random() * 480; f.tam = 1.1 + Math.random() * 1.6;
+    }
+    // luz somada ('lighter'): estoura forte e apaga rápido, como flash de celular
+    var corF = en ? RT_LUAR : '#fff7e0';
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    g.fillStyle = corF;
+    for (var i = 0; i < RT_FLASH_MAX; i++) {
+      var p = _rtFlashes[i];
+      if (!p.t0) continue;
+      var ida = pn - p.t0;
+      if (ida >= p.dur || ida < 0) { p.t0 = 0; continue; }
+      var a = 1 - ida / p.dur;
+      a *= a;
+      g.globalAlpha = a * 0.3;
+      g.beginPath(); g.arc(p.x, p.y, p.tam * 2.6, 0, Math.PI * 2); g.fill();
+      g.globalAlpha = a;
+      g.beginPath(); g.arc(p.x, p.y, p.tam, 0, Math.PI * 2); g.fill();
+      g.fillRect(p.x - p.tam * 3, p.y - 0.5, p.tam * 6, 1);           // brilho em cruz
+      g.fillRect(p.x - 0.5, p.y - p.tam * 3, 1, p.tam * 6);
+    }
+    g.restore();
+  }
+  // A banda em cima de onde a pista nasce. Pulinho no tempo da batida.
+  function _rtBandaDesenhar(g, agora, pn, topo, x0, x1, fase) {
+    var hV = Math.min(88, topo - 64);
+    if (hV < 40) return;
+    var cx = (x0 + x1) / 2, dx = (x1 - x0) * RT_PERSP_TOPO * 0.62, hS = hV * 0.74;
+    var en = _rtEnergiaAtiva, triste = _rtVida <= 1 / 3 && !en;
+    var festa = en || _rtMultCombo() >= RT_MULT_MAX;
+    var tocando = _rtEstado === 'jogando' && !_rtPausado && !_rtFalhou && agora > 0 && agora < _rtFim - 1500;
+    var nb = _rtBatida ? Math.floor((agora - _rtFase) / _rtBatida) : 0;
+    var pulo = tocando ? Math.pow(1 - fase, 3) : 0;
+    var esc = triste ? 0.62 : 0.92;
+    _rtPose(g, festa ? 'bateria-festa' : 'bateria-toca', 'bateria-toca', cx - dx, topo + 2 - pulo * 3, hS, esc, -1);
+    _rtPose(g, festa ? 'baixo-festa' : 'baixo-toca', 'baixo-toca', cx + dx, topo + 2 - pulo * ((nb & 1) ? 3 : 1.5), hS, esc, -1);
+    if (en) {                                    // halo de luar atrás do vocalista (degradê guardado)
+      var rh = Math.round(hV * 0.75);
+      if (!_rtHaloC || _rtHaloC.r !== rh) {
+        var hg = g.createRadialGradient(0, 0, 0, 0, 0, rh);
+        hg.addColorStop(0, 'rgba(224,242,254,0.75)');
+        hg.addColorStop(0.5, 'rgba(186,230,253,0.28)');
+        hg.addColorStop(1, 'rgba(186,230,253,0)');
+        _rtHaloC = { r: rh, g: hg };
+      }
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      g.globalAlpha = 0.7 + 0.3 * (1 - fase);
+      g.translate(cx, topo - hV * 0.45);
+      g.fillStyle = _rtHaloC.g;
+      g.fillRect(-rh, -rh, rh * 2, rh * 2);
+      g.restore();
+    }
+    // Cantando: a animação (vídeo) se existir; senão alterna parada/canta na batida.
+    if (tocando && !triste && !festa && _rtBandaPose('vocal-canta-anim', null)) {
+      var qa = Math.floor(pn / RT_ANIM_MS) % (RT_ANIM_QUADROS * 2 - 2);
+      _rtPose(g, 'vocal-canta-anim', 'vocal-parada', cx, topo + 4 - pulo * 4, hV, 1, qa < RT_ANIM_QUADROS ? qa : RT_ANIM_QUADROS * 2 - 2 - qa);
+      return;
+    }
+    var pv = triste ? 'vocal-triste' : festa ? 'vocal-festa' : (tocando && (nb & 1) ? 'vocal-canta' : 'vocal-parada');
+    _rtPose(g, pv, 'vocal-parada', cx, topo + 4 - pulo * 4, hV, triste ? 0.8 : 1, -1);
+  }
+
   function _rtDesenhar(agora) {
     var g = _rtG;
     if (!g || !_rtW) return;
@@ -2754,7 +2955,7 @@
     var en = _rtEnergiaAtiva;
 
     // Projeção deste frame (ver _rtPj*): a pista nasce em y = topo (z = 1).
-    var topo = Math.round(Math.max(RT_PERSP_Y0_MIN, H * RT_PERSP_Y0_FRAC));
+    var topo = _rtComBanda ? Math.round(Math.max(RT_TOPO_BANDA_MIN, H * RT_TOPO_BANDA_FRAC)) : Math.round(Math.max(RT_PERSP_Y0_MIN, H * RT_PERSP_Y0_FRAC));
     _rtPjK = 1 / RT_PERSP_TOPO - 1;
     _rtPjHz = (topo - hitY * RT_PERSP_TOPO) / (1 - RT_PERSP_TOPO);
     _rtPjAlt = hitY - _rtPjHz;
@@ -2773,6 +2974,7 @@
     } else {
       g.clearRect(0, 0, _rtW, H);
     }
+    _rtPalcoVivo(g, agora, pn, topo, x0, x1, hitY);
 
     // Faixas (cores da skin de pista) + realce da coluna pressionada
     for (var c = 0; c < K; c++) {
@@ -2949,6 +3151,21 @@
     }
     g.globalAlpha = 1;
 
+    // Medidor no vermelho: borda vermelha pulsando (a plateia esfriou)
+    if (_rtVida <= 1 / 3 && !_rtFalhou && _rtEstado === 'jogando' && agora > 0) {
+      var vk = _rtW + 'x' + H;
+      if (!_rtVinhetaC || _rtVinhetaC.k !== vk) {
+        var vg = g.createRadialGradient(_rtW / 2, H / 2, Math.min(_rtW, H) * 0.36, _rtW / 2, H / 2, Math.max(_rtW, H) * 0.72);
+        vg.addColorStop(0, 'rgba(248,113,113,0)');
+        vg.addColorStop(1, 'rgba(248,113,113,0.42)');
+        _rtVinhetaC = { k: vk, g: vg };
+      }
+      g.globalAlpha = (0.55 + 0.45 * Math.sin(pn / 170)) * (_rtVida <= 0 ? 1 : 0.7);
+      g.fillStyle = _rtVinhetaC.g;
+      g.fillRect(0, 0, _rtW, H);
+      g.globalAlpha = 1;
+    }
+
     // Julgamento no alto da pista (o combo agora fica no HUD, no canto).
     // Animação: entra grande (1,5×) e assenta em 1× com um leve quique,
     // sobe uns pixels e some. Erro treme de lado em vez de quicar.
@@ -2996,12 +3213,27 @@
       g.restore();
     }
 
-    // "Prepare-se" antes da primeira nota
+    // Abertura: palco (Carreira) ou estilo, nome da música e "Prepare-se"
     if (_rtEstado === 'jogando' && agora < 0) {
-      g.font = '800 18px Syne, system-ui, sans-serif';
+      var aIn = Math.min(1, -agora / 600);
       g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillStyle = 'rgba(255,255,255,' + Math.min(1, -agora / 600).toFixed(2) + ')';
-      g.fillText(_rtPausado ? '' : 'Prepare-se!', ccx, H * 0.36);
+      if (!_rtPausado && _rtMusica) {
+        var infA = _rtModo === 'carreira' ? _rtCarInfo(_rtMusica.id) : null;
+        var linha1 = infA ? RT_PALCOS[infA.i].nome.toUpperCase() + (infA.bis ? ' · BIS' : '') : (_rtMusica.sub || '').toUpperCase();
+        var tamT = Math.round(Math.min(30, Math.max(22, _rtW * 0.07)));
+        g.globalAlpha = aIn;
+        g.lineWidth = 5; g.strokeStyle = 'rgba(5,8,14,0.8)'; g.lineJoin = 'round';
+        g.font = '800 12px system-ui, sans-serif';
+        g.fillStyle = infA ? '#fde68a' : 'rgba(199,209,224,0.9)';
+        g.strokeText(linha1, ccx, H * 0.36 - tamT - 22); g.fillText(linha1, ccx, H * 0.36 - tamT - 22);
+        g.font = '900 ' + tamT + 'px Syne, system-ui, sans-serif';
+        g.fillStyle = '#ffffff';
+        g.strokeText(_rtMusica.titulo, ccx, H * 0.36 - tamT * 0.75); g.fillText(_rtMusica.titulo, ccx, H * 0.36 - tamT * 0.75);
+        g.globalAlpha = 1;
+      }
+      g.font = '800 18px Syne, system-ui, sans-serif';
+      g.fillStyle = 'rgba(255,255,255,' + aIn.toFixed(2) + ')';
+      g.fillText(_rtPausado ? '' : 'Prepare-se!', ccx, H * 0.36 + 8);
     }
 
     // Falhou: tela escurece em vermelho

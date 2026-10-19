@@ -29,7 +29,15 @@
                           tempo da música sai do ctx.currentTime (preciso,
                           ao contrário do <audio>.currentTime no celular).
    - Julgamento ......... RT_JANELAS (Perfeito / Ótimo / Bom / Erro)
-   - Pontuação .......... até 1.000.000 (90% precisão + 10% combo máximo)
+   - Pontuação .......... estilo Guitar Hero: RT_PONTOS por nota × multiplicador
+                          do combo (x1–x4) × 2 com a Energia da Coruja ativa
+   - Energia da Coruja .. frases de "luar" (_rtMarcarFrases); completar sem
+                          erro enche 25%; com metade, deslizar ↑ / 🦉 / Enter /
+                          Select dobra o multiplicador até a barra esvaziar
+   - Medidor ............ em todas as dificuldades; só falha no modo Carreira
+   - Estrelas ........... 1–5 pela precisão (RT_ESTRELAS); a 5ª é dourada com FC
+   - Pista 3D ........... projeção em perspectiva (_rtPj*): a linha de acerto e
+                          os receptores ficam onde sempre estiveram (toque igual)
    - Recompensa ......... _rtMoedas(): rank × dificuldade × precisão
 
    Fala com o app APENAS via window.AngatubaGames (a ponte do hub):
@@ -113,18 +121,68 @@
   var RT_PART_QTD = { perfeito: 8, otimo: 6, bom: 4 };   // por acerto
   var RT_ANEL_MS = 300;                                    // duração do anel de acerto
 
-  /* ── Barra de vida (só no Hard) ─────────────────────────────────
-     Começa cheia (1). Cada julgamento soma/subtrai; zerou → falhou.
-     "solto" = soltou a nota longa antes da hora. Com estes valores,
-     ~12 erros seguidos derrubam; uma sequência de acertos recupera. */
+  /* ── Medidor de performance (todas as dificuldades) ─────────────
+     Começa cheio (1). Cada julgamento soma/subtrai. "solto" = soltou a
+     nota longa antes da hora. Com estes valores, ~12 erros seguidos
+     zeram; uma sequência de acertos recupera. Zerar só FALHA a música
+     no modo em que RT_FALHA_NO_MODO é true (Carreira, Fase 2); no modo
+     livre o medidor fica no vermelho piscando e a música segue. */
   var RT_VIDA = { perfeito: 0.012, otimo: 0.006, bom: -0.02, erro: -0.08, solto: -0.05 };
+  var RT_FALHA_NO_MODO = { livre: false, carreira: true };
+
+  /* ── Multiplicador e pontos (estilo Guitar Hero) ────────────────
+     Cada julgamento vale RT_PONTOS × RT_VALOR (Perfeito 50, Ótimo 35,
+     Bom 20) × multiplicador. O multiplicador sobe a cada RT_MULT_PASSO
+     acertos seguidos (x2 aos 10, x3 aos 20, x4 aos 30) e volta a x1 no
+     erro. Com a Energia ativa ele dobra (até x8). O score máximo de um
+     mapa fica bem abaixo do teto de 1.000.000 das regras do ranking. */
+  var RT_PONTOS = 50, RT_MULT_PASSO = 10, RT_MULT_MAX = 4;
+
+  /* ── Energia da Coruja ──────────────────────────────────────────
+     Frases de "luar" geradas na hora a partir do mapa (_rtMarcarFrases):
+     uma a cada ~RT_FRASE_CADA_MS, com RT_FRASE_BATIDAS batidas. Acertar
+     todas as notas da frase (sem nenhum erro) enche RT_FRASE_GANHO. Com
+     pelo menos RT_ENERGIA_MIN dá pra soltar; a barra cheia dura 16 s. */
+  var RT_FRASE_CADA_MS = 18000, RT_FRASE_BATIDAS = 8, RT_FRASE_MIN_NOTAS = 4;
+  var RT_FRASE_GANHO = 0.25, RT_ENERGIA_MIN = 0.5, RT_ENERGIA_DRENO = 1 / 16000;   // por ms
+  var RT_LUAR = '#e0f2fe';
+  var RT_PAD_ENERGIA = 8;      // Select (se não estiver mapeado como coluna)
+
+  /* ── Pista 3D ───────────────────────────────────────────────────
+     RT_PERSP_TOPO: largura da pista no alto da tela, em fração da largura
+     na linha de acerto. A perspectiva "aperta" o topo, então a nota fica
+     RT_PERSP_QUEDA vezes mais tempo na tela que na pista plana (e acelera
+     ao chegar, como no Guitar Hero). RT_ACHATA: notas e receptores vistos
+     um pouco de lado (elipse). */
+  var RT_PERSP_TOPO = 0.46, RT_PERSP_QUEDA = 1.6, RT_ACHATA = 0.78;
+  // A pista "nasce" um pouco abaixo do alto da tela (o "horizonte"), pra
+  // o placar, o multiplicador e a Energia não ficarem por cima das notas.
+  var RT_PERSP_Y0_MIN = 104, RT_PERSP_Y0_FRAC = 0.13;
+
+  /* ── Estrelas (por música + dificuldade + colunas) ──────────────
+     Precisão mínima pra 1★ … 5★. A 5ª fica dourada com Full Combo
+     (nenhum erro na música inteira, contando "soltou cedo"). */
+  var RT_ESTRELAS = [60, 70, 80, 90, 95];
+
+  // Capas das músicas (512×512 WebP) e ícone do botão da Energia.
+  // Sem o arquivo, vale a capa provisória (inicial + cor) / o 🦉.
+  var RT_CAPAS = '/img/ritmo/capas/';
+  var RT_ICONE_ENERGIA = '/img/ritmo/energia.webp';
 
   var RT_LEAD_S = 2.2;         // silêncio antes da música começar (as notas já vêm descendo)
   var RT_RETOMAR_S = 2.0;      // ao continuar da pausa, a música volta com esse "respiro"
 
-  // { "<id>|<dif>" (4K) ou "<id>|<dif>|<k>k" (5K/7K): {score, acc, rank, combo} }
+  // { _v: 2, "<id>|<dif>" (4K) ou "<id>|<dif>|<k>k" (5K/7K): {score, acc, rank, combo, est, fc} }
+  // _v: versão da pontuação. Recordes de outra versão (score antigo de até
+  // 1.000.000, sem multiplicador) são descartados na leitura.
   var RT_KEY_REC = 'angatuba_ritmo_recordes';
-  var RT_KEY_CFG = 'angatuba_ritmo_cfg';       // { dif, velocidade, ajuste, ultima, colunas }
+  var RT_REC_VERSAO = 2;
+  // Sufixo no id da música no ranking da cidade a partir da pontuação v2
+  // ("mare-alta-2_hard_4k"): os scores antigos (escala até 1.000.000) ficam
+  // nos docs antigos e não competem com os novos. Continua batendo com a
+  // regex das regras ([a-z0-9-]{1,40}_(normal|hard)_(4|5|7)k).
+  var RT_RANK_SUFIXO = '-2';
+  var RT_KEY_CFG = 'angatuba_ritmo_cfg';       // { dif, velocidade, ajuste, ultima, colunas, pad, dicaE }
 
   /* ── Estado ──────────────────────────────────────────────────── */
   var _rtRoot = null;            // #ritmo-root
@@ -167,6 +225,13 @@
   var _rtDesvioSoma = 0, _rtDesvioN = 0;   // toques acertados: média >0 = atrasado
   var _rtFim = 0;              // ms em que a partida termina
   var _rtSaindo = false;
+  var _rtModo = 'livre';       // 'livre' (seleção) · 'carreira' (Fase 2) — ver RT_FALHA_NO_MODO
+  var _rtPontos = 0;           // score da partida (pontos × multiplicador)
+  var _rtEnergia = 0, _rtEnergiaAtiva = false, _rtEnergiaUsos = 0;
+  var _rtFrases = [];          // { ini, fim, total, ok, falhou } — nota.fr = índice aqui (-1 = fora)
+  var _rtBatida = 0, _rtFase = 0;   // ms por batida e fase da grade (linhas da pista)
+  var _rtFaixa = null;         // aviso grande no canvas: { txt, cor, ate, dur }
+  var _rtTeclaUsada = false;   // pra dica certa da Energia (teclado / controle / toque)
 
   // Visual
   var _rtCanvas = null, _rtG = null, _rtW = 0, _rtH = 0, _rtDpr = 1;
@@ -180,6 +245,7 @@
   var _rtFundoImgs = {};               // url -> Image() (carrega uma vez só)
   var _rtFundoCv = null, _rtFundoChave = '';   // fundo já escalado (cover) no tamanho do canvas
   var _rtPonteiros = {};               // pointerId -> coluna
+  var _rtGesto = {};                   // pointerId -> { y, t, usado } (deslizar ↑ solta a Energia)
   var _rtJulgVis = null;               // {tipo, ate, desvio}
   var _rtUltimoFrame = 0;
 
@@ -210,7 +276,8 @@
       ajuste: Math.max(-200, Math.min(200, Math.round(Number(c.ajuste) || 0))),
       ultima: typeof c.ultima === 'string' ? c.ultima : '',
       colunas: RT_MODOS_K.indexOf(Number(c.colunas)) !== -1 ? Number(c.colunas) : 4,
-      pad: _rtCfgPad(c.pad)
+      pad: _rtCfgPad(c.pad),
+      dicaE: Math.max(0, Math.min(9, Math.round(Number(c.dicaE) || 0)))   // vezes que soltou a Energia (dica some depois de 3)
     };
   }
   // Botões personalizados do controle: { 4:[b,b,b,b], 5:[...], 7:[...] } (um por coluna).
@@ -227,16 +294,45 @@
     try { localStorage.setItem(RT_KEY_CFG, JSON.stringify(_rtCfg)); } catch (e) {}
   }
   function _rtRecLer() {
-    try { var o = JSON.parse(localStorage.getItem(RT_KEY_REC) || '{}'); return (o && typeof o === 'object') ? o : {}; }
-    catch (e) { return {}; }
+    var o = null;
+    try { o = JSON.parse(localStorage.getItem(RT_KEY_REC) || '{}'); } catch (e) {}
+    // Recordes da pontuação antiga (sem _v) não valem mais: começa do zero.
+    return (o && typeof o === 'object' && o._v === RT_REC_VERSAO) ? o : { _v: RT_REC_VERSAO };
   }
   function _rtRecSalvar(o) {
+    o._v = RT_REC_VERSAO;
     try { localStorage.setItem(RT_KEY_REC, JSON.stringify(o)); } catch (e) {}
   }
-  // Chave do recorde local: a de 4K continua igual à de antes (compatível).
+  // Chave do recorde local: id|dif (4K) ou id|dif|Nk.
   function _rtChaveRec(id, dif, k) { return id + '|' + dif + (k && k !== 4 ? '|' + k + 'k' : ''); }
   // Id do mapa no ranking da cidade (mesmo formato validado nas regras).
-  function _rtMapaId(id, dif, k) { return id + '_' + dif + '_' + (k || 4) + 'k'; }
+  function _rtMapaId(id, dif, k) { return id + RT_RANK_SUFIXO + '_' + dif + '_' + (k || 4) + 'k'; }
+
+  /* ── Estrelas e capas (HTML da seleção e do resultado) ─────────── */
+  function _rtEstrelas(acc) {
+    var e = 0;
+    for (var i = 0; i < RT_ESTRELAS.length; i++) if (acc >= RT_ESTRELAS[i]) e = i + 1;
+    return e;
+  }
+  var RT_SVG_ESTRELA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.4l2.95 6.2 6.75.8-5 4.7 1.3 6.7L12 17.5l-6 3.3 1.3-6.7-5-4.7 6.75-.8z"/></svg>';
+  // n estrelas cheias de 5; com Full Combo e 5★ a última fica dourada.
+  function _rtEstrelasHtml(n, fc, cls) {
+    var h = '<span class="rt-ests ' + (cls || '') + '" role="img" aria-label="' + n + ' de 5 estrelas' + (fc ? ', full combo' : '') + '">';
+    for (var i = 0; i < 5; i++) h += '<i class="rt-est' + (i < n ? ' rt-est-on' : '') + (fc && n >= 5 && i === 4 ? ' rt-est-ouro' : '') + '" style="--i:' + i + '">' + RT_SVG_ESTRELA + '</i>';
+    return h + '</span>';
+  }
+  // Capa da música: arquivo em RT_CAPAS/<id>.webp por cima de uma capa
+  // provisória (inicial + cor tirada do id). Se a imagem falhar uma vez,
+  // não é pedida de novo nesta sessão (ver o 'error' em _rtMontar).
+  var _rtCapaFalhou = {};
+  function _rtCapaHtml(m, cls) {
+    var h = 0;
+    for (var i = 0; i < m.id.length; i++) h = (h * 31 + m.id.charCodeAt(i)) % 360;
+    return '<span class="rt-capa ' + (cls || '') + '" style="--rt-capa-h:' + h + '">' +
+      '<span class="rt-capa-ini" aria-hidden="true">' + _rtEsc(m.titulo.charAt(0)) + '</span>' +
+      (_rtCapaFalhou[m.id] ? '' : '<img src="' + RT_CAPAS + encodeURIComponent(m.id) + '.webp" alt="" loading="lazy" decoding="async" draggable="false" data-capa="' + _rtEsc(m.id) + '">') +
+    '</span>';
+  }
   // Skin equipada (Loja da Coruja). Fallback: clássica.
   function _rtSkin() {
     var G = _rtG_(), it = null;
@@ -606,7 +702,15 @@
       '<div class="rt-jogo" id="rt-jogo" style="display:none;">' +
         '<canvas class="rt-canvas" id="rt-canvas"></canvas>' +
         '<div class="rt-progresso"><div class="rt-progresso-barra" id="rt-prog"></div></div>' +
-        '<div class="rt-vida" id="rt-vida" style="display:none;" aria-label="Vida"><i>❤</i><div class="rt-vida-trilho"><div class="rt-vida-barra" id="rt-vida-barra"></div></div></div>' +
+        '<div class="rt-vida" id="rt-vida" aria-label="Medidor de performance"><i>👏</i><div class="rt-vida-trilho"><div class="rt-vida-barra" id="rt-vida-barra"></div></div></div>' +
+        // Multiplicador (anel = progresso até o próximo) + Energia da Coruja
+        '<div class="rt-poder">' +
+          '<div class="rt-mult" id="rt-mult" data-m="1" aria-label="Multiplicador"><b id="rt-mult-x">x1</b></div>' +
+          '<div class="rt-energia" id="rt-energia">' +
+            '<button type="button" class="rt-energia-btn" id="rt-energia-btn" aria-label="Soltar a Energia da Coruja (ou deslize pra cima na pista)"><span aria-hidden="true">🦉</span><img src="' + RT_ICONE_ENERGIA + '" alt="" draggable="false" data-icone="1"></button>' +
+            '<div class="rt-energia-trilho"><div class="rt-energia-barra" id="rt-energia-barra"></div></div>' +
+          '</div>' +
+        '</div>' +
         '<div class="rt-hud">' +
           '<div class="rt-hud-score" id="rt-score">0</div>' +
           '<div class="rt-hud-acc" id="rt-acc">100,00%</div>' +
@@ -617,8 +721,11 @@
       '</div>' +
       // ── Resultado ──
       '<div class="rt-res" id="rt-res" style="display:none;">' +
+        '<div class="rt-res-capa" id="rt-res-capa"></div>' +
         '<div class="rt-res-musica" id="rt-res-musica"></div>' +
-        '<div class="rt-res-rank" id="rt-res-rank">A</div>' +
+        '<div class="rt-res-estrelas" id="rt-res-estrelas"></div>' +
+        '<div class="rt-res-fc" id="rt-res-fc" style="display:none;">Full Combo!</div>' +
+        '<div class="rt-res-rank" id="rt-res-rank" style="display:none;"></div>' +
         '<div class="rt-res-falhou-msg" id="rt-res-falhou-msg" style="display:none;"></div>' +
         '<div class="rt-res-recorde" id="rt-res-recorde" style="display:none;">🏆 Novo recorde!</div>' +
         '<div class="rt-res-score" id="rt-res-score">0</div>' +
@@ -659,10 +766,25 @@
       aviso: q('rt-aviso'), erro: q('rt-erro'),
       rankLinha: q('rt-rank-linha'), skinCv: q('rt-skin-cv'), skinNome: q('rt-skin-nome'),
       vida: q('rt-vida'), vidaBarra: q('rt-vida-barra'), topOv: q('rt-top-ov'),
-      combo: q('rt-combo'), hudPad: q('rt-hud-pad'), pad: q('rt-pad'), padOv: q('rt-pad-ov')
+      combo: q('rt-combo'), hudPad: q('rt-hud-pad'), pad: q('rt-pad'), padOv: q('rt-pad-ov'),
+      mult: q('rt-mult'), multX: q('rt-mult-x'), energia: q('rt-energia'), energiaBarra: q('rt-energia-barra')
     };
     _rtCanvas = q('rt-canvas');
     _rtG = _rtCanvas.getContext('2d');
+
+    // Imagem que não existe (capa ainda não feita, ícone da Energia): some e
+    // fica a provisória. 'error' não borbulha — por isso a captura.
+    _rtRoot.addEventListener('error', function (e) {
+      var t = e.target;
+      if (!t || t.tagName !== 'IMG') return;
+      t.style.display = 'none';
+      var id = t.getAttribute('data-capa');
+      if (id) _rtCapaFalhou[id] = true;
+    }, true);
+    // Botão 🦉: pointerdown pra não esperar o "click" (o polegar está na pista)
+    var be = q('rt-energia-btn');
+    be.addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); _rtEnergiaAtivar(); });
+    be.addEventListener('click', function (e) { e.preventDefault(); _rtEnergiaAtivar(); });
 
     // Lista de músicas (clique escolhe; duplo toque/“Jogar” começa).
     _rtEls.lista.addEventListener('click', function (e) {
@@ -734,6 +856,7 @@
 
     // Toque nas pistas (multitoque: cada dedo é um pointerId).
     _rtCanvas.addEventListener('pointerdown', _rtPointerDown, { passive: false });
+    _rtCanvas.addEventListener('pointermove', _rtPointerMove);
     _rtCanvas.addEventListener('pointerup', _rtPointerUp);
     _rtCanvas.addEventListener('pointercancel', _rtPointerUp);
     _rtCanvas.addEventListener('lostpointercapture', _rtPointerUp);
@@ -752,7 +875,6 @@
   }
 
   /* ── Tela de seleção ─────────────────────────────────────────── */
-  var RT_ORDEM_RANK = { SS: 6, S: 5, A: 4, B: 3, C: 2, D: 1 };
   function _rtRenderSelecao() {
     var rec = _rtRecLer();
     var html = '';
@@ -761,13 +883,14 @@
       var rn = rec[_rtChaveRec(m.id, 'normal', _rtCfg.colunas)], rh = rec[_rtChaveRec(m.id, 'hard', _rtCfg.colunas)];
       var sel = m.id === _rtSelId;
       html += '<button type="button" class="rt-musica' + (sel ? ' rt-musica-sel' : '') + '" data-musica="' + _rtEsc(m.id) + '" data-titulo="' + _rtEsc(m.titulo + (m.sub ? ' (' + m.sub + ')' : '')) + '" aria-pressed="' + sel + '">' +
-        '<span class="rt-musica-ico">' + (sel ? '▶' : '♪') + '</span>' +
+        // Capa com o ícone da prévia (▶ / ♪ / girando / barrinhas) no canto
+        '<span class="rt-musica-capa">' + _rtCapaHtml(m) + '<span class="rt-musica-ico">' + (sel ? '▶' : '♪') + '</span></span>' +
         '<span class="rt-musica-txt">' +
           '<span class="rt-musica-tit">' + _rtEsc(m.titulo) + '</span>' +
           '<span class="rt-musica-meta">' + _rtEsc(m.sub) + ' · ' + m.bpm + ' BPM · ' + _rtMMSS(m.duracao) + '</span>' +
         '</span>' +
-        // Melhor rank em cada dificuldade: rótulo pequeno em cima, rank embaixo
-        // ("—" enquanto não jogou).
+        // Melhores estrelas em cada dificuldade (nas colunas escolhidas):
+        // rótulo pequeno em cima, 5 estrelinhas embaixo.
         '<span class="rt-musica-ranks">' +
           _rtRankChip('Normal', 'rt-rk-n', rn) +
           _rtRankChip('Hard', 'rt-rk-h', rh) +
@@ -787,7 +910,7 @@
       difs[j].setAttribute('aria-checked', ativo ? 'true' : 'false');
     }
     var sub = document.getElementById('rt-sel-sub');
-    if (sub) sub.textContent = 'Toque nas ' + _rtCfg.colunas + ' colunas quando as notas chegarem na linha. Notas longas: segure até o fim.';
+    if (sub) sub.textContent = 'Toque nas ' + _rtCfg.colunas + ' colunas quando as notas chegarem na linha. Notas com luar enchem a Energia 🦉: deslize pra cima pra dobrar os pontos.';
     var ks = _rtRoot.querySelectorAll('.rt-k');
     for (var kk = 0; kk < ks.length; kk++) {
       var kAtivo = Number(ks[kk].getAttribute('data-k')) === _rtCfg.colunas;
@@ -903,9 +1026,10 @@
   }
   function _rtTopFechar() { if (_rtEls.topOv) _rtEls.topOv.style.display = 'none'; }
   function _rtRankChip(rotulo, cls, rec) {
-    return '<span class="rt-rk ' + cls + (rec ? '' : ' rt-rk-vazio') + '" title="' + (rec ? 'Melhor no ' + rotulo + ': ' + rec.rank + ' (' + _rtFmtAcc(rec.acc || 0) + ')' : 'Ainda não jogou no ' + rotulo) + '">' +
+    var e = rec ? (rec.est || 0) : 0;
+    return '<span class="rt-rk ' + cls + (rec ? '' : ' rt-rk-vazio') + '" title="' + (rec ? 'Melhor no ' + rotulo + ': ' + e + '★' + (rec.fc ? ' · full combo' : '') + ' · ' + _rtFmtNum(rec.score || 0) + ' pts (' + _rtFmtAcc(rec.acc || 0) + ')' : 'Ainda não jogou no ' + rotulo) + '">' +
       '<span class="rt-rk-dif">' + rotulo + '</span>' +
-      '<span class="rt-rk-val' + (rec ? ' rt-r-' + rec.rank : '') + '">' + (rec ? rec.rank : '—') + '</span>' +
+      _rtEstrelasHtml(e, rec && rec.fc, 'rt-ests-mini') +
     '</span>';
   }
   function _rtRenderAjustes() {
@@ -993,6 +1117,9 @@
     for (var p = 0; p < _rtParts.length; p++) _rtParts[p].t0 = 0;   // apaga partículas da partida anterior
     _rtLongasPausadas = [];
     _rtVida = 1; _rtFalhou = false; _rtFalhaEm = 0; _rtFalhaPos = 0;
+    _rtPontos = 0; _rtEnergia = 0; _rtEnergiaAtiva = false; _rtEnergiaUsos = 0;
+    _rtFrases = []; _rtBatida = 0; _rtFase = 0; _rtFaixa = null; _rtGesto = {};
+    _rtEls.jogo.classList.remove('rt-energia-on');
     _rtSkinAtual = _rtSkin();
     _rtPistaAtual = _rtPista();
     _rtFundoAtual = _rtFundoUrl();
@@ -1001,8 +1128,51 @@
     _rtEls.acc.textContent = '100,00%';
     _rtComboRender();
     _rtEls.prog.style.width = '0%';
-    _rtEls.vida.style.display = _rtCfg.dif === 'hard' ? '' : 'none';
     _rtVidaRender();
+    _rtMultRender();
+    _rtHudEnergia(true);
+  }
+
+  /* ── Frases de luar (Energia da Coruja) ──────────────────────────
+     Os beatmaps não marcam frases, então elas saem do próprio mapa, de
+     forma determinística (o mesmo mapa dá sempre as mesmas frases — o
+     ranking continua justo): a 1ª uns 5 s depois da primeira nota, e
+     depois uma a cada ~RT_FRASE_CADA_MS, cada uma com RT_FRASE_BATIDAS
+     batidas encaixadas na grade do BPM. Frase com menos de
+     RT_FRASE_MIN_NOTAS notas não conta. total = julgamentos (longa = 2). */
+  function _rtMarcarFrases(notas, mapa) {
+    _rtFrases = [];
+    for (var i = 0; i < notas.length; i++) notas[i].fr = -1;
+    var bpm = Number(mapa && mapa.bpm) || 0;
+    _rtBatida = bpm >= 40 && bpm <= 300 ? 60000 / bpm : 0;
+    _rtFase = _rtBatida ? _rtFaseBatida(notas, _rtBatida) : 0;
+    if (!notas.length) return;
+    var dur = _rtBatida ? _rtBatida * RT_FRASE_BATIDAS : 3500;
+    var ultima = notas[notas.length - 1].t, t = notas[0].t + 5000, j = 0;
+    while (t + dur < ultima) {
+      var ini = _rtBatida ? _rtFase + Math.round((t - _rtFase) / _rtBatida) * _rtBatida : t, fim = ini + dur;
+      while (j < notas.length && notas[j].t < ini) j++;
+      var k = j, total = 0;
+      while (k < notas.length && notas[k].t < fim) { total += notas[k].fim ? 2 : 1; k++; }
+      if (k - j >= RT_FRASE_MIN_NOTAS) {
+        for (var q = j; q < k; q++) notas[q].fr = _rtFrases.length;
+        _rtFrases.push({ ini: ini, fim: fim, total: total, ok: 0, falhou: false });
+      }
+      j = k;
+      t = ini + RT_FRASE_CADA_MS;
+    }
+  }
+  // Fase da grade de batidas: onde (dentro de uma batida) cai a maioria das
+  // notas — os mapas encaixam as notas em batidas inteiras (Normal) ou meias.
+  function _rtFaseBatida(notas, batida) {
+    var B = 32, h = [], i;
+    for (i = 0; i < B; i++) h.push(0);
+    for (i = 0; i < notas.length; i++) h[Math.floor((((notas[i].t % batida) + batida) % batida) / batida * B) % B]++;
+    var m = 0;
+    for (i = 1; i < B; i++) if (h[i] > h[m]) m = i;
+    var soma = 0, n = 0;
+    for (var d = -1; d <= 1; d++) { var b = (m + d + B) % B; soma += (m + d + 0.5) * h[b]; n += h[b]; }
+    return n ? (soma / n) / B * batida : 0;
   }
 
   /* ── 4K → 5K/7K ──────────────────────────────────────────────────
@@ -1096,6 +1266,7 @@
     notas.sort(function (a, b) { return a.t - b.t || a.c - b.c; });
     if (keysMapa !== _rtK) notas = (keysMapa === 4) ? _rtConverterK(notas, _rtK) : [];
     notas = _rtAjustarDedos(notas, _rtK);
+    _rtMarcarFrases(notas, mapa);
     _rtNotas = notas;
     _rtPorCol = [];
     _rtPonteiro = [];
@@ -1152,6 +1323,12 @@
       if (_rtGanho && !_rtSaindo) {
         var alvo = _rtSomAtivo() ? 1 : 0;
         if (_rtGanho.gain.value !== alvo) _rtGanho.gain.setValueAtTime(alvo, _rtCtx.currentTime);
+      }
+      // Energia ativa esvazia com o tempo (parada na pausa)
+      if (_rtEnergiaAtiva) {
+        _rtEnergia -= dt * RT_ENERGIA_DRENO;
+        if (_rtEnergia <= 0) _rtEnergiaFim();
+        _rtHudEnergia(false);
       }
       if (agora >= _rtFim && !_rtSaindo) _rtTerminar();
     }
@@ -1283,30 +1460,114 @@
   function _rtJulgar(n, tipo, desvio) {
     n.j = tipo;
     _rtContar(tipo, desvio, null);
+    _rtFraseJulgar(n, tipo);
   }
   // semAviso: o erro da cabeça já apareceu na tela; o do fim conta calado.
   function _rtFinalizarLonga(n, tipo, semAviso) {
     if (n.jc) return;
     n.jc = tipo;
     _rtContar(tipo, null, n.solto ? 'SOLTOU CEDO' : null, semAviso, semAviso ? 'nenhuma' : (n.solto ? 'solto' : null));
+    _rtFraseJulgar(n, tipo);
   }
   // Contabiliza UM julgamento (cabeça de nota, toque ou fim de longa).
+  // Os pontos usam o multiplicador de ANTES deste acerto (a 11ª nota
+  // seguida é a primeira que vale x2).
   function _rtContar(tipo, desvio, rotulo, semAviso, chaveVida) {
     _rtCont[tipo]++;
     _rtJulgadas++;
     _rtSoma += RT_VALOR[tipo];
+    if (tipo !== 'erro') _rtPontos += Math.round(RT_PONTOS * RT_VALOR[tipo]) * _rtMult();
     if (tipo === 'erro') _rtCombo = 0;
     else { _rtCombo++; if (_rtCombo > _rtComboMax) _rtComboMax = _rtCombo; }
     if (!semAviso) _rtJulgVis = { tipo: tipo, ate: performance.now() + 520, desvio: desvio, rotulo: rotulo };
     _rtEls.score.textContent = _rtFmtNum(_rtScoreAtual());
     _rtEls.acc.textContent = _rtFmtAcc(_rtPrecisao());
     _rtComboRender();
-    if (_rtDif === 'hard' && !_rtFalhou && !_rtSaindo) {
+    _rtMultRender();
+    if (!_rtFalhou && !_rtSaindo) {
       var dv = chaveVida === 'nenhuma' ? 0 : (RT_VIDA[chaveVida || tipo] || 0);
       _rtVida = Math.max(0, Math.min(1, _rtVida + dv));
       _rtVidaRender();
-      if (_rtVida <= 0) _rtFalhar();
+      if (_rtVida <= 0 && RT_FALHA_NO_MODO[_rtModo]) _rtFalhar();
     }
+  }
+
+  /* ── Multiplicador (HUD) ─────────────────────────────────────────
+     Anel em volta do "x2" = quanto falta pro próximo nível (CSS --p).
+     data-m dá a cor; subir de nível dá um pulinho (rt-mult-sobe). */
+  function _rtMultCombo() { return Math.min(RT_MULT_MAX, 1 + Math.floor(_rtCombo / RT_MULT_PASSO)); }
+  function _rtMult() { return _rtMultCombo() * (_rtEnergiaAtiva ? 2 : 1); }
+  var _rtMultUlt = 1;
+  function _rtMultRender() {
+    var el = _rtEls.mult;
+    if (!el) return;
+    var mc = _rtMultCombo(), m = _rtMult();
+    _rtEls.multX.textContent = 'x' + m;
+    el.style.setProperty('--p', mc >= RT_MULT_MAX ? '1' : ((_rtCombo % RT_MULT_PASSO) / RT_MULT_PASSO).toFixed(2));
+    if (el.getAttribute('data-m') !== String(mc)) el.setAttribute('data-m', mc);
+    el.classList.toggle('rt-mult-energia', _rtEnergiaAtiva);
+    if (m > _rtMultUlt) { el.classList.remove('rt-mult-sobe'); void el.offsetWidth; el.classList.add('rt-mult-sobe'); }
+    _rtMultUlt = m;
+  }
+
+  /* ── Energia da Coruja ───────────────────────────────────────────
+     Um julgamento de nota de frase: erro estraga a frase; a frase toda
+     certa enche RT_FRASE_GANHO. Soltar (_rtEnergiaAtivar) precisa de
+     RT_ENERGIA_MIN e dobra o multiplicador até a barra esvaziar. */
+  function _rtFraseJulgar(n, tipo) {
+    if (!n || !(n.fr >= 0)) return;
+    var f = _rtFrases[n.fr];
+    if (!f || f.falhou) return;
+    if (tipo === 'erro') { f.falhou = true; return; }
+    if (++f.ok < f.total) return;
+    var antes = _rtEnergia;
+    _rtEnergia = Math.min(1, _rtEnergia + RT_FRASE_GANHO);
+    _rtEfeitoLuar();
+    if (!_rtEnergiaAtiva && antes < RT_ENERGIA_MIN && _rtEnergia >= RT_ENERGIA_MIN && _rtCfg.dicaE < 3) {
+      _rtFaixaMostrar('ENERGIA PRONTA! ' + (_rtPadUsado ? 'aperte Select' : (_rtTeclaUsada ? 'aperte Enter' : 'deslize ↑')), RT_LUAR, 1600);
+    } else {
+      _rtFaixaMostrar('+ ENERGIA', RT_LUAR, 700);
+    }
+    _rtHudEnergia(true);
+  }
+  function _rtEnergiaAtivar() {
+    if (_rtEstado !== 'jogando' || _rtPausado || _rtFalhou || _rtSaindo || _rtEnergiaAtiva) return;
+    if (_rtEnergia < RT_ENERGIA_MIN) return;
+    _rtEnergiaAtiva = true;
+    _rtEnergiaUsos++;
+    if (_rtCfg.dicaE < 3) { _rtCfg.dicaE++; _rtCfgSalvar(); }
+    _rtEls.jogo.classList.add('rt-energia-on');
+    _rtFaixaMostrar('ENERGIA DA CORUJA!', RT_LUAR, 1100);
+    _rtEfeitoLuar();
+    _rtMultRender();
+    _rtHudEnergia(true);
+  }
+  function _rtEnergiaFim() {
+    _rtEnergia = 0;
+    _rtEnergiaAtiva = false;
+    _rtEls.jogo.classList.remove('rt-energia-on');
+    _rtMultRender();
+    _rtHudEnergia(true);
+  }
+  // Acende os receptores em luar (reaproveita o anel de acerto)
+  function _rtEfeitoLuar() {
+    var t = performance.now();
+    for (var c = 0; c < _rtK; c++) { _rtAnel[c] = t; _rtAnelForca[c] = 1; _rtBrilho[c] = Math.max(_rtBrilho[c], 0.7); }
+  }
+  var _rtEnergiaUltW = -1;
+  function _rtHudEnergia(forcar) {
+    var b = _rtEls.energiaBarra;
+    if (!b) return;
+    var w = Math.round(Math.max(0, _rtEnergia) * 200) / 2;          // passos de 0,5%
+    if (!forcar && w === _rtEnergiaUltW) return;
+    _rtEnergiaUltW = w;
+    b.style.width = w + '%';
+    _rtEls.energia.classList.toggle('rt-energia-pronta', !_rtEnergiaAtiva && _rtEnergia >= RT_ENERGIA_MIN);
+    _rtEls.energia.classList.toggle('rt-energia-ativa', _rtEnergiaAtiva);
+  }
+  // Aviso grande e curto no canvas (abaixo do julgamento)
+  function _rtFaixaMostrar(txt, cor, dur) {
+    _rtFaixa = { txt: txt, cor: cor, ate: performance.now() + dur, dur: dur };
   }
 
   /* ── Combo no canto (HUD), longe do julgamento ───────────────────
@@ -1326,16 +1587,20 @@
     _rtComboUlt = _rtCombo;
   }
 
-  /* ── Barra de vida (Hard) ─────────────────────────────────────── */
+  /* ── Medidor de performance ──────────────────────────────────────
+     Três faixas, como o medidor de plateia: verde-água (acima de 2/3),
+     âmbar e vermelho (abaixo de 1/3, piscando). Zerado: rt-vida-zero. */
   function _rtVidaRender() {
     var b = _rtEls.vidaBarra;
     if (!b) return;
     var v = Math.max(0, Math.min(1, _rtVida));
     b.style.width = (v * 100).toFixed(1) + '%';
-    b.style.background = v > 0.5 ? '#5eead4' : v > 0.25 ? '#fbbf24' : '#f87171';
-    _rtEls.vida.classList.toggle('rt-vida-baixa', v <= 0.25);
+    b.style.background = v > 2 / 3 ? '#5eead4' : v > 1 / 3 ? '#fbbf24' : '#f87171';
+    _rtEls.vida.classList.toggle('rt-vida-baixa', v <= 1 / 3);
+    _rtEls.vida.classList.toggle('rt-vida-zero', v <= 0);
   }
-  // Vida zerou: a música "desliga" (desacelera + some) e vem a tela de Falhou.
+  // Medidor zerou no modo que falha: a música "desliga" (desacelera + some)
+  // e vem a tela de Falhou.
   function _rtFalhar() {
     _rtFalhou = true;
     _rtSaindo = true;
@@ -1356,15 +1621,12 @@
   }
 
   /* ── Pontuação ───────────────────────────────────────────────────
-     Estilo osu!mania: teto de 1.000.000. 90% vem da precisão de cada
-     nota (Perfeito 100%, Ótimo 70%, Bom 40%, Erro 0) e 10% do combo
-     máximo em relação ao total. Nota longa vale 2 julgamentos (cabeça e
-     fim). */
-  // Total = julgamentos possíveis (toques + cabeça e fim de cada longa).
-  function _rtScoreAtual() {
-    var total = _rtTotal || 1;
-    return Math.round(900000 * (_rtSoma / total) + 100000 * (_rtComboMax / total));
-  }
+     Estilo Guitar Hero (ver RT_PONTOS): soma dos pontos de cada
+     julgamento × multiplicador, acumulada em _rtContar. A precisão
+     (Perfeito 100%, Ótimo 70%, Bom 40%, Erro 0) continua decidindo rank,
+     estrelas e moedas. Nota longa vale 2 julgamentos (cabeça e fim).
+     O teto de 1.000.000 é só a trava das regras do ranking. */
+  function _rtScoreAtual() { return Math.min(1000000, _rtPontos); }
   function _rtPrecisao() { return _rtJulgadas ? (_rtSoma / _rtJulgadas) * 100 : 100; }
   function _rtFmtAcc(v) { return v.toFixed(2).replace('.', ',') + '%'; }
   function _rtFmtNum(v) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
@@ -1416,20 +1678,24 @@
     var q = function (id) { return document.getElementById(id); };
     var nomeMapa = _rtMusica.titulo + (_rtMusica.sub ? ' · ' + _rtMusica.sub : '') + ' — ' + (_rtDif === 'hard' ? 'Hard' : 'Normal') + ' · ' + _rtK + 'K';
     q('rt-res-musica').textContent = nomeMapa;
+    q('rt-res-capa').innerHTML = _rtCapaHtml(_rtMusica, 'rt-capa-grande');
     q('rt-res-cidade').style.display = 'none';
     q('rt-res-dica').style.display = 'none';
     q('rt-res-denovo').textContent = _rtFalhou ? 'Tentar de novo' : 'Jogar de novo';
 
-    /* ── Falhou (Hard, vida zerou): sem moedas, recorde nem ranking.
-       Conta a partida nas stats (tempo jogado), com score 0 e 'derrota'
-       no histórico — não mexe no recorde. */
+    /* ── Falhou (medidor zerou num modo que falha): sem moedas, recorde,
+       estrelas nem ranking. Conta a partida nas stats (tempo jogado), com
+       score 0 e 'derrota' no histórico — não mexe no recorde. */
     if (_rtFalhou) {
       if (G && typeof G.statsRegistrarPartida === 'function') G.statsRegistrarPartida('ritmo', { segundos: segundos, score: 0, resultado: 'derrota' });
+      q('rt-res-estrelas').innerHTML = '';
+      q('rt-res-fc').style.display = 'none';
       var rkF = q('rt-res-rank');
       rkF.textContent = 'Falhou';
       rkF.className = 'rt-res-rank rt-res-rank-falhou';
+      rkF.style.display = '';
       var fm = q('rt-res-falhou-msg');
-      fm.textContent = 'A vida acabou em ' + progresso + '% da música. No Hard, cada erro tira vida e cada acerto devolve um pouco.';
+      fm.textContent = 'O medidor zerou em ' + progresso + '% da música. Cada erro derruba o medidor e cada acerto levanta um pouco.';
       fm.style.display = '';
       q('rt-res-recorde').style.display = 'none';
       q('rt-res-score').textContent = _rtFmtNum(_rtScoreAtual());
@@ -1455,15 +1721,21 @@
     var acc = _rtPrecisao();
     var score = _rtScoreAtual();
     var rank = _rtRank(acc, _rtCont);
+    var est = _rtEstrelas(acc), fc = _rtCont.erro === 0;
 
-    // Recorde local por música + dificuldade
+    // Recorde local por música + dificuldade + colunas. Score/precisão são
+    // da melhor partida; estrelas e FC guardam o melhor já feito (podem
+    // vir de partidas diferentes).
     var rec = _rtRecLer(), chave = _rtChaveRec(_rtMusica.id, _rtDif, _rtK);
     var antes = rec[chave];
     var novo = !antes || score > (antes.score || 0);
-    if (novo) {
-      rec[chave] = { score: score, acc: Math.round(acc * 100) / 100, rank: rank, combo: _rtComboMax };
-      _rtRecSalvar(rec);
-    }
+    var r2 = {};
+    if (antes) for (var ka in antes) r2[ka] = antes[ka];
+    if (novo) { r2.score = score; r2.acc = Math.round(acc * 100) / 100; r2.rank = rank; r2.combo = _rtComboMax; }
+    r2.est = Math.max((antes && antes.est) || 0, est);
+    r2.fc = !!((antes && antes.fc) || fc);
+    rec[chave] = r2;
+    _rtRecSalvar(rec);
 
     // Moedas + stats (mesmo padrão dos outros jogos do hub)
     var moedas = _rtMoedas(rank, acc, _rtDif, _rtK);
@@ -1472,10 +1744,10 @@
       if (typeof G.statsRegistrarPartida === 'function') G.statsRegistrarPartida('ritmo', { segundos: segundos, score: score });
     }
 
-    // Tela
-    var rk = q('rt-res-rank');
-    rk.textContent = rank;
-    rk.className = 'rt-res-rank rt-r-' + rank;
+    // Tela: estrelas grandes (entram uma a uma) no lugar da letra do rank
+    q('rt-res-rank').style.display = 'none';
+    q('rt-res-estrelas').innerHTML = _rtEstrelasHtml(est, fc, 'rt-ests-grande');
+    q('rt-res-fc').style.display = fc ? '' : 'none';
     q('rt-res-recorde').style.display = (novo && antes) ? '' : 'none';
     q('rt-res-score').textContent = _rtFmtNum(score);
     q('rt-res-acc').textContent = _rtFmtAcc(acc);
@@ -1488,8 +1760,8 @@
     _rtDicaCalibrar();
     _rtResRankCidade(score);
     _rtMostrar('res');
-    if (G && G.som && typeof G.som.fim === 'function') { try { G.som.fim(RT_ORDEM_RANK[rank] >= 5); } catch (e) {} }
-    if (RT_ORDEM_RANK[rank] >= 5 && G && G.efeitos) G.efeitos.confete('rt-res', 90);
+    if (G && G.som && typeof G.som.fim === 'function') { try { G.som.fim(est >= 4); } catch (e) {} }
+    if (est >= 5 && G && G.efeitos) G.efeitos.confete('rt-res', 90);
   }
 
   function _rtResContagem() {
@@ -1597,7 +1869,7 @@
       if (n) { n.seg = false; n.pausado = true; _rtLongasPausadas.push(n); _rtSegurando[c] = null; }
       _rtApertada[c] = 0;
     }
-    _rtPonteiros = {}; _rtTeclasDown = {}; _rtPadCols = {};
+    _rtPonteiros = {}; _rtTeclasDown = {}; _rtPadCols = {}; _rtGesto = {};
   }
   function _rtContinuar() {
     if (!_rtPausado || _rtEstado !== 'jogando') return;
@@ -1629,11 +1901,20 @@
     e.preventDefault();
     var c = _rtColunaDoX(e.clientX);
     _rtPonteiros[e.pointerId] = c;
+    _rtGesto[e.pointerId] = { y: e.clientY, t: performance.now(), usado: false };
     _rtApertada[c]++;
     try { _rtCanvas.setPointerCapture(e.pointerId); } catch (err) {}
     _rtTocar(c);
   }
+  // Deslizar o dedo pra cima, rápido (≥ 55 px em até 450 ms), solta a
+  // Energia — o "levantar a guitarra" do celular. O toque em si já contou.
+  function _rtPointerMove(e) {
+    var p = _rtGesto[e.pointerId];
+    if (!p || p.usado) return;
+    if (p.y - e.clientY >= 55 && performance.now() - p.t <= 450) { p.usado = true; _rtEnergiaAtivar(); }
+  }
   function _rtPointerUp(e) {
+    delete _rtGesto[e.pointerId];
     var c = _rtPonteiros[e.pointerId];
     if (c === undefined) return;
     delete _rtPonteiros[e.pointerId];
@@ -1650,7 +1931,16 @@
   var _rtTeclasDown = {};
   function _rtKeyDown(e) {
     if (_rtEstado !== 'jogando') return;
+    // Enter / Shift: solta a Energia da Coruja (não são teclas de coluna)
+    if (e.key === 'Enter' || e.key === 'Shift') {
+      var telaE = document.getElementById('jogo-ritmo');
+      if (!telaE || telaE.style.display === 'none') return;
+      e.preventDefault();                      // Enter não "clica" num botão escondido
+      if (!e.repeat) { _rtTeclaUsada = true; _rtEnergiaAtivar(); }
+      return;
+    }
     var c = _rtColunaDaTecla(e);
+    if (c !== undefined) _rtTeclaUsada = true;
     if (c === undefined) return;
     if (e.repeat) { e.preventDefault(); return; }
     var tela = document.getElementById('jogo-ritmo');
@@ -1714,6 +2004,11 @@
     return RT_PAD_PADRAO[k] || RT_PAD_PADRAO[4];
   }
 
+  function _rtPadMapaTem(mapa, b) {
+    for (var c = 0; c < mapa.length; c++) if (mapa[c].indexOf(b) !== -1) return true;
+    return false;
+  }
+
   // Marca como "já apertado" tudo que está pressionado agora: o Start/A
   // que acabou de começar a música não vira pausa nem toque no 1º frame.
   function _rtPadSnapshot() {
@@ -1738,6 +2033,12 @@
         else if (M.abrir) M.abrir('jogo-ritmo');
       }
       _rtPadAntes[kS] = apS;
+      // Select: solta a Energia (se a pessoa não pôs o Select numa coluna)
+      if (!_rtPadMapaTem(mapa, RT_PAD_ENERGIA)) {
+        var kE = gp.index + '_' + RT_PAD_ENERGIA, apE = _rtBotaoApertado(gp, RT_PAD_ENERGIA);
+        if (apE && !_rtPadAntes[kE]) { _rtPadUsado = true; _rtEnergiaAtivar(); }
+        _rtPadAntes[kE] = apE;
+      }
       for (var c = 0; c < mapa.length; c++) {
         for (var j = 0; j < mapa[c].length; j++) {
           var b = mapa[c][j];
@@ -2118,34 +2419,113 @@
     g.beginPath(); g.arc(x - r * 0.3, y - r * 0.35, r * 0.22, 0, PI2); g.fillStyle = 'rgba(255,255,255,0.7)'; g.fill();
   }
 
-  // Corpo da nota longa: faixa arredondada entre a cabeça (y1) e o fim (y0).
-  function _rtDesenharCorpo(g, x, y0, y1, larg, cor, alfa) {
-    if (y1 <= y0) return;
+  /* ── Projeção da pista 3D ─────────────────────────────────────────
+     z = quanto falta pra nota chegar, em fração do tempo de queda
+     (0 = na linha de acerto, 1 = onde a pista nasce, perto do alto da
+     tela). s = escala naquele z: 1 na linha de acerto (a pista e os
+     receptores ficam EXATAMENTE onde a pista plana deixava — o toque por
+     coluna não muda) e RT_PERSP_TOPO onde ela nasce. y e x saem de s por
+     uma reta até o ponto de fuga (acima da tela), então as bordas das
+     faixas são retas convergindo pro centro. Só números de módulo. */
+  var _rtPjHz = 0, _rtPjAlt = 1, _rtPjCx = 0, _rtPjK = 1;
+  function _rtPjS(z) { return 1 / (1 + _rtPjK * Math.max(-0.6, z)); }
+  function _rtPjY(s) { return _rtPjHz + _rtPjAlt * s; }
+  function _rtPjX(xp, s) { return _rtPjCx + (xp - _rtPjCx) * s; }
+  function _rtPjSdoY(y) { return (y - _rtPjHz) / _rtPjAlt; }
+  // Caminho do trecho da pista entre as bordas xa..xb (medidas na linha de
+  // acerto), da altura y0 até y1 na tela.
+  function _rtPjQuad(g, xa, xb, y0, y1) {
+    var s0 = _rtPjSdoY(y0), s1 = _rtPjSdoY(y1);
+    g.beginPath();
+    g.moveTo(_rtPjX(xa, s0), y0); g.lineTo(_rtPjX(xb, s0), y0);
+    g.lineTo(_rtPjX(xb, s1), y1); g.lineTo(_rtPjX(xa, s1), y1);
+    g.closePath();
+  }
+  // Nota/receptor vistos um pouco de lado: a mesma arte da skin, achatada.
+  function _rtNotaPj(g, x, y, r, cor, estilo) {
+    g.save(); g.translate(x, y); g.scale(1, RT_ACHATA);
+    _rtDesenharNota(g, 0, 0, r, cor, estilo);
+    g.restore();
+  }
+  // Halo de luar em volta de nota de frase da Energia.
+  function _rtLuarNota(g, x, y, r, alfa) {
+    var a0 = g.globalAlpha;
+    g.globalAlpha = a0 * 0.3 * alfa;
+    g.beginPath(); g.ellipse(x, y, r * 1.42, r * 1.42 * RT_ACHATA, 0, 0, Math.PI * 2); g.fillStyle = RT_LUAR; g.fill();
+    g.globalAlpha = a0 * 0.85 * alfa;
+    g.lineWidth = Math.max(1.5, r * 0.13); g.strokeStyle = RT_LUAR;
+    g.beginPath(); g.ellipse(x, y, r * 1.16, r * 1.16 * RT_ACHATA, 0, 0, Math.PI * 2); g.stroke();
+    g.globalAlpha = a0;
+  }
+
+  // Corpo da nota longa em perspectiva: trapézio da cabeça (zH) até o fim
+  // (zT), afinando com a distância, com a ponta arredondada.
+  function _rtCorpoPj(g, xp, zT, zH, larg, cor, alfa) {
+    var sH = _rtPjS(zH), sT = _rtPjS(zT), yH = _rtPjY(sH), yT = _rtPjY(sT);
+    if (yH <= yT) return;
+    var xH = _rtPjX(xp, sH), xT = _rtPjX(xp, sT), wH = larg * sH / 2, wT = larg * sT / 2;
     var a0 = g.globalAlpha;
     g.globalAlpha = a0 * alfa;
-    var rr = larg / 2;
     g.beginPath();
-    g.moveTo(x - rr, y1);
-    g.lineTo(x - rr, y0 + rr);
-    g.arc(x, y0 + rr, rr, Math.PI, 0);
-    g.lineTo(x + rr, y1);
+    g.moveTo(xH - wH, yH);
+    g.lineTo(xT - wT, yT);
+    g.ellipse(xT, yT, wT, wT * RT_ACHATA, 0, Math.PI, 0);
+    g.lineTo(xH + wH, yH);
     g.closePath();
     g.fillStyle = cor; g.fill();
     g.globalAlpha = a0;
+  }
+
+  // Divisórias que aparecem aos poucos no alto da pista (gradiente guardado
+  // por cor + altura; recriado só quando muda o tamanho ou a skin).
+  var _rtGradTopo = {};
+  function _rtLinhaTopo(g, cor, topo) {
+    var ch = cor + '|' + topo, gr = _rtGradTopo[ch];
+    if (!gr) {
+      gr = g.createLinearGradient(0, topo, 0, topo + 70);
+      gr.addColorStop(0, 'rgba(0,0,0,0)');
+      gr.addColorStop(1, cor);
+      _rtGradTopo[ch] = gr;
+    }
+    return gr;
+  }
+
+  // Linhas de batida atravessando a pista (a cada 4, mais fortes), descendo
+  // junto com as notas. Fase e BPM vêm do mapa (_rtMarcarFrases).
+  function _rtBatidas(g, agora, queda, x0, x1, pista) {
+    var b = _rtBatida;
+    if (!b) return;
+    g.fillStyle = pista.linha;
+    for (var i = Math.ceil((agora - _rtFase - 0.1 * queda) / b); ; i++) {
+      var z = (_rtFase + i * b - agora) / queda;
+      if (z > 1) break;
+      var s = _rtPjS(z), y = _rtPjY(s), forte = ((i % 4) + 4) % 4 === 0, h = (forte ? 2.6 : 1.2) * s;
+      g.globalAlpha = (forte ? 1 : 0.6) * (z > 0.85 ? (1 - z) / 0.15 : 1);    // somem perto de onde a pista nasce
+      g.fillRect(_rtPjX(x0, s), y - h / 2, (x1 - x0) * s, h);
+    }
+    g.globalAlpha = 1;
   }
 
   function _rtDesenhar(agora) {
     var g = _rtG;
     if (!g || !_rtW) return;
     g.setTransform(_rtDpr, 0, 0, _rtDpr, 0, 0);
-    var K = _rtK || 4;
-    var L = _rtLayout(), lw = L.lw, x0 = L.x0, hitY = L.hitY;
-    var queda = _rtTempoQueda();
-    var px = hitY / queda;          // pixels por ms
+    var K = _rtK || 4, H = _rtH;
+    var L = _rtLayout(), lw = L.lw, x0 = L.x0, hitY = L.hitY, x1 = x0 + lw * K;
+    var queda = _rtTempoQueda() * RT_PERSP_QUEDA;   // ms do alto da tela até a linha
     var skin = _rtSkinAtual || _rtSkin();
     var pista = _rtPistaAtual || RT_PISTA_PADRAO;
     var PI2 = Math.PI * 2;
     var pn = performance.now();
+    var en = _rtEnergiaAtiva;
+
+    // Projeção deste frame (ver _rtPj*): a pista nasce em y = topo (z = 1).
+    var topo = Math.round(Math.max(RT_PERSP_Y0_MIN, H * RT_PERSP_Y0_FRAC));
+    _rtPjK = 1 / RT_PERSP_TOPO - 1;
+    _rtPjHz = (topo - hitY * RT_PERSP_TOPO) / (1 - RT_PERSP_TOPO);
+    _rtPjAlt = hitY - _rtPjHz;
+    _rtPjCx = (x0 + x1) / 2;
+    var sTopo = _rtPjSdoY(topo), sBase = _rtPjSdoY(H);
 
     // Fundo: imagem equipada (cópia já escalada → 1 drawImage 1:1) ou,
     // no padrão / enquanto a imagem carrega, o fundo escuro do CSS.
@@ -2155,93 +2535,111 @@
       g.drawImage(fundo, 0, 0);
       g.setTransform(_rtDpr, 0, 0, _rtDpr, 0, 0);
       g.fillStyle = RT_FUNDO_VEU_PISTA;          // véu extra só onde as notas passam
-      g.fillRect(x0, 0, lw * K, _rtH);
+      _rtPjQuad(g, x0, x1, topo, H); g.fill();
     } else {
-      g.clearRect(0, 0, _rtW, _rtH);
+      g.clearRect(0, 0, _rtW, H);
     }
 
-    // Fundo das pistas (cores da skin de pista)
+    // Faixas (cores da skin de pista) + realce da coluna pressionada
     for (var c = 0; c < K; c++) {
       var x = x0 + c * lw;
       g.fillStyle = pista.faixa[c % 2];
-      g.fillRect(x, 0, lw, _rtH);
+      _rtPjQuad(g, x, x + lw, topo, H); g.fill();
       if (_rtApertada[c] > 0) {
-        var grad = g.createLinearGradient(0, hitY, 0, hitY - _rtH * 0.45);
+        var yAp = hitY - H * 0.45;
+        var grad = g.createLinearGradient(0, hitY, 0, yAp);
         grad.addColorStop(0, 'rgba(' + pista.aperto + ',0.22)');
         grad.addColorStop(1, 'rgba(' + pista.aperto + ',0)');
         g.fillStyle = grad;
-        g.fillRect(x, 0, lw, hitY);
+        _rtPjQuad(g, x, x + lw, yAp, hitY); g.fill();
       }
     }
-    // Divisórias: halo largo e translúcido por baixo (skins com brilho) + linha fina
-    if (pista.brilho) {
-      g.fillStyle = pista.brilho;
-      for (var sb = 0; sb <= K; sb++) g.fillRect(x0 + sb * lw - 2.5, 0, 5, _rtH);
-    }
-    g.fillStyle = pista.linha;
-    for (var s = 0; s <= K; s++) g.fillRect(x0 + s * lw, 0, 1, _rtH);
+    // Energia ativa: a pista inteira fica banhada de luar
+    if (en) { g.fillStyle = 'rgba(186,230,253,0.075)'; _rtPjQuad(g, x0, x1, topo, H); g.fill(); }
+    _rtBatidas(g, agora, queda, x0, x1, pista);
 
-    // Linha de acerto + receptores (no estilo da skin de nota)
+    // Divisórias convergindo: halo largo translúcido (skins com brilho) +
+    // linha fina. As duas bordas da pista são mais fortes (trilho).
+    var sd;
+    if (pista.brilho) {
+      g.strokeStyle = _rtLinhaTopo(g, pista.brilho, topo); g.lineWidth = 5;
+      g.beginPath();
+      for (sd = 0; sd <= K; sd++) { g.moveTo(_rtPjX(x0 + sd * lw, sTopo), topo); g.lineTo(_rtPjX(x0 + sd * lw, sBase), H); }
+      g.stroke();
+    }
+    g.strokeStyle = _rtLinhaTopo(g, pista.linha, topo); g.lineWidth = 1;
+    g.beginPath();
+    for (sd = 1; sd < K; sd++) { g.moveTo(_rtPjX(x0 + sd * lw, sTopo), topo); g.lineTo(_rtPjX(x0 + sd * lw, sBase), H); }
+    g.stroke();
+    g.strokeStyle = en ? 'rgba(224,242,254,' + (0.6 + 0.25 * Math.sin(pn / 130)).toFixed(2) + ')' : _rtLinhaTopo(g, 'rgba(255,255,255,0.2)', topo);
+    g.lineWidth = en ? 3 : 2;
+    g.beginPath();
+    g.moveTo(_rtPjX(x0, sTopo), topo); g.lineTo(_rtPjX(x0, sBase), H);
+    g.moveTo(_rtPjX(x1, sTopo), topo); g.lineTo(_rtPjX(x1, sBase), H);
+    g.stroke();
+
+    // Linha de acerto + receptores (no estilo da skin de nota, achatados)
     var raio = _rtRaioNota(lw);
     if (pista.brilho) { g.fillStyle = pista.brilho; g.fillRect(x0, hitY - 4, lw * K, 8); }
-    g.strokeStyle = pista.acerto;
+    g.strokeStyle = en ? RT_LUAR : pista.acerto;
     g.lineWidth = 2;
-    g.beginPath(); g.moveTo(x0, hitY); g.lineTo(x0 + lw * K, hitY); g.stroke();
+    g.beginPath(); g.moveTo(x0, hitY); g.lineTo(x1, hitY); g.stroke();
     for (var r = 0; r < K; r++) {
       var cxr = x0 + r * lw + lw / 2, corR = _rtCorCol(skin, r, K);
       var ap = _rtAperto[r] || 0;                                   // 0 solto → 1 pressionado
       var idadeA = pn - (_rtAnel[r] || 0);                          // ms desde o último acerto
       var pop = idadeA < 140 ? (1 - idadeA / 140) * 0.1 : 0;        // "quique" no acerto
       var rr = raio * (1 - 0.1 * ap + pop);
+      g.save();
+      g.translate(cxr, hitY); g.scale(1, RT_ACHATA);
       // halo da cor da pista quando pressiona (círculo translúcido, sem shadowBlur)
       if (ap > 0.02) {
         g.globalAlpha = 0.2 * ap;
-        g.beginPath(); g.arc(cxr, hitY, raio * 1.28, 0, PI2); g.fillStyle = corR; g.fill();
+        g.beginPath(); g.arc(0, 0, raio * 1.28, 0, PI2); g.fillStyle = corR; g.fill();
       }
       // base escura + "fantasma" da própria nota (gema, neon, ouro, olho, flat)
       g.globalAlpha = 1;
-      g.beginPath(); g.arc(cxr, hitY, rr, 0, PI2); g.fillStyle = 'rgba(6,9,16,0.82)'; g.fill();
+      g.beginPath(); g.arc(0, 0, rr, 0, PI2); g.fillStyle = 'rgba(6,9,16,0.82)'; g.fill();
       g.globalAlpha = 0.24 + 0.46 * ap;
-      _rtDesenharNota(g, cxr, hitY, rr * 0.74, corR, skin.estilo);
-      // anel grosso na cor da skin
+      _rtDesenharNota(g, 0, 0, rr * 0.74, corR, skin.estilo);
+      // anel grosso na cor da skin (luar com a Energia ativa)
       g.globalAlpha = 0.72 + 0.28 * ap;
       g.lineWidth = Math.max(3.5, raio * 0.19);
-      g.strokeStyle = corR;
-      g.beginPath(); g.arc(cxr, hitY, rr * 0.93, 0, PI2); g.stroke();
+      g.strokeStyle = en ? RT_LUAR : corR;
+      g.beginPath(); g.arc(0, 0, rr * 0.93, 0, PI2); g.stroke();
       // fio claro por dentro do anel quando pressionado
       if (ap > 0.02) {
         g.globalAlpha = 0.55 * ap;
         g.lineWidth = Math.max(1.5, raio * 0.06);
         g.strokeStyle = '#ffffff';
-        g.beginPath(); g.arc(cxr, hitY, rr * 0.8, 0, PI2); g.stroke();
-      }
-      g.globalAlpha = 1;
-      if (_rtBrilho[r] > 0) {
-        // faísca subindo pela pista (também acesa enquanto segura uma longa)
-        var b = _rtBrilho[r];
-        var fg = g.createLinearGradient(0, hitY, 0, hitY - 130);
-        fg.addColorStop(0, corR);
-        fg.addColorStop(1, 'rgba(0,0,0,0)');
-        g.fillStyle = fg;
-        g.globalAlpha = b * 0.35;
-        g.fillRect(x0 + r * lw + lw * 0.18, hitY - 130, lw * 0.64, 130);
-        g.globalAlpha = 1;
+        g.beginPath(); g.arc(0, 0, rr * 0.8, 0, PI2); g.stroke();
       }
       if (idadeA < RT_ANEL_MS) {
         // anel de acerto: clarão no receptor + onda que abre e afina
         var va = idadeA / RT_ANEL_MS, fa = _rtAnelForca[r] || 0.6, sai = 1 - (1 - va) * (1 - va);
         if (va < 0.35) {
           g.globalAlpha = (1 - va / 0.35) * 0.45 * fa;
-          g.beginPath(); g.arc(cxr, hitY, raio * (0.95 + 0.2 * va), 0, PI2); g.fillStyle = '#ffffff'; g.fill();
+          g.beginPath(); g.arc(0, 0, raio * (0.95 + 0.2 * va), 0, PI2); g.fillStyle = '#ffffff'; g.fill();
         }
         g.globalAlpha = (1 - va) * fa;
         g.lineWidth = Math.max(1, raio * 0.22 * (1 - va));
-        g.strokeStyle = corR;
-        g.beginPath(); g.arc(cxr, hitY, raio * (1 + sai * (0.55 + 0.35 * fa)), 0, PI2); g.stroke();
+        g.strokeStyle = en ? RT_LUAR : corR;
+        g.beginPath(); g.arc(0, 0, raio * (1 + sai * (0.55 + 0.35 * fa)), 0, PI2); g.stroke();
+      }
+      g.restore();
+      g.globalAlpha = 1;
+      if (_rtBrilho[r] > 0) {
+        // faísca subindo pela pista (também acesa enquanto segura uma longa)
+        var b = _rtBrilho[r];
+        var fg = g.createLinearGradient(0, hitY, 0, hitY - 130);
+        fg.addColorStop(0, en ? RT_LUAR : corR);
+        fg.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = fg;
+        g.globalAlpha = b * 0.35;
+        _rtPjQuad(g, x0 + r * lw + lw * 0.18, x0 + r * lw + lw * 0.82, hitY - 130, hitY); g.fill();
         g.globalAlpha = 1;
       }
     }
-
 
     // Notas visíveis: do ponteiro de desenho até sair pelo topo.
     // Uma nota sai da lista quando já foi resolvida e passou da linha
@@ -2257,38 +2655,48 @@
       var n = _rtNotas[i];
       var dtn = n.t - agora;
       if (dtn > queda * 1.05) break;
-      var cx = x0 + n.c * lw + lw / 2, cor = _rtCorCol(skin, n.c, K);
-      var y = hitY - dtn * px;
+      var xp = x0 + n.c * lw + lw / 2, cor = _rtCorCol(skin, n.c, K);
+      var z = dtn / queda, s = _rtPjS(z), y = _rtPjY(s);
+      var nev = z > 0.8 ? Math.max(0, (1.05 - z) / 0.25) : 1;      // surge do fundo, sem "estalar"
+      var luar = n.fr >= 0 && _rtFrases[n.fr] && !_rtFrases[n.fr].falhou;
       if (n.fim) {
         if (n.jc && n.jc !== 'erro') continue;               // completada: some
-        var yFim = Math.max(-raio, hitY - (n.fim - agora) * px);
+        var zFim = Math.min(1, (n.fim - agora) / queda);   // o rabo não passa de onde a pista nasce
         var morta = n.solto || n.j === 'erro' || n.jc === 'erro';
-        var yCab = n.seg ? hitY : y;                         // segurando: cabeça presa na linha
+        var zCab = n.seg ? 0 : z;                            // segurando: cabeça presa na linha
         if (morta) {
-          _rtDesenharCorpo(g, cx, yFim, yCab, larg, 'rgba(148,163,184,1)', 0.28);
+          _rtCorpoPj(g, xp, zFim, zCab, larg, 'rgba(148,163,184,1)', 0.28);
         } else {
-          _rtDesenharCorpo(g, cx, yFim, yCab, larg, cor, n.seg ? 0.85 : 0.5);
+          _rtCorpoPj(g, xp, zFim, zCab, larg, cor, n.seg ? 0.85 : 0.5);
           if (n.seg) {
             // brilho correndo pelo corpo enquanto segura
-            var faixa = (performance.now() / 4) % 60;
             g.globalAlpha = 0.35; g.fillStyle = '#fff';
-            for (var fy = yCab - faixa; fy > yFim + 6; fy -= 60) g.fillRect(cx - larg * 0.18, fy - 10, larg * 0.36, 10);
+            for (var zz = 0.03 + (pn / 2600) % 0.06; zz < zFim - 0.02; zz += 0.06) {
+              var ss = _rtPjS(zz), ww = larg * 0.36 * ss;
+              g.fillRect(_rtPjX(xp, ss) - ww / 2, _rtPjY(ss) - 9 * ss, ww, 9 * ss);
+            }
             g.globalAlpha = 1;
           }
         }
         // ponta do fim
+        var sF = _rtPjS(zFim);
         g.globalAlpha = morta ? 0.3 : 1;
-        g.beginPath(); g.arc(cx, yFim, raio * 0.42, 0, Math.PI * 2);
+        g.beginPath(); g.ellipse(_rtPjX(xp, sF), _rtPjY(sF), raio * 0.42 * sF, raio * 0.42 * sF * RT_ACHATA, 0, 0, PI2);
         g.fillStyle = morta ? '#94a3b8' : cor; g.fill();
-        g.globalAlpha = morta ? 0.3 : 1;
-        if (yCab > -raio && yCab < _rtH + raio) _rtDesenharNota(g, cx, yCab, raio, morta ? '#64748b' : cor, skin.estilo);
+        var sC = _rtPjS(zCab), yC = _rtPjY(sC);
+        g.globalAlpha = (morta ? 0.3 : 1) * (n.seg ? 1 : nev);
+        if (yC > -raio && yC < H + raio) {
+          if (luar && !morta && !n.seg) _rtLuarNota(g, _rtPjX(xp, sC), yC, raio * sC, 1);
+          _rtNotaPj(g, _rtPjX(xp, sC), yC, raio * sC, morta ? '#64748b' : cor, skin.estilo);
+        }
         g.globalAlpha = 1;
         continue;
       }
       if (n.j && n.j !== 'erro') continue;
-      if (y < -raio || y > _rtH + raio) continue;
-      g.globalAlpha = n.j === 'erro' ? 0.25 : 1;
-      _rtDesenharNota(g, cx, y, raio, cor, skin.estilo);
+      if (y < -raio || y > H + raio) continue;
+      g.globalAlpha = (n.j === 'erro' ? 0.25 : 1) * nev;
+      if (luar && !n.j) _rtLuarNota(g, _rtPjX(xp, s), y, raio * s, 1);
+      _rtNotaPj(g, _rtPjX(xp, s), y, raio * s, cor, skin.estilo);
       g.globalAlpha = 1;
     }
 
@@ -2310,7 +2718,7 @@
     // Julgamento no alto da pista (o combo agora fica no HUD, no canto).
     // Animação: entra grande (1,5×) e assenta em 1× com um leve quique,
     // sobe uns pixels e some. Erro treme de lado em vez de quicar.
-    var ccx = _rtW / 2, jy = Math.max(118, Math.min(_rtH * 0.24, hitY - 260));
+    var ccx = _rtW / 2, jy = Math.max(118, Math.min(H * 0.24, hitY - 260));
     if (_rtJulgVis && pn < _rtJulgVis.ate) {
       var DUR = 520, vida = 1 - (_rtJulgVis.ate - pn) / DUR;      // 0 → 1
       var entra = Math.min(1, vida / 0.18);                        // primeiros ~90 ms
@@ -2336,24 +2744,42 @@
       g.restore();
     }
 
+    // Aviso da Energia ("+ ENERGIA", "ENERGIA PRONTA!", "ENERGIA DA CORUJA!"),
+    // logo abaixo do julgamento: entra rápido, segura e some.
+    if (_rtFaixa && pn < _rtFaixa.ate) {
+      var vf = 1 - (_rtFaixa.ate - pn) / _rtFaixa.dur;
+      g.save();
+      g.globalAlpha = vf > 0.75 ? (1 - vf) / 0.25 : Math.min(1, vf / 0.08);
+      g.translate(ccx, jy + 46);
+      var ef = vf < 0.08 ? 1.25 - vf * 3.1 : 1;
+      g.scale(ef, ef);
+      g.font = '900 ' + Math.round(Math.min(24, Math.max(17, _rtW * 0.055))) + 'px Syne, system-ui, sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.lineWidth = 5; g.strokeStyle = 'rgba(5,8,14,0.8)'; g.lineJoin = 'round';
+      g.strokeText(_rtFaixa.txt, 0, 0);
+      g.fillStyle = _rtFaixa.cor;
+      g.fillText(_rtFaixa.txt, 0, 0);
+      g.restore();
+    }
+
     // "Prepare-se" antes da primeira nota
     if (_rtEstado === 'jogando' && agora < 0) {
       g.font = '800 18px Syne, system-ui, sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillStyle = 'rgba(255,255,255,' + Math.min(1, -agora / 600).toFixed(2) + ')';
-      g.fillText(_rtPausado ? '' : 'Prepare-se!', ccx, _rtH * 0.36);
+      g.fillText(_rtPausado ? '' : 'Prepare-se!', ccx, H * 0.36);
     }
 
     // Falhou: tela escurece em vermelho
     if (_rtFalhou) {
       var f = Math.min(1, (pn - _rtFalhaEm) / 1200);
       g.fillStyle = 'rgba(60,6,12,' + (f * 0.75).toFixed(3) + ')';
-      g.fillRect(0, 0, _rtW, _rtH);
+      g.fillRect(0, 0, _rtW, H);
       g.globalAlpha = f;
       g.font = '900 ' + Math.round(Math.min(40, _rtW * 0.1)) + 'px Syne, system-ui, sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillStyle = '#f87171';
-      g.fillText('FALHOU', ccx, _rtH * 0.42);
+      g.fillText('FALHOU', ccx, H * 0.42);
       g.globalAlpha = 1;
     }
 

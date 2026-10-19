@@ -63,7 +63,7 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
 /* Melhor rank por dificuldade: rótulo pequeno em cima, letra embaixo.
    Sem borda (antes eram 2 caixinhas "N"/"H" que pareciam botões). */
 .rt-rk {
-  width: 44px; padding: 4px 0 5px; border-radius: 10px;
+  width: 50px; padding: 4px 0 5px; border-radius: 10px;
   display: flex; flex-direction: column; align-items: center; gap: 1px;
   background: rgba(255,255,255,.05);
 }
@@ -288,7 +288,7 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
   text-decoration: underline; cursor: pointer;
 }
 
-/* ── Barra de vida (Hard) — topo, entre o ⏸ e o placar ── */
+/* ── Medidor de performance (todas as dificuldades) — topo, entre o ⏸ e o placar ── */
 .rt-vida {
   position: absolute; top: calc(env(safe-area-inset-top, 0px) + 20px); left: 60px; right: 128px;
   display: flex; align-items: center; gap: 6px; pointer-events: none; max-width: 260px;
@@ -354,7 +354,117 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
 .rt-pad-dicas b { color: #ccfbf1; font-weight: 800; }
 #jogo-ritmo .rt-jm-recomecar { margin: 0; }
 
+/* ══ Fase 1 "Guitar Hero light": capas, estrelas, multiplicador, Energia ══ */
+
+/* ── Capa da música (arquivo por cima da provisória: inicial + cor do id) ── */
+.rt-capa {
+  position: relative; display: block; overflow: hidden; border-radius: inherit;
+  width: 100%; height: 100%;
+  background: linear-gradient(145deg, hsl(var(--rt-capa-h, 260) 55% 42%), hsl(calc(var(--rt-capa-h, 260) + 40) 60% 18%));
+}
+.rt-capa-ini {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif; font-weight: 900; font-size: 22px; color: rgba(255,255,255,.85);
+  text-shadow: 0 2px 6px rgba(0,0,0,.4);
+}
+.rt-capa img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.rt-musica-capa {
+  position: relative; flex-shrink: 0; width: 46px; height: 46px; border-radius: 11px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+}
+.rt-musica-sel .rt-musica-capa { box-shadow: 0 0 0 2px #a78bfa, 0 4px 14px rgba(167,139,250,.4); }
+/* ícone da prévia vira um selo no canto da capa */
+.rt-musica-capa .rt-musica-ico {
+  position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%;
+  font-size: 9px; background: rgba(9,14,22,.9); border: 1.5px solid rgba(255,255,255,.12);
+}
+.rt-musica-capa .rt-ico-carregando::after { width: 10px; height: 10px; border-width: 1.5px; }
+.rt-musica-capa .rt-eq { height: 9px; gap: 1.5px; }
+.rt-musica-capa .rt-eq i { width: 2px; }
+
+/* ── Estrelas (SVG; cheia, vazia e dourada do Full Combo) ── */
+.rt-ests { display: inline-flex; align-items: center; gap: 1px; line-height: 0; }
+.rt-est { display: inline-block; font-style: normal; }
+.rt-est svg { width: 100%; height: 100%; display: block; fill: rgba(255,255,255,.14); }
+.rt-est-on svg { fill: #f8fafc; }
+.rt-est-ouro svg { fill: #fbbf24; filter: drop-shadow(0 0 3px rgba(251,191,36,.8)); }
+.rt-ests-mini .rt-est { width: 8.5px; height: 8.5px; }
+.rt-rk-vazio .rt-ests-mini .rt-est svg { fill: rgba(255,255,255,.1); }
+.rt-ests-grande { gap: 6px; margin: 4px 0 2px; }
+.rt-ests-grande .rt-est { width: 46px; height: 46px; }
+.rt-ests-grande .rt-est-on { animation: rtEstEntra .45s cubic-bezier(.2,1.7,.4,1) both; animation-delay: calc(.15s + var(--i) * .16s); }
+.rt-ests-grande .rt-est-on svg { filter: drop-shadow(0 0 8px rgba(248,250,252,.55)); }
+.rt-ests-grande .rt-est-ouro svg { fill: #fbbf24; filter: drop-shadow(0 0 12px rgba(251,191,36,.9)); }
+@keyframes rtEstEntra { from { transform: scale(0) rotate(-40deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+
+/* ── Resultado: capa grande + Full Combo ── */
+.rt-res-capa { width: 112px; height: 112px; border-radius: 18px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.08); }
+.rt-res-capa .rt-capa-ini { font-size: 48px; }
+.rt-res-fc {
+  padding: 3px 12px; border-radius: 999px; font-family: 'Syne', sans-serif; font-weight: 900; font-size: 13px;
+  letter-spacing: .08em; text-transform: uppercase; color: #1a1205;
+  background: linear-gradient(90deg, #fde68a, #fbbf24); box-shadow: 0 0 18px rgba(251,191,36,.5);
+  animation: rtRankEntra .5s cubic-bezier(.2,1.6,.4,1) .9s both;
+}
+
+/* ── Multiplicador + Energia (canto esquerdo, abaixo do ⏸) ── */
+.rt-poder {
+  position: absolute; top: calc(env(safe-area-inset-top, 0px) + 56px); left: 10px;
+  display: flex; align-items: center; gap: 8px; pointer-events: none;
+}
+.rt-mult {
+  --p: 0; --c: rgba(199,209,224,.55);
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  background: conic-gradient(var(--c) calc(var(--p) * 360deg), rgba(255,255,255,.1) 0);
+}
+.rt-mult b {
+  width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: rgba(9,14,22,.88); font-family: 'Syne', sans-serif; font-weight: 900; font-size: 14px; color: var(--c);
+  font-variant-numeric: tabular-nums;
+}
+.rt-mult[data-m="2"] { --c: #5eead4; }
+.rt-mult[data-m="3"] { --c: #fbbf24; }
+.rt-mult[data-m="4"] { --c: #c4b5fd; }
+.rt-mult[data-m="4"] b { box-shadow: 0 0 12px rgba(196,181,253,.45) inset; }
+.rt-mult.rt-mult-energia { --c: #e0f2fe; }
+.rt-mult.rt-mult-energia b { background: rgba(14,40,64,.92); box-shadow: 0 0 14px rgba(224,242,254,.6); }
+.rt-mult-sobe { animation: rtComboMarco .4s cubic-bezier(.2,1.6,.4,1); }
+
+.rt-energia { display: flex; align-items: center; gap: 6px; }
+.rt-energia-btn {
+  pointer-events: auto; position: relative; width: 40px; height: 40px; padding: 0; border-radius: 50%;
+  border: 2px solid rgba(224,242,254,.18); background: rgba(9,14,22,.7); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 19px; line-height: 1;
+  filter: grayscale(.85) brightness(.7); transition: filter .2s, border-color .2s, transform .1s;
+  -webkit-tap-highlight-color: transparent; touch-action: none;
+}
+.rt-energia-btn img { position: absolute; inset: 3px; width: calc(100% - 6px); height: calc(100% - 6px); object-fit: contain; border-radius: 50%; }
+.rt-energia-btn:active { transform: scale(.92); }
+.rt-energia-trilho {
+  position: relative; width: 84px; height: 7px; border-radius: 999px; overflow: hidden;
+  background: rgba(255,255,255,.1);
+}
+.rt-energia-trilho::after {      /* marca da metade: dá pra soltar a partir daqui */
+  content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px; background: rgba(224,242,254,.4);
+}
+.rt-energia-barra { height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #7dd3fc, #e0f2fe); transition: width .12s linear; }
+.rt-energia-pronta .rt-energia-btn {
+  filter: none; border-color: #e0f2fe;
+  animation: rtEnergiaPronta .9s ease-in-out infinite alternate;
+}
+.rt-energia-pronta .rt-energia-trilho { box-shadow: 0 0 8px rgba(224,242,254,.55); }
+.rt-energia-ativa .rt-energia-btn { filter: none; border-color: #e0f2fe; background: rgba(14,40,64,.9); box-shadow: 0 0 16px rgba(224,242,254,.75); }
+.rt-energia-ativa .rt-energia-barra { background: #e0f2fe; }
+@keyframes rtEnergiaPronta { from { box-shadow: 0 0 0 rgba(224,242,254,0); } to { box-shadow: 0 0 14px rgba(224,242,254,.85); } }
+/* Energia ativa: HUD em luar */
+.rt-energia-on .rt-hud-score { color: #e0f2fe; }
+.rt-energia-on .rt-progresso-barra { background: linear-gradient(90deg, #7dd3fc, #e0f2fe); }
+
+/* Medidor zerado (modo livre: a música segue) */
+.rt-vida-zero i { animation: rtVidaPisca .35s ease-in-out infinite alternate; }
+
 @media (prefers-reduced-motion: reduce) {
   .rt-eq i, .rt-ico-carregando::after, .rt-vida-baixa .rt-vida-trilho, .rt-hud-combo.rt-combo-marco, .rt-pad-slot-agora { animation: none; }
   .rt-res-rank { animation: none; }
+  .rt-ests-grande .rt-est-on, .rt-res-fc, .rt-mult-sobe, .rt-energia-pronta .rt-energia-btn, .rt-vida-zero i { animation: none; }
 }

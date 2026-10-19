@@ -463,6 +463,78 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
 /* Medidor zerado (modo livre: a música segue) */
 .rt-vida-zero i { animation: rtVidaPisca .35s ease-in-out infinite alternate; }
 
+/* ══ Fase 2: Carreira ══════════════════════════════════════════════ */
+/* Abas Carreira / Livre (topo da seleção) */
+.rt-abas {
+  display: inline-flex; gap: 4px; margin-top: 10px; padding: 3px; border-radius: 999px;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08);
+}
+.rt-aba {
+  min-width: 112px; padding: 7px 14px; border: none; border-radius: 999px; cursor: pointer;
+  background: none; color: rgba(199,209,224,.8); font-family: 'Syne', sans-serif; font-weight: 800; font-size: 13.5px;
+  -webkit-tap-highlight-color: transparent;
+}
+.rt-aba-ativa { background: linear-gradient(90deg, #a78bfa, #fbbf24); color: #120b24; }
+
+/* Cartaz da banda */
+.rt-car-banda {
+  position: relative; flex-shrink: 0; border-radius: 16px; overflow: hidden; aspect-ratio: 16 / 9; max-height: 150px;
+  background: linear-gradient(135deg, #2e1065, #78350f); box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.rt-car-banda img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%; }
+.rt-car-banda-txt {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 26px 14px 10px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  background: linear-gradient(180deg, rgba(11,15,23,0), rgba(11,15,23,.92));
+}
+.rt-car-banda-txt b { font-family: 'Syne', sans-serif; font-weight: 900; font-size: 18px; }
+.rt-car-banda-txt span { font-size: 12.5px; font-weight: 800; color: #fde68a; white-space: nowrap; }
+
+/* Palco: faixa com a imagem do palco + músicas embaixo */
+.rt-palco { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.rt-palco-cab {
+  position: relative; display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px;
+  border-radius: 14px; overflow: hidden; background-size: cover; background-position: 50% 62%;
+  background-color: #1d1336;
+}
+.rt-palco-cab::before { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(11,15,23,.88) 30%, rgba(11,15,23,.45)); }
+.rt-palco-cab > * { position: relative; }
+.rt-palco-num {
+  width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  background: #a78bfa; color: #120b24; font-family: 'Syne', sans-serif; font-weight: 900; font-size: 13px;
+}
+.rt-palco-nome { flex: 1; min-width: 0; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-palco-info { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 800; color: #fde68a; white-space: nowrap; }
+.rt-palco-ok .rt-palco-num { background: #5eead4; }
+.rt-palco-ok .rt-palco-info { color: #99f6e4; }
+.rt-palco-fechado .rt-palco-cab { filter: grayscale(.8) brightness(.75); }
+.rt-palco-fechado .rt-palco-num { background: rgba(255,255,255,.18); color: #fff; }
+.rt-palco-fechado .rt-palco-info { color: rgba(199,209,224,.85); }
+.rt-palco-msg { padding: 2px 6px 4px; font-size: 12px; color: rgba(199,209,224,.7); }
+
+.rt-cad { display: inline-flex; width: 13px; height: 13px; }
+.rt-cad svg { width: 100%; height: 100%; fill: currentColor; }
+.rt-cad-grande { width: 20px; height: 20px; color: rgba(199,209,224,.55); }
+
+/* Card da música dentro do palco */
+.rt-musica-car { margin-left: 10px; width: calc(100% - 10px); }
+.rt-musica-bloq { opacity: .55; }
+.rt-musica-bloq .rt-musica-capa { filter: grayscale(.9); }
+.rt-car-dir { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.rt-bis {
+  padding: 1px 7px; border-radius: 999px; font-size: 9.5px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase;
+  color: #1a1205; background: #fbbf24;
+}
+.rt-ests-car .rt-est { width: 11px; height: 11px; }
+.rt-ests-nova .rt-est svg { fill: rgba(255,255,255,.1); }
+
+/* Resultado: desbloqueios da Carreira */
+.rt-res-carreira {
+  max-width: 340px; padding: 10px 14px; border-radius: 14px; font-size: 13px; line-height: 1.6;
+  background: rgba(251,191,36,.10); border: 1px solid rgba(251,191,36,.35); color: #fde68a;
+}
+.rt-res-carreira b { color: #fff; }
+#rt-res-prox { background: linear-gradient(90deg, #5eead4, #a78bfa); }
+
 @media (prefers-reduced-motion: reduce) {
   .rt-eq i, .rt-ico-carregando::after, .rt-vida-baixa .rt-vida-trilho, .rt-hud-combo.rt-combo-marco, .rt-pad-slot-agora { animation: none; }
   .rt-res-rank { animation: none; }

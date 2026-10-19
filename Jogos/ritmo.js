@@ -5,7 +5,8 @@
    linha de acerto, no tempo da música. Notas longas ("length" no
    beatmap) precisam ser seguradas até o fim; no Hard há barra de vida.
 
-   Fluxo:  seleção (música + dificuldade) → partida → resultado → 🪙
+   Fluxo:  seleção (aba Carreira ou Livre; música + dificuldade) →
+           partida → resultado → 🪙 (+ desbloqueios e bônus no Carreira)
 
    Peças principais:
    - RT_CATALOGO ........ lista das músicas (arquivo, BPM, duração, níveis)
@@ -35,6 +36,8 @@
                           erro enche 25%; com metade, deslizar ↑ / 🦉 / Enter /
                           Select dobra o multiplicador até a barra esvaziar
    - Medidor ............ em todas as dificuldades; só falha no modo Carreira
+   - Carreira ........... RT_PALCOS: palcos com setlist + bis, abertos por
+                          palco concluído + estrelas; progresso em rec._c
    - Estrelas ........... 1–5 pela precisão (RT_ESTRELAS); a 5ª é dourada com FC
    - Pista 3D ........... projeção em perspectiva (_rtPj*): a linha de acerto e
                           os receptores ficam onde sempre estiveram (toque igual)
@@ -169,6 +172,29 @@
   var RT_CAPAS = '/img/ritmo/capas/';
   var RT_ICONE_ENERGIA = '/img/ritmo/energia.webp';
 
+  /* ── Carreira (aba "Carreira" da seleção) ─────────────────────────
+     5 palcos, da garagem ao show da cidade. Cada palco tem o setlist e
+     o BIS, que abre quando o setlist foi terminado. Um palco abre quando
+     o anterior foi concluído (bis terminado) E a soma de estrelas da
+     Carreira nessa dificuldade chega em "precisa". "Terminar" = chegar
+     ao fim sem falhar, mesmo com 0★. No Carreira o medidor zerado FALHA
+     a música (RT_FALHA_NO_MODO) e a pista usa o fundo do palco. Concluir
+     um palco pela 1ª vez (por dificuldade) paga "bonus" (×1,5 no Hard).
+     Progresso por dificuldade, valendo qualquer nº de colunas; fica
+     dentro do objeto dos recordes (rec._c), então já é isolado por
+     conta como eles (_progressoGarantirDono no hub.js). */
+  var RT_PALCOS = [
+    { id: 'garagem',      nome: 'Garagem de Casa',   precisa: 0,  bonus: 40,  setlist: ['plateia'],           bis: 'bateria-fraca' },
+    { id: 'praca',        nome: 'Praça da Matriz',   precisa: 4,  bonus: 60,  setlist: ['ninguem-te-repara'], bis: 'estatica-eletronica' },
+    { id: 'festa-junina', nome: 'Festa Junina',      precisa: 9,  bonus: 80,  setlist: ['plateia-v2'],        bis: 'estatica-eletronica-v2' },
+    { id: 'ginasio',      nome: 'Ginásio Municipal', precisa: 15, bonus: 100, setlist: ['estatica'],          bis: 'mare-alta' },
+    { id: 'show-cidade',  nome: 'Show da Cidade',    precisa: 22, bonus: 150, setlist: ['estatica-v2'],       bis: 'transborda' }
+  ];
+  var RT_PALCOS_PASTA = '/img/ritmo/palcos/';     // <id>.jpg, 572×1024
+  var RT_IMG_BANDA = '/img/ritmo/carreira-banda.webp';
+  var RT_VIDA_NORMAL = 0.6;    // no Normal, as perdas do medidor valem 60% (Carreira mais justa)
+  var RT_SVG_CADEADO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7.5a5 5 0 0 1 10 0V10h.5A1.5 1.5 0 0 1 19 11.5v8A1.5 1.5 0 0 1 17.5 21h-11A1.5 1.5 0 0 1 5 19.5v-8A1.5 1.5 0 0 1 6.5 10H7zm2 0h6V7.5a3 3 0 0 0-6 0V10z"/></svg>';
+
   var RT_LEAD_S = 2.2;         // silêncio antes da música começar (as notas já vêm descendo)
   var RT_RETOMAR_S = 2.0;      // ao continuar da pausa, a música volta com esse "respiro"
 
@@ -182,7 +208,7 @@
   // nos docs antigos e não competem com os novos. Continua batendo com a
   // regex das regras ([a-z0-9-]{1,40}_(normal|hard)_(4|5|7)k).
   var RT_RANK_SUFIXO = '-2';
-  var RT_KEY_CFG = 'angatuba_ritmo_cfg';       // { dif, velocidade, ajuste, ultima, colunas, pad, dicaE }
+  var RT_KEY_CFG = 'angatuba_ritmo_cfg';       // { dif, velocidade, ajuste, ultima, colunas, pad, dicaE, aba }
 
   /* ── Estado ──────────────────────────────────────────────────── */
   var _rtRoot = null;            // #ritmo-root
@@ -277,7 +303,8 @@
       ultima: typeof c.ultima === 'string' ? c.ultima : '',
       colunas: RT_MODOS_K.indexOf(Number(c.colunas)) !== -1 ? Number(c.colunas) : 4,
       pad: _rtCfgPad(c.pad),
-      dicaE: Math.max(0, Math.min(9, Math.round(Number(c.dicaE) || 0)))   // vezes que soltou a Energia (dica some depois de 3)
+      dicaE: Math.max(0, Math.min(9, Math.round(Number(c.dicaE) || 0))),  // vezes que soltou a Energia (dica some depois de 3)
+      aba: c.aba === 'livre' ? 'livre' : 'carreira'                         // aba da seleção
     };
   }
   // Botões personalizados do controle: { 4:[b,b,b,b], 5:[...], 7:[...] } (um por coluna).
@@ -660,6 +687,10 @@
       '<div class="rt-sel" id="rt-sel">' +
         '<div class="rt-sel-topo">' +
           '<div class="rt-sel-titulo">🎵 Ritmo da Coruja</div>' +
+          '<div class="rt-abas" role="tablist" aria-label="Modo">' +
+            '<button type="button" class="rt-aba" data-aba="carreira" role="tab">🎸 Carreira</button>' +
+            '<button type="button" class="rt-aba" data-aba="livre" role="tab">🎵 Livre</button>' +
+          '</div>' +
           '<div class="rt-sel-sub" id="rt-sel-sub"></div>' +
           '<button type="button" class="rt-aviso-som" id="rt-aviso-som" style="display:none;">🔇 O som dos jogos está desligado — toque para ligar</button>' +
           '<div class="rt-erro" id="rt-erro" role="alert" style="display:none;"></div>' +
@@ -695,7 +726,7 @@
             'Se aparece <b>“cedo”</b>, diminua (−). Fone Bluetooth costuma precisar de +100 a +200 ms. Deixe em 0 ms se estiver tudo certo.' +
           '</div>' +
           '<button type="button" class="rt-jogar" id="rt-jogar">Jogar</button>' +
-          '<div class="rt-pad-dicas" id="rt-pad-dicas" style="display:none;"><span><b>Ⓐ</b> jogar</span><span><b>Ⓑ</b> voltar</span><span><b>↑↓</b> música</span><span><b>←→</b> dificuldade</span><span><b>LB RB</b> colunas</span><span><b>Ⓨ</b> ranking</span><span><b>Select</b> botões</span></div>' +
+          '<div class="rt-pad-dicas" id="rt-pad-dicas" style="display:none;"><span><b>Ⓐ</b> jogar</span><span><b>Ⓑ</b> voltar</span><span><b>↑↓</b> música</span><span><b>←→</b> dificuldade</span><span><b>LB RB</b> colunas</span><span><b>Ⓨ</b> ranking</span><span><b>Select</b> botões</span><span><b>Ⓧ</b> carreira/livre</span></div>' +
         '</div>' +
       '</div>' +
       // ── Partida ──
@@ -737,6 +768,8 @@
         '<div class="rt-res-moedas" id="rt-res-moedas" style="display:none;"></div>' +
         '<div class="rt-res-dica" id="rt-res-dica" style="display:none;"></div>' +
         '<div class="rt-res-cidade" id="rt-res-cidade" style="display:none;"></div>' +
+        '<div class="rt-res-carreira" id="rt-res-carreira" style="display:none;"></div>' +
+        '<button type="button" class="rt-jogar" id="rt-res-prox" style="display:none;"></button>' +
         '<button type="button" class="rt-jogar" id="rt-res-denovo">Jogar de novo</button>' +
         '<button type="button" class="rt-link" id="rt-res-voltar">Escolher outra música</button>' +
       '</div>' +
@@ -791,6 +824,7 @@
       var b = e.target.closest && e.target.closest('[data-musica]');
       if (!b) return;
       var id = b.getAttribute('data-musica');
+      if (b.getAttribute('data-bloq')) { _rtMostrarErro(b.getAttribute('data-bloq')); return; }
       _rtMostrarErro('');
       if (id === _rtSelId && (_rtPrev.id === id || _rtPrev.carregando === id)) { _rtPreviaParar(); return; }
       _rtSelId = id;
@@ -799,6 +833,10 @@
     });
     // App foi pro segundo plano: a prévia não continua tocando escondida.
     document.addEventListener('visibilitychange', function () { if (document.hidden) _rtPreviaParar(); });
+    _rtRoot.querySelector('.rt-abas').addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('[data-aba]');
+      if (b) _rtTrocarAba(b.getAttribute('data-aba'));
+    });
     _rtRoot.querySelector('.rt-difs').addEventListener('click', function (e) {
       var b = e.target.closest && e.target.closest('[data-dif]');
       if (!b) return;
@@ -850,8 +888,12 @@
       if (typeof window._alternarSomJogos === 'function') window._alternarSomJogos();
       _rtRenderAvisoSom();
     });
-    q('rt-jogar').addEventListener('click', function () { _rtComecar(_rtSelId, _rtCfg.dif); });
+    q('rt-jogar').addEventListener('click', _rtJogarSel);
     q('rt-res-denovo').addEventListener('click', function () { if (_rtMusica) _rtComecar(_rtMusica.id, _rtDif); });
+    q('rt-res-prox').addEventListener('click', function () {
+      var id = this.getAttribute('data-id');
+      if (id) { _rtSelId = id; _rtComecar(id, _rtDif, 'carreira'); }
+    });
     q('rt-res-voltar').addEventListener('click', _rtMostrarSelecao);
 
     // Toque nas pistas (multitoque: cada dedo é um pointerId).
@@ -875,29 +917,39 @@
   }
 
   /* ── Tela de seleção ─────────────────────────────────────────── */
+  // Card de uma música (lista livre e setlist da Carreira). direita = HTML
+  // do lado direito; bloq = motivo de estar travada (card não seleciona).
+  function _rtCardHtml(m, direita, cls, bloq) {
+    var sel = m.id === _rtSelId && !bloq;
+    return '<button type="button" class="rt-musica' + (sel ? ' rt-musica-sel' : '') + (cls ? ' ' + cls : '') + '" data-musica="' + _rtEsc(m.id) + '" data-titulo="' + _rtEsc(m.titulo + (m.sub ? ' (' + m.sub + ')' : '')) + '" aria-pressed="' + sel + '"' + (bloq ? ' data-bloq="' + _rtEsc(bloq) + '" aria-disabled="true"' : '') + '>' +
+      // Capa com o ícone da prévia (▶ / ♪ / girando / barrinhas) no canto
+      '<span class="rt-musica-capa">' + _rtCapaHtml(m) + '<span class="rt-musica-ico">' + (sel ? '▶' : '♪') + '</span></span>' +
+      '<span class="rt-musica-txt">' +
+        '<span class="rt-musica-tit">' + _rtEsc(m.titulo) + '</span>' +
+        '<span class="rt-musica-meta">' + _rtEsc(m.sub) + ' · ' + m.bpm + ' BPM · ' + _rtMMSS(m.duracao) + '</span>' +
+      '</span>' + direita +
+    '</button>';
+  }
   function _rtRenderSelecao() {
     var rec = _rtRecLer();
     var html = '';
-    for (var i = 0; i < RT_CATALOGO.length; i++) {
-      var m = RT_CATALOGO[i];
-      var rn = rec[_rtChaveRec(m.id, 'normal', _rtCfg.colunas)], rh = rec[_rtChaveRec(m.id, 'hard', _rtCfg.colunas)];
-      var sel = m.id === _rtSelId;
-      html += '<button type="button" class="rt-musica' + (sel ? ' rt-musica-sel' : '') + '" data-musica="' + _rtEsc(m.id) + '" data-titulo="' + _rtEsc(m.titulo + (m.sub ? ' (' + m.sub + ')' : '')) + '" aria-pressed="' + sel + '">' +
-        // Capa com o ícone da prévia (▶ / ♪ / girando / barrinhas) no canto
-        '<span class="rt-musica-capa">' + _rtCapaHtml(m) + '<span class="rt-musica-ico">' + (sel ? '▶' : '♪') + '</span></span>' +
-        '<span class="rt-musica-txt">' +
-          '<span class="rt-musica-tit">' + _rtEsc(m.titulo) + '</span>' +
-          '<span class="rt-musica-meta">' + _rtEsc(m.sub) + ' · ' + m.bpm + ' BPM · ' + _rtMMSS(m.duracao) + '</span>' +
-        '</span>' +
+    if (_rtCfg.aba === 'carreira') html = _rtCarreiraHtml(rec);
+    else {
+      for (var i = 0; i < RT_CATALOGO.length; i++) {
+        var m = RT_CATALOGO[i];
+        var rn = rec[_rtChaveRec(m.id, 'normal', _rtCfg.colunas)], rh = rec[_rtChaveRec(m.id, 'hard', _rtCfg.colunas)];
         // Melhores estrelas em cada dificuldade (nas colunas escolhidas):
         // rótulo pequeno em cima, 5 estrelinhas embaixo.
-        '<span class="rt-musica-ranks">' +
-          _rtRankChip('Normal', 'rt-rk-n', rn) +
-          _rtRankChip('Hard', 'rt-rk-h', rh) +
-        '</span>' +
-      '</button>';
+        html += _rtCardHtml(m, '<span class="rt-musica-ranks">' + _rtRankChip('Normal', 'rt-rk-n', rn) + _rtRankChip('Hard', 'rt-rk-h', rh) + '</span>', '', '');
+      }
     }
     _rtEls.lista.innerHTML = html;
+    var abas = _rtRoot.querySelectorAll('.rt-aba');
+    for (var a = 0; a < abas.length; a++) {
+      var at = abas[a].getAttribute('data-aba') === _rtCfg.aba;
+      abas[a].classList.toggle('rt-aba-ativa', at);
+      abas[a].setAttribute('aria-selected', at ? 'true' : 'false');
+    }
     _rtPreviaIcones();
     var m2 = _rtMusicaPorId(_rtSelId) || RT_CATALOGO[0];
     _rtSelId = m2.id;
@@ -910,7 +962,9 @@
       difs[j].setAttribute('aria-checked', ativo ? 'true' : 'false');
     }
     var sub = document.getElementById('rt-sel-sub');
-    if (sub) sub.textContent = 'Toque nas ' + _rtCfg.colunas + ' colunas quando as notas chegarem na linha. Notas com luar enchem a Energia 🦉: deslize pra cima pra dobrar os pontos.';
+    if (sub) sub.textContent = _rtCfg.aba === 'carreira'
+      ? 'Leve a banda da garagem ao show da cidade. No Carreira, se o medidor 👏 zerar, a música para.'
+      : 'Toque nas ' + _rtCfg.colunas + ' colunas quando as notas chegarem na linha. Notas com luar enchem a Energia 🦉: deslize pra cima pra dobrar os pontos.';
     var ks = _rtRoot.querySelectorAll('.rt-k');
     for (var kk = 0; kk < ks.length; kk++) {
       var kAtivo = Number(ks[kk].getAttribute('data-k')) === _rtCfg.colunas;
@@ -922,6 +976,132 @@
     _rtRenderSkinBtn();
     _rtRankAtualizar();
     _rtPadIndicador();
+  }
+
+  /* ── Carreira: progresso, estado dos palcos e o mapa da seleção ────
+     rec._c = { normal: { <id>: melhor ★ (0–5) }, hard: {…},
+                pago: { normal: [id do palco], hard: [...] } }
+     Ter a chave da música = terminou ela no Carreira (mesmo com 0★). */
+  function _rtCarLer(rec) {
+    var c = rec._c;
+    if (!c || typeof c !== 'object') c = {};
+    if (!c.pago || typeof c.pago !== 'object') c.pago = {};
+    ['normal', 'hard'].forEach(function (d) {
+      if (!c[d] || typeof c[d] !== 'object') c[d] = {};
+      if (!Array.isArray(c.pago[d])) c.pago[d] = [];
+    });
+    return c;
+  }
+  // Onde a música está na Carreira: { i (palco), bis }  ou null.
+  function _rtCarInfo(id) {
+    for (var i = 0; i < RT_PALCOS.length; i++) {
+      if (RT_PALCOS[i].bis === id) return { i: i, bis: true };
+      if (RT_PALCOS[i].setlist.indexOf(id) !== -1) return { i: i, bis: false };
+    }
+    return null;
+  }
+  // Estado de cada palco: aberto, bis aberto, concluído e estrelas; + total.
+  function _rtCarEstado(c, dif) {
+    var feitas = c[dif], total = 0, out = [], k;
+    for (k in feitas) total += Number(feitas[k]) || 0;
+    var antConcl = true;
+    for (var i = 0; i < RT_PALCOS.length; i++) {
+      var p = RT_PALCOS[i], ids = p.setlist.concat(p.bis), est = 0;
+      for (var j = 0; j < ids.length; j++) est += Number(feitas[ids[j]]) || 0;
+      var aberto = i === 0 || (antConcl && total >= p.precisa);
+      var setFeito = p.setlist.every(function (id) { return feitas[id] != null; });
+      var concl = aberto && setFeito && feitas[p.bis] != null;
+      out.push({ p: p, aberto: aberto, bisAberto: aberto && setFeito, concluido: concl, est: est, max: ids.length * 5, antConcl: antConcl });
+      antConcl = concl;
+    }
+    out.total = total;
+    out.feitas = feitas;
+    return out;
+  }
+  // A música pode ser jogada no Carreira? '' = sim; senão, o motivo.
+  function _rtCarBloqueio(st, id) {
+    var inf = _rtCarInfo(id);
+    if (!inf) return 'Esta música não faz parte da Carreira.';
+    var e = st[inf.i];
+    if (!e.aberto) return e.antConcl ? 'Junte ' + e.p.precisa + ' ★ na Carreira pra abrir ' + e.p.nome + ' (você tem ' + st.total + ').' : 'Conclua o palco anterior pra abrir ' + e.p.nome + '.';
+    if (inf.bis && !e.bisAberto) {
+      var falta = e.p.setlist.filter(function (x) { return st.feitas[x] == null; }).map(function (x) { var mm = _rtMusicaPorId(x); return mm ? mm.titulo : x; });
+      return 'O bis abre quando você terminar ' + (falta.join(' e ') || 'o setlist') + ' sem falhar.';
+    }
+    return '';
+  }
+  // Ordem da Carreira (setlist e bis de cada palco)
+  function _rtCarOrdem() {
+    var l = [];
+    RT_PALCOS.forEach(function (p) { l.push.apply(l, p.setlist.concat(p.bis)); });
+    return l;
+  }
+  // Próxima música aberta e ainda não terminada (depois de "id"; senão do começo).
+  function _rtCarProxima(c, dif, id) {
+    var st = _rtCarEstado(c, dif), ord = _rtCarOrdem(), ini = Math.max(0, ord.indexOf(id) + 1);
+    for (var v = 0; v < 2; v++) {
+      for (var i = v ? 0 : ini; i < ord.length; i++) {
+        if (ord[i] !== id && !_rtCarBloqueio(st, ord[i]) && c[dif][ord[i]] == null) return ord[i];
+      }
+    }
+    return null;
+  }
+  // Músicas que dá pra escolher na aba atual (navegação ↑↓ do controle)
+  function _rtOrdemSel() {
+    if (_rtCfg.aba !== 'carreira') return RT_CATALOGO.map(function (m) { return m.id; });
+    var st = _rtCarEstado(_rtCarLer(_rtRecLer()), _rtCfg.dif);
+    return _rtCarOrdem().filter(function (id) { return !_rtCarBloqueio(st, id); });
+  }
+  function _rtCarreiraHtml(rec) {
+    var c = _rtCarLer(rec), dif = _rtCfg.dif, st = _rtCarEstado(c, dif);
+    // Selecionada precisa estar aberta; senão vai pra próxima do caminho.
+    if (_rtCarBloqueio(st, _rtSelId)) _rtSelId = _rtCarProxima(c, dif, null) || RT_PALCOS[0].setlist[0];
+    var maxTot = 0;
+    st.forEach(function (e) { maxTot += e.max; });
+    var html = '<div class="rt-car-banda"><img src="' + RT_IMG_BANDA + '" alt="" decoding="async" draggable="false">' +
+      '<div class="rt-car-banda-txt"><b>Turnê da Coruja</b><span>★ ' + st.total + ' de ' + maxTot + ' · ' + (dif === 'hard' ? 'Hard' : 'Normal') + '</span></div></div>';
+    for (var i = 0; i < st.length; i++) {
+      var e = st[i], p = e.p;
+      var info = !e.aberto ? '<span class="rt-cad">' + RT_SVG_CADEADO + '</span>' + (e.antConcl ? p.precisa + ' ★' : 'Conclua o anterior')
+        : e.concluido ? '✔ ★ ' + e.est + '/' + e.max : '★ ' + e.est + '/' + e.max;
+      html += '<div class="rt-palco' + (e.aberto ? '' : ' rt-palco-fechado') + (e.concluido ? ' rt-palco-ok' : '') + '">' +
+        '<div class="rt-palco-cab" style="background-image:url(\'' + RT_PALCOS_PASTA + p.id + '.jpg\')">' +
+          '<span class="rt-palco-num">' + (i + 1) + '</span><span class="rt-palco-nome">' + _rtEsc(p.nome) + '</span>' +
+          '<span class="rt-palco-info">' + info + '</span>' +
+        '</div>';
+      if (e.aberto) {
+        var ids = p.setlist.concat(p.bis);
+        for (var j = 0; j < ids.length; j++) {
+          var m = _rtMusicaPorId(ids[j]);
+          if (!m) continue;
+          var bis = ids[j] === p.bis, bloq = _rtCarBloqueio(st, m.id), feita = c[dif][m.id] != null;
+          var dir = '<span class="rt-car-dir">' + (bis ? '<span class="rt-bis">Bis</span>' : '') +
+            (bloq ? '<span class="rt-cad rt-cad-grande">' + RT_SVG_CADEADO + '</span>' : _rtEstrelasHtml(feita ? c[dif][m.id] : 0, false, 'rt-ests-car' + (feita ? '' : ' rt-ests-nova'))) + '</span>';
+          html += _rtCardHtml(m, dir, 'rt-musica-car' + (bloq ? ' rt-musica-bloq' : ''), bloq);
+        }
+      } else if (e.antConcl) {
+        // travado só por estrelas: diz quantas faltam (o "conclua o anterior" já está no cabeçalho)
+        html += '<div class="rt-palco-msg">' + _rtEsc(_rtCarBloqueio(st, p.setlist[0])) + '</div>';
+      }
+      html += '</div>';
+    }
+    return html;
+  }
+  function _rtTrocarAba(aba) {
+    if (aba !== 'carreira' && aba !== 'livre') return;
+    if (aba === _rtCfg.aba) return;
+    _rtCfg.aba = aba; _rtCfgSalvar();
+    _rtMostrarErro('');
+    _rtRenderSelecao();
+    if (_rtEls.lista) _rtEls.lista.scrollTop = 0;
+  }
+  // "Jogar" da seleção: no Carreira, só música aberta.
+  function _rtJogarSel() {
+    if (_rtCfg.aba === 'carreira') {
+      var b = _rtCarBloqueio(_rtCarEstado(_rtCarLer(_rtRecLer()), _rtCfg.dif), _rtSelId);
+      if (b) { _rtMostrarErro(b); return; }
+    }
+    _rtComecar(_rtSelId, _rtCfg.dif, _rtCfg.aba);
   }
 
   /* ── Botão da skin (amostra desenhada com as skins equipadas) ────
@@ -1052,9 +1232,12 @@
   /* ══════════════════════════════════════════════════════════════
      PARTIDA
   ══════════════════════════════════════════════════════════════ */
-  function _rtComecar(id, dif) {
+  // modo: 'livre' | 'carreira' (sem modo = continua o da partida anterior:
+  // "Jogar de novo" e "Recomeçar" ficam no mesmo modo).
+  function _rtComecar(id, dif, modo) {
     var m = _rtMusicaPorId(id);
     if (!m) return;
+    if (modo) _rtModo = modo;
     _rtPreviaParar();
     _rtMostrarErro('');
     // Áudio destravado AQUI, dentro do toque (antes de qualquer await).
@@ -1122,7 +1305,9 @@
     _rtEls.jogo.classList.remove('rt-energia-on');
     _rtSkinAtual = _rtSkin();
     _rtPistaAtual = _rtPista();
-    _rtFundoAtual = _rtFundoUrl();
+    // No Carreira a pista fica na frente do palco da música; no livre, o fundo equipado.
+    var infP = _rtModo === 'carreira' && _rtMusica ? _rtCarInfo(_rtMusica.id) : null;
+    _rtFundoAtual = infP ? RT_PALCOS_PASTA + RT_PALCOS[infP.i].id + '.jpg' : _rtFundoUrl();
     _rtFundoImg(_rtFundoAtual);   // começa a carregar (se já não estiver no cache)
     _rtEls.score.textContent = '0';
     _rtEls.acc.textContent = '100,00%';
@@ -1486,6 +1671,7 @@
     _rtMultRender();
     if (!_rtFalhou && !_rtSaindo) {
       var dv = chaveVida === 'nenhuma' ? 0 : (RT_VIDA[chaveVida || tipo] || 0);
+      if (dv < 0 && _rtDif === 'normal') dv *= RT_VIDA_NORMAL;
       _rtVida = Math.max(0, Math.min(1, _rtVida + dv));
       _rtVidaRender();
       if (_rtVida <= 0 && RT_FALHA_NO_MODO[_rtModo]) _rtFalhar();
@@ -1677,10 +1863,14 @@
     var G = _rtG_();
     var q = function (id) { return document.getElementById(id); };
     var nomeMapa = _rtMusica.titulo + (_rtMusica.sub ? ' · ' + _rtMusica.sub : '') + ' — ' + (_rtDif === 'hard' ? 'Hard' : 'Normal') + ' · ' + _rtK + 'K';
-    q('rt-res-musica').textContent = nomeMapa;
     q('rt-res-capa').innerHTML = _rtCapaHtml(_rtMusica, 'rt-capa-grande');
     q('rt-res-cidade').style.display = 'none';
     q('rt-res-dica').style.display = 'none';
+    q('rt-res-carreira').style.display = 'none';
+    q('rt-res-prox').style.display = 'none';
+    var infR = _rtModo === 'carreira' ? _rtCarInfo(_rtMusica.id) : null;
+    if (infR) nomeMapa = 'Carreira · ' + RT_PALCOS[infR.i].nome + (infR.bis ? ' (bis)' : '') + ' — ' + nomeMapa;
+    q('rt-res-musica').textContent = nomeMapa;
     q('rt-res-denovo').textContent = _rtFalhou ? 'Tentar de novo' : 'Jogar de novo';
 
     /* ── Falhou (medidor zerou num modo que falha): sem moedas, recorde,
@@ -1695,7 +1885,7 @@
       rkF.className = 'rt-res-rank rt-res-rank-falhou';
       rkF.style.display = '';
       var fm = q('rt-res-falhou-msg');
-      fm.textContent = 'O medidor zerou em ' + progresso + '% da música. Cada erro derruba o medidor e cada acerto levanta um pouco.';
+      fm.textContent = 'O medidor zerou em ' + progresso + '% da música. Cada erro derruba o medidor e cada acerto levanta um pouco' + (infR ? ' — no Carreira, medidor zerado encerra o show.' : '.');
       fm.style.display = '';
       q('rt-res-recorde').style.display = 'none';
       q('rt-res-score').textContent = _rtFmtNum(_rtScoreAtual());
@@ -1735,12 +1925,14 @@
     r2.est = Math.max((antes && antes.est) || 0, est);
     r2.fc = !!((antes && antes.fc) || fc);
     rec[chave] = r2;
+    var car = infR ? _rtCarRegistrar(rec, _rtMusica.id, _rtDif, est) : null;
     _rtRecSalvar(rec);
 
     // Moedas + stats (mesmo padrão dos outros jogos do hub)
     var moedas = _rtMoedas(rank, acc, _rtDif, _rtK);
     if (G) {
       if (moedas > 0 && typeof G.moedasAdd === 'function') G.moedasAdd(moedas, 'ritmo');
+      if (car && car.bonus > 0 && typeof G.moedasAdd === 'function') G.moedasAdd(car.bonus, 'ritmo');
       if (typeof G.statsRegistrarPartida === 'function') G.statsRegistrarPartida('ritmo', { segundos: segundos, score: score });
     }
 
@@ -1759,9 +1951,49 @@
     me.classList.toggle('rt-res-moedas-zero', moedas <= 0);
     _rtDicaCalibrar();
     _rtResRankCidade(score);
+    if (car) _rtResCarreira(car);
     _rtMostrar('res');
     if (G && G.som && typeof G.som.fim === 'function') { try { G.som.fim(est >= 4); } catch (e) {} }
     if (est >= 5 && G && G.efeitos) G.efeitos.confete('rt-res', 90);
+  }
+
+  /* ── Carreira no resultado ────────────────────────────────────────
+     Grava a música como terminada (melhor ★) e compara o antes e o
+     depois: bis que abriu, palco concluído (bônus 1ª vez), palco novo.
+     Volta { msgs[], bonus, prox } pra tela. */
+  function _rtCarRegistrar(rec, id, dif, est) {
+    var c = _rtCarLer(rec);
+    rec._c = c;
+    var antes = _rtCarEstado(c, dif), prev = c[dif][id];
+    c[dif][id] = Math.max(prev == null ? 0 : prev, est);
+    var dep = _rtCarEstado(c, dif), msgs = [], bonus = 0, inf = _rtCarInfo(id);
+    for (var i = 0; i < dep.length; i++) {
+      var a = antes[i], d = dep[i], p = d.p;
+      if (!a.bisAberto && d.bisAberto) { var mb = _rtMusicaPorId(p.bis); msgs.push('🔓 Bis liberado: <b>' + _rtEsc(mb ? mb.titulo + (mb.sub ? ' · ' + mb.sub : '') : p.bis) + '</b>'); }
+      if (!a.concluido && d.concluido && c.pago[dif].indexOf(p.id) === -1) {
+        c.pago[dif].push(p.id);
+        var b = Math.round(p.bonus * (dif === 'hard' ? 1.5 : 1));
+        bonus += b;
+        msgs.push('🎸 <b>' + _rtEsc(p.nome) + '</b> concluído! +' + b + ' 🪙 de bônus');
+      }
+      if (!a.aberto && d.aberto) msgs.push('🔓 Novo palco: <b>' + _rtEsc(p.nome) + '</b>');
+    }
+    if (prev != null && est > prev) msgs.push('★ Melhorou na Carreira: ' + prev + ' → ' + est + ' estrelas');
+    var nx = inf && dep[inf.i + 1];
+    if (nx && !nx.aberto && dep[inf.i].concluido) msgs.push('Faltam <b>' + (nx.p.precisa - dep.total) + ' ★</b> pra abrir <b>' + _rtEsc(nx.p.nome) + '</b>. Melhore as estrelas das músicas já tocadas.');
+    if (!nx && inf && dep[inf.i].concluido && !antes[inf.i].concluido) msgs.push('🏆 A banda tocou no Show da Cidade! Turnê completa no ' + (dif === 'hard' ? 'Hard' : 'Normal') + '.');
+    return { msgs: msgs, bonus: bonus, prox: _rtCarProxima(c, dif, id) };
+  }
+  function _rtResCarreira(car) {
+    var el = document.getElementById('rt-res-carreira'), bp = document.getElementById('rt-res-prox');
+    if (car.msgs.length) { el.innerHTML = car.msgs.join('<br>'); el.style.display = ''; }
+    var m = car.prox && _rtMusicaPorId(car.prox);
+    if (m) {
+      var repete = RT_CATALOGO.filter(function (x) { return x.titulo === m.titulo; }).length > 1;
+      bp.textContent = 'Próxima: ' + m.titulo + (repete && m.sub ? ' · ' + m.sub : '');
+      bp.setAttribute('data-id', m.id);
+      bp.style.display = '';
+    }
   }
 
   function _rtResContagem() {
@@ -1828,7 +2060,7 @@
       podePausar: function () { return _rtEstado === 'jogando' && !_rtSaindo; },
       pausar: _rtPausar,
       continuar: _rtContinuar,
-      descricao: function () { return _rtMusica ? _rtMusica.titulo + ' · ' + (_rtDif === 'hard' ? 'Hard' : 'Normal') + ' · ' + _rtK + 'K' : ''; },
+      descricao: function () { return _rtMusica ? (_rtModo === 'carreira' ? 'Carreira · ' : '') + _rtMusica.titulo + ' · ' + (_rtDif === 'hard' ? 'Hard' : 'Normal') + ' · ' + _rtK + 'K' : ''; },
       extra: { rotulo: 'Escolher outra música', acao: _rtMostrarSelecao }
     });
     // O hub desenha o "extra" como link de texto (.jm-link). Aqui ele vira
@@ -2172,7 +2404,7 @@
      ignorado até soltar (sem "A" fantasma vindo da última nota).
      O foco do controle aparece com a classe .rt-foco.
   ══════════════════════════════════════════════════════════════ */
-  var RT_NAV = { cima: 12, baixo: 13, esq: 14, dir: 15, a: 0, b: 1, y: 3, lb: 4, rb: 5, select: 8 };
+  var RT_NAV = { cima: 12, baixo: 13, esq: 14, dir: 15, a: 0, b: 1, x: 2, y: 3, lb: 4, rb: 5, select: 8 };
   var _rtNav = { raf: 0, ctx: '', antes: {}, desde: {}, rep: {}, foco: 0, previaT: 0 };
 
   function _rtNavIniciar() {
@@ -2222,7 +2454,7 @@
       if (ctx === 'pausa' || ctx === 'resultado') _rtNavFocoAplicar();
     }
     var ev = [];
-    ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'y', 'lb', 'rb', 'select', 'start'].forEach(function (n) {
+    ['cima', 'baixo', 'esq', 'dir', 'a', 'b', 'x', 'y', 'lb', 'rb', 'select', 'start'].forEach(function (n) {
       var ap = !!st[n];
       if (ap && !_rtNav.antes[n]) { ev.push(n); _rtNav.desde[n] = agora; _rtNav.rep[n] = agora; }
       else if (ap && (n === 'cima' || n === 'baixo') && agora - _rtNav.desde[n] > 420 && agora - _rtNav.rep[n] > 120) {
@@ -2290,12 +2522,11 @@
     }
     // ── seleção ──
     if (n === 'cima' || n === 'baixo') {
-      var i = 0;
-      for (var j = 0; j < RT_CATALOGO.length; j++) if (RT_CATALOGO[j].id === _rtSelId) i = j;
-      i = Math.max(0, Math.min(RT_CATALOGO.length - 1, i + (n === 'baixo' ? 1 : -1)));
-      if (RT_CATALOGO[i].id !== _rtSelId) {
+      var ord = _rtOrdemSel(), i = Math.max(0, ord.indexOf(_rtSelId));    // só as músicas que dá pra escolher nesta aba
+      i = Math.max(0, Math.min(ord.length - 1, i + (n === 'baixo' ? 1 : -1)));
+      if (ord[i] && ord[i] !== _rtSelId) {
         _rtPreviaParar();
-        _rtSelId = RT_CATALOGO[i].id;
+        _rtSelId = ord[i];
         _rtMostrarErro('');
         _rtRenderSelecao();
         var card = _rtEls.lista.querySelector('.rt-musica-sel');
@@ -2311,7 +2542,10 @@
       if (RT_MODOS_K[ik] !== _rtCfg.colunas) { _rtCfg.colunas = RT_MODOS_K[ik]; _rtCfgSalvar(); _rtRenderSelecao(); }
     } else if (n === 'a' || n === 'start') {
       _rtNav.previaT = 0;
-      _rtComecar(_rtSelId, _rtCfg.dif);
+      _rtJogarSel();
+    } else if (n === 'x') {
+      _rtPreviaParar();
+      _rtTrocarAba(_rtCfg.aba === 'carreira' ? 'livre' : 'carreira');
     } else if (n === 'b') {
       _rtNav.previaT = 0;
       if (_rtPrev.id || _rtPrev.carregando) _rtPreviaParar();      // 1º B: para a prévia

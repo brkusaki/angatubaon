@@ -68,8 +68,10 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
   background: rgba(255,255,255,.05);
 }
 .rt-rk-dif { font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
-.rt-rk-n .rt-rk-dif { color: #5eead4; }
-.rt-rk-h .rt-rk-dif { color: #fca5a5; }
+.rt-rk-easy .rt-rk-dif { color: #86efac; }
+.rt-rk-normal .rt-rk-dif { color: #5eead4; }
+.rt-rk-hard .rt-rk-dif { color: #fca5a5; }
+.rt-rk-expert .rt-rk-dif { color: #c4b5fd; }
 .rt-rk-val { font-family: 'Syne', sans-serif; font-weight: 900; font-size: 16px; line-height: 1.1; color: #fff; }
 .rt-rk-vazio { background: rgba(255,255,255,.03); }
 .rt-rk-vazio .rt-rk-dif { opacity: .7; }
@@ -111,17 +113,21 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
   border-top: 1px solid rgba(255,255,255,.06);
   display: flex; flex-direction: column; gap: 8px; align-items: center;
 }
-.rt-difs { display: flex; gap: 8px; width: 100%; max-width: 420px; }
+.rt-difs { display: flex; gap: 6px; width: 100%; max-width: 420px; }
 .rt-dif {
-  flex: 1; display: flex; flex-direction: column; gap: 2px; align-items: center;
-  padding: 9px 8px; border-radius: 12px; cursor: pointer; color: #fff;
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; align-items: center;
+  padding: 8px 4px; border-radius: 12px; cursor: pointer; color: #fff;
   background: rgba(255,255,255,.04); border: 1px solid rgba(94,234,212,.25);
   -webkit-tap-highlight-color: transparent;
 }
+.rt-dif-easy { border-color: rgba(134,239,172,.25); }
 .rt-dif-hard { border-color: rgba(248,113,113,.25); }
+.rt-dif-expert { border-color: rgba(196,181,253,.3); }
 .rt-dif-ativa { background: rgba(94,234,212,.14); border-color: #5eead4; }
+.rt-dif-easy.rt-dif-ativa { background: rgba(134,239,172,.14); border-color: #86efac; }
 .rt-dif-hard.rt-dif-ativa { background: rgba(248,113,113,.14); border-color: #f87171; }
-.rt-dif-nome { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px; }
+.rt-dif-expert.rt-dif-ativa { background: rgba(196,181,253,.16); border-color: #c4b5fd; }
+.rt-dif-nome { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 14px; white-space: nowrap; }
 .rt-dif-info { font-size: 11px; color: rgba(199,209,224,.75); }
 
 .rt-ajustes { display: flex; gap: 8px; width: 100%; max-width: 420px; }
@@ -489,13 +495,14 @@ body.games-fs-open .rt-sel-topo { padding-top: calc(env(safe-area-inset-top, 0px
 .rt-car-banda-txt b { font-family: 'Syne', sans-serif; font-weight: 900; font-size: 18px; }
 .rt-car-banda-txt span { font-size: 12.5px; font-weight: 800; color: #fde68a; white-space: nowrap; }
 
-/* Escolha do fundo da pista no Carreira (só pra quem tem fundo da loja) */
-.rt-car-fundo {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0;
-  padding: 6px 6px 6px 12px; border-radius: 12px; background: rgba(255,255,255,.04);
-  font-size: 12.5px; font-weight: 700; color: #c7d1e0;
+/* Botão ⚙️ e painel de ajustes (velocidade + atraso do áudio) */
+.rt-aj-btn {
+  flex-shrink: 0; width: 40px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.05); font-size: 17px; cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
-.rt-car-fundo .rt-k { min-width: 0; padding: 6px 10px; font-size: 12px; }
+.rt-aj-caixa { padding-bottom: 14px; }
+.rt-aj-caixa .rt-ajustes, .rt-aj-caixa .rt-ajuda-txt { margin: 4px auto 0; width: calc(100% - 28px); }
+.rt-aj-nota { margin: 10px 16px 0; font-size: 12px; line-height: 1.45; color: rgba(199,209,224,.75); }
 
 /* Palco: faixa com a imagem do palco + músicas embaixo */
 .rt-palco { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }

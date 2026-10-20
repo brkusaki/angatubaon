@@ -2129,13 +2129,13 @@
   /* ── Ranking por MAPA (Ritmo da Coruja) ──────────────────────
      Um ranking pra cada música + dificuldade + nº de colunas, numa
      subcoleção: ranking_ritmo/{mapa}/scores/{uid}, com
-     mapa = "<musica>_<normal|hard>_<4|5|7>k" (ex.: "mare-alta_hard_4k").
+     mapa = "<musica>_<easy|normal|hard|expert>_<4|5|7>k" (ex.: "mare-alta_hard_4k").
      Doc igual ao dos outros rankings (uid, nome, score, photoURL,
      atualizadoEm) e mesmo read-before-write do rankSubmeter. Teto
      1.000.000 = score máximo possível no jogo (ver firestore.rules).
      Não entra no Ranking GERAL nem nas abas do painel (são dezenas de
      mapas) — o Ritmo mostra a posição na própria tela de seleção. */
-  var RANK_MAPA_RE = /^[a-z0-9-]{1,40}_(normal|hard)_(4|5|7)k$/;
+  var RANK_MAPA_RE = /^[a-z0-9-]{1,40}_(easy|normal|hard|expert)_(4|5|7)k$/;
   function _rankMapaCol(db, mapa) {
     return db.collection('ranking_ritmo').doc(mapa).collection('scores');
   }

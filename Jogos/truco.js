@@ -981,7 +981,7 @@
   function _avatarCorujaEl() {
     var av = _elx('div', 'avatar-coruja');
     var img = _elx('img', null, {
-      src: '/Jogos/assets/baralho/' + (_corujaComemorando() ? 'owl-comemorando' : 'owl-neutra') + '.webp',
+      src: '/Jogos/assets/baralho/' + (_corujaComemorando() ? 'owl-comemorando' : 'owl-neutra') + '-v2.webp',   // -v2: arte nova (CACHE_JOGOS é cache-first)
       alt: '', draggable: 'false'
     });
     img.addEventListener('error', function () {

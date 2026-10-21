@@ -1389,9 +1389,9 @@
     ],
     baralho: [
       '/Jogos/baralho.min.js', '/Jogos/baralho.css',
-      '/Jogos/assets/baralho/owl-comemorando.webp',
-      '/Jogos/assets/baralho/owl-neutra.webp',
-      '/Jogos/assets/baralho/owl-provocando.webp',
+      '/Jogos/assets/baralho/owl-comemorando-v2.webp',
+      '/Jogos/assets/baralho/owl-neutra-v2.webp',
+      '/Jogos/assets/baralho/owl-provocando-v2.webp',
       '/Jogos/assets/baralho/verso-truco.webp',
       '/Jogos/assets/baralho/verso-uno.webp'
     ],

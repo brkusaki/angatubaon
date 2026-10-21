@@ -1059,7 +1059,7 @@
 
     var av = _elx('div', 'op-avatar op-avatar-bot');
     var img = _elx('img', null, {
-      src: '/Jogos/assets/baralho/' + arte + '.webp', alt: '', draggable: 'false'
+      src: '/Jogos/assets/baralho/' + arte + '-v2.webp', alt: '', draggable: 'false'   // -v2: arte nova (CACHE_JOGOS é cache-first)
     });
     img.addEventListener('error', function () {
       av.classList.remove(_cls('op-avatar-bot'));

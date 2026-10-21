@@ -139,7 +139,10 @@
   // aplicados pelo chamador): frame atual do spritesheet com os PÉS na
   // base da caixa de colisão (+oh/2); sem sheet, a imagem única.
   function _vooDrawOwl(ctx, ow, oh) {
-    var reg = _vooAsset(_VOO_SHEET);
+    // Skin de arte: o sheet dela (mesma geometria); enquanto não carrega,
+    // o clássico.
+    var reg = _vooSkinSheet ? _vooAsset(_vooSkinSheet) : null;
+    if (!reg || !(reg.ok && reg.w >= _VOO_SH_CW * 3 && reg.h >= _VOO_SH_CH * 3)) reg = _vooAsset(_VOO_SHEET);
     if (reg.ok && reg.w >= _VOO_SH_CW * 3 && reg.h >= _VOO_SH_CH * 3) {
       var e = oh / _VOO_SH_CORPOH, f = _vooAnimFrame();
       ctx.drawImage(reg.img, (f % 3) * _VOO_SH_CW, Math.floor(f / 3) * _VOO_SH_CH, _VOO_SH_CW, _VOO_SH_CH,
@@ -261,11 +264,18 @@
   var _vooSkinFiltro = '';
   var _vooSkinPixelado = false;
   var _vooSkinAnimado = false;   // 'arcoiris': gira o hue-rotate(0deg) do filtro a cada frame
+  // Skin com arte própria (catálogo: 'sheet' + 'preview'): sheet de voo
+  // inteiro na mesma geometria do clássico (_VOO_SH_*), sem filtro nenhum —
+  // funciona igual no Safari sem ctx.filter. preview = coruja parada das
+  // telas de início/fim.
+  var _vooSkinSheet = '', _vooSkinPreview = '';
   function _vooAtualizarSkin() {
     _vooSkinId = '';
     _vooSkinFiltro = '';
     _vooSkinPixelado = false;
     _vooSkinAnimado = false;
+    _vooSkinSheet = '';
+    _vooSkinPreview = '';
     var G = window.AngatubaGames;
     if (G && typeof G.equipado === 'function' && typeof G.lojaCatalogo === 'function') {
       try {
@@ -278,6 +288,11 @@
               _vooSkinFiltro = catalogo[i].filtroCss || '';
               _vooSkinPixelado = !!catalogo[i].pixelado;
               _vooSkinAnimado = (catalogo[i].animado === 'arcoiris');
+              if (catalogo[i].sheet) {
+                _vooSkinSheet = catalogo[i].sheet;
+                _vooSkinPreview = catalogo[i].preview || '';
+                _vooAsset(_vooSkinSheet);   // já começa a baixar
+              }
               break;
             }
           }
@@ -292,6 +307,13 @@
     var imgs = document.querySelectorAll('#jogo-voo .vo-overlay-owl');
     for (var i = 0; i < imgs.length; i++) {
       var im = imgs[i];
+      // Tela de início: com skin de arte, troca a imagem (guarda a original
+      // pra voltar ao desequipar). A de fim é trocada em _vooFim.
+      if (im.id !== 'vo-fim-owl') {
+        if (im.dataset.srcBase == null) im.dataset.srcBase = im.getAttribute('src') || '';
+        var alvo = _vooSkinPreview || im.dataset.srcBase;
+        if (alvo && im.getAttribute('src') !== alvo) im.src = alvo;
+      }
       im.style.filter = _vooSkinFiltro ? _vooSkinFiltro + ' drop-shadow(0 6px 18px rgba(0,0,0,.5))' : '';
       im.style.imageRendering = _vooSkinPixelado ? 'pixelated' : '';
       if (_vooSkinAnimado) im.classList.add('skin-arcoiris-anim');
@@ -1393,7 +1415,7 @@
       // nesse caso usa um sprite pré-tingido em canvas offscreen
       // (cacheado por skin+tamanho) em vez de confiar no filter.
       // 'pixelado' (desligar suavizado) funciona nos dois caminhos.
-      if (_vooSkinId && !_vooFilterSuportado) {
+      if (_vooSkinId && !_vooSkinSheet && !_vooFilterSuportado) {
         var _spOwl = _vooOwlSpriteColorido(_vooSkinId, _vooSkinPixelado, ow, oh);
         var suavAntesP = ctx.imageSmoothingEnabled;
         if (_vooSkinPixelado) ctx.imageSmoothingEnabled = false;
@@ -1647,7 +1669,7 @@
       if (moedasGanhas > 0) { moedasEl.textContent = '+' + moedasGanhas + ' 🪙'; moedasEl.style.display = ''; }
       else moedasEl.style.display = 'none';
     }
-    if (owlEl) { owlEl.src = recorde ? '/webp/owl-celebrate-flying.webp' : '/webp/owl-flying.webp'; owlEl.style.display = ''; }
+    if (owlEl) { owlEl.src = _vooSkinPreview || (recorde ? '/webp/owl-celebrate-flying.webp' : '/webp/owl-flying.webp'); owlEl.style.display = ''; }
     if (titEl) titEl.textContent = recorde ? '🎉 Novo recorde!' : 'Fim do voo!';
     if (msgEl) msgEl.textContent = score + (score === 1 ? ' ponto' : ' pontos');
     if (subEl) {

@@ -2792,7 +2792,9 @@
   /* ── Catálogo (hardcoded) ──────────────────────────────────────
      Cada item: { id, nome, desc, preco, slot, tipo, preview, jogo }.
      Skins do Voo reusam o mesmo sprite (/webp/owl-flying.webp) e se
-     diferenciam por filtro CSS/canvas (filtroCss) — sem asset novo.
+     diferenciam por filtro CSS/canvas (filtroCss) — exceto as que têm
+     'sheet': arte própria (sheet de voo em /Jogos/assets/voo/, mesma
+     geometria do clássico) + 'preview' parado, sem filtro.
      Item com 'jogo' preenchido é vendido SÓ na loja dentro do próprio
      jogo (lojaJogoAbrir) — a Loja da Coruja principal não lista. Id novo
      de skin precisa entrar também em equipadoValido (firestore.rules). */
@@ -2804,9 +2806,9 @@
     { id: 'voo_skin_pixel',    nome: 'Coruja Pixel',     desc: 'Estilo 8-bit retrô.',        preco: 120, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'contrast(1.45) saturate(.5) brightness(1.05)', pixelado: true },
     { id: 'voo_skin_rosa',     nome: 'Coruja Magenta',   desc: 'Rosa choque com brilho.',    preco: 90,  slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'hue-rotate(285deg) saturate(2.2) brightness(1.12) drop-shadow(0 0 6px rgba(255,80,200,.75))' },
     { id: 'voo_skin_floresta', nome: 'Coruja Floresta',  desc: 'Verde de mata fechada.',     preco: 110, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'sepia(.6) hue-rotate(60deg) saturate(2.2) brightness(.9) drop-shadow(0 0 5px rgba(60,200,90,.6))' },
-    { id: 'voo_skin_sombra',   nome: 'Coruja Sombra',    desc: 'Preta, com aura roxa.',      preco: 130, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'grayscale(1) brightness(.45) contrast(1.4) drop-shadow(0 0 7px rgba(150,90,255,.85))' },
-    { id: 'voo_skin_gelo',     nome: 'Coruja Gelo',      desc: 'Azul-claro congelante.',     preco: 140, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'hue-rotate(165deg) saturate(1.2) brightness(1.4) drop-shadow(0 0 7px rgba(170,230,255,.9))' },
-    { id: 'voo_skin_fogo',     nome: 'Coruja Fogo',      desc: 'Asas em brasa.',             preco: 160, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'sepia(1) saturate(7) hue-rotate(-28deg) brightness(1.05) drop-shadow(0 0 8px rgba(255,90,20,.9))' },
+    { id: 'voo_skin_sombra',   nome: 'Coruja Sombra',    desc: 'Preta, com aura roxa.',      preco: 130, slot: 'voo_owl', tipo: 'skin', preview: '/Jogos/assets/voo/skin-sombra.webp', sheet: 'coruja_voo_sheet_sombra.webp', jogo: 'voo', filtroCss: '' },
+    { id: 'voo_skin_gelo',     nome: 'Coruja Gelo',      desc: 'Azul-claro congelante.',     preco: 140, slot: 'voo_owl', tipo: 'skin', preview: '/Jogos/assets/voo/skin-gelo.webp', sheet: 'coruja_voo_sheet_gelo.webp', jogo: 'voo', filtroCss: '' },
+    { id: 'voo_skin_fogo',     nome: 'Coruja Fogo',      desc: 'Asas em brasa.',             preco: 160, slot: 'voo_owl', tipo: 'skin', preview: '/Jogos/assets/voo/skin-fogo.webp', sheet: 'coruja_voo_sheet_fogo.webp', jogo: 'voo', filtroCss: '' },
     // animado: 'arcoiris' → o Voo gira o hue-rotate(0deg) do filtro a cada
     // frame (ver _vooDesenharCoruja); na loja, a classe .skin-arcoiris-anim
     // (styles.css) faz o mesmo giro na miniatura.

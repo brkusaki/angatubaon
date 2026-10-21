@@ -20,6 +20,15 @@
   ══════════════════════════════════════════════════════════════ */
   var _VOO_OWL_SRC = '/webp/owl-flying.webp';
   var _vooImg = null, _vooImgOk = false, _vooImgRatio = 1;   // ratio = h/w
+  // Proporção (h/w) da caixa de colisão da coruja. Era lida da própria
+  // owl-flying.webp (367×400); a arte nova tem asas abertas e é bem mais
+  // larga, então a caixa ficou fixa no valor antigo — física e colisão
+  // continuam idênticas. _vooImgRatio segue sendo a proporção real da
+  // imagem, usada só pra desenhá-la sem distorcer (_vooImgRect).
+  var _VOO_OWL_RATIO = 400 / 367;
+  // owl-flying.webp: fração da altura da imagem ocupada pelo corpo
+  // (orelhas→pés) e posição da linha dos pés (o resto é asa acima da cabeça).
+  var _VOO_IMG_CORPO = 0.9312, _VOO_IMG_PES = 0.9872;
 
   // P1-4: Safari/iOS em muitas versões aceita a atribuição a ctx.filter
   // (não lança erro, o valor fica lá) mas não aplica o efeito no
@@ -84,16 +93,22 @@
   }
 
   /* ── Animação de voo da Corujinha ────────────────────────────────
-     Spritesheet horizontal de 9 frames (coruja_voo_sheet.png), células
-     160×136; âncora de cada célula: x=80 (centro do corpo) e y=130 (linha
-     dos pés). Frames: 1 em pé · 2 agachar · 3 pulo (asas fechadas) ·
-     4 asas abrindo · 5 asas abertas · 6 meio do bater · 7 asas fechando ·
-     8 pouso · 9 em pé. Opcional como os demais assets: se o PNG não
-     carregar (ou skin tingida sem ctx.filter), desenha a imagem única de
-     antes (owl-flying.webp) — física e colisão não dependem dele. ── */
-  var _VOO_SHEET = 'coruja_voo_sheet.png';
-  var _VOO_SH_CW = 160, _VOO_SH_CH = 136, _VOO_SH_AX = 80, _VOO_SH_AY = 130;
-  var _VOO_SH_CORPOH = 118;      // altura pés→topo do frame "em pé" (escala = _vooOwlH / isto)
+     Spritesheet em grade 3×3 com 9 frames (coruja_voo_sheet_v2.webp,
+     lidos da esquerda pra direita, de cima pra baixo), células 342×292;
+     âncora de cada célula: x=171 (centro da cabeça) e y=286 (linha dos
+     pés). Nos frames no chão (1, 2, 3, 8, 9) os pés ficam na linha; nos
+     de voo (4–7) a cabeça fica na mesma altura do frame "em pé", pro
+     corpo não sacudir durante o bater de asas. Frames: 1 em pé ·
+     2 agachar · 3 pulo (asas fechadas) · 4 asas abrindo · 5 asas abertas ·
+     6 meio do bater · 7 asas fechando · 8 pouso · 9 em pé. Nome novo
+     (_v2) de propósito: /Jogos/assets/ é cache-first no CACHE_JOGOS, que
+     nunca é apagado — com o nome antigo quem já jogou veria o sheet velho.
+     Opcional como os demais assets: se não carregar (ou skin tingida sem
+     ctx.filter), desenha a imagem única (owl-flying.webp) — física e
+     colisão não dependem dele. ── */
+  var _VOO_SHEET = 'coruja_voo_sheet_v2.webp';
+  var _VOO_SH_CW = 342, _VOO_SH_CH = 292, _VOO_SH_AX = 171, _VOO_SH_AY = 286;
+  var _VOO_SH_CORPOH = 269;      // altura pés→topo do frame "em pé" (escala = _vooOwlH / isto)
   var _VOO_ANIM_MS = [100, 60, 80, 60, 110, 80, 80, 100, 160];   // ms de cada frame
   var _VOO_ANIM_SEQ = {
     parado:  { f: [0],          loop: true },                    // em pé
@@ -122,16 +137,25 @@
 
   // Desenha a coruja (já transladada pro centro, com rotação/squash/espelho
   // aplicados pelo chamador): frame atual do spritesheet com os PÉS na
-  // base da caixa de colisão (+oh/2); sem sheet, a imagem única de antes.
+  // base da caixa de colisão (+oh/2); sem sheet, a imagem única.
   function _vooDrawOwl(ctx, ow, oh) {
     var reg = _vooAsset(_VOO_SHEET);
-    if (reg.ok && reg.w >= _VOO_SH_CW * 9) {
-      var e = oh / _VOO_SH_CORPOH;
-      ctx.drawImage(reg.img, _vooAnimFrame() * _VOO_SH_CW, 0, _VOO_SH_CW, _VOO_SH_CH,
+    if (reg.ok && reg.w >= _VOO_SH_CW * 3 && reg.h >= _VOO_SH_CH * 3) {
+      var e = oh / _VOO_SH_CORPOH, f = _vooAnimFrame();
+      ctx.drawImage(reg.img, (f % 3) * _VOO_SH_CW, Math.floor(f / 3) * _VOO_SH_CH, _VOO_SH_CW, _VOO_SH_CH,
         -_VOO_SH_AX * e, oh / 2 - _VOO_SH_AY * e, _VOO_SH_CW * e, _VOO_SH_CH * e);
     } else {
-      ctx.drawImage(_vooImg, -ow / 2, -oh / 2, ow, oh);
+      var r = _vooImgRect(oh);
+      ctx.drawImage(_vooImg, r.x, r.y, r.w, r.h);
     }
+  }
+
+  // Retângulo da imagem única (owl-flying.webp) mantendo a proporção dela:
+  // corpo (orelhas→pés) com a altura da caixa e pés na base (+oh/2), como
+  // no sheet; as asas abertas passam da largura da caixa, só no visual.
+  function _vooImgRect(oh) {
+    var h = oh / _VOO_IMG_CORPO, w = h / _vooImgRatio;
+    return { x: -w / 2, y: oh / 2 - _VOO_IMG_PES * h, w: w, h: h };
   }
 
   // Sprites do burst de partículas do efeitos.js (faíscas no trampolim,
@@ -334,22 +358,22 @@
     var chave = skinId + '|' + (pixelado ? 'P' : '-') + '|' + Math.round(ow) + 'x' + Math.round(oh) + '|' + _vooDpr;
     var sp = _vooOwlSprites[chave];
     if (sp) return sp;
-    var cv, c;
+    var cv, c, r = _vooImgRect(oh);
     try {
       cv = document.createElement('canvas');
-      cv.width  = Math.max(1, Math.round(ow * _vooDpr));
-      cv.height = Math.max(1, Math.round(oh * _vooDpr));
+      cv.width  = Math.max(1, Math.round(r.w * _vooDpr));
+      cv.height = Math.max(1, Math.round(r.h * _vooDpr));
       c = cv.getContext('2d');
       if (!c) return null;
     } catch (e) { return null; }
     c.scale(_vooDpr, _vooDpr);
     if (pixelado) c.imageSmoothingEnabled = false;
-    try { c.drawImage(_vooImg, 0, 0, ow, oh); } catch (e) { return null; }
+    try { c.drawImage(_vooImg, 0, 0, r.w, r.h); } catch (e) { return null; }
     var cor = VOO_SKIN_TINTURA[skinId];
     if (cor) {
       c.globalCompositeOperation = 'source-atop';
       c.fillStyle = cor;
-      c.fillRect(0, 0, ow, oh);
+      c.fillRect(0, 0, r.w, r.h);
       c.globalCompositeOperation = 'source-over';
     }
     sp = { cv: cv };
@@ -507,7 +531,7 @@
   }
   function _vooPlatH() { return Math.max(8, 0.028 * _vooH); }
   function _vooOwlW()  { return 0.15 * _vooU(); }
-  function _vooOwlH()  { return _vooOwlW() * (_vooImgOk ? _vooImgRatio : 1); }
+  function _vooOwlH()  { return _vooOwlW() * (_vooImgOk ? _VOO_OWL_RATIO : 1); }
 
   // Gap vertical entre plataformas, cresce com a pontuação (mais difícil).
   // Alcance seguro de um pulo (altura máxima), em px, com margem.
@@ -1374,8 +1398,9 @@
         var suavAntesP = ctx.imageSmoothingEnabled;
         if (_vooSkinPixelado) ctx.imageSmoothingEnabled = false;
         try {
-          if (_spOwl) ctx.drawImage(_spOwl.cv, -ow / 2, -oh / 2, ow, oh);
-          else ctx.drawImage(_vooImg, -ow / 2, -oh / 2, ow, oh);
+          var _rOwl = _vooImgRect(oh);
+          if (_spOwl) ctx.drawImage(_spOwl.cv, _rOwl.x, _rOwl.y, _rOwl.w, _rOwl.h);
+          else ctx.drawImage(_vooImg, _rOwl.x, _rOwl.y, _rOwl.w, _rOwl.h);
         } catch (e) { _vooDrawFallback(ctx, ow); }
         if (_vooSkinPixelado) ctx.imageSmoothingEnabled = suavAntesP;
       } else {

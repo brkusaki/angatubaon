@@ -41,7 +41,7 @@
 /* ── Overlays (início/fim): SOBRE o palco, NÃO rotacionados, texto
    sempre em pé. ── */
 .cor-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:22px;background:rgba(9,12,10,.85);backdrop-filter:blur(3px);z-index:4;}
-.cor-overlay-owl{width:88px;height:88px;object-fit:contain;margin-bottom:10px;filter:drop-shadow(0 6px 18px rgba(0,0,0,.5));}
+.cor-overlay-owl{width:124px;height:88px;object-fit:contain;margin-bottom:10px;filter:drop-shadow(0 6px 18px rgba(0,0,0,.5));}
 .cor-overlay-titulo{font-size:21px;font-weight:800;color:#fff;font-family:'Syne',sans-serif;margin-bottom:8px;}
 .cor-overlay-pontos{font-size:28px;font-weight:900;color:var(--red,#ff3355);font-family:'Syne',sans-serif;margin-bottom:6px;}
 .cor-overlay-desc{font-size:13.5px;line-height:1.5;color:#c7d1e0;max-width:300px;margin-bottom:16px;}

@@ -55,7 +55,7 @@ body.games-fs-open .pty-card {
      e consome o espaço todo, então não sobra nada pra "centralizar". */
   flex: 1; justify-content: center; width: 100%;
 }
-.pty-owl { width: 68px; height: 68px; object-fit: contain; margin-bottom: 2px; }
+.pty-owl { width: 88px; height: 68px; object-fit: contain; margin-bottom: 2px; }
 .pty-titulo { font-family: var(--font-h); font-weight: 800; font-size: 21px; color: var(--text); }
 .pty-desc { font-size: 13px; color: var(--muted); line-height: 1.5; max-width: 300px; }
 

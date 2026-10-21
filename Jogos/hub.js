@@ -1379,9 +1379,7 @@
     ],
     puff: [
       '/Jogos/puff.min.js', '/Jogos/puff.css',
-      '/Jogos/assets/puff/coruja-puff-tossindo.webp',
-      '/Jogos/assets/puff/coruja-puff.webp',
-      '/Jogos/assets/puff/coruja-tossindo-loop.webm'
+      '/Jogos/assets/puff/puff-sheet-v2.webp'
     ],
     ervilhas: [
       '/Jogos/ervilhas.min.js', '/Jogos/ervilhas.css',

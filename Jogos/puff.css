@@ -54,30 +54,14 @@
   position: absolute; font-size: 88px; line-height: 1; pointer-events: none;
   filter: drop-shadow(0 4px 10px rgba(0,0,0,.4));
 }
-.pf-owl-img {
-  position: absolute; width: 100%; height: 100%; object-fit: contain;
-  pointer-events: none; visibility: visible;
+.pf-owl-sprite {
+  position: absolute; width: 100%; height: 100%; pointer-events: none;
+  background-repeat: no-repeat; background-size: 300% 300%; background-position: 0 0;
 }
-.pf-owl-img[src=""] { visibility: hidden; }
-
-/* Loop de vídeo da tosse (opcional — ver CORUJA-PARTY-PLANO.md/B2).
-   Ao contrário dos .webp, o vídeo tem fundo de estúdio (não é
-   transparente), então ganha máscara circular + contorno sutil pra
-   parecer um "adesivo" redondo em vez de um retângulo cru — no
-   tamanho pequeno do wrap (150px) fica discreto. Escondido/pausado
-   por padrão; só toca durante .pf-tossindo (ver puff.js, _tosse()).
-   O <img> NUNCA fica escondido (puff.js troca o src dele pra
-   coruja-puff-tossindo.webp nesse estado) — o vídeo só entra POR CIMA,
-   na mesma posição/tamanho. Assim, se o vídeo não carregar, quem
-   aparece por baixo já é a pose de tosse certa, não um vazio. */
-.pf-owl-video {
-  position: absolute; width: 100%; height: 100%; object-fit: cover;
-  border-radius: 50%; pointer-events: none; display: none;
-}
-.pf-owl-wrap.pf-tossindo .pf-owl-video {
-  display: block;
-  box-shadow: 0 0 0 2px rgba(255,255,255,.25), 0 4px 14px rgba(0,0,0,.35);
-}
+/* Sprite 3×3 (Jogos/assets/puff/puff-sheet-v2.webp): quadro q →
+   background-position (q%3)*50% (q/3)*50% — trocado pelo puff.js
+   conforme o tempo segurando, ao soltar e na tosse. Substituiu as duas
+   imagens paradas e o vídeo .webm da tosse. */
 
 /* Enchendo o peito: cresce suavemente pela duração --pf-dur (ms),
    definida via JS no momento em que o toque começa (puff.js). */
@@ -89,7 +73,7 @@
 }
 @keyframes pfInflar {
   0%   { transform: scale(1); }
-  100% { transform: scale(1.35); }
+  100% { transform: scale(1.12); }   /* o próprio sprite já incha (quadros 1–4) */
 }
 /* Puff válido: "estourinho" de confirmação */
 .pf-owl-wrap.pf-pop { animation: pfPop .28s ease; }

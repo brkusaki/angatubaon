@@ -71,14 +71,18 @@
   var _dcCores = ['#ef4444', '#a855f7', '#4ade80', '#fbbf24', '#38bdf8'];
   // Texturas opcionais (mesma ordem de _dcCores); se a imagem não
   // carregar, a cor sólida acima já é usada como fundo do doce.
+  // -v2: arte nova em 192 px (as antigas tinham 96). Nome novo de
+  // propósito: /Jogos/assets/ é cache-first no CACHE_JOGOS, que nunca é
+  // apagado — com o mesmo nome, quem já jogou veria a arte antiga.
   var _dcTexturas = [
-    '/Jogos/assets/doces/doce-vermelho.webp',
-    '/Jogos/assets/doces/doce-roxo.webp',
-    '/Jogos/assets/doces/doce-verde.webp',
-    '/Jogos/assets/doces/doce-amarelo.webp',
-    '/Jogos/assets/doces/doce-azul.webp'
+    '/Jogos/assets/doces/doce-vermelho-v2.webp',
+    '/Jogos/assets/doces/doce-roxo-v2.webp',
+    '/Jogos/assets/doces/doce-verde-v2.webp',
+    '/Jogos/assets/doces/doce-amarelo-v2.webp',
+    '/Jogos/assets/doces/doce-azul-v2.webp'
   ];
-  var _DC_TEX_GELO = '/Jogos/assets/doces/gelo.webp';
+  var _DC_TEX_GELO = '/Jogos/assets/doces/gelo-v2.webp';
+  var _DC_TEX_BOMBA = '/Jogos/assets/doces/bomba-v2.webp';   // trufa com granulado (bomba de cor)
   var _dcCoresNome = ['🔴 vermelho', '🟣 roxo', '🟢 verde', '🟡 amarelo', '🔵 azul'];
 
   // Skin (paleta dos doces) — loja dentro do jogo (hub.js). Tema com
@@ -631,6 +635,9 @@
     var imgGelo = new Image();
     imgGelo.onload = function () { _dcImgs.gelo = imgGelo; };
     imgGelo.src = _DC_TEX_GELO;
+    var imgBomba = new Image();
+    imgBomba.onload = function () { _dcImgs.bomba = imgBomba; };
+    imgBomba.src = _DC_TEX_BOMBA;
   }
 
   // Layout atual do tabuleiro em pixels CSS (depende só da largura
@@ -696,6 +703,13 @@
     // Bomba de cor: orbe arco-íris no lugar da imagem normal — não fica
     // "dentro" de gelo nem herda a textura da cor guardada (ela é curinga).
     if (tipo === _DC_TIPO_BOMBA) {
+      if (_dcImgs.bomba) {
+        var ladoB = r * 1.9;
+        try { ctx.drawImage(_dcImgs.bomba, x - ladoB / 2, cy - ladoB / 2, ladoB, ladoB); } catch (e) {}
+        ctx.restore();
+        return;
+      }
+      // Reserva enquanto a imagem não carrega: orbe arco-íris.
       var grad = ctx.createRadialGradient(x, cy, r * 0.1, x, cy, r * 0.95);
       grad.addColorStop(0, '#ffffff');
       grad.addColorStop(0.25, '#f87171');

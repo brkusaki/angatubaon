@@ -1287,7 +1287,7 @@
     ],
     corrida: [
       '/Jogos/corrida.min.js', '/Jogos/corrida.css',
-      '/Jogos/assets/corrida/arma.webp',
+      '/Jogos/assets/corrida/arma-v2.webp',
       '/Jogos/assets/corrida/cenario-floresta.webp',
       '/Jogos/assets/corrida/municao.webp',
       '/Jogos/assets/corrida/musica-fundo.mp3',
@@ -1344,12 +1344,13 @@
     ],
     doces: [
       '/Jogos/doces.min.js', '/Jogos/doces.css',
-      '/Jogos/assets/doces/doce-amarelo.webp',
-      '/Jogos/assets/doces/doce-azul.webp',
-      '/Jogos/assets/doces/doce-roxo.webp',
-      '/Jogos/assets/doces/doce-verde.webp',
-      '/Jogos/assets/doces/doce-vermelho.webp',
-      '/Jogos/assets/doces/gelo.webp'
+      '/Jogos/assets/doces/doce-amarelo-v2.webp',
+      '/Jogos/assets/doces/doce-azul-v2.webp',
+      '/Jogos/assets/doces/doce-roxo-v2.webp',
+      '/Jogos/assets/doces/doce-verde-v2.webp',
+      '/Jogos/assets/doces/doce-vermelho-v2.webp',
+      '/Jogos/assets/doces/gelo-v2.webp',
+      '/Jogos/assets/doces/bomba-v2.webp'
     ],
     tanques: [
       '/Jogos/tanques.min.js', '/Jogos/tanques.css', '/Jogos/multiplayer.min.js',
@@ -3637,7 +3638,7 @@
         h += '<rect x="' + (m - 12.5) + '" y="' + (n - 12.5) + '" width="25" height="25" rx="5" fill="rgba(255,255,255,.06)"/>';
         h += item.paleta
           ? _ljDoce(m, n, 10, item.paleta[ci % item.paleta.length], ci, uid + '-' + i)
-          : '<image href="/Jogos/assets/doces/doce-' + _LJ_DC_TEX[ci] + '.webp" x="' + (m - 12) + '" y="' + (n - 12) + '" width="24" height="24"/>';
+          : '<image href="/Jogos/assets/doces/doce-' + _LJ_DC_TEX[ci] + '-v2.webp" x="' + (m - 12) + '" y="' + (n - 12) + '" width="24" height="24"/>';
       }
       return _ljSvg(h);
     }

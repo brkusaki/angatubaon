@@ -117,6 +117,9 @@
      Se faltar/falhar, usa fallback vetorial.
   ══════════════════════════════════════════════════════════════ */
   var _COR_ASSET_BASE = '/Jogos/assets/corrida/';
+  // Asas + lançador de espuma no estilo da Master Reference. Nome novo
+  // (-v2) por causa do CACHE_JOGOS (cache-first, nunca apagado).
+  var _COR_ARMA = 'arma-v2.webp';
   var _corAssets = {};
 
   // Metadados dos spritesheets animados (zumbis). "frames" é só um PALPITE:
@@ -1657,7 +1660,7 @@
     var baseY = H + kick + swayY;
     var cx = W * 0.5 + swayX;
 
-    var asset = _corAsset('arma.webp');
+    var asset = _corAsset(_COR_ARMA);
     var fonteArma = _corFonte(asset);
     if (fonteArma) {
       // Arma FPS empunhada na base. Ancoramos pela largura pra as asas
@@ -2402,7 +2405,7 @@
         var reg = _corSheetPronto(tipo);
         if (reg) _corFonte(reg.sheet); else faltou = true;
       }
-      _corFonte(_corAsset('arma.webp'));
+      _corFonte(_corAsset(_COR_ARMA));
       _corFonte(_corAsset('municao.webp'));
       for (var oi2 = 0; oi2 < _COR_OBST_NOMES.length; oi2++) _corFonte(_corAsset('obst-' + _COR_OBST_NOMES[oi2] + '.webp'));
       if (!faltou || ++tentativas > 20) { clearInterval(_corFontesTimer); _corFontesTimer = 0; }
@@ -2570,7 +2573,7 @@
       _corFonte(a);
       return { carregou: a.ok, imagem: a.ok ? a.w + '×' + a.h : null, fundoChapadoRemovido: !!a.fundoRemovido };
     }
-    out.arma = estat('arma.webp');
+    out.arma = estat(_COR_ARMA);
     out.municao = estat('municao.webp');
     // cenario-floresta.webp é imagem opaca (não sprite) — sem _corFonte()
     // aqui, senão o diag dispararia o flood-fill de remoção de fundo nela.

@@ -143,7 +143,14 @@
        enfeite. Desligue ANIM_CORUJA para voltar ao giro puro. */
     ANIM_CORUJA: true,
     MS_ANIM_CORUJA: 1500,
-    VIDEO_CORUJA: '/Jogos/assets/negocios/dados-coruja.mp4'
+    // Sheet 3×3 da coruja jogando os dados (estilo da Master Reference).
+    // Nome novo (-v2) de propósito: /Jogos/assets/ é cache-first no
+    // CACHE_JOGOS, que nunca é apagado.
+    SHEET_CORUJA: '/Jogos/assets/negocios/dados-coruja-sheet-v2.webp',
+    // [quadro, ms] — soma = MS_ANIM_CORUJA. Quadros: 0 pronta · 1/2
+    // chacoalhando · 3 assoprando · 4 preparando · 5 jogando · 6 olhando
+    // os dados · 7 comemorando · 8 torcendo (7 e 8 ficam de reserva).
+    SEQ_CORUJA: [[0, 150], [1, 110], [2, 110], [1, 110], [2, 110], [3, 220], [4, 170], [5, 170], [6, 350]]
   };
 
   /* -----------------------------------------------------------------------
@@ -1690,33 +1697,34 @@
   };
 
   /* ------------------------- animação da coruja ------------------------- */
-  /* O vídeo (dados-coruja.mp4) roda no miolo do tabuleiro antes dos dados
-     girarem. É enfeite: o lance já foi sorteado pelo motor quando isto
-     começa, então se o vídeo não tocar (autoplay bloqueado, arquivo
-     ausente, prefers-reduced-motion) o jogo segue igual pelo aoTerminar.
-
-     Marca d'água do Pika: a arte é ampliada (scale) e recortada por uma
-     máscara radial no CSS, o que empurra os cantos — onde a marca fica —
-     para fora do quadro e ainda funde a borda com o fundo do tabuleiro.
-     Se em algum aparelho a marca ainda aparecer de canto de olho, é
-     preferível deixar assim a não ter animação nenhuma. */
+  /* A coruja jogando os dados (sprite 3×3, CFG.SHEET_CORUJA) roda no miolo
+     do tabuleiro antes dos dados girarem, quadro a quadro (CFG.SEQ_CORUJA).
+     É enfeite: o lance já foi sorteado pelo motor quando isto começa, então
+     sem o sheet (não carregou) ou com prefers-reduced-motion o jogo segue
+     igual pelo aoTerminar. Substituiu o dados-coruja.mp4 (fundo preto,
+     marca d'água e autoplay bloqueado no iPhone em economia de bateria). */
+  var _corujaSheetOk = true, _corujaTimer = null;
   function _semMovimento() {
     return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }
 
   UI.animarCoruja = function (aoTerminar) {
     var ov = $('#ndc-coruja');
-    var vid = $('#ndc-coruja-video');
-    if (!ov || !vid || !CFG.ANIM_CORUJA || _semMovimento()) {
+    var sp = $('#ndc-coruja-sprite');
+    if (!ov || !sp || !CFG.ANIM_CORUJA || !_corujaSheetOk || _semMovimento()) {
       aoTerminar && aoTerminar();
       return;
     }
     ov.classList.add('ndc-ativa');
-    try {
-      vid.currentTime = 0;
-      var p = vid.play();
-      if (p && p.catch) p.catch(function () {});   // autoplay bloqueado: só o pôster
-    } catch (e) { /* sem vídeo, segue o jogo */ }
+    var seq = CFG.SEQ_CORUJA, k = 0;
+    if (_corujaTimer) clearTimeout(_corujaTimer);
+    (function passo() {
+      var q = seq[k][0];
+      sp.style.backgroundPosition = ((q % 3) * 50) + '% ' + (Math.floor(q / 3) * 50) + '%';
+      var ms = seq[k][1];
+      k++;
+      _corujaTimer = k < seq.length ? setTimeout(passo, ms) : null;
+    })();
 
     setTimeout(function () {
       UI.pararCoruja();
@@ -1727,9 +1735,8 @@
   UI.pararCoruja = function () {
     if (!raiz) return;
     var ov = $('#ndc-coruja');
-    var vid = $('#ndc-coruja-video');
     if (ov) ov.classList.remove('ndc-ativa');
-    if (vid) { try { vid.pause(); } catch (e) { /* ignorado */ } }
+    if (_corujaTimer) { clearTimeout(_corujaTimer); _corujaTimer = null; }
   };
 
   /* =====================================================================
@@ -3025,11 +3032,10 @@
                 '<div class="ndc-msg" id="ndc-msg-centro">Toque em “Rolar dados” para começar.</div>' +
               '</div>' +
               // Overlay da coruja: ocupa o mesmo miolo do tabuleiro que o
-              // centro. O src entra no _montar() para o caminho morar só
+              // centro. A imagem entra no _montar() para o caminho morar só
               // em NDC.CONFIG.
               '<div class="ndc-coruja" id="ndc-coruja" aria-hidden="true">' +
-                '<video class="ndc-coruja-video" id="ndc-coruja-video" muted playsinline ' +
-                  'preload="auto" disablepictureinpicture></video>' +
+                '<div class="ndc-coruja-sprite" id="ndc-coruja-sprite"></div>' +
               '</div>' +
               '<div class="ndc-camada-tokens" id="ndc-camada-tokens"></div>' +
             '</div>' +
@@ -3231,8 +3237,16 @@
     UI.ligarAbas();
     UI.zerarDados();
 
-    var vid = $('#ndc-coruja-video');
-    if (vid && CFG.ANIM_CORUJA) vid.src = CFG.VIDEO_CORUJA;
+    var spr = $('#ndc-coruja-sprite');
+    if (spr && CFG.ANIM_CORUJA) {
+      spr.style.backgroundImage = 'url(\'' + CFG.SHEET_CORUJA + '\')';
+      // Pré-carrega já: a 1ª jogada de dados não espera download. Se falhar,
+      // animarCoruja pula direto pro aoTerminar.
+      var pre = new Image();
+      pre.onload = function () { _corujaSheetOk = true; };
+      pre.onerror = function () { _corujaSheetOk = false; };
+      pre.src = CFG.SHEET_CORUJA;
+    }
 
     $('#ndc-btn-construir').addEventListener('click', modalConstruir);
     $('#ndc-btn-hipoteca').addEventListener('click', modalHipotecas);

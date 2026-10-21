@@ -1397,7 +1397,7 @@
     ],
     negocios: [
       '/Jogos/negocios.min.js', '/Jogos/negocios.css',
-      '/Jogos/assets/negocios/dados-coruja.mp4',
+      '/Jogos/assets/negocios/dados-coruja-sheet-v2.webp',
       '/Jogos/assets/negocios/token-bike-amarela.webp',
       '/Jogos/assets/negocios/token-bike-colorida.webp',
       '/Jogos/assets/negocios/token-caminhao-laranja.webp',

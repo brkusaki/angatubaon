@@ -642,7 +642,7 @@
   grid-column: 2 / 11;
   grid-row: 2 / 11;
   z-index: 6;
-  position: relative;      /* âncora do ::after que cobre a marca do Pika */
+  position: relative;
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -654,38 +654,18 @@
 }
 #jogo-negocios .ndc-coruja.ndc-ativa { opacity: 1; visibility: visible; }
 
-/* MARCA D'ÁGUA DO PIKA — tratamento deliberado, não é bug.
-   A marca NÃO fica num canto: é o wordmark "Pika" no meio-esquerda do
-   quadro (x 12%-28%, y 24%-28,5% do vídeo, medido frame a frame — está lá
-   os 5 segundos inteiros), então recorte de borda não alcança ela. O que
-   salva é o entorno: ali o fundo do vídeo é preto puro (brilho médio 8 de
-   255), então uma mancha preta suave por cima apaga o wordmark sem deixar
-   buraco visível — some no próprio fundo da cena.
-
-   São três camadas, nesta ordem:
-     1. scale(1.12) no vídeo — tira as bordas e qualquer sujeira de canto;
-     2. máscara radial — funde a borda do vídeo com o fundo do tabuleiro;
-     3. ::after — a mancha preta em cima do wordmark (já em coordenadas do
-        container, ou seja, com o scale do item 1 descontado).
-   Nada de inpainting. Se um dia sair uma versão sem marca, é só trocar o
-   mp4 e apagar o ::after. */
-#jogo-negocios .ndc-coruja-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scale(1.12);
-  -webkit-mask-image: radial-gradient(circle at 50% 48%, #000 0 56%, rgba(0,0,0,.6) 74%, transparent 88%);
-          mask-image: radial-gradient(circle at 50% 48%, #000 0 56%, rgba(0,0,0,.6) 74%, transparent 88%);
-}
-
-/* camada 3: a mancha que cobre o wordmark (ver bloco acima) */
-#jogo-negocios .ndc-coruja::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(ellipse 19% 11% at 16.5% 23.5%,
-    #000 0 52%, rgba(0,0,0,.92) 72%, transparent 100%);
+/* Sprite 3×3 (dados-coruja-sheet-v2.webp, fundo transparente): quadro q →
+   background-position (q%3)*50% (q/3)*50%, trocado pelo negocios.js
+   (UI.animarCoruja / CFG.SEQ_CORUJA). Substituiu o vídeo .mp4 — sem marca
+   d'água, então saíram o scale, a máscara radial e a mancha do ::after. */
+#jogo-negocios .ndc-coruja-sprite {
+  width: 92%;
+  max-height: 92%;
+  aspect-ratio: 1 / 1;
+  background-repeat: no-repeat;
+  background-size: 300% 300%;
+  background-position: 0 0;
+  filter: drop-shadow(0 8px 14px rgba(0,0,0,.45));
 }
 
 /* ============================== 8. PAINEL ============================== */

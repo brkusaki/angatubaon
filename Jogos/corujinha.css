@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════
    CORUJINHA — slot 3×3 (ver Jogos/corujinha.js). Tela cheia, tema
    próprio (noite roxa + ouro), sempre escuro nos dois temas do app.
-   Arte 3D suave (PNG RGBA) em /Jogos/assets/corujinha/: renderização
-   normal do navegador, sem image-rendering: pixelated.
+   Arte 3D suave (WebP RGBA, v2) em /Jogos/assets/corujinha/: renderização
+   normal do navegador, sem image-rendering: pixelated. Mascote em grade
+   3×3 (background-size 300% 300%; quadro q → (q%3)*50% (q/3)*50%).
    ═══════════════════════════════════════════════════════════════ */
 #jogo-corujinha > .jogo-voltar { display: none; }
 #corujinha-root { flex: 1 1 auto; min-height: 0; display: flex; }
@@ -65,7 +66,7 @@
 .cjx-mascote { position: relative; z-index: 3; width: var(--masc); height: var(--masc); margin-bottom: calc(var(--masc) * -0.2); }
 .cjx-coruja {
   width: 100%; height: 100%;
-  background: url('/Jogos/assets/corujinha/coruja-sheet.png') 0 0 / 400% 100% no-repeat;
+  background: url('/Jogos/assets/corujinha/coruja-sheet-v2.webp') 0 0 / 300% 300% no-repeat;
   animation: cjxBob 1.4s ease-in-out infinite;
   filter: drop-shadow(0 6px 6px rgba(0,0,0,.45));
 }
@@ -245,12 +246,12 @@
 @keyframes cjxGira { to { transform: rotate(360deg); } }
 .cjx-splash-coruja, .cjx-big-coruja {
   position: relative; width: clamp(120px, 24vh, 190px); height: clamp(120px, 24vh, 190px);
-  background: url('/Jogos/assets/corujinha/coruja-sheet.png') 66.666% 0 / 400% 100% no-repeat;
+  background: url('/Jogos/assets/corujinha/coruja-sheet-v2.webp') 100% 0 / 300% 300% no-repeat;
   animation: cjxAsas .34s steps(1) infinite, cjxBob 1.2s ease-in-out infinite;
   filter: drop-shadow(0 10px 10px rgba(0,0,0,.5));
 }
-.cjx-big-coruja { width: clamp(90px, 17vh, 140px); height: clamp(90px, 17vh, 140px); }
-@keyframes cjxAsas { 0% { background-position: 66.666% 0; } 50% { background-position: 100% 0; } }
+.cjx-big-coruja { width: clamp(90px, 17vh, 140px); height: clamp(90px, 17vh, 140px); background-position: 0 100%; animation: cjxBob 1.2s ease-in-out infinite; }
+@keyframes cjxAsas { 0% { background-position: 100% 0; } 50% { background-position: 0 50%; } }
 .cjx-logo-grande { position: relative; font-size: clamp(34px, 11vw, 52px); margin-top: -6px; }
 .cjx-splash-sub { position: relative; font-weight: 800; font-size: 15px; color: #fff6c4; }
 .cjx-splash-lista {
@@ -275,7 +276,7 @@
 .cjx-big-moedas { position: absolute; inset: 0; pointer-events: none; }
 .cjx-big-moedas i {
   position: absolute; top: -50px; aspect-ratio: 1;
-  background: url('/Jogos/assets/corujinha/sim-moeda.png') center / contain no-repeat;
+  background: url('/Jogos/assets/corujinha/sim-moeda-v2.webp') center / contain no-repeat;
   animation: cjxCai 2s linear infinite;
 }
 @keyframes cjxCai { to { transform: translateY(115vh) rotate(var(--g, 360deg)); } }

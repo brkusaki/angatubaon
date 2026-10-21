@@ -25,10 +25,14 @@
    e já aplicado ao saldo/inventário — a animação é só visual, então
    sair no meio não perde nem duplica nada.
 
-   ARTE: pixel art provisória em /Jogos/assets/corujinha/ (PNG pequeno,
-   desenhado com image-rendering: pixelated). Pra trocar por arte final,
-   basta substituir os arquivos mantendo os nomes (proporção quadrada nos
-   símbolos; coruja-sheet.png = 4 quadros lado a lado).
+   ARTE (v2, estilo da Master Reference): /Jogos/assets/corujinha/
+   sim-*-v2.webp (símbolos quadrados 256×256) e coruja-sheet-v2.webp
+   (mascote em grade 3×3, quadros de 372×372: 0 parada · 1 piscando ·
+   2/3 asas · 4 olhando o giro · 5 suspense · 6 prêmio grande · 7 quase ·
+   8 piscadinha). Pra trocar a arte, use NOMES NOVOS (ex.: -v3): a pasta
+   /Jogos/assets/ é cache-first no CACHE_JOGOS, que nunca é apagado —
+   substituir mantendo o nome deixa quem já jogou com a arte antiga.
+   Lembrar de atualizar a lista do Corujinha em Jogos/hub.js (JOGOS_ASSETS).
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -228,11 +232,15 @@
   function esperar(ms) { return new Promise(function (ok) { later(ok, ms); }); }
   function tempo(ms) { return st.turbo ? Math.round(ms * 0.45) : ms; }
 
-  /* ── Coruja mascote (sprite 4 quadros: 0 parada, 1 piscando, 2/3 asas) ── */
+  /* ── Coruja mascote (sprite 3×3: 0 parada, 1 piscando, 2/3 asas,
+        4 olhando o giro, 5 suspense, 6 prêmio grande, 7 quase, 8 piscadinha) ── */
   var coruja = { modo: 'parada', piscaT: 0, asaT: 0 };
+  // Modos de pose parada (um quadro só, sem piscar); 'gira' mantém a classe
+  // de balanço rápido que já existia.
+  var CORUJA_POSE = { gira: 4, suspense: 5, quase: 7, piscadinha: 8 };
   function corujaQuadro(q) {
     var el = $('cjx-coruja');
-    if (el) el.style.backgroundPosition = (q * 100 / 3) + '% 0';
+    if (el) el.style.backgroundPosition = ((q % 3) * 50) + '% ' + (Math.floor(q / 3) * 50) + '%';
   }
   function corujaModo(modo, ms) {
     var el = $('cjx-coruja'); if (!el) return;
@@ -247,7 +255,12 @@
       if (ms) coruja.piscaT = setTimeout(function () { corujaModo('parada'); }, ms);
       return;
     }
-    if (modo === 'gira') el.classList.add('cjx-coruja-gira');
+    if (modo === 'gira' || modo === 'suspense') el.classList.add('cjx-coruja-gira');
+    if (CORUJA_POSE[modo] != null) {
+      corujaQuadro(CORUJA_POSE[modo]);
+      if (ms) coruja.piscaT = setTimeout(function () { corujaModo('parada'); }, ms);
+      return;
+    }
     corujaQuadro(0);
     (function piscar() {
       coruja.piscaT = setTimeout(function () {
@@ -266,7 +279,7 @@
 
   /* ── DOM ─────────────────────────────────────────────────────── */
   function simHtml(s) {
-    return '<div class="cjx-s cjx-s-' + s + '"><i style="background-image:url(\'' + ASSETS + 'sim-' + s + '.png\')"></i>' +
+    return '<div class="cjx-s cjx-s-' + s + '"><i style="background-image:url(\'' + ASSETS + 'sim-' + s + '-v2.webp\')"></i>' +
            (s === 'coruja' ? '<b>CORINGA</b>' : '') + '</div>';
   }
   function marcasHtml(lado) {
@@ -330,10 +343,10 @@
           '<div class="cjx-logo cjx-logo-grande">CORUJINHA</div>' +
           '<div class="cjx-splash-sub">Alinhe 3 e ganhe!</div>' +
           '<ul class="cjx-splash-lista">' +
-            '<li><i style="background-image:url(\'' + ASSETS + 'sim-coruja.png\')"></i>Coruja é coringa</li>' +
-            '<li><i style="background-image:url(\'' + ASSETS + 'sim-estrela.png\')"></i>Voo da Sorte: re-giros até ganhar</li>' +
-            '<li><i style="background-image:url(\'' + ASSETS + 'sim-coroa.png\')"></i>Tela cheia paga ×10</li>' +
-            '<li><i style="background-image:url(\'' + ASSETS + 'sim-ovo.png\')"></i>3 ovos dourados = cosmético</li>' +
+            '<li><i style="background-image:url(\'' + ASSETS + 'sim-coruja-v2.webp\')"></i>Coruja é coringa</li>' +
+            '<li><i style="background-image:url(\'' + ASSETS + 'sim-estrela-v2.webp\')"></i>Voo da Sorte: re-giros até ganhar</li>' +
+            '<li><i style="background-image:url(\'' + ASSETS + 'sim-coroa-v2.webp\')"></i>Tela cheia paga ×10</li>' +
+            '<li><i style="background-image:url(\'' + ASSETS + 'sim-ovo-v2.webp\')"></i>3 ovos dourados = cosmético</li>' +
           '</ul>' +
           '<button type="button" class="cjx-comecar" onclick="CorujinhaGame._comecar()">COMEÇAR</button>' +
           '<div class="cjx-splash-nota">Moedas do app — não valem dinheiro.</div>' +
@@ -466,6 +479,7 @@
   }
   function suspenseLigar() {
     var m = $('cjx-maquina'); if (m) m.classList.add('cjx-maquina-suspense');
+    corujaModo('suspense');
     for (var r = 0; r < 3; r++) { var el = $('cjx-cel-' + r + '2'); if (el) el.classList.add('cjx-suspense'); }
     som('mola');
   }
@@ -669,7 +683,7 @@
 
   function vooAnimar(r) {
     var m = $('cjx-maquina'); if (m) m.classList.add('cjx-maquina-voo');
-    ganhoBar('<img src="' + ASSETS + 'sim-' + r.voo + '.png" alt=""> VOO DA SORTE!', 'cjx-ganhobar-voo');
+    ganhoBar('<img src="' + ASSETS + 'sim-' + r.voo + '-v2.webp" alt=""> VOO DA SORTE!', 'cjx-ganhobar-voo');
     balao('Voo da Sorte!', 1800);
     corujaModo('voo', 1600);
     som('mola'); vibrar(40);
@@ -704,12 +718,12 @@
       som(r.mult >= 3 ? 'bonus' : 'acerto');
       if (r.cheia) { balao('TELA CHEIA ×' + CJM.CHEIA_MULT + '!', 2200); vibrar([40, 60, 40]); }
     } else if (!r.ovo) {
-      corujaModo('parada');
       // "quase": par numa linha
       var quase = CJM.LINHAS.some(function (L) {
         var a = gFinal[L[0][0]][L[0][1]], b = gFinal[L[1][0]][L[1][1]], c = gFinal[L[2][0]][L[2][1]];
         return a !== 'ovo' && (a === b || b === c) && a !== 'moeda';
       });
+      if (quase) corujaModo('quase', 1600); else corujaModo('parada');
       ganhoBar(quase ? 'Quase! Mais um giro?' : 'Boa sorte!', '');
     }
     if (r.ovo) mostrarOvos(gFinal);
@@ -772,7 +786,7 @@
     var s = $('cjx-splash'); if (s) s.classList.add('cjx-sai');
     later(function () { if (s) s.classList.remove('on', 'cjx-sai'); }, 380);
     som('nivelUp');
-    corujaModo('festa', 1200);
+    corujaModo('piscadinha', 1500);
     balao('Boa sorte!', 1500);
   }
   function voltar() {

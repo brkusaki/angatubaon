@@ -1278,12 +1278,12 @@
   var JOGOS_ASSETS = {
     corujinha: [
       '/Jogos/corujinha.min.js', '/Jogos/corujinha.css',
-      '/Jogos/assets/corujinha/coruja-sheet.png', '/Jogos/assets/corujinha/moldura.png',
+      '/Jogos/assets/corujinha/coruja-sheet-v2.webp', '/Jogos/assets/corujinha/moldura.png',
       '/Jogos/assets/corujinha/skyline.png',
-      '/Jogos/assets/corujinha/sim-coruja.png', '/Jogos/assets/corujinha/sim-coroa.png',
-      '/Jogos/assets/corujinha/sim-igreja.png', '/Jogos/assets/corujinha/sim-livro.png',
-      '/Jogos/assets/corujinha/sim-estrela.png', '/Jogos/assets/corujinha/sim-milho.png',
-      '/Jogos/assets/corujinha/sim-moeda.png', '/Jogos/assets/corujinha/sim-ovo.png'
+      '/Jogos/assets/corujinha/sim-coruja-v2.webp', '/Jogos/assets/corujinha/sim-coroa-v2.webp',
+      '/Jogos/assets/corujinha/sim-igreja-v2.webp', '/Jogos/assets/corujinha/sim-livro-v2.webp',
+      '/Jogos/assets/corujinha/sim-estrela-v2.webp', '/Jogos/assets/corujinha/sim-milho-v2.webp',
+      '/Jogos/assets/corujinha/sim-moeda-v2.webp', '/Jogos/assets/corujinha/sim-ovo-v2.webp'
     ],
     corrida: [
       '/Jogos/corrida.min.js', '/Jogos/corrida.css',

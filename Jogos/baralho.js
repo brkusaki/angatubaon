@@ -614,9 +614,20 @@
     else if (_tela === 'lobby') _renderLobby();
   }
 
+  var VERSO_MODO = {
+    truco: '/Jogos/assets/baralho/verso-truco.webp',
+    uno: '/Jogos/assets/baralho/verso-uno.webp'
+  };
+
   function _renderEscolha() {
     var wrap = _el('div', 'escolha');
     _renderAviso(wrap);
+    // Capa: a mesma arte do card do hub (já está em cache quem abriu o hub).
+    var capa = _el('div', 'capa');
+    var capaImg = _el('img', 'capa-img', { src: '/Jogos/assets/card-baralho-v2.webp', alt: '', draggable: 'false' });
+    capaImg.addEventListener('error', function () { capa.style.display = 'none'; });
+    capa.appendChild(capaImg);
+    wrap.appendChild(capa);
     wrap.appendChild(_el('h2', 'titulo', { texto: 'Jogos de Baralho' }));
     wrap.appendChild(_el('p', 'subtitulo', { texto: 'Chame a turma pra uma partida.' }));
 
@@ -625,6 +636,16 @@
     chaves.forEach(function (chave) {
       var def = modos()[chave];
       var card = _el('button', 'card-modo', { type: 'button' });
+      // Verso do baralho de cada jogo, em leque (só enfeite; some se faltar).
+      if (VERSO_MODO[chave]) {
+        var leque = _el('span', 'card-modo-leque');
+        for (var vi = 0; vi < 3; vi++) {
+          var v = _el('img', 'card-modo-verso', { src: VERSO_MODO[chave], alt: '', draggable: 'false' });
+          v.addEventListener('error', function () { leque.style.display = 'none'; });
+          leque.appendChild(v);
+        }
+        card.appendChild(leque);
+      }
       card.appendChild(_el('span', 'card-modo-nome', { texto: def.nome }));
       card.appendChild(_el('span', 'card-modo-jogadores', { texto: def.min + ' a ' + def.max + ' jogadores' }));
       card.addEventListener('click', function () { _aviso = ''; _modoEscolhido = chave; _tela = 'criar'; _renderizar(); });

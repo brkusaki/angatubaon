@@ -113,6 +113,26 @@
 
 #baralho-root .brl-card-modo-em-breve { opacity: 0.5; cursor: default; }
 
+/* Capa e leque de versos do menu de escolha */
+#baralho-root .brl-capa {
+  width: 100%; aspect-ratio: 800 / 620; max-height: 30vh;
+  border-radius: 18px; overflow: hidden; margin-bottom: -4px;
+  box-shadow: 0 10px 24px rgba(0,0,0,.35);
+}
+#baralho-root .brl-capa-img { width: 100%; height: 100%; object-fit: cover; object-position: center 35%; display: block; }
+#baralho-root .brl-card-modo-leque { position: relative; width: 92px; height: 76px; margin-bottom: 4px; }
+#baralho-root .brl-card-modo-verso {
+  position: absolute; left: 50%; bottom: 0; width: 46px; height: auto;
+  border-radius: 5px; box-shadow: 0 3px 8px rgba(0,0,0,.35);
+  transform-origin: 50% 100%;
+}
+#baralho-root .brl-card-modo-verso:nth-child(1) { transform: translateX(-50%) rotate(-16deg); }
+#baralho-root .brl-card-modo-verso:nth-child(2) { transform: translateX(-50%) rotate(0deg); z-index: 1; }
+#baralho-root .brl-card-modo-verso:nth-child(3) { transform: translateX(-50%) rotate(16deg); z-index: 2; }
+#baralho-root .brl-card-modo:hover .brl-card-modo-verso:nth-child(1) { transform: translateX(-50%) rotate(-22deg); }
+#baralho-root .brl-card-modo:hover .brl-card-modo-verso:nth-child(3) { transform: translateX(-50%) rotate(22deg); }
+#baralho-root .brl-card-modo-verso { transition: transform .18s ease; }
+
 #baralho-root .brl-card-modo-nome { font-family: var(--font-h); font-weight: 700; font-size: 1.05rem; }
 #baralho-root .brl-card-modo-jogadores { font-size: 0.82rem; color: var(--muted); }
 

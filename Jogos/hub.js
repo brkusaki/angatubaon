@@ -1383,9 +1383,11 @@
     ],
     ervilhas: [
       '/Jogos/ervilhas.min.js', '/Jogos/ervilhas.css',
-      '/Jogos/assets/ervilhas/coruja-bico.webp',
-      '/Jogos/assets/ervilhas/olho-aberto.webp',
-      '/Jogos/assets/ervilhas/olho-fechado.webp'
+      '/Jogos/assets/ervilhas/sala.webp', '/Jogos/assets/ervilhas/chefe-sheet.webp',
+      '/Jogos/assets/ervilhas/mesa.webp', '/Jogos/assets/ervilhas/prato.webp',
+      '/Jogos/assets/ervilhas/ervilha.webp', '/Jogos/assets/ervilhas/asa-garfo-1.webp',
+      '/Jogos/assets/ervilhas/asa-garfo-2.webp', '/Jogos/assets/ervilhas/asa-garfo-3.webp',
+      '/Jogos/assets/ervilhas/guardanapo.webp', '/Jogos/assets/ervilhas/suco.webp'
     ],
     baralho: [
       '/Jogos/baralho.min.js', '/Jogos/baralho.css',

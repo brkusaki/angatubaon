@@ -7,20 +7,28 @@
    este módulo não tem tela própria em index.html nem card no hub, só
    entra pela pool do Coruja Party (Jogos/party.js).
 
-   Mecânica (Red Light / Green Light):
-   - Toque 1 = espeta uma semente com o bico (animação curta).
-   - Toque 2 = engole a semente espetada (outra animação curta).
-   - De tempos em tempos o "Olhão da Coruja-Chefe" abre. Se o toque
-     começar OU a animação de espetar/engolir estiver rolando quando
-     o olho abrir, o jogador é flagrado: perde a semente em andamento
-     (não desconta do prato, só não conta) e fica "assustado" por um
-     instante sem poder agir. Ficar parado (esperando ou segurando a
-     semente já espetada) nunca é perigoso — só o movimento é.
-   - Objetivo: esvaziar o prato o mais rápido possível.
-   - v1: cada aparelho sorteia os intervalos do olho localmente (sem
-     mensagem extra) — ver o comentário no topo de party.js sobre o
-     "seed" da rodada, que fica disponível pra sincronizar isso depois
-     se um dia valer a pena.
+   v2 (tela cheia, no jeito do Table Manners):
+   - Em cima, a sala de jantar com a Coruja-Chefe lendo jornal na
+     cabeceira. Embaixo, a toalha, o prato de ervilhas e o garfo na asa
+     do jogador (primeira pessoa).
+   - Dois botões, como os dois cliques do original:
+       ESPETAR  = põe uma ervilha no garfo (até GARFO_MAX);
+       COMER    = engole tudo que está no garfo de uma vez.
+     Encher o garfo rende mais por mordida, mas arrisca mais.
+   - A Chefe alterna: lendo (seguro) → aviso (espia por cima do jornal,
+     ainda seguro) → olhando (perigo) → lendo. Parte dos avisos é
+     alarme falso (volta a ler). Ela fica mais desconfiada conforme o
+     prato esvazia (lê menos tempo, olha por mais tempo, avisa mais rápido).
+   - Se mexer (tocar, ou estar no meio de espetar/comer) com ela
+     olhando = flagrado: as ervilhas do garfo voltam pro prato e o
+     jogador fica travado um instante. Ficar parado nunca é perigoso.
+   - Objetivo: esvaziar o prato antes do tempo. Pontos = ervilhas
+     comidas × PONTOS_POR_SEMENTE + bônus de tempo se esvaziar.
+   - Tela cheia: o .ev-root é position: fixed por cima do Party (o
+     container continua o mesmo; se o Party esconder a tela, o fixed
+     some junto porque o ancestral fica display:none).
+   - v1 de sorteio local dos intervalos (sem mensagem extra) — ver o
+     comentário no topo de party.js sobre o "seed" da rodada.
    - Sozinho no próprio aparelho — no fim, reporta só o score final
      pro Coruja Party (ver onFim).
    ═══════════════════════════════════════════════════════════════ */
@@ -29,77 +37,99 @@
 
   // Handle da rodada em andamento (setado por render(), consumido por
   // parar()). Sem isto, sair do Party no meio da rodada deixava a cadeia
-  // do olhão (_agendarOlho) se reagendando pra sempre sobre um <div> já
-  // descartado, e o timerRodada acabava reportando o placar da rodada
-  // abandonada como se fosse da rodada atual (ver A2.2).
+  // da Chefe se reagendando pra sempre sobre um <div> já descartado, e o
+  // timerRodada acabava reportando o placar da rodada abandonada como se
+  // fosse da rodada atual (ver A2.2).
   var _pararAtual = null;
 
-  var TOTAL_SEMENTES     = 14;   // sementes no prato (sugestão do pedido: 12-15)
-  var ESPETAR_MS         = 380;  // duração da animação de espetar
-  var ENGOLIR_MS         = 380;  // duração da animação de engolir
-  var ASSUSTADA_MS       = 800;  // travado depois de flagrado
-  var OLHO_FECHADO_MIN   = 1500; // ms — faixa inicial de "olho fechado" (seguro)
-  var OLHO_FECHADO_MAX   = 2900;
-  var OLHO_ABERTO_MIN    = 700;  // ms — faixa inicial de "olho aberto" (perigo)
-  var OLHO_ABERTO_MAX    = 1300;
+  var A = '/Jogos/assets/ervilhas/';
+  var TOTAL_SEMENTES     = 20;   // ervilhas no prato
+  var GARFO_MAX          = 5;    // quantas cabem no garfo
+  var ESPETAR_MS         = 230;  // animação de espetar (uma ervilha)
+  var COMER_MS           = 420;  // animação de levar o garfo à boca
+  var ASSUSTADA_MS       = 1000; // travado depois de flagrado
+  var PEGOU_MS           = 1100; // quanto tempo a Chefe fica apontando
+  var LENDO_MIN = 1300, LENDO_MAX = 2700;   // seguro
+  var AVISO_MIN = 450,  AVISO_MAX = 700;    // espiando (ainda seguro)
+  var OLHANDO_MIN = 800, OLHANDO_MAX = 1400; // perigo
+  var CHANCE_ALARME_FALSO = 0.3;
   var PONTOS_POR_SEMENTE = 100;
-  var BONUS_TEMPO_DIVISOR = 500; // bônus de velocidade só se esvaziar o prato: tempoRestanteMs / 500
+  var BONUS_TEMPO_DIVISOR = 500; // bônus só se esvaziar o prato: msRestantes / 500
+
+  // Quadros do chefe-sheet.webp (grade 3×3, cabeça alinhada em todos):
+  // 0 lendo · 1 virando a página · 2 ajeitando os óculos (aviso) ·
+  // 3 espiando por cima do jornal (aviso) · 4 jornal no queixo (olhando) ·
+  // 5 jornal na mesa, encarando (olhando) · 6 apontando "te peguei" ·
+  // 7 braços cruzados, satisfeita · 8 bocejando (lendo, alarme falso visual)
+  var Q = { LENDO: 0, PAGINA: 1, OCULOS: 2, ESPIA: 3, QUEIXO: 4, ENCARA: 5, PEGOU: 6, FIM: 7, BOCEJO: 8 };
+  // asa-garfo-1/2/3.webp: parado (dentes pra cima) · espetando · levando
+  // à boca. Âncora: canto inferior direito. tipX/tipY = ponta dos dentes
+  // e tinesW = largura da cabeça do garfo, em px da própria imagem —
+  // usados pra empilhar as ervilhas no garfo.
+  var ASA = {
+    1: { w: 251, h: 375, tipX: 40, tipY: 2, tinesW: 40 },
+    2: { w: 341, h: 362 },
+    3: { w: 289, h: 370, tipX: 88, tipY: 1, tinesW: 111 }
+  };
 
   function render(container, opts) {
     if (!container) return;
     opts = opts || {};
     var duracaoSeg = Math.max(15, Number(opts.duracaoSeg) || 38);
-    var duracaoMs = duracaoSeg * 1000;
     var onFim = typeof opts.onFim === 'function' ? opts.onFim : function () {};
 
     // Estado da rodada (recriado a cada render — cada rodada é um jogo novo).
-    var sementesRestantes = TOTAL_SEMENTES;
-    var estado = 'esperando'; // esperando | espetando | segurando | engolindo | assustada
-    var olhoAberto = false;
+    var noPrato = TOTAL_SEMENTES;   // ervilhas ainda no prato
+    var noGarfo = 0;                // espetadas, ainda não comidas
+    var comidas = 0;
+    var movendo = null;             // null | 'espetar' | 'comer'
+    var travada = false;
     var acabou = false;
-    var inicioEm = Date.now();
-    var timerAnimacao = null;
-    var timerOlho = null;
-    var timerAssustada = null;
-    var timerRodada = null;
+    var chefe = 'lendo';            // lendo | aviso | olhando | pegou
     var tempoRestante = duracaoSeg;
+    var timerMov = null, timerChefe = null, timerTravada = null, timerRodada = null, timerPagina = null;
 
     container.innerHTML =
-      '<div class="ev-card">' +
-        '<div class="ev-hud">' +
-          '<div class="ev-hud-item"><span class="ev-hud-label">Sementes</span><span class="ev-hud-valor" id="ev-restantes">' + sementesRestantes + '</span></div>' +
-          '<div class="ev-hud-item"><span class="ev-hud-label">Tempo</span><span class="ev-hud-valor" id="ev-tempo">' + duracaoSeg + '</span></div>' +
-        '</div>' +
-        '<div class="ev-arena" id="ev-arena">' +
-          '<div class="ev-olho-wrap" id="ev-olho-wrap">' +
-            '<span class="ev-olho-emoji" id="ev-olho-emoji">😌</span>' +
-            '<img class="ev-olho-img" id="ev-olho-img" src="/Jogos/assets/ervilhas/olho-fechado.webp" alt="" draggable="false">' +
-            '<div class="ev-olho-label">Olhão da Coruja-Chefe</div>' +
+      '<div class="ev-root" id="ev-root">' +
+        '<div class="ev-sala" style="background-image:url(\'' + A + 'sala.webp\')">' +
+          '<div class="ev-hud">' +
+            '<button type="button" class="ev-sair" id="ev-sair" aria-label="Sair">✕</button>' +
+            '<span class="ev-chip"><b id="ev-restantes">' + noPrato + '</b> no prato</span>' +
+            '<span class="ev-chip ev-chip-tempo"><b id="ev-tempo">' + duracaoSeg + '</b>s</span>' +
           '</div>' +
-          '<div class="ev-prato" id="ev-prato"></div>' +
-          '<div class="ev-owl-wrap" id="ev-owl-wrap">' +
-            '<span class="ev-owl-emoji">🦉</span>' +
-            '<img class="ev-owl-img" id="ev-owl-img" src="/Jogos/assets/ervilhas/coruja-bico.webp" alt="" draggable="false">' +
+          '<div class="ev-chefe-wrap">' +
+            '<div class="ev-chefe" id="ev-chefe" style="background-image:url(\'' + A + 'chefe-sheet.webp\')"></div>' +
+            '<img class="ev-mesa" src="' + A + 'mesa.webp" alt="" draggable="false">' +
           '</div>' +
-          '<div class="ev-instrucao" id="ev-instrucao">Toque pra espetar, toque de novo pra engolir. Nunca se mexa com o olho aberto!</div>' +
-          '<div class="ev-aviso-flagra" id="ev-aviso-flagra">Flagrado! 😱</div>' +
+          '<div class="ev-balao" id="ev-balao"></div>' +
         '</div>' +
+        '<div class="ev-toalha" id="ev-toalha">' +
+          '<img class="ev-guardanapo" src="' + A + 'guardanapo.webp" alt="" draggable="false">' +
+          '<img class="ev-suco" src="' + A + 'suco.webp" alt="" draggable="false">' +
+          '<div class="ev-prato" id="ev-prato"><img class="ev-prato-img" src="' + A + 'prato.webp" alt="" draggable="false"></div>' +
+          '<div class="ev-asa" id="ev-asa">' +
+            '<img class="ev-asa-img" id="ev-asa-img" src="' + A + 'asa-garfo-1.webp" alt="" draggable="false">' +
+            '<div class="ev-garfo-ervilhas" id="ev-garfo-ervilhas"></div>' +
+          '</div>' +
+          '<div class="ev-garfo-cont" id="ev-garfo-cont">Garfo 0/' + GARFO_MAX + '</div>' +
+          '<div class="ev-instrucao" id="ev-instrucao">Espete e coma só quando a Chefe estiver lendo.<br>Encheu o garfo? Mais ervilhas por mordida — e mais risco!</div>' +
+        '</div>' +
+        '<div class="ev-botoes">' +
+          '<button type="button" class="ev-btn ev-btn-espetar" id="ev-btn-espetar">Espetar</button>' +
+          '<button type="button" class="ev-btn ev-btn-comer" id="ev-btn-comer">Comer</button>' +
+        '</div>' +
+        '<div class="ev-flash" id="ev-flash"></div>' +
       '</div>';
 
-    var elRestantes  = container.querySelector('#ev-restantes');
-    var elTempo      = container.querySelector('#ev-tempo');
-    var elArena       = container.querySelector('#ev-arena');
-    var elOlhoWrap    = container.querySelector('#ev-olho-wrap');
-    var elOlhoEmoji   = container.querySelector('#ev-olho-emoji');
-    var elOlhoImg     = container.querySelector('#ev-olho-img');
-    var elPrato       = container.querySelector('#ev-prato');
-    var elOwlWrap     = container.querySelector('#ev-owl-wrap');
-    var elOwlImg      = container.querySelector('#ev-owl-img');
-    var elInstrucao   = container.querySelector('#ev-instrucao');
-    var elAvisoFlagra = container.querySelector('#ev-aviso-flagra');
+    var $ = function (id) { return container.querySelector('#' + id); };
+    var elRoot = $('ev-root'), elChefe = $('ev-chefe'), elBalao = $('ev-balao');
+    var elRestantes = $('ev-restantes'), elTempo = $('ev-tempo');
+    var elToalha = $('ev-toalha'), elPrato = $('ev-prato'), elAsa = $('ev-asa'), elAsaImg = $('ev-asa-img');
+    var elGarfoErv = $('ev-garfo-ervilhas'), elGarfoCont = $('ev-garfo-cont'), elInstrucao = $('ev-instrucao');
+    var elBtnEspetar = $('ev-btn-espetar'), elBtnComer = $('ev-btn-comer'), elFlash = $('ev-flash');
 
-    elOlhoImg.onerror = function () { this.style.visibility = 'hidden'; };
-    elOwlImg.onerror = function () { this.style.visibility = 'hidden'; };
+    // Pré-carrega as três poses da asa (a troca de src fica instantânea).
+    [2, 3].forEach(function (k) { var im = new Image(); im.src = A + 'asa-garfo-' + k + '.webp'; });
 
     function _som(m, args) {
       var G = window.AngatubaGames;
@@ -108,145 +138,276 @@
     function _vibrar(padrao) {
       if (navigator.vibrate) { try { navigator.vibrate(padrao); } catch (e) {} }
     }
+    function _quadroChefe(q) {
+      if (elChefe) elChefe.style.backgroundPosition = ((q % 3) * 50) + '% ' + (Math.floor(q / 3) * 50) + '%';
+    }
+    function _balao(txt, ms) {
+      if (!elBalao) return;
+      if (!txt) { elBalao.classList.remove('on'); return; }
+      elBalao.textContent = txt;
+      elBalao.classList.remove('on'); void elBalao.offsetWidth; elBalao.classList.add('on');
+      if (ms) setTimeout(function () { if (elBalao) elBalao.classList.remove('on'); }, ms);
+    }
 
-    // ── Prato: uma "semente" (div) por unidade restante ────────────
-    var sementesEls = [];
-    (function _montarPrato() {
-      for (var i = 0; i < TOTAL_SEMENTES; i++) {
-        var s = document.createElement('div');
-        s.className = 'ev-semente';
-        elPrato.appendChild(s);
-        sementesEls.push(s);
-      }
-    })();
-    function _removerUmaSemente() {
-      // Some com a última semente "viva" da lista (visual só — a
-      // contagem de verdade é sementesRestantes).
-      for (var i = sementesEls.length - 1; i >= 0; i--) {
-        if (!sementesEls[i]._comida) {
-          sementesEls[i]._comida = true;
-          sementesEls[i].classList.add('ev-semente-comida');
-          break;
+    // ── Prato: uma <img> de ervilha por unidade, espalhadas dentro do
+    // círculo interno do prato. Espetar tira uma; flagra devolve. ──────
+    var ervilhasPrato = [];
+    function _posLivre() {
+      // Sorteia uma posição no miolo do prato evitando encostar demais
+      // nas ervilhas já postas (algumas tentativas; se não achar, aceita).
+      var melhor = null;
+      for (var t = 0; t < 14; t++) {
+        var ang = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.27;
+        var x = 0.5 + Math.cos(ang) * r, y = 0.5 + Math.sin(ang) * r;
+        var ok = true;
+        for (var i = 0; i < ervilhasPrato.length; i++) {
+          var e = ervilhasPrato[i];
+          if ((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y) < 0.075 * 0.075) { ok = false; break; }
         }
+        melhor = { x: x, y: y };
+        if (ok) break;
+      }
+      return melhor;
+    }
+    function _addErvilhaPrato() {
+      var p = _posLivre();
+      var el = document.createElement('img');
+      el.className = 'ev-ervilha';
+      el.src = A + 'ervilha.webp';
+      el.alt = ''; el.draggable = false;
+      el.style.left = (p.x * 100) + '%';
+      el.style.top = (p.y * 100) + '%';
+      el.style.transform = 'translate(-50%,-50%) rotate(' + Math.round(Math.random() * 360) + 'deg)';
+      elPrato.appendChild(el);
+      ervilhasPrato.push({ x: p.x, y: p.y, el: el });
+    }
+    function _tirarErvilhaPrato() {
+      var e = ervilhasPrato.pop();
+      if (e && e.el && e.el.parentNode) e.el.parentNode.removeChild(e.el);
+    }
+    for (var i0 = 0; i0 < TOTAL_SEMENTES; i0++) _addErvilhaPrato();
+
+    // ── Asa + garfo: pose (1 parado, 2 espetando, 3 comendo) e as
+    // ervilhas empilhadas nos dentes. Tamanho da asa vem do CSS (altura
+    // da .ev-asa); as larguras e a pilha seguem a proporção da imagem. ─
+    var poseAsa = 1;
+    function _escalaAsa() {
+      var h = elAsa ? elAsa.clientHeight : 0;
+      return h > 0 ? h / 375 : 0;
+    }
+    function _poseAsa(k) {
+      poseAsa = k;
+      var s = _escalaAsa();
+      elAsaImg.src = A + 'asa-garfo-' + k + '.webp';
+      elAsaImg.style.width = (ASA[k].w * s) + 'px';
+      elAsaImg.style.height = (ASA[k].h * s) + 'px';
+      _desenharGarfo();
+    }
+    function _desenharGarfo() {
+      if (!elGarfoErv) return;
+      var d = ASA[poseAsa];
+      elGarfoErv.innerHTML = '';
+      if (elGarfoCont) elGarfoCont.textContent = 'Garfo ' + noGarfo + '/' + GARFO_MAX;
+      if (!noGarfo || !d.tinesW) return;
+      var s = _escalaAsa();
+      var img = d.w * s, imh = d.h * s;
+      var tam = d.tinesW * s * 1.05;
+      // Ponta dos dentes no sistema da .ev-asa: a imagem fica ancorada
+      // no canto inferior direito dela.
+      var asaW = elAsa.clientWidth, asaH = elAsa.clientHeight;
+      var baseX = asaW - img + d.tipX * s, baseY = asaH - imh + d.tipY * s;
+      for (var k = 0; k < noGarfo; k++) {
+        var el = document.createElement('img');
+        el.className = 'ev-ervilha ev-ervilha-garfo';
+        el.src = A + 'ervilha.webp'; el.alt = ''; el.draggable = false;
+        el.style.width = tam + 'px'; el.style.height = tam + 'px';
+        el.style.left = (baseX - tam / 2 + ((k % 2) ? tam * 0.12 : -tam * 0.12)) + 'px';
+        el.style.top = (baseY + tam * 0.15 + k * tam * 0.62) + 'px';
+        elGarfoErv.appendChild(el);
       }
     }
 
-    // ── Progresso (0..1) — usado pra apertar as faixas do olho aos
-    // poucos, deixando o fim do prato mais tenso. ───────────────────
-    function _progresso() { return 1 - (sementesRestantes / TOTAL_SEMENTES); }
-    function _faixaAtual(min, max, aperto, cresce) {
-      // cresce=true (olho aberto): a faixa AUMENTA com o progresso —
-      // fica perigoso por mais tempo conforme o prato esvazia.
-      // cresce=false (olho fechado): a faixa ENCOLHE com o progresso —
-      // a folga segura fica mais curta conforme o prato esvazia.
-      var fator = cresce ? (1 + aperto * 0.4) : (1 - aperto * 0.35);
-      var faixaMin = Math.max(280, min * fator);
-      var faixaMax = Math.max(faixaMin + 150, max * fator);
-      return faixaMin + Math.random() * (faixaMax - faixaMin);
+    function _atualizarHud() {
+      if (elRestantes) elRestantes.textContent = noPrato;
+      if (elBtnEspetar) elBtnEspetar.disabled = acabou || noPrato <= 0 || noGarfo >= GARFO_MAX;
+      if (elBtnComer) elBtnComer.disabled = acabou || noGarfo <= 0;
+      _desenharGarfo();
     }
 
-    // ── Olhão da Coruja-Chefe: alterna aberto/fechado sozinho ──────
-    function _agendarOlho() {
-      if (acabou) return;
-      var aperto = _progresso(); // 0 no início, 1 quando o prato tá quase vazio
-      var espera = olhoAberto
-        ? _faixaAtual(OLHO_ABERTO_MIN, OLHO_ABERTO_MAX, aperto, true)
-        : _faixaAtual(OLHO_FECHADO_MIN, OLHO_FECHADO_MAX, aperto, false);
-      timerOlho = setTimeout(function () {
-        _alternarOlho();
-        _agendarOlho();
-      }, espera);
+    // ── Coruja-Chefe ──────────────────────────────────────────────
+    function _progresso() { return comidas / TOTAL_SEMENTES; }
+    function _sorteio(min, max, fator) { return (min + Math.random() * (max - min)) * fator; }
+    function _perigo() { return chefe === 'olhando' || chefe === 'pegou'; }
+
+    function _agendarChefe(ms, fn) {
+      if (timerChefe) clearTimeout(timerChefe);
+      timerChefe = setTimeout(function () { timerChefe = null; if (!acabou) fn(); }, ms);
     }
-    function _alternarOlho() {
-      olhoAberto = !olhoAberto;
-      if (elOlhoWrap) elOlhoWrap.classList.toggle('ev-olho-aberto', olhoAberto);
-      if (elOlhoEmoji) elOlhoEmoji.textContent = olhoAberto ? '👁️' : '😌';
-      if (elOlhoImg) elOlhoImg.src = olhoAberto
-        ? '/Jogos/assets/ervilhas/olho-aberto.webp'
-        : '/Jogos/assets/ervilhas/olho-fechado.webp';
-      if (olhoAberto) {
-        _som('toque');
-        // Pegou alguém se mexendo no exato momento em que o olho abriu.
-        if (estado === 'espetando' || estado === 'engolindo') _flagrada();
-      }
+    function _virarPagina() {
+      // Enfeite enquanto lê: vira a página ou boceja de vez em quando.
+      if (timerPagina) clearTimeout(timerPagina);
+      timerPagina = setTimeout(function () {
+        timerPagina = null;
+        if (acabou || chefe !== 'lendo') return;
+        var q = Math.random() < 0.25 ? Q.BOCEJO : Q.PAGINA;
+        _quadroChefe(q);
+        timerPagina = setTimeout(function () {
+          timerPagina = null;
+          if (!acabou && chefe === 'lendo') { _quadroChefe(Q.LENDO); _virarPagina(); }
+        }, q === Q.BOCEJO ? 700 : 450);
+      }, 700 + Math.random() * 1400);
     }
-
-    // ── Interação: toque 1 espeta, toque 2 engole ──────────────────
-    function _aoTocar(ev) {
-      if (ev) ev.preventDefault();
-      if (acabou || estado === 'assustada') return;
-
-      if (estado === 'esperando') {
-        if (olhoAberto) { _flagrada(); return; }
-        estado = 'espetando';
-        elOwlWrap.classList.add('ev-bicando');
-        if (elInstrucao) elInstrucao.style.display = 'none';
-        _som('toque');
-        timerAnimacao = setTimeout(function () {
-          if (estado !== 'espetando') return; // já foi flagrado nesse meio tempo
-          estado = 'segurando';
-          elOwlWrap.classList.remove('ev-bicando');
-          elOwlWrap.classList.add('ev-segurando-semente');
-        }, ESPETAR_MS);
-        return;
-      }
-
-      if (estado === 'segurando') {
-        if (olhoAberto) { _flagrada(); return; }
-        estado = 'engolindo';
-        elOwlWrap.classList.remove('ev-segurando-semente');
-        elOwlWrap.classList.add('ev-engolindo');
-        timerAnimacao = setTimeout(function () {
-          if (estado !== 'engolindo') return; // já foi flagrado nesse meio tempo
-          _semenComida();
-        }, ENGOLIR_MS);
-        return;
-      }
-      // estado === 'espetando' ou 'engolindo': ignora toque extra (já em movimento).
+    function _lendo() {
+      chefe = 'lendo';
+      _quadroChefe(Q.LENDO);
+      elRoot.classList.remove('ev-perigo', 'ev-alerta');
+      _virarPagina();
+      var p = _progresso();
+      _agendarChefe(_sorteio(LENDO_MIN, LENDO_MAX, 1 - p * 0.35), _aviso);
+    }
+    function _aviso() {
+      chefe = 'aviso';
+      if (timerPagina) { clearTimeout(timerPagina); timerPagina = null; }
+      _quadroChefe(Math.random() < 0.35 ? Q.OCULOS : Q.ESPIA);
+      elRoot.classList.add('ev-alerta');
+      _som('toque');
+      var p = _progresso();
+      var falso = Math.random() < CHANCE_ALARME_FALSO;
+      _agendarChefe(_sorteio(AVISO_MIN, AVISO_MAX, 1 - p * 0.3), falso ? _lendo : _olhando);
+    }
+    function _olhando() {
+      chefe = 'olhando';
+      _quadroChefe(Math.random() < 0.5 ? Q.QUEIXO : Q.ENCARA);
+      elRoot.classList.remove('ev-alerta');
+      elRoot.classList.add('ev-perigo');
+      // Pegou alguém no meio do movimento no instante em que olhou.
+      if (movendo) { _flagrada(); return; }
+      var p = _progresso();
+      _agendarChefe(_sorteio(OLHANDO_MIN, OLHANDO_MAX, 1 + p * 0.4), _lendo);
     }
 
-    function _semenComida() {
-      estado = 'esperando';
-      elOwlWrap.classList.remove('ev-engolindo');
-      sementesRestantes = Math.max(0, sementesRestantes - 1);
-      if (elRestantes) elRestantes.textContent = sementesRestantes;
-      _removerUmaSemente();
-      elOwlWrap.classList.remove('ev-pop'); void elOwlWrap.offsetWidth; elOwlWrap.classList.add('ev-pop');
-      _som('acerto');
-      _vibrar(20);
-      if (sementesRestantes <= 0) { _finalizar(); return; }
+    // ── Ações ─────────────────────────────────────────────────────
+    function _espetar() {
+      if (acabou || travada || movendo) return;
+      if (_perigo()) { _flagrada(); return; }
+      if (noPrato <= 0 || noGarfo >= GARFO_MAX) return;
+      if (elInstrucao) elInstrucao.style.display = 'none';
+      movendo = 'espetar';
+      _poseAsa(2);
+      _som('toque');
+      timerMov = setTimeout(function () {
+        timerMov = null;
+        if (movendo !== 'espetar') return;
+        movendo = null;
+        noPrato--; noGarfo++;
+        _tirarErvilhaPrato();
+        _poseAsa(1);
+        _atualizarHud();
+      }, ESPETAR_MS);
     }
-
+    function _comer() {
+      if (acabou || travada || movendo) return;
+      if (_perigo()) { _flagrada(); return; }
+      if (noGarfo <= 0) return;
+      movendo = 'comer';
+      _poseAsa(3);
+      timerMov = setTimeout(function () {
+        timerMov = null;
+        if (movendo !== 'comer') return;
+        movendo = null;
+        comidas += noGarfo;
+        var n = noGarfo;
+        noGarfo = 0;
+        _poseAsa(1);
+        _atualizarHud();
+        elAsa.classList.remove('ev-nham'); void elAsa.offsetWidth; elAsa.classList.add('ev-nham');
+        _som(n >= 3 ? 'bonus' : 'acerto');
+        _vibrar(n >= 3 ? [20, 30, 20] : 20);
+        if (n >= GARFO_MAX) _balao('Garfada cheia! +' + n, 900);
+        if (comidas >= TOTAL_SEMENTES) _finalizar();
+      }, COMER_MS);
+    }
     function _flagrada() {
-      if (estado === 'assustada') return;
-      if (timerAnimacao) { clearTimeout(timerAnimacao); timerAnimacao = null; }
-      estado = 'assustada';
-      elOwlWrap.classList.remove('ev-bicando', 'ev-segurando-semente', 'ev-engolindo');
-      elOwlWrap.classList.add('ev-flagrado');
-      if (elAvisoFlagra) { elAvisoFlagra.style.display = 'block'; elAvisoFlagra.classList.remove('ev-aviso-anim'); void elAvisoFlagra.offsetWidth; elAvisoFlagra.classList.add('ev-aviso-anim'); }
+      if (travada || acabou) return;
+      if (timerMov) { clearTimeout(timerMov); timerMov = null; }
+      movendo = null;
+      travada = true;
+      // As ervilhas do garfo voltam pro prato.
+      var devolver = noGarfo;
+      noGarfo = 0;
+      noPrato += devolver;
+      for (var i = 0; i < devolver; i++) _addErvilhaPrato();
+      _poseAsa(1);
+      _atualizarHud();
+      // A Chefe aponta e dá bronca; depois volta a ler.
+      chefe = 'pegou';
+      if (timerPagina) { clearTimeout(timerPagina); timerPagina = null; }
+      _quadroChefe(Q.PEGOU);
+      _balao(devolver ? 'Te peguei! Devolve essas ervilhas!' : 'Te peguei!', 1100);
+      elRoot.classList.remove('ev-sacode'); void elRoot.offsetWidth; elRoot.classList.add('ev-sacode');
+      if (elFlash) { elFlash.classList.remove('on'); void elFlash.offsetWidth; elFlash.classList.add('on'); }
       _som('dano');
       _vibrar([50, 70, 50]);
-      timerAssustada = setTimeout(function () {
-        estado = 'esperando';
-        elOwlWrap.classList.remove('ev-flagrado');
-        if (elAvisoFlagra) elAvisoFlagra.style.display = 'none';
-      }, ASSUSTADA_MS);
+      _agendarChefe(PEGOU_MS, _lendo);
+      timerTravada = setTimeout(function () { timerTravada = null; travada = false; _atualizarHud(); }, ASSUSTADA_MS);
     }
 
-    elArena.addEventListener('pointerdown', _aoTocar);
+    function _toque(fn) { return function (ev) { if (ev) ev.preventDefault(); fn(); }; }
+    var _aoEspetar = _toque(_espetar), _aoComer = _toque(_comer);
+    // Tela cheia cobre o "Voltar" do Party: este ✕ faz o mesmo caminho.
+    var elSair = $('ev-sair');
+    if (elSair) elSair.addEventListener('click', function () {
+      if (typeof window._voltarAoMenu === 'function') window._voltarAoMenu();
+    });
+    elBtnEspetar.addEventListener('pointerdown', _aoEspetar);
+    elBtnComer.addEventListener('pointerdown', _aoComer);
+    // Teclado (desktop): ← / A espetar, → / D / espaço comer.
+    function _aoTecla(ev) {
+      if (acabou) return;
+      var k = ev.key;
+      if (k === 'ArrowLeft' || k === 'a' || k === 'A') { ev.preventDefault(); _espetar(); }
+      else if (k === 'ArrowRight' || k === 'd' || k === 'D' || k === ' ') { ev.preventDefault(); _comer(); }
+    }
+    document.addEventListener('keydown', _aoTecla);
+    // Tamanho da asa depende da altura da tela: refaz em resize/rotação.
+    function _aoResize() { _poseAsa(poseAsa); }
+    window.addEventListener('resize', _aoResize);
 
-    timerRodada = setInterval(function () {
-      tempoRestante--;
-      if (elTempo) elTempo.textContent = Math.max(0, tempoRestante);
-      if (tempoRestante <= 0) _finalizar();
-    }, 1000);
+    // ── Relógio da rodada ─────────────────────────────────────────
+    function _ligarRelogioRodada() {
+      timerRodada = setInterval(function () {
+        tempoRestante--;
+        if (elTempo) elTempo.textContent = Math.max(0, tempoRestante);
+        if (tempoRestante <= 5 && elRoot) elRoot.classList.add('ev-fim-perto');
+        if (tempoRestante <= 0) _finalizar();
+      }, 1000);
+    }
+    _ligarRelogioRodada();
+
+    // Fix A2.11: sem isto, o relógio da rodada seguia contando em segundo
+    // plano e a rodada terminava (reportando o placar) sem o jogador ver.
+    // Pausa enquanto oculto e retoma de onde parou ao voltar.
+    function _aoVisibilidade() {
+      if (acabou) return;
+      if (document.hidden) {
+        if (timerRodada) { clearInterval(timerRodada); timerRodada = null; }
+      } else if (!timerRodada) {
+        _ligarRelogioRodada();
+      }
+    }
+    document.addEventListener('visibilitychange', _aoVisibilidade);
 
     function _limpar() {
       if (timerRodada) { clearInterval(timerRodada); timerRodada = null; }
-      if (timerOlho) { clearTimeout(timerOlho); timerOlho = null; }
-      if (timerAnimacao) { clearTimeout(timerAnimacao); timerAnimacao = null; }
-      if (timerAssustada) { clearTimeout(timerAssustada); timerAssustada = null; }
-      elArena.removeEventListener('pointerdown', _aoTocar);
+      if (timerChefe) { clearTimeout(timerChefe); timerChefe = null; }
+      if (timerPagina) { clearTimeout(timerPagina); timerPagina = null; }
+      if (timerMov) { clearTimeout(timerMov); timerMov = null; }
+      if (timerTravada) { clearTimeout(timerTravada); timerTravada = null; }
+      document.removeEventListener('visibilitychange', _aoVisibilidade);
+      document.removeEventListener('keydown', _aoTecla);
+      window.removeEventListener('resize', _aoResize);
+      elBtnEspetar.removeEventListener('pointerdown', _aoEspetar);
+      elBtnComer.removeEventListener('pointerdown', _aoComer);
       if (_pararAtual === _pararExterno) _pararAtual = null;
     }
 
@@ -254,21 +415,21 @@
       if (acabou) return;
       acabou = true;
       _limpar();
-
-      var comidas = TOTAL_SEMENTES - sementesRestantes;
-      var esvaziou = sementesRestantes <= 0;
-      var tempoRestanteMs = Math.max(0, duracaoMs - (Date.now() - inicioEm));
-      var bonusTempo = esvaziou ? Math.round(tempoRestanteMs / BONUS_TEMPO_DIVISOR) : 0;
+      var esvaziou = comidas >= TOTAL_SEMENTES;
+      var bonusTempo = esvaziou ? Math.round((Math.max(0, tempoRestante) * 1000) / BONUS_TEMPO_DIVISOR) : 0;
       var score = comidas * PONTOS_POR_SEMENTE + bonusTempo;
-
+      _quadroChefe(esvaziou ? Q.FIM : Q.ENCARA);
+      elRoot.classList.remove('ev-perigo', 'ev-alerta');
+      _balao(esvaziou ? 'Prato limpo! Muito bem.' : 'Acabou o tempo!', 0);
+      _atualizarHud();
       _som('fim', [esvaziou]);
       onFim(score);
     }
 
     // Chamado de fora (party.js) quando a rodada é abandonada antes do
-    // tempo — não reporta placar nenhum, só limpa (ver A2.2). Sem isto o
-    // _agendarOlho ficaria se reagendando pra sempre (acabou nunca vira
-    // true) mesmo depois de sair da rodada.
+    // tempo — não reporta placar nenhum, só limpa (ver A2.2). Sem isto a
+    // cadeia da Chefe ficaria se reagendando pra sempre (acabou nunca
+    // vira true) mesmo depois de sair da rodada.
     function _pararExterno() {
       if (acabou) return;
       acabou = true;
@@ -276,7 +437,9 @@
     }
     _pararAtual = _pararExterno;
 
-    _agendarOlho();
+    _poseAsa(1);
+    _atualizarHud();
+    _lendo();
   }
 
   function parar() {

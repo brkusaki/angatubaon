@@ -83,6 +83,57 @@
     return reg;
   }
 
+  /* ── Animação de voo da Corujinha ────────────────────────────────
+     Spritesheet horizontal de 9 frames (coruja_voo_sheet.png), células
+     160×136; âncora de cada célula: x=80 (centro do corpo) e y=130 (linha
+     dos pés). Frames: 1 em pé · 2 agachar · 3 pulo (asas fechadas) ·
+     4 asas abrindo · 5 asas abertas · 6 meio do bater · 7 asas fechando ·
+     8 pouso · 9 em pé. Opcional como os demais assets: se o PNG não
+     carregar (ou skin tingida sem ctx.filter), desenha a imagem única de
+     antes (owl-flying.webp) — física e colisão não dependem dele. ── */
+  var _VOO_SHEET = 'coruja_voo_sheet.png';
+  var _VOO_SH_CW = 160, _VOO_SH_CH = 136, _VOO_SH_AX = 80, _VOO_SH_AY = 130;
+  var _VOO_SH_CORPOH = 118;      // altura pés→topo do frame "em pé" (escala = _vooOwlH / isto)
+  var _VOO_ANIM_MS = [100, 60, 80, 60, 110, 80, 80, 100, 160];   // ms de cada frame
+  var _VOO_ANIM_SEQ = {
+    parado:  { f: [0],          loop: true },                    // em pé
+    impulso: { f: [1, 2],       prox: 'voo' },                   // agachar → pulo
+    voo:     { f: [3, 4, 5, 6], loop: true },                    // abrindo → abertas → meio → fechando
+    pouso:   { f: [7, 8],       prox: 'parado' }                 // pouso → em pé
+  };
+  var _vooAnimSeq = 'parado', _vooAnimK = 0, _vooAnimT = 0;
+
+  function _vooAnimTocar(nome) { _vooAnimSeq = nome; _vooAnimK = 0; _vooAnimT = 0; }
+  function _vooAnimFrame() { return _VOO_ANIM_SEQ[_vooAnimSeq].f[_vooAnimK]; }
+  function _vooAnimAvancar(dt) {                 // dt em segundos
+    _vooAnimT += Math.min(dt, 0.1) * 1000;
+    for (;;) {
+      var sq = _VOO_ANIM_SEQ[_vooAnimSeq];
+      if (sq.f.length === 1) { _vooAnimT = 0; return; }
+      var dur = _VOO_ANIM_MS[sq.f[_vooAnimK]];
+      if (_vooAnimT < dur) return;
+      _vooAnimT -= dur;
+      if (++_vooAnimK >= sq.f.length) {
+        if (sq.loop) _vooAnimK = 0;
+        else { _vooAnimSeq = sq.prox; _vooAnimK = 0; }
+      }
+    }
+  }
+
+  // Desenha a coruja (já transladada pro centro, com rotação/squash/espelho
+  // aplicados pelo chamador): frame atual do spritesheet com os PÉS na
+  // base da caixa de colisão (+oh/2); sem sheet, a imagem única de antes.
+  function _vooDrawOwl(ctx, ow, oh) {
+    var reg = _vooAsset(_VOO_SHEET);
+    if (reg.ok && reg.w >= _VOO_SH_CW * 9) {
+      var e = oh / _VOO_SH_CORPOH;
+      ctx.drawImage(reg.img, _vooAnimFrame() * _VOO_SH_CW, 0, _VOO_SH_CW, _VOO_SH_CH,
+        -_VOO_SH_AX * e, oh / 2 - _VOO_SH_AY * e, _VOO_SH_CW * e, _VOO_SH_CH * e);
+    } else {
+      ctx.drawImage(_vooImg, -ow / 2, -oh / 2, ow, oh);
+    }
+  }
+
   // Sprites do burst de partículas do efeitos.js (faíscas no trampolim,
   // confete de recorde) — mesmo pool usado em Blocos/Doces/Corrida.
   // Carregados uma vez em _vooPreparar via efeitos.carregarSprites (pela
@@ -416,6 +467,7 @@
       };
       _vooImg.onerror = function () { _vooImgOk = false; };
       _vooImg.src = _VOO_OWL_SRC;
+      _vooAsset(_VOO_SHEET);
     } catch (e) { _vooImg = null; _vooImgOk = false; }
   }
 
@@ -582,6 +634,7 @@
       vx: 0, vy: _vooJump() * 0.6,   // já sobe um pouquinho no começo
       dir: 1                          // 1 direita, -1 esquerda (p/ espelhar)
     };
+    _vooAnimTocar('impulso');
 
     // Sobe as plataformas iniciais (mesma proteção do _vooGerarAcima:
     // nunca duas não-normais seguidas; encurta gap após não-normal).
@@ -823,6 +876,7 @@
           o.y = pl.y - owlH / 2;           // encosta em cima
           // Feedback: achata no impacto e dispara som (mola no trampolim).
           _vooSquash = pl.boost ? -0.42 : -0.26;
+          _vooAnimTocar('impulso');
           if (window.AngatubaGames && window.AngatubaGames.som) {
             if (pl.boost) window.AngatubaGames.som.mola();
             else          window.AngatubaGames.som.pulo();
@@ -849,6 +903,16 @@
         }
       }
     }
+
+    // Animação da coruja: avança o relógio e decide o próximo trecho pela
+    // velocidade vertical. Caindo (vy entre 20% e 90% do pulo) → pouso
+    // (8→9) chega em pé no contato — espera o bater de asas chegar nos
+    // frames 6/7 (asas pra baixo) pra não "piscar" asas abertas antes de
+    // pousar; queda longa (≥90%) → volta a bater asa.
+    _vooAnimAvancar(dt);
+    var _vj = -_vooJump();
+    if (_vooAnimSeq === 'voo' && o.vy > 0.2 * _vj && o.vy < 0.9 * _vj && (_vooAnimK >= 2 || o.vy > 0.5 * _vj)) _vooAnimTocar('pouso');
+    else if (_vooAnimSeq === 'parado' && o.vy >= 0.9 * _vj) _vooAnimTocar('voo');
 
     // Direção pra espelhar sprite
     if (o.vx > 2) o.dir = 1; else if (o.vx < -2) o.dir = -1;
@@ -1322,7 +1386,7 @@
             : _vooSkinFiltro;
         }
         if (_vooSkinPixelado) ctx.imageSmoothingEnabled = false;
-        try { ctx.drawImage(_vooImg, -ow / 2, -oh / 2, ow, oh); }
+        try { _vooDrawOwl(ctx, ow, oh); }
         catch (e) { _vooDrawFallback(ctx, ow); }
         if (_vooSkinFiltro) ctx.filter = filtroAntes;
         if (_vooSkinPixelado) ctx.imageSmoothingEnabled = suavAntes;

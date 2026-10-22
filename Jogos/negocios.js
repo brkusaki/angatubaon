@@ -1306,6 +1306,24 @@
     delegacia: '🚓', vadelegacia: '🚨', livre: '🅿️', estacao: '🚌', utilidade: '💡'
   };
 
+  // Ícone em arte (Jogos/assets/negocios/ic-<nome>.webp) pra cada casa que
+  // tem emoji acima; o emoji fica de reserva se a imagem não carregar.
+  var ICONE_IMG = {
+    partida: 'partida', sorte: 'sorte', azar: 'azar', imposto: 'imposto', imposto_renda: 'imposto',
+    delegacia: 'delegacia', vadelegacia: 'vadelegacia', livre: 'livre', estacao: 'onibus', utilidade: 'luz'
+  };
+  function iconeImgDaCasa(casa) {
+    var n;
+    if (casa.id === 5 || casa.id === 35) n = 'estrada';
+    else if (casa.id === 15) n = 'trem';
+    else if (casa.id === 25) n = 'onibus';
+    else if (casa.id === 12) n = 'luz';
+    else if (casa.id === 28) n = 'agua';
+    else n = ICONE_IMG[casa.tipo];
+    return n ? '/Jogos/assets/negocios/ic-' + n + '.webp' : '';
+  }
+  UI.iconeImgDaCasa = iconeImgDaCasa;
+
   function iconeDaCasa(casa) {
     if (casa.id === 5 || casa.id === 35) return '🛣️';
     if (casa.id === 15) return '🚂';
@@ -1472,7 +1490,19 @@
 
       var miolo = [];
       var ico = iconeDaCasa(casa);
-      if (ico && !casa.preco) miolo.push(el('div', { class: 'icone', texto: ico }));
+      if (ico && !casa.preco) {
+        var icoSrc = iconeImgDaCasa(casa);
+        var icoEl = el('div', { class: 'icone' + (icoSrc ? ' icone-img' : ''), texto: icoSrc ? '' : ico });
+        if (icoSrc) {
+          var icoImg = el('img', { src: icoSrc, alt: '', draggable: 'false' });
+          icoImg.addEventListener('error', function () {
+            icoEl.classList.remove(cls('icone-img'));
+            icoEl.textContent = ico;
+          });
+          icoEl.appendChild(icoImg);
+        }
+        miolo.push(icoEl);
+      }
       miolo.push(el('div', { class: 'sigla', texto: sigla(casa.curto) }));
       miolo.push(el('div', { class: 'curto', texto: casa.curto }));
       if (casa.preco) miolo.push(el('div', { class: 'preco', texto: casa.preco }));

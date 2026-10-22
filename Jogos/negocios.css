@@ -453,6 +453,9 @@
   font-variant-numeric: tabular-nums;
 }
 #jogo-negocios .ndc-casa .ndc-icone { font-size: 3.6cqw; line-height: 1; }
+/* Ícone em arte (ic-*.webp): ocupa o mesmo espaço do emoji (1em × 1em),
+   então herda todos os font-size dos layouts abaixo sem regra nova. */
+#jogo-negocios .ndc-casa .ndc-icone.ndc-icone-img img { display: block; width: 1.25em; height: 1.25em; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
 
 /* Cantos: no tabuleiro compacto o ícone diz tudo (🏁 🚓 🅿️ 🚨) e o nome
    não caberia legível. O nome volta no modo ampliado e no desktop. */
@@ -567,7 +570,12 @@
 #jogo-negocios .ndc-centro {
   grid-column: 2 / 11;
   grid-row: 2 / 11;
-  background: radial-gradient(120% 120% at 50% 0%, #17223f 0%, #0b1222 100%);
+  /* Praça de Angatuba ao fundo, escurecida no meio pra os dados e o
+     texto continuarem legíveis. */
+  background:
+    radial-gradient(70% 60% at 50% 50%, rgba(11,18,34,.72) 0%, rgba(11,18,34,.35) 70%, rgba(11,18,34,.15) 100%),
+    url('/Jogos/assets/negocios/centro-angatuba.webp') center / cover no-repeat,
+    radial-gradient(120% 120% at 50% 0%, #17223f 0%, #0b1222 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -585,6 +593,10 @@
   color: var(--ndc-txt3);
 }
 #jogo-negocios .ndc-centro .ndc-titulo-centro b { color: var(--ndc-acc); }
+/* Texto do miolo por cima da arte da praça: sombra pra continuar legível. */
+#jogo-negocios .ndc-centro .ndc-titulo-centro,
+#jogo-negocios .ndc-centro .ndc-msg,
+#jogo-negocios .ndc-centro .ndc-resultado { text-shadow: 0 1px 3px rgba(0,0,0,.95), 0 0 10px rgba(0,0,0,.7); }
 
 #jogo-negocios .ndc-dados {
   display: flex;

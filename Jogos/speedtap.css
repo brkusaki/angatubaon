@@ -41,9 +41,10 @@
 .st-arena {
   position: relative;
   height: 340px;
+  /* Floresta de noite ao fundo (escurecida pra as corujas saltarem à vista). */
   background:
-    radial-gradient(circle at 30% 20%, rgba(168,85,247,0.10), transparent 60%),
-    radial-gradient(circle at 70% 80%, rgba(245,158,11,0.10), transparent 60%),
+    linear-gradient(rgba(8,10,20,.45), rgba(8,10,20,.55)),
+    url('/Jogos/assets/speedtap/floresta.webp') center / cover no-repeat,
     var(--surface2);
   overflow: hidden;
   touch-action: manipulation;

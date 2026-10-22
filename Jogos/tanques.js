@@ -706,15 +706,15 @@
     // Tema floresta. chao-arena/parede-tijolo/parede-escombros/mato
     // continuam no disco, mas o código ativo não usa mais.
     _tqAsset('chao-floresta.webp');
-    _tqAsset('tank-azul.webp');
-    _tqAsset('tank-vermelho.webp');
-    _tqAsset('tronco-parede.webp');
-    _tqAsset('rocha-parede.webp');
-    _tqAsset('escombro-floresta.webp');
-    _tqAsset('parede-metal.webp');
-    _tqAsset('barril.webp');
-    _tqAsset('arbusto-1.webp');
-    _tqAsset('arbusto-2.webp');
+    _tqAsset('tank-azul-v2.webp');
+    _tqAsset('tank-vermelho-v2.webp');
+    _tqAsset('tronco-parede-v2.webp');
+    _tqAsset('rocha-parede-v2.webp');
+    _tqAsset('escombro-floresta-v2.webp');
+    _tqAsset('parede-metal-v2.webp');
+    _tqAsset('barril-v2.webp');
+    _tqAsset('arbusto-1-v2.webp');
+    _tqAsset('arbusto-2-v2.webp');
     _tqAsset('arvore-1.webp');
     _tqAsset('arvore-2.webp');
     // Pede ao sistema pra girar pra landscape (instalado/fullscreen);
@@ -3145,8 +3145,8 @@
       // em _tqSimularMundo).
       var anfitriaoVisivel = _tqSouAnfitriao || !_tqEscondidoAnfitriao;
       var convidadoVisivel = !_tqSouAnfitriao || !_tqEscondidoConvidado;
-      if (anfitriaoVisivel) _tqDesenharTanque(_tqTanqueAnfitriao, 'tank-azul.webp', TQ_COR_ANFITRIAO, _tqRecuoAnfitriao, _tqEscudoAnfitriao);
-      if (convidadoVisivel) _tqDesenharTanque(_tqTanqueConvidado, 'tank-vermelho.webp', TQ_COR_CONVIDADO, _tqRecuoConvidado, _tqEscudoConvidado);
+      if (anfitriaoVisivel) _tqDesenharTanque(_tqTanqueAnfitriao, 'tank-azul-v2.webp', TQ_COR_ANFITRIAO, _tqRecuoAnfitriao, _tqEscudoAnfitriao);
+      if (convidadoVisivel) _tqDesenharTanque(_tqTanqueConvidado, 'tank-vermelho-v2.webp', TQ_COR_CONVIDADO, _tqRecuoConvidado, _tqEscudoConvidado);
       // Batata Quente: ícone só sobre um tanque que já foi desenhado
       // acima (senão entregaria a posição de um tanque escondido).
       if (_tqModoJogo === 'batata') {
@@ -3321,7 +3321,7 @@
     if (!moitas.length) return;
     var ctx = _tqCtx;
     // PLACEHOLDER pixel — substituir por asset Gemini do user
-    var regs = [_tqAsset('arbusto-1.webp'), _tqAsset('arbusto-2.webp')];
+    var regs = [_tqAsset('arbusto-1-v2.webp'), _tqAsset('arbusto-2-v2.webp')];
     ctx.save();
     ctx.fillStyle = 'rgba(46,125,50,0.55)';
     ctx.strokeStyle = 'rgba(27,79,31,0.65)';
@@ -3355,10 +3355,10 @@
   function _tqDesenharParedes() {
     var ctx = _tqCtx;
     // PLACEHOLDER pixel — substituir por asset Gemini do user
-    var regTronco = _tqAsset('tronco-parede.webp');
-    var regRocha = _tqAsset('rocha-parede.webp');
-    var regEscombro = _tqAsset('escombro-floresta.webp');
-    var regMetal = _tqAsset('parede-metal.webp');
+    var regTronco = _tqAsset('tronco-parede-v2.webp');
+    var regRocha = _tqAsset('rocha-parede-v2.webp');
+    var regEscombro = _tqAsset('escombro-floresta-v2.webp');
+    var regMetal = _tqAsset('parede-metal-v2.webp');
     for (var i = 0; i < _tqParedes.length; i++) {
       var p = _tqParedes[i];
       var px = p.x * _tqH, py = p.y * _tqH, pw = p.w * _tqH, ph = p.h * _tqH;
@@ -3427,7 +3427,7 @@
     var ctx = _tqCtx;
     var r = TQ_BARRIL_RAIO * _tqH;
     // PLACEHOLDER pixel — substituir por asset Gemini do user
-    var reg = _tqAsset('barril.webp');
+    var reg = _tqAsset('barril-v2.webp');
     for (var i = 0; i < _tqBarris.length; i++) {
       var b = _tqBarris[i];
       if (b.destruido) continue;
@@ -3506,7 +3506,7 @@
   // os dois tanques têm o cano apontando pra cima na imagem-fonte,
   // então giram em torno do CENTRO DO CASCO (não do centro da
   // imagem, que inclui o cano saindo pra cima de forma assimétrica).
-  var TQ_PIVO_Y = 0.63;
+  var TQ_PIVO_Y = 0.62;
   function _tqDesenharTanque(t, arquivo, corFallback, recuo, comEscudo) {
     var ctx = _tqCtx;
     var reg = _tqAsset(arquivo);

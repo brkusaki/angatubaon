@@ -1359,18 +1359,18 @@
     ],
     tanques: [
       '/Jogos/tanques.min.js', '/Jogos/tanques.css', '/Jogos/multiplayer.min.js',
-      '/Jogos/assets/tanques/arbusto-1.webp',
-      '/Jogos/assets/tanques/arbusto-2.webp',
+      '/Jogos/assets/tanques/arbusto-1-v2.webp',
+      '/Jogos/assets/tanques/arbusto-2-v2.webp',
       '/Jogos/assets/tanques/arvore-1.webp',
       '/Jogos/assets/tanques/arvore-2.webp',
-      '/Jogos/assets/tanques/barril.webp',
+      '/Jogos/assets/tanques/barril-v2.webp',
       '/Jogos/assets/tanques/chao-floresta.webp',
-      '/Jogos/assets/tanques/escombro-floresta.webp',
-      '/Jogos/assets/tanques/parede-metal.webp',
-      '/Jogos/assets/tanques/rocha-parede.webp',
-      '/Jogos/assets/tanques/tronco-parede.webp',
-      '/Jogos/assets/tanques/tank-azul.webp',
-      '/Jogos/assets/tanques/tank-vermelho.webp'
+      '/Jogos/assets/tanques/escombro-floresta-v2.webp',
+      '/Jogos/assets/tanques/parede-metal-v2.webp',
+      '/Jogos/assets/tanques/rocha-parede-v2.webp',
+      '/Jogos/assets/tanques/tronco-parede-v2.webp',
+      '/Jogos/assets/tanques/tank-azul-v2.webp',
+      '/Jogos/assets/tanques/tank-vermelho-v2.webp'
     ],
     pingpong: [
       '/Jogos/pingpong.min.js', '/Jogos/pingpong.css', '/Jogos/multiplayer.min.js',
@@ -3718,7 +3718,7 @@
     if (jogo === 'tanques') {
       // O próprio sprite do tanque, com a tinta da skin por cima (mesmo
       // "source-atop" do jogo, aqui via máscara CSS).
-      var tk = '/Jogos/assets/tanques/tank-azul.webp';
+      var tk = '/Jogos/assets/tanques/tank-azul-v2.webp';
       return '<span class="ljm ljm-tq" aria-hidden="true"><img src="' + tk + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' +
         (item.tinta ? '<i style="background:' + _rankEsc(item.tinta) + ';-webkit-mask-image:url(' + tk + ');mask-image:url(' + tk + ')"></i>' : '') + '</span>';
     }

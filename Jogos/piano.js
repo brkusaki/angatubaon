@@ -415,6 +415,18 @@
   // equipado muda (evento 'angatuba:equipado').
   var _PN_SKIN_CLASSICA = { tecla: '#e3354f', tocada: '33,166,123', onda: '#8ffdd6', fundo: '#0d1420' };
   var _pnSkin = _PN_SKIN_CLASSICA;
+  // Fundo: sala de concerto (opcional — sem a imagem, fica a cor do tema).
+  // Escurecida por cima pra os azulejos continuarem saltando à vista.
+  var _PN_FUNDO_SRC = '/Jogos/assets/piano/sala-concerto.webp';
+  var _pnFundoImg = null, _pnFundoOk = false;
+  function _pnCarregarFundo() {
+    if (_pnFundoImg) return;
+    try {
+      _pnFundoImg = new Image();
+      _pnFundoImg.onload = function () { _pnFundoOk = true; };
+      _pnFundoImg.src = _PN_FUNDO_SRC;
+    } catch (e) { _pnFundoImg = null; }
+  }
   function _pnAplicarSkin() {
     var G = window.AngatubaGames, it = null;
     try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('piano_tema') : null; } catch (e) {}
@@ -720,6 +732,14 @@
     // Fundo + trilhos das colunas
     ctx.fillStyle = _pnSkin.fundo;
     ctx.fillRect(0, 0, W, H);
+    if (_pnFundoOk) {
+      // "cover": preenche a tela inteira sem distorcer.
+      var fi = _pnFundoImg, fs = Math.max(W / fi.naturalWidth, H / fi.naturalHeight);
+      var fw = fi.naturalWidth * fs, fh = fi.naturalHeight * fs;
+      ctx.drawImage(fi, (W - fw) / 2, (H - fh) / 2, fw, fh);
+      ctx.fillStyle = 'rgba(6,9,18,0.55)';
+      ctx.fillRect(0, 0, W, H);
+    }
     // Tela larga: escurece as laterais fora do campo pra marcar a pista
     if (x0 > 1) {
       ctx.fillStyle = 'rgba(0,0,0,0.28)';
@@ -762,6 +782,10 @@
         // por frame; agora é o tom médio fixo, sem alocação.
         ctx.fillStyle = _pnSkin.tecla;
         _pnRoundRect(ctx, bx, by, bw, bh, raio); ctx.fill();
+        // Brilho de tecla envernizada (faixa clara no topo, cor sólida —
+        // sem gradiente por frame, pelo mesmo motivo de cima).
+        ctx.fillStyle = 'rgba(255,255,255,0.16)';
+        _pnRoundRect(ctx, bx + bw * 0.06, by + bh * 0.06, bw * 0.88, bh * 0.30, raio * 0.8); ctx.fill();
         if (az === alvo) {
           ctx.strokeStyle = 'rgba(255,255,255,0.85)';
           ctx.lineWidth = Math.max(2, cw * 0.022);
@@ -1398,6 +1422,7 @@
 
   /* ── Ciclo de vida ────────────────────────────────────────────── */
   function _pnPreparar() {
+    _pnCarregarFundo();
     _pnCanvas = document.getElementById('pn-canvas');
     if (!_pnCanvas) return;
     _pnCtx = _pnCanvas.getContext('2d');

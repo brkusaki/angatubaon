@@ -56,7 +56,17 @@
   var FOLGA_MS    = 1800;    // o anfitrião espera um pouco além do prazo (rede)
   var REVELAR_MS  = 3900;    // duração da revelação antes do próximo round
   var FIM_MS      = 7500;    // tela de fim dentro da arena antes do pódio da Party
-  var CORES       = ['#ec4899', '#22d3ee', '#f59e0b', '#a3e635'];
+  var CORES       = ['#ef4444', '#3b82f6', '#facc15', '#22c55e'];
+  // Arte (fichas da Coruja, casas de pedra, mira). Sem a imagem carregada,
+  // o desenho cai no vetor antigo (círculo + inicial / hexágono liso).
+  var _HX_DIR = '/Jogos/assets/hexarena/';
+  var _HX_FICHAS = ['ficha-vermelha', 'ficha-azul', 'ficha-amarela', 'ficha-verde'];
+  var _hxImgs = {};
+  function _hxImg(nome) {
+    var im = _hxImgs[nome];
+    if (!im) { im = _hxImgs[nome] = new Image(); im.src = _HX_DIR + nome + '.webp'; }
+    return (im.complete && im.naturalWidth) ? im : null;
+  }
   var RODADAS_FINAIS = 3;    // rounds na arena final (raio 1) antes do empate
   // Moedas por colocação. Empate no 1º paga o valor do 2º (12): sem
   // isso, um grupo combinando de não se acertar tirava 20 cada partida.
@@ -272,7 +282,7 @@
         '</div>' +
         '<div class="hx-controles" id="hx-controles">' +
           '<div class="hx-seg" role="group" aria-label="O que tocar na arena">' +
-            '<button type="button" class="hx-seg-btn on" data-hx-modo="mover">👣 Mover</button>' +
+            '<button type="button" class="hx-seg-btn on" data-hx-modo="mover"><img class="hx-seg-ico" src="/Jogos/assets/hexarena/pegada.webp" alt=""> Mover</button>' +
             '<button type="button" class="hx-seg-btn" data-hx-modo="mirar">🎯 Mirar</button>' +
           '</div>' +
           '<button type="button" class="hx-confirmar" id="hx-confirmar" disabled>Confirmar</button>' +
@@ -380,6 +390,22 @@
         g.globalAlpha = 1;
         if (borda && revelando) { escala = 0.94 * (1 - queda); g.globalAlpha = 1 - queda; }
         if (escala <= 0.02) { g.globalAlpha = 1; return; }
+        var pedra = _hxImg(borda ? 'hex-rachado' : 'hex');
+        if (pedra) {
+          var sw = tam * escala * 2.04;
+          g.drawImage(pedra, p.x - sw / 2, p.y - sw * 0.46, sw, sw * 0.92);
+          _hexPath(p, tam * escala);
+          g.fillStyle = borda ? 'rgba(244,63,94,' + (0.14 + 0.16 * pulso) + ')'
+            : (reach[_chave(c)] ? 'rgba(139,92,246,.42)' : 'rgba(17,13,31,.30)');
+          g.fill();
+          if (borda || reach[_chave(c)]) {
+            g.lineWidth = borda ? 1.6 : 1.4;
+            g.strokeStyle = borda ? 'rgba(251,113,133,' + (0.45 + 0.4 * pulso) + ')' : 'rgba(196,181,253,.85)';
+            g.stroke();
+          }
+          g.globalAlpha = 1;
+          return;
+        }
         _hexPath(p, tam * escala);
         if (borda) {
           g.fillStyle = 'rgba(244,63,94,' + (0.18 + 0.14 * pulso) + ')';
@@ -419,6 +445,8 @@
           g.strokeStyle = _alpha(cor, 0.55 + 0.35 * pulso); g.lineWidth = Math.max(2, tam * 0.16);
           g.beginPath(); g.moveTo(alvo.x, alvo.y); g.lineTo(fimL.x, fimL.y); g.stroke();
           g.setLineDash([]);
+          var mira = lin.length ? _hxImg('alvo') : null;
+          if (mira) { var ms = tam * (1.25 + 0.12 * pulso); g.drawImage(mira, fimL.x - ms / 2, fimL.y - ms / 2, ms, ms); }
           _seta(alvo, sel.dir, cor);
         }
       }
@@ -489,6 +517,13 @@
       if (souEu) {
         g.beginPath(); g.arc(p.x, p.y, r + 4 + 2 * Math.sin(Date.now() / 200), 0, Math.PI * 2);
         g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 2; g.stroke();
+      }
+      var ficha = _hxImg(flash ? 'ficha-nocaute' : (_HX_FICHAS[(est && est.cores && est.cores[uid]) || 0] || _HX_FICHAS[0]));
+      if (ficha) {
+        var fs = r * 2.3;
+        g.drawImage(ficha, p.x - fs / 2, p.y - fs / 2, fs, fs);
+        g.restore();
+        return;
       }
       g.beginPath(); g.arc(p.x, p.y, r, 0, Math.PI * 2);
       g.fillStyle = flash ? '#ffffff' : cor; g.fill();

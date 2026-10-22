@@ -1374,7 +1374,8 @@
     ],
     pingpong: [
       '/Jogos/pingpong.min.js', '/Jogos/pingpong.css', '/Jogos/multiplayer.min.js',
-      '/Jogos/assets/pingpong/cenario-arena.webp'
+      '/Jogos/assets/pingpong/cenario-arena.webp',
+      '/Jogos/assets/pingpong/coruja-pp-sheet.webp'
     ],
     hoquei: [
       '/Jogos/hoquei.min.js', '/Jogos/hoquei.css', '/Jogos/multiplayer.min.js',

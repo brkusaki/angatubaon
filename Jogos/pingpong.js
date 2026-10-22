@@ -1167,18 +1167,25 @@
     ctx.clearRect(0, 0, _ppW, _ppH);
 
     _ppDesenharFundo();
-    _ppDesenharMesa();
 
     var jogando = (_ppEstado === 'jogando');
     var renderDBola = _ppSouAnfitriao ? _ppBola.d : (1 - _ppBola.d);
 
+    // Adversário: a coruja em pé atrás da mesa (desenhada ANTES do tampo,
+    // que cobre as pernas). Sem o sheet carregado, volta a raquete solta.
+    var comCoruja = _ppDesenharCorujaAdv(jogando, renderDBola);
+    _ppDesenharMesa();
+
     // Ordem de desenho por profundidade (a rede fica sempre em d=0.5):
     // a raquete do adversário é sempre mais longe que a rede, a minha
     // é sempre mais perto — só a bola muda de lado.
-    _ppDesenharRaquete(_ppRaqueteAdversarioX, _ppRaqueteAdversarioH, 1, '#ff5470');
-    if (jogando && renderDBola < 0.5) _ppDesenharBola(renderDBola);
+    if (!comCoruja) _ppDesenharRaquete(_ppRaqueteAdversarioX, _ppRaqueteAdversarioH, 1, '#ff5470');
+    // Coruja segurando a bola esperando pra sacar: a bola "de verdade"
+    // some até o saque sair (senão apareciam duas).
+    var bolaNaAsa = comCoruja && _ppCoruja.segurandoBola;
+    if (jogando && renderDBola < 0.5 && !bolaNaAsa) _ppDesenharBola(renderDBola);
     _ppDesenharRede();
-    if (jogando && renderDBola >= 0.5) _ppDesenharBola(renderDBola);
+    if (jogando && renderDBola >= 0.5 && !bolaNaAsa) _ppDesenharBola(renderDBola);
     _ppDesenharRaquete(_ppMinhaRaqueteX, _ppMinhaRaqueteH, 0, _ppCorRaquete);
 
     if (jogando && _ppAguardandoSaque) _ppDesenharPromptSaque();
@@ -1366,6 +1373,119 @@
       ctx.fill();
     }
     ctx.restore();
+  }
+
+  /* ── Coruja adversária (sheet coruja-pp-sheet.webp, 5×5 quadros) ──
+     Só visual: a física continua usando _ppRaqueteAdversarioX/H. A
+     coruja segue a raquete (a raquete do desenho fica à esquerda do
+     corpo, então o corpo vai um pouco à direita do ponto da raquete) e
+     escolhe o quadro pelo que está acontecendo, tudo deduzido aqui no
+     desenho — vale igual no solo, no anfitrião e no convidado:
+       - rebateu: a bola estava indo pra ela e passou a vir pra mim;
+       - ponto: o placar de um dos lados subiu;
+       - saque: está esperando o saque e não é a minha vez.
+     Entre os quadros: respiração, piscada, inclinação pela velocidade,
+     pulo quando a raquete sobe e amassadinha ao aterrissar. */
+  var PP_COR_COLS = 5, PP_COR_QW = 270, PP_COR_QH = 255, PP_COR_BASE = 244, PP_COR_PADX = 0.3;
+  var PP_COR_ANDAR = [2, 3, 5, 6], PP_COR_ANDAR_MS = 110;
+  var PP_COR_ACOES = {
+    direita: { q: [13, 11, 12], ms: [70, 90, 160] },        // bola do lado da raquete
+    esquerda: { q: [10, 8, 9], ms: [70, 90, 160] },         // bola do outro lado (revés)
+    saque: { q: [17, 18], ms: [160, 180] },
+    festa: { q: [19, 20, 21], ms: [160, 300, 1100], pulo: 1 },
+    triste: { q: [22, 23, 24], ms: [220, 300, 1000] }
+  };
+  var _ppCoruja = {
+    x: null, alvoAnt: null, vx: 0, ts: 0, acao: null, acaoT0: 0,
+    bolaD: null, bolaDir: 0, placarEu: -1, placarEla: -1,
+    saqueAnt: false, segurandoBola: false, noAr: 0, piscaEm: 0
+  };
+  function _ppCorujaQuadroAcao(agora) {
+    var a = _ppCoruja.acao && PP_COR_ACOES[_ppCoruja.acao];
+    if (!a) return -1;
+    var t = agora - _ppCoruja.acaoT0;
+    for (var i = 0; i < a.q.length; i++) { if (t < a.ms[i]) return i; t -= a.ms[i]; }
+    _ppCoruja.acao = null;
+    return -1;
+  }
+  function _ppDesenharCorujaAdv(jogando, renderDBola) {
+    var reg = _ppAsset('coruja-pp-sheet.webp');
+    if (!(reg && reg.ok && reg.img && reg.w)) return false;
+    var c = _ppCoruja, agora = performance.now();
+    var dt = c.ts ? Math.min(0.1, (agora - c.ts) / 1000) : 0;
+    c.ts = agora;
+
+    // Eventos (só durante a partida)
+    if (jogando) {
+      if (c.bolaD !== null && dt > 0) {
+        var dir = renderDBola > c.bolaD + 1e-4 ? 1 : (renderDBola < c.bolaD - 1e-4 ? -1 : 0);
+        if (c.bolaDir > 0 && dir < 0 && renderDBola > 0.7 && !_ppAguardandoSaque) {
+          c.acao = (_ppBola.x <= _ppRaqueteAdversarioX) ? 'direita' : 'esquerda'; c.acaoT0 = agora;
+        }
+        if (dir) c.bolaDir = dir;
+      }
+      c.bolaD = renderDBola;
+      var eu = _ppSouAnfitriao ? _ppSetsAnfitriao * 100 + _ppPlacarAnfitriao : _ppSetsConvidado * 100 + _ppPlacarConvidado;
+      var ela = _ppSouAnfitriao ? _ppSetsConvidado * 100 + _ppPlacarConvidado : _ppSetsAnfitriao * 100 + _ppPlacarAnfitriao;
+      if (c.placarEu >= 0 && ela > c.placarEla) { c.acao = 'festa'; c.acaoT0 = agora; }
+      else if (c.placarEu >= 0 && eu > c.placarEu) { c.acao = 'triste'; c.acaoT0 = agora; }
+      c.placarEu = eu; c.placarEla = ela;
+      var esperando = _ppAguardandoSaque && !_ppEhMinhaVezDeSacar();
+      if (c.saqueAnt && !esperando && !_ppAguardandoSaque) { c.acao = 'saque'; c.acaoT0 = agora; }
+      c.saqueAnt = esperando;
+      c.segurandoBola = esperando && !c.acao;
+    } else {
+      c.bolaD = null; c.placarEu = -1; c.segurandoBola = false; c.saqueAnt = false;
+    }
+
+    // Posição: segue a raquete com um deslize suave
+    var p = _ppProjetar(_ppRaqueteAdversarioX, 1, 0);
+    var esc = p.escala * 1.1;                     // um pouco maior que a raquete do jogo: lê melhor de longe
+    var qw = PP_COR_QW * esc, qh = PP_COR_QH * esc;
+    var alvo = p.x + qw * PP_COR_PADX;
+    if (c.x === null) c.x = alvo;
+    var antes = c.x;
+    c.x += (alvo - c.x) * Math.min(1, dt * 12);
+    var vx = dt > 0 ? (c.x - antes) / dt : 0;
+    c.vx += (vx - c.vx) * Math.min(1, dt * 10);
+
+    // Quadro
+    var iAcao = _ppCorujaQuadroAcao(agora), q = 0, lift = 0, sx = 1, sy = 1, rot = 0;
+    var alta = _ppRaqueteAdversarioH > 0.28;
+    if (iAcao >= 0) {
+      var def = PP_COR_ACOES[c.acao];
+      q = def.q[iAcao];
+      if (def.pulo === iAcao) lift = qh * 0.1 * Math.sin(Math.PI * Math.min(1, (agora - c.acaoT0 - def.ms[0]) / def.ms[1]));
+    } else if (c.segurandoBola) {
+      q = 16;
+    } else if (alta) {
+      q = 14; c.noAr = agora;
+      lift = Math.min(1, (_ppRaqueteAdversarioH - 0.28) / 0.3) * qh * 0.16;
+    } else if (c.noAr && agora - c.noAr < 160) {
+      q = 15; sy = 0.94; sx = 1.04;
+    } else if (Math.abs(c.vx) > 35) {
+      q = PP_COR_ANDAR[Math.floor(agora / PP_COR_ANDAR_MS) % PP_COR_ANDAR.length];
+      rot = Math.max(-0.1, Math.min(0.1, c.vx / 900));
+      lift = Math.abs(Math.sin(agora / PP_COR_ANDAR_MS * Math.PI / 2)) * qh * 0.02;
+    } else {
+      if (agora > c.piscaEm + 140) c.piscaEm = agora + 1800 + Math.random() * 2600;
+      q = (agora >= c.piscaEm && agora < c.piscaEm + 140) ? 1 : 0;
+      var resp = Math.sin(agora / 420);
+      sy = 1 + resp * 0.018; sx = 1 - resp * 0.012;
+    }
+
+    // Desenho: pés escondidos um pouco abaixo da borda de trás da mesa
+    var ctx = _ppCtx;
+    var sxq = (q % PP_COR_COLS) * PP_COR_QW, syq = Math.floor(q / PP_COR_COLS) * PP_COR_QH;
+    var pe = p.chaoY + qh * 0.14 - lift;
+    ctx.save();
+    ctx.translate(c.x, pe);
+    if (rot) ctx.rotate(rot);
+    ctx.scale(sx, sy);
+    ctx.drawImage(reg.img, sxq, syq, PP_COR_QW, PP_COR_QH,
+      -qw / 2, -PP_COR_BASE * esc, qw, qh);
+    ctx.restore();
+    return true;
   }
 
   // Aviso central quando a bola está parada esperando o saque — some

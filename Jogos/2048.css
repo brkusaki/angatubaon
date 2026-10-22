@@ -87,6 +87,22 @@
   transition: transform 90ms ease-out;
 }
 
+/* Evolução da Coruja (ver _t48AtualizarFace): a arte da fase ocupa a
+   peça e o número vai pra um selo no canto. Sem a classe t48-com-arte
+   (arte falhou), a img some e o número volta grande no meio. */
+.t48-tile-face { position: relative; overflow: hidden; }
+.t48-tile-arte { display: none; }
+.t48-com-arte .t48-tile-arte {
+  display: block; position: absolute; left: 8%; top: 6%; width: 84%; height: 78%;
+  object-fit: contain; object-position: 50% 100%;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25)); pointer-events: none;
+}
+.t48-com-arte .t48-tile-num {
+  position: absolute; right: 5%; bottom: 4%; line-height: 1;
+  padding: 0.12em 0.32em; border-radius: 0.5em;
+  background: rgba(0,0,0,0.38); color: #fff;
+}
+
 /* Paleta clássica do 2048, com um leve tom mais quente/coruja nos
    valores altos (âmbar → dourado) em vez do laranja-avermelhado
    original — combina com o resto do hub. */

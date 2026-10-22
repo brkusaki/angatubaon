@@ -1425,6 +1425,23 @@
       '/Jogos/assets/baralho/uno-mais2-G.webp',
       '/Jogos/assets/baralho/uno-mais2-Y.webp'
     ],
+    '2048': [
+      '/Jogos/2048.min.js', '/Jogos/2048.css',
+      // Evolução da Coruja: arte de cada peça + coruja do troféu
+      '/Jogos/assets/2048/evo-2.webp',
+      '/Jogos/assets/2048/evo-4.webp',
+      '/Jogos/assets/2048/evo-8.webp',
+      '/Jogos/assets/2048/evo-16.webp',
+      '/Jogos/assets/2048/evo-32.webp',
+      '/Jogos/assets/2048/evo-64.webp',
+      '/Jogos/assets/2048/evo-128.webp',
+      '/Jogos/assets/2048/evo-256.webp',
+      '/Jogos/assets/2048/evo-512.webp',
+      '/Jogos/assets/2048/evo-1024.webp',
+      '/Jogos/assets/2048/evo-2048.webp',
+      '/Jogos/assets/2048/evo-super.webp',
+      '/Jogos/assets/2048/coruja-trofeu.webp'
+    ],
     negocios: [
       '/Jogos/negocios.min.js', '/Jogos/negocios.css',
       '/Jogos/assets/negocios/dados-coruja-sheet-v2.webp',

@@ -139,6 +139,15 @@
     el.className = 't48-tile';
     var face = document.createElement('div');
     face.className = 't48-tile-face';
+    // Evolução da Coruja: arte da fase + número pequeno no canto. Se a
+    // arte falhar, _t48SemArte volta pro número grande de sempre.
+    var img = document.createElement('img');
+    img.className = 't48-tile-arte'; img.alt = ''; img.draggable = false;
+    img.addEventListener('error', function () { _t48SemArte = true; if (tile.faceEl) _t48AtualizarFace(tile, _t48Layout().cellPx); });
+    var num = document.createElement('span');
+    num.className = 't48-tile-num';
+    face.appendChild(img); face.appendChild(num);
+    tile.arteEl = img; tile.numEl = num;
     el.appendChild(face);
     _t48TilesEl.appendChild(el);
     tile.el = el;
@@ -150,13 +159,20 @@
   // genérico em vez de crescer a lista de cores pra sempre.
   function _t48AtualizarFace(tile, cellPx) {
     var v = tile.valor <= 2048 ? tile.valor : 'super';
-    tile.faceEl.className = 't48-tile-face t48-tile-v' + v;
-    tile.faceEl.textContent = tile.valor;
+    tile.faceEl.className = 't48-tile-face t48-tile-v' + v + (_t48SemArte ? '' : ' t48-com-arte');
+    tile.numEl.textContent = tile.valor;
+    if (!_t48SemArte) {
+      var src = '/Jogos/assets/2048/evo-' + v + '.webp';
+      if (tile.arteEl.getAttribute('src') !== src) tile.arteEl.setAttribute('src', src);
+    }
     _t48PintarFace(tile);
     var digitos = String(tile.valor).length;
-    var fonte = cellPx * (digitos <= 2 ? 0.42 : digitos === 3 ? 0.34 : digitos === 4 ? 0.27 : 0.22);
-    tile.faceEl.style.fontSize = Math.max(11, fonte) + 'px';
+    var fonte = _t48SemArte
+      ? cellPx * (digitos <= 2 ? 0.42 : digitos === 3 ? 0.34 : digitos === 4 ? 0.27 : 0.22)
+      : cellPx * (digitos <= 3 ? 0.2 : 0.17);
+    tile.faceEl.style.fontSize = Math.max(_t48SemArte ? 11 : 9, fonte) + 'px';
   }
+  var _t48SemArte = false;
 
   // Posiciona uma peça na grade (via transform:translate). Quando
   // `semTransicao` é true (peça recém-criada), desliga a transição
@@ -422,7 +438,7 @@
     var owl = document.getElementById('t48-fim-owl');
     var tit = document.getElementById('t48-fim-titulo');
     var msg = document.getElementById('t48-fim-msg');
-    if (owl) { owl.src = venceu ? '/webp/owl-celebrate-pro.webp' : '/webp/owl-angry.webp'; owl.style.display = ''; }
+    if (owl) { owl.src = venceu ? '/Jogos/assets/2048/coruja-trofeu.webp' : '/webp/owl-angry.webp'; owl.style.display = ''; }
     if (tit) tit.textContent = venceu ? 'Você chegou ao 2048! 🎉' : 'Sem jogadas! 😵';
     if (msg) {
       msg.textContent = 'Você fez ' + _t48Pontos + ' pontos' + (bateuRecorde ? ' — novo recorde!' : '') +

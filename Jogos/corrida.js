@@ -107,8 +107,9 @@
   /* ══════════════════════════════════════════════════════════════
      ASSETS opcionais (o jogo funciona 100% em vetor). Base:
      /Jogos/assets/corrida/ (J maiúsculo; GitHub Pages é case-sensitive).
-       zumbi-normal-sheet.webp | zumbi-rapido-sheet.webp | zumbi-forte-sheet.webp
-       municao.webp        → caixa de recarga no chão
+       zumbi-coruja-normal.webp | zumbi-coruja-normal-b.webp | zumbi-coruja-rapido.webp | zumbi-coruja-forte.webp (3×3, ver _COR_SHEETS)
+       obst-<tipo>.webp      → obstáculos (carro/cerca/entulho/pedra/toco/placa/abobora/lapide)
+       municao-v2.webp     → caixa de recarga no chão
        arma.webp           → sprite da arma em 1a pessoa (base da tela)
        cenario-floresta.webp → cenário inteiro (céu, lua, árvores mortas e
                              chão/trilha), fundo estático cobrindo o canvas
@@ -133,11 +134,19 @@
   // baixava os arquivos com a chave longa e, na hora de desenhar, o jogo
   // procurava por 'normal', achava undefined e caía no boneco vetorial
   // pra sempre. O nome do arquivo mora em "arquivo".
+  // v2: corujas-zumbi no estilo da Master Reference, sheet em grade 3×3
+  // (9 quadros de caminhada, pés na base de cada célula). 'grade' fixa o
+  // layout (sem depender do palpite por proporção); 'esc' ajusta o tamanho
+  // na tela (a forte é maior). 'normalB' é uma segunda aparência da comum:
+  // metade das comuns nasce com ela (ver _corSpawnZumbi, zb.sheetKey) —
+  // mesmo tipo/HP/velocidade, só muda a arte.
   var _COR_SHEETS = {
-    normal: { arquivo: 'zumbi-normal-sheet.webp', frames: 12, fps: 10 },
-    rapido: { arquivo: 'zumbi-rapido-sheet.webp', frames: 12, fps: 12 },
-    forte:  { arquivo: 'zumbi-forte-sheet.webp',  frames: 12, fps: 8 }
+    normal:  { arquivo: 'zumbi-coruja-normal.webp',   frames: 9, fps: 9,  grade: [3, 3], esc: 1.00 },
+    normalB: { arquivo: 'zumbi-coruja-normal-b.webp', frames: 9, fps: 9,  grade: [3, 3], esc: 1.00 },
+    rapido:  { arquivo: 'zumbi-coruja-rapido.webp',   frames: 9, fps: 13, grade: [3, 3], esc: 0.95 },
+    forte:   { arquivo: 'zumbi-coruja-forte.webp',    frames: 9, fps: 7,  grade: [3, 3], esc: 1.22 }
   };
+  var _COR_MUNICAO = 'municao-v2.webp';
 
   // Carrega uma imagem, tentando VÁRIOS nomes em cascata. Isso torna o jogo
   // tolerante a arquivos que subiram com o nome normalizado (sem hífens) —
@@ -343,6 +352,8 @@
     _corAssets[chave] = reg;
     if (!meta) return reg;
     reg.decl = meta.frames;
+    reg.grade = meta.grade || null;
+    reg.esc = meta.esc || 1;
     reg.durFrame = 1000 / (meta.fps || 10);
     reg.sheet = _corAsset(meta.arquivo);   // carrega a imagem do sheet
     return reg;
@@ -357,7 +368,8 @@
       var img = reg.sheet.img;
       var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
       if (!w || !h) return null;
-      reg.lay = _corLayoutSheet(w, h, reg.decl);
+      reg.lay = reg.grade ? { c: reg.grade[0], r: reg.grade[1], n: reg.decl }
+                          : _corLayoutSheet(w, h, reg.decl);
       reg.lay.fw = w / reg.lay.c;
       reg.lay.fh = h / reg.lay.r;
       reg.ok = true;
@@ -738,9 +750,16 @@
     carro:   { altMul: 0.95, ratio: 1.85, larguraMundo: 0.62, cor: '#4c5761', corEsc: '#2b3237', corVid: '#232a30', corFarol: '#d8b24a' },
     cerca:   { altMul: 0.55, ratio: 2.60, larguraMundo: 0.46, cor: '#8a6a44', corEsc: '#5c4630' },
     entulho: { altMul: 0.50, ratio: 1.70, larguraMundo: 0.42, cor: '#6b6153', corEsc: '#453f36' },
-    pedra:   { altMul: 0.50, ratio: 1.25, larguraMundo: 0.32, cor: '#767670', corEsc: '#4a4a45' }
+    pedra:   { altMul: 0.50, ratio: 1.25, larguraMundo: 0.32, cor: '#767670', corEsc: '#4a4a45' },
+    // v2: obstáculos novos (só com arte; sem a imagem, desenham como pedra).
+    toco:    { altMul: 0.55, ratio: 1.05, larguraMundo: 0.30, cor: '#6b5236', corEsc: '#45341f', vetor: 'pedra' },
+    placa:   { altMul: 0.80, ratio: 0.62, larguraMundo: 0.20, cor: '#7a6040', corEsc: '#4e3c27', vetor: 'pedra' },
+    abobora: { altMul: 0.42, ratio: 1.03, larguraMundo: 0.26, cor: '#e07a1f', corEsc: '#9c4f10', vetor: 'pedra' },
+    lapide:  { altMul: 0.55, ratio: 0.96, larguraMundo: 0.26, cor: '#86867f', corEsc: '#55554f', vetor: 'pedra' }
   };
-  var _COR_OBST_NOMES = ['carro', 'cerca', 'entulho', 'pedra'];
+  // Arte dos obstáculos: obst-<tipo>.webp (carro/cerca/entulho/pedra/toco/
+  // placa/abobora/lapide), recortados sem fundo.
+  var _COR_OBST_NOMES = ['carro', 'cerca', 'entulho', 'pedra', 'toco', 'placa', 'abobora', 'lapide'];
   // Mesma lógica do _corMeiaColisao, mas pro obstáculo (sem o +0.11 do
   // zumbi, que existia pra compensar a "gordura" do boneco vetorial).
   function _corMeiaObst(tipo) { return (_COR_OBST_TIPOS[tipo].larguraMundo * 0.5) + 0.05; }
@@ -868,6 +887,8 @@
     var r = Math.random();
     var tipo = (r < pForte) ? 'forte' : ((r < pForte + pRapido) ? 'rapido' : 'normal');
     var def = _COR_TIPOS[tipo];
+    // Arte: a comum alterna entre duas aparências (só visual).
+    var sheetKey = (tipo === 'normal' && Math.random() < 0.5) ? 'normalB' : tipo;
     // Campo aberto: zumbis nascem RELATIVOS à posição da câmera (sempre no
     // teu campo de visão atual), pra o campo nunca "acabar" quando você anda
     // muito pro lado. Espalhados numa faixa de ±1.6 ao redor de onde olha.
@@ -876,7 +897,7 @@
     // todos na mesma linha de profundidade.
     var z = _COR_Z_FAR - _corRand(0, 0.18);
     _corZumbis.push({
-      z: z, faixa: faixa, tipo: tipo,
+      z: z, faixa: faixa, tipo: tipo, sheetKey: sheetKey,
       hp: def.hp, morto: false, cai: 0, bob: Math.random() * Math.PI * 2,
       // defasagem da animação: sem isso a horda inteira dá o mesmo passo
       // no mesmo instante e parece um só zumbi clonado.
@@ -1470,12 +1491,14 @@
     ctx.globalAlpha = mortAlpha;
 
     // 1ª opção: spritesheet animado. Pés em p.y, corpo pra cima.
-    var ah = hpx * _COR_ALT_MUL * mortScale;
-    var aw = ah * _corSheetRatio(zb.tipo);
+    var sk = zb.sheetKey || zb.tipo;
+    var regSk = _corSheetPronto(sk);
+    var ah = hpx * _COR_ALT_MUL * mortScale * (regSk ? regSk.esc : 1);
+    var aw = ah * _corSheetRatio(sk);
     ctx.save();
     ctx.translate(p.x, p.y + bob);
     if (mortRot) ctx.rotate(mortRot);
-    var desenhou = _corDrawSheetFrame(ctx, zb.tipo, _corRelogio + zb.fase, -aw / 2, -ah, aw, ah);
+    var desenhou = _corDrawSheetFrame(ctx, sk, _corRelogio + zb.fase, -aw / 2, -ah, aw, ah);
     if (!desenhou) {
       // 2ª opção: o webp estático antigo (imagem real, sem animar).
       var est = _corAsset('zumbi-' + zb.tipo + '.webp');
@@ -1554,9 +1577,10 @@
     ctx.globalAlpha = 0.3 * (0.4 + s); ctx.fillStyle = '#000';
     ctx.beginPath(); ctx.ellipse(p.x, p.y, sz * 0.9, sz * 0.3, 0, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
-    var fonteMun = _corFonte(_corAsset('municao.webp'));
+    var regMun = _corAsset(_COR_MUNICAO);
+    var fonteMun = _corFonte(regMun);
     if (fonteMun) {
-      var aw = sz * 2.4, ah = sz * 2.4;
+      var ah = sz * 2.6, aw = ah * ((regMun.w && regMun.h) ? regMun.w / regMun.h : 1);
       ctx.drawImage(fonteMun, p.x - aw / 2, p.y - ah + bob, aw, ah);
     } else {
       ctx.save(); ctx.translate(p.x, p.y - sz + bob);
@@ -1591,7 +1615,7 @@
       ctx.drawImage(fonte, p.x - iaw / 2, p.y - ah, iaw, ah);
       return;
     }
-    _corVetorObstaculo(ctx, p.x, p.y, aw, ah, ob.tipo, def);
+    _corVetorObstaculo(ctx, p.x, p.y, aw, ah, def.vetor || ob.tipo, def);
   }
 
   // Silhuetas vetoriais simples e legíveis — sem sombreado nem detalhe
@@ -2368,6 +2392,7 @@
     // Pré-carrega os spritesheets dos zumbis (imagens únicas; o fallback
     // vetor cobre enquanto não chegam).
     _corSheet('normal');
+    _corSheet('normalB');
     _corSheet('rapido');
     _corSheet('forte');
     _corAsset('cenario-floresta.webp');   // dispara o carregamento do fundo cedo
@@ -2400,13 +2425,13 @@
     var tentativas = 0;
     _corFontesTimer = setInterval(function () {
       var faltou = false;
-      for (var tipo in _COR_TIPOS) {
-        if (!_COR_TIPOS.hasOwnProperty(tipo)) continue;
+      for (var tipo in _COR_SHEETS) {
+        if (!_COR_SHEETS.hasOwnProperty(tipo)) continue;
         var reg = _corSheetPronto(tipo);
         if (reg) _corFonte(reg.sheet); else faltou = true;
       }
       _corFonte(_corAsset(_COR_ARMA));
-      _corFonte(_corAsset('municao.webp'));
+      _corFonte(_corAsset(_COR_MUNICAO));
       for (var oi2 = 0; oi2 < _COR_OBST_NOMES.length; oi2++) _corFonte(_corAsset('obst-' + _COR_OBST_NOMES[oi2] + '.webp'));
       if (!faltou || ++tentativas > 20) { clearInterval(_corFontesTimer); _corFontesTimer = 0; }
     }, 400);
@@ -2574,7 +2599,7 @@
       return { carregou: a.ok, imagem: a.ok ? a.w + '×' + a.h : null, fundoChapadoRemovido: !!a.fundoRemovido };
     }
     out.arma = estat(_COR_ARMA);
-    out.municao = estat('municao.webp');
+    out.municao = estat(_COR_MUNICAO);
     // cenario-floresta.webp é imagem opaca (não sprite) — sem _corFonte()
     // aqui, senão o diag dispararia o flood-fill de remoção de fundo nela.
     (function () {

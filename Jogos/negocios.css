@@ -456,6 +456,8 @@
 /* Ícone em arte (ic-*.webp): ocupa o mesmo espaço do emoji (1em × 1em),
    então herda todos os font-size dos layouts abaixo sem regra nova. */
 #jogo-negocios .ndc-casa .ndc-icone.ndc-icone-img img { display: block; width: 1.25em; height: 1.25em; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+#jogo-negocios .ndc-casa .ndc-icone.ndc-icone-preco { font-size: 3.3cqw; }
+#jogo-negocios .ndc-casa .ndc-icone-preco ~ .ndc-sigla { display: none; }
 
 /* Cantos: no tabuleiro compacto o ícone diz tudo (🏁 🚓 🅿️ 🚨) e o nome
    não caberia legível. O nome volta no modo ampliado e no desktop. */

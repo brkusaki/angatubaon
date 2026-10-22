@@ -1107,10 +1107,31 @@
     el.setAttribute('aria-label', (cor === 'W' ? '' : NOME_COR[cor] + ' ') + _nomeValor(v));
     el.appendChild(_elx('span', 'carta-canto carta-canto-cima', { texto: _rotuloValor(v) }));
     var oval = _elx('span', 'carta-oval');
-    oval.appendChild(_elx('span', 'carta-valor', { texto: _rotuloValor(v) }));
+    var valorEl = _elx('span', 'carta-valor', { texto: _rotuloValor(v) });
+    var arte = _arteCarta(cor, v);
+    if (arte && !opcoes.pequena) {
+      // Arte no meio (ver /Jogos/assets/baralho/uno-*): o texto vira só o
+      // "+2"/"+4" por cima, ou some — e volta sozinho se a imagem falhar.
+      el.classList.add(_cls('carta-com-arte'));
+      var im = _elx('img', 'carta-arte', { src: '/Jogos/assets/baralho/' + arte + '.webp', alt: '', draggable: 'false' });
+      im.addEventListener('error', function () { el.classList.remove(_cls('carta-com-arte')); if (im.parentNode) im.parentNode.removeChild(im); });
+      oval.appendChild(im);
+      if (v === '+2' || v === '+4') valorEl.classList.add(_cls('carta-valor-sobre'));
+    }
+    oval.appendChild(valorEl);
     el.appendChild(oval);
     el.appendChild(_elx('span', 'carta-canto carta-canto-baixo', { texto: _rotuloValor(v) }));
     return el;
+  }
+
+  function _arteCarta(cor, v) {
+    if (v === 'cor') return 'coruja-coringa';
+    if (v === '+4') return 'uno-mais4';
+    if (cor === 'W') return null;
+    if (v === 'pula') return 'uno-pula-' + cor;
+    if (v === 'inverte') return 'uno-inverte-' + cor;
+    if (v === '+2') return 'uno-mais2-' + cor;
+    return null;
   }
 
   /* ---------- balões de reação ----------

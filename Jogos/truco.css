@@ -276,6 +276,18 @@
 }
 .trc-carta-manilha .trc-carta-naipe-grande { text-shadow: 0 0 6px rgba(217, 164, 65, 0.8); }
 
+/* Arte das faces (ver _imgArte em truco.js): naipe 3D no meio e mini no
+   canto, embaixo do valor; Rei/Dama/Valete com a coruja no lugar do naipe. */
+.trc-carta-valor { display: flex; flex-direction: column; align-items: center; position: relative; z-index: 1; }
+.trc-carta-naipe-mini { width: 0.72em; height: 0.72em; object-fit: contain; margin-top: 1px; }
+.trc-carta-naipe-img { width: 1.15em; height: 1.15em; object-fit: contain; display: block; }
+.trc-carta-figura .trc-carta-naipe-grande { width: 76%; height: 68%; opacity: 1; }
+.trc-carta-figura-img {
+  width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; display: block;
+  -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent);
+}
+.trc-carta-manilha .trc-carta-naipe-grande img { filter: drop-shadow(0 0 4px rgba(217, 164, 65, 0.9)); }
+
 .trc-carta-verso {
   background: linear-gradient(135deg, #123a2a, #0a2418);
   border: 2px solid var(--trc-dourado);

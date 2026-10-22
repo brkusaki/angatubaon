@@ -1490,9 +1490,11 @@
 
       var miolo = [];
       var ico = iconeDaCasa(casa);
-      if (ico && !casa.preco) {
-        var icoSrc = iconeImgDaCasa(casa);
-        var icoEl = el('div', { class: 'icone' + (icoSrc ? ' icone-img' : ''), texto: icoSrc ? '' : ico });
+      var icoSrc = ico ? iconeImgDaCasa(casa) : '';
+      // Casa com preço (estradas, trem, ônibus, luz, água) só ganha ícone
+      // quando tem arte — aí ele toma o lugar da sigla (ver negocios.css).
+      if (ico && (!casa.preco || icoSrc)) {
+        var icoEl = el('div', { class: 'icone' + (icoSrc ? ' icone-img' : '') + (casa.preco ? ' icone-preco' : ''), texto: icoSrc ? '' : ico });
         if (icoSrc) {
           var icoImg = el('img', { src: icoSrc, alt: '', draggable: 'false' });
           icoImg.addEventListener('error', function () {

@@ -443,6 +443,17 @@
 .uno-carta-c-G .uno-carta-valor { color: var(--uno-G-esc); }
 .uno-carta-c-Y .uno-carta-valor { color: var(--uno-Y-esc); }
 
+/* Arte no meio das cartas especiais (ver _arteCarta em uno.js). A oval é
+   girada -22°, então a imagem gira +22° pra ficar em pé. */
+.uno-carta-arte { width: 82%; height: 82%; object-fit: contain; transform: rotate(22deg); display: block; }
+.uno-carta-com-arte .uno-carta-valor { display: none; }
+.uno-carta-com-arte .uno-carta-valor.uno-carta-valor-sobre {
+  display: block; position: absolute; color: #fff;
+  -webkit-text-stroke: 1.5px #1c1440; paint-order: stroke fill;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.45);
+}
+.uno-carta-c-W.uno-carta-com-arte .uno-carta-arte { width: 112%; height: 112%; }
+
 .uno-carta-canto {
   position: absolute;
   font-family: var(--font-h);

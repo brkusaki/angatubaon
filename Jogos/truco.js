@@ -1023,11 +1023,32 @@
     el.classList.add(_cls('carta-' + COR_NAIPE[naipe]));
     if (opcoes.manilha) el.classList.add(_cls('carta-manilha'));
     if (opcoes.vencedora) el.classList.add(_cls('carta-vencedora'));
+    var figura = FIGURA_CARTA[valor];
     var topo = _elx('span', 'carta-valor', { texto: valor });
-    var meio = _elx('span', 'carta-naipe-grande', { texto: SIMBOLO_NAIPE[naipe] });
+    topo.appendChild(_imgArte(ARTE_NAIPE[naipe], 'carta-naipe-mini', SIMBOLO_NAIPE[naipe]));
+    var meio = _elx('span', 'carta-naipe-grande');
+    if (figura) {
+      el.classList.add(_cls('carta-figura'));
+      meio.appendChild(_imgArte('coruja-' + figura, 'carta-figura-img', SIMBOLO_NAIPE[naipe]));
+    } else {
+      meio.appendChild(_imgArte(ARTE_NAIPE[naipe], 'carta-naipe-img', SIMBOLO_NAIPE[naipe]));
+    }
     var baixo = _elx('span', 'carta-valor carta-valor-baixo', { texto: valor });
+    baixo.appendChild(_imgArte(ARTE_NAIPE[naipe], 'carta-naipe-mini', SIMBOLO_NAIPE[naipe]));
     el.appendChild(topo); el.appendChild(meio); el.appendChild(baixo);
     return el;
+  }
+
+  // Arte das faces (/Jogos/assets/baralho/): naipes 3D e as corujas do
+  // Rei, da Dama e do Valete. Se a imagem falhar, volta o símbolo em texto.
+  var ARTE_NAIPE = { O: 'naipe-ouros', E: 'naipe-espadas', C: 'naipe-copas', P: 'naipe-paus' };
+  var FIGURA_CARTA = { K: 'rei', Q: 'dama', J: 'valete' };
+  function _imgArte(nome, classe, textoFallback) {
+    var im = _elx('img', classe, { src: '/Jogos/assets/baralho/' + nome + '.webp', alt: '', draggable: 'false' });
+    im.addEventListener('error', function () {
+      if (im.parentNode) im.parentNode.replaceChild(document.createTextNode(textoFallback), im);
+    });
+    return im;
   }
 
   // Layout relativo: sul = eu, norte = à minha frente (parceiro se 4

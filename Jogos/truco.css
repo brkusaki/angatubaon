@@ -278,7 +278,8 @@
 
 /* Arte das faces (ver _imgArte em truco.js): naipe 3D no meio e mini no
    canto, embaixo do valor; Rei/Dama/Valete com a coruja no lugar do naipe. */
-.trc-carta-valor { display: flex; flex-direction: column; align-items: center; position: relative; z-index: 1; }
+.trc-carta-valor { display: flex; flex-direction: column; align-items: center; position: relative; z-index: 1; align-self: flex-start; }
+.trc-carta-valor.trc-carta-valor-baixo { align-self: flex-end; }
 .trc-carta-naipe-mini { width: 0.72em; height: 0.72em; object-fit: contain; margin-top: 1px; }
 .trc-carta-naipe-img { width: 1.15em; height: 1.15em; object-fit: contain; display: block; }
 .trc-carta-figura .trc-carta-naipe-grande { width: 76%; height: 68%; opacity: 1; }

@@ -2873,9 +2873,9 @@
     }
 
     const catLabel = CATEGORIAS.find(c => c.id === activeCat)?.label ?? 'Todas';
-    titleEl.textContent = q
-      ? `🔍 "${q}"`
-      : activeCat === 'todos' ? '📍 Todas as Lojas' : `📍 ${catLabel}`;
+    titleEl.innerHTML = q
+      ? `<i class="fa fa-magnifying-glass sec-ico" aria-hidden="true"></i>"${escHTML(q)}"`
+      : `<i class="fa fa-location-dot sec-ico" aria-hidden="true"></i>${escHTML(activeCat === 'todos' ? 'Todas as Lojas' : catLabel)}`;
 
     infoEl.textContent = temResultado
       ? (abertas > 0 ? `${abertas} aberta${abertas>1?'s':''} agora` : 'Nenhuma aberta')
@@ -6366,7 +6366,7 @@
       '<div class="conb-pop" id="lonb-pop" role="document">' +
         '<div class="conb-pop-arrow" id="lonb-pop-arrow"></div>' +
         '<div class="conb-owl-wrap"><img class="conb-owl" id="lonb-owl" src="" alt="" ' +
-          'onerror="if(!this.dataset.f){this.dataset.f=1;this.style.display=\'none\';}" /></div>' +
+          'onerror="if(!this.dataset.f){this.dataset.f=1;this.style.display=\'none\';this.parentNode.nextElementSibling.style.display=\'\';}" /></div>' +
         '<div class="conb-icon" id="lonb-icon"></div>' +
         '<div class="conb-title" id="lonb-title"></div>' +
         '<div class="conb-text" id="lonb-text"></div>' +
@@ -6411,7 +6411,9 @@
     const dots = document.getElementById('lonb-dots');
     const cta = document.getElementById('lonb-cta');
     if (owl) { owl.dataset.f = ''; owl.style.display = ''; owl.src = s.owl || ''; }
-    if (icon) icon.textContent = s.icon || '';
+    // Emoji do passo é só reserva: com a coruja na tela ele repetia a ideia
+    // (👋 embaixo da coruja acenando). Volta pelo onerror da coruja.
+    if (icon) { icon.textContent = s.icon || ''; icon.style.display = s.owl ? 'none' : ''; }
     if (titulo) titulo.textContent = s.titulo || '';
     if (texto) texto.innerHTML = s.texto || '';
     // Bolinhas = só os passos que o plano atual realmente mostra (mesma
@@ -6721,7 +6723,7 @@
       '<div class="conb-pop" id="conb-pop" role="document">' +
         '<div class="conb-pop-arrow" id="conb-pop-arrow"></div>' +
         '<div class="conb-owl-wrap"><img class="conb-owl" id="conb-owl" src="" alt="" ' +
-          'onerror="if(!this.dataset.f){this.dataset.f=1;this.style.display=\'none\';}" /></div>' +
+          'onerror="if(!this.dataset.f){this.dataset.f=1;this.style.display=\'none\';this.parentNode.nextElementSibling.style.display=\'\';}" /></div>' +
         '<div class="conb-icon" id="conb-icon"></div>' +
         '<div class="conb-title" id="conb-title"></div>' +
         '<div class="conb-text" id="conb-text"></div>' +
@@ -6755,7 +6757,9 @@
     const dots = document.getElementById('conb-dots');
     const cta = document.getElementById('conb-cta');
     if (owl) { owl.dataset.f = ''; owl.style.display = ''; owl.src = s.owl || ''; }
-    if (icon) icon.textContent = s.icon || '';
+    // Emoji do passo é só reserva: com a coruja na tela ele repetia a ideia
+    // (👋 embaixo da coruja acenando). Volta pelo onerror da coruja.
+    if (icon) { icon.textContent = s.icon || ''; icon.style.display = s.owl ? 'none' : ''; }
     if (titulo) titulo.textContent = s.titulo || '';
     if (texto) texto.innerHTML = s.texto || '';
     const _clienteOnbValidos = _clienteOnbIndicesValidos();
@@ -11182,7 +11186,7 @@
     var dados = lista || AVISOS_HOJE_MOCK;
     window._avisosAtuais = dados; // referência usada pelo modal de post (_abrirAvisoPost)
     if (!dados || !dados.length) {
-      box.innerHTML = '<div class="avisos-empty">Nenhum aviso por aqui hoje. Volte mais tarde! 🦉</div>';
+      box.innerHTML = '<div class="avisos-empty"><img src="/webp/owl-sleeping.webp" alt="" class="avisos-empty-owl" onerror="this.style.display=\'none\'">Nenhum aviso por aqui hoje. Volte mais tarde!</div>';
       return;
     }
     var curtidos = _avisosCurtidosGet();

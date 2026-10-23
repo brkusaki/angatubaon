@@ -528,7 +528,7 @@
       '<div class="bib-head">' +
       '<button type="button" class="games-sair-btn" onclick="_bibVoltarUI()" aria-label="Voltar para a tela inicial" title="Voltar ao início"><i class="fa fa-chevron-left"></i></button>' +
       '<div class="bib-head-txt"><h2 class="bib-head-titulo">Biblioteca <span>da Coruja</span></h2>' +
-      '<p class="bib-head-sub">Clássicos completos, de graça e offline 🦉</p></div></div>' +
+      '<p class="bib-head-sub">Clássicos completos, de graça e offline</p></div></div>' +
       _bibJuntarHtml() +
       '<div class="bib-abas" role="tablist">' +
       '<button type="button" role="tab" class="bib-aba' + (_bibFiltro.aba === 'acervo' ? ' ativa' : '') + '" data-aba="acervo" aria-selected="' + (_bibFiltro.aba === 'acervo') + '"><i class="fa-solid fa-book"></i> Acervo</button>' +

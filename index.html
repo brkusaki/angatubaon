@@ -2235,7 +2235,7 @@
                   <li><i class="ti ti-check"></i> Posição acima das lojas Grátis</li>
                   <li><i class="ti ti-check"></i> Foto de capa e logo na página da sua loja</li>
                   <li><i class="ti ti-check"></i> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
-                  <li><i class="ti ti-check"></i> Cardápio / Serviços (até 8 itens, sem foto)</li>
+                  <li><i class="ti ti-check"></i> Cardápio / Serviços (até 40 itens, sem foto)</li>
                   <li><i class="ti ti-check"></i> Anúncio do dia no card + selo ✦ PLUS</li>
                 </ul>
                 <button type="button" class="acc-vertudo" onclick="event.stopPropagation();cadToggleVerTudo('plus',this)">
@@ -2500,7 +2500,7 @@
                   <li><span class="feat-icon">✅</span> Métricas detalhadas (7d, 30d, WPP vs Tel)</li>
                   <li><span class="feat-icon">✅</span> Link de compartilhamento da loja</li>
                   <li><span class="feat-icon">✅</span> Foto de capa e logo na página da loja</li>
-                  <li><span class="feat-icon">✅</span> Cardápio / Serviços (até 8 itens, sem foto)</li>
+                  <li><span class="feat-icon">✅</span> Cardápio / Serviços (até 40 itens, sem foto)</li>
                   <li><span class="feat-icon">✅</span> Pedidos direto pelo WhatsApp</li>
                   <li><span class="feat-icon">✅</span> Anúncio do dia no card (texto + emoji, 24h)</li>
                   <li class="feat-off"><span class="feat-icon">✦</span> Foto de capa e logo no card da listagem</li>
@@ -3341,6 +3341,9 @@
                       <i class="fab fa-instagram"></i> Instagram
                     </a>
                   </div>
+                  <button type="button" id="ml-share-qr-btn" onclick="mlBaixarQR()" style="width:100%;margin-top:8px;padding:9px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                    <i class="fa fa-qrcode"></i> Baixar QR code para o balcão
+                  </button>
                   <div id="ml-share-cardapio-wrap" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
                     <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">Link direto do seu cardápio (abre já no menu):</div>
                     <div style="display:flex;align-items:center;gap:8px;">

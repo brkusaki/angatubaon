@@ -5380,11 +5380,22 @@
       mlMontarCompartilhamento(d.nome);
     }
 
-    // ── Upload de imagens (Plus e Pro) ───────────────────
+    // ── Upload de imagens (capa: todos · logo: Plus e Pro) ─
     const uploadSection = document.getElementById('ml-upload-section');
     if (uploadSection) {
-      uploadSection.style.display = isPago ? '' : 'none';
-      if (isPago) {
+      uploadSection.style.display = '';
+      // Grátis: o seletor de logo vira convite para os planos pagos.
+      const logoInput = document.getElementById('ml-up-logo-file');
+      if (logoInput) logoInput.disabled = !isPago;
+      document.querySelectorAll('label[for="ml-up-logo-file"]').forEach(function (lb) {
+        if (!lb.dataset.htmlOrig) lb.dataset.htmlOrig = lb.innerHTML;
+        if (isPago) { lb.innerHTML = lb.dataset.htmlOrig; lb.onclick = null; }
+        else {
+          if (lb.textContent.trim()) lb.innerHTML = '🔒 Logo no Plus/Pro';
+          lb.onclick = function (e) { e.preventDefault(); if (typeof mlAbrirUpgrade === 'function') mlAbrirUpgrade(); };
+        }
+      });
+      {
         // Preenche nome/ramo no preview do card
         const nomePreview = document.getElementById('ml-up-nome-preview');
         const ramoPreview = document.getElementById('ml-up-ramo-preview');
@@ -5574,14 +5585,18 @@
   // Chamado pelo toggle de status (lojaToggle) assim que o lojista mexe em
   // Aberto/Já voltamos/Fechado com sucesso — não dá pra inferir isso só
   // olhando o status atual, por isso precisa de uma flag própria.
-  function mlChecklistMarcarStatusTestado() {
+  function mlChecklistMarcarStatusTestado() { mlChecklistMarcar('statusTestado'); }
+  // Marca uma tarefa do checklist que não dá pra inferir dos dados
+  // ('statusTestado', 'compartilhou', 'qrBaixado').
+  function mlChecklistMarcar(flag) {
     if (!_mlChecklistKey()) return;
     const state = _mlChecklistState();
-    if (state.statusTestado) return; // já marcado — evita gravação redundante
-    state.statusTestado = true;
+    if (state[flag]) return; // já marcado — evita gravação redundante
+    state[flag] = true;
     _mlChecklistSalvar(state);
     mlChecklistRender();
   }
+  window.mlChecklistMarcar = mlChecklistMarcar;
 
   // "Dispensar" esconde o card (progresso continua salvo).
   function mlChecklistDispensar() {
@@ -5631,9 +5646,19 @@
         tab: 'loja', sel: '#ml-info-section'
       },
       {
-        id: 'perfil', titulo: 'Perfil básico completo',
-        done: !!(d.nome && d.ramo),
-        tab: 'loja', sel: '#ml-info-section'
+        id: 'foto', titulo: isPago ? 'Foto ou logo da loja' : 'Foto de capa da loja',
+        done: !!(d.foto || (isPago && d.logo)),
+        tab: 'loja', sel: '#ml-upload-section'
+      },
+      {
+        id: 'compartilhou', titulo: 'Mande o link da loja no WhatsApp',
+        done: !!state.compartilhou,
+        tab: 'loja', sel: '#ml-share-section'
+      },
+      {
+        id: 'qr', titulo: 'Baixe o QR code para o balcão',
+        done: !!state.qrBaixado,
+        tab: 'loja', sel: '#ml-share-qr-btn'
       },
       isPago ? {
         id: 'cardapio', titulo: 'Cardápio com pelo menos 1 item',
@@ -5643,15 +5668,6 @@
         id: 'cardapio', locked: true,
         titulo: 'Cardápio (Plus/Pro)',
         texto: 'No Grátis sua loja aparece na lista. No Plus você monta o cardápio e o cliente pede pelo WhatsApp com os itens.'
-      },
-      isPago ? {
-        id: 'foto', titulo: 'Foto ou logo da loja',
-        done: !!(d.foto || d.logo),
-        tab: 'loja', sel: '#ml-upload-section'
-      } : {
-        id: 'foto', locked: true,
-        titulo: 'Foto e logo (Plus/Pro)',
-        texto: 'Destaque sua loja com foto de capa e logo — disponível nos planos pagos.'
       }
     ];
 
@@ -6119,40 +6135,16 @@
       texto: 'Toque aqui pra mudar seu status <strong>na hora</strong>. O cliente vê Aberto, Já voltamos ou Fechado na mesma hora.'
     },
     {
-      tab: 'hoje', sel: '#ml-anuncio-section',
-      owl: '/webp/owl-sign.webp', icon: '📣',
-      titulo: 'Anúncios e stories',
-      texto: 'Publique o <strong>anúncio do dia</strong> ou stories pra aparecer em destaque pros clientes.'
-    },
-    {
-      tab: 'hoje', sel: '#ml-agenda-section',
-      owl: '/webp/owl-idea.webp', icon: '🗓️',
-      titulo: 'Agende seus posts',
-      texto: 'Programe stories pra publicarem <strong>sozinhos</strong> na hora que você marcar. Deixe tudo pronto de uma vez.'
-    },
-    {
-      tab: 'loja', sel: '#ml-cardapio-add-btn',
-      owl: '/webp/owl-point.webp', icon: '🍔',
-      titulo: 'Monte seu cardápio',
-      texto: 'Adicione seus <strong>produtos, preços e fotos</strong>. É o cardápio digital que o cliente abre e pede no WhatsApp.'
-    },
-    {
-      tab: 'loja', sel: '#ml-info-section',
-      owl: '/webp/owl-tip.webp', icon: '✏️',
-      titulo: 'Dados da loja',
-      texto: 'Atualize <strong>horário, endereço, bairro e contatos</strong> quando quiser.'
-    },
-    {
       tab: 'loja', sel: '#ml-share-section',
       owl: '/webp/owl-phone.webp', icon: '🔗',
       titulo: 'Divulgue sua loja',
-      texto: 'Copie o <strong>link direto</strong> da sua loja e mande no WhatsApp, Instagram, onde quiser.'
+      texto: 'Mande o <strong>link da sua loja</strong> no WhatsApp e baixe o <strong>QR code</strong> para deixar no balcão.'
     },
     {
       tab: 'metricas', sel: '#ml-metricas-wrap',
       owl: '/webp/owl-badge.webp', icon: '📊',
-      titulo: 'Acompanhe os acessos',
-      texto: 'Veja <strong>quantas pessoas viram</strong> sua loja e <strong>clicaram no WhatsApp</strong>. Saiba o que está dando certo.'
+      titulo: 'Veja o resultado',
+      texto: 'Aqui você vê <strong>quantas pessoas viram</strong> sua loja, <strong>chamaram no WhatsApp</strong> e fizeram <strong>pedido pelo app</strong>.'
     }
   ];
   let _lojistaOnbIdx = 0;
@@ -8175,7 +8167,7 @@
     const { status, fechaStr, agendado } = calcStatusInfo(loja);
 
     // ── CAPA com logo sobreposto ───────────────────────────────
-    const hasFoto = isPago && loja.foto && loja.foto.trim();
+    const hasFoto = loja.foto && loja.foto.trim(); // capa liberada no Grátis
     const hasLogo = isPago && loja.logo && loja.logo.trim();
 
     // Tem foto de anuncio? Logo ganha anel animado + abre a sequência de
@@ -12113,6 +12105,7 @@
      COMPARTILHAMENTO — painel Minha Loja
   ══════════════════════════════════════════════════════════════ */
   window.mlCopiarLink = function() {
+    if (window.mlChecklistMarcar) window.mlChecklistMarcar('compartilhou');
     const urlEl = document.getElementById('ml-share-url');
     const btn   = document.getElementById('ml-copy-btn');
     if (!urlEl) return;
@@ -12138,6 +12131,7 @@
 
   // Copia o link direto do cardápio (mesma UX do mlCopiarLink, botão próprio).
   window.mlCopiarCardapio = function() {
+    if (window.mlChecklistMarcar) window.mlChecklistMarcar('compartilhou');
     const urlEl = document.getElementById('ml-share-cardapio-url');
     const btn   = document.getElementById('ml-copy-cardapio-btn');
     if (!urlEl || !btn) return;
@@ -12158,6 +12152,56 @@
     });
   };
 
+  // Gera um cartaz PNG (nome da loja + QR + link) para imprimir no balcão.
+  // A lib de QR só carrega quando o lojista pede (não pesa no app).
+  window.mlBaixarQR = async function () {
+    const btn = document.getElementById('ml-share-qr-btn');
+    const urlEl = document.getElementById('ml-share-url');
+    const url = urlEl ? urlEl.textContent.trim() : '';
+    if (!url) return;
+    const nome = (document.getElementById('ml-nome')?.textContent || _lojaNome || '').trim();
+    const rotulo = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Gerando…'; }
+    try {
+      if (typeof QRCode === 'undefined') await _injetarScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js');
+      const tmp = document.createElement('div');
+      new QRCode(tmp, { text: url, width: 760, height: 760, correctLevel: QRCode.CorrectLevel.M });
+      const qrCanvas = tmp.querySelector('canvas');
+      if (!qrCanvas) throw new Error('QR indisponível');
+      const W = 1080, H = 1440;
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      const g = c.getContext('2d');
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+      g.fillStyle = '#111111'; g.textAlign = 'center';
+      g.font = 'bold 64px sans-serif';
+      let titulo = nome || 'Nossa loja';
+      while (g.measureText(titulo).width > W - 120 && titulo.length > 4) titulo = titulo.slice(0, -2);
+      if (titulo !== (nome || 'Nossa loja')) titulo = titulo.trim() + '…';
+      g.fillText(titulo, W / 2, 150);
+      g.font = '40px sans-serif'; g.fillStyle = '#444444';
+      g.fillText('Veja o cardápio e chame no WhatsApp', W / 2, 220);
+      g.drawImage(qrCanvas, (W - 760) / 2, 290, 760, 760);
+      g.font = 'bold 44px sans-serif'; g.fillStyle = '#e11d48';
+      g.fillText('📱 Aponte a câmera do celular', W / 2, 1140);
+      g.font = '34px sans-serif'; g.fillStyle = '#666666';
+      g.fillText(url.replace(/^https?:\/\//, ''), W / 2, 1210);
+      g.font = 'bold 38px sans-serif'; g.fillStyle = '#111111';
+      g.fillText('AngatubaON', W / 2, 1350);
+      const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'qr-' + (toSlug(nome) || 'loja') + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      if (window.mlChecklistMarcar) window.mlChecklistMarcar('qrBaixado');
+      mlToast('QR baixado! Imprima e deixe no balcão ou na vitrine.', 'ok');
+    } catch (e) {
+      mlToast('Não foi possível gerar o QR agora. Tente de novo.', 'erro');
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = rotulo; }
+    }
+  };
+
   function mlMontarCompartilhamento(nome) {
     const slug    = toSlug(nome);
     const url     = `${location.origin}/#${slug}`;
@@ -12165,7 +12209,10 @@
     const wppEl   = document.getElementById('ml-share-wpp');
     const igEl    = document.getElementById('ml-share-ig');
     if (urlEl) urlEl.textContent = url;
-    if (wppEl) wppEl.href = `https://wa.me/?text=${encodeURIComponent(`Confira ${nome} no AngatubaON! 📍\n${url}`)}`;
+    if (wppEl) {
+      wppEl.href = `https://wa.me/?text=${encodeURIComponent(`Confira ${nome} no AngatubaON! 📍\n${url}`)}`;
+      wppEl.onclick = function () { if (window.mlChecklistMarcar) window.mlChecklistMarcar('compartilhou'); };
+    }
     // Usa o handle do Instagram da loja (se disponível), senão abre o app
     const lojaLocal = _mlAcharLojaLocal(null, nome);
     if (igEl) {
@@ -13419,7 +13466,7 @@ ${urlCard}`)}`;
      CARDÁPIO — PAINEL DO DONO
   ══════════════════════════════════════════════════════════════ */
   let _cardapioItens  = [];
-  const PLUS_LIMITE_ITENS = 8; // fonte única do limite de itens do plano PLUS
+  const PLUS_LIMITE_ITENS = 40; // fonte única do limite de itens do plano PLUS (espelho do GAS)
   let _cardapioBusca = '';           // termo de busca atual (em memória)
   let _cardapioGruposFechados = {};  // { categoria: true } = colapsado
   let _cardapioPlano  = 'GRATIS';

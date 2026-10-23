@@ -1663,7 +1663,9 @@
     const DIAS_IDX = { dom:0, seg:1, ter:2, qua:3, qui:4, sex:5, sab:6 };
     const txt = String(loja.horarioTexto || loja.horario_texto || '').trim();
 
-    if (txt && txt.indexOf('|') !== -1) {
+    // Turno único ("Seg, Ter 08:00-18:00") também é lido do texto: é o que o
+    // painel grava ao editar o horário. Texto livre não parseável cai no legado.
+    if (txt) {
       const turnos = [];
       txt.split('|').forEach(parte => {
         parte = parte.trim();
@@ -3522,6 +3524,7 @@
       if (titEl) titEl.innerHTML = 'Pronto! <span>🎊</span>';
 
       setTimeout(() => {
+        if (history.state?.modal === 'aguardando') history.replaceState({ modal: 'minha-loja' }, '');
         fecharAguardando(true);
         setTimeout(() => abrirMinhaLoja(), 250);
       }, 1600);
@@ -3550,14 +3553,49 @@
         if (_lojaToken) { pararPollingAprovacao(); return; }
         try {
           const params = new URLSearchParams();
-          params.append('payload', JSON.stringify({ action: 'lojaVerificarAprovacao', wpp }));
+          let claim = '';
+          try { claim = localStorage.getItem('angatuba_pendente_claim') || ''; } catch (e) {}
+          params.append('payload', JSON.stringify({ action: 'lojaVerificarAprovacao', wpp, claim }));
           const resp = await fetch(APPS_SCRIPT_URL, {
             method: 'POST', body: params,
-            signal: AbortSignal.timeout(12000),
+            signal: AbortSignal.timeout(20000),
           });
           const json = await resp.json();
+          const stAprov = json && json.data && json.data.status;
           if (json.status === 'ok' && json.data && json.data.token) {
+            try { localStorage.removeItem('angatuba_pendente_claim'); } catch (e) {}
             _aoAprovar(wpp, json.data);
+          } else if (stAprov === 'REJEITADO' || stAprov === 'SEM_CLAIM') {
+            // Sem auto-login possível: para o polling e explica o próximo passo.
+            pararPollingAprovacao();
+            const rejeitado = stAprov === 'REJEITADO';
+            if (!rejeitado) {
+              // Cadastro antigo (sem segredo): segue em análise, entra pelo login.
+              ['angatuba_pendente_wpp','angatuba_pendente_plano','angatuba_pendente_ciclo','angatuba_pendente_claim']
+                .forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+            }
+            const bigEl = document.getElementById('aguardando-title-big');
+            const subEl = document.getElementById('aguardando-sub');
+            const stTxt = document.getElementById('aguardando-status-text');
+            const acoes = document.getElementById('aguardando-acoes');
+            const hint  = document.getElementById('aguardando-hint');
+            if (hint) hint.style.display = 'none';
+            if (rejeitado) {
+              if (bigEl) bigEl.innerHTML = 'Cadastro não aprovado';
+              if (subEl) subEl.innerHTML = 'Não conseguimos aprovar este cadastro. Fale com a gente no WhatsApp para entender o motivo — depois você pode se cadastrar de novo com o mesmo número.';
+              if (stTxt) stTxt.textContent = 'Não aprovado';
+              if (acoes) {
+                acoes.innerHTML = '';
+                const a = document.createElement('a');
+                a.className = 'success-wpp-btn'; a.target = '_blank'; a.rel = 'noopener';
+                a.href = `https://wa.me/${ADMIN_WPP_CONTATO}?text=${encodeURIComponent('Olá! Meu cadastro no AngatubaON não foi aprovado. Pode me explicar o motivo?')}`;
+                a.innerHTML = '<i class="fab fa-whatsapp"></i> Falar no WhatsApp →';
+                acoes.appendChild(a);
+              }
+            } else {
+              if (subEl) subEl.innerHTML = 'Seu cadastro está em análise. Quando for aprovado, entre em <strong>Minha Loja</strong> com o seu WhatsApp para receber o código de acesso.';
+              if (stTxt) stTxt.textContent = 'Em análise';
+            }
           } else { tentar(); }
         } catch(e) { tentar(); }
       }, delay);
@@ -3634,6 +3672,7 @@
 
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
+    if (history.state?.modal !== 'aguardando') history.pushState({ modal: 'aguardando' }, '');
 
     // Garante o polling rodando (normaliza WPP com 55, igual à planilha)
     const wppNorm = (() => { const n = String(wpp || '').replace(/\D/g, ''); return n && !n.startsWith('55') ? '55' + n : n; })();
@@ -3641,10 +3680,11 @@
   }
   window.abrirAguardando = abrirAguardando;
 
-  function fecharAguardando(manterPolling) {
+  function fecharAguardando(manterPolling, viaPopstate) {
     const overlay = document.getElementById('modal-aguardando');
     if (overlay) overlay.classList.remove('open');
     document.body.style.overflow = '';
+    if (viaPopstate !== true && history.state?.modal === 'aguardando') { _popstateNosso = true; history.back(); }
     // Ao fechar manualmente, o polling continua rodando em background até o
     // limite de tempo — mas só faz sentido se ainda há cadastro pendente.
     if (!manterPolling && !_lojaToken && !localStorage.getItem('angatuba_pendente_wpp')) {
@@ -4449,6 +4489,12 @@
 
       this.style.display = 'none';
 
+      // Segredo de uso único do auto-login (só quem cadastrou recebe).
+      try {
+        if (json.data && json.data.claim) localStorage.setItem('angatuba_pendente_claim', json.data.claim);
+        else localStorage.removeItem('angatuba_pendente_claim');
+      } catch (e) {}
+
       const plano = selectedPlan;
 
       // Persiste o cadastro pendente (WPP + plano + ciclo) para que, se a pessoa
@@ -4653,14 +4699,16 @@
     document.getElementById('login-loja-sub').textContent = 'Digite o WhatsApp cadastrado para receber seu código';
     document.getElementById('modal-login-loja').classList.add('open');
     document.body.style.overflow = 'hidden';
+    if (history.state?.modal !== 'login-loja') history.pushState({ modal: 'login-loja' }, '');
     setTimeout(() => document.getElementById('ll-wpp').focus(), 300);
   }
 
-  function closeLoginLoja() {
+  function closeLoginLoja(viaPopstate) {
     llPararTimer();
     if (_llCooldownInt) { clearInterval(_llCooldownInt); _llCooldownInt = null; }
     document.getElementById('modal-login-loja').classList.remove('open');
     document.body.style.overflow = '';
+    if (viaPopstate !== true && history.state?.modal === 'login-loja') { _popstateNosso = true; history.back(); }
   }
 
   document.getElementById('modal-login-loja').addEventListener('click', function(e) {
@@ -4756,7 +4804,7 @@
   /* ════════════ Timer de expiração (10 min) ═══════════════════ */
   function llIniciarTimer() {
     llPararTimer();
-    _llTimerRestante = 600; // 10 minutos
+    _llTimerRestante = 1800; // 30 minutos (igual ao CODIGO_TTL_MS do GAS)
     llRenderTimer();
     _llTimerInt = setInterval(() => {
       _llTimerRestante--;
@@ -4882,7 +4930,7 @@
         llIniciarCooldown();
       } else if (json.status === 'ok') {
         loginStep(2);
-        document.getElementById('login-loja-sub').textContent = 'Código enviado! Confira seu WhatsApp.';
+        document.getElementById('login-loja-sub').textContent = 'Pedido recebido! Vamos te mandar o código no WhatsApp em alguns minutos.';
 
         // ── Preenche card de identidade da loja ─────────────────
         const infoLoja = json.data || {};
@@ -4958,7 +5006,7 @@
       } else if (json.msg === 'WPP_NAO_ENCONTRADO') {
         llWppErro('Número não encontrado. Confira o WhatsApp ou use "Cadastrar".');
       } else if (json.msg === 'LOJA_NAO_APROVADA') {
-        llWppErro('Sua loja ainda está pendente de aprovação. Aguarde o contato.');
+        llWppErro('Seu cadastro ainda não foi aprovado. Dúvidas? Fale com a gente pelo WhatsApp.');
       } else {
         llWppErro(json.msg || 'Erro ao solicitar. Tente novamente.');
       }
@@ -4970,7 +5018,7 @@
       if (ehTimeout) {
         loginStep(2);
         document.getElementById('login-loja-sub').textContent =
-          'Se você está cadastrado, o código já está a caminho. Confira seu WhatsApp.';
+          'Se você está cadastrado, vamos te mandar o código no WhatsApp em alguns minutos.';
         const cardEl = document.getElementById('login-loja-card');
         if (cardEl) cardEl.style.display = 'none';
         setTimeout(() => { llOtpFocus(0); }, 120);
@@ -5024,6 +5072,7 @@
         localStorage.setItem('angatuba_loja_nome',  _lojaNome);
         localStorage.setItem('angatuba_loja_wpp',   _lojaWpp);
         setTimeout(() => {
+          if (history.state?.modal === 'login-loja') history.replaceState({ modal: 'minha-loja' }, '');
           closeLoginLoja();
           atualizarNav();
           abrirMinhaLoja();
@@ -5320,11 +5369,11 @@
     mlRenderVencimento(d);
     mlRenderAvaliacaoNova(d);
 
-    // ── Link de compartilhamento (Plus e Pro) ────────────
+    // ── Link de compartilhamento (todos os planos) ───────
     const shareSection = document.getElementById('ml-share-section');
     if (shareSection) {
-      shareSection.style.display = isPago ? '' : 'none';
-      if (isPago) mlMontarCompartilhamento(d.nome);
+      shareSection.style.display = '';
+      mlMontarCompartilhamento(d.nome);
     }
 
     // ── Upload de imagens (Plus e Pro) ───────────────────
@@ -7107,7 +7156,9 @@
   // Confirma "Já voltamos" com prazo em minutos (0 = sem previsão)
   async function lojaToggleVoltamos(minutos) {
     document.getElementById('ml-voltamos-ate-wrap').style.display = 'none';
-    if (!minutos) { await lojaToggle('VOLTAMOS'); return; }
+    // "Sem previsão" vale 3h: depois a loja volta ao horário automático
+    // (antes ficava "Já voltamos" para sempre se o dono esquecesse).
+    if (!minutos) minutos = 180;
     const ate = new Date(Date.now() + minutos * 60000);
     const yyyy = ate.getFullYear();
     const mm   = String(ate.getMonth() + 1).padStart(2, '0');
@@ -7126,14 +7177,23 @@
     const _agora = new Date();
     // Fix #5: "aberto até" com horário menor/igual ao horário atual (ex: 00:00 = meia-noite)
     // significa amanhã. Sem isto, ABERTO_ATE_<hoje>_0000 vira "início de hoje", já no passado.
-    const _alvo = new Date(_agora);
-    if (time) {
-      const [_h, _m] = time.split(':').map(Number);
-      _alvo.setHours(_h, _m, 0, 0);
-      if (_alvo <= _agora) _alvo.setDate(_alvo.getDate() + 1); // rola para o dia seguinte
+    // Sem horário digitado: "aberto até" o fechamento do horário de hoje (ou
+    // 23:59). Antes virava 'ABERTO' sem prazo e a loja ficava aberta para sempre.
+    let _ate = /^\d{2}:\d{2}$/.test(time || '') ? time : '';
+    if (!_ate) {
+      try {
+        const _lj = _mlAcharLojaLocal(null, _lojaNome);
+        const _si = _lj ? calcStatusInfo(Object.assign({}, _lj, { statusLoja: '' })) : null;
+        if (_si && _si.status === 'open' && /^\d{2}:\d{2}$/.test(_si.fechaStr || '')) _ate = _si.fechaStr;
+      } catch (e) {}
+      if (!_ate) _ate = '23:59';
     }
+    const _alvo = new Date(_agora);
+    const [_h, _m] = _ate.split(':').map(Number);
+    _alvo.setHours(_h, _m, 0, 0);
+    if (_alvo <= _agora) _alvo.setDate(_alvo.getDate() + 1); // rola para o dia seguinte
     const hoje = `${_alvo.getFullYear()}-${String(_alvo.getMonth()+1).padStart(2,'0')}-${String(_alvo.getDate()).padStart(2,'0')}`;
-    const status = time ? `ABERTO_ATE_${hoje}_${time.replace(':','')}` : 'ABERTO';
+    const status = `ABERTO_ATE_${hoje}_${_ate.replace(':','')}`;
     document.getElementById('ml-aberto-ate-wrap').style.display = 'none';
     await lojaToggle(status);
   }
@@ -7217,7 +7277,7 @@
     } catch(e) {}
     try {
       // Token via POST — nunca em query string (logs de servidor, histórico do browser)
-      const json = await apiPost('lojaToggle', { token: _lojaToken, statusLoja: novoStatus }, { timeout: 10000 });
+      const json = await apiPost('lojaToggle', { token: _lojaToken, statusLoja: novoStatus }, { timeout: 25000 });
       // backend pode devolver erro de negócio (linha mudou, data inválida) com status != ok.
       if (json.status !== 'ok') throw new Error(json.msg || 'Falha ao salvar status');
       // Item 6: feedback de sucesso via helper à prova de corrida.
@@ -7227,6 +7287,27 @@
     } catch(e) {
       if (e.message === 'UNAUTHORIZED') return; // apiPost já fez logout
       console.warn('[lojaToggle] Erro:', e.message);
+      // Timeout ≠ falha: o GAS lento costuma gravar mesmo assim. Confere o
+      // status real antes de desfazer (antes o painel dizia "não salvou" e o
+      // público mostrava o status novo).
+      if (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+        _mlToggleFeedback('aviso', '⏳ Servidor lento — conferindo…');
+        try {
+          const jd = await apiPost('lojaDados', { token: _lojaToken }, { timeout: 25000 });
+          if (jd && jd.status === 'ok' && jd.data) {
+            const real = String(jd.data.statusLoja || '');
+            marcarToggle(real);
+            try { localStorage.setItem('angatuba_loja_dados', JSON.stringify(jd.data)); } catch (e4) {}
+            if (real === novoStatus) {
+              _mlToggleFeedback('ok', '✅ Status salvo');
+              if (typeof mlChecklistMarcarStatusTestado === 'function') mlChecklistMarcarStatusTestado();
+            } else {
+              _mlToggleFeedback('erro', '❌ Status não foi salvo. Tente de novo.');
+            }
+            return;
+          }
+        } catch (e3) { if (e3 && e3.message === 'UNAUTHORIZED') return; }
+      }
       // Fix #4: reverte visual E cache do localStorage (estava sobrescrevendo otimista)
       if (statusAnterior) marcarToggle(statusAnterior);
       if (statusCacheAnterior !== null) {
@@ -7265,7 +7346,7 @@
     if (status) { status.textContent = ''; status.style.color = ''; }
 
     try {
-      const json = await apiPost('lojaAtualizarInstagram', { token: _lojaToken, instagram: valor }, { timeout: 10000, ignoreUnauthorized: true });
+      const json = await apiPost('lojaAtualizarInstagram', { token: _lojaToken, instagram: valor }, { timeout: 20000, ignoreUnauthorized: true });
 
       if (json.status === 'erro' || json.msg === 'UNAUTHORIZED') {
         if (status) { status.textContent = '❌ Erro ao salvar. Tente novamente.'; status.style.color = 'var(--red)'; }
@@ -9613,7 +9694,7 @@
 
       if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
       try {
-        const json = await apiPost(map.action, Object.assign({ token: _lojaToken }, map.payload), { timeout: 10000, ignoreUnauthorized: true });
+        const json = await apiPost(map.action, Object.assign({ token: _lojaToken }, map.payload), { timeout: 20000, ignoreUnauthorized: true });
         if (json.status === 'ok') {
           map.apply();
           persistirCache();
@@ -9758,7 +9839,7 @@
       const valor = tagState.map(function (t) { return t.texto; }).join(', ');
       if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
       try {
-        const json = await apiPost('lojaAtualizarTags', { token: _lojaToken, tags: valor }, { timeout: 10000, ignoreUnauthorized: true });
+        const json = await apiPost('lojaAtualizarTags', { token: _lojaToken, tags: valor }, { timeout: 20000, ignoreUnauthorized: true });
         if (json.status === 'ok') {
           cur.tags = json.data && typeof json.data.tags === 'string' ? json.data.tags : valor;
           persistirCache();
@@ -9918,7 +9999,7 @@
 
       if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
       try {
-        const json = await apiPost('lojaAtualizarEndereco', { token: _lojaToken, endereco: endFull, bairro: bairro }, { timeout: 10000, ignoreUnauthorized: true });
+        const json = await apiPost('lojaAtualizarEndereco', { token: _lojaToken, endereco: endFull, bairro: bairro }, { timeout: 20000, ignoreUnauthorized: true });
         if (json.status === 'ok') {
           cur.endereco = endFull;
           cur.bairro = bairro;
@@ -10150,7 +10231,7 @@
       if (!texto) { if (msg) { msg.textContent = 'Selecione ao menos um dia e horário.'; msg.style.color = '#ef4444'; } return; }
       if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
       try {
-        const json = await apiPost('lojaAtualizarHorario', { token: _lojaToken, horario: texto, dias: mleMontarDias() }, { timeout: 10000, ignoreUnauthorized: true });
+        const json = await apiPost('lojaAtualizarHorario', { token: _lojaToken, horario: texto, dias: mleMontarDias() }, { timeout: 20000, ignoreUnauthorized: true });
         if (json.status === 'ok') {
           cur.horario = texto;
           persistirCache();
@@ -11898,6 +11979,13 @@
       if (painelSegueAberto) history.pushState({ modal: 'minha-loja' }, '');
       return;
     }
+    // Login do lojista e tela "Aguardando aprovação"
+    if (document.getElementById('modal-login-loja')?.classList.contains('open')) {
+      closeLoginLoja(true); return;
+    }
+    if (document.getElementById('modal-aguardando')?.classList.contains('open')) {
+      fecharAguardando(false, true); return;
+    }
     // Editor de aviso (admin) — fecha antes do modal de post, que fica por baixo
     if (document.getElementById('aviso-editor-overlay')?.style.display === 'flex') {
       if (typeof _fecharEditorAviso === 'function') _fecharEditorAviso(true); return;
@@ -12265,7 +12353,7 @@ ${urlCard}`)}`;
         campo,
         url,
       }));
-      const saveResp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
+      const saveResp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(20000) });
       const saveJson = await saveResp.json();
       if (saveJson.status !== 'ok') throw new Error(saveJson.msg || 'Erro ao salvar');
 
@@ -12921,7 +13009,10 @@ ${urlCard}`)}`;
     try {
       const params = new URLSearchParams();
       params.append('payload', JSON.stringify({ action:'lojaRemoverAnuncio', token:_lojaToken }));
-      await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
+      const respRm = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(20000) });
+      const jsonRm = await respRm.json();
+      if (jsonRm.msg === 'UNAUTHORIZED') { lojaLogout(true); return; }
+      if (jsonRm.status !== 'ok') throw new Error(jsonRm.msg || 'Falha ao remover');
       document.getElementById('ml-anuncio-ativo').style.display = 'none';
       document.getElementById('ml-anuncio-timer').textContent = '';
       if (typeof _mlPararTimerAnuncio === 'function') _mlPararTimerAnuncio(); // Item 17
@@ -12937,6 +13028,7 @@ ${urlCard}`)}`;
       if (formEl) formEl.style.display = '';
     } catch(e) {
       console.warn('[Anuncio] Erro ao remover:', e.message);
+      mlToast('Não foi possível remover o anúncio agora. Ele continua no ar — tente de novo.', 'erro');
     }
   }
 

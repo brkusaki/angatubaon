@@ -4585,6 +4585,34 @@
     }
   })();
 
+  // Link de "entrar em outro celular" (?entrar=<código de uso único>).
+  (function entrarPorLink() {
+    let code = '';
+    try { code = new URLSearchParams(location.search).get('entrar') || ''; } catch (e) {}
+    if (!code) return;
+    try {
+      const q = new URLSearchParams(location.search); q.delete('entrar');
+      history.replaceState(history.state, '', location.pathname + (q.toString() ? '?' + q.toString() : '') + location.hash);
+    } catch (e) {}
+    apiPost('lojaEntrarComLink', { code }, { timeout: 30000, ignoreUnauthorized: true }).then(json => {
+      if (json.status === 'ok' && json.data && json.data.token) {
+        _lojaToken = json.data.token;
+        _lojaNome  = json.data.nome || '';
+        _lojaWpp   = String(json.data.wpp || '');
+        localStorage.setItem('angatuba_loja_token', _lojaToken);
+        localStorage.setItem('angatuba_loja_nome',  _lojaNome);
+        localStorage.setItem('angatuba_loja_wpp',   _lojaWpp);
+        localStorage.removeItem('angatuba_loja_dados');
+        atualizarNav();
+        setTimeout(() => abrirMinhaLoja(), 300);
+      } else {
+        mlAviso('Link expirado', 'Esse link de acesso já foi usado ou passou dos 10 minutos. Gere um novo no celular que já está logado (Minha Loja → Loja → Entrar em outro celular).', '/webp/owl-sign.webp');
+      }
+    }).catch(() => {
+      mlAviso('Não foi possível entrar', 'Confira a internet e abra o link de novo (ele vale 10 minutos).', '/webp/owl-sign.webp');
+    });
+  })();
+
   /* ── Atualiza a bottom nav conforme sessão ───────────────── */
   function atualizarNav() {
     const navLojaBtn      = document.getElementById('nav-loja');
@@ -12166,6 +12194,50 @@
       document.body.removeChild(tmp);
       feedback();
     });
+  };
+
+  // Entrar em outro celular sem pedir código: gera um link de uso único
+  // (10 min) e mostra o QR para o outro aparelho escanear.
+  window.mlEntrarOutroCelular = async function () {
+    if (!_lojaToken) return;
+    const btn = document.getElementById('ml-outro-cel-btn');
+    const rotulo = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Gerando…'; }
+    try {
+      const json = await apiPost('lojaGerarLinkLogin', { token: _lojaToken }, { timeout: 25000 });
+      if (json.status !== 'ok' || !json.data || !json.data.code) throw new Error(json.msg || 'Falha ao gerar');
+      const link = location.origin + '/?entrar=' + json.data.code;
+      if (typeof QRCode === 'undefined') await _injetarScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js');
+      const ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:16px;';
+      ov.innerHTML =
+        '<div style="background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px;max-width:340px;width:100%;text-align:center;">' +
+          '<div style="font-family:var(--font-h);font-size:15px;font-weight:800;margin-bottom:6px;">Entrar em outro celular</div>' +
+          '<div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Aponte a câmera do outro celular para o QR. O link vale <strong>10 minutos</strong> e funciona <strong>uma vez só</strong>. Não mande para quem não é da loja.</div>' +
+          '<div id="ml-outro-cel-qr" style="background:#fff;border-radius:12px;padding:12px;display:inline-block;"></div>' +
+          '<div style="display:flex;gap:8px;margin-top:12px;">' +
+            '<button type="button" data-acao="copiar" style="flex:1;padding:10px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-weight:700;font-size:12px;cursor:pointer;"><i class="fa fa-copy"></i> Copiar link</button>' +
+            '<button type="button" data-acao="fechar" style="flex:1;padding:10px;border-radius:10px;background:var(--red);border:none;color:#fff;font-weight:700;font-size:12px;cursor:pointer;">Fechar</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(ov);
+      new QRCode(ov.querySelector('#ml-outro-cel-qr'), { text: link, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+      const fechar = () => { clearTimeout(tExp); ov.remove(); };
+      const tExp = setTimeout(fechar, 600000);
+      ov.addEventListener('click', function (e) {
+        const acao = e.target.closest('[data-acao]')?.dataset.acao;
+        if (e.target === ov || acao === 'fechar') fechar();
+        else if (acao === 'copiar') {
+          navigator.clipboard.writeText(link).then(() => mlToast('Link copiado! Abra no outro celular.', 'ok'))
+            .catch(() => mlToast('Não deu pra copiar — use o QR.', 'erro'));
+        }
+      });
+    } catch (e) {
+      if (e && e.message === 'UNAUTHORIZED') return;
+      mlToast('Não foi possível gerar o link agora. Tente de novo.', 'erro');
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = rotulo; }
+    }
   };
 
   // Gera um cartaz PNG (nome da loja + QR + link) para imprimir no balcão.

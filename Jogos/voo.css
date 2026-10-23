@@ -5,7 +5,8 @@
 .gc-voo .gc-owl-glow{background:radial-gradient(circle,rgba(73,167,255,.55),transparent 70%);}
 .vo-card{background:var(--card,#151d2b);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:12px;}
 .vo-hud{display:flex;gap:10px;justify-content:center;margin-bottom:10px;}
-.vo-hud-item{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.04);border-radius:12px;padding:6px 16px;min-width:88px;}
+.vo-hud-item{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.04);border-radius:12px;padding:6px 12px;min-width:80px;}
+.vo-hud-moedas{color:#ffd740;white-space:nowrap;}
 .vo-hud-label{font-size:11px;color:var(--muted,#8794a8);text-transform:uppercase;letter-spacing:.04em;}
 .vo-hud-valor{font-size:22px;font-weight:800;color:#fff;font-family:'Syne',sans-serif;}
 .vo-arena{position:relative;width:100%;aspect-ratio:9/16;max-height:72vh;margin:0 auto;border-radius:14px;overflow:hidden;background:#0d1420;touch-action:none;}

@@ -1335,7 +1335,8 @@
       '/Jogos/assets/voo/plat-move-esp.webp',
       '/Jogos/assets/voo/plat-normal-atm.webp',
       '/Jogos/assets/voo/plat-normal-ceu.webp',
-      '/Jogos/assets/voo/plat-normal-esp.webp'
+      '/Jogos/assets/voo/plat-normal-esp.webp',
+      '/Jogos/assets/corujinha/sim-moeda-v2.webp'
     ],
     blocos: [
       '/Jogos/blocos.min.js', '/Jogos/blocos.css',
@@ -2777,10 +2778,15 @@
      devolve aposta já debitada, com RTP < 100% e teto por giro — se
      contasse, quem passasse do teto perderia a aposta sem poder receber.
      O resgate diário ('diario', 100 fixas, 1x por dia civil) também fica
-     fora: é bônus de presença, não ganho de partida. */
+     fora: é bônus de presença, não ganho de partida.
+     Jogos com moedas coletáveis sem teto por partida (Voo da Coruja,
+     estilo Sky Jump do Pou) também ficam fora do teto do dia — senão
+     quem fizesse um recorde alto veria as moedas pegas não entrarem —
+     mas continuam recebendo o multiplicador de evento. */
   var TETO_DIARIO_MOEDAS = 500;
   var LOJA_KEY_MOEDAS_DIA = 'angatuba_moedas_dia';
   var TETO_MOTIVOS_ISENTOS = { 'corujinha-premio': true, 'diario': true };
+  var TETO_MOTIVOS_SEM_TETO = { 'voo': true };
   // Resgate diário: guarda o dia civil local ('YYYY-MM-DD') do último resgate.
   // É do APARELHO (fica fora do pacote por conta em _progressoGarantirDono),
   // pra trocar de conta no mesmo celular não render um 2º resgate no dia.
@@ -3057,16 +3063,20 @@
       var mult = (C && typeof C.multiplicadorMoedas === 'function') ? C.multiplicadorMoedas() : 1;
       var base = qtd;
       if (mult > 1) qtd = Math.floor(qtd * mult);
-      var dia = _ganhoDiaLer();
-      var efetivo = Math.min(qtd, Math.floor(TETO_DIARIO_MOEDAS * mult) - dia.ganho);
-      if (efetivo <= 0) {
-        if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[loja] teto diário atingido — +' + qtd + ' (' + (motivo || '?') + ') não creditado');
-        return _moedasLer();
+      if (TETO_MOTIVOS_SEM_TETO[motivo]) {
+        bonusEvento = Math.max(0, qtd - base);
+      } else {
+        var dia = _ganhoDiaLer();
+        var efetivo = Math.min(qtd, Math.floor(TETO_DIARIO_MOEDAS * mult) - dia.ganho);
+        if (efetivo <= 0) {
+          if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[loja] teto diário atingido — +' + qtd + ' (' + (motivo || '?') + ') não creditado');
+          return _moedasLer();
+        }
+        dia.ganho += efetivo;
+        _ganhoDiaSalvar(dia);
+        qtd = efetivo;
+        bonusEvento = Math.max(0, efetivo - base);
       }
-      dia.ganho += efetivo;
-      _ganhoDiaSalvar(dia);
-      qtd = efetivo;
-      bonusEvento = Math.max(0, efetivo - base);
     }
     var novo = Math.max(0, _moedasLer() + qtd);
     if (qtd !== 0) {

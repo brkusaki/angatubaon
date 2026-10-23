@@ -14,6 +14,8 @@
        arrasta o dedo pra mover na horizontal (controle relativo).
      — Pontuação = altura subida (independente de resolução: tudo
        normalizado por H, a altura lógica do canvas).
+     — Moedas: coletáveis no caminho, sem teto por partida (ver
+       _vooGerarMoedas / _vooColetarMoedas).
      — Integra no hub como os outros: _vooPreparar (ao abrir a tela),
        _vooComecar (botão), _vooParar (ao sair). Rank via
        rankSubmeter('voo', score) + rankFimDeJogo no fim.
@@ -342,6 +344,19 @@
   var _vooDecorTimer = 0;      // tempo até tentar spawnar o próximo decor (s)
   var _vooBuracoCd = 0;        // cooldown (s) até um buraco negro poder surgir
 
+  /* ── Moedas no céu (estilo Sky Jump do Pou) ─────────────────────
+     Em vez de pagar por pontuação no fim (com teto de 25 por partida,
+     que batia antes do espaço), as moedas ficam espalhadas no caminho e
+     cada uma pega vale 1 — sem teto: quem sobe mais pega mais. Nascem
+     junto com as plataformas (ver _vooGerarMoedas) e ficam presas a
+     elas (acompanham as móveis). Creditadas de uma vez no fim (ou ao
+     sair no meio), pra não gravar no localStorage a cada moeda. ── */
+  var _VOO_MOEDA_IMG = '../corujinha/sim-moeda-v2.webp';   // mesma arte da Corujinha
+  var _vooMoedas = [];         // { p: plataforma-âncora, dx, x, y, fase }
+  var _vooMoedasRun = 0;       // moedas pegas na partida atual
+  var _vooMoedaFx = [];        // brilho de coleta: { x, y (mundo), t }
+  var _vooMoedaStreak = 0, _vooMoedaStreakT = 0;   // sequência rápida → som sobe de tom
+
   /* ── Caches de desenho (performance) ────────────────────────────
      O gargalo do jogo era redesenhar TUDO do zero a cada frame: cada
      plataforma criava um gradiente novo e passava por um ctx.shadowBlur
@@ -658,13 +673,94 @@
       yAtual -= g;
       var nova = _vooNovaPlat(yAtual, anteriorRuim);   // força normal se anterior ruim
       _vooPlats.push(nova);
+      _vooGerarMoedas(nova);
       tipoAnterior = nova.tipo;
     }
+  }
+
+  // Raio da moeda (unidade de tamanho, igual à coruja).
+  function _vooMoedaR() { return 0.042 * _vooU(); }
+
+  // Sorteia moedas acima de uma plataforma recém-criada. Ficam logo
+  // acima da cabeça da coruja pousada, então quem pula no MEIO da
+  // plataforma pega; quem pula na ponta passa raspando. Trampolim sempre
+  // traz uma coluna alta (o pulo dele vai longe). Um pouco mais de moedas
+  // conforme sobe (mesma escala de dificuldade, score/3200). A coluna
+  // comum cabe inteira na altura de um pulo normal.
+  function _vooGerarMoedas(pl) {
+    var t = Math.min(1, _vooScore / 3200);
+    var n = 0, passo = 0.045 * _vooH;
+    if (pl.boost) { n = 4; passo = 0.08 * _vooH; }
+    else {
+      var r = Math.random();
+      if (r < 0.03 + 0.02 * t) n = 3 + ((Math.random() * 2) | 0);    // coluna de 3 ou 4
+      else if (r < 0.16 + 0.07 * t) n = 1;
+    }
+    if (!n) return;
+    var dx = pl.w / 2;
+    var base = pl.y - _vooOwlH() * 0.5 - 0.035 * _vooH;
+    for (var i = 0; i < n; i++) {
+      _vooMoedas.push({ p: pl, dx: dx, x: pl.x + dx, y: base - i * passo, fase: Math.random() * 6.283 });
+    }
+  }
+
+  // Move as moedas junto da plataforma, coleta as que encostam na coruja
+  // e descarta as que ficaram pra baixo da tela (compacta no lugar).
+  function _vooColetarMoedas(dt) {
+    var o = _vooOwl;
+    var hw = _vooOwlW() * 0.42, hh = _vooOwlH() * 0.5, r = _vooMoedaR();
+    var limiteBaixo = _vooCamY + _vooH * 1.3;
+    if (_vooMoedaStreakT > 0) { _vooMoedaStreakT -= dt; if (_vooMoedaStreakT <= 0) _vooMoedaStreak = 0; }
+    var k = 0, pegou = 0;
+    for (var i = 0; i < _vooMoedas.length; i++) {
+      var m = _vooMoedas[i];
+      if (m.p) m.x = m.p.x + m.dx;
+      if (m.y > limiteBaixo) continue;
+      if (Math.abs(m.x - o.x) < hw + r && Math.abs(m.y - o.y) < hh + r) {
+        pegou++;
+        if (_vooMoedaFx.length >= 10) _vooMoedaFx.shift();
+        _vooMoedaFx.push({ x: m.x, y: m.y, t: 0 });
+        continue;
+      }
+      _vooMoedas[k++] = m;
+    }
+    _vooMoedas.length = k;
+
+    // Brilho de coleta: envelhece e some em ~0.5s.
+    var kf = 0;
+    for (var f = 0; f < _vooMoedaFx.length; f++) {
+      var fx = _vooMoedaFx[f];
+      fx.t += dt;
+      if (fx.t < 0.5) _vooMoedaFx[kf++] = fx;
+    }
+    _vooMoedaFx.length = kf;
+
+    if (pegou) {
+      _vooMoedasRun += pegou;
+      var el = document.getElementById('vo-moedas');
+      if (el) el.textContent = _vooMoedasRun;
+      _vooMoedaStreak += pegou;
+      _vooMoedaStreakT = 0.7;
+      if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.combo(Math.min(8, _vooMoedaStreak));
+    }
+  }
+
+  // Credita as moedas da partida na carteira (uma vez só) e devolve quantas.
+  function _vooCreditarMoedas() {
+    var n = _vooMoedasRun;
+    _vooMoedasRun = 0;
+    var G = window.AngatubaGames;
+    if (n > 0 && G && typeof G.moedasAdd === 'function') G.moedasAdd(n, 'voo');
+    return n;
   }
 
   function _vooReset() {
     _vooDimensionar();
     _vooPlats = [];
+    _vooMoedas = []; _vooMoedaFx = []; _vooMoedasRun = 0;
+    _vooMoedaStreak = 0; _vooMoedaStreakT = 0;
+    var elM = document.getElementById('vo-moedas'); if (elM) elM.textContent = 0;
+    _vooAsset(_VOO_MOEDA_IMG);
     _vooStartY = 0;
     _vooCamY = _vooStartY - 0.7 * _vooH;     // coruja começa no terço de baixo
     _vooMaxClimb = 0; _vooScore = 0; _vooScoreShown = -1;
@@ -692,6 +788,7 @@
       y -= gg;
       var np = _vooNovaPlat(y, ruim);
       _vooPlats.push(np);
+      _vooGerarMoedas(np);
       tAnt = np.tipo;
     }
 
@@ -980,6 +1077,7 @@
     _vooPlats.length = k;
 
     _vooAtualizarScore();
+    _vooColetarMoedas(dt);
 
     // Altitude normalizada (0 solo → 1 espaço), suavizada pra transição
     // de céu não "pinotear" quando a coruja oscila. A fração linear passa
@@ -1019,7 +1117,79 @@
     var o = _vooOwl;
     _vooDesenharRastro(ctx);
     _vooDesenharPlataformas(ctx, W, H);
+    _vooDesenharMoedas(ctx, H);
     _vooDesenharCoruja(ctx, o);
+  }
+
+  // ── Moedas: sprite pré-renderizado (arte da moeda-coruja com halo
+  //    dourado; sem a arte, disco vetorial) girando no eixo vertical,
+  //    mais o brilho "+1" de coleta. ──
+  function _vooDesenharMoedas(ctx, H) {
+    if (!_vooMoedas.length && !_vooMoedaFx.length) return;
+    var r = _vooMoedaR();
+    var sp = _vooMoedaSprite(r);
+    if (sp) {
+      var R = sp.R;
+      for (var i = 0; i < _vooMoedas.length; i++) {
+        var m = _vooMoedas[i];
+        var y = m.y - _vooCamY;
+        if (y < -R || y > H + R) continue;
+        var esc = 0.3 + 0.7 * Math.abs(Math.cos(_vooTempo * 2.6 + m.fase));
+        ctx.drawImage(sp.cv, m.x - R * esc, y - R, 2 * R * esc, 2 * R);
+      }
+    }
+    for (var f = 0; f < _vooMoedaFx.length; f++) {
+      var fx = _vooMoedaFx[f];
+      var k = fx.t / 0.5;
+      var fy = fx.y - _vooCamY;
+      ctx.globalAlpha = 1 - k;
+      ctx.strokeStyle = '#ffd740';
+      ctx.lineWidth = Math.max(1.5, r * 0.18);
+      ctx.beginPath(); ctx.arc(fx.x, fy, r * (1 + 1.4 * k), 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#ffe680';
+      ctx.font = '800 ' + Math.round(r * 1.1) + 'px Syne, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('+1', fx.x, fy - r * (1.2 + 2 * k));
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function _vooMoedaSprite(r) {
+    if (!(r > 0)) return null;
+    var reg = _vooAsset(_VOO_MOEDA_IMG);
+    var temImg = !!(reg && reg.ok && reg.img);
+    var chave = 'moeda|' + (temImg ? 'I' : 'V') + '|' + Math.round(r * 10);
+    var sp = _vooSprites[chave];
+    if (sp) return sp;
+    var R = r * 1.35;                                  // folga pro halo
+    var cv, c;
+    try {
+      cv = document.createElement('canvas');
+      cv.width = cv.height = Math.max(1, Math.round(2 * R * _vooDpr));
+      c = cv.getContext('2d');
+      if (!c) return null;
+    } catch (e) { return null; }
+    c.setTransform(_vooDpr, 0, 0, _vooDpr, 0, 0);
+    c.translate(R, R);
+    c.shadowColor = 'rgba(255,205,70,0.75)';
+    c.shadowBlur = r * 0.6;
+    var desenhou = false;
+    if (temImg) {
+      try { c.drawImage(reg.img, -r * 1.12, -r * 1.12, r * 2.24, r * 2.24); desenhou = true; } catch (e) {}
+    }
+    if (!desenhou) {
+      var g = c.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+      g.addColorStop(0, '#fff3b0'); g.addColorStop(0.55, '#ffc928'); g.addColorStop(1, '#d48a00');
+      c.fillStyle = g;
+      c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill();
+      c.shadowBlur = 0;
+      c.strokeStyle = 'rgba(150,90,0,0.7)';
+      c.lineWidth = Math.max(1, r * 0.14);
+      c.beginPath(); c.arc(0, 0, r * 0.68, 0, Math.PI * 2); c.stroke();
+    }
+    sp = { cv: cv, R: R };
+    _vooSprites[chave] = sp;
+    return sp;
   }
 
   // ── Camada 1: céu (gradiente por altitude) + astro + estrelas + nuvens ──
@@ -1594,7 +1764,8 @@
 
   function _vooParar() {
     if (_vooRAF) { cancelAnimationFrame(_vooRAF); _vooRAF = 0; }
-    if (_vooEstado === 'jogando') _vooEstado = 'inicio';
+    // Saiu no meio do voo: as moedas já pegas não se perdem.
+    if (_vooEstado === 'jogando') { _vooCreditarMoedas(); _vooEstado = 'inicio'; }
     _vooDragging = false; _vooKeyDir = 0;
     _vooMenuPartida(false);
   }
@@ -1646,14 +1817,12 @@
     // Rank (silencioso se deslogado; o Firestore aplica recorde/teto)
     if (window.AngatubaGames) window.AngatubaGames.rankSubmeter('voo', score);
 
-    // Moedas da Loja da Coruja (teto 25 por partida) + stats locais
-    // (partidas/segundos/recorde), já no formato que o perfil vai usar.
+    // Moedas da Loja da Coruja: as que a coruja pegou no caminho, sem
+    // teto por partida + stats locais (partidas/segundos/recorde), já no
+    // formato que o perfil vai usar.
     var moedasGanhas = 0;
     if (window.AngatubaGames) {
-      moedasGanhas = Math.max(0, Math.min(25, Math.floor(score / 50)));
-      if (moedasGanhas > 0 && typeof window.AngatubaGames.moedasAdd === 'function') {
-        window.AngatubaGames.moedasAdd(moedasGanhas, 'voo');
-      }
+      moedasGanhas = _vooCreditarMoedas();
       if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
         window.AngatubaGames.statsRegistrarPartida('voo', { segundos: _vooTempoJogado, score: score });
       }

@@ -1590,6 +1590,12 @@
       return { status: 'open', fechaStr: '' };
     }
 
+    // Dia marcado como fechado (feriado/folga) pelo dono no painel
+    if (Array.isArray(loja.fechadoEm) && loja.fechadoEm.length) {
+      const hojeFe = `${_agora.y}-${String(_agora.mo).padStart(2,'0')}-${String(_agora.d).padStart(2,'0')}`;
+      if (loja.fechadoEm.indexOf(hojeFe) !== -1) return { status: 'closed', fechaStr: '' };
+    }
+
     // ── Múltiplos turnos ──────────────────────────────────────
     // Fonte da verdade: o texto "Seg, Ter 08:00-18:00 | Sáb 08:00-12:00"
     // (separado por "|"). Se não houver texto parseável, cai no horário
@@ -5427,6 +5433,7 @@
 
     // ── Banners da aba Hoje: vencimento (#3) e nova avaliação (#5) ──
     mlRenderVencimento(d);
+    mlDiasFechadosRender(d.diasFechados || '');
     mlRenderAvaliacaoNova(d);
 
     // ── Link de compartilhamento (todos os planos) ───────
@@ -12248,6 +12255,48 @@
       document.body.removeChild(tmp);
       feedback();
     });
+  };
+
+  // ── Dias fechados (feriado/folga) ─────────────────────────
+  function mlDiasFechadosRender(csv) {
+    const box = document.getElementById('ml-fechados-lista');
+    if (!box) return;
+    const hj = (() => { const n = _agoraSP(); return `${n.y}-${String(n.mo).padStart(2,'0')}-${String(n.d).padStart(2,'0')}`; })();
+    const datas = String(csv || '').split(',').map(x => x.trim()).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x) && x >= hj);
+    box.dataset.datas = datas.join(',');
+    const inp = document.getElementById('ml-fechados-data');
+    if (inp) inp.min = hj;
+    box.innerHTML = datas.length ? datas.map(dt => {
+      const [y, m, dd] = dt.split('-');
+      return `<span style="display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);font-size:11px;font-weight:700;color:var(--red);">` +
+        `${dd}/${m}${dt === hj ? ' (hoje)' : ''}<button type="button" onclick="mlDiasFechadosRemover('${dt}')" aria-label="Remover" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;padding:0;line-height:1;">×</button></span>`;
+    }).join('') : '<span style="font-size:11px;color:var(--muted);">Nenhum dia marcado.</span>';
+  }
+  async function _mlDiasFechadosSalvar(lista) {
+    const json = await apiPost('lojaAtualizarDiasFechados', { token: _lojaToken, datas: lista.join(',') }, { timeout: 25000 });
+    if (json.status !== 'ok') throw new Error(json.msg || 'Falha ao salvar');
+    const csv = (json.data && json.data.diasFechados) || '';
+    try {
+      const c = JSON.parse(localStorage.getItem('angatuba_loja_dados') || 'null');
+      if (c) { c.diasFechados = csv; localStorage.setItem('angatuba_loja_dados', JSON.stringify(c)); }
+    } catch (e) {}
+    mlDiasFechadosRender(csv);
+  }
+  window.mlDiasFechadosAdd = async function () {
+    const inp = document.getElementById('ml-fechados-data');
+    const box = document.getElementById('ml-fechados-lista');
+    const v = inp ? inp.value : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { mlToast('Escolha a data primeiro.', 'erro'); return; }
+    const atual = (box && box.dataset.datas) ? box.dataset.datas.split(',').filter(Boolean) : [];
+    if (atual.indexOf(v) !== -1) return;
+    try { await _mlDiasFechadosSalvar(atual.concat(v)); if (inp) inp.value = ''; mlToast('Pronto! Nesse dia sua loja aparece fechada.', 'ok'); }
+    catch (e) { if (e.message !== 'UNAUTHORIZED') mlToast('Não foi possível salvar agora. Tente de novo.', 'erro'); }
+  };
+  window.mlDiasFechadosRemover = async function (dt) {
+    const box = document.getElementById('ml-fechados-lista');
+    const atual = (box && box.dataset.datas) ? box.dataset.datas.split(',').filter(Boolean) : [];
+    try { await _mlDiasFechadosSalvar(atual.filter(x => x !== dt)); }
+    catch (e) { if (e.message !== 'UNAUTHORIZED') mlToast('Não foi possível salvar agora. Tente de novo.', 'erro'); }
   };
 
   // Lista os pedidos do carrinho dos últimos 30 dias (planos pagos).

@@ -1334,7 +1334,6 @@
       '/Jogos/assets/voo/plat-move-ceu.webp',
       '/Jogos/assets/voo/plat-move-esp.webp',
       '/Jogos/assets/voo/plat-normal-atm.webp',
-      '/Jogos/assets/voo/plat-normal-ceu.png',
       '/Jogos/assets/voo/plat-normal-ceu.webp',
       '/Jogos/assets/voo/plat-normal-esp.webp'
     ],

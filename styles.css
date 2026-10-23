@@ -708,7 +708,7 @@
       border-left:3px solid var(--zap); border-radius:14px;
       padding:12px 16px; box-shadow:0 8px 32px rgba(0,0,0,0.6);
       font-size:13px; line-height:1.4; color:var(--text);
-      white-space:normal; max-width:min(380px,calc(100vw - 32px));
+      white-space:normal; width:max-content; max-width:min(380px,calc(100vw - 32px));
       opacity:0; pointer-events:none;
       transition:opacity 0.25s ease, transform 0.25s ease;
       will-change:opacity,transform;
@@ -6399,6 +6399,9 @@ body.light-mode .rc-evento-chip { color: #b45309; }
       width: 100%; height: 100%; border-radius: 50%;
       object-fit: cover; display: block;
     }
+    /* Aviso do próprio app: a coruja inteira no lugar da bolinha com inicial. */
+    .aon-aviso-av-app { background: none; width: 40px; height: 40px; }
+    .aon-aviso-av-app .aon-aviso-av-img { border-radius: 0; object-fit: contain; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); }
     .aon-aviso-av-ini {
       position: absolute; inset: 0; border-radius: 50%;
       align-items: center; justify-content: center;

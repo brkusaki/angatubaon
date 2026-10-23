@@ -810,7 +810,7 @@
 
       <!-- Estado vazio: nenhum jogo bate com a busca/filtro -->
       <div class="games-empty" id="games-empty">
-        <div class="games-empty-owl">🦉</div>
+        <div class="games-empty-owl"><img src="/webp/owl-search.webp" alt="" style="width:72px;height:72px;object-fit:contain;" onerror="this.parentNode.textContent='🦉'"></div>
         <div class="games-empty-tit">Nenhum jogo encontrado</div>
         <div class="games-empty-sub">Tenta outra busca ou categoria.</div>
       </div>
@@ -3677,19 +3677,19 @@
   <!-- ══════════════════════════════ UPDATE BANNER -->
   <div id="sw-update-banner" style="
     display:none;position:fixed;bottom:72px;left:12px;right:12px;z-index:9999;
-    background:linear-gradient(135deg,#1e1b4b,#312e81);
-    border:1px solid rgba(99,102,241,0.4);border-radius:16px;
-    padding:12px 14px;box-shadow:0 8px 32px rgba(0,0,0,0.5);
+    background:linear-gradient(135deg,#1a1a1a,#262626);
+    border:1px solid rgba(255,68,68,0.35);border-radius:16px;
+    padding:10px 14px 10px 10px;box-shadow:0 8px 32px rgba(0,0,0,0.5);
     display:none;align-items:center;gap:10px;
     animation: slideUpBanner 0.35s cubic-bezier(0.32,0.72,0,1) forwards;">
-    <div style="font-size:1.4rem;flex-shrink:0;">🚀</div>
+    <img src="/webp/owl-celebrate-flying.webp" alt="" style="width:52px;height:44px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.5));" onerror="this.style.display='none'" />
     <div style="flex:1;min-width:0;">
-      <div style="font-family:var(--font-h);font-size:13px;font-weight:800;color:#fff;">Nova versão disponível!</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:1px;">Clique para atualizar agora</div>
+      <div style="font-family:var(--font-h);font-size:13px;font-weight:800;color:#fff;">Novidade no Angatuba<span style="color:var(--red);">ON</span>!</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:1px;">A coruja trouxe uma versão nova. Toque pra atualizar.</div>
     </div>
     <button id="sw-update-btn" style="
       padding:8px 14px;border-radius:9px;
-      background:linear-gradient(135deg,var(--plano-plus-1),var(--plano-plus-2));
+      background:linear-gradient(135deg,#ff4444,#e11d48);
       color:#fff;font-family:var(--font-h);font-size:12px;font-weight:800;
       border:none;cursor:pointer;white-space:nowrap;flex-shrink:0;">
       Atualizar

@@ -20515,8 +20515,10 @@ ${urlCard}`)}`;
     // Foto (P3): o pedido de amizade traz a photoURL de quem pediu; o
     // convite pra jogar (4.4) não tem esse campo no nó e fica na
     // inicial, que é o comportamento de sempre.
-    var foto = _amigosFotoValida(o.foto);
-    return '<span class="aon-aviso-av">' +
+    // Aviso do próprio app (o.avatar, ex.: pedido de notificação): a coruja
+    // ocupa o avatar inteiro, sem a inicial "A" por trás.
+    var foto = o.avatar || _amigosFotoValida(o.foto);
+    return '<span class="aon-aviso-av' + (o.avatar ? ' aon-aviso-av-app' : '') + '">' +
         (foto
           ? '<img src="' + escHTML(foto) + '" alt="" class="aon-aviso-av-img" ' +
             'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" />' +
@@ -23416,7 +23418,7 @@ ${urlCard}`)}`;
     _avisoMostrar({
       chave: 'fcm:pedir',
       nome: 'AngatubaON',
-      owl: '/webp/owl-wave.webp',
+      avatar: '/webp/owl-wave.webp',
       texto: 'Ativar avisos de convite e amigo mesmo com o app fechado?',
       acoes: [
         { rotulo: 'Ativar',    classe: 'ok', fn: _fcmPedirPermissao },

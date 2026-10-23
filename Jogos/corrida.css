@@ -8,8 +8,9 @@
    Prefixo .cor-* (espelha o padrão do Voo .vo-*).
    ═══════════════════════════════════════════════════════════════ */
 .cor-card{background:var(--card,#151d2b);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:12px;}
-.cor-hud{display:flex;gap:10px;justify-content:center;margin-bottom:10px;}
-.cor-hud-item{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.04);border-radius:12px;padding:6px 14px;min-width:74px;}
+.cor-hud{display:flex;gap:6px;justify-content:center;margin-bottom:10px;}
+.cor-hud-item{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.04);border-radius:12px;padding:6px 10px;min-width:64px;}
+.cor-hud-item.cor-hud-moedas .cor-hud-valor{color:#ffd740;white-space:nowrap;}
 .cor-hud-label{font-size:11px;color:var(--muted,#8794a8);text-transform:uppercase;letter-spacing:.04em;}
 .cor-hud-valor{font-size:22px;font-weight:800;color:#fff;font-family:'Syne',sans-serif;}
 .cor-hud-item.cor-hud-mun .cor-hud-valor{color:#ffd24a;}

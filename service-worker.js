@@ -66,7 +66,7 @@ self.addEventListener('notificationclick', function (event) {
   );
 });
 
-const CACHE = 'angatubaon-v457';
+const CACHE = 'angatubaon-v458';
 // Cache separado dos assets dos jogos (sprites, sons, músicas, vídeos
 // dos minigames). Fica de fora do CACHE principal de propósito: o
 // activate() abaixo NUNCA apaga o CACHE_JOGOS quando o app atualiza

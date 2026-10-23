@@ -1299,6 +1299,7 @@
       '/Jogos/assets/corrida/obst-entulho.webp', '/Jogos/assets/corrida/obst-pedra.webp',
       '/Jogos/assets/corrida/obst-toco.webp', '/Jogos/assets/corrida/obst-placa.webp',
       '/Jogos/assets/corrida/obst-abobora.webp', '/Jogos/assets/corrida/obst-lapide.webp',
+      '/Jogos/assets/corujinha/sim-moeda-v2.webp',
       // partículas usadas pela corrida:
       '/Jogos/assets/particulas/brilho/circle_01.webp',
       '/Jogos/assets/particulas/brilho/circle_02.webp',
@@ -2780,13 +2781,13 @@
      O resgate diário ('diario', 100 fixas, 1x por dia civil) também fica
      fora: é bônus de presença, não ganho de partida.
      Jogos com moedas coletáveis sem teto por partida (Voo da Coruja,
-     estilo Sky Jump do Pou) também ficam fora do teto do dia — senão
+     estilo Sky Jump do Pou; Corrida da Coruja, moedas na pista) também ficam fora do teto do dia — senão
      quem fizesse um recorde alto veria as moedas pegas não entrarem —
      mas continuam recebendo o multiplicador de evento. */
   var TETO_DIARIO_MOEDAS = 500;
   var LOJA_KEY_MOEDAS_DIA = 'angatuba_moedas_dia';
   var TETO_MOTIVOS_ISENTOS = { 'corujinha-premio': true, 'diario': true };
-  var TETO_MOTIVOS_SEM_TETO = { 'voo': true };
+  var TETO_MOTIVOS_SEM_TETO = { 'voo': true, 'corrida': true };
   // Resgate diário: guarda o dia civil local ('YYYY-MM-DD') do último resgate.
   // É do APARELHO (fica fora do pacote por conta em _progressoGarantirDono),
   // pra trocar de conta no mesmo celular não render um 2º resgate no dia.

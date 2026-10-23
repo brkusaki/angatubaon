@@ -100,6 +100,10 @@
       abafado a cada 10-18s como ambiente, e um pouco mais de "corpo"
       grave no esbarrão. Ver _corSomRosnado/_corSomImpactoObstaculo/
       _corSomUivoDistante logo depois de _corSomMorte.
+  10) MOEDAS NA PISTA: fileiras de moedas (retas ou diagonais) vêm pelo
+      campo; cada uma pega vale 1, sem teto por partida (antes pagava
+      metros/200 com teto de 25). Ver _corSpawnMoedas e o bloco de
+      moedas em _corUpdate.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -710,6 +714,21 @@
   var _corObstaculos = [];
   var _corSpawnT = 0, _corItemT = 0, _corObstT = 0;
 
+  /* ── Moedas na pista (estilo Subway Surfers) ─────────────────────
+     Em vez de pagar por distância no fim (com teto de 25 por partida),
+     fileiras de moedas vêm pelo campo — retas ou na diagonal — e cada
+     uma pega vale 1, sem teto: quem corre mais longe pega mais. Elas
+     passam no meio da horda, então pegar tudo é arriscar. Creditadas de
+     uma vez no fim (ou ao sair no meio), pra não gravar a cada moeda. */
+  var _COR_MOEDA_IMG = '/Jogos/assets/corujinha/sim-moeda-v2.webp';   // mesma arte da Corujinha
+  var _COR_MOEDA_PEGA = 0.24;    // meia-largura (unid. de faixa) que conta como pegar
+  var _corMoedas = [];           // { z, faixa, fase }
+  var _corMoedaT = 0;            // s até a próxima fileira
+  var _corMoedasRun = 0;         // moedas pegas na corrida atual
+  var _corMoedaFx = [];          // "+1" de coleta, em coordenadas de tela: { x, t }
+  var _corMoedaStreak = 0, _corMoedaStreakT = 0;   // sequência → som sobe de tom
+  var _corMoedaImg = null, _corMoedaSp = null, _corMoedaSpImg = false;
+
   // Campo ABERTO: os zumbis nascem em qualquer x lateral contínuo dentro
   // deste range (em unidades de faixa; -1.6..1.6 cobre além das bordas pra
   // eles entrarem/saírem de campo naturalmente). Sem faixas discretas.
@@ -844,6 +863,9 @@
     _corRosnadoT = 0; _corUivoT = _corRand(10, 18); _corUivoTocandoT = 0;
     _corPasso = 0; _corPassoUlt = 0;
     _corZumbis.length = 0; _corItens.length = 0; _corSangue.length = 0; _corObstaculos.length = 0;
+    _corMoedas.length = 0; _corMoedaFx.length = 0; _corMoedasRun = 0; _corMoedasPagas = false;
+    _corMoedaStreak = 0; _corMoedaStreakT = 0; _corMoedaT = 4.5;
+    _corMoedaSprite();   // já começa a baixar a arte da moeda
     // 2.2s (era 0.9s) — dá tempo do jogador se situar antes do primeiro
     // lote de zumbis nascer (ver comentário em _corPopMin sobre a "parede").
     _corSpawnT = 2.2; _corItemT = 8.5; _corObstT = _corRand(8, 12);
@@ -854,14 +876,16 @@
      localStorage.getItem A CADA FRAME (180 escritas de DOM por segundo).
      Em Android fraco isso sozinho já engasgava o loop. Agora os elementos
      ficam em cache e só escrevemos quando o valor realmente muda. */
-  var _corElDist = null, _corElMun = null, _corElRec = null;
-  var _corHudUlt = { d: -1, m: -1, r: -1 };
+  var _corElDist = null, _corElMun = null, _corElRec = null, _corElMoe = null;
+  var _corHudUlt = { d: -1, m: -1, r: -1, mo: -1 };
   function _corAtualizarHUD(forcar) {
     if (forcar || !_corElDist) {
       _corElDist = document.getElementById('cor-dist');
       _corElMun  = document.getElementById('cor-mun');
       _corElRec  = document.getElementById('cor-recorde');
+      _corElMoe  = document.getElementById('cor-moedas');
     }
+    if (_corElMoe && (forcar || _corMoedasRun !== _corHudUlt.mo)) { _corElMoe.textContent = _corMoedasRun; _corHudUlt.mo = _corMoedasRun; }
     var dv = Math.floor(_corDist);
     if (_corElDist && (forcar || dv !== _corHudUlt.d)) { _corElDist.textContent = dv + 'm'; _corHudUlt.d = dv; }
     if (_corElMun && (forcar || _corMun !== _corHudUlt.m)) { _corElMun.textContent = _corMun; _corHudUlt.m = _corMun; }
@@ -920,6 +944,78 @@
     _corItens.push({ z: _COR_Z_FAR, faixa: _corCamX + lado, bob: Math.random() * Math.PI * 2 });
   }
 
+  /* Fileira de 4 a 6 moedas, uma atrás da outra (nascem além do horizonte,
+     escondidas na névoa, e vão surgindo). 40% das vezes é diagonal —
+     obriga a acompanhar com o arraste. Relativa à câmera, como o resto.
+     Desvia de obstáculo que acabou de nascer, pra fileira não terminar
+     dentro de um carro. */
+  function _corSpawnMoedas() {
+    var n = 4 + ((Math.random() * 3) | 0);
+    var ini = _corCamX + _corRand(-0.85, 0.85);
+    var fim = (Math.random() < 0.4) ? _corClamp(ini + _corRand(-0.7, 0.7), _corCamX - 0.95, _corCamX + 0.95) : ini;
+    for (var k = 0; k < _corObstaculos.length; k++) {
+      var ob = _corObstaculos[k], meio = (ini + fim) / 2;
+      if (ob.z > 0.55 && Math.abs(ob.faixa - meio) < 0.45) {
+        var desvio = (meio >= ob.faixa ? 1 : -1) * 0.5;
+        ini += desvio; fim += desvio;
+      }
+    }
+    for (var i = 0; i < n; i++) {
+      _corMoedas.push({ z: _COR_Z_FAR + i * 0.055, faixa: ini + (fim - ini) * (i / (n - 1)), fase: Math.random() * 6.283 });
+    }
+  }
+
+  // Credita as moedas da corrida na carteira (uma vez só) e devolve quantas.
+  var _corMoedasPagas = false;
+  function _corCreditarMoedas() {
+    if (_corMoedasPagas) return 0;
+    _corMoedasPagas = true;
+    var G = window.AngatubaGames;
+    if (_corMoedasRun > 0 && G && typeof G.moedasAdd === 'function') G.moedasAdd(_corMoedasRun, 'corrida');
+    return _corMoedasRun;
+  }
+
+  // Sprite da moeda (arte da moeda-coruja com halo dourado; sem a arte,
+  // disco vetorial), pré-renderizado UMA vez em 96px e só escalado no
+  // desenho. Refeito uma única vez quando a arte termina de carregar.
+  function _corMoedaSprite() {
+    if (!_corMoedaImg) {
+      try {
+        _corMoedaImg = new Image();
+        _corMoedaImg.onload = function () { _corMoedaSp = null; };
+        _corMoedaImg.src = _COR_MOEDA_IMG;
+      } catch (e) {}
+    }
+    var temImg = !!(_corMoedaImg && _corMoedaImg.complete && _corMoedaImg.naturalWidth);
+    if (_corMoedaSp && (_corMoedaSpImg || !temImg)) return _corMoedaSp;
+    var T = 96, r = T / 2 / 1.35, cv, c;
+    try {
+      cv = document.createElement('canvas');
+      cv.width = cv.height = T;
+      c = cv.getContext('2d');
+      if (!c) return null;
+    } catch (e) { return null; }
+    c.translate(T / 2, T / 2);
+    c.shadowColor = 'rgba(255,205,70,0.85)';
+    c.shadowBlur = r * 0.6;
+    var desenhou = false;
+    if (temImg) {
+      try { c.drawImage(_corMoedaImg, -r * 1.12, -r * 1.12, r * 2.24, r * 2.24); desenhou = true; } catch (e) {}
+    }
+    if (!desenhou) {
+      var g = c.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+      g.addColorStop(0, '#fff3b0'); g.addColorStop(0.55, '#ffc928'); g.addColorStop(1, '#d48a00');
+      c.fillStyle = g;
+      c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill();
+      c.shadowBlur = 0;
+      c.strokeStyle = 'rgba(150,90,0,0.7)';
+      c.lineWidth = Math.max(1, r * 0.14);
+      c.beginPath(); c.arc(0, 0, r * 0.68, 0, Math.PI * 2); c.stroke();
+    }
+    _corMoedaSp = cv; _corMoedaSpImg = desenhou;
+    return cv;
+  }
+
   /* Obstáculo de cenário: nasce no horizonte, relativo à câmera (mesmo
      padrão dos zumbis/itens — nunca "acaba" mesmo andando muito pro lado).
      Metade das vezes nasce "no caminho" (perto do centro, força desviar de
@@ -942,6 +1038,10 @@
     // Não nasce em cima de um item de munição já nascido no mesmo trecho.
     for (var i = 0; i < _corItens.length; i++) {
       if (Math.abs(_corItens[i].faixa - faixa) < 0.30) { faixa += lado * 0.35; break; }
+    }
+    // Nem em cima do fim de uma fileira de moedas que ainda está chegando.
+    for (var j = 0; j < _corMoedas.length; j++) {
+      if (_corMoedas[j].z > 0.7 && Math.abs(_corMoedas[j].faixa - faixa) < 0.35) { faixa += lado * 0.45; break; }
     }
     _corObstaculos.push({ z: _COR_Z_FAR, faixa: faixa, tipo: tipo });
   }
@@ -1214,6 +1314,32 @@
       }
     }
 
+    // Moedas: fileira nova a cada ~9-13s no começo, apertando até ~5.5-8s.
+    _corMoedaT -= dt;
+    if (_corMoedaT <= 0) {
+      _corSpawnMoedas();
+      _corMoedaT = _corRand(_corClamp(9 - _corDist / 400, 5.5, 9), _corClamp(13 - _corDist / 350, 8, 13));
+    }
+    if (_corMoedaStreakT > 0) { _corMoedaStreakT -= dt; if (_corMoedaStreakT <= 0) _corMoedaStreak = 0; }
+    for (i = _corMoedas.length - 1; i >= 0; i--) {
+      var mo = _corMoedas[i];
+      mo.z -= _corVel * dt;
+      if (mo.z <= 0.07) {
+        if (Math.abs(mo.faixa - _corCamX) < _COR_MOEDA_PEGA) {
+          _corMoedasRun++;
+          _corMoedaStreak++; _corMoedaStreakT = 1.0;
+          if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.combo(Math.min(8, _corMoedaStreak));
+          if (_corMoedaFx.length >= 8) _corMoedaFx.shift();
+          _corMoedaFx.push({ x: _corProj(mo.z, mo.faixa).x, t: 0 });
+        }
+        _corMoedas.splice(i, 1);
+      }
+    }
+    for (i = _corMoedaFx.length - 1; i >= 0; i--) {
+      _corMoedaFx[i].t += dt;
+      if (_corMoedaFx[i].t >= 0.6) _corMoedaFx.splice(i, 1);
+    }
+
     for (i = _corSangue.length - 1; i >= 0; i--) {
       var sg = _corSangue[i];
       sg.life -= dt; sg.y += dt * 46;
@@ -1250,10 +1376,12 @@
     for (i = 0; i < _corItens.length; i++) render.push({ k: 'item', o: _corItens[i], z: _corItens[i].z });
     for (i = 0; i < _corZumbis.length; i++) render.push({ k: 'zumbi', o: _corZumbis[i], z: _corZumbis[i].z });
     for (i = 0; i < _corObstaculos.length; i++) render.push({ k: 'obst', o: _corObstaculos[i], z: _corObstaculos[i].z });
+    for (i = 0; i < _corMoedas.length; i++) if (_corMoedas[i].z <= _COR_Z_FAR) render.push({ k: 'moeda', o: _corMoedas[i], z: _corMoedas[i].z });
     render.sort(function (a, b) { return b.z - a.z; });
     for (i = 0; i < render.length; i++) {
       if (render[i].k === 'zumbi') _corDrawZumbi(ctx, render[i].o);
       else if (render[i].k === 'obst') _corDrawObstaculo(ctx, render[i].o);
+      else if (render[i].k === 'moeda') _corDrawMoeda(ctx, render[i].o);
       else _corDrawItem(ctx, render[i].o);
     }
 
@@ -1281,6 +1409,19 @@
     // ── Arma + mira ──
     _corDrawArma(ctx, W, H);
     _corDrawMira(ctx, W, H);
+
+    // "+1" das moedas pegas: por cima da arma (a moeda some atrás dela).
+    if (_corMoedaFx.length) {
+      ctx.font = '800 ' + Math.round(H * 0.06) + 'px Syne, sans-serif';
+      ctx.textAlign = 'center';
+      for (i = 0; i < _corMoedaFx.length; i++) {
+        var mf = _corMoedaFx[i], kf = mf.t / 0.6;
+        ctx.globalAlpha = 1 - kf * kf;
+        ctx.fillStyle = '#ffd740';
+        ctx.fillText('+1', mf.x, H * (0.6 - 0.14 * kf));
+      }
+      ctx.globalAlpha = 1;
+    }
 
     if (_corFlashT > 0) {
       var fx = W * 0.5, fy = H * (0.72 - _corRecuo * 0.03);
@@ -1595,6 +1736,24 @@
     }
   }
 
+  // Moeda flutuando logo ACIMA da cabeça do zumbi (mesma escala hpx dele):
+  // mais baixa ela ficava escondida atrás da arma justo quando vem na sua
+  // direção. Gira no eixo vertical, com sombrinha no chão.
+  function _corDrawMoeda(ctx, mo) {
+    var sp = _corMoedaSprite();
+    if (!sp) return;
+    var p = _corProj(mo.z, mo.faixa);
+    var hpx = 0.5 * _corH * p.s * 0.94;
+    var r = hpx * 0.15, R = r * 1.35;
+    var t = _corRelogio / 1000;
+    var cy = p.y - hpx * 1.05 + Math.sin(t * 3 + mo.fase) * hpx * 0.03;
+    ctx.globalAlpha = 0.3 * (0.4 + p.s); ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, r * 0.8, r * 0.25, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    var esc = 0.3 + 0.7 * Math.abs(Math.cos(t * 2.6 + mo.fase));
+    ctx.drawImage(sp, p.x - R * esc, cy - R, 2 * R * esc, 2 * R);
+  }
+
   /* Obstáculo de cenário — ancorado no chão (pé em p.y), igual ao zumbi:
      1ª opção imagem (se o asset carregar), 2ª opção sempre o vetor. Sem
      HP/animação: só entra na composição do render por z, como zumbi/item. */
@@ -1770,15 +1929,12 @@
     if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.fim(recorde);
     if (window.AngatubaGames) window.AngatubaGames.rankSubmeter('corrida', score);
 
-    // Moedas da Loja da Coruja (teto 25 por partida) + stats locais
-    // (partidas/segundos/recorde), no mesmo padrão do Voo da Coruja.
+    // Moedas da Loja da Coruja: as pegas na pista, sem teto por partida
+    // + stats locais (partidas/segundos/recorde), no mesmo padrão do Voo.
     var moedasGanhas = 0;
     var segundos = Math.max(0, Math.round((Date.now() - _corInicioMs - _corPausaTotalMs) / 1000));
     if (window.AngatubaGames) {
-      moedasGanhas = Math.max(0, Math.min(25, Math.floor(score / 200)));
-      if (moedasGanhas > 0 && typeof window.AngatubaGames.moedasAdd === 'function') {
-        window.AngatubaGames.moedasAdd(moedasGanhas, 'corrida');
-      }
+      moedasGanhas = _corCreditarMoedas();
       if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
         window.AngatubaGames.statsRegistrarPartida('corrida', { segundos: segundos, score: score });
       }
@@ -2503,7 +2659,8 @@
 
   function _corParar() {
     if (_corRAF) { cancelAnimationFrame(_corRAF); _corRAF = 0; }
-    if (_corEstado === 'jogando') _corEstado = 'inicio';
+    // Saiu no meio da corrida: as moedas já pegas não se perdem.
+    if (_corEstado === 'jogando') { _corCreditarMoedas(); _corEstado = 'inicio'; }
     _corDrag = false;
     _corBgmParar();
     _corDestravarOrientacao();     // volta a orientação do sistema ao normal

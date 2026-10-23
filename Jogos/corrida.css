@@ -56,6 +56,28 @@
 
 /* Crédito da música de fundo (CC BY — obrigatório, discreto). Mesmo
    tratamento visual do .pn-creditos do Piano da Coruja. */
+/* ── Missões (v6): lista compacta nas telas de início e fim ── */
+.cor-missoes{width:100%;max-width:340px;margin:0 auto 14px;text-align:left;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px 10px;}
+.cor-missoes-tit{font-family:'Syne',sans-serif;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#ffd24a;margin-bottom:4px;}
+.cor-missao{display:flex;align-items:center;gap:6px;font-size:12.5px;line-height:1.35;color:#c7d1e0;padding:3px 0;}
+.cor-missao-ic{width:14px;flex-shrink:0;text-align:center;color:#8794a8;}
+.cor-missao-txt{flex:1;min-width:0;}
+.cor-missao-prog{flex-shrink:0;font-size:11px;color:#8794a8;}
+.cor-missao-premio{flex-shrink:0;font-weight:800;color:#ffd740;font-size:12px;}
+.cor-missao-feita .cor-missao-ic{color:#7CF0A0;font-weight:900;}
+.cor-missao-feita .cor-missao-txt{color:#e8f9ee;}
+/* Overlay com mais conteúdo: rola se faltar altura; em tela baixa
+   (celular deitado) esconde a coruja e encolhe o texto. */
+.cor-overlay{overflow-y:auto;}
+@media (max-height:520px){
+  #jogo-corrida .cor-overlay{justify-content:flex-start;padding-top:14px;}
+  #jogo-corrida .cor-overlay-owl{display:none;}
+  #jogo-corrida .cor-overlay-desc{font-size:12px;margin-bottom:8px;}
+  #cor-inicio .cor-overlay-desc{display:none;}   /* as dicas de controle logo abaixo já explicam */
+  #jogo-corrida .cor-dica{margin-bottom:8px;}
+  #jogo-corrida .cor-missoes{margin-bottom:10px;padding:6px 10px;}
+}
+
 .cor-creditos{font-size:11px;line-height:1.5;color:rgba(199,209,224,.55);max-width:300px;margin-top:14px;}
 
 /* ── Foco do controle nos menus (fases/início, fim, pausa) — mesmo visual do .rt-foco do Ritmo ── */

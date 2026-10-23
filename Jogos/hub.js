@@ -2815,7 +2815,7 @@
       if (dono) {
         var chaves = [LOJA_KEY_MOEDAS, LOJA_KEY_INVENTARIO, LOJA_KEY_EQUIPADO, LOJA_KEY_STATS,
                       TITULOS_KEY_DESBLOQUEADOS, TITULOS_KEY_EQUIPADOS, 'angatuba_streak',
-                      HIST_KEY, TITULOS_KEY_DESTAQUE, 'angatuba_ritmo_recordes'];
+                      HIST_KEY, TITULOS_KEY_DESTAQUE, 'angatuba_ritmo_recordes', 'angatuba_corrida_missoes'];
         Object.keys(RANK_REC_LOCAL).forEach(function (k) { chaves.push(RANK_REC_LOCAL[k]); });
         var pacote = {};
         chaves.forEach(function (c) { var v = localStorage.getItem(c); if (v !== null) pacote[c] = v; });

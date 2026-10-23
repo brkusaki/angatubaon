@@ -104,6 +104,11 @@
       campo; cada uma pega vale 1, sem teto por partida (antes pagava
       metros/200 com teto de 25). Ver _corSpawnMoedas e o bloco de
       moedas em _corUpdate.
+  11) MAIS INTO THE DEAD (v6): caixa de arma (escopeta/metralhadora com
+      munição própria), agarrão na morte por zumbi + batimento e borda
+      vermelha de perigo, missões (3 ativas, pagam moedas), zonas por
+      distância (cenário + obstáculos próprios) e a coruja guardiã. Arte
+      nova é opcional — ver o bloco "v6" e claude/corrida-v6-assets.md.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -729,6 +734,78 @@
   var _corMoedaStreak = 0, _corMoedaStreakT = 0;   // sequência → som sobe de tom
   var _corMoedaImg = null, _corMoedaSp = null, _corMoedaSpImg = false;
 
+  /* ══════════════════════════════════════════════════════════════
+     v6 — MAIS INTO THE DEAD: armas nas caixas, agarrão + aviso de
+     perigo, missões, zonas por distância e coruja guardiã. Toda arte
+     nova é OPCIONAL (mesma regra do resto do jogo): sem o arquivo, cai
+     num desenho provisório e "acende" sozinha quando o arquivo subir.
+  ══════════════════════════════════════════════════════════════ */
+
+  /* ── Armas temporárias ──────────────────────────────────────────
+     Caixa de arma no campo (como a de munição, mas mais rara): pegar dá
+     uma arma especial com munição PRÓPRIA; quando ela acaba, volta pro
+     lançador de sempre (cuja munição fica guardada). Escopeta: tiro
+     espalhado que pega todo zumbi perto num cone largo. Metralhadora:
+     atira SOZINHA enquanto tiver zumbi na mira (você só mira desviando).
+     filtro = tingimento provisório do lançador enquanto a arte não chega. */
+  var _COR_ARMAS = {
+    escopeta:     { nome: 'Escopeta',     sub: 'Espalha e derruba quem estiver perto', mun: 8,  cd: 0.55, arte: 'arma-escopeta.webp',     filtro: 'hue-rotate(-35deg) saturate(1.5) brightness(1.05)', cor: '#ff9d3a' },
+    metralhadora: { nome: 'Metralhadora', sub: 'Atira sozinha no que estiver na mira',  mun: 45, cd: 0.10, arte: 'arma-metralhadora.webp', filtro: 'hue-rotate(150deg) saturate(1.4)',               cor: '#5fd4ff', auto: true }
+  };
+  var _COR_ARMAS_LISTA = ['escopeta', 'metralhadora'];
+  var _COR_CAIXA_ARMA = 'caixa-arma.webp';
+  var _corArma = '';           // '' = lançador básico
+  var _corArmaMun = 0;
+  var _corCaixas = [];         // { z, faixa, bob, arma }
+  var _corCaixaT = 0;
+
+  /* ── Coruja guardiã (o "cachorro" do Into the Dead) ─────────────
+     Item raro no campo. Pegou: por _COR_GUARD_DUR segundos uma coruja
+     voa na sua frente e derruba, um por um, os zumbis que chegam perto
+     (prioriza quem está na sua linha). Arte: sheet 3×3 voando/atacando;
+     sem ela, usa a owl-flying.webp do app com um halo dourado. */
+  var _COR_GUARD_DUR = 8, _COR_GUARD_CD = 0.65;
+  var _COR_GUARD_SHEET = 'coruja-guardia.webp', _COR_GUARD_ITEM = 'item-guardia.webp';
+  var _corGuardItens = [];     // { z, faixa, bob }
+  var _corGuardItemT = 0;
+  var _corGuardT = 0;          // s restantes de guardiã ativa
+  var _corGuardCdT = 0;        // s até o próximo ataque
+  var _corGuard = { x: 0, y: 0, alvo: null, voo: 0, atk: 0 };   // tela; atk>0 = mergulhando
+  var _corGuardImg = null;     // fallback /webp/owl-flying.webp
+
+  /* ── Perigo (batimento + borda vermelha) e agarrão ──────────────
+     _corPerigo 0..1: quão perto está o zumbi mais perigoso DA SUA LINHA
+     (mesma conta do pulso vermelho no chão). Dita o ritmo do coração e
+     a força da borda vermelha. Morte por zumbi não corta direto pro fim:
+     ~1.1s de "agarrão" (a coruja-zumbi pula na tela) antes da tela final. */
+  var _corPerigo = 0, _corCoracaoT = 0, _corCoracaoPulso = 0;
+  var _COR_AGARRAO_DUR = 1.15, _COR_AGARRAO_SHEET = 'zumbi-agarrao.webp';
+  var _corAgarraoT = 0, _corAgarraoZb = null;
+
+  /* ── Zonas por distância ────────────────────────────────────────
+     Cada zona troca o cenário de fundo (com fusão de ~2.5s) e o sorteio
+     de obstáculos. Sem a arte da zona, usa o cenário da floresta com uma
+     tinta de cor por cima. Obstáculos "soArte" só entram no sorteio
+     depois que a imagem deles carregou (sem desenho provisório feio). */
+  var COR_ZONAS = [
+    { nome: 'Floresta Morta',     ini: 0,    cen: 'cenario-floresta.webp', tinta: '',                      obst: ['toco', 'pedra', 'lapide', 'abobora', 'cerca', 'placa'] },
+    { nome: 'Sítio Abandonado',   ini: 350,  cen: 'cenario-sitio.webp',    tinta: 'rgba(130,85,25,0.26)',  obst: ['cerca', 'abobora', 'entulho', 'feno', 'trator', 'espantalho'] },
+    { nome: 'Entrada da Cidade',  ini: 800,  cen: 'cenario-estrada.webp',  tinta: 'rgba(40,75,130,0.22)',  obst: ['carro', 'placa', 'entulho', 'cone', 'barricada', 'onibus'] },
+    { nome: 'Centro de Angatuba', ini: 1400, cen: 'cenario-centro.webp',   tinta: 'rgba(160,70,30,0.20)',  obst: ['carro', 'entulho', 'placa', 'banco', 'poste', 'carrinho'] }
+  ];
+  var _corZonaIdx = 0, _corZonaAnt = -1, _corZonaFade = 1;
+
+  /* ── Avisos grandes no meio da tela (arma, zona, missão) — fila ── */
+  var _corAvisos = [];         // { txt, sub, cor, t, dur }
+
+  /* ── Contadores da corrida (missões) ── */
+  var _corRun = null;
+  function _corRunZerar() {
+    _corRun = { abates: 0, rapido: 0, forte: 0, escopeta: 0, tiros: 0, distPrimeiroTiro: -1,
+                esbarroes: 0, distPrimeiroEsb: -1, caixas: 0, guardia: 0, missoesFeitas: [] };
+  }
+  _corRunZerar();
+
   // Campo ABERTO: os zumbis nascem em qualquer x lateral contínuo dentro
   // deste range (em unidades de faixa; -1.6..1.6 cobre além das bordas pra
   // eles entrarem/saírem de campo naturalmente). Sem faixas discretas.
@@ -774,11 +851,23 @@
     toco:    { altMul: 0.55, ratio: 1.05, larguraMundo: 0.30, cor: '#6b5236', corEsc: '#45341f', vetor: 'pedra' },
     placa:   { altMul: 0.80, ratio: 0.62, larguraMundo: 0.20, cor: '#7a6040', corEsc: '#4e3c27', vetor: 'pedra' },
     abobora: { altMul: 0.42, ratio: 1.03, larguraMundo: 0.26, cor: '#e07a1f', corEsc: '#9c4f10', vetor: 'pedra' },
-    lapide:  { altMul: 0.55, ratio: 0.96, larguraMundo: 0.26, cor: '#86867f', corEsc: '#55554f', vetor: 'pedra' }
+    lapide:  { altMul: 0.55, ratio: 0.96, larguraMundo: 0.26, cor: '#86867f', corEsc: '#55554f', vetor: 'pedra' },
+    // v6: obstáculos das zonas novas — soArte: só entram no sorteio quando
+    // a imagem carregou (ver _corObstSortear).
+    feno:       { altMul: 0.55, ratio: 1.40, larguraMundo: 0.40, cor: '#b58a3a', corEsc: '#7a5a22', vetor: 'pedra', soArte: true },
+    trator:     { altMul: 1.00, ratio: 1.50, larguraMundo: 0.66, cor: '#8a3a2a', corEsc: '#4e2018', vetor: 'pedra', soArte: true },
+    espantalho: { altMul: 1.15, ratio: 0.75, larguraMundo: 0.26, cor: '#8a6a44', corEsc: '#5c4630', vetor: 'pedra', soArte: true },
+    cone:       { altMul: 0.45, ratio: 0.70, larguraMundo: 0.20, cor: '#e8752a', corEsc: '#9c4a14', vetor: 'pedra', soArte: true },
+    barricada:  { altMul: 0.60, ratio: 2.20, larguraMundo: 0.50, cor: '#c9a12a', corEsc: '#6b5616', vetor: 'pedra', soArte: true },
+    onibus:     { altMul: 1.15, ratio: 2.00, larguraMundo: 0.80, cor: '#c9a12a', corEsc: '#6b5616', vetor: 'pedra', soArte: true },
+    banco:      { altMul: 0.50, ratio: 2.00, larguraMundo: 0.42, cor: '#6b4a2a', corEsc: '#3e2a16', vetor: 'pedra', soArte: true },
+    poste:      { altMul: 1.60, ratio: 0.25, larguraMundo: 0.14, cor: '#55595e', corEsc: '#2f3236', vetor: 'pedra', soArte: true },
+    carrinho:   { altMul: 0.85, ratio: 1.00, larguraMundo: 0.36, cor: '#c33a3a', corEsc: '#7a2020', vetor: 'pedra', soArte: true }
   };
-  // Arte dos obstáculos: obst-<tipo>.webp (carro/cerca/entulho/pedra/toco/
-  // placa/abobora/lapide), recortados sem fundo.
-  var _COR_OBST_NOMES = ['carro', 'cerca', 'entulho', 'pedra', 'toco', 'placa', 'abobora', 'lapide'];
+  // Arte dos obstáculos: obst-<tipo>.webp, recortados sem fundo. Lista de
+  // TODOS (pré-carga); o sorteio de cada zona vem de COR_ZONAS[].obst.
+  var _COR_OBST_NOMES = ['carro', 'cerca', 'entulho', 'pedra', 'toco', 'placa', 'abobora', 'lapide',
+                         'feno', 'trator', 'espantalho', 'cone', 'barricada', 'onibus', 'banco', 'poste', 'carrinho'];
   // Mesma lógica do _corMeiaColisao, mas pro obstáculo (sem o +0.11 do
   // zumbi, que existia pra compensar a "gordura" do boneco vetorial).
   function _corMeiaObst(tipo) { return (_COR_OBST_TIPOS[tipo].larguraMundo * 0.5) + 0.05; }
@@ -866,6 +955,17 @@
     _corMoedas.length = 0; _corMoedaFx.length = 0; _corMoedasRun = 0; _corMoedasPagas = false;
     _corMoedaStreak = 0; _corMoedaStreakT = 0; _corMoedaT = 4.5;
     _corMoedaSprite();   // já começa a baixar a arte da moeda
+    _corArma = ''; _corArmaMun = 0; _corCaixas.length = 0; _corCaixaT = 22;
+    _corGuardItens.length = 0; _corGuardItemT = 35; _corGuardT = 0; _corGuardCdT = 0;
+    _corGuard.alvo = null; _corGuard.atk = 0;
+    _corPerigo = 0; _corCoracaoT = 0; _corCoracaoPulso = 0;
+    _corAgarraoT = 0; _corAgarraoZb = null;
+    _corZonaIdx = 0; _corZonaAnt = -1; _corZonaFade = 1;
+    _corAvisos.length = 0;
+    _corRunZerar();
+    _corMissoesCarregar();
+    _corAssetNovo(_COR_CAIXA_ARMA); _corAssetNovo(_COR_GUARD_ITEM); _corAssetNovo(_COR_GUARD_SHEET); _corAssetNovo(_COR_AGARRAO_SHEET);
+    if (!_corGuardImg) { try { _corGuardImg = new Image(); _corGuardImg.src = '/webp/owl-flying.webp'; } catch (e) {} }
     // 2.2s (era 0.9s) — dá tempo do jogador se situar antes do primeiro
     // lote de zumbis nascer (ver comentário em _corPopMin sobre a "parede").
     _corSpawnT = 2.2; _corItemT = 8.5; _corObstT = _corRand(8, 12);
@@ -876,19 +976,27 @@
      localStorage.getItem A CADA FRAME (180 escritas de DOM por segundo).
      Em Android fraco isso sozinho já engasgava o loop. Agora os elementos
      ficam em cache e só escrevemos quando o valor realmente muda. */
-  var _corElDist = null, _corElMun = null, _corElRec = null, _corElMoe = null;
-  var _corHudUlt = { d: -1, m: -1, r: -1, mo: -1 };
+  var _corElDist = null, _corElMun = null, _corElRec = null, _corElMoe = null, _corElMunLbl = null;
+  var _corHudUlt = { d: -1, m: -1, r: -1, mo: -1, a: null };
   function _corAtualizarHUD(forcar) {
     if (forcar || !_corElDist) {
       _corElDist = document.getElementById('cor-dist');
       _corElMun  = document.getElementById('cor-mun');
       _corElRec  = document.getElementById('cor-recorde');
       _corElMoe  = document.getElementById('cor-moedas');
+      _corElMunLbl = _corElMun && _corElMun.parentNode ? _corElMun.parentNode.querySelector('.cor-hud-label') : null;
     }
     if (_corElMoe && (forcar || _corMoedasRun !== _corHudUlt.mo)) { _corElMoe.textContent = _corMoedasRun; _corHudUlt.mo = _corMoedasRun; }
     var dv = Math.floor(_corDist);
     if (_corElDist && (forcar || dv !== _corHudUlt.d)) { _corElDist.textContent = dv + 'm'; _corHudUlt.d = dv; }
-    if (_corElMun && (forcar || _corMun !== _corHudUlt.m)) { _corElMun.textContent = _corMun; _corHudUlt.m = _corMun; }
+    // Com arma especial, o quadro de munição mostra a dela (nome + tiros).
+    var munV = _corArma ? _corArmaMun : _corMun;
+    if (_corElMunLbl && (forcar || _corArma !== _corHudUlt.a)) {
+      _corElMunLbl.textContent = _corArma ? _COR_ARMAS[_corArma].nome : 'Munição';
+      if (_corElMun) _corElMun.style.color = _corArma ? _COR_ARMAS[_corArma].cor : '';
+      _corHudUlt.a = _corArma;
+    }
+    if (_corElMun && (forcar || munV !== _corHudUlt.m)) { _corElMun.textContent = munV; _corHudUlt.m = munV; }
     var rv = _corRec();
     if (_corElRec && (forcar || rv !== _corHudUlt.r)) { _corElRec.textContent = rv + 'm'; _corHudUlt.r = rv; }
   }
@@ -1016,6 +1124,515 @@
     return cv;
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     v6 — FUNÇÕES: itens novos, avisos, missões, zonas, guardiã,
+     perigo e agarrão (ver o bloco de estado "v6" lá em cima).
+  ══════════════════════════════════════════════════════════════ */
+
+  // Asset novo (v6): um nome só, sem a cascata de variantes de nome — os
+  // arquivos novos sobem já com o nome certo, e assim cada arte que ainda
+  // não existe custa 1 pedido (404) em vez de 3.
+  function _corAssetNovo(nome) { return _corAssetMulti([nome]); }
+  function _corObstAsset(tipo) {
+    var def = _COR_OBST_TIPOS[tipo];
+    return (def && def.soArte) ? _corAssetNovo('obst-' + tipo + '.webp') : _corAsset('obst-' + tipo + '.webp');
+  }
+  function _corImgPronta(reg) { return !!(reg && reg.ok && reg.img && reg.w && reg.h); }
+
+  /* ── Avisos (fila) ── */
+  function _corAviso(txt, sub, cor, dur) {
+    if (_corAvisos.length >= 4) _corAvisos.shift();
+    _corAvisos.push({ txt: txt, sub: sub || '', cor: cor || '#fff', t: 0, dur: dur || 2.2 });
+  }
+
+  /* ── Caixa de arma e item da guardiã: nascem nas laterais, como a munição ── */
+  function _corSpawnCaixa() {
+    var lado = (Math.random() < 0.5 ? -1 : 1) * _corRand(0.35, 1.0);
+    _corCaixas.push({ z: _COR_Z_FAR, faixa: _corCamX + lado, bob: Math.random() * 6.283,
+                      arma: _COR_ARMAS_LISTA[(Math.random() * _COR_ARMAS_LISTA.length) | 0] });
+  }
+  function _corSpawnGuardItem() {
+    var lado = (Math.random() < 0.5 ? -1 : 1) * _corRand(0.4, 1.1);
+    _corGuardItens.push({ z: _COR_Z_FAR, faixa: _corCamX + lado, bob: Math.random() * 6.283 });
+  }
+  function _corPegarArma(tipo) {
+    var def = _COR_ARMAS[tipo];
+    if (_corArma === tipo) _corArmaMun += def.mun;
+    else { _corArma = tipo; _corArmaMun = def.mun; }
+    _corAssetNovo(def.arte);
+    _corRun.caixas++;
+    _corSomRecarga();
+    if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.bonus();
+    _corAviso(def.nome + '!', def.sub, def.cor, 2.2);
+    _corAtualizarHUD();
+  }
+  function _corPegarGuardia() {
+    _corGuardT = _COR_GUARD_DUR; _corGuardCdT = 0.5;
+    _corGuard.x = _corW * 0.5; _corGuard.y = -_corH * 0.2; _corGuard.alvo = null; _corGuard.atk = 0;
+    _corRun.guardia++;
+    if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.nivelUp();
+    _corAviso('Coruja guardiã!', 'Ela derruba os zumbis por ' + _COR_GUARD_DUR + ' segundos', '#ffd24a', 2.2);
+  }
+
+  // Move e coleta os itens novos (caixa de arma, guardiã). Mesma regra da
+  // munição: chegou em z≈0 perto da sua linha, pegou.
+  function _corItensV6(dt) {
+    var i, it;
+    _corCaixaT -= dt;
+    if (_corCaixaT <= 0) {
+      if (_corDist > 120 && !_corArma && !_corCaixas.length) { _corSpawnCaixa(); _corCaixaT = _corRand(24, 36); }
+      else _corCaixaT = 4;
+    }
+    for (i = _corCaixas.length - 1; i >= 0; i--) {
+      it = _corCaixas[i];
+      it.z -= _corVel * dt; it.bob += dt * 4;
+      if (it.z <= 0.07) {
+        if (Math.abs(it.faixa - _corCamX) < 0.34) _corPegarArma(it.arma);
+        _corCaixas.splice(i, 1);
+      }
+    }
+    _corGuardItemT -= dt;
+    if (_corGuardItemT <= 0) {
+      if (_corDist > 250 && _corGuardT <= 0 && !_corGuardItens.length) { _corSpawnGuardItem(); _corGuardItemT = _corRand(45, 70); }
+      else _corGuardItemT = 5;
+    }
+    for (i = _corGuardItens.length - 1; i >= 0; i--) {
+      it = _corGuardItens[i];
+      it.z -= _corVel * dt; it.bob += dt * 3;
+      if (it.z <= 0.07) {
+        if (Math.abs(it.faixa - _corCamX) < 0.34) _corPegarGuardia();
+        _corGuardItens.splice(i, 1);
+      }
+    }
+    // Metralhadora: dispara sozinha enquanto houver zumbi na mira.
+    if (_corArma && _COR_ARMAS[_corArma].auto) _corAtirar(true);
+  }
+
+  /* ── Coruja guardiã ── */
+  function _corGuardEscolher() {
+    var melhor = null, melhorNota = 1e9;
+    for (var i = 0; i < _corZumbis.length; i++) {
+      var zb = _corZumbis[i];
+      if (zb.morto || zb.z > 0.8) continue;
+      var d = Math.abs(zb.faixa - _corCamX);
+      if (d > 1.1) continue;
+      var nota = zb.z + (d < _corMeiaColisao(zb.tipo) ? -0.5 : 0);   // quem está na sua linha primeiro
+      if (nota < melhorNota) { melhorNota = nota; melhor = zb; }
+    }
+    return melhor;
+  }
+  function _corGuardAtualizar(dt) {
+    if (_corGuardT <= 0) return;
+    var g = _corGuard, W = _corW, H = _corH;
+    _corGuardT -= dt; g.voo += dt;
+    if (g.alvo && (g.alvo.morto || _corZumbis.indexOf(g.alvo) < 0)) { g.alvo = null; g.atk = 0; }
+    if (!g.alvo && _corGuardT > 0.4) {
+      _corGuardCdT -= dt;
+      if (_corGuardCdT <= 0) {
+        g.alvo = _corGuardEscolher();
+        if (g.alvo) g.atk = 0.001; else _corGuardCdT = 0.2;
+      }
+    }
+    var tx = W * 0.5 + Math.sin(g.voo * 1.3) * W * 0.12, ty = H * 0.22 + Math.sin(g.voo * 2.1) * H * 0.03;
+    if (g.alvo) {
+      var p = _corProj(g.alvo.z, g.alvo.faixa), hpx = 0.5 * H * p.s * 0.94;
+      tx = p.x; ty = p.y - hpx * _COR_ALT_MUL * 0.7;
+      g.atk += dt;
+    }
+    var k = Math.min(1, dt * (g.alvo ? 9 : 4));
+    g.x += (tx - g.x) * k; g.y += (ty - g.y) * k;
+    if (g.alvo && ((Math.abs(g.x - tx) < W * 0.03 && Math.abs(g.y - ty) < H * 0.05) || g.atk > 0.6)) {
+      _corDano(g.alvo, 99, 'guardia');
+      var ac = _corAudio();
+      if (ac && _corSomLigado()) _corTom(ac, ac.currentTime, 'triangle', 900, 1500, 0.12, 0.16);
+      g.alvo = null; g.atk = 0; _corGuardCdT = _COR_GUARD_CD;
+    }
+    if (_corGuardT <= 0) { _corGuardT = 0; g.alvo = null; _corAviso('A guardiã foi embora', '', '#c7d1e0', 1.4); }
+  }
+
+  /* ── Perigo: batimento + borda vermelha ── */
+  function _corSomCoracao(v) {
+    var ac = _corAudio();
+    if (!ac || !_corSomLigado()) return;
+    var t = ac.currentTime;
+    _corTom(ac, t, 'sine', 68, 42, 0.12, 0.34 * v);
+    _corTom(ac, t + 0.17, 'sine', 60, 38, 0.10, 0.24 * v);
+  }
+  function _corPerigoAtualizar(dt) {
+    var alvo = 0;
+    for (var i = 0; i < _corZumbis.length; i++) {
+      var zb = _corZumbis[i];
+      if (zb.morto || zb.z >= 0.45) continue;
+      if (Math.abs(zb.faixa - _corCamX) < _corMeiaColisao(zb.tipo)) alvo = Math.max(alvo, 1 - zb.z / 0.45);
+    }
+    _corPerigo += (alvo - _corPerigo) * Math.min(1, dt * 6);
+    if (_corCoracaoPulso > 0) _corCoracaoPulso = Math.max(0, _corCoracaoPulso - dt * 2.2);
+    if (_corPerigo > 0.08) {
+      _corCoracaoT -= dt;
+      if (_corCoracaoT <= 0) {
+        _corCoracaoT = 0.95 - 0.5 * _corPerigo;
+        _corCoracaoPulso = 1;
+        _corSomCoracao(0.4 + 0.6 * _corPerigo);
+      }
+    } else _corCoracaoT = 0;
+  }
+
+  /* ── Zonas ── */
+  function _corZonaAtualizar(dt) {
+    var nova = _corZonaIdx;
+    while (nova + 1 < COR_ZONAS.length && _corDist >= COR_ZONAS[nova + 1].ini) nova++;
+    // Pede a arte da próxima zona ~150 m antes de chegar nela.
+    if (nova + 1 < COR_ZONAS.length && _corDist > COR_ZONAS[nova + 1].ini - 150) _corAssetNovo(COR_ZONAS[nova + 1].cen);
+    if (nova !== _corZonaIdx) {
+      _corZonaAnt = _corZonaIdx; _corZonaIdx = nova; _corZonaFade = 0;
+      _corAssetNovo(COR_ZONAS[nova].cen);
+      var lo = COR_ZONAS[nova].obst;
+      for (var i = 0; i < lo.length; i++) _corObstAsset(lo[i]);
+      _corAviso('Zona ' + (nova + 1), COR_ZONAS[nova].nome, '#ffd24a', 2.6);
+    }
+    if (_corZonaFade < 1) _corZonaFade = Math.min(1, _corZonaFade + dt / 2.5);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     MISSÕES — 3 ativas por vez, salvas neste aparelho (e no pacote por
+     conta do hub). Tipos "Run" valem dentro de uma corrida; "Tot" somam
+     entre corridas (prog guardado). Cumpriu: paga na hora (moedasAdd) e
+     avisa; no fim da corrida as cumpridas dão lugar a novas.
+  ══════════════════════════════════════════════════════════════ */
+  var COR_MISSOES_KEY = 'angatuba_corrida_missoes';
+  var COR_MISSOES = [
+    { id: 'dist300',   txt: 'Corra 300 m numa corrida',          tipo: 'distRun',     meta: 300,  premio: 20 },
+    { id: 'dist600',   txt: 'Corra 600 m numa corrida',          tipo: 'distRun',     meta: 600,  premio: 35 },
+    { id: 'dist1000',  txt: 'Corra 1.000 m numa corrida',        tipo: 'distRun',     meta: 1000, premio: 60 },
+    { id: 'tot2000',   txt: 'Corra 2.000 m no total',            tipo: 'distTot',     meta: 2000, premio: 30 },
+    { id: 'tot5000',   txt: 'Corra 5.000 m no total',            tipo: 'distTot',     meta: 5000, premio: 60 },
+    { id: 'abate15',   txt: 'Abata 15 zumbis numa corrida',      tipo: 'abatesRun',   meta: 15,   premio: 25 },
+    { id: 'abate40',   txt: 'Abata 40 zumbis no total',          tipo: 'abatesTot',   meta: 40,   premio: 25 },
+    { id: 'rapido8',   txt: 'Abata 8 corujas rápidas',           tipo: 'rapidoTot',   meta: 8,    premio: 25 },
+    { id: 'forte3',    txt: 'Abata 3 corujas fortes',            tipo: 'forteTot',    meta: 3,    premio: 25 },
+    { id: 'moeda30',   txt: 'Pegue 30 moedas numa corrida',      tipo: 'moedasRun',   meta: 30,   premio: 25 },
+    { id: 'semtiro',   txt: 'Corra 200 m sem atirar',            tipo: 'semTiro',     meta: 200,  premio: 25 },
+    { id: 'semesb',    txt: 'Corra 400 m sem esbarrar',          tipo: 'semEsb',      meta: 400,  premio: 30 },
+    { id: 'caixa2',    txt: 'Pegue 2 caixas de arma',            tipo: 'caixasTot',   meta: 2,    premio: 20 },
+    { id: 'escop5',    txt: 'Abata 5 com a escopeta',            tipo: 'escopetaTot', meta: 5,    premio: 25 },
+    { id: 'guardia1',  txt: 'Chame a coruja guardiã',            tipo: 'guardiaTot',  meta: 1,    premio: 20 },
+    { id: 'zona2',     txt: 'Chegue ao Sítio Abandonado',        tipo: 'zonaRun',     meta: 1,    premio: 20 },
+    { id: 'zona3',     txt: 'Chegue à Entrada da Cidade',        tipo: 'zonaRun',     meta: 2,    premio: 45 },
+    { id: 'zona4',     txt: 'Chegue ao Centro de Angatuba',      tipo: 'zonaRun',     meta: 3,    premio: 80 }
+  ];
+  var _corMissoes = null;   // { ativas: [{ id, prog, feita }] }
+  var _corMisT = 0;
+
+  function _corMissaoDef(id) {
+    for (var i = 0; i < COR_MISSOES.length; i++) if (COR_MISSOES[i].id === id) return COR_MISSOES[i];
+    return null;
+  }
+  function _corMissoesSalvar() {
+    try { localStorage.setItem(COR_MISSOES_KEY, JSON.stringify(_corMissoes)); } catch (e) {}
+  }
+  function _corMissaoSortear(usados) {
+    var c = [];
+    for (var i = 0; i < COR_MISSOES.length; i++) if (!usados[COR_MISSOES[i].id]) c.push(COR_MISSOES[i].id);
+    return c.length ? c[(Math.random() * c.length) | 0] : null;
+  }
+  // Lê do aparelho, descarta ids que não existem mais e completa até 3.
+  function _corMissoesCarregar() {
+    var d = null;
+    try { d = JSON.parse(localStorage.getItem(COR_MISSOES_KEY) || 'null'); } catch (e) {}
+    var ativas = [], usados = {};
+    if (d && d.ativas && d.ativas.length) {
+      for (var i = 0; i < d.ativas.length && ativas.length < 3; i++) {
+        var m = d.ativas[i];
+        if (!m || !_corMissaoDef(m.id) || m.feita || usados[m.id]) continue;
+        usados[m.id] = true;
+        ativas.push({ id: m.id, prog: Math.max(0, Number(m.prog) || 0) });
+      }
+    }
+    while (ativas.length < 3) {
+      var id = _corMissaoSortear(usados);
+      if (!id) break;
+      usados[id] = true; ativas.push({ id: id, prog: 0 });
+    }
+    _corMissoes = { ativas: ativas };
+    _corMissoesSalvar();
+  }
+  function _corMissaoValor(m, def) {
+    var r = _corRun, d = _corDist;
+    switch (def.tipo) {
+      case 'distRun':     return d;
+      case 'distTot':     return m.prog + d;
+      case 'abatesRun':   return r.abates;
+      case 'abatesTot':   return m.prog + r.abates;
+      case 'rapidoTot':   return m.prog + r.rapido;
+      case 'forteTot':    return m.prog + r.forte;
+      case 'escopetaTot': return m.prog + r.escopeta;
+      case 'moedasRun':   return _corMoedasRun;
+      case 'semTiro':     return r.distPrimeiroTiro < 0 ? d : r.distPrimeiroTiro;
+      case 'semEsb':      return r.distPrimeiroEsb < 0 ? d : r.distPrimeiroEsb;
+      case 'caixasTot':   return m.prog + r.caixas;
+      case 'guardiaTot':  return m.prog + r.guardia;
+      case 'zonaRun':     return _corZonaIdx;
+    }
+    return 0;
+  }
+  function _corMissaoTot(def) { return /Tot$/.test(def.tipo); }
+
+  function _corMissoesChecar() {
+    if (!_corMissoes) return;
+    var mudou = false;
+    for (var i = 0; i < _corMissoes.ativas.length; i++) {
+      var m = _corMissoes.ativas[i];
+      if (m.feita) continue;
+      var def = _corMissaoDef(m.id);
+      if (!def || _corMissaoValor(m, def) < def.meta) continue;
+      m.feita = true; mudou = true;
+      _corRun.missoesFeitas.push(m.id);
+      var G = window.AngatubaGames;
+      if (G && typeof G.moedasAdd === 'function') G.moedasAdd(def.premio, 'corrida');
+      if (G && G.som) G.som.nivelUp();
+      _corAviso('Missão cumprida!', def.txt + '  +' + def.premio + ' 🪙', '#7CF0A0', 2.6);
+    }
+    if (mudou) _corMissoesSalvar();
+  }
+
+  // Fim da corrida (ou saída no meio): guarda o progresso dos tipos "Tot",
+  // troca as cumpridas por novas e devolve o resumo pra tela de fim.
+  function _corMissoesFechar() {
+    if (!_corMissoes) return [];
+    var resumo = [], ficam = [], usados = {}, i, m, def;
+    for (i = 0; i < _corMissoes.ativas.length; i++) {
+      m = _corMissoes.ativas[i]; def = _corMissaoDef(m.id);
+      if (!def) continue;
+      usados[m.id] = true;
+      var val = _corMissaoValor(m, def);
+      if (!m.feita && _corMissaoTot(def)) m.prog = Math.min(def.meta, val);
+      resumo.push({ txt: def.txt, premio: def.premio, feita: !!m.feita, prog: Math.min(def.meta, Math.floor(val)), meta: def.meta, tot: _corMissaoTot(def) });
+      if (!m.feita) ficam.push({ id: m.id, prog: m.prog || 0 });
+    }
+    while (ficam.length < 3) {
+      var id = _corMissaoSortear(usados);
+      if (!id) break;
+      usados[id] = true; ficam.push({ id: id, prog: 0 });
+    }
+    _corMissoes = { ativas: ficam };
+    _corMissoesSalvar();
+    return resumo;
+  }
+
+  function _corNumBr(n) { n = Math.floor(n); return n >= 1000 ? String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : String(n); }
+
+  // Lista no overlay (início: as ativas com progresso; fim: o resumo da corrida).
+  function _corMissoesRender(elId, itens) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    if (!itens || !itens.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+    var h = '<div class="cor-missoes-tit">Missões</div>';
+    for (var i = 0; i < itens.length; i++) {
+      var it = itens[i];
+      var prog = it.feita ? '' : (it.tot ? _corNumBr(it.prog) + '/' + _corNumBr(it.meta) : '');
+      h += '<div class="cor-missao' + (it.feita ? ' cor-missao-feita' : '') + '">' +
+             '<span class="cor-missao-ic">' + (it.feita ? '✓' : '•') + '</span>' +
+             '<span class="cor-missao-txt">' + it.txt + '</span>' +
+             (prog ? '<span class="cor-missao-prog">' + prog + '</span>' : '') +
+             '<span class="cor-missao-premio">+' + it.premio + ' 🪙</span>' +
+           '</div>';
+    }
+    el.innerHTML = h;
+    el.style.display = '';
+  }
+  function _corMissoesItensAtivas() {
+    var out = [];
+    if (!_corMissoes) return out;
+    for (var i = 0; i < _corMissoes.ativas.length; i++) {
+      var m = _corMissoes.ativas[i], def = _corMissaoDef(m.id);
+      if (!def) continue;
+      out.push({ txt: def.txt, premio: def.premio, feita: false, prog: m.prog || 0, meta: def.meta, tot: _corMissaoTot(def) });
+    }
+    return out;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     AGARRÃO — morte por zumbi: a cena congela, escurece e a coruja-zumbi
+     pula na tela por _COR_AGARRAO_DUR antes do game over. Arte própria
+     (sheet 3×3 do bote); sem ela, a própria coruja-zumbi que te pegou
+     cresce até tomar a tela, com garras vermelhas no fim.
+  ══════════════════════════════════════════════════════════════ */
+  function _corAgarrar(zb) {
+    _corEstado = 'agarrao'; _corAgarraoT = 0; _corAgarraoZb = zb;
+    _corMenuPartida(false);
+    _corDrag = false; _corCamVX = 0;
+    _corBgmParar();
+    _corSomRosnado();
+    var ac = _corAudio();
+    if (ac && _corSomLigado()) _corTom(ac, ac.currentTime + 0.05, 'sawtooth', 180, 55, 0.4, 0.22);
+  }
+  function _corDrawAgarrao() {
+    var ctx = _corCtx;
+    if (!ctx) return;
+    var W = _corW, H = _corH, t = _corAgarraoT, k = Math.min(1, t / _COR_AGARRAO_DUR);
+    _corDraw();
+    var amp = 1 - k * 0.5;
+    var sx = Math.sin(t * 70) * W * 0.012 * amp, sy = Math.cos(t * 55) * H * 0.015 * amp;
+    ctx.fillStyle = 'rgba(0,0,0,' + (0.25 + 0.45 * k).toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+    var ease = 1 - Math.pow(1 - Math.min(1, t / 0.45), 3);   // bote rápido, depois segura
+    var reg = _corAssetNovo(_COR_AGARRAO_SHEET);
+    if (_corImgPronta(reg)) {
+      var fw = reg.w / 3, fh = reg.h / 3;
+      var f = Math.min(8, Math.floor(t / (_COR_AGARRAO_DUR / 9)));
+      var hh = H * (0.6 + 0.8 * ease), ww = hh * fw / fh;
+      ctx.drawImage(reg.img, (f % 3) * fw, Math.floor(f / 3) * fh, fw, fh, W / 2 - ww / 2 + sx, H * 0.55 - hh / 2 + sy, ww, hh);
+    } else {
+      var zb = _corAgarraoZb;
+      var sk = zb ? (zb.sheetKey || zb.tipo) : 'normal';
+      var ah = H * (0.5 + 1.15 * ease), aw = ah * _corSheetRatio(sk);
+      ctx.save();
+      ctx.translate(W / 2 + sx, H * (1.0 + 0.45 * ease) + sy);
+      ctx.rotate(Math.sin(t * 9) * 0.06);
+      var ok = _corDrawSheetFrame(ctx, sk, _corRelogio * 2, -aw / 2, -ah, aw, ah);
+      ctx.restore();
+      if (!ok) _corVetorZumbi(ctx, W / 2 + sx, H * (1.0 + 0.45 * ease) + sy, ah * 0.47, ah / _COR_ALT_MUL, _COR_TIPOS[(zb && zb.tipo) || 'normal'], 0, t * 8);
+    }
+    if (t < 0.25) {
+      ctx.fillStyle = 'rgba(255,0,0,' + (0.45 * (1 - t / 0.25)).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (t > 0.42) {
+      var g = Math.min(1, (t - 0.42) / 0.22);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(150,0,0,0.85)'; ctx.lineCap = 'round';
+      ctx.lineWidth = Math.max(4, H * 0.028);
+      for (var i = 0; i < 3; i++) {
+        var x0 = W * (0.30 + i * 0.13), y0 = H * 0.12, x1 = W * (0.42 + i * 0.13), y1 = H * 0.88;
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + (x1 - x0) * g, y0 + (y1 - y0) * g); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    var gV = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.3, W * 0.5, H * 0.5, H * 0.95);
+    gV.addColorStop(0, 'rgba(120,0,0,0)'); gV.addColorStop(1, 'rgba(120,0,0,' + (0.35 + 0.4 * k).toFixed(3) + ')');
+    ctx.fillStyle = gV; ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     DESENHO dos itens novos, da guardiã, do perigo e dos avisos
+  ══════════════════════════════════════════════════════════════ */
+  function _corRotulo(ctx, txt, x, y, px, cor) {
+    ctx.font = '800 ' + Math.round(px) + 'px Syne, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = Math.max(2, px * 0.22); ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    ctx.strokeText(txt, x, y);
+    ctx.fillStyle = cor; ctx.fillText(txt, x, y);
+  }
+  function _corDrawCaixa(ctx, cx) {
+    var p = _corProj(cx.z, cx.faixa), s = p.s, bob = Math.sin(cx.bob) * 5 * s, sz = 22 * s;
+    var def = _COR_ARMAS[cx.arma];
+    ctx.globalAlpha = 0.3 * (0.4 + s); ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, sz * 1.0, sz * 0.32, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    var reg = _corAssetNovo(_COR_CAIXA_ARMA), topo;
+    if (_corImgPronta(reg)) {
+      var ah = sz * 2.8, aw = ah * reg.w / reg.h;
+      ctx.drawImage(reg.img, p.x - aw / 2, p.y - ah + bob, aw, ah);
+      topo = p.y - ah + bob;
+    } else {
+      var bw = sz * 2.2, bh = sz * 1.5, bx = p.x - bw / 2, by = p.y - bh + bob;
+      ctx.save();
+      ctx.globalAlpha = 0.5 + 0.5 * Math.abs(Math.sin(cx.bob));
+      ctx.strokeStyle = def.cor; ctx.lineWidth = Math.max(2, sz * 0.12);
+      ctx.strokeRect(bx - 3, by - 3, bw + 6, bh + 6);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#2b2f36'; ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = def.cor; ctx.fillRect(bx, by + bh * 0.38, bw, bh * 0.24);
+      ctx.fillStyle = '#1a1d22'; ctx.fillRect(bx + bw * 0.42, by + bh * 0.3, bw * 0.16, bh * 0.4);
+      ctx.restore();
+      topo = by;
+    }
+    if (cx.z < 0.75) _corRotulo(ctx, def.nome.toUpperCase(), p.x, topo - 6 * s, Math.max(10, 16 * s + 4), def.cor);
+  }
+  function _corDrawGuardItem(ctx, it) {
+    var p = _corProj(it.z, it.faixa), s = p.s, bob = Math.sin(it.bob) * 6 * s, sz = 24 * s;
+    var cy = p.y - sz * 1.7 + bob;
+    var pul = 0.75 + 0.25 * Math.sin(it.bob * 2);
+    var gr = ctx.createRadialGradient(p.x, cy, 0, p.x, cy, sz * 1.9);
+    gr.addColorStop(0, 'rgba(255,215,90,' + (0.55 * pul).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(255,215,90,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(p.x, cy, sz * 1.9, 0, Math.PI * 2); ctx.fill();
+    var reg = _corAssetNovo(_COR_GUARD_ITEM);
+    if (_corImgPronta(reg)) {
+      var ih = sz * 2.4, iw = ih * reg.w / reg.h;
+      ctx.drawImage(reg.img, p.x - iw / 2, cy - ih / 2, iw, ih);
+    } else if (_corGuardImg && _corGuardImg.complete && _corGuardImg.naturalWidth) {
+      var gw = sz * 2.8, gh = gw * _corGuardImg.naturalHeight / _corGuardImg.naturalWidth;
+      ctx.drawImage(_corGuardImg, p.x - gw / 2, cy - gh / 2, gw, gh);
+    } else {
+      ctx.fillStyle = '#ffd24a'; ctx.beginPath(); ctx.arc(p.x, cy, sz * 0.8, 0, Math.PI * 2); ctx.fill();
+    }
+    if (it.z < 0.75) _corRotulo(ctx, 'GUARDIÃ', p.x, cy - sz * 1.5, Math.max(10, 16 * s + 4), '#ffd24a');
+  }
+  function _corDrawGuardia(ctx, W, H) {
+    if (_corGuardT <= 0) return;
+    var g = _corGuard, tam = H * 0.2;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, _corGuardT / 0.6);
+    var gr = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, tam * 0.85);
+    gr.addColorStop(0, 'rgba(255,215,90,0.45)'); gr.addColorStop(1, 'rgba(255,215,90,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(g.x, g.y, tam * 0.85, 0, Math.PI * 2); ctx.fill();
+    var reg = _corAssetNovo(_COR_GUARD_SHEET);
+    if (_corImgPronta(reg)) {
+      var fw = reg.w / 3, fh = reg.h / 3;
+      var f = g.alvo ? 6 + (Math.floor(g.atk * 10) % 3) : (Math.floor(g.voo * 12) % 6);
+      var ww = tam * fw / fh;
+      ctx.drawImage(reg.img, (f % 3) * fw, Math.floor(f / 3) * fh, fw, fh, g.x - ww / 2, g.y - tam / 2, ww, tam);
+    } else if (_corGuardImg && _corGuardImg.complete && _corGuardImg.naturalWidth) {
+      var iw = tam * 1.3, ih = iw * _corGuardImg.naturalHeight / _corGuardImg.naturalWidth;
+      ctx.translate(g.x, g.y);
+      if (g.alvo) ctx.rotate(0.35);
+      ctx.drawImage(_corGuardImg, -iw / 2, -ih / 2, iw, ih);
+    }
+    ctx.restore();
+  }
+  function _corDrawPerigo(ctx, W, H) {
+    if (_corPerigo < 0.03) return;
+    var a = _corPerigo * (0.28 + 0.4 * _corCoracaoPulso);
+    var g = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.35, W * 0.5, H * 0.5, H * 0.95);
+    g.addColorStop(0, 'rgba(200,0,0,0)'); g.addColorStop(1, 'rgba(200,0,0,' + a.toFixed(3) + ')');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  // Avisos (fila) + barrinha do tempo da guardiã, por cima de tudo.
+  function _corDrawAvisos(ctx, W, H) {
+    if (_corGuardT > 0) {
+      var bx = W * 0.03, by = H * 0.06, bw = W * 0.16, bh = Math.max(5, H * 0.016);
+      ctx.font = '800 ' + Math.round(H * 0.04) + 'px Syne, sans-serif'; ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffd24a'; ctx.fillText('Guardiã', bx, by - bh);
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = '#ffd24a'; ctx.fillRect(bx, by, bw * (_corGuardT / _COR_GUARD_DUR), bh);
+    }
+    if (!_corAvisos.length) return;
+    var av = _corAvisos[0];
+    var a = Math.max(0, Math.min(1, av.t / 0.2, (av.dur - av.t) / 0.35));
+    var y = H * 0.2;
+    ctx.save();
+    ctx.globalAlpha = a;
+    var f1 = Math.round(H * 0.065), f2 = Math.round(H * 0.036);
+    ctx.font = '800 ' + f1 + 'px Syne, sans-serif';
+    var w1 = ctx.measureText(av.txt).width;
+    ctx.font = '600 ' + f2 + 'px sans-serif';
+    var w2 = av.sub ? ctx.measureText(av.sub).width : 0;
+    var pw = Math.max(w1, w2) + H * 0.08, ph = f1 + (av.sub ? f2 * 1.5 : 0) + H * 0.04;
+    ctx.fillStyle = 'rgba(8,10,12,0.62)';
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(W / 2 - pw / 2, y - f1, pw, ph, H * 0.025); ctx.fill(); }
+    else ctx.fillRect(W / 2 - pw / 2, y - f1, pw, ph);
+    ctx.textAlign = 'center';
+    ctx.font = '800 ' + f1 + 'px Syne, sans-serif'; ctx.fillStyle = av.cor;
+    ctx.fillText(av.txt, W / 2, y + f1 * 0.15);
+    if (av.sub) { ctx.font = '600 ' + f2 + 'px sans-serif'; ctx.fillStyle = '#e8edf5'; ctx.fillText(av.sub, W / 2, y + f1 * 0.15 + f2 * 1.35); }
+    ctx.restore();
+  }
+  function _corAvisosAtualizar(dt) {
+    if (!_corAvisos.length) return;
+    _corAvisos[0].t += dt;
+    if (_corAvisos[0].t >= _corAvisos[0].dur) _corAvisos.shift();
+  }
+
   /* Obstáculo de cenário: nasce no horizonte, relativo à câmera (mesmo
      padrão dos zumbis/itens — nunca "acaba" mesmo andando muito pro lado).
      Metade das vezes nasce "no caminho" (perto do centro, força desviar de
@@ -1023,8 +1640,22 @@
      existe outro obstáculo em campo, o novo é OBRIGATORIAMENTE lateral e do
      lado OPOSTO ao último — assim os dois nunca fecham os dois lados ao
      mesmo tempo e sempre sobra passagem livre. */
+  // Sorteia o tipo do obstáculo pela ZONA atual; os "soArte" só valem com
+  // a imagem já carregada. Sem nenhum disponível, cai em pedra/entulho.
+  function _corObstSortear() {
+    var lista = COR_ZONAS[_corZonaIdx].obst, ok = [];
+    for (var i = 0; i < lista.length; i++) {
+      var def = _COR_OBST_TIPOS[lista[i]];
+      if (!def) continue;
+      if (def.soArte) { var a = _corObstAsset(lista[i]); if (!(a && a.ok)) continue; }
+      ok.push(lista[i]);
+    }
+    if (!ok.length) ok = ['pedra', 'entulho'];
+    return ok[(Math.random() * ok.length) | 0];
+  }
+
   function _corSpawnObstaculo() {
-    var tipo = _COR_OBST_NOMES[(Math.random() * _COR_OBST_NOMES.length) | 0];
+    var tipo = _corObstSortear();
     var lado, offset;
     if (_corObstaculos.length > 0) {
       var ultimo = _corObstaculos[_corObstaculos.length - 1];
@@ -1087,32 +1718,84 @@
     return alvo;
   }
 
-  function _corAtirar() {
+  // Dano num zumbi (tiro de qualquer arma ou ataque da guardiã). 'fonte'
+  // alimenta os contadores das missões. Devolve true se matou.
+  function _corDano(alvo, n, fonte) {
+    if (!alvo || alvo.morto) return false;
+    alvo.hp -= n;
+    if (alvo.hp <= 0) {
+      alvo.morto = true; alvo.cai = 0.001;
+      for (var k = 0; k < 7; k++) {
+        _corSangue.push({
+          x: alvo._px + _corRand(-16, 16), y: alvo._py - _corRand(6, 40) * alvo._ps,
+          r: _corRand(2, 7) * (0.6 + alvo._ps), life: 0.5, max: 0.5
+        });
+      }
+      _corSomImpacto(true);
+      _corRun.abates++;
+      if (alvo.tipo === 'rapido') _corRun.rapido++;
+      else if (alvo.tipo === 'forte') _corRun.forte++;
+      if (fonte === 'escopeta') _corRun.escopeta++;
+      return true;
+    }
+    _corSomImpacto(false);
+    if (window.AngatubaGames && window.AngatubaGames.efeitos) {
+      window.AngatubaGames.efeitos.estrelas(alvo._px, alvo._py - 20 * alvo._ps, 4, _corOpcoesFx());
+    }
+    return false;
+  }
+
+  // auto=true: disparo automático da metralhadora (só ela atira sozinha).
+  function _corAtirar(auto) {
     if (_corEstado !== 'jogando') return;
     if (_corTiroT > 0) return;
+    if (_corArma) { _corAtirarEspecial(auto); return; }
+    if (auto) return;
     if (_corMun <= 0) { _corSomVazio(); return; }
     _corMun--; _corTiroT = _COR_TIRO_CD; _corFlashT = 0.09; _corRecuo = 1;
     _corSomTiro();
-
+    _corContarTiro();
     var alvo = _corMiraAlvo(_corW, _corH);
+    if (alvo) _corDano(alvo, 1, 'lancador');
+    _corAtualizarHUD();
+  }
 
-    if (alvo) {
-      alvo.hp--;
-      if (alvo.hp <= 0) {
-        alvo.morto = true; alvo.cai = 0.001;
-        for (var k = 0; k < 7; k++) {
-          _corSangue.push({
-            x: alvo._px + _corRand(-16, 16), y: alvo._py - _corRand(6, 40) * alvo._ps,
-            r: _corRand(2, 7) * (0.6 + alvo._ps), life: 0.5, max: 0.5
-          });
-        }
-        _corSomImpacto(true);
-      } else {
-        _corSomImpacto(false);
-        if (window.AngatubaGames && window.AngatubaGames.efeitos) {
-          window.AngatubaGames.efeitos.estrelas(alvo._px, alvo._py - 20 * alvo._ps, 4, _corOpcoesFx());
-        }
+  function _corContarTiro() {
+    _corRun.tiros++;
+    if (_corRun.distPrimeiroTiro < 0) _corRun.distPrimeiroTiro = _corDist;
+  }
+
+  /* Escopeta: acerta TODO zumbi vivo e visível num cone largo à frente
+     (perto conta mais: dentro de z<0.3 derruba até a forte). Metralhadora:
+     tiro único rápido no alvo da mira, igual ao lançador. */
+  function _corAtirarEspecial(auto) {
+    var def = _COR_ARMAS[_corArma];
+    if (auto && !def.auto) return;
+    if (auto && !_corMiraAlvo(_corW, _corH)) return;
+    _corArmaMun--; _corTiroT = def.cd;
+    _corContarTiro();
+    var W = _corW, H = _corH;
+    if (_corArma === 'escopeta') {
+      _corFlashT = 0.16; _corRecuo = 1.5; _corShakeT = Math.max(_corShakeT, _COR_SHAKE_DUR * 0.6);
+      _corSomTiro();
+      var acE = _corAudio();
+      if (acE && _corSomLigado()) _corTom(acE, acE.currentTime, 'sawtooth', 120, 40, 0.22, 0.22);
+      var cx = W * 0.5;
+      for (var i = 0; i < _corZumbis.length; i++) {
+        var zb = _corZumbis[i];
+        if (zb.morto || !zb._vis || zb.z > 0.6) continue;
+        if (Math.abs(zb._px - cx) > W * (0.12 + 0.22 * zb._ps)) continue;
+        _corDano(zb, zb.z < 0.3 ? 3 : 2, 'escopeta');
       }
+    } else {
+      _corFlashT = 0.06; _corRecuo = 0.55;
+      _corSomTiro();
+      var alvo = _corMiraAlvo(W, H);
+      if (alvo) _corDano(alvo, 1, 'metralhadora');
+    }
+    if (_corArmaMun <= 0) {
+      _corArma = ''; _corArmaMun = 0;
+      _corAviso('Munição especial acabou', 'De volta ao lançador', '#c7d1e0', 1.6);
     }
     _corAtualizarHUD();
   }
@@ -1130,6 +1813,8 @@
     var lado = (zb.faixa - _corCamX) < 0 ? -1 : 1;
     var forca = (zb.tipo === 'forte') ? 0.05 : (zb.tipo === 'rapido' ? 0.16 : 0.12);
     zb.faixa += lado * forca;
+    _corRun.esbarroes++;
+    if (_corRun.distPrimeiroEsb < 0) _corRun.distPrimeiroEsb = _corDist;
     _corShakeT = _COR_SHAKE_DUR;
     _corIframesT = _COR_IFRAMES_DUR;
     _corSlowT = _COR_SLOW_DUR;
@@ -1271,12 +1956,12 @@
             // contato agora (centro OU borda) mata. Sem segundo esbarrão
             // de graça: se a horda te alcançar antes de você se afastar
             // e o slow acabar, morreu.
-            if (dist < meia) { _corGameOver(); return; }
+            if (dist < meia) { _corAgarrar(zb); return; }
           } else {
             // Fora do cambaleio: distingue COLISÃO FATAL (centro, < 55%
             // da meia-colisão) de ESBARRÃO (borda, entre 55% e 100%) —
             // igual antes.
-            if (dist < meia * _COR_FATAL_FRAC) { _corGameOver(); return; }
+            if (dist < meia * _COR_FATAL_FRAC) { _corAgarrar(zb); return; }
             if (dist < meia) { _corEsbarrao(zb); _corZumbis.splice(i, 1); continue; }
           }
         }
@@ -1340,6 +2025,15 @@
       if (_corMoedaFx[i].t >= 0.6) _corMoedaFx.splice(i, 1);
     }
 
+    // v6: caixas de arma, guardiã, perigo, zona, avisos e missões.
+    _corItensV6(dt);
+    _corGuardAtualizar(dt);
+    _corPerigoAtualizar(dt);
+    _corZonaAtualizar(dt);
+    _corAvisosAtualizar(dt);
+    _corMisT += dt;
+    if (_corMisT >= 0.25) { _corMisT = 0; _corMissoesChecar(); }
+
     for (i = _corSangue.length - 1; i >= 0; i--) {
       var sg = _corSangue[i];
       sg.life -= dt; sg.y += dt * 46;
@@ -1377,11 +2071,15 @@
     for (i = 0; i < _corZumbis.length; i++) render.push({ k: 'zumbi', o: _corZumbis[i], z: _corZumbis[i].z });
     for (i = 0; i < _corObstaculos.length; i++) render.push({ k: 'obst', o: _corObstaculos[i], z: _corObstaculos[i].z });
     for (i = 0; i < _corMoedas.length; i++) if (_corMoedas[i].z <= _COR_Z_FAR) render.push({ k: 'moeda', o: _corMoedas[i], z: _corMoedas[i].z });
+    for (i = 0; i < _corCaixas.length; i++) render.push({ k: 'caixa', o: _corCaixas[i], z: _corCaixas[i].z });
+    for (i = 0; i < _corGuardItens.length; i++) render.push({ k: 'guard', o: _corGuardItens[i], z: _corGuardItens[i].z });
     render.sort(function (a, b) { return b.z - a.z; });
     for (i = 0; i < render.length; i++) {
       if (render[i].k === 'zumbi') _corDrawZumbi(ctx, render[i].o);
       else if (render[i].k === 'obst') _corDrawObstaculo(ctx, render[i].o);
       else if (render[i].k === 'moeda') _corDrawMoeda(ctx, render[i].o);
+      else if (render[i].k === 'caixa') _corDrawCaixa(ctx, render[i].o);
+      else if (render[i].k === 'guard') _corDrawGuardItem(ctx, render[i].o);
       else _corDrawItem(ctx, render[i].o);
     }
 
@@ -1406,6 +2104,9 @@
     // Dead) — desenhado ANTES da arma, atrás dela. ──
     _corDrawMato(ctx, W, H);
 
+    // ── Coruja guardiã (na frente dos zumbis, atrás da arma) ──
+    _corDrawGuardia(ctx, W, H);
+
     // ── Arma + mira ──
     _corDrawArma(ctx, W, H);
     _corDrawMira(ctx, W, H);
@@ -1426,9 +2127,10 @@
     if (_corFlashT > 0) {
       var fx = W * 0.5, fy = H * (0.72 - _corRecuo * 0.03);
       ctx.globalAlpha = _corClamp(_corFlashT / 0.09, 0, 1);
-      var gF = ctx.createRadialGradient(fx, fy, 2, fx, fy, H * 0.14);
+      var rF = H * (_corArma === 'escopeta' ? 0.24 : 0.14);
+      var gF = ctx.createRadialGradient(fx, fy, 2, fx, fy, rF);
       gF.addColorStop(0, 'rgba(255,232,150,0.95)'); gF.addColorStop(1, 'rgba(255,180,60,0)');
-      ctx.fillStyle = gF; ctx.beginPath(); ctx.arc(fx, fy, H * 0.14, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = gF; ctx.beginPath(); ctx.arc(fx, fy, rF, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
     }
 
@@ -1436,6 +2138,10 @@
     var gV = ctx.createRadialGradient(W * 0.5, H * 0.48, H * 0.28, W * 0.5, H * 0.5, H * 0.9);
     gV.addColorStop(0, 'rgba(0,0,0,0)'); gV.addColorStop(1, 'rgba(0,0,0,0.62)');
     ctx.fillStyle = gV; ctx.fillRect(0, 0, W, H);
+
+    // v6: borda vermelha do perigo (no ritmo do coração) + avisos.
+    _corDrawPerigo(ctx, W, H);
+    _corDrawAvisos(ctx, W, H);
   }
 
   // Floresta de pinheiros (silhuetas serrilhadas) no horizonte.
@@ -1494,8 +2200,26 @@
      recortado) — rodar a remoção de fundo nela trataria a imagem inteira
      como "fundo chapado" e comeria tudo.
   ─────────────────────────────────────────────────────────────── */
+  /* v6 — cenário por ZONA: desenha o da zona anterior e funde o da atual
+     por cima (_corZonaFade 0→1). Sem a arte da zona, usa a floresta com a
+     tinta de cor da zona por cima. */
   function _corDrawCeuFundo(ctx, W, H, horizonY) {
-    var reg = _corAsset('cenario-floresta.webp');
+    if (_corZonaFade < 1 && _corZonaAnt >= 0) {
+      _corDrawCenarioZona(ctx, W, H, horizonY, _corZonaAnt);
+      ctx.save(); ctx.globalAlpha = _corZonaFade;
+      _corDrawCenarioZona(ctx, W, H, horizonY, _corZonaIdx);
+      ctx.restore();
+    } else _corDrawCenarioZona(ctx, W, H, horizonY, _corZonaIdx);
+  }
+  function _corDrawCenarioZona(ctx, W, H, horizonY, zi) {
+    var z = COR_ZONAS[zi] || COR_ZONAS[0];
+    var regZ = zi > 0 ? _corAssetNovo(z.cen) : null;
+    if (_corImgPronta(regZ)) { _corDrawCenarioImg(ctx, W, H, horizonY, regZ); return; }
+    _corDrawCenarioImg(ctx, W, H, horizonY, null);
+    if (z.tinta) { ctx.fillStyle = z.tinta; ctx.fillRect(0, 0, W, H); }
+  }
+  function _corDrawCenarioImg(ctx, W, H, horizonY, regForcado) {
+    var reg = regForcado || _corAsset('cenario-floresta.webp');
     if (reg && reg.ok && reg.img && reg.w && reg.h) {
       var escala = Math.max(W / reg.w, H / reg.h);
       var dw = reg.w * escala, dh = reg.h * escala;
@@ -1767,7 +2491,7 @@
     ctx.beginPath(); ctx.ellipse(p.x, p.y, aw * 0.52, aw * 0.15, 0, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
 
-    var asset = _corAsset('obst-' + ob.tipo + '.webp');
+    var asset = _corObstAsset(ob.tipo);
     var fonte = _corFonte(asset);
     if (fonte && asset.w && asset.h) {
       var iaw = ah * (asset.w / asset.h);
@@ -1843,8 +2567,14 @@
     var baseY = H + kick + swayY;
     var cx = W * 0.5 + swayX;
 
-    var asset = _corAsset(_COR_ARMA);
-    var fonteArma = _corFonte(asset);
+    // v6: arma especial — arte própria; sem ela, o lançador tingido.
+    var asset = _corAsset(_COR_ARMA), fonteArma = null, filtroArma = '';
+    if (_corArma) {
+      var regEsp = _corAssetNovo(_COR_ARMAS[_corArma].arte);
+      if (_corImgPronta(regEsp)) { asset = regEsp; fonteArma = regEsp.img; }
+      else filtroArma = _COR_ARMAS[_corArma].filtro;
+    }
+    if (!fonteArma) fonteArma = _corFonte(asset);
     if (fonteArma) {
       // Arma FPS empunhada na base. Ancoramos pela largura pra as asas
       // transbordarem, MAS com TETO de altura pra não cobrir a tela em
@@ -1856,7 +2586,10 @@
       var ah = aw / ratio;
       var ahMax = H * 0.52;
       if (ah > ahMax) { ah = ahMax; aw = ah * ratio; }
+      var filtroAntes = ctx.filter;
+      if (filtroArma) ctx.filter = filtroArma;
       ctx.drawImage(fonteArma, cx - aw / 2, baseY - ah, aw, ah);
+      if (filtroArma) ctx.filter = filtroAntes || 'none';
       return;
     }
     ctx.save(); ctx.translate(cx, baseY);
@@ -1903,6 +2636,16 @@
      LOOP
   ══════════════════════════════════════════════════════════════ */
   function _corLoop(ts) {
+    if (_corEstado === 'agarrao') {
+      if (!_corLast) _corLast = ts;
+      var dta = Math.min(0.05, (ts - _corLast) / 1000); _corLast = ts;
+      _corRelogio = ts;
+      _corAgarraoT += dta;
+      _corDrawAgarrao();
+      if (_corAgarraoT >= _COR_AGARRAO_DUR) { _corRAF = 0; _corGameOver(true); return; }
+      _corRAF = requestAnimationFrame(_corLoop);
+      return;
+    }
     if (_corEstado !== 'jogando') return;
     if (!_corLast) _corLast = ts;
     var dt = (ts - _corLast) / 1000; _corLast = ts;
@@ -1912,19 +2655,20 @@
     if (_corPausado) return;          // Start acabou de pausar: o loop para aqui
     _corUpdate(dt);
     if (_corEstado === 'jogando') { _corDraw(); _corRAF = requestAnimationFrame(_corLoop); }
+    else if (_corEstado === 'agarrao') _corRAF = requestAnimationFrame(_corLoop);
   }
 
   /* ══════════════════════════════════════════════════════════════
      GAME OVER
   ══════════════════════════════════════════════════════════════ */
-  function _corGameOver() {
+  function _corGameOver(doAgarrao) {
     if (_corRAF) { cancelAnimationFrame(_corRAF); _corRAF = 0; }
     _corEstado = 'fim';
     _corMenuPartida(false);
     _corBgmParar();
     var score = Math.floor(_corDist), rec = _corRec(), recorde = score > rec;
     if (recorde) _corRecSet(score);
-    _corDraw();
+    if (!doAgarrao) _corDraw();   // do agarrão, fica o último quadro dele por trás
     _corSomMorte();
     if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.fim(recorde);
     if (window.AngatubaGames) window.AngatubaGames.rankSubmeter('corrida', score);
@@ -1935,6 +2679,7 @@
     var segundos = Math.max(0, Math.round((Date.now() - _corInicioMs - _corPausaTotalMs) / 1000));
     if (window.AngatubaGames) {
       moedasGanhas = _corCreditarMoedas();
+      _corMissoesRender('cor-missoes-fim', _corMissoesFechar());
       if (typeof window.AngatubaGames.statsRegistrarPartida === 'function') {
         window.AngatubaGames.statsRegistrarPartida('corrida', { segundos: segundos, score: score });
       }
@@ -2268,6 +3013,7 @@
     var tela = document.getElementById('jogo-corrida');
     if (!tela || tela.style.display === 'none' || !_corCanvas) return null;
     if (_corPadCal) return 'cal';                // configurando botões: é com o _corPadCalPoll
+    if (_corEstado === 'agarrao') return 'jogo';
     if (_corEstado === 'jogando') {
       var M = _corMenu();
       return (M && M.aberto && M.aberto('jogo-corrida')) ? 'pausa' : 'jogo';
@@ -2544,6 +3290,7 @@
     }
     _corEstado = 'inicio';
     _corDist = 0; _corMun = _COR_MUN_INI;
+    _corArma = ''; _corZonaIdx = 0; _corZonaAnt = -1; _corZonaFade = 1;
     _corAtualizarHUD(true);
     // Pré-carrega os spritesheets dos zumbis (imagens únicas; o fallback
     // vetor cobre enquanto não chegam).
@@ -2552,7 +3299,9 @@
     _corSheet('rapido');
     _corSheet('forte');
     _corAsset('cenario-floresta.webp');   // dispara o carregamento do fundo cedo
-    for (var oi = 0; oi < _COR_OBST_NOMES.length; oi++) _corAsset('obst-' + _COR_OBST_NOMES[oi] + '.webp');
+    for (var oi = 0; oi < _COR_OBST_NOMES.length; oi++) if (!_COR_OBST_TIPOS[_COR_OBST_NOMES[oi]].soArte) _corAsset('obst-' + _COR_OBST_NOMES[oi] + '.webp');
+    _corMissoesCarregar();
+    _corMissoesRender('cor-missoes-ini', _corMissoesItensAtivas());
     _corCarregarSpritesFx();
     _corPrepararFontes();
     _corBgmPreparar();   // cria/pré-carrega a música de fundo (play só em _corComecar)
@@ -2588,7 +3337,7 @@
       }
       _corFonte(_corAsset(_COR_ARMA));
       _corFonte(_corAsset(_COR_MUNICAO));
-      for (var oi2 = 0; oi2 < _COR_OBST_NOMES.length; oi2++) _corFonte(_corAsset('obst-' + _COR_OBST_NOMES[oi2] + '.webp'));
+      for (var oi2 = 0; oi2 < _COR_OBST_NOMES.length; oi2++) if (!_COR_OBST_TIPOS[_COR_OBST_NOMES[oi2]].soArte) _corFonte(_corAsset('obst-' + _COR_OBST_NOMES[oi2] + '.webp'));
       if (!faltou || ++tentativas > 20) { clearInterval(_corFontesTimer); _corFontesTimer = 0; }
     }, 400);
   }
@@ -2660,7 +3409,9 @@
   function _corParar() {
     if (_corRAF) { cancelAnimationFrame(_corRAF); _corRAF = 0; }
     // Saiu no meio da corrida: as moedas já pegas não se perdem.
-    if (_corEstado === 'jogando') { _corCreditarMoedas(); _corEstado = 'inicio'; }
+    if (_corEstado === 'jogando' || _corEstado === 'agarrao') {
+      _corCreditarMoedas(); _corMissoesFechar(); _corEstado = 'inicio';
+    }
     _corDrag = false;
     _corBgmParar();
     _corDestravarOrientacao();     // volta a orientação do sistema ao normal

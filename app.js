@@ -3202,7 +3202,7 @@
   /* ── Métricas de clique ──────────────────────────────────────── */
   // Fire-and-forget: registra na planilha sem bloquear a ação do usuário.
   // Chamado apenas em botões de lojas ABERTAS (wpp/tel ativos).
-  function registrarClique(nome, tipo, plano, categoria, storyId, valor) {
+  function registrarClique(nome, tipo, plano, categoria, storyId, valor, resumo) {
     // Registra a visita para o "nudge" de avaliação (só contatos diretos)
     if (tipo === 'wpp' || tipo === 'tel' || tipo === 'pedido') {
       registrarVisitaParaAvaliar(nome);
@@ -3218,6 +3218,7 @@
       categoria: categoria,
       storyId:   storyId || '',  // só usado quando tipo==='anuncio'
       valor:     valor || '',    // só usado quando tipo==='pedido' (total do carrinho)
+      resumo:    resumo || '',   // só pedido: itens (sem dados do cliente)
       wpp:       wppLoja,        // métricas sobrevivem a renomear a loja
       sid:       getAvalSid(),   // identifica o DISPOSITIVO pro rate-limit do GAS (ver A4.4)
     }));
@@ -3486,6 +3487,9 @@
 
   // Aplica o login e transição visual quando a loja é aprovada.
   function _aoAprovar(wpp, data) {
+    // Plano escolhido no cadastro (a loja entra no Grátis até pagar).
+    const planoPend = String(localStorage.getItem('angatuba_pendente_plano') || 'GRATIS').toUpperCase();
+    const cicloPend = localStorage.getItem('angatuba_pendente_ciclo') || 'mensal';
     pararPollingAprovacao();
     localStorage.removeItem('angatuba_pendente_wpp');
     localStorage.removeItem('angatuba_pendente_plano');
@@ -3513,7 +3517,7 @@
         owlEl.src = `/webp/owl-celebrate-${owlMap[plano] || 'gratis'}.webp`;
       }
       const bigEl = document.getElementById('aguardando-title-big');
-      if (bigEl) bigEl.innerHTML = 'Loja aprovada! 🎉';
+      if (bigEl) bigEl.innerHTML = 'Sua loja está no ar! 🎉';
       const subEl = document.getElementById('aguardando-sub');
       if (subEl) subEl.innerHTML = 'Tudo certo! Estamos abrindo a sua loja…';
       const statusEl = document.getElementById('aguardando-status');
@@ -3521,11 +3525,35 @@
       const statusTxt = document.getElementById('aguardando-status-text');
       if (statusTxt) statusTxt.textContent = 'Acesso liberado';
       const acoesEl = document.getElementById('aguardando-acoes');
-      if (acoesEl) acoesEl.innerHTML = '';
       const hintEl = document.getElementById('aguardando-hint');
       if (hintEl) hintEl.style.display = 'none';
       const titEl = document.getElementById('aguardando-title');
       if (titEl) titEl.innerHTML = 'Pronto! <span>🎊</span>';
+
+      // Escolheu Plus/Pro: a loja já está no ar no Grátis; mantém os botões
+      // de pagamento na tela (o plano ativa sozinho quando o pagamento cair).
+      if (planoPend === 'PLUS' || planoPend === 'PRO') {
+        if (subEl) subEl.innerHTML = `Sua loja já aparece no app. <strong>Ative o Plano ${planoPend}</strong> pagando agora — ele entra sozinho assim que o pagamento for aprovado:`;
+        if (acoesEl) {
+          acoesEl.innerHTML = '';
+          const payBtn = document.createElement('button');
+          payBtn.type = 'button'; payBtn.className = 'success-pay-btn';
+          payBtn.innerHTML = '<i class="ti ti-credit-card"></i> Pagar e ativar o ' + planoPend + ' →';
+          payBtn.onclick = () => iniciarPagamentoMP(wpp, planoPend, cicloPend, payBtn);
+          acoesEl.appendChild(payBtn);
+          const verBtn = document.createElement('button');
+          verBtn.type = 'button'; verBtn.className = 'success-wpp-btn';
+          verBtn.textContent = 'Ver minha loja agora';
+          verBtn.onclick = () => {
+            if (history.state?.modal === 'aguardando') history.replaceState({ modal: 'minha-loja' }, '');
+            fecharAguardando(true);
+            setTimeout(() => abrirMinhaLoja(), 250);
+          };
+          acoesEl.appendChild(verBtn);
+        }
+        return;
+      }
+      if (acoesEl) acoesEl.innerHTML = '';
 
       setTimeout(() => {
         if (history.state?.modal === 'aguardando') history.replaceState({ modal: 'minha-loja' }, '');
@@ -5497,6 +5525,29 @@
   function _mlAplicarMetricas(metJson, isPago, isPro) {
     if (metJson && metJson.status === 'ok') {
       const m = metJson.data.metricas || { total:0, wpp:0, tel:0, d7:0, d30:0 };
+
+      // ── Card "Sua semana" (aba Hoje): resumo de 7 dias ──
+      const semEl = document.getElementById('ml-semana-card');
+      const semTxt = document.getElementById('ml-semana-txt');
+      const semSub = document.getElementById('ml-semana-sub');
+      if (semEl && semTxt) {
+        const v7 = m.views7d || 0, p7 = m.pedidos7d || 0;
+        if (isPago) {
+          const c7 = m.d7 || 0, cAnt = m.d7ant || 0;
+          semTxt.innerHTML = `👀 <strong>${v7}</strong> ${v7 === 1 ? 'visita' : 'visitas'} · 💬 <strong>${c7}</strong> ${c7 === 1 ? 'contato' : 'contatos'} · 🛒 <strong>${p7}</strong> ${p7 === 1 ? 'pedido' : 'pedidos'}` +
+            ((m.pedidosValor7d || 0) > 0 ? ` <span style="color:var(--green);">(${fmtBRL(m.pedidosValor7d)})</span>` : '');
+          if (semSub) semSub.textContent = (v7 + c7 + p7) === 0
+            ? 'Semana começando: mande o link da loja no WhatsApp para atrair visitas.'
+            : (cAnt > 0 ? `Contatos: ${c7} nesta semana contra ${cAnt} na anterior.` : 'Últimos 7 dias.');
+        } else {
+          semTxt.innerHTML = `👀 <strong>${v7}</strong> ${v7 === 1 ? 'pessoa abriu' : 'pessoas abriram'} sua loja nos últimos 7 dias` +
+            (p7 > 0 ? ` · 🛒 <strong>${p7}</strong> ${p7 === 1 ? 'pedido' : 'pedidos'}` : '');
+          if (semSub) semSub.textContent = v7 === 0
+            ? 'Mande o link da loja no WhatsApp e deixe o QR no balcão para atrair visitas.'
+            : 'No Plus você vê quem chamou no WhatsApp e quanto os pedidos renderam.';
+        }
+        semEl.style.display = '';
+      }
       const lockEl = document.getElementById('ml-metricas-lock');
 
       // Badge de novos cliques desde última visita
@@ -5527,6 +5578,8 @@
         if (document.getElementById('ml-m-ig')) document.getElementById('ml-m-ig').textContent = m.ig ?? 0;
         const pedEl = document.getElementById('ml-m-pedidos');
         if (pedEl) pedEl.textContent = m.pedidos30d ?? 0;
+        const pedBtn = document.getElementById('ml-pedidos-btn');
+        if (pedBtn) pedBtn.style.display = '';
         const pedValEl = document.getElementById('ml-m-pedidos-valor');
         if (pedValEl) pedValEl.textContent = (m.pedidosValor30d || 0) > 0 ? fmtBRL(m.pedidosValor30d) : '';
       } else {
@@ -5541,6 +5594,7 @@
         document.getElementById('ml-m-tel').textContent   = '—';
         if (document.getElementById('ml-m-ig')) document.getElementById('ml-m-ig').textContent = '—';
         if (document.getElementById('ml-m-pedidos')) document.getElementById('ml-m-pedidos').textContent = '—';
+        if (document.getElementById('ml-pedidos-btn')) document.getElementById('ml-pedidos-btn').style.display = 'none';
         if (document.getElementById('ml-m-pedidos-valor')) document.getElementById('ml-m-pedidos-valor').textContent = '';
         // A2: teaser com copy de dor/valor — usa só o total (já público no
         // GRÁTIS) pra não inventar número nem depender de campo novo do GAS.
@@ -12196,6 +12250,43 @@
     });
   };
 
+  // Lista os pedidos do carrinho dos últimos 30 dias (planos pagos).
+  window.mlVerPedidos = async function () {
+    const box = document.getElementById('ml-pedidos-lista');
+    const btn = document.getElementById('ml-pedidos-btn');
+    if (!box || !_lojaToken) return;
+    if (box.dataset.aberto === '1') { box.style.display = 'none'; box.dataset.aberto = ''; if (btn) btn.textContent = 'Ver pedidos'; return; }
+    if (btn) btn.textContent = 'Carregando…';
+    try {
+      const json = await apiPost('lojaPedidosListar', { token: _lojaToken }, { timeout: 30000 });
+      if (json.status !== 'ok') {
+        box.innerHTML = json.msg === 'PLANO'
+          ? '<div style="font-size:11px;color:var(--muted);">O histórico de pedidos é dos planos Plus e Pro.</div>'
+          : '<div style="font-size:11px;color:var(--red);">Não foi possível carregar agora.</div>';
+      } else {
+        const ps = (json.data && json.data.pedidos) || [];
+        box.innerHTML = ps.length ? ps.map(pd => {
+          const dt = pd.ts ? new Date(pd.ts) : null;
+          const quando = dt ? dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' +
+                              dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+          return '<div style="padding:8px 0;border-top:1px solid var(--border);">' +
+            '<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:700;">' +
+              '<span>' + (pd.id ? '#' + escHTML(pd.id) : 'Pedido') + ' <span style="color:var(--muted);font-weight:600;">· ' + escHTML(quando) + '</span></span>' +
+              '<span style="color:var(--green);">' + (pd.valor ? fmtBRL(pd.valor) : '') + '</span>' +
+            '</div>' +
+            (pd.resumo ? '<div style="font-size:10.5px;color:var(--muted);margin-top:2px;line-height:1.4;">' + escHTML(pd.resumo) + '</div>' : '') +
+          '</div>';
+        }).join('') : '<div style="font-size:11px;color:var(--muted);">Nenhum pedido pelo app nos últimos 30 dias.</div>';
+      }
+      box.style.display = ''; box.dataset.aberto = '1';
+      if (btn) btn.textContent = 'Esconder pedidos';
+    } catch (e) {
+      if (btn) btn.textContent = 'Ver pedidos';
+      if (e && e.message === 'UNAUTHORIZED') return;
+      mlToast('Não foi possível carregar os pedidos.', 'erro');
+    }
+  };
+
   // Entrar em outro celular sem pedir código: gera um link de uso único
   // (10 min) e mostra o QR para o outro aparelho escanear.
   window.mlEntrarOutroCelular = async function () {
@@ -16537,11 +16628,16 @@ ${urlCard}`)}`;
       valoresBloco = `*Total: R$ ${total.toFixed(2).replace('.',',')}*`;
     }
 
-    const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n\n${linhas.join('\n')}\n\n${valoresBloco}${entregaLine}${obsLine}\n\nPoderia confirmar?`;
+    // Nº curto do pedido: aparece na mensagem e no histórico do lojista.
+    const pedidoId = (Date.now().toString(36).slice(-4) + Math.random().toString(36).slice(2, 4)).toUpperCase();
+    const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n🧾 *Pedido #${pedidoId}*\n\n${linhas.join('\n')}\n\n${valoresBloco}${entregaLine}${obsLine}\n\nPoderia confirmar?`;
     const url = `https://wa.me/${loja.wpp}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank', 'noopener');
     // Métrica de pedido (o dado que prova resultado pro lojista).
-    try { registrarClique(loja.nome, 'pedido', loja.plano || 'GRATIS', loja.categoria || '', '', total); } catch (e) {}
+    try {
+      const resumo = itens.map(l => l.qty + '× ' + l.item.nome).join(', ').slice(0, 200);
+      registrarClique(loja.nome, 'pedido', loja.plano || 'GRATIS', loja.categoria || '', pedidoId, total, resumo);
+    } catch (e) {}
 
     // Exibe botão de confirmação explícita em vez de detectar visibilitychange
     // (visibilitychange dispara para qualquer troca de app, não só para o WhatsApp)

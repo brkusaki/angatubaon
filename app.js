@@ -3202,11 +3202,13 @@
   /* ── Métricas de clique ──────────────────────────────────────── */
   // Fire-and-forget: registra na planilha sem bloquear a ação do usuário.
   // Chamado apenas em botões de lojas ABERTAS (wpp/tel ativos).
-  function registrarClique(nome, tipo, plano, categoria, storyId) {
+  function registrarClique(nome, tipo, plano, categoria, storyId, valor) {
     // Registra a visita para o "nudge" de avaliação (só contatos diretos)
-    if (tipo === 'wpp' || tipo === 'tel') {
+    if (tipo === 'wpp' || tipo === 'tel' || tipo === 'pedido') {
       registrarVisitaParaAvaliar(nome);
     }
+    let wppLoja = '';
+    try { const lj = LOJAS.find(l => l.nome === nome); wppLoja = (lj && lj.wpp) || ''; } catch (e) {}
     const params = new URLSearchParams();
     params.append('payload', JSON.stringify({
       action:    'registrarClique',
@@ -3215,6 +3217,8 @@
       plano:     plano,
       categoria: categoria,
       storyId:   storyId || '',  // só usado quando tipo==='anuncio'
+      valor:     valor || '',    // só usado quando tipo==='pedido' (total do carrinho)
+      wpp:       wppLoja,        // métricas sobrevivem a renomear a loja
       sid:       getAvalSid(),   // identifica o DISPOSITIVO pro rate-limit do GAS (ver A4.4)
     }));
     // sendBeacon sobrevive à navegação — sem isto, abrir o WhatsApp no mesmo
@@ -5443,6 +5447,15 @@
     }
 
     // ── Métricas ─────────────────────────────────────────
+    _mlAplicarMetricas(metJson, isPago, isPro);
+
+    // ── Checklist de ativação (A1) ────────────────────────
+    if (typeof mlChecklistRender === 'function') mlChecklistRender();
+  }
+
+  // Métricas do painel. Separado de _aplicarDadosLoja para o painel não
+  // esperar a chamada lenta de métricas: elas entram quando chegarem.
+  function _mlAplicarMetricas(metJson, isPago, isPro) {
     if (metJson && metJson.status === 'ok') {
       const m = metJson.data.metricas || { total:0, wpp:0, tel:0, d7:0, d30:0 };
       const lockEl = document.getElementById('ml-metricas-lock');
@@ -5473,6 +5486,10 @@
         document.getElementById('ml-m-wpp').textContent   = m.wpp  ?? 0;
         document.getElementById('ml-m-tel').textContent   = m.tel  ?? 0;
         if (document.getElementById('ml-m-ig')) document.getElementById('ml-m-ig').textContent = m.ig ?? 0;
+        const pedEl = document.getElementById('ml-m-pedidos');
+        if (pedEl) pedEl.textContent = m.pedidos30d ?? 0;
+        const pedValEl = document.getElementById('ml-m-pedidos-valor');
+        if (pedValEl) pedValEl.textContent = (m.pedidosValor30d || 0) > 0 ? fmtBRL(m.pedidosValor30d) : '';
       } else {
         // Item 1: plano Grátis NÃO deve renderizar os números detalhados no DOM.
         // O backend já envia só { total, bloqueado } — aqui escrevemos '—' nos
@@ -5484,12 +5501,18 @@
         document.getElementById('ml-m-wpp').textContent   = '—';
         document.getElementById('ml-m-tel').textContent   = '—';
         if (document.getElementById('ml-m-ig')) document.getElementById('ml-m-ig').textContent = '—';
+        if (document.getElementById('ml-m-pedidos')) document.getElementById('ml-m-pedidos').textContent = '—';
+        if (document.getElementById('ml-m-pedidos-valor')) document.getElementById('ml-m-pedidos-valor').textContent = '';
         // A2: teaser com copy de dor/valor — usa só o total (já público no
         // GRÁTIS) pra não inventar número nem depender de campo novo do GAS.
         const lockTeaserEl = document.getElementById('ml-lock-teaser');
         if (lockTeaserEl) {
           const total = m.total ?? 0;
-          lockTeaserEl.innerHTML = total > 0
+          const ped30 = m.pedidos30d ?? 0;
+          lockTeaserEl.innerHTML = ped30 > 0
+            ? `Sua loja recebeu <strong style="color:#fff;">${ped30}</strong> ${ped30 === 1 ? 'pedido' : 'pedidos'} pelo AngatubaON nos últimos 30 dias.<br>` +
+              `No <strong style="color:var(--plano-plus-txt);">Plus</strong> você vê quanto isso rendeu em R$ e de onde vêm os contatos.`
+            : total > 0
             ? `Sua loja já despertou interesse: <strong style="color:#fff;">${total}</strong> ${total === 1 ? 'clique registrado' : 'cliques registrados'}.<br>` +
               `No <strong style="color:var(--plano-plus-txt);">Plus</strong> você vê de onde vieram (WhatsApp, telefone) e o que está funcionando.`
             : `Assim que o movimento começar, o <strong style="color:var(--plano-plus-txt);">Plus</strong> mostra de onde vêm os cliques.<br>` +
@@ -5514,8 +5537,6 @@
       }
     }
 
-    // ── Checklist de ativação (A1) ────────────────────────
-    if (typeof mlChecklistRender === 'function') mlChecklistRender();
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -7046,13 +7067,13 @@
       };
       // 20s (era 10s): o GAS "frio" passa fácil de 10s na primeira chamada e o
       // painel mostrava "Sem conexão" com a internet funcionando normalmente.
-      const [dadosResp, metResp] = await Promise.all([
-        fetch(APPS_SCRIPT_URL, { method: 'POST', body: mkParams('lojaDados'),    signal: AbortSignal.timeout(20000) }),
-        fetch(APPS_SCRIPT_URL, { method: 'POST', body: mkParams('lojaMetricas'), signal: AbortSignal.timeout(20000) }),
-      ]);
-
+      // Métricas varrem a aba inteira (a chamada mais lenta): saem em paralelo
+      // mas NÃO seguram o painel — antes, se estourassem o tempo, o painel todo
+      // mostrava "Sem conexão" e o cardápio nem começava a carregar.
+      const metPromise = fetch(APPS_SCRIPT_URL, { method: 'POST', body: mkParams('lojaMetricas'), signal: AbortSignal.timeout(30000) })
+        .then(r => r.json()).catch(() => null);
+      const dadosResp = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: mkParams('lojaDados'), signal: AbortSignal.timeout(20000) });
       const dadosJson = await dadosResp.json();
-      const metJson   = await metResp.json();
 
       // Sessão expirada
       if (dadosJson.msg === 'UNAUTHORIZED') {
@@ -7063,8 +7084,17 @@
         // Salva cache para próxima abertura ser instantânea
         try { localStorage.setItem('angatuba_loja_dados', JSON.stringify(dadosJson.data)); } catch(e) {}
 
-        _aplicarDadosLoja(dadosJson.data, metJson, window._mlPainelInteragido);
+        _aplicarDadosLoja(dadosJson.data, null, window._mlPainelInteragido);
         mlAvisoOffline(false); // Item 3: rede ok — garante que o aviso não fica preso
+
+        // Métricas: aplicam quando chegarem (sem bloquear nada)
+        metPromise.then(metJson => {
+          if (!metJson || metJson.status !== 'ok' || !_lojaToken) return;
+          const _pl = String(dadosJson.data.plano || 'GRATIS').toUpperCase();
+          _mlAplicarMetricas(metJson, _pl !== 'GRATIS', _pl === 'PRO');
+          // Plus: anúncio do dia vem junto das métricas
+          if (_pl === 'PLUS' && metJson.data && metJson.data.anuncio) mlExibirAnuncioAtivo(metJson.data.anuncio);
+        });
 
         // ── Cardápio ─────────────────────────────────────
         await mlCardapioCarregar(dadosJson.data.plano || 'GRATIS');
@@ -8119,6 +8149,13 @@
     } else {
       history.pushState({ modal: 'detalhes', idx }, '', '#' + toSlug(loja.nome));
     }
+
+    // Métrica de visualização (antes nunca era enviada: Visualizações e
+    // Conversão ficavam sempre em 0). Abrir a própria loja não conta.
+    try {
+      const souDono = !!_lojaToken && _mlMesmoWpp(loja.wpp, localStorage.getItem('angatuba_loja_wpp') || '');
+      if (!souDono) registrarClique(loja.nome, 'view', loja.plano || 'GRATIS', loja.categoria || '');
+    } catch (e) {}
 
     const overlay = document.getElementById('modal-detalhes');
     const sheet   = document.getElementById('detail-sheet');
@@ -16368,6 +16405,8 @@ ${urlCard}`)}`;
     const msg = `Olá! Fiz um pedido pelo AngatubaON 🛒\n\n${linhas.join('\n')}\n\n${valoresBloco}${entregaLine}${obsLine}\n\nPoderia confirmar?`;
     const url = `https://wa.me/${loja.wpp}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank', 'noopener');
+    // Métrica de pedido (o dado que prova resultado pro lojista).
+    try { registrarClique(loja.nome, 'pedido', loja.plano || 'GRATIS', loja.categoria || '', '', total); } catch (e) {}
 
     // Exibe botão de confirmação explícita em vez de detectar visibilitychange
     // (visibilitychange dispara para qualquer troca de app, não só para o WhatsApp)

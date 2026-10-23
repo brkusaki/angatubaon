@@ -5747,6 +5747,14 @@
     } else if (dias === 0) {
       urgente = true;
       msg = `Seu plano ${nomePlano} vence hoje. Renove agora para não perder seus benefícios.`;
+    } else if (dias >= -3) {
+      // Carência (CARENCIA_DIAS do GAS): venceu, mas a loja segue com o plano
+      urgente = true;
+      const fimCar = new Date(validade.getTime() + 3 * 24 * 60 * 60 * 1000 - 3 * 3600 * 1000);
+      const fimTxt = ('0' + fimCar.getUTCDate()).slice(-2) + '/' + ('0' + (fimCar.getUTCMonth() + 1)).slice(-2);
+      msg = dias === -3
+        ? `Último dia: seu plano ${nomePlano} venceu e amanhã a loja volta para o Grátis. Renove agora.`
+        : `Seu plano ${nomePlano} venceu, mas sua loja segue com os benefícios até ${fimTxt}. Renove para não perder nada.`;
     } else {
       // já venceu (backend ainda não rebaixou, ou cache antigo)
       urgente = true;
@@ -5848,7 +5856,15 @@
   };
 
   // Botão "Renovar" do banner de vencimento → WhatsApp de contato (mesmo do upgrade)
+  // Renovar em 1 toque: vai direto ao Checkout do Mercado Pago (plano atual,
+  // mensal). Se falhar, iniciarPagamentoMP já oferece o WhatsApp como saída.
   window.mlRenovarPlano = function() {
+    const wpp   = _lojaWpp || localStorage.getItem('angatuba_loja_wpp') || '';
+    const plano = String(_mlPlanoAtual || '').toUpperCase();
+    if (wpp && (plano === 'PLUS' || plano === 'PRO')) {
+      iniciarPagamentoMP(wpp, plano, 'mensal', document.getElementById('ml-vencimento-btn'));
+      return;
+    }
     const nome = _lojaNome || localStorage.getItem('angatuba_loja_nome') || 'minha loja';
     const msg = encodeURIComponent(`Olá! Sou dono da loja *${nome}* no AngatubaON e quero renovar meu plano.`);
     window.open(`https://wa.me/${ADMIN_WPP_CONTATO}?text=${msg}`, '_blank', 'noopener');

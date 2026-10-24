@@ -129,7 +129,7 @@
   var _COR_ASSET_BASE = '/Jogos/assets/corrida/';
   // Asas + lançador de espuma no estilo da Master Reference. Nome novo
   // (-v2) por causa do CACHE_JOGOS (cache-first, nunca apagado).
-  var _COR_ARMA = 'arma-v3.webp';   // v3: vista por trás, cano pra dentro da tela (a v2 apontava pro jogador)
+  var _COR_ARMA = 'arma-v4.webp';   // v4: vista por trás, cano pra dentro da tela (a v2 apontava pro jogador; a v3 tinha halo na asa direita)
   var _corAssets = {};
 
   // Metadados dos spritesheets animados (zumbis). "frames" é só um PALPITE:
@@ -788,12 +788,31 @@
      tinta de cor por cima. Obstáculos "soArte" só entram no sorteio
      depois que a imagem deles carregou (sem desenho provisório feio). */
   var COR_ZONAS = [
-    { nome: 'Floresta Morta',     ini: 0,    cen: 'cenario-floresta.webp', tinta: '',                      obst: ['toco', 'pedra', 'lapide', 'abobora', 'cerca', 'placa'] },
-    { nome: 'Sítio Abandonado',   ini: 350,  cen: 'cenario-sitio.webp',    tinta: 'rgba(130,85,25,0.26)',  obst: ['cerca', 'abobora', 'entulho', 'feno', 'trator', 'espantalho'] },
-    { nome: 'Entrada da Cidade',  ini: 800,  cen: 'cenario-estrada.webp',  tinta: 'rgba(40,75,130,0.22)',  obst: ['carro', 'placa', 'entulho', 'cone', 'barricada', 'onibus'] },
-    { nome: 'Centro de Angatuba', ini: 1400, cen: 'cenario-centro.webp',   tinta: 'rgba(160,70,30,0.20)',  obst: ['carro', 'entulho', 'placa', 'banco', 'poste', 'carrinho'] }
+    { nome: 'Floresta Morta',     ini: 0,    cen: 'cenario-floresta.webp', tinta: '',                      obst: ['toco', 'pedra', 'lapide', 'abobora', 'cerca', 'placa'], beira: ['toco', 'toco', 'lapide', 'lapide', 'pedra', 'pedra', 'abobora', 'cerca'] },
+    { nome: 'Sítio Abandonado',   ini: 350,  cen: 'cenario-sitio.webp',    tinta: 'rgba(130,85,25,0.26)',  obst: ['cerca', 'abobora', 'entulho', 'feno', 'trator', 'espantalho'], beira: ['feno', 'feno', 'cerca', 'cerca', 'espantalho', 'abobora', 'trator'] },
+    { nome: 'Entrada da Cidade',  ini: 800,  cen: 'cenario-estrada.webp',  tinta: 'rgba(40,75,130,0.22)',  obst: ['carro', 'placa', 'entulho', 'cone', 'barricada', 'onibus'], beira: ['poste', 'poste', 'poste', 'cone', 'cone', 'placa', 'barricada', 'carro', 'onibus'] },
+    { nome: 'Centro de Angatuba', ini: 1400, cen: 'cenario-centro.webp',   tinta: 'rgba(160,70,30,0.20)',  obst: ['carro', 'entulho', 'placa', 'banco', 'poste', 'carrinho'], beira: ['poste', 'poste', 'poste', 'banco', 'banco', 'carrinho', 'carro', 'placa'] }
   ];
   var _corZonaIdx = 0, _corZonaAnt = -1, _corZonaFade = 1;
+
+  /* ── Beira do caminho (v6.1): o mundo passando ──────────────────
+     O Into the Dead dá sensação de corrida porque o mundo inteiro passa por
+     você: árvores, cercas, carros, mato. Aqui o fundo era uma imagem parada
+     e só os obstáculos se mexiam. Agora, dos dois lados (fora da faixa onde
+     nascem zumbis e obstáculos) vem um fluxo contínuo de cenário de beira,
+     SEM colisão: a vegetação genérica (deco-*.webp, todas as zonas) e os
+     objetos da zona (reaproveitando a arte dos obstáculos). Tufos de capim
+     pequenos passam também pelo meio do chão. Só entra o que tem arte.
+     As listas "beira" das zonas repetem nomes de propósito = peso no sorteio
+     (poste aparece muito, ônibus é raro). */
+  var _COR_DECO = {   // altMul em relação à altura do zumbi; meio = pode passar pelo chão do meio
+    arvore1:  { altMul: 3.2 }, arvore2: { altMul: 2.8 }, pinheiro: { altMul: 3.4 },
+    arbusto:  { altMul: 0.9 }, capim:   { altMul: 0.6 }, tufo:     { altMul: 0.28, meio: true },
+    mato:     { altMul: 0.45, meio: true }, mourao: { altMul: 0.9 }, pedra: { altMul: 0.5 }
+  };
+  var _COR_DECO_NOMES = ['arvore1', 'arvore2', 'pinheiro', 'arbusto', 'capim', 'tufo', 'mato', 'mourao', 'pedra'];
+  var _corBeira = [];          // { z, faixa, tipo, deco, esc, flip }
+  var _corBeiraT = 0, _corChaoT = 0;
 
   /* ── Avisos grandes no meio da tela (arma, zona, missão) — fila ── */
   var _corAvisos = [];         // { txt, sub, cor, t, dur }
@@ -962,6 +981,9 @@
     _corAgarraoT = 0; _corAgarraoZb = null;
     _corZonaIdx = 0; _corZonaAnt = -1; _corZonaFade = 1;
     _corAvisos.length = 0;
+    _corBeira.length = 0; _corBeiraT = 0; _corChaoT = 0;
+    for (var dn = 0; dn < _COR_DECO_NOMES.length; dn++) _corAssetNovo('deco-' + _COR_DECO_NOMES[dn] + '.webp');
+    _corAssetNovo(_COR_MATO);
     _corRunZerar();
     _corMissoesCarregar();
     _corAssetNovo(_COR_CAIXA_ARMA); _corAssetNovo(_COR_GUARD_ITEM); _corAssetNovo(_COR_GUARD_SHEET); _corAssetNovo(_COR_AGARRAO_SHEET);
@@ -1139,6 +1161,63 @@
   }
   function _corImgPronta(reg) { return !!(reg && reg.ok && reg.img && reg.w && reg.h); }
 
+  /* ── Beira do caminho ── */
+  function _corBeiraSortear(chao) {
+    var c = [], i, n;
+    for (i = 0; i < _COR_DECO_NOMES.length; i++) {
+      n = _COR_DECO_NOMES[i];
+      if (chao && !_COR_DECO[n].meio) continue;
+      if (_corImgPronta(_corAssetNovo('deco-' + n + '.webp'))) c.push({ tipo: n, deco: true });
+    }
+    if (!chao) {
+      var z = COR_ZONAS[_corZonaIdx].beira || [];
+      for (i = 0; i < z.length; i++) {
+        var a = _corObstAsset(z[i]);
+        if (a && a.ok && a.w) c.push({ tipo: z[i], deco: false });
+      }
+    }
+    return c.length ? c[(Math.random() * c.length) | 0] : null;
+  }
+  function _corBeiraAtualizar(dt) {
+    var i, b;
+    _corBeiraT -= dt;
+    if (_corBeiraT <= 0) {
+      _corBeiraT = _corRand(0.22, 0.45);
+      var esc = _corBeiraSortear(false);
+      if (esc) {
+        var lado = Math.random() < 0.5 ? -1 : 1;
+        _corBeira.push({ z: _COR_Z_FAR, faixa: _corCamX + lado * _corRand(1.35, 3.2), tipo: esc.tipo, deco: esc.deco,
+                         esc: _corRand(0.8, 1.25), flip: Math.random() < 0.5 });
+      }
+    }
+    _corChaoT -= dt;
+    if (_corChaoT <= 0) {
+      _corChaoT = _corRand(0.12, 0.3);
+      var tf = _corBeiraSortear(true);
+      if (tf) _corBeira.push({ z: _COR_Z_FAR, faixa: _corCamX + _corRand(-1.3, 1.3), tipo: tf.tipo, deco: true,
+                               esc: _corRand(0.7, 1.2), flip: Math.random() < 0.5 });
+    }
+    for (i = _corBeira.length - 1; i >= 0; i--) {
+      b = _corBeira[i];
+      b.z -= _corVel * dt;
+      if (b.z <= 0.01) _corBeira.splice(i, 1);
+    }
+  }
+  function _corDrawBeira(ctx, b) {
+    var reg = b.deco ? _corAssetNovo('deco-' + b.tipo + '.webp') : _corObstAsset(b.tipo);
+    if (!reg || !reg.ok || !reg.w || !reg.h) return;
+    var def = b.deco ? _COR_DECO[b.tipo] : _COR_OBST_TIPOS[b.tipo];
+    var p = _corProj(b.z, b.faixa);
+    var ah = 0.5 * _corH * p.s * 0.94 * def.altMul * b.esc, aw = ah * reg.w / reg.h;
+    if (p.x + aw / 2 < 0 || p.x - aw / 2 > _corW) return;
+    var fonte = b.deco ? reg.img : (_corFonte(reg) || reg.img);
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    if (b.flip) ctx.scale(-1, 1);
+    ctx.drawImage(fonte, -aw / 2, -ah, aw, ah);
+    ctx.restore();
+  }
+
   /* ── Avisos (fila) ── */
   function _corAviso(txt, sub, cor, dur) {
     if (_corAvisos.length >= 4) _corAvisos.shift();
@@ -1286,7 +1365,7 @@
     if (nova !== _corZonaIdx) {
       _corZonaAnt = _corZonaIdx; _corZonaIdx = nova; _corZonaFade = 0;
       _corAssetNovo(COR_ZONAS[nova].cen);
-      var lo = COR_ZONAS[nova].obst;
+      var lo = COR_ZONAS[nova].obst.concat(COR_ZONAS[nova].beira || []);
       for (var i = 0; i < lo.length; i++) _corObstAsset(lo[i]);
       _corAviso('Zona ' + (nova + 1), COR_ZONAS[nova].nome, '#ffd24a', 2.6);
     }
@@ -1524,7 +1603,8 @@
     ctx.fillStyle = cor; ctx.fillText(txt, x, y);
   }
   function _corDrawCaixa(ctx, cx) {
-    var p = _corProj(cx.z, cx.faixa), s = p.s, bob = Math.sin(cx.bob) * 5 * s, sz = 22 * s;
+    var p = _corProj(cx.z, cx.faixa), s = p.s, hpxC = 0.5 * _corH * p.s * 0.94;
+    var bob = Math.sin(cx.bob) * hpxC * 0.03, sz = hpxC * 0.27;   // escala do mundo (antes: px fixos, minúsculo)
     var def = _COR_ARMAS[cx.arma];
     ctx.globalAlpha = 0.3 * (0.4 + s); ctx.fillStyle = '#000';
     ctx.beginPath(); ctx.ellipse(p.x, p.y, sz * 1.0, sz * 0.32, 0, 0, Math.PI * 2); ctx.fill();
@@ -1547,10 +1627,11 @@
       ctx.restore();
       topo = by;
     }
-    if (cx.z < 0.75) _corRotulo(ctx, def.nome.toUpperCase(), p.x, topo - 6 * s, Math.max(10, 16 * s + 4), def.cor);
+    if (cx.z < 0.75) _corRotulo(ctx, def.nome.toUpperCase(), p.x, topo - sz * 0.25, Math.max(11, sz * 0.55), def.cor);
   }
   function _corDrawGuardItem(ctx, it) {
-    var p = _corProj(it.z, it.faixa), s = p.s, bob = Math.sin(it.bob) * 6 * s, sz = 24 * s;
+    var p = _corProj(it.z, it.faixa), s = p.s, hpxG = 0.5 * _corH * p.s * 0.94;
+    var bob = Math.sin(it.bob) * hpxG * 0.03, sz = hpxG * 0.22;
     var cy = p.y - sz * 1.7 + bob;
     var pul = 0.75 + 0.25 * Math.sin(it.bob * 2);
     var gr = ctx.createRadialGradient(p.x, cy, 0, p.x, cy, sz * 1.9);
@@ -1566,7 +1647,7 @@
     } else {
       ctx.fillStyle = '#ffd24a'; ctx.beginPath(); ctx.arc(p.x, cy, sz * 0.8, 0, Math.PI * 2); ctx.fill();
     }
-    if (it.z < 0.75) _corRotulo(ctx, 'GUARDIÃ', p.x, cy - sz * 1.5, Math.max(10, 16 * s + 4), '#ffd24a');
+    if (it.z < 0.75) _corRotulo(ctx, 'GUARDIÃ', p.x, cy - sz * 1.5, Math.max(11, sz * 0.55), '#ffd24a');
   }
   function _corDrawGuardia(ctx, W, H) {
     if (_corGuardT <= 0) return;
@@ -2026,6 +2107,7 @@
     }
 
     // v6: caixas de arma, guardiã, perigo, zona, avisos e missões.
+    _corBeiraAtualizar(dt);
     _corItensV6(dt);
     _corGuardAtualizar(dt);
     _corPerigoAtualizar(dt);
@@ -2072,6 +2154,7 @@
     for (i = 0; i < _corObstaculos.length; i++) render.push({ k: 'obst', o: _corObstaculos[i], z: _corObstaculos[i].z });
     for (i = 0; i < _corMoedas.length; i++) if (_corMoedas[i].z <= _COR_Z_FAR) render.push({ k: 'moeda', o: _corMoedas[i], z: _corMoedas[i].z });
     for (i = 0; i < _corCaixas.length; i++) render.push({ k: 'caixa', o: _corCaixas[i], z: _corCaixas[i].z });
+    for (i = 0; i < _corBeira.length; i++) render.push({ k: 'beira', o: _corBeira[i], z: _corBeira[i].z });
     for (i = 0; i < _corGuardItens.length; i++) render.push({ k: 'guard', o: _corGuardItens[i], z: _corGuardItens[i].z });
     render.sort(function (a, b) { return b.z - a.z; });
     for (i = 0; i < render.length; i++) {
@@ -2079,6 +2162,7 @@
       else if (render[i].k === 'obst') _corDrawObstaculo(ctx, render[i].o);
       else if (render[i].k === 'moeda') _corDrawMoeda(ctx, render[i].o);
       else if (render[i].k === 'caixa') _corDrawCaixa(ctx, render[i].o);
+      else if (render[i].k === 'beira') _corDrawBeira(ctx, render[i].o);
       else if (render[i].k === 'guard') _corDrawGuardItem(ctx, render[i].o);
       else _corDrawItem(ctx, render[i].o);
     }
@@ -2125,7 +2209,7 @@
     }
 
     if (_corFlashT > 0) {
-      var fx = W * 0.59, fy = H * (0.66 - _corRecuo * 0.03);   // boca do cano da arma (deslocada pra direita)
+      var fx = W * 0.5, fy = H * (0.65 - _corRecuo * 0.03);   // ponta do cano, logo abaixo da mira
       ctx.globalAlpha = _corClamp(_corFlashT / 0.09, 0, 1);
       var rF = H * (_corArma === 'escopeta' ? 0.24 : 0.14);
       var gF = ctx.createRadialGradient(fx, fy, 2, fx, fy, rF);
@@ -2269,33 +2353,28 @@
     }
   }
 
-  // Mato em primeiro plano: tufos de grama escura na base da tela, com leve
-  // balanço pela passada. Duas camadas (atrás mais clara, frente preta).
+  // Mato em primeiro plano. Com a arte (mato-frente.webp: faixa larga de
+  // capim escuro, repetida na horizontal), duas camadas com balanço da
+  // passada e parallax do arraste. Sem a arte, só um degradê escuro na base
+  // (os tufos vetoriais antigos destoavam do resto, que é todo em arte).
+  var _COR_MATO = 'mato-frente.webp';
   function _corDrawMato(ctx, W, H) {
+    var reg = _corAssetNovo(_COR_MATO);
     var swayG = Math.sin(_corPasso * 0.5) * W * 0.008;
-    // camada de trás (mais clara, tufos menores)
-    _corDrawTufos(ctx, W, H, H * 0.82, W * 0.045, 'rgba(20,26,20,0.75)', swayG * 0.5, 17);
-    // camada da frente (preta, tufos maiores, cobre a base)
-    _corDrawTufos(ctx, W, H, H * 0.90, W * 0.075, 'rgba(6,9,6,0.96)', swayG, 11);
-  }
-  function _corDrawTufos(ctx, W, H, topY, larg, cor, sway, seedBase) {
-    ctx.save();
-    ctx.fillStyle = cor;
-    var seed = seedBase;
-    var x = -larg;
-    while (x < W + larg) {
-      seed = (seed * 9301 + 49297) % 233280;
-      var altura = (H - topY) * (0.55 + (seed / 233280) * 0.7);
-      var lw = larg * (0.6 + (seed / 233280));
-      var cx = x + sway * (0.5 + (seed / 233280));
-      // tufo = triângulo pontudo pra cima
-      ctx.beginPath();
-      ctx.moveTo(cx - lw * 0.5, H);
-      ctx.quadraticCurveTo(cx - lw * 0.15, H - altura * 0.7, cx, H - altura);
-      ctx.quadraticCurveTo(cx + lw * 0.15, H - altura * 0.7, cx + lw * 0.5, H);
-      ctx.closePath(); ctx.fill();
-      x += larg * 0.55;
+    if (_corImgPronta(reg)) {
+      _corDrawMatoFaixa(ctx, W, H, reg, H * 0.24, swayG * 0.5, 0.18, 0.75);   // de trás, mais baixa e apagada
+      _corDrawMatoFaixa(ctx, W, H, reg, H * 0.30, swayG, 0.32, 1);           // da frente
+      return;
     }
+    var g = ctx.createLinearGradient(0, H * 0.8, 0, H);
+    g.addColorStop(0, 'rgba(5,8,5,0)'); g.addColorStop(1, 'rgba(5,8,5,0.85)');
+    ctx.fillStyle = g; ctx.fillRect(0, H * 0.8, W, H * 0.2);
+  }
+  function _corDrawMatoFaixa(ctx, W, H, reg, alt, sway, parallax, alfa) {
+    var larg = alt * reg.w / reg.h;
+    var off = ((-_corCamX * W * parallax + sway) % larg + larg) % larg - larg;
+    ctx.save(); ctx.globalAlpha = alfa;
+    for (var x = off; x < W; x += larg - 1) ctx.drawImage(reg.img, x, H - alt + H * 0.02, larg, alt);
     ctx.restore();
   }
 
@@ -2438,7 +2517,8 @@
 
   function _corDrawItem(ctx, it) {
     var p = _corProj(it.z, it.faixa);
-    var s = p.s, bob = Math.sin(it.bob) * 5 * s, sz = 20 * s;
+    var hpxI = 0.5 * _corH * p.s * 0.94;                  // mesma escala do zumbi
+    var s = p.s, bob = Math.sin(it.bob) * hpxI * 0.03, sz = hpxI * 0.24;
     ctx.globalAlpha = 0.3 * (0.4 + s); ctx.fillStyle = '#000';
     ctx.beginPath(); ctx.ellipse(p.x, p.y, sz * 0.9, sz * 0.3, 0, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
@@ -2581,10 +2661,10 @@
       // telas landscape largas (celular deitado tem proporção ~2.2:1, então
       // largura×105% daria altura maior que a tela). O teto garante que a
       // arma ocupe no máx ~52% da altura, deixando o campo de visão livre.
-      // v3 (arte vista por trás, cano pra dentro da tela): o cano ocupava
-      // justo o centro, de onde os zumbis vêm. Como nos FPS, a arma fica
-      // menor (teto 40% da altura), um pouco afundada e deslocada pra
-      // direita — a faixa do meio fica livre e a mira continua no centro.
+      // v3 (arte vista por trás, cano pra dentro da tela): arma menor (teto
+      // 40% da altura) e afundada, CENTRALIZADA — a ponta do cano fica logo
+      // abaixo da mira, apontando pra ela (deslocada pro lado, a mira
+      // parecia solta, longe do cano).
       var ratio = (asset.h && asset.w) ? (asset.w / asset.h) : 2.2;  // w/h
       var aw = W * 1.05;
       var ah = aw / ratio;
@@ -2592,7 +2672,7 @@
       if (ah > ahMax) { ah = ahMax; aw = ah * ratio; }
       var filtroAntes = ctx.filter;
       if (filtroArma) ctx.filter = filtroArma;
-      ctx.drawImage(fonteArma, cx + W * 0.09 - aw / 2, baseY + H * 0.04 - ah, aw, ah);
+      ctx.drawImage(fonteArma, cx - aw / 2, baseY + H * 0.04 - ah, aw, ah);
       if (filtroArma) ctx.filter = filtroAntes || 'none';
       return;
     }

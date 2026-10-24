@@ -1287,7 +1287,7 @@
     ],
     corrida: [
       '/Jogos/corrida.min.js', '/Jogos/corrida.css',
-      '/Jogos/assets/corrida/arma-v3.webp',
+      '/Jogos/assets/corrida/arma-v4.webp',
       '/Jogos/assets/corrida/cenario-floresta.webp',
       '/Jogos/assets/corrida/municao-v2.webp',
       '/Jogos/assets/corrida/musica-fundo.mp3',

@@ -6937,6 +6937,21 @@ body.light-mode .rc-evento-chip { color: #b45309; }
     @keyframes moedasDiarioPop { 0% { transform: scale(.94); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
     /* No hero do perfil o botão fica abaixo do card de identidade. */
     .perfil-hero .moedas-diario-btn { margin: 12px 0 0; }
+    /* Save na nuvem: aviso pro visitante (sem conta = só no aparelho) e
+       confirmação discreta pra quem está logado. */
+    .nuvem-aviso {
+      width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
+      padding: 10px 12px; margin: -4px 0 14px; border-radius: 12px; cursor: pointer;
+      background: rgba(56,189,248,.10); border: 1px solid rgba(56,189,248,.35);
+      color: var(--text); font-family: var(--font-b, inherit); font-size: 12.5px; line-height: 1.35;
+      -webkit-tap-highlight-color: transparent; transition: transform .15s;
+    }
+    .nuvem-aviso:active { transform: scale(0.98); }
+    .nuvem-aviso b { color: #38bdf8; }
+    .nuvem-aviso-ico { font-size: 20px; flex-shrink: 0; }
+    .nuvem-ok {
+      margin: -6px 0 14px; text-align: center; font-size: 11.5px; color: var(--muted);
+    }
 
     /* ── Loja de skins DENTRO do jogo (overlay montado por lojaJogoAbrir) ── */
     .lojajogo-overlay {

@@ -149,6 +149,25 @@ service cloud.firestore {
                     && rankUpdateOk(request.resource.data, resource.data, 300000);
       allow delete: if false;
     }
+    // Ritmo da Coruja — um ranking POR MAPA (música + dificuldade + colunas),
+    // em subcoleção: ranking_ritmo/{mapa}/scores/{uid}. O id do mapa é
+    // "<musica>_<easy|normal|hard|expert>_<4|5|7>k" (ex.: "mare-alta_hard_4k") — validado
+    // aqui pra ninguém criar mapa lixo. Teto 1000000: é o score MÁXIMO do
+    // jogo (90% precisão + 10% combo, ver _rtScoreAtual em Jogos/ritmo.js).
+    // O doc-pai ranking_ritmo/{mapa} não existe (só a subcoleção) e não
+    // precisa de regra própria.
+    match /ranking_ritmo/{mapa}/scores/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && mapa.matches('[a-z0-9-]{1,40}_(easy|normal|hard|expert)_(4|5|7)k')
+                    && scoreValido(request.resource.data, 1000000);
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && mapa.matches('[a-z0-9-]{1,40}_(easy|normal|hard|expert)_(4|5|7)k')
+                    && rankUpdateOk(request.resource.data, resource.data, 1000000);
+      allow delete: if false;
+    }
     // Módulo Aprender — progresso de idiomas (XP, ofensiva, lições concluídas).
     // Diferente dos rankings acima, é dado PRIVADO do próprio usuário (não
     // aparece pra mais ninguém), então só o dono pode ler ou escrever o
@@ -165,16 +184,34 @@ service cloud.firestore {
     function langProgressValido(dados) {
       return dados.keys().hasOnly(['en', 'atualizadoEm'])
         && dados.en is map
-        && dados.en.keys().hasOnly(['totalXp', 'streak', 'lastDate', 'units'])
+        && dados.en.keys().hasOnly(['totalXp', 'streak', 'lastDate', 'placementDone', 'placementLevel', 'units'])
         && dados.en.totalXp is int && dados.en.totalXp >= 0 && dados.en.totalXp <= 1000000
         && dados.en.streak is int && dados.en.streak >= 0 && dados.en.streak <= 100000
-        && dados.en.lastDate is string && dados.en.lastDate.size() <= 10
+        // lastDate é null enquanto a pessoa não concluiu nenhuma lição — e
+        // com o teste de nivelamento isso passou a ser gravado (o placement
+        // salva antes da 1ª lição, sem mexer na ofensiva).
+        && (dados.en.lastDate == null || (dados.en.lastDate is string && dados.en.lastDate.size() <= 10))
+        // Nivelamento (opcionais: docs criados antes deste recurso não têm).
+        && (!dados.en.keys().hasAny(['placementDone']) || dados.en.placementDone is bool)
+        && (!dados.en.keys().hasAny(['placementLevel'])
+            || (dados.en.placementLevel is int && dados.en.placementLevel >= 0 && dados.en.placementLevel <= 10))
         && dados.en.units is map
-        && dados.en.units.keys().hasOnly(['u1', 'u2', 'u3', 'u4'])
+        && dados.en.units.keys().hasOnly(['u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7', 'u8', 'u9', 'u10'])
+        // u1-u4 sempre existem: todo app, de qualquer versao, grava as quatro.
         && unidadeAprenderValida(dados.en.units.u1)
         && unidadeAprenderValida(dados.en.units.u2)
         && unidadeAprenderValida(dados.en.units.u3)
         && unidadeAprenderValida(dados.en.units.u4)
+        // u5-u10 sao OPCIONAIS de proposito (mesmo padrao dos campos de
+        // nivelamento acima): um aparelho ainda com o bundle antigo em cache
+        // grava so u1-u4, e o progresso dele tem que continuar sincronizando
+        // ate o service worker novo entrar. Presentes, sao validadas igual.
+        && (!dados.en.units.keys().hasAny(['u5']) || unidadeAprenderValida(dados.en.units.u5))
+        && (!dados.en.units.keys().hasAny(['u6']) || unidadeAprenderValida(dados.en.units.u6))
+        && (!dados.en.units.keys().hasAny(['u7']) || unidadeAprenderValida(dados.en.units.u7))
+        && (!dados.en.units.keys().hasAny(['u8']) || unidadeAprenderValida(dados.en.units.u8))
+        && (!dados.en.units.keys().hasAny(['u9']) || unidadeAprenderValida(dados.en.units.u9))
+        && (!dados.en.units.keys().hasAny(['u10']) || unidadeAprenderValida(dados.en.units.u10))
         && dados.atualizadoEm is timestamp;
     }
     match /lang_progress/{uid} {
@@ -186,6 +223,302 @@ service cloud.firestore {
                     && uid == request.auth.uid
                     && langProgressValido(request.resource.data);
       allow delete: if false;
+    }
+    // Perfil público (Camada 3 — estilo Steam). Diferente do lang_progress
+    // acima: aqui é o OPOSTO — leitura livre pra qualquer um (é o que
+    // aparece quando você clica num jogador no ranking), mas só o dono
+    // escreve, e só o que já é público em outro lugar (cosméticos
+    // equipados, que já aparecem no jogo, e estatísticas agregadas).
+    // NUNCA guarda moedas nem o inventário completo — só o equipado.
+    // Whitelist do LOJA_CATALOGO — ao adicionar cosmético novo, atualizar esta lista e republicar no Console.
+    // Fail-closed: id fora da lista rejeita o create/update do perfil.
+    // Não valida "dono do item" (inventário é local) — só ids conhecidos.
+    // Slots de skin dos outros jogos: OPCIONAIS (o app hoje não publica
+    // esses slots no perfil — _perfilPublicoSync manda só voo_owl/badge/
+    // bg/card), mas, se vierem, só ids do catálogo.
+    function skinJogoOk(e, slot, ids) {
+      return !e.keys().hasAny([slot]) || (e[slot] is string && e[slot] in ids);
+    }
+    function equipadoValido(e) {
+      return e.keys().hasOnly(['voo_owl', 'badge', 'bg', 'card',
+                               't48_tema', 'piano_tema', 'pp_skin', 'sq_tema',
+                               'st_tema', 'bb_tema', 'tq_skin', 'dc_tema'])
+        && skinJogoOk(e, 't48_tema',   ['t48_classico', 't48_oceano', 't48_floresta', 't48_neon', 't48_galaxia'])
+        && skinJogoOk(e, 'piano_tema', ['piano_classico', 'piano_oceano', 'piano_algodao', 'piano_ouro', 'piano_neon'])
+        && skinJogoOk(e, 'pp_skin',    ['pp_classico', 'pp_limao', 'pp_roxo', 'pp_fogo', 'pp_ouro'])
+        && skinJogoOk(e, 'sq_tema',    ['sq_classico', 'sq_pastel', 'sq_neon', 'sq_doces', 'sq_galaxia'])
+        && skinJogoOk(e, 'st_tema',    ['st_classico', 'st_neon', 'st_dourada', 'st_gelo', 'st_arcoiris'])
+        && skinJogoOk(e, 'bb_tema',    ['bb_classico', 'bb_pastel', 'bb_neon', 'bb_madeira', 'bb_galaxia'])
+        && skinJogoOk(e, 'tq_skin',    ['tq_classico', 'tq_militar', 'tq_deserto', 'tq_onix', 'tq_ouro'])
+        && skinJogoOk(e, 'dc_tema',    ['dc_classico', 'dc_frutas', 'dc_pastel', 'dc_neon', 'dc_joias'])
+        && e.voo_owl is string && e.voo_owl.size() <= 40
+        && e.badge is string && e.badge.size() <= 40
+        && e.bg is string && e.bg.size() <= 40
+        && e.card is string && e.card.size() <= 40
+        && e.voo_owl in ['voo_skin_classica', 'voo_skin_neon', 'voo_skin_dourada', 'voo_skin_pixel',
+                         'voo_skin_rosa', 'voo_skin_floresta', 'voo_skin_sombra', 'voo_skin_gelo',
+                         'voo_skin_fogo', 'voo_skin_arcoiris']
+        && e.badge in ['', 'badge_estrela', 'badge_fogo', 'badge_coroa']
+        && e.bg in ['bg_padrao', 'bg_noite', 'bg_dia', 'bg_neon',
+                    'bg_neblina', 'bg_estadio', 'bg_milho', 'bg_igreja_chuva',
+                    'bg_igreja_tempestade', 'bg_rua_estrelada', 'bg_igreja_estrelada',
+                    'bg_festa_junina', 'bg_neon2']
+        && e.card in ['card_padrao', 'card_ouro', 'card_pixel',
+                      'card_madeira', 'card_pixel_pro', 'card_coruja_classica',
+                      'card_estrelas', 'card_tech_verde', 'card_neon_roxo',
+                      'card_fogo', 'card_holografico', 'card_ouro_premium'];
+    }
+    // Uma entrada de stats por jogo — mesmo formato de angatuba_stats_jogos
+    // no cliente (ver Jogos/hub.js, statsRegistrarPartida).
+    function statsEntradaValida(s) {
+      return s.keys().hasOnly(['partidas', 'segundos', 'recorde'])
+        && s.partidas is int && s.partidas >= 0 && s.partidas <= 100000
+        && s.segundos is int && s.segundos >= 0 && s.segundos <= 20000000
+        && s.recorde is int && s.recorde >= 0 && s.recorde <= 1000000;
+    }
+    // Chaves são os mesmos jogoKey dos rankings acima ('2048' via colchete
+    // por não ser identificador válido). Uma chave nova (jogo novo gravando
+    // stats) precisa ser adicionada aqui pra sincronizar — até lá, o
+    // create/update inteiro falha (fail-closed; não perde silenciosamente
+    // um campo, só rejeita o doc, e o cliente já é silencioso no erro).
+    function statsValido(s) {
+      return s.keys().hasOnly(['pegacoruja', 'pegacoruja_surv', 'relampago', 'sequencia',
+                                'voo', 'corrida', 'piano', 'blocos', 'doces', '2048', 'ritmo'])
+        && (!s.keys().hasAny(['pegacoruja'])      || statsEntradaValida(s.pegacoruja))
+        && (!s.keys().hasAny(['pegacoruja_surv']) || statsEntradaValida(s.pegacoruja_surv))
+        && (!s.keys().hasAny(['relampago'])       || statsEntradaValida(s.relampago))
+        && (!s.keys().hasAny(['sequencia'])       || statsEntradaValida(s.sequencia))
+        && (!s.keys().hasAny(['voo'])             || statsEntradaValida(s.voo))
+        && (!s.keys().hasAny(['corrida'])         || statsEntradaValida(s.corrida))
+        && (!s.keys().hasAny(['piano'])           || statsEntradaValida(s.piano))
+        && (!s.keys().hasAny(['blocos'])          || statsEntradaValida(s.blocos))
+        && (!s.keys().hasAny(['doces'])           || statsEntradaValida(s.doces))
+        && (!s.keys().hasAny(['2048'])            || statsEntradaValida(s['2048']))
+        && (!s.keys().hasAny(['ritmo'])           || statsEntradaValida(s.ritmo));
+    }
+    // Um id de título (ver TITULOS_KEY_EQUIPADOS em Jogos/hub.js) — mesma
+    // faixa de tamanho dos demais ids de item (voo_owl/badge/bg/card).
+    function tituloIdValido(id) {
+      return id is string && id.size() <= 40;
+    }
+    // Só os títulos EQUIPADOS (até 2) ficam públicos — o histórico
+    // completo de desbloqueados é local (angatuba_titulos_desbloqueados).
+    function titulosValido(t) {
+      return t is list && t.size() <= 2
+        && (t.size() < 1 || tituloIdValido(t[0]))
+        && (t.size() < 2 || tituloIdValido(t[1]));
+    }
+    // Histórico das últimas partidas (Fase 1, item 2) — ver o bloco
+    // "HISTÓRICO DE PARTIDAS" em Jogos/hub.js. Lista ÚNICA (todos os
+    // jogos juntos, mais nova primeiro) com no máx. 15 itens: as regras
+    // não sabem iterar lista, então cada posição é validada à mão abaixo
+    // — é isso que mantém o doc com tamanho controlado e sem lixo.
+    // 15 (e não mais) por causa do limite de 1.000 expressões avaliadas
+    // por request: o perfilValido inteiro roda a cada gravação do perfil.
+    // Pelo mesmo motivo o item é enxuto: campo ausente ou do tipo errado
+    // já faz a checagem tipada falhar (erro = negado), sem hasAll.
+    // "jogo" não é whitelist (é só rótulo; jogo novo não precisa de
+    // regra nova), mas é id curto [a-z0-9_]. "placar" só nos jogos 1x1.
+    function historicoItemValido(i) {
+      return i.keys().hasOnly(['jogo', 'resultado', 'score', 'segundos', 'em', 'placar'])
+        && i.jogo is string && i.jogo.matches('[a-z0-9_]{1,20}')
+        && i.resultado in ['', 'vitoria', 'derrota', 'empate', 'recorde']
+        && i.score is int && i.score >= 0 && i.score <= 1000000
+        && i.segundos is int && i.segundos >= 0 && i.segundos <= 86400
+        && i.em is int && i.em > 0
+        && (!('placar' in i) || (i.placar is string && i.placar.size() <= 12));
+    }
+    function historicoValido(h) {
+      return h is list && h.size() <= 15
+        && (h.size() < 1 || historicoItemValido(h[0]))
+        && (h.size() < 2 || historicoItemValido(h[1]))
+        && (h.size() < 3 || historicoItemValido(h[2]))
+        && (h.size() < 4 || historicoItemValido(h[3]))
+        && (h.size() < 5 || historicoItemValido(h[4]))
+        && (h.size() < 6 || historicoItemValido(h[5]))
+        && (h.size() < 7 || historicoItemValido(h[6]))
+        && (h.size() < 8 || historicoItemValido(h[7]))
+        && (h.size() < 9 || historicoItemValido(h[8]))
+        && (h.size() < 10 || historicoItemValido(h[9]))
+        && (h.size() < 11 || historicoItemValido(h[10]))
+        && (h.size() < 12 || historicoItemValido(h[11]))
+        && (h.size() < 13 || historicoItemValido(h[12]))
+        && (h.size() < 14 || historicoItemValido(h[13]))
+        && (h.size() < 15 || historicoItemValido(h[14]));
+    }
+    // Fase 2 — vitrine pública de conquistas (estilo Steam). O que antes
+    // era só local (angatuba_titulos_desbloqueados) passa a ser público
+    // por decisão do Bruno. Vai como UMA string "id,id,..." e não como
+    // lista: um regex só valida tudo (custo fixo no limite de 1.000
+    // expressões do perfilValido), sem item a item. Ids são [a-z0-9_].
+    function conquistasValido(c) {
+      return c is string && c.size() <= 1500 && c.matches('[a-z0-9_,]*');
+    }
+    // Título em destaque: um id (ou '' = nenhum).
+    function tituloDestaqueValido(t) {
+      return t is string && t.size() <= 40 && t.matches('[a-z0-9_]*');
+    }
+    function perfilValido(dados) {
+      return dados.keys().hasOnly(['uid', 'nome', 'photoURL', 'equipado', 'stats', 'titulos', 'historico',
+                                   'tituloDestaque', 'conquistas', 'atualizadoEm'])
+        && dados.uid is string
+        && dados.uid == request.auth.uid
+        && dados.nome is string
+        && dados.nome.size() >= 2
+        && dados.nome.size() <= 20
+        && dados.photoURL is string
+        && dados.photoURL.size() < 300
+        && (dados.photoURL == ''
+            || dados.photoURL.matches('https://(lh3[.]googleusercontent[.]com|res[.]cloudinary[.]com)/.*'))
+        && dados.equipado is map
+        && equipadoValido(dados.equipado)
+        && dados.stats is map
+        && statsValido(dados.stats)
+        && (!dados.keys().hasAny(['titulos']) || titulosValido(dados.titulos))
+        // Opcional: perfis criados antes da Fase 1 (e bundles antigos em
+        // cache, que gravam com merge sem este campo) continuam válidos.
+        && (!dados.keys().hasAny(['historico']) || historicoValido(dados.historico))
+        // Fase 2: opcionais pelo mesmo motivo do historico.
+        && (!dados.keys().hasAny(['tituloDestaque']) || tituloDestaqueValido(dados.tituloDestaque))
+        && (!dados.keys().hasAny(['conquistas']) || conquistasValido(dados.conquistas))
+        && dados.atualizadoEm is timestamp;
+    }
+    match /perfis/{uid} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && perfilValido(request.resource.data);
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && perfilValido(request.resource.data);
+      allow delete: if false;
+    }
+    // Biblioteca da Coruja — listas e progresso de leitura. Dado PRIVADO
+    // do próprio usuário (igual ao lang_progress): só o dono lê/escreve.
+    // Valida a forma pra evitar lixo; ids de livro são strings curtas.
+    function listaLivrosValida(l) {
+      return l is list && l.size() <= 60;
+    }
+    function bibliotecaValida(d) {
+      return d.keys().hasOnly(['fav', 'lidos', 'quero', 'prog', 't', 'atualizadoEm'])
+        && listaLivrosValida(d.fav)
+        && listaLivrosValida(d.lidos)
+        && listaLivrosValida(d.quero)
+        && d.prog is map && d.prog.size() <= 60
+        && d.t is number
+        && d.atualizadoEm is timestamp;
+    }
+    match /biblioteca/{uid} {
+      allow read: if request.auth != null && uid == request.auth.uid;
+      allow create, update: if request.auth != null
+                    && uid == request.auth.uid
+                    && bibliotecaValida(request.resource.data);
+      allow delete: if false;
+    }
+    // Avaliações dos livros — PÚBLICAS (qualquer um lê a média e os
+    // comentários), uma por conta e por livro (doc id = uid), só o dono
+    // grava/apaga a própria. Livro precisa ser do acervo (lista fixa:
+    // livro novo no acervo = acrescentar o id aqui).
+    function livroDoAcervo(livro) {
+      return livro in ['1984', 'revolucao-dos-bichos', 'metamorfose', 'processo', 'frankenstein',
+                       'dracula', 'maquina-do-tempo', 'guerra-dos-mundos', 'dorian-gray',
+                       'coracao-das-trevas', 'chamado-da-floresta', 'dom-casmurro', 'bras-cubas',
+                       'cortico', 'policarpo', 'medico-e-o-monstro'];
+    }
+    function notaValida(d) {
+      return d.keys().hasOnly(['uid', 'nome', 'photoURL', 'nota', 'comentario', 'atualizadoEm'])
+        && d.uid is string && d.uid == request.auth.uid
+        && d.nome is string && d.nome.size() >= 2 && d.nome.size() <= 20
+        && d.photoURL is string && d.photoURL.size() < 300
+        && (d.photoURL == ''
+            || d.photoURL.matches('https://(lh3[.]googleusercontent[.]com|res[.]cloudinary[.]com)/.*'))
+        && d.nota is int && d.nota >= 1 && d.nota <= 5
+        && d.comentario is string && d.comentario.size() <= 500
+        && d.atualizadoEm is timestamp;
+    }
+    match /biblioteca_avaliacoes/{livro}/notas/{uid} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+                    && uid == request.auth.uid
+                    && livroDoAcervo(livro)
+                    && notaValida(request.resource.data);
+      allow delete: if request.auth != null && uid == request.auth.uid;
+    }
+    // Lojas favoritas (Fase 2) — dado PRIVADO, igual ao lang_progress e à
+    // biblioteca: só o dono lê e escreve. fav/rem são mapas id -> tempo
+    // (ms) — rem é a "lápide" que impede a mesclagem entre aparelhos de
+    // ressuscitar um favorito removido. Os valores não são validados um a
+    // um (é doc do próprio usuário, não afeta terceiros); o que segura o
+    // tamanho são os tetos de chaves. Ver FAVORITOS SINCRONIZADOS em app.js.
+    function favoritosValido(d) {
+      return d.keys().hasOnly(['fav', 'rem', 'atualizadoEm'])
+        && d.fav is map && d.fav.size() <= 300
+        && d.rem is map && d.rem.size() <= 300
+        && d.atualizadoEm is timestamp;
+    }
+    match /favoritos/{uid} {
+      allow read: if request.auth != null && uid == request.auth.uid;
+      allow create, update: if request.auth != null
+                    && uid == request.auth.uid
+                    && favoritosValido(request.resource.data);
+      allow delete: if false;
+    }
+    // Preferências da conta (chat v3) — dado PRIVADO, só o dono lê e
+    // escreve. Hoje guarda o fundo das conversas: tema pronto (lista
+    // fechada = CHAT_TEMAS em app.js) e/ou foto (só URL do Cloudinary,
+    // a mesma conta de imagens do app). `t` = ms da última mudança, pra
+    // mesclar aparelhos (vence o mais novo).
+    function preferenciasValido(d) {
+      return d.keys().hasOnly(['chatTema', 'chatFoto', 't', 'atualizadoEm'])
+        && d.chatTema is string
+        && d.chatTema in ['padrao', 'escuro', 'claro', 'pontos', 'linhas', 'noite']
+        && d.chatFoto is string && d.chatFoto.size() < 300
+        && (d.chatFoto == '' || d.chatFoto.matches('https://res[.]cloudinary[.]com/[A-Za-z0-9_./,:-]+'))
+        && d.t is int && d.t > 0
+        && d.atualizadoEm is timestamp;
+    }
+    match /preferencias/{uid} {
+      allow read: if request.auth != null && uid == request.auth.uid;
+      allow create, update: if request.auth != null
+                    && uid == request.auth.uid
+                    && preferenciasValido(request.resource.data);
+      allow delete: if false;
+    }
+    // Save na nuvem dos jogos (moedas, cosméticos comprados, equipados,
+    // stats, títulos, recordes) — dado PRIVADO, só o dono lê e escreve,
+    // igual à biblioteca/favoritos. `dados` = cópia das chaves do
+    // localStorage do pacote da conta (ver SAVE NA NUVEM em Jogos/hub.js);
+    // `rev` só anda de 1 em 1, então dois aparelhos não se sobrescrevem
+    // às cegas (o cliente sempre grava por transação). Nada aqui é
+    // público: o perfil público continua em perfis/{uid}.
+    function progressoValido(d) {
+      return d.keys().hasOnly(['v', 'rev', 'dados', 'atualizadoEm'])
+        && d.v is int && d.v == 1
+        && d.rev is int && d.rev >= 1
+        && d.dados is map && d.dados.size() <= 40
+        && d.atualizadoEm is timestamp;
+    }
+    match /progresso/{uid} {
+      allow read: if request.auth != null && uid == request.auth.uid;
+      allow create: if request.auth != null
+                    && uid == request.auth.uid
+                    && progressoValido(request.resource.data)
+                    && request.resource.data.rev == 1;
+      allow update: if request.auth != null
+                    && uid == request.auth.uid
+                    && progressoValido(request.resource.data)
+                    && request.resource.data.rev == resource.data.rev + 1;
+      allow delete: if false;
+    }
+    // Notícias do "Hoje em Angatuba" — geradas pelo Worker
+    // angatubaon-noticias (conta de serviço, que ignora estas regras) e
+    // aprovadas por e-mail. O app só pode LER, e só o que está publicado:
+    // rascunhos, expirados e despublicados ficam invisíveis. A consulta do
+    // app filtra status == 'publicado', então passa nesta regra.
+    // noticias_privado/ e noticias_meta/ caem no "nega tudo" lá embaixo.
+    match /noticias/{id} {
+      allow get, list: if resource.data.status == 'publicado';
+      allow write: if false;
     }
     match /{document=**} {
       allow read, write: if false;

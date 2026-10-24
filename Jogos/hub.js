@@ -2831,8 +2831,9 @@
   var HIST_KEY            = 'angatuba_historico_jogos';
 
   /* ── Teto diário de GANHO de moedas ────────────────────────────
-     Economia local por decisão (moedas/inventário NÃO vão pro
-     Firestore). Este teto só mitiga farm trivial no aparelho (console,
+     A economia roda no localStorage; com conta logada, o pacote é
+     copiado pro save PRIVADO da conta (progresso/{uid} — ver SAVE NA
+     NUVEM). Este teto só mitiga farm trivial no aparelho (console,
      auto-play): é do aparelho, não da conta, e não é gravado no
      servidor. Jogos pagam no máx. ~25 por partida; 500 ≈ dia muito
      ativo. Gasto/aposta (qtd <= 0) nunca é limitado.
@@ -2867,18 +2868,28 @@
      Retorna true se o progresso local é da conta logada. */
   var PROGRESSO_UID_KEY = 'angatuba_progresso_uid';
   var PROGRESSO_GUARDADO_PREFIXO = 'angatuba_progresso_de_';
+  // Chaves do "pacote" de progresso de UMA conta: as mesmas que a troca de
+  // conta guarda à parte e que o save na nuvem (progresso/{uid}) sobe.
+  // A marca da nuvem (NUVEM_MARCA_KEY) vai junto na troca de conta — é
+  // por conta — mas nunca sobe pro Firestore (ver _nuvemPacoteLocal).
+  var LOJA_KEY_DIARIO_CONTA = 'angatuba_moedas_diario_conta';
+  var NUVEM_MARCA_KEY = 'angatuba_progresso_nuvem';
+  function _progressoChaves() {
+    var chaves = [LOJA_KEY_MOEDAS, LOJA_KEY_INVENTARIO, LOJA_KEY_EQUIPADO, LOJA_KEY_STATS,
+                  TITULOS_KEY_DESBLOQUEADOS, TITULOS_KEY_EQUIPADOS, 'angatuba_streak',
+                  HIST_KEY, TITULOS_KEY_DESTAQUE, 'angatuba_ritmo_recordes', 'angatuba_corrida_missoes',
+                  'angatuba_corrida_melhorias', LOJA_KEY_DIARIO_CONTA];
+    Object.keys(RANK_REC_LOCAL).forEach(function (k) { chaves.push(RANK_REC_LOCAL[k]); });
+    return chaves;
+  }
   function _progressoGarantirDono() {
     if (typeof _cliUser === 'undefined' || !_cliUser || !_cliUser.uid) return false;
     var uid = _cliUser.uid;
     try {
       var dono = localStorage.getItem(PROGRESSO_UID_KEY);
-      if (dono === uid) return true;
+      if (dono === uid) { _nuvemAoConfirmarDono(uid); return true; }
       if (dono) {
-        var chaves = [LOJA_KEY_MOEDAS, LOJA_KEY_INVENTARIO, LOJA_KEY_EQUIPADO, LOJA_KEY_STATS,
-                      TITULOS_KEY_DESBLOQUEADOS, TITULOS_KEY_EQUIPADOS, 'angatuba_streak',
-                      HIST_KEY, TITULOS_KEY_DESTAQUE, 'angatuba_ritmo_recordes', 'angatuba_corrida_missoes',
-                      'angatuba_corrida_melhorias'];
-        Object.keys(RANK_REC_LOCAL).forEach(function (k) { chaves.push(RANK_REC_LOCAL[k]); });
+        var chaves = _progressoChaves().concat([NUVEM_MARCA_KEY]);
         var pacote = {};
         chaves.forEach(function (c) { var v = localStorage.getItem(c); if (v !== null) pacote[c] = v; });
         localStorage.setItem(PROGRESSO_GUARDADO_PREFIXO + dono, JSON.stringify(pacote));
@@ -2895,9 +2906,335 @@
       } else {
         localStorage.setItem(PROGRESSO_UID_KEY, uid);
       }
+      _nuvemAoConfirmarDono(uid);
       return true;
     } catch (e) { return false; }
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     SAVE NA NUVEM — progresso dos jogos preso à CONTA
+     ------------------------------------------------------------
+     Antes, moedas/inventário/equipado/stats/títulos/recordes viviam só
+     no localStorage: limpar os dados do navegador (ou trocar de
+     celular) zerava tudo. Agora, com conta nomeada logada, o pacote de
+     _progressoChaves() tem uma cópia PRIVADA em progresso/{uid}
+     (só o dono lê/escreve — ver firestore.rules):
+       { v: 1, rev: N, dados: { <chave do localStorage>: <string> }, atualizadoEm }
+     O localStorage continua sendo onde os jogos leem/gravam (nada muda
+     neles); a nuvem é o backup que viaja com a conta.
+
+     Marca local (NUVEM_MARCA_KEY, por conta): { uid, rev, moedas, sig }
+     = como a nuvem estava na última sincronia deste aparelho. Com ela:
+       · local igual à marca  → nada a subir (sem rede, sem custo);
+       · nuvem no mesmo rev   → este aparelho é o mais novo: sobe o local;
+       · nuvem andou e o local não mudou → baixa a nuvem inteira;
+       · os dois mudaram      → mescla (abaixo) e sobe o resultado.
+     Sem marca (aparelho novo, dados apagados, 1ª vez desta conta aqui)
+     → mescla somando as moedas: o que foi ganho aqui como visitante
+     entra na conta, e quem apagou os dados (local zerado) recebe tudo
+     de volta.
+
+     Mesclagem por chave: moedas = nuvem + (local − base da marca);
+     inventário/títulos desbloqueados = união (item comprado nunca some);
+     recordes/stats/melhorias = maior valor; histórico = _histMesclar;
+     ofensiva = a de último dia mais recente; equipado/títulos
+     equipados/destaque/missões = o lado "preferido" (o local quando ele
+     tem mudança, a nuvem quando o aparelho é novo).
+
+     Sempre por transação (lê → mescla → grava), como os favoritos: a
+     regra exige rev+1, então dois aparelhos nunca se sobrescrevem às
+     cegas. Roda ao confirmar o dono (login / hub aberto), 4s depois de
+     mexer em moedas/itens/stats, ao esconder a aba, quando a rede volta
+     e numa checagem leve a cada 45s (só compara, não acessa a rede se
+     nada mudou). Sem login: tudo como antes, só no aparelho.
+  ══════════════════════════════════════════════════════════════ */
+  var NUVEM_COLECAO = 'progresso';
+  var NUVEM_DEBOUNCE_MS = 4000;
+  // Chaves cujo valor vem do lado "preferido" em vez de mesclado.
+  var NUVEM_CHAVES_PREFERIDO = {};
+  NUVEM_CHAVES_PREFERIDO[LOJA_KEY_EQUIPADO] = true;
+  NUVEM_CHAVES_PREFERIDO['angatuba_titulos_equipados'] = true;
+  NUVEM_CHAVES_PREFERIDO['angatuba_titulo_destaque'] = true;
+  NUVEM_CHAVES_PREFERIDO['angatuba_corrida_missoes'] = true;
+  var _nuvemTimer = null;
+  var _nuvemSincronizando = null;
+  var _nuvemPuxadoUid = null;      // uid que já fez a 1ª sincronia nesta sessão
+  var _nuvemPuxando = false;       // 1ª sincronia de aparelho sem marca em andamento
+  var _nuvemUltima = 0;            // ms da última sincronia concluída
+
+  function _nuvemPacoteLocal() {
+    var p = {};
+    try {
+      _progressoChaves().forEach(function (c) {
+        var v = localStorage.getItem(c);
+        if (v !== null) p[c] = v;
+      });
+    } catch (e) {}
+    return p;
+  }
+  // Hash curto (djb2) — a marca guarda só a assinatura, não o pacote.
+  function _nuvemAssinatura(p) {
+    var s = Object.keys(p || {}).sort().map(function (k) { return k + '=' + p[k]; }).join('\u0001');
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36) + '.' + s.length;
+  }
+  function _nuvemMoedasDe(p) {
+    return Math.max(0, Math.floor(Number(p && p[LOJA_KEY_MOEDAS]) || 0));
+  }
+  function _nuvemMarcaLer(uid) {
+    try {
+      var m = JSON.parse(localStorage.getItem(NUVEM_MARCA_KEY) || 'null');
+      if (m && m.uid === uid && typeof m.rev === 'number' && typeof m.sig === 'string') return m;
+    } catch (e) {}
+    return null;
+  }
+  function _nuvemMarcaSalvar(uid, rev, pacote) {
+    try {
+      localStorage.setItem(NUVEM_MARCA_KEY, JSON.stringify({
+        uid: uid, rev: rev, moedas: _nuvemMoedasDe(pacote), sig: _nuvemAssinatura(pacote)
+      }));
+    } catch (e) {}
+  }
+  // Doc da nuvem → { rev, dados } só com chaves conhecidas e valores string.
+  function _nuvemNormRemoto(d) {
+    if (!d || typeof d !== 'object') return null;
+    var dados = {}, src = (d.dados && typeof d.dados === 'object') ? d.dados : {};
+    _progressoChaves().forEach(function (c) { if (typeof src[c] === 'string') dados[c] = src[c]; });
+    return { rev: Math.max(0, Math.floor(Number(d.rev) || 0)), dados: dados };
+  }
+
+  // Valor guardado (string do localStorage) → valor JS pra mesclar.
+  function _nvLer(s) {
+    if (typeof s !== 'string') return undefined;
+    try { return { j: true, v: JSON.parse(s) }; } catch (e) { return { j: false, v: s }; }
+  }
+  function _nvEscrever(r) { return r.j ? JSON.stringify(r.v) : String(r.v); }
+  var _NV_DATA = /^\d{4}-\d{2}-\d{2}$/;
+  // Mescla "o maior vence": número → max, booleano → ou, lista de valores
+  // simples → união, objeto → chave a chave, data 'YYYY-MM-DD' → a mais
+  // nova. Resto (texto, listas de objetos): o lado preferido (a).
+  function _nvMaxProf(a, b) {
+    if (a === undefined || a === null) return b;
+    if (b === undefined || b === null) return a;
+    if (typeof a === 'number' && typeof b === 'number') return Math.max(a, b);
+    if (typeof a === 'boolean' && typeof b === 'boolean') return a || b;
+    if (typeof a === 'string' && typeof b === 'string') {
+      return (_NV_DATA.test(a) && _NV_DATA.test(b)) ? (a > b ? a : b) : a;
+    }
+    if (Array.isArray(a) && Array.isArray(b)) {
+      var simples = function (x) { return x === null || typeof x !== 'object'; };
+      if (!a.every(simples) || !b.every(simples)) return a;
+      var out = a.slice();
+      b.forEach(function (x) { if (out.indexOf(x) === -1) out.push(x); });
+      return out;
+    }
+    if (typeof a === 'object' && typeof b === 'object' && !Array.isArray(a) && !Array.isArray(b)) {
+      var o = {};
+      Object.keys(a).forEach(function (k) { o[k] = a[k]; });
+      Object.keys(b).forEach(function (k) { o[k] = _nvMaxProf(a[k], b[k]); });
+      return o;
+    }
+    return a;
+  }
+  // local L, nuvem R, base = moedas da nuvem que o local já contém
+  // (marca.moedas; 0 sem marca → soma), preferirLocal = quem vence no
+  // equipado e afins.
+  function _nuvemMesclar(L, R, baseMoedas, preferirLocal) {
+    var P = preferirLocal ? L : R, O = preferirLocal ? R : L;
+    var out = {};
+    _progressoChaves().forEach(function (c) {
+      var p = P[c], o = O[c];
+      if (p === undefined && o === undefined) return;
+      if (p === undefined) { out[c] = o; return; }
+      if (o === undefined) { out[c] = p; return; }
+      if (c === LOJA_KEY_MOEDAS) {
+        out[c] = String(Math.max(0, _nuvemMoedasDe(R) + (_nuvemMoedasDe(L) - baseMoedas)));
+        return;
+      }
+      if (NUVEM_CHAVES_PREFERIDO[c]) { out[c] = p; return; }
+      var rp = _nvLer(p), ro = _nvLer(o);
+      if (c === HIST_KEY) {
+        out[c] = JSON.stringify(_histMesclar(Array.isArray(rp.v) ? rp.v : [], Array.isArray(ro.v) ? ro.v : []));
+        return;
+      }
+      if (c === 'angatuba_streak') {
+        var sp = (rp.v && typeof rp.v === 'object') ? rp.v : {}, so = (ro.v && typeof ro.v === 'object') ? ro.v : {};
+        var up = Number(sp.ultimoDia) || 0, uo = Number(so.ultimoDia) || 0;
+        out[c] = (uo > up || (uo === up && (Number(so.dias) || 0) > (Number(sp.dias) || 0))) ? o : p;
+        return;
+      }
+      out[c] = _nvEscrever({ j: rp.j && ro.j, v: (rp.j === ro.j) ? _nvMaxProf(rp.v, ro.v) : rp.v });
+    });
+    return out;
+  }
+
+  // Grava o pacote no localStorage e atualiza o que estiver na tela.
+  function _nuvemAplicar(pacote) {
+    var eqAntes = _equipadoLer();
+    try {
+      _progressoChaves().forEach(function (c) {
+        if (typeof pacote[c] === 'string' && localStorage.getItem(c) !== pacote[c]) localStorage.setItem(c, pacote[c]);
+      });
+    } catch (e) {}
+    _lojaInit();
+    _lojaAtualizarSaldoUI();
+    try { _lojaRenderCorpo(); } catch (e) {}
+    try { _lojaJogoRender(); } catch (e) {}
+    var tela = document.getElementById('jogo-perfil');
+    if (tela && tela.classList.contains('perfil-open') && _perfilModo === 'eu') { try { _perfilRender(); } catch (e) {} }
+    var eqDepois = _equipadoLer();
+    LOJA_SLOTS.forEach(function (slot) {
+      if (eqAntes[slot] === eqDepois[slot]) return;
+      try { window.dispatchEvent(new CustomEvent('angatuba:equipado', { detail: { slot: slot, id: eqDepois[slot] } })); } catch (e) {}
+    });
+    try { window.dispatchEvent(new CustomEvent('angatuba:progresso')); } catch (e) {}
+    if (typeof _perfilPublicoSyncDebounced === 'function') _perfilPublicoSyncDebounced();
+  }
+
+  function _nuvemUidLogado() {
+    return (typeof _cliUser !== 'undefined' && _cliUser && _cliUser.uid) ? _cliUser.uid : null;
+  }
+  // Tem mudança local ainda não confirmada na nuvem?
+  function _nuvemSujo(uid) {
+    var m = _nuvemMarcaLer(uid);
+    return !m || m.sig !== _nuvemAssinatura(_nuvemPacoteLocal());
+  }
+
+  function _nuvemSincronizar() {
+    var uid = _nuvemUidLogado();
+    if (_nuvemSincronizando) return _nuvemSincronizando;
+    var desiste = function () { _nuvemPuxando = false; return Promise.resolve(false); };
+    if (!uid) return desiste();
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return desiste();
+    // Celular compartilhado: só sincroniza se o progresso local é desta conta.
+    try { if (localStorage.getItem(PROGRESSO_UID_KEY) !== uid) return desiste(); } catch (e) { return desiste(); }
+
+    var L = _nuvemPacoteLocal(), sigL = _nuvemAssinatura(L), M = _nuvemMarcaLer(uid);
+    if (!M) _nuvemPuxando = true;
+    var res = null;
+    _nuvemSincronizando = _rankDbPronto().then(function (db) {
+      if (_nuvemUidLogado() !== uid) return false;
+      var ref = db.collection(NUVEM_COLECAO).doc(uid);
+      return db.runTransaction(function (tx) {
+        return tx.get(ref).then(function (doc) {
+          var R = (doc && doc.exists) ? _nuvemNormRemoto(doc.data()) : null;
+          var final, rev, escrever;
+          if (!R) {                                   // 1ª vez da conta: sobe o local
+            final = L; rev = 1; escrever = true;
+          } else if (M && M.rev === R.rev) {          // nuvem parada: o local é o mais novo
+            final = L; escrever = (sigL !== _nuvemAssinatura(R.dados));
+          } else if (M && M.sig === sigL) {           // só a nuvem andou: baixa
+            final = R.dados; escrever = false;
+          } else {                                    // os dois andaram, ou aparelho sem marca
+            final = _nuvemMesclar(L, R.dados, M ? (Number(M.moedas) || 0) : 0, !!M);
+            escrever = (_nuvemAssinatura(final) !== _nuvemAssinatura(R.dados));
+          }
+          if (R) rev = escrever ? R.rev + 1 : R.rev;
+          if (escrever) {
+            tx.set(ref, { v: 1, rev: rev, dados: final,
+                          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp() });
+          }
+          res = { final: final, rev: rev };
+        });
+      }).then(function () {
+        if (!res || _nuvemUidLogado() !== uid) return false;
+        try { if (localStorage.getItem(PROGRESSO_UID_KEY) !== uid) return false; } catch (e) { return false; }
+        var atual = _nuvemPacoteLocal();
+        var sigFinal = _nuvemAssinatura(res.final);
+        if (_nuvemAssinatura(atual) === sigL) {
+          // Nada mudou no aparelho durante a ida à rede.
+          if (sigFinal !== sigL) _nuvemAplicar(res.final);
+          _nuvemMarcaSalvar(uid, res.rev, res.final);
+        } else {
+          // Ganhou/gastou algo enquanto sincronizava: soma essa diferença
+          // em cima do que foi pra nuvem e agenda outra rodada.
+          _nuvemMarcaSalvar(uid, res.rev, res.final);
+          var junto = _nuvemMesclar(atual, res.final, _nuvemMoedasDe(L), true);
+          if (_nuvemAssinatura(junto) !== _nuvemAssinatura(atual)) _nuvemAplicar(junto);
+          _nuvemAgendar();
+        }
+        _nuvemPuxadoUid = uid;
+        _nuvemUltima = Date.now();
+        return true;
+      });
+    }).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[nuvem] sincronia do progresso falhou (offline ou firestore.rules):', err && (err.code || err.message));
+      return false;
+    }).then(function (ok) {
+      _nuvemSincronizando = null;
+      if (_nuvemPuxando) {
+        _nuvemPuxando = false;
+        // Libera/atualiza o botão do resgate diário (ver _moedasDiarioDisponivel).
+        try { _lojaRenderCorpo(); } catch (e) {}
+        try { _lojaJogoRender(); } catch (e) {}
+      }
+      return ok;
+    });
+    return _nuvemSincronizando;
+  }
+
+  // Agenda uma sincronia (debounce). Chamado de quem grava moedas/itens/stats.
+  function _nuvemAgendar(ms) {
+    if (!_nuvemUidLogado()) return;
+    if (_nuvemTimer) clearTimeout(_nuvemTimer);
+    _nuvemTimer = setTimeout(function () {
+      _nuvemTimer = null;
+      var uid = _nuvemUidLogado();
+      // A 1ª da sessão sempre vai à rede (pode ter vindo algo de outro aparelho).
+      if (uid && (_nuvemPuxadoUid !== uid || _nuvemSujo(uid))) _nuvemSincronizar();
+    }, (typeof ms === 'number') ? ms : NUVEM_DEBOUNCE_MS);
+  }
+  // Login / hub aberto com a conta: 1ª sincronia desta conta na sessão.
+  function _nuvemAoConfirmarDono(uid) {
+    if (_nuvemPuxadoUid === uid || _nuvemSincronizando) return;
+    // Aparelho sem marca desta conta: segura o resgate diário até a nuvem responder.
+    if (!_nuvemMarcaLer(uid)) _nuvemPuxando = true;
+    _nuvemAgendar(300);
+  }
+
+  // Aba escondida (app minimizado/fechando): sobe o que estiver pendente.
+  // Aba voltou depois de um tempo: puxa o que outro aparelho mudou.
+  document.addEventListener('visibilitychange', function () {
+    var uid = _nuvemUidLogado();
+    if (!uid) return;
+    if (document.visibilityState === 'hidden') {
+      if (_nuvemSujo(uid)) { if (_nuvemTimer) { clearTimeout(_nuvemTimer); _nuvemTimer = null; } _nuvemSincronizar(); }
+    } else if (Date.now() - _nuvemUltima > 5 * 60 * 1000) {
+      _nuvemAgendar(500);
+    }
+  });
+  window.addEventListener('online', function () {
+    var uid = _nuvemUidLogado();
+    if (uid && (_nuvemPuxadoUid !== uid || _nuvemSujo(uid))) _nuvemAgendar(1000);
+  });
+  // Rede de segurança pros jogos que gravam direto no localStorage
+  // (recordes, missões): só compara a assinatura; rede só se mudou algo.
+  setInterval(function () {
+    var uid = _nuvemUidLogado();
+    if (uid && _nuvemPuxadoUid === uid && !_nuvemTimer && !_nuvemSincronizando && _nuvemSujo(uid)) _nuvemSincronizar();
+  }, 45000);
+
+  // Aviso na loja/perfil: visitante é lembrado de que sem conta o
+  // progresso é só do aparelho; logado vê que está salvo.
+  function _nuvemAvisoHtml() {
+    if (!_nuvemUidLogado()) {
+      return '<button type="button" class="nuvem-aviso" onclick="_nuvemPedirLogin()">' +
+               '<span class="nuvem-aviso-ico" aria-hidden="true">☁️</span>' +
+               '<span class="nuvem-aviso-txt">Sem conta, suas moedas e itens ficam só neste aparelho. <b>Entre pra salvar na sua conta</b></span>' +
+             '</button>';
+    }
+    return '<div class="nuvem-ok"><span aria-hidden="true">☁️</span> Moedas e itens salvos na sua conta</div>';
+  }
+  function _nuvemPedirLogin() {
+    var estavaFs = (typeof _fsAtivo === 'function' && _fsAtivo());
+    if (typeof _sairTelaCheia === 'function') _sairTelaCheia();
+    var abrir = function () {
+      if (typeof cliAbrirLogin === 'function') cliAbrirLogin('Entre pra salvar suas moedas e cosméticos na sua conta!');
+    };
+    if (estavaFs) setTimeout(abrir, 220); else abrir();
+  }
+  window._nuvemPedirLogin = _nuvemPedirLogin;
 
   // Slots válidos de equipamento — mesmo formato que o perfil público vai usar depois.
   // Slots de skin por jogo (t48_tema ... dc_tema): vendidos só na loja
@@ -3094,6 +3431,7 @@
   }
   function _moedasSalvar(v) {
     try { localStorage.setItem(LOJA_KEY_MOEDAS, String(Math.max(0, Math.floor(v)))); } catch (e) {}
+    _nuvemAgendar();
   }
   // Ganho do dia no aparelho: { dia: 'YYYY-MM-DD' (local), ganho: N }.
   function _diaLocal() {
@@ -3158,8 +3496,17 @@
   // ── Resgate diário (100 moedas, 1x por dia civil local) ─────────
   // Grava o dia ANTES de creditar e confere a gravação: com localStorage
   // bloqueado/cheio, não credita (senão daria pra resgatar sem limite).
+  // Além do dia do APARELHO, vale o dia da CONTA (LOJA_KEY_DIARIO_CONTA,
+  // que viaja no save na nuvem): apagar os dados do navegador não rende
+  // um 2º resgate no mesmo dia. Enquanto a 1ª sincronia de um aparelho
+  // sem marca não volta, o botão espera (é ela que traz o dia da conta).
   function _moedasDiarioDisponivel() {
-    try { return localStorage.getItem(LOJA_KEY_DAILY_CLAIM) !== _diaLocal(); }
+    if (_nuvemPuxando && _nuvemUidLogado()) return false;
+    try {
+      var hoje = _diaLocal();
+      return localStorage.getItem(LOJA_KEY_DAILY_CLAIM) !== hoje &&
+             localStorage.getItem(LOJA_KEY_DIARIO_CONTA) !== hoje;
+    }
     catch (e) { return false; }
   }
   function _moedasResgatarDiario() {
@@ -3168,6 +3515,7 @@
     try {
       localStorage.setItem(LOJA_KEY_DAILY_CLAIM, hoje);
       if (localStorage.getItem(LOJA_KEY_DAILY_CLAIM) !== hoje) return { ok: false, msg: 'Não foi possível salvar' };
+      localStorage.setItem(LOJA_KEY_DIARIO_CONTA, hoje);
     } catch (e) { return { ok: false, msg: 'Não foi possível salvar' }; }
     var novoSaldo = _moedasAdd(MOEDAS_DIARIO_QTD, 'diario');
     return { ok: true, saldo: novoSaldo };
@@ -3216,6 +3564,7 @@
   }
   function _invSalvar(arr) {
     try { localStorage.setItem(LOJA_KEY_INVENTARIO, JSON.stringify(arr)); } catch (e) {}
+    _nuvemAgendar();
   }
   function _temItem(id) { return _invLer().indexOf(id) !== -1; }
 
@@ -3243,6 +3592,7 @@
   }
   function _equipadoSalvar(obj) {
     try { localStorage.setItem(LOJA_KEY_EQUIPADO, JSON.stringify(obj)); } catch (e) {}
+    _nuvemAgendar();
   }
 
   // Compra um item do catálogo: precisa existir, não ter ainda, e ter saldo.
@@ -3308,6 +3658,7 @@
   }
   function _statsSalvar(obj) {
     try { localStorage.setItem(LOJA_KEY_STATS, JSON.stringify(obj)); } catch (e) {}
+    _nuvemAgendar();
   }
   function _statsJogo(jogoKey) {
     var s = _statsLer()[jogoKey];
@@ -3520,7 +3871,7 @@
     var eq = _equipadoLer();
     // Atalho pro mini-jogo Corujinha (ganhar moedas/cosméticos) — fica no
     // topo do corpo rolável, em todas as abas.
-    var html = _moedasDiarioBtnHtml() +
+    var html = _moedasDiarioBtnHtml() + _nuvemAvisoHtml() +
                (!_corujinhaLiberada() ? '' :
                '<button type="button" class="loja-corujinha-btn" onclick="corujinhaAbrir()">' +
                  '<span class="loja-abrir-ico">🎰</span>' +
@@ -3889,7 +4240,7 @@
     // com título por slot, na ordem do catálogo. Um slot só: grade única.
     var slots = [];
     itens.forEach(function (item) { if (slots.indexOf(item.slot) === -1) slots.push(item.slot); });
-    var html = _moedasDiarioBtnHtml();
+    var html = _moedasDiarioBtnHtml() + _nuvemAvisoHtml();
     slots.forEach(function (slot) {
       if (slots.length > 1) html += '<div class="perfil-secao"><div class="perfil-secao-titulo">' + _rankEsc(LOJA_SLOT_ROTULO[slot] || slot) + '</div>';
       html += '<div class="loja-grid">';
@@ -4291,7 +4642,7 @@
         // .perfil-ir-loja abaixo) — mesma ação, outro ponto de entrada.
         '<button type="button" class="perfil-editar-btn" onclick="lojaAbrir()">Editar cosméticos</button>' +
         '<button type="button" class="perfil-editar-btn" onclick="_titulosAbrirSeletor()"><i class="fa fa-award" aria-hidden="true"></i> Títulos</button>' +
-        (!logado ? '<button type="button" class="perfil-login-cta" onclick="_perfilPedirLogin()">Entrar pra mostrar seu nome no ranking</button>' : '') +
+        (!logado ? '<button type="button" class="perfil-login-cta" onclick="_perfilPedirLogin()">Entrar pra salvar suas moedas e aparecer no ranking</button>' : '') +
       '</div>';
 
     // Corpo rolável: grade de resumo + vitrine de insígnias + lista de
@@ -4817,6 +5168,7 @@
   }
   function _titulosDesbloqueadosSalvar(arr) {
     try { localStorage.setItem(TITULOS_KEY_DESBLOQUEADOS, JSON.stringify(arr)); } catch (e) {}
+    _nuvemAgendar();
   }
   function _titulosEquipadosLer() {
     try {

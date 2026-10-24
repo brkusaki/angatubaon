@@ -1287,7 +1287,7 @@
     ],
     corrida: [
       '/Jogos/corrida.min.js', '/Jogos/corrida.css',
-      '/Jogos/assets/corrida/arma-v2.webp',
+      '/Jogos/assets/corrida/arma-v3.webp',
       '/Jogos/assets/corrida/cenario-floresta.webp',
       '/Jogos/assets/corrida/municao-v2.webp',
       '/Jogos/assets/corrida/musica-fundo.mp3',
@@ -1299,6 +1299,17 @@
       '/Jogos/assets/corrida/obst-entulho.webp', '/Jogos/assets/corrida/obst-pedra.webp',
       '/Jogos/assets/corrida/obst-toco.webp', '/Jogos/assets/corrida/obst-placa.webp',
       '/Jogos/assets/corrida/obst-abobora.webp', '/Jogos/assets/corrida/obst-lapide.webp',
+      // v6: armas, caixa, guardiã, agarrão, zonas e obstáculos das zonas
+      '/Jogos/assets/corrida/arma-escopeta.webp', '/Jogos/assets/corrida/arma-metralhadora.webp',
+      '/Jogos/assets/corrida/caixa-arma.webp', '/Jogos/assets/corrida/item-guardia.webp',
+      '/Jogos/assets/corrida/coruja-guardia.webp', '/Jogos/assets/corrida/zumbi-agarrao.webp',
+      '/Jogos/assets/corrida/cenario-sitio.webp', '/Jogos/assets/corrida/cenario-estrada.webp',
+      '/Jogos/assets/corrida/cenario-centro.webp',
+      '/Jogos/assets/corrida/obst-feno.webp', '/Jogos/assets/corrida/obst-trator.webp',
+      '/Jogos/assets/corrida/obst-espantalho.webp', '/Jogos/assets/corrida/obst-cone.webp',
+      '/Jogos/assets/corrida/obst-barricada.webp', '/Jogos/assets/corrida/obst-onibus.webp',
+      '/Jogos/assets/corrida/obst-banco.webp', '/Jogos/assets/corrida/obst-poste.webp',
+      '/Jogos/assets/corrida/obst-carrinho.webp',
       '/Jogos/assets/corujinha/sim-moeda-v2.webp',
       // partículas usadas pela corrida:
       '/Jogos/assets/particulas/brilho/circle_01.webp',

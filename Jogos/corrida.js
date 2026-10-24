@@ -129,7 +129,7 @@
   var _COR_ASSET_BASE = '/Jogos/assets/corrida/';
   // Asas + lançador de espuma no estilo da Master Reference. Nome novo
   // (-v2) por causa do CACHE_JOGOS (cache-first, nunca apagado).
-  var _COR_ARMA = 'arma-v2.webp';
+  var _COR_ARMA = 'arma-v3.webp';   // v3: vista por trás, cano pra dentro da tela (a v2 apontava pro jogador)
   var _corAssets = {};
 
   // Metadados dos spritesheets animados (zumbis). "frames" é só um PALPITE:
@@ -854,15 +854,15 @@
     lapide:  { altMul: 0.55, ratio: 0.96, larguraMundo: 0.26, cor: '#86867f', corEsc: '#55554f', vetor: 'pedra' },
     // v6: obstáculos das zonas novas — soArte: só entram no sorteio quando
     // a imagem carregou (ver _corObstSortear).
-    feno:       { altMul: 0.55, ratio: 1.40, larguraMundo: 0.40, cor: '#b58a3a', corEsc: '#7a5a22', vetor: 'pedra', soArte: true },
-    trator:     { altMul: 1.00, ratio: 1.50, larguraMundo: 0.66, cor: '#8a3a2a', corEsc: '#4e2018', vetor: 'pedra', soArte: true },
-    espantalho: { altMul: 1.15, ratio: 0.75, larguraMundo: 0.26, cor: '#8a6a44', corEsc: '#5c4630', vetor: 'pedra', soArte: true },
-    cone:       { altMul: 0.45, ratio: 0.70, larguraMundo: 0.20, cor: '#e8752a', corEsc: '#9c4a14', vetor: 'pedra', soArte: true },
-    barricada:  { altMul: 0.60, ratio: 2.20, larguraMundo: 0.50, cor: '#c9a12a', corEsc: '#6b5616', vetor: 'pedra', soArte: true },
-    onibus:     { altMul: 1.15, ratio: 2.00, larguraMundo: 0.80, cor: '#c9a12a', corEsc: '#6b5616', vetor: 'pedra', soArte: true },
-    banco:      { altMul: 0.50, ratio: 2.00, larguraMundo: 0.42, cor: '#6b4a2a', corEsc: '#3e2a16', vetor: 'pedra', soArte: true },
-    poste:      { altMul: 1.60, ratio: 0.25, larguraMundo: 0.14, cor: '#55595e', corEsc: '#2f3236', vetor: 'pedra', soArte: true },
-    carrinho:   { altMul: 0.85, ratio: 1.00, larguraMundo: 0.36, cor: '#c33a3a', corEsc: '#7a2020', vetor: 'pedra', soArte: true }
+    feno:       { altMul: 0.55, ratio: 1.13, larguraMundo: 0.31, cor: '#b58a3a', corEsc: '#7a5a22', vetor: 'pedra', soArte: true },
+    trator:     { altMul: 1.00, ratio: 1.22, larguraMundo: 0.61, cor: '#8a3a2a', corEsc: '#4e2018', vetor: 'pedra', soArte: true },
+    espantalho: { altMul: 1.15, ratio: 0.79, larguraMundo: 0.35, cor: '#8a6a44', corEsc: '#5c4630', vetor: 'pedra', soArte: true },
+    cone:       { altMul: 0.45, ratio: 0.82, larguraMundo: 0.19, cor: '#e8752a', corEsc: '#9c4a14', vetor: 'pedra', soArte: true },
+    barricada:  { altMul: 0.70, ratio: 0.93, larguraMundo: 0.32, cor: '#c9a12a', corEsc: '#6b5616', vetor: 'pedra', soArte: true },
+    onibus:     { altMul: 1.15, ratio: 1.42, larguraMundo: 0.80, cor: '#c9a12a', corEsc: '#6b5616', vetor: 'pedra', soArte: true },
+    banco:      { altMul: 0.50, ratio: 1.48, larguraMundo: 0.37, cor: '#6b4a2a', corEsc: '#3e2a16', vetor: 'pedra', soArte: true },
+    poste:      { altMul: 1.60, ratio: 0.48, larguraMundo: 0.16, cor: '#55595e', corEsc: '#2f3236', vetor: 'pedra', soArte: true },
+    carrinho:   { altMul: 0.85, ratio: 0.73, larguraMundo: 0.31, cor: '#c33a3a', corEsc: '#7a2020', vetor: 'pedra', soArte: true }
   };
   // Arte dos obstáculos: obst-<tipo>.webp, recortados sem fundo. Lista de
   // TODOS (pré-carga); o sorteio de cada zona vem de COR_ZONAS[].obst.
@@ -2125,7 +2125,7 @@
     }
 
     if (_corFlashT > 0) {
-      var fx = W * 0.5, fy = H * (0.72 - _corRecuo * 0.03);
+      var fx = W * 0.59, fy = H * (0.66 - _corRecuo * 0.03);   // boca do cano da arma (deslocada pra direita)
       ctx.globalAlpha = _corClamp(_corFlashT / 0.09, 0, 1);
       var rF = H * (_corArma === 'escopeta' ? 0.24 : 0.14);
       var gF = ctx.createRadialGradient(fx, fy, 2, fx, fy, rF);
@@ -2581,14 +2581,18 @@
       // telas landscape largas (celular deitado tem proporção ~2.2:1, então
       // largura×105% daria altura maior que a tela). O teto garante que a
       // arma ocupe no máx ~52% da altura, deixando o campo de visão livre.
+      // v3 (arte vista por trás, cano pra dentro da tela): o cano ocupava
+      // justo o centro, de onde os zumbis vêm. Como nos FPS, a arma fica
+      // menor (teto 40% da altura), um pouco afundada e deslocada pra
+      // direita — a faixa do meio fica livre e a mira continua no centro.
       var ratio = (asset.h && asset.w) ? (asset.w / asset.h) : 2.2;  // w/h
       var aw = W * 1.05;
       var ah = aw / ratio;
-      var ahMax = H * 0.52;
+      var ahMax = H * 0.40;
       if (ah > ahMax) { ah = ahMax; aw = ah * ratio; }
       var filtroAntes = ctx.filter;
       if (filtroArma) ctx.filter = filtroArma;
-      ctx.drawImage(fonteArma, cx - aw / 2, baseY - ah, aw, ah);
+      ctx.drawImage(fonteArma, cx + W * 0.09 - aw / 2, baseY + H * 0.04 - ah, aw, ah);
       if (filtroArma) ctx.filter = filtroAntes || 'none';
       return;
     }

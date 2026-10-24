@@ -4938,7 +4938,8 @@
           '<div class="perfil-identidade-txt">' +
             '<div class="perfil-nome">' + _rankEsc(nome) + '</div>' +
             _perfilTituloHtml(eq) +
-            _perfilTitulosHeroHtml(String(dados.tituloDestaque || ''), Array.isArray(dados.titulos) ? dados.titulos : []) +
+            _perfilTitulosHeroHtml(_titulosPromover([String(dados.tituloDestaque || '')], _titulosConquistasDeString(dados.conquistas))[0] || '',
+                                   _titulosPromover(Array.isArray(dados.titulos) ? dados.titulos : [], _titulosConquistasDeString(dados.conquistas))) +
             '<div class="perfil-visitando-tag" id="perfil-presenca-tag">Perfil de jogador</div>' +
           '</div>' +
         '</div>' +
@@ -4964,7 +4965,8 @@
     var maisJogadoKey = _perfilStatsChavesOrdenadas(stats)[0];
     var quartoItem = maisJogadoKey ? { rotulo: 'Recorde', valor: (stats[maisJogadoKey].recorde || 0) } : null;
     var historico = Array.isArray(dados.historico) ? dados.historico : [];
-    var conquistasHtml = _perfilConquistasHtml(_titulosConquistasDeString(dados.conquistas), String(dados.tituloDestaque || ''), false);
+    var conqVisitado = _titulosConquistasDeString(dados.conquistas);
+    var conquistasHtml = _perfilConquistasHtml(conqVisitado, _titulosPromover([String(dados.tituloDestaque || '')], conqVisitado)[0] || '', false);
     corpo.innerHTML = _perfilCorpoHtml(stats, badgesEquipados, eq.badge, quartoItem, true, historico, conquistasHtml);
   }
 
@@ -5173,7 +5175,9 @@
   function _titulosEquipadosLer() {
     try {
       var arr = JSON.parse(localStorage.getItem(TITULOS_KEY_EQUIPADOS) || '[]');
-      return Array.isArray(arr) ? arr.filter(function (id) { return typeof id === 'string'; }).slice(0, TITULOS_MAX_EQUIPADOS) : [];
+      if (!Array.isArray(arr)) return [];
+      return _titulosPromover(arr.filter(function (id) { return typeof id === 'string'; }), _titulosDesbloqueadosLer())
+        .slice(0, TITULOS_MAX_EQUIPADOS);
     } catch (e) { return []; }
   }
   function _titulosEquipadosSalvar(arr) {
@@ -5183,7 +5187,8 @@
   function _titulosDestaqueLer() {
     var id = '';
     try { id = String(localStorage.getItem(TITULOS_KEY_DESTAQUE) || ''); } catch (e) {}
-    return (id && _titulosDesbloqueadosLer().indexOf(id) !== -1) ? id : '';
+    var desbloq = _titulosDesbloqueadosLer();
+    return (id && desbloq.indexOf(id) !== -1) ? _titulosPromover([id], desbloq)[0] : '';
   }
   function _titulosDestaqueSalvar(id) {
     try {
@@ -5226,11 +5231,55 @@
     if (/^main_/.test(id)) return 40;
     return 1;
   }
-  // Ids válidos e conhecidos, do mais raro pro mais comum.
-  function _titulosOrdenarPorRaridade(ids) {
+  /* Família de um título: degraus da MESMA conquista (Top 1/3/10 do
+     mesmo jogo, Ofensiva 3/7/30, Veterano 10/50/100...). Quem tem o
+     degrau maior não precisa ver os menores — a vitrine, o seletor e o
+     campo público mostram só o melhor de cada família. O histórico
+     local (angatuba_titulos_desbloqueados) continua guardando todos. */
+  function _titulosFamilia(id) {
+    var m = /^rank_top(?:1|3|10)_(.+)$/.exec(id);
+    if (m) return 'rank_' + m[1];
+    if (/^rank_geral_top/.test(id)) return 'rank_geral';
+    m = /^(stats_partidas|stats_tempo|ofensiva)_\d+$/.exec(id);
+    if (m) return m[1];
+    return id;   // main_<jogo> e afins: cada um é único
+  }
+  // Mantém só o de maior peso de cada família (ordem de entrada preservada).
+  function _titulosMelhoresPorFamilia(ids) {
+    var melhor = {};
+    (ids || []).forEach(function (id) {
+      if (typeof id !== 'string') return;
+      var f = _titulosFamilia(id);
+      if (!melhor[f] || _titulosPeso(id) > _titulosPeso(melhor[f])) melhor[f] = id;
+    });
     var vistos = {};
     return (ids || []).filter(function (id) {
-      if (typeof id !== 'string' || vistos[id] || !/^[a-z0-9_]{1,40}$/.test(id) || !_titulosLabelDe(id)) return false;
+      if (typeof id !== 'string' || vistos[id] || melhor[_titulosFamilia(id)] !== id) return false;
+      vistos[id] = true;
+      return true;
+    });
+  }
+  // Troca cada id escolhido (equipado/destaque) pelo melhor degrau da
+  // família que a pessoa já tem — quem equipou "Top 3" e depois fez
+  // "Top 1" passa a mostrar o Top 1, sem repetir a mesma família.
+  function _titulosPromover(escolhidos, desbloqueados) {
+    var melhores = _titulosMelhoresPorFamilia(desbloqueados);
+    var porFamilia = {};
+    melhores.forEach(function (id) { porFamilia[_titulosFamilia(id)] = id; });
+    var out = [];
+    (escolhidos || []).forEach(function (id) {
+      if (typeof id !== 'string' || !id) return;
+      var novo = porFamilia[_titulosFamilia(id)] || id;
+      if (out.indexOf(novo) === -1) out.push(novo);
+    });
+    return out;
+  }
+  // Ids válidos e conhecidos, só o melhor de cada família, do mais raro
+  // pro mais comum.
+  function _titulosOrdenarPorRaridade(ids) {
+    var vistos = {};
+    return _titulosMelhoresPorFamilia(ids).filter(function (id) {
+      if (vistos[id] || !/^[a-z0-9_]{1,40}$/.test(id) || !_titulosLabelDe(id)) return false;
       vistos[id] = true;
       return true;
     }).sort(function (a, b) { return _titulosPeso(b) - _titulosPeso(a); });
@@ -5484,7 +5533,7 @@
     var lista = document.getElementById('titulos-sheet-lista');
     var contagem = document.getElementById('titulos-sheet-count');
     if (!lista) return;
-    var desbloq = _titulosDesbloqueadosLer();
+    var desbloq = _titulosMelhoresPorFamilia(_titulosDesbloqueadosLer());
     var equipados = _titulosEquipadosLer();
     var destaque = _titulosDestaqueLer();
     if (contagem) contagem.textContent = '(' + equipados.length + '/' + TITULOS_MAX_EQUIPADOS + ')';

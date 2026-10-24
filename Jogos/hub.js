@@ -1310,6 +1310,12 @@
       '/Jogos/assets/corrida/obst-barricada.webp', '/Jogos/assets/corrida/obst-onibus.webp',
       '/Jogos/assets/corrida/obst-banco.webp', '/Jogos/assets/corrida/obst-poste.webp',
       '/Jogos/assets/corrida/obst-carrinho.webp',
+      '/Jogos/assets/corrida/mato-frente.webp',
+      '/Jogos/assets/corrida/deco-arvore1.webp', '/Jogos/assets/corrida/deco-arvore2.webp',
+      '/Jogos/assets/corrida/deco-pinheiro.webp', '/Jogos/assets/corrida/deco-arbusto.webp',
+      '/Jogos/assets/corrida/deco-capim.webp', '/Jogos/assets/corrida/deco-tufo.webp',
+      '/Jogos/assets/corrida/deco-mato.webp', '/Jogos/assets/corrida/deco-mourao.webp',
+      '/Jogos/assets/corrida/deco-pedra.webp',
       '/Jogos/assets/corujinha/sim-moeda-v2.webp',
       // partículas usadas pela corrida:
       '/Jogos/assets/particulas/brilho/circle_01.webp',
@@ -2826,7 +2832,8 @@
       if (dono) {
         var chaves = [LOJA_KEY_MOEDAS, LOJA_KEY_INVENTARIO, LOJA_KEY_EQUIPADO, LOJA_KEY_STATS,
                       TITULOS_KEY_DESBLOQUEADOS, TITULOS_KEY_EQUIPADOS, 'angatuba_streak',
-                      HIST_KEY, TITULOS_KEY_DESTAQUE, 'angatuba_ritmo_recordes', 'angatuba_corrida_missoes'];
+                      HIST_KEY, TITULOS_KEY_DESTAQUE, 'angatuba_ritmo_recordes', 'angatuba_corrida_missoes',
+                      'angatuba_corrida_melhorias'];
         Object.keys(RANK_REC_LOCAL).forEach(function (k) { chaves.push(RANK_REC_LOCAL[k]); });
         var pacote = {};
         chaves.forEach(function (c) { var v = localStorage.getItem(c); if (v !== null) pacote[c] = v; });

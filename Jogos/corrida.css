@@ -78,6 +78,36 @@
   #jogo-corrida .cor-missoes{margin-bottom:10px;padding:6px 10px;}
 }
 
+/* ── v6.2: botões extras (melhorias, inclinação), aviso curto, calibração e painel de melhorias ── */
+.cor-extras{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:0 0 12px;}
+.cor-extra-btn{background:rgba(255,255,255,.08);color:#e8edf5;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:8px 14px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;}
+.cor-extra-btn.cor-extra-on{background:rgba(124,240,160,.16);border-color:rgba(124,240,160,.5);color:#c9f7d8;}
+.cor-toast{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:9;background:rgba(8,10,12,.85);color:#fff;font-size:13px;font-weight:700;padding:8px 14px;border-radius:999px;pointer-events:none;max-width:90%;text-align:center;}
+.cor-tilt-cal{z-index:7;}
+.cor-tilt-vol{font-size:46px;color:#7CF0A0;margin:4px 0 14px;animation:cor-vol 1.4s ease-in-out infinite;}
+@keyframes cor-vol{0%,100%{transform:rotate(0deg);}50%{transform:rotate(35deg);}}
+.cor-melh{z-index:7;justify-content:flex-start;padding-top:18px;}
+.cor-melh-saldo{font-family:'Syne',sans-serif;font-weight:800;color:#ffd740;font-size:16px;margin:-2px 0 10px;}
+.cor-melh-lista{width:100%;max-width:380px;display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+.cor-melh-item{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px 10px;text-align:left;}
+.cor-melh-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:12px;color:#9fb0c4;}
+.cor-melh-txt b{color:#fff;font-size:13px;}
+.cor-melh-pips{display:flex;gap:4px;margin-top:2px;}
+.cor-melh-pip{width:14px;height:5px;border-radius:3px;background:rgba(255,255,255,.15);}
+.cor-melh-pip.on{background:#7CF0A0;}
+.cor-melh-btn{flex-shrink:0;background:#ffd24a;color:#1a1305;border:none;border-radius:10px;padding:8px 10px;font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;}
+.cor-melh-btn:disabled{opacity:.4;cursor:default;}
+.cor-melh-max{flex-shrink:0;font-size:12px;font-weight:800;color:#7CF0A0;}
+.cor-melh-sub{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#ffd24a;margin:4px 0 6px;}
+.cor-melh-armas{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:14px;}
+.cor-melh-arma{background:rgba(255,255,255,.06);color:#e8edf5;border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:7px 12px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;}
+.cor-melh-arma.on{background:rgba(255,210,74,.18);border-color:#ffd24a;color:#ffe9a8;}
+.cor-melh-arma:disabled{opacity:.4;cursor:default;}
+@media (max-height:520px){
+  #jogo-corrida .cor-extras{margin-bottom:8px;}
+  #jogo-corrida .cor-extra-btn{padding:6px 12px;font-size:12px;}
+}
+
 .cor-creditos{font-size:11px;line-height:1.5;color:rgba(199,209,224,.55);max-width:300px;margin-top:14px;}
 
 /* ── Foco do controle nos menus (fases/início, fim, pausa) — mesmo visual do .rt-foco do Ritmo ── */

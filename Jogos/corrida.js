@@ -478,6 +478,7 @@
   function _corAudioDestravar() {
     var ac = _corAudio();
     if (ac && ac.state === 'suspended') { try { ac.resume(); } catch (e) {} }
+    _corSfxCarregar();
   }
   // 1 segundo de ruído branco, gerado uma vez e reaproveitado em todos
   // os disparos (criar buffer por tiro cansaria o GC no Android fraco).
@@ -529,7 +530,88 @@
     o.start(t); o.stop(t + dur + 0.04);
   }
 
+  /* ── SONS GRAVADOS (v6.5, gerados no ElevenLabs) ─────────────────
+     /Jogos/assets/corrida/sfx/<nome>-N.mp3. Cada efeito pode ter várias
+     versões (sorteia uma, nunca a mesma duas vezes seguidas) e toca com
+     uma leve variação de tom. Carregam ao abrir a corrida; enquanto não
+     chegam (ou se faltarem), o som sintetizado antigo continua no lugar.
+     Loops (passos, respiração, chuva) têm volume/velocidade por quadro. */
+  var _COR_SFX_BASE = '/Jogos/assets/corrida/sfx/';
+  var _COR_SFX = {
+    tiro: 2, escopeta: 2, metralhadora: 2, recarga: 1, vazio: 1, caixa: 1,
+    acerto: 2, morre: 2, gemido: 4, corredora: 2, terra: 1, agarrao: 1,
+    rosnado: 2, coracao: 1, trovao: 2, guardia: 1, esbarrao: 2, batida: 1, uivo: 2,
+    'passos-loop': 1, 'respiracao-loop': 1, 'chuva-loop': 1
+  };
+  var _corSfxBuf = {}, _corSfxUlt = {}, _corSfxPedido = false, _corLoops = {};
+  function _corSfxUrl(nome, i) { return _COR_SFX_BASE + nome + '-' + i + '.mp3'; }
+  function _corSfxCarregar() {
+    var ac = _corAudio();
+    if (_corSfxPedido || !ac || typeof fetch !== 'function') return;
+    _corSfxPedido = true;
+    Object.keys(_COR_SFX).forEach(function (nome) {
+      _corSfxBuf[nome] = [];
+      for (var i = 1; i <= _COR_SFX[nome]; i++) (function (url) {
+        fetch(url).then(function (r) { if (!r.ok) throw 0; return r.arrayBuffer(); }).then(function (ab) {
+          // Forma com callbacks: o Safari antigo não devolve Promise aqui.
+          ac.decodeAudioData(ab, function (b) { _corSfxBuf[nome].push(b); }, function () {});
+        }).catch(function () {});
+      })(_corSfxUrl(nome, i));
+    });
+  }
+  // Toca um efeito. Devolve false se ainda não há gravação (quem chama
+  // cai no som sintetizado). vol 0..1, pan -1..1, varTom = ± variação.
+  function _corSfx(nome, vol, pan, varTom, rate) {
+    if (!_corSomLigado()) return true;
+    var ac = _corAudio(), l = _corSfxBuf[nome];
+    if (!ac || !l || !l.length) return false;
+    var i = (Math.random() * l.length) | 0;
+    if (l.length > 1 && i === _corSfxUlt[nome]) i = (i + 1) % l.length;
+    _corSfxUlt[nome] = i;
+    try {
+      var src = ac.createBufferSource(); src.buffer = l[i];
+      var v = varTom == null ? 0.06 : varTom;
+      src.playbackRate.value = (rate || 1) * (1 + (Math.random() * 2 - 1) * v);
+      var g = ac.createGain(); g.gain.value = vol == null ? 1 : vol;
+      src.connect(g);
+      var saida = g;
+      if (pan && ac.createStereoPanner) { var pn = ac.createStereoPanner(); pn.pan.value = _corClamp(pan, -1, 1); g.connect(pn); saida = pn; }
+      saida.connect(_corMaster);
+      src.start();
+    } catch (e) { return false; }
+    return true;
+  }
+  // Loop contínuo: chame todo quadro com o volume desejado (0 = some).
+  function _corSfxLoop(nome, vol, rate) {
+    var ac = _corAudio(), l = _corSfxBuf[nome];
+    if (!ac) return false;
+    var lp = _corLoops[nome];
+    if (!_corSomLigado() || _corPausado || _corEstado !== 'jogando') vol = 0;
+    if (!lp) {
+      if (!l || !l.length) return false;
+      if (vol < 0.005) return true;
+      try {
+        var src = ac.createBufferSource(); src.buffer = l[0]; src.loop = true;
+        var g = ac.createGain(); g.gain.value = 0.0001;
+        src.connect(g); g.connect(_corMaster);
+        src.start(0, Math.random() * l[0].duration);
+        lp = _corLoops[nome] = { src: src, g: g };
+      } catch (e) { return false; }
+    }
+    try {
+      lp.g.gain.setTargetAtTime(Math.max(0.0001, vol), ac.currentTime, 0.25);
+      if (rate) lp.src.playbackRate.setTargetAtTime(rate, ac.currentTime, 0.3);
+    } catch (e) {}
+    if (vol < 0.003 && lp.g.gain.value < 0.003) { try { lp.src.stop(); } catch (e) {} delete _corLoops[nome]; }
+    return true;
+  }
+  function _corLoopsParar() {
+    for (var k in _corLoops) { try { _corLoops[k].src.stop(); } catch (e) {} }
+    _corLoops = {};
+  }
+
   function _corSomTiro() {
+    if (_corSfx('tiro', 0.75)) return;
     if (!_corSomLigado()) return;
     var ac = _corAudio(); if (!ac) return;
     var t = ac.currentTime;
@@ -538,6 +620,7 @@
     _corSopro(ac, t + 0.05, 0.26, 1100, 160, 0.14); // cauda/eco no campo
   }
   function _corSomImpacto(matou) {
+    if (_corSfx('acerto', 0.7)) { if (matou) _corSfx('morre', 0.55, 0, 0.1); return; }
     if (!_corSomLigado()) return;
     var ac = _corAudio(); if (!ac) return;
     var t = ac.currentTime + 0.02;
@@ -545,6 +628,7 @@
     _corTom(ac, t, 'triangle', matou ? 120 : 190, matou ? 45 : 110, matou ? 0.20 : 0.08, 0.30);
   }
   function _corSomVazio() {
+    if (_corSfx('vazio', 0.8)) return;
     if (!_corSomLigado()) return;
     var ac = _corAudio(); if (!ac) return;
     var t = ac.currentTime;
@@ -552,12 +636,14 @@
     _corSopro(ac, t + 0.07, 0.03, 3400, 1500, 0.20, 900);
   }
   function _corSomPasso() {
+    if (_corSfxBuf['passos-loop'] && _corSfxBuf['passos-loop'].length) return;   // o loop de passos cuida disso
     if (!_corSomLigado()) return;
     var ac = _corAudio(); if (!ac || ac.state !== 'running') return;
     var t = ac.currentTime;
     _corSopro(ac, t, 0.07, 620 + Math.random() * 180, 120, 0.085);
   }
   function _corSomRecarga() {
+    if (_corSfx('recarga', 0.75)) return;
     if (!_corSomLigado()) return;
     var ac = _corAudio(); if (!ac) return;
     var t = ac.currentTime;
@@ -576,6 +662,7 @@
   // (leve batimento) + um sopro rouco por cima — mais "growl" orgânico do
   // que um tom puro. f0/f1 sorteados a cada chamada pra não repetir igual.
   function _corSomRosnado() {
+    if (_corSfx('rosnado', 0.6, 0, 0.12)) return;
     if (!_corSomLigado()) return;
     var ac = _corAudio(); if (!ac) return;
     var t = ac.currentTime;
@@ -590,6 +677,7 @@
   // é ruído filtrado em faixa (highpass alto) + um 'square' curto: mais
   // "crash" metálico que "soco".
   function _corSomImpactoObstaculo() {
+    if (_corSfx('batida', 0.85)) return;
     if (!_corSomLigado()) return;
     var ac = _corAudio(); if (!ac) return;
     var t = ac.currentTime;
@@ -601,6 +689,7 @@
   // no sopro (o oposto do rosnado): deixa mais grave/redondo, "longe e
   // abafado" sem precisar de um filtro novo.
   function _corSomUivoDistante(dur) {
+    if (_corSfx('uivo', 0.32, _corRand(-0.8, 0.8), 0.1)) return;
     if (!_corSomLigado()) return;
     var ac = _corAudio(); if (!ac) return;
     var t = ac.currentTime;
@@ -1297,6 +1386,7 @@
     else { _corArma = tipo; _corArmaMun = def.mun; }
     _corAssetNovo(def.arte);
     _corRun.caixas++;
+    _corSfx('caixa', 0.7);
     _corSomRecarga();
     _corVibrar(30);
     if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.bonus();
@@ -1308,6 +1398,7 @@
     _corGuard.x = _corW * 0.5; _corGuard.y = -_corH * 0.2; _corGuard.alvo = null; _corGuard.atk = 0;
     _corRun.guardia++;
     _corVibrar([30, 40, 30]);
+    _corSfx('guardia', 0.8, 0, 0.04);
     if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.nivelUp();
     _corAviso('Coruja guardiã!', 'Ela derruba os zumbis por ' + _corGuardDur() + ' segundos', '#ffd24a', 2.2);
   }
@@ -1391,6 +1482,7 @@
 
   /* ── Perigo: batimento + borda vermelha ── */
   function _corSomCoracao(v) {
+    if (_corSfx('coracao', 0.35 + 0.55 * v, 0, 0.02)) return;
     var ac = _corAudio();
     if (!ac || !_corSomLigado()) return;
     var t = ac.currentTime;
@@ -1605,9 +1697,11 @@
     _corDrag = false; _corCamVX = 0;
     _corBgmParar();
     _corChuvaSomParar();
-    _corSomRosnado();
-    var ac = _corAudio();
-    if (ac && _corSomLigado()) _corTom(ac, ac.currentTime + 0.05, 'sawtooth', 180, 55, 0.4, 0.22);
+    if (!_corSfx('agarrao', 1, 0, 0.03)) {
+      _corSomRosnado();
+      var ac = _corAudio();
+      if (ac && _corSomLigado()) _corTom(ac, ac.currentTime + 0.05, 'sawtooth', 180, 55, 0.4, 0.22);
+    }
   }
   function _corDrawAgarrao() {
     var ctx = _corCtx;
@@ -2147,11 +2241,11 @@
         if (_corSheetPronto('chao')) zb.sheetKey = 'chao';
       }
       var ac = _corAudio();
-      if (ac && _corSomLigado()) _corSopro(ac, ac.currentTime, 0.6, 500, 90, 0.3, 0);
+      if (!_corSfx('terra', 0.75, (zb.faixa - _corCamX) / 1.2) && ac && _corSomLigado()) _corSopro(ac, ac.currentTime, 0.6, 500, 90, 0.3, 0);
     } else if (ev === 'corredora') {
       zb = _corNovoZumbi('corredor', _corCamX + _corRand(-0.6, 0.6), _COR_Z_FAR);
       zb.homing = 0.55;
-      _corSomRosnado();
+      if (!_corSfx('corredora', 0.7, (zb.faixa - _corCamX) / 1.2, 0.08)) _corSomRosnado();
       _corAviso('Corredora!', 'Desvia ou derruba antes que ela chegue', '#ff6a5a', 1.6);
     } else if (ev === 'parede') {
       var k = 8, brecha = 2 + ((Math.random() * 4) | 0), larg = 2.8;
@@ -2223,7 +2317,8 @@
     if (c.flash > 0) c.flash = Math.max(0, c.flash - dt * 4);
     if (c.trovaoT > 0) {
       c.trovaoT -= dt;
-      if (c.trovaoT <= 0) { ac = _corAudio(); if (ac && _corSomLigado()) { _corSopro(ac, ac.currentTime, 1.8, 380, 50, 0.45, 0); _corTom(ac, ac.currentTime, 'sine', 55, 30, 1.2, 0.18); } }
+      if (c.trovaoT <= 0 && _corSfx('trovao', 0.8, _corRand(-0.4, 0.4), 0.08)) c.trovaoT = 0;
+      else if (c.trovaoT <= 0) { ac = _corAudio(); if (ac && _corSomLigado()) { _corSopro(ac, ac.currentTime, 1.8, 380, 50, 0.45, 0); _corTom(ac, ac.currentTime, 'sine', 55, 30, 1.2, 0.18); } }
     }
     // Noite fechada.
     c.noiteT -= dt;
@@ -2242,6 +2337,7 @@
     var ac = _corAudio();
     var alvo = (_corClima && _corEstado === 'jogando' && !_corPausado && _corSomLigado()) ? _corClima.chuva * 0.09 : 0;
     if (!ac) return;
+    if (_corSfxLoop('chuva-loop', alvo * 5.5)) { if (_corChuvaSom) { try { _corChuvaSom.src.stop(); } catch (e) {} _corChuvaSom = null; } return; }
     if (!_corChuvaSom) {
       if (alvo < 0.005) return;
       try {
@@ -2258,6 +2354,7 @@
   }
   function _corChuvaSomParar() {
     if (_corChuvaSom) { try { _corChuvaSom.src.stop(); } catch (e) {} _corChuvaSom = null; }
+    _corLoopsParar();   // passos, fôlego e chuva gravados param junto (pausa, fim, saída)
   }
   // Noite: escurece em volta, sobra o facho da lanterna em volta da mira.
   function _corDrawNoite(ctx, W, H) {
@@ -2296,6 +2393,10 @@
     if (_corGemidoCd > 0) _corGemidoCd -= dt;
     var vel = (_corVel - _COR_VEL_INI) / (_COR_VEL_MAX - _COR_VEL_INI);
     var I = Math.max(_corPerigo, _corSlowT > 0 ? 0.85 : 0, vel * 0.45);
+    // Gravados: passos sempre (ritmo pela velocidade) e fôlego pela tensão.
+    var velN = _corClamp(vel, 0, 1);
+    _corSfxLoop('passos-loop', _corSlowT > 0 ? 0.22 : 0.3, 0.92 + 0.28 * velN + (_corSlowT > 0 ? -0.12 : 0));
+    if (_corSfxLoop('respiracao-loop', I < 0.18 ? 0 : 0.12 + 0.4 * I, 0.9 + 0.3 * I)) return;
     _corRespT -= dt;
     if (I < 0.18 || _corRespT > 0) return;
     var per = 1.15 - 0.55 * I;
@@ -2307,6 +2408,7 @@
     _corSopro(ac, t + per * 0.45, per * 0.38, 1100, 480, 0.045 + 0.11 * I, 250); // solta
   }
   function _corSomGemido(pan, vol) {
+    if (_corSfx('gemido', 0.55 * (vol || 1), pan, 0.12)) return;
     var ac = _corAudio();
     if (!ac || !_corSomLigado()) return;
     try {
@@ -2551,9 +2653,11 @@
     var W = _corW, H = _corH;
     if (_corArma === 'escopeta') {
       _corFlashT = 0.16; _corRecuo = 1.5; _corShakeT = Math.max(_corShakeT, _COR_SHAKE_DUR * 0.6);
-      _corSomTiro();
-      var acE = _corAudio();
-      if (acE && _corSomLigado()) _corTom(acE, acE.currentTime, 'sawtooth', 120, 40, 0.22, 0.22);
+      if (!_corSfx('escopeta', 0.9)) {
+        _corSomTiro();
+        var acE = _corAudio();
+        if (acE && _corSomLigado()) _corTom(acE, acE.currentTime, 'sawtooth', 120, 40, 0.22, 0.22);
+      }
       var cx = W * 0.5;
       for (var i = 0; i < _corZumbis.length; i++) {
         var zb = _corZumbis[i];
@@ -2563,7 +2667,7 @@
       }
     } else {
       _corFlashT = 0.06; _corRecuo = 0.55;
-      _corSomTiro();
+      if (!_corSfx('metralhadora', 0.55, 0, 0.08)) _corSomTiro();
       var alvo = _corMiraAlvo(W, H);
       if (alvo) _corDano(alvo, 1, 'metralhadora');
     }
@@ -2593,11 +2697,13 @@
     _corIframesT = _COR_IFRAMES_DUR;
     _corSlowT = _COR_SLOW_DUR;
     _corVibrar(70);
-    _corSomImpacto(false);
-    // Corpo extra grave por baixo do impacto — o esbarrão é um "trombada",
-    // não só um tiro de raspão; dá mais peso sem trocar o som base.
-    var acEsb = _corAudio();
-    if (acEsb && _corSomLigado()) _corTom(acEsb, acEsb.currentTime, 'sine', 90, 35, 0.18, 0.20);
+    if (!_corSfx('esbarrao', 0.85, lado * 0.5)) {
+      _corSomImpacto(false);
+      // Corpo extra grave por baixo do impacto — o esbarrão é um "trombada",
+      // não só um tiro de raspão; dá mais peso sem trocar o som base.
+      var acEsb = _corAudio();
+      if (acEsb && _corSomLigado()) _corTom(acEsb, acEsb.currentTime, 'sine', 90, 35, 0.18, 0.20);
+    }
     if (window.AngatubaGames && window.AngatubaGames.efeitos) {
       var p = _corProj(zb.z, zb.faixa);
       window.AngatubaGames.efeitos.estrelas(p.x, p.y - 10 * p.s, 3, _corOpcoesFx());

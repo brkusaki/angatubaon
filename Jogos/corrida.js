@@ -819,9 +819,29 @@
   var _COR_DECO = {   // altMul em relação à altura do zumbi; meio = pode passar pelo chão do meio
     arvore1:  { altMul: 3.2 }, arvore2: { altMul: 2.8 }, pinheiro: { altMul: 3.4 },
     arbusto:  { altMul: 0.9 }, capim:   { altMul: 0.6 }, tufo:     { altMul: 0.28, meio: true },
-    mato:     { altMul: 0.45, meio: true }, mourao: { altMul: 0.9 }, pedra: { altMul: 0.5 }
+    mato:     { altMul: 0.45, meio: true }, mourao: { altMul: 0.9 }, pedra: { altMul: 0.5 },
+    // Objetos de beira próprios de cada zona (zona = id em COR_ZONAS). Só entram com arte.
+    milho:       { altMul: 1.7, zona: 'sitio' },   caixadagua: { altMul: 2.8, zona: 'sitio' },  galinheiro: { altMul: 1.3, zona: 'sitio' },
+    carroca:     { altMul: 1.0, zona: 'sitio' },   porteira:   { altMul: 0.9, zona: 'sitio' },  latao:      { altMul: 0.6, zona: 'sitio' },
+    lenha:       { altMul: 0.6, zona: 'sitio' },   moinho:     { altMul: 3.2, zona: 'sitio' },  poco:       { altMul: 1.0, zona: 'sitio' },
+    placavel:    { altMul: 1.5, zona: 'estrada' }, capotado:   { altMul: 0.8, zona: 'estrada' }, lixo:      { altMul: 0.8, zona: 'estrada' },
+    ponto:       { altMul: 1.6, zona: 'estrada' }, outdoor:    { altMul: 2.6, zona: 'estrada' }, cacamba:   { altMul: 0.9, zona: 'estrada' },
+    hidrante:    { altMul: 0.5, zona: 'estrada' }, semaforo:   { altMul: 2.0, zona: 'estrada' }, pneus:     { altMul: 0.6, zona: 'estrada' },
+    orelhao:     { altMul: 1.4, zona: 'centro' },  banca:      { altMul: 1.5, zona: 'centro' },  chafariz:  { altMul: 1.2, zona: 'centro' },
+    lixeira:     { altMul: 0.7, zona: 'centro' },  bicicleta:  { altMul: 0.6, zona: 'centro' },  mesabar:   { altMul: 0.8, zona: 'centro' },
+    mercado:     { altMul: 0.7, zona: 'centro' },  floreira:   { altMul: 0.6, zona: 'centro' },  relogio:   { altMul: 2.4, zona: 'centro' }
   };
-  var _COR_DECO_NOMES = ['arvore1', 'arvore2', 'pinheiro', 'arbusto', 'capim', 'tufo', 'mato', 'mourao', 'pedra'];
+  var _COR_DECO_NOMES = ['arvore1', 'arvore2', 'pinheiro', 'arbusto', 'capim', 'tufo', 'mato', 'mourao', 'pedra',
+    'milho', 'caixadagua', 'galinheiro', 'carroca', 'porteira', 'latao', 'lenha', 'moinho', 'poco',
+    'placavel', 'capotado', 'lixo', 'ponto', 'outdoor', 'cacamba', 'hidrante', 'semaforo', 'pneus',
+    'orelhao', 'banca', 'chafariz', 'lixeira', 'bicicleta', 'mesabar', 'mercado', 'floreira', 'relogio'];
+  // Pede a arte da vegetação geral + a dos objetos da zona (1 pedido por arquivo).
+  function _corDecoPedir(zonaId) {
+    for (var i = 0; i < _COR_DECO_NOMES.length; i++) {
+      var d = _COR_DECO[_COR_DECO_NOMES[i]];
+      if (!d.zona || d.zona === zonaId) _corAssetNovo('deco-' + _COR_DECO_NOMES[i] + '.webp');
+    }
+  }
   var _corBeira = [];          // { z, faixa, tipo, deco, esc, flip }
   var _corBeiraT = 0, _corChaoT = 0;
 
@@ -999,7 +1019,7 @@
     _corZonaIdx = 0; _corZonaAnt = -1; _corZonaFade = 1;
     _corAvisos.length = 0;
     _corBeira.length = 0; _corBeiraT = 0; _corChaoT = 0;
-    for (var dn = 0; dn < _COR_DECO_NOMES.length; dn++) _corAssetNovo('deco-' + _COR_DECO_NOMES[dn] + '.webp');
+    _corDecoPedir('floresta');
     _corAssetNovo(_COR_MATO);
     _corRunZerar();
     _corMissoesCarregar();
@@ -1184,6 +1204,7 @@
     for (i = 0; i < _COR_DECO_NOMES.length; i++) {
       n = _COR_DECO_NOMES[i];
       if (chao && !_COR_DECO[n].meio) continue;
+      if (_COR_DECO[n].zona && _COR_DECO[n].zona !== COR_ZONAS[_corZonaIdx].id) continue;
       if (_corImgPronta(_corAssetNovo('deco-' + n + '.webp'))) c.push({ tipo: n, deco: true });
     }
     if (!chao) {
@@ -1382,6 +1403,7 @@
     if (nova !== _corZonaIdx) {
       _corZonaAnt = _corZonaIdx; _corZonaIdx = nova; _corZonaFade = 0;
       _corAssetNovo(COR_ZONAS[nova].cen);
+      _corDecoPedir(COR_ZONAS[nova].id);
       var lo = COR_ZONAS[nova].obst.concat(COR_ZONAS[nova].beira || []);
       for (var i = 0; i < lo.length; i++) _corObstAsset(lo[i]);
       _corAviso('Zona ' + (nova + 1), COR_ZONAS[nova].nome, '#ffd24a', 2.6);

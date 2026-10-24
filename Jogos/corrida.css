@@ -27,6 +27,8 @@
    CSS gira 90° + centraliza. ── */
 .cor-rot{position:absolute;inset:0;}
 .cor-rot #cor-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;background:#0d1210;}
+/* Vinheta escura fixa (antes era um gradiente redesenhado no canvas a cada quadro). */
+.cor-rot::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle closest-side at 50% 49%,rgba(0,0,0,0) 56%,rgba(0,0,0,.62) 180%);}
 .cor-rot[data-rot="1"]{
   inset:auto;
   transform:translate(-50%,-50%) rotate(90deg);

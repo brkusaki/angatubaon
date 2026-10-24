@@ -1295,8 +1295,8 @@
       '/Jogos/assets/corrida/zumbi-coruja-normal-b.webp',
       '/Jogos/assets/corrida/zumbi-coruja-rapido.webp',
       '/Jogos/assets/corrida/zumbi-coruja-forte.webp',
-      '/Jogos/assets/corrida/obst-carro.webp', '/Jogos/assets/corrida/obst-cerca.webp',
-      '/Jogos/assets/corrida/obst-entulho.webp', '/Jogos/assets/corrida/obst-pedra.webp',
+      '/Jogos/assets/corrida/obst-carro.webp?v=2', '/Jogos/assets/corrida/obst-cerca.webp',
+      '/Jogos/assets/corrida/obst-entulho.webp?v=2', '/Jogos/assets/corrida/obst-pedra.webp',
       '/Jogos/assets/corrida/obst-toco.webp', '/Jogos/assets/corrida/obst-placa.webp',
       '/Jogos/assets/corrida/obst-abobora.webp', '/Jogos/assets/corrida/obst-lapide.webp',
       // v6: armas, caixa, guardiã, agarrão, zonas e obstáculos das zonas
@@ -1310,29 +1310,29 @@
       '/Jogos/assets/corrida/obst-barricada.webp', '/Jogos/assets/corrida/obst-onibus.webp',
       '/Jogos/assets/corrida/obst-banco.webp', '/Jogos/assets/corrida/obst-poste.webp',
       '/Jogos/assets/corrida/obst-carrinho.webp',
-      '/Jogos/assets/corrida/mato-frente.webp',
-      '/Jogos/assets/corrida/deco-arvore1.webp', '/Jogos/assets/corrida/deco-arvore2.webp',
-      '/Jogos/assets/corrida/deco-pinheiro.webp', '/Jogos/assets/corrida/deco-arbusto.webp',
-      '/Jogos/assets/corrida/deco-capim.webp', '/Jogos/assets/corrida/deco-tufo.webp',
-      '/Jogos/assets/corrida/deco-mato.webp', '/Jogos/assets/corrida/deco-mourao.webp',
-      '/Jogos/assets/corrida/deco-pedra.webp',
+      '/Jogos/assets/corrida/mato-frente.webp?v=2',
+      '/Jogos/assets/corrida/deco-arvore1.webp?v=2', '/Jogos/assets/corrida/deco-arvore2.webp?v=2',
+      '/Jogos/assets/corrida/deco-pinheiro.webp?v=2', '/Jogos/assets/corrida/deco-arbusto.webp?v=2',
+      '/Jogos/assets/corrida/deco-capim.webp?v=2', '/Jogos/assets/corrida/deco-tufo.webp?v=2',
+      '/Jogos/assets/corrida/deco-mato.webp?v=2', '/Jogos/assets/corrida/deco-mourao.webp?v=2',
+      '/Jogos/assets/corrida/deco-pedra.webp?v=2',
       // v6.3: zumbis corredora/rastejante/saindo do chão, texturas do chão e objetos de beira das zonas
       '/Jogos/assets/corrida/chao-centro.webp', '/Jogos/assets/corrida/chao-estrada.webp',
       '/Jogos/assets/corrida/chao-floresta.webp', '/Jogos/assets/corrida/chao-sitio.webp',
-      '/Jogos/assets/corrida/deco-banca.webp', '/Jogos/assets/corrida/deco-bicicleta.webp',
-      '/Jogos/assets/corrida/deco-cacamba.webp', '/Jogos/assets/corrida/deco-caixadagua.webp',
-      '/Jogos/assets/corrida/deco-capotado.webp', '/Jogos/assets/corrida/deco-carroca.webp',
-      '/Jogos/assets/corrida/deco-chafariz.webp', '/Jogos/assets/corrida/deco-floreira.webp',
-      '/Jogos/assets/corrida/deco-galinheiro.webp', '/Jogos/assets/corrida/deco-hidrante.webp',
-      '/Jogos/assets/corrida/deco-latao.webp', '/Jogos/assets/corrida/deco-lenha.webp',
-      '/Jogos/assets/corrida/deco-lixeira.webp', '/Jogos/assets/corrida/deco-lixo.webp',
-      '/Jogos/assets/corrida/deco-mercado.webp', '/Jogos/assets/corrida/deco-mesabar.webp',
-      '/Jogos/assets/corrida/deco-milho.webp', '/Jogos/assets/corrida/deco-moinho.webp',
-      '/Jogos/assets/corrida/deco-orelhao.webp', '/Jogos/assets/corrida/deco-outdoor.webp',
-      '/Jogos/assets/corrida/deco-placavel.webp', '/Jogos/assets/corrida/deco-pneus.webp',
-      '/Jogos/assets/corrida/deco-poco.webp', '/Jogos/assets/corrida/deco-ponto.webp',
-      '/Jogos/assets/corrida/deco-porteira.webp', '/Jogos/assets/corrida/deco-relogio.webp',
-      '/Jogos/assets/corrida/deco-semaforo.webp', '/Jogos/assets/corrida/zumbi-coruja-chao.webp',
+      '/Jogos/assets/corrida/deco-banca.webp?v=2', '/Jogos/assets/corrida/deco-bicicleta.webp?v=2',
+      '/Jogos/assets/corrida/deco-cacamba.webp?v=2', '/Jogos/assets/corrida/deco-caixadagua.webp?v=2',
+      '/Jogos/assets/corrida/deco-capotado.webp?v=2', '/Jogos/assets/corrida/deco-carroca.webp?v=2',
+      '/Jogos/assets/corrida/deco-chafariz.webp?v=2', '/Jogos/assets/corrida/deco-floreira.webp?v=2',
+      '/Jogos/assets/corrida/deco-galinheiro.webp?v=2', '/Jogos/assets/corrida/deco-hidrante.webp?v=2',
+      '/Jogos/assets/corrida/deco-latao.webp?v=2', '/Jogos/assets/corrida/deco-lenha.webp?v=2',
+      '/Jogos/assets/corrida/deco-lixeira.webp?v=2', '/Jogos/assets/corrida/deco-lixo.webp?v=2',
+      '/Jogos/assets/corrida/deco-mercado.webp?v=2', '/Jogos/assets/corrida/deco-mesabar.webp?v=2',
+      '/Jogos/assets/corrida/deco-milho.webp?v=2', '/Jogos/assets/corrida/deco-moinho.webp?v=2',
+      '/Jogos/assets/corrida/deco-orelhao.webp?v=2', '/Jogos/assets/corrida/deco-outdoor.webp?v=2',
+      '/Jogos/assets/corrida/deco-placavel.webp?v=2', '/Jogos/assets/corrida/deco-pneus.webp?v=2',
+      '/Jogos/assets/corrida/deco-poco.webp?v=2', '/Jogos/assets/corrida/deco-ponto.webp?v=2',
+      '/Jogos/assets/corrida/deco-porteira.webp?v=2', '/Jogos/assets/corrida/deco-relogio.webp?v=2',
+      '/Jogos/assets/corrida/deco-semaforo.webp?v=2', '/Jogos/assets/corrida/zumbi-coruja-chao.webp',
       '/Jogos/assets/corrida/zumbi-coruja-corredor.webp', '/Jogos/assets/corrida/zumbi-coruja-rastejante.webp',
       '/Jogos/assets/corujinha/sim-moeda-v2.webp',
       // partículas usadas pela corrida:
@@ -1690,6 +1690,10 @@
          pausar: fn, continuar: fn,
          descricao: fn → string, // linha abaixo do título
          extra: { rotulo: 'Sair da partida', acao: fn }, // link secundário
+         opcoes: fn → [{ icone: 'fa-…', rotulo: 'Controle: Arrastar',
+                         ativo: true|false|null, acao: fn }],
+                                 // opções próprias do jogo (grade de botões;
+                                 // tocar chama acao() e redesenha o menu)
          teclaPropria: true,     // o jogo já trata Esc/P (não duplicar)
          pausarAoOcultar: false  // padrão true: app foi pro 2º plano → abre pausado
        });
@@ -1731,6 +1735,7 @@
           '<div class="jm-desc"></div>' +
           '<button type="button" class="jm-play" data-jm="continuar"><i class="fa fa-play"></i><span>Continuar</span></button>' +
           '<button type="button" class="jm-opcao" data-jm="som"><i class="fa fa-volume-high"></i><span>Som ligado</span></button>' +
+          '<div class="jm-opcoes" style="display:none;"></div>' +
           '<button type="button" class="jm-opcao" data-jm="sair"><i class="fa fa-chevron-left"></i><span>Voltar aos jogos</span></button>' +
           '<button type="button" class="jm-link" data-jm="extra" style="display:none;"></button>' +
         '</div>';
@@ -1748,12 +1753,22 @@
         } else if (acao === 'extra') {
           _fechar(id, false);
           if (c.extra) _chamar(c.extra.acao);
+        } else if (acao === 'op') {
+          var lista = _opcoes(id), op = lista[+b.getAttribute('data-op')];
+          if (op) _chamar(op.acao);
+          _render(id);
         }
       });
       tela.appendChild(btn);
       tela.appendChild(ov);
       s.btn = btn; s.ov = ov;
       return s;
+    }
+
+    function _opcoes(id) {
+      var c = _cfg[id] || {}, l = [];
+      if (typeof c.opcoes === 'function') { try { l = c.opcoes() || []; } catch (e) { l = []; } }
+      return l;
     }
 
     function _render(id) {
@@ -1787,6 +1802,17 @@
       bs.setAttribute('aria-pressed', somOn ? 'true' : 'false');
       bs.querySelector('i').className = 'fa ' + (somOn ? 'fa-volume-high' : 'fa-volume-xmark');
       bs.querySelector('span').textContent = somOn ? 'Som ligado' : 'Som desligado';
+      var ops = _opcoes(id), cx = q('.jm-opcoes');
+      if (cx) {
+        var h = '';
+        for (var oi = 0; oi < ops.length; oi++) {
+          var op = ops[oi];
+          h += '<button type="button" class="jm-opcao jm-op' + (op.ativo === false ? ' jm-som-off' : '') + '" data-jm="op" data-op="' + oi + '">' +
+               '<i class="fa ' + (op.icone || 'fa-gear') + '"></i><span>' + String(op.rotulo || '').replace(/[<>&]/g, '') + '</span></button>';
+        }
+        cx.innerHTML = h;
+        cx.style.display = ops.length ? '' : 'none';
+      }
       var bx = q('[data-jm="extra"]');
       bx.style.display = c.extra ? '' : 'none';
       if (c.extra) bx.textContent = c.extra.rotulo || '';

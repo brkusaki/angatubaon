@@ -115,6 +115,11 @@
       corredora, horda com brecha, rastejante), clima (chuva, relâmpago,
       noite fechada com lanterna), respiração e gemidos com direção, e
       melhorias compradas com moedas + arma inicial.
+  13) v6.4: desempenho (canvas com teto de resolução, chão num buffer
+      reduzido, vinheta em CSS, imagens pré-decodificadas, gráficos leves
+      automáticos em aparelho lento) e opções no menu de pausa: modo de
+      controle (arrastar / toque nos lados / inclinar), tiro automático,
+      sensibilidade, música, vibração, gráficos leves e recomeçar.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -133,6 +138,10 @@
      Se faltar/falhar, usa fallback vetorial.
   ══════════════════════════════════════════════════════════════ */
   var _COR_ASSET_BASE = '/Jogos/assets/corrida/';
+  // Artes reprocessadas (borda clara removida): ?v= força baixar de novo,
+  // porque o CACHE_JOGOS do service worker é cache-first por URL.
+  var _COR_ARTE_V = /^(deco-|mato-frente|obst-carro|obst-entulho)/;
+  function _corArteUrl(nome) { return _COR_ASSET_BASE + nome + (_COR_ARTE_V.test(nome) ? '?v=2' : ''); }
   // Asas + lançador de espuma no estilo da Master Reference. Nome novo
   // (-v2) por causa do CACHE_JOGOS (cache-first, nunca apagado).
   var _COR_ARMA = 'arma-v4.webp';   // v4: vista por trás, cano pra dentro da tela (a v2 apontava pro jogador; a v3 tinha halo na asa direita)
@@ -184,11 +193,16 @@
       try {
         var im = new Image();
         im.onload = function () {
-          reg.ok = true; reg.img = im; reg.nomeOk = nome;
-          reg.w = im.naturalWidth || 0; reg.h = im.naturalHeight || 0;
+          // decode() antes de liberar: sem isso a 1ª vez que a arte aparece
+          // na tela decodifica no meio do quadro (engasgo ao trocar de zona).
+          var pronto = function () {
+            reg.ok = true; reg.img = im; reg.nomeOk = nome;
+            reg.w = im.naturalWidth || 0; reg.h = im.naturalHeight || 0;
+          };
+          if (im.decode) im.decode().then(pronto, pronto); else pronto();
         };
         im.onerror = function () { tentar(); };   // 404 → tenta o próximo nome
-        im.src = _COR_ASSET_BASE + nome;
+        im.src = _corArteUrl(nome);
         if (!reg.img) reg.img = im;               // provisório até carregar
       } catch (e) { tentar(); }
     }
@@ -623,7 +637,7 @@
     } catch (e) { _corBgm = null; _corBgmOk = false; }
   }
   function _corBgmTocar() {
-    if (!_corBgm || !_corBgmOk || !_corSomLigado()) return;
+    if (!_corBgm || !_corBgmOk || !_corSomLigado() || !_corOpc.musica) return;
     try {
       var p = _corBgm.play();
       if (p && p.catch) p.catch(function () {});   // autoplay bloqueado/erro de decode → silencioso
@@ -986,7 +1000,12 @@
     }
     if (cssW < 2) cssW = 640;
     if (cssH < 2) cssH = 360;
-    _corDpr = Math.min(2, window.devicePixelRatio || 1);
+    // Desempenho: o custo do quadro cresce com o nº de pixels (DPR 2 = 4×).
+    // Teto de 1.5 (1 no modo leve) e um orçamento total de pixels, pra telas
+    // grandes de PC não pesarem; o navegador amplia o canvas sem custo.
+    var dprMax = _corOpc.leve ? 1 : 1.5, orc = _corOpc.leve ? 0.55e6 : 1.15e6;
+    _corDpr = Math.min(dprMax, window.devicePixelRatio || 1);
+    if (cssW * cssH * _corDpr * _corDpr > orc) _corDpr = Math.max(0.6, Math.sqrt(orc / (cssW * cssH)));
     _corCanvas.width = Math.round(cssW * _corDpr);
     _corCanvas.height = Math.round(cssH * _corDpr);
     _corW = cssW; _corH = cssH;
@@ -1000,7 +1019,7 @@
     _corDist = 0; _corVel = _COR_VEL_INI;
     _corMelhRecarregar();
     _corMun = _corMunInicial();
-    _corChaoRolo = 0; _corEventoT = 8; _corRespT = 0; _corGemidoCd = 0; _corTilt.base = null;
+    _corChaoRolo = 0; _corEventoT = 8; _corRespT = 0; _corGemidoCd = 0; _corTilt.base = null; _corLados = {}; _corAutoT = 0; _corFps.n = 0; _corFps.soma = 0;
     _corClimaZerar();
     _corTiroT = 0; _corFlashT = 0; _corRecuo = 0;
     _corCamX = 0; _corCamVX = 0;
@@ -1220,7 +1239,7 @@
     var i, b;
     _corBeiraT -= dt;
     if (_corBeiraT <= 0) {
-      _corBeiraT = _corRand(0.22, 0.45);
+      _corBeiraT = _corRand(0.22, 0.45) * (_corOpc.leve ? 1.7 : 1);
       var esc = _corBeiraSortear(false);
       if (esc) {
         var lado = Math.random() < 0.5 ? -1 : 1;
@@ -1230,7 +1249,7 @@
     }
     _corChaoT -= dt;
     if (_corChaoT <= 0) {
-      _corChaoT = _corRand(0.07, 0.16);
+      _corChaoT = _corRand(0.11, 0.22) * (_corOpc.leve ? 2 : 1);
       var tf = _corBeiraSortear(true);
       if (tf) _corBeira.push({ z: _COR_Z_FAR, faixa: _corCamX + _corRand(-1.3, 1.3), tipo: tf.tipo, deco: true,
                                esc: _corRand(0.7, 1.2), flip: Math.random() < 0.5 });
@@ -1247,7 +1266,7 @@
     var def = b.deco ? _COR_DECO[b.tipo] : _COR_OBST_TIPOS[b.tipo];
     var p = _corProj(b.z, b.faixa);
     var ah = 0.5 * _corH * p.s * 0.94 * def.altMul * b.esc, aw = ah * reg.w / reg.h;
-    if (p.x + aw / 2 < 0 || p.x - aw / 2 > _corW) return;
+    if (ah < 2.5 || p.x + aw / 2 < 0 || p.x - aw / 2 > _corW) return;
     var fonte = b.deco ? reg.img : (_corFonte(reg) || reg.img);
     ctx.save();
     ctx.translate(p.x, p.y);
@@ -1279,6 +1298,7 @@
     _corAssetNovo(def.arte);
     _corRun.caixas++;
     _corSomRecarga();
+    _corVibrar(30);
     if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.bonus();
     _corAviso(def.nome + '!', def.sub, def.cor, 2.2);
     _corAtualizarHUD();
@@ -1287,6 +1307,7 @@
     _corGuardT = _corGuardDur(); _corGuardCdT = 0.5;
     _corGuard.x = _corW * 0.5; _corGuard.y = -_corH * 0.2; _corGuard.alvo = null; _corGuard.atk = 0;
     _corRun.guardia++;
+    _corVibrar([30, 40, 30]);
     if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.nivelUp();
     _corAviso('Coruja guardiã!', 'Ela derruba os zumbis por ' + _corGuardDur() + ' segundos', '#ffd24a', 2.2);
   }
@@ -1323,6 +1344,7 @@
     }
     // Metralhadora: dispara sozinha enquanto houver zumbi na mira.
     if (_corArma && _COR_ARMAS[_corArma].auto) _corAtirar(true);
+    else if (_corOpc.auto) _corAutoTiro(dt);
   }
 
   /* ── Coruja guardiã ── */
@@ -1577,6 +1599,8 @@
   ══════════════════════════════════════════════════════════════ */
   function _corAgarrar(zb) {
     _corEstado = 'agarrao'; _corAgarraoT = 0; _corAgarraoZb = zb;
+    _corLadosSoltar();
+    _corVibrar([90, 50, 220]);
     _corMenuPartida(false);
     _corDrag = false; _corCamVX = 0;
     _corBgmParar();
@@ -1713,7 +1737,7 @@
   }
   function _corDrawPerigo(ctx, W, H) {
     if (_corPerigo < 0.03) return;
-    var a = _corPerigo * (0.28 + 0.4 * _corCoracaoPulso);
+    var a = Math.min(0.9, _corPerigo * (0.4 + 0.55 * _corCoracaoPulso));
     var g = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.35, W * 0.5, H * 0.5, H * 0.95);
     g.addColorStop(0, 'rgba(200,0,0,0)'); g.addColorStop(1, 'rgba(200,0,0,' + a.toFixed(3) + ')');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
@@ -1774,21 +1798,43 @@
     var reg = _corAssetNovo('chao-' + z.id + '.webp');
     return _corImgPronta(reg) ? reg : null;
   }
+  // Desempenho: a textura é desenhada num canvas à parte com BEM menos
+  // pixels (o chão em perspectiva já é borrado de natureza) e colada de uma
+  // vez no quadro — era a camada mais cara do jogo, linha a linha na
+  // resolução cheia.
+  var _corChaoCv = null, _corChaoCx = null, _corChaoM = null;
   function _corDrawChao(ctx, W, H) {
     if (typeof DOMMatrix === 'undefined') return;
     var a = _corChaoTex(_corZonaIdx), b = (_corZonaFade < 1 && _corZonaAnt >= 0) ? _corChaoTex(_corZonaAnt) : null;
     if (!a && !b) return;
-    if (b) _corDrawChaoTex(ctx, W, H, b, 1);
-    if (a) _corDrawChaoTex(ctx, W, H, a, b ? _corZonaFade : 1);
+    var horizonY = H * _COR_HORIZ + _corBobY * H + _corShakeY() * H;
+    var faixaH = H * 1.06 + _corBobY * H + _corShakeY() * H - horizonY;
+    var topo = Math.max(0, Math.floor(horizonY + faixaH * 0.05));
+    if (topo >= H) return;
+    var k = _corOpc.leve ? 0.4 : 0.6;
+    var cw = Math.ceil(W * k), ch = Math.ceil((H - topo) * k) + 1;
+    if (!_corChaoCv) {
+      try { _corChaoCv = document.createElement('canvas'); _corChaoCx = _corChaoCv.getContext('2d'); } catch (e) { _corChaoCx = null; }
+      if (!_corChaoCx) { _corChaoCv = null; return; }
+    }
+    if (_corChaoCv.width !== cw || _corChaoCv.height < ch) { _corChaoCv.width = cw; _corChaoCv.height = ch; }
+    var c2 = _corChaoCx;
+    c2.setTransform(1, 0, 0, 1, 0, 0); c2.clearRect(0, 0, cw, ch);
+    c2.setTransform(k, 0, 0, k, 0, -topo * k);
+    if (b) _corDrawChaoTex(c2, W, H, b, 1, 1.25 / k);
+    if (a) _corDrawChaoTex(c2, W, H, a, b ? _corZonaFade : 1, 1.25 / k);
+    ctx.drawImage(_corChaoCv, 0, 0, cw, ch, 0, topo, cw / k, ch / k);
   }
-  function _corDrawChaoTex(ctx, W, H, reg, alfaZona) {
+  function _corDrawChaoTex(ctx, W, H, reg, alfaZona, passo) {
     var nome = reg.nomeOk || 'x';
     var pat = _corChaoPat[nome];
     if (!pat) { try { pat = ctx.createPattern(reg.img, 'repeat'); } catch (e) { pat = null; } _corChaoPat[nome] = pat || false; }
     if (!pat || !pat.setTransform) return;
+    if (!_corChaoM) _corChaoM = new DOMMatrix();
+    var m = _corChaoM;
     var horizonY = H * _COR_HORIZ + _corBobY * H + _corShakeY() * H;
     var baseY = H * 1.06 + _corBobY * H + _corShakeY() * H;
-    var faixaH = baseY - horizonY, passo = 2;
+    var faixaH = baseY - horizonY;
     var lateral = (_corSwayX + _corShakeX()) * W;
     ctx.save();
     ctx.fillStyle = pat;
@@ -1803,7 +1849,8 @@
       var dv = v2 - v1; if (Math.abs(dv) < 1e-3) continue;
       var sx = 0.42 * W * e / _COR_CHAO_U, sy = passo / dv;
       var tx = W / 2 - _corCamX * 0.42 * W * e + lateral * e;
-      pat.setTransform(new DOMMatrix([sx, 0, 0, sy, tx, y - v1 * sy]));
+      m.a = sx; m.b = 0; m.c = 0; m.d = sy; m.e = tx; m.f = y - v1 * sy;
+      pat.setTransform(m);
       ctx.globalAlpha = al * 0.96 * alfaZona;
       ctx.fillRect(0, y, W, passo + 0.6);
     }
@@ -1853,8 +1900,17 @@
   }
   function _corTiltAlternar() {
     if (_corTilt.on) { _corTilt.on = false; _corTiltSalvar(); _corTiltBotao(); return; }
+    _corTiltLigar(false);
+  }
+  // Liga a inclinação. Se o lado do giro já foi aprendido, liga direto
+  // (recal=true força girar de novo). No iOS a permissão sai deste toque.
+  function _corTiltLigar(recal) {
     var pedir = window.DeviceMotionEvent && typeof window.DeviceMotionEvent.requestPermission === 'function';
-    var seguir = function () { _corTiltOuvir(); _corTiltCalIniciar(); };
+    var seguir = function () {
+      _corTiltOuvir();
+      if (_corTilt.sinal && !recal) { _corTilt.on = true; _corTilt.base = null; _corOpc.lados = false; _corTiltSalvar(); _corOpcSalvar(); _corTiltBotao(); _corMenuRedesenhar(); }
+      else _corTiltCalIniciar();
+    };
     if (pedir) {
       window.DeviceMotionEvent.requestPermission().then(function (r) { if (r === 'granted') seguir(); else _corAvisoDom('Sem permissão do sensor: o jogo segue no arraste.'); }).catch(function () { _corAvisoDom('Não deu pra ligar o sensor.'); });
     } else seguir();
@@ -1862,12 +1918,14 @@
   function _corTiltCalIniciar() {
     _corTilt.cal = { ini: null, feito: false };
     var el = document.getElementById('cor-tilt-cal');
-    if (!el) {
-      var palco = document.getElementById('cor-palco');
-      if (!palco) return;
-      el = document.createElement('div'); el.id = 'cor-tilt-cal'; el.className = 'cor-overlay cor-tilt-cal';
-      palco.appendChild(el);
-    }
+    var palco = document.getElementById('cor-palco');
+    if (!palco) return;
+    if (!el) { el = document.createElement('div'); el.id = 'cor-tilt-cal'; el.className = 'cor-overlay cor-tilt-cal'; }
+    // Chamada do menu de pausa (overlay fixo do hub): mora dentro dele, senão ficaria por baixo.
+    var tela = document.getElementById('jogo-corrida');
+    var jm = _corPausado && tela ? tela.querySelector('.jm-overlay.jm-aberto') : null;
+    var pai = jm || palco;
+    if (el.parentNode !== pai) pai.appendChild(el);
     el.innerHTML = '<div class="cor-overlay-titulo">📱 Inclinar pra desviar</div>' +
       '<div class="cor-overlay-desc">Segure o celular deitado e <b>gire pra DIREITA</b>, como um volante.</div>' +
       '<div class="cor-tilt-vol">⟳</div>' +
@@ -1881,22 +1939,24 @@
     _corTilt.cal = null;
     var el = document.getElementById('cor-tilt-cal');
     if (el) el.style.display = 'none';
+    if (ok) { _corTilt.base = null; _corOpc.lados = false; _corOpcSalvar(); }
     if (msg) _corAvisoDom(msg);
     else if (ok) _corAvisoDom('Pronto! Gire o celular pra desviar.');
     _corTiltBotao();
+    _corMenuRedesenhar();
   }
   function _corTiltBotao() {
     var b = document.getElementById('cor-tilt-btn');
     if (!b) return;
-    b.style.display = _corTiltSuportado() ? '' : 'none';
-    b.textContent = '📱 Inclinar: ' + (_corTilt.on ? 'ligado' : 'desligado');
-    b.classList.toggle('cor-extra-on', !!_corTilt.on);
+    b.style.display = '';
+    b.textContent = '🎮 Controle: ' + COR_CONTROLE_NOME[_corControle()];
+    b.classList.toggle('cor-extra-on', _corControle() !== 'arrastar');
   }
   // Na partida: zera o "neutro" no começo e desvia pelo quanto girou.
   function _corTiltAplicar(dt) {
     if (!_corTilt.on || _corTilt.val == null) return;
     if (_corTilt.base == null) _corTilt.base = _corTilt.val;
-    var d = (_corTilt.val - _corTilt.base) * _corTilt.sinal / 3.2;
+    var d = (_corTilt.val - _corTilt.base) * _corTilt.sinal / 3.2 * COR_SENS[_corOpc.sens];
     if (Math.abs(d) < 0.1) return;
     d = _corClamp(d, -1, 1);
     _corCamX = _corClamp(_corCamX + d * COR_PAD_VEL * dt, -_COR_CAM_LIM, _COR_CAM_LIM);
@@ -1908,6 +1968,145 @@
     var t = document.createElement('div'); t.className = 'cor-toast'; t.textContent = txt;
     palco.appendChild(t);
     setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2600);
+  }
+
+  /* ── OPÇÕES (menu de pausa + botão "Controle" da tela inicial) ──────
+     Controle: Arrastar (padrão: arrasta pra desviar, toca pra atirar) ·
+     Toque nos lados (segura o terço esquerdo/direito pra andar, toca no
+     meio pra atirar; dá pra segurar um lado e atirar com o outro dedo) ·
+     Inclinar (sensor; arrastar continua valendo).
+     E mais: tiro automático, sensibilidade, música, vibração e gráficos
+     leves. Preferência do aparelho, não da conta. */
+  var COR_OPC_KEY = 'angatuba_corrida_opcoes';
+  var COR_SENS = [0.7, 1, 1.45], COR_SENS_NOME = ['baixa', 'média', 'alta'];
+  var COR_CONTROLE_NOME = { arrastar: 'Arrastar', lados: 'Toque nos lados', inclinar: 'Inclinar' };
+  var COR_CONTROLE_DICA = {
+    arrastar: 'Arraste pra desviar, toque pra atirar.',
+    lados: 'Segure a esquerda ou a direita pra desviar, toque no meio pra atirar.',
+    inclinar: 'Gire o celular pra desviar, toque pra atirar.'
+  };
+  var _corOpc = (function () {
+    var o = { lados: false, auto: false, sens: 1, musica: true, vibrar: true, leve: false, leveManual: false };
+    try {
+      var d = JSON.parse(localStorage.getItem(COR_OPC_KEY) || 'null');
+      if (d && typeof d === 'object') {
+        o.lados = !!d.lados; o.auto = !!d.auto; o.leve = !!d.leve; o.leveManual = !!d.leveManual;
+        o.musica = d.musica !== false; o.vibrar = d.vibrar !== false;
+        if (d.sens === 0 || d.sens === 2) o.sens = d.sens;
+      }
+    } catch (e) {}
+    return o;
+  })();
+  function _corOpcSalvar() { try { localStorage.setItem(COR_OPC_KEY, JSON.stringify(_corOpc)); } catch (e) {} }
+  function _corControle() { return _corTilt.on ? 'inclinar' : (_corOpc.lados ? 'lados' : 'arrastar'); }
+  function _corControleCiclar() {
+    var c = _corControle();
+    _corLadosSoltar();
+    if (c === 'arrastar') _corOpc.lados = true;
+    else if (c === 'lados') {
+      _corOpc.lados = false;
+      if (_corTiltSuportado()) { _corOpcSalvar(); _corTiltLigar(false); _corTiltBotao(); return; }
+    } else { _corTilt.on = false; _corTiltSalvar(); }
+    _corOpcSalvar(); _corTiltBotao();
+    if (!_corPausado) _corAvisoDom(COR_CONTROLE_DICA[_corControle()]);
+  }
+  function _corOpcTrocar(k) {
+    if (k === 'sens') _corOpc.sens = (_corOpc.sens + 1) % 3;
+    else _corOpc[k] = !_corOpc[k];
+    if (k === 'leve') _corOpc.leveManual = true;
+    _corOpcSalvar();
+    if (k === 'leve') { _corDimensionar(); if (_corEstado !== 'jogando') _corDrawIdle(); }
+    if (k === 'vibrar' && _corOpc.vibrar) _corVibrar(40);
+  }
+  // Aparelho sofrendo (média < ~40 fps nos primeiros segundos da corrida):
+  // liga os gráficos leves sozinho, uma vez, e avisa. Quem escolheu no
+  // menu (leveManual) manda — o automático não mexe mais.
+  var _corFps = { n: 0, soma: 0, feito: false };
+  function _corFpsMedir(dt) {
+    var f = _corFps;
+    if (f.feito || _corOpc.leve || _corOpc.leveManual || _corPausado) return;
+    if (dt <= 0 || dt > 0.25) return;            // aba em segundo plano / volta da pausa
+    f.n++; f.soma += dt;
+    if (f.n < 150) return;
+    var media = f.soma / f.n;
+    f.n = 0; f.soma = 0;
+    if (media > 0.025) {
+      f.feito = true;
+      _corOpc.leve = true; _corOpcSalvar(); _corDimensionar();
+      _corAviso('Gráficos leves ligados', 'pra rodar mais liso · dá pra mudar no ⏸', '#7CF0A0', 2.6);
+    }
+  }
+  function _corVibrar(p) {
+    if (!_corOpc.vibrar) return;
+    try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {}
+  }
+  // O menu do hub só se redesenha num clique dele; a calibração termina
+  // depois, então pedimos um redesenho (registrar de novo só re-renderiza).
+  var _corMenuCfg = null;
+  function _corMenuRedesenhar() {
+    var M = _corMenu();
+    if (M && _corMenuCfg && _corPausado) M.registrar('jogo-corrida', _corMenuCfg);
+  }
+  function _corOpcoesMenu() {
+    var c = _corControle();
+    var l = [{ icone: c === 'inclinar' ? 'fa-mobile-screen-button' : (c === 'lados' ? 'fa-arrows-left-right' : 'fa-hand-pointer'),
+               rotulo: 'Controle: ' + COR_CONTROLE_NOME[c], acao: _corControleCiclar }];
+    if (c === 'inclinar') l.push({ icone: 'fa-rotate', rotulo: 'Recalibrar giro', acao: function () { _corTiltLigar(true); } });
+    l.push({ icone: 'fa-crosshairs', rotulo: 'Tiro automático: ' + (_corOpc.auto ? 'sim' : 'não'), ativo: _corOpc.auto, acao: function () { _corOpcTrocar('auto'); } });
+    l.push({ icone: 'fa-sliders', rotulo: 'Sensibilidade ' + COR_SENS_NOME[_corOpc.sens], acao: function () { _corOpcTrocar('sens'); } });
+    l.push({ icone: _corOpc.musica ? 'fa-music' : 'fa-volume-xmark', rotulo: 'Música: ' + (_corOpc.musica ? 'sim' : 'não'), ativo: _corOpc.musica, acao: function () { _corOpcTrocar('musica'); } });
+    if (navigator.vibrate) l.push({ icone: 'fa-mobile', rotulo: 'Vibração: ' + (_corOpc.vibrar ? 'sim' : 'não'), ativo: _corOpc.vibrar, acao: function () { _corOpcTrocar('vibrar'); } });
+    l.push({ icone: 'fa-bolt', rotulo: 'Gráficos leves: ' + (_corOpc.leve ? 'sim' : 'não'), ativo: _corOpc.leve, acao: function () { _corOpcTrocar('leve'); } });
+    return l;
+  }
+  function _corRecomecar() {
+    if (_corEstado === 'jogando') { _corCreditarMoedas(); _corMissoesFechar(); }
+    _corBgmParar();
+    _corChuvaSomParar();
+    _corComecar();
+  }
+
+  /* Toque nos lados: cada dedo guarda o lado em que encostou (-1/+1). */
+  var _corLados = {};
+  function _corLadosSoltar() { _corLados = {}; }
+  function _corLadoDe(x, y) {
+    if (!_corCanvas) return 0;
+    var r = _corCanvas.getBoundingClientRect();
+    // Girado por CSS: a esquerda do jogo é o TOPO da tela física.
+    var f = _corRotacionado() ? (y - r.top) / (r.height || 1) : (x - r.left) / (r.width || 1);
+    return f < 0.34 ? -1 : (f > 0.66 ? 1 : 0);
+  }
+  function _corLadosAplicar(dt) {
+    var dir = 0;
+    for (var k in _corLados) dir += _corLados[k];
+    if (!dir) return;
+    dir = dir > 0 ? 1 : -1;
+    _corCamX = _corClamp(_corCamX + dir * COR_PAD_VEL * 1.15 * COR_SENS[_corOpc.sens] * dt, -_COR_CAM_LIM, _COR_CAM_LIM);
+  }
+  function _corDrawLados(ctx, W, H) {
+    if (_corControle() !== 'lados') return;
+    var dir = 0;
+    for (var k in _corLados) dir += _corLados[k];
+    var r = H * 0.05, y = H * 0.56;
+    ctx.save();
+    ctx.lineWidth = Math.max(3, H * 0.012); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (var lado = -1; lado <= 1; lado += 2) {
+      var x = lado < 0 ? W * 0.06 : W * 0.94;
+      ctx.strokeStyle = (dir && (dir > 0) === (lado > 0)) ? 'rgba(124,240,160,0.85)' : 'rgba(255,255,255,0.28)';
+      ctx.beginPath(); ctx.moveTo(x - lado * r * 0.5, y - r); ctx.lineTo(x + lado * r * 0.5, y); ctx.lineTo(x - lado * r * 0.5, y + r); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // Tiro automático: dispara sozinho quando há zumbi perto na mira.
+  var _corAutoT = 0;
+  function _corAutoTiro(dt) {
+    _corAutoT -= dt;
+    if (_corAutoT > 0 || _corTiroT > 0) return;
+    if (!_corArma && _corMun <= 0) return;
+    var a = _corMiraAlvo(_corW, _corH);
+    if (!a || a.z > 0.55) return;
+    _corAutoT = 0.3;
+    _corAtirar();
   }
 
   /* ── EVENTOS DE ZUMBI ───────────────────────────────────────────
@@ -2076,7 +2275,7 @@
     if (!c) return;
     if (c.chuva > 0.02) {
       ctx.fillStyle = 'rgba(10,18,32,' + (0.16 * c.chuva).toFixed(3) + ')'; ctx.fillRect(0, 0, W, H);
-      var n = Math.floor(_corGotas.length * c.chuva);
+      var n = Math.floor(_corGotas.length * c.chuva * (_corOpc.leve ? 0.45 : 1));
       ctx.strokeStyle = 'rgba(190,205,230,' + (0.38 * c.chuva).toFixed(3) + ')';
       ctx.lineWidth = Math.max(1, H * 0.0025);
       ctx.beginPath();
@@ -2393,6 +2592,7 @@
     _corShakeT = _COR_SHAKE_DUR;
     _corIframesT = _COR_IFRAMES_DUR;
     _corSlowT = _COR_SLOW_DUR;
+    _corVibrar(70);
     _corSomImpacto(false);
     // Corpo extra grave por baixo do impacto — o esbarrão é um "trombada",
     // não só um tiro de raspão; dá mais peso sem trocar o som base.
@@ -2618,6 +2818,7 @@
     _corClimaAtualizar(dt);
     _corRespAtualizar(dt);
     _corTiltAplicar(dt);
+    _corLadosAplicar(dt);
     // v6: caixas de arma, guardiã, perigo, zona, avisos e missões.
     _corBeiraAtualizar(dt);
     _corItensV6(dt);
@@ -2708,6 +2909,7 @@
     _corDrawGuardia(ctx, W, H);
 
     // ── Arma + mira ──
+    _corDrawLados(ctx, W, H);
     _corDrawArma(ctx, W, H);
     _corDrawMira(ctx, W, H);
 
@@ -2734,10 +2936,9 @@
       ctx.globalAlpha = 1;
     }
 
-    // Vinheta escura (clima sombrio, mais forte que antes).
-    var gV = ctx.createRadialGradient(W * 0.5, H * 0.48, H * 0.28, W * 0.5, H * 0.5, H * 0.9);
-    gV.addColorStop(0, 'rgba(0,0,0,0)'); gV.addColorStop(1, 'rgba(0,0,0,0.62)');
-    ctx.fillStyle = gV; ctx.fillRect(0, 0, W, H);
+    // Vinheta escura: virou CSS (.cor-rot::after) — uma camada fixa que a
+    // GPU compõe sem redesenhar; aqui no canvas custava uma tela inteira
+    // de gradiente por quadro.
 
     // v6.2: chuva e clarão do relâmpago por cima de tudo.
     _corDrawChuva(ctx, W, H);
@@ -2880,7 +3081,7 @@
     var reg = _corAssetNovo(_COR_MATO);
     var swayG = Math.sin(_corPasso * 0.5) * W * 0.008;
     if (_corImgPronta(reg)) {
-      _corDrawMatoFaixa(ctx, W, H, reg, H * 0.24, swayG * 0.5, 0.18, 0.75);   // de trás, mais baixa e apagada
+      if (!_corOpc.leve) _corDrawMatoFaixa(ctx, W, H, reg, H * 0.24, swayG * 0.5, 0.18, 0.75);   // de trás, mais baixa e apagada
       _corDrawMatoFaixa(ctx, W, H, reg, H * 0.30, swayG, 0.32, 1);           // da frente
       return;
     }
@@ -3267,6 +3468,7 @@
     if (_corEstado !== 'jogando') return;
     if (!_corLast) _corLast = ts;
     var dt = (ts - _corLast) / 1000; _corLast = ts;
+    _corFpsMedir(dt);
     if (dt > 0.05) dt = 0.05;
     _corRelogio = ts;                 // relógio p/ animação dos webp
     _corPadPoll(dt);                  // controle (Gamepad API) — não tem eventos de botão
@@ -3346,11 +3548,32 @@
     // O AudioContext só acorda dentro de um gesto — este é o gesto.
     _corAudioDestravar();
     if (_corEstado !== 'jogando' || _corPausado) return;
+    if (_corControle() === 'lados') {
+      var ts = e.changedTouches || [e];
+      for (var i = 0; i < ts.length; i++) {
+        var lado = _corLadoDe(ts[i].clientX, ts[i].clientY);
+        if (lado) _corLados[ts[i].identifier != null ? ts[i].identifier : 'm'] = lado;
+        else _corAtirar();
+      }
+      if (e.cancelable) e.preventDefault();
+      return;
+    }
     _corDrag = true;
     _corLast2 = _corXY(e); _corDownXY = _corLast2; _corDownT = (e.timeStamp || Date.now()); _corMoveu = false;
     if (e.cancelable) e.preventDefault();
   }
   function _corPointerMove(e) {
+    if (_corControle() === 'lados') {
+      var ts = e.changedTouches || [e];
+      for (var i = 0; i < ts.length; i++) {
+        var id = ts[i].identifier != null ? ts[i].identifier : 'm';
+        if (!(id in _corLados)) continue;
+        var lado = _corLadoDe(ts[i].clientX, ts[i].clientY);
+        if (lado) _corLados[id] = lado; else delete _corLados[id];
+      }
+      if (e.cancelable && e.changedTouches) e.preventDefault();
+      return;
+    }
     if (!_corDrag || _corEstado !== 'jogando') return;
     var xy = _corXY(e);
     var dxScreen = xy.x - _corLast2.x;
@@ -3362,12 +3585,14 @@
     var mov = _corRotacionado() ? dyScreen : dxScreen;
     var accX = xy.x - _corDownXY.x, accY = xy.y - _corDownXY.y;
     if (Math.sqrt(accX * accX + accY * accY) > 8) _corMoveu = true;
-    var escala = 1 / (_corW * 0.5);
+    var escala = COR_SENS[_corOpc.sens] / (_corW * 0.5);
     _corCamX = _corClamp(_corCamX + mov * escala, -_COR_CAM_LIM, _COR_CAM_LIM);
     _corCamVX = mov;
     if (e.cancelable) e.preventDefault();
   }
   function _corPointerUp(e) {
+    var ts = (e && e.changedTouches) || [e || {}];
+    for (var i = 0; i < ts.length; i++) delete _corLados[ts[i].identifier != null ? ts[i].identifier : 'm'];
     if (_corEstado === 'jogando' && _corDrag) {
       var dtms = ((e && e.timeStamp) || Date.now()) - _corDownT;
       if (!_corMoveu && dtms < 320) _corAtirar();
@@ -4000,9 +4225,6 @@
     _corDrawMato(ctx, W, H);
     _corDrawArma(ctx, W, H);
     _corDrawMira(ctx, W, H);
-    var gV = ctx.createRadialGradient(W * 0.5, H * 0.48, H * 0.28, W * 0.5, H * 0.5, H * 0.9);
-    gV.addColorStop(0, 'rgba(0,0,0,0)'); gV.addColorStop(1, 'rgba(0,0,0,0.62)');
-    ctx.fillStyle = gV; ctx.fillRect(0, 0, W, H);
   }
 
   function _corComecar() {
@@ -4063,9 +4285,12 @@
   function _corRegistrarMenu() {
     var M = _corMenu();
     if (!M) return;
-    M.registrar('jogo-corrida', {
+    _corMenuCfg = {
+      opcoes: _corOpcoesMenu,
+      extra: { rotulo: 'Recomeçar corrida', acao: _corRecomecar },
       pausar: function () {
         _corPausado = true;
+        _corLadosSoltar();
         _corPausaInicioMs = Date.now();
         if (_corRAF) { cancelAnimationFrame(_corRAF); _corRAF = 0; }
         _corDrag = false; _corCamVX = 0;
@@ -4077,6 +4302,7 @@
         _corPausado = false;
         if (_corPausaInicioMs) { _corPausaTotalMs += Date.now() - _corPausaInicioMs; _corPausaInicioMs = 0; }
         if (_corEstado !== 'jogando') return;
+        _corTilt.base = null;          // o "reto" volta a ser como a pessoa está segurando agora
         _corBgmMudoAntes = _corSomLigado();
         _corBgmTocar();
         if (!_corRAF) {
@@ -4084,7 +4310,8 @@
           _corRAF = requestAnimationFrame(_corLoop);
         }
       }
-    });
+    };
+    M.registrar('jogo-corrida', _corMenuCfg);
   }
 
   function _corMostrarOverlay(qual) {
@@ -4151,6 +4378,7 @@
   window._corMelhComprar = _corMelhComprar;
   window._corArmaIniEscolher = _corArmaIniEscolher;
   window._corTiltAlternar = _corTiltAlternar;
+  window._corControleCiclar = _corControleCiclar;
   window._corTiltCalFim = _corTiltCalFim;
   window.CorridaGame = { preparar: _corPreparar, comecar: _corComecar, parar: _corParar, diag: _corDiag };
 })();

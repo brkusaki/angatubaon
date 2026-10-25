@@ -120,6 +120,9 @@
       automáticos em aparelho lento) e opções no menu de pausa: modo de
       controle (arrastar / toque nos lados / inclinar), tiro automático,
       sensibilidade, música, vibração, gráficos leves e recomeçar.
+  14) v6.5: sons gravados (ElevenLabs) em /Jogos/assets/corrida/sfx/ —
+      armas, zumbis, passos/fôlego/chuva em loop, trovão, guardiã; o som
+      sintetizado antigo fica de reserva se um arquivo faltar.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -538,9 +541,9 @@
      Loops (passos, respiração, chuva) têm volume/velocidade por quadro. */
   var _COR_SFX_BASE = '/Jogos/assets/corrida/sfx/';
   var _COR_SFX = {
-    tiro: 2, escopeta: 2, metralhadora: 2, recarga: 1, vazio: 1, caixa: 1,
-    acerto: 2, morre: 2, gemido: 4, corredora: 2, terra: 1, agarrao: 1,
-    rosnado: 2, coracao: 1, trovao: 2, guardia: 1, esbarrao: 2, batida: 1, uivo: 2,
+    tiro: 2, escopeta: 1, metralhadora: 1, recarga: 1, vazio: 1, caixa: 1,
+    acerto: 1, morre: 1, gemido: 2, corredora: 1, terra: 1, agarrao: 1,
+    rosnado: 1, coracao: 1, trovao: 1, guardia: 1, esbarrao: 1, batida: 1, uivo: 1,
     'passos-loop': 1, 'respiracao-loop': 1, 'chuva-loop': 1
   };
   var _corSfxBuf = {}, _corSfxUlt = {}, _corSfxPedido = false, _corLoops = {};
@@ -592,6 +595,9 @@
       if (vol < 0.005) return true;
       try {
         var src = ac.createBufferSource(); src.buffer = l[0]; src.loop = true;
+        // mp3 tem um respiro de codificação nas pontas: pula 30 ms de cada
+        // lado pra emenda do loop não dar "clique".
+        if (l[0].duration > 0.5) { src.loopStart = 0.03; src.loopEnd = l[0].duration - 0.03; }
         var g = ac.createGain(); g.gain.value = 0.0001;
         src.connect(g); g.connect(_corMaster);
         src.start(0, Math.random() * l[0].duration);

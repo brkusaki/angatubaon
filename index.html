@@ -1615,8 +1615,11 @@
           <!-- Sub-tela: menu (criar ou entrar numa sala) -->
           <div class="pty-sub" id="pty-menu" style="display:flex;">
             <img src="/webp/owl-wave.webp" alt="" class="pty-owl" onerror="this.style.display='none'">
-            <div class="pty-titulo">🦉 Coruja Party</div>
-            <div class="pty-desc">Chame de 2 a 4 amigos. Na sala, o anfitrião escolhe o jogo: minigames em rodadas ou a Hex Arena, todo mundo na mesma arena.</div>
+            <div class="pty-titulo">Coruja Party</div>
+            <div class="pty-subtitulo">A Máquina está esperando</div>
+            <div class="pty-desc">De 2 a 4 amigos, cada um no seu celular. A cada rodada a Máquina sorteia uma armadilha: quem cai, perde. Mais pontos no fim leva a Party.</div>
+            <!-- Catálogo dos minigames que podem cair (desenhado por _renderCatalogo em party.js a partir da POOL) -->
+            <div class="pty-catalogo" id="pty-catalogo"></div>
             <div class="pty-opcoes">
               <button type="button" class="pty-btn" onclick="_ptyCriarSala()">Criar Party</button>
               <label class="pty-privada-toggle">
@@ -1663,9 +1666,17 @@
           </div>
 
           <!-- Sub-tela: contagem regressiva antes da rodada -->
+          <!-- Cartão da Máquina: roleta → minigame sorteado + regra + controle,
+               e depois o 3-2-1 (ver o handler de 'countdown' em party.js) -->
           <div class="pty-sub" id="pty-countdown">
-            <div class="pty-countdown-jogo" id="pty-countdown-jogo">Minigame surpresa</div>
-            <div class="pty-countdown-num" id="pty-countdown-num">3</div>
+            <div class="pty-maq-rodada" id="pty-countdown-rodada">Rodada 1</div>
+            <div class="pty-maq-cartao" id="pty-countdown-cartao">
+              <div class="pty-maq-icone" id="pty-countdown-icone">⚙️</div>
+              <div class="pty-countdown-jogo" id="pty-countdown-jogo">Minigame surpresa</div>
+              <div class="pty-maq-regra" id="pty-countdown-regra"></div>
+              <div class="pty-maq-controle" id="pty-countdown-controle"></div>
+            </div>
+            <div class="pty-countdown-num" id="pty-countdown-num"></div>
           </div>
 
           <!-- Sub-tela: arena — hospeda minigames "container" (ex.: Puff),

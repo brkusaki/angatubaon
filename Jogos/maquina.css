@@ -1,0 +1,106 @@
+/* ═══════════════════════════════════════════════════════════════
+   A MÁQUINA DA CORUJA — estilos dos minigames do Coruja Party
+   (Jogos/maquina.js). Tela cheia por cima do Party, igual às
+   Ervilhas: .mq-root é position:fixed; se o Party esconder a tela, o
+   fixed some junto porque o ancestral fica display:none.
+   Paleta da Máquina: aço escuro, amarelo de perigo, vermelho de alerta.
+   ═══════════════════════════════════════════════════════════════ */
+.mq-root {
+  position: fixed; inset: 0; z-index: 38;          /* abaixo do .jm-btn (40) e do .jm-overlay (45) */
+  display: flex; flex-direction: column;
+  background: #0d0f12;
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(255,45,85,.08), transparent 60%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 22px);
+  overflow: hidden; touch-action: none;
+  user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  font-family: var(--font-b, system-ui, sans-serif); color: #e8ecf1;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+/* A faixa dos rivais (party.js, #pty-rivais) mora no topo da tela
+   durante a rodada — o HUD desce um pouco pra não ficar embaixo dela. */
+body.angatuba-party-ativo .mq-root { padding-top: calc(env(safe-area-inset-top, 0px) + 30px); }
+
+/* ── HUD ─────────────────────────────────────────────────────── */
+.mq-hud {
+  flex: 0 0 auto; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  padding: 6px 14px 4px; gap: 8px;
+}
+.mq-hud-bloco { display: flex; flex-direction: column; line-height: 1; }
+.mq-hud-dir { align-items: flex-end; }
+.mq-hud-rot { font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: #8b95a1; font-weight: 700; }
+.mq-hud-bloco b { font-family: var(--font-h, inherit); font-weight: 800; font-size: 22px; color: #fff; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.mq-hud-titulo {
+  font-family: var(--font-h, inherit); font-weight: 800; font-size: 13px; letter-spacing: .12em; text-transform: uppercase;
+  color: #0d0f12; background: #f5c518; padding: 5px 10px; border-radius: 4px;
+  box-shadow: 0 0 0 2px #0d0f12, 0 0 0 3px rgba(245,197,24,.45);
+}
+.mq-final .mq-hud-tempo { color: #ff4d6d; animation: mqPisca .5s steps(2) infinite; }
+@keyframes mqPisca { 50% { opacity: .35; } }
+
+.mq-tempo-barra { flex: 0 0 auto; height: 4px; margin: 0 14px 6px; background: #1e2329; border-radius: 2px; overflow: hidden; }
+.mq-tempo-barra i { display: block; height: 100%; background: linear-gradient(90deg, #ff2d55, #f5c518); transform-origin: left; }
+
+/* ── Palco (canvas) ──────────────────────────────────────────── */
+.mq-palco { position: relative; flex: 1 1 auto; min-height: 0; }
+.mq-cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+/* Vinheta fixa em CSS (não pinta no canvas todo quadro). */
+.mq-palco::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%);
+}
+.mq-moedas {
+  position: absolute; left: 12px; top: 6px; z-index: 2; pointer-events: none;
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 9px 3px 6px; border-radius: 999px; background: rgba(0,0,0,.55); border: 1px solid rgba(245,179,1,.4);
+  font-family: var(--font-h, inherit); font-weight: 800; font-size: 13px; color: #ffd23f;
+}
+.mq-moedas-pop { animation: mqPop .35s ease; }
+@keyframes mqPop { 40% { transform: scale(1.25); } }
+.mq-dica {
+  position: absolute; left: 50%; bottom: 14px; z-index: 2; pointer-events: none;
+  transform: translate(-50%, 8px); opacity: 0; transition: opacity .25s, transform .25s;
+  background: rgba(13,15,18,.86); border: 1px solid rgba(245,197,24,.5); color: #f8e7a1;
+  font-size: 13px; font-weight: 700; padding: 7px 14px; border-radius: 8px; white-space: nowrap;
+}
+.mq-dica.mq-dica-on { opacity: 1; transform: translate(-50%, 0); }
+
+/* ── Controles (Escada Errada) ───────────────────────────────── */
+.mq-controles { flex: 0 0 auto; display: none; }
+.mq-controles.mq-controles-on { display: block; padding: 8px 10px 12px; background: linear-gradient(#14171b, #0d0f12); border-top: 2px solid #f5c518; }
+.mq-setas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-width: 460px; margin: 0 auto; }
+.mq-bt {
+  height: 74px; border-radius: 14px; border: none; cursor: pointer; color: #111;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: inset 0 -5px 0 rgba(0,0,0,.28), 0 3px 0 #000;
+  touch-action: none; -webkit-tap-highlight-color: transparent;
+}
+.mq-bt svg { width: 38px; height: 38px; }
+.mq-bt-esq { background: #38bdf8; } .mq-bt-esq svg { transform: rotate(180deg); }
+.mq-bt-cima { background: #4ade80; } .mq-bt-cima svg { transform: rotate(-90deg); }
+.mq-bt-baixo { background: #f472b6; } .mq-bt-baixo svg { transform: rotate(90deg); }
+.mq-bt-dir { background: #facc15; }
+.mq-bt:active, .mq-bt.mq-bt-pop { transform: translateY(3px); box-shadow: inset 0 -2px 0 rgba(0,0,0,.28), 0 0 0 #000; }
+
+/* ── Tela de morte / sobreviveu ──────────────────────────────── */
+.mq-fim {
+  position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
+  pointer-events: none; opacity: 0; transition: opacity .2s;
+}
+.mq-fim.mq-fim-on { opacity: 1; }
+.mq-fim-morte { background: radial-gradient(ellipse at center, rgba(120,0,20,.55), rgba(0,0,0,.75)); }
+.mq-fim-vitoria { background: radial-gradient(ellipse at center, rgba(10,80,40,.5), rgba(0,0,0,.72)); }
+.mq-fim-cx { text-align: center; transform: scale(.7); transition: transform .35s cubic-bezier(.2,1.6,.4,1); padding: 0 20px; }
+.mq-fim-on .mq-fim-cx { transform: scale(1); }
+.mq-fim-tit {
+  font-family: var(--font-h, inherit); font-weight: 800; font-size: 38px; line-height: 1.05; letter-spacing: .02em;
+  color: #fff; text-shadow: 0 4px 0 #000, 0 0 24px rgba(255,45,85,.6);
+}
+.mq-fim-vitoria .mq-fim-tit { color: #bbf7d0; text-shadow: 0 4px 0 #000, 0 0 24px rgba(74,222,128,.6); }
+.mq-fim-sub { margin-top: 10px; font-size: 14px; font-weight: 700; color: #e5e7eb; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mq-final .mq-hud-tempo, .mq-moedas-pop { animation: none; }
+  .mq-fim-cx { transition: none; }
+}

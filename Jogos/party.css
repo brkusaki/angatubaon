@@ -1,158 +1,217 @@
 /* ═══════════════════════════════════════════════════════════════
    CORUJA PARTY — estilos do modo 2-4 jogadores (lazy-loaded)
    Injetado sob demanda pelo _jogoLoader ao abrir o card "Coruja
-   Party". Segue o mesmo padrão visual de pp-* (Ping Pong): telas
-   "overlay" empilhadas dentro de um único card, uma visível por vez
-   (ver _mostrarSub em party.js). Cor do modo: rosa/dourado — ver
-   .gc-party em styles.css (moldura do card no hub).
+   Party". Telas "overlay" empilhadas dentro de um único card, uma
+   visível por vez (ver _mostrarSub em party.js).
+   v2 "A Máquina" (out/2026, estilo Machine Party): aço escuro, amarelo
+   de perigo e vermelho de alerta — sempre escuro, como os minigames da
+   Máquina (Jogos/maquina.css), independente do tema do app.
    ═══════════════════════════════════════════════════════════════ */
 
+#jogo-party {
+  --pty-aco: #15181c;
+  --pty-aco-2: #1e2228;
+  --pty-borda: #2f353d;
+  --pty-texto: #e8ecf1;
+  --pty-mudo: #8b95a1;
+  --pty-amarelo: #f5c518;
+  --pty-vermelho: #ff2d55;
+  --pty-verde: #4ade80;
+}
+
 .pty-card {
+  position: relative;
   border-radius: 16px; overflow: hidden;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border: 1px solid var(--pty-borda);
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(255,45,85,.14), transparent 55%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.02) 0 1px, transparent 1px 24px),
+    var(--pty-aco);
+  color: var(--pty-texto);
   min-height: 420px;
   display: flex; flex-direction: column;
+}
+/* Faixa de perigo no topo do cartão — a "boca" da Máquina. */
+.pty-card::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 6px; z-index: 1;
+  background: repeating-linear-gradient(-45deg, var(--pty-amarelo) 0 8px, #111 8px 16px);
+  opacity: .9; pointer-events: none;
 }
 /* Em tela cheia (body.games-fs-open), #jogo-party.jogo-tela ganha
    height:100dvh do CSS (ver styles.css), mas quem abre a tela
    (_abrirJogo/_mostrarTelaJogo) seta display:block INLINE no elemento
-   — isso vence o "display:flex" da mesma regra (estilo inline sempre
-   tem prioridade sobre seletor de classe, sem !important em nenhum
-   dos dois lados). Ou seja: na prática vira um bloco comum, não um
-   flex column — "flex:1" sozinho no .pty-card não tem efeito nenhum
-   nesse caso. Por isso a altura vem por height:100% (resolve contra o
-   height explícito do pai, funciona em block OU flex), com flex:1
-   como reforço caso o display real do pai um dia volte a ser flex.
-   Sem isso, o cartão só crescia até o conteúdo e sobrava um vão preto
-   embaixo em telas com pouco conteúdo (ex.: o menu) — parecia que a
-   tela tinha sido "cortada" no meio. overflow-y:auto cobre o caso de
-   conteúdo mais alto que a tela (ex.: lista grande de parties
-   abertas), já que o .jogo-tela pai tem overflow:hidden. */
+   — isso vence o "display:flex" da mesma regra. Por isso a altura vem
+   por height:100% (resolve contra o height explícito do pai, funciona
+   em block OU flex), com flex:1 como reforço. overflow-y:auto cobre
+   conteúdo mais alto que a tela (ex.: lista grande de parties). */
 body.games-fs-open .pty-card {
   height: 100%;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   box-sizing: border-box;
+  border-radius: 0; border: none;
 }
 
-/* Todas as sub-telas do Party (menu/lobby/countdown/arena/aguardando/
-   resultado/campeao/erro) compartilham este layout — uma por vez,
-   controlada via display:flex/none em party.js (_mostrarSub). */
+/* Todas as sub-telas compartilham este layout — uma por vez
+   (_mostrarSub). flex:1 + justify-content:center centralizam o
+   conteúdo curto; a arena tem flex:1 próprio e consome tudo. */
 .pty-sub {
   display: none; flex-direction: column; align-items: center;
-  padding: 22px 18px; gap: 10px; text-align: center;
+  padding: 26px 18px 22px; gap: 10px; text-align: center;
   min-height: 420px; box-sizing: border-box;
-  /* .pty-card agora estica pra preencher a tela (ver comentário lá em
-     cima), mas isso sozinho não bastava: a sub-tela ATIVA (esta regra)
-     não tinha flex-grow nenhum, então continuava do tamanho do
-     conteúdo e ficava "grudada" no topo do cartão, com um vão vazio
-     embaixo dela mesma. flex:1 faz ela ocupar o cartão inteiro;
-     justify-content:center centraliza o conteúdo curto (menu, erro,
-     campeão) no meio desse espaço em vez de empilhar tudo no topo. Não
-     atrapalha a tela de arena: #pty-arena-container tem flex:1 próprio
-     e consome o espaço todo, então não sobra nada pra "centralizar". */
   flex: 1; justify-content: center; width: 100%;
 }
-.pty-owl { width: 88px; height: 68px; object-fit: contain; margin-bottom: 2px; }
-.pty-titulo { font-family: var(--font-h); font-weight: 800; font-size: 21px; color: var(--text); }
-.pty-desc { font-size: 13px; color: var(--muted); line-height: 1.5; max-width: 300px; }
+.pty-owl { width: 92px; height: 72px; object-fit: contain; margin-bottom: 2px; filter: drop-shadow(0 6px 14px rgba(255,45,85,.35)); }
+.pty-titulo {
+  font-family: var(--font-h); font-weight: 800; font-size: 24px; letter-spacing: .04em; text-transform: uppercase;
+  color: #fff; text-shadow: 0 3px 0 #000;
+}
+.pty-subtitulo {
+  font-size: 11px; font-weight: 800; letter-spacing: .22em; text-transform: uppercase;
+  color: var(--pty-vermelho); margin-top: -6px;
+}
+.pty-desc { font-size: 13px; color: var(--pty-mudo); line-height: 1.5; max-width: 310px; }
 
-/* Botão principal (gradiente rosa/dourado, mesmo estilo do st-btn) */
+/* Botão principal: placa amarela de perigo */
 .pty-btn {
-  font-family: var(--font-h); font-weight: 800; font-size: 15px;
-  color: #fff; cursor: pointer;
-  padding: 13px 30px; border-radius: 999px; border: none;
-  background: linear-gradient(135deg, #ec4899, #f59e0b);
+  font-family: var(--font-h); font-weight: 800; font-size: 15px; letter-spacing: .06em; text-transform: uppercase;
+  color: #111; cursor: pointer;
+  padding: 14px 30px; border-radius: 10px; border: none;
+  background: var(--pty-amarelo);
+  box-shadow: inset 0 -4px 0 rgba(0,0,0,.25), 0 4px 0 #000, 0 0 22px rgba(245,197,24,.18);
   -webkit-tap-highlight-color: transparent;
-  transition: transform .1s, filter .15s, opacity .15s;
-  box-shadow: 0 4px 14px rgba(236,72,153,.35);
+  transition: transform .08s, filter .15s, opacity .15s;
   width: 100%; max-width: 300px;
 }
-.pty-btn:active { transform: scale(.96); }
-.pty-btn:disabled { opacity: .45; filter: grayscale(.3); cursor: not-allowed; }
+.pty-btn:active { transform: translateY(3px); box-shadow: inset 0 -2px 0 rgba(0,0,0,.25), 0 1px 0 #000; }
+.pty-btn:disabled { opacity: .4; filter: grayscale(.6); cursor: not-allowed; }
 .pty-btn-alt {
-  background: var(--surface2, var(--surface));
-  color: var(--text); border: 1px solid var(--border);
+  background: var(--pty-aco-2); color: var(--pty-texto); border: 1px solid var(--pty-borda);
   box-shadow: none;
 }
 .pty-link {
-  margin-top: 2px; background: none; border: none; color: var(--muted);
+  margin-top: 2px; background: none; border: none; color: var(--pty-mudo);
   font-size: 12.5px; text-decoration: underline; cursor: pointer; padding: 6px;
 }
 
 /* ── Menu: criar / entrar ─────────────────────────────────────── */
+.pty-catalogo { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 330px; margin: 2px 0 4px; }
+.pty-cat-item {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 700; color: #cfd6de;
+  padding: 5px 9px; border-radius: 6px; background: var(--pty-aco-2); border: 1px solid var(--pty-borda);
+}
 .pty-opcoes { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; margin-top: 6px; }
 .pty-privada-toggle {
-  display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted);
+  display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--pty-mudo);
   justify-content: center; margin-top: 2px; cursor: pointer;
 }
 .pty-divisor {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+  font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .14em; color: var(--pty-mudo);
   width: 100%; max-width: 300px; margin-top: 10px;
   display: flex; align-items: center; gap: 8px;
 }
-.pty-divisor::before, .pty-divisor::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.pty-divisor::before, .pty-divisor::after { content: ''; flex: 1; height: 1px; background: var(--pty-borda); }
 .pty-lista-salas { width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 6px; max-height: 130px; overflow-y: auto; }
-.pty-lista-vazia { font-size: 12px; color: var(--muted); padding: 8px 0; }
+.pty-lista-vazia { font-size: 12px; color: var(--pty-mudo); padding: 8px 0; }
 .pty-sala-item {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border);
-  background: var(--surface2, var(--surface)); color: var(--text);
+  padding: 10px 12px; border-radius: 8px; border: 1px solid var(--pty-borda);
+  background: var(--pty-aco-2); color: var(--pty-texto);
   font-size: 13px; cursor: pointer;
 }
-.pty-sala-item-cta { font-weight: 800; color: #ec4899; font-size: 12px; }
+.pty-sala-item-cta { font-weight: 800; color: var(--pty-amarelo); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
 .pty-entrar-wrap { display: flex; gap: 8px; width: 100%; max-width: 300px; }
 .pty-codigo-input {
-  flex: 1; text-align: center; letter-spacing: .2em; text-transform: uppercase;
-  font-family: var(--font-h); font-weight: 800; font-size: 16px;
-  padding: 11px 8px; border-radius: 10px; border: 1px solid var(--border);
-  background: var(--surface2, var(--surface)); color: var(--text);
+  flex: 1; min-width: 0; text-align: center; letter-spacing: .3em; text-transform: uppercase;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-weight: 800; font-size: 18px;
+  padding: 11px 8px; border-radius: 8px; border: 1px solid var(--pty-borda);
+  background: #0b0d10; color: var(--pty-amarelo);
 }
 .pty-btn-entrar-mini {
-  font-family: var(--font-h); font-weight: 800; font-size: 13px; color: #fff;
-  padding: 0 18px; border-radius: 10px; border: none;
-  background: linear-gradient(135deg, #ec4899, #f59e0b); cursor: pointer;
+  font-family: var(--font-h); font-weight: 800; font-size: 13px; color: #111; text-transform: uppercase;
+  padding: 0 18px; border-radius: 8px; border: none;
+  background: var(--pty-amarelo); cursor: pointer; box-shadow: inset 0 -3px 0 rgba(0,0,0,.25);
 }
-.pty-menu-erro { font-size: 12.5px; color: #ff4444; }
+.pty-menu-erro { font-size: 12.5px; color: #ff6b81; }
+
+/* ── Avatar (cor do jogador) ──────────────────────────────────── */
+.pty-av {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 24px; height: 24px; border-radius: 50%; font-size: 13px; line-height: 1;
+  background: #0b0d10; box-shadow: 0 0 0 2px var(--pty-cor, #888), 0 0 10px color-mix(in srgb, var(--pty-cor, #888) 50%, transparent);
+  margin-right: 7px; vertical-align: middle;
+}
 
 /* ── Lobby ─────────────────────────────────────────────────────── */
-.pty-lobby-codigo-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 4px 0; }
-.pty-lobby-codigo-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.pty-lobby-codigo-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 4px 0;
+  padding: 10px 22px 8px; border-radius: 10px; background: #0b0d10; border: 1px solid var(--pty-borda);
+}
+.pty-lobby-codigo-label { font-size: 10.5px; font-weight: 800; color: var(--pty-mudo); text-transform: uppercase; letter-spacing: .16em; }
 .pty-lobby-codigo {
-  font-family: var(--font-h); font-weight: 800; font-size: 34px; letter-spacing: .15em;
-  color: #ec4899; text-shadow: 0 2px 10px rgba(236,72,153,.35);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-weight: 800; font-size: 38px; letter-spacing: .2em;
+  color: var(--pty-amarelo); text-shadow: 0 0 14px rgba(245,197,24,.4);
 }
 .pty-jogador-chip {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border);
-  background: var(--surface2, var(--surface)); color: var(--text);
-  font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center;
+  padding: 6px 12px 6px 6px; border-radius: 999px; border: 1px solid var(--pty-borda);
+  background: var(--pty-aco-2); color: var(--pty-texto);
+  font-size: 13px; font-weight: 700;
 }
-.pty-jogador-chip.pty-jogador-pronto { border-color: #4ade80; }
+.pty-jogador-chip.pty-jogador-pronto { border-color: var(--pty-verde); }
 .pty-badge-anfitriao {
-  font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
-  color: #f59e0b; border: 1px solid rgba(245,158,11,.4); border-radius: 999px; padding: 1px 6px;
+  margin-left: 6px;
+  font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--pty-amarelo); border: 1px solid rgba(245,197,24,.45); border-radius: 4px; padding: 1px 5px;
 }
-#pty-lobby-jogadores { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 320px; }
-.pty-lobby-contador { font-size: 12px; color: var(--muted); }
+#pty-lobby-jogadores { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 330px; }
+.pty-lobby-contador { font-size: 12px; color: var(--pty-mudo); }
 .pty-rodadas-escolha { display: flex; flex-direction: column; gap: 6px; align-items: center; margin-top: 4px; }
-.pty-rodadas-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.pty-rodadas-label { font-size: 10.5px; font-weight: 800; color: var(--pty-mudo); text-transform: uppercase; letter-spacing: .14em; }
 .pty-rodadas-chips { display: flex; gap: 6px; }
 .pty-rodadas-chip {
-  font-family: var(--font-h); font-weight: 800; font-size: 13px;
-  width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border);
-  background: var(--surface2, var(--surface)); color: var(--text); cursor: pointer;
+  font-family: var(--font-h); font-weight: 800; font-size: 14px;
+  width: 38px; height: 38px; border-radius: 8px; border: 1px solid var(--pty-borda);
+  background: var(--pty-aco-2); color: var(--pty-texto); cursor: pointer;
 }
-.pty-rodadas-chip.pty-rodadas-ativa { background: linear-gradient(135deg, #ec4899, #f59e0b); color: #fff; border-color: transparent; }
+.pty-rodadas-chip.pty-rodadas-ativa { background: var(--pty-amarelo); color: #111; border-color: transparent; box-shadow: inset 0 -3px 0 rgba(0,0,0,.25); }
 
-/* ── Countdown ─────────────────────────────────────────────────── */
-.pty-countdown-jogo { font-size: 13px; color: var(--muted); }
+/* ── Cartão da Máquina (antes de cada rodada) ─────────────────── */
+.pty-maq-rodada {
+  font-size: 11px; font-weight: 800; letter-spacing: .24em; text-transform: uppercase; color: var(--pty-vermelho);
+}
+.pty-maq-cartao {
+  width: 100%; max-width: 320px; padding: 22px 18px 18px; border-radius: 14px;
+  background: linear-gradient(#22272e, #15181c); border: 2px solid #3a414a;
+  box-shadow: 0 0 0 4px #0b0d10, 0 14px 30px rgba(0,0,0,.5);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  position: relative; overflow: hidden;
+}
+.pty-maq-cartao::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 5px;
+  background: repeating-linear-gradient(-45deg, var(--pty-amarelo) 0 7px, #111 7px 14px);
+}
+.pty-maq-icone { font-size: 46px; line-height: 1; filter: drop-shadow(0 4px 0 rgba(0,0,0,.5)); }
+.pty-countdown-jogo {
+  font-family: var(--font-h); font-weight: 800; font-size: 26px; line-height: 1.1; color: #fff;
+  letter-spacing: .02em; text-transform: uppercase; min-height: 30px;
+}
+.pty-maq-regra { font-size: 14px; line-height: 1.45; color: #cfd6de; min-height: 40px; opacity: 0; transform: translateY(6px); transition: opacity .3s, transform .3s; }
+.pty-maq-controle {
+  font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  color: #111; background: var(--pty-amarelo); padding: 4px 10px; border-radius: 4px;
+  opacity: 0; transition: opacity .3s .1s;
+}
+.pty-cartao-pronto { animation: ptyCartaoBate .45s ease; border-color: var(--pty-amarelo); }
+.pty-cartao-pronto .pty-maq-regra { opacity: 1; transform: none; }
+.pty-cartao-pronto .pty-maq-controle { opacity: 1; }
+@keyframes ptyCartaoBate { 0% { transform: scale(1.06); } 60% { transform: scale(.98); } 100% { transform: none; } }
+
 .pty-countdown-num {
-  font-family: var(--font-h); font-weight: 800; font-size: 88px; line-height: 1;
-  background: linear-gradient(135deg, #ec4899, #f59e0b);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
+  font-family: var(--font-h); font-weight: 800; font-size: 84px; line-height: 1; min-height: 84px;
+  color: var(--pty-amarelo); text-shadow: 0 5px 0 #000, 0 0 30px rgba(245,197,24,.4);
 }
 .pty-countdown-pulse { animation: ptyCountPulse .5s ease; }
 @keyframes ptyCountPulse {
@@ -160,39 +219,76 @@ body.games-fs-open .pty-card {
   50% { transform: scale(1.15); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
-/* "Vai!" — último frame do countdown, cor distinta pra marcar o início */
-.pty-countdown-num.pty-countdown-vai {
-  background: linear-gradient(135deg, #4ade80, #f59e0b);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  font-size: 64px;
-}
+.pty-countdown-num.pty-countdown-vai { color: var(--pty-verde); text-shadow: 0 5px 0 #000, 0 0 30px rgba(74,222,128,.5); font-size: 64px; }
 
-/* ── Arena (hospeda minigames "container" como o Puff) ───────────── */
+/* ── Arena (hospeda minigames "container") ───────────────────── */
 .pty-sub#pty-arena { padding: 0; }
 #pty-arena-container { width: 100%; flex: 1; display: flex; }
 
+/* ── Faixa dos rivais (criada por party.js no <body>) ─────────── */
+#pty-rivais {
+  position: fixed; left: 0; right: 0; top: 0; z-index: 39;
+  display: none; flex-direction: column; align-items: center; gap: 4px;
+  padding: calc(env(safe-area-inset-top, 0px) + 5px) 60px 0; pointer-events: none;
+}
+body.angatuba-party-ativo #pty-rivais { display: flex; }
+.pty-rivais-lista { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.pty-rival {
+  display: inline-flex; align-items: center; gap: 5px;
+  font: 800 11px/1 var(--font-b, system-ui, sans-serif); color: #fff;
+  padding: 4px 8px 4px 5px; border-radius: 999px; background: rgba(10,12,15,.82); border: 1px solid var(--pty-cor, #888);
+  transition: opacity .3s, filter .3s;
+}
+.pty-rival i { width: 8px; height: 8px; border-radius: 50%; background: var(--pty-cor, #888); box-shadow: 0 0 6px var(--pty-cor, #888); animation: mqRivalVivo 1s ease-in-out infinite; }
+@keyframes mqRivalVivo { 50% { opacity: .35; } }
+.pty-rival.pty-rival-fora { opacity: .55; filter: grayscale(1); text-decoration: line-through; }
+.pty-rival.pty-rival-fora i { animation: none; background: #555; box-shadow: none; }
+.pty-rivais-aviso {
+  font: 800 13px/1 var(--font-h, system-ui); color: #fff; letter-spacing: .02em;
+  padding: 6px 12px; border-radius: 6px; background: rgba(255,45,85,.92); box-shadow: 0 4px 14px rgba(0,0,0,.4);
+  opacity: 0; transform: translateY(-6px);
+  margin-top: 64px; /* abaixo do HUD dos minigames (pontos/título/tempo) */
+}
+.pty-rivais-aviso.pty-rivais-aviso-on { animation: ptyAvisoRival 2.2s ease forwards; }
+@keyframes ptyAvisoRival {
+  0% { opacity: 0; transform: translateY(-6px) scale(.9); }
+  10%, 80% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
 /* ── Aguardando outros jogadores ──────────────────────────────── */
-#pty-aguardando-lista { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 320px; }
+#pty-aguardando-lista { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 330px; }
 .pty-spinner {
-  width: 34px; height: 34px; border-radius: 50%;
-  border: 3px solid var(--border); border-top-color: #ec4899;
-  animation: ptySpin 1s linear infinite;
+  width: 46px; height: 46px; border-radius: 50%;
+  border: 6px dashed #3a414a; border-top-color: var(--pty-amarelo);
+  animation: ptySpin 1.6s linear infinite;
 }
 @keyframes ptySpin { to { transform: rotate(360deg); } }
 
 /* ── Resultado da rodada ──────────────────────────────────────── */
-#pty-resultado-lista { width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 6px; }
+#pty-resultado-lista { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 6px; }
 .pty-resultado-item {
-  display: grid; grid-template-columns: 28px 1fr auto auto; gap: 8px; align-items: center;
-  padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border);
-  background: var(--surface2, var(--surface));
+  display: grid; grid-template-columns: 30px 1fr auto auto; gap: 8px; align-items: center;
+  padding: 9px 12px; border-radius: 10px; border: 1px solid var(--pty-borda);
+  background: var(--pty-aco-2);
+  animation: ptyRevela .45s cubic-bezier(.2,1.4,.4,1) both;
 }
-.pty-resultado-pos { font-size: 16px; text-align: center; }
-.pty-resultado-nome { font-size: 13px; color: var(--text); font-weight: 600; text-align: left; }
-.pty-resultado-score { font-size: 12px; color: var(--muted); }
-.pty-resultado-pts { font-family: var(--font-h); font-weight: 800; font-size: 13px; color: #4ade80; }
-#pty-resultado-geral { width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
-.pty-geral-item { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); padding: 2px 4px; }
+.pty-resultado-1 { border-color: var(--pty-amarelo); background: linear-gradient(90deg, rgba(245,197,24,.16), var(--pty-aco-2)); animation-name: ptyRevelaCarimbo; }
+.pty-resultado-eu { box-shadow: inset 3px 0 0 var(--pty-vermelho); }
+@keyframes ptyRevela { 0% { opacity: 0; transform: translateX(-18px); } 100% { opacity: 1; transform: none; } }
+@keyframes ptyRevelaCarimbo { 0% { opacity: 0; transform: scale(1.4); } 70% { opacity: 1; transform: scale(.97); } 100% { transform: none; } }
+.pty-resultado-pos { font-size: 17px; text-align: center; }
+.pty-resultado-nome { font-size: 13px; color: var(--pty-texto); font-weight: 700; text-align: left; display: flex; align-items: center; min-width: 0; }
+.pty-resultado-score { font-size: 12px; color: var(--pty-mudo); font-variant-numeric: tabular-nums; }
+.pty-resultado-pts { font-family: var(--font-h); font-weight: 800; font-size: 14px; color: var(--pty-verde); }
+#pty-resultado-geral { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.pty-geral-item { display: grid; grid-template-columns: auto 74px 1fr 34px; align-items: center; gap: 6px; font-size: 12px; color: var(--pty-texto); }
+.pty-geral-item .pty-av { width: 20px; height: 20px; font-size: 11px; margin-right: 0; }
+.pty-geral-nome { text-align: left; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pty-geral-barra { height: 8px; border-radius: 4px; background: #0b0d10; overflow: hidden; }
+.pty-geral-barra i { display: block; height: 100%; border-radius: 4px; animation: ptyBarra .9s ease .9s both; transform-origin: left; }
+@keyframes ptyBarra { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.pty-geral-pts { font-family: var(--font-h); font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ── Campeão / pódio ──────────────────────────────────────────── */
 .pty-campeao-titulo-anim { animation: ptyCampeaoTitulo .6s ease; }
@@ -201,14 +297,13 @@ body.games-fs-open .pty-card {
   60% { transform: scale(1.08) translateY(0); opacity: 1; }
   100% { transform: scale(1) translateY(0); opacity: 1; }
 }
-#pty-campeao-podio { width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 8px; }
+#pty-campeao-podio { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 8px; }
 .pty-podio-item {
-  display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center;
-  padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border);
-  background: var(--surface2, var(--surface));
+  display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; align-items: center;
+  padding: 10px 14px; border-radius: 12px; border: 1px solid var(--pty-borda);
+  background: var(--pty-aco-2);
   animation: ptyPodioEntrada .4s ease both;
 }
-/* Entrada escalonada — 1º, 2º, 3º... aparecem em sequência rápida */
 .pty-podio-item:nth-child(1) { animation-delay: .05s; }
 .pty-podio-item:nth-child(2) { animation-delay: .15s; }
 .pty-podio-item:nth-child(3) { animation-delay: .25s; }
@@ -218,43 +313,46 @@ body.games-fs-open .pty-card {
   100% { transform: translateY(0); opacity: 1; }
 }
 .pty-podio-1 {
-  border-color: #f59e0b; background: linear-gradient(135deg, rgba(245,158,11,.14), transparent);
+  border-color: var(--pty-amarelo); background: linear-gradient(135deg, rgba(245,197,24,.18), var(--pty-aco-2));
   animation: ptyPodioEntrada .4s ease both, ptyPodio1Brilho 1.8s ease-in-out .5s infinite;
 }
 @keyframes ptyPodio1Brilho {
-  0%, 100% { box-shadow: 0 0 0 rgba(245,158,11,0); }
-  50% { box-shadow: 0 0 14px rgba(245,158,11,.45); }
+  0%, 100% { box-shadow: 0 0 0 rgba(245,197,24,0); }
+  50% { box-shadow: 0 0 16px rgba(245,197,24,.45); }
 }
-.pty-podio-medalha { font-size: 18px; }
-.pty-podio-nome { font-size: 14px; font-weight: 700; color: var(--text); text-align: left; }
-.pty-podio-pts { font-family: var(--font-h); font-weight: 800; font-size: 13px; color: #f59e0b; }
+.pty-podio-medalha { font-size: 19px; }
+.pty-podio-nome { font-size: 14px; font-weight: 800; color: var(--pty-texto); text-align: left; display: flex; align-items: center; min-width: 0; }
+.pty-podio-pts { font-family: var(--font-h); font-weight: 800; font-size: 14px; color: var(--pty-amarelo); }
 
-/* Esconde o botão "← Voltar aos jogos" de qualquer jogo da pool
-   enquanto uma rodada de Party está rolando — evita que o jogador
-   fuja da rodada pela navegação normal do jogo solo (ver
-   document.body.classList em party.js: _iniciarRodadaLocal/
-   reportarResultado). Usar a controle própria da Party pra sair. */
+/* Esconde o "← Voltar aos jogos" de qualquer jogo da pool enquanto uma
+   rodada de Party está rolando — evita fugir da rodada pela navegação
+   do jogo solo. Usar a controle própria da Party pra sair. */
 body.angatuba-party-ativo .jogo-voltar { display: none !important; }
 
 /* ── Lobby: escolha do jogo da sala (modos) ──────────────────────
    Chips desenhados por _renderModos (party.js) a partir de MODOS. Só o
    anfitrião toca; pros outros os chips ficam desabilitados, mas o
-   ativo continua destacado (é assim que sabem o que vem por aí). */
-.pty-modo-escolha { display: flex; flex-direction: column; gap: 6px; align-items: center; width: 100%; max-width: 320px; margin-top: 4px; }
+   ativo continua destacado. */
+.pty-modo-escolha { display: flex; flex-direction: column; gap: 6px; align-items: center; width: 100%; max-width: 330px; margin-top: 4px; }
 .pty-modo-chips { display: flex; gap: 8px; width: 100%; }
 .pty-modo-chip {
-  flex: 1; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 8px 10px; border-radius: 12px; border: 1px solid var(--border);
-  background: var(--surface2, var(--surface)); color: var(--text);
+  flex: 1; min-height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 10px; border-radius: 10px; border: 1px solid var(--pty-borda);
+  background: var(--pty-aco-2); color: var(--pty-texto);
   font-family: var(--font-h); font-weight: 800; font-size: 13.5px; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .pty-modo-chip:disabled { cursor: default; opacity: .6; }
 .pty-modo-chip.pty-modo-ativo {
-  background: linear-gradient(135deg, #ec4899, #f59e0b); color: #fff; border-color: transparent; opacity: 1;
+  background: var(--pty-amarelo); color: #111; border-color: transparent; opacity: 1;
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.25);
 }
 .pty-modo-emoji { font-size: 17px; line-height: 1; }
-.pty-modo-desc { font-size: 12px; color: var(--muted); line-height: 1.45; max-width: 300px; }
+.pty-modo-desc { font-size: 12px; color: var(--pty-mudo); line-height: 1.45; max-width: 310px; }
 
-/* Moedas da partida no pódio (só modos que pagam, ex.: Hex Arena) */
-.pty-campeao-moedas { font-family: var(--font-h); font-weight: 800; font-size: 18px; color: #f59e0b; }
+/* Moedas da Party no pódio (pegas nos minigames + bônus do pódio, ou o que o módulo pagou) */
+.pty-campeao-moedas { font-family: var(--font-h); font-weight: 800; font-size: 18px; color: #ffd23f; text-shadow: 0 2px 0 #000; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pty-resultado-item, .pty-podio-item, .pty-geral-barra i, .pty-cartao-pronto, .pty-rival i { animation: none !important; }
+}

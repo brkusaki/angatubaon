@@ -73,28 +73,60 @@
   // forcarFimParty em sequencia.js/piano.js). "duracaoSeg" é só a
   // estimativa usada no timeout de segurança do host (reportar 0 se nem
   // isso responder) — por isso fica um pouco maior que o tetoSeg.
+  // Cada entrada também carrega o "cartão da Máquina" que aparece antes
+  // da rodada (regra de sobrevivência + controle + ícone) e um "peso" no
+  // sorteio: os minigames da Máquina (estilo Machine Party) saem mais que
+  // os jogos solo reaproveitados. "eliminacao": quem termina antes do
+  // tempo é porque MORREU — a faixa de rivais mostra "caiu" em vez de
+  // "terminou".
   var POOL = [
     {
-      chave: 'speedtap', nome: 'Pega a Coruja', duracaoSeg: 25,
+      chave: 'laminas', nome: 'Lâminas', duracaoSeg: 38, peso: 3, eliminacao: true, icone: '🪚',
+      regra: 'Serras quicando pela sala. Não deixe nenhuma te encostar.', controle: 'Arraste o dedo',
+      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 35, seed, 'laminas'); }
+    },
+    {
+      chave: 'escada', nome: 'Escada Errada', duracaoSeg: 43, peso: 3, eliminacao: true, icone: '⬆️',
+      regra: 'Aperte a seta do degrau de cima pra subir. A prensa está logo atrás.', controle: 'Botões de seta',
+      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 40, seed, 'escada'); }
+    },
+    {
+      chave: 'piso', nome: 'Piso Falso', duracaoSeg: 48, peso: 3, eliminacao: true, icone: '🔷',
+      regra: 'Quando a sirene tocar, esteja num piso com o símbolo do painel.', controle: 'Toque no piso',
+      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 45, seed, 'piso'); }
+    },
+    {
+      chave: 'esteira', nome: 'A Esteira', duracaoSeg: 38, peso: 3, eliminacao: true, icone: '🔥',
+      regra: 'Quadro vai pro fogo (toque nele). Peça deixa passar. 3 erros e a máquina trava.', controle: 'Toque nos quadros',
+      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 35, seed, 'esteira'); }
+    },
+    {
+      chave: 'puff', nome: 'Puff da Coruja', duracaoSeg: 28, peso: 2, icone: '💨',
+      regra: 'Segure pra encher o peito e solte antes de tossir. Mais puffs vence.', controle: 'Segure e solte',
+      iniciar: function (seed) { return _iniciarJogoContainer('puff', 28, seed); }
+    },
+    {
+      chave: 'ervilhas', nome: 'Ervilhas da Coruja', duracaoSeg: 42, peso: 2, icone: '🫛',
+      regra: 'Coma as ervilhas sem a Chefe ver. Ela olhou, congele.', controle: 'Espetar e comer',
+      iniciar: function (seed) { return _iniciarJogoContainer('ervilhas', 38, seed); }
+    },
+    {
+      chave: 'speedtap', nome: 'Pega a Coruja', duracaoSeg: 25, peso: 1, icone: '👆',
+      regra: 'Toque nas corujas que aparecem. A mais rápida vence.', controle: 'Toque rápido',
       iniciar: function () { return _iniciarJogoTela('speedtap', ['classico']); }
     },
     {
-      chave: 'sequencia', nome: 'Sequência da Coruja', duracaoSeg: 60,
+      chave: 'sequencia', nome: 'Sequência da Coruja', duracaoSeg: 60, peso: 1, eliminacao: true, icone: '🧠',
+      regra: 'Repita a sequência. Errou, está fora.', controle: 'Toque na ordem',
       iniciar: function () { return _iniciarJogoTela('sequencia', [], 50); }
     },
     {
-      chave: 'piano', nome: 'Piano da Coruja', duracaoSeg: 60,
+      chave: 'piano', nome: 'Piano da Coruja', duracaoSeg: 60, peso: 1, eliminacao: true, icone: '🎹',
+      regra: 'Toque só nas teclas pretas. Errou ou deixou passar, está fora.', controle: 'Toque nas teclas',
       iniciar: function () { return _iniciarJogoTela('piano', ['sobrevivencia'], 50); }
-    },
-    {
-      chave: 'puff', nome: 'Puff da Coruja', duracaoSeg: 28,
-      iniciar: function () { return _iniciarJogoContainer('puff', 28); }
-    },
-    {
-      chave: 'ervilhas', nome: 'Ervilhas da Coruja', duracaoSeg: 42,
-      iniciar: function () { return _iniciarJogoContainer('ervilhas', 38); }
     }
   ];
+  var APRESENTACAO_MS = 2600; // o cartão da Máquina fica sozinho na tela antes do 3-2-1
   function _poolPorChave(chave) {
     for (var i = 0; i < POOL.length; i++) if (POOL[i].chave === chave) return POOL[i];
     return null;
@@ -139,6 +171,8 @@
   var _modoListeners = [];     // escutas abertas pelo módulo — saem junto com ele, não com a sala
   var _modoEmAndamento = false;
   var _recompensaModo = null;  // moedas que o módulo pagou nesta partida (mostra no pódio)
+  var _moedasSessao = 0;       // moedas pegas nos minigames desta Party (mostra no pódio)
+  var _podioPagoChave = null;  // evita pagar o bônus do pódio 2x (o 'campeao' re-emite a cada snapshot)
 
   function disponivel() {
     return typeof firebase !== 'undefined' && !!firebase.database && !!firebase.auth;
@@ -332,7 +366,7 @@
     // comecarParty() punha rodadaAtual = 1 de novo, _rodadaVistaEm ainda
     // valia 1 da revanche anterior, a comparação abaixo dava "igual" e o
     // minigame nunca abria — todo mundo ficava olhando o lobby.
-    if (sala.status === 'lobby') { _rodadaVistaEm = -1; _modoSeedVisto = null; _recompensaModo = null; }
+    if (sala.status === 'lobby') { _rodadaVistaEm = -1; _modoSeedVisto = null; _recompensaModo = null; _moedasSessao = 0; }
     // Saiu do jogo-módulo (pódio, revanchinha): desmonta ele aqui.
     if (sala.status !== 'modo' && _modoEmAndamento) _pararModo();
 
@@ -444,7 +478,7 @@
     document.body.classList.add('angatuba-party-ativo');
     _emit('countdown', { jogo: entry, sala: sala });
 
-    _contagemRegressiva(3, function () {
+    _apresentarEContar(function () {
       // Sair da sala durante o "3...2...1..." cancela a contagem (ver
       // sair()), mas ainda assim confere aqui: sem isto, o minigame podia
       // abrir por cima de qualquer tela em que a pessoa estivesse (A2.6).
@@ -481,7 +515,7 @@
     _modoEmAndamento = true;
     _recompensaModo = null;
     _emit('countdown', { jogo: modo, sala: sala });
-    _contagemRegressiva(3, function () {
+    _apresentarEContar(function () {
       if (!_modoEmAndamento || !_salaRef) return;
       _mostrarTelaJogo('party');
       _emit('mostrarArena');
@@ -537,6 +571,13 @@
     _salaRef.update(updates).catch(function () {});
   }
 
+  // Cartão da Máquina (nome + regra) sozinho na tela por um instante, e
+  // só então o 3-2-1. O mesmo _contagemHandle cobre as duas esperas,
+  // então sair() cancela as duas (ver A2.6).
+  function _apresentarEContar(aoFim) {
+    _contagemHandle = setTimeout(function () { _contagemRegressiva(3, aoFim); }, APRESENTACAO_MS);
+  }
+
   function _contagemRegressiva(n, aoFim) {
     // Desce até n=0 (emite o "Vai!") antes de chamar aoFim — antes o
     // contador pulava de "1" direto pro jogo, sem mostrar o "Vai!"
@@ -586,7 +627,7 @@
 
   /* ── Mostra a tela do próprio Party (arena) e deixa o minigame
      "container" desenhar tudo dentro do container que ela expõe. ── */
-  function _iniciarJogoContainer(nome, duracaoSeg) {
+  function _iniciarJogoContainer(nome, duracaoSeg, seed, variante) {
     _mostrarTelaJogo('party');
     _emit('mostrarArena');
     return window._jogoLoader(nome).then(function (api) {
@@ -598,6 +639,11 @@
       if (typeof api.render !== 'function') throw new Error('Módulo ' + nome + ' não expõe render().');
       api.render(container, {
         duracaoSeg: duracaoSeg,
+        // Mesma semente pra sala inteira: a armadilha sai igual em todos
+        // os celulares (ver o cabeçalho de Jogos/maquina.js).
+        seed: seed,
+        jogo: variante,
+        onMoedas: function (qtd) { _moedasSessao += Math.max(0, Math.floor(Number(qtd) || 0)); },
         onFim: function (score) { reportarResultado(score); }
       });
       return api;
@@ -671,10 +717,14 @@
     _salaRef.child('modo').set(chave).catch(function () {});
   }
 
+  // Sorteio com peso (ver "peso" na POOL), nunca o mesmo duas vezes seguidas.
   function _sortearProximoJogo() {
     var opcoes = POOL.filter(function (j) { return j.chave !== _ultimoJogoUsado; });
     if (!opcoes.length) opcoes = POOL;
-    var escolhido = opcoes[Math.floor(Math.random() * opcoes.length)];
+    var total = 0;
+    opcoes.forEach(function (j) { total += (j.peso || 1); });
+    var r = Math.random() * total, escolhido = opcoes[opcoes.length - 1];
+    for (var i = 0; i < opcoes.length; i++) { r -= (opcoes[i].peso || 1); if (r < 0) { escolhido = opcoes[i]; break; } }
     _ultimoJogoUsado = escolhido.chave;
     return escolhido.chave;
   }
@@ -811,7 +861,7 @@
     _rodadaEmAndamento = false; _rodadaVistaEm = -1;
     _apiAtual = null;
     _reentrando = false; _tentativasReentrada = 0; // ver _reentrarNoLobbySePreciso
-    _modoSeedVisto = null; _recompensaModo = null;
+    _modoSeedVisto = null; _recompensaModo = null; _moedasSessao = 0;
   }
 
   function estado() { return _sala; }
@@ -876,7 +926,18 @@
   // ter vindo do fluxo normal de criarSala() — descarta em vez de renderizar.
   function _ptyCodigoValido(c) { return /^[A-Z0-9]{4}$/.test(c || ''); }
 
+  // Catálogo da Máquina no menu: os minigames que podem cair na roleta.
+  function _renderCatalogo() {
+    var el = _q('pty-catalogo');
+    if (!el || el.getAttribute('data-ok')) return;
+    el.innerHTML = POOL.filter(function (j) { return (j.peso || 1) >= 2; }).map(function (j) {
+      return '<span class="pty-cat-item"><span>' + j.icone + '</span>' + _escHTML(j.nome) + '</span>';
+    }).join('');
+    el.setAttribute('data-ok', '1');
+  }
+
   function _ptyPreparar() {
+    _renderCatalogo();
     _erroMenu('');
     var input = _q('pty-codigo-input'); if (input) input.value = '';
     _mostrarSub('menu');
@@ -1019,6 +1080,69 @@
   }
   window._ptyVoltarHubFinal = _ptyVoltarHubFinal;
 
+  /* ── Cor e avatar de cada jogador ─────────────────────────────────
+     A ordem é a dos uids (igual em todos os aparelhos), então a mesma
+     pessoa tem a mesma cor no lobby, na faixa de rivais e no placar. */
+  var CORES_JOGADOR = ['#ff4d6d', '#38bdf8', '#4ade80', '#facc15'];
+  var BONUS_PODIO = [30, 15, 8, 4]; // moedas no fim da Party, por lugar
+  function _ptyCor(sala, uid) {
+    var uids = Object.keys((sala && sala.jogadores) || {}).sort();
+    var i = uids.indexOf(uid);
+    return CORES_JOGADOR[(i < 0 ? 0 : i) % CORES_JOGADOR.length];
+  }
+  function _ptyAvatar(sala, uid) {
+    return '<span class="pty-av" style="--pty-cor:' + _ptyCor(sala, uid) + '">🦉</span>';
+  }
+
+  /* ── Faixa dos rivais (durante a rodada) ──────────────────────────
+     Fica no topo da tela por cima de QUALQUER minigame (os de tela
+     própria também), só enquanto body.angatuba-party-ativo. Não precisa
+     de nó novo no Firebase: quem reportou o resultado da rodada acabou
+     — nos minigames de eliminação, isso quer dizer que caiu. */
+  var _rivaisVistos = {};
+  var _rivaisJogo = null;
+  function _rivaisEl() {
+    var el = document.getElementById('pty-rivais');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'pty-rivais';
+      el.setAttribute('aria-live', 'polite');
+      el.innerHTML = '<div class="pty-rivais-lista"></div><div class="pty-rivais-aviso"></div>';
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function _rivaisMontar(sala, jogo) {
+    _rivaisJogo = jogo || null;
+    _rivaisVistos = {};
+    var el = _rivaisEl();
+    var meu = window.AngatubaParty.meuUid();
+    var jogadores = (sala && sala.jogadores) || {};
+    var lista = el.querySelector('.pty-rivais-lista');
+    lista.innerHTML = Object.keys(jogadores).filter(function (u) { return u !== meu; }).map(function (u) {
+      return '<span class="pty-rival" data-uid="' + _escHTML(u) + '" style="--pty-cor:' + _ptyCor(sala, u) + '">' +
+        '<i></i>' + _escHTML(String(jogadores[u].nome || 'Jogador').slice(0, 10)) + '</span>';
+    }).join('');
+    el.querySelector('.pty-rivais-aviso').classList.remove('pty-rivais-aviso-on');
+  }
+  function _rivaisAtualizar(rodada) {
+    var el = document.getElementById('pty-rivais');
+    if (!el) return;
+    var res = _resultadosCache[rodada] || {};
+    var sala = window.AngatubaParty.estado() || {};
+    var jogadores = sala.jogadores || {};
+    Object.keys(res).forEach(function (u) {
+      if (_rivaisVistos[u] || u === window.AngatubaParty.meuUid()) return;
+      _rivaisVistos[u] = true;
+      var chip = el.querySelector('.pty-rival[data-uid="' + u + '"]');
+      if (chip) chip.classList.add('pty-rival-fora');
+      var elim = _rivaisJogo && _rivaisJogo.eliminacao;
+      var aviso = el.querySelector('.pty-rivais-aviso');
+      aviso.textContent = (elim ? '💥 ' : '✔ ') + String((jogadores[u] && jogadores[u].nome) || 'Alguém').slice(0, 14) + (elim ? ' caiu!' : ' terminou');
+      aviso.classList.remove('pty-rivais-aviso-on'); void aviso.offsetWidth; aviso.classList.add('pty-rivais-aviso-on');
+    });
+  }
+
   /* ── Renderização reativa a partir dos eventos do AngatubaParty ── */
   window.AngatubaParty.on('salaMudou', function (sala) {
     var codEl = _q('pty-lobby-codigo'); if (codEl) codEl.textContent = window.AngatubaParty.codigoSala() || '';
@@ -1029,7 +1153,7 @@
       var wrap = _q('pty-lobby-jogadores');
       if (wrap) {
         wrap.innerHTML = lista.map(function (j) {
-          return '<div class="pty-jogador-chip">🦉 ' + _escHTML(j.nome) + (j.anfitriao ? ' <span class="pty-badge-anfitriao">anfitrião</span>' : '') + '</div>';
+          return '<div class="pty-jogador-chip">' + _ptyAvatar(sala, j.uid) + _escHTML(j.nome) + (j.anfitriao ? ' <span class="pty-badge-anfitriao">anfitrião</span>' : '') + '</div>';
         }).join('');
       }
       var contador = _q('pty-lobby-contador');
@@ -1055,12 +1179,49 @@
     }
   });
 
+  // Cartão da Máquina: uma roleta rápida pelos nomes da pool e para no
+  // minigame sorteado, com a regra e o controle — é o tempo de ler antes
+  // do 3-2-1 (APRESENTACAO_MS lá em cima).
+  var _roletaHandle = null;
   window.AngatubaParty.on('countdown', function (info) {
-    var nomeEl = _q('pty-countdown-jogo');
-    if (nomeEl) nomeEl.textContent = (info.jogo && info.jogo.nome) || 'Minigame surpresa';
+    var jogo = info.jogo || {}, sala = info.sala || {};
+    var nomeEl = _q('pty-countdown-jogo'), iconeEl = _q('pty-countdown-icone');
+    var regraEl = _q('pty-countdown-regra'), ctrlEl = _q('pty-countdown-controle');
+    var rodEl = _q('pty-countdown-rodada'), numEl = _q('pty-countdown-num');
+    var cartao = _q('pty-countdown-cartao');
+    if (rodEl) {
+      rodEl.textContent = (jogo.tipo === 'modulo' || !sala.rodadaAtual)
+        ? 'A Máquina escolheu'
+        : 'Rodada ' + sala.rodadaAtual + ' de ' + (sala.totalRodadas || sala.rodadaAtual);
+    }
+    if (numEl) { numEl.textContent = ''; numEl.classList.remove('pty-countdown-vai'); }
+    if (regraEl) regraEl.textContent = '';
+    if (ctrlEl) ctrlEl.textContent = '';
+    if (cartao) cartao.classList.remove('pty-cartao-pronto');
+    _rivaisMontar(sala, jogo);
     _mostrarSub('countdown');
+    if (_roletaHandle) { clearInterval(_roletaHandle); _roletaHandle = null; }
+    var giros = 0, nomes = POOL.map(function (j) { return j; });
+    function _pousar() {
+      if (nomeEl) nomeEl.textContent = jogo.nome || 'Minigame surpresa';
+      if (iconeEl) iconeEl.textContent = jogo.icone || jogo.emoji || '⚙️';
+      if (regraEl) regraEl.textContent = jogo.regra || jogo.desc || '';
+      if (ctrlEl) { ctrlEl.textContent = jogo.controle || ''; ctrlEl.style.display = jogo.controle ? '' : 'none'; }
+      if (cartao) cartao.classList.add('pty-cartao-pronto');
+      if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.nivelUp();
+    }
+    if (jogo.tipo === 'modulo') { _pousar(); return; }
+    _roletaHandle = setInterval(function () {
+      giros++;
+      var j = nomes[giros % nomes.length];
+      if (nomeEl) nomeEl.textContent = j.nome;
+      if (iconeEl) iconeEl.textContent = j.icone;
+      if (window.AngatubaGames && window.AngatubaGames.som && giros % 2) window.AngatubaGames.som.toque();
+      if (giros >= 11) { clearInterval(_roletaHandle); _roletaHandle = null; _pousar(); }
+    }, 85);
   });
   window.AngatubaParty.on('countdownTick', function (n) {
+    if (_roletaHandle) { clearInterval(_roletaHandle); _roletaHandle = null; }
     var numEl = _q('pty-countdown-num');
     if (numEl) {
       numEl.textContent = n > 0 ? n : 'Vai!';
@@ -1080,7 +1241,7 @@
   });
   window.AngatubaParty.on('resultadosMudaram', function () {
     var sala = window.AngatubaParty.estado();
-    if (sala && sala.status === 'rodada') _atualizarAguardando(sala.rodadaAtual);
+    if (sala && sala.status === 'rodada') { _atualizarAguardando(sala.rodadaAtual); _rivaisAtualizar(sala.rodadaAtual); }
   });
   function _atualizarAguardando(rodada) {
     var sala = window.AngatubaParty.estado();
@@ -1091,7 +1252,7 @@
     if (!wrap) return;
     wrap.innerHTML = Object.keys(jogadores).map(function (uid) {
       var pronto = !!resultados[uid];
-      return '<div class="pty-jogador-chip' + (pronto ? ' pty-jogador-pronto' : '') + '">🦉 ' +
+      return '<div class="pty-jogador-chip' + (pronto ? ' pty-jogador-pronto' : '') + '">' + _ptyAvatar(sala, uid) +
         _escHTML(jogadores[uid].nome) + (pronto ? ' ✅' : ' ⏳') + '</div>';
     }).join('');
   }
@@ -1104,23 +1265,36 @@
 
     var medalhas = ['🥇', '🥈', '🥉', '🎖️'];
     var listaEl = _q('pty-resultado-lista');
-    if (listaEl) {
+    // Revelação de baixo pra cima (último lugar primeiro, o vencedor por
+    // último com carimbo) — o atraso de cada linha vai no style.
+    var n = itens.length;
+    var uidsPlacar = Object.keys(placar);
+    // Chave com a semente: depois de uma revanchinha a rodada 1 volta a existir.
+    var chaveRodada = rodada + ':' + sala.seed;
+    if (listaEl && listaEl.getAttribute('data-rodada') !== chaveRodada) {
+      listaEl.setAttribute('data-rodada', chaveRodada);
       listaEl.innerHTML = itens.map(function (it, i) {
-        return '<div class="pty-resultado-item">' +
+        var uid = uidsPlacar.filter(function (u) { return placar[u] === it; })[0];
+        var eu = uid === window.AngatubaParty.meuUid();
+        return '<div class="pty-resultado-item' + (i === 0 ? ' pty-resultado-1' : '') + (eu ? ' pty-resultado-eu' : '') + '" style="animation-delay:' + ((n - 1 - i) * 0.32 + 0.1).toFixed(2) + 's">' +
           '<span class="pty-resultado-pos">' + (medalhas[i] || (i + 1) + 'º') + '</span>' +
-          '<span class="pty-resultado-nome">' + _escHTML(it.nome) + '</span>' +
+          '<span class="pty-resultado-nome">' + _ptyAvatar(sala, uid) + _escHTML(it.nome) + '</span>' +
           '<span class="pty-resultado-score">' + it.score + '</span>' +
           '<span class="pty-resultado-pts">+' + it.pontosGanhos + '</span></div>';
       }).join('');
     }
 
     var jogadores = sala.jogadores || {};
-    var geral = Object.keys(jogadores).map(function (uid) { return { nome: jogadores[uid].nome, pontosTotal: jogadores[uid].pontosTotal || 0 }; });
+    var geral = Object.keys(jogadores).map(function (uid) { return { uid: uid, nome: jogadores[uid].nome, pontosTotal: jogadores[uid].pontosTotal || 0 }; });
     geral.sort(function (a, b) { return b.pontosTotal - a.pontosTotal; });
+    var maxPts = Math.max(1, geral.length ? geral[0].pontosTotal : 1);
     var geralEl = _q('pty-resultado-geral');
     if (geralEl) {
       geralEl.innerHTML = geral.map(function (j) {
-        return '<div class="pty-geral-item"><span>' + _escHTML(j.nome) + '</span><span>' + j.pontosTotal + ' pts</span></div>';
+        return '<div class="pty-geral-item">' + _ptyAvatar(sala, j.uid) +
+          '<span class="pty-geral-nome">' + _escHTML(j.nome) + '</span>' +
+          '<span class="pty-geral-barra"><i style="width:' + Math.round(j.pontosTotal / maxPts * 100) + '%;background:' + _ptyCor(sala, j.uid) + '"></i></span>' +
+          '<span class="pty-geral-pts">' + j.pontosTotal + '</span></div>';
       }).join('');
     }
 
@@ -1139,7 +1313,7 @@
 
   window.AngatubaParty.on('campeao', function (sala) {
     var jogadores = sala.jogadores || {};
-    var geral = Object.keys(jogadores).map(function (uid) { return { nome: jogadores[uid].nome, pontosTotal: jogadores[uid].pontosTotal || 0 }; });
+    var geral = Object.keys(jogadores).map(function (uid) { return { uid: uid, nome: jogadores[uid].nome, pontosTotal: jogadores[uid].pontosTotal || 0 }; });
     geral.sort(function (a, b) { return b.pontosTotal - a.pontosTotal; });
 
     var medalhas = ['🥇', '🥈', '🥉', '🎖️'];
@@ -1149,7 +1323,7 @@
         // Lugar = 1 + quantos fizeram MAIS pontos: empatados dividem a medalha.
         var i = geral.filter(function (o) { return o.pontosTotal > j.pontosTotal; }).length;
         return '<div class="pty-podio-item pty-podio-' + (i + 1) + '"><span class="pty-podio-medalha">' + (medalhas[i] || '') + '</span>' +
-          '<span class="pty-podio-nome">' + _escHTML(j.nome) + '</span><span class="pty-podio-pts">' + j.pontosTotal + ' pts</span></div>';
+          '<span class="pty-podio-nome">' + _ptyAvatar(sala, j.uid) + _escHTML(j.nome) + '</span><span class="pty-podio-pts">' + j.pontosTotal + ' pts</span></div>';
       }).join('');
     }
     var tituloEl = _q('pty-campeao-titulo');
@@ -1164,12 +1338,28 @@
       tituloEl.classList.remove('pty-campeao-titulo-anim'); void tituloEl.offsetWidth; tituloEl.classList.add('pty-campeao-titulo-anim');
     }
 
-    // Moedas: só os modos-módulo pagam (a Hex Arena credita no próprio
-    // aparelho e conta pra cá quanto foi). Minigames seguem sem moeda.
+    // Moedas: os modos-módulo pagam sozinhos (a Hex Arena credita no
+    // próprio aparelho e conta pra cá quanto foi). No modo de minigames,
+    // somam as moedas pegas nas rodadas (já creditadas pelo maquina.js)
+    // + o bônus do pódio, pago UMA vez por Party (_podioPagoChave).
+    var bonusPodio = 0;
+    if (_modoDaSala(sala).tipo === 'pool') {
+      var meu = window.AngatubaParty.meuUid();
+      var minhaPos = -1;
+      geral.forEach(function (j, idx) { if (j.uid === meu) minhaPos = geral.filter(function (o) { return o.pontosTotal > j.pontosTotal; }).length; });
+      bonusPodio = minhaPos >= 0 ? (BONUS_PODIO[minhaPos] || 0) : 0;
+      var chavePodio = (window.AngatubaParty.codigoSala() || '') + ':' + sala.seed + ':' + sala.rodadaAtual;
+      if (bonusPodio > 0 && _podioPagoChave !== chavePodio) {
+        _podioPagoChave = chavePodio;
+        var G = window.AngatubaGames;
+        if (G && typeof G.moedasAdd === 'function') { try { G.moedasAdd(bonusPodio, 'party'); } catch (e) {} }
+      }
+    }
+    var totalMoedas = (_recompensaModo || 0) + _moedasSessao + bonusPodio;
     var moedasEl = _q('pty-campeao-moedas');
     if (moedasEl) {
-      moedasEl.textContent = _recompensaModo ? '+' + _recompensaModo + ' 🪙' : '';
-      moedasEl.style.display = _recompensaModo ? '' : 'none';
+      moedasEl.textContent = totalMoedas ? '+' + totalMoedas + ' 🪙' + (bonusPodio ? ' (pódio +' + bonusPodio + ')' : '') : '';
+      moedasEl.style.display = totalMoedas ? '' : 'none';
     }
 
     var souAnf = window.AngatubaParty.souAnfitriao();

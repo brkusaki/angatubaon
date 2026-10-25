@@ -1236,6 +1236,10 @@
     // arena hexagonal). Sem tela nem card próprios — party.js carrega via
     // window._jogoLoader('hexarena') e monta em #pty-arena-container.
     hexarena: { js: '/Jogos/hexarena.min.js', css: '/Jogos/hexarena.css', global: 'HexArenaGame' },
+    // A Máquina da Coruja: os minigames estilo Machine Party (Lâminas,
+    // Escada Errada, Piso Falso, A Esteira) num módulo só, mesmo contrato
+    // "container" do Puff — party.js chama render(container, {jogo, ...}).
+    maquina: { js: '/Jogos/maquina.min.js', css: '/Jogos/maquina.css', global: 'MaquinaGame' },
     // Blocos da Coruja e Doces da Coruja: solo com fases (não entram na
     // pool do Coruja Party). Ranking = maior fase concluída.
     blocos: { js: '/Jogos/blocos.min.js', css: '/Jogos/blocos.css', global: 'BlocosGame' },
@@ -1432,6 +1436,10 @@
     puff: [
       '/Jogos/puff.min.js', '/Jogos/puff.css',
       '/Jogos/assets/puff/puff-sheet-v2.webp'
+    ],
+    maquina: [
+      '/Jogos/maquina.min.js', '/Jogos/maquina.css',
+      '/Jogos/assets/corujinha/coruja-sheet-v2.webp', '/Jogos/assets/corujinha/sim-moeda-v2.webp'
     ],
     ervilhas: [
       '/Jogos/ervilhas.min.js', '/Jogos/ervilhas.css',
@@ -2858,7 +2866,8 @@
   var TETO_DIARIO_MOEDAS = 500;
   var LOJA_KEY_MOEDAS_DIA = 'angatuba_moedas_dia';
   var TETO_MOTIVOS_ISENTOS = { 'corujinha-premio': true, 'diario': true };
-  var TETO_MOTIVOS_SEM_TETO = { 'voo': true, 'corrida': true };
+  // 'party': moedas pegas nos minigames da Máquina + bônus do pódio (out/2026).
+  var TETO_MOTIVOS_SEM_TETO = { 'voo': true, 'corrida': true, 'party': true };
   // Resgate diário: guarda o dia civil local ('YYYY-MM-DD') do último resgate.
   // É do APARELHO (fica fora do pacote por conta em _progressoGarantirDono),
   // pra trocar de conta no mesmo celular não render um 2º resgate no dia.

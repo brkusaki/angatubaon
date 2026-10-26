@@ -62,7 +62,7 @@ body.games-fs-open .pty-card {
   min-height: 420px; box-sizing: border-box;
   flex: 1; justify-content: center; width: 100%;
 }
-.pty-owl { width: 92px; height: 72px; object-fit: contain; margin-bottom: 2px; filter: drop-shadow(0 6px 14px rgba(255,45,85,.35)); }
+.pty-owl { width: 118px; height: 107px; object-fit: contain; margin-bottom: 2px; filter: drop-shadow(0 6px 14px rgba(255,45,85,.35)); }
 .pty-titulo {
   font-family: var(--font-h); font-weight: 800; font-size: 24px; letter-spacing: .04em; text-transform: uppercase;
   color: #fff; text-shadow: 0 3px 0 #000;
@@ -193,7 +193,9 @@ body.games-fs-open .pty-card {
   content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 5px;
   background: repeating-linear-gradient(-45deg, var(--pty-amarelo) 0 7px, #111 7px 14px);
 }
-.pty-maq-icone { font-size: 46px; line-height: 1; filter: drop-shadow(0 4px 0 rgba(0,0,0,.5)); }
+.pty-maq-icone { font-size: 46px; line-height: 1; min-height: 64px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 4px 0 rgba(0,0,0,.5)); }
+.pty-ico { width: 64px; height: 64px; object-fit: contain; display: block; }
+.pty-ico-mini { width: 24px; height: 24px; }
 .pty-countdown-jogo {
   font-family: var(--font-h); font-weight: 800; font-size: 26px; line-height: 1.1; color: #fff;
   letter-spacing: .02em; text-transform: uppercase; min-height: 30px;

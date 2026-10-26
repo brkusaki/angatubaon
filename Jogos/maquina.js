@@ -24,10 +24,12 @@
    corta em 20000). Moedas coletadas na rodada vão pra carteira no
    fim (motivo 'party', sem teto — ver TETO_MOTIVOS_SEM_TETO no hub).
 
-   ARTE: tudo é desenhado no código. Quando a arte do Gemini subir em
-   /Jogos/assets/maquina/ com o nome de ARTES, ela "acende" sozinha
-   no lugar do desenho (ver _arte). Sons: /Jogos/assets/maquina/sfx/
-   <nome>-N.mp3 listados em SFX_ARQ; sem arquivo, toca o sintetizado.
+   ARTE: a arte do Gemini fica em /Jogos/assets/maquina/ (tabela ARTES) e
+   entra no lugar do desenho feito no código — que continua como reserva
+   se o arquivo não carregar (ver _arte). Cada minigame lista em "artes"
+   o que usa, e o cenário fixo é redesenhado quando tudo chega. Sons
+   gravados: /Jogos/assets/maquina/sfx/<nome>-N.mp3 (SFX_ARQ); sem o
+   arquivo, toca o sintetizado.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -41,14 +43,22 @@
   // Quando o Bruno subir, basta pôr o nome aqui (e na lista do hub).
   // Caminho começando com '/' = arte de outro jogo reaproveitada.
   var ARTES = {
-    // Sheet 3×3 da Corujinha (Master Reference): 0 parada · 1 piscando ·
-    // 2 feliz de asas abertas · 3 asas abertas · 4 asas no rosto (tonta) ·
-    // 5 assustada · 6 comemorando · 7 asas meio abertas · 8 joinha.
-    coruja: '/Jogos/assets/corujinha/coruja-sheet-v2.webp',
-    moeda: '/Jogos/assets/corujinha/sim-moeda-v2.webp'
+    // Sheet 3×3 da coruja operária (capacete amarelo): 0 parada · 1 piscando ·
+    // 2 correndo de asas abertas · 3 assustada · 4 tonta · 5 comemorando ·
+    // 6 e 7 de costas subindo (pé esquerdo / direito) · 8 amassada (X nos olhos).
+    coruja: 'coruja-sheet.webp',
+    moeda: '/Jogos/assets/corujinha/sim-moeda-v2.webp',
+    serra: 'serra.webp',                  // serra circular vista de cima
+    itens: 'itens.webp',                  // sheet 3×3: 5 quadros, engrenagem, parafuso, porca, mola
+    prensa: 'prensa.webp',                // mandíbula da prensa hidráulica
+    chao: 'chao-laminas.webp',            // chapa xadrez do piso das Lâminas
+    piso: 'piso-tile.webp'                // ladrilho do Piso Falso
   };
-  // Sons gravados disponíveis: nome -> quantas versões (nome-1.mp3 ...).
-  var SFX_ARQ = {};
+  // Sons gravados (ElevenLabs): nome -> quantas versões (nome-1.mp3 ...).
+  var SFX_ARQ = {
+    serra: 1, clank: 1, raspao: 1, alerta: 1, morte: 1, prensa: 1, passo: 1,
+    erro: 1, sirene: 1, queda: 1, fogo: 1, acerto: 1, moeda: 1, vitoria: 1
+  };
 
   var _pararAtual = null;
 
@@ -206,7 +216,7 @@
     o = o || {};
     var sheet = o.desenhada ? null : _arte('coruja');
     if (sheet) {
-      var q = o.olhos === 'x' ? 4 : o.olhos === 'medo' ? 5 : o.vitoria ? 6 : o.pisca ? 1 : (o.asa || 0) > 0.55 ? 3 : (o.asa || 0) > 0.2 ? 7 : 0;
+      var q = o.morta ? 8 : o.costas ? (o.passo ? 7 : 6) : o.olhos === 'x' ? 4 : o.olhos === 'medo' ? 3 : o.vitoria ? 5 : o.pisca ? 1 : (o.asa || 0) > 0.4 ? 2 : 0;
       var S = 3.1;
       ctx.save();
       ctx.translate(x, y);
@@ -444,7 +454,10 @@
     };
     M.coruja = _coruja; M.listras = _listras; M.chapa = _chapa; M.rebites = _rebites; M.engrenagem = _engrenagem;
     M.arte = _arte; M.desenharMoeda = _moedaDesenhar;
-    _arte('coruja'); _arte('moeda'); // já começa a carregar
+    // Já começa a carregar a arte que este minigame usa; quando tudo chega,
+    // o cenário fixo (cache) é redesenhado uma vez com a arte nova.
+    var artesJogo = ['coruja', 'moeda'].concat(jogo.artes || []), artesOk = false;
+    artesJogo.forEach(function (k) { _arte(k); });
 
     // Morreu: a armadilha pegou. score = o que fez até aqui.
     M.morrer = function (titulo, sub) {
@@ -522,6 +535,7 @@
         }
       }
       dt = Math.min(0.05, dt);
+      if (!artesOk && artesJogo.every(function (k) { return _arte(k); })) { artesOk = true; fundo = null; }
       if (M.estado === 'jogando') {
         M.t += dt;
         jogo.atualizar(dt);
@@ -616,11 +630,18 @@
     var serraSprite = {};
 
     function _spriteSerra(r) {
-      var k = r.toFixed(1) + '|' + M.s;
+      var arte = _arte('serra');
+      var k = r.toFixed(1) + '|' + M.s + (arte ? 'a' : 'd');
       if (serraSprite[k]) return serraSprite[k];
       var px = Math.ceil(r * 2.4 * M.s * 1.5), c = document.createElement('canvas');
       c.width = c.height = px;
       var g = c.getContext('2d'), sc = px / (r * 2.4);
+      if (arte) { // arte gravada: a serra (pontas dos dentes inclusas) ocupa 2.3r de 2.4r
+        g.imageSmoothingQuality = 'high';
+        var lado = px * 2.3 / 2.4, off = (px - lado) / 2;
+        g.drawImage(arte, off, off, lado, lado);
+        serraSprite[k] = c; return c;
+      }
       g.setTransform(sc, 0, 0, sc, px / 2, px / 2);
       var dentes = 14;
       g.fillStyle = '#c9d1da';
@@ -653,13 +674,20 @@
     }
 
     return {
-      chave: 'laminas', titulo: 'Lâminas', mundo: [W, H],
+      chave: 'laminas', titulo: 'Lâminas', mundo: [W, H], artes: ['serra', 'chao'],
       iniciar: function () { M.dica('Arraste pra fugir das serras', 2600); },
       fundo: function (c) {
         c.fillStyle = '#1b1e23'; c.fillRect(0, 0, W, H);
         // chapas do piso
-        for (var y = P; y < H - P; y += 16) for (var x = P; x < W - P; x += 20.25) {
-          M.chapa(c, x, y, 20.25, 16, '#2c3138', '#23272d');
+        var chao = _arte('chao');
+        if (chao) { // chapa xadrez da arte, 2 ladrilhos empilhados + véu escuro pra serra e coruja saltarem
+          var hl = (H - 2 * P) / 2;
+          c.drawImage(chao, P, P, W - 2 * P, hl + 0.2); c.drawImage(chao, P, P + hl, W - 2 * P, hl);
+          c.fillStyle = 'rgba(8,10,14,.32)'; c.fillRect(P, P, W - 2 * P, H - 2 * P);
+        } else {
+          for (var y = P; y < H - P; y += 16) for (var x = P; x < W - P; x += 20.25) {
+            M.chapa(c, x, y, 20.25, 16, '#2c3138', '#23272d');
+          }
         }
         c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 0.3;
         for (var k = 0; k < 40; k++) { // arranhões
@@ -841,7 +869,7 @@
     }
 
     return {
-      chave: 'escada', titulo: 'Escada Errada', mundo: [W, H], alinharBaixo: true,
+      chave: 'escada', titulo: 'Escada Errada', mundo: [W, H], alinharBaixo: true, artes: ['prensa'],
       iniciar: function () {
         var html = '';
         ['esq', 'baixo', 'cima', 'dir'].forEach(function (s) {
@@ -941,10 +969,11 @@
           M.coruja(c, XC, cy, 4.6, {
             asa: tonta > 0 ? 0.9 * Math.abs(Math.sin(M.t * 20)) : pulo,
             rot: tonta > 0 ? Math.sin(M.t * 30) * 0.25 : 0,
-            olhos: p < 2 ? 'medo' : (tonta > 0 ? 'x' : null), olharY: -1
+            olhos: p < 2 ? 'medo' : (tonta > 0 ? 'x' : null), olharY: -1,
+            costas: tonta <= 0, passo: degraus % 2 === 1   // sobe de costas, um pé de cada vez
           });
           if (tonta > 0) { c.fillStyle = '#ffe08a'; c.font = '800 4px ' + M.fonte; c.textAlign = 'center'; c.fillText('★ ★', XC, cy - 8); }
-        } else {
+        } else if (!_arte('coruja')) {
           c.fillStyle = '#7189a6'; c.beginPath(); c.ellipse(XC, Y_PRENSA - 0.6, 7, 1.2, 0, 0, 6.283); c.fill();
         }
 
@@ -954,14 +983,34 @@
         var topo = Y_PRENSA - bate;
         c.fillStyle = 'rgba(255,40,60,' + (0.12 + perigo * 0.35) + ')';
         c.fillRect(16, topo - 14, W - 32, 14);
-        M.chapa(c, 10, topo, W - 20, H - topo, '#4a515b', '#262a30');
-        c.fillStyle = '#9aa3ad';
-        for (var d = 12; d < W - 12; d += 5) { c.beginPath(); c.moveTo(d, topo); c.lineTo(d + 2.5, topo - 3.6); c.lineTo(d + 5, topo); c.closePath(); c.fill(); }
-        M.listras(c, 10, topo + 3, W - 20, 3.4, 2.6);
-        c.fillStyle = '#2f343b'; c.fillRect(20, topo + 8, 8, H); c.fillRect(W - 28, topo + 8, 8, H);
-        c.fillStyle = '#c4ccd5'; c.fillRect(22.5, topo + 6, 3, H); c.fillRect(W - 25.5, topo + 6, 3, H);
-        c.fillStyle = perigo > 0.3 && Math.floor(M.t * 8) % 2 ? '#ff2d55' : '#5a1220';
-        c.beginPath(); c.arc(45, topo + 12, 2.2, 0, 6.283); c.fill();
+        var parte = _arte('prensa');
+        if (parte) {
+          var ph = (W - 20) * parte.height / parte.width, yp = topo - 3, fimP = yp + ph * 0.96;
+          c.fillStyle = '#15171b'; c.fillRect(10, fimP, W - 20, H - fimP);
+          c.fillStyle = 'rgba(255,255,255,.06)'; c.fillRect(10, fimP, W - 20, 0.7);
+          [0.371, 0.569].forEach(function (fx) { // pistões seguem pra baixo da arte
+            var px = 10 + fx * (W - 20), gr = c.createLinearGradient(px, 0, px + 4.1, 0);
+            gr.addColorStop(0, '#6c7580'); gr.addColorStop(0.35, '#e1e7ee'); gr.addColorStop(1, '#59626d');
+            c.fillStyle = gr; c.fillRect(px, fimP - 0.5, 4.1, H - fimP + 0.5);
+          });
+          c.drawImage(parte, 10, yp, W - 20, ph);
+          if (perigo > 0.3 && Math.floor(M.t * 8) % 2) { // luz de perigo pulsando
+            var lx = 45, ly = yp + ph * 0.44, gl = c.createRadialGradient(lx, ly, 0, lx, ly, 9);
+            gl.addColorStop(0, 'rgba(255,60,60,.7)'); gl.addColorStop(1, 'rgba(255,60,60,0)');
+            c.fillStyle = gl; c.beginPath(); c.arc(lx, ly, 9, 0, 6.283); c.fill();
+          }
+        } else {
+          M.chapa(c, 10, topo, W - 20, H - topo, '#4a515b', '#262a30');
+          c.fillStyle = '#9aa3ad';
+          for (var d = 12; d < W - 12; d += 5) { c.beginPath(); c.moveTo(d, topo); c.lineTo(d + 2.5, topo - 3.6); c.lineTo(d + 5, topo); c.closePath(); c.fill(); }
+          M.listras(c, 10, topo + 3, W - 20, 3.4, 2.6);
+          c.fillStyle = '#2f343b'; c.fillRect(20, topo + 8, 8, H); c.fillRect(W - 28, topo + 8, 8, H);
+          c.fillStyle = '#c4ccd5'; c.fillRect(22.5, topo + 6, 3, H); c.fillRect(W - 25.5, topo + 6, 3, H);
+          c.fillStyle = perigo > 0.3 && Math.floor(M.t * 8) % 2 ? '#ff2d55' : '#5a1220';
+          c.beginPath(); c.arc(45, topo + 12, 2.2, 0, 6.283); c.fill();
+        }
+        // coruja amassada na mandíbula (arte da coruja operária)
+        if (M.estado === 'morto' && _arte('coruja')) M.coruja(c, XC, Y_PRENSA - 6.4, 6.4, { morta: true, semSombra: true });
       },
       proxima: function () { return _seta(degraus).s; },
       toqueInicio: function (pt) { swipe = { x: pt.x, y: pt.y, id: pt.id }; },
@@ -1065,7 +1114,7 @@
     }
 
     return {
-      chave: 'piso', titulo: 'Piso Falso', mundo: [W, H],
+      chave: 'piso', titulo: 'Piso Falso', mundo: [W, H], artes: ['piso'],
       iniciar: function () { _novaRodada(); M.dica('Toque num piso com o símbolo do painel', 2800); },
       fundo: function (c) {
         // parede com painel
@@ -1144,10 +1193,15 @@
           c.save(); c.translate(x, y + p.cai * 6); c.scale(esc, esc);
           c.globalAlpha = 1 - p.cai * 0.8;
           c.fillStyle = '#0c0d10'; c.fillRect(-T / 2, -T / 2 + 1.6, T, T);
-          var gg = c.createLinearGradient(0, -T / 2, 0, T / 2);
-          gg.addColorStop(0, '#59616c'); gg.addColorStop(1, '#353b43');
-          c.fillStyle = gg; c.fillRect(-T / 2, -T / 2, T, T - 0.6);
-          c.strokeStyle = 'rgba(255,255,255,.1)'; c.lineWidth = 0.4; c.strokeRect(-T / 2 + 0.6, -T / 2 + 0.6, T - 1.2, T - 1.8);
+          var tile = _arte('piso');
+          if (tile) {
+            c.drawImage(_recorte('piso', tile, 0, 1, T * _pxPorUnidade), -T / 2, -T / 2, T, T - 0.6);
+          } else {
+            var gg = c.createLinearGradient(0, -T / 2, 0, T / 2);
+            gg.addColorStop(0, '#59616c'); gg.addColorStop(1, '#353b43');
+            c.fillStyle = gg; c.fillRect(-T / 2, -T / 2, T, T - 0.6);
+            c.strokeStyle = 'rgba(255,255,255,.1)'; c.lineWidth = 0.4; c.strokeRect(-T / 2 + 0.6, -T / 2 + 0.6, T - 1.2, T - 1.8);
+          }
           _desenharSimbolo(c, 0, -0.4, 3.6, p.simb);
           if (p.moeda) M.desenharMoeda(c, 4.4, -4.4, 2.4);
           c.restore();
@@ -1207,7 +1261,13 @@
     }
     function _desenharItem(c, it, x, y, esc) {
       c.save(); c.translate(x, y); c.scale(esc, esc); c.rotate(it.rot || 0);
-      if (it.t === 'quadro') {
+      var folha = (it.t === 'moeda') ? null : _arte('itens');
+      if (folha) { // arte gravada: células 0-4 quadros, 5-8 engrenagem/parafuso/porca/mola
+        var qi = it.t === 'quadro' ? Math.max(0, CORES_QUADRO.indexOf(it.cor)) : 5 + Math.max(0, TIPOS_PECA.indexOf(it.p));
+        if (it.p === 'engrenagem') c.rotate(it.giro * 0.6);
+        var tam = 14;
+        c.drawImage(_recorte('itens', folha, qi, 3, tam * _pxPorUnidade), -tam / 2, -tam / 2, tam, tam);
+      } else if (it.t === 'quadro') {
         c.fillStyle = '#7a4d12'; c.fillRect(-6.2, -5, 12.4, 10);
         c.fillStyle = '#d4a017'; c.fillRect(-5.6, -4.4, 11.2, 8.8);
         c.fillStyle = '#9a6b0f'; c.fillRect(-4.4, -3.2, 8.8, 6.4);
@@ -1237,7 +1297,7 @@
     }
 
     return {
-      chave: 'esteira', titulo: 'A Esteira', mundo: [W, H],
+      chave: 'esteira', titulo: 'A Esteira', mundo: [W, H], artes: ['itens'],
       iniciar: function () { M.dica('Quadro pro fogo (toque) · peça deixa passar', 3000); },
       fundo: function (c) {
         c.fillStyle = '#16181c'; c.fillRect(0, 0, W, H);

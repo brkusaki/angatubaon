@@ -126,6 +126,15 @@
       iniciar: function () { return _iniciarJogoTela('piano', ['sobrevivencia'], 50); }
     }
   ];
+  // Ícones gravados dos minigames (Jogos/assets/maquina/ico-*.webp). Sem
+  // mapeamento (ou se a imagem falhar) cai no emoji da POOL.
+  var ICO_ARQ = { laminas: 'laminas', escada: 'escada', piso: 'piso', esteira: 'esteira', puff: 'puff',
+    ervilhas: 'ervilhas', speedtap: 'sirene', sequencia: 'misterio', piano: 'prensa' };
+  function _icoHTML(j, cls) {
+    var n = j && ICO_ARQ[j.chave];
+    if (!n) return _escHTML((j && (j.icone || j.emoji)) || '⚙️');
+    return '<img class="' + (cls || 'pty-ico') + '" src="/Jogos/assets/maquina/ico-' + n + '.webp" alt="" width="64" height="64" draggable="false">';
+  }
   var APRESENTACAO_MS = 2600; // o cartão da Máquina fica sozinho na tela antes do 3-2-1
   function _poolPorChave(chave) {
     for (var i = 0; i < POOL.length; i++) if (POOL[i].chave === chave) return POOL[i];
@@ -931,8 +940,9 @@
     var el = _q('pty-catalogo');
     if (!el || el.getAttribute('data-ok')) return;
     el.innerHTML = POOL.filter(function (j) { return (j.peso || 1) >= 2; }).map(function (j) {
-      return '<span class="pty-cat-item"><span>' + j.icone + '</span>' + _escHTML(j.nome) + '</span>';
+      return '<span class="pty-cat-item">' + _icoHTML(j, 'pty-ico pty-ico-mini') + _escHTML(j.nome) + '</span>';
     }).join('');
+    POOL.forEach(function (j) { var n = ICO_ARQ[j.chave]; if (n) { var im = new Image(); im.src = '/Jogos/assets/maquina/ico-' + n + '.webp'; } }); // pré-carrega pra roleta não piscar
     el.setAttribute('data-ok', '1');
   }
 
@@ -1204,7 +1214,7 @@
     var giros = 0, nomes = POOL.map(function (j) { return j; });
     function _pousar() {
       if (nomeEl) nomeEl.textContent = jogo.nome || 'Minigame surpresa';
-      if (iconeEl) iconeEl.textContent = jogo.icone || jogo.emoji || '⚙️';
+      if (iconeEl) iconeEl.innerHTML = _icoHTML(jogo);
       if (regraEl) regraEl.textContent = jogo.regra || jogo.desc || '';
       if (ctrlEl) { ctrlEl.textContent = jogo.controle || ''; ctrlEl.style.display = jogo.controle ? '' : 'none'; }
       if (cartao) cartao.classList.add('pty-cartao-pronto');
@@ -1215,7 +1225,7 @@
       giros++;
       var j = nomes[giros % nomes.length];
       if (nomeEl) nomeEl.textContent = j.nome;
-      if (iconeEl) iconeEl.textContent = j.icone;
+      if (iconeEl) iconeEl.innerHTML = _icoHTML(j);
       if (window.AngatubaGames && window.AngatubaGames.som && giros % 2) window.AngatubaGames.som.toque();
       if (giros >= 11) { clearInterval(_roletaHandle); _roletaHandle = null; _pousar(); }
     }, 85);

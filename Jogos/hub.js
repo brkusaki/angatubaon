@@ -1439,7 +1439,11 @@
     ],
     maquina: [
       '/Jogos/maquina.min.js', '/Jogos/maquina.css',
-      '/Jogos/assets/corujinha/coruja-sheet-v2.webp', '/Jogos/assets/corujinha/sim-moeda-v2.webp'
+      '/Jogos/assets/maquina/coruja-sheet.webp', '/Jogos/assets/maquina/serra.webp', '/Jogos/assets/maquina/itens.webp',
+      '/Jogos/assets/maquina/prensa.webp', '/Jogos/assets/maquina/chao-laminas.webp', '/Jogos/assets/maquina/piso-tile.webp',
+      '/Jogos/assets/corujinha/sim-moeda-v2.webp',
+      // efeitos gravados (ElevenLabs)
+      '/Jogos/assets/maquina/sfx/serra-1.mp3', '/Jogos/assets/maquina/sfx/clank-1.mp3', '/Jogos/assets/maquina/sfx/raspao-1.mp3', '/Jogos/assets/maquina/sfx/alerta-1.mp3', '/Jogos/assets/maquina/sfx/morte-1.mp3', '/Jogos/assets/maquina/sfx/prensa-1.mp3', '/Jogos/assets/maquina/sfx/passo-1.mp3', '/Jogos/assets/maquina/sfx/erro-1.mp3', '/Jogos/assets/maquina/sfx/sirene-1.mp3', '/Jogos/assets/maquina/sfx/queda-1.mp3', '/Jogos/assets/maquina/sfx/fogo-1.mp3', '/Jogos/assets/maquina/sfx/acerto-1.mp3', '/Jogos/assets/maquina/sfx/moeda-1.mp3', '/Jogos/assets/maquina/sfx/vitoria-1.mp3'
     ],
     ervilhas: [
       '/Jogos/ervilhas.min.js', '/Jogos/ervilhas.css',

@@ -81,32 +81,32 @@
   // "terminou".
   var POOL = [
     {
-      chave: 'laminas', nome: 'Lâminas', duracaoSeg: 38, peso: 3, eliminacao: true, icone: '🪚',
+      chave: 'laminas', modulo: 'maquina', nome: 'Lâminas', duracaoSeg: 38, peso: 3, eliminacao: true, icone: '🪚',
       regra: 'Serras quicando pela sala. Não deixe nenhuma te encostar.', controle: 'Arraste o dedo',
       iniciar: function (seed) { return _iniciarJogoContainer('maquina', 35, seed, 'laminas'); }
     },
     {
-      chave: 'escada', nome: 'Escada Errada', duracaoSeg: 43, peso: 3, eliminacao: true, icone: '⬆️',
+      chave: 'escada', modulo: 'maquina', nome: 'Escada Errada', duracaoSeg: 43, peso: 3, eliminacao: true, icone: '⬆️',
       regra: 'Aperte a seta do degrau de cima pra subir. A prensa está logo atrás.', controle: 'Botões de seta',
       iniciar: function (seed) { return _iniciarJogoContainer('maquina', 40, seed, 'escada'); }
     },
     {
-      chave: 'piso', nome: 'Piso Falso', duracaoSeg: 48, peso: 3, eliminacao: true, icone: '🔷',
+      chave: 'piso', modulo: 'maquina', nome: 'Piso Falso', duracaoSeg: 48, peso: 3, eliminacao: true, icone: '🔷',
       regra: 'Quando a sirene tocar, esteja num piso com o símbolo do painel.', controle: 'Toque no piso',
       iniciar: function (seed) { return _iniciarJogoContainer('maquina', 45, seed, 'piso'); }
     },
     {
-      chave: 'esteira', nome: 'A Esteira', duracaoSeg: 38, peso: 3, eliminacao: true, icone: '🔥',
+      chave: 'esteira', modulo: 'maquina', nome: 'A Esteira', duracaoSeg: 38, peso: 3, eliminacao: true, icone: '🔥',
       regra: 'Quadro vai pro fogo (toque nele). Peça deixa passar. 3 erros e a máquina trava.', controle: 'Toque nos quadros',
       iniciar: function (seed) { return _iniciarJogoContainer('maquina', 35, seed, 'esteira'); }
     },
     {
-      chave: 'puff', nome: 'Puff da Coruja', duracaoSeg: 28, peso: 2, icone: '💨',
+      chave: 'puff', modulo: 'puff', nome: 'Puff da Coruja', duracaoSeg: 28, peso: 2, icone: '💨',
       regra: 'Segure pra encher o peito e solte antes de tossir. Mais puffs vence.', controle: 'Segure e solte',
       iniciar: function (seed) { return _iniciarJogoContainer('puff', 28, seed); }
     },
     {
-      chave: 'ervilhas', nome: 'Ervilhas da Coruja', duracaoSeg: 42, peso: 2, icone: '🫛',
+      chave: 'ervilhas', modulo: 'ervilhas', nome: 'Ervilhas da Coruja', duracaoSeg: 42, peso: 2, icone: '🫛',
       regra: 'Coma as ervilhas sem a Chefe ver. Ela olhou, congele.', controle: 'Espetar e comer',
       iniciar: function (seed) { return _iniciarJogoContainer('ervilhas', 38, seed); }
     },
@@ -182,6 +182,10 @@
   var _recompensaModo = null;  // moedas que o módulo pagou nesta partida (mostra no pódio)
   var _moedasSessao = 0;       // moedas pegas nos minigames desta Party (mostra no pódio)
   var _podioPagoChave = null;  // evita pagar o bônus do pódio 2x (o 'campeao' re-emite a cada snapshot)
+  var _posRef = null, _posCb = null; // escuta de posicoes/{rodada} (rivais na mesma arena)
+  var _posCache = {};          // { uid: { v, em } } — última posição de cada rival e quando chegou
+  var _assistindo = false;     // já reportei, mas sigo vendo a arena até a rodada fechar
+  var _preCarga = null, _preCargaNome = null; // minigame baixando durante a roleta
 
   function disponivel() {
     return typeof firebase !== 'undefined' && !!firebase.database && !!firebase.auth;
@@ -378,6 +382,15 @@
     if (sala.status === 'lobby') { _rodadaVistaEm = -1; _modoSeedVisto = null; _recompensaModo = null; _moedasSessao = 0; }
     // Saiu do jogo-módulo (pódio, revanchinha): desmonta ele aqui.
     if (sala.status !== 'modo' && _modoEmAndamento) _pararModo();
+    // A rodada fechou: para de ouvir as posições e desmonta a arena de quem
+    // ficou assistindo (o placar vem por cima logo a seguir).
+    if (sala.status !== 'rodada') {
+      _pararPosicoes();
+      if (_assistindo) {
+        _assistindo = false;
+        if (_apiAtual && typeof _apiAtual.parar === 'function') { try { _apiAtual.parar(); } catch (e) {} }
+      }
+    }
 
     if (sala.status === 'modo') {
       if (sala.seed !== _modoSeedVisto) {
@@ -456,6 +469,8 @@
      sair() voluntário quanto pela queda da sala — ver _aoSalaFechada. */
   function _pararLocal() {
     _pararListeners();
+    _pararPosicoes();
+    _assistindo = false;
     if (_timeoutSeguranca) { clearTimeout(_timeoutSeguranca); _timeoutSeguranca = null; }
     if (_contagemHandle) { clearTimeout(_contagemHandle); _contagemHandle = null; }
     _rodadaEmAndamento = false;
@@ -484,6 +499,15 @@
   function _iniciarRodadaLocal(sala) {
     var entry = _poolPorChave(sala.jogoAtual);
     _rodadaEmAndamento = true;
+    _assistindo = false;
+    // Baixa o minigame durante a roleta + 3-2-1: todo mundo larga junto
+    // (sem isto, quem baixava o arquivo na hora começava atrasado e via
+    // os rivais "adiantados" na arena).
+    _preCarga = null; _preCargaNome = entry && entry.modulo;
+    if (_preCargaNome && window._jogoLoader) {
+      _preCarga = window._jogoLoader(_preCargaNome);
+      _preCarga.catch(function () {});
+    }
     document.body.classList.add('angatuba-party-ativo');
     _emit('countdown', { jogo: entry, sala: sala });
 
@@ -639,7 +663,13 @@
   function _iniciarJogoContainer(nome, duracaoSeg, seed, variante) {
     _mostrarTelaJogo('party');
     _emit('mostrarArena');
-    return window._jogoLoader(nome).then(function (api) {
+    // Reaproveita o download da roleta (o _jogoLoader resolve na hora um
+    // <script> que ainda está baixando — chamar de novo quebraria).
+    var carga = (_preCarga && _preCargaNome === nome)
+      ? _preCarga.catch(function () { return window._jogoLoader(nome); })
+      : window._jogoLoader(nome);
+    _preCarga = null;
+    return carga.then(function (api) {
       // Mesma guarda do _iniciarJogoTela (P4): sala caiu durante o load,
       // não adianta montar a arena por cima da tela de aviso.
       if (!_rodadaEmAndamento) return null;
@@ -653,20 +683,68 @@
         seed: seed,
         jogo: variante,
         onMoedas: function (qtd) { _moedasSessao += Math.max(0, Math.floor(Number(qtd) || 0)); },
-        onFim: function (score) { reportarResultado(score); }
+        rede: _redeDaRodada(),
+        onFim: function (score, assistir) { reportarResultado(score, assistir === true); }
       });
       return api;
     });
   }
 
+  /* ── Rivais na mesma arena ─────────────────────────────────────
+     Cada celular grava a própria posição em posicoes/{rodada}/{uid}
+     (texto curto, ~10x por segundo — ver o motor em Jogos/maquina.js)
+     e ouve a dos outros. Ninguém é dono de nada aqui: é só pra
+     desenhar os rivais; quem decide a rodada continua sendo o
+     resultados/ de cada um. */
+  function _redeDaRodada() {
+    if (!_salaRef || !_sala || !_meuUid) return null;
+    _pararPosicoes();
+    _posCache = {};
+    var ref = _salaRef.child('posicoes/' + _sala.rodadaAtual);
+    var minha = ref.child(_meuUid);
+    _posRef = ref;
+    _posCb = function (snap) {
+      var v = snap.val() || {}, agora = Date.now();
+      Object.keys(v).forEach(function (u) {
+        if (u === _meuUid || typeof v[u] !== 'string') return;
+        var c = _posCache[u];
+        if (!c || c.v !== v[u]) _posCache[u] = { v: v[u], em: agora };
+      });
+    };
+    ref.on('value', _posCb);
+    return {
+      assistir: true,
+      enviar: function (txt) {
+        if (_posRef !== ref) return; // rodada já fechou
+        minha.set(String(txt).slice(0, 60)).catch(function () {});
+      },
+      rivais: function () {
+        var jog = (_sala && _sala.jogadores) || {};
+        return Object.keys(jog).sort().filter(function (u) { return u !== _meuUid && _posCache[u]; }).map(function (u) {
+          return { uid: u, nome: String(jog[u].nome || 'Jogador').slice(0, 10), cor: _ptyCor(_sala, u), v: _posCache[u].v, em: _posCache[u].em };
+        });
+      }
+    };
+  }
+  function _pararPosicoes() {
+    if (_posRef && _posCb) { try { _posRef.off('value', _posCb); } catch (e) {} }
+    _posRef = null; _posCb = null;
+  }
+
   /* ── Reportar resultado da minha rodada ──────────────────────── */
-  function reportarResultado(score) {
+  function reportarResultado(score, ficarAssistindo) {
     if (!_rodadaEmAndamento || !_salaRef || !_sala) return;
     _rodadaEmAndamento = false;
     if (_timeoutSeguranca) { clearTimeout(_timeoutSeguranca); _timeoutSeguranca = null; }
-    document.body.classList.remove('angatuba-party-ativo');
-    _mostrarTelaJogo('party');
-    _emit('aguardandoOutros', _sala.rodadaAtual);
+    if (ficarAssistindo) {
+      // Caiu (ou sobreviveu) mas a arena continua na tela com os rivais
+      // até o anfitrião fechar a rodada — aí o placar entra por cima.
+      _assistindo = true;
+    } else {
+      document.body.classList.remove('angatuba-party-ativo');
+      _mostrarTelaJogo('party');
+      _emit('aguardandoOutros', _sala.rodadaAtual);
+    }
 
     var rodada = _sala.rodadaAtual;
     _salaRef.child('resultados/' + rodada + '/' + _meuUid).set({
@@ -796,6 +874,7 @@
   function proximaRodada() {
     if (!_souAnfitriao || !_sala || !_salaRef) return;
     _salaRef.update({
+      posicoes: null, // as posições da rodada anterior não servem mais pra ninguém
       rodadaAtual: (_sala.rodadaAtual || 0) + 1,
       jogoAtual: _sortearProximoJogo(),
       seed: Math.floor(Math.random() * 1e9),
@@ -814,7 +893,7 @@
   function revanche() {
     if (!_souAnfitriao || !_sala || !_salaRef) return;
     var jogadores = _sala.jogadores || {};
-    var updates = { status: 'lobby', rodadaAtual: 0, resultados: null, placarRodadas: null, modoEstado: null, modoJogadas: null };
+    var updates = { status: 'lobby', rodadaAtual: 0, resultados: null, placarRodadas: null, posicoes: null, modoEstado: null, modoJogadas: null };
     Object.keys(jogadores).forEach(function (uid) { updates['jogadores/' + uid + '/pontosTotal'] = 0; });
     _salaRef.update(updates).catch(function () {});
   }

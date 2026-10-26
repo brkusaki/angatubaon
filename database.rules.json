@@ -138,6 +138,45 @@
             ".validate": "newData.parent().parent().child('anfitriao/uid').val() == auth.uid"
           }
         },
+        /* Modos da sala (Hex Arena e os que vierem). Ver o cabeçalho de
+           Jogos/party.js. São nós GENÉRICOS de propósito: um jogo novo
+           da Party não precisa de regra nova.
+           - modo: qual jogo a sala roda ('minigames', 'hexarena'…). Só
+             o anfitrião escolhe.
+           - modoEstado: estado da partida, gravado inteiro (set) pelo
+             anfitrião — ele é a fonte da verdade.
+           - modoJogadas/{n}/{uid}: a jogada de cada um no round n, UMA
+             vez (não dá pra trocar depois de ver a revelação). O
+             conteúdo é uma string curta que o módulo interpreta. */
+        "modo": {
+          ".validate": "newData.isString() && newData.val().length <= 20 && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        "modoEstado": {
+          ".validate": "newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        "modoJogadas": {
+          "$rodada": {
+            "$uid": {
+              ".validate": "!data.exists() && auth.uid == $uid && newData.hasChildren(['v','em'])",
+              "v": { ".validate": "newData.isString() && newData.val().length <= 60" },
+              "em": { ".validate": "newData.val() == now" },
+              "$outro": { ".validate": false }
+            }
+          }
+        },
+        /* Rivais na mesma arena (minigames da Máquina, ver Jogos/maquina.js):
+           posicoes/{rodada}/{uid} = texto curto "estado;números…" que o
+           próprio jogador regrava ~10x por segundo. Só serve pra desenhar
+           os outros na tela — o que vale ponto continua sendo resultados/.
+           Só quem está na sala grava, e só a própria posição. O anfitrião
+           apaga o nó inteiro a cada rodada nova / revanchinha. */
+        "posicoes": {
+          "$rodada": {
+            "$uid": {
+              ".validate": "auth.uid == $uid && newData.isString() && newData.val().length <= 60 && newData.parent().parent().parent().child('jogadores').child($uid).exists()"
+            }
+          }
+        },
         "$outro": { ".validate": false }
       }
     },
@@ -265,7 +304,17 @@
           rejeitar justamente ela por diferença de milissegundos — e o
           preço desse erro é um nó preso em 'online' pra sempre. O campo
           é informativo (a 4.3 mostra "offline há 2h"), não é segurança;
-          quem protege o nó é o auth.uid == $uid. */
+          quem protege o nó é o auth.uid == $uid.
+
+       4. Presença rica (Fase 1): "jogo" e "texto" são OPCIONAIS —
+          o app novo grava a atividade ("Jogando Voo da Coruja",
+          "Na Biblioteca"), o bundle antigo em cache segue gravando só
+          state/nome/atualizadoEm e continua válido. "jogando" NÃO é
+          um state novo (ver o bloco de presença em app.js: clientes
+          antigos pintariam como offline); é derivado de state
+          'online' + "jogo". Tetos curtos de propósito: é rótulo, não
+          mensagem — e é texto livre que outra pessoa vai ler (a UI
+          sempre usa textContent). */
     "presence": {
       "$uid": {
         ".read": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'",
@@ -279,6 +328,12 @@
         },
         "atualizadoEm": {
           ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000"
+        },
+        "jogo": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20 && newData.val().matches(/^[a-z0-9_]+$/)"
+        },
+        "texto": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
         },
         "$outro": { ".validate": false }
       }
@@ -330,6 +385,38 @@
        lista pra você aceitar ou recusar —, e as regras não têm como
        contar filhos pra impor um teto de pendências. Se virar
        incômodo, é caso pra 4.4 com Cloud Function. */
+    /* ── Tokens de push (FCM) — preparação ───────────────────────
+       fcmTokens/{uid}/{tokenId} = { token, criadoEm }
+
+       Mesma disciplina de presence/: não existe ".read" na raiz, só
+       em fcmTokens/{uid} (o próprio dono lê os próprios tokens); e
+       só conta nomeada grava, igual às outras (sessão anônima de
+       sala não é identidade). $tokenId é uma chave gerada por
+       push() no cliente (app.js, _fcmSalvarToken) — não o token
+       cru, que tem caracteres inválidos como chave do RTDB — então
+       não há formato pra validar na chave em si, só no valor.
+
+       Um token por entrada: quando o navegador rotaciona o token
+       (getToken devolve um valor novo), o cliente grava numa chave
+       NOVA e apaga a antiga — nunca sobrescreve, porque sobrescrever
+       encobriria uma rotação real com um "continua o mesmo" falso.
+
+       Envio da notificação (Cloud Function lendo gameInvites/
+       lobbyInvites e escrevendo aqui pra saber pra quem mandar) é
+       etapa futura — aqui só o token é gravado. */
+    "fcmTokens": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid && auth.token.firebase.sign_in_provider != 'anonymous'",
+        "$tokenId": {
+          ".write": "auth != null && auth.uid == $uid && auth.token.firebase.sign_in_provider != 'anonymous'",
+          ".validate": "newData.hasChildren(['token','criadoEm'])",
+          "token": { ".validate": "newData.isString() && newData.val().length >= 20 && newData.val().length <= 4096" },
+          "criadoEm": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
+          "$outro": { ".validate": false }
+        }
+      }
+    },
+
     "friendRequests": {
       "$para": {
         // Só o destinatário lê a própria caixa de pedidos.
@@ -471,7 +558,7 @@
           ".validate": "newData.hasChildren(['de','nome','jogo','codigo','em','expiraEm'])",
           "de": { ".validate": "newData.isString() && newData.val() == auth.uid" },
           "nome": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
-          "jogo": { ".validate": "newData.isString() && (newData.val() == 'pingpong' || newData.val() == 'tanques' || newData.val() == 'party' || newData.val() == 'baralho')" },
+          "jogo": { ".validate": "newData.isString() && (newData.val() == 'pingpong' || newData.val() == 'tanques' || newData.val() == 'hoquei' || newData.val() == 'party' || newData.val() == 'baralho')" },
           // Código de sala dos três sistemas: 4 letras hoje, faixa com
           // folga pra não travar uma mudança de tamanho lá na frente.
           "codigo": { ".validate": "newData.isString() && newData.val().length >= 3 && newData.val().length <= 8" },
@@ -491,7 +578,7 @@
        Irmão do gameInvites acima, e de propósito NÃO é ele.
 
          lobbyInvites/{paraUid}/{deUid} = {
-           nome, codigoLobby, em, expiraEm
+           nome, codigoLobby, em, expiraEm, foto?
          }
 
        A CHAVE É O REMETENTE, e só ele. No gameInvites a chave é
@@ -534,6 +621,59 @@
           ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((auth.uid == $para && !newData.exists()) || (auth.uid == $de && auth.uid != $para && newData.exists() && root.child('friends').child(auth.uid).child($para).exists()) || (auth.uid == $de && !newData.exists()))",
           ".validate": "newData.hasChildren(['nome','codigoLobby','em','expiraEm'])",
           "nome": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
+          // Foto (L2): OPCIONAL de propósito — fica fora do
+          // hasChildren, então quem não tem avatar grava o convite sem
+          // o campo, e convite antigo (gravado na L1) continua válido.
+          // Mesmas duas travas dos nós de amizade: https e teto de 300.
+          "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().beginsWith('https://')" },
+          "codigoLobby": { ".validate": "newData.isString() && newData.val().length == 6 && newData.val().matches(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]+$/)" },
+          "em": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
+          "expiraEm": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 3600000" },
+          "$outro": { ".validate": false }
+        }
+      }
+    },
+
+    /* ── Espelho dos convites ENVIADOS (Etapa L2) ────────────────
+         lobbyInvitesSent/{deUid}/{paraUid} = { codigoLobby, em, expiraEm }
+
+       Existe por um motivo só: a caixa alheia ninguém lê. As regras do
+       lobbyInvites dão `.read` apenas ao dono da caixa — e é assim que
+       tem de ser. Só que isso deixa quem convidou sem saber se o
+       convite ainda está de pé, e na L1 o botão dizia "Convidado" de
+       memória, que evaporava ao recarregar a página.
+
+       Então o remetente guarda uma cópia no PRÓPRIO ramo, escrita no
+       mesmo gesto do convite. Não carrega nome nem foto: quem lê já é
+       o dono dos dados, e o que ele precisa é "existe e vale até
+       quando". É espelho, não fonte — o convite de verdade continua
+       sendo lobbyInvites/{para}/{de}, e se o espelho sumir o convite
+       segue valendo do outro lado.
+
+       ESCREVER, só o dono do ramo ($de == auth.uid), e com a MESMA
+       trava de amizade do convite — senão o ramo viraria um jeito
+       oblíquo de marcar gente com quem não se tem vínculo.
+
+       APAGAR, dois: o dono (cancelou, o amigo entrou, venceu) e o
+       DESTINATÁRIO, mas só a chave com o próprio uid ($para ==
+       auth.uid) e só pra apagar (!newData.exists()). É essa segunda
+       porta que faz "Recusar" devolver o botão do outro lado pra
+       "Convidar" em vez de deixá-lo em "Aguardando" até vencer — e
+       ela não abre nada: o destinatário já podia apagar o convite em
+       si, aqui ele apaga o eco dele.
+
+       Não existe `.read` na raiz: cada um lê só o próprio ramo.
+
+       Mesmos tetos do lobbyInvites, pelos mesmos motivos — inclusive
+       o de NÃO exigir `expiraEm > now` (relógio atrasado escreve um
+       espelho que nasce vencido, não leva permission_denied). */
+    "lobbyInvitesSent": {
+      "$de": {
+        // Só o dono do ramo lê o ramo inteiro.
+        ".read": "auth != null && auth.uid == $de && auth.token.firebase.sign_in_provider != 'anonymous'",
+        "$para": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((auth.uid == $de && auth.uid != $para && newData.exists() && root.child('friends').child(auth.uid).child($para).exists()) || (auth.uid == $de && !newData.exists()) || (auth.uid == $para && auth.uid != $de && !newData.exists()))",
+          ".validate": "newData.hasChildren(['codigoLobby','em','expiraEm'])",
           "codigoLobby": { ".validate": "newData.isString() && newData.val().length == 6 && newData.val().matches(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]+$/)" },
           "em": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
           "expiraEm": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 3600000" },
@@ -604,7 +744,28 @@
        FANTASMA — o onDisconnect do anfitrião apaga o nó inteiro (o
        do membro apaga só a si). Um lobby sem anfitrião não sugere
        jogo nem abre sala, então não há estado intermediário pra
-       varrer depois; ver claude/app.js, bloco "LOBBY SOCIAL". */
+       varrer depois; ver claude/app.js, bloco "LOBBY SOCIAL".
+
+       CHAT DE TEXTO (Etapa L3) — ramo novo DENTRO do lobby:
+
+         socialLobbies/{CODIGO}/chat/{pushId} = { uid, nome, texto, em }
+
+       Mora aqui e não num nó de primeiro nível porque a vida dele é
+       exatamente a do lobby: o onDisconnect/remove do anfitrião já
+       leva o chat junto, sem varredura nenhuma. LER é o ".read" do
+       lobby, herdado — quem tem o código lê a sala inteira, e o chat
+       não é mais secreto que a lista de nomes. ESCREVER é o primeiro
+       lugar em que o MEMBRO escreve fora de membros/{proprio uid}:
+       a regra pede membros/{auth.uid} existente, `uid == auth.uid` e
+       mensagem NOVA (não dá pra editar a de ninguém, nem a própria).
+       APAGAR, só o dono da mensagem — e o anfitrião, que herda
+       escrita do nó do lobby e sempre pôde apagar o cômodo inteiro.
+
+       O ".validate" do nó do lobby (hasChildren de anfitriao/criadoEm/
+       status/membros) NÃO roda aqui: validate só é avaliado no nó
+       escrito e abaixo dele, nunca nos pais. Mas "chat" precisa
+       existir como chave nomeada, senão cairia no "$outro" de baixo,
+       que é `false` por construção. */
     "socialLobbies": {
       "$codigo": {
         ".read": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'",
@@ -628,7 +789,7 @@
         // Sugestão de jogo — mesma lista de gameInvites (4.4). É só um
         // recado no nó: ninguém entra em sala por causa dela.
         "jogoSugerido": {
-          ".validate": "newData.isString() && (newData.val() == 'pingpong' || newData.val() == 'tanques' || newData.val() == 'party' || newData.val() == 'baralho') && newData.parent().child('anfitriao/uid').val() == auth.uid"
+          ".validate": "newData.isString() && (newData.val() == 'pingpong' || newData.val() == 'tanques' || newData.val() == 'hoquei' || newData.val() == 'party' || newData.val() == 'baralho') && newData.parent().child('anfitriao/uid').val() == auth.uid"
         },
         // Preenchido só na 5.3, quando o lobby passar a apontar pra uma
         // sala de verdade. Mesma faixa de tamanho do codigo de
@@ -656,7 +817,109 @@
             "$outro": { ".validate": false }
           }
         },
+        // Chat de texto do lobby (L3) — ver o bloco acima.
+        "chat": {
+          "$msgId": {
+            // Escrever: mensagem NOVA (!data.exists()), assinada pelo
+            // próprio uid, de quem está em membros/. Apagar: só a
+            // própria (o anfitrião apaga por herança do nó do lobby).
+            ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((newData.exists() && !data.exists() && newData.child('uid').val() == auth.uid && root.child('socialLobbies').child($codigo).child('membros').child(auth.uid).exists()) || (!newData.exists() && data.child('uid').val() == auth.uid))",
+            ".validate": "newData.hasChildren(['uid','nome','texto','em'])",
+            "uid": { ".validate": "newData.isString() && newData.val() == auth.uid" },
+            "nome": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
+            // Teto de 160 caracteres: recado de lobby, não redação.
+            "texto": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 160" },
+            // Relógio do servidor, igual a criadoEm: ninguém antedata
+            // mensagem pra ela subir no topo da janela.
+            "em": { ".validate": "newData.val() == now" },
+            "$outro": { ".validate": false }
+          }
+        },
         "$outro": { ".validate": false }
+      }
+    },
+
+    /* ── Chat 1x1 entre amigos (Fase 2) ──────────────────────────
+       chats/{A_B}/msgs/{pushId} = { de, txt, em }
+       chats/{A_B}/lido/{uid}    = timestamp do último "visto"
+       chats/{A_B}/typing/{uid}  = timestamp, "digitando…" (chat v2)
+       chatInbox/{dono}/{outro}  = { ultima, de, em, naoLidas, nome, foto? }
+
+       POR QUE AQUI (RTDB) E NÃO NO FIRESTORE: a amizade mora em
+       friends/ (4.3), e só uma regra do RTDB consegue consultar esse
+       nó. Mesma trava do gameInvites/lobbyInvites — SÓ AMIGO ESCREVE.
+
+       A_B = os dois uids em ordem, separados por "_" (uid do Firebase
+       não tem "_"). "Participante" = auth.uid numa das pontas; o OUTRO
+       uid sai do próprio $chatId com replace(), e é nele que a amizade
+       é conferida: friends/{auth.uid}/{outro}.
+
+       MENSAGEM É IMUTÁVEL: só criar (!data.exists()), assinada pelo
+       próprio uid, com o relógio do servidor (em == now — ninguém
+       antedata mensagem). Não dá pra editar nem apagar a de ninguém,
+       nem a própria. LER: só os dois participantes, e não existe
+       ".read" na raiz de chats/ (ninguém lista conversas alheias).
+       Desfeita a amizade, o histórico continua legível pros dois, mas
+       nenhuma mensagem nova entra.
+
+       CAIXA (chatInbox) — lista de conversas de cada um. O dono lê,
+       zera o naoLidas e apaga a própria entrada. O OUTRO lado (quem
+       manda a mensagem) só pode CRIAR/ATUALIZAR a entrada que fala
+       dele na caixa do amigo — nunca apagar — e só sendo amigo. É o
+       update() multi-caminho do envio (atômico: mensagem + as duas
+       entradas ou nada). naoLidas é contador cosmético: teto de
+       sanidade, não segurança.
+
+       Tetos: txt 500 (conversa, não redação), prévia 80, nome 20
+       (mesmo do resto do app), foto com as travas de friends/. */
+    "chats": {
+      "$chatId": {
+        ".read": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))",
+        "msgs": {
+          "$msgId": {
+            ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && newData.exists() && !data.exists() && newData.child('de').val() == auth.uid && (($chatId.beginsWith(auth.uid + '_') && root.child('friends').child(auth.uid).child($chatId.replace(auth.uid + '_', '')).exists()) || ($chatId.endsWith('_' + auth.uid) && root.child('friends').child(auth.uid).child($chatId.replace('_' + auth.uid, '')).exists()))",
+            ".validate": "newData.hasChildren(['de','txt','em'])",
+            "de": { ".validate": "newData.isString() && newData.val() == auth.uid" },
+            "txt": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 500" },
+            "em": { ".validate": "newData.val() == now" },
+            "$outro": { ".validate": false }
+          }
+        },
+        "lido": {
+          "$uid": {
+            ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && auth.uid == $uid && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))",
+            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000"
+          }
+        },
+        // Chat v2 — "digitando…": typing/{uid} = timestamp do servidor.
+        // Ler: herda o ".read" dos dois participantes, acima. Escrever: só o
+        // próprio uid, sendo participante. LIGAR exige amizade (mesma trava
+        // das mensagens); APAGAR vale sempre — é o que o envio e o
+        // onDisconnect fazem, e ex-amigo também precisa conseguir limpar.
+        // O freio de custo (1 gravação a cada 2s no máximo) é do cliente.
+        "typing": {
+          "$uid": {
+            ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && auth.uid == $uid && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid)) && (!newData.exists() || ($chatId.beginsWith(auth.uid + '_') && root.child('friends').child(auth.uid).child($chatId.replace(auth.uid + '_', '')).exists()) || ($chatId.endsWith('_' + auth.uid) && root.child('friends').child(auth.uid).child($chatId.replace('_' + auth.uid, '')).exists()))",
+            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000"
+          }
+        },
+        "$outro": { ".validate": false }
+      }
+    },
+    "chatInbox": {
+      "$dono": {
+        ".read": "auth != null && auth.uid == $dono && auth.token.firebase.sign_in_provider != 'anonymous'",
+        "$outro": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && $outro != $dono && (auth.uid == $dono || (auth.uid == $outro && newData.exists() && root.child('friends').child(auth.uid).child($dono).exists()))",
+          ".validate": "newData.hasChildren(['ultima','de','em','naoLidas','nome'])",
+          "ultima": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 80" },
+          "de": { ".validate": "newData.isString() && (newData.val() == $dono || newData.val() == $outro)" },
+          "em": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
+          "naoLidas": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9999" },
+          "nome": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
+          "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().beginsWith('https://')" },
+          "$campo": { ".validate": false }
+        }
       }
     }
   }

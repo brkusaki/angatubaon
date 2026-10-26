@@ -188,15 +188,19 @@
   // a imagem de 1116 px a cada quadro custa caro e serrilha). O motor
   // atualiza _pxPorUnidade antes de cada desenho.
   var _pxPorUnidade = 4, _recortes = {};
-  function _recorte(chave, img, q, cols, px) {
+  function _recorte(chave, img, q, cols, px, cor) {
     px = Math.max(8, Math.ceil(px / 8) * 8);
-    var k = chave + '|' + q + '|' + px;
+    var k = chave + '|' + q + '|' + px + '|' + (cor || '');
     var c = _recortes[k];
     if (c) return c;
     c = document.createElement('canvas'); c.width = c.height = px;
     var fw = img.width / cols, fh = img.height / cols;
     var g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
     g.drawImage(img, (q % cols) * fw, Math.floor(q / cols) * fh, fw, fh, 0, 0, px, px);
+    if (cor) { // coruja de rival: tingida com a cor do jogador (só onde há pena)
+      g.globalCompositeOperation = 'source-atop'; g.globalAlpha = 0.42;
+      g.fillStyle = cor; g.fillRect(0, 0, px, px);
+    }
     _recortes[k] = c;
     return c;
   }
@@ -228,7 +232,7 @@
       ctx.scale(o.sx || 1, o.sy || 1);
       if (o.alpha != null) ctx.globalAlpha = o.alpha;
       var t = r * S;
-      ctx.drawImage(_recorte('coruja', sheet, q, 3, t * _pxPorUnidade), -t / 2, -t / 2, t, t);
+      ctx.drawImage(_recorte('coruja', sheet, q, 3, t * _pxPorUnidade, o.cor), -t / 2, -t / 2, t, t);
       ctx.restore();
       return;
     }
@@ -390,6 +394,70 @@
     var fpsAcum = 0, fpsN = 0, fpsDecidido = false;
     var timers = [];
 
+    /* — rede: os rivais na mesma arena —
+       opts.rede vem do party.js: enviar(texto) grava a MINHA posição na
+       sala e rivais() devolve a última posição de cada um ({uid, nome,
+       cor, v, em}). O texto é "estado;n1;n2…;segundo" (0 jogando,
+       1 caiu, 2 sobreviveu) e cada minigame decide o que vai nos
+       números (jogo.rede()). Ninguém manda no outro: cada celular simula a
+       própria coruja e só desenha (e, nas Lâminas, sente o empurrão de)
+       quem está do lado. */
+    var rede = (opts.rede && typeof opts.rede.enviar === 'function' && typeof opts.rede.rivais === 'function') ? opts.rede : null;
+    var rivais = {}, envioUlt = '', envioEm = 0;
+    M.mudo = false; M.assistindo = false;
+    function _redeEnviar(forcar) {
+      if (!rede || typeof jogo.rede !== 'function') return;
+      var agora = Date.now();
+      if (!forcar && agora - envioEm < 100) return;           // ~10 por segundo
+      // O último campo é o segundo da rodada: muda sozinho a cada 1 s, então
+      // até quem está parado manda um "tô vivo" (o RTDB não avisa um set igual).
+      var str = (M.estado === 'jogando' ? 0 : M.estado === 'morto' ? 1 : 2) + ';' + jogo.rede() + ';' + Math.floor(M.t);
+      if (!forcar && str === envioUlt) return;
+      envioUlt = str; envioEm = agora;
+      try { rede.enviar(str); } catch (e) {}
+    }
+    function _redeReceber(dt) {
+      if (!rede) return;
+      var lista = [];
+      try { lista = rede.rivais() || []; } catch (e) {}
+      var agora = Date.now(), vistos = {}, k = Math.min(1, dt * 10);
+      lista.forEach(function (r, i) {
+        if (!r || typeof r.v !== 'string') return;
+        var partes = r.v.split(';'), e = Number(partes[0]) || 0;
+        var n = partes.slice(1, -1).map(function (x) { var v = Number(x); return isFinite(v) ? v : 0; });
+        var g = rivais[r.uid];
+        if (!g) g = rivais[r.uid] = { uid: r.uid, s: n.slice(), vx: 0, vy: 0, e: e, morteT: e ? 9 : 0, bateu: 0 };
+        g.nome = String(r.nome || ''); g.cor = r.cor || '#ffffff'; g.i = i; g.n = n;
+        g.velho = agora - (r.em || 0) > 4000;
+        if (e === 1 && g.e !== 1) {
+          g.morteT = 0;
+          M.som('morte', 0.3);
+          if (typeof jogo.rivalCaiu === 'function') { try { jogo.rivalCaiu(g); } catch (er) {} }
+        }
+        g.e = e; vistos[r.uid] = 1;
+      });
+      Object.keys(rivais).forEach(function (u) {
+        var g = rivais[u];
+        if (!vistos[u]) { delete rivais[u]; return; }
+        var x0 = g.s[0], y0 = g.s[1];
+        for (var j = 0; j < g.n.length; j++) g.s[j] = g.s[j] == null ? g.n[j] : _lerp(g.s[j], g.n[j], k);
+        if (dt > 0) { g.vx = _lerp(g.vx, (g.s[0] - x0) / dt, 0.3); g.vy = _lerp(g.vy, (g.s[1] - y0) / dt, 0.3); }
+        g.morteT += dt; g.bateu = Math.max(0, g.bateu - dt);
+      });
+    }
+    // Rivais na ordem fixa da sala; some quem parou de mandar sinal
+    // (caiu a conexão), a não ser que já tenha terminado a rodada.
+    M.rivais = function () {
+      return Object.keys(rivais).map(function (u) { return rivais[u]; })
+        .filter(function (g) { return !g.velho || g.e; })
+        .sort(function (a, b) { return a.i - b.i; });
+    };
+    M.rotulo = function (c, x, y, txt, cor) {
+      c.font = '800 3px ' + fonte; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.lineWidth = 0.9; c.strokeStyle = 'rgba(0,0,0,.8)'; c.strokeText(txt, x, y);
+      c.fillStyle = cor; c.fillText(txt, x, y);
+    };
+
     /* — tamanho — */
     var fundo = null; // cache do cenário fixo (jogo.fundo)
     function _redimensionar() {
@@ -426,7 +494,7 @@
       M.particulas(x, y, 8, '#ffd23f', 'faisca');
       M.texto(x, y - 4, '+1 🪙', '#ffd23f');
     };
-    M.som = _som;
+    M.som = function (nome, vol) { if (!M.mudo) _som(nome, vol); }; // assistindo: só os rivais fazem barulho
     M.vibrar = function (p) { if (navigator.vibrate) { try { navigator.vibrate(p); } catch (e) {} } };
     M.tremer = function (v) { tremor = Math.max(tremor, v); };
     M.flash = function (cor) { flashCor = cor; flashT = 1; };
@@ -463,6 +531,7 @@
     M.morrer = function (titulo, sub) {
       if (M.estado !== 'jogando') return;
       M.estado = 'morto';
+      _redeEnviar(true);
       M.tremer(3); M.flash('rgba(255,40,60,.55)'); M.vibrar([60, 40, 120]);
       _som('morte');
       _mostrarFim(titulo || 'VOCÊ CAIU!', sub, 'morte');
@@ -470,6 +539,7 @@
     function _terminouTempo() {
       if (M.estado !== 'jogando') return;
       M.estado = 'venceu';
+      _redeEnviar(true);
       if (typeof jogo.sobreviveu === 'function') jogo.sobreviveu();
       _som('vitoria');
       M.vibrar(40);
@@ -491,7 +561,16 @@
         if (typeof opts.onMoedas === 'function') { try { opts.onMoedas(M.moedas); } catch (e) {} }
         if (G && typeof G.moedasAdd === 'function') { try { G.moedasAdd(M.moedas, 'party'); } catch (e) {} }
       }
-      onFim(Math.min(SCORE_TETO, Math.max(0, Math.round(M.pts))));
+      // Com rede, quem já terminou fica assistindo a arena até a rodada
+      // fechar (igual Machine Party) em vez de ir pra tela de espera.
+      var assistir = !!(rede && rede.assistir && typeof jogo.assistir === 'function');
+      if (assistir) {
+        M.assistindo = true; M.mudo = true;
+        elFim.classList.remove('mq-fim-on');
+        root.classList.add('mq-assistindo');
+        M.dica('👀 Assistindo os outros · você fez ' + M.pts + ' pts');
+      }
+      onFim(Math.min(SCORE_TETO, Math.max(0, Math.round(M.pts))), assistir);
     }
 
     /* — entrada (toque/mouse) em unidades do mundo — */
@@ -536,16 +615,23 @@
       }
       dt = Math.min(0.05, dt);
       if (!artesOk && artesJogo.every(function (k) { return _arte(k); })) { artesOk = true; fundo = null; }
+      _redeReceber(dt);
+      var andou = false;
       if (M.estado === 'jogando') {
-        M.t += dt;
+        M.t += dt; andou = true;
         jogo.atualizar(dt);
         if (M.estado === 'jogando' && M.t >= duracao) _terminouTempo();
+        _redeEnviar(false);
+      } else {
+        if (typeof jogo.atualizarFim === 'function') jogo.atualizarFim(dt);
+        // Com rede, a armadilha segue rodando pros rivais que ainda estão vivos.
+        if (rede && typeof jogo.assistir === 'function' && M.t < duracao) { M.t += dt; andou = true; jogo.assistir(dt); }
+      }
+      if (andou) {
         var rest = Math.max(0, duracao - M.t);
         elTempo.textContent = Math.ceil(rest);
         elBarra.style.transform = 'scaleX(' + (rest / duracao).toFixed(4) + ')';
         root.classList.toggle('mq-final', rest < 5);
-      } else if (typeof jogo.atualizarFim === 'function') {
-        jogo.atualizarFim(dt);
       }
       // partículas e textos
       for (var i = parts.length - 1; i >= 0; i--) {
@@ -627,6 +713,7 @@
     var proxSerra = 1.4, nSerras = 0, proxMoeda = 2.2;
     var dedo = null, teclas = {};
     var SENS = 1.25, MAXV = 95, acumVivo = 0;
+    var emp = { x: 0, y: 0 };               // empurrão levado de um rival (decai sozinho)
     var serraSprite = {};
 
     function _spriteSerra(r) {
@@ -673,6 +760,41 @@
       M.som('serra', 0.8); M.tremer(1.2);
     }
 
+    // A armadilha em si (serras, alertas, moedas), sem a coruja: roda
+    // igual pra quem joga e pra quem ficou assistindo.
+    function _mundo(dt) {
+      // spawn de serras (tempo fixo pela semente → igual pra todos)
+      proxSerra -= dt;
+      if (proxSerra <= 0 && serras.length + alertas.length < 7) {
+        var duto = Math.floor(rSpawn() * 3);
+        alertas.push({ duto: duto, t: 1.0 });
+        M.som('alerta', 0.6);
+        proxSerra = Math.max(2.0, 4.6 - nSerras * 0.35) + rSpawn() * 0.8;
+      }
+      for (var a = alertas.length - 1; a >= 0; a--) {
+        alertas[a].t -= dt;
+        if (alertas[a].t <= 0) { _novaSerra(alertas[a].duto); alertas.splice(a, 1); }
+      }
+      proxMoeda -= dt;
+      if (proxMoeda <= 0) {
+        moedas.push({ x: 12 + rMoeda() * 66, y: 22 + rMoeda() * 124, v: 0 });
+        proxMoeda = 2.4 + rMoeda() * 1.4;
+      }
+      for (var i = 0; i < serras.length; i++) {
+        var s = serras[i];
+        s.x += s.vx * dt; s.y += s.vy * dt; s.rot += dt * 18; s.nova = Math.max(0, s.nova - dt);
+        if (s.x < P + s.r) { s.x = P + s.r; s.vx = Math.abs(s.vx); M.som('clank', 0.25); }
+        if (s.x > W - P - s.r) { s.x = W - P - s.r; s.vx = -Math.abs(s.vx); M.som('clank', 0.25); }
+        if (s.y < P + s.r && s.nova <= 0) { s.y = P + s.r; s.vy = Math.abs(s.vy); M.som('clank', 0.25); }
+        if (s.y > H - P - s.r) { s.y = H - P - s.r; s.vy = -Math.abs(s.vy); M.som('clank', 0.25); }
+        s.raspou = Math.max(0, s.raspou - dt);
+      }
+      for (var m = moedas.length - 1; m >= 0; m--) {
+        moedas[m].v += dt;
+        if (moedas[m].v > 6.5) moedas.splice(m, 1);
+      }
+    }
+
     return {
       chave: 'laminas', titulo: 'Lâminas', mundo: [W, H], artes: ['serra', 'chao'],
       iniciar: function () { M.dica('Arraste pra fugir das serras', 2600); },
@@ -709,46 +831,51 @@
           c.strokeStyle = '#4b525c'; c.lineWidth = 0.8; c.strokeRect(dx - 8, -1, 16, P + 2.4);
         });
       },
+      rede: function () { return coruja.x.toFixed(1) + ';' + coruja.y.toFixed(1); },
+      rivalCaiu: function (g) {
+        M.particulas(g.s[0], g.s[1], 14, g.cor, 'pena');
+        M.texto(g.s[0], g.s[1] - 8, g.nome + ' caiu!', g.cor, 3.6);
+      },
+      assistir: function (dt) { _mundo(dt); },
       atualizar: function (dt) {
-        // spawn de serras (tempo fixo pela semente → igual pra todos)
-        proxSerra -= dt;
-        if (proxSerra <= 0 && serras.length + alertas.length < 7) {
-          var duto = Math.floor(rSpawn() * 3);
-          alertas.push({ duto: duto, t: 1.0 });
-          M.som('alerta', 0.6);
-          proxSerra = Math.max(2.0, 4.6 - nSerras * 0.35) + rSpawn() * 0.8;
-        }
-        for (var a = alertas.length - 1; a >= 0; a--) {
-          alertas[a].t -= dt;
-          if (alertas[a].t <= 0) { _novaSerra(alertas[a].duto); alertas.splice(a, 1); }
-        }
-        proxMoeda -= dt;
-        if (proxMoeda <= 0) {
-          moedas.push({ x: 12 + rMoeda() * 66, y: 22 + rMoeda() * 124, v: 0 });
-          proxMoeda = 2.4 + rMoeda() * 1.4;
-        }
+        _mundo(dt);
         // movimento: teclado (PC) soma com o arrasto
         var kx = (teclas.ArrowRight ? 1 : 0) - (teclas.ArrowLeft ? 1 : 0);
         var ky = (teclas.ArrowDown ? 1 : 0) - (teclas.ArrowUp ? 1 : 0);
         if (kx || ky) { coruja.x += kx * 70 * dt; coruja.y += ky * 70 * dt; }
+        // Empurrão: rival encostado me tira do lugar (metade da sobreposição
+        // aqui, a outra metade no celular dele); vindo rápido, dá um tranco
+        // que pode jogar na serra.
+        coruja.x += emp.x * dt; coruja.y += emp.y * dt;
+        var amort = Math.exp(-dt * 5); emp.x *= amort; emp.y *= amort;
+        M.rivais().forEach(function (g) {
+          if (g.e !== 0) return;
+          var dx = coruja.x - g.s[0], dy = coruja.y - g.s[1], d = Math.sqrt(dx * dx + dy * dy), min = coruja.r * 1.5;
+          if (d >= min || d < 0.001) return;
+          var nx = dx / d, ny = dy / d;
+          coruja.x += nx * (min - d) * 0.5; coruja.y += ny * (min - d) * 0.5;
+          var vRel = g.vx * nx + g.vy * ny; // quanto o rival vem pra cima de mim
+          if (vRel > 14 && !g.bateu) {
+            g.bateu = 0.35;
+            var f = Math.min(110, vRel * 1.1);
+            emp.x += nx * f; emp.y += ny * f;
+            M.som('clank', 0.35); M.vibrar(25);
+            M.particulas(coruja.x - nx * coruja.r, coruja.y - ny * coruja.r, 6, '#ffe08a', 'faisca');
+            M.texto(coruja.x, coruja.y - 8, 'EMPURRÃO!', g.cor, 3.6);
+          }
+        });
         coruja.x = _clamp(coruja.x, P + coruja.r, W - P - coruja.r);
         coruja.y = _clamp(coruja.y, P + coruja.r + 2, H - P - coruja.r);
         coruja.asa = Math.max(0, coruja.asa - dt * 3);
-        // serras
+        // serras × coruja
         for (var i = 0; i < serras.length; i++) {
           var s = serras[i];
-          s.x += s.vx * dt; s.y += s.vy * dt; s.rot += dt * 18; s.nova = Math.max(0, s.nova - dt);
-          if (s.x < P + s.r) { s.x = P + s.r; s.vx = Math.abs(s.vx); M.som('clank', 0.25); }
-          if (s.x > W - P - s.r) { s.x = W - P - s.r; s.vx = -Math.abs(s.vx); M.som('clank', 0.25); }
-          if (s.y < P + s.r && s.nova <= 0) { s.y = P + s.r; s.vy = Math.abs(s.vy); M.som('clank', 0.25); }
-          if (s.y > H - P - s.r) { s.y = H - P - s.r; s.vy = -Math.abs(s.vy); M.som('clank', 0.25); }
           var d = _dist(s.x, s.y, coruja.x, coruja.y);
           if (d < s.r * 0.95 + coruja.r * 0.72) {
             M.penas(coruja.x, coruja.y);
             M.morrer('FATIADA! 🪚', 'Durou ' + M.t.toFixed(1).replace('.', ',') + ' s');
             return;
           }
-          s.raspou = Math.max(0, s.raspou - dt);
           if (d < s.r + coruja.r + 4 && !s.raspou) {
             s.raspou = 1.2; M.pontos(40); M.texto(coruja.x, coruja.y - 7, 'raspão! +40', '#ff8fa3', 4);
             M.som('raspao', 0.7); M.vibrar(15);
@@ -756,8 +883,6 @@
           }
         }
         for (var m = moedas.length - 1; m >= 0; m--) {
-          moedas[m].v += dt;
-          if (moedas[m].v > 6.5) { moedas.splice(m, 1); continue; }
           if (_dist(moedas[m].x, moedas[m].y, coruja.x, coruja.y) < coruja.r + 3.5) {
             M.moeda(moedas[m].x, moedas[m].y); M.pontos(150); moedas.splice(m, 1);
           }
@@ -786,8 +911,20 @@
           c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(m.x, m.y + 3, 2.4 * esc, 0.8 * esc, 0, 0, 6.283); c.fill();
           M.desenharMoeda(c, m.x, m.y + bob, 2.8 * esc);
         });
+        // rivais (mesma sala, cor de cada um) — abaixo da minha coruja
+        var rv = M.rivais();
+        rv.forEach(function (g) {
+          if (g.e === 1) {
+            if (g.morteT < 1.4) M.coruja(c, g.s[0], g.s[1], coruja.r, { morta: true, cor: g.cor, semSombra: true, alpha: Math.max(0, 1 - g.morteT / 1.4) });
+            return;
+          }
+          var vg = Math.min(1, Math.sqrt(g.vx * g.vx + g.vy * g.vy) / 60);
+          M.coruja(c, g.s[0], g.s[1], coruja.r, { cor: g.cor, alpha: g.e === 2 ? 0.6 : 0.95, asa: vg * 0.6 * (0.5 + 0.5 * Math.sin(M.t * 30 + g.i)) });
+          M.rotulo(c, g.s[0], g.s[1] - 8.6, g.nome, g.cor);
+        });
         // coruja (abaixo das serras)
         if (M.estado !== 'morto') {
+          if (rv.length) M.rotulo(c, coruja.x, coruja.y - 8.6, 'VOCÊ', '#ffffff');
           var vel = Math.min(1, Math.sqrt(coruja.vx * coruja.vx + coruja.vy * coruja.vy) / 60);
           var perto = 1e9;
           serras.forEach(function (s) { perto = Math.min(perto, _dist(s.x, s.y, coruja.x, coruja.y) - s.r); });
@@ -832,6 +969,7 @@
     var Y_PRENSA = 138;                    // linha da prensa
     var P_MAX = 6.2;                       // teto: sempre sobram ~4 setas visíveis acima
     var XC = 33, XS = 60;                  // coluna da coruja e trilho das setas
+    var LANES = [23.5, 42.5, 48];          // colunas dos rivais (até 3), um de cada lado de mim
     var rSeta = M.fluxo();
     var SETAS = ['esq', 'cima', 'baixo', 'dir'];
     var ROT = { esq: Math.PI, cima: -Math.PI / 2, baixo: Math.PI / 2, dir: 0 };
@@ -914,6 +1052,13 @@
         }
       },
       atualizarFim: function (dt) { prensaAbre += dt * 6; },
+      assistir: function (dt) { var v = _velocidade(); rolagem = (rolagem + v * dt) % 1; },
+      rede: function () { return pVis.toFixed(2) + ';' + degraus; },
+      rivalCaiu: function (g) {
+        var lx = LANES[g.i % LANES.length];
+        M.particulas(lx, Y_PRENSA - 2, 12, g.cor, 'pena');
+        M.texto(lx, Y_PRENSA - 12, g.nome + ' esmagada!', g.cor, 3.4);
+      },
       sobreviveu: function () { M.pontos(2000); M.texto(45, 60, '+2000', '#4ade80', 6); },
       desenhar: function (c) {
         // degraus rolando pra baixo
@@ -963,6 +1108,14 @@
         }
         c.globalAlpha = 1;
 
+        // rivais subindo na mesma escada, cada um na própria altura
+        var rv = M.rivais();
+        rv.forEach(function (g) {
+          if (g.e === 1) return; // amassado: desenhado em cima da prensa, lá embaixo
+          var lx = LANES[g.i % LANES.length], gy = Math.max(14, Y_PRENSA - g.s[0] * HS - 4.2);
+          M.coruja(c, lx, gy, 3.8, { cor: g.cor, alpha: 0.92, costas: g.e === 0, passo: (g.n[1] | 0) % 2 === 1, vitoria: g.e === 2 });
+          M.rotulo(c, lx, gy - 7.6, g.nome, g.cor);
+        });
         // coruja de costas subindo
         if (M.estado !== 'morto') {
           var cy = baseY - 5.2 - pulo * 2.6;
@@ -1011,6 +1164,9 @@
         }
         // coruja amassada na mandíbula (arte da coruja operária)
         if (M.estado === 'morto' && _arte('coruja')) M.coruja(c, XC, Y_PRENSA - 6.4, 6.4, { morta: true, semSombra: true });
+        rv.forEach(function (g) {
+          if (g.e === 1) M.coruja(c, LANES[g.i % LANES.length], Y_PRENSA - 5, 5, { morta: true, semSombra: true, cor: g.cor });
+        });
       },
       proxima: function () { return _seta(degraus).s; },
       toqueInicio: function (pt) { swipe = { x: pt.x, y: pt.y, id: pt.id }; },
@@ -1170,6 +1326,17 @@
         pisos.forEach(function (p) { if (p.vivo && p.simb !== alvo) p.cai = Math.min(1, p.cai + dt * 2.2); });
       },
       sobreviveu: function () { M.pontos(2000); M.texto(45, 90, '+2000', '#4ade80', 6); },
+      rede: function () { return cor.x.toFixed(1) + ';' + cor.y.toFixed(1); },
+      rivalCaiu: function (g) { M.texto(g.s[0], g.s[1] - 9, g.nome + ' caiu!', g.cor, 3.4); },
+      // Assistindo: as rodadas seguem (mesma semente → mesmos pisos dos rivais).
+      assistir: function (dt) {
+        faseT += dt;
+        if (fase === 'escolha' && faseT >= faseDur) { fase = 'queda'; faseT = 0; M.tremer(1); }
+        if (fase === 'queda') {
+          pisos.forEach(function (p) { if (p.vivo && p.simb !== alvo) p.cai = Math.min(1, p.cai + dt * 2.2); });
+          if (faseT >= 1.15) _novaRodada();
+        }
+      },
       desenhar: function (c) {
         // painel: símbolo alvo + anel de tempo
         var rest = fase === 'escolha' ? 1 - faseT / faseDur : 0;
@@ -1207,12 +1374,26 @@
           c.restore();
         });
         c.globalAlpha = 1;
+        // rivais (um pouco deslocados pra não sumirem atrás de quem divide o piso)
+        var rv = M.rivais(), DESL = [-2.6, 2.6, 0];
+        rv.forEach(function (g) {
+          var gx = g.s[0] + DESL[g.i % 3], gy = g.s[1];
+          if (g.e === 1) {
+            var kg = Math.min(1, g.morteT * 1.6);
+            if (kg < 1) M.coruja(c, gx, gy + kg * 10, 4 * (1 - kg * 0.85), { rot: kg * 6, olhos: 'medo', semSombra: true, cor: g.cor, alpha: 1 - kg * 0.6 });
+            return;
+          }
+          M.coruja(c, gx, gy, 4, { cor: g.cor, alpha: 0.92, vitoria: g.e === 2 });
+          M.rotulo(c, gx, gy - 8, g.nome, g.cor);
+        });
         // coruja
         if (cor.caindo) {
           var k = cor.caindo;
+          if (k >= 1) return;
           M.coruja(c, cor.x, cor.y + k * 10, 4.4 * (1 - k * 0.85), { rot: k * 6, olhos: 'medo', semSombra: true, asa: Math.abs(Math.sin(M.t * 25)), alpha: 1 - k * 0.6 });
         } else {
           M.coruja(c, cor.x, cor.y, 4.4, { asa: cor.de ? 0.8 : 0, olhos: (fase === 'escolha' && rest < 0.3) ? 'medo' : null, pisca: (M.t % 3.2) < 0.12 });
+          if (rv.length) M.rotulo(c, cor.x, cor.y - 8.6, 'VOCÊ', '#ffffff');
         }
       },
       estado: function () { return { alvo: alvo, fase: fase, rodada: rodada, pisos: pisos.filter(function (p) { return p.vivo && p.simb === alvo; }).map(function (p) { return [_cx(p.c), _cy(p.l)]; }) }; },
@@ -1357,6 +1538,9 @@
         }
       },
       sobreviveu: function () { M.pontos(1500); M.texto(45, 80, '+1500', '#4ade80', 6); },
+      rede: function () { return String(erros); },
+      rivalCaiu: function (g) { M.texto(14 + g.i * 26, 63, g.nome + ' travou!', g.cor, 3.2); },
+      assistir: function (dt) { rolo = (rolo + _vel() * dt) % 6; },
       desenhar: function (c) {
         // fogo da fornalha
         var chama = 0.6 + 0.4 * Math.sin(M.t * 13) * Math.sin(M.t * 7.3) + fogo * 0.8;
@@ -1394,6 +1578,16 @@
           if (acesa) { c.strokeStyle = 'rgba(255,45,85,.5)'; c.lineWidth = 1; c.beginPath(); c.arc(60 + e * 8, 130, 3.8, 0, 6.283); c.stroke(); }
         }
         c.fillStyle = '#9aa3ad'; c.font = '800 3.2px ' + M.fonte; c.textAlign = 'center'; c.fillText('ERROS', 68, 141);
+        // rivais: cada um opera a própria esteira — aqui só a cara e os erros
+        M.rivais().forEach(function (g) {
+          var rx = 14 + g.i * 26, ry = 72, ne = g.n[0] | 0;
+          M.coruja(c, rx, ry, 3.2, { cor: g.cor, semSombra: true, alpha: g.e === 1 ? 0.5 : 0.95, olhos: g.e === 1 ? 'x' : (ne >= 2 ? 'medo' : null), vitoria: g.e === 2 });
+          for (var k = 0; k < MAX_ERROS; k++) {
+            c.fillStyle = k < ne ? '#ff2d55' : 'rgba(60,24,30,.9)';
+            c.beginPath(); c.arc(rx + 6.6 + k * 3, ry + 1.5, 1.1, 0, 6.283); c.fill();
+          }
+          M.rotulo(c, rx + 6, ry - 6, g.nome, g.cor);
+        });
         // coruja operadora
         var bracos = voando.length ? 1 : 0;
         M.coruja(c, 28, 132, 7, { asa: bracos ? 1 : 0.15 * Math.sin(M.t * 3), olhos: erros >= 2 ? 'medo' : null, olharY: -1, olharX: 0.3 });

@@ -9477,72 +9477,184 @@ body.aprender-fs-open .apr-tela-licao {
 .dm-fundo-status.erro { color: var(--red); }
 
 /* ═════ Coleção (hub.js: colecaoAbrir) ═════════════════════════
-   Tudo da loja agrupado por jogo: o que tem (colorido, Equipar/Em
-   uso) e o que falta (apagado, com cadeado e preço). */
+   Coleção estilo skins de jogo: raridade pelo preço (comum, rara,
+   épica, lendária), carta com a cor da raridade, item que falta em
+   silhueta com cadeado, e janela do item (.colecao-detalhe). */
 .colecao-overlay {
+  --r-comum: #9fb3c8; --r-rara: #38bdf8; --r-epica: #c084fc; --r-lendaria: #fbbf24;
   position: fixed; inset: 0; z-index: 9700;
   display: none; align-items: flex-end; justify-content: center;
-  background: rgba(5,8,14,.76); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  background: rgba(3,5,10,.8); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
 }
 .colecao-caixa {
-  width: 100%; max-width: 560px; height: 92vh; height: 92dvh;
-  display: flex; flex-direction: column;
-  background: var(--surface, #141821); border: 1px solid var(--border, rgba(255,255,255,.1));
-  border-radius: 20px 20px 0 0; overflow: hidden;
-  box-shadow: 0 -10px 40px rgba(0,0,0,.5);
+  position: relative; width: 100%; max-width: 560px; height: 94vh; height: 94dvh;
+  display: flex; flex-direction: column; overflow: hidden;
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(251,191,36,.14), transparent 60%),
+    linear-gradient(180deg, #121521, #0b0d15);
+  border: 1px solid rgba(255,255,255,.08); border-bottom: none;
+  border-radius: 22px 22px 0 0; box-shadow: 0 -12px 50px rgba(0,0,0,.6);
+  color: #eef1f8;
 }
-.colecao-topo { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px; }
-.colecao-titulo { font-family: var(--font-h); font-weight: 900; font-size: 19px; color: var(--text); }
-.colecao-resumo { padding: 4px 16px 10px; }
-.colecao-resumo-num { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
-.colecao-resumo-num b { font-family: var(--font-h); font-size: 24px; color: #fbbf24; margin-right: 4px; }
-.colecao-resumo-num span { font-weight: 800; color: var(--text); }
-.colecao-barra { margin-top: 6px; height: 8px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }
-.colecao-barra i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #f59e0b, #fde047); transition: width .4s ease; }
-.colecao-filtros { display: flex; gap: 6px; padding: 0 16px 10px; }
+.colecao-topo { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 4px; }
+.colecao-titulo {
+  font-family: var(--font-h); font-weight: 900; font-size: 26px; line-height: 1; letter-spacing: .02em;
+  text-transform: uppercase; color: #fde68a; text-shadow: 0 2px 14px rgba(251,191,36,.35);
+}
+.colecao-titulo-sub { display: block; font-size: 11px; letter-spacing: .3em; color: rgba(255,255,255,.5); margin-bottom: 3px; }
+.colecao-x {
+  width: 36px; height: 36px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
+  font-size: 15px; color: #fff; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
+}
+.colecao-resumo { padding: 10px 16px 8px; }
+.colecao-resumo-linha { display: flex; align-items: center; gap: 14px; }
+.colecao-resumo-num { font-family: var(--font-h); font-weight: 900; line-height: 1; white-space: nowrap; }
+.colecao-resumo-num b { font-size: 38px; color: #fbbf24; }
+.colecao-resumo-num span { font-size: 18px; color: rgba(255,255,255,.45); }
+.colecao-resumo-txt { flex: 1; font-size: 12.5px; font-weight: 700; color: rgba(255,255,255,.75); }
+.colecao-barra { margin-top: 7px; height: 9px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,.5); }
+.colecao-barra i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #f59e0b, #fde047); box-shadow: 0 0 10px rgba(251,191,36,.6); transition: width .4s ease; }
+.colecao-rars { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.colecao-rar {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 99px;
+  font-size: 11px; font-weight: 700; color: rgba(255,255,255,.7); background: rgba(255,255,255,.05);
+}
+.colecao-rar i { width: 8px; height: 8px; border-radius: 2px; transform: rotate(45deg); background: var(--rc); box-shadow: 0 0 6px var(--rc); }
+.colecao-rar b { color: #fff; }
+.r-comum { --rc: var(--r-comum); } .r-rara { --rc: var(--r-rara); }
+.r-epica { --rc: var(--r-epica); } .r-lendaria { --rc: var(--r-lendaria); }
+.colecao-filtros { display: flex; gap: 6px; padding: 4px 16px 10px; }
 .colecao-filtros button {
-  flex: 1; padding: 8px 0; border-radius: 999px; cursor: pointer;
-  font-weight: 800; font-size: 13px; color: var(--muted);
-  background: rgba(255,255,255,.05); border: 1px solid var(--border, rgba(255,255,255,.12));
+  flex: 1; padding: 8px 0; border-radius: 10px; cursor: pointer;
+  font-weight: 800; font-size: 12.5px; letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,.6);
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1);
 }
-.colecao-filtros button.on { color: #1a1205; background: #fbbf24; border-color: #fbbf24; }
-.colecao-corpo { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 12px 24px; }
-.colecao-grupo { margin-top: 10px; }
-.colecao-grupo-topo { display: flex; align-items: center; gap: 8px; padding: 8px 4px; }
+.colecao-filtros button.on { color: #1a1205; background: linear-gradient(180deg, #fde047, #f59e0b); border-color: #fbbf24; }
+.colecao-corpo { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 12px 28px; }
+.colecao-grupo { margin-top: 14px; }
+.colecao-grupo-topo { display: flex; align-items: center; gap: 8px; padding: 0 2px 6px; }
 .colecao-grupo-ico { font-size: 18px; }
-.colecao-grupo-nome { flex: 1; font-weight: 800; font-size: 14px; color: var(--text); }
-.colecao-grupo-qtd { font-weight: 800; font-size: 12px; color: var(--muted); padding: 2px 9px; border-radius: 99px; background: rgba(255,255,255,.06); }
-.colecao-grupo-qtd.completo { color: #1a1205; background: #4ade80; }
-.colecao-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.colecao-item {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px;
-  padding: 8px 6px 9px; border-radius: 14px; text-align: center;
-  background: var(--surface2, rgba(255,255,255,.04)); border: 1px solid var(--border, rgba(255,255,255,.1));
+.colecao-grupo-nome { flex: 1; font-family: var(--font-h); font-weight: 800; font-size: 14px; letter-spacing: .02em; }
+.colecao-grupo-qtd { font-weight: 800; font-size: 12px; color: rgba(255,255,255,.6); }
+.colecao-grupo.completo .colecao-grupo-qtd { color: #fbbf24; }
+.colecao-grupo-barra { height: 3px; margin: 0 2px 10px; border-radius: 99px; background: rgba(255,255,255,.07); overflow: hidden; }
+.colecao-grupo-barra i { display: block; height: 100%; background: #fbbf24; }
+.colecao-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+
+/* Carta */
+.colecao-carta {
+  position: relative; display: flex; flex-direction: column; align-items: stretch; padding: 0; cursor: pointer;
+  border-radius: 14px; overflow: hidden; text-align: center; color: inherit; font: inherit;
+  background: linear-gradient(180deg, #1b1f2e, #12141e);
+  border: 2px solid color-mix(in srgb, var(--rc) 70%, transparent);
+  box-shadow: 0 6px 14px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.04);
+  -webkit-tap-highlight-color: transparent; transition: transform .12s ease;
 }
-.colecao-item.tem { border-color: rgba(251,191,36,.35); }
-.colecao-item.destaque { border: 2px solid #fbbf24; box-shadow: 0 0 18px rgba(251,191,36,.45); animation: colecaoBrilho 1.6s ease-in-out 3; }
-@keyframes colecaoBrilho { 50% { box-shadow: 0 0 30px rgba(251,191,36,.85); } }
-.colecao-novo {
-  position: absolute; top: -7px; right: -4px; z-index: 2; padding: 2px 7px; border-radius: 99px;
-  font-size: 10px; font-weight: 900; letter-spacing: .04em; color: #1a1205; background: #fbbf24;
+.colecao-carta:active { transform: scale(.96); }
+.colecao-carta.tem { box-shadow: 0 6px 16px rgba(0,0,0,.45), 0 0 14px color-mix(in srgb, var(--rc) 35%, transparent); }
+.colecao-carta.falta { border-color: color-mix(in srgb, var(--rc) 28%, #2a2e3d); }
+.colecao-carta-arte {
+  position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 4 / 4.4;
+  background: radial-gradient(90% 75% at 50% 70%, color-mix(in srgb, var(--rc) 38%, transparent), transparent 72%);
+  overflow: hidden;
 }
-.colecao-prev {
-  width: 100%; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden;
-  display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.22);
+/* brilho diagonal das cartas que você tem */
+.colecao-carta.tem .colecao-carta-arte::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.22) 48%, transparent 60%);
+  transform: translateX(-120%); animation: colecaoBrilho 4.5s ease-in-out infinite;
 }
-.colecao-prev img { width: 88%; height: 88%; object-fit: contain; }
-.colecao-prev .loja-item-ph { font-size: 30px; }
-.colecao-bg-mini { display: block; width: 100%; height: 100%; }
-.colecao-item.falta .colecao-prev { filter: grayscale(1) brightness(.55); opacity: .7; }
-.colecao-nome { font-size: 11.5px; font-weight: 700; line-height: 1.2; color: var(--text); min-height: 2.4em; display: flex; align-items: center; }
-.colecao-item.falta .colecao-nome { color: var(--muted); }
-.colecao-preco { font-size: 11px; font-weight: 800; color: var(--muted); }
-.colecao-em-uso { font-size: 11px; font-weight: 800; color: #4ade80; }
-.colecao-equipar {
-  padding: 4px 12px; border-radius: 99px; cursor: pointer; font-size: 11px; font-weight: 800;
-  color: #fbbf24; background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.45);
+@keyframes colecaoBrilho { 0%, 62% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+.colecao-carta-arte > img { width: 84%; height: 84%; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(0,0,0,.5)); }
+.colecao-carta-arte .loja-item-ph { font-size: 30px; }
+.colecao-carta-arte .colecao-bg-mini { position: absolute; inset: 8%; border-radius: 8px; }
+.colecao-carta.falta .colecao-carta-arte > *:not(.colecao-cadeado):not(.colecao-tag-novo) { filter: grayscale(1) brightness(.35) contrast(1.1); opacity: .85; }
+.colecao-cadeado {
+  position: absolute; z-index: 2; font-size: 22px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.8));
 }
-.colecao-vazio { padding: 30px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+.colecao-tag-uso, .colecao-tag-novo {
+  position: absolute; z-index: 2; top: 6px; left: 6px; padding: 2px 7px; border-radius: 6px;
+  font-size: 9.5px; font-weight: 900; letter-spacing: .06em; color: #04130a; background: #4ade80;
+}
+.colecao-tag-novo { left: auto; right: 6px; color: #1a1205; background: #fbbf24; }
+.colecao-carta-rar {
+  padding: 3px 0; font-size: 9.5px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase;
+  color: #0b0d15; background: var(--rc);
+}
+.colecao-carta.falta .colecao-carta-rar { color: var(--rc); background: color-mix(in srgb, var(--rc) 14%, transparent); }
+.colecao-carta-nome {
+  padding: 6px 5px 2px; font-size: 11.5px; font-weight: 800; line-height: 1.15; min-height: 2.5em;
+  display: flex; align-items: center; justify-content: center;
+}
+.colecao-carta.falta .colecao-carta-nome { color: rgba(255,255,255,.55); }
+.colecao-carta-preco { padding: 0 0 7px; font-size: 11px; font-weight: 800; color: rgba(255,255,255,.5); }
+.colecao-carta.tem .colecao-carta-nome { padding-bottom: 8px; }
+.colecao-carta.destaque { animation: colecaoPulso 1.4s ease-in-out 3; }
+@keyframes colecaoPulso { 50% { box-shadow: 0 0 26px color-mix(in srgb, var(--rc) 80%, transparent); } }
+.colecao-vazio { padding: 40px 16px; text-align: center; color: rgba(255,255,255,.6); font-size: 13px; }
+
+/* Janela do item */
+.colecao-detalhe {
+  position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
+  padding: 18px; background: rgba(3,5,10,.78); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  opacity: 0; pointer-events: none; transition: opacity .18s ease;
+}
+.colecao-detalhe.on { opacity: 1; pointer-events: auto; }
+.colecao-det {
+  position: relative; width: min(360px, 100%); display: flex; flex-direction: column; align-items: center;
+  padding: 18px 18px 16px; border-radius: 22px; text-align: center;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rc) 22%, #151826), #10121b 70%);
+  border: 2px solid var(--rc); box-shadow: 0 0 40px color-mix(in srgb, var(--rc) 40%, transparent), 0 20px 50px rgba(0,0,0,.6);
+  transform: scale(.92); transition: transform .2s cubic-bezier(.3,1.4,.5,1);
+}
+.colecao-detalhe.on .colecao-det { transform: scale(1); }
+.colecao-det.falta { border-color: color-mix(in srgb, var(--rc) 55%, #333); box-shadow: 0 20px 50px rgba(0,0,0,.6); }
+.colecao-det-x { position: absolute; top: 10px; right: 10px; z-index: 3; }
+.colecao-det-palco { position: relative; width: 100%; height: 210px; display: flex; align-items: center; justify-content: center; }
+.colecao-det-raios {
+  position: absolute; left: 50%; top: 50%; width: 320px; height: 320px; margin: -160px 0 0 -160px; border-radius: 50%;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--rc) 30%, transparent) 0 8deg, transparent 8deg 20deg);
+  -webkit-mask: radial-gradient(circle, #000 20%, transparent 68%); mask: radial-gradient(circle, #000 20%, transparent 68%);
+  animation: colecaoGira 16s linear infinite; pointer-events: none;
+}
+.colecao-det.falta .colecao-det-raios { opacity: .35; }
+@keyframes colecaoGira { to { transform: rotate(360deg); } }
+.colecao-det-arte {
+  position: relative; width: 180px; height: 180px; display: flex; align-items: center; justify-content: center;
+  border-radius: 18px; overflow: hidden;
+}
+.colecao-det-arte > img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 10px 14px rgba(0,0,0,.6)); }
+.colecao-det-arte .loja-item-ph { font-size: 70px; }
+.colecao-det-arte .colecao-bg-mini { position: absolute; inset: 0; }
+.colecao-det.falta .colecao-det-arte > * { filter: grayscale(.85) brightness(.6); }
+.colecao-det-nav {
+  position: absolute; top: 50%; margin-top: -20px; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+  font-size: 26px; line-height: 1; color: #fff; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.18);
+}
+.colecao-det-nav.ant { left: -4px; } .colecao-det-nav.prox { right: -4px; }
+.colecao-det-rar {
+  margin-top: 4px; padding: 3px 12px; border-radius: 99px; font-size: 11px; font-weight: 900; letter-spacing: .18em;
+  text-transform: uppercase; color: #0b0d15; background: var(--rc); box-shadow: 0 0 14px color-mix(in srgb, var(--rc) 60%, transparent);
+}
+.colecao-det-nome { margin-top: 8px; font-family: var(--font-h); font-weight: 900; font-size: 24px; line-height: 1.1; color: #fff; }
+.colecao-det-onde { margin-top: 3px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--rc); }
+.colecao-det-desc { margin-top: 8px; font-size: 13px; color: rgba(255,255,255,.75); }
+.colecao-det-status { margin-top: 10px; font-size: 12px; font-weight: 700; color: rgba(255,255,255,.55); }
+.colecao-det-btn {
+  margin-top: 12px; width: 100%; padding: 12px; border-radius: 14px; cursor: pointer;
+  font-family: var(--font-h); font-weight: 900; font-size: 15px; letter-spacing: .03em;
+  color: #1a1205; background: linear-gradient(180deg, #fde047, #f59e0b); border: none;
+  box-shadow: 0 6px 16px rgba(245,158,11,.3);
+}
+.colecao-det-btn.sec { color: #fff; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); box-shadow: none; }
+.colecao-det-btn.ok { color: #04130a; background: #4ade80; box-shadow: none; }
+.colecao-det-btn:disabled { cursor: default; }
+.colecao-det-pos { margin-top: 8px; font-size: 11px; color: rgba(255,255,255,.4); }
+@media (prefers-reduced-motion: reduce) {
+  .colecao-carta.tem .colecao-carta-arte::after, .colecao-det-raios { animation: none; }
+}
+
 .perfil-colecao-btn {
   display: flex; align-items: center; justify-content: space-between; width: 100%;
   margin: 14px 0 8px; padding: 13px 16px; border-radius: 14px; cursor: pointer;

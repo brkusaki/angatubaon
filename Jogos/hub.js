@@ -4379,16 +4379,31 @@
 
   /* ══════════════════════════════════════════════════════════════
      COLEÇÃO — tudo o que existe na loja (itens pagos), agrupado por jogo,
-     com o que a pessoa já tem e quanto falta (estilo coleção do LoL).
+     estilo coleção de skins: cada item tem RARIDADE pelo preço (Comum,
+     Rara, Épica, Lendária), carta com a cor da raridade e, ao tocar,
+     uma janela com o item grande (equipar / comprar / ‹ › entre itens).
      Abre do perfil ("Minha coleção") e do prêmio do ovo dourado da
-     Corujinha, que destaca o item recém-ganho. 100% local: lê o mesmo
-     inventário/equipado da loja, não grava nada além do "Equipar".
+     Corujinha, que já abre a janela do item ganho. 100% local: lê o
+     mesmo inventário/equipado da loja.
   ══════════════════════════════════════════════════════════════ */
   var COLECAO_GRUPO_PERFIL = { badge: 'Badges do perfil', bg: 'Fundos do perfil', card: 'Cards do perfil' };
   var COLECAO_ICO_PERFIL = { badge: '🎖️', bg: '🖼️', card: '🪪' };
+  var COLECAO_RARIDADES = [
+    { id: 'comum',    nome: 'Comum',    ate: 90 },
+    { id: 'rara',     nome: 'Rara',     ate: 140 },
+    { id: 'epica',    nome: 'Épica',    ate: 190 },
+    { id: 'lendaria', nome: 'Lendária', ate: Infinity }
+  ];
   var _colecaoFiltro = 'todas';   // 'todas' | 'tenho' | 'faltam'
   var _colecaoDestaque = '';
+  var _colecaoLista = [];         // ordem visível (pra ‹ › da janela)
+  var _colecaoAberto = '';        // id na janela de detalhe
 
+  function _colecaoRaridade(item) {
+    var p = (item && item.preco) || 0;
+    for (var i = 0; i < COLECAO_RARIDADES.length; i++) if (p <= COLECAO_RARIDADES[i].ate) return COLECAO_RARIDADES[i];
+    return COLECAO_RARIDADES[0];
+  }
   // Itens que contam pra coleção: os pagos (os grátis todo mundo tem).
   function _colecaoItens() {
     return _lojaCatalogo().filter(function (it) { return it.preco > 0; });
@@ -4398,7 +4413,7 @@
     itens.forEach(function (it) { if (_temItem(it.id)) tem++; });
     return { tem: tem, total: itens.length };
   }
-  // Rótulo de onde o item vale: "Skin do Piano", "Badge do perfil"...
+  // Rótulo de onde o item vale: "Skin · Piano da Coruja", "Badge do perfil"...
   function _colecaoOnde(item) {
     if (!item) return '';
     if (item.jogo) return (item.tipo === 'bg' ? 'Cenário · ' : 'Skin · ') + _perfilLabelJogo(item.jogo);
@@ -4434,8 +4449,8 @@
     ov.innerHTML =
       '<div class="colecao-caixa">' +
         '<div class="colecao-topo">' +
-          '<div class="colecao-titulo">🏆 Minha coleção</div>' +
-          '<button type="button" class="lojajogo-fechar" onclick="colecaoFechar()" aria-label="Fechar">✕</button>' +
+          '<div class="colecao-titulo"><span class="colecao-titulo-sub">Minha</span>Coleção</div>' +
+          '<button type="button" class="colecao-x" onclick="colecaoFechar()" aria-label="Fechar">✕</button>' +
         '</div>' +
         '<div class="colecao-resumo" id="colecao-resumo"></div>' +
         '<div class="colecao-filtros" role="group" aria-label="Filtrar">' +
@@ -4444,16 +4459,20 @@
           '<button type="button" data-colecao-filtro="faltam">Faltam</button>' +
         '</div>' +
         '<div class="colecao-corpo" id="colecao-corpo"></div>' +
+        '<div class="colecao-detalhe" id="colecao-detalhe" aria-hidden="true"></div>' +
       '</div>';
     ov.addEventListener('click', function (e) {
-      if (e.target === ov) { colecaoFechar(); return; }
-      var f = e.target.closest && e.target.closest('[data-colecao-filtro]');
+      var alvo = e.target;
+      if (alvo === ov) { colecaoFechar(); return; }
+      var t = alvo.closest ? alvo : null;
+      if (!t) return;
+      var f = t.closest('[data-colecao-filtro]');
       if (f) { _colecaoFiltro = f.getAttribute('data-colecao-filtro'); _colecaoRender(); return; }
-      var eqb = e.target.closest && e.target.closest('[data-colecao-equipar]');
-      if (eqb) {
-        var it = _lojaItemPorId(eqb.getAttribute('data-colecao-equipar'));
-        if (it) { _equiparItem(it.slot, it.id); _colecaoRender(); }
-      }
+      var ac = t.closest('[data-colecao-acao]');
+      if (ac) { _colecaoAcao(ac.getAttribute('data-colecao-acao')); return; }
+      if (alvo.id === 'colecao-detalhe') { _colecaoDetalheFechar(); return; }
+      var card = t.closest('[data-colecao-abrir]');
+      if (card) _colecaoDetalheAbrir(card.getAttribute('data-colecao-abrir'));
     });
     parent.appendChild(ov);
     return ov;
@@ -4465,10 +4484,23 @@
     if (!corpo) return;
     var r = _colecaoResumo();
     var pct = r.total ? Math.round(r.tem * 100 / r.total) : 0;
+    // Quantos de cada raridade (tem / existem).
+    var porRar = {};
+    _colecaoItens().forEach(function (it) {
+      var rr = _colecaoRaridade(it).id;
+      porRar[rr] = porRar[rr] || { tem: 0, total: 0 };
+      porRar[rr].total++; if (_temItem(it.id)) porRar[rr].tem++;
+    });
     if (resumoEl) resumoEl.innerHTML =
-      '<div class="colecao-resumo-num"><b>' + r.tem + '</b> de ' + r.total + ' itens' +
-        '<span>' + (r.tem >= r.total ? 'Coleção completa! 🎉' : 'Faltam ' + (r.total - r.tem)) + '</span></div>' +
-      '<div class="colecao-barra"><i style="width:' + pct + '%"></i></div>';
+      '<div class="colecao-resumo-linha">' +
+        '<div class="colecao-resumo-num"><b>' + r.tem + '</b><span>/' + r.total + '</span></div>' +
+        '<div class="colecao-resumo-txt">' + (r.tem >= r.total ? 'Coleção completa! 🎉' : pct + '% completa · faltam ' + (r.total - r.tem)) +
+          '<div class="colecao-barra"><i style="width:' + pct + '%"></i></div></div>' +
+      '</div>' +
+      '<div class="colecao-rars">' + COLECAO_RARIDADES.map(function (rr) {
+        var c = porRar[rr.id] || { tem: 0, total: 0 };
+        return '<span class="colecao-rar r-' + rr.id + '"><i></i>' + rr.nome + ' <b>' + c.tem + '/' + c.total + '</b></span>';
+      }).join('') + '</div>';
     var fb = document.querySelectorAll('#colecao-overlay [data-colecao-filtro]');
     for (var k = 0; k < fb.length; k++) fb[k].classList.toggle('on', fb[k].getAttribute('data-colecao-filtro') === _colecaoFiltro);
 
@@ -4490,56 +4522,139 @@
       return grupos[a].nome.localeCompare(grupos[b].nome, 'pt-BR');
     });
     var eq = _equipadoLer(), html = '';
+    _colecaoLista = [];
     ordem.forEach(function (chave) {
       var g = grupos[chave];
       var lista = g.itens.filter(function (it) {
         var tem = _temItem(it.id);
         return _colecaoFiltro === 'todas' || (_colecaoFiltro === 'tenho' ? tem : !tem);
-      });
+      }).sort(function (a, b) { return a.preco - b.preco; });
       if (!lista.length) return;
       var completo = g.tem >= g.itens.length;
-      html += '<div class="colecao-grupo">' +
+      var gp = Math.round(g.tem * 100 / g.itens.length);
+      html += '<section class="colecao-grupo' + (completo ? ' completo' : '') + '">' +
         '<div class="colecao-grupo-topo"><span class="colecao-grupo-ico" aria-hidden="true">' + g.ico + '</span>' +
           '<span class="colecao-grupo-nome">' + _rankEsc(g.nome) + '</span>' +
-          '<span class="colecao-grupo-qtd' + (completo ? ' completo' : '') + '">' + g.tem + '/' + g.itens.length + (completo ? ' ✓' : '') + '</span></div>' +
+          '<span class="colecao-grupo-qtd">' + (completo ? '★ ' : '') + g.tem + '/' + g.itens.length + '</span></div>' +
+        '<div class="colecao-grupo-barra"><i style="width:' + gp + '%"></i></div>' +
         '<div class="colecao-grade">';
       lista.forEach(function (it) {
-        var tem = _temItem(it.id), emUso = (eq[it.slot] === it.id);
-        var acao = !tem ? '<span class="colecao-preco">🔒 🪙 ' + it.preco + '</span>'
-          : emUso ? '<span class="colecao-em-uso">Em uso</span>'
-          : '<button type="button" class="colecao-equipar" data-colecao-equipar="' + _rankEsc(it.id) + '">Equipar</button>';
-        html += '<div class="colecao-item' + (tem ? ' tem' : ' falta') + (it.id === _colecaoDestaque ? ' destaque' : '') + '" data-colecao-id="' + _rankEsc(it.id) + '">' +
-            (it.id === _colecaoDestaque ? '<span class="colecao-novo">NOVO</span>' : '') +
-            '<div class="colecao-prev">' + _colecaoPreviewHtml(it) + '</div>' +
-            '<div class="colecao-nome">' + _rankEsc(it.nome) + '</div>' + acao +
-          '</div>';
+        _colecaoLista.push(it.id);
+        var tem = _temItem(it.id), emUso = (eq[it.slot] === it.id), rar = _colecaoRaridade(it);
+        html += '<button type="button" class="colecao-carta r-' + rar.id + (tem ? ' tem' : ' falta') + (emUso ? ' em-uso' : '') +
+              (it.id === _colecaoDestaque ? ' destaque' : '') + '" data-colecao-abrir="' + _rankEsc(it.id) + '" aria-label="' + _rankEsc(it.nome) + '">' +
+            '<span class="colecao-carta-arte">' + _colecaoPreviewHtml(it) +
+              (tem ? '' : '<span class="colecao-cadeado" aria-hidden="true">🔒</span>') +
+              (emUso ? '<span class="colecao-tag-uso">EM USO</span>' : '') +
+              (it.id === _colecaoDestaque ? '<span class="colecao-tag-novo">NOVO</span>' : '') +
+            '</span>' +
+            '<span class="colecao-carta-rar">' + rar.nome + '</span>' +
+            '<span class="colecao-carta-nome">' + _rankEsc(it.nome) + '</span>' +
+            (tem ? '' : '<span class="colecao-carta-preco">🪙 ' + it.preco + '</span>') +
+          '</button>';
       });
-      html += '</div></div>';
+      html += '</div></section>';
     });
     corpo.innerHTML = html || '<div class="colecao-vazio">' +
-      (_colecaoFiltro === 'tenho' ? 'Você ainda não tem nenhum item. Jogue pra ganhar moedas e tente o ovo dourado na Corujinha!' : 'Nada por aqui.') + '</div>';
+      (_colecaoFiltro === 'tenho' ? 'Você ainda não tem nenhum item. Jogue pra ganhar moedas e tente o ovo dourado na Corujinha!' : 'Você já tem tudo por aqui! 🎉') + '</div>';
+    if (_colecaoAberto) _colecaoDetalheRender();
   }
 
-  // destaqueId (opcional): item pra realçar e rolar até ele (prêmio novo).
+  // ── Janela do item ────────────────────────────────────────────
+  function _colecaoDetalheAbrir(id) {
+    var it = _lojaItemPorId(id);
+    var el = document.getElementById('colecao-detalhe');
+    if (!it || !el) return;
+    _colecaoAberto = id;
+    _colecaoDetalheRender();
+    el.classList.add('on');
+    el.setAttribute('aria-hidden', 'false');
+  }
+  function _colecaoDetalheFechar() {
+    var el = document.getElementById('colecao-detalhe');
+    if (el) { el.classList.remove('on'); el.setAttribute('aria-hidden', 'true'); }
+    _colecaoAberto = '';
+  }
+  function _colecaoDetalheRender() {
+    var el = document.getElementById('colecao-detalhe');
+    var it = _lojaItemPorId(_colecaoAberto);
+    if (!el || !it) return;
+    var tem = _temItem(it.id), eq = _equipadoLer(), emUso = (eq[it.slot] === it.id);
+    var rar = _colecaoRaridade(it), saldo = _moedasLer();
+    var pos = _colecaoLista.indexOf(it.id), n = _colecaoLista.length;
+    var acao;
+    if (emUso) {
+      acao = (it.slot === 'badge')
+        ? '<button type="button" class="colecao-det-btn sec" data-colecao-acao="remover">Tirar badge</button>'
+        : '<button type="button" class="colecao-det-btn ok" disabled>✓ Em uso</button>';
+    } else if (tem) {
+      acao = '<button type="button" class="colecao-det-btn" data-colecao-acao="equipar">Equipar</button>';
+    } else if (saldo >= it.preco) {
+      acao = '<button type="button" class="colecao-det-btn" data-colecao-acao="comprar">Comprar · 🪙 ' + it.preco + '</button>';
+    } else {
+      acao = '<button type="button" class="colecao-det-btn sec" disabled>Faltam 🪙 ' + (it.preco - saldo) + '</button>';
+    }
+    el.innerHTML =
+      '<div class="colecao-det r-' + rar.id + (tem ? ' tem' : ' falta') + '">' +
+        '<button type="button" class="colecao-x colecao-det-x" data-colecao-acao="fechar" aria-label="Fechar">✕</button>' +
+        '<div class="colecao-det-palco">' +
+          '<span class="colecao-det-raios" aria-hidden="true"></span>' +
+          '<span class="colecao-det-arte">' + _colecaoPreviewHtml(it) + '</span>' +
+          (n > 1 ? '<button type="button" class="colecao-det-nav ant" data-colecao-acao="ant" aria-label="Anterior">‹</button>' +
+                   '<button type="button" class="colecao-det-nav prox" data-colecao-acao="prox" aria-label="Próximo">›</button>' : '') +
+        '</div>' +
+        '<span class="colecao-det-rar">' + rar.nome + '</span>' +
+        '<div class="colecao-det-nome">' + _rankEsc(it.nome) + '</div>' +
+        '<div class="colecao-det-onde">' + _rankEsc(_colecaoOnde(it)) + '</div>' +
+        (it.desc ? '<div class="colecao-det-desc">' + _rankEsc(it.desc) + '</div>' : '') +
+        '<div class="colecao-det-status">' + (tem ? (emUso ? 'Equipado agora' : 'Na sua coleção') : '🔒 Ainda não é seu · 🪙 ' + it.preco) + '</div>' +
+        acao +
+        (n > 1 ? '<div class="colecao-det-pos">' + (pos + 1) + ' de ' + n + '</div>' : '') +
+      '</div>';
+  }
+  function _colecaoAcao(a) {
+    var it = _lojaItemPorId(_colecaoAberto);
+    if (a === 'fechar') { _colecaoDetalheFechar(); return; }
+    if (a === 'ant' || a === 'prox') {
+      var n = _colecaoLista.length; if (!n) return;
+      var i = _colecaoLista.indexOf(_colecaoAberto);
+      i = (i + (a === 'prox' ? 1 : -1) + n) % n;
+      _colecaoAberto = _colecaoLista[i];
+      _colecaoDetalheRender();
+      return;
+    }
+    if (!it) return;
+    if (a === 'equipar') _equiparItem(it.slot, it.id);
+    else if (a === 'remover') _equiparItem('badge', null);
+    else if (a === 'comprar') {
+      var res = _comprarItem(it.id);
+      if (res && res.ok && typeof showToastSimples === 'function') showToastSimples('Novo na coleção: ' + it.nome + ' ✨', '/Jogos/assets/hub/bonus-moedas.webp');
+    }
+    _colecaoRender();
+  }
+
+  // destaqueId (opcional): item pra realçar e já abrir na janela (prêmio novo).
   function colecaoAbrir(destaqueId) {
     _colecaoDestaque = destaqueId ? String(destaqueId) : '';
     if (_colecaoDestaque) _colecaoFiltro = 'todas';
+    _colecaoAberto = '';
     var ov = _colecaoMontar();
     ov.style.display = 'flex';
+    _colecaoDetalheFechar();
     _colecaoRender();
     if (_colecaoDestaque) {
-      setTimeout(function () {
-        var el = ov.querySelector('[data-colecao-id="' + _colecaoDestaque.replace(/"/g, '') + '"]');
-        if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      }, 60);
+      var el = ov.querySelector('[data-colecao-abrir="' + _colecaoDestaque.replace(/"/g, '') + '"]');
+      if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' });
+      _colecaoDetalheAbrir(_colecaoDestaque);
     }
     return true;
   }
   function colecaoFechar() {
     var ov = document.getElementById('colecao-overlay');
     if (ov) ov.style.display = 'none';
+    _colecaoDetalheFechar();
     _colecaoDestaque = '';
-    // O perfil mostra a contagem; reflete o que mudou (equipar).
+    // O perfil mostra a contagem; reflete o que mudou (compra/equipar).
     var cont = document.getElementById('perfil-colecao-qtd');
     if (cont) { var r = _colecaoResumo(); cont.textContent = r.tem + '/' + r.total; }
   }

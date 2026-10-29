@@ -83,114 +83,193 @@
     } catch(e) {}
   </script>
 
-  <!-- ══ SPLASH SCREEN — vídeo da coruja quando cacheado, CSS como fallback ══ -->
+  <!-- ══ SPLASH SCREEN — coruja pousa no letreiro ON, o neon acende e as frases entram.
+       Primeira abertura: sequência completa (~7,5s, toque pula). Depois: versão curta (~3,5s).
+       O app chama window.__splashFechar() quando está pronto (ver _esconderSplash no app.js);
+       a splash só sai quando o app está pronto E a animação terminou. ══ -->
+  <link rel="preload" href="/webp/splash/coruja-pouso.webp" as="image" />
+  <link rel="preload" href="/fonts/nunito-900-latin.woff2" as="font" type="font/woff2" crossorigin />
   <div id="splash-screen" aria-hidden="true">
     <style>
-      #splash-screen {
-        position: fixed; inset: 0; z-index: 99999;
-        background: #0d0d0d;
-        display: flex; align-items: center; justify-content: center;
-        overflow: hidden;
-      }
-      #splash-screen.splash-saindo {
-        transition: opacity 0.6s ease;
-        opacity: 0;
-        pointer-events: none;
-      }
-      #spl-video {
-        position: absolute; inset: 0;
-        width: 100%; height: 100%;
-        object-fit: cover;
-        opacity: 0;
-        transition: opacity 0.35s ease;
-      }
-      #spl-video.pronto { opacity: 1; }
-      /* Texto "Angatuba" sobreposto — o vídeo só tem "ON" */
-      #spl-texto {
-        position: absolute; bottom: 13%;
-        left: 0; right: 0; text-align: center;
-        opacity: 0; pointer-events: none;
-        transition: opacity 0.5s ease 1.6s;
-      }
-      #spl-texto.visivel { opacity: 1; }
-      .spl-txt-angatuba {
-        font-family: 'Syne', sans-serif;
-        font-size: 2.1rem; font-weight: 800; color: #fff;
-        text-shadow:
-          0 0 0 #000,
-          -2px -2px 0 rgba(0,0,0,.9),
-           2px -2px 0 rgba(0,0,0,.9),
-          -2px  2px 0 rgba(0,0,0,.9),
-           2px  2px 0 rgba(0,0,0,.9),
-           0    0  20px rgba(0,0,0,.8);
-      }
-      .spl-txt-cidade {
-        font-size: .65rem; font-weight: 600; letter-spacing: .3em;
-        text-transform: uppercase; color: rgba(255,255,255,.7);
-        margin-top: 4px;
-        text-shadow: 0 1px 4px #000, 0 0 8px #000;
-      }
-      /* Fallback CSS — visível quando vídeo não está cacheado */
-      #spl-fallback {
-        position: relative; z-index: 1;
-        display: flex; flex-direction: column;
-        align-items: center; justify-content: center;
-        transition: opacity 0.3s ease;
-      }
-      #spl-fallback.oculto { opacity: 0; pointer-events: none; }
-      .spl-owl {
-        width: 88px; height: 88px; border-radius: 50%; margin-bottom: 20px;
-        animation: spl-pulsa 1.9s ease-in-out infinite;
-      }
-      @keyframes spl-pulsa {
-        0%,100% { transform:scale(1);    filter:drop-shadow(0 0 10px rgba(255,55,55,.3)); }
-        50%      { transform:scale(1.07); filter:drop-shadow(0 0 24px rgba(255,55,55,.6)); }
-      }
-      .spl-logo {
-        font-family: 'Syne', sans-serif; font-size: 2.2rem;
-        font-weight: 800; color: #fff; letter-spacing: -.02em; line-height: 1; margin-bottom: 5px;
-      }
-      .spl-logo span { color: #ff3737; }
-      .spl-cidade-fb {
-        font-size: .68rem; font-weight: 600; color: rgba(255,255,255,.32);
-        letter-spacing: .28em; text-transform: uppercase; margin-bottom: 36px;
-      }
-      .spl-dots { display: flex; gap: 7px; }
-      .spl-dot {
-        width: 7px; height: 7px; border-radius: 50%; background: #ff3737;
-        animation: spl-dot 1.15s ease-in-out infinite;
-      }
-      .spl-dot:nth-child(2) { animation-delay: .19s; }
-      .spl-dot:nth-child(3) { animation-delay: .38s; }
-      @keyframes spl-dot {
-        0%,80%,100% { opacity:.2; transform:scale(.75); }
-        40%          { opacity:1;  transform:scale(1.35); }
-      }
+      @font-face{font-family:'Nunito Splash';font-weight:900;font-display:block;src:url(/fonts/nunito-900-latin.woff2) format('woff2')}
+      #splash-screen{position:fixed;inset:0;z-index:99999;background:#050f14;overflow:hidden;-webkit-user-select:none;user-select:none}
+      #splash-screen.splash-saindo{transition:opacity .6s ease;opacity:0;pointer-events:none}
+      #spl-bg{position:absolute;inset:-3%;background:#0b222c url(/img/splash-fundo.webp) center 30%/cover no-repeat;will-change:transform}
+      #spl-bgsh{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,15,20,.35) 0%,rgba(5,15,20,0) 30%,rgba(5,15,20,.25) 62%,rgba(5,15,20,.85) 100%)}
+      #spl-bokeh{position:absolute;inset:0}
+      #spl-bokeh i{position:absolute;border-radius:50%;opacity:0;will-change:transform,opacity}
+      #spl-stage{position:absolute;left:50%;top:50%;width:360px;height:640px;margin:-320px 0 0 -180px;transform-origin:50% 50%}
+      #spl-scene{position:absolute;inset:0;transform-origin:50% 52%;will-change:transform}
+      #spl-halo{position:absolute;left:50%;top:367px;width:520px;height:420px;margin:-210px 0 0 -260px;border-radius:50%;background:radial-gradient(closest-side,rgba(255,46,68,.30),rgba(255,46,68,.10) 45%,rgba(255,46,68,0) 100%);opacity:0}
+      #spl-sign{position:absolute;left:50%;top:330px;width:140px;height:74px;margin-left:-70px;overflow:visible}
+      #spl-owl{position:absolute;left:0;top:0;width:210px;height:201px;will-change:transform;opacity:0}
+      #spl-owl b{position:absolute;inset:0;background:url(/webp/splash/coruja-pouso.webp) 0 0/900% 100% no-repeat}
+      #spl-owl .lit{background:linear-gradient(to top,rgba(255,60,80,.95) 0%,rgba(255,46,68,.35) 22%,rgba(255,46,68,0) 42%);mix-blend-mode:screen;opacity:0;
+        -webkit-mask:url(/webp/splash/coruja-pouso.webp) 0 0/900% 100% no-repeat;mask:url(/webp/splash/coruja-pouso.webp) 0 0/900% 100% no-repeat}
+      #spl-fx{position:absolute;left:0;top:0;width:360px;height:640px;pointer-events:none}
+      #spl-copy{position:absolute;left:12px;right:12px;top:438px;height:120px}
+      .spl-ph{position:absolute;inset:0;text-align:center;font:900 37px/1 'Nunito Splash','Nunito',sans-serif;color:#fff;letter-spacing:-.015em}
+      .spl-ph .m{display:block;overflow:hidden;padding:.14em 0 .2em;margin-top:-.16em}
+      .spl-ph .w{display:inline-block;opacity:0;will-change:transform,filter;-webkit-text-stroke:8px #1a0a10;paint-order:stroke fill;text-shadow:0 3px 0 #ff2e44,0 5px 0 #1a0a10,0 10px 18px rgba(0,0,0,.45)}
+      .spl-ph .neo{color:#ffe3e6}
+      #spl-sub{position:absolute;left:24px;right:24px;top:546px;text-align:center;font:600 14px/1.4 'DM Sans',sans-serif;color:#9db3bd;opacity:0}
+      #spl-vig{position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 90% at 50% 50%,transparent 55%,rgba(0,0,0,.55) 100%)}
+      #spl-grain{position:absolute;inset:0;pointer-events:none;opacity:.07;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
     </style>
-
-    <!-- Vídeo da coruja (toca apenas quando já está cacheado) -->
-    <video id="spl-video" autoplay muted playsinline preload="auto">
-      <source src="/webp/splash-anim.webm" type="video/webm" />
-    </video>
-
-    <!-- "Angatuba" aparece junto com o letreiro ON do vídeo (~1.6s) -->
-    <div id="spl-texto">
-      <div class="spl-txt-angatuba">Angatuba</div>
-      <div class="spl-txt-cidade">Angatuba · SP</div>
-    </div>
-
-    <!-- Fallback: coruja animada por CSS (primeira vez, sem cache) -->
-    <div id="spl-fallback">
-      <img src="/webp/owl-badge.webp" alt="" class="spl-owl" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
-      <div class="spl-logo">Angatuba<span>ON</span></div>
-      <div class="spl-cidade-fb">Angatuba · SP</div>
-      <div class="spl-dots">
-        <div class="spl-dot"></div>
-        <div class="spl-dot"></div>
-        <div class="spl-dot"></div>
+    <div id="spl-bg"></div><div id="spl-bgsh"></div><div id="spl-bokeh"></div>
+    <div id="spl-stage">
+      <div id="spl-scene">
+        <div id="spl-halo"></div>
+        <svg id="spl-sign" viewBox="0 0 196 104">
+          <defs>
+            <linearGradient id="spl-metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a565d"/><stop offset=".08" stop-color="#2a343a"/><stop offset=".55" stop-color="#1a2227"/><stop offset="1" stop-color="#0e1418"/></linearGradient>
+            <linearGradient id="spl-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d161b"/><stop offset="1" stop-color="#070c0f"/></linearGradient>
+            <pattern id="spl-perf" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r=".7" fill="#1b262c"/></pattern>
+            <filter id="spl-b6" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5"/></filter>
+            <filter id="spl-b2" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.6"/></filter>
+            <radialGradient id="spl-spill" cx=".5" cy=".5" r=".6"><stop offset="0" stop-color="#ff2e44" stop-opacity=".55"/><stop offset="1" stop-color="#ff2e44" stop-opacity="0"/></radialGradient>
+            <path id="spl-pO" d="M56 26 H62 A26 26 0 0 1 62 78 H56 A26 26 0 0 1 56 26 Z"/>
+            <path id="spl-pN" d="M112 78 V26 L164 78 V26"/>
+          </defs>
+          <rect x="1" y="1" width="194" height="102" rx="11" fill="url(#spl-metal)"/>
+          <rect x="1.5" y="1.5" width="193" height="101" rx="10.5" fill="none" stroke="#6f7c83" stroke-opacity=".35"/>
+          <rect x="8" y="8" width="180" height="88" rx="6" fill="url(#spl-panel)"/>
+          <rect x="8" y="8" width="180" height="88" rx="6" fill="url(#spl-perf)"/>
+          <rect id="spl-spillR" x="8" y="8" width="180" height="88" rx="6" fill="url(#spl-spill)" opacity="0"/>
+          <rect x="8" y="8" width="180" height="88" rx="6" fill="none" stroke="#000" stroke-opacity=".6" stroke-width="1.5"/>
+          <g fill="#7e8a90"><circle cx="14" cy="14" r="1.8"/><circle cx="182" cy="14" r="1.8"/><circle cx="14" cy="90" r="1.8"/><circle cx="182" cy="90" r="1.8"/></g>
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <g id="spl-lO">
+              <use href="#spl-pO" stroke="#ff2e44" stroke-width="16" filter="url(#spl-b6)" class="glow" opacity="0"/>
+              <use href="#spl-pO" stroke="#3a2a30" stroke-width="6.5"/>
+              <use href="#spl-pO" stroke="#ff3a4f" stroke-width="6.5" class="tube" opacity="0"/>
+              <use href="#spl-pO" stroke="#ffe3e6" stroke-width="2.2" filter="url(#spl-b2)" class="core" opacity="0"/>
+              <use href="#spl-pO" stroke="#fff" stroke-opacity=".18" stroke-width="1.2" transform="translate(-.8 -1)"/>
+            </g>
+            <g id="spl-lN">
+              <use href="#spl-pN" stroke="#ff2e44" stroke-width="16" filter="url(#spl-b6)" class="glow" opacity="0"/>
+              <use href="#spl-pN" stroke="#3a2a30" stroke-width="6.5"/>
+              <use href="#spl-pN" stroke="#ff3a4f" stroke-width="6.5" class="tube" opacity="0"/>
+              <use href="#spl-pN" stroke="#ffe3e6" stroke-width="2.2" filter="url(#spl-b2)" class="core" opacity="0"/>
+              <use href="#spl-pN" stroke="#fff" stroke-opacity=".18" stroke-width="1.2" transform="translate(-.8 -1)"/>
+            </g>
+          </g>
+          <rect x="3" y="2" width="190" height="1.3" rx=".6" fill="#9aa7ad" opacity=".55"/>
+        </svg>
+        <div id="spl-owl"><b class="img"></b><b class="lit"></b></div>
+        <canvas id="spl-fx"></canvas>
       </div>
+      <div id="spl-copy"></div>
+      <div id="spl-sub">Comércio, jogos, notícias e leitura da cidade.</div>
     </div>
+    <div id="spl-vig"></div><div id="spl-grain"></div>
   </div>
+  <script>
+  /* Splash animada. Roda antes do app_min.js para começar já no primeiro frame. */
+  (function(){
+    var root=document.getElementById('splash-screen');if(!root)return;
+    var $=function(id){return document.getElementById(id)};
+    var KEY='angatuba_splash_v1',completa=true;
+    try{completa=!localStorage.getItem(KEY)}catch(e){}
+    var reduz=false;try{reduz=matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){}
+
+    // ---- linha do tempo (ms desde o início) ----
+    var T={flyEnd:1300,descEnd:1750,touch:1900,fold:2100,final:2350};
+    var PH=completa?[
+      {l:['Onde pedir','hoje?'],in:2760,out:3800},
+      {l:['O que rolou','na região?'],in:4220,out:5260},
+      {l:['Angatuba','tá <span class="neo">ON</span>.'],in:5680,out:1e9}
+    ]:[{l:['Angatuba','tá <span class="neo">ON</span>.'],in:2560,out:1e9}];
+    var DIPS=completa?[2760,4220,5680]:[2560];
+    var SUB=completa?6500:1e9;
+    var DUR=completa?7500:3500;
+
+    // ---- encaixe na tela: palco 360x640 escalado pra caber ----
+    var stage=$('spl-stage'),scene=$('spl-scene'),fx=$('spl-fx'),cx=fx.getContext('2d');
+    function fit(){var s=Math.min(innerWidth/360,innerHeight/640,1.5);stage.style.transform='scale('+s+')';
+      var k=Math.min(3,(window.devicePixelRatio||1)*s);fx.width=360*k;fx.height=640*k;cx.setTransform(k,0,0,k,0,0)}
+    fit();addEventListener('resize',fit);
+
+    var clamp=function(v,a,b){a=a||0;b=b===undefined?1:b;return Math.max(a,Math.min(b,v))},lerp=function(a,b,t){return a+(b-a)*t};
+    var ease=function(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2},eOut=function(t){return 1-Math.pow(1-t,3)},eIn=function(t){return t*t*t};
+    function rng(s){return function(){s|=0;s=s+0x6D2B79F5|0;var t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+    function seq(t,st){var v=0;for(var i=0;i<st.length;i++){if(t>=st[i][0])v=st[i][1];else break}return v}
+
+    // ---- coruja (sprite de 9 quadros) ----
+    var owl=$('spl-owl'),oImg=owl.children[0],oLit=owl.children[1],LX=180,LY=333,OW=210,BASE=185,cur=-1,temCoruja=false;
+    function pose(f,x,y,s,sy){sy=sy||1;if(f!==cur){cur=f;var p=(f*12.5)+'% 0';oImg.style.backgroundPosition=p;oLit.style.webkitMaskPosition=p;oLit.style.maskPosition=p}
+      owl.style.transformOrigin='50% '+BASE+'px';owl.style.transform='translate('+(x-OW/2)+'px,'+(y-BASE)+'px) scale('+s+','+(s*sy)+')'}
+
+    // ---- letreiro ----
+    var ON_O=[[2000,.85],[2055,0],[2130,1],[2185,.25],[2235,1]],ON_N=[[2300,.55],[2335,0],[2380,1],[2415,.15],[2470,1]];
+    function hum(t){var d=1;for(var i=0;i<DIPS.length;i++){var k=DIPS[i];if(t>=k&&t<k+70)d=.35;else if(t>=k+70&&t<k+110)d=.8}return d*(1-.035*(Math.sin(t*.031)*.5+.5)*Math.sin(t*.0071))}
+    function letra(g){return{g:g.querySelector('.glow'),t:g.querySelector('.tube'),c:g.querySelector('.core')}}
+    var lO=letra($('spl-lO')),lN=letra($('spl-lN')),halo=$('spl-halo'),spill=$('spl-spillR'),sign=$('spl-sign'),bg=$('spl-bg');
+    function acende(l,v){l.g.setAttribute('opacity',v*.95);l.t.setAttribute('opacity',v);l.c.setAttribute('opacity',v)}
+
+    // ---- luzes da cidade desfocadas ----
+    var R=rng(7),BK=[],cols=['255,180,94','255,180,94','207,227,255','255,210,150','170,205,225'];
+    for(var i=0;i<14;i++){var el=document.createElement('i'),sz=12+R()*58,c=cols[Math.floor(R()*cols.length)];
+      el.style.cssText='width:'+sz+'px;height:'+sz+'px;left:'+(R()*100)+'%;top:'+(56+R()*44)+'%;margin:'+(-sz/2)+'px 0 0 '+(-sz/2)+'px;background:radial-gradient(circle,rgba('+c+',.9),rgba('+c+',.25) 60%,rgba('+c+',0) 72%);filter:blur('+(1+R()*5)+'px)';
+      $('spl-bokeh').appendChild(el);BK.push({el:el,a:.08+R()*.18,ph:R()*6.28,sp:.0004+R()*.0006,dx:6+R()*12})}
+
+    // ---- partículas: poeira do pouso e faíscas do N ----
+    var dust=[],sparks=[];
+    (function(){var r=rng(3);for(var i=0;i<16;i++){var d=r()<.5?-1:1;dust.push({x:LX+d*(4+r()*18),vx:d*(40+r()*90),vy:-(8+r()*40),life:450+r()*400,rad:1+r()*2.2})}
+      r=rng(11);for(i=0;i<22;i++){var u=r(),px,py;if(u<.33){px=112;py=26+r()*52}else if(u<.66){var k=r();px=112+52*k;py=26+52*k}else{px=164;py=26+r()*52}
+        var a=r()*Math.PI*2,sp=70+r()*170;sparks.push({x:110+px*.714,y:330+py*.714,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-60,life:380+r()*520,t0:2380+(r()<.3?-80:0)})}})();
+    function desenhaFx(t){cx.clearRect(0,0,360,640);var kd=t-T.touch,i,p,s,a;
+      if(temCoruja&&kd>0&&kd<900)for(i=0;i<dust.length;i++){p=dust[i];if(kd>p.life)continue;s=kd/1000;a=1-kd/p.life;
+        cx.fillStyle='rgba(190,210,220,'+(.45*a)+')';cx.beginPath();cx.arc(p.x+p.vx*s,LY-2+p.vy*s+60*s*s,p.rad*(1+s*1.5),0,7);cx.fill()}
+      cx.globalCompositeOperation='lighter';
+      for(i=0;i<sparks.length;i++){p=sparks[i];var k=t-p.t0;if(k<0||k>p.life)continue;s=k/1000;a=1-k/p.life;
+        var x=p.x+p.vx*s,y=p.y+p.vy*s+420*s*s,vx=p.vx,vy=p.vy+840*s,n=Math.hypot(vx,vy)||1;
+        cx.strokeStyle='rgba(255,'+Math.round(150+100*a)+','+Math.round(120*a)+','+a+')';cx.lineWidth=1.3;cx.beginPath();cx.moveTo(x,y);cx.lineTo(x-vx/n*7*a,y-vy/n*7*a);cx.stroke()}
+      cx.globalCompositeOperation='source-over'}
+
+    // ---- frases ----
+    var copy=$('spl-copy'),sub=$('spl-sub');
+    PH.forEach(function(p){var d=document.createElement('div');d.className='spl-ph';
+      p.ws=p.l.map(function(h){var m=document.createElement('span');m.className='m';var w=document.createElement('span');w.className='w';w.innerHTML=h;m.appendChild(w);d.appendChild(m);return w});
+      p.neo=d.querySelector('.neo');copy.appendChild(d)});
+    function desenhaCopy(t){PH.forEach(function(p){p.ws.forEach(function(w,k){
+        var ei=eOut(clamp((t-p.in-k*110)/620)),eo=eIn(clamp((t-p.out-k*70)/340));
+        w.style.transform='translateY('+((1-ei)*115-eo*115)+'%)';w.style.filter=ei<1?'blur('+((1-ei)*6)+'px)':'none';w.style.opacity=ei*(1-eo)});
+      if(p.neo){var k=p.in+490,n=seq(t,[[k,.9],[k+45,.12],[k+110,1]]);
+        p.neo.style.textShadow=n?'0 3px 0 #ff2e44,0 5px 0 #1a0a10,0 0 16px rgba(255,46,68,'+n+'),0 0 34px rgba(255,46,68,'+(.9*n)+')':'0 3px 0 #5a2a32,0 5px 0 #1a0a10';p.neo.style.color=n?'#ffe3e6':'#8a7378'}});
+      var e=eOut(clamp((t-SUB)/700));sub.style.opacity=e;sub.style.transform='translateY('+((1-e)*8)+'px)'}
+
+    function render(t){
+      if(temCoruja){var flap=[0,1,2,1];owl.style.opacity=1;
+        if(t<T.flyEnd){var p=ease(t/T.flyEnd);pose(flap[Math.floor(t/115)%4],lerp(430,LX+10,p)-Math.sin(p*Math.PI)*50,lerp(-40,LY-140,p),lerp(.75,1,p))}
+        else if(t<T.descEnd){p=ease((t-T.flyEnd)/(T.descEnd-T.flyEnd));pose(t<T.flyEnd+210?3:4,lerp(LX+10,LX,p),lerp(LY-140,LY-30,p),1)}
+        else if(t<T.touch)pose(5,LX,lerp(LY-30,LY-6,(t-T.descEnd)/(T.touch-T.descEnd)),1);
+        else{var k=t-T.touch,dip=k<300?Math.sin(k/300*Math.PI)*4:0,f=t<T.fold?6:t<T.final?7:8,
+          sq=k<160?1-.04*Math.sin(k/160*Math.PI):1+(t>T.final?.012*Math.sin((t-T.final)/520):0);
+          pose(f,LX,LY+dip,1,sq);sign.style.transform='translateY('+dip+'px)'}}
+      var h=hum(t),vO=seq(t,ON_O)*h,vN=seq(t,ON_N)*h,L=(vO+vN)/2;acende(lO,vO);acende(lN,vN);
+      halo.style.opacity=L;spill.setAttribute('opacity',L*.9);oLit.style.opacity=L*.75;
+      var c=ease(clamp((t-2300)/5000));scene.style.transform='scale('+(1+.045*c)+') translateY('+(-4*c)+'px)';bg.style.transform='scale('+(1+.02*c)+')';
+      var bf=clamp(t/900);BK.forEach(function(b){b.el.style.opacity=b.a*bf*(.75+.25*Math.sin(t*b.sp*3+b.ph));b.el.style.transform='translate('+(Math.sin(t*b.sp+b.ph)*b.dx)+'px,'+(-t*.004)+'px)'});
+      desenhaFx(t);desenhaCopy(t)}
+
+    // ---- controle: começa quando a coruja carregou (máx 2,5s), sai quando app pronto + animação acabou ----
+    var gravou=false,t0=0,raf=0,fim=Infinity,appPronto=false,pulado=false,saindo=false,timer=0;
+    function loop(n){var t=n-t0;render(t);if(completa&&!gravou&&t>=5680){gravou=true;try{localStorage.setItem(KEY,'1')}catch(e){}}if(t<DUR+400&&!saindo)raf=requestAnimationFrame(loop)}
+    function comecar(ok){if(t0)return;temCoruja=ok;t0=performance.now();
+      if(reduz){render(DUR);fim=t0+1200;if(completa)try{localStorage.setItem(KEY,'1')}catch(e){}}else{fim=t0+DUR;raf=requestAnimationFrame(loop)}
+      tentar()}
+    function sair(){if(saindo)return;saindo=true;cancelAnimationFrame(raf);root.classList.add('splash-saindo');
+      setTimeout(function(){try{root.remove()}catch(e){}},650);try{delete window.__splashFechar}catch(e){window.__splashFechar=null}}
+    function tentar(){if(!appPronto||saindo||fim===Infinity)return;clearTimeout(timer);timer=setTimeout(sair,pulado?0:Math.max(0,fim-performance.now()))}
+    window.__splashFechar=function(){appPronto=true;tentar()};
+    if(completa)root.addEventListener('pointerdown',function(){pulado=true;tentar()});
+    var img=new Image();img.onload=function(){(img.decode?img.decode():Promise.resolve()).then(function(){comecar(true)},function(){comecar(true)})};
+    img.onerror=function(){comecar(false)};img.src='/webp/splash/coruja-pouso.webp';
+    setTimeout(function(){comecar(img.complete&&img.naturalWidth>0)},2500);
+    setTimeout(sair,15000); // failsafe absoluto
+  })();
+  </script>
 
   <!-- ══ TOAST ══ -->
   <div id="toast" role="alert" aria-live="assertive">

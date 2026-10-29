@@ -841,40 +841,19 @@
   }
 
   /* ══════════════════════════════════════════════════════════════
-     SPLASH SCREEN — vídeo da coruja (cacheado) ou CSS fallback
-     Tempo mínimo: 1.8s. Máximo: 5s (failsafe).
+     SPLASH SCREEN — a animação mora num script inline no index.html
+     (coruja pousando no letreiro ON). Aqui só avisamos que o app está
+     pronto; a splash sai quando a animação termina. Failsafe: 5s.
   ══════════════════════════════════════════════════════════════ */
   const _splashInicio = Date.now();
   const _SPLASH_MIN   = 1800;
   const _SPLASH_MAX   = 5000;
   let   _splashOculta = false;
 
-  // Inicia lógica do vídeo — só mostra se já estiver no cache (carrega < 400ms)
-  (function _initSplashVideo() {
-    const vid      = document.getElementById('spl-video');
-    const fallback = document.getElementById('spl-fallback');
-    const texto    = document.getElementById('spl-texto');
-    if (!vid) return;
-
-    const t0 = Date.now();
-    vid.addEventListener('canplay', () => {
-      if (Date.now() - t0 > 400) return; // demorou: não estava cacheado, mantém fallback
-      // Vídeo cacheado: troca fallback pelo vídeo
-      if (fallback) fallback.classList.add('oculto');
-      vid.classList.add('pronto');
-      if (texto) texto.classList.add('visivel');
-      vid.play().catch(() => {});
-    }, { once: true });
-
-    // Se o vídeo não estiver disponível, garante que o fallback aparece limpo
-    vid.addEventListener('error', () => {
-      if (fallback) fallback.classList.remove('oculto');
-    }, { once: true });
-  })();
-
   function _esconderSplash() {
     if (_splashOculta) return;
     _splashOculta = true;
+    if (typeof window.__splashFechar === 'function') { window.__splashFechar(); return; }
     const decorrido = Date.now() - _splashInicio;
     const espera    = Math.max(0, _SPLASH_MIN - decorrido);
     setTimeout(() => {

@@ -66,7 +66,7 @@ self.addEventListener('notificationclick', function (event) {
   );
 });
 
-const CACHE = 'angatubaon-v471';
+const CACHE = 'angatubaon-v472';
 // Cache separado dos assets dos jogos (sprites, sons, músicas, vídeos
 // dos minigames). Fica de fora do CACHE principal de propósito: o
 // activate() abaixo NUNCA apaga o CACHE_JOGOS quando o app atualiza
@@ -117,7 +117,9 @@ const STATIC = [
   '/webp/owl-celebrate-plus.webp',
   '/webp/owl-celebrate-pro.webp',
   '/webp/owl-celebrate-flying.webp',
-  '/webp/splash-anim.webm',
+  '/webp/splash/coruja-pouso.webp',
+  '/img/splash-fundo.webp',
+  '/fonts/nunito-900-latin.woff2',
   '/webp/owl-search.webp',
   '/webp/owl-idea.webp',
   '/webp/owl-sleeping.webp',

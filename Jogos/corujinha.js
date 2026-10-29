@@ -605,7 +605,7 @@
         })(ini);
       } else {
         big.contando = false;
-        bigAutoFechar();
+        if (!opts.fixo) bigAutoFechar();
       }
     });
   }
@@ -744,13 +744,29 @@
     if (r.ovo && r.item) {
       p = p.then(function () { return esperar(tempo(400)); }).then(function () {
         var conv = Math.floor(r.item.preco * CONVERSAO_REPETIDO);
-        var prev = r.item.preview
-          ? '<img src="' + esc(r.item.preview) + '" alt="" onerror="this.style.display=\'none\'">'
-          : '<span class="cjx-big-item-ico">🎁</span>';
-        var html = '<div class="cjx-big-item-card">' + prev + '<div><b>' + esc(r.item.nome) + '</b>' +
-                   '<small>' + (r.itemNovo ? 'Novo no seu inventário! Equipe na Loja.' : 'Você já tinha — virou moedas') + '</small></div></div>';
+        var gg = G() || {};
+        // Prêmio grande: miniatura do item, de qual jogo é e a coleção. Item
+        // novo NÃO fecha sozinho (nem no automático) — fica até o toque.
+        var prev = (typeof gg.itemPreviewHtml === 'function' && gg.itemPreviewHtml(r.item.id)) ||
+          (r.item.preview ? '<img src="' + esc(r.item.preview) + '" alt="" onerror="this.style.display=\'none\'">' : '<span class="cjx-big-item-ico">🎁</span>');
+        var onde = (typeof gg.itemOnde === 'function') ? gg.itemOnde(r.item.id) : '';
+        var res = (typeof gg.colecaoResumo === 'function') ? gg.colecaoResumo() : null;
+        var html = '<div class="cjx-premio' + (r.itemNovo ? ' cjx-premio-novo' : '') + '">' +
+            (r.itemNovo ? '<span class="cjx-premio-selo">NOVO!</span>' : '') +
+            '<div class="cjx-premio-prev">' + prev + '</div>' +
+            (onde ? '<div class="cjx-premio-onde">' + esc(onde) + '</div>' : '') +
+            '<div class="cjx-premio-nome">' + esc(r.item.nome) + '</div>' +
+            '<div class="cjx-premio-txt">' + (r.itemNovo ? 'Já está na sua coleção!' : 'Você já tinha — virou ' + fmt(conv) + ' moedas') + '</div>' +
+            (res ? '<div class="cjx-premio-col">Coleção: <b>' + res.tem + '/' + res.total + '</b></div>' : '') +
+            (r.itemNovo ? '<div class="cjx-premio-acoes">' +
+              (typeof gg.equiparItem === 'function'
+                ? '<button type="button" class="cjx-premio-btn" id="cjx-premio-equipar" onclick="event.stopPropagation(); CorujinhaGame._equiparPremio(\'' + esc(r.item.id) + '\')">Equipar agora</button>' : '') +
+              (typeof gg.colecaoAbrir === 'function'
+                ? '<button type="button" class="cjx-premio-btn cjx-premio-btn2" onclick="event.stopPropagation(); CorujinhaGame._verColecao(\'' + esc(r.item.id) + '\')">Ver coleção</button>' : '') +
+              '</div>' : '') +
+          '</div>';
         if (!r.itemNovo) st.ultimoGanho += conv;
-        return bigAbrir({ titulo: 'OVO DOURADO!', itemHtml: html, valor: r.itemNovo ? 0 : conv, duracao: 1200 });
+        return bigAbrir({ titulo: 'OVO DOURADO!', itemHtml: html, valor: r.itemNovo ? 0 : conv, duracao: 1200, fixo: r.itemNovo });
       });
     }
     return p.then(function () {
@@ -819,6 +835,15 @@
     parar: parar,
     _girar: girar, _aposta: mudarAposta, _turbo: turbo, _autoMenu: autoMenu, _autoIniciar: autoIniciar,
     _tabela: tabela, _comecar: comecar, _bigToque: bigToque, _voltar: voltar,
+    // Do prêmio do ovo: fecha o aviso e abre a coleção no item ganho.
+    _equiparPremio: function (id) {
+      var g = G(), it = null;
+      (g && g.lojaCatalogo ? g.lojaCatalogo() : []).forEach(function (x) { if (x.id === id) it = x; });
+      var ok = it && g.equiparItem(it.slot, it.id);
+      var b = $('cjx-premio-equipar');
+      if (b && ok && ok.ok) { b.textContent = '✓ Equipado'; b.disabled = true; som('toque'); }
+    },
+    _verColecao: function (id) { bigFechar(); var g = G(); if (g && g.colecaoAbrir) g.colecaoAbrir(id); },
     _mat: CJM
   };
 })();

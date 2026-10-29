@@ -4377,6 +4377,175 @@
   window.lojaJogoAbrir  = lojaJogoAbrir;
   window.lojaJogoFechar = lojaJogoFechar;
 
+  /* ══════════════════════════════════════════════════════════════
+     COLEÇÃO — tudo o que existe na loja (itens pagos), agrupado por jogo,
+     com o que a pessoa já tem e quanto falta (estilo coleção do LoL).
+     Abre do perfil ("Minha coleção") e do prêmio do ovo dourado da
+     Corujinha, que destaca o item recém-ganho. 100% local: lê o mesmo
+     inventário/equipado da loja, não grava nada além do "Equipar".
+  ══════════════════════════════════════════════════════════════ */
+  var COLECAO_GRUPO_PERFIL = { badge: 'Badges do perfil', bg: 'Fundos do perfil', card: 'Cards do perfil' };
+  var COLECAO_ICO_PERFIL = { badge: '🎖️', bg: '🖼️', card: '🪪' };
+  var _colecaoFiltro = 'todas';   // 'todas' | 'tenho' | 'faltam'
+  var _colecaoDestaque = '';
+
+  // Itens que contam pra coleção: os pagos (os grátis todo mundo tem).
+  function _colecaoItens() {
+    return _lojaCatalogo().filter(function (it) { return it.preco > 0; });
+  }
+  function _colecaoResumo() {
+    var itens = _colecaoItens(), tem = 0;
+    itens.forEach(function (it) { if (_temItem(it.id)) tem++; });
+    return { tem: tem, total: itens.length };
+  }
+  // Rótulo de onde o item vale: "Skin do Piano", "Badge do perfil"...
+  function _colecaoOnde(item) {
+    if (!item) return '';
+    if (item.jogo) return (item.tipo === 'bg' ? 'Cenário · ' : 'Skin · ') + _perfilLabelJogo(item.jogo);
+    return COLECAO_GRUPO_PERFIL[item.tipo] ? COLECAO_GRUPO_PERFIL[item.tipo].replace('s do perfil', ' do perfil') : 'Loja';
+  }
+  // Miniatura do item (a mesma lógica da loja): imagem quando tem preview,
+  // miniatura de cores pros temas de paleta, ícone no resto.
+  function _colecaoPreviewHtml(item) {
+    if (!item) return '';
+    var estilo = (item.filtroCss ? 'filter:' + item.filtroCss + ';' : '') + (item.pixelado ? 'image-rendering:pixelated;' : '');
+    if (item.preview && item.jogo !== 'ritmo') {
+      return '<img src="' + _rankEsc(item.preview) + '" alt=""' + (item.animado === 'arcoiris' ? ' class="skin-arcoiris-anim"' : '') +
+        (estilo ? ' style="' + estilo + '"' : '') + ' loading="lazy" onerror="this.style.display=\'none\'">';
+    }
+    if (item.jogo) return _lojaJogoMiniHtml(item);
+    if (item.tipo === 'bg' && typeof _perfilBgEstilo === 'function') {
+      return '<span class="colecao-bg-mini" style="' + _rankEsc(_perfilBgEstilo(item.id)) + '"></span>';
+    }
+    return '<span class="loja-item-ph" aria-hidden="true">' + (LOJA_TIPO_ICO[item.tipo] || '🦉') + '</span>';
+  }
+
+  function _colecaoMontar() {
+    var parent = (document.getElementById('jogo-perfil') || {}).parentNode || document.body;
+    var ov = document.getElementById('colecao-overlay');
+    if (ov && ov.parentNode !== parent) { ov.parentNode.removeChild(ov); ov = null; }
+    if (ov) return ov;
+    ov = document.createElement('div');
+    ov.id = 'colecao-overlay';
+    ov.className = 'colecao-overlay';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-label', 'Minha coleção');
+    ov.innerHTML =
+      '<div class="colecao-caixa">' +
+        '<div class="colecao-topo">' +
+          '<div class="colecao-titulo">🏆 Minha coleção</div>' +
+          '<button type="button" class="lojajogo-fechar" onclick="colecaoFechar()" aria-label="Fechar">✕</button>' +
+        '</div>' +
+        '<div class="colecao-resumo" id="colecao-resumo"></div>' +
+        '<div class="colecao-filtros" role="group" aria-label="Filtrar">' +
+          '<button type="button" data-colecao-filtro="todas">Todas</button>' +
+          '<button type="button" data-colecao-filtro="tenho">Tenho</button>' +
+          '<button type="button" data-colecao-filtro="faltam">Faltam</button>' +
+        '</div>' +
+        '<div class="colecao-corpo" id="colecao-corpo"></div>' +
+      '</div>';
+    ov.addEventListener('click', function (e) {
+      if (e.target === ov) { colecaoFechar(); return; }
+      var f = e.target.closest && e.target.closest('[data-colecao-filtro]');
+      if (f) { _colecaoFiltro = f.getAttribute('data-colecao-filtro'); _colecaoRender(); return; }
+      var eqb = e.target.closest && e.target.closest('[data-colecao-equipar]');
+      if (eqb) {
+        var it = _lojaItemPorId(eqb.getAttribute('data-colecao-equipar'));
+        if (it) { _equiparItem(it.slot, it.id); _colecaoRender(); }
+      }
+    });
+    parent.appendChild(ov);
+    return ov;
+  }
+
+  function _colecaoRender() {
+    var corpo = document.getElementById('colecao-corpo');
+    var resumoEl = document.getElementById('colecao-resumo');
+    if (!corpo) return;
+    var r = _colecaoResumo();
+    var pct = r.total ? Math.round(r.tem * 100 / r.total) : 0;
+    if (resumoEl) resumoEl.innerHTML =
+      '<div class="colecao-resumo-num"><b>' + r.tem + '</b> de ' + r.total + ' itens' +
+        '<span>' + (r.tem >= r.total ? 'Coleção completa! 🎉' : 'Faltam ' + (r.total - r.tem)) + '</span></div>' +
+      '<div class="colecao-barra"><i style="width:' + pct + '%"></i></div>';
+    var fb = document.querySelectorAll('#colecao-overlay [data-colecao-filtro]');
+    for (var k = 0; k < fb.length; k++) fb[k].classList.toggle('on', fb[k].getAttribute('data-colecao-filtro') === _colecaoFiltro);
+
+    // Grupos: perfil (badge/fundo/card) primeiro, depois cada jogo pelo nome.
+    var grupos = {}, ordem = [];
+    _colecaoItens().forEach(function (it) {
+      var chave = it.jogo ? 'j:' + it.jogo : 'p:' + it.tipo;
+      if (!grupos[chave]) {
+        grupos[chave] = { itens: [], tem: 0,
+          nome: it.jogo ? _perfilLabelJogo(it.jogo) : (COLECAO_GRUPO_PERFIL[it.tipo] || 'Perfil'),
+          ico: it.jogo ? _perfilIcoJogo(it.jogo) : (COLECAO_ICO_PERFIL[it.tipo] || '🦉') };
+        ordem.push(chave);
+      }
+      grupos[chave].itens.push(it);
+      if (_temItem(it.id)) grupos[chave].tem++;
+    });
+    ordem.sort(function (a, b) {
+      if (a.charAt(0) !== b.charAt(0)) return a.charAt(0) === 'p' ? -1 : 1;
+      return grupos[a].nome.localeCompare(grupos[b].nome, 'pt-BR');
+    });
+    var eq = _equipadoLer(), html = '';
+    ordem.forEach(function (chave) {
+      var g = grupos[chave];
+      var lista = g.itens.filter(function (it) {
+        var tem = _temItem(it.id);
+        return _colecaoFiltro === 'todas' || (_colecaoFiltro === 'tenho' ? tem : !tem);
+      });
+      if (!lista.length) return;
+      var completo = g.tem >= g.itens.length;
+      html += '<div class="colecao-grupo">' +
+        '<div class="colecao-grupo-topo"><span class="colecao-grupo-ico" aria-hidden="true">' + g.ico + '</span>' +
+          '<span class="colecao-grupo-nome">' + _rankEsc(g.nome) + '</span>' +
+          '<span class="colecao-grupo-qtd' + (completo ? ' completo' : '') + '">' + g.tem + '/' + g.itens.length + (completo ? ' ✓' : '') + '</span></div>' +
+        '<div class="colecao-grade">';
+      lista.forEach(function (it) {
+        var tem = _temItem(it.id), emUso = (eq[it.slot] === it.id);
+        var acao = !tem ? '<span class="colecao-preco">🔒 🪙 ' + it.preco + '</span>'
+          : emUso ? '<span class="colecao-em-uso">Em uso</span>'
+          : '<button type="button" class="colecao-equipar" data-colecao-equipar="' + _rankEsc(it.id) + '">Equipar</button>';
+        html += '<div class="colecao-item' + (tem ? ' tem' : ' falta') + (it.id === _colecaoDestaque ? ' destaque' : '') + '" data-colecao-id="' + _rankEsc(it.id) + '">' +
+            (it.id === _colecaoDestaque ? '<span class="colecao-novo">NOVO</span>' : '') +
+            '<div class="colecao-prev">' + _colecaoPreviewHtml(it) + '</div>' +
+            '<div class="colecao-nome">' + _rankEsc(it.nome) + '</div>' + acao +
+          '</div>';
+      });
+      html += '</div></div>';
+    });
+    corpo.innerHTML = html || '<div class="colecao-vazio">' +
+      (_colecaoFiltro === 'tenho' ? 'Você ainda não tem nenhum item. Jogue pra ganhar moedas e tente o ovo dourado na Corujinha!' : 'Nada por aqui.') + '</div>';
+  }
+
+  // destaqueId (opcional): item pra realçar e rolar até ele (prêmio novo).
+  function colecaoAbrir(destaqueId) {
+    _colecaoDestaque = destaqueId ? String(destaqueId) : '';
+    if (_colecaoDestaque) _colecaoFiltro = 'todas';
+    var ov = _colecaoMontar();
+    ov.style.display = 'flex';
+    _colecaoRender();
+    if (_colecaoDestaque) {
+      setTimeout(function () {
+        var el = ov.querySelector('[data-colecao-id="' + _colecaoDestaque.replace(/"/g, '') + '"]');
+        if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }, 60);
+    }
+    return true;
+  }
+  function colecaoFechar() {
+    var ov = document.getElementById('colecao-overlay');
+    if (ov) ov.style.display = 'none';
+    _colecaoDestaque = '';
+    // O perfil mostra a contagem; reflete o que mudou (equipar).
+    var cont = document.getElementById('perfil-colecao-qtd');
+    if (cont) { var r = _colecaoResumo(); cont.textContent = r.tem + '/' + r.total; }
+  }
+  window.colecaoAbrir = colecaoAbrir;
+  window.colecaoFechar = colecaoFechar;
+
   /* ── Corujinha (slot 3×3) — o jogo mora em Jogos/corujinha.js (módulo
      sob demanda, ver JOGOS_EXTERNOS). Aqui só as portas de entrada: card
      do menu, atalho da Loja e a ponte. Vindo da Loja, SUBSTITUI a entrada
@@ -4715,6 +4884,8 @@
       _perfilCorpoHtml(_statsLer(), badgesInv, eq.badge,
         { rotulo: 'Ofensiva', valor: streak.dias + (streak.dias === 1 ? ' dia' : ' dias') }, false, _histLer(),
         _perfilConquistasHtml(_titulosDesbloqueadosLer(), _titulosDestaqueLer(), true)) +
+      '<button type="button" class="perfil-colecao-btn" onclick="colecaoAbrir()">🏆 Minha coleção <span id="perfil-colecao-qtd">' +
+        _colecaoResumo().tem + '/' + _colecaoResumo().total + '</span></button>' +
       '<button type="button" class="perfil-ir-loja" onclick="lojaAbrir()">Ir à Loja</button>';
   }
 
@@ -5818,6 +5989,12 @@
     // Loja de skins dentro do jogo (só itens com item.jogo === jogoId).
     lojaJogoAbrir: function (jogoId) { return lojaJogoAbrir(jogoId); },
     lojaJogoFechar: function () { return lojaJogoFechar(); },
+    // Coleção (todas as skins/itens, quantos tem e quantos faltam).
+    colecaoAbrir: function (destaqueId) { return colecaoAbrir(destaqueId); },
+    colecaoResumo: function () { return _colecaoResumo(); },
+    // "Skin · Piano", "Badge do perfil"... e a miniatura do item (HTML).
+    itemOnde: function (id) { return _colecaoOnde(_lojaItemPorId(id)); },
+    itemPreviewHtml: function (id) { return _colecaoPreviewHtml(_lojaItemPorId(id)); },
     corujinhaAbrir: function () { return corujinhaAbrir(); },
     corujinhaFechar: function () { return corujinhaFechar(); },
 

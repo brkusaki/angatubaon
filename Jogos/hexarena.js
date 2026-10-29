@@ -67,6 +67,19 @@
     if (!im) { im = _hxImgs[nome] = new Image(); im.src = _HX_DIR + nome + '.webp'; }
     return (im.complete && im.naturalWidth) ? im : null;
   }
+  // Piso da arena (skin hx_tema da loja): nome do arquivo da casa, ou ''
+  // pro clássico (hex / hex-rachado). Só muda o desenho deste aparelho.
+  var _hxCasaSkin = '';
+  function _hxAplicarSkin() {
+    var G = window.AngatubaGames, it = null;
+    try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('hx_tema') : null; } catch (e) {}
+    _hxCasaSkin = (it && it.casa) ? String(it.casa) : '';
+    if (_hxCasaSkin) _hxImg(_hxCasaSkin);   // já começa a baixar
+  }
+  _hxAplicarSkin();
+  window.addEventListener('angatuba:equipado', function (e) {
+    if (e && e.detail && e.detail.slot === 'hx_tema') _hxAplicarSkin();
+  });
   var RODADAS_FINAIS = 3;    // rounds na arena final (raio 1) antes do empate
   // Moedas por colocação. Empate no 1º paga o valor do 2º (12): sem
   // isso, um grupo combinando de não se acertar tirava 20 cada partida.
@@ -390,7 +403,7 @@
         g.globalAlpha = 1;
         if (borda && revelando) { escala = 0.94 * (1 - queda); g.globalAlpha = 1 - queda; }
         if (escala <= 0.02) { g.globalAlpha = 1; return; }
-        var pedra = _hxImg(borda ? 'hex-rachado' : 'hex');
+        var pedra = (_hxCasaSkin && _hxImg(_hxCasaSkin)) || _hxImg(borda ? 'hex-rachado' : 'hex');
         if (pedra) {
           var sw = tam * escala * 2.04;
           g.drawImage(pedra, p.x - sw / 2, p.y - sw * 0.46, sw, sw * 0.92);

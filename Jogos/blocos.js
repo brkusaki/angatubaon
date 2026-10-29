@@ -76,13 +76,20 @@
   // 'paleta' (6 cores) troca _bbCores e desliga as texturas (que são de
   // cor fixa) — no lugar, um brilho em gradiente dá o relevo da peça.
   var _BB_CORES_CLASSICAS = _bbCores.slice();
+  var _BB_TEX_CLASSICAS = _bbTexturas.slice();
   var _bbTemaPaleta = false;
   function _bbAplicarSkin() {
     var G = window.AngatubaGames, it = null;
     try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('bb_tema') : null; } catch (e) {}
     var pal = (it && it.paleta && it.paleta.length >= _BB_CORES_CLASSICAS.length) ? it.paleta : null;
+    // Tema com arte ('texturas', 6): usa as imagens dele no lugar das do
+    // clássico; a paleta fica só de cor de fundo enquanto a imagem carrega.
+    var tex = (it && it.texturas && it.texturas.length >= _BB_TEX_CLASSICAS.length) ? it.texturas : null;
+    _bbTexturas = tex ? tex.slice(0, _BB_TEX_CLASSICAS.length) : _BB_TEX_CLASSICAS.slice();
+    if (tex) pal = null;
     _bbTemaPaleta = !!pal;
-    _bbCores = pal ? pal.slice(0, _BB_CORES_CLASSICAS.length) : _BB_CORES_CLASSICAS.slice();
+    _bbCores = pal ? pal.slice(0, _BB_CORES_CLASSICAS.length)
+      : (tex && it.paleta ? it.paleta.slice(0, _BB_CORES_CLASSICAS.length) : _BB_CORES_CLASSICAS.slice());
     if (_bbCelEls) _bbRenderGrid();
     if (_bbTrayEls) _bbRenderTray();
   }

@@ -1147,7 +1147,11 @@
     }).join('');
     wrap.innerHTML = '<span class="pty-rodadas-label">' + (souAnf ? 'Qual jogo?' : 'Jogo da sala') + '</span>' +
       '<div class="pty-modo-chips">' + chips + '</div>' +
-      '<div class="pty-modo-desc">' + _escHTML(atual.desc) + '</div>';
+      '<div class="pty-modo-desc">' + _escHTML(atual.desc) + '</div>' +
+      // Hex Arena tem skins de piso (slot hx_tema): cada um escolhe a sua.
+      (atual.chave === 'hexarena' && typeof window.lojaJogoAbrir === 'function'
+        ? '<button type="button" class="jogo-btn-skins pty-hx-skins" onclick="lojaJogoAbrir(\'hexarena\')">🎨 Skins da arena</button>'
+        : '');
   }
 
   function _ptyComecarParty() { window.AngatubaParty.comecarParty(); }

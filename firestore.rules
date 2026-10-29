@@ -244,11 +244,11 @@ service cloud.firestore {
                                't48_tema', 'piano_tema', 'pp_skin', 'sq_tema',
                                'st_tema', 'bb_tema', 'tq_skin', 'dc_tema'])
         && skinJogoOk(e, 't48_tema',   ['t48_classico', 't48_oceano', 't48_floresta', 't48_neon', 't48_galaxia'])
-        && skinJogoOk(e, 'piano_tema', ['piano_classico', 'piano_oceano', 'piano_algodao', 'piano_ouro', 'piano_neon'])
+        && skinJogoOk(e, 'piano_tema', ['piano_classico', 'piano_oceano', 'piano_algodao', 'piano_ouro', 'piano_neon', 'piano_vidro', 'piano_neonvidro'])
         && skinJogoOk(e, 'pp_skin',    ['pp_classico', 'pp_limao', 'pp_roxo', 'pp_fogo', 'pp_ouro'])
         && skinJogoOk(e, 'sq_tema',    ['sq_classico', 'sq_pastel', 'sq_neon', 'sq_doces', 'sq_galaxia'])
         && skinJogoOk(e, 'st_tema',    ['st_classico', 'st_neon', 'st_dourada', 'st_gelo', 'st_arcoiris'])
-        && skinJogoOk(e, 'bb_tema',    ['bb_classico', 'bb_pastel', 'bb_neon', 'bb_madeira', 'bb_galaxia'])
+        && skinJogoOk(e, 'bb_tema',    ['bb_classico', 'bb_pastel', 'bb_neon', 'bb_madeira', 'bb_galaxia', 'bb_elementos'])
         && skinJogoOk(e, 'tq_skin',    ['tq_classico', 'tq_militar', 'tq_deserto', 'tq_onix', 'tq_ouro'])
         && skinJogoOk(e, 'dc_tema',    ['dc_classico', 'dc_frutas', 'dc_pastel', 'dc_neon', 'dc_joias'])
         && e.voo_owl is string && e.voo_owl.size() <= 40

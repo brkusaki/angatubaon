@@ -415,6 +415,8 @@
   // equipado muda (evento 'angatuba:equipado').
   var _PN_SKIN_CLASSICA = { tecla: '#e3354f', tocada: '33,166,123', onda: '#8ffdd6', fundo: '#0d1420' };
   var _pnSkin = _PN_SKIN_CLASSICA;
+  var _pnAzImg = null;   // { tecla, tocada } quando a skin tem arte (ver _pnAplicarSkin)
+  function _pnImgOk(im) { return !!(im && im.complete && im.naturalWidth); }
   // Fundo: sala de concerto (opcional — sem a imagem, fica a cor do tema).
   // Escurecida por cima pra os azulejos continuarem saltando à vista.
   var _PN_FUNDO_SRC = '/Jogos/assets/piano/sala-concerto.webp';
@@ -432,6 +434,14 @@
     try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('piano_tema') : null; } catch (e) {}
     var c = it && it.cores;
     _pnSkin = (c && c.tecla && c.tocada && c.onda && c.fundo) ? c : _PN_SKIN_CLASSICA;
+    // Skin com arte ('azulejos'): a imagem entra no lugar da cor da tecla.
+    var az = it && it.azulejos;
+    _pnAzImg = null;
+    if (az && az.tecla && az.tocada) {
+      _pnAzImg = { tecla: new Image(), tocada: new Image() };
+      _pnAzImg.tecla.src = az.tecla;
+      _pnAzImg.tocada.src = az.tocada;
+    }
     if (_pnCtx && _pnEstado !== 'jogando') _pnDraw();
   }
   window.addEventListener('angatuba:equipado', function (e) {
@@ -775,8 +785,21 @@
         // Android mais fraco. Uma cor só, recalculada por número, é
         // igual de viva no efeito de flash e não aloca nada extra.
         var f = az.flash;
-        ctx.fillStyle = 'rgba(' + _pnSkin.tocada + ',' + (0.13 + f * 0.475) + ')';
-        _pnRoundRect(ctx, bx, by, bw, bh, raio); ctx.fill();
+        if (_pnAzImg && _pnImgOk(_pnAzImg.tocada)) {
+          ctx.globalAlpha = 0.28 + f * 0.72;
+          ctx.drawImage(_pnAzImg.tocada, bx, by, bw, bh);
+          ctx.globalAlpha = 1;
+        } else {
+          ctx.fillStyle = 'rgba(' + _pnSkin.tocada + ',' + (0.13 + f * 0.475) + ')';
+          _pnRoundRect(ctx, bx, by, bw, bh, raio); ctx.fill();
+        }
+      } else if (_pnAzImg && _pnImgOk(_pnAzImg.tecla)) {
+        ctx.drawImage(_pnAzImg.tecla, bx, by, bw, bh);
+        if (az === alvo) {
+          ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+          ctx.lineWidth = Math.max(2, cw * 0.022);
+          _pnRoundRect(ctx, bx, by, bw, bh, raio); ctx.stroke();
+        }
       } else {
         // Idem: era gradiente #ff4d63→#c81e3c recriado por azulejo
         // por frame; agora é o tom médio fixo, sem alocação.

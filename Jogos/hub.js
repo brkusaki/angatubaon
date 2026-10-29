@@ -3264,14 +3264,14 @@
   // público (_perfilPublicoSync só manda voo_owl/badge/bg/card).
   var LOJA_SLOTS = ['voo_owl', 'badge', 'bg', 'card',
     't48_tema', 'piano_tema', 'pp_skin', 'sq_tema', 'st_tema',
-    'bb_tema', 'tq_skin', 'dc_tema', 'rt_nota', 'rt_fundo', 'rt_pista'];
+    'bb_tema', 'tq_skin', 'dc_tema', 'rt_nota', 'rt_fundo', 'rt_pista', 'hx_tema'];
 
   function _equipadoPadrao() {
     return { voo_owl: 'voo_skin_classica', badge: null, bg: 'bg_padrao', card: 'card_padrao',
       t48_tema: 't48_classico', piano_tema: 'piano_classico', pp_skin: 'pp_classico',
       sq_tema: 'sq_classico', st_tema: 'st_classico', bb_tema: 'bb_classico',
       tq_skin: 'tq_classico', dc_tema: 'dc_classico', rt_nota: 'rt_classico',
-      rt_fundo: 'rtf_padrao', rt_pista: 'rtp_padrao' };
+      rt_fundo: 'rtf_padrao', rt_pista: 'rtp_padrao', hx_tema: 'hx_classico' };
   }
   // Título de cada slot na loja dentro do jogo — só aparece quando o jogo
   // vende mais de um slot (hoje só o Ritmo: notas, fundo e pista).
@@ -3319,6 +3319,11 @@
     { id: 'piano_algodao',  nome: 'Algodão-doce',  desc: 'Rosa com lilás.',        preco: 120, slot: 'piano_tema', tipo: 'skin', preview: null, jogo: 'piano', cores: { tecla: '#ec4899', tocada: '196,181,253', onda: '#fbcfe8', fundo: '#1a0d1f' }, amostra: ['#ec4899', '#c4b5fd', '#1a0d1f'] },
     { id: 'piano_ouro',     nome: 'Ouro',          desc: 'Teclas douradas.',       preco: 150, slot: 'piano_tema', tipo: 'skin', preview: null, jogo: 'piano', cores: { tecla: '#d97706', tocada: '250,204,21',  onda: '#fde68a', fundo: '#140f05' }, amostra: ['#d97706', '#facc15', '#140f05'] },
     { id: 'piano_neon',     nome: 'Neon',          desc: 'Roxo e ciano elétrico.', preco: 200, slot: 'piano_tema', tipo: 'skin', preview: null, jogo: 'piano', cores: { tecla: '#a855f7', tocada: '34,211,238',  onda: '#67e8f9', fundo: '#05010d' }, amostra: ['#a855f7', '#22d3ee', '#05010d'] },
+    // Com arte: 'azulejos' = imagens da tecla e da tecla tocada (piano.js
+    // desenha a imagem no lugar da cor; 'cores' segue valendo pra onda,
+    // fundo e fallback enquanto a imagem carrega).
+    { id: 'piano_vidro',     nome: 'Vidro Negro',   desc: 'Teclas de vidro preto.',  preco: 180, slot: 'piano_tema', tipo: 'skin', preview: '/Jogos/assets/piano/azulejo-preto.webp', jogo: 'piano', cores: { tecla: '#111318', tocada: '255,255,255', onda: '#ffffff', fundo: '#07080c' }, azulejos: { tecla: '/Jogos/assets/piano/azulejo-preto.webp', tocada: '/Jogos/assets/piano/azulejo-preto-tocado.webp' } },
+    { id: 'piano_neonvidro', nome: 'Neon de Vidro', desc: 'Roxo que acende ciano.',  preco: 220, slot: 'piano_tema', tipo: 'skin', preview: '/Jogos/assets/piano/azulejo-neon-roxo.webp', jogo: 'piano', cores: { tecla: '#9333ea', tocada: '34,211,238', onda: '#67e8f9', fundo: '#05010d' }, azulejos: { tecla: '/Jogos/assets/piano/azulejo-neon-roxo.webp', tocada: '/Jogos/assets/piano/azulejo-neon-ciano.webp' } },
     // Ping Pong — só a SUA raquete e a bola (local; o adversário não vê).
     { id: 'pp_classico', nome: 'Clássico',     desc: 'Raquete azul, bola branca.', preco: 0,   slot: 'pp_skin', tipo: 'skin', preview: null, jogo: 'pingpong', amostra: ['#38bdf8', '#ffffff'] },
     { id: 'pp_limao',    nome: 'Verde Limão',  desc: 'Raquete limão.',             preco: 85,  slot: 'pp_skin', tipo: 'skin', preview: null, jogo: 'pingpong', corRaquete: '#84cc16', corBola: '#fef08a', amostra: ['#84cc16', '#fef08a'] },
@@ -3335,7 +3340,9 @@
     // pra skin nunca confundir o jogo).
     { id: 'st_classico', nome: 'Clássica',          desc: 'A coruja de sempre.',   preco: 0,   slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: '' },
     { id: 'st_neon',     nome: 'Coruja Neon',       desc: 'Brilho ciano.',         preco: 85,  slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: 'hue-rotate(150deg) saturate(2.4) brightness(1.15) drop-shadow(0 0 7px #22e3ff)' },
-    { id: 'st_dourada',  nome: 'Coruja Dourada',    desc: 'Reluz feito ouro.',     preco: 120, slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: 'sepia(1) saturate(4.5) hue-rotate(-12deg) brightness(1.2) drop-shadow(0 0 7px rgba(255,200,60,.85))' },
+    // st_dourada: id mantido (quem comprou continua com o item), mas a cor
+    // virou esmeralda — dourada confundia com a coruja bônus, que é de ouro.
+    { id: 'st_dourada',  nome: 'Coruja Esmeralda',  desc: 'Verde brilhante.',      preco: 120, slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: 'sepia(.5) hue-rotate(70deg) saturate(2.6) brightness(1.05) drop-shadow(0 0 7px rgba(52,211,153,.85))' },
     { id: 'st_gelo',     nome: 'Coruja Gelo',       desc: 'Azul congelante.',      preco: 150, slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: 'hue-rotate(165deg) saturate(1.2) brightness(1.4) drop-shadow(0 0 7px rgba(170,230,255,.9))' },
     { id: 'st_arcoiris', nome: 'Coruja Arco-íris',  desc: 'Muda de cor sem parar.', preco: 200, slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: 'sepia(1) saturate(5) hue-rotate(0deg) brightness(1.08) drop-shadow(0 0 6px rgba(255,255,255,.55))', animado: 'arcoiris' },
     // Blocos — paleta: 6 cores das peças (sem as texturas do clássico).
@@ -3344,6 +3351,9 @@
     { id: 'bb_neon',     nome: 'Neon',     desc: 'Cores elétricas.',       preco: 120, slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', paleta: ['#d946ef', '#3b82f6', '#22c55e', '#facc15', '#f43f5e', '#06b6d4'] },
     { id: 'bb_madeira',  nome: 'Madeira',  desc: 'Blocos de marcenaria.',  preco: 150, slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', paleta: ['#7c4a24', '#a0632f', '#c08552', '#8b5a2b', '#d4a373', '#5c3a1e'] },
     { id: 'bb_galaxia',  nome: 'Galáxia',  desc: 'Roxos, rosas e ouro.',   preco: 200, slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', paleta: ['#7c3aed', '#4f46e5', '#db2777', '#0ea5e9', '#9333ea', '#f59e0b'] },
+    // Com arte: 'texturas' (6, mesma ordem das cores) no lugar das do
+    // clássico; 'paleta' fica de fundo enquanto a imagem carrega.
+    { id: 'bb_elementos', nome: 'Elementos', desc: 'Lava, gelo, grama, cristal, ouro e doce.', preco: 220, slot: 'bb_tema', tipo: 'skin', preview: '/Jogos/assets/blocos/elem-lava.webp', jogo: 'blocos', paleta: ['#c2410c', '#7dd3fc', '#4d7c0f', '#2563eb', '#ca8a04', '#f472b6'], texturas: ['/Jogos/assets/blocos/elem-lava.webp', '/Jogos/assets/blocos/elem-gelo.webp', '/Jogos/assets/blocos/elem-grama.webp', '/Jogos/assets/blocos/elem-cristal.webp', '/Jogos/assets/blocos/elem-ouro.webp', '/Jogos/assets/blocos/elem-doce.webp'] },
     // Batalha de Tanques — tinta sobre o sprite do SEU tanque (local; o
     // adversário continua vendo a cor padrão). Sem vermelho/azul puros,
     // pra não confundir com as cores dos dois lados.
@@ -3359,6 +3369,15 @@
     { id: 'dc_pastel',   nome: 'Pastel',   desc: 'Confeitos suaves.',       preco: 120, slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', paleta: ['#fda4af', '#c4b5fd', '#86efac', '#fde68a', '#93c5fd'], nomes: ['🌸 rosa', '💜 lilás', '🌿 menta', '🌼 baunilha', '💙 céu'] },
     { id: 'dc_neon',     nome: 'Neon',     desc: 'Balas que brilham.',      preco: 150, slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', paleta: ['#f43f5e', '#d946ef', '#22c55e', '#facc15', '#06b6d4'], nomes: ['🔴 pink', '🟣 magenta', '🟢 verde', '🟡 amarelo', '🔵 ciano'] },
     { id: 'dc_joias',    nome: 'Joias',    desc: 'Rubi, safira e cia.',     preco: 200, slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', paleta: ['#dc2626', '#7c3aed', '#059669', '#f59e0b', '#2563eb'], nomes: ['❤️ rubi', '💜 ametista', '💚 esmeralda', '💛 topázio', '💙 safira'] },
+    // Hex Arena — piso da arena (só no SEU aparelho; os outros veem o
+    // deles). 'casa' = arte da casa; o anel que vai desabar usa a mesma
+    // arte com o véu vermelho de sempre por cima. Vendida pelo botão de
+    // skins no lobby da Party quando o modo Hex Arena está escolhido.
+    { id: 'hx_classico', nome: 'Pedra',   desc: 'O piso de sempre.',    preco: 0,   slot: 'hx_tema', tipo: 'skin', preview: '/Jogos/assets/hexarena/hex.webp',  jogo: 'hexarena' },
+    { id: 'hx_gelo',     nome: 'Gelo',    desc: 'Arena congelada.',     preco: 85,  slot: 'hx_tema', tipo: 'skin', preview: '/Jogos/assets/hexarena/hex-gelo.webp',    jogo: 'hexarena', casa: 'hex-gelo' },
+    { id: 'hx_grama',    nome: 'Gramado', desc: 'Campinho verde.',      preco: 120, slot: 'hx_tema', tipo: 'skin', preview: '/Jogos/assets/hexarena/hex-grama.webp',   jogo: 'hexarena', casa: 'hex-grama' },
+    { id: 'hx_lava',     nome: 'Lava',    desc: 'Rocha em brasa.',      preco: 150, slot: 'hx_tema', tipo: 'skin', preview: '/Jogos/assets/hexarena/hex-lava.webp',    jogo: 'hexarena', casa: 'hex-lava' },
+    { id: 'hx_cristal',  nome: 'Cristal', desc: 'Piso de safira.',      preco: 200, slot: 'hx_tema', tipo: 'skin', preview: '/Jogos/assets/hexarena/hex-cristal.webp', jogo: 'hexarena', casa: 'hex-cristal' },
     // Ritmo da Coruja — skin das notas E dos receptores (slot rt_nota).
     // nota.estilo diz COMO desenhar (ver _rtDesenharNota em Jogos/ritmo.js:
     // gema | flat | olho | neon | ouro); nota.cores = [pistas de fora,
@@ -4296,7 +4315,9 @@
     jogoId = String(jogoId || '');
     var temItens = LOJA_CATALOGO.some(function (it) { return it.jogo === jogoId; });
     if (!temItens) return false;
-    var tela = document.getElementById('jogo-' + jogoId) || document.body;
+    // Hex Arena não tem tela própria: roda dentro da Party (#jogo-party).
+    var tela = document.getElementById('jogo-' + jogoId) ||
+      (jogoId === 'hexarena' ? document.getElementById('jogo-party') : null) || document.body;
     var ov = document.getElementById('lojajogo-overlay');
     if (ov && ov.parentNode !== tela) { ov.parentNode.removeChild(ov); ov = null; }
     if (!ov) {

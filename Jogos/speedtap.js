@@ -119,6 +119,24 @@
     _stSkinArco = !!(it && it.animado === 'arcoiris');
     var boa = document.querySelector('#st-arena .st-boa img');
     if (boa) _stPintarBoa(boa);
+    _stAplicarFundo();
+  }
+  // Cenário da arena (slot st_fundo). Sem item com 'fundo', volta ao
+  // CSS de sempre (floresta à noite, em speedtap.css).
+  function _stAplicarFundo() {
+    var arena = document.getElementById('st-arena');
+    if (!arena) return;
+    var G = window.AngatubaGames, it = null;
+    try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('st_fundo') : null; } catch (e) {}
+    if (it && it.fundo) {
+      arena.style.backgroundImage = 'linear-gradient(rgba(8,10,20,.45), rgba(8,10,20,.55)), url("' + it.fundo + '")';
+      arena.style.backgroundSize = 'cover';
+      arena.style.backgroundPosition = 'center';
+    } else {
+      arena.style.backgroundImage = '';
+      arena.style.backgroundSize = '';
+      arena.style.backgroundPosition = '';
+    }
   }
   function _stPintarBoa(img) {
     img.style.filter = _stSkinFiltro;
@@ -126,7 +144,7 @@
     else img.classList.remove('skin-arcoiris-anim');
   }
   window.addEventListener('angatuba:equipado', function (e) {
-    if (e && e.detail && e.detail.slot === 'st_tema') _stAplicarSkin();
+    if (e && e.detail && (e.detail.slot === 'st_tema' || e.detail.slot === 'st_fundo')) _stAplicarSkin();
   });
 
   // Prepara a tela (estado inicial, mostra recorde). Não inicia o jogo ainda.

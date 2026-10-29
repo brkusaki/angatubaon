@@ -233,17 +233,31 @@
   // O buraco negro é evento raro: 1 por vez e com cooldown longo entre
   // aparições (_VOO_BURACO_CD) — antes ele dividia o sorteio do espaço
   // meio a meio com o OVNI e dava pra ter três na tela de uma vez.
+  // 'nomes' (opcional): variações do mesmo tipo — cada aparição sorteia
+  // uma (arte em /Jogos/assets/voo/d-*.webp). Sem 'nomes', usa 'nome'.
   var _VOO_DECOR = [
-    // Céu (baixa/média-baixa): pássaros e balões. Ficam só no azul do dia.
+    // Céu (baixa/média-baixa): pássaros, balões, pipa e companhia.
     { nome: 'passaro.webp',    kind: 'passaro', min: 0.00, max: 0.50, tam: 0.10, vmin: 0.10, vmax: 0.22, camada: 0.55, modo: 'cruza', maxN: 2 },
-    { nome: 'balao.webp',      kind: 'balao',   min: 0.00, max: 0.45, tam: 0.15, vmin: 0.02, vmax: 0.06, camada: 0.35, modo: 'sobe' , maxN: 2 },
+    { nome: 'balao.webp',      kind: 'balao',   min: 0.00, max: 0.45, tam: 0.15, vmin: 0.02, vmax: 0.06, camada: 0.35, modo: 'sobe' , maxN: 2,
+      nomes: ['balao.webp', 'd-balao-listras.webp', 'd-balao-estrelas.webp', 'd-balao-retalhos.webp', 'd-balao-coruja.webp'] },
+    { nome: 'd-pipa.webp',        kind: 'pipa',      min: 0.00, max: 0.40, tam: 0.16, vmin: 0.05, vmax: 0.10, camada: 0.45, modo: 'cruza', maxN: 1 },
+    { nome: 'd-aviao-papel.webp', kind: 'papel',     min: 0.05, max: 0.45, tam: 0.11, vmin: 0.14, vmax: 0.24, camada: 0.60, modo: 'cruza', maxN: 1 },
+    { nome: 'd-drone.webp',       kind: 'drone',     min: 0.10, max: 0.50, tam: 0.13, vmin: 0.08, vmax: 0.16, camada: 0.55, modo: 'cruza', maxN: 1 },
+    { nome: 'd-dirigivel.webp',   kind: 'dirigivel', min: 0.25, max: 0.62, tam: 0.24, vmin: 0.03, vmax: 0.06, camada: 0.30, modo: 'cruza', maxN: 1 },
     // Atmosfera (meio): aviões cruzam o céu mais alto.
-    { nome: 'aviao.webp',      kind: 'aviao',   min: 0.40, max: 0.78, tam: 0.22, vmin: 0.16, vmax: 0.30, camada: 0.70, modo: 'cruza', maxN: 2 },
+    { nome: 'aviao.webp',      kind: 'aviao',   min: 0.40, max: 0.78, tam: 0.22, vmin: 0.16, vmax: 0.30, camada: 0.70, modo: 'cruza', maxN: 2,
+      nomes: ['aviao.webp', 'd-aviao-vermelho.webp', 'd-aviao-jato.webp', 'd-aviao-biplano.webp', 'd-aviao-hidro.webp'] },
     // Transição atmosfera→espaço: foguetes sobem.
-    { nome: 'foguete.webp',    kind: 'foguete', min: 0.68, max: 0.92, tam: 0.13, vmin: 0.20, vmax: 0.36, camada: 0.80, modo: 'sobe' , maxN: 2 },
-    // Espaço (alto): OVNIs e buracos negros — nada de balão/avião aqui.
-    { nome: 'ovni.webp',       kind: 'ovni',    min: 0.84, max: 1.01, tam: 0.18, vmin: 0.10, vmax: 0.26, camada: 0.60, modo: 'cruza', maxN: 2 },
-    { nome: 'buraconegro.webp',kind: 'buraco',  min: 0.88, max: 1.01, tam: 0.34, vmin: 0.00, vmax: 0.00, camada: 0.25, modo: 'flutua', maxN: 1 }
+    { nome: 'foguete.webp',    kind: 'foguete', min: 0.68, max: 0.92, tam: 0.13, vmin: 0.20, vmax: 0.36, camada: 0.80, modo: 'sobe' , maxN: 2,
+      nomes: ['foguete.webp', 'd-foguete-classico.webp', 'd-foguete-azul.webp', 'd-foguete-onibus.webp', 'd-foguete-verde.webp'] },
+    // Espaço (alto): OVNIs, buracos negros e coisas que flutuam devagar.
+    { nome: 'ovni.webp',       kind: 'ovni',    min: 0.84, max: 1.01, tam: 0.18, vmin: 0.10, vmax: 0.26, camada: 0.60, modo: 'cruza', maxN: 2,
+      nomes: ['ovni.webp', 'd-ovni-prata.webp', 'd-ovni-et.webp', 'd-ovni-ouro.webp', 'd-ovni-coruja.webp'] },
+    { nome: 'buraconegro-v2.webp', kind: 'buraco', min: 0.88, max: 1.01, tam: 0.34, vmin: 0.00, vmax: 0.00, camada: 0.25, modo: 'flutua', maxN: 1 },
+    { nome: 'd-satelite.webp', kind: 'espaco',  min: 0.80, max: 1.01, tam: 0.16, vmin: 0.03, vmax: 0.08, camada: 0.40, modo: 'cruza', maxN: 1,
+      nomes: ['d-satelite.webp', 'd-planeta.webp', 'd-meteoro.webp', 'd-astronauta.webp', 'd-estacao.webp', 'd-lua.webp', 'd-capacete.webp'] },
+    { nome: 'd-cometa.webp',   kind: 'cometa',  min: 0.82, max: 1.01, tam: 0.18, vmin: 0.22, vmax: 0.36, camada: 0.70, modo: 'cruza', maxN: 1,
+      nomes: ['d-cometa.webp', 'd-estrela-cadente.webp'] }
   ];
 
   // Espera (s) antes do PRIMEIRO buraco negro depois de entrar no espaço e
@@ -916,14 +930,16 @@
     var def = cands[(Math.random() * cands.length) | 0];
     if (def.kind === 'buraco') _vooBuracoCd = _vooBuracoCdNovo();
 
+    // Variação sorteada (balões, aviões, foguetes, OVNIs, espaço).
+    var nome = (def.nomes && def.nomes.length) ? def.nomes[(Math.random() * def.nomes.length) | 0] : def.nome;
     // Pede o asset (idempotente). Mesmo sem ele, criamos o objeto: o
     // desenho tem fallback vetorial por 'kind'.
-    _vooAsset(def.nome);
+    _vooAsset(nome);
 
     var tam = def.tam;
     var vel = (def.vmin + Math.random() * (def.vmax - def.vmin)) * _vooW;
     var d = {
-      def: def, kind: def.kind, nome: def.nome,
+      def: def, kind: def.kind, nome: nome,
       tam: tam, camada: def.camada, modo: def.modo,
       idade: 0, giro: 0,
       x: 0, y: 0, vx: 0, vsobe: 0, dir: 1

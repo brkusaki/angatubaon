@@ -1372,7 +1372,9 @@
       '/Jogos/voo.min.js', '/Jogos/voo.css',
       '/Jogos/assets/voo/aviao.webp',
       '/Jogos/assets/voo/balao.webp',
-      '/Jogos/assets/voo/buraconegro.webp',
+      '/Jogos/assets/voo/buraconegro-v2.webp',
+      '/Jogos/assets/voo/ceu-1-dia.webp', '/Jogos/assets/voo/ceu-2-por-do-sol.webp',
+      '/Jogos/assets/voo/ceu-3-noite.webp', '/Jogos/assets/voo/ceu-4-espaco.webp',
       '/Jogos/assets/voo/foguete.webp',
       '/Jogos/assets/voo/ovni.webp',
       '/Jogos/assets/voo/passaro.webp',
@@ -3264,18 +3266,19 @@
   // público (_perfilPublicoSync só manda voo_owl/badge/bg/card).
   var LOJA_SLOTS = ['voo_owl', 'badge', 'bg', 'card',
     't48_tema', 'piano_tema', 'pp_skin', 'sq_tema', 'st_tema',
-    'bb_tema', 'tq_skin', 'dc_tema', 'rt_nota', 'rt_fundo', 'rt_pista', 'hx_tema'];
+    'bb_tema', 'tq_skin', 'dc_tema', 'rt_nota', 'rt_fundo', 'rt_pista', 'hx_tema', 'st_fundo'];
 
   function _equipadoPadrao() {
     return { voo_owl: 'voo_skin_classica', badge: null, bg: 'bg_padrao', card: 'card_padrao',
       t48_tema: 't48_classico', piano_tema: 'piano_classico', pp_skin: 'pp_classico',
       sq_tema: 'sq_classico', st_tema: 'st_classico', bb_tema: 'bb_classico',
       tq_skin: 'tq_classico', dc_tema: 'dc_classico', rt_nota: 'rt_classico',
-      rt_fundo: 'rtf_padrao', rt_pista: 'rtp_padrao', hx_tema: 'hx_classico' };
+      rt_fundo: 'rtf_padrao', rt_pista: 'rtp_padrao', hx_tema: 'hx_classico', st_fundo: 'stf_noite' };
   }
   // Título de cada slot na loja dentro do jogo — só aparece quando o jogo
   // vende mais de um slot (hoje só o Ritmo: notas, fundo e pista).
-  var LOJA_SLOT_ROTULO = { rt_nota: '🎵 Notas e receptores', rt_fundo: '🖼️ Fundo', rt_pista: '🎸 Pista' };
+  var LOJA_SLOT_ROTULO = { rt_nota: '🎵 Notas e receptores', rt_fundo: '🖼️ Fundo', rt_pista: '🎸 Pista',
+    st_tema: '🦉 Coruja', st_fundo: '🌳 Cenário' };
 
   /* ── Catálogo (hardcoded) ──────────────────────────────────────
      Cada item: { id, nome, desc, preco, slot, tipo, preview, jogo }.
@@ -3345,6 +3348,12 @@
     { id: 'st_dourada',  nome: 'Coruja Esmeralda',  desc: 'Verde brilhante.',      preco: 120, slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: 'sepia(.5) hue-rotate(70deg) saturate(2.6) brightness(1.05) drop-shadow(0 0 7px rgba(52,211,153,.85))' },
     { id: 'st_gelo',     nome: 'Coruja Gelo',       desc: 'Azul congelante.',      preco: 150, slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: 'hue-rotate(165deg) saturate(1.2) brightness(1.4) drop-shadow(0 0 7px rgba(170,230,255,.9))' },
     { id: 'st_arcoiris', nome: 'Coruja Arco-íris',  desc: 'Muda de cor sem parar.', preco: 200, slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: 'sepia(1) saturate(5) hue-rotate(0deg) brightness(1.08) drop-shadow(0 0 6px rgba(255,255,255,.55))', animado: 'arcoiris' },
+    // Pega a Coruja — cenário da arena (slot st_fundo). 'fundo' = imagem
+    // atrás das corujas (speedtap.js põe por cima o mesmo véu escuro).
+    { id: 'stf_noite',  nome: 'Floresta à Noite', desc: 'O cenário de sempre.',  preco: 0,   slot: 'st_fundo', tipo: 'bg', preview: '/Jogos/assets/speedtap/floresta.webp',        jogo: 'speedtap' },
+    { id: 'stf_dia',    nome: 'Manhã na Mata',    desc: 'Sol entre as árvores.', preco: 100, slot: 'st_fundo', tipo: 'bg', preview: '/Jogos/assets/speedtap/floresta-dia.webp',    jogo: 'speedtap', fundo: '/Jogos/assets/speedtap/floresta-dia.webp' },
+    { id: 'stf_outono', nome: 'Outono',           desc: 'Folhas caindo.',        preco: 120, slot: 'st_fundo', tipo: 'bg', preview: '/Jogos/assets/speedtap/floresta-outono.webp', jogo: 'speedtap', fundo: '/Jogos/assets/speedtap/floresta-outono.webp' },
+    { id: 'stf_chuva',  nome: 'Dia de Chuva',     desc: 'Chuva fina na mata.',   preco: 140, slot: 'st_fundo', tipo: 'bg', preview: '/Jogos/assets/speedtap/floresta-chuva.webp',  jogo: 'speedtap', fundo: '/Jogos/assets/speedtap/floresta-chuva.webp' },
     // Blocos — paleta: 6 cores das peças (sem as texturas do clássico).
     { id: 'bb_classico', nome: 'Clássico', desc: 'Peças com textura.',     preco: 0,   slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', amostra: ['#a855f7', '#38bdf8', '#34d399', '#fbbf24', '#fb7185', '#22d3ee'] },
     { id: 'bb_pastel',   nome: 'Pastel',   desc: 'Tons suaves.',           preco: 85,  slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', paleta: ['#c4b5fd', '#93c5fd', '#86efac', '#fde68a', '#fda4af', '#a5f3fc'] },

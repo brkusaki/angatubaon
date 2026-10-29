@@ -9664,3 +9664,90 @@ body.aprender-fs-open .apr-tela-licao {
 }
 .perfil-colecao-btn span { font-size: 13px; padding: 2px 10px; border-radius: 99px; background: rgba(0,0,0,.18); }
 .perfil-colecao-btn:active { transform: scale(.98); }
+
+/* ═════ Perfil v2 (mesma linguagem da Coleção) ═════════════════
+   Nível com barra de XP no hero, ações em linha, grade colorida com
+   ícone, card da coleção, vitrine "Equipado agora" em cartas de
+   raridade e jogos com barra de tempo + recorde. */
+#jogo-perfil { --r-comum: #9fb3c8; --r-rara: #38bdf8; --r-epica: #c084fc; --r-lendaria: #fbbf24; }
+
+.perfil-nivel { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 7px; align-items: center; margin-top: 6px; width: 100%; max-width: 240px; }
+.perfil-nivel .perfil-nivel-num { grid-row: 1 / 3; }
+.perfil-nivel .perfil-nivel-barra { min-width: 70px; }
+.perfil-nivel .perfil-nivel-xp { grid-column: 2; margin-top: 2px; font-size: 10px; }
+.perfil-nivel-num {
+  flex-shrink: 0; display: inline-flex; align-items: baseline; gap: 2px; padding: 2px 8px; border-radius: 8px;
+  font-family: var(--font-h); font-weight: 900; font-size: 15px; color: #1a1205;
+  background: linear-gradient(180deg, #fde047, #f59e0b); box-shadow: 0 0 10px rgba(251,191,36,.45);
+}
+.perfil-nivel-num small { font-size: 9px; letter-spacing: .08em; }
+.perfil-nivel-barra { flex: 1; height: 7px; border-radius: 99px; background: rgba(0,0,0,.4); overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,.5); }
+.perfil-nivel-barra i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #38bdf8, #a78bfa); box-shadow: 0 0 8px rgba(125,170,255,.7); }
+.perfil-nivel-xp { flex-shrink: 0; font-size: 10.5px; font-weight: 800; color: rgba(255,255,255,.8); text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+
+.perfil-acoes { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.perfil-acao {
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 4px; border-radius: 14px; cursor: pointer;
+  font-family: var(--font-h); font-weight: 800; font-size: 11.5px; color: #fff;
+  background: rgba(10,12,20,.55); border: 1px solid rgba(255,255,255,.18);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  -webkit-tap-highlight-color: transparent; transition: transform .12s ease;
+}
+.perfil-acao span { font-size: 19px; line-height: 1; }
+.perfil-acao:active { transform: scale(.95); }
+
+/* Grade: ícone + cor por item */
+.perfil-grade-item { position: relative; overflow: hidden; --pg: #94a3b8; border-color: color-mix(in srgb, var(--pg) 35%, var(--border)); }
+.perfil-grade-item::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(90% 80% at 50% 0%, color-mix(in srgb, var(--pg) 22%, transparent), transparent 70%);
+}
+.perfil-grade-ico { position: relative; font-size: 20px; line-height: 1; margin-bottom: 4px; }
+.perfil-grade-num, .perfil-grade-label { position: relative; }
+.perfil-grade-item:not(.perfil-grade-item-vazio) .perfil-grade-num { color: color-mix(in srgb, var(--pg) 55%, #fff); }
+.pg-azul { --pg: #38bdf8; } .pg-verde { --pg: #4ade80; } .pg-roxo { --pg: #c084fc; }
+.pg-laranja { --pg: #fb923c; } .pg-ouro { --pg: #fbbf24; }
+body.light-mode .perfil-grade-item:not(.perfil-grade-item-vazio) .perfil-grade-num { color: color-mix(in srgb, var(--pg) 70%, #111); }
+
+/* Card da coleção */
+.perfil-col-card {
+  display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 14px; padding: 12px 14px; cursor: pointer; text-align: left;
+  border-radius: 16px; color: #fff; font: inherit;
+  background: radial-gradient(120% 120% at 0% 0%, rgba(251,191,36,.28), transparent 60%), linear-gradient(135deg, #1d1a2e, #12141e);
+  border: 1.5px solid rgba(251,191,36,.55); box-shadow: 0 8px 22px rgba(0,0,0,.35), 0 0 18px rgba(251,191,36,.15);
+  -webkit-tap-highlight-color: transparent; transition: transform .12s ease;
+}
+.perfil-col-card:active { transform: scale(.98); }
+.perfil-col-ico { font-size: 30px; filter: drop-shadow(0 3px 6px rgba(0,0,0,.5)); }
+.perfil-col-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.perfil-col-txt b { font-family: var(--font-h); font-weight: 900; font-size: 15px; letter-spacing: .02em; text-transform: uppercase; color: #fde68a; }
+.perfil-col-txt small { font-size: 11.5px; font-weight: 700; color: rgba(255,255,255,.7); }
+.perfil-col-barra { margin-top: 5px; height: 6px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
+.perfil-col-barra i { display: block; height: 100%; background: linear-gradient(90deg, #f59e0b, #fde047); }
+.perfil-col-num { font-family: var(--font-h); font-weight: 900; font-size: 18px; color: #fbbf24; }
+
+/* Vitrine "Equipado agora" */
+.perfil-secao-dica { font-family: inherit; font-weight: 600; font-size: 11px; color: var(--muted); margin-left: 6px; }
+.perfil-eq-grade { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.perfil-eq-carta { color: #eef1f8; border-radius: 12px; }
+.perfil-eq-carta .colecao-carta-nome { font-size: 10.5px; min-height: 2.4em; padding: 5px 4px 7px; }
+.perfil-eq-carta .colecao-carta-rar { font-size: 8.5px; letter-spacing: .1em; }
+.perfil-eq-slot {
+  position: absolute; top: 5px; left: 5px; z-index: 2; padding: 1px 6px; border-radius: 5px;
+  font-size: 9px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; color: #fff; background: rgba(0,0,0,.55);
+}
+@media (max-width: 360px) { .perfil-eq-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Jogos com barra de tempo + recorde */
+.perfil-jogo-row { align-items: center; gap: 10px; }
+.perfil-jogo-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.perfil-jogo-info .perfil-stat-valor { text-align: left; font-size: 11px; }
+.perfil-jogo-barra { height: 5px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }
+.perfil-jogo-barra i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #38bdf8, #4ade80); }
+.perfil-stat-row-top .perfil-jogo-barra i { background: linear-gradient(90deg, #f59e0b, #fde047); }
+.perfil-jogo-rec {
+  flex-shrink: 0; display: flex; flex-direction: column; align-items: center; min-width: 54px; padding: 4px 6px; border-radius: 10px;
+  font-family: var(--font-h); font-weight: 900; font-size: 15px; color: #fbbf24; background: rgba(251,191,36,.1);
+}
+.perfil-jogo-rec small { font-family: inherit; font-size: 8.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+body.light-mode .perfil-jogo-barra { background: rgba(0,0,0,.08); }

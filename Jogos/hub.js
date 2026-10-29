@@ -4655,8 +4655,8 @@
     _colecaoDetalheFechar();
     _colecaoDestaque = '';
     // O perfil mostra a contagem; reflete o que mudou (compra/equipar).
-    var cont = document.getElementById('perfil-colecao-qtd');
-    if (cont) { var r = _colecaoResumo(); cont.textContent = r.tem + '/' + r.total; }
+    var tela = document.getElementById('jogo-perfil');
+    if (tela && tela.style.display !== 'none' && _perfilModo === 'eu') _perfilRender();
   }
   window.colecaoAbrir = colecaoAbrir;
   window.colecaoFechar = colecaoFechar;
@@ -4817,6 +4817,63 @@
     return chaves;
   }
 
+  /* Nível do jogador (só apresentação): XP = 20 por partida + 5 por
+     minuto jogado, somando todos os jogos. Cada nível custa 100 + 50 por
+     nível a mais. Sai das mesmas stats do perfil — funciona igual no
+     próprio perfil e no de outro jogador (stats públicas). */
+  function _perfilNivel(stats) {
+    var xp = 0;
+    Object.keys(stats || {}).forEach(function (k) {
+      var st = stats[k] || {};
+      xp += (Number(st.partidas) || 0) * 20 + Math.floor((Number(st.segundos) || 0) / 60) * 5;
+    });
+    var nivel = 1, custo = 100, resto = xp;
+    while (resto >= custo && nivel < 999) { resto -= custo; nivel++; custo = 100 + 50 * (nivel - 1); }
+    return { nivel: nivel, xp: resto, prox: custo, pct: Math.round(resto * 100 / custo) };
+  }
+  function _perfilNivelHtml(stats) {
+    var n = _perfilNivel(stats);
+    return '<div class="perfil-nivel" title="XP: 20 por partida + 5 por minuto jogado">' +
+        '<span class="perfil-nivel-num"><small>NV</small>' + n.nivel + '</span>' +
+        '<span class="perfil-nivel-barra"><i style="width:' + n.pct + '%"></i></span>' +
+        '<span class="perfil-nivel-xp">' + n.xp + '/' + n.prox + ' XP</span>' +
+      '</div>';
+  }
+  // Vitrine "Equipado agora": os cosméticos em uso em cartas de raridade
+  // (mesmo visual da Coleção). Toque abre o item na Coleção — no perfil
+  // de outra pessoa isso vira "gostei, quero essa" (comprar/equipar).
+  function _perfilEquipadosHtml(eq, proprio) {
+    var slots = [['voo_owl', 'Voo'], ['card', 'Card'], ['bg', 'Fundo'], ['badge', 'Badge']];
+    var html = '';
+    slots.forEach(function (sl) {
+      var it = eq && eq[sl[0]] ? _lojaItemPorId(eq[sl[0]]) : null;
+      if (!it || !(it.preco > 0)) return;
+      var rar = _colecaoRaridade(it);
+      html += '<button type="button" class="colecao-carta perfil-eq-carta tem r-' + rar.id + '" onclick="colecaoAbrir(\'' + _rankEsc(it.id) + '\')" aria-label="' + _rankEsc(it.nome) + '">' +
+          '<span class="colecao-carta-arte">' + _colecaoPreviewHtml(it) + '<span class="perfil-eq-slot">' + sl[1] + '</span></span>' +
+          '<span class="colecao-carta-rar">' + rar.nome + '</span>' +
+          '<span class="colecao-carta-nome">' + _rankEsc(it.nome) + '</span>' +
+        '</button>';
+    });
+    if (!html) {
+      return proprio ? '<div class="perfil-secao"><div class="perfil-secao-titulo">Equipado agora</div>' +
+        '<div class="perfil-stats-vazio">Só itens clássicos por enquanto. Ganhe moedas jogando e personalize na Loja! 🎨</div></div>' : '';
+    }
+    return '<div class="perfil-secao"><div class="perfil-secao-titulo">Equipado agora' +
+        (proprio ? '' : ' <span class="perfil-secao-dica">toque pra ver</span>') + '</div>' +
+      '<div class="perfil-eq-grade">' + html + '</div></div>';
+  }
+  // Coleção em destaque no próprio perfil (substitui o botão simples).
+  function _perfilColecaoHtml() {
+    var r = _colecaoResumo(), pct = r.total ? Math.round(r.tem * 100 / r.total) : 0;
+    return '<button type="button" class="perfil-col-card" onclick="colecaoAbrir()">' +
+        '<span class="perfil-col-ico" aria-hidden="true">🏆</span>' +
+        '<span class="perfil-col-txt"><b>Minha coleção</b><small>' + pct + '% completa · faltam ' + (r.total - r.tem) + '</small>' +
+          '<span class="perfil-col-barra"><i style="width:' + pct + '%"></i></span></span>' +
+        '<span class="perfil-col-num" id="perfil-colecao-qtd">' + r.tem + '/' + r.total + '</span>' +
+      '</button>';
+  }
+
   function _perfilStatsHtml() {
     return _perfilStatsHtmlDe(_statsLer(), false);
   }
@@ -4838,15 +4895,21 @@
       '</div>';
     }
     var html = '';
+    var maxSeg = Math.max(1, (todos[chaves[0]] && todos[chaves[0]].segundos) || 1);
     chaves.forEach(function (k, i) {
       var s = todos[k];
       var maisJogado = (i === 0); // primeiro da lista = mais tempo jogado
-      html += '<div class="perfil-stat-row' + (maisJogado ? ' perfil-stat-row-top' : '') + '">' +
+      var pct = Math.max(4, Math.round((s.segundos || 0) * 100 / maxSeg));
+      html += '<div class="perfil-stat-row perfil-jogo-row' + (maisJogado ? ' perfil-stat-row-top' : '') + '">' +
                 '<span class="perfil-stat-ico" aria-hidden="true">' + _perfilIcoJogo(k) + '</span>' +
-                '<span class="perfil-stat-nome">' + _rankEsc(_perfilLabelJogo(k)) +
-                  (maisJogado ? ' <span class="perfil-stat-top-tag">Mais jogado</span>' : '') + '</span>' +
-                '<span class="perfil-stat-valor">' + _perfilFormatarTempo(s.segundos) +
-                  ' · ' + s.partidas + (s.partidas === 1 ? ' partida' : ' partidas') + '</span>' +
+                '<span class="perfil-jogo-info">' +
+                  '<span class="perfil-stat-nome">' + _rankEsc(_perfilLabelJogo(k)) +
+                    (maisJogado ? ' <span class="perfil-stat-top-tag">Mais jogado</span>' : '') + '</span>' +
+                  '<span class="perfil-jogo-barra"><i style="width:' + pct + '%"></i></span>' +
+                  '<span class="perfil-stat-valor">' + _perfilFormatarTempo(s.segundos) +
+                    ' · ' + s.partidas + (s.partidas === 1 ? ' partida' : ' partidas') + '</span>' +
+                '</span>' +
+                (s.recorde ? '<span class="perfil-jogo-rec"><small>Recorde</small>' + _rankEsc(String(s.recorde)) + '</span>' : '') +
               '</div>';
     });
     return html;
@@ -4870,7 +4933,8 @@
     itens.forEach(function (it) {
       // Sem dado ainda (0 partidas, "—") — card mais discreto, não grita zero.
       var vazio = (it.valor === 0 || it.valor === '0' || it.valor === '—');
-      html += '<div class="perfil-grade-item' + (vazio ? ' perfil-grade-item-vazio' : '') + '">' +
+      html += '<div class="perfil-grade-item' + (vazio ? ' perfil-grade-item-vazio' : '') + (it.cor ? ' pg-' + it.cor : '') + '">' +
+                (it.ico ? '<div class="perfil-grade-ico" aria-hidden="true">' + it.ico + '</div>' : '') +
                 '<div class="perfil-grade-num">' + _rankEsc(String(it.valor)) + '</div>' +
                 '<div class="perfil-grade-label">' + _rankEsc(it.rotulo) + '</div>' +
               '</div>';
@@ -4907,22 +4971,24 @@
   // jogos) — mesma estrutura pro próprio perfil e pro de outro jogador;
   // só muda o que cada chamador passa (fonte dos badges, 4º item da
   // grade, e o texto de empty state via "visitante").
-  function _perfilCorpoHtml(stats, badgeIds, badgeEquipadoId, quartoItem, visitante, historico, conquistasHtml) {
+  function _perfilCorpoHtml(stats, badgeIds, badgeEquipadoId, quartoItem, visitante, historico, conquistasHtml, topoHtml) {
     stats = (stats && typeof stats === 'object') ? stats : {};
     var chaves = _perfilStatsChavesOrdenadas(stats);
     var totalSeg = 0;
     chaves.forEach(function (k) { totalSeg += (stats[k].segundos || 0); });
 
     var gradeItens = [
-      { rotulo: 'Jogos', valor: chaves.length },
-      { rotulo: 'Tempo', valor: chaves.length ? _perfilFormatarTempo(totalSeg) : '—' },
-      { rotulo: 'Insígnias', valor: badgeIds.length }
+      { rotulo: 'Jogos', valor: chaves.length, ico: '🎮', cor: 'azul' },
+      { rotulo: 'Tempo', valor: chaves.length ? _perfilFormatarTempo(totalSeg) : '—', ico: '⏱️', cor: 'verde' },
+      { rotulo: 'Insígnias', valor: badgeIds.length, ico: '🎖️', cor: 'roxo' }
     ];
     if (quartoItem) gradeItens.push(quartoItem);
 
     return _perfilGradeHtml(gradeItens) +
+      (topoHtml || '') +
       (conquistasHtml || '') +
-      _perfilVitrineHtml(badgeIds, badgeEquipadoId) +
+      // Visitante: a única insígnia conhecida já aparece em "Equipado agora".
+      (visitante ? '' : _perfilVitrineHtml(badgeIds, badgeEquipadoId)) +
       _histHtml(historico) +
       '<div class="perfil-secao">' +
         '<div class="perfil-secao-titulo">Jogos</div>' +
@@ -4975,14 +5041,18 @@
             '<div class="perfil-nome">' + _rankEsc(nome) + '</div>' +
             _perfilTituloHtml(eq) +
             _perfilTitulosHeroHtml(_titulosDestaqueLer(), _titulosEquipadosLer()) +
+            _perfilNivelHtml(_statsLer()) +
             '<div class="loja-hero-saldo perfil-saldo">🪙 ' + saldo + '</div>' +
           '</div>' +
         '</div>' +
         _moedasDiarioBtnHtml() +
         // Atalho secundário pra loja (complementa o CTA do rodapé, ver
         // .perfil-ir-loja abaixo) — mesma ação, outro ponto de entrada.
-        '<button type="button" class="perfil-editar-btn" onclick="lojaAbrir()">Editar cosméticos</button>' +
-        '<button type="button" class="perfil-editar-btn" onclick="_titulosAbrirSeletor()"><i class="fa fa-award" aria-hidden="true"></i> Títulos</button>' +
+        '<div class="perfil-acoes">' +
+          '<button type="button" class="perfil-acao" onclick="lojaAbrir()"><span aria-hidden="true">🎨</span>Cosméticos</button>' +
+          '<button type="button" class="perfil-acao" onclick="_titulosAbrirSeletor()"><span aria-hidden="true">🏅</span>Títulos</button>' +
+          '<button type="button" class="perfil-acao" onclick="colecaoAbrir()"><span aria-hidden="true">🏆</span>Coleção</button>' +
+        '</div>' +
         (!logado ? '<button type="button" class="perfil-login-cta" onclick="_perfilPedirLogin()">Entrar pra salvar suas moedas e aparecer no ranking</button>' : '') +
       '</div>';
 
@@ -4997,10 +5067,9 @@
     var streak = (typeof _streakLer === 'function') ? _streakLer() : { dias: 0 };
     corpo.innerHTML =
       _perfilCorpoHtml(_statsLer(), badgesInv, eq.badge,
-        { rotulo: 'Ofensiva', valor: streak.dias + (streak.dias === 1 ? ' dia' : ' dias') }, false, _histLer(),
-        _perfilConquistasHtml(_titulosDesbloqueadosLer(), _titulosDestaqueLer(), true)) +
-      '<button type="button" class="perfil-colecao-btn" onclick="colecaoAbrir()">🏆 Minha coleção <span id="perfil-colecao-qtd">' +
-        _colecaoResumo().tem + '/' + _colecaoResumo().total + '</span></button>' +
+        { rotulo: 'Ofensiva', valor: streak.dias + (streak.dias === 1 ? ' dia' : ' dias'), ico: '🔥', cor: 'laranja' }, false, _histLer(),
+        _perfilConquistasHtml(_titulosDesbloqueadosLer(), _titulosDestaqueLer(), true),
+        _perfilColecaoHtml() + _perfilEquipadosHtml(eq, true)) +
       '<button type="button" class="perfil-ir-loja" onclick="lojaAbrir()">Ir à Loja</button>';
   }
 
@@ -5283,6 +5352,7 @@
             _perfilTituloHtml(eq) +
             _perfilTitulosHeroHtml(_titulosPromover([String(dados.tituloDestaque || '')], _titulosConquistasDeString(dados.conquistas))[0] || '',
                                    _titulosPromover(Array.isArray(dados.titulos) ? dados.titulos : [], _titulosConquistasDeString(dados.conquistas))) +
+            _perfilNivelHtml((dados.stats && typeof dados.stats === 'object') ? dados.stats : {}) +
             '<div class="perfil-visitando-tag" id="perfil-presenca-tag">Perfil de jogador</div>' +
           '</div>' +
         '</div>' +
@@ -5306,11 +5376,11 @@
     var stats = (dados.stats && typeof dados.stats === 'object') ? dados.stats : {};
     var badgesEquipados = eq.badge ? [eq.badge] : [];
     var maisJogadoKey = _perfilStatsChavesOrdenadas(stats)[0];
-    var quartoItem = maisJogadoKey ? { rotulo: 'Recorde', valor: (stats[maisJogadoKey].recorde || 0) } : null;
+    var quartoItem = maisJogadoKey ? { rotulo: 'Recorde', valor: (stats[maisJogadoKey].recorde || 0), ico: '🏆', cor: 'ouro' } : null;
     var historico = Array.isArray(dados.historico) ? dados.historico : [];
     var conqVisitado = _titulosConquistasDeString(dados.conquistas);
     var conquistasHtml = _perfilConquistasHtml(conqVisitado, _titulosPromover([String(dados.tituloDestaque || '')], conqVisitado)[0] || '', false);
-    corpo.innerHTML = _perfilCorpoHtml(stats, badgesEquipados, eq.badge, quartoItem, true, historico, conquistasHtml);
+    corpo.innerHTML = _perfilCorpoHtml(stats, badgesEquipados, eq.badge, quartoItem, true, historico, conquistasHtml, _perfilEquipadosHtml(eq, false));
   }
 
   // Busca o doc público perfis/{uid} uma única vez (sem listener — a

@@ -3391,9 +3391,9 @@
     { id: 'rtp_roxo',   nome: 'Roxo Profundo', desc: 'Roxo escuro elegante.',     preco: 100, slot: 'rt_pista', tipo: 'skin', preview: null, jogo: 'ritmo', pista: { faixa: ['rgba(76,29,149,0.24)', 'rgba(46,16,101,0.32)'], linha: 'rgba(167,139,250,0.24)', acerto: 'rgba(196,181,253,0.65)', aperto: '139,92,246' }, amostra: ['#2e1065', '#8b5cf6'] },
 
     // Badges
-    { id: 'badge_estrela', nome: 'Estrela da Coruja', desc: 'Pra quem brilha nos jogos.',         preco: 50,  slot: 'badge', tipo: 'badge', preview: '/webp/owl-tada.webp',   jogo: null },
-    { id: 'badge_fogo',    nome: 'Chama da Ofensiva',  desc: 'Homenagem a quem não falta um dia.', preco: 100, slot: 'badge', tipo: 'badge', preview: '/webp/owl-tada.webp',   jogo: null },
-    { id: 'badge_coroa',   nome: 'Coroa de Angatuba',  desc: 'Pros campeões do ranking.',          preco: 200, slot: 'badge', tipo: 'badge', preview: '/webp/owl-trophy.webp', jogo: null },
+    { id: 'badge_estrela', nome: 'Estrela da Coruja', desc: 'Pra quem brilha nos jogos.',         preco: 50,  slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/estrela.webp',   jogo: null },
+    { id: 'badge_fogo',    nome: 'Chama da Ofensiva',  desc: 'Homenagem a quem não falta um dia.', preco: 100, slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/fogo.webp',   jogo: null },
+    { id: 'badge_coroa',   nome: 'Coroa de Angatuba',  desc: 'Pros campeões do ranking.',          preco: 200, slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/coroa.webp', jogo: null },
 
     // Planos de fundo de perfil (catálogo — sem upload)
     { id: 'bg_padrao', nome: 'Céu de Angatuba', desc: 'O fundo padrão do seu perfil.', preco: 0,   slot: 'bg', tipo: 'bg', preview: null,               jogo: null },
@@ -4384,9 +4384,14 @@
      Ranking). BG e card vêm do catálogo da loja — nunca upload.
   ══════════════════════════════════════════════════════════════ */
 
-  // Emoji pequeno pro cantinho do avatar — o preview do catálogo (webp
-  // de coruja) é grande demais pra um badge; aqui é só o "selo".
-  var PERFIL_BADGE_ICO = { badge_estrela: '⭐', badge_fogo: '🔥', badge_coroa: '👑' };
+  // Medalha pequena (HTML <img>) pro cantinho do avatar, o título e a
+  // vitrine — mesmas artes de /Jogos/assets/medalhas/ usadas nas
+  // conquistas (_titulosIcone). O CSS .medalha-ico mede em em, então ela
+  // herda o tamanho do emoji que ocupava o lugar.
+  function _medalhaImg(nome) {
+    return '<img class="medalha-ico" src="/Jogos/assets/medalhas/' + nome + '.webp" alt="" decoding="async">';
+  }
+  var PERFIL_BADGE_ICO = { badge_estrela: _medalhaImg('estrela'), badge_fogo: _medalhaImg('fogo'), badge_coroa: _medalhaImg('coroa') };
 
   // 'eu' = tela mostrando o próprio perfil local; 'outro' = visitando o
   // perfil público (Firestore) de outro jogador (Camada 3). Controla só
@@ -5229,15 +5234,15 @@
   /* Ícone e "raridade" de cada conquista — só apresentação (vitrine e
      destaque). Peso maior = mais difícil = aparece primeiro. */
   function _titulosIcone(id) {
-    if (/^rank_geral_top1$/.test(id)) return '👑';
-    if (/^rank_geral_/.test(id)) return '🏆';
-    if (/^rank_top1_/.test(id)) return '🥇';
-    if (/^rank_top3_/.test(id)) return '🥈';
-    if (/^rank_top10_/.test(id)) return '🏅';
-    if (/^main_/.test(id)) return '🎮';
-    if (/^ofensiva_/.test(id)) return '🔥';
-    if (/^stats_tempo_/.test(id)) return '⏳';
-    return '🎯';
+    if (/^rank_geral_top1$/.test(id)) return _medalhaImg('coroa');
+    if (/^rank_geral_/.test(id)) return _medalhaImg('trofeu');
+    if (/^rank_top1_/.test(id)) return _medalhaImg('ouro');
+    if (/^rank_top3_/.test(id)) return _medalhaImg('prata');
+    if (/^rank_top10_/.test(id)) return _medalhaImg('bronze');
+    if (/^main_/.test(id)) return _medalhaImg('estrela');
+    if (/^ofensiva_/.test(id)) return _medalhaImg('fogo');
+    if (/^stats_tempo_/.test(id)) return _medalhaImg('raio');
+    return _medalhaImg('escudo-coruja');
   }
   var TITULOS_PESO = {
     rank_geral_top1: 100, rank_geral_top3: 90, rank_geral_top10: 80,

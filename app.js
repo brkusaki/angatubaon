@@ -8026,6 +8026,10 @@
     const emptyEl = document.getElementById('empty-state');
     emptyEl.style.display = 'block';
     document.getElementById('empty-icon').textContent = '📡';
+    // Coruja segurando o cabo solto (a do empty-state ficava na última
+    // pose usada, que podia ser a da lupa "não achei nada").
+    const _owlOff = document.getElementById('empty-owl');
+    if (_owlOff) { _owlOff.src = '/webp/owl-offline.webp'; _owlOff.style.display = 'block'; }
     document.getElementById('empty-msg').textContent = 'Sem conexão com o servidor.';
     document.getElementById('empty-sub').textContent = vaiRetry
       ? 'Tentando novamente em alguns segundos...'
@@ -11165,7 +11169,7 @@
     var dados = lista || AVISOS_HOJE_MOCK;
     window._avisosAtuais = dados; // referência usada pelo modal de post (_abrirAvisoPost)
     if (!dados || !dados.length) {
-      box.innerHTML = '<div class="avisos-empty"><img src="/webp/owl-sleeping.webp" alt="" class="avisos-empty-owl" onerror="this.style.display=\'none\'">Nenhum aviso por aqui hoje. Volte mais tarde!</div>';
+      box.innerHTML = '<div class="avisos-empty"><img src="/webp/owl-empty.webp" alt="" class="avisos-empty-owl" onerror="this.style.display=\'none\'">Nenhum aviso por aqui hoje. Volte mais tarde!</div>';
       return;
     }
     var curtidos = _avisosCurtidosGet();

@@ -167,14 +167,17 @@
     { id: 'vamos',     texto: 'Vamos!' },
     { id: 'sorte',     texto: 'Sorte de principiante…' },
     { id: 'boa',       texto: 'Boa!' },
-    { id: 'pensando',  texto: '🤔' },
+    { id: 'pensando',  texto: '🤔', img: '/Jogos/assets/baralho/reacoes/pensando.webp' },
     { id: 'silencio',  texto: '🤫' },
-    { id: 'tedio',     texto: '🥱' },
-    { id: 'risada',    texto: '😂' },
-    { id: 'estiloso',  texto: '😎' },
-    { id: 'fogo',      texto: '🔥' },
-    { id: 'palmas',    texto: '👏' },
-    { id: 'caveira',   texto: '💀' }
+    { id: 'tedio',     texto: '🥱', img: '/Jogos/assets/baralho/reacoes/dormindo.webp' },
+    { id: 'risada',    texto: '😂', img: '/Jogos/assets/baralho/reacoes/rindo.webp' },
+    { id: 'estiloso',  texto: '😎', img: '/Jogos/assets/baralho/reacoes/convencida.webp' },
+    { id: 'fogo',      texto: '🔥', img: '/Jogos/assets/baralho/reacoes/forte.webp' },
+    { id: 'palmas',    texto: '👏', img: '/Jogos/assets/baralho/reacoes/palmas.webp' },
+    { id: 'caveira',   texto: '💀', img: '/Jogos/assets/baralho/reacoes/explodindo.webp' },
+    { id: 'lingua',    texto: '😛', img: '/Jogos/assets/baralho/reacoes/lingua.webp' },
+    { id: 'chocada',   texto: '😱', img: '/Jogos/assets/baralho/reacoes/chocada.webp' },
+    { id: 'desisto',   texto: 'Desisto!', img: '/Jogos/assets/baralho/reacoes/bandeira.webp' }
   ];
   /* Linguagem de mesa. Cada situação tem 2-4 variações sorteadas — o que
      tira o ar de robô sem precisar de texto livre. ATENÇÃO: frase que os
@@ -1074,7 +1077,7 @@
       _reacoesVistas[uid] = r.seq;
       var def = r.texto ? { texto: r.texto } : _reacaoPorId(r.id);
       if (!def) return;
-      _baloes[uid] = { texto: def.texto, expiraEm: agora + MS_BALAO };
+      _baloes[uid] = { texto: def.texto, img: def.img || '', expiraEm: agora + MS_BALAO };
       mudou = true;
     });
     if (mudou) _agendarLimpezaBaloes();
@@ -1095,6 +1098,12 @@
   function _balaoEl(uid) {
     var b = _baloes[uid];
     if (!b || b.expiraEm <= Date.now()) return null;
+    // Reação com arte da coruja: o balão mostra a imagem no lugar do emoji.
+    if (b.img) {
+      var bi = _elx('div', 'balao balao-img');
+      bi.appendChild(_elx('img', 'reacao-img', { src: b.img, alt: b.texto, decoding: 'async' }));
+      return bi;
+    }
     return _elx('div', 'balao', { texto: b.texto });
   }
 
@@ -1296,7 +1305,8 @@
   function _criarPainelReacoes() {
     var painel = _elx('div', 'painel-reacoes');
     REACOES.forEach(function (r) {
-      var b = _elx('button', 'chip-reacao', { type: 'button', texto: r.texto });
+      var b = _elx('button', r.img ? 'chip-reacao chip-reacao-img' : 'chip-reacao', { type: 'button', texto: r.img ? '' : r.texto, 'aria-label': r.texto });
+      if (r.img) b.appendChild(_elx('img', 'reacao-img', { src: r.img, alt: '', decoding: 'async' }));
       b.addEventListener('click', function () {
         _empurrarAcao('reacao', { id: r.id });
         _painelReacoes = false;

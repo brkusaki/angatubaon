@@ -807,6 +807,12 @@
   -webkit-tap-highlight-color: transparent;
 }
 .uno-chip-reacao:active { transform: scale(0.95); }
+/* Reações com arte da coruja (Jogos/assets/baralho/reacoes/) */
+.uno-chip-reacao-img { padding: 2px 6px; line-height: 0; }
+.uno-chip-reacao-img .uno-reacao-img { width: 34px; height: 34px; }
+.uno-reacao-img { display: block; object-fit: contain; pointer-events: none; }
+.uno-balao-img { padding: 4px 6px; line-height: 0; }
+.uno-balao-img .uno-reacao-img { width: 56px; height: 56px; }
 
 /* ---------- flash ---------- */
 

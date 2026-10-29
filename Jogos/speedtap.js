@@ -11,9 +11,12 @@
   /* -- Speed Tap: "Pega a Coruja" (com níveis, combo, coruja fake e 2 modos) -- */
   var _ST_DURACAO = 25;                        // segundos por partida (modo clássico)
   var _ST_VIDAS   = 3;                          // fakes que pode errar (modo sobrevivência)
-  var _ST_OWL     = '/webp/owl-portrait.webp'; // coruja boa (vale ponto)
-  var _ST_FAKE    = '/webp/owl-angry.webp';    // coruja fake (não pode tocar!)
-  var _ST_BONUS   = '/webp/owl-trophy.webp';   // coruja bônus dourada (+5)
+  var _ST_DIR     = '/Jogos/assets/speedtap/';
+  var _ST_OWL     = _ST_DIR + 'boa-acenando.webp';   // coruja boa (vale ponto)
+  var _ST_FAKE    = _ST_DIR + 'fake.webp';           // impostora disfarçada (não pode tocar!)
+  var _ST_BONUS   = _ST_DIR + 'dourada.webp';        // coruja bônus dourada (+5)
+  // Quadro do toque: some no lugar da coruja tocada (ver _stFantasma).
+  var _ST_TOQUE   = { boa: _ST_DIR + 'boa-tonta.webp', fake: _ST_DIR + 'fake-pega.webp', bonus: _ST_DIR + 'dourada-moedas.webp' };
 
   var _stModo = 'classico';                     // 'classico' | 'sobrevivencia'
   var _stTempo = 0, _stPontos = 0, _stCombo = 0, _stComboMax = 0;
@@ -213,6 +216,7 @@
   // Trata o toque conforme o tipo de coruja.
   function _stTocarCoruja(tipo, alvo, arena) {
     var pEl = document.getElementById('st-pontos');
+    _stFantasma(tipo, alvo, arena);
 
     if (tipo === 'fake') {
       if (_stModo === 'sobrevivencia') {
@@ -262,6 +266,23 @@
     _stAtualizarNivel();
     if (_stTimerCiclo) { clearTimeout(_stTimerCiclo); _stTimerCiclo = null; }
     _stProximaCoruja();
+  }
+
+  // Reação da coruja tocada (tonta / disfarce caindo / chuva de moedas):
+  // um <img> solto no lugar do alvo, que some sozinho — o alvo em si é
+  // trocado na hora pela próxima coruja. A coruja boa leva o filtro da
+  // skin equipada, igual ao alvo.
+  function _stFantasma(tipo, alvo, arena) {
+    var src = _ST_TOQUE[tipo];
+    if (!src || !alvo || !arena) return;
+    var el = document.createElement('img');
+    el.className = 'st-fantasma';
+    el.src = src; el.alt = '';
+    el.style.left = alvo.style.left; el.style.top = alvo.style.top;
+    el.style.width = alvo.style.width; el.style.height = alvo.style.height;
+    if (tipo === 'boa') _stPintarBoa(el);
+    arena.appendChild(el);
+    setTimeout(function(){ if (el.parentNode) el.remove(); }, 520);
   }
 
   // Badge de texto flutuante (+N / -N) na posição da coruja.
@@ -433,7 +454,7 @@
       if (_stModo === 'sobrevivencia') {
         if (bateuRecorde) fimMsg.textContent = 'Novo recorde de sobrevivência! 🏆' + extra;
         else if (_stPontos >= 30) fimMsg.textContent = 'Resistiu bravamente! 🛡️' + extra;
-        else fimMsg.textContent = 'As corujas bravas venceram dessa vez! 😠' + extra;
+        else fimMsg.textContent = 'As impostoras venceram dessa vez! 🥸' + extra;
       } else {
         if (bateuRecorde) fimMsg.textContent = 'Novo recorde! Você é rápido! 🏆' + extra;
         else if (_stPontos >= 40) fimMsg.textContent = 'Mandou muito bem! 🔥' + extra;

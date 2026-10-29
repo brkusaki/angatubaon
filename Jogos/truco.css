@@ -24,7 +24,12 @@
   height: 100%;
   min-height: 560px;
   box-sizing: border-box;
+  /* Mesa de feltro do bar (Gemini, vista de cima) com véu escuro por
+     cima pra carta e texto lerem bem; o gradiente é o fundo enquanto a
+     imagem carrega ou se ela falhar. */
   background:
+    linear-gradient(rgba(6, 20, 12, 0.42), rgba(6, 20, 12, 0.58)),
+    url('/Jogos/assets/baralho/mesa-truco.webp') center / cover no-repeat,
     radial-gradient(ellipse at 50% 38%, var(--trc-feltro-2), var(--trc-feltro) 72%);
   color: #f2ece0;
   font-family: var(--font-b, inherit);

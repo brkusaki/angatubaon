@@ -2692,7 +2692,7 @@
       if (jogoKey !== _rankAbaAtual) return;
       if (!top || !top.length) {
         lista.innerHTML = '<div class="rank-vazio">' +
-            '<img src="/webp/owl-trophy.webp" alt="" class="rank-vazio-owl" onerror="this.style.display=\'none\'">' +
+            '<img src="/Jogos/assets/hub/rank-vazio.webp" alt="" class="rank-vazio-owl" onerror="this.style.display=\'none\'">' +
             '<div class="rank-vazio-tit">Ninguém pontuou ainda</div>' +
             '<div class="rank-vazio-sub">' + (ehGeral
               ? 'Jogue pelo menos ' + RANK_GERAL_MIN_JOGOS + ' jogos diferentes pra entrar no geral! 🦉'
@@ -2769,7 +2769,7 @@
       _rankPendente = { jogo: jogoKey, score: Math.max(0, Math.round(Number(scoreObtido) || 0)) };
       slot.innerHTML =
         '<div class="rank-fim-convite">' +
-          '<img src="/webp/owl-trophy.webp" alt="" class="rank-fim-owl" onerror="this.style.display=\'none\'">' +
+          '<img src="/Jogos/assets/hub/rank-fim.webp" alt="" class="rank-fim-owl" onerror="this.style.display=\'none\'">' +
           '<div class="rank-fim-txt">Entre para salvar <b>' + (scoreObtido || 0) + '</b> no ranking da cidade!</div>' +
           '<button class="rank-fim-btn" onclick="rankPedirLogin()">Entrar e competir</button>' +
         '</div>';
@@ -3333,11 +3333,11 @@
     { id: 'sq_galaxia',  nome: 'Galáxia',  desc: 'Nebulosas e estrelas.',  preco: 200, slot: 'sq_tema', tipo: 'skin', preview: null, jogo: 'sequencia', paleta: ['#8b5cf6', '#f472b6', '#22d3ee', '#facc15', '#34d399', '#fb923c'] },
     // Pega a Coruja — filtro só na coruja BOA (brava e dourada ficam iguais,
     // pra skin nunca confundir o jogo).
-    { id: 'st_classico', nome: 'Clássica',          desc: 'A coruja de sempre.',   preco: 0,   slot: 'st_tema', tipo: 'skin', preview: '/webp/owl-portrait.webp', jogo: 'speedtap', filtroCss: '' },
-    { id: 'st_neon',     nome: 'Coruja Neon',       desc: 'Brilho ciano.',         preco: 85,  slot: 'st_tema', tipo: 'skin', preview: '/webp/owl-portrait.webp', jogo: 'speedtap', filtroCss: 'hue-rotate(150deg) saturate(2.4) brightness(1.15) drop-shadow(0 0 7px #22e3ff)' },
-    { id: 'st_dourada',  nome: 'Coruja Dourada',    desc: 'Reluz feito ouro.',     preco: 120, slot: 'st_tema', tipo: 'skin', preview: '/webp/owl-portrait.webp', jogo: 'speedtap', filtroCss: 'sepia(1) saturate(4.5) hue-rotate(-12deg) brightness(1.2) drop-shadow(0 0 7px rgba(255,200,60,.85))' },
-    { id: 'st_gelo',     nome: 'Coruja Gelo',       desc: 'Azul congelante.',      preco: 150, slot: 'st_tema', tipo: 'skin', preview: '/webp/owl-portrait.webp', jogo: 'speedtap', filtroCss: 'hue-rotate(165deg) saturate(1.2) brightness(1.4) drop-shadow(0 0 7px rgba(170,230,255,.9))' },
-    { id: 'st_arcoiris', nome: 'Coruja Arco-íris',  desc: 'Muda de cor sem parar.', preco: 200, slot: 'st_tema', tipo: 'skin', preview: '/webp/owl-portrait.webp', jogo: 'speedtap', filtroCss: 'sepia(1) saturate(5) hue-rotate(0deg) brightness(1.08) drop-shadow(0 0 6px rgba(255,255,255,.55))', animado: 'arcoiris' },
+    { id: 'st_classico', nome: 'Clássica',          desc: 'A coruja de sempre.',   preco: 0,   slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: '' },
+    { id: 'st_neon',     nome: 'Coruja Neon',       desc: 'Brilho ciano.',         preco: 85,  slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: 'hue-rotate(150deg) saturate(2.4) brightness(1.15) drop-shadow(0 0 7px #22e3ff)' },
+    { id: 'st_dourada',  nome: 'Coruja Dourada',    desc: 'Reluz feito ouro.',     preco: 120, slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: 'sepia(1) saturate(4.5) hue-rotate(-12deg) brightness(1.2) drop-shadow(0 0 7px rgba(255,200,60,.85))' },
+    { id: 'st_gelo',     nome: 'Coruja Gelo',       desc: 'Azul congelante.',      preco: 150, slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: 'hue-rotate(165deg) saturate(1.2) brightness(1.4) drop-shadow(0 0 7px rgba(170,230,255,.9))' },
+    { id: 'st_arcoiris', nome: 'Coruja Arco-íris',  desc: 'Muda de cor sem parar.', preco: 200, slot: 'st_tema', tipo: 'skin', preview: '/Jogos/assets/speedtap/boa-acenando.webp', jogo: 'speedtap', filtroCss: 'sepia(1) saturate(5) hue-rotate(0deg) brightness(1.08) drop-shadow(0 0 6px rgba(255,255,255,.55))', animado: 'arcoiris' },
     // Blocos — paleta: 6 cores das peças (sem as texturas do clássico).
     { id: 'bb_classico', nome: 'Clássico', desc: 'Peças com textura.',     preco: 0,   slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', amostra: ['#a855f7', '#38bdf8', '#34d399', '#fbbf24', '#fb7185', '#22d3ee'] },
     { id: 'bb_pastel',   nome: 'Pastel',   desc: 'Tons suaves.',           preco: 85,  slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', paleta: ['#c4b5fd', '#93c5fd', '#86efac', '#fde68a', '#fda4af', '#a5f3fc'] },
@@ -3510,7 +3510,7 @@
     // A tela de fim de cada jogo mostra o ganho BASE (calculado lá); o
     // extra do evento aparece aqui, sem precisar mexer em cada jogo.
     if (bonusEvento > 0 && typeof showToastSimples === 'function') {
-      showToastSimples('Bônus do evento: +' + bonusEvento + ' 🪙', '/webp/owl-tada.webp');
+      showToastSimples('Bônus do evento: +' + bonusEvento + ' 🪙', '/Jogos/assets/hub/bonus-moedas.webp');
     }
     return novo;
   }

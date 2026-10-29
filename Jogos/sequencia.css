@@ -169,6 +169,19 @@ body.games-fs-open .sq-grade {
 }
 .sq-btn:active { transform: scale(.94); }
 
+/* Arte: cada casa tem a coruja da sua cor (parada) e a mesma coruja
+   cantando, que aparece quando acende. Com paleta da loja, volta a
+   coruja neutra (ver _sqAplicarSkin). */
+.sq-btn .sq-img-cor { opacity: .9; filter: brightness(.88) saturate(.9); }
+.sq-btn .sq-img-on {
+  position: absolute; left: 20%; top: 20%;
+  opacity: 0; filter: none;
+}
+.sq-btn .sq-img-neutra { display: none; }
+.sq-grade.sq-com-paleta .sq-img-cor,
+.sq-grade.sq-com-paleta .sq-img-on { display: none; }
+.sq-grade.sq-com-paleta .sq-img-neutra { display: block; }
+
 /* Cada coruja tem sua cor (usada na borda, no fundo e no brilho) */
 .sq-btn-0 { --sqc: #a855f7; }
 .sq-btn-1 { --sqc: #f59e0b; }
@@ -193,6 +206,8 @@ body.games-fs-open .sq-grade {
   filter: grayscale(0) brightness(1.12) drop-shadow(0 2px 8px rgba(0,0,0,.65));
   transform: scale(1.08);
 }
+.sq-btn.sq-on .sq-img-cor { opacity: 0; }
+.sq-btn.sq-on .sq-img-on { filter: drop-shadow(0 2px 10px rgba(0,0,0,.6)); }
 
 /* Slot travado: a casa já existe (e por isso nada se move quando ela
    entra em jogo), mas está apagada, com cadeado e sem clique. */

@@ -103,6 +103,11 @@
     try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('sq_tema') : null; } catch (e) {}
     var pal = (it && it.paleta && it.paleta.length >= 6) ? it.paleta : null;
     var btns = _sqBotoes();
+    // As corujas coloridas (Jogos/assets/sequencia) são do tema clássico;
+    // com paleta da loja volta a coruja neutra, pra cor da arte não brigar
+    // com a cor do tema.
+    var grade = document.getElementById('sq-grade');
+    if (grade) grade.classList.toggle('sq-com-paleta', !!pal);
     for (var i = 0; i < btns.length; i++) {
       if (pal && pal[i]) btns[i].style.setProperty('--sqc', pal[i]);
       else btns[i].style.removeProperty('--sqc');

@@ -841,6 +841,9 @@
     _vooAsset(_vooPlatAssetNome('normal', 'ceu'));
     _vooAsset(_vooPlatAssetNome('move', 'ceu'));
     _vooAsset(_vooPlatAssetNome('break', 'ceu'));
+    // Céus pintados: o 1º já entra pronto; os outros chegam bem antes de
+    // a altitude pedir (o fade começa em 0.30).
+    for (var ci = 0; ci < _VOO_CEU_IMG.length; ci++) _vooAsset(_VOO_CEU_IMG[ci].nome);
   }
 
   // Atualiza a decoração de fundo: move os objetos ativos e, de tempos
@@ -1193,6 +1196,36 @@
   }
 
   // ── Camada 1: céu (gradiente por altitude) + astro + estrelas + nuvens ──
+  // Céus pintados (Jogos/assets/voo/ceu-*.webp, 9:16) por cima do
+  // gradiente: dia → pôr do sol → noite → espaço. Cada faixa entra com
+  // fade de _VOO_CEU_FADE de altitude antes do seu 'a' e cobre a de
+  // baixo; a de baixo deixa de ser desenhada quando a de cima já está
+  // 100%. Sem a imagem (falhou/carregando), fica o gradiente de sempre.
+  var _VOO_CEU_IMG = [
+    { nome: 'ceu-1-dia.webp',        a: 0.00 },
+    { nome: 'ceu-2-por-do-sol.webp', a: 0.40 },
+    { nome: 'ceu-3-noite.webp',      a: 0.66 },
+    { nome: 'ceu-4-espaco.webp',     a: 0.88 }
+  ];
+  var _VOO_CEU_FADE = 0.10;
+  function _vooDesenharCeuImg(ctx, W, H, alt) {
+    var n = _VOO_CEU_IMG.length;
+    for (var i = 0; i < n; i++) {
+      var c = _VOO_CEU_IMG[i];
+      var op = (i === 0) ? 1 : Math.max(0, Math.min(1, (alt - (c.a - _VOO_CEU_FADE)) / _VOO_CEU_FADE));
+      if (op <= 0) break;
+      var prox = _VOO_CEU_IMG[i + 1];
+      if (prox && alt >= prox.a) continue;          // a de cima já cobre tudo
+      var reg = _vooAsset(c.nome);
+      if (!reg.ok || !reg.w || !reg.h) continue;
+      var esc = Math.max(W / reg.w, H / reg.h);     // "cover"
+      var dw = reg.w * esc, dh = reg.h * esc;
+      ctx.globalAlpha = op;
+      ctx.drawImage(reg.img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    }
+    ctx.globalAlpha = 1;
+  }
+
   function _vooDesenharCeu(ctx, W, H, alt) {
     // Gradiente do céu reaproveitado: a altitude muda devagar, então não
     // faz sentido montar um gradiente novo (com interpolação de paleta)
@@ -1207,6 +1240,7 @@
     }
     ctx.fillStyle = _vooCeuGrad;
     ctx.fillRect(0, 0, W, H);
+    _vooDesenharCeuImg(ctx, W, H, alt);
 
     // Sol/lua: um disco que sobe pra fora de cena e esfria de cor
     // conforme ganhamos altitude (some no espaço). Parallax bem lento.

@@ -270,11 +270,14 @@ service cloud.firestore {
     }
     // Uma entrada de stats por jogo — mesmo formato de angatuba_stats_jogos
     // no cliente (ver Jogos/hub.js, statsRegistrarPartida).
+    // ENXUTA de propósito (out/2026): o perfilValido inteiro roda a cada
+    // gravação e o Firestore corta em 1.000 expressões. Com 8+ jogos e o
+    // histórico cheio, a versão campo-a-campo estourava o limite e TODA
+    // gravação do perfil era negada (perfil público congelado). O doc é
+    // vitrine (o próprio cliente calcula esses números), então basta
+    // garantir forma e tamanho.
     function statsEntradaValida(s) {
-      return s.keys().hasOnly(['partidas', 'segundos', 'recorde'])
-        && s.partidas is int && s.partidas >= 0 && s.partidas <= 100000
-        && s.segundos is int && s.segundos >= 0 && s.segundos <= 20000000
-        && s.recorde is int && s.recorde >= 0 && s.recorde <= 1000000;
+      return s is map && s.size() <= 3 && s.recorde is int && s.recorde <= 1000000;
     }
     // Chaves são os mesmos jogoKey dos rankings acima ('2048' via colchete
     // por não ser identificador válido). Uma chave nova (jogo novo gravando
@@ -319,14 +322,9 @@ service cloud.firestore {
     // já faz a checagem tipada falhar (erro = negado), sem hasAll.
     // "jogo" não é whitelist (é só rótulo; jogo novo não precisa de
     // regra nova), mas é id curto [a-z0-9_]. "placar" só nos jogos 1x1.
+    // Enxuta pelo mesmo motivo do statsEntradaValida (limite de 1.000).
     function historicoItemValido(i) {
-      return i.keys().hasOnly(['jogo', 'resultado', 'score', 'segundos', 'em', 'placar'])
-        && i.jogo is string && i.jogo.matches('[a-z0-9_]{1,20}')
-        && i.resultado in ['', 'vitoria', 'derrota', 'empate', 'recorde']
-        && i.score is int && i.score >= 0 && i.score <= 1000000
-        && i.segundos is int && i.segundos >= 0 && i.segundos <= 86400
-        && i.em is int && i.em > 0
-        && (!('placar' in i) || (i.placar is string && i.placar.size() <= 12));
+      return i is map && i.size() <= 6 && i.jogo is string && i.jogo.size() <= 20;
     }
     function historicoValido(h) {
       return h is list && h.size() <= 15

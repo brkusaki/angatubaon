@@ -9753,3 +9753,5 @@ body.light-mode .perfil-grade-item:not(.perfil-grade-item-vazio) .perfil-grade-n
 body.light-mode .perfil-jogo-barra { background: rgba(0,0,0,.08); }
 .perfil-col-card.perfil-col-outro { border-color: rgba(56,189,248,.5); background: radial-gradient(120% 120% at 0% 0%, rgba(56,189,248,.24), transparent 60%), linear-gradient(135deg, #18203a, #12141e); }
 .perfil-col-card.perfil-col-outro .perfil-col-txt b { color: #bae6fd; }
+.perfil-sync-erro { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; font-size: 12px; line-height: 1.35; color: #fecaca; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.45); }
+.perfil-sync-erro b { color: #fff; font-family: monospace; }

@@ -5081,7 +5081,7 @@
       _perfilCorpoHtml(_statsLer(), badgesInv, eq.badge,
         { rotulo: 'Ofensiva', valor: streak.dias + (streak.dias === 1 ? ' dia' : ' dias'), ico: '🔥', cor: 'laranja' }, false, _histLer(),
         _perfilConquistasHtml(_titulosDesbloqueadosLer(), _titulosDestaqueLer(), true),
-        _perfilColecaoHtml() + _perfilEquipadosHtml(eq, true)) +
+        _perfilSyncErroHtml() + _perfilColecaoHtml() + _perfilEquipadosHtml(eq, true)) +
       '<button type="button" class="perfil-ir-loja" onclick="lojaAbrir()">Ir à Loja</button>';
   }
 
@@ -5571,13 +5571,35 @@
           _perfilColecaoRecusada = true;
           delete doc.colecao;
           return ref.set(doc, { merge: true });
+        }).then(function () {
+          _perfilSyncErroSalvar('');
         });
       });
     }).catch(function (err) {
-      if (typeof DEBUG !== 'undefined' && DEBUG) {
-        console.log('[perfil] sync do perfil público falhou (SDK ausente ou firestore.rules):', err && (err.code || err.message));
-      }
+      // Antes era silencioso: o perfil público congelava e ninguém via.
+      // Agora guarda o motivo e o próprio perfil mostra um aviso.
+      _perfilSyncErroSalvar((err && (err.code || err.message)) || 'erro');
+      console.warn('[perfil] perfil público não atualizou:', err && (err.code || err.message));
     });
+  }
+  var PERFIL_SYNC_ERRO_KEY = 'angatuba_perfil_sync_erro';
+  function _perfilSyncErroSalvar(msg) {
+    try {
+      var antes = localStorage.getItem(PERFIL_SYNC_ERRO_KEY) || '';
+      if (msg) localStorage.setItem(PERFIL_SYNC_ERRO_KEY, String(msg).slice(0, 80));
+      else localStorage.removeItem(PERFIL_SYNC_ERRO_KEY);
+      if (antes !== (msg || '') && _perfilModo === 'eu') {
+        var tela = document.getElementById('jogo-perfil');
+        if (tela && tela.style.display !== 'none') _perfilRender();
+      }
+    } catch (e) {}
+  }
+  function _perfilSyncErroHtml() {
+    var e = '';
+    try { e = localStorage.getItem(PERFIL_SYNC_ERRO_KEY) || ''; } catch (x) {}
+    if (!e || typeof _cliUser === 'undefined' || !_cliUser) return '';
+    return '<div class="perfil-sync-erro">⚠️ Seu perfil público (o que os amigos veem) não atualizou. Motivo: <b>' +
+      _rankEsc(e) + '</b></div>';
   }
 
   // Debounce leve (~1.5s): equipar vários itens em sequência, ou

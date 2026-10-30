@@ -237,7 +237,8 @@
   // uma (arte em /Jogos/assets/voo/d-*.webp). Sem 'nomes', usa 'nome'.
   var _VOO_DECOR = [
     // Céu (baixa/média-baixa): pássaros, balões, pipa e companhia.
-    { nome: 'passaro.webp',    kind: 'passaro', min: 0.00, max: 0.50, tam: 0.10, vmin: 0.10, vmax: 0.22, camada: 0.55, modo: 'cruza', maxN: 2 },
+    // 'quadros': tira horizontal de N quadros (asas batendo), 'fps' = velocidade.
+    { nome: 'passaro-sheet.webp', kind: 'passaro', min: 0.00, max: 0.50, tam: 0.11, vmin: 0.10, vmax: 0.22, camada: 0.55, modo: 'cruza', maxN: 2, quadros: 9, usar: 8, fps: 14 },
     { nome: 'balao.webp',      kind: 'balao',   min: 0.00, max: 0.45, tam: 0.15, vmin: 0.02, vmax: 0.06, camada: 0.35, modo: 'sobe' , maxN: 2,
       nomes: ['balao.webp', 'd-balao-listras.webp', 'd-balao-estrelas.webp', 'd-balao-retalhos.webp', 'd-balao-coruja.webp'] },
     { nome: 'd-pipa.webp',        kind: 'pipa',      min: 0.00, max: 0.40, tam: 0.16, vmin: 0.05, vmax: 0.10, camada: 0.45, modo: 'cruza', maxN: 1 },
@@ -941,7 +942,7 @@
     var d = {
       def: def, kind: def.kind, nome: nome,
       tam: tam, camada: def.camada, modo: def.modo,
-      idade: 0, giro: 0,
+      idade: 0, giro: 0, fase: Math.random(),
       x: 0, y: 0, vx: 0, vsobe: 0, dir: 1
     };
 
@@ -1347,11 +1348,21 @@
       ctx.translate(d.x, d.y);
       if (reg && reg.ok && reg.img) {
         // Proporção real do asset; espelha se estiver indo pra esquerda.
-        var ratio = (reg.w > 0 && reg.h > 0) ? reg.h / reg.w : 1;
+        var q = (d.def && d.def.quadros) || 1;
+        var qw = reg.w / q;
+        var ratio = (qw > 0 && reg.h > 0) ? reg.h / qw : 1;
         var h = w * ratio;
         if (d.modo === 'cruza' && d.dir < 0) ctx.scale(-1, 1);
         if (d.modo === 'flutua') ctx.rotate(d.giro);
-        try { ctx.drawImage(reg.img, -w / 2, -h / 2, w, h); }
+        try {
+          if (q > 1) {
+            // Sprite animado: quadro pela idade (cada bicho com fase própria).
+            var qi = Math.floor((d.idade + (d.fase || 0)) * (d.def.fps || 12)) % (d.def.usar || q);
+            ctx.drawImage(reg.img, qi * qw, 0, qw, reg.h, -w / 2, -h / 2, w, h);
+          } else {
+            ctx.drawImage(reg.img, -w / 2, -h / 2, w, h);
+          }
+        }
         catch (e) { _vooDecorFallback(ctx, d, w); }
       } else {
         if (d.modo === 'cruza' && d.dir < 0) ctx.scale(-1, 1);

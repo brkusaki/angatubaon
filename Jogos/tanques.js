@@ -705,7 +705,7 @@
     _tqDimensionar();
     // Tema floresta. chao-arena/parede-tijolo/parede-escombros/mato
     // continuam no disco, mas o código ativo não usa mais.
-    _tqAsset('chao-floresta.webp');
+    _tqAsset(_tqChaoNome(true));
     _tqAsset('tank-azul-v2.webp');
     _tqAsset('tank-vermelho-v2.webp');
     _tqAsset('tronco-parede-v2.webp');
@@ -3246,13 +3246,24 @@
   //     nem aparece na tela, então pintar tudo (16x mais área que antes
   //     de existir mundo grande) só gastava tempo à toa a cada quadro.
   var _tqChaoPatternCache = null; // { pat, img, h }
+  var _tqChaoAtual = '';   // cache: lido de novo só quando equipa (evento) ou prepara
+  function _tqChaoNome(reler) {
+    if (_tqChaoAtual && !reler) return _tqChaoAtual;
+    var G = window.AngatubaGames, it = null;
+    try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('tq_chao') : null; } catch (e) {}
+    _tqChaoAtual = (it && it.chao) ? String(it.chao) : 'chao-floresta.webp';
+    return _tqChaoAtual;
+  }
+  window.addEventListener('angatuba:equipado', function (e) {
+    if (e && e.detail && e.detail.slot === 'tq_chao') { _tqChaoNome(true); _tqChaoPatternCache = null; }
+  });
   var TQ_CHAO_FOLGA_PX = 32; // cobre o deslocamento do screen shake sem deixar fresta na borda
   function _tqDesenharChao() {
     var ctx = _tqCtx;
     var vx = _tqCamera.x * _tqH - TQ_CHAO_FOLGA_PX, vy = _tqCamera.y * _tqH - TQ_CHAO_FOLGA_PX;
     var vw = _tqViewportLargura * _tqH + TQ_CHAO_FOLGA_PX * 2, vh = TQ_VIEWPORT_ALTURA * _tqH + TQ_CHAO_FOLGA_PX * 2;
-    // PLACEHOLDER pixel — substituir por asset Gemini do user
-    var reg = _tqAsset('chao-floresta.webp');
+    // Chão da arena: skin tq_chao da loja (só neste aparelho) ou floresta.
+    var reg = _tqAsset(_tqChaoNome());
     if (reg && reg.ok && reg.img && reg.w && reg.h) {
       try {
         if (!_tqChaoPatternCache || _tqChaoPatternCache.img !== reg.img || _tqChaoPatternCache.h !== _tqH || _tqChaoPatternCache.vw !== _tqViewportLargura) {

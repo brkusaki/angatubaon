@@ -358,9 +358,14 @@ service cloud.firestore {
     function tituloDestaqueValido(t) {
       return t is string && t.size() <= 40 && t.matches('[a-z0-9_]*');
     }
+    function colecaoValida(c) {
+      return c is map && c.keys().hasOnly(['tem', 'total'])
+        && c.tem is int && c.total is int
+        && c.tem >= 0 && c.total >= 0 && c.tem <= c.total && c.total <= 1000;
+    }
     function perfilValido(dados) {
       return dados.keys().hasOnly(['uid', 'nome', 'photoURL', 'equipado', 'stats', 'titulos', 'historico',
-                                   'tituloDestaque', 'conquistas', 'atualizadoEm'])
+                                   'tituloDestaque', 'conquistas', 'colecao', 'atualizadoEm'])
         && dados.uid is string
         && dados.uid == request.auth.uid
         && dados.nome is string
@@ -381,6 +386,8 @@ service cloud.firestore {
         // Fase 2: opcionais pelo mesmo motivo do historico.
         && (!dados.keys().hasAny(['tituloDestaque']) || tituloDestaqueValido(dados.tituloDestaque))
         && (!dados.keys().hasAny(['conquistas']) || conquistasValido(dados.conquistas))
+        // Coleção (quantos itens da loja tem / total) — opcional.
+        && (!dados.keys().hasAny(['colecao']) || colecaoValida(dados.colecao))
         && dados.atualizadoEm is timestamp;
     }
     match /perfis/{uid} {

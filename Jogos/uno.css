@@ -39,7 +39,12 @@
   height: 100%;
   min-height: 560px;
   box-sizing: border-box;
-  background: radial-gradient(ellipse at 50% 40%, var(--uno-fundo-2), var(--uno-fundo) 74%);
+  /* Mesa de feltro roxo com neon (vista de cima) + véu escuro por cima
+     pra carta e texto lerem; o gradiente fica de reserva. */
+  background:
+    linear-gradient(rgba(14,10,36,0.40), rgba(14,10,36,0.55)),
+    url('/Jogos/assets/baralho/mesa-uno.webp') center / cover no-repeat,
+    radial-gradient(ellipse at 50% 40%, var(--uno-fundo-2), var(--uno-fundo) 74%);
   color: var(--uno-texto);
   font-family: var(--font-b, inherit);
   overflow: hidden;

@@ -1377,7 +1377,7 @@
       '/Jogos/assets/voo/ceu-3-noite.webp', '/Jogos/assets/voo/ceu-4-espaco.webp',
       '/Jogos/assets/voo/foguete.webp',
       '/Jogos/assets/voo/ovni.webp',
-      '/Jogos/assets/voo/passaro.webp',
+      '/Jogos/assets/voo/passaro-sheet.webp',
       '/Jogos/assets/voo/plat-break-atm.webp',
       '/Jogos/assets/voo/plat-break-ceu.webp',
       '/Jogos/assets/voo/plat-break-esp.webp',
@@ -3266,19 +3266,19 @@
   // público (_perfilPublicoSync só manda voo_owl/badge/bg/card).
   var LOJA_SLOTS = ['voo_owl', 'badge', 'bg', 'card',
     't48_tema', 'piano_tema', 'pp_skin', 'sq_tema', 'st_tema',
-    'bb_tema', 'tq_skin', 'dc_tema', 'rt_nota', 'rt_fundo', 'rt_pista', 'hx_tema', 'st_fundo'];
+    'bb_tema', 'tq_skin', 'dc_tema', 'rt_nota', 'rt_fundo', 'rt_pista', 'hx_tema', 'st_fundo', 'tq_chao'];
 
   function _equipadoPadrao() {
     return { voo_owl: 'voo_skin_classica', badge: null, bg: 'bg_padrao', card: 'card_padrao',
       t48_tema: 't48_classico', piano_tema: 'piano_classico', pp_skin: 'pp_classico',
       sq_tema: 'sq_classico', st_tema: 'st_classico', bb_tema: 'bb_classico',
       tq_skin: 'tq_classico', dc_tema: 'dc_classico', rt_nota: 'rt_classico',
-      rt_fundo: 'rtf_padrao', rt_pista: 'rtp_padrao', hx_tema: 'hx_classico', st_fundo: 'stf_noite' };
+      rt_fundo: 'rtf_padrao', rt_pista: 'rtp_padrao', hx_tema: 'hx_classico', st_fundo: 'stf_noite', tq_chao: 'tqc_floresta' };
   }
   // Título de cada slot na loja dentro do jogo — só aparece quando o jogo
   // vende mais de um slot (hoje só o Ritmo: notas, fundo e pista).
   var LOJA_SLOT_ROTULO = { rt_nota: '🎵 Notas e receptores', rt_fundo: '🖼️ Fundo', rt_pista: '🎸 Pista',
-    st_tema: '🦉 Coruja', st_fundo: '🌳 Cenário' };
+    st_tema: '🦉 Coruja', st_fundo: '🌳 Cenário', tq_skin: '🎨 Pintura do tanque', tq_chao: '🗺️ Arena' };
 
   /* ── Catálogo (hardcoded) ──────────────────────────────────────
      Cada item: { id, nome, desc, preco, slot, tipo, preview, jogo }.
@@ -3371,6 +3371,10 @@
     { id: 'tq_deserto',  nome: 'Deserto',       desc: 'Camuflagem de areia.',  preco: 120, slot: 'tq_skin', tipo: 'skin', preview: null, jogo: 'tanques', tinta: 'rgba(194,164,107,0.66)', amostra: ['#c2a46b'] },
     { id: 'tq_onix',     nome: 'Ônix',          desc: 'Preto fosco.',          preco: 150, slot: 'tq_skin', tipo: 'skin', preview: null, jogo: 'tanques', tinta: 'rgba(24,28,36,0.72)',   amostra: ['#1f2937'] },
     { id: 'tq_ouro',     nome: 'Ouro',          desc: 'Blindagem dourada.',    preco: 200, slot: 'tq_skin', tipo: 'skin', preview: null, jogo: 'tanques', tinta: 'rgba(245,183,10,0.62)', amostra: ['#f5b70a'] },
+    // Tanques — chão da arena (slot tq_chao, só no SEU aparelho).
+    { id: 'tqc_floresta', nome: 'Floresta', desc: 'O chão de sempre.',     preco: 0,   slot: 'tq_chao', tipo: 'bg', preview: '/Jogos/assets/tanques/chao-floresta.webp', jogo: 'tanques' },
+    { id: 'tqc_deserto',  nome: 'Deserto',  desc: 'Areia e pedrinhas.',    preco: 120, slot: 'tq_chao', tipo: 'bg', preview: '/Jogos/assets/tanques/chao-deserto.webp',  jogo: 'tanques', chao: 'chao-deserto.webp' },
+    { id: 'tqc_neve',     nome: 'Neve',     desc: 'Campo gelado.',          preco: 150, slot: 'tq_chao', tipo: 'bg', preview: '/Jogos/assets/tanques/chao-neve.webp',     jogo: 'tanques', chao: 'chao-neve.webp' },
     // Doces — paleta: 5 cores (cada uma com formato próprio) + nomes pro
     // objetivo "Faça N combinações <cor>".
     { id: 'dc_classico', nome: 'Clássico', desc: 'Os doces de sempre.',     preco: 0,   slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', amostra: ['#ef4444', '#a855f7', '#4ade80', '#fbbf24', '#38bdf8'] },
@@ -3615,6 +3619,8 @@
   function _invSalvar(arr) {
     try { localStorage.setItem(LOJA_KEY_INVENTARIO, JSON.stringify(arr)); } catch (e) {}
     _nuvemAgendar();
+    // A contagem da coleção é pública (perfil de amigo) — reflete a compra.
+    if (typeof _perfilPublicoSyncDebounced === 'function') _perfilPublicoSyncDebounced();
   }
   function _temItem(id) { return _invLer().indexOf(id) !== -1; }
 
@@ -4864,13 +4870,19 @@
       '<div class="perfil-eq-grade">' + html + '</div></div>';
   }
   // Coleção em destaque no próprio perfil (substitui o botão simples).
-  function _perfilColecaoHtml() {
-    var r = _colecaoResumo(), pct = r.total ? Math.round(r.tem * 100 / r.total) : 0;
-    return '<button type="button" class="perfil-col-card" onclick="colecaoAbrir()">' +
+  // Sem argumentos = a própria coleção (abre a tela). Com (resumo, nome)
+  // = a de outro jogador: só mostra, e o toque abre a SUA pra comparar.
+  function _perfilColecaoHtml(resumo, nomeOutro) {
+    var r = resumo || _colecaoResumo(), pct = r.total ? Math.min(100, Math.round(r.tem * 100 / r.total)) : 0;
+    var titulo = nomeOutro ? 'Coleção de ' + _rankEsc(String(nomeOutro).split(' ')[0]) : 'Minha coleção';
+    var sub = nomeOutro
+      ? pct + '% completa · a sua: ' + _colecaoResumo().tem + '/' + _colecaoResumo().total
+      : pct + '% completa · faltam ' + (r.total - r.tem);
+    return '<button type="button" class="perfil-col-card' + (nomeOutro ? ' perfil-col-outro' : '') + '" onclick="colecaoAbrir()">' +
         '<span class="perfil-col-ico" aria-hidden="true">🏆</span>' +
-        '<span class="perfil-col-txt"><b>Minha coleção</b><small>' + pct + '% completa · faltam ' + (r.total - r.tem) + '</small>' +
+        '<span class="perfil-col-txt"><b>' + titulo + '</b><small>' + sub + '</small>' +
           '<span class="perfil-col-barra"><i style="width:' + pct + '%"></i></span></span>' +
-        '<span class="perfil-col-num" id="perfil-colecao-qtd">' + r.tem + '/' + r.total + '</span>' +
+        '<span class="perfil-col-num"' + (nomeOutro ? '' : ' id="perfil-colecao-qtd"') + '>' + r.tem + '/' + r.total + '</span>' +
       '</button>';
   }
 
@@ -5380,7 +5392,9 @@
     var historico = Array.isArray(dados.historico) ? dados.historico : [];
     var conqVisitado = _titulosConquistasDeString(dados.conquistas);
     var conquistasHtml = _perfilConquistasHtml(conqVisitado, _titulosPromover([String(dados.tituloDestaque || '')], conqVisitado)[0] || '', false);
-    corpo.innerHTML = _perfilCorpoHtml(stats, badgesEquipados, eq.badge, quartoItem, true, historico, conquistasHtml, _perfilEquipadosHtml(eq, false));
+    var col = (dados.colecao && typeof dados.colecao === 'object') ? dados.colecao : null;
+    var colHtml = (col && Number(col.total) > 0) ? _perfilColecaoHtml({ tem: Number(col.tem) || 0, total: Number(col.total) }, nome) : '';
+    corpo.innerHTML = _perfilCorpoHtml(stats, badgesEquipados, eq.badge, quartoItem, true, historico, conquistasHtml, colHtml + _perfilEquipadosHtml(eq, false));
   }
 
   // Busca o doc público perfis/{uid} uma única vez (sem listener — a
@@ -5532,7 +5546,21 @@
           atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
         };
         if (comHistorico) doc.historico = _histLer();
-        return db.collection('perfis').doc(uid).set(doc, { merge: true });
+        // Coleção (tem/total) pro perfil de amigo. Se as firestore.rules
+        // publicadas ainda não aceitam o campo, o set falha com
+        // permission-denied: grava de novo sem ele e não tenta mais nesta
+        // sessão — o resto do perfil nunca deixa de sincronizar por isso.
+        var ref = db.collection('perfis').doc(uid);
+        if (!_perfilColecaoRecusada) {
+          var r = _colecaoResumo();
+          doc.colecao = { tem: r.tem, total: r.total };
+        }
+        return ref.set(doc, { merge: true }).catch(function (err) {
+          if (!doc.colecao || !err || err.code !== 'permission-denied') throw err;
+          _perfilColecaoRecusada = true;
+          delete doc.colecao;
+          return ref.set(doc, { merge: true });
+        });
       });
     }).catch(function (err) {
       if (typeof DEBUG !== 'undefined' && DEBUG) {
@@ -5544,6 +5572,7 @@
   // Debounce leve (~1.5s): equipar vários itens em sequência, ou
   // registrar várias partidas rápidas, não deve disparar uma gravação
   // por chamada — só a última, depois de a poeira baixar.
+  var _perfilColecaoRecusada = false;
   function _perfilPublicoSyncDebounced() {
     if (typeof _cliUser === 'undefined' || !_cliUser) return;
     if (_perfilSyncTimer) clearTimeout(_perfilSyncTimer);

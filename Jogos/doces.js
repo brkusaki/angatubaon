@@ -97,7 +97,16 @@
     try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('dc_tema') : null; } catch (e) {}
     var n = _DC_CORES_CLASSICAS.length;
     var pal = (it && it.paleta && it.paleta.length >= n) ? it.paleta.slice(0, n) : null;
-    if (!pal) {
+    var tex = (it && it.texturas && it.texturas.length >= n) ? it.texturas.slice(0, n) : null;
+    if (tex) {
+      // Tema com arte (frutas, joias): imagens no lugar das do clássico.
+      // A paleta segue valendo pra cor de reserva e pros nomes do objetivo.
+      _dcCores = pal || _DC_CORES_CLASSICAS.slice();
+      _dcCoresNome = (it.nomes && it.nomes.length >= n) ? it.nomes.slice(0, n) : _DC_NOMES_CLASSICOS.slice();
+      _dcSkinSprites = tex.map(function (src) {
+        var im = new Image(); im.decoding = 'async'; im.src = src; return im;
+      });
+    } else if (!pal) {
       _dcCores = _DC_CORES_CLASSICAS.slice(); _dcCoresNome = _DC_NOMES_CLASSICOS.slice(); _dcSkinSprites = null;
     } else {
       _dcCores = pal;
@@ -730,6 +739,7 @@
 
     if (gelo) { try { ctx.filter = gelo === 2 ? 'saturate(0.5) brightness(1.05)' : 'saturate(0.3) brightness(1.12)'; } catch (e) {} }
     var img = _dcSkinSprites ? _dcSkinSprites[corIdx - 1] : _dcImgs[corIdx - 1];
+    if (img && img.tagName === 'IMG' && !(img.complete && img.naturalWidth)) img = null;   // arte do tema ainda baixando
     if (img) {
       var lado = r * 1.9; // quase o diâmetro (2r) inteiro da célula
       try { ctx.drawImage(img, x - lado / 2, cy - lado / 2, lado, lado); } catch (e) {}

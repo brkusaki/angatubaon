@@ -250,23 +250,25 @@ service cloud.firestore {
         && skinJogoOk(e, 'st_tema',    ['st_classico', 'st_neon', 'st_dourada', 'st_gelo', 'st_arcoiris'])
         && skinJogoOk(e, 'bb_tema',    ['bb_classico', 'bb_pastel', 'bb_neon', 'bb_madeira', 'bb_galaxia', 'bb_elementos'])
         && skinJogoOk(e, 'tq_skin',    ['tq_classico', 'tq_militar', 'tq_deserto', 'tq_onix', 'tq_ouro'])
-        && skinJogoOk(e, 'dc_tema',    ['dc_classico', 'dc_frutas', 'dc_pastel', 'dc_neon', 'dc_joias'])
+        && skinJogoOk(e, 'dc_tema',    ['dc_classico', 'dc_frutas', 'dc_pastel', 'dc_neon', 'dc_joias', 'dc_gomas', 'dc_gemas'])
         && e.voo_owl is string && e.voo_owl.size() <= 40
         && e.badge is string && e.badge.size() <= 40
         && e.bg is string && e.bg.size() <= 40
         && e.card is string && e.card.size() <= 40
         && e.voo_owl in ['voo_skin_classica', 'voo_skin_neon', 'voo_skin_dourada', 'voo_skin_pixel',
                          'voo_skin_rosa', 'voo_skin_floresta', 'voo_skin_sombra', 'voo_skin_gelo',
-                         'voo_skin_fogo', 'voo_skin_arcoiris']
-        && e.badge in ['', 'badge_estrela', 'badge_fogo', 'badge_coroa']
+                         'voo_skin_fogo', 'voo_skin_arcoiris', 'voo_skin_galaxia']
+        && e.badge in ['', 'badge_estrela', 'badge_fogo', 'badge_coroa', 'badge_raio', 'badge_pena',
+                         'badge_coracao', 'badge_musica', 'badge_estrela_verde', 'badge_lua', 'badge_sol',
+                         'badge_diamante', 'badge_coruja_dourada']
         && e.bg in ['bg_padrao', 'bg_noite', 'bg_dia', 'bg_neon',
                     'bg_neblina', 'bg_estadio', 'bg_milho', 'bg_igreja_chuva',
                     'bg_igreja_tempestade', 'bg_rua_estrelada', 'bg_igreja_estrelada',
-                    'bg_festa_junina', 'bg_neon2']
+                    'bg_festa_junina', 'bg_neon2', 'bg_praca', 'bg_lago', 'bg_estacao', 'bg_feira']
         && e.card in ['card_padrao', 'card_ouro', 'card_pixel',
                       'card_madeira', 'card_pixel_pro', 'card_coruja_classica',
                       'card_estrelas', 'card_tech_verde', 'card_neon_roxo',
-                      'card_fogo', 'card_holografico', 'card_ouro_premium'];
+                      'card_fogo', 'card_holografico', 'card_ouro_premium', 'card_gelo', 'card_floresta'];
     }
     // Uma entrada de stats por jogo — mesmo formato de angatuba_stats_jogos
     // no cliente (ver Jogos/hub.js, statsRegistrarPartida).

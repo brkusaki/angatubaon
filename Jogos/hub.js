@@ -3293,13 +3293,14 @@
     // Skins da coruja no Voo da Coruja
     { id: 'voo_skin_classica', nome: 'Coruja Clássica', desc: 'O visual de sempre.',        preco: 0,   slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: '' },
     { id: 'voo_skin_neon',     nome: 'Coruja Neon',      desc: 'Brilho neon nas asas.',      preco: 80,  slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'hue-rotate(150deg) saturate(2.4) brightness(1.15) drop-shadow(0 0 7px #22e3ff)' },
-    { id: 'voo_skin_dourada',  nome: 'Coruja Dourada',   desc: 'Reluz feito ouro.',          preco: 150, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'sepia(1) saturate(4.5) hue-rotate(-12deg) brightness(1.2) drop-shadow(0 0 7px rgba(255,200,60,.85))' },
+    { id: 'voo_skin_dourada',  nome: 'Coruja Dourada',   desc: 'Penas de ouro polido.',      preco: 150, slot: 'voo_owl', tipo: 'skin', preview: '/Jogos/assets/voo/skin-dourada.webp', sheet: 'coruja_voo_sheet_dourada.webp', jogo: 'voo', filtroCss: '' },
     { id: 'voo_skin_pixel',    nome: 'Coruja Pixel',     desc: 'Estilo 8-bit retrô.',        preco: 120, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'contrast(1.45) saturate(.5) brightness(1.05)', pixelado: true },
     { id: 'voo_skin_rosa',     nome: 'Coruja Magenta',   desc: 'Rosa choque com brilho.',    preco: 90,  slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'hue-rotate(285deg) saturate(2.2) brightness(1.12) drop-shadow(0 0 6px rgba(255,80,200,.75))' },
     { id: 'voo_skin_floresta', nome: 'Coruja Floresta',  desc: 'Verde de mata fechada.',     preco: 110, slot: 'voo_owl', tipo: 'skin', preview: '/webp/owl-flying.webp', jogo: 'voo', filtroCss: 'sepia(.6) hue-rotate(60deg) saturate(2.2) brightness(.9) drop-shadow(0 0 5px rgba(60,200,90,.6))' },
     { id: 'voo_skin_sombra',   nome: 'Coruja Sombra',    desc: 'Preta, com aura roxa.',      preco: 130, slot: 'voo_owl', tipo: 'skin', preview: '/Jogos/assets/voo/skin-sombra.webp', sheet: 'coruja_voo_sheet_sombra.webp', jogo: 'voo', filtroCss: '' },
     { id: 'voo_skin_gelo',     nome: 'Coruja Gelo',      desc: 'Azul-claro congelante.',     preco: 140, slot: 'voo_owl', tipo: 'skin', preview: '/Jogos/assets/voo/skin-gelo.webp', sheet: 'coruja_voo_sheet_gelo.webp', jogo: 'voo', filtroCss: '' },
     { id: 'voo_skin_fogo',     nome: 'Coruja Fogo',      desc: 'Asas em brasa.',             preco: 160, slot: 'voo_owl', tipo: 'skin', preview: '/Jogos/assets/voo/skin-fogo.webp', sheet: 'coruja_voo_sheet_fogo.webp', jogo: 'voo', filtroCss: '' },
+    { id: 'voo_skin_galaxia',  nome: 'Coruja Galáxia',   desc: 'Penas de céu estrelado.',    preco: 220, slot: 'voo_owl', tipo: 'skin', preview: '/Jogos/assets/voo/skin-galaxia.webp', sheet: 'coruja_voo_sheet_galaxia.webp', jogo: 'voo', filtroCss: '' },
     // animado: 'arcoiris' → o Voo gira o hue-rotate(0deg) do filtro a cada
     // frame (ver _vooDesenharCoruja); na loja, a classe .skin-arcoiris-anim
     // (styles.css) faz o mesmo giro na miniatura.
@@ -3354,6 +3355,7 @@
     { id: 'stf_dia',    nome: 'Manhã na Mata',    desc: 'Sol entre as árvores.', preco: 100, slot: 'st_fundo', tipo: 'bg', preview: '/Jogos/assets/speedtap/floresta-dia.webp',    jogo: 'speedtap', fundo: '/Jogos/assets/speedtap/floresta-dia.webp' },
     { id: 'stf_outono', nome: 'Outono',           desc: 'Folhas caindo.',        preco: 120, slot: 'st_fundo', tipo: 'bg', preview: '/Jogos/assets/speedtap/floresta-outono.webp', jogo: 'speedtap', fundo: '/Jogos/assets/speedtap/floresta-outono.webp' },
     { id: 'stf_chuva',  nome: 'Dia de Chuva',     desc: 'Chuva fina na mata.',   preco: 140, slot: 'st_fundo', tipo: 'bg', preview: '/Jogos/assets/speedtap/floresta-chuva.webp',  jogo: 'speedtap', fundo: '/Jogos/assets/speedtap/floresta-chuva.webp' },
+    { id: 'stf_neve',   nome: 'Inverno',          desc: 'Mata coberta de neve.', preco: 160, slot: 'st_fundo', tipo: 'bg', preview: '/Jogos/assets/speedtap/floresta-neve.webp',   jogo: 'speedtap', fundo: '/Jogos/assets/speedtap/floresta-neve.webp' },
     // Blocos — paleta: 6 cores das peças (sem as texturas do clássico).
     { id: 'bb_classico', nome: 'Clássico', desc: 'Peças com textura.',     preco: 0,   slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', amostra: ['#a855f7', '#38bdf8', '#34d399', '#fbbf24', '#fb7185', '#22d3ee'] },
     { id: 'bb_pastel',   nome: 'Pastel',   desc: 'Tons suaves.',           preco: 85,  slot: 'bb_tema', tipo: 'skin', preview: null, jogo: 'blocos', paleta: ['#c4b5fd', '#93c5fd', '#86efac', '#fde68a', '#fda4af', '#a5f3fc'] },
@@ -3373,8 +3375,10 @@
     { id: 'tq_ouro',     nome: 'Ouro',          desc: 'Blindagem dourada.',    preco: 200, slot: 'tq_skin', tipo: 'skin', preview: null, jogo: 'tanques', tinta: 'rgba(245,183,10,0.62)', amostra: ['#f5b70a'] },
     // Tanques — chão da arena (slot tq_chao, só no SEU aparelho).
     { id: 'tqc_floresta', nome: 'Floresta', desc: 'O chão de sempre.',     preco: 0,   slot: 'tq_chao', tipo: 'bg', preview: '/Jogos/assets/tanques/chao-floresta.webp', jogo: 'tanques' },
-    { id: 'tqc_deserto',  nome: 'Deserto',  desc: 'Areia e pedrinhas.',    preco: 120, slot: 'tq_chao', tipo: 'bg', preview: '/Jogos/assets/tanques/chao-deserto.webp',  jogo: 'tanques', chao: 'chao-deserto.webp' },
-    { id: 'tqc_neve',     nome: 'Neve',     desc: 'Campo gelado.',          preco: 150, slot: 'tq_chao', tipo: 'bg', preview: '/Jogos/assets/tanques/chao-neve.webp',     jogo: 'tanques', chao: 'chao-neve.webp' },
+    { id: 'tqc_deserto',  nome: 'Deserto',  desc: 'Areia e pedrinhas.',    preco: 120, slot: 'tq_chao', tipo: 'bg', preview: '/Jogos/assets/tanques/chao-deserto.webp',  jogo: 'tanques', chao: 'chao-deserto.webp',
+      obst: { 'arvore-1.webp': 'deserto-cacto-g.webp', 'arvore-2.webp': 'deserto-cacto-p.webp', 'arbusto-1-v2.webp': 'deserto-arbusto.webp', 'arbusto-2-v2.webp': 'deserto-pedra-p.webp', 'barril-v2.webp': 'deserto-barril.webp', 'rocha-parede-v2.webp': 'deserto-pedra-g.webp', 'tronco-parede-v2.webp': 'deserto-sacos.webp', 'escombro-floresta-v2.webp': 'deserto-ruina.webp', 'parede-metal-v2.webp': 'deserto-caixa.webp' } },
+    { id: 'tqc_neve',     nome: 'Neve',     desc: 'Campo gelado.',          preco: 150, slot: 'tq_chao', tipo: 'bg', preview: '/Jogos/assets/tanques/chao-neve.webp',     jogo: 'tanques', chao: 'chao-neve.webp',
+      obst: { 'arvore-1.webp': 'neve-pinheiro-g.webp', 'arvore-2.webp': 'neve-pinheiro-p.webp', 'arbusto-1-v2.webp': 'neve-arbusto.webp', 'arbusto-2-v2.webp': 'neve-boneco.webp', 'barril-v2.webp': 'neve-barril.webp', 'rocha-parede-v2.webp': 'neve-gelo.webp', 'tronco-parede-v2.webp': 'neve-muro.webp', 'escombro-floresta-v2.webp': 'neve-pedra-p.webp', 'parede-metal-v2.webp': 'neve-tronco.webp' } },
     // Doces — paleta: 5 cores (cada uma com formato próprio) + nomes pro
     // objetivo "Faça N combinações <cor>".
     { id: 'dc_classico', nome: 'Clássico', desc: 'Os doces de sempre.',     preco: 0,   slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', amostra: ['#ef4444', '#a855f7', '#4ade80', '#fbbf24', '#38bdf8'] },
@@ -3382,6 +3386,9 @@
     { id: 'dc_pastel',   nome: 'Pastel',   desc: 'Confeitos suaves.',       preco: 120, slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', paleta: ['#fda4af', '#c4b5fd', '#86efac', '#fde68a', '#93c5fd'], nomes: ['🌸 rosa', '💜 lilás', '🌿 menta', '🌼 baunilha', '💙 céu'] },
     { id: 'dc_neon',     nome: 'Neon',     desc: 'Balas que brilham.',      preco: 150, slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', paleta: ['#f43f5e', '#d946ef', '#22c55e', '#facc15', '#06b6d4'], nomes: ['🔴 pink', '🟣 magenta', '🟢 verde', '🟡 amarelo', '🔵 ciano'] },
     { id: 'dc_joias',    nome: 'Joias',    desc: 'Rubi, safira e cia.',     preco: 200, slot: 'dc_tema', tipo: 'skin', preview: null, jogo: 'doces', paleta: ['#dc2626', '#7c3aed', '#059669', '#f59e0b', '#2563eb'], nomes: ['❤️ rubi', '💜 ametista', '💚 esmeralda', '💛 topázio', '💙 safira'] },
+    // Com arte: 'texturas' (5, ordem das cores) no lugar dos doces clássicos.
+    { id: 'dc_gomas', nome: 'Gomas de Fruta', desc: 'Morango, uva, maçã, limão e mirtilo.', preco: 180, slot: 'dc_tema', tipo: 'skin', preview: '/Jogos/assets/doces/fruta-vermelho.webp', jogo: 'doces', paleta: ['#e11d48', '#7c3aed', '#65a30d', '#facc15', '#2563eb'], nomes: ['🍓 morango', '🍇 uva', '🍏 maçã', '🍋 limão', '🫐 mirtilo'], texturas: ['/Jogos/assets/doces/fruta-vermelho.webp', '/Jogos/assets/doces/fruta-roxo.webp', '/Jogos/assets/doces/fruta-verde.webp', '/Jogos/assets/doces/fruta-amarelo.webp', '/Jogos/assets/doces/fruta-azul.webp'] },
+    { id: 'dc_gemas', nome: 'Gemas Lapidadas', desc: 'Rubi, ametista, esmeralda, topázio e safira.', preco: 240, slot: 'dc_tema', tipo: 'skin', preview: '/Jogos/assets/doces/joia-roxo.webp', jogo: 'doces', paleta: ['#dc2626', '#7c3aed', '#059669', '#f59e0b', '#2563eb'], nomes: ['❤️ rubi', '💜 ametista', '💚 esmeralda', '💛 topázio', '💙 safira'], texturas: ['/Jogos/assets/doces/joia-vermelho.webp', '/Jogos/assets/doces/joia-roxo.webp', '/Jogos/assets/doces/joia-verde.webp', '/Jogos/assets/doces/joia-amarelo.webp', '/Jogos/assets/doces/joia-azul.webp'] },
     // Hex Arena — piso da arena (só no SEU aparelho; os outros veem o
     // deles). 'casa' = arte da casa; o anel que vai desabar usa a mesma
     // arte com o véu vermelho de sempre por cima. Vendida pelo botão de
@@ -3426,6 +3433,15 @@
     { id: 'badge_estrela', nome: 'Estrela da Coruja', desc: 'Pra quem brilha nos jogos.',         preco: 50,  slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/estrela.webp',   jogo: null },
     { id: 'badge_fogo',    nome: 'Chama da Ofensiva',  desc: 'Homenagem a quem não falta um dia.', preco: 100, slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/fogo.webp',   jogo: null },
     { id: 'badge_coroa',   nome: 'Coroa de Angatuba',  desc: 'Pros campeões do ranking.',          preco: 200, slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/coroa.webp', jogo: null },
+    { id: 'badge_raio', nome: 'Raio Azul', desc: 'Velocidade pura.', preco: 60, slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/badge-raio.webp', jogo: null },
+    { id: 'badge_pena', nome: 'Pena Mística', desc: 'Leve como a coruja.', preco: 80, slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/badge-pena.webp', jogo: null },
+    { id: 'badge_coracao', nome: 'Coração', desc: 'Joga com o coração.', preco: 70, slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/badge-coracao.webp', jogo: null },
+    { id: 'badge_musica', nome: 'Ritmo no Sangue', desc: 'Pros mestres do Ritmo.', preco: 110, slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/badge-musica.webp', jogo: null },
+    { id: 'badge_estrela_verde', nome: 'Estrela Verde', desc: 'Brilha diferente.', preco: 90, slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/badge-estrela-verde.webp', jogo: null },
+    { id: 'badge_lua', nome: 'Coruja da Noite', desc: 'Joga de madrugada.', preco: 130, slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/badge-lua.webp', jogo: null },
+    { id: 'badge_sol', nome: 'Sol de Angatuba', desc: 'Pra quem joga de dia.', preco: 120, slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/badge-sol.webp', jogo: null },
+    { id: 'badge_diamante', nome: 'Diamante', desc: 'Raro e valioso.', preco: 180, slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/badge-diamante.webp', jogo: null },
+    { id: 'badge_coruja_dourada', nome: 'Coruja Dourada', desc: 'A insígnia mais rara.', preco: 250, slot: 'badge', tipo: 'badge', preview: '/Jogos/assets/medalhas/badge-coruja-dourada.webp', jogo: null },
 
     // Planos de fundo de perfil (catálogo — sem upload)
     { id: 'bg_padrao', nome: 'Céu de Angatuba', desc: 'O fundo padrão do seu perfil.', preco: 0,   slot: 'bg', tipo: 'bg', preview: null,               jogo: null },
@@ -3436,6 +3452,10 @@
     // do perfil (ver _perfilBgEstilo); se o arquivo faltar, a loja esconde a <img>
     // (onerror) e o perfil cai no gradiente padrão do CSS.
     { id: 'bg_neblina',           nome: 'Neblina na Praça',        desc: 'Manhã enevoada na Matriz.',      preco: 80,  slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-neblina.jpg',           jogo: null },
+    { id: 'bg_praca',   nome: 'Praça Iluminada',   desc: 'Fonte e varal de luzes.',   preco: 110, slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-praca.jpg',   jogo: null },
+    { id: 'bg_lago',    nome: 'Lago ao Entardecer', desc: 'Píer no pôr do sol.',       preco: 120, slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-lago.jpg',    jogo: null },
+    { id: 'bg_estacao', nome: 'Estação à Noite',    desc: 'Maria-fumaça chegando.',    preco: 150, slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-estacao.jpg', jogo: null },
+    { id: 'bg_feira',   nome: 'Noite de Quermesse', desc: 'Roda-gigante e barracas.',  preco: 170, slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-feira.jpg',   jogo: null },
     { id: 'bg_estadio',           nome: 'Campinho do Bairro',      desc: 'Pôr do sol no campo de terra.',  preco: 90,  slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-estadio.jpg',           jogo: null },
     { id: 'bg_milho',             nome: 'Milharal',                desc: 'Neblina sobre a lavoura.',       preco: 100, slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-milho.jpg',             jogo: null },
     { id: 'bg_igreja_chuva',      nome: 'Chuva na Matriz',         desc: 'Noite de chuva na praça.',       preco: 120, slot: 'bg', tipo: 'bg', preview: '/img/cosmeticos/bg-igreja-chuva.jpg',      jogo: null },
@@ -3462,6 +3482,8 @@
     { id: 'card_fogo',            nome: 'Fogo Ardente',      desc: 'Moldura em chamas.',            preco: 220, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-fogo.webp',            fatia: '13% 13%', jogo: null },
     { id: 'card_holografico',     nome: 'Holográfico',       desc: 'Reflexos de arco-íris.',        preco: 230, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-holografico.webp',     fatia: '11% 11%', jogo: null },
     { id: 'card_ouro_premium',    nome: 'Ouro Premium',      desc: 'Corujas de ouro nos cantos.',   preco: 250, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-ouro-premium.webp',    fatia: '16% 16%', jogo: null }
+    ,{ id: 'card_gelo',     nome: 'Gelo Esculpido', desc: 'Corujas de gelo nos cantos.', preco: 210, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-gelo.webp',     fatia: '23% 18%', jogo: null },
+    { id: 'card_floresta', nome: 'Cipó e Flores',  desc: 'Moldura viva da mata.',       preco: 170, slot: 'card', tipo: 'card', preview: '/img/cosmeticos/card-floresta.webp', fatia: '23% 18%', jogo: null }
   ];
 
   var LOJA_TIPO_ICO = { skin: '🦉', badge: '🎖️', bg: '🖼️', card: '🪪' };
@@ -4713,6 +4735,9 @@
     return '<img class="medalha-ico" src="/Jogos/assets/medalhas/' + nome + '.webp" alt="" decoding="async">';
   }
   var PERFIL_BADGE_ICO = { badge_estrela: _medalhaImg('estrela'), badge_fogo: _medalhaImg('fogo'), badge_coroa: _medalhaImg('coroa') };
+  ['raio', 'pena', 'coracao', 'musica', 'estrela-verde', 'lua', 'sol', 'diamante', 'coruja-dourada'].forEach(function (n) {
+    PERFIL_BADGE_ICO['badge_' + n.replace(/-/g, '_')] = _medalhaImg('badge-' + n);
+  });
 
   // 'eu' = tela mostrando o próprio perfil local; 'outro' = visitando o
   // perfil público (Firestore) de outro jogador (Camada 3). Controla só

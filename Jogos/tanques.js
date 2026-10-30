@@ -617,6 +617,9 @@
   var _TQ_ASSET_BASE = '/Jogos/assets/tanques/';
   var _tqAssets = {};
   function _tqAsset(nome) {
+    // Arena com obstáculos próprios (skin tq_chao com 'obst'): troca o
+    // arquivo pelo da arena (cacto no lugar da árvore etc.).
+    if (_tqObstMapa && _tqObstMapa[nome]) nome = _tqObstMapa[nome];
     if (_tqAssets[nome]) return _tqAssets[nome];
     var reg = { img: null, ok: false, w: 0, h: 0 };
     _tqAssets[nome] = reg;
@@ -3247,11 +3250,13 @@
   //     de existir mundo grande) só gastava tempo à toa a cada quadro.
   var _tqChaoPatternCache = null; // { pat, img, h }
   var _tqChaoAtual = '';   // cache: lido de novo só quando equipa (evento) ou prepara
+  var _tqObstMapa = null;  // { 'arvore-1.webp': 'deserto-cacto-g.webp', ... } da arena equipada
   function _tqChaoNome(reler) {
     if (_tqChaoAtual && !reler) return _tqChaoAtual;
     var G = window.AngatubaGames, it = null;
     try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('tq_chao') : null; } catch (e) {}
     _tqChaoAtual = (it && it.chao) ? String(it.chao) : 'chao-floresta.webp';
+    _tqObstMapa = (it && it.obst && typeof it.obst === 'object') ? it.obst : null;
     return _tqChaoAtual;
   }
   window.addEventListener('angatuba:equipado', function (e) {

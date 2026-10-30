@@ -25,7 +25,8 @@ service cloud.firestore {
                     || dadosNovos.photoURL != dadosAntigos.photoURL)));
     }
     match /ranking_pegacoruja/{uid} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
       allow create: if request.auth != null
                     && uid == request.auth.uid
                     && scoreValido(request.resource.data, 500);
@@ -35,7 +36,8 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /ranking_pegacoruja_surv/{uid} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
       allow create: if request.auth != null
                     && uid == request.auth.uid
                     && scoreValido(request.resource.data, 2000);
@@ -45,7 +47,8 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /ranking_relampago/{uid} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
       allow create: if request.auth != null
                     && uid == request.auth.uid
                     && scoreValido(request.resource.data, 4500);
@@ -55,7 +58,8 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /ranking_sequencia/{uid} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
       allow create: if request.auth != null
                     && uid == request.auth.uid
                     && scoreValido(request.resource.data, 200);
@@ -65,7 +69,8 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /ranking_voo/{uid} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
       allow create: if request.auth != null
                     && uid == request.auth.uid
                     && scoreValido(request.resource.data, 100000);
@@ -79,7 +84,8 @@ service cloud.firestore {
     // entao 50000m exigiriam ~4h30 de partida sem morrer. Folga enorme pra
     // um recorde legitimo e ainda barra valor injetado pelo console.
     match /ranking_corrida/{uid} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
       allow create: if request.auth != null
                     && uid == request.auth.uid
                     && scoreValido(request.resource.data, 50000);
@@ -98,7 +104,8 @@ service cloud.firestore {
     // um erro. Folga de sobra pro melhor jogador da cidade e ainda barra
     // valor injetado pelo console.
     match /ranking_piano/{uid} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
       allow create: if request.auth != null
                     && uid == request.auth.uid
                     && scoreValido(request.resource.data, 10000);
@@ -113,7 +120,8 @@ service cloud.firestore {
     // partidas do que qualquer jogador real — folga de sobra pro melhor
     // jogador da cidade e ainda barra valor injetado pelo console.
     match /ranking_blocos/{uid} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
       allow create: if request.auth != null
                     && uid == request.auth.uid
                     && scoreValido(request.resource.data, 999);
@@ -123,7 +131,8 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /ranking_doces/{uid} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
       allow create: if request.auth != null
                     && uid == request.auth.uid
                     && scoreValido(request.resource.data, 999);
@@ -140,7 +149,8 @@ service cloud.firestore {
     // cidade (cobre até uma sequência de sorte chegando perto da peça
     // 16384) e ainda barra valor injetado pelo console.
     match /ranking_2048/{uid} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
       allow create: if request.auth != null
                     && uid == request.auth.uid
                     && scoreValido(request.resource.data, 300000);
@@ -157,7 +167,8 @@ service cloud.firestore {
     // O doc-pai ranking_ritmo/{mapa} não existe (só a subcoleção) e não
     // precisa de regra própria.
     match /ranking_ritmo/{mapa}/scores/{uid} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
       allow create: if request.auth != null
                     && uid == request.auth.uid
                     && mapa.matches('[a-z0-9-]{1,40}_(easy|normal|hard|expert)_(4|5|7)k')
@@ -382,8 +393,11 @@ service cloud.firestore {
         && (!dados.keys().hasAny(['colecao']) || colecaoValida(dados.colecao))
         && dados.atualizadoEm is timestamp;
     }
+    // Perfil público: abre um por um (get). Listar a coleção inteira não
+    // tem uso no app e só serviria pra gastar a cota de leituras.
     match /perfis/{uid} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if false;
       allow create: if request.auth != null
                     && uid == request.auth.uid
                     && perfilValido(request.resource.data);
@@ -436,7 +450,8 @@ service cloud.firestore {
         && d.atualizadoEm is timestamp;
     }
     match /biblioteca_avaliacoes/{livro}/notas/{uid} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if request.query.limit <= 300;
       allow create, update: if request.auth != null
                     && uid == request.auth.uid
                     && livroDoAcervo(livro)
@@ -516,8 +531,16 @@ service cloud.firestore {
     // app filtra status == 'publicado', então passa nesta regra.
     // noticias_privado/ e noticias_meta/ caem no "nega tudo" lá embaixo.
     match /noticias/{id} {
-      allow get, list: if resource.data.status == 'publicado';
+      allow get: if resource.data.status == 'publicado';
+      allow list: if resource.data.status == 'publicado' && request.query.limit <= 20;
       allow write: if false;
+    }
+    // Resumo do ranking (top 20 de cada jogo num doc só), montado a cada
+    // 15 min pelo Worker angatubaon-noticias com a conta de serviço — que
+    // ignora estas regras. O app só lê esse doc.
+    match /ranking_resumo/{id} {
+      allow get: if true;
+      allow list, write: if false;
     }
     match /{document=**} {
       allow read, write: if false;

@@ -883,6 +883,9 @@
     microfoneMutado: microfoneMutado,
     setMicrofoneMutado: setMicrofoneMutado,
     audioAtivo: audioAtivo,
-    audioRemotoAtivo: audioRemotoAtivo
+    audioRemotoAtivo: audioRemotoAtivo,
+    // Usado pelo app.js pra não desligar o RTDB com o app minimizado
+    // enquanto houver sala aberta.
+    emSala: function () { return !!_salaRef; }
   };
 })();

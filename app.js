@@ -11090,7 +11090,7 @@
   // Busca os avisos reais no GAS (aba "Avisos"). Só cai no mock se a busca
   // falhar de verdade (erro/timeout/offline) — não mostra mais o mock como
   // "placeholder" que depois some sozinho, pra não parecer bug pro usuário.
-  function _carregarAvisosReal() {
+  function _carregarAvisosReal(forcarNoticias) {
     var params = new URLSearchParams();
     params.append('payload', JSON.stringify({ action: 'avisosListar' }));
     var avisosGas = fetch(APPS_SCRIPT_URL, { method: 'POST', body: params, signal: AbortSignal.timeout(10000) })
@@ -11099,7 +11099,7 @@
       .catch(function () { return null; });
     // Notícias aprovadas (Worker angatubaon-noticias) — falhar aqui nunca
     // derruba os avisos: no pior caso a lista sai só com os do GAS.
-    Promise.all([avisosGas, _carregarNoticiasPublicadas()]).then(function (res) {
+    Promise.all([avisosGas, _carregarNoticiasPublicadas(forcarNoticias === true)]).then(function (res) {
       var avisos = res[0], noticias = res[1];
       if (!avisos && !noticias.length) { _renderAvisosHoje(AVISOS_HOJE_MOCK); return; }
       // Notícias entram na linha do tempo pela data de publicação, misturadas
@@ -11118,8 +11118,23 @@
      REST (sem carregar o SDK do Firestore só pra isso). As regras só
      deixam ler o que está publicado; o Worker tira do ar sozinho o que
      passa de 7 dias. Cada notícia vira um "aviso" com a imagem do post
-     como mídia — reaproveita card, modal, curtir e compartilhar. */
-  function _carregarNoticiasPublicadas() {
+     como mídia — reaproveita card, modal, curtir e compartilhar.
+     Cada consulta custa até 10 leituras do Firestore e rodava a cada
+     visita à página: agora fica 15 min guardada no aparelho (o
+     puxar-pra-atualizar ignora o cache). Saem no máx. 2 posts por dia,
+     então 15 min de atraso não fazem diferença. */
+  var NOTICIAS_CACHE_KEY = 'angatuba_noticias_cache_v1';
+  var NOTICIAS_CACHE_MS = 15 * 60000;
+  function _carregarNoticiasPublicadas(forcar) {
+    if (!forcar) {
+      try {
+        var c = JSON.parse(localStorage.getItem(NOTICIAS_CACHE_KEY) || 'null');
+        var idade = c ? Date.now() - c.em : Infinity;
+        if (c && Array.isArray(c.lista) && idade >= 0 && idade < NOTICIAS_CACHE_MS) {
+          return Promise.resolve(c.lista.filter(function (n) { return !n.expiraEm || new Date(n.expiraEm).getTime() >= Date.now(); }));
+        }
+      } catch (e) {}
+    }
     var url = 'https://firestore.googleapis.com/v1/projects/' + _fbConfig.projectId +
       '/databases/(default)/documents:runQuery?key=' + encodeURIComponent(_fbConfig.apiKey);
     var corpo = { structuredQuery: {
@@ -11127,10 +11142,11 @@
       where: { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'publicado' } } },
       limit: 10,
     } };
+    var ok = false;
     return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo), signal: AbortSignal.timeout(6000) })
-      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (r) { ok = r.ok; return r.ok ? r.json() : []; })
       .then(function (linhas) {
-        return (Array.isArray(linhas) ? linhas : []).filter(function (l) { return l && l.document; }).map(function (l) {
+        var lista = (Array.isArray(linhas) ? linhas : []).filter(function (l) { return l && l.document; }).map(function (l) {
           var f = l.document.fields || {};
           var txt = function (k) { return (f[k] && (f[k].stringValue || f[k].timestampValue)) || ''; };
           var img = txt('imagemUrl');
@@ -11145,8 +11161,12 @@
             fonteNome: txt('fonteNome'), fonteUrl: txt('fonteUrl'),
             rodapeCard: txt('rodapeCard'), linkUrl: txt('linkUrl'), linkTexto: txt('linkTexto'),
             midias: /^https:\/\/res\.cloudinary\.com\//.test(img) ? [{ tipo: 'foto', url: img }] : [],
+            expiraEm: expira || '',
           };
         }).filter(function (n) { return n && n.titulo; });
+        // Só guarda resposta boa (erro/offline tenta de novo na próxima visita).
+        if (ok) { try { localStorage.setItem(NOTICIAS_CACHE_KEY, JSON.stringify({ em: Date.now(), lista: lista })); } catch (e) {} }
+        return lista;
       })
       .catch(function () { return []; });
   }
@@ -11947,7 +11967,7 @@
         _pullToRefreshState.debounce = 1;
         if (indicator) indicator.classList.add('show');
         _carregarClima();
-        _carregarAvisosReal();
+        _carregarAvisosReal(true);
         setTimeout(function () {
           if (indicator) indicator.classList.remove('show');
           _pullToRefreshState.debounce = 0;
@@ -18024,6 +18044,47 @@ ${urlCard}`)}`;
     } else if (_presEstado !== 'online') {
       _presPublicar('online');
     }
+  }
+
+  /* CONEXÃO OCIOSA (limite de conexões do Realtime Database)
+     O plano grátis do Firebase aceita 100 conexões simultâneas ao RTDB, e
+     toda conta logada com o app aberto segura uma (presença + convites),
+     mesmo quem está só no guia de lojas. Celular já derruba a conexão ao
+     congelar a aba; no PC uma aba esquecida aberta ocupava a vaga pra
+     sempre. Aqui: escondido por RTDB_OCIOSO_MS e sem nenhuma sala aberta
+     (lobby social, Party, Baralho, multiplayer 1×1) → goOffline() (o
+     onDisconnect da presença marca "offline" sozinho). Voltou → goOnline()
+     e o .info/connected da presença republica "online" e rearma tudo. Com
+     sala aberta não desliga: tenta de novo a cada minuto. */
+  var RTDB_OCIOSO_MS = 5 * 60000;
+  var _rtdbOciosoTimer = null, _rtdbDesligado = false;
+  function _rtdbEmSala() {
+    try {
+      if (_lobRef) return true;
+      if (window.AngatubaParty && typeof AngatubaParty.codigoSala === 'function' && AngatubaParty.codigoSala()) return true;
+      if (window.AngatubaBaralho && typeof AngatubaBaralho.codigoSala === 'function' && AngatubaBaralho.codigoSala()) return true;
+      if (window.AngatubaMP && typeof AngatubaMP.emSala === 'function' && AngatubaMP.emSala()) return true;
+    } catch (e) {}
+    return false;
+  }
+  function _rtdbVisibilidade() {
+    if (_rtdbOciosoTimer) { clearTimeout(_rtdbOciosoTimer); _rtdbOciosoTimer = null; }
+    // SDK do RTDB nunca baixou nesta sessão: não há conexão pra desligar.
+    if (typeof firebase === 'undefined' || !firebase.database) return;
+    if (document.hidden) {
+      _rtdbOciosoTimer = setTimeout(function tentar() {
+        _rtdbOciosoTimer = null;
+        if (!document.hidden) return;
+        if (_rtdbEmSala()) { _rtdbOciosoTimer = setTimeout(tentar, 60000); return; }
+        try { firebase.database().goOffline(); _rtdbDesligado = true; } catch (e) {}
+      }, RTDB_OCIOSO_MS);
+    } else if (_rtdbDesligado) {
+      _rtdbDesligado = false;
+      try { firebase.database().goOnline(); } catch (e) {}
+    }
+  }
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', _rtdbVisibilidade);
   }
 
   /* Liga a presença do usuário logado. Idempotente: chamar de novo com

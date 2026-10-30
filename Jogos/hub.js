@@ -2205,7 +2205,9 @@
           score: val,
           photoURL: foto,
           atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true }).catch(function (err) {
+        }, { merge: true }).then(function () {
+          _rankMeuGuardar(jogoKey, val);
+        }).catch(function (err) {
           // permission-denied aqui = regra do servidor rejeitou (ex.: teto
           // por jogo nas security rules do Firestore menor que o score).
           // Se um recorde legítimo não sobe, é o teto do servidor que precisa
@@ -2245,7 +2247,21 @@
       return out;
     });
   }
+  // Top ≤ 20 sai dos tops guardados/resumo (0–1 leitura); só vai direto
+  // na coleção (limite leituras) se nenhum dos dois servir — nunca dispara
+  // as 200 leituras do modo antigo por causa de uma aba ou do fim de jogo.
   function rankLerTop(jogoKey, limite) {
+    var n = limite || 20;
+    if (n <= 20 && RANK_COLECOES[jogoKey]) {
+      return _rankTopsBarato().then(function (l) {
+        l = _rankMeusAplicar(l);
+        if (l) for (var i = 0; i < l.length; i++) if (l[i].jogo === jogoKey) return l[i].top.slice(0, n);
+        return _rankLerTopDiretoSeguro(jogoKey, n);
+      });
+    }
+    return _rankLerTopDiretoSeguro(jogoKey, n);
+  }
+  function _rankLerTopDiretoSeguro(jogoKey, limite) {
     return _rankLerTopOuErro(jogoKey, limite).catch(function (err) {
       if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] erro ao ler:', err && err.message);
       return [];
@@ -2309,26 +2325,36 @@
     });
   }
   // Promise<{ top:[{uid,nome,score,photoURL}], pos:number|null, meu:number|null }>
-  // top = até 50 melhores; pos = sua colocação se estiver neles; meu = seu
-  // score (mesmo fora do top 50). Erro/offline → top vazio (nunca rejeita).
-  function rankMapaPosicao(mapa) {
+  // pos = sua colocação se estiver no top 50; meu = seu score (mesmo fora
+  // do top 50). Erro/offline → top vazio (nunca rejeita).
+  // Custo: a linha da seleção (lista=false) só precisa do líder — lê 1 doc
+  // do topo + o seu + quem está acima de você (até 49), em vez dos 50
+  // melhores a cada música escolhida. lista=true (janela do ranking da
+  // música) traz o top 10, que é o que a janela mostra.
+  function rankMapaPosicao(mapa, lista) {
     var vazio = { top: [], pos: null, meu: null, erro: true };
     if (!RANK_MAPA_RE.test(String(mapa || ''))) return Promise.resolve(vazio);
     var uid = (typeof _cliUser !== 'undefined' && _cliUser) ? _cliUser.uid : null;
+    var n = lista ? 10 : 1;
     return _rankDbPronto().then(function (db) {
       var col = _rankMapaCol(db, mapa);
-      return col.orderBy('score', 'desc').limit(50).get().then(function (snap) {
+      return col.orderBy('score', 'desc').limit(n).get().then(function (snap) {
         var top = [], pos = null, meu = null;
         snap.forEach(function (doc) {
-          var d = doc.data() || {};
-          var item = { uid: d.uid || doc.id, nome: d.nome || 'Jogador', score: d.score || 0, photoURL: d.photoURL || '' };
+          var item = _rankItemNorm(doc.data(), doc.id);
           top.push(item);
           if (uid && item.uid === uid) { pos = top.length; meu = item.score; }
         });
-        if (!uid || pos) return { top: top, pos: pos, meu: meu };
+        if (!uid || pos || !top.length) return { top: top, pos: pos, meu: meu };
         return col.doc(uid).get().then(function (doc) {
           var d = doc && doc.exists ? (doc.data() || {}) : null;
-          return { top: top, pos: null, meu: d && typeof d.score === 'number' ? d.score : null };
+          meu = d && typeof d.score === 'number' ? d.score : null;
+          if (meu == null) return { top: top, pos: null, meu: null };
+          // Quantos têm score maior que o meu (até 49 → posição até 50).
+          return col.where('score', '>', meu).orderBy('score', 'desc').limit(49).get().then(function (acima) {
+            var qtd = acima.size;
+            return { top: top, pos: qtd < 49 ? qtd + 1 : null, meu: meu };
+          });
         });
       });
     }).catch(function () { return vazio; });
@@ -2353,19 +2379,97 @@
     return (pos <= 20) ? 1 : 0;
   }
 
-  // Lê o Top 20 dos 7 jogos de uma vez (pra montar o geral e, pra quem
-  // abriu o painel, pra ordenar as abas por popularidade — ver
-  // rankRenderAbas). Cache: 140 leituras do Firestore por abertura do
-  // painel é a operação mais cara do app — 60s (em vez dos 4s originais,
-  // que só cobriam duas chamadas quase simultâneas na mesma abertura) corta
-  // quase tudo pra quem abre o ranking mais de uma vez seguida (ver A1.24).
-  var _rankTopsCache = null, _rankTopsCacheEm = 0;
-  function _rankTopsTodosJogos() {
+  /* ── Tops de todos os jogos (Ranking geral, abas, títulos, fim de jogo) ──
+     Era a operação mais cara do app: top 20 × 10 jogos = 200 leituras do
+     Firestore a cada abertura do Ranking OU do próprio perfil (títulos).
+     Agora, nesta ordem, para no primeiro que servir:
+       1. memória / aparelho (localStorage, sobrevive a reabrir o app);
+       2. ranking_resumo/atual — um doc só, montado a cada 15 min pelo
+          Worker de notícias (cron) = 1 leitura;
+       3. modo antigo (200 leituras), só se o resumo faltar ou estiver
+          velho (Worker parado). Guardado 10 min no aparelho.
+     Os recordes que a própria pessoa acabou de fazer entram por cima
+     (_rankMeusAplicar), já que o resumo pode estar até 15 min atrasado. */
+  var RANK_RESUMO_DOC = 'ranking_resumo/atual';
+  var RANK_TOPS_LS = 'angatuba_rank_tops_v1';
+  var RANK_TOPS_TTL_RESUMO = 5 * 60000;
+  var RANK_TOPS_TTL_DIRETO = 10 * 60000;
+  var RANK_RESUMO_VELHO = 60 * 60000;
+  var RANK_MEUS_LS = 'angatuba_rank_meus_v1';
+  var RANK_MEUS_TTL = 30 * 60000;
+  var _rankTopsMem = null, _rankTopsMemAte = 0;
+  var _rankResumoP = null, _rankDiretoP = null;
+
+  function _rankTopsGuardar(listas, ttl) {
+    _rankTopsMem = listas;
+    _rankTopsMemAte = Date.now() + ttl;
+    try { localStorage.setItem(RANK_TOPS_LS, JSON.stringify({ ate: _rankTopsMemAte, listas: listas })); } catch (e) {}
+  }
+  function _rankTopsInvalidar() {
+    _rankTopsMem = null; _rankTopsMemAte = 0;
+    try { localStorage.removeItem(RANK_TOPS_LS); } catch (e) {}
+  }
+  function _rankItemNorm(d, id) {
+    d = d || {};
+    return { uid: d.uid || id || '', nome: d.nome || 'Jogador', score: Number(d.score) || 0, photoURL: d.photoURL || '' };
+  }
+
+  // Resumo montado pelo Worker. null = não serve (não existe, velho,
+  // regra ainda não publicada, offline): quem chama cai no modo antigo.
+  function _rankResumoLer() {
+    return _rankDbPronto().then(function (db) {
+      return db.doc(RANK_RESUMO_DOC).get();
+    }).then(function (doc) {
+      if (!doc || !doc.exists) return null;
+      var d = doc.data() || {};
+      var t = (d.atualizadoEm && typeof d.atualizadoEm.toMillis === 'function') ? d.atualizadoEm.toMillis() : 0;
+      if (!t || Date.now() - t > RANK_RESUMO_VELHO || !d.jogos || typeof d.jogos !== 'object') return null;
+      var faltam = [];
+      var listas = Object.keys(RANK_COLECOES).map(function (k) {
+        var arr = d.jogos[k];
+        if (!Array.isArray(arr)) { faltam.push(k); return { jogo: k, top: [] }; }
+        return { jogo: k, top: arr.slice(0, 20).map(function (it) { return _rankItemNorm(it); }) };
+      });
+      if (!faltam.length) return listas;
+      // Jogo novo que o Worker ainda não conhece: só ele vai direto.
+      return Promise.all(faltam.map(function (k) {
+        return _rankLerTopOuErro(k, 20).then(function (top) {
+          for (var i = 0; i < listas.length; i++) if (listas[i].jogo === k) listas[i].top = top;
+        });
+      })).then(function () { return listas; });
+    }).catch(function (err) {
+      if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[rank] resumo indisponível:', err && (err.code || err.message));
+      return null;
+    });
+  }
+
+  // Memória → aparelho → resumo. Promise<listas|null> (null = só o modo
+  // antigo resolveria).
+  function _rankTopsBarato() {
     var agora = Date.now();
-    if (_rankTopsCache && (agora - _rankTopsCacheEm) < 60000) return _rankTopsCache;
-    _rankTopsCacheEm = agora;
+    if (_rankTopsMem && agora < _rankTopsMemAte) return Promise.resolve(_rankTopsMem);
+    try {
+      var c = JSON.parse(localStorage.getItem(RANK_TOPS_LS) || 'null');
+      if (c && Array.isArray(c.listas) && agora < c.ate && c.ate - agora <= RANK_TOPS_TTL_DIRETO) {
+        _rankTopsMem = c.listas; _rankTopsMemAte = c.ate;
+        return Promise.resolve(c.listas);
+      }
+    } catch (e) {}
+    if (!_rankResumoP) {
+      _rankResumoP = _rankResumoLer().then(function (l) {
+        _rankResumoP = null;
+        if (l) _rankTopsGuardar(l, RANK_TOPS_TTL_RESUMO);
+        return l;
+      });
+    }
+    return _rankResumoP;
+  }
+
+  // Modo antigo: top 20 de cada coleção (200 leituras).
+  function _rankTopsDireto() {
+    if (_rankDiretoP) return _rankDiretoP;
     var falhou = false;
-    var p = Promise.all(Object.keys(RANK_COLECOES).map(function (k) {
+    _rankDiretoP = Promise.all(Object.keys(RANK_COLECOES).map(function (k) {
       return _rankLerTopOuErro(k, 20).then(function (top) {
         return { jogo: k, top: top };
       }, function (err) {
@@ -2374,14 +2478,54 @@
         return { jogo: k, top: [] };
       });
     })).then(function (listas) {
+      _rankDiretoP = null;
       // P0-2: resultado com falha (SDK ausente, offline, erro) volta pra
-      // tela como hoje, mas NÃO fica no cache — senão seriam 60 s de
-      // "ninguém pontuou" falso pra todas as telas.
-      if (falhou && _rankTopsCache === p) _rankTopsCache = null;
+      // tela, mas NÃO fica guardado — senão seriam minutos de "ninguém
+      // pontuou" falso.
+      if (!falhou) _rankTopsGuardar(listas, RANK_TOPS_TTL_DIRETO);
       return listas;
     });
-    _rankTopsCache = p;
-    return p;
+    return _rankDiretoP;
+  }
+
+  // Recorde que a própria pessoa acabou de fazer (fim de partida ou
+  // gravação no Firestore): vale por 30 min por cima de qualquer fonte.
+  function _rankMeuGuardar(jogoKey, score) {
+    if (typeof _cliUser === 'undefined' || !_cliUser) return;
+    var s = Math.max(0, Math.round(Number(score) || 0));
+    if (!s || !RANK_COLECOES[jogoKey]) return;
+    var nome = (typeof cliNomeExibicao === 'function' && cliNomeExibicao()) || 'Jogador';
+    if (nome.length < 2) nome = 'Jogador';
+    try {
+      var m = JSON.parse(localStorage.getItem(RANK_MEUS_LS) || 'null');
+      if (!m || m.uid !== _cliUser.uid || !m.j) m = { uid: _cliUser.uid, j: {} };
+      var ant = m.j[jogoKey];
+      if (ant && ant.s >= s && Date.now() - ant.em < RANK_MEUS_TTL) return;
+      m.j[jogoKey] = { s: s, n: nome, f: _cliUser.photoURL || '', em: Date.now() };
+      localStorage.setItem(RANK_MEUS_LS, JSON.stringify(m));
+    } catch (e) {}
+  }
+  function _rankMeusAplicar(listas) {
+    var uid = (typeof _cliUser !== 'undefined' && _cliUser) ? _cliUser.uid : null;
+    if (!uid || !listas) return listas;
+    var m = null;
+    try { m = JSON.parse(localStorage.getItem(RANK_MEUS_LS) || 'null'); } catch (e) {}
+    if (!m || m.uid !== uid || !m.j) return listas;
+    var agora = Date.now();
+    return listas.map(function (e) {
+      var r = m.j[e.jogo];
+      if (!r || agora - r.em > RANK_MEUS_TTL) return e;
+      var outros = [], antigo = null;
+      e.top.forEach(function (it) { if (it.uid === uid) antigo = it; else outros.push(it); });
+      if (antigo && antigo.score >= r.s) return e;
+      outros.push({ uid: uid, nome: r.n, score: r.s, photoURL: r.f });
+      outros.sort(function (a, b) { return b.score - a.score; });
+      return { jogo: e.jogo, top: outros.slice(0, 20) };
+    });
+  }
+
+  function _rankTopsTodosJogos() {
+    return _rankTopsBarato().then(function (l) { return l || _rankTopsDireto(); }).then(_rankMeusAplicar);
   }
 
   function rankLerGeral(limite) {
@@ -2467,7 +2611,7 @@
     });
 
     // Docs podem ter mudado de nome/foto: invalida o cache dos tops.
-    _rankTopsCache = null;
+    _rankTopsInvalidar();
   }
 
   window.rankSubmeter            = rankSubmeter;
@@ -2785,6 +2929,10 @@
     slot.style.display = '';
 
     var meuUid = _cliUser.uid;
+    // A partida que acabou de terminar entra no top na hora (os tops podem
+    // ter vindo do aparelho/resumo, de antes desta partida).
+    _rankMeuGuardar(jogoKey, Math.max(Math.round(Number(scoreObtido) || 0),
+      _progressoGarantirDono() ? _rankRecordeLocal(jogoKey) : 0));
     rankLerTop(jogoKey, 5).then(function (top) {
       if (!top || !top.length) {
         slot.innerHTML = '<div class="rank-fim-titulo">🏆 Ranking</div>' +
@@ -6226,7 +6374,7 @@
     },
     // Ranking por mapa (Ritmo da Coruja): ver rankMapaSubmeter/rankMapaPosicao.
     rankMapaSubmeter: function (mapa, score) { return rankMapaSubmeter(mapa, score); },
-    rankMapaPosicao: function (mapa) { return rankMapaPosicao(mapa); },
+    rankMapaPosicao: function (mapa, lista) { return rankMapaPosicao(mapa, lista); },
 
     // ── Sessão do cliente ───────────────────────────────────
     // true se há usuário logado (pra decidir convite de login etc.).

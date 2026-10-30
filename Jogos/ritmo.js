@@ -1366,15 +1366,18 @@
      gravar um recorde o cache daquele mapa é descartado. */
   var _rtRankCache = {};
   function _rtRankMapaSel() { return _rtMapaId(_rtSelId, _rtCfg.dif, _rtCfg.colunas); }
-  function _rtRankLer(mapa, forcar) {
-    var c = _rtRankCache[mapa];
+  // lista=true: top 10 pra janela do ranking; senão só líder + posição
+  // (cache separado — a linha da seleção é a chamada frequente).
+  function _rtRankLer(mapa, forcar, lista) {
+    var chave = lista ? mapa + '|lista' : mapa;
+    var c = _rtRankCache[chave];
     if (c && !forcar && Date.now() - c.em < 60000) return c.p;
     var G = _rtG_();
     var falha = { top: [], pos: null, meu: null, erro: true };
-    var p = (G && typeof G.rankMapaPosicao === 'function') ? G.rankMapaPosicao(mapa) : Promise.resolve(falha);
+    var p = (G && typeof G.rankMapaPosicao === 'function') ? G.rankMapaPosicao(mapa, !!lista) : Promise.resolve(falha);
     // Offline/SDK do Firebase não carregou: não fica "carregando" pra sempre.
     p = Promise.race([p, new Promise(function (ok) { setTimeout(function () { ok(falha); }, 8000); })]);
-    _rtRankCache[mapa] = { em: Date.now(), p: p };
+    _rtRankCache[chave] = { em: Date.now(), p: p };
     return p;
   }
   function _rtRankAtualizar() {
@@ -1404,7 +1407,7 @@
     lista.innerHTML = '<li class="rt-top-vazio">Carregando…</li>';
     rod.innerHTML = '';
     _rtEls.topOv.style.display = 'flex';
-    _rtRankLer(mapa, true).then(function (r) {
+    _rtRankLer(mapa, true, true).then(function (r) {
       if (_rtEls.topOv.style.display === 'none') return;
       var logado = !!(G && typeof G.estaLogado === 'function' && G.estaLogado());
       if (r.erro) { lista.innerHTML = '<li class="rt-top-vazio">Sem conexão com o ranking agora.</li>'; return; }
@@ -2273,7 +2276,7 @@
     el.textContent = '🏆 Enviando pro ranking da cidade…';
     el.style.display = '';
     G.rankMapaSubmeter(mapa, score).then(function (gravou) {
-      delete _rtRankCache[mapa];
+      delete _rtRankCache[mapa]; delete _rtRankCache[mapa + '|lista'];
       return _rtRankLer(mapa, true).then(function (r) {
         if (r.erro) { el.textContent = '🏆 Ranking indisponível agora — seu recorde fica salvo neste aparelho.'; return; }
         el.innerHTML = '🏆 ' + (r.pos ? 'Você está em <b>#' + r.pos + '</b> na cidade neste mapa' : 'Seu melhor neste mapa: <b>' + _rtFmtNum(r.meu || score) + '</b> (fora do top 50)') +

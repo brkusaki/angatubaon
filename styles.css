@@ -9755,3 +9755,7 @@ body.light-mode .perfil-jogo-barra { background: rgba(0,0,0,.08); }
 .perfil-col-card.perfil-col-outro .perfil-col-txt b { color: #bae6fd; }
 .perfil-sync-erro { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; font-size: 12px; line-height: 1.35; color: #fecaca; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.45); }
 .perfil-sync-erro b { color: #fff; font-family: monospace; }
+.perfil-sync { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 12px; padding: 8px 12px; border-radius: 12px; font-size: 11.5px; line-height: 1.35; }
+.perfil-sync-ok { color: var(--muted); background: rgba(74,222,128,.07); border: 1px solid rgba(74,222,128,.25); }
+.perfil-sync-btn { margin-left: auto; padding: 4px 10px; border-radius: 99px; cursor: pointer; font-size: 11px; font-weight: 800; color: #fff; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); }
+.perfil-sync-btn:disabled { opacity: .6; cursor: default; }

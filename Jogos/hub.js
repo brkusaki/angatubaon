@@ -5490,33 +5490,80 @@
   // só o que é público por natureza: nome, foto, cosméticos equipados
   // (não os itens comprados, só os equipados) e stats por jogo. Nunca
   // grava moedas nem inventário completo (ver firestore.rules).
-  function _perfilPublicoSync() {
-    if (typeof _cliUser === 'undefined' || !_cliUser) return;
-    // Celular compartilhado (decisão A): só publica stats/equipado/títulos
-    // se o progresso local é desta conta. Se não deu pra confirmar (ex.:
-    // localStorage bloqueado), não publica nada — o create exige
-    // equipado/stats, e mandar os de outra pessoa é pior que não sincronizar.
-    if (!_progressoGarantirDono()) return;
+  // Jogos aceitos em stats pelas firestore.rules (statsValido). Chave fora
+  // desta lista derrubava a gravação INTEIRA do perfil — agora é filtrada.
+  var PERFIL_STATS_PUBLICOS = ['pegacoruja', 'pegacoruja_surv', 'relampago', 'sequencia',
+    'voo', 'corrida', 'piano', 'blocos', 'doces', '2048', 'ritmo'];
+  var _perfilRemotoStats = null;   // stats que já estavam publicados (lidos 1x por sessão)
+  var _perfilPublicando = false;
+
+  // Publica o estado do próprio usuário em perfis/{uid} — só o que é
+  // público por natureza: nome, foto, cosméticos EQUIPADOS, stats,
+  // títulos, conquistas, coleção (tem/total) e as últimas partidas.
+  //   - Espera a 1ª sincronia com a nuvem da sessão (pra este aparelho
+  //     já ter o progresso dos outros), mas publica mesmo se ela falhar.
+  //   - Os números NUNCA descem: cada jogo fica com o maior valor entre o
+  //     local e o que já estava publicado. Era o bug do perfil congelado
+  //     num aparelho velho (2 jogos / 5 min por cima de 8 jogos / 2h).
+  //   - Recusado pelas regras: regrava o doc do zero (sem merge) e, se
+  //     ainda falhar, descobre qual campo é o culpado e mostra no perfil.
+  function _perfilPublicoSync(forcar) {
+    if (typeof _cliUser === 'undefined' || !_cliUser) return Promise.resolve(false);
+    if (!_progressoGarantirDono()) { _perfilSyncStatus('erro', 'progresso deste aparelho é de outra conta'); return Promise.resolve(false); }
     var uid = _cliUser.uid;
-    // Só publica depois da 1ª sincronia com a nuvem nesta sessão. Antes
-    // disso o localStorage deste aparelho pode estar atrasado (ex.: PC
-    // pouco usado) e publicar ele SOBRESCREVIA o perfil público bom que
-    // o celular tinha mandado (nível, tempo, recorde voltavam pra trás).
-    // Se a sincronia falhar (offline), não publica nesta sessão.
-    if (_nuvemPuxadoUid !== uid) {
-      _nuvemSincronizar().then(function (ok) {
-        if (ok && _nuvemPuxadoUid === uid) _perfilPublicoSyncDebounced();
+    if (_perfilPublicando && !forcar) return Promise.resolve(false);
+    _perfilPublicando = true;
+    var nuvem = (_nuvemPuxadoUid === uid) ? Promise.resolve(true)
+      : _nuvemSincronizar().then(function (ok) { return !!ok; }, function () { return false; });
+    return nuvem.then(function () {
+      return _rankDbPronto();
+    }).then(function (db) {
+      if (typeof _cliUser === 'undefined' || !_cliUser || _cliUser.uid !== uid) return false;
+      var ref = db.collection('perfis').doc(uid);
+      var prep = (_histMescladoUid === uid && _perfilRemotoStats)
+        ? Promise.resolve(true)
+        : ref.get().then(function (doc) {
+            var d = (doc && doc.exists) ? (doc.data() || {}) : {};
+            var antes = _histLer().length;
+            _histSalvar(_histMesclar(_histLer(), Array.isArray(d.historico) ? d.historico : []));
+            _histMescladoUid = uid;
+            _perfilRemotoStats = (d.stats && typeof d.stats === 'object') ? d.stats : {};
+            var tela = document.getElementById('jogo-perfil');
+            if (_histLer().length !== antes && _perfilModo === 'eu' && tela && tela.classList.contains('perfil-open')) _perfilRender();
+            return true;
+          }).catch(function () { return false; });
+      return prep.then(function (comRemoto) {
+        if (typeof _cliUser === 'undefined' || !_cliUser || _cliUser.uid !== uid) return false;
+        var doc = _perfilPublicoMontar(uid, comRemoto);
+        return ref.set(doc, { merge: true }).catch(function (err) {
+          if (!err || err.code !== 'permission-denied') throw err;
+          // Doc antigo com campo que as regras de hoje não aceitam (o merge
+          // carrega ele junto): regrava do zero.
+          return ref.set(doc).catch(function (err2) {
+            if (!err2 || err2.code !== 'permission-denied') throw err2;
+            return _perfilPublicoAcharCulpado(ref, doc);
+          });
+        }).then(function (culpado) {
+          if (culpado) { _perfilSyncStatus('erro', 'regras do Firebase recusam o campo "' + culpado + '" (republique o firestore.rules)'); return false; }
+          _perfilSyncStatus('ok');
+          return true;
+        });
       });
-      return;
-    }
-    var foto = _cliUser.photoURL || '';
+    }).catch(function (err) {
+      _perfilSyncStatus('erro', (err && (err.code || err.message)) || 'erro');
+      console.warn('[perfil] perfil público não atualizou:', err && (err.code || err.message));
+      return false;
+    }).then(function (r) { _perfilPublicando = false; return r; });
+  }
 
+  function _perfilPublicoMontar(uid, comRemoto) {
     var nome = (typeof cliNomeExibicao === 'function' && cliNomeExibicao()) || 'Jogador';
+    nome = String(nome).trim().slice(0, 20);
     if (nome.length < 2) nome = 'Jogador';
+    var foto = String(_cliUser.photoURL || '');
+    if (foto.length >= 300 || !/^https:\/\/(lh3\.googleusercontent\.com|res\.cloudinary\.com)\//.test(foto)) foto = '';
 
-    // Só ids do catálogo (mesma whitelist de equipadoValido em
-    // firestore.rules): id velho/inválido no localStorage cai no padrão do
-    // slot, senão o set() inteiro falharia com permission-denied.
+    // Só ids do catálogo (mesma whitelist de equipadoValido).
     var eqLocal = _equipadoLer();
     function _eqOk(slot, id, padrao) {
       var it = id ? _lojaItemPorId(id) : null;
@@ -5529,106 +5576,118 @@
       card:    _eqOk('card',    eqLocal.card,    'card_padrao')
     };
 
-    // Só entradas com partidas > 0 — mesmo filtro do "meu perfil" local,
-    // e mantém o doc pequeno (a lista de jogos com stats é fixa/curta).
-    var statsLocais = _statsLer();
-    var stats = {};
-    Object.keys(statsLocais).forEach(function (k) {
-      var s = statsLocais[k];
-      if (!s || !(s.partidas > 0)) return;
-      stats[k] = {
-        partidas: Math.max(0, Math.round(Number(s.partidas) || 0)),
-        segundos: Math.max(0, Math.round(Number(s.segundos) || 0)),
-        recorde:  Math.max(0, Math.round(Number(s.recorde) || 0))
+    // Stats: só jogos aceitos, inteiros, e o MAIOR entre local e publicado.
+    var local = _statsLer(), remoto = comRemoto ? (_perfilRemotoStats || {}) : {}, stats = {};
+    function _int(v, max) { v = Math.round(Number(v) || 0); return Math.max(0, Math.min(max, v)); }
+    PERFIL_STATS_PUBLICOS.forEach(function (k) {
+      var a = local[k] || {}, b = remoto[k] || {};
+      var e = {
+        partidas: Math.max(_int(a.partidas, 100000), _int(b.partidas, 100000)),
+        segundos: Math.max(_int(a.segundos, 20000000), _int(b.segundos, 20000000)),
+        recorde:  Math.max(_int(a.recorde, 1000000), _int(b.recorde, 1000000))
       };
+      if (e.partidas > 0) stats[k] = e;
     });
 
-    // Só os títulos EQUIPADOS (até 2) — o histórico completo de
-    // desbloqueados é local e não precisa ser público.
-    var titulos = (typeof _titulosEquipadosLer === 'function') ? _titulosEquipadosLer() : [];
+    var titulos = ((typeof _titulosEquipadosLer === 'function') ? _titulosEquipadosLer() : [])
+      .filter(function (t) { return typeof t === 'string' && t.length <= 40; }).slice(0, 2);
+    var destaque = (typeof _titulosDestaqueLer === 'function') ? String(_titulosDestaqueLer() || '') : '';
+    if (!/^[a-z0-9_]{0,40}$/.test(destaque)) destaque = '';
+    var conq = (typeof _titulosConquistasString === 'function') ? String(_titulosConquistasString(_titulosDesbloqueadosLer()) || '') : '';
+    if (conq.length > 1500 || !/^[a-z0-9_,]*$/.test(conq)) conq = '';
 
-    // P0-2: espera o Firestore (sessão fria) em vez de desistir com db null.
-    _rankDbPronto().then(function (db) {
-      if (typeof _cliUser === 'undefined' || !_cliUser || _cliUser.uid !== uid) return;
-      // Histórico (Fase 1): na 1ª publicação da sessão por conta, lê o
-      // que OUTRO aparelho já publicou e mescla com o local antes de
-      // gravar — senão o celular e o PC ficariam sobrescrevendo a lista
-      // um do outro. Depois disso, o local já contém tudo e a leitura
-      // extra não se repete. Falhou a leitura? Grava sem o histórico
-      // (o campo antigo fica como está, graças ao merge).
-      var prep = (_histMescladoUid === uid)
-        ? Promise.resolve(true)
-        : db.collection('perfis').doc(uid).get().then(function (doc) {
-            var remoto = (doc && doc.exists && Array.isArray((doc.data() || {}).historico)) ? doc.data().historico : [];
-            var antes = _histLer().length;
-            _histSalvar(_histMesclar(_histLer(), remoto));
-            _histMescladoUid = uid;
-            // Veio partida de outro aparelho com o próprio perfil aberto: redesenha.
-            var tela = document.getElementById('jogo-perfil');
-            if (_histLer().length !== antes && _perfilModo === 'eu' && tela && tela.classList.contains('perfil-open')) _perfilRender();
-            return true;
-          }).catch(function () { return false; });
-      return prep.then(function (comHistorico) {
-        if (typeof _cliUser === 'undefined' || !_cliUser || _cliUser.uid !== uid) return;
-        var doc = {
-          uid: uid,
-          nome: nome,
-          photoURL: foto,
-          equipado: equipado,
-          stats: stats,
-          titulos: titulos,
-          // Fase 2: vitrine pública de conquistas + o título em destaque.
-          tituloDestaque: (typeof _titulosDestaqueLer === 'function') ? _titulosDestaqueLer() : '',
-          conquistas: (typeof _titulosConquistasString === 'function') ? _titulosConquistasString(_titulosDesbloqueadosLer()) : '',
-          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        // Público: só as últimas HIST_PUBLICO (o próprio perfil mostra o
-        // histórico local inteiro). Menos itens = regras bem mais baratas.
-        if (comHistorico) doc.historico = _histLer().slice(0, HIST_PUBLICO);
-        // Coleção (tem/total) pro perfil de amigo. Se as firestore.rules
-        // publicadas ainda não aceitam o campo, o set falha com
-        // permission-denied: grava de novo sem ele e não tenta mais nesta
-        // sessão — o resto do perfil nunca deixa de sincronizar por isso.
-        var ref = db.collection('perfis').doc(uid);
-        if (!_perfilColecaoRecusada) {
-          var r = _colecaoResumo();
-          doc.colecao = { tem: r.tem, total: r.total };
-        }
-        return ref.set(doc, { merge: true }).catch(function (err) {
-          if (!doc.colecao || !err || err.code !== 'permission-denied') throw err;
-          _perfilColecaoRecusada = true;
-          delete doc.colecao;
-          return ref.set(doc, { merge: true });
-        }).then(function () {
-          _perfilSyncErroSalvar('');
+    var doc = {
+      uid: uid, nome: nome, photoURL: foto, equipado: equipado, stats: stats,
+      titulos: titulos, tituloDestaque: destaque, conquistas: conq,
+      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    // Público: só as últimas HIST_PUBLICO partidas.
+    if (comRemoto) doc.historico = _histLer().slice(0, HIST_PUBLICO);
+    var r = _colecaoResumo();
+    doc.colecao = { tem: Math.min(r.tem, r.total), total: r.total };
+    return doc;
+  }
+
+  // Última tentativa: grava só o essencial e vai somando os campos
+  // opcionais um a um. Devolve o nome do 1º campo recusado ('' = gravou
+  // tudo). O essencial recusado também é reportado.
+  function _perfilPublicoAcharCulpado(ref, doc) {
+    var base = { uid: doc.uid, nome: doc.nome, photoURL: doc.photoURL, equipado: doc.equipado,
+                 stats: doc.stats, atualizadoEm: doc.atualizadoEm };
+    var opcionais = ['titulos', 'tituloDestaque', 'conquistas', 'historico', 'colecao'];
+    var culpado = '';
+    function tentar(d) { return ref.set(d).then(function () { return true; }, function () { return false; }); }
+    return tentar(base).then(function (ok) {
+      if (!ok) {
+        // Essencial recusado: testa cada parte pra dizer qual.
+        var partes = ['equipado', 'stats', 'photoURL', 'nome'];
+        var p = Promise.resolve('');
+        partes.forEach(function (campo) {
+          p = p.then(function (achou) {
+            if (achou) return achou;
+            var d = JSON.parse(JSON.stringify(base)); d.atualizadoEm = base.atualizadoEm;
+            if (campo === 'equipado') d.equipado = { voo_owl: 'voo_skin_classica', badge: '', bg: 'bg_padrao', card: 'card_padrao' };
+            if (campo === 'stats') d.stats = {};
+            if (campo === 'photoURL') d.photoURL = '';
+            if (campo === 'nome') d.nome = 'Jogador';
+            return tentar(d).then(function (ok2) { return ok2 ? campo : ''; });
+          });
+        });
+        return p.then(function (achou) { return achou || 'perfil (todos)'; });
+      }
+      var atual = base, p2 = Promise.resolve();
+      opcionais.forEach(function (campo) {
+        if (!(campo in doc)) return;
+        p2 = p2.then(function () {
+          var d = {}; Object.keys(atual).forEach(function (k) { d[k] = atual[k]; });
+          d[campo] = doc[campo];
+          return tentar(d).then(function (ok3) { if (ok3) atual = d; else if (!culpado) culpado = campo; });
         });
       });
-    }).catch(function (err) {
-      // Antes era silencioso: o perfil público congelava e ninguém via.
-      // Agora guarda o motivo e o próprio perfil mostra um aviso.
-      _perfilSyncErroSalvar((err && (err.code || err.message)) || 'erro');
-      console.warn('[perfil] perfil público não atualizou:', err && (err.code || err.message));
+      return p2.then(function () { return culpado; });
     });
   }
+
   var PERFIL_SYNC_ERRO_KEY = 'angatuba_perfil_sync_erro';
-  function _perfilSyncErroSalvar(msg) {
+  var PERFIL_SYNC_OK_KEY = 'angatuba_perfil_sync_ok';
+  function _perfilSyncStatus(tipo, msg) {
     try {
-      var antes = localStorage.getItem(PERFIL_SYNC_ERRO_KEY) || '';
-      if (msg) localStorage.setItem(PERFIL_SYNC_ERRO_KEY, String(msg).slice(0, 80));
-      else localStorage.removeItem(PERFIL_SYNC_ERRO_KEY);
-      if (antes !== (msg || '') && _perfilModo === 'eu') {
+      var antes = (localStorage.getItem(PERFIL_SYNC_ERRO_KEY) || '') + '|' + (localStorage.getItem(PERFIL_SYNC_OK_KEY) || '');
+      if (tipo === 'ok') { localStorage.removeItem(PERFIL_SYNC_ERRO_KEY); localStorage.setItem(PERFIL_SYNC_OK_KEY, String(Date.now())); }
+      else localStorage.setItem(PERFIL_SYNC_ERRO_KEY, String(msg || 'erro').slice(0, 120));
+      var depois = (localStorage.getItem(PERFIL_SYNC_ERRO_KEY) || '') + '|' + (localStorage.getItem(PERFIL_SYNC_OK_KEY) || '');
+      if (antes !== depois && _perfilModo === 'eu') {
         var tela = document.getElementById('jogo-perfil');
         if (tela && tela.style.display !== 'none') _perfilRender();
       }
     } catch (e) {}
   }
+  function _perfilSyncErroSalvar(msg) { if (msg) _perfilSyncStatus('erro', msg); else _perfilSyncStatus('ok'); }
+  // Linha de status no próprio perfil: quando o perfil público (o que os
+  // amigos veem) foi atualizado, ou por que não foi — e botão pra forçar.
   function _perfilSyncErroHtml() {
-    var e = '';
-    try { e = localStorage.getItem(PERFIL_SYNC_ERRO_KEY) || ''; } catch (x) {}
-    if (!e || typeof _cliUser === 'undefined' || !_cliUser) return '';
-    return '<div class="perfil-sync-erro">⚠️ Seu perfil público (o que os amigos veem) não atualizou. Motivo: <b>' +
-      _rankEsc(e) + '</b></div>';
+    if (typeof _cliUser === 'undefined' || !_cliUser) return '';
+    var e = '', ok = 0;
+    try { e = localStorage.getItem(PERFIL_SYNC_ERRO_KEY) || ''; ok = Number(localStorage.getItem(PERFIL_SYNC_OK_KEY)) || 0; } catch (x) {}
+    var btn = '<button type="button" class="perfil-sync-btn" onclick="_perfilSyncAgora(this)">Atualizar agora</button>';
+    if (e) {
+      return '<div class="perfil-sync perfil-sync-erro">⚠️ Seu perfil público (o que os amigos veem) não atualizou. Motivo: <b>' +
+        _rankEsc(e) + '</b>' + btn + '</div>';
+    }
+    var quando = ok ? new Date(ok) : null;
+    var txt = quando
+      ? ('🌐 Perfil público atualizado ' + (Date.now() - ok < 86400000 ? 'às ' : 'em ' + quando.toLocaleDateString('pt-BR') + ' às ') +
+         quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+      : '🌐 Perfil público ainda não atualizado neste aparelho';
+    return '<div class="perfil-sync perfil-sync-ok">' + txt + btn + '</div>';
   }
+  function _perfilSyncAgora(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Atualizando…'; }
+    _perfilPublicoSync(true).then(function () {
+      if (_perfilModo === 'eu') _perfilRender();
+    });
+  }
+  window._perfilSyncAgora = _perfilSyncAgora;
 
   // Debounce leve (~1.5s): equipar vários itens em sequência, ou
   // registrar várias partidas rápidas, não deve disparar uma gravação

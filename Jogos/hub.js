@@ -5495,6 +5495,8 @@
   var PERFIL_STATS_PUBLICOS = ['pegacoruja', 'pegacoruja_surv', 'relampago', 'sequencia',
     'voo', 'corrida', 'piano', 'blocos', 'doces', '2048', 'ritmo'];
   var _perfilRemotoStats = null;   // stats que já estavam publicados (lidos 1x por sessão)
+  var _perfilHistRuins = {};       // partidas que as regras recusaram (jogo|em) — puladas na sessão
+  function _perfilHistSig(h) { return (h && h.jogo) + '|' + (h && h.em); }
   var _perfilPublicando = false;
 
   // Publica o estado do próprio usuário em perfis/{uid} — só o que é
@@ -5545,6 +5547,8 @@
           });
         }).then(function (culpado) {
           if (culpado) { _perfilSyncStatus('erro', 'regras do Firebase recusam o campo "' + culpado + '" (republique o firestore.rules)'); return false; }
+          // Nota da partida recusada só some quando nada mais é pulado.
+          if (!Object.keys(_perfilHistRuins).length) _perfilSyncNota('');
           _perfilSyncStatus('ok');
           return true;
         });
@@ -5602,7 +5606,7 @@
       atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
     };
     // Público: só as últimas HIST_PUBLICO partidas.
-    if (comRemoto) doc.historico = _histLer().slice(0, HIST_PUBLICO);
+    if (comRemoto) doc.historico = _histLer().filter(function (h) { return !_perfilHistRuins[_perfilHistSig(h)]; }).slice(0, HIST_PUBLICO);
     var r = _colecaoResumo();
     doc.colecao = { tem: Math.min(r.tem, r.total), total: r.total };
     return doc;
@@ -5636,12 +5640,37 @@
         return p.then(function (achou) { return achou || 'perfil (todos)'; });
       }
       var atual = base, p2 = Promise.resolve();
+      function com(campo, valor) { var d = {}; Object.keys(atual).forEach(function (k) { d[k] = atual[k]; }); d[campo] = valor; return d; }
       opcionais.forEach(function (campo) {
         if (!(campo in doc)) return;
         p2 = p2.then(function () {
-          var d = {}; Object.keys(atual).forEach(function (k) { d[k] = atual[k]; });
-          d[campo] = doc[campo];
-          return tentar(d).then(function (ok3) { if (ok3) atual = d; else if (!culpado) culpado = campo; });
+          var d = com(campo, doc[campo]);
+          return tentar(d).then(function (ok3) {
+            if (ok3) { atual = d; return; }
+            if (campo !== 'historico' || !Array.isArray(doc.historico)) { if (!culpado) culpado = campo; return; }
+            // Histórico recusado: testa partida por partida, pula as que as
+            // regras não aceitam (e guarda a 1ª pra mostrar no perfil) e
+            // publica o resto.
+            var boas = [], ruim = null, q = Promise.resolve();
+            doc.historico.forEach(function (h) {
+              q = q.then(function () {
+                return tentar(com('historico', [h])).then(function (ok4) {
+                  if (ok4) boas.push(h);
+                  else { _perfilHistRuins[_perfilHistSig(h)] = true; if (!ruim) ruim = h; }
+                });
+              });
+            });
+            return q.then(function () {
+              if (ruim) _perfilSyncNota('Uma partida do histórico foi recusada pelas regras: ' + JSON.stringify(ruim));
+              // Junta as boas (se a lista inteira ainda falhar, vai encurtando).
+              function juntar(n) {
+                if (n <= 0) { if (!ruim) culpado = 'historico (lista)'; return Promise.resolve(); }
+                var d2 = com('historico', boas.slice(0, n));
+                return tentar(d2).then(function (ok5) { if (ok5) atual = d2; else return juntar(n - 1); });
+              }
+              return juntar(boas.length);
+            });
+          });
         });
       });
       return p2.then(function () { return culpado; });
@@ -5662,6 +5691,10 @@
       }
     } catch (e) {}
   }
+  var PERFIL_SYNC_NOTA_KEY = 'angatuba_perfil_sync_nota';
+  function _perfilSyncNota(msg) {
+    try { if (msg) localStorage.setItem(PERFIL_SYNC_NOTA_KEY, String(msg).slice(0, 300)); else localStorage.removeItem(PERFIL_SYNC_NOTA_KEY); } catch (e) {}
+  }
   function _perfilSyncErroSalvar(msg) { if (msg) _perfilSyncStatus('erro', msg); else _perfilSyncStatus('ok'); }
   // Linha de status no próprio perfil: quando o perfil público (o que os
   // amigos veem) foi atualizado, ou por que não foi — e botão pra forçar.
@@ -5679,7 +5712,10 @@
       ? ('🌐 Perfil público atualizado ' + (Date.now() - ok < 86400000 ? 'às ' : 'em ' + quando.toLocaleDateString('pt-BR') + ' às ') +
          quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
       : '🌐 Perfil público ainda não atualizado neste aparelho';
-    return '<div class="perfil-sync perfil-sync-ok">' + txt + btn + '</div>';
+    var nota = '';
+    try { nota = localStorage.getItem(PERFIL_SYNC_NOTA_KEY) || ''; } catch (x) {}
+    return '<div class="perfil-sync perfil-sync-ok">' + txt + btn +
+      (nota ? '<div class="perfil-sync-nota">' + _rankEsc(nota) + '</div>' : '') + '</div>';
   }
   function _perfilSyncAgora(btn) {
     if (btn) { btn.disabled = true; btn.textContent = 'Atualizando…'; }

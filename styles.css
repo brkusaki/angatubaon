@@ -9759,3 +9759,4 @@ body.light-mode .perfil-jogo-barra { background: rgba(0,0,0,.08); }
 .perfil-sync-ok { color: var(--muted); background: rgba(74,222,128,.07); border: 1px solid rgba(74,222,128,.25); }
 .perfil-sync-btn { margin-left: auto; padding: 4px 10px; border-radius: 99px; cursor: pointer; font-size: 11px; font-weight: 800; color: #fff; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); }
 .perfil-sync-btn:disabled { opacity: .6; cursor: default; }
+.perfil-sync-nota { flex-basis: 100%; font-size: 10.5px; color: #fcd34d; word-break: break-all; font-family: monospace; }

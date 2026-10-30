@@ -326,23 +326,15 @@ service cloud.firestore {
     function historicoItemValido(i) {
       return i is map && i.size() <= 6 && i.jogo is string && i.jogo.size() <= 20;
     }
+    // Só as 5 últimas partidas vão pro perfil público (HIST_PUBLICO em
+    // Jogos/hub.js); o histórico completo fica no aparelho.
     function historicoValido(h) {
-      return h is list && h.size() <= 15
+      return h is list && h.size() <= 5
         && (h.size() < 1 || historicoItemValido(h[0]))
         && (h.size() < 2 || historicoItemValido(h[1]))
         && (h.size() < 3 || historicoItemValido(h[2]))
         && (h.size() < 4 || historicoItemValido(h[3]))
-        && (h.size() < 5 || historicoItemValido(h[4]))
-        && (h.size() < 6 || historicoItemValido(h[5]))
-        && (h.size() < 7 || historicoItemValido(h[6]))
-        && (h.size() < 8 || historicoItemValido(h[7]))
-        && (h.size() < 9 || historicoItemValido(h[8]))
-        && (h.size() < 10 || historicoItemValido(h[9]))
-        && (h.size() < 11 || historicoItemValido(h[10]))
-        && (h.size() < 12 || historicoItemValido(h[11]))
-        && (h.size() < 13 || historicoItemValido(h[12]))
-        && (h.size() < 14 || historicoItemValido(h[13]))
-        && (h.size() < 15 || historicoItemValido(h[14]));
+        && (h.size() < 5 || historicoItemValido(h[4]));
     }
     // Fase 2 — vitrine pública de conquistas (estilo Steam). O que antes
     // era só local (angatuba_titulos_desbloqueados) passa a ser público

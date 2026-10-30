@@ -3768,7 +3768,8 @@
        · AngatubaGames.historicoRegistrar (jogos 1x1: Ping Pong,
          Tanques, Hóquei) — que não têm stats, mas têm vencedor.
   ══════════════════════════════════════════════════════════════ */
-  var HIST_MAX = 15;            // = teto de firestore.rules (historicoValido)
+  var HIST_MAX = 15;            // guardadas no aparelho (próprio perfil)
+  var HIST_PUBLICO = 5;         // publicadas no perfil público = teto de firestore.rules (historicoValido)
   var HIST_RESULTADOS = { vitoria: 1, derrota: 1, empate: 1, recorde: 1 };
 
   // Normaliza um item (do localStorage OU do Firestore de outra pessoa):
@@ -5556,7 +5557,9 @@
           conquistas: (typeof _titulosConquistasString === 'function') ? _titulosConquistasString(_titulosDesbloqueadosLer()) : '',
           atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
         };
-        if (comHistorico) doc.historico = _histLer();
+        // Público: só as últimas HIST_PUBLICO (o próprio perfil mostra o
+        // histórico local inteiro). Menos itens = regras bem mais baratas.
+        if (comHistorico) doc.historico = _histLer().slice(0, HIST_PUBLICO);
         // Coleção (tem/total) pro perfil de amigo. Se as firestore.rules
         // publicadas ainda não aceitam o campo, o set falha com
         // permission-denied: grava de novo sem ele e não tenta mais nesta

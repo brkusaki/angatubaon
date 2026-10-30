@@ -5472,6 +5472,17 @@
     // equipado/stats, e mandar os de outra pessoa é pior que não sincronizar.
     if (!_progressoGarantirDono()) return;
     var uid = _cliUser.uid;
+    // Só publica depois da 1ª sincronia com a nuvem nesta sessão. Antes
+    // disso o localStorage deste aparelho pode estar atrasado (ex.: PC
+    // pouco usado) e publicar ele SOBRESCREVIA o perfil público bom que
+    // o celular tinha mandado (nível, tempo, recorde voltavam pra trás).
+    // Se a sincronia falhar (offline), não publica nesta sessão.
+    if (_nuvemPuxadoUid !== uid) {
+      _nuvemSincronizar().then(function (ok) {
+        if (ok && _nuvemPuxadoUid === uid) _perfilPublicoSyncDebounced();
+      });
+      return;
+    }
     var foto = _cliUser.photoURL || '';
 
     var nome = (typeof cliNomeExibicao === 'function' && cliNomeExibicao()) || 'Jogador';

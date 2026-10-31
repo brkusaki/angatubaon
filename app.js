@@ -1069,6 +1069,7 @@
     const agoraFav = (i === -1);
     if (agoraFav) _favoritos.push(n); else _favoritos.splice(i, 1);
     _salvarFavoritos();
+    _uiSom(agoraFav ? 'favoritar' : 'desfavoritar');
 
     // Atualiza o coração no modal (se aberto) sem re-render
     document.querySelectorAll('.fav-btn-big[data-fav-id="' + cssEscapeAttr(n) + '"]').forEach(function (btn) {
@@ -2936,6 +2937,7 @@
 
     // Garante a coruja dormindo (o toast simples pode ter trocado antes)
     _setToastOwl('/webp/owl-sleeping.webp');
+    _uiSom('aviso');
 
     title.textContent = `${nomeLoja} — fechado agora`;
 
@@ -2993,9 +2995,64 @@
     toastTimer = setTimeout(hideToast, 2200);
   }
 
+  // ── SONS DO APP (ElevenLabs, /sons/ui/<nome>.mp3 — ver claude/sons-catalogo-elevenlabs.md) ──
+  // Curtos e baixos. Ligados por padrão; desliga em Minha conta → "Sons do app"
+  // (localStorage 'angatuba_sons_app' = '0'). Web Audio: cada arquivo é baixado
+  // e decodificado uma vez (no 1º toque da pessoa) e toca sem atraso. Sem
+  // suporte, sem arquivo ou com o som desligado: silêncio, nada quebra.
+  var SONS_APP_KEY = 'angatuba_sons_app';
+  var _UI_SONS = ['toque','abrir','fechar','aba','favoritar','desfavoritar','sucesso','erro','aviso',
+    'notificacao','mensagem','enviar','copiar','compartilhar','whatsapp','atualizar','loja-abriu','loja-fechou','interruptor'];
+  var _UI_SOM_VOL = { toque: 0.35, aba: 0.4, mensagem: 0.4, copiar: 0.45, interruptor: 0.45 };
+  var _uiSomCtx = null, _uiSomBuf = {}, _uiSomUlt = {};
+  function _uiSonsLigados() { try { return localStorage.getItem(SONS_APP_KEY) !== '0'; } catch (e) { return true; } }
+  function _uiSomCarregar(nome) {
+    if (!_uiSomBuf[nome]) {
+      _uiSomBuf[nome] = fetch('/sons/ui/' + nome + '.mp3')
+        .then(function (r) { if (!r.ok) throw new Error('sem som'); return r.arrayBuffer(); })
+        .then(function (ab) { return new Promise(function (ok, falha) { _uiSomCtx.decodeAudioData(ab, ok, falha); }); });
+      _uiSomBuf[nome].catch(function () {});
+    }
+    return _uiSomBuf[nome];
+  }
+  function _uiSomPreparar() {
+    if (_uiSomCtx || !_uiSonsLigados()) return !!_uiSomCtx;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    try { _uiSomCtx = new AC(); } catch (e) { return false; }
+    _UI_SONS.forEach(_uiSomCarregar);
+    return true;
+  }
+  function _uiSom(nome) {
+    if (!_uiSonsLigados() || !_uiSomPreparar()) return;
+    var agora = Date.now();
+    if (agora - (_uiSomUlt[nome] || 0) < 90) return; // evita som dobrado (dois handlers no mesmo toque)
+    _uiSomUlt[nome] = agora;
+    try { if (_uiSomCtx.state === 'suspended') _uiSomCtx.resume(); } catch (e) {}
+    _uiSomCarregar(nome).then(function (buf) {
+      var src = _uiSomCtx.createBufferSource(), g = _uiSomCtx.createGain();
+      src.buffer = buf;
+      g.gain.value = _UI_SOM_VOL[nome] || 0.55;
+      src.connect(g); g.connect(_uiSomCtx.destination);
+      src.start(0);
+    }).catch(function () {});
+  }
+  // 1º toque destrava o áudio (iOS/Chrome exigem gesto) e pré-carrega tudo.
+  // Os toques genéricos ficam aqui, num ouvinte só: barra de baixo (aba),
+  // pílulas de filtro (toque) e qualquer link do WhatsApp (whatsapp).
+  document.addEventListener('pointerdown', function () { _uiSomPreparar(); }, { capture: true, passive: true });
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    if (t.closest('#bottom-nav .nav-item')) _uiSom('aba');
+    else if (t.closest('.pill-btn')) _uiSom('toque');
+    else if (t.closest('a[href*="wa.me/"]')) _uiSom('whatsapp');
+  }, true);
+
   // Item 11: toast padronizado (avisos/sucesso/erro efemeros) no lugar de alert().
   // Reusa a infra visual de #toast (com a coruja) — troca a coruja conforme o tipo.
   function mlToast(mensagem, tipo, owlSrc) {
+    if (tipo === 'ok') _uiSom('sucesso'); else if (tipo === 'erro') _uiSom('erro');
     var owl = owlSrc || (tipo === 'erro' ? '/webp/owl-sign.webp'
                        : tipo === 'ok'  ? '/webp/owl-thumbsup.webp'
                        : '/webp/owl-tip.webp');
@@ -7247,6 +7304,7 @@
     const wrapVoltamos = document.getElementById('ml-voltamos-ate-wrap');
     // Feedback visual imediato — marca o botão clicado mesmo antes de confirmar
     marcarToggle(status);
+    if (status === 'ABERTO') _uiSom('loja-abriu');
     if (status === 'ABERTO') {
       if (wrapVoltamos) wrapVoltamos.style.display = 'none';
       if (!wrapAberto) { lojaToggle(status); return; }
@@ -7331,6 +7389,7 @@
       return;
     }
     _mlResetFechadoConfirm();
+    _uiSom('loja-fechou');
     const d = new Date();
     const hoje = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     await lojaToggle(`FECHADO_HOJE_${hoje}`);
@@ -8219,6 +8278,7 @@
   function abrirDetalhes(idx) {
     const loja = LOJAS[idx];
     if (!loja) return;
+    _uiSom('abrir');
 
     // Fecha o nudge de avaliação se estiver visível — evita ele flutuar
     // por cima do modal que está abrindo (idempotente: _fecharNudgeAval
@@ -8581,6 +8641,7 @@
 
     const text = `${emojiLoja(loja) || '📍'} *${loja.nome}*\n${loja.sub || loja.categoria || ''}${loja.endereco ? `\n📍 ${loja.endereco}` : ''}\n${statusTxt}${anuncioTxt}\n\nVeja no AngatubaON: ${url}`;
 
+    _uiSom('compartilhar');
     if (navigator.share) {
       navigator.share({ title: loja.nome, text, url }).catch(() => {});
     } else {
@@ -8600,6 +8661,7 @@
 
   function fecharDetalhes(silencioso = false) {
     const overlay = document.getElementById('modal-detalhes');
+    if (overlay.classList.contains('open')) _uiSom('fechar');
     overlay.classList.remove('open');
     document.body.style.overflow = '';
     _focusTrapDesativar();
@@ -11966,6 +12028,7 @@
       if (dy > 50 && !_pullToRefreshState.debounce) {
         _pullToRefreshState.debounce = 1;
         if (indicator) indicator.classList.add('show');
+        _uiSom('atualizar');
         _carregarClima();
         _carregarAvisosReal(true);
         setTimeout(function () {
@@ -17320,6 +17383,7 @@ ${urlCard}`)}`;
     cliPintarAvatarPainel(nome);
     // Sincroniza o rótulo do botão de tema dentro do painel com o estado atual.
     if (typeof cliSincronizarTemaLabel === 'function') cliSincronizarTemaLabel();
+    if (typeof cliSincronizarSonsLabel === 'function') cliSincronizarSonsLabel();
     // Preenche recordes dos jogos e lojas favoritas (assíncrono, sem travar a abertura).
     // cliRenderRecordes vive no Jogos/hub.js (lazy) — quem abre a conta sem
     // nunca ter aberto os jogos nesta sessão ainda não tem essa função;
@@ -17776,8 +17840,21 @@ ${urlCard}`)}`;
   // Botão de tema DENTRO do painel: chama o mesmo toggleTheme() de sempre
   // e reflete o novo estado no rótulo, sem duplicar lógica de tema.
   function cliTrocarTema() {
+    _uiSom('interruptor');
     if (typeof toggleTheme === 'function') toggleTheme();
     if (typeof cliSincronizarTemaLabel === 'function') cliSincronizarTemaLabel();
+  }
+
+  // "Sons do app" no painel: liga/desliga os sons da interface (ver SONS DO APP).
+  function cliTrocarSons() {
+    var ligar = !_uiSonsLigados();
+    try { localStorage.setItem(SONS_APP_KEY, ligar ? '1' : '0'); } catch (e) {}
+    if (ligar) _uiSom('interruptor');
+    cliSincronizarSonsLabel();
+  }
+  function cliSincronizarSonsLabel() {
+    var el = document.getElementById('cli-conta-sons-label');
+    if (el) el.textContent = _uiSonsLigados() ? 'Ligados' : 'Desligados';
   }
 
   // Atualiza o texto do botão de tema no painel (Dia / Noite / Automático).
@@ -17856,6 +17933,7 @@ ${urlCard}`)}`;
   window.cliAbrirPainelConta  = cliAbrirPainelConta;
   window.cliFecharPainelConta = cliFecharPainelConta;
   window.cliTrocarTema        = cliTrocarTema;
+  window.cliTrocarSons        = cliTrocarSons;
   window.cliSair              = cliSair;
   window.cliEditarApelido     = cliEditarApelido;
   window.cliCancelarApelido   = cliCancelarApelido;
@@ -18812,7 +18890,7 @@ ${urlCard}`)}`;
       var mostrar = function () { _amMsg('Seu código: ' + cod, ''); };
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(cod)
-          .then(function () { _amMsg('Código copiado: ' + cod + ' — mande pro seu amigo.', 'ok'); })
+          .then(function () { _uiSom('copiar'); _amMsg('Código copiado: ' + cod + ' — mande pro seu amigo.', 'ok'); })
           .catch(mostrar);
       } else {
         mostrar();
@@ -19738,6 +19816,7 @@ ${urlCard}`)}`;
 
   function _chatAvisar(e) {
     if (typeof _avisoMostrar !== 'function') return;
+    _uiSom('mensagem');
     _avisoMostrar({
       chave: 'chat:' + e.uid,
       tipo: 'chat',
@@ -20172,6 +20251,7 @@ ${urlCard}`)}`;
     _chatEnviando = true;
     window.AngatubaChat.enviar(uid, txt).then(function () {
       _chatEnviando = false;
+      _uiSom('enviar');
     }).catch(function (err) {
       _chatEnviando = false;
       if (_chatCom === uid) {
@@ -23400,6 +23480,7 @@ ${urlCard}`)}`;
     try {
       msg.onMessage(function (payload) {
         var n = (payload && payload.notification) || {};
+        _uiSom('notificacao');
         if (typeof showToastSimples === 'function') {
           showToastSimples(n.title ? (n.body ? n.title + ' — ' + n.body : n.title) : 'Nova notificação.', '/webp/owl-wave.webp');
         }

@@ -1225,19 +1225,18 @@
     // Coruja Party (2-4 jogadores): fala direto com o Firebase Realtime
     // Database, não usa AngatubaMP (que é só 1x1). Ver Jogos/party.js.
     party: { js: '/Jogos/party.min.js', css: '/Jogos/party.css', global: 'PartyGame' },
-    // Puff da Coruja: minigame da pool do Coruja Party. Não tem tela
-    // própria (nem card no hub) — é carregado de dentro do party.js via
-    // window._jogoLoader('puff') e desenha tudo em #pty-arena-container.
+    // Puff e Ervilhas (módulos antigos, um jogador por tela): desde o SW
+    // v488 a Party usa as versões com todo mundo na mesma cena, dentro do
+    // maquina.js. Ficam aqui pra um modo solo futuro.
     puff: { js: '/Jogos/puff.min.js', css: '/Jogos/puff.css', global: 'PuffGame' },
-    // Ervilhas da Coruja: mesmo esquema do Puff acima — minigame só da
-    // pool do Coruja Party, carregado via window._jogoLoader('ervilhas').
     ervilhas: { js: '/Jogos/ervilhas.min.js', css: '/Jogos/ervilhas.css', global: 'ErvilhasGame' },
     // Hex Arena: modo "módulo" do Coruja Party (todo mundo no mesmo jogo,
     // arena hexagonal). Sem tela nem card próprios — party.js carrega via
     // window._jogoLoader('hexarena') e monta em #pty-arena-container.
     hexarena: { js: '/Jogos/hexarena.min.js', css: '/Jogos/hexarena.css', global: 'HexArenaGame' },
     // A Máquina da Coruja: os minigames estilo Machine Party (Lâminas,
-    // Escada Errada, Piso Falso, A Esteira) num módulo só, mesmo contrato
+    // Escada, Piso, Esteira, Empurra-Empurra, Campo Minado, Túnel, Puff,
+    // Ervilhas) num módulo só, mesmo contrato
     // "container" do Puff — party.js chama render(container, {jogo, ...}).
     maquina: { js: '/Jogos/maquina.min.js', css: '/Jogos/maquina.css', global: 'MaquinaGame' },
     // Blocos da Coruja e Doces da Coruja: solo com fases (não entram na
@@ -1443,6 +1442,10 @@
       '/Jogos/maquina.min.js', '/Jogos/maquina.css',
       '/Jogos/assets/maquina/coruja-sheet.webp', '/Jogos/assets/maquina/serra.webp', '/Jogos/assets/maquina/itens.webp',
       '/Jogos/assets/maquina/prensa.webp', '/Jogos/assets/maquina/chao-laminas.webp', '/Jogos/assets/maquina/piso-tile.webp',
+      // Puff e Ervilhas viraram minigames da Máquina (todos na mesma cena)
+      // e reaproveitam a arte dos módulos antigos.
+      '/Jogos/assets/puff/puff-sheet-v2.webp', '/Jogos/assets/ervilhas/chefe-sheet.webp', '/Jogos/assets/ervilhas/sala.webp',
+      '/Jogos/assets/ervilhas/mesa.webp', '/Jogos/assets/ervilhas/prato.webp', '/Jogos/assets/ervilhas/ervilha.webp',
       '/Jogos/assets/corujinha/sim-moeda-v2.webp',
       // efeitos gravados (ElevenLabs)
       '/Jogos/assets/maquina/sfx/serra-1.mp3', '/Jogos/assets/maquina/sfx/clank-1.mp3', '/Jogos/assets/maquina/sfx/raspao-1.mp3', '/Jogos/assets/maquina/sfx/alerta-1.mp3', '/Jogos/assets/maquina/sfx/morte-1.mp3', '/Jogos/assets/maquina/sfx/prensa-1.mp3', '/Jogos/assets/maquina/sfx/passo-1.mp3', '/Jogos/assets/maquina/sfx/erro-1.mp3', '/Jogos/assets/maquina/sfx/sirene-1.mp3', '/Jogos/assets/maquina/sfx/queda-1.mp3', '/Jogos/assets/maquina/sfx/fogo-1.mp3', '/Jogos/assets/maquina/sfx/acerto-1.mp3', '/Jogos/assets/maquina/sfx/moeda-1.mp3', '/Jogos/assets/maquina/sfx/vitoria-1.mp3'

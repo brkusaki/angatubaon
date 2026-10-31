@@ -32,9 +32,12 @@
        reportarResultado(score) em vez do fluxo solo normal (ver o
        comentário "Modo Coruja Party" em speedtap.js/sequencia.js/
        piano.js — são 3-4 linhas cada, o resto do jogo é intocado).
-     - "container": minigames feitos JÁ pensando em Party (Puff,
-       Ervilhas), que recebem um <div> vazio e desenham tudo sozinhos
-       (não têm tela própria em index.html).
+     - "container": minigames feitos JÁ pensando em Party (todos os da
+       Máquina, Jogos/maquina.js — inclusive Puff e Ervilhas, com todo
+       mundo na mesma cena), que recebem um <div> vazio e desenham tudo
+       sozinhos (não têm tela própria em index.html).
+   ROBÔS: o anfitrião pode completar a sala com robôs (ver "Robôs (CPU)"
+   abaixo) — dá pra jogar a Party sozinho.
    Exposto ao app pela ponte window.AngatubaGames.party (ver app.js).
 
    MODOS DA SALA (o anfitrião escolhe qual jogo a Party vai rodar):
@@ -101,27 +104,42 @@
       iniciar: function (seed) { return _iniciarJogoContainer('maquina', 35, seed, 'esteira'); }
     },
     {
-      chave: 'puff', modulo: 'puff', nome: 'Puff da Coruja', duracaoSeg: 28, peso: 2, icone: '💨',
-      regra: 'Segure pra encher o peito e solte antes de tossir. Mais puffs vence.', controle: 'Segure e solte',
-      iniciar: function (seed) { return _iniciarJogoContainer('puff', 28, seed); }
+      chave: 'empurra', modulo: 'maquina', nome: 'Empurra-Empurra', duracaoSeg: 43, peso: 3, eliminacao: true, icone: '💥',
+      regra: 'A plataforma encolhe sobre o poço. Empurre os outros e fique em cima.', controle: 'Arraste · botão Empurrar',
+      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 40, seed, 'empurra'); }
     },
     {
-      chave: 'ervilhas', modulo: 'ervilhas', nome: 'Ervilhas da Coruja', duracaoSeg: 42, peso: 2, icone: '🫛',
-      regra: 'Coma as ervilhas sem a Chefe ver. Ela olhou, congele.', controle: 'Espetar e comer',
-      iniciar: function (seed) { return _iniciarJogoContainer('ervilhas', 38, seed); }
+      chave: 'minado', modulo: 'maquina', nome: 'Campo Minado', duracaoSeg: 48, peso: 3, eliminacao: true, icone: '💣',
+      regra: 'Atravesse até a saída. O número diz quantas minas há em volta.', controle: 'Toque no piso do lado',
+      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 45, seed, 'minado'); }
     },
     {
-      chave: 'speedtap', nome: 'Pega a Coruja', duracaoSeg: 25, peso: 1, icone: '👆',
+      chave: 'tunel', modulo: 'maquina', nome: 'O Túnel', duracaoSeg: 43, peso: 3, eliminacao: true, icone: '🚇',
+      regra: 'Os pistões descem pelo túnel. Troque de faixa pra passar no vão.', controle: 'Toque nos lados',
+      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 40, seed, 'tunel'); }
+    },
+    {
+      chave: 'puff', modulo: 'maquina', nome: 'Puff da Coruja', duracaoSeg: 33, peso: 2, icone: '💨',
+      regra: 'Segure pra encher o peito. Quanto mais cheio, mais pontos. Passou do limite, tosse.', controle: 'Segure e solte',
+      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 30, seed, 'puff'); }
+    },
+    {
+      chave: 'ervilhas', modulo: 'maquina', nome: 'Ervilhas da Coruja', duracaoSeg: 43, peso: 2, icone: '🫛',
+      regra: 'Todos na mesma mesa: coma sem a Chefe ver. Ela olhou, congele.', controle: 'Espetar e comer',
+      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 40, seed, 'mesa'); }
+    },
+    {
+      chave: 'speedtap', nome: 'Pega a Coruja', duracaoSeg: 25, peso: 1, icone: '👆', botFaixa: [22, 70], botAte: 25,
       regra: 'Toque nas corujas que aparecem. A mais rápida vence.', controle: 'Toque rápido',
       iniciar: function () { return _iniciarJogoTela('speedtap', ['classico']); }
     },
     {
-      chave: 'sequencia', nome: 'Sequência da Coruja', duracaoSeg: 60, peso: 1, eliminacao: true, icone: '🧠',
+      chave: 'sequencia', nome: 'Sequência da Coruja', duracaoSeg: 60, peso: 1, eliminacao: true, icone: '🧠', botFaixa: [3, 10], botAte: 45,
       regra: 'Repita a sequência. Errou, está fora.', controle: 'Toque na ordem',
       iniciar: function () { return _iniciarJogoTela('sequencia', [], 50); }
     },
     {
-      chave: 'piano', nome: 'Piano da Coruja', duracaoSeg: 60, peso: 1, eliminacao: true, icone: '🎹',
+      chave: 'piano', nome: 'Piano da Coruja', duracaoSeg: 60, peso: 1, eliminacao: true, icone: '🎹', botFaixa: [15, 90], botAte: 45,
       regra: 'Toque só nas teclas pretas. Errou ou deixou passar, está fora.', controle: 'Toque nas teclas',
       iniciar: function () { return _iniciarJogoTela('piano', ['sobrevivencia'], 50); }
     }
@@ -186,6 +204,7 @@
   var _posCache = {};          // { uid: { v, em } } — última posição de cada rival e quando chegou
   var _assistindo = false;     // já reportei, mas sigo vendo a arena até a rodada fechar
   var _preCarga = null, _preCargaNome = null; // minigame baixando durante a roleta
+  var _botTimers = [];         // anfitrião: relógios que reportam pelos robôs (jogos de tela / segurança)
 
   function disponivel() {
     return typeof firebase !== 'undefined' && !!firebase.database && !!firebase.auth;
@@ -214,6 +233,93 @@
   function _db() {
     if (typeof firebase === 'undefined' || !firebase.database) return null;
     try { return firebase.database(); } catch (e) { return null; }
+  }
+  // Posições dos rivais ficam FORA da sala (posParty/{codigo}) — ver
+  // _redeDaRodada e a regra em database.rules.json.
+  function _posRaiz() { return _db().ref('posParty/' + _codigo); }
+  function _limparPosicoes() {
+    if (!_souAnfitriao || !_codigo) return;
+    try { _posRaiz().remove().catch(function () {}); } catch (e) {}
+  }
+
+  /* ── Robôs (CPU) ──────────────────────────────────────────────────
+     Completam a sala quando falta gente (e deixam testar sozinho). Ficam
+     em jogadores/bot-N com bot:true e quem joga por eles é o ANFITRIÃO:
+     nos minigames da Máquina o motor (Jogos/maquina.js) simula cada robô
+     na mesma armadilha e manda a posição dele pelo mesmo canal dos
+     rivais (os outros celulares veem o robô como mais um jogador); nos
+     jogos de tela (Pega a Coruja, Sequência, Piano) o anfitrião sorteia
+     uma pontuação plausível. Só no modo de minigames — os módulos (Hex
+     Arena) são só entre gente. */
+  var BOT_NOMES = ['Robô Bolt', 'Robô Faísca', 'Robô Parafuso'];
+  function _ehBot(uid) { return /^bot-/.test(String(uid || '')); }
+  // Nome que cabe na arena e na faixa de rivais ("Robô Parafuso" → "Parafuso").
+  function _nomeCurto(uid, nome) {
+    nome = String(nome || (_ehBot(uid) ? 'Robô' : 'Jogador'));
+    return (_ehBot(uid) ? nome.replace(/^Robô\s+/, '') : nome).slice(0, 10);
+  }
+  function _botsDaSala(sala) {
+    return Object.keys((sala && sala.jogadores) || {}).filter(_ehBot).sort();
+  }
+  function _humanosDaSala(sala) {
+    return Object.keys((sala && sala.jogadores) || {}).filter(function (u) { return !_ehBot(u); });
+  }
+  function adicionarRobo() {
+    if (!_souAnfitriao || !_salaRef || !_sala || _sala.status !== 'lobby') return;
+    if (_modoDaSala(_sala).tipo !== 'pool') return;
+    var jog = _sala.jogadores || {};
+    if (Object.keys(jog).length >= MAX_JOGADORES) return;
+    for (var i = 1; i <= BOT_NOMES.length; i++) {
+      var id = 'bot-' + i;
+      if (jog[id]) continue;
+      _salaRef.child('jogadores/' + id).set({
+        nome: BOT_NOMES[i - 1], entrouEm: firebase.database.ServerValue.TIMESTAMP, pontosTotal: 0, bot: true
+      }).catch(function () {});
+      return;
+    }
+  }
+  function removerRobo(uid) {
+    if (!_souAnfitriao || !_salaRef || !_ehBot(uid)) return;
+    _salaRef.child('jogadores/' + uid).remove().catch(function () {});
+  }
+  // Gente nova entrou numa sala cheia de robôs: sai o último robô.
+  function _anfitriaoAjustarRobos(sala) {
+    if (!_souAnfitriao || !sala || sala.status !== 'lobby') return;
+    var bots = _botsDaSala(sala);
+    var excesso = Object.keys(sala.jogadores || {}).length - MAX_JOGADORES;
+    for (var i = 0; i < excesso && i < bots.length; i++) removerRobo(bots[bots.length - 1 - i]);
+  }
+  function _botReportar(uid, score, rodada) {
+    if (!_souAnfitriao || !_salaRef || !_sala || _sala.status !== 'rodada') return;
+    if (rodada != null && rodada !== _sala.rodadaAtual) return;
+    var r = _sala.rodadaAtual;
+    if (_resultadosCache[r] && _resultadosCache[r][uid]) return;
+    _salaRef.child('resultados/' + r + '/' + uid).set({
+      score: Math.max(0, Math.min(19999, Math.round(Number(score) || 0))),
+      enviadoEm: firebase.database.ServerValue.TIMESTAMP
+    }).catch(function () {});
+  }
+  function _pararBotTimers() { _botTimers.forEach(clearTimeout); _botTimers = []; }
+  // Anfitrião, começo da rodada: jogos de tela sorteiam a pontuação do
+  // robô; em qualquer jogo, um corte de segurança reporta 0 pelo robô que
+  // ainda não tiver resultado (o motor caiu, a aba dormiu…).
+  function _botsRodada(entry, sala) {
+    _pararBotTimers();
+    if (!_souAnfitriao) return;
+    var bots = _botsDaSala(sala);
+    if (!bots.length) return;
+    var rodada = sala.rodadaAtual;
+    if (entry && entry.botFaixa) {
+      bots.forEach(function (uid) {
+        var f = entry.botFaixa, sc = f[0] + Math.random() * (f[1] - f[0]);
+        var ate = (entry.botAte || entry.duracaoSeg || 30) * (0.45 + Math.random() * 0.5);
+        _botTimers.push(setTimeout(function () { _botReportar(uid, sc, rodada); }, (APRESENTACAO_MS + 3200) + ate * 1000));
+      });
+    }
+    var limite = APRESENTACAO_MS + 3200 + ((entry && entry.duracaoSeg) || 30) * 1000 + FOLGA_SEGURANCA_MS;
+    _botTimers.push(setTimeout(function () {
+      bots.forEach(function (uid) { _botReportar(uid, 0, rodada); });
+    }, limite));
   }
 
   function _codigoAleatorio() {
@@ -263,6 +369,7 @@
         _codigo = codigo; _salaRef = ref; _souAnfitriao = true;
         // Sala sem ninguém a mais entrar / anfitrião cair = some sozinha.
         ref.onDisconnect().remove();
+        _posRaiz().onDisconnect().remove();
 
         if (publica) {
           var refPublica = db.ref('salasPartyPublicas/' + codigo);
@@ -292,7 +399,9 @@
         var sala = snap.val();
         if (sala.status !== 'lobby') return Promise.reject(new Error('Essa Party já começou. Peça um código novo ou espere voltar ao lobby.'));
         var jogadores = sala.jogadores || {};
-        var qtd = Object.keys(jogadores).length;
+        // Robô não ocupa vaga de gente: o anfitrião tira um quando a sala
+        // passa de 4 (ver _anfitriaoAjustarRobos).
+        var qtd = Object.keys(jogadores).filter(function (u) { return !_ehBot(u); }).length;
         if (jogadores[eu.uid]) {
           // Reconexão: já era desta sala (ex.: recarregou a página).
         } else if (qtd >= MAX_JOGADORES) {
@@ -316,7 +425,7 @@
           // Anfitrião de volta: rearma a limpeza da sala inteira nesta
           // conexão (a da sessão anterior já se foi) pra não deixar sala
           // fantasma. Convidado limpa só o próprio nó, como sempre.
-          if (_souAnfitriao) ref.onDisconnect().remove();
+          if (_souAnfitriao) { ref.onDisconnect().remove(); _posRaiz().onDisconnect().remove(); }
           else ref.child('jogadores/' + eu.uid).onDisconnect().remove();
           _observarSala();
           return codigo;
@@ -379,7 +488,7 @@
     // comecarParty() punha rodadaAtual = 1 de novo, _rodadaVistaEm ainda
     // valia 1 da revanche anterior, a comparação abaixo dava "igual" e o
     // minigame nunca abria — todo mundo ficava olhando o lobby.
-    if (sala.status === 'lobby') { _rodadaVistaEm = -1; _modoSeedVisto = null; _recompensaModo = null; _moedasSessao = 0; }
+    if (sala.status === 'lobby') { _rodadaVistaEm = -1; _modoSeedVisto = null; _recompensaModo = null; _moedasSessao = 0; _anfitriaoAjustarRobos(sala); }
     // Saiu do jogo-módulo (pódio, revanchinha): desmonta ele aqui.
     if (sala.status !== 'modo' && _modoEmAndamento) _pararModo();
     // A rodada fechou: para de ouvir as posições e desmonta a arena de quem
@@ -470,6 +579,7 @@
   function _pararLocal() {
     _pararListeners();
     _pararPosicoes();
+    _pararBotTimers();
     _assistindo = false;
     if (_timeoutSeguranca) { clearTimeout(_timeoutSeguranca); _timeoutSeguranca = null; }
     if (_contagemHandle) { clearTimeout(_contagemHandle); _contagemHandle = null; }
@@ -510,6 +620,7 @@
     }
     document.body.classList.add('angatuba-party-ativo');
     _emit('countdown', { jogo: entry, sala: sala });
+    _botsRodada(entry, sala);
 
     _apresentarEContar(function () {
       // Sair da sala durante o "3...2...1..." cancela a contagem (ver
@@ -563,7 +674,12 @@
           seed: seedDaPartida,
           meuUid: _meuUid,
           souAnfitriao: function () { return _souAnfitriao; },
-          jogadores: function () { return (_sala && _sala.jogadores) || {}; },
+          jogadores: function () {
+            // Robôs só jogam os minigames; nos módulos eles nem entram.
+            var j = (_sala && _sala.jogadores) || {}, o = {};
+            Object.keys(j).forEach(function (u) { if (!_ehBot(u)) o[u] = j[u]; });
+            return o;
+          },
           estadoRef: salaRef.child('modoEstado'),
           jogadasRef: salaRef.child('modoJogadas'),
           agora: firebase.database.ServerValue.TIMESTAMP,
@@ -665,6 +781,7 @@
     _emit('mostrarArena');
     // Reaproveita o download da roleta (o _jogoLoader resolve na hora um
     // <script> que ainda está baixando — chamar de novo quebraria).
+    var rodadaDoJogo = _sala && _sala.rodadaAtual;
     var carga = (_preCarga && _preCargaNome === nome)
       ? _preCarga.catch(function () { return window._jogoLoader(nome); })
       : window._jogoLoader(nome);
@@ -684,6 +801,14 @@
         jogo: variante,
         onMoedas: function (qtd) { _moedasSessao += Math.max(0, Math.floor(Number(qtd) || 0)); },
         rede: _redeDaRodada(),
+        // Só o anfitrião simula os robôs (ver "Robôs" lá em cima).
+        // Lugar fixo de cada um (ordem dos uids, igual em todo celular):
+        // onde nasce nas arenas em que todo mundo começa junto.
+        slot: _slotDe(_meuUid),
+        bots: _souAnfitriao ? _botsDaSala(_sala).map(function (u) {
+          return { uid: u, nome: _nomeCurto(u, _sala.jogadores[u].nome), cor: _ptyCor(_sala, u), slot: _slotDe(u) };
+        }) : [],
+        onBotFim: function (uid, score) { _botReportar(uid, score, rodadaDoJogo); },
         onFim: function (score, assistir) { reportarResultado(score, assistir === true); }
       });
       return api;
@@ -697,11 +822,12 @@
      desenhar os rivais; quem decide a rodada continua sendo o
      resultados/ de cada um. */
   function _redeDaRodada() {
-    if (!_salaRef || !_sala || !_meuUid) return null;
+    if (!_salaRef || !_sala || !_meuUid || !_codigo) return null;
     _pararPosicoes();
     _posCache = {};
-    var ref = _salaRef.child('posicoes/' + _sala.rodadaAtual);
+    var ref = _posRaiz().child(String(_sala.rodadaAtual));
     var minha = ref.child(_meuUid);
+    var souAnf = _souAnfitriao;
     _posRef = ref;
     _posCb = function (snap) {
       var v = snap.val() || {}, agora = Date.now();
@@ -718,13 +844,23 @@
         if (_posRef !== ref) return; // rodada já fechou
         minha.set(String(txt).slice(0, 60)).catch(function () {});
       },
+      // Anfitrião manda a posição de cada robô que ele simula.
+      enviarBot: function (uid, txt) {
+        if (_posRef !== ref || !souAnf || !_ehBot(uid)) return;
+        ref.child(uid).set(String(txt).slice(0, 60)).catch(function () {});
+      },
       rivais: function () {
         var jog = (_sala && _sala.jogadores) || {};
-        return Object.keys(jog).sort().filter(function (u) { return u !== _meuUid && _posCache[u]; }).map(function (u) {
-          return { uid: u, nome: String(jog[u].nome || 'Jogador').slice(0, 10), cor: _ptyCor(_sala, u), v: _posCache[u].v, em: _posCache[u].em };
+        // No anfitrião os robôs vêm direto do motor (não pela rede).
+        return Object.keys(jog).sort().filter(function (u) { return u !== _meuUid && _posCache[u] && !(souAnf && _ehBot(u)); }).map(function (u) {
+          return { uid: u, nome: _nomeCurto(u, jog[u].nome), cor: _ptyCor(_sala, u), v: _posCache[u].v, em: _posCache[u].em };
         });
       }
     };
+  }
+  function _slotDe(uid) {
+    var i = Object.keys((_sala && _sala.jogadores) || {}).sort().indexOf(uid);
+    return i < 0 ? 0 : i % MAX_JOGADORES;
   }
   function _pararPosicoes() {
     if (_posRef && _posCb) { try { _posRef.off('value', _posCb); } catch (e) {} }
@@ -802,6 +938,7 @@
     if (!_souAnfitriao || !_salaRef || !_sala || _sala.status !== 'lobby') return;
     if (!MODOS[chave]) return;
     _salaRef.child('modo').set(chave).catch(function () {});
+    if (MODOS[chave].tipo !== 'pool') _botsDaSala(_sala).forEach(removerRobo);
   }
 
   // Sorteio com peso (ver "peso" na POOL), nunca o mesmo duas vezes seguidas.
@@ -823,6 +960,8 @@
     if (!_souAnfitriao || !_sala || !_salaRef) return;
     var qtd = Object.keys(_sala.jogadores || {}).length;
     var modo = _modoDaSala(_sala);
+    // Robô conta como jogador só nos minigames (basta 1 pessoa + robôs).
+    if (modo.tipo === 'modulo') qtd = _humanosDaSala(_sala).length;
     if (qtd < Math.max(MIN_JOGADORES, modo.min || 0)) return;
     if (modo.tipo === 'modulo') {
       // Um jogo só, todo mundo junto: limpa a partida anterior (se
@@ -873,8 +1012,8 @@
   // frente pra sempre e a Party nunca terminava.)
   function proximaRodada() {
     if (!_souAnfitriao || !_sala || !_salaRef) return;
+    _limparPosicoes(); // as posições da rodada anterior não servem mais pra ninguém
     _salaRef.update({
-      posicoes: null, // as posições da rodada anterior não servem mais pra ninguém
       rodadaAtual: (_sala.rodadaAtual || 0) + 1,
       jogoAtual: _sortearProximoJogo(),
       seed: Math.floor(Math.random() * 1e9),
@@ -893,7 +1032,8 @@
   function revanche() {
     if (!_souAnfitriao || !_sala || !_salaRef) return;
     var jogadores = _sala.jogadores || {};
-    var updates = { status: 'lobby', rodadaAtual: 0, resultados: null, placarRodadas: null, posicoes: null, modoEstado: null, modoJogadas: null };
+    var updates = { status: 'lobby', rodadaAtual: 0, resultados: null, placarRodadas: null, modoEstado: null, modoJogadas: null };
+    _limparPosicoes();
     Object.keys(jogadores).forEach(function (uid) { updates['jogadores/' + uid + '/pontosTotal'] = 0; });
     _salaRef.update(updates).catch(function () {});
   }
@@ -919,6 +1059,8 @@
         // _salaRef de forma síncrona, antes desta Promise resolver — usar
         // a variável do módulo direto dentro do then() pegaria null.
         var salaRefAoSair = _salaRef;
+        try { _posRaiz().onDisconnect().cancel(); } catch (e) {}
+        _limparPosicoes();
         var limparPublica = Promise.resolve();
         if (_sala && _sala.publica) {
           try {
@@ -950,6 +1092,7 @@
     _apiAtual = null;
     _reentrando = false; _tentativasReentrada = 0; // ver _reentrarNoLobbySePreciso
     _modoSeedVisto = null; _recompensaModo = null; _moedasSessao = 0;
+    _pararBotTimers();
   }
 
   function estado() { return _sala; }
@@ -966,6 +1109,8 @@
     listarSalas: listarSalas,
     definirTotalRodadas: definirTotalRodadas,
     definirModo: definirModo,
+    adicionarRobo: adicionarRobo,
+    removerRobo: removerRobo,
     modos: modos,
     comecarParty: comecarParty,
     proximaRodada: proximaRodada,
@@ -1184,7 +1329,7 @@
     return CORES_JOGADOR[(i < 0 ? 0 : i) % CORES_JOGADOR.length];
   }
   function _ptyAvatar(sala, uid) {
-    return '<span class="pty-av" style="--pty-cor:' + _ptyCor(sala, uid) + '">🦉</span>';
+    return '<span class="pty-av" style="--pty-cor:' + _ptyCor(sala, uid) + '">' + (_ehBot(uid) ? '🤖' : '🦉') + '</span>';
   }
 
   /* ── Faixa dos rivais (durante a rodada) ──────────────────────────
@@ -1214,7 +1359,7 @@
     var lista = el.querySelector('.pty-rivais-lista');
     lista.innerHTML = Object.keys(jogadores).filter(function (u) { return u !== meu; }).map(function (u) {
       return '<span class="pty-rival" data-uid="' + _escHTML(u) + '" style="--pty-cor:' + _ptyCor(sala, u) + '">' +
-        '<i></i>' + _escHTML(String(jogadores[u].nome || 'Jogador').slice(0, 10)) + '</span>';
+        '<i></i>' + (_ehBot(u) ? '🤖 ' : '') + _escHTML(_nomeCurto(u, jogadores[u].nome)) + '</span>';
     }).join('');
     el.querySelector('.pty-rivais-aviso').classList.remove('pty-rivais-aviso-on');
   }
@@ -1237,36 +1382,54 @@
   }
 
   /* ── Renderização reativa a partir dos eventos do AngatubaParty ── */
+  var _ptyLobbyListenerOn = false;
   window.AngatubaParty.on('salaMudou', function (sala) {
     var codEl = _q('pty-lobby-codigo'); if (codEl) codEl.textContent = window.AngatubaParty.codigoSala() || '';
     var jogadores = sala.jogadores || {};
     var lista = Object.keys(jogadores).map(function (uid) { return { uid: uid, nome: jogadores[uid].nome, pontosTotal: jogadores[uid].pontosTotal || 0, anfitriao: sala.anfitriao && sala.anfitriao.uid === uid }; });
 
     if (sala.status === 'lobby') {
+      var souAnf = window.AngatubaParty.souAnfitriao();
+      var modoSala = _modoDaSala(sala);
+      var humanos = lista.filter(function (j) { return !_ehBot(j.uid); }).length;
       var wrap = _q('pty-lobby-jogadores');
       if (wrap) {
+        if (!_ptyLobbyListenerOn) {
+          // Um listener só (sem onclick inline com o id interpolado).
+          wrap.addEventListener('click', function (e) {
+            var rm = e.target.closest && e.target.closest('[data-pty-tirar-robo]');
+            if (rm) { window.AngatubaParty.removerRobo(rm.getAttribute('data-pty-tirar-robo')); return; }
+            if (e.target.closest && e.target.closest('.pty-add-robo')) window.AngatubaParty.adicionarRobo();
+          });
+          _ptyLobbyListenerOn = true;
+        }
         wrap.innerHTML = lista.map(function (j) {
-          return '<div class="pty-jogador-chip">' + _ptyAvatar(sala, j.uid) + _escHTML(j.nome) + (j.anfitriao ? ' <span class="pty-badge-anfitriao">anfitrião</span>' : '') + '</div>';
-        }).join('');
+          var bot = _ehBot(j.uid);
+          return '<div class="pty-jogador-chip' + (bot ? ' pty-jogador-robo' : '') + '">' + _ptyAvatar(sala, j.uid) + _escHTML(j.nome) +
+            (j.anfitriao ? ' <span class="pty-badge-anfitriao">anfitrião</span>' : '') +
+            (bot && souAnf ? ' <button type="button" class="pty-tirar-robo" data-pty-tirar-robo="' + _escHTML(j.uid) + '" aria-label="Tirar robô">✕</button>' : '') + '</div>';
+        }).join('') +
+          (souAnf && modoSala.tipo === 'pool' && lista.length < MAX_JOGADORES
+            ? '<button type="button" class="pty-add-robo">🤖 + Adicionar robô</button>' : '');
       }
       var contador = _q('pty-lobby-contador');
-      if (contador) contador.textContent = lista.length + '/4 jogadores (mínimo 2 pra começar)';
-      var btnComecar = _q('pty-btn-comecar');
-      var souAnf = window.AngatubaParty.souAnfitriao();
-      if (btnComecar) {
-        btnComecar.style.display = souAnf ? '' : 'none';
-        btnComecar.disabled = lista.length < 2;
+      if (contador) {
+        contador.textContent = lista.length + '/4 jogadores' + (modoSala.tipo === 'pool'
+          ? ' (mínimo 2 pra começar — robô vale)' : ' (mínimo 2 pessoas)');
       }
+      var btnComecar = _q('pty-btn-comecar');
+      if (btnComecar) btnComecar.style.display = souAnf ? '' : 'none';
       var esperaAnf = _q('pty-lobby-espera-anfitriao');
       if (esperaAnf) esperaAnf.style.display = souAnf ? 'none' : '';
-      var modoSala = _modoDaSala(sala);
       _renderModos(sala, souAnf);
       // "Rodadas por sessão" só existe no modo de minigames.
       var rodadasWrap = _q('pty-rodadas-escolha');
       if (rodadasWrap) rodadasWrap.style.display = (souAnf && modoSala.tipo === 'pool') ? '' : 'none';
       if (btnComecar) {
         btnComecar.textContent = modoSala.tipo === 'pool' ? 'Começar Party' : 'Começar ' + modoSala.nome;
-        btnComecar.disabled = lista.length < Math.max(2, modoSala.min || 0);
+        btnComecar.disabled = modoSala.tipo === 'pool'
+          ? (lista.length < 2 || humanos < 1)
+          : humanos < Math.max(2, modoSala.min || 0);
       }
       _mostrarSub('lobby');
     }

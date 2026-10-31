@@ -104,11 +104,17 @@
         },
         "jogadores": {
           "$uid": {
+            // Robôs (CPU): id "bot-N", criados e apagados só pelo
+            // anfitrião, que também joga e reporta por eles (ver
+            // Jogos/party.js, "Robôs").
             "nome": {
-              ".validate": "!data.exists() && auth.uid == $uid && newData.isString() && newData.val().length <= 20"
+              ".validate": "!data.exists() && (auth.uid == $uid || ($uid.beginsWith('bot-') && newData.parent().parent().parent().child('anfitriao/uid').val() == auth.uid)) && newData.isString() && newData.val().length <= 20"
             },
             "entrouEm": {
-              ".validate": "!data.exists() && auth.uid == $uid && newData.val() == now"
+              ".validate": "!data.exists() && (auth.uid == $uid || ($uid.beginsWith('bot-') && newData.parent().parent().parent().child('anfitriao/uid').val() == auth.uid)) && newData.val() == now"
+            },
+            "bot": {
+              ".validate": "newData.val() == true && $uid.beginsWith('bot-') && newData.parent().parent().parent().child('anfitriao/uid').val() == auth.uid"
             },
             "pontosTotal": {
               ".validate": "newData.isNumber() && ((auth.uid == $uid && newData.val() == 0) || newData.parent().parent().parent().child('anfitriao/uid').val() == auth.uid)"
@@ -124,10 +130,10 @@
                 // 100 + bônus) com folga enorme — sem isto dava pra gravar
                 // qualquer número direto pelo console e vencer toda rodada
                 // (ver A2.4).
-                ".validate": "!data.exists() && auth.uid == $uid && newData.isNumber() && newData.val() >= 0 && newData.val() <= 20000"
+                ".validate": "!data.exists() && (auth.uid == $uid || ($uid.beginsWith('bot-') && root.child('salasParty').child($codigo).child('anfitriao/uid').val() == auth.uid)) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 20000"
               },
               "enviadoEm": {
-                ".validate": "auth.uid == $uid && newData.val() == now"
+                ".validate": "(auth.uid == $uid || ($uid.beginsWith('bot-') && root.child('salasParty').child($codigo).child('anfitriao/uid').val() == auth.uid)) && newData.val() == now"
               },
               "$outro": { ".validate": false }
             }
@@ -164,20 +170,31 @@
             }
           }
         },
-        /* Rivais na mesma arena (minigames da Máquina, ver Jogos/maquina.js):
-           posicoes/{rodada}/{uid} = texto curto "estado;números…" que o
-           próprio jogador regrava ~10x por segundo. Só serve pra desenhar
-           os outros na tela — o que vale ponto continua sendo resultados/.
-           Só quem está na sala grava, e só a própria posição. O anfitrião
-           apaga o nó inteiro a cada rodada nova / revanchinha. */
-        "posicoes": {
-          "$rodada": {
-            "$uid": {
-              ".validate": "auth.uid == $uid && newData.isString() && newData.val().length <= 60 && newData.parent().parent().parent().child('jogadores').child($uid).exists()"
-            }
-          }
-        },
         "$outro": { ".validate": false }
+      }
+    },
+
+    /* Rivais na mesma arena (minigames da Máquina, ver Jogos/maquina.js):
+       posParty/{codigo}/{rodada}/{uid} = texto curto "estado;números…"
+       que o próprio jogador regrava ~10x por segundo. Só serve pra
+       desenhar os outros na tela — o que vale ponto continua sendo
+       salasParty/{codigo}/resultados. Fica FORA da sala de propósito:
+       dentro dela, cada posição disparava o listener da sala inteira
+       ~30x por segundo em todo celular (auditoria do Firebase, 30/10).
+       - Grava: o próprio jogador (se está na sala) ou o anfitrião pelos
+         robôs ("bot-N").
+       - Apaga o nó do código inteiro: o anfitrião (rodada nova,
+         revanchinha, saída) ou qualquer um quando a sala já não existe
+         (limpeza de sobra). */
+    "posParty": {
+      "$codigo": {
+        ".read": "auth != null",
+        ".write": "auth != null && !newData.exists() && (root.child('salasParty').child($codigo).child('anfitriao/uid').val() == auth.uid || !root.child('salasParty').child($codigo).exists())",
+        "$rodada": {
+          "$uid": {
+            ".write": "auth != null && newData.isString() && newData.val().length <= 60 && ((auth.uid == $uid && root.child('salasParty').child($codigo).child('jogadores').child($uid).exists()) || ($uid.beginsWith('bot-') && root.child('salasParty').child($codigo).child('anfitriao/uid').val() == auth.uid))"
+          }
+        }
       }
     },
 

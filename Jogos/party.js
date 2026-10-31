@@ -118,6 +118,10 @@
     if (!n) return _escHTML((j && (j.icone || j.emoji)) || '⚙️');
     return '<img class="' + (cls || 'pty-ico') + '" src="/Jogos/assets/maquina/ico-' + n + '.webp" alt="" width="64" height="64" draggable="false">';
   }
+  // Arte do cartão (Jogos/assets/maquina/cartao-<chave>.webp); sem arte
+  // própria, mostra a Máquina.
+  var CARTAO_ARTE = { laminas: 1, escada: 1, piso: 1, esteira: 1, empurra: 1, minado: 1, tunel: 1, puff: 1, ervilhas: 1 };
+  function _cartaoSrc(j) { return '/Jogos/assets/maquina/cartao-' + (j && CARTAO_ARTE[j.chave] ? j.chave : 'maquina') + '.webp'; }
   var APRESENTACAO_MS = 2600; // o cartão da Máquina fica sozinho na tela antes do 3-2-1
   function _poolPorChave(chave) {
     for (var i = 0; i < POOL.length; i++) if (POOL[i].chave === chave) return POOL[i];
@@ -1216,7 +1220,7 @@
     el.innerHTML = POOL.filter(function (j) { return (j.peso || 1) >= 2; }).map(function (j) {
       return '<span class="pty-cat-item">' + _icoHTML(j, 'pty-ico pty-ico-mini') + _escHTML(j.nome) + '</span>';
     }).join('');
-    POOL.forEach(function (j) { var n = ICO_ARQ[j.chave]; if (n) { var im = new Image(); im.src = '/Jogos/assets/maquina/ico-' + n + '.webp'; } }); // pré-carrega pra roleta não piscar
+    POOL.forEach(function (j) { var n = ICO_ARQ[j.chave]; if (n) { var im = new Image(); im.src = '/Jogos/assets/maquina/ico-' + n + '.webp'; } (new Image()).src = _cartaoSrc(j); }); // pré-carrega pra roleta não piscar
     el.setAttribute('data-ok', '1');
   }
 
@@ -1799,7 +1803,7 @@
     var nomeEl = _q('pty-countdown-jogo'), iconeEl = _q('pty-countdown-icone');
     var regraEl = _q('pty-countdown-regra'), ctrlEl = _q('pty-countdown-controle');
     var rodEl = _q('pty-countdown-rodada'), numEl = _q('pty-countdown-num');
-    var cartao = _q('pty-countdown-cartao');
+    var cartao = _q('pty-countdown-cartao'), arteEl = _q('pty-countdown-arte');
     if (rodEl) {
       rodEl.textContent = (jogo.tipo === 'modulo' || !sala.rodadaAtual)
         ? 'A Máquina escolheu'
@@ -1816,6 +1820,7 @@
     function _pousar() {
       if (nomeEl) nomeEl.textContent = jogo.nome || 'Minigame surpresa';
       if (iconeEl) iconeEl.innerHTML = _icoHTML(jogo);
+      if (arteEl) arteEl.src = _cartaoSrc(jogo);
       if (regraEl) regraEl.textContent = jogo.regra || jogo.desc || '';
       if (ctrlEl) { ctrlEl.textContent = jogo.controle || ''; ctrlEl.style.display = jogo.controle ? '' : 'none'; }
       if (cartao) cartao.classList.add('pty-cartao-pronto');
@@ -1827,6 +1832,7 @@
       var j = nomes[giros % nomes.length];
       if (nomeEl) nomeEl.textContent = j.nome;
       if (iconeEl) iconeEl.innerHTML = _icoHTML(j);
+      if (arteEl) arteEl.src = _cartaoSrc(j);
       if (window.AngatubaGames && window.AngatubaGames.som && giros % 2) window.AngatubaGames.som.toque();
       if (giros >= 11) { clearInterval(_roletaHandle); _roletaHandle = null; _pousar(); }
     }, 85);

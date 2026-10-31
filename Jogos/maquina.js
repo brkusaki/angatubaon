@@ -285,7 +285,7 @@
     // id: [bases que já têm folha]   (bases: 'coruja', 'puff', 'mesaCoruja')
     operaria: ['coruja', 'puff', 'mesaCoruja'], cauboi: ['coruja', 'puff', 'mesaCoruja'], pirata: ['coruja', 'puff', 'mesaCoruja'], chef: ['coruja', 'puff', 'mesaCoruja'],
     caipira: ['coruja', 'puff', 'mesaCoruja'], nerd: ['coruja', 'puff', 'mesaCoruja'], realeza: ['coruja', 'puff', 'mesaCoruja'], astronauta: ['coruja', 'puff', 'mesaCoruja'],
-    bruxa: [], heroina: [], detetive: [], roqueira: []
+    bruxa: ['coruja', 'puff', 'mesaCoruja'], heroina: ['coruja', 'puff', 'mesaCoruja'], detetive: ['coruja', 'puff', 'mesaCoruja'], roqueira: ['coruja', 'puff', 'mesaCoruja']
   };
   var SKIN_ARQ = { coruja: 'coruja', puff: 'puff', mesaCoruja: 'mesa' };
   // Chave da folha a usar pra esta base com este visual (registra na tabela

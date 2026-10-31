@@ -348,14 +348,18 @@ body.angatuba-party-ativo .jogo-voltar { display: none !important; }
    anfitrião toca; pros outros os chips ficam desabilitados, mas o
    ativo continua destacado. */
 .pty-modo-escolha { display: flex; flex-direction: column; gap: 6px; align-items: center; width: 100%; max-width: 330px; margin-top: 4px; }
-.pty-modo-chips { display: flex; gap: 8px; width: 100%; }
+.pty-modo-chips {
+  display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; max-width: 360px;
+  border-radius: 12px; overflow: hidden; border: 1px solid var(--pty-borda);
+}
 .pty-modo-chip {
-  flex: 1; min-height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 8px 10px; border-radius: 10px; border: 1px solid var(--pty-borda);
+  min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 8px 4px; border: none; border-right: 1px solid var(--pty-borda);
   background: var(--pty-aco-2); color: var(--pty-texto);
-  font-family: var(--font-h); font-weight: 800; font-size: 13.5px; cursor: pointer;
+  font-family: var(--font-h); font-weight: 800; font-size: 12px; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+.pty-modo-chip:last-child { border-right: none; }
 .pty-modo-chip:disabled { cursor: default; opacity: .6; }
 .pty-modo-chip.pty-modo-ativo {
   background: var(--pty-amarelo); color: #111; border-color: transparent; opacity: 1;
@@ -376,30 +380,6 @@ body.angatuba-party-ativo .jogo-voltar { display: none !important; }
 .pty-av.pty-av-img { overflow: hidden; background: #15181c; }
 .pty-av.pty-av-img img { width: 130%; height: 130%; object-fit: cover; object-position: 50% 18%; }
 
-/* Menu: botão grande do "Monte sua coruja" com a coruja equipada. */
-.pty-visual-btn {
-  display: flex; align-items: center; gap: 12px; width: 100%; max-width: 320px;
-  padding: 8px 16px 8px 8px; border-radius: 14px; cursor: pointer; text-align: left;
-  border: 1px solid rgba(245,197,24,.4); background: linear-gradient(135deg, #1e2228, #15181c); color: var(--pty-texto);
-  box-shadow: 0 4px 0 #000;
-}
-.pty-visual-btn canvas { width: 64px; height: 64px; flex: 0 0 auto; border-radius: 10px; background: radial-gradient(circle at 50% 40%, #2b3038, #0b0d10); }
-.pty-visual-btn b { display: block; font-family: var(--font-h); font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(--pty-amarelo); }
-.pty-visual-btn small { display: block; font-size: 12px; color: var(--pty-mudo); margin-top: 2px; }
-.pty-btn-sec { background: #2a2f37; color: var(--pty-texto); box-shadow: inset 0 -4px 0 rgba(0,0,0,.35), 0 4px 0 #000; }
-
-/* Lobby: palco das corujas + contagem. */
-#pty-palco {
-  width: 100%; max-width: 360px; height: auto; aspect-ratio: 720 / 330;
-  border-radius: 12px; border: 1px solid var(--pty-borda);
-  background: radial-gradient(ellipse at 50% 0%, rgba(255,45,85,.12), transparent 60%), repeating-linear-gradient(90deg, rgba(255,255,255,.02) 0 1px, transparent 1px 30px), #0d0f12;
-}
-.pty-lobby-contagem { min-height: 22px; font-size: 13px; font-weight: 700; color: var(--pty-mudo); text-align: center; }
-.pty-lobby-contagem.pty-contagem-on { font-family: var(--font-h); font-size: 22px; color: var(--pty-amarelo); text-shadow: 0 0 14px rgba(245,197,24,.5); animation: ptyContagemPulso 1s ease infinite; }
-@keyframes ptyContagemPulso { 0% { transform: scale(1.15); } 30% { transform: scale(1); } }
-.pty-btn.pty-btn-pronto { background: var(--pty-verde); font-size: 13px; }
-.pty-lobby-acoes { display: flex; gap: 18px; justify-content: center; }
-
 /* Personalizado: grade dos minigames que entram. */
 .pty-sel-grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; max-width: 340px; margin-top: 8px; }
 .pty-sel-item {
@@ -410,33 +390,103 @@ body.angatuba-party-ativo .jogo-voltar { display: none !important; }
 .pty-sel-item:disabled { cursor: default; }
 .pty-sel-item .pty-ico { width: 34px; height: 34px; }
 
-/* "Monte sua coruja". */
-#pty-visual-preview {
-  width: 170px; height: 170px; border-radius: 50%;
-  background: radial-gradient(circle at 50% 45%, #2f353d, #0b0d10 70%); box-shadow: 0 0 0 3px rgba(245,197,24,.35), 0 0 30px rgba(245,197,24,.12);
+/* ═══ Fase 3b: telas com cenário (menu, lobby, provador, pódio) ═══
+   .pty-tela = sub-tela de ponta a ponta: o cenário (canvas com a arte e
+   as corujas) encosta nas bordas e as ações ficam embaixo. */
+.pty-sub.pty-tela { padding: 0 0 20px; justify-content: flex-start; gap: 12px; }
+.pty-cena { position: relative; width: 100%; line-height: 0; overflow: hidden; }
+.pty-cena canvas { display: block; width: 100%; height: auto; }
+.pty-cena-menu::after, .pty-cena-provador::after { /* funde a arte com o aço do cartão embaixo */
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 26%; pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--pty-aco));
 }
-.pty-visual-saldo { font-family: var(--font-h); font-weight: 800; color: #ffd23f; font-size: 15px; }
-.pty-visual-abas { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
-.pty-visual-aba {
-  padding: 7px 14px; border-radius: 999px; cursor: pointer; border: 1px solid var(--pty-borda);
-  background: #0b0d10; color: var(--pty-mudo); font-weight: 800; font-size: 13px;
+
+/* Menu */
+.pty-cena-menu { cursor: pointer; }
+.pty-logo {
+  position: absolute; left: 0; right: 0; top: 4%; z-index: 1; line-height: .9; text-align: center; pointer-events: none;
+  font-family: var(--font-h); text-transform: uppercase; color: #fff; text-shadow: 0 4px 0 #000, 0 0 26px rgba(255,45,85,.55);
 }
-.pty-visual-aba.pty-visual-aba-on { background: var(--pty-amarelo); color: #111; border-color: var(--pty-amarelo); }
-.pty-visual-grade { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; width: 100%; max-width: 360px; }
+.pty-logo span { display: block; font-size: 22px; letter-spacing: .32em; color: var(--pty-amarelo); }
+.pty-logo b { display: block; font-size: 50px; letter-spacing: .06em; font-weight: 800; }
+.pty-cena-menu { max-height: 46vh; }
+.pty-cena-menu canvas { margin-top: 0; }
+.pty-cena-dica {
+  position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%); z-index: 1; line-height: 1.2;
+  font-size: 11px; font-weight: 700; color: rgba(255,255,255,.75); background: rgba(0,0,0,.55); padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+}
+.pty-menu-acoes { width: 100%; max-width: 360px; padding: 0 16px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.pty-btn.pty-btn-grande { max-width: 340px; padding: 16px 30px; font-size: 18px; letter-spacing: .1em; }
+.pty-menu-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 340px; }
+.pty-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 8px 11px; border-radius: 14px; cursor: pointer;
+  border: 1px solid var(--pty-borda); background: linear-gradient(180deg, #252a31, #15181c); color: var(--pty-texto);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 4px 0 #000;
+}
+.pty-tile:active { transform: translateY(3px); box-shadow: 0 1px 0 #000; }
+.pty-tile i { font-style: normal; font-size: 26px; line-height: 1.1; }
+.pty-tile b { font-family: var(--font-h); font-size: 14px; letter-spacing: .06em; text-transform: uppercase; color: var(--pty-amarelo); }
+.pty-tile small { font-size: 11px; color: var(--pty-mudo); }
+.pty-privada-toggle { font-size: 12px; }
+
+/* Lobby */
+.pty-lobby-topo { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 12px 14px 0; box-sizing: border-box; }
+.pty-sala-chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--pty-borda); background: #0b0d10; color: var(--pty-texto);
+}
+.pty-sala-chip small { font-size: 10px; font-weight: 800; letter-spacing: .16em; color: var(--pty-mudo); }
+.pty-sala-chip b { font-family: ui-monospace, Menlo, monospace; font-size: 20px; letter-spacing: .18em; color: var(--pty-amarelo); }
+.pty-sala-chip i { font-style: normal; font-size: 14px; }
+.pty-sala-info { font-weight: 800; font-size: 14px; color: var(--pty-mudo); }
+.pty-cena-lobby canvas { cursor: pointer; }
+.pty-cena-lobby .pty-lobby-contagem {
+  position: absolute; left: 50%; top: 12%; transform: translateX(-50%); z-index: 2; line-height: 1.2; white-space: nowrap;
+  padding: 6px 14px; border-radius: 10px; background: rgba(0,0,0,.6);
+}
+.pty-cena-lobby .pty-lobby-contagem:empty { display: none; }
+.pty-palco-dica { font-size: 12px; color: var(--pty-mudo); padding: 0 16px; min-height: 0; }
+.pty-palco-dica:empty { display: none; }
+.pty-modo-escolha { padding: 0 14px; box-sizing: border-box; width: 100%; display: flex; flex-direction: column; align-items: center; }
+.pty-lobby-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 340px; padding: 0 16px; box-sizing: border-box; }
+.pty-btn-sec2 {
+  padding: 11px 10px; border-radius: 10px; cursor: pointer; font-weight: 800; font-size: 14px;
+  border: 1px solid var(--pty-borda); background: #20242a; color: var(--pty-texto); box-shadow: 0 3px 0 #000;
+}
+.pty-btn-sec2:active { transform: translateY(2px); box-shadow: 0 1px 0 #000; }
+.pty-btn-sec2.pty-btn-sair { color: #ff8fa3; }
+
+/* Provador ("Monte sua coruja") */
+.pty-cena-provador { max-height: 52vh; }
+.pty-cena-provador canvas { width: 100%; height: auto; margin-top: -12%; }
+.pty-visual-saldo {
+  position: absolute; right: 10px; top: 10px; z-index: 2; line-height: 1.2;
+  font-family: var(--font-h); font-weight: 800; color: #ffd23f; font-size: 14px; background: rgba(0,0,0,.65); padding: 5px 10px; border-radius: 999px;
+}
+.pty-visual-painel { width: 100%; max-width: 380px; padding: 0 14px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: -26px; position: relative; z-index: 2; }
+.pty-visual-abas { display: grid; grid-template-columns: 1fr 1fr; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--pty-borda); }
+.pty-visual-aba { padding: 10px; cursor: pointer; border: none; background: #0b0d10; color: var(--pty-mudo); font-weight: 800; font-size: 13px; }
+.pty-visual-aba.pty-visual-aba-on { background: var(--pty-amarelo); color: #111; }
+.pty-visual-grade { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; width: 100%; }
 .pty-visual-item {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 3px 6px;
   border-radius: 12px; cursor: pointer; border: 1px solid var(--pty-borda); background: #15181c; color: var(--pty-texto);
   font-size: 10px; font-weight: 700; line-height: 1.15; text-align: center;
 }
-.pty-visual-item img { width: 46px; height: 46px; object-fit: contain; }
+.pty-visual-item img { width: 56px; height: 56px; object-fit: contain; }
 .pty-visual-item b { font-size: 10px; color: #ffd23f; }
 .pty-visual-item.pty-visual-on { border-color: var(--pty-verde); box-shadow: 0 0 0 1px var(--pty-verde) inset; }
 .pty-visual-item.pty-visual-on b { color: var(--pty-verde); }
 .pty-visual-item.pty-visual-sel { border-color: var(--pty-amarelo); box-shadow: 0 0 0 2px var(--pty-amarelo) inset; }
-.pty-visual-item.pty-visual-bloq img, .pty-visual-item.pty-visual-bloq .pty-visual-cor { filter: saturate(.75) brightness(.8); }
-.pty-visual-cor { display: block; width: 38px; height: 38px; border-radius: 50%; margin: 4px 0; box-shadow: inset 0 -4px 0 rgba(0,0,0,.25), 0 0 0 2px rgba(255,255,255,.12); }
-.pty-visual-nada { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; font-style: normal; font-size: 24px; color: var(--pty-mudo); }
-.pty-visual-vazio { grid-column: 1 / -1; padding: 18px 10px; text-align: center; color: var(--pty-mudo); font-size: 13px; border: 1px dashed var(--pty-borda); border-radius: 12px; }
-.pty-visual-acao { min-height: 8px; width: 100%; display: flex; justify-content: center; }
+.pty-visual-item.pty-visual-breve { opacity: .45; cursor: default; }
+.pty-visual-item b.pty-breve { color: var(--pty-mudo); }
+.pty-visual-cor { display: block; width: 40px; height: 40px; border-radius: 50%; margin: 4px 0; box-shadow: inset 0 -4px 0 rgba(0,0,0,.25), 0 0 0 2px rgba(255,255,255,.12); }
+.pty-visual-nada { display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; font-style: normal; font-size: 26px; color: var(--pty-mudo); }
+.pty-visual-acao { min-height: 0; width: 100%; display: flex; justify-content: center; }
 .pty-btn-comprar { background: #ffd23f; }
 .pty-visual-aviso { color: #ff8fa3; font-size: 13px; font-weight: 700; }
+
+/* Pódio */
+.pty-cena-podio { max-width: 420px; }
+#pty-campeao .pty-titulo { margin-top: -30px; position: relative; z-index: 2; padding: 0 14px; }
+#pty-campeao #pty-campeao-podio, #pty-campeao .pty-btn, #pty-campeao .pty-link, #pty-campeao .pty-desc, #pty-campeao .pty-campeao-moedas { margin-left: 14px; margin-right: 14px; }

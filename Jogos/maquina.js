@@ -81,12 +81,6 @@
     pistao: 'pistao.webp',          // bloco do pistão que desce pelo túnel (O Túnel)
     mina: 'mina.webp',              // ladrilho com a mina explodida (Campo Minado)
     pisoMina: 'piso-mina.webp',     // ladrilho do Campo Minado
-    // "Monte sua coruja": folhas 3×3 dos acessórios (ordem em ACESS_Q).
-    // Vazio = desenho em código. Pedido em claude/party-maquina-fase3.md.
-    // Peças normalizadas aqui: chapéu com 78% da largura da célula e a base
-    // em 88%; rosto com os óculos em 78% da largura, no meio; pescoço com o
-    // topo da peça em 27% (ver _acessorio).
-    chapeus: 'chapeus.webp', rostos: 'rostos.webp', pescocos: 'pescocos.webp',
     // Ervilhas: coruja sentada à mesa em 3/4 olhando pra direita, cortada na
     // barriga (base do corte a 94% da célula). 0 calma · 1 piscando ·
     // 2 espetando · 3 garfo com ervilhas · 4 comendo · 5 mastigando ·
@@ -96,7 +90,9 @@
   // Sons gravados (ElevenLabs): nome -> quantas versões (nome-1.mp3 ...).
   var SFX_ARQ = {
     serra: 1, clank: 1, raspao: 1, alerta: 1, morte: 1, prensa: 1, passo: 1,
-    erro: 1, sirene: 1, queda: 1, fogo: 1, acerto: 1, moeda: 1, vitoria: 1
+    erro: 1, sirene: 1, queda: 1, fogo: 1, acerto: 1, moeda: 1, vitoria: 1,
+    // fase 2/3: Empurra-Empurra, Campo Minado, Puff e Ervilhas
+    investida: 1, explosao: 1, tosse: 1, mastigar: 1
   };
 
   var _pararAtual = null;
@@ -188,7 +184,11 @@
     queda:   function (t) { _tom(t, 'sine', 600, 80, 0.7, 0.2); },
     fogo:    function (t) { _sopro(t, 0.45, 1600, 300, 0.35); _tom(t, 'sine', 120, 60, 0.3, 0.2); },
     clank:   function (t) { _tom(t, 'square', 180, 120, 0.12, 0.18); _sopro(t, 0.08, 3600, 1800, 0.18); },
-    vitoria: function (t) { [523, 659, 784, 1047].forEach(function (f, i) { _tom(t + i * 0.09, 'triangle', f, f, 0.18, 0.18); }); }
+    vitoria: function (t) { [523, 659, 784, 1047].forEach(function (f, i) { _tom(t + i * 0.09, 'triangle', f, f, 0.18, 0.18); }); },
+    investida: function (t) { _sopro(t, 0.3, 900, 3000, 0.3); },
+    explosao: function (t) { _tom(t, 'sine', 120, 35, 0.6, 0.6); _sopro(t, 0.6, 2500, 200, 0.5); },
+    tosse:   function (t) { _sopro(t, 0.12, 1400, 600, 0.35); _sopro(t + 0.2, 0.12, 1300, 500, 0.3); },
+    mastigar: function (t) { _sopro(t, 0.05, 3000, 2000, 0.15); _sopro(t + 0.1, 0.05, 2800, 1800, 0.15); }
   };
   function _som(nome, vol) {
     if (!_somLigado()) return;
@@ -231,12 +231,12 @@
   // Desenha o quadro q de uma folha da tabela ARTES com centro (x, y) e
   // largura w (altura pela proporção da célula). Devolve false sem a arte.
   function _quadroArte(ctx, chave, q, cols, linhas, x, y, w, cor, alpha) {
+    if (cor && typeof cor === 'object') chave = _folhaDaSkin(chave, cor);
     var img = _arte(chave);
     if (!img) return false;
     var c = _recorte(chave, img, q, cols, w * _pxPorUnidade, cor, linhas), h = w * c.height / c.width;
     if (alpha != null) ctx.globalAlpha = alpha;
     ctx.drawImage(c, x - w / 2, y - h / 2, w, h);
-    if (cor && typeof cor === 'object') _vestir(ctx, chave, img, q, cols, linhas, x, y, w, h, cor, false);
     if (alpha != null) ctx.globalAlpha = 1;
     return true;
   }
@@ -244,8 +244,8 @@
   // quadrada (a Chefe é 520×370) sai com a mesma proporção: largura px.
   function _recorte(chave, img, q, cols, px, cor, linhas) {
     px = Math.max(8, Math.ceil(px / 8) * 8);
-    // cor: texto = tinta da cor do jogador; objeto = visual da coruja (só a
-    // cor da pena entra aqui, os acessórios vão por cima em _vestir).
+    // cor: texto = tinta da cor do jogador; objeto = visual da coruja (a
+    // roupa já veio na folha da skin — ver _folhaDaSkin — e aqui entra a cor).
     var vis = cor && typeof cor === 'object' ? cor : null;
     var k = chave + '|' + q + '|' + px + '|' + (vis ? 'v' + vis.cor : (cor || ''));
     var c = _recortes[k];
@@ -272,14 +272,31 @@
 
 
   /* ── Visual da coruja ("Monte sua coruja") ───────────────────────
-     Cada jogador escolhe cor da pena, chapéu, rosto e pescoço (itens da
-     Loja, slots pty_*). Vai pra sala como texto "cor|chapeu|rosto|pescoco"
-     e cada celular desenha os outros com o visual deles.
-     - COR: troca só o tom das penas cinza-azuladas (barriga creme, olhos,
-       bico amarelo do capacete e o neon das asas ficam como estão).
-     - ACESSÓRIOS: presos na cabeça/pescoço de cada quadro (âncoras
-       medidas na própria arte, ver _ancora). A arte vem das folhas 3×3
-       da tabela ARTES (chapeus/rostos/pescocos, ordem em ACESS_Q). */
+     Cada jogador escolhe a COR da pena e uma SKIN (roupa completa). Vai
+     pra sala como texto "cor|skin" e cada celular desenha os outros assim.
+     - SKIN: é uma folha inteira redesenhada pelo Gemini com a coruja já
+       vestida (mesmas poses e geometria da folha base) — nada de peça
+       colada por cima. Uma folha por base: coruja (minigames), puff e
+       mesa. Se a skin ainda não tem a folha de uma base, aquela base usa
+       a coruja sem roupa. Arquivos: /Jogos/assets/maquina/skins/<skin>-<base>.webp
+       e a lista do que existe em SKINS (o Claude acrescenta quando chega).
+     - COR: troca só o tom das penas cinza-azuladas, em cima da arte. */
+  var SKINS = {
+    // id: [bases que já têm folha]   (bases: 'coruja', 'puff', 'mesaCoruja')
+    operaria: [], cauboi: [], pirata: [], realeza: [], bruxa: [], chef: [],
+    caipira: [], astronauta: [], heroina: [], nerd: [], detetive: [], roqueira: []
+  };
+  var SKIN_ARQ = { coruja: 'coruja', puff: 'puff', mesaCoruja: 'mesa' };
+  // Chave da folha a usar pra esta base com este visual (registra na tabela
+  // ARTES na primeira vez). Sem folha da skin, devolve a base.
+  function _folhaDaSkin(chave, vis) {
+    var sk = vis && vis.skin, lista = sk && SKINS[sk];
+    if (!lista || lista.indexOf(chave) < 0) return chave;
+    var k = 'skin:' + sk + ':' + chave;
+    if (!ARTES[k]) ARTES[k] = 'skins/' + sk + '-' + SKIN_ARQ[chave] + '.webp';
+    return _arte(k) ? k : chave;   // enquanto a da skin carrega, mostra a base
+  }
+  function _skinsProntas() { return Object.keys(SKINS).filter(function (k) { return SKINS[k].indexOf('coruja') >= 0; }); }
   var CORES_PENA = {
     classica: null,
     azul:     { h: 205, sm: 1.5, sa: 0.28, lm: 1, la: 0.02 },
@@ -296,7 +313,7 @@
   function _visParse(str) {
     if (str && typeof str === 'object') return str;
     var p = String(str || '').split('|');
-    return { cor: CORES_PENA.hasOwnProperty(p[0]) ? p[0] : 'classica', chapeu: p[1] || '', rosto: p[2] || '', pescoco: p[3] || '' };
+    return { cor: CORES_PENA.hasOwnProperty(p[0]) ? p[0] : 'classica', skin: SKINS.hasOwnProperty(p[1]) ? p[1] : '' };
   }
   function _rgb2hsl(r, g, b) {
     r /= 255; g /= 255; b /= 255;
@@ -333,83 +350,14 @@
       g.putImageData(d, 0, 0);
     } catch (e) {}
   }
-  // Âncoras de um quadro (frações da célula): topo da cabeça, base, centro
-  // da cabeça e largura do corpo. Medidas uma vez pelo alfa da arte.
-  var _ancoras = {};
-  function _ancora(chave, img, q, cols, linhas) {
-    var k = chave + '|' + q;
-    if (_ancoras[k]) return _ancoras[k];
-    var A = { topo: 0.12, base: 0.92, cx: 0.5, larg: 0.6 };
-    try {
-      var fw = img.width / cols, fh = img.height / (linhas || cols), N = 64, M = Math.round(N * fh / fw);
-      var c = document.createElement('canvas'); c.width = N; c.height = M;
-      var g = c.getContext('2d');
-      g.drawImage(img, (q % cols) * fw, Math.floor(q / cols) * fh, fw, fh, 0, 0, N, M);
-      var d = g.getImageData(0, 0, N, M).data, topo = -1, base = 0, esq = N, dir = 0;
-      for (var y = 0; y < M; y++) for (var x = 0; x < N; x++) {
-        if (d[(y * N + x) * 4 + 3] > 90) { if (topo < 0) topo = y; base = y; if (x < esq) esq = x; if (x > dir) dir = x; }
-      }
-      if (topo >= 0) {
-        // centro da cabeça: média das colunas cheias no terço de cima
-        var faixa = topo + Math.round((base - topo) * 0.32), sx = 0, n = 0;
-        for (var yy = topo; yy <= faixa; yy++) for (var xx = 0; xx < N; xx++) if (d[(yy * N + xx) * 4 + 3] > 90) { sx += xx; n++; }
-        A = { topo: topo / M, base: base / M, cx: n ? sx / n / N : 0.5, larg: (dir - esq) / N };
-      }
-    } catch (e) {}
-    _ancoras[k] = A;
-    return A;
-  }
-
-  // Onde cada parte encaixa em cada folha de coruja (frações da altura da
-  // coruja no quadro 0, a partir do topo das orelhas; cab = largura da
-  // cabeça em relação à largura do corpo).
-  var ENCAIXE = {
-    coruja: { topo: 0.1, olhos: 0.235, pescoco: 0.41, cab: 0.95 },
-    puff: { topo: 0.08, olhos: 0.21, pescoco: 0.36, cab: 0.92 },
-    mesaCoruja: { topo: 0.08, olhos: 0.28, pescoco: 0.5, cab: 0.72, rx: 0.03 }
-  };
-  // Ordem das células nas folhas 3×3 de arte (chapeus/rostos/pescocos).
-  var ACESS_Q = {
-    chapeu: ['capacete', 'cartola', 'bone', 'coroa', 'festa', 'palha', 'gorro', 'bruxa', 'cowboy'],
-    rosto: ['oculos', 'escuros', 'monoculo', 'tapa', 'bigode', 'mascara', 'coracao', 'estrela', 'nerd'],
-    pescoco: ['borboleta', 'gravata', 'cachecol', 'colar', 'lenco', 'medalha', 'sino', 'gola', 'corrente']
-  };
-  var ACESS_ARTE = { chapeu: 'chapeus', rosto: 'rostos', pescoco: 'pescocos' };
-  // Só arte gravada (sem desenho em código): enquanto a folha não existe,
-  // a peça não aparece — e a tela "Monte sua coruja" nem oferece.
-  // (x, y) = ponto de encaixe; cab = largura da cabeça. As folhas são
-  // normalizadas (ver ARTES): daqui sai o tamanho e o centro da célula.
-  function _acessorio(c, tipo, id, x, y, cab) {
-    var q = ACESS_Q[tipo].indexOf(id);
-    if (q < 0) return;
-    var wc, cy;
-    if (tipo === 'chapeu') { wc = cab * 1.08 / 0.78; cy = y - (0.883 - 0.5) * wc; }
-    else if (tipo === 'rosto') { wc = cab * 0.92 / 0.78; cy = y + (id === 'bigode' ? cab * 0.4 : 0); }
-    else { wc = cab * 0.86 / 0.742; cy = y + (0.5 - 0.273) * wc; }
-    _quadroArte(c, ACESS_ARTE[tipo], q, 3, 3, x, cy, wc);
-  }
-  function _acessorioDisponivel(tipo) { return !!_arte(ACESS_ARTE[tipo]); }
-  // Acessórios por cima de um quadro já desenhado em (x, y) com largura w e
-  // altura h (centro do quadro). costas: só o chapéu aparece.
-  function _vestir(c, chave, img, q, cols, linhas, x, y, w, h, vis, costas) {
-    if (!vis || !(vis.chapeu || vis.rosto || vis.pescoco)) return;
-    // posição pelo quadro; tamanho pelo quadro 0 (em pé, asas fechadas) —
-    // asas abertas não podem aumentar o chapéu
-    var A = _ancora(chave, img, q, cols, linhas), A0 = _ancora(chave, img, 0, cols, linhas);
-    var esq = x - w / 2, topo = y - h / 2, P = ENCAIXE[chave] || ENCAIXE.coruja;
-    var hx = esq + A.cx * w + (P.dx || 0) * w, ht = topo + A.topo * h, alt = (A0.base - A0.topo) * h, cab = A0.larg * w * P.cab;
-    if (!costas && vis.pescoco) _acessorio(c, 'pescoco', vis.pescoco, hx, ht + alt * P.pescoco, cab);
-    if (!costas && vis.rosto) _acessorio(c, 'rosto', vis.rosto, hx + (P.rx || 0) * w, ht + alt * P.olhos, cab);
-    if (vis.chapeu) _acessorio(c, 'chapeu', vis.chapeu, hx, ht + alt * P.topo, cab);
-  }
-
   /* ── Desenhos de base (coruja, metal, listras) ───────────────── */
   // Coruja chibi desenhada (cinza-azulada, barriga creme, olhos âmbar,
   // linhas de neon vermelho nas asas — mesma cara da Master Reference).
   // Em unidades do mundo: (x, y) = centro do corpo, r = raio do corpo.
   function _coruja(ctx, x, y, r, o) {
     o = o || {};
-    var sheet = o.desenhada ? null : _arte('coruja');
+    var visO = o.vis ? _visParse(o.vis) : null, chaveF = visO ? _folhaDaSkin('coruja', visO) : 'coruja';
+    var sheet = o.desenhada ? null : _arte(chaveF);
     if (sheet) {
       var q = o.morta ? 8 : o.costas ? (o.passo ? 7 : 6) : o.olhos === 'x' ? 4 : o.olhos === 'medo' ? 3 : o.vitoria ? 5 : o.pisca ? 1 : (o.asa || 0) > 0.4 ? 2 : 0;
       var S = 3.1;
@@ -422,9 +370,8 @@
       if (o.rot) ctx.rotate(o.rot);
       ctx.scale(o.sx || 1, o.sy || 1);
       if (o.alpha != null) ctx.globalAlpha = o.alpha;
-      var t = r * S, tinta = o.vis ? _visParse(o.vis) : o.cor;
-      ctx.drawImage(_recorte('coruja', sheet, q, 3, t * _pxPorUnidade, tinta), -t / 2, -t / 2, t, t);
-      if (o.vis && q !== 8) _vestir(ctx, 'coruja', sheet, q, 3, 3, 0, 0, t, t, tinta, !!o.costas);
+      var t = r * S, tinta = visO || o.cor;
+      ctx.drawImage(_recorte(chaveF, sheet, q, 3, t * _pxPorUnidade, tinta), -t / 2, -t / 2, t, t);
       ctx.restore();
       return;
     }
@@ -2186,7 +2133,7 @@
         botoes.addEventListener('pointerdown', function (e) {
           e.preventDefault(); _audioDestravar();
           if (M.estado !== 'jogando') return;
-          if (_investir(eu, joy.x, joy.y)) { M.som('raspao', 0.6); M.vibrar(20); eu.asa = 1; }
+          if (_investir(eu, joy.x, joy.y)) { M.som('investida', 0.8); M.vibrar(20); eu.asa = 1; }
         });
         M.dica('Arraste pra andar · Empurrar joga os outros longe', 3000);
       },
@@ -2272,7 +2219,7 @@
               if (o.recarga <= 0) {
                 lista.forEach(function (q) {
                   var d = _dist(q.x, q.y, o.x, o.y);
-                  if (d < 15 && d > 2 && B.r() < raiva) { if (_investir(o, q.x - o.x, q.y - o.y) && q.eu) M.som('raspao', 0.4); }
+                  if (d < 15 && d > 2 && B.r() < raiva) { if (_investir(o, q.x - o.x, q.y - o.y) && q.eu) M.som('investida', 0.45); }
                 });
               }
             }
@@ -2376,7 +2323,7 @@
       toqueFim: function (p) { if (dedo && dedo.id === p.id) { dedo = null; joy.x = joy.y = 0; } },
       tecla: function (k, desce) {
         if (k.indexOf('Arrow') === 0) { teclas[k] = desce; return true; }
-        if (k === ' ' && desce && M.estado === 'jogando') { if (_investir(eu, joy.x, joy.y)) M.som('raspao', 0.6); return true; }
+        if (k === ' ' && desce && M.estado === 'jogando') { if (_investir(eu, joy.x, joy.y)) M.som('investida', 0.8); return true; }
         return false;
       }
     };
@@ -2504,7 +2451,7 @@
           var res = _pisar(eu, true);
           if (res === 'mina') {
             M.penas(eu.x, eu.y); M.particulas(eu.x, eu.y, 16, '#ff8a00', 'faisca');
-            M.som('prensa'); M.tremer(4); eu.morto = true;
+            M.som('explosao'); M.tremer(4); eu.morto = true;
             M.morrer('BOOM! 💣', (LINS - 1 - eu.melhor) + ' fileiras');
             return;
           }
@@ -2525,7 +2472,7 @@
       rede: function () { return eu.c + ';' + eu.l; },
       rivalCaiu: function (g) {
         var c = Math.round(g.n[0]), l = Math.round(g.n[1]);
-        if (_ok(c, l)) { visto[l][c] = true; boom.push({ c: c, l: l, t: 0 }); M.particulas(_cx(c), _cy(l), 12, '#ff8a00', 'faisca'); }
+        if (_ok(c, l)) { visto[l][c] = true; boom.push({ c: c, l: l, t: 0 }); M.particulas(_cx(c), _cy(l), 12, '#ff8a00', 'faisca'); M.som('explosao', 0.45); }
         M.texto(_cx(c), _cy(l) - 7, g.nome + ' explodiu!', g.cor, 3.2);
       },
       // Robô: conhece o mapa (é robô), mas a cada passo pode se distrair e
@@ -2893,7 +2840,7 @@
         o.t += dt;
         if (o.t > _lim(o.n)) {
           o.segura = false; o.tosse = TOSSE_S; o.n++;
-          if (souEu) { M.som('erro'); M.vibrar([40, 60, 40]); M.tremer(1.4); M.flash('rgba(255,90,90,.22)'); }
+          if (souEu) { M.som('tosse'); M.vibrar([40, 60, 40]); M.tremer(1.4); M.flash('rgba(255,90,90,.22)'); }
         }
       }
     }
@@ -3203,7 +3150,7 @@
         if (r === 'pego') _pego();
         else if (r === 'comeu') {
           var L = LUG[M.slot], n = eu.ultimaMordida;
-          M.pontos(100 * n); M.texto(L.x, L.y - 14, '+' + (100 * n), '#ffd166', 3.6 + n * 0.3); M.som('moeda', 0.35);
+          M.pontos(100 * n); M.texto(L.x, L.y - 14, '+' + (100 * n), '#ffd166', 3.6 + n * 0.3); M.som('mastigar', 0.7);
           eu.mastiga = 0.35;
           if (eu.comidas >= TOTAL) {
             var bonus = Math.round(Math.max(0, 40 - M.t) * 25);
@@ -3310,7 +3257,7 @@
   }
 
   /* ── Coruja fora dos minigames (lobby, "Monte sua coruja", pódio) ── */
-  var ARTES_VISUAL = ['coruja', 'chapeus', 'rostos', 'pescocos'];
+  var ARTES_VISUAL = ['coruja'];
   // Chama cb quando a arte da coruja e dos acessórios chegou (ou falhou).
   function carregarVisual(cb) {
     var feito = false, t0 = Date.now();
@@ -3344,6 +3291,8 @@
     var k = String(visual || '') + '@' + px;
     if (_avatares[k]) return _avatares[k];
     if (!_arte('coruja')) return null;
+    var vv = _visParse(visual);
+    if (vv.skin && _folhaDaSkin('coruja', vv) === 'coruja' && SKINS[vv.skin] && SKINS[vv.skin].indexOf('coruja') >= 0) return null; // skin ainda carregando
     var c = document.createElement('canvas'); c.width = c.height = px;
     desenharCoruja(c, visual, { escala: 1.05, y: px * 0.56 });
     try { _avatares[k] = c.toDataURL('image/png'); } catch (e) { return null; }
@@ -3354,6 +3303,6 @@
     render: render, parar: parar, jogos: function () { return Object.keys(JOGOS); },
     carregarVisual: carregarVisual, desenharCoruja: desenharCoruja, avatar: avatar,
     // listas pra montar a tela "Monte sua coruja"
-    visual: { cores: Object.keys(CORES_PENA), acessorios: ACESS_Q, temArte: _acessorioDisponivel }
+    visual: { cores: Object.keys(CORES_PENA), skins: _skinsProntas }
   };
 })();

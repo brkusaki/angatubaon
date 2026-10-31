@@ -212,13 +212,14 @@
   }
 
   /* ── Visual da coruja ("Monte sua coruja") ───────────────────────
-     Cor e acessórios são itens da Loja da Coruja (slots pty_*, hub.js).
-     Vão pra sala como texto "cor|chapeu|rosto|pescoco" em
-     jogadores/{uid}/visual, e cada celular desenha os outros assim. */
-  var SLOTS_VISUAL = ['pty_cor', 'pty_chapeu', 'pty_rosto', 'pty_pescoco'];
+     Cor da pena e skin (roupa completa) são itens da Loja da Coruja
+     (slots pty_cor / pty_skin, hub.js). Vão pra sala como texto
+     "cor|skin" em jogadores/{uid}/visual, e cada celular desenha os
+     outros assim (ver SKINS em Jogos/maquina.js). */
+  var SLOTS_VISUAL = ['pty_cor', 'pty_skin'];
   function _meuVisual() {
     var G = window.AngatubaGames;
-    if (!G || typeof G.equipado !== 'function' || typeof G.lojaCatalogo !== 'function') return 'classica|||';
+    if (!G || typeof G.equipado !== 'function' || typeof G.lojaCatalogo !== 'function') return 'classica|';
     var cat = G.lojaCatalogo() || [];
     return SLOTS_VISUAL.map(function (slot) {
       var id = G.equipado(slot), it = null;
@@ -284,13 +285,12 @@
       return;
     }
   }
-  // Robô ganha um visual sorteado (cor + o que a arte já tiver).
+  // Robô ganha um visual sorteado (cor + uma skin que já tenha arte).
   function _visualSorteado() {
     var MQ = window.MaquinaGame, V = MQ && MQ.visual, pega = function (l) { return l[Math.floor(Math.random() * l.length)]; };
-    if (!V) return pega(['azul', 'vermelha', 'verde', 'roxa', 'laranja', 'rosa']) + '|||';
-    var cor = pega(V.cores.filter(function (c) { return c !== 'classica'; }));
-    var parte = function (tipo) { return V.temArte(tipo) && Math.random() < 0.75 ? pega(V.acessorios[tipo]) : ''; };
-    return [cor, parte('chapeu'), parte('rosto'), parte('pescoco')].join('|');
+    if (!V) return pega(['azul', 'vermelha', 'verde', 'roxa', 'laranja', 'rosa']) + '|';
+    var skins = V.skins();
+    return pega(V.cores.filter(function (c) { return c !== 'classica'; })) + '|' + (skins.length && Math.random() < 0.8 ? pega(skins) : '');
   }
   function removerRobo(uid) {
     if (!_souAnfitriao || !_salaRef || !_ehBot(uid)) return;
@@ -1232,15 +1232,68 @@
     }).catch(function () {});
   }
   function _ptyRedesenharCorujas() {
-    var MQ = window.MaquinaGame;
-    if (!MQ || !_maqPronta) return;
-    MQ.desenharCoruja(_q('pty-menu-coruja'), _meuVisual(), { pose: 0, escala: 1.02 });
+    _cenaMenu();
     var sala = window.AngatubaParty.estado();
     if (sala) window.AngatubaParty._reemitir && window.AngatubaParty._reemitir();
+  }
+
+  /* ── Cenários (arte do Gemini) com as corujas desenhadas por cima ──
+     palco-lobby.webp (1024×459): 4 plataformas — centros e altura do
+     piso medidos na arte. podio.webp (1024×1024): topo dos 3 pedestais.
+     provador.webp (765×1024): chão no meio. */
+  var CENAS = { palco: '/Jogos/assets/maquina/palco-lobby.webp', podio: '/Jogos/assets/maquina/podio.webp', provador: '/Jogos/assets/maquina/provador.webp' };
+  var PALCO_X = [150, 392, 632, 872], PALCO_PE = 384;
+  var _cenaImg = {};
+  function _cena(nome, cb) {
+    var r = _cenaImg[nome];
+    if (!r) {
+      r = _cenaImg[nome] = { img: new Image(), ok: false, cbs: [] };
+      r.img.onload = function () { r.ok = true; r.cbs.forEach(function (f) { f(); }); r.cbs = []; };
+      r.img.src = CENAS[nome];
+    }
+    if (r.ok) return r.img;
+    if (cb && r.cbs.indexOf(cb) < 0) r.cbs.push(cb);
+    return null;
+  }
+  // Coruja em pé com os pés em (x, pe), altura alt (em px do canvas).
+  function _corujaEmPe(cv, visual, x, pe, alt, pose) {
+    var MQ = window.MaquinaGame;
+    if (!MQ || !_maqPronta) return;
+    // na folha, a coruja ocupa ~65% da altura da célula e os pés ficam a 89%
+    var cel = alt / 0.65;
+    MQ.desenharCoruja(cv, visual, { manter: true, x: x, y: pe - cel * 0.39, escala: cel / Math.min(cv.width, cv.height), pose: pose });
+  }
+  function _luz(ctx, x, topo, base, larg, cor) {
+    var g = ctx.createLinearGradient(0, topo, 0, base);
+    g.addColorStop(0, 'rgba(' + cor + ',0)'); g.addColorStop(1, 'rgba(' + cor + ',.32)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x - 26, topo); ctx.lineTo(x + 26, topo); ctx.lineTo(x + larg, base); ctx.lineTo(x - larg, base); ctx.closePath(); ctx.fill();
+  }
+  function _rotuloCena(ctx, txt, x, y, cor, tam) {
+    ctx.font = '800 ' + (tam || 24) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.strokeText(txt, x, y);
+    ctx.fillStyle = cor; ctx.fillText(txt, x, y);
+  }
+  // Menu: a sua coruja no meio do palco, na frente do olho da Máquina.
+  var _menuAnim = null;
+  function _cenaMenu() {
+    var cv = _q('pty-menu-palco');
+    if (!cv) return;
+    if (_menuAnim) { clearTimeout(_menuAnim); _menuAnim = null; }
+    // recorte do meio do palco (o olho da Máquina) cobrindo a altura toda
+    var ctx = cv.getContext('2d'), img = _cena('palco', _cenaMenu), W = cv.width, H = cv.height, k = H / 459;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
+    if (img) ctx.drawImage(img, (W - 1024 * k) / 2, 0, 1024 * k, H);
+    _luz(ctx, W / 2, 0, H * 0.93, 150, '255,230,170');
+    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(W / 2, H * 0.905, 120, 22, 0, 0, 6.283); ctx.fill();
+    var t = Date.now() / 1000;
+    _corujaEmPe(cv, _meuVisual(), W / 2, H * 0.91, H * 0.5, (t % 3.6) < 0.14 ? 1 : (t % 9) > 7.8 ? 5 : 0);
+    var menu = _q('pty-menu');
+    if (menu && menu.style.display !== 'none') _menuAnim = setTimeout(_cenaMenu, 140);
   }
   function _ptyPreparar() {
     _renderCatalogo();
     _carregarMaquina();
+    _cenaMenu();
     _erroMenu('');
     var input = _q('pty-codigo-input'); if (input) input.value = '';
     _mostrarSub('menu');
@@ -1278,6 +1331,7 @@
   }
 
   function _ptyCriarSala() {
+    _ptyTreino = false;
     var publicaCheck = _q('pty-publica-check');
     var publica = !!(publicaCheck && publicaCheck.checked);
     _erroMenu('');
@@ -1417,56 +1471,70 @@
     _contagemLobby = setInterval(tique, 1000);
   }
 
-  /* ── Palco do lobby: as corujas de todo mundo, lado a lado ─────── */
-  var _palcoAnim = null;
+  /* ── Palco do lobby: cada um na sua plataforma ───────────────────
+     Pronto = luz verde e a coruja comemorando. O anfitrião toca numa vaga
+     vazia pra chamar um robô, ou num robô pra tirar. */
+  var _palcoAnim = null, _palcoListener = false;
   function _palcoDesenhar(sala) {
-    var cv = _q('pty-palco'), MQ = window.MaquinaGame;
+    var cv = _q('pty-palco');
     if (!cv) return;
     if (_palcoAnim) { clearTimeout(_palcoAnim); _palcoAnim = null; }
-    var ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+    if (!_palcoListener) {
+      _palcoListener = true;
+      cv.addEventListener('click', function (e) {
+        var s2 = window.AngatubaParty.estado();
+        if (!s2 || s2.status !== 'lobby' || !window.AngatubaParty.souAnfitriao()) return;
+        var r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * cv.width;
+        var i = Math.max(0, Math.min(3, Math.round((x - 150) / 240)));
+        var u = Object.keys(s2.jogadores || {}).sort()[i];
+        if (!u) { if (_modoDaSala(s2).tipo === 'pool') window.AngatubaParty.adicionarRobo(); }
+        else if (_ehBot(u)) window.AngatubaParty.removerRobo(u);
+      });
+    }
+    var ctx = cv.getContext('2d'), W = cv.width, H = cv.height, img = _cena('palco', function () { var s3 = window.AngatubaParty.estado(); if (s3) _palcoDesenhar(s3); });
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
-    var jog = sala.jogadores || {}, uids = Object.keys(jog).sort(), larg = W / 4, t = Date.now();
-    // chão e luzes
-    var g = ctx.createLinearGradient(0, H * 0.55, 0, H);
-    g.addColorStop(0, 'rgba(245,197,24,0)'); g.addColorStop(1, 'rgba(245,197,24,.08)');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    if (img) ctx.drawImage(img, 0, 0, W, H);
+    var jog = sala.jogadores || {}, uids = Object.keys(jog).sort(), t = Date.now() / 1000, souAnf = window.AngatubaParty.souAnfitriao();
+    var podeRobo = souAnf && _modoDaSala(sala).tipo === 'pool';
     for (var i = 0; i < 4; i++) {
-      var u = uids[i], cx = larg * i + larg / 2, base = H - 74;
-      // plataforma
-      ctx.fillStyle = '#0b0d10'; ctx.beginPath(); ctx.ellipse(cx, base + 8, larg * 0.36, 16, 0, 0, 6.283); ctx.fill();
-      ctx.fillStyle = u ? '#2a2f37' : '#16191d'; ctx.beginPath(); ctx.ellipse(cx, base, larg * 0.36, 14, 0, 0, 6.283); ctx.fill();
-      ctx.strokeStyle = u ? (jog[u].pronto ? '#4ade80' : _ptyCor(sala, u)) : 'rgba(255,255,255,.12)';
-      ctx.lineWidth = 3; ctx.setLineDash(u ? [] : [8, 6]); ctx.stroke(); ctx.setLineDash([]);
+      var u = uids[i], x = PALCO_X[i];
       if (!u) {
-        ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('vaga', cx, base - 60);
+        _rotuloCena(ctx, podeRobo ? '+ 🤖' : 'vaga', x, PALCO_PE - 80, 'rgba(255,255,255,.55)', 40);
+        if (podeRobo) _rotuloCena(ctx, 'chamar robô', x, PALCO_PE + 40, 'rgba(255,255,255,.65)', 26);
         continue;
       }
       var pronto = !!jog[u].pronto || _ehBot(u);
-      // luz de cima quando pronto
-      if (pronto) {
-        var luz = ctx.createLinearGradient(0, 0, 0, base);
-        luz.addColorStop(0, 'rgba(74,222,128,0)'); luz.addColorStop(1, 'rgba(74,222,128,.22)');
-        ctx.fillStyle = luz; ctx.beginPath(); ctx.moveTo(cx - 30, 0); ctx.lineTo(cx + 30, 0); ctx.lineTo(cx + larg * 0.36, base); ctx.lineTo(cx - larg * 0.36, base); ctx.closePath(); ctx.fill();
-      }
-      if (MQ && _maqPronta) {
-        var pisca = ((t / 1000 + i * 0.7) % 3.3) < 0.14;
-        MQ.desenharCoruja(cv, jog[u].visual || 'classica|||', { manter: true, x: cx, y: base - 92, escala: 0.52, pose: pronto ? 5 : (pisca ? 1 : 0) });
-      }
-      // nome
-      ctx.font = '800 24px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      var nome = (_ehBot(u) ? '🤖 ' : '') + _nomeCurto(u, jog[u].nome);
-      ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.strokeText(nome, cx, base + 38);
-      ctx.fillStyle = _ptyCor(sala, u); ctx.fillText(nome, cx, base + 38);
-      ctx.font = '800 17px system-ui, sans-serif';
-      ctx.fillStyle = pronto ? '#4ade80' : '#8b95a1';
-      ctx.fillText(pronto ? 'PRONTO' : 'esperando', cx, base + 62);
+      if (pronto) _luz(ctx, x, 0, PALCO_PE + 6, 105, '74,222,128');
+      var pisca = ((t + i * 0.7) % 3.3) < 0.14;
+      _corujaEmPe(ctx.canvas, jog[u].visual || 'classica|', x, PALCO_PE + 6, 175, pronto ? 5 : (pisca ? 1 : 0));
+      _rotuloCena(ctx, (_ehBot(u) ? '🤖 ' : '') + _nomeCurto(u, jog[u].nome), x, PALCO_PE + 36, _ptyCor(sala, u), 32);
+      _rotuloCena(ctx, pronto ? 'PRONTO' : 'esperando…', x, PALCO_PE + 64, pronto ? '#4ade80' : '#cbd5e1', 24);
+      if (_ehBot(u) && souAnf) _rotuloCena(ctx, '✕', x + 62, PALCO_PE - 178, '#ff8fa3', 34);
     }
-    // anima o piscar enquanto o lobby está na tela
     if (sala.status === 'lobby') _palcoAnim = setTimeout(function () {
       var s2 = window.AngatubaParty.estado();
       if (s2 && s2.status === 'lobby' && _q('pty-lobby') && _q('pty-lobby').style.display !== 'none') _palcoDesenhar(s2);
     }, 140);
+  }
+
+  // Pódio do fim da Party: 1º no meio, 2º à esquerda, 3º à direita.
+  var PODIO = [{ x: 512, pe: 592, alt: 270 }, { x: 270, pe: 676, alt: 240 }, { x: 756, pe: 738, alt: 230 }];
+  var _podioAnim = null;
+  function _cenaPodio(sala, geral) {
+    var cv = _q('pty-podio-cena');
+    if (!cv) return;
+    if (_podioAnim) { clearTimeout(_podioAnim); _podioAnim = null; }
+    var ctx = cv.getContext('2d'), img = _cena('podio', function () { _cenaPodio(sala, geral); });
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+    if (img) ctx.drawImage(img, 0, 0, cv.width, cv.height);
+    var jog = sala.jogadores || {}, t = Date.now() / 1000;
+    geral.slice(0, 3).forEach(function (j, i) {
+      var P = PODIO[i];
+      _corujaEmPe(cv, (jog[j.uid] && jog[j.uid].visual) || 'classica|', P.x, P.pe + 6, P.alt, i === 0 ? ((t % 1.2) < 0.6 ? 5 : 2) : ((t + i) % 3.3) < 0.14 ? 1 : 0);
+      _rotuloCena(ctx, (_ehBot(j.uid) ? '🤖 ' : '') + _nomeCurto(j.uid, j.nome), P.x, P.pe + 70, _ptyCor(sala, j.uid), 34);
+    });
+    var tela = _q('pty-campeao');
+    if (tela && tela.style.display !== 'none') _podioAnim = setTimeout(function () { _cenaPodio(sala, geral); }, 160);
   }
 
   /* ── "Treinar com robôs": sala privada + 3 robôs ─────────────────── */
@@ -1474,6 +1542,7 @@
     _erroMenu('');
     var chk = _q('pty-publica-check'); if (chk) chk.checked = false;
     window.AngatubaParty.criarSala(false).then(function () {
+      _ptyTreino = true;
       _rendarLobby();
       // um robô por vez, cada um depois que a sala confirmou o anterior
       var tentativas = 0;
@@ -1493,10 +1562,8 @@
      Acessório só aparece quando a arte dele existe (MaquinaGame.visual). */
   var _visualAberto = false, _visualVolta = 'menu', _visualAba = 'pty_cor', _visualSel = null, _visualAnim = null, _visualListener = false;
   var ABAS_VISUAL = [
-    { slot: 'pty_cor', nome: 'Cor', tipo: null },
-    { slot: 'pty_chapeu', nome: 'Chapéu', tipo: 'chapeu' },
-    { slot: 'pty_rosto', nome: 'Rosto', tipo: 'rosto' },
-    { slot: 'pty_pescoco', nome: 'Pescoço', tipo: 'pescoco' }
+    { slot: 'pty_cor', nome: 'Cor da pena' },
+    { slot: 'pty_skin', nome: 'Skins' }
   ];
   function _catalogoParty() {
     var G = window.AngatubaGames;
@@ -1525,17 +1592,21 @@
     _visualAberto = false; _visualSel = null;
     if (_visualAnim) { clearTimeout(_visualAnim); _visualAnim = null; }
     window.AngatubaParty.atualizarVisual();
-    _ptyRedesenharCorujas();
     if (_visualVolta === 'lobby' && window.AngatubaParty.estado()) { _mostrarSub('lobby'); window.AngatubaParty._reemitir(); }
-    else _mostrarSub('menu');
+    else { _mostrarSub('menu'); _cenaMenu(); }
   }
   window._ptyFecharVisual = _ptyFecharVisual;
+  // Provador: a coruja no chão, no meio da sala.
   function _visualAnimar() {
     if (!_visualAberto) return;
-    var MQ = window.MaquinaGame;
-    if (MQ && _maqPronta) {
-      var t = Date.now() / 1000, pose = (t % 4) < 0.14 ? 1 : (t % 8) > 6.6 ? 5 : 0;
-      MQ.desenharCoruja(_q('pty-visual-preview'), _visualPrevia(), { pose: pose, escala: 0.95 });
+    var cv = _q('pty-visual-preview');
+    if (cv) {
+      var ctx = cv.getContext('2d'), img = _cena('provador');
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+      if (img) ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(400, 905, 130, 26, 0, 0, 6.283); ctx.fill();
+      var t = Date.now() / 1000;
+      _corujaEmPe(cv, _visualPrevia(), 400, 915, 380, (t % 4) < 0.14 ? 1 : (t % 8) > 6.6 ? 5 : 0);
     }
     _visualAnim = setTimeout(_visualAnimar, 120);
   }
@@ -1569,25 +1640,25 @@
         _visualRender();
       });
     }
-    var temArte = function (tipo) { return !tipo || (MQ && MQ.visual && MQ.visual.temArte(tipo)); };
     abas.innerHTML = ABAS_VISUAL.map(function (a) {
       return '<button type="button" class="pty-visual-aba' + (a.slot === _visualAba ? ' pty-visual-aba-on' : '') + '" data-aba="' + a.slot + '">' + a.nome + '</button>';
     }).join('');
-    var aba = ABAS_VISUAL.filter(function (a) { return a.slot === _visualAba; })[0] || ABAS_VISUAL[0];
-    if (!temArte(aba.tipo)) {
-      grade.innerHTML = '<div class="pty-visual-vazio">Em breve: os ' + aba.nome.toLowerCase() + (aba.nome.slice(-1) === 'u' ? 's' : '') + ' chegam com a arte nova da Corujinha.</div>';
-      if (acao) acao.innerHTML = '';
-      return;
-    }
-    var itens = _catalogoParty().filter(function (it) { return it.slot === aba.slot; });
-    var equip = G && typeof G.equipado === 'function' ? G.equipado(aba.slot) : null;
+    var prontas = MQ && MQ.visual ? MQ.visual.skins() : [];
+    var itens = _catalogoParty().filter(function (it) { return it.slot === _visualAba; });
+    var equip = G && typeof G.equipado === 'function' ? G.equipado(_visualAba) : null;
+    var corEu = _meuVisual().split('|')[0];
     grade.innerHTML = itens.map(function (it) {
       var tem = G && G.temItem(it.id), on = it.id === equip, sel = _visualSel && _visualSel.id === it.id;
-      var amostra = aba.slot === 'pty_cor'
-        ? '<i class="pty-visual-cor" style="background:' + (it.amostra || '#7189a6') + '"></i>'
-        : (MQ && _maqPronta && it.valor ? '<img src="' + (MQ.avatar(['classica', aba.tipo === 'chapeu' ? it.valor : '', aba.tipo === 'rosto' ? it.valor : '', aba.tipo === 'pescoco' ? it.valor : ''].join('|'), 72) || '') + '" alt="">' : '<i class="pty-visual-nada">∅</i>');
-      return '<button type="button" class="pty-visual-item' + (on ? ' pty-visual-on' : '') + (sel ? ' pty-visual-sel' : '') + (tem ? '' : ' pty-visual-bloq') + '" data-item="' + it.id + '">' +
-        amostra + '<span>' + _escHTML(it.nome) + '</span>' + (tem ? (on ? '<b>✔</b>' : '') : '<b>🪙 ' + it.preco + '</b>') + '</button>';
+      // skin sem arte ainda: aparece, mas "em breve"
+      var breve = _visualAba === 'pty_skin' && it.valor && prontas.indexOf(it.valor) < 0;
+      var amostra;
+      if (_visualAba === 'pty_cor') amostra = '<i class="pty-visual-cor" style="background:' + (it.amostra || '#7189a6') + '"></i>';
+      else {
+        var url = MQ && _maqPronta && !breve ? MQ.avatar(corEu + '|' + (it.valor || ''), 96) : null;
+        amostra = url ? '<img src="' + url + '" alt="">' : '<i class="pty-visual-nada">' + (breve ? '🔒' : '🦉') + '</i>';
+      }
+      return '<button type="button" class="pty-visual-item' + (on ? ' pty-visual-on' : '') + (sel ? ' pty-visual-sel' : '') + (tem ? '' : ' pty-visual-bloq') + (breve ? ' pty-visual-breve' : '') + '" data-item="' + it.id + '"' + (breve ? ' disabled' : '') + '>' +
+        amostra + '<span>' + _escHTML(it.nome) + '</span>' + (breve ? '<b class="pty-breve">em breve</b>' : tem ? (on ? '<b>✔</b>' : '') : '<b>🪙 ' + it.preco + '</b>') + '</button>';
     }).join('');
     if (acao) {
       if (_visualSel && !(G && G.temItem(_visualSel.id))) {
@@ -1679,7 +1750,7 @@
   }
 
   /* ── Renderização reativa a partir dos eventos do AngatubaParty ── */
-  var _ptyLobbyListenerOn = false;
+  var _ptyTreino = false; // a sala foi aberta pelo "Treinar com robôs"
   window.AngatubaParty.on('salaMudou', function (sala) {
     var codEl = _q('pty-lobby-codigo'); if (codEl) codEl.textContent = window.AngatubaParty.codigoSala() || '';
     var jogadores = sala.jogadores || {};
@@ -1689,30 +1760,19 @@
       var souAnf = window.AngatubaParty.souAnfitriao();
       var modoSala = _modoDaSala(sala);
       var humanos = lista.filter(function (j) { return !_ehBot(j.uid); }).length;
-      var wrap = _q('pty-lobby-jogadores');
-      if (wrap) {
-        if (!_ptyLobbyListenerOn) {
-          // Um listener só (sem onclick inline com o id interpolado).
-          wrap.addEventListener('click', function (e) {
-            var rm = e.target.closest && e.target.closest('[data-pty-tirar-robo]');
-            if (rm) { window.AngatubaParty.removerRobo(rm.getAttribute('data-pty-tirar-robo')); return; }
-            if (e.target.closest && e.target.closest('.pty-add-robo')) window.AngatubaParty.adicionarRobo();
-          });
-          _ptyLobbyListenerOn = true;
-        }
-        wrap.innerHTML = lista.map(function (j) {
-          var bot = _ehBot(j.uid);
-          return '<div class="pty-jogador-chip' + (bot ? ' pty-jogador-robo' : '') + '">' + _ptyAvatar(sala, j.uid) + _escHTML(j.nome) +
-            (j.anfitriao ? ' <span class="pty-badge-anfitriao">anfitrião</span>' : '') +
-            (bot && souAnf ? ' <button type="button" class="pty-tirar-robo" data-pty-tirar-robo="' + _escHTML(j.uid) + '" aria-label="Tirar robô">✕</button>' : '') + '</div>';
-        }).join('') +
-          (souAnf && modoSala.tipo === 'pool' && lista.length < MAX_JOGADORES
-            ? '<button type="button" class="pty-add-robo">🤖 + Adicionar robô</button>' : '');
-      }
+      // Topo: código da sala (no treino com robôs, só "TREINO") e quantos são.
+      var treino = !sala.publica && humanos === 1 && lista.length > 1 && souAnf && _ptyTreino;
+      var rot = _q('pty-sala-rotulo'), cop = _q('pty-sala-copiar'), codEl2 = _q('pty-lobby-codigo');
+      if (rot) rot.textContent = treino ? 'TREINO' : 'SALA';
+      if (codEl2) codEl2.style.display = treino ? 'none' : '';
+      if (cop) cop.style.display = treino ? 'none' : '';
       var contador = _q('pty-lobby-contador');
-      if (contador) {
-        contador.textContent = lista.length + '/4 jogadores' + (modoSala.tipo === 'pool'
-          ? ' (mínimo 2 pra começar — robô vale)' : ' (mínimo 2 pessoas)');
+      if (contador) contador.textContent = '👥 ' + lista.length + '/4';
+      var dica = _q('pty-lobby-jogadores');
+      if (dica) {
+        dica.textContent = souAnf && modoSala.tipo === 'pool'
+          ? (lista.length < MAX_JOGADORES ? 'Toque numa vaga do palco pra chamar um robô (ou no ✕ pra tirar).' : 'Toque no ✕ de um robô pra liberar a vaga.')
+          : (modoSala.tipo === 'pool' ? '' : 'Hex Arena é só entre pessoas (mínimo 2).');
       }
       _renderModos(sala, souAnf);
       // "Pronto!" de cada um; todos prontos → contagem de 5 s (igual ao
@@ -1720,7 +1780,7 @@
       var eu = jogadores[window.AngatubaParty.meuUid()] || {};
       var btnComecar = _q('pty-btn-comecar');
       if (btnComecar) {
-        btnComecar.textContent = eu.pronto ? '✔ Pronto — tocar pra cancelar' : 'Pronto!';
+        btnComecar.textContent = eu.pronto ? '✔ Pronto · cancelar' : 'Pronto!';
         btnComecar.classList.toggle('pty-btn-pronto', !!eu.pronto);
       }
       _lobbyContagem(sala);
@@ -1926,6 +1986,7 @@
     document.body.classList.remove('angatuba-party-ativo');
     _mostrarTelaJogo('party');
     _mostrarSub('campeao');
+    _cenaPodio(sala, geral);
     if (window.AngatubaGames && window.AngatubaGames.efeitos) {
       window.AngatubaGames.efeitos.confete('pty-campeao-podio');
       // Segunda leva de confete um instante depois — reforça o clima de

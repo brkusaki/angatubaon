@@ -102,6 +102,14 @@
         "rodadaIniciadaEm": {
           ".validate": "newData.val() == now && newData.parent().child('anfitriao/uid').val() == auth.uid"
         },
+        // Original/Personalizado (ver Jogos/party.js): fila = ordem sorteada
+        // dos minigames da sessão; selecao = os marcados no Personalizado.
+        "fila": {
+          ".validate": "newData.isString() && newData.val().length <= 400 && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
+        "selecao": {
+          ".validate": "newData.isString() && newData.val().length <= 400 && newData.parent().child('anfitriao/uid').val() == auth.uid"
+        },
         "jogadores": {
           "$uid": {
             // Robôs (CPU): id "bot-N", criados e apagados só pelo
@@ -115,6 +123,15 @@
             },
             "bot": {
               ".validate": "newData.val() == true && $uid.beginsWith('bot-') && newData.parent().parent().parent().child('anfitriao/uid').val() == auth.uid"
+            },
+            // "Monte sua coruja": "cor|chapeu|rosto|pescoco" (ver Jogos/party.js).
+            "visual": {
+              ".validate": "newData.isString() && newData.val().length <= 60 && (auth.uid == $uid || ($uid.beginsWith('bot-') && newData.parent().parent().parent().child('anfitriao/uid').val() == auth.uid))"
+            },
+            // "Pronto!" do lobby: cada um marca o seu; o anfitrião só pode
+            // desmarcar (revanchinha) ou marcar robô.
+            "pronto": {
+              ".validate": "newData.isBoolean() && (auth.uid == $uid || (newData.parent().parent().parent().child('anfitriao/uid').val() == auth.uid && (newData.val() == false || $uid.beginsWith('bot-'))))"
             },
             "pontosTotal": {
               ".validate": "newData.isNumber() && ((auth.uid == $uid && newData.val() == 0) || newData.parent().parent().parent().child('anfitriao/uid').val() == auth.uid)"

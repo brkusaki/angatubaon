@@ -1440,7 +1440,8 @@
     ],
     maquina: [
       '/Jogos/maquina.min.js', '/Jogos/maquina.css',
-      '/Jogos/assets/maquina/coruja-sheet.webp', '/Jogos/assets/maquina/serra.webp', '/Jogos/assets/maquina/itens.webp',
+      '/Jogos/assets/maquina/coruja-party-sheet.webp', '/Jogos/assets/maquina/serra.webp', '/Jogos/assets/maquina/itens.webp',
+      '/Jogos/assets/maquina/coruja-mesa-sheet.webp', '/Jogos/assets/maquina/chapeus.webp', '/Jogos/assets/maquina/rostos.webp', '/Jogos/assets/maquina/pescocos.webp',
       '/Jogos/assets/maquina/prensa.webp', '/Jogos/assets/maquina/chao-laminas.webp', '/Jogos/assets/maquina/piso-tile.webp',
       // Puff e Ervilhas viraram minigames da Máquina (todos na mesma cena)
       // e reaproveitam a arte dos módulos antigos.
@@ -3419,14 +3420,17 @@
   // público (_perfilPublicoSync só manda voo_owl/badge/bg/card).
   var LOJA_SLOTS = ['voo_owl', 'badge', 'bg', 'card',
     't48_tema', 'piano_tema', 'pp_skin', 'sq_tema', 'st_tema',
-    'bb_tema', 'tq_skin', 'dc_tema', 'rt_nota', 'rt_fundo', 'rt_pista', 'hx_tema', 'st_fundo', 'tq_chao'];
+    'bb_tema', 'tq_skin', 'dc_tema', 'rt_nota', 'rt_fundo', 'rt_pista', 'hx_tema', 'st_fundo', 'tq_chao',
+    // "Monte sua coruja" da Coruja Party (cor da pena + 3 acessórios)
+    'pty_cor', 'pty_chapeu', 'pty_rosto', 'pty_pescoco'];
 
   function _equipadoPadrao() {
     return { voo_owl: 'voo_skin_classica', badge: null, bg: 'bg_padrao', card: 'card_padrao',
       t48_tema: 't48_classico', piano_tema: 'piano_classico', pp_skin: 'pp_classico',
       sq_tema: 'sq_classico', st_tema: 'st_classico', bb_tema: 'bb_classico',
       tq_skin: 'tq_classico', dc_tema: 'dc_classico', rt_nota: 'rt_classico',
-      rt_fundo: 'rtf_padrao', rt_pista: 'rtp_padrao', hx_tema: 'hx_classico', st_fundo: 'stf_noite', tq_chao: 'tqc_floresta' };
+      rt_fundo: 'rtf_padrao', rt_pista: 'rtp_padrao', hx_tema: 'hx_classico', st_fundo: 'stf_noite', tq_chao: 'tqc_floresta',
+      pty_cor: 'ptyc_classica', pty_chapeu: 'ptyh_nenhum', pty_rosto: 'ptyr_nenhum', pty_pescoco: 'ptyp_nenhum' };
   }
   // Título de cada slot na loja dentro do jogo — só aparece quando o jogo
   // vende mais de um slot (hoje só o Ritmo: notas, fundo e pista).
@@ -3551,6 +3555,51 @@
     { id: 'hx_grama',    nome: 'Gramado', desc: 'Campinho verde.',      preco: 120, slot: 'hx_tema', tipo: 'skin', preview: '/Jogos/assets/hexarena/hex-grama.webp',   jogo: 'hexarena', casa: 'hex-grama' },
     { id: 'hx_lava',     nome: 'Lava',    desc: 'Rocha em brasa.',      preco: 150, slot: 'hx_tema', tipo: 'skin', preview: '/Jogos/assets/hexarena/hex-lava.webp',    jogo: 'hexarena', casa: 'hex-lava' },
     { id: 'hx_cristal',  nome: 'Cristal', desc: 'Piso de safira.',      preco: 200, slot: 'hx_tema', tipo: 'skin', preview: '/Jogos/assets/hexarena/hex-cristal.webp', jogo: 'hexarena', casa: 'hex-cristal' },
+    // ── Coruja Party: "Monte sua coruja" (vendido na própria Party, tela
+    // pty-visual em party.js). 'valor' é o que vai no visual da sala
+    // ("cor|chapeu|rosto|pescoco", ver Jogos/maquina.js). Acessório só
+    // aparece pra escolher quando a folha de arte dele existe.
+    { id: 'ptyc_classica', nome: 'Clássica', desc: 'Cinza-azulada de sempre.', preco: 0, slot: 'pty_cor', tipo: 'skin', preview: null, jogo: 'party', valor: 'classica', amostra: '#7189a6' },
+    { id: 'ptyc_azul', nome: 'Azul', desc: 'Azul-céu.', preco: 0, slot: 'pty_cor', tipo: 'skin', preview: null, jogo: 'party', valor: 'azul', amostra: '#3b9be8' },
+    { id: 'ptyc_vermelha', nome: 'Vermelha', desc: 'Vermelho vivo.', preco: 0, slot: 'pty_cor', tipo: 'skin', preview: null, jogo: 'party', valor: 'vermelha', amostra: '#e23b4b' },
+    { id: 'ptyc_verde', nome: 'Verde', desc: 'Verde mato.', preco: 0, slot: 'pty_cor', tipo: 'skin', preview: null, jogo: 'party', valor: 'verde', amostra: '#3fae4a' },
+    { id: 'ptyc_menta', nome: 'Menta', desc: 'Verde-água.', preco: 60, slot: 'pty_cor', tipo: 'skin', preview: null, jogo: 'party', valor: 'menta', amostra: '#3cc7a5' },
+    { id: 'ptyc_roxa', nome: 'Roxa', desc: 'Roxo uva.', preco: 80, slot: 'pty_cor', tipo: 'skin', preview: null, jogo: 'party', valor: 'roxa', amostra: '#8b4fd8' },
+    { id: 'ptyc_rosa', nome: 'Rosa', desc: 'Rosa chiclete.', preco: 80, slot: 'pty_cor', tipo: 'skin', preview: null, jogo: 'party', valor: 'rosa', amostra: '#ec5fae' },
+    { id: 'ptyc_laranja', nome: 'Laranja', desc: 'Laranja fogo.', preco: 90, slot: 'pty_cor', tipo: 'skin', preview: null, jogo: 'party', valor: 'laranja', amostra: '#f2802f' },
+    { id: 'ptyc_branca', nome: 'Branca', desc: 'Branca como neve.', preco: 120, slot: 'pty_cor', tipo: 'skin', preview: null, jogo: 'party', valor: 'branca', amostra: '#e7ebf0' },
+    { id: 'ptyc_preta', nome: 'Preta', desc: 'Preta como a noite.', preco: 140, slot: 'pty_cor', tipo: 'skin', preview: null, jogo: 'party', valor: 'preta', amostra: '#262a31' },
+    { id: 'ptyc_dourada', nome: 'Dourada', desc: 'Penas de ouro.', preco: 220, slot: 'pty_cor', tipo: 'skin', preview: null, jogo: 'party', valor: 'dourada', amostra: '#e6b422' },
+    { id: 'ptyh_nenhum', nome: 'Nenhum', desc: 'Sem chapéu.', preco: 0, slot: 'pty_chapeu', tipo: 'skin', preview: null, jogo: 'party', valor: '' },
+    { id: 'ptyh_capacete', nome: 'Capacete', desc: 'Pra trabalhar na Máquina.', preco: 0, slot: 'pty_chapeu', tipo: 'skin', preview: null, jogo: 'party', valor: 'capacete' },
+    { id: 'ptyh_bone', nome: 'Boné', desc: 'Aba pro lado.', preco: 0, slot: 'pty_chapeu', tipo: 'skin', preview: null, jogo: 'party', valor: 'bone' },
+    { id: 'ptyh_festa', nome: 'Chapéu de festa', desc: 'Sempre pronta pra Party.', preco: 0, slot: 'pty_chapeu', tipo: 'skin', preview: null, jogo: 'party', valor: 'festa' },
+    { id: 'ptyh_gorro', nome: 'Gorro', desc: 'Quentinho.', preco: 80, slot: 'pty_chapeu', tipo: 'skin', preview: null, jogo: 'party', valor: 'gorro' },
+    { id: 'ptyh_palha', nome: 'Chapéu de palha', desc: 'Caipira de Angatuba.', preco: 90, slot: 'pty_chapeu', tipo: 'skin', preview: null, jogo: 'party', valor: 'palha' },
+    { id: 'ptyh_bruxa', nome: 'Chapéu de bruxa', desc: 'Pro Halloween.', preco: 120, slot: 'pty_chapeu', tipo: 'skin', preview: null, jogo: 'party', valor: 'bruxa' },
+    { id: 'ptyh_cowboy', nome: 'Chapéu de caubói', desc: 'Sertanejo raiz.', preco: 120, slot: 'pty_chapeu', tipo: 'skin', preview: null, jogo: 'party', valor: 'cowboy' },
+    { id: 'ptyh_cartola', nome: 'Cartola', desc: 'Elegância total.', preco: 150, slot: 'pty_chapeu', tipo: 'skin', preview: null, jogo: 'party', valor: 'cartola' },
+    { id: 'ptyh_coroa', nome: 'Coroa', desc: 'Rainha da Party.', preco: 250, slot: 'pty_chapeu', tipo: 'skin', preview: null, jogo: 'party', valor: 'coroa' },
+    { id: 'ptyr_nenhum', nome: 'Nenhum', desc: 'Cara limpa.', preco: 0, slot: 'pty_rosto', tipo: 'skin', preview: null, jogo: 'party', valor: '' },
+    { id: 'ptyr_oculos', nome: 'Óculos redondos', desc: 'Pra ler o placar.', preco: 0, slot: 'pty_rosto', tipo: 'skin', preview: null, jogo: 'party', valor: 'oculos' },
+    { id: 'ptyr_bigode', nome: 'Bigode', desc: 'Respeito.', preco: 0, slot: 'pty_rosto', tipo: 'skin', preview: null, jogo: 'party', valor: 'bigode' },
+    { id: 'ptyr_nerd', nome: 'Óculos de nerd', desc: 'Calcula a rota das serras.', preco: 70, slot: 'pty_rosto', tipo: 'skin', preview: null, jogo: 'party', valor: 'nerd' },
+    { id: 'ptyr_escuros', nome: 'Óculos escuros', desc: 'Estilo.', preco: 80, slot: 'pty_rosto', tipo: 'skin', preview: null, jogo: 'party', valor: 'escuros' },
+    { id: 'ptyr_tapa', nome: 'Tapa-olho', desc: 'Pirata da fábrica.', preco: 90, slot: 'pty_rosto', tipo: 'skin', preview: null, jogo: 'party', valor: 'tapa' },
+    { id: 'ptyr_coracao', nome: 'Óculos de coração', desc: 'Apaixonada pela vitória.', preco: 100, slot: 'pty_rosto', tipo: 'skin', preview: null, jogo: 'party', valor: 'coracao' },
+    { id: 'ptyr_estrela', nome: 'Óculos de estrela', desc: 'Brilha no palco.', preco: 100, slot: 'pty_rosto', tipo: 'skin', preview: null, jogo: 'party', valor: 'estrela' },
+    { id: 'ptyr_mascara', nome: 'Máscara de baile', desc: 'Misteriosa.', preco: 110, slot: 'pty_rosto', tipo: 'skin', preview: null, jogo: 'party', valor: 'mascara' },
+    { id: 'ptyr_monoculo', nome: 'Monóculo', desc: 'Muito chique.', preco: 120, slot: 'pty_rosto', tipo: 'skin', preview: null, jogo: 'party', valor: 'monoculo' },
+    { id: 'ptyp_nenhum', nome: 'Nenhum', desc: 'Pescoço livre.', preco: 0, slot: 'pty_pescoco', tipo: 'skin', preview: null, jogo: 'party', valor: '' },
+    { id: 'ptyp_borboleta', nome: 'Gravata-borboleta', desc: 'Clássica.', preco: 0, slot: 'pty_pescoco', tipo: 'skin', preview: null, jogo: 'party', valor: 'borboleta' },
+    { id: 'ptyp_cachecol', nome: 'Cachecol', desc: 'Listrado.', preco: 0, slot: 'pty_pescoco', tipo: 'skin', preview: null, jogo: 'party', valor: 'cachecol' },
+    { id: 'ptyp_gravata', nome: 'Gravata', desc: 'Pra reunião com a Máquina.', preco: 70, slot: 'pty_pescoco', tipo: 'skin', preview: null, jogo: 'party', valor: 'gravata' },
+    { id: 'ptyp_lenco', nome: 'Lenço de caubói', desc: 'Combina com o chapéu.', preco: 80, slot: 'pty_pescoco', tipo: 'skin', preview: null, jogo: 'party', valor: 'lenco' },
+    { id: 'ptyp_sino', nome: 'Coleira com sino', desc: 'Dlim-dlim.', preco: 90, slot: 'pty_pescoco', tipo: 'skin', preview: null, jogo: 'party', valor: 'sino' },
+    { id: 'ptyp_gola', nome: 'Gola de babado', desc: 'Da realeza.', preco: 100, slot: 'pty_pescoco', tipo: 'skin', preview: null, jogo: 'party', valor: 'gola' },
+    { id: 'ptyp_medalha', nome: 'Medalha', desc: 'Campeã da Party.', preco: 120, slot: 'pty_pescoco', tipo: 'skin', preview: null, jogo: 'party', valor: 'medalha' },
+    { id: 'ptyp_colar', nome: 'Colar de cristal', desc: 'Brilha no escuro.', preco: 150, slot: 'pty_pescoco', tipo: 'skin', preview: null, jogo: 'party', valor: 'colar' },
+    { id: 'ptyp_corrente', nome: 'Corrente de ouro', desc: 'Ostentação.', preco: 200, slot: 'pty_pescoco', tipo: 'skin', preview: null, jogo: 'party', valor: 'corrente' },
     // Ritmo da Coruja — skin das notas E dos receptores (slot rt_nota).
     // nota.estilo diz COMO desenhar (ver _rtDesenharNota em Jogos/ritmo.js:
     // gema | flat | olho | neon | ouro); nota.cores = [pistas de fora,

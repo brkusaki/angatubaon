@@ -1699,8 +1699,14 @@
             <div class="pty-desc">De 2 a 4 jogadores, cada um no seu celular — faltou gente, completa com robô. A cada rodada a Máquina sorteia uma armadilha: quem cai, perde. Mais pontos no fim leva a Party.</div>
             <!-- Catálogo dos minigames que podem cair (desenhado por _renderCatalogo em party.js a partir da POOL) -->
             <div class="pty-catalogo" id="pty-catalogo"></div>
+            <!-- "Monte sua coruja": a coruja que você usa em todos os minigames -->
+            <button type="button" class="pty-visual-btn" onclick="_ptyAbrirVisual()">
+              <canvas id="pty-menu-coruja" width="120" height="120"></canvas>
+              <span><b>Monte sua coruja</b><small>Cor, chapéu e acessórios</small></span>
+            </button>
             <div class="pty-opcoes">
               <button type="button" class="pty-btn" onclick="_ptyCriarSala()">Criar Party</button>
+              <button type="button" class="pty-btn pty-btn-sec" onclick="_ptyTreinar()">🤖 Treinar com robôs</button>
               <label class="pty-privada-toggle">
                 <input type="checkbox" id="pty-publica-check" checked>
                 <span>🌐 Sala pública (aparece na lista)</span>
@@ -1725,23 +1731,31 @@
               <span class="pty-lobby-codigo" id="pty-lobby-codigo">----</span>
               <button type="button" class="pty-link" id="pty-btn-copiar" onclick="_ptyCopiarCodigo()">Copiar código</button>
             </div>
+            <!-- Palco: as corujas de quem está na sala, com a luz de "pronto" -->
+            <canvas id="pty-palco" width="720" height="330"></canvas>
             <div id="pty-lobby-jogadores"></div>
             <div class="pty-lobby-contador" id="pty-lobby-contador">1/4 jogadores (mínimo 2 pra começar)</div>
             <!-- Qual jogo a sala vai rodar (Minigames / Hex Arena / …).
                  Desenhado por _renderModos em party.js a partir de MODOS. -->
             <div class="pty-modo-escolha" id="pty-modo-escolha"></div>
-            <div class="pty-rodadas-escolha" id="pty-rodadas-escolha">
-              <span class="pty-rodadas-label">Rodadas por sessão</span>
-              <div class="pty-rodadas-chips">
-                <button type="button" class="pty-rodadas-chip" onclick="_ptyEscolherRodadas(3, this)">3</button>
-                <button type="button" class="pty-rodadas-chip pty-rodadas-ativa" onclick="_ptyEscolherRodadas(4, this)">4</button>
-                <button type="button" class="pty-rodadas-chip" onclick="_ptyEscolherRodadas(5, this)">5</button>
-                <button type="button" class="pty-rodadas-chip" onclick="_ptyEscolherRodadas(6, this)">6</button>
-              </div>
+            <!-- Todo mundo "Pronto" → contagem de 5 s e a Party começa sozinha -->
+            <div class="pty-lobby-contagem" id="pty-lobby-contagem"></div>
+            <button type="button" class="pty-btn" id="pty-btn-comecar" onclick="_ptyPronto()">Pronto!</button>
+            <div class="pty-lobby-acoes">
+              <button type="button" class="pty-link" onclick="_ptyAbrirVisual()">🦉 Minha coruja</button>
+              <button type="button" class="pty-link" onclick="_ptyVoltarMenuLobby()">Sair da sala</button>
             </div>
-            <button type="button" class="pty-btn" id="pty-btn-comecar" onclick="_ptyComecarParty()">Começar Party</button>
-            <div class="pty-desc" id="pty-lobby-espera-anfitriao" style="display:none;">Esperando o anfitrião começar a Party…</div>
-            <button type="button" class="pty-link" onclick="_ptyVoltarMenuLobby()">Sair da sala</button>
+          </div>
+
+          <!-- Sub-tela: "Monte sua coruja" (cor e acessórios = itens da Loja, slots pty_*) -->
+          <div class="pty-sub" id="pty-visual">
+            <div class="pty-titulo">Monte sua coruja</div>
+            <canvas id="pty-visual-preview" width="300" height="300"></canvas>
+            <div class="pty-visual-saldo" id="pty-visual-saldo"></div>
+            <div class="pty-visual-abas" id="pty-visual-abas"></div>
+            <div class="pty-visual-grade" id="pty-visual-grade"></div>
+            <div class="pty-visual-acao" id="pty-visual-acao"></div>
+            <button type="button" class="pty-btn" onclick="_ptyFecharVisual()">Pronto</button>
           </div>
 
           <!-- Sub-tela: contagem regressiva antes da rodada -->

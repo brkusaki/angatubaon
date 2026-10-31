@@ -82,67 +82,31 @@
   // os jogos solo reaproveitados. "eliminacao": quem termina antes do
   // tempo é porque MORREU — a faixa de rivais mostra "caiu" em vez de
   // "terminou".
+  // Igual ao Machine Party: as de sobrevivência não têm relógio — vão até
+  // sobrar um (duracaoSeg é só o teto de segurança, ver o modo
+  // 'sobrevivencia' em Jogos/maquina.js). Campo Minado e Ervilhas são de
+  // objetivo (chegar na saída / limpar o prato primeiro).
+  // Os jogos de tela (Pega a Coruja, Sequência, Piano) saíram da Party em
+  // nov/2026: não dá pra ver todo mundo junto neles. Continuam no hub.
+  var TETO_SOBREV = 150;
+  function _maq(chave, nome, icone, regra, controle, peso, objetivoSeg) {
+    var dur = objetivoSeg || TETO_SOBREV;
+    return {
+      chave: chave, modulo: 'maquina', nome: nome, duracaoSeg: dur + 3, peso: peso, eliminacao: !objetivoSeg, icone: icone,
+      regra: regra, controle: controle,
+      iniciar: function (seed) { return _iniciarJogoContainer('maquina', dur, seed, chave === 'ervilhas' ? 'mesa' : chave); }
+    };
+  }
   var POOL = [
-    {
-      chave: 'laminas', modulo: 'maquina', nome: 'Lâminas', duracaoSeg: 38, peso: 3, eliminacao: true, icone: '🪚',
-      regra: 'Serras quicando pela sala. Não deixe nenhuma te encostar.', controle: 'Arraste o dedo',
-      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 35, seed, 'laminas'); }
-    },
-    {
-      chave: 'escada', modulo: 'maquina', nome: 'Escada Errada', duracaoSeg: 43, peso: 3, eliminacao: true, icone: '⬆️',
-      regra: 'Aperte a seta do degrau de cima pra subir. A prensa está logo atrás.', controle: 'Botões de seta',
-      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 40, seed, 'escada'); }
-    },
-    {
-      chave: 'piso', modulo: 'maquina', nome: 'Piso Falso', duracaoSeg: 48, peso: 3, eliminacao: true, icone: '🔷',
-      regra: 'Quando a sirene tocar, esteja num piso com o símbolo do painel.', controle: 'Toque no piso',
-      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 45, seed, 'piso'); }
-    },
-    {
-      chave: 'esteira', modulo: 'maquina', nome: 'A Esteira', duracaoSeg: 38, peso: 3, eliminacao: true, icone: '🔥',
-      regra: 'Quadro vai pro fogo (toque nele). Peça deixa passar. 3 erros e a máquina trava.', controle: 'Toque nos quadros',
-      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 35, seed, 'esteira'); }
-    },
-    {
-      chave: 'empurra', modulo: 'maquina', nome: 'Empurra-Empurra', duracaoSeg: 43, peso: 3, eliminacao: true, icone: '💥',
-      regra: 'A plataforma encolhe sobre o poço. Empurre os outros e fique em cima.', controle: 'Arraste · botão Empurrar',
-      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 40, seed, 'empurra'); }
-    },
-    {
-      chave: 'minado', modulo: 'maquina', nome: 'Campo Minado', duracaoSeg: 48, peso: 3, eliminacao: true, icone: '💣',
-      regra: 'Atravesse até a saída. O número diz quantas minas há em volta.', controle: 'Toque no piso do lado',
-      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 45, seed, 'minado'); }
-    },
-    {
-      chave: 'tunel', modulo: 'maquina', nome: 'O Túnel', duracaoSeg: 43, peso: 3, eliminacao: true, icone: '🚇',
-      regra: 'Os pistões descem pelo túnel. Troque de faixa pra passar no vão.', controle: 'Toque nos lados',
-      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 40, seed, 'tunel'); }
-    },
-    {
-      chave: 'puff', modulo: 'maquina', nome: 'Puff da Coruja', duracaoSeg: 33, peso: 2, icone: '💨',
-      regra: 'Segure pra encher o peito. Quanto mais cheio, mais pontos. Passou do limite, tosse.', controle: 'Segure e solte',
-      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 30, seed, 'puff'); }
-    },
-    {
-      chave: 'ervilhas', modulo: 'maquina', nome: 'Ervilhas da Coruja', duracaoSeg: 43, peso: 2, icone: '🫛',
-      regra: 'Todos na mesma mesa: coma sem a Chefe ver. Ela olhou, congele.', controle: 'Espetar e comer',
-      iniciar: function (seed) { return _iniciarJogoContainer('maquina', 40, seed, 'mesa'); }
-    },
-    {
-      chave: 'speedtap', nome: 'Pega a Coruja', duracaoSeg: 25, peso: 1, icone: '👆', botFaixa: [22, 70], botAte: 25,
-      regra: 'Toque nas corujas que aparecem. A mais rápida vence.', controle: 'Toque rápido',
-      iniciar: function () { return _iniciarJogoTela('speedtap', ['classico']); }
-    },
-    {
-      chave: 'sequencia', nome: 'Sequência da Coruja', duracaoSeg: 60, peso: 1, eliminacao: true, icone: '🧠', botFaixa: [3, 10], botAte: 45,
-      regra: 'Repita a sequência. Errou, está fora.', controle: 'Toque na ordem',
-      iniciar: function () { return _iniciarJogoTela('sequencia', [], 50); }
-    },
-    {
-      chave: 'piano', nome: 'Piano da Coruja', duracaoSeg: 60, peso: 1, eliminacao: true, icone: '🎹', botFaixa: [15, 90], botAte: 45,
-      regra: 'Toque só nas teclas pretas. Errou ou deixou passar, está fora.', controle: 'Toque nas teclas',
-      iniciar: function () { return _iniciarJogoTela('piano', ['sobrevivencia'], 50); }
-    }
+    _maq('laminas', 'Lâminas', '🪚', 'Serras quicando pela sala. A última de pé vence.', 'Arraste o dedo', 3),
+    _maq('escada', 'Escada Errada', '⬆️', 'Aperte a seta do degrau de cima. A prensa pega quem ficar pra trás.', 'Botões de seta', 3),
+    _maq('piso', 'Piso Falso', '🔷', 'Na sirene, esteja num piso com o símbolo do painel. Sobra um.', 'Toque no piso', 3),
+    _maq('esteira', 'A Esteira', '🔥', 'Quadro pro fogo, peça passa. 3 erros e a máquina trava.', 'Toque nos quadros', 3),
+    _maq('empurra', 'Empurra-Empurra', '💥', 'A plataforma encolhe sobre o poço. Empurre os outros pra fora.', 'Arraste · botão Empurrar', 3),
+    _maq('minado', 'Campo Minado', '💣', 'Chegue na saída antes da colheitadeira. O número diz quantas minas há em volta.', 'Toque no piso do lado', 3, 46),
+    _maq('tunel', 'O Túnel', '🚇', 'Os pistões descem pelo túnel. Troque de faixa pra passar no vão.', 'Toque nos lados', 3),
+    _maq('puff', 'Puff da Coruja', '💨', 'Antes da sirene, solte um fôlego acima da marca. Passou do limite, tosse.', 'Segure e solte', 3),
+    _maq('ervilhas', 'Ervilhas da Coruja', '🫛', 'Limpe o prato primeiro. Se a Chefe olhar e você se mexer, perde o garfo.', 'Espetar e comer', 3, 60)
   ];
   // Ícones gravados dos minigames (Jogos/assets/maquina/ico-*.webp). Sem
   // mapeamento (ou se a imagem falhar) cai no emoji da POOL.
@@ -165,9 +129,14 @@
      tipo 'modulo' -> um jogo só, com todo mundo junto. `modulo` é o
                       nome no JOGOS_EXTERNOS do hub (window._jogoLoader). */
   var MODOS = {
+    // 'minigames' é o Original (chave antiga mantida pras salas abertas).
     minigames: {
-      chave: 'minigames', tipo: 'pool', nome: 'Minigames', emoji: '🎲', min: 2, max: 4,
-      desc: 'Um minigame surpresa por rodada — cada um joga no seu celular.'
+      chave: 'minigames', tipo: 'pool', nome: 'Original', emoji: '🎲', min: 2, max: 4,
+      desc: 'Todos os minigames da Máquina, um de cada, em ordem surpresa.'
+    },
+    personalizado: {
+      chave: 'personalizado', tipo: 'pool', nome: 'Personalizado', emoji: '🎛️', min: 2, max: 4,
+      desc: 'O anfitrião escolhe quais minigames entram. Cada um cai uma vez.'
     },
     hexarena: {
       chave: 'hexarena', tipo: 'modulo', modulo: 'hexarena', nome: 'Hex Arena', emoji: '⬡', min: 2, max: 4,
@@ -175,7 +144,7 @@
     }
   };
   var MODO_PADRAO = 'minigames';
-  var MODOS_ORDEM = ['minigames', 'hexarena'];
+  var MODOS_ORDEM = ['minigames', 'personalizado', 'hexarena'];
   function _modoDaSala(sala) { return (sala && sala.modo && MODOS[sala.modo]) ? MODOS[sala.modo] : MODOS[MODO_PADRAO]; }
 
   /* ── Estado local ────────────────────────────────────────────── */
@@ -191,7 +160,6 @@
   var _rodadaVistaEm = -1;     // último valor de rodadaAtual já processado (evita reprocessar)
   var _timeoutSeguranca = null;
   var _ultimoJogoUsado = null; // evita repetir o mesmo minigame 2x seguidas
-  var _totalRodadasEscolhidas = TOTAL_RODADAS_PADRAO; // ajustável no lobby, só o anfitrião
   var _apiAtual = null;        // módulo do minigame em andamento — sair() chama .parar() nele (ver A2.2)
   var _contagemHandle = null;  // setTimeout em andamento de _contagemRegressiva — sair() cancela (ver A2.6)
   var _modoSeedVisto = null;   // seed da partida de módulo já aberta (igual _rodadaVistaEm, pros modos)
@@ -243,6 +211,42 @@
     try { _posRaiz().remove().catch(function () {}); } catch (e) {}
   }
 
+  /* ── Visual da coruja ("Monte sua coruja") ───────────────────────
+     Cor e acessórios são itens da Loja da Coruja (slots pty_*, hub.js).
+     Vão pra sala como texto "cor|chapeu|rosto|pescoco" em
+     jogadores/{uid}/visual, e cada celular desenha os outros assim. */
+  var SLOTS_VISUAL = ['pty_cor', 'pty_chapeu', 'pty_rosto', 'pty_pescoco'];
+  function _meuVisual() {
+    var G = window.AngatubaGames;
+    if (!G || typeof G.equipado !== 'function' || typeof G.lojaCatalogo !== 'function') return 'classica|||';
+    var cat = G.lojaCatalogo() || [];
+    return SLOTS_VISUAL.map(function (slot) {
+      var id = G.equipado(slot), it = null;
+      for (var i = 0; i < cat.length; i++) if (cat[i].id === id) { it = cat[i]; break; }
+      return (it && it.valor) || (slot === 'pty_cor' ? 'classica' : '');
+    }).join('|');
+  }
+  // Mudou a coruja com a sala aberta: os outros veem na hora.
+  function atualizarVisual() {
+    if (!_salaRef || !_meuUid || !_sala || !(_sala.jogadores || {})[_meuUid]) return;
+    _salaRef.child('jogadores/' + _meuUid + '/visual').set(_meuVisual()).catch(function () {});
+  }
+  // "Pronto!" no lobby. Quando todo mundo está pronto, a Party começa
+  // sozinha depois de 5 s (ver _lobbyContagem na UI).
+  function marcarPronto(v) {
+    if (!_salaRef || !_meuUid || !_sala || _sala.status !== 'lobby') return;
+    _salaRef.child('jogadores/' + _meuUid + '/pronto').set(!!v).catch(function () {});
+  }
+  // Todos prontos? (robô sempre está). Devolve false se falta gente.
+  function _todosProntos(sala) {
+    var jog = (sala && sala.jogadores) || {}, uids = Object.keys(jog), modo = _modoDaSala(sala);
+    var humanos = uids.filter(function (u) { return !_ehBot(u); });
+    var min = Math.max(MIN_JOGADORES, modo.min || 0);
+    if ((modo.tipo === 'pool' ? uids.length : humanos.length) < min || !humanos.length) return false;
+    if (modo.chave === 'personalizado' && _selecaoDaSala(sala).length < 2) return false;
+    return humanos.every(function (u) { return jog[u].pronto === true; });
+  }
+
   /* ── Robôs (CPU) ──────────────────────────────────────────────────
      Completam a sala quando falta gente (e deixam testar sozinho). Ficam
      em jogadores/bot-N com bot:true e quem joga por eles é o ANFITRIÃO:
@@ -274,10 +278,19 @@
       var id = 'bot-' + i;
       if (jog[id]) continue;
       _salaRef.child('jogadores/' + id).set({
-        nome: BOT_NOMES[i - 1], entrouEm: firebase.database.ServerValue.TIMESTAMP, pontosTotal: 0, bot: true
+        nome: BOT_NOMES[i - 1], entrouEm: firebase.database.ServerValue.TIMESTAMP, pontosTotal: 0, bot: true,
+        pronto: true, visual: _visualSorteado()
       }).catch(function () {});
       return;
     }
+  }
+  // Robô ganha um visual sorteado (cor + o que a arte já tiver).
+  function _visualSorteado() {
+    var MQ = window.MaquinaGame, V = MQ && MQ.visual, pega = function (l) { return l[Math.floor(Math.random() * l.length)]; };
+    if (!V) return pega(['azul', 'vermelha', 'verde', 'roxa', 'laranja', 'rosa']) + '|||';
+    var cor = pega(V.cores.filter(function (c) { return c !== 'classica'; }));
+    var parte = function (tipo) { return V.temArte(tipo) && Math.random() < 0.75 ? pega(V.acessorios[tipo]) : ''; };
+    return [cor, parte('chapeu'), parte('rosto'), parte('pescoco')].join('|');
   }
   function removerRobo(uid) {
     if (!_souAnfitriao || !_salaRef || !_ehBot(uid)) return;
@@ -364,7 +377,7 @@
         rodadaAtual: 0
       }).then(function () {
         return ref.child('jogadores/' + eu.uid).set({
-          nome: eu.nome, entrouEm: firebase.database.ServerValue.TIMESTAMP, pontosTotal: 0
+          nome: eu.nome, entrouEm: firebase.database.ServerValue.TIMESTAMP, pontosTotal: 0, pronto: false, visual: _meuVisual()
         });
       }).then(function () {
         _codigo = codigo; _salaRef = ref; _souAnfitriao = true;
@@ -421,7 +434,7 @@
         _souAnfitriao = !!(sala.anfitriao && sala.anfitriao.uid === eu.uid);
         return ref.child('jogadores/' + eu.uid).set({
           nome: eu.nome, entrouEm: firebase.database.ServerValue.TIMESTAMP,
-          pontosTotal: (jogadores[eu.uid] && jogadores[eu.uid].pontosTotal) || 0
+          pontosTotal: (jogadores[eu.uid] && jogadores[eu.uid].pontosTotal) || 0, pronto: false, visual: _meuVisual()
         }).then(function () {
           // Anfitrião de volta: rearma a limpeza da sala inteira nesta
           // conexão (a da sessão anterior já se foi) pra não deixar sala
@@ -550,7 +563,7 @@
     _tentativasReentrada++;
     var ref = _salaRef.child('jogadores/' + _meuUid);
     ref.set({
-      nome: _meuNome, entrouEm: firebase.database.ServerValue.TIMESTAMP, pontosTotal: 0
+      nome: _meuNome, entrouEm: firebase.database.ServerValue.TIMESTAMP, pontosTotal: 0, pronto: false, visual: _meuVisual()
     }).then(function () {
       ref.onDisconnect().remove();
     }).catch(function () {}).then(function () { _reentrando = false; });
@@ -806,8 +819,17 @@
         // Lugar fixo de cada um (ordem dos uids, igual em todo celular):
         // onde nasce nas arenas em que todo mundo começa junto.
         slot: _slotDe(_meuUid),
+        visual: _meuVisual(),
+        total: Object.keys((_sala && _sala.jogadores) || {}).length,
+        // Quem ainda está no jogo = quem não mandou resultado (decide a
+        // "última de pé" nas rodadas de sobrevivência).
+        vivos: function () {
+          if (!_sala || _sala.rodadaAtual !== rodadaDoJogo) return null;
+          var res = _resultadosCache[rodadaDoJogo] || {};
+          return Object.keys(_sala.jogadores || {}).filter(function (u) { return !res[u]; }).length;
+        },
         bots: _souAnfitriao ? _botsDaSala(_sala).map(function (u) {
-          return { uid: u, nome: _nomeCurto(u, _sala.jogadores[u].nome), cor: _ptyCor(_sala, u), slot: _slotDe(u) };
+          return { uid: u, nome: _nomeCurto(u, _sala.jogadores[u].nome), cor: _ptyCor(_sala, u), slot: _slotDe(u), visual: _sala.jogadores[u].visual || '' };
         }) : [],
         onBotFim: function (uid, score) { _botReportar(uid, score, rodadaDoJogo); },
         onFim: function (score, assistir) { reportarResultado(score, assistir === true); }
@@ -854,7 +876,7 @@
         var jog = (_sala && _sala.jogadores) || {};
         // No anfitrião os robôs vêm direto do motor (não pela rede).
         return Object.keys(jog).sort().filter(function (u) { return u !== _meuUid && _posCache[u] && !(souAnf && _ehBot(u)); }).map(function (u) {
-          return { uid: u, nome: _nomeCurto(u, jog[u].nome), cor: _ptyCor(_sala, u), v: _posCache[u].v, em: _posCache[u].em };
+          return { uid: u, nome: _nomeCurto(u, jog[u].nome), cor: _ptyCor(_sala, u), visual: jog[u].visual || '', v: _posCache[u].v, em: _posCache[u].em };
         });
       }
     };
@@ -917,8 +939,10 @@
     var updates = {};
     var placar = {};
     lista.forEach(function (j, i) {
-      var pontosGanhos = PONTOS_POR_COLOCACAO[i] || 0;
-      placar[j.uid] = { nome: j.nome, score: j.score, colocacao: i + 1, pontosGanhos: pontosGanhos };
+      // Empate (dois caíram juntos) divide o lugar e os pontos.
+      var lugar = lista.filter(function (o) { return o.score > j.score; }).length;
+      var pontosGanhos = PONTOS_POR_COLOCACAO[lugar] || 0;
+      placar[j.uid] = { nome: j.nome, score: j.score, colocacao: lugar + 1, pontosGanhos: pontosGanhos };
       var totalAnterior = (jogadores[j.uid] && jogadores[j.uid].pontosTotal) || 0;
       updates['jogadores/' + j.uid + '/pontosTotal'] = totalAnterior + pontosGanhos;
     });
@@ -929,8 +953,20 @@
   }
 
   /* ── Anfitrião: escolhe rodadas (lobby), começa e avança rodadas ── */
-  function definirTotalRodadas(n) {
-    _totalRodadasEscolhidas = Math.max(2, Math.min(20, Number(n) || TOTAL_RODADAS_PADRAO));
+  // Personalizado: quais minigames entram (o anfitrião marca no lobby).
+  function _selecaoDaSala(sala) {
+    var sel = String((sala && sala.selecao) || '').split(',').filter(_poolPorChave);
+    return sel.length ? sel : POOL.map(function (j) { return j.chave; });
+  }
+  function alternarMinigame(chave) {
+    if (!_souAnfitriao || !_salaRef || !_sala || _sala.status !== 'lobby' || !_poolPorChave(chave)) return;
+    var sel = _selecaoDaSala(_sala), i = sel.indexOf(chave);
+    if (i >= 0) { if (sel.length <= 2) return; sel.splice(i, 1); } else sel.push(chave);
+    _salaRef.child('selecao').set(sel.join(',')).catch(function () {});
+  }
+  function _embaralhar(arr) {
+    for (var i = arr.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
+    return arr;
   }
 
   // Anfitrião escolhe o modo no lobby. Grava na sala pra todo mundo ver
@@ -977,11 +1013,15 @@
       _tirarDaListaPublica();
       return;
     }
-    var baseRodada = _sala.rodadaAtual || 0;
+    // Original: todos os minigames; Personalizado: os marcados. Cada um cai
+    // UMA vez, em ordem sorteada (sala.fila) — igual ao Machine Party.
+    var fila = _embaralhar(modo.chave === 'personalizado' ? _selecaoDaSala(_sala).slice() : POOL.map(function (j) { return j.chave; }));
+    if (fila.length < 2) return;
     _salaRef.update({
-      totalRodadas: baseRodada + _totalRodadasEscolhidas,
-      rodadaAtual: baseRodada + 1,
-      jogoAtual: _sortearProximoJogo(),
+      fila: fila.join(','),
+      totalRodadas: fila.length,
+      rodadaAtual: 1,
+      jogoAtual: fila[0],
       seed: Math.floor(Math.random() * 1e9),
       status: 'rodada',
       rodadaIniciadaEm: firebase.database.ServerValue.TIMESTAMP
@@ -1014,9 +1054,10 @@
   function proximaRodada() {
     if (!_souAnfitriao || !_sala || !_salaRef) return;
     _limparPosicoes(); // as posições da rodada anterior não servem mais pra ninguém
+    var nova = (_sala.rodadaAtual || 0) + 1, fila = String(_sala.fila || '').split(',');
     _salaRef.update({
-      rodadaAtual: (_sala.rodadaAtual || 0) + 1,
-      jogoAtual: _sortearProximoJogo(),
+      rodadaAtual: nova,
+      jogoAtual: _poolPorChave(fila[nova - 1]) ? fila[nova - 1] : _sortearProximoJogo(),
       seed: Math.floor(Math.random() * 1e9),
       status: 'rodada',
       rodadaIniciadaEm: firebase.database.ServerValue.TIMESTAMP
@@ -1033,9 +1074,12 @@
   function revanche() {
     if (!_souAnfitriao || !_sala || !_salaRef) return;
     var jogadores = _sala.jogadores || {};
-    var updates = { status: 'lobby', rodadaAtual: 0, resultados: null, placarRodadas: null, modoEstado: null, modoJogadas: null };
+    var updates = { status: 'lobby', rodadaAtual: 0, resultados: null, placarRodadas: null, modoEstado: null, modoJogadas: null, fila: null };
     _limparPosicoes();
-    Object.keys(jogadores).forEach(function (uid) { updates['jogadores/' + uid + '/pontosTotal'] = 0; });
+    Object.keys(jogadores).forEach(function (uid) {
+      updates['jogadores/' + uid + '/pontosTotal'] = 0;
+      if (!_ehBot(uid)) updates['jogadores/' + uid + '/pronto'] = false; // cada um confirma de novo
+    });
     _salaRef.update(updates).catch(function () {});
   }
 
@@ -1108,7 +1152,9 @@
     criarSala: criarSala,
     entrarSala: entrarSala,
     listarSalas: listarSalas,
-    definirTotalRodadas: definirTotalRodadas,
+    alternarMinigame: alternarMinigame,
+    marcarPronto: marcarPronto,
+    atualizarVisual: atualizarVisual,
     definirModo: definirModo,
     adicionarRobo: adicionarRobo,
     removerRobo: removerRobo,
@@ -1129,7 +1175,10 @@
     // de seguir o fluxo solo normal. Ver window.AngatubaGames.party
     // em app.js — é só uma fachada segura sobre isto.
     ativo: _ativo,
-    reportarResultado: reportarResultado
+    reportarResultado: reportarResultado,
+    // Repete o último evento da sala (a UI redesenha quando a arte da
+    // coruja termina de carregar).
+    _reemitir: function () { if (_sala) _emit('salaMudou', _sala); }
   };
 
   // Controlador de UI (telas do #jogo-party) vive em party-ui.js? Não —
@@ -1142,7 +1191,7 @@
 
   function _q(id) { return document.getElementById(id); }
   function _mostrarSub(tela) {
-    var nomes = ['menu', 'lobby', 'countdown', 'arena', 'aguardando', 'resultado', 'campeao', 'erro'];
+    var nomes = ['menu', 'lobby', 'visual', 'countdown', 'arena', 'aguardando', 'resultado', 'campeao', 'erro'];
     nomes.forEach(function (n) {
       var el = _q('pty-' + n);
       if (el) el.style.display = (n === tela) ? 'flex' : 'none';
@@ -1171,8 +1220,27 @@
     el.setAttribute('data-ok', '1');
   }
 
+  // A coruja de cada um é desenhada pelo motor da Máquina: baixa ele já
+  // no menu (de qualquer jeito ele é o próximo a ser usado).
+  var _maqPronta = false;
+  function _carregarMaquina(cb) {
+    if (_maqPronta && window.MaquinaGame) { if (cb) cb(); return; }
+    if (!window._jogoLoader) return;
+    window._jogoLoader('maquina').then(function (api) {
+      if (!api || typeof api.carregarVisual !== 'function') return;
+      api.carregarVisual(function () { _maqPronta = true; _ptyRedesenharCorujas(); if (cb) cb(); });
+    }).catch(function () {});
+  }
+  function _ptyRedesenharCorujas() {
+    var MQ = window.MaquinaGame;
+    if (!MQ || !_maqPronta) return;
+    MQ.desenharCoruja(_q('pty-menu-coruja'), _meuVisual(), { pose: 0, escala: 1.02 });
+    var sala = window.AngatubaParty.estado();
+    if (sala) window.AngatubaParty._reemitir && window.AngatubaParty._reemitir();
+  }
   function _ptyPreparar() {
     _renderCatalogo();
+    _carregarMaquina();
     _erroMenu('');
     var input = _q('pty-codigo-input'); if (input) input.value = '';
     _mostrarSub('menu');
@@ -1261,12 +1329,6 @@
   }
   window._ptyCopiarCodigo = _ptyCopiarCodigo;
 
-  function _ptyEscolherRodadas(n, btn) {
-    window.AngatubaParty.definirTotalRodadas(n);
-    document.querySelectorAll('.pty-rodadas-chip').forEach(function (b) { b.classList.remove('pty-rodadas-ativa'); });
-    if (btn) btn.classList.add('pty-rodadas-ativa');
-  }
-  window._ptyEscolherRodadas = _ptyEscolherRodadas;
 
   function _ptyEscolherModo(chave) { window.AngatubaParty.definirModo(chave); }
   window._ptyEscolherModo = _ptyEscolherModo;
@@ -1281,6 +1343,8 @@
       wrap.addEventListener('click', function (e) {
         var b = e.target.closest && e.target.closest('[data-pty-modo]');
         if (b && !b.disabled) _ptyEscolherModo(b.getAttribute('data-pty-modo'));
+        var sb = e.target.closest && e.target.closest('[data-pty-sel]');
+        if (sb && !sb.disabled) window.AngatubaParty.alternarMinigame(sb.getAttribute('data-pty-sel'));
       });
       _ptyModoListenerOn = true;
     }
@@ -1291,9 +1355,18 @@
         (souAnf ? '' : ' disabled') + ' aria-pressed="' + (on ? 'true' : 'false') + '">' +
         '<span class="pty-modo-emoji">' + m.emoji + '</span><span>' + _escHTML(m.nome) + '</span></button>';
     }).join('');
+    var grade = '';
+    if (atual.chave === 'personalizado') {
+      var sel = _selecaoDaSala(sala);
+      grade = '<div class="pty-sel-grade">' + POOL.map(function (j) {
+        var on = sel.indexOf(j.chave) >= 0;
+        return '<button type="button" class="pty-sel-item' + (on ? ' pty-sel-on' : '') + '" data-pty-sel="' + j.chave + '"' + (souAnf ? '' : ' disabled') + '>' +
+          _icoHTML(j, 'pty-ico pty-ico-mini') + '<span>' + _escHTML(j.nome) + '</span></button>';
+      }).join('') + '</div><div class="pty-modo-desc">' + sel.length + ' minigames · ' + sel.length + ' rodadas</div>';
+    }
     wrap.innerHTML = '<span class="pty-rodadas-label">' + (souAnf ? 'Qual jogo?' : 'Jogo da sala') + '</span>' +
       '<div class="pty-modo-chips">' + chips + '</div>' +
-      '<div class="pty-modo-desc">' + _escHTML(atual.desc) + '</div>' +
+      '<div class="pty-modo-desc">' + _escHTML(atual.desc) + '</div>' + grade +
       // Hex Arena tem skins de piso (slot hx_tema): cada um escolhe a sua.
       (atual.chave === 'hexarena' && typeof window.lojaJogoAbrir === 'function'
         ? '<button type="button" class="jogo-btn-skins pty-hx-skins" onclick="lojaJogoAbrir(\'hexarena\')">🎨 Skins da arena</button>'
@@ -1302,6 +1375,226 @@
 
   function _ptyComecarParty() { window.AngatubaParty.comecarParty(); }
   window._ptyComecarParty = _ptyComecarParty;
+
+  function _ptyPronto() {
+    var sala = window.AngatubaParty.estado(), eu = sala && (sala.jogadores || {})[window.AngatubaParty.meuUid()];
+    window.AngatubaParty.marcarPronto(!(eu && eu.pronto));
+  }
+  window._ptyPronto = _ptyPronto;
+
+  // Contagem do lobby: cada celular mostra; quem dá a largada é o anfitrião.
+  var _contagemLobby = null, _contagemChave = null;
+  function _lobbyContagem(sala) {
+    var el = _q('pty-lobby-contagem');
+    var pronto = sala.status === 'lobby' && _todosProntos(sala);
+    // A "chave" muda com qualquer coisa que importa (gente, prontos, modo,
+    // seleção): mudou no meio da conta, recomeça.
+    var chave = pronto ? JSON.stringify([Object.keys(sala.jogadores || {}).sort(), sala.modo || '', sala.selecao || '']) : null;
+    if (chave === _contagemChave) return;
+    _contagemChave = chave;
+    if (_contagemLobby) { clearInterval(_contagemLobby); _contagemLobby = null; }
+    if (!pronto) {
+      if (el) {
+        var jog = sala.jogadores || {}, falta = Object.keys(jog).filter(function (u) { return !_ehBot(u) && !jog[u].pronto; }).length;
+        el.textContent = Object.keys(jog).length < 2 ? 'Chame alguém ou adicione um robô' : (falta ? 'Esperando ' + falta + (falta > 1 ? ' jogadores ficarem' : ' jogador ficar') + ' pronto…' : '');
+        el.classList.remove('pty-contagem-on');
+      }
+      return;
+    }
+    var n = 5;
+    var tique = function () {
+      if (el) { el.textContent = 'Começando em ' + n + '…'; el.classList.add('pty-contagem-on'); }
+      if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.toque();
+      if (n <= 0) {
+        clearInterval(_contagemLobby); _contagemLobby = null; _contagemChave = null;
+        if (el) el.textContent = 'Vai!';
+        if (window.AngatubaParty.souAnfitriao()) window.AngatubaParty.comecarParty();
+        return;
+      }
+      n--;
+    };
+    tique();
+    _contagemLobby = setInterval(tique, 1000);
+  }
+
+  /* ── Palco do lobby: as corujas de todo mundo, lado a lado ─────── */
+  var _palcoAnim = null;
+  function _palcoDesenhar(sala) {
+    var cv = _q('pty-palco'), MQ = window.MaquinaGame;
+    if (!cv) return;
+    if (_palcoAnim) { clearTimeout(_palcoAnim); _palcoAnim = null; }
+    var ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
+    var jog = sala.jogadores || {}, uids = Object.keys(jog).sort(), larg = W / 4, t = Date.now();
+    // chão e luzes
+    var g = ctx.createLinearGradient(0, H * 0.55, 0, H);
+    g.addColorStop(0, 'rgba(245,197,24,0)'); g.addColorStop(1, 'rgba(245,197,24,.08)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    for (var i = 0; i < 4; i++) {
+      var u = uids[i], cx = larg * i + larg / 2, base = H - 74;
+      // plataforma
+      ctx.fillStyle = '#0b0d10'; ctx.beginPath(); ctx.ellipse(cx, base + 8, larg * 0.36, 16, 0, 0, 6.283); ctx.fill();
+      ctx.fillStyle = u ? '#2a2f37' : '#16191d'; ctx.beginPath(); ctx.ellipse(cx, base, larg * 0.36, 14, 0, 0, 6.283); ctx.fill();
+      ctx.strokeStyle = u ? (jog[u].pronto ? '#4ade80' : _ptyCor(sala, u)) : 'rgba(255,255,255,.12)';
+      ctx.lineWidth = 3; ctx.setLineDash(u ? [] : [8, 6]); ctx.stroke(); ctx.setLineDash([]);
+      if (!u) {
+        ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.font = '700 22px system-ui, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('vaga', cx, base - 60);
+        continue;
+      }
+      var pronto = !!jog[u].pronto || _ehBot(u);
+      // luz de cima quando pronto
+      if (pronto) {
+        var luz = ctx.createLinearGradient(0, 0, 0, base);
+        luz.addColorStop(0, 'rgba(74,222,128,0)'); luz.addColorStop(1, 'rgba(74,222,128,.22)');
+        ctx.fillStyle = luz; ctx.beginPath(); ctx.moveTo(cx - 30, 0); ctx.lineTo(cx + 30, 0); ctx.lineTo(cx + larg * 0.36, base); ctx.lineTo(cx - larg * 0.36, base); ctx.closePath(); ctx.fill();
+      }
+      if (MQ && _maqPronta) {
+        var pisca = ((t / 1000 + i * 0.7) % 3.3) < 0.14;
+        MQ.desenharCoruja(cv, jog[u].visual || 'classica|||', { manter: true, x: cx, y: base - 92, escala: 0.52, pose: pronto ? 5 : (pisca ? 1 : 0) });
+      }
+      // nome
+      ctx.font = '800 24px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      var nome = (_ehBot(u) ? '🤖 ' : '') + _nomeCurto(u, jog[u].nome);
+      ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.strokeText(nome, cx, base + 38);
+      ctx.fillStyle = _ptyCor(sala, u); ctx.fillText(nome, cx, base + 38);
+      ctx.font = '800 17px system-ui, sans-serif';
+      ctx.fillStyle = pronto ? '#4ade80' : '#8b95a1';
+      ctx.fillText(pronto ? 'PRONTO' : 'esperando', cx, base + 62);
+    }
+    // anima o piscar enquanto o lobby está na tela
+    if (sala.status === 'lobby') _palcoAnim = setTimeout(function () {
+      var s2 = window.AngatubaParty.estado();
+      if (s2 && s2.status === 'lobby' && _q('pty-lobby') && _q('pty-lobby').style.display !== 'none') _palcoDesenhar(s2);
+    }, 140);
+  }
+
+  /* ── "Treinar com robôs": sala privada + 3 robôs ─────────────────── */
+  function _ptyTreinar() {
+    _erroMenu('');
+    var chk = _q('pty-publica-check'); if (chk) chk.checked = false;
+    window.AngatubaParty.criarSala(false).then(function () {
+      _rendarLobby();
+      // um robô por vez, cada um depois que a sala confirmou o anterior
+      var tentativas = 0;
+      (function mais() {
+        var sala = window.AngatubaParty.estado();
+        if (++tentativas > 40 || (sala && Object.keys(sala.jogadores || {}).length >= MAX_JOGADORES)) return;
+        if (sala && sala.status === 'lobby') window.AngatubaParty.adicionarRobo();
+        setTimeout(mais, 300);
+      })();
+    }).catch(function (err) { _erroMenu(err && err.message ? err.message : 'Não foi possível criar a sala.'); });
+  }
+  window._ptyTreinar = _ptyTreinar;
+
+  /* ── Tela "Monte sua coruja" ──────────────────────────────────────
+     Os itens são da Loja da Coruja (jogo 'party', slots pty_*): o que já
+     é seu equipa na hora; o resto mostra o preço e compra com moedas.
+     Acessório só aparece quando a arte dele existe (MaquinaGame.visual). */
+  var _visualAberto = false, _visualVolta = 'menu', _visualAba = 'pty_cor', _visualSel = null, _visualAnim = null, _visualListener = false;
+  var ABAS_VISUAL = [
+    { slot: 'pty_cor', nome: 'Cor', tipo: null },
+    { slot: 'pty_chapeu', nome: 'Chapéu', tipo: 'chapeu' },
+    { slot: 'pty_rosto', nome: 'Rosto', tipo: 'rosto' },
+    { slot: 'pty_pescoco', nome: 'Pescoço', tipo: 'pescoco' }
+  ];
+  function _catalogoParty() {
+    var G = window.AngatubaGames;
+    return (G && typeof G.lojaCatalogo === 'function' ? G.lojaCatalogo() : []).filter(function (it) { return it.jogo === 'party'; });
+  }
+  // Visual de prévia: o equipado, trocando o slot da aba pelo item tocado.
+  function _visualPrevia() {
+    var v = _meuVisual().split('|');
+    if (_visualSel) {
+      var idx = SLOTS_VISUAL.indexOf(_visualSel.slot);
+      if (idx >= 0) v[idx] = _visualSel.valor || (idx === 0 ? 'classica' : '');
+    }
+    return v.join('|');
+  }
+  function _ptyAbrirVisual() {
+    var sala = window.AngatubaParty.estado();
+    _visualVolta = sala && sala.status === 'lobby' ? 'lobby' : 'menu';
+    _visualAberto = true; _visualSel = null;
+    _carregarMaquina(_visualRender);
+    _visualRender();
+    _mostrarSub('visual');
+    _visualAnimar();
+  }
+  window._ptyAbrirVisual = _ptyAbrirVisual;
+  function _ptyFecharVisual() {
+    _visualAberto = false; _visualSel = null;
+    if (_visualAnim) { clearTimeout(_visualAnim); _visualAnim = null; }
+    window.AngatubaParty.atualizarVisual();
+    _ptyRedesenharCorujas();
+    if (_visualVolta === 'lobby' && window.AngatubaParty.estado()) { _mostrarSub('lobby'); window.AngatubaParty._reemitir(); }
+    else _mostrarSub('menu');
+  }
+  window._ptyFecharVisual = _ptyFecharVisual;
+  function _visualAnimar() {
+    if (!_visualAberto) return;
+    var MQ = window.MaquinaGame;
+    if (MQ && _maqPronta) {
+      var t = Date.now() / 1000, pose = (t % 4) < 0.14 ? 1 : (t % 8) > 6.6 ? 5 : 0;
+      MQ.desenharCoruja(_q('pty-visual-preview'), _visualPrevia(), { pose: pose, escala: 0.95 });
+    }
+    _visualAnim = setTimeout(_visualAnimar, 120);
+  }
+  function _visualRender() {
+    var G = window.AngatubaGames, MQ = window.MaquinaGame;
+    var saldo = _q('pty-visual-saldo');
+    if (saldo) saldo.textContent = G && typeof G.moedasSaldo === 'function' ? '🪙 ' + G.moedasSaldo() + ' moedas' : '';
+    var abas = _q('pty-visual-abas'), grade = _q('pty-visual-grade'), acao = _q('pty-visual-acao');
+    if (!abas || !grade) return;
+    if (!_visualListener) {
+      _visualListener = true;
+      abas.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-aba]');
+        if (b) { _visualAba = b.getAttribute('data-aba'); _visualSel = null; _visualRender(); }
+      });
+      grade.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-item]');
+        if (!b) return;
+        var it = _catalogoParty().filter(function (x) { return x.id === b.getAttribute('data-item'); })[0];
+        if (!it) return;
+        var G2 = window.AngatubaGames;
+        if (G2 && G2.temItem(it.id)) { G2.equiparItem(it.slot, it.id); _visualSel = null; window.AngatubaParty.atualizarVisual(); }
+        else _visualSel = it;
+        _visualRender();
+      });
+      acao.addEventListener('click', function (e) {
+        if (!(e.target.closest && e.target.closest('[data-comprar]')) || !_visualSel) return;
+        var G3 = window.AngatubaGames, r = G3 && G3.comprarItem(_visualSel.id);
+        if (r && r.ok) { G3.equiparItem(_visualSel.slot, _visualSel.id); _visualSel = null; window.AngatubaParty.atualizarVisual(); if (G3.som) G3.som.nivelUp(); }
+        else if (r && r.motivo === 'saldo_insuficiente') acao.innerHTML = '<div class="pty-visual-aviso">Moedas insuficientes — jogue mais um pouco!</div>';
+        _visualRender();
+      });
+    }
+    var temArte = function (tipo) { return !tipo || (MQ && MQ.visual && MQ.visual.temArte(tipo)); };
+    abas.innerHTML = ABAS_VISUAL.map(function (a) {
+      return '<button type="button" class="pty-visual-aba' + (a.slot === _visualAba ? ' pty-visual-aba-on' : '') + '" data-aba="' + a.slot + '">' + a.nome + '</button>';
+    }).join('');
+    var aba = ABAS_VISUAL.filter(function (a) { return a.slot === _visualAba; })[0] || ABAS_VISUAL[0];
+    if (!temArte(aba.tipo)) {
+      grade.innerHTML = '<div class="pty-visual-vazio">Em breve: os ' + aba.nome.toLowerCase() + (aba.nome.slice(-1) === 'u' ? 's' : '') + ' chegam com a arte nova da Corujinha.</div>';
+      if (acao) acao.innerHTML = '';
+      return;
+    }
+    var itens = _catalogoParty().filter(function (it) { return it.slot === aba.slot; });
+    var equip = G && typeof G.equipado === 'function' ? G.equipado(aba.slot) : null;
+    grade.innerHTML = itens.map(function (it) {
+      var tem = G && G.temItem(it.id), on = it.id === equip, sel = _visualSel && _visualSel.id === it.id;
+      var amostra = aba.slot === 'pty_cor'
+        ? '<i class="pty-visual-cor" style="background:' + (it.amostra || '#7189a6') + '"></i>'
+        : (MQ && _maqPronta && it.valor ? '<img src="' + (MQ.avatar(['classica', aba.tipo === 'chapeu' ? it.valor : '', aba.tipo === 'rosto' ? it.valor : '', aba.tipo === 'pescoco' ? it.valor : ''].join('|'), 72) || '') + '" alt="">' : '<i class="pty-visual-nada">∅</i>');
+      return '<button type="button" class="pty-visual-item' + (on ? ' pty-visual-on' : '') + (sel ? ' pty-visual-sel' : '') + (tem ? '' : ' pty-visual-bloq') + '" data-item="' + it.id + '">' +
+        amostra + '<span>' + _escHTML(it.nome) + '</span>' + (tem ? (on ? '<b>✔</b>' : '') : '<b>🪙 ' + it.preco + '</b>') + '</button>';
+    }).join('');
+    if (acao) {
+      if (_visualSel && !(G && G.temItem(_visualSel.id))) {
+        acao.innerHTML = '<button type="button" class="pty-btn pty-btn-comprar" data-comprar="1">Comprar ' + _escHTML(_visualSel.nome) + ' · 🪙 ' + _visualSel.preco + '</button>';
+      } else if (!acao.querySelector('.pty-visual-aviso')) acao.innerHTML = '';
+    }
+  }
 
   // Continuar na MESMA sala é o caminho principal do fim de rodada e do fim
   // de Party (2.3): nenhuma das duas encosta em sair() — quem sai da sala é
@@ -1330,6 +1623,9 @@
     return CORES_JOGADOR[(i < 0 ? 0 : i) % CORES_JOGADOR.length];
   }
   function _ptyAvatar(sala, uid) {
+    var MQ = window.MaquinaGame, j = ((sala && sala.jogadores) || {})[uid] || {};
+    var url = MQ && _maqPronta && typeof MQ.avatar === 'function' ? MQ.avatar(j.visual || 'classica|||', 72) : null;
+    if (url) return '<span class="pty-av pty-av-img" style="--pty-cor:' + _ptyCor(sala, uid) + '"><img src="' + url + '" alt=""></span>';
     return '<span class="pty-av" style="--pty-cor:' + _ptyCor(sala, uid) + '">' + (_ehBot(uid) ? '🤖' : '🦉') + '</span>';
   }
 
@@ -1418,21 +1714,18 @@
         contador.textContent = lista.length + '/4 jogadores' + (modoSala.tipo === 'pool'
           ? ' (mínimo 2 pra começar — robô vale)' : ' (mínimo 2 pessoas)');
       }
-      var btnComecar = _q('pty-btn-comecar');
-      if (btnComecar) btnComecar.style.display = souAnf ? '' : 'none';
-      var esperaAnf = _q('pty-lobby-espera-anfitriao');
-      if (esperaAnf) esperaAnf.style.display = souAnf ? 'none' : '';
       _renderModos(sala, souAnf);
-      // "Rodadas por sessão" só existe no modo de minigames.
-      var rodadasWrap = _q('pty-rodadas-escolha');
-      if (rodadasWrap) rodadasWrap.style.display = (souAnf && modoSala.tipo === 'pool') ? '' : 'none';
+      // "Pronto!" de cada um; todos prontos → contagem de 5 s (igual ao
+      // Machine Party). Qualquer mudança no lobby recomeça a conta.
+      var eu = jogadores[window.AngatubaParty.meuUid()] || {};
+      var btnComecar = _q('pty-btn-comecar');
       if (btnComecar) {
-        btnComecar.textContent = modoSala.tipo === 'pool' ? 'Começar Party' : 'Começar ' + modoSala.nome;
-        btnComecar.disabled = modoSala.tipo === 'pool'
-          ? (lista.length < 2 || humanos < 1)
-          : humanos < Math.max(2, modoSala.min || 0);
+        btnComecar.textContent = eu.pronto ? '✔ Pronto — tocar pra cancelar' : 'Pronto!';
+        btnComecar.classList.toggle('pty-btn-pronto', !!eu.pronto);
       }
-      _mostrarSub('lobby');
+      _lobbyContagem(sala);
+      _palcoDesenhar(sala);
+      if (!_visualAberto) _mostrarSub('lobby');
     }
   });
 
@@ -1442,6 +1735,7 @@
   var _roletaHandle = null;
   window.AngatubaParty.on('countdown', function (info) {
     var jogo = info.jogo || {}, sala = info.sala || {};
+    if (_visualAberto) { _visualAberto = false; if (_visualAnim) { clearTimeout(_visualAnim); _visualAnim = null; } }
     var nomeEl = _q('pty-countdown-jogo'), iconeEl = _q('pty-countdown-icone');
     var regraEl = _q('pty-countdown-regra'), ctrlEl = _q('pty-countdown-controle');
     var rodEl = _q('pty-countdown-rodada'), numEl = _q('pty-countdown-num');

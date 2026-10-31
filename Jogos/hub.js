@@ -1446,6 +1446,8 @@
       // e reaproveitam a arte dos módulos antigos.
       '/Jogos/assets/puff/puff-sheet-v2.webp', '/Jogos/assets/ervilhas/chefe-sheet.webp', '/Jogos/assets/ervilhas/sala.webp',
       '/Jogos/assets/ervilhas/mesa.webp', '/Jogos/assets/ervilhas/prato.webp', '/Jogos/assets/ervilhas/ervilha.webp',
+      '/Jogos/assets/maquina/mesa-longa.webp', '/Jogos/assets/maquina/plataforma.webp', '/Jogos/assets/maquina/braco.webp',
+      '/Jogos/assets/maquina/pistao.webp', '/Jogos/assets/maquina/piso-mina.webp', '/Jogos/assets/maquina/mina.webp',
       '/Jogos/assets/corujinha/sim-moeda-v2.webp',
       // efeitos gravados (ElevenLabs)
       '/Jogos/assets/maquina/sfx/serra-1.mp3', '/Jogos/assets/maquina/sfx/clank-1.mp3', '/Jogos/assets/maquina/sfx/raspao-1.mp3', '/Jogos/assets/maquina/sfx/alerta-1.mp3', '/Jogos/assets/maquina/sfx/morte-1.mp3', '/Jogos/assets/maquina/sfx/prensa-1.mp3', '/Jogos/assets/maquina/sfx/passo-1.mp3', '/Jogos/assets/maquina/sfx/erro-1.mp3', '/Jogos/assets/maquina/sfx/sirene-1.mp3', '/Jogos/assets/maquina/sfx/queda-1.mp3', '/Jogos/assets/maquina/sfx/fogo-1.mp3', '/Jogos/assets/maquina/sfx/acerto-1.mp3', '/Jogos/assets/maquina/sfx/moeda-1.mp3', '/Jogos/assets/maquina/sfx/vitoria-1.mp3'

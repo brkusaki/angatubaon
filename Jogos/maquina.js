@@ -74,12 +74,12 @@
     ervilha: '/Jogos/assets/ervilhas/ervilha.webp',
     // Arte pedida pros jogos novos (claude/party-maquina-assets-fase2.md).
     // Vazio = ainda não existe; o desenho em código assume.
-    mesaLonga: '',        // mesa de jantar comprida vista de frente, 4 lugares (Ervilhas)
-    plataforma: '',       // disco de metal visto de cima (Empurra-Empurra)
-    braco: '',            // braço giratório da plataforma (Empurra-Empurra)
-    pistao: '',           // bloco do pistão que desce pelo túnel (O Túnel)
-    mina: '',             // mina explodida (Campo Minado)
-    pisoMina: ''          // ladrilho do Campo Minado
+    mesaLonga: 'mesa-longa.webp',   // mesa de jantar comprida em perspectiva (Ervilhas)
+    plataforma: 'plataforma.webp',  // disco de metal visto de cima (Empurra-Empurra)
+    braco: 'braco.webp',            // braço giratório, pivô na ponta esquerda (Empurra-Empurra)
+    pistao: 'pistao.webp',          // bloco do pistão que desce pelo túnel (O Túnel)
+    mina: 'mina.webp',              // ladrilho com a mina explodida (Campo Minado)
+    pisoMina: 'piso-mina.webp'      // ladrilho do Campo Minado
   };
   // Sons gravados (ElevenLabs): nome -> quantas versões (nome-1.mp3 ...).
   var SFX_ARQ = {
@@ -2075,8 +2075,8 @@
           for (var k = 1; k < 4; k++) { c.beginPath(); c.arc(CX, CY, raio * k / 4, 0, 6.283); c.stroke(); }
           for (var j = 0; j < 8; j++) { var aj = j / 8 * 6.283; c.beginPath(); c.moveTo(CX, CY); c.lineTo(CX + Math.cos(aj) * raio, CY + Math.sin(aj) * raio); c.stroke(); }
         }
-        // borda de perigo (listra amarela/preta em anel)
-        var segs = Math.max(12, Math.round(raio * 1.2));
+        // borda de perigo (listra amarela/preta em anel) — a arte já tem a dela
+        var segs = plat ? 0 : Math.max(12, Math.round(raio * 1.2));
         c.lineWidth = 2;
         for (var sgi = 0; sgi < segs; sgi++) {
           c.strokeStyle = sgi % 2 ? '#16161a' : '#f5c518';
@@ -2097,7 +2097,7 @@
           c.save(); c.translate(CX, CY); c.rotate(braco.a);
           c.globalAlpha = on ? 1 : 0.35 + 0.3 * Math.sin(M.t * 20);
           var art = _arte('braco');
-          if (art) c.drawImage(art, 0, -3, raio, 6);
+          if (art) c.drawImage(art, -3, -3, raio + 3, 6);
           else {
             c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(1, -1.6, raio, 4.4);
             M.chapa(c, 0, -2.2, raio, 4.4, '#9aa3ad', '#59626d');
@@ -2106,9 +2106,11 @@
             c.beginPath(); c.arc(raio - 2, 0, 1.6, 0, 6.283); c.fill();
           }
           c.restore(); c.globalAlpha = 1;
-          // eixo central
-          M.engrenagem(c, CX, CY, 5, 10, braco.a * 2, '#c4ccd5');
-          c.fillStyle = '#e11d48'; c.beginPath(); c.arc(CX, CY, 1.8, 0, 6.283); c.fill();
+          // eixo central (a arte do braço já traz o pivô)
+          if (!art) {
+            M.engrenagem(c, CX, CY, 5, 10, braco.a * 2, '#c4ccd5');
+            c.fillStyle = '#e11d48'; c.beginPath(); c.arc(CX, CY, 1.8, 0, 6.283); c.fill();
+          }
           if (on && braco.aviso < 1.2) M.rotulo(c, CX + ux * raio * 0.5, CY + uy * raio * 0.5 - 4, '!', '#ff8fa3');
         }
         // rivais
@@ -2754,12 +2756,15 @@
   function _mesa(M) {
     var W = 90, H = 160, TOTAL = 20, GARFO_MAX = 5, ESPETAR = 0.23, COMER = 0.42, TRAVA = 1.0;
     // Lugares: 0 frente-esq, 1 frente-dir, 2 fundo-esq, 3 fundo-dir.
+    // Mesa em perspectiva (ponta na Chefe, lá em cima): cada um senta na
+    // borda, o prato fica pra dentro da toalha.
     var LUG = [
-      { x: 14, y: 126, esc: 1.0, px: 30, py: 134 },
-      { x: 76, y: 126, esc: 1.0, px: 60, py: 134 },
-      { x: 20, y: 90, esc: 0.78, px: 33, py: 97 },
-      { x: 70, y: 90, esc: 0.78, px: 57, py: 97 }
+      { x: 16, y: 96, esc: 1.0, px: 31, py: 105 },
+      { x: 74, y: 96, esc: 1.0, px: 59, py: 105 },
+      { x: 27.5, y: 75, esc: 0.8, px: 38, py: 83 },
+      { x: 62.5, y: 75, esc: 0.8, px: 52, py: 83 }
     ];
+    var MESA_X = 10, MESA_W = 70, MESA_Y = 52, MESA_H = 102; // onde a mesa é desenhada
     var rChefe = M.fluxo();
     var chefe = { st: 'lendo', ate: 1.6 + rChefe() * 1.2, q: 0, pegouAte: 0 };
     var eu = { comidas: 0, garfo: 0, mov: 0, movT: 0, trava: 0, pego: 0 };
@@ -2854,7 +2859,7 @@
     function _qComensal(mov, trava, mastiga) { return mov === 3 || trava > 0 ? 8 : mastiga ? 3 : mov === 2 ? 2 : (M.t % 3.1) < 0.12 ? 1 : 0; }
 
     return {
-      chave: 'mesa', titulo: 'Ervilhas', mundo: [W, H], artes: ['puff', 'chefe', 'sala', 'prato', 'ervilha', 'mesaChefe'], tituloFim: 'TEMPO! 🍽️',
+      chave: 'mesa', titulo: 'Ervilhas', mundo: [W, H], artes: ['puff', 'chefe', 'sala', 'prato', 'ervilha', 'mesaChefe', 'mesaLonga'], tituloFim: 'TEMPO! 🍽️',
       iniciar: function () {
         M.controles.innerHTML = '<div class="mq-acoes mq-acoes-2">' +
           '<button type="button" class="mq-acao mq-acao-espetar" data-q="1">🍴 ESPETAR</button>' +
@@ -2871,21 +2876,17 @@
         if (sala) c.drawImage(sala, 150, 80, 900, 560, 0, 0, W, 56);
         else { c.fillStyle = '#3a2618'; c.fillRect(0, 0, W, 56); }
         c.fillStyle = '#2a1a10'; c.fillRect(0, 56, W, H - 56);
-        // mesa comprida em perspectiva (toalha branca)
+        // mesa comprida em perspectiva (toalha branca), ponta na Chefe
         var art = _arte('mesaLonga');
-        if (art) { c.drawImage(art, 0, 52, W, H - 52); return; }
+        if (art) { c.drawImage(art, MESA_X, MESA_Y, MESA_W, MESA_H); return; }
+        var yb = MESA_Y + MESA_H * 0.57, yf = MESA_Y + MESA_H * 0.8;
         c.fillStyle = '#4a2c16';
-        c.beginPath(); c.moveTo(27, 55); c.lineTo(63, 55); c.lineTo(96, 152); c.lineTo(-6, 152); c.closePath(); c.fill();
-        var g = c.createLinearGradient(0, 55, 0, 150);
+        c.beginPath(); c.moveTo(45, MESA_Y); c.lineTo(MESA_X + MESA_W, yb); c.lineTo(MESA_X + MESA_W, MESA_Y + MESA_H); c.lineTo(MESA_X, MESA_Y + MESA_H); c.lineTo(MESA_X, yb); c.closePath(); c.fill();
+        var g = c.createLinearGradient(0, MESA_Y, 0, yf);
         g.addColorStop(0, '#d9d4c8'); g.addColorStop(1, '#f6f2e8');
         c.fillStyle = g;
-        c.beginPath(); c.moveTo(29, 55.5); c.lineTo(61, 55.5); c.lineTo(92, 147); c.lineTo(-2, 147); c.closePath(); c.fill();
-        c.strokeStyle = 'rgba(160,140,110,.25)'; c.lineWidth = 0.35;
-        for (var i = 1; i < 6; i++) { var t = i / 6, y = _lerp(55.5, 147, t); c.beginPath(); c.moveTo(_lerp(29, -2, t), y); c.lineTo(_lerp(61, 92, t), y); c.stroke(); }
-        c.fillStyle = 'rgba(140,40,40,.18)'; c.beginPath(); c.moveTo(42, 55.5); c.lineTo(48, 55.5); c.lineTo(56, 147); c.lineTo(34, 147); c.closePath(); c.fill();
-        // castiçal no meio
-        c.fillStyle = '#b8892b'; c.fillRect(44, 70, 2, 9); c.fillRect(42.5, 78, 5, 1.4);
-        c.fillStyle = '#ffd166'; c.beginPath(); c.ellipse(45, 68.6, 0.9, 1.6, 0, 0, 6.283); c.fill();
+        c.beginPath(); c.moveTo(45, MESA_Y + 2); c.lineTo(MESA_X + MESA_W - 2, yb + 1); c.lineTo(MESA_X + MESA_W - 2, yf); c.lineTo(MESA_X + 2, yf); c.lineTo(MESA_X + 2, yb + 1); c.closePath(); c.fill();
+        c.fillStyle = 'rgba(140,40,40,.25)'; c.beginPath(); c.moveTo(45, MESA_Y + 3); c.lineTo(48, 92); c.lineTo(42, 92); c.closePath(); c.fill();
       },
       atualizar: function (dt) {
         _mundo();

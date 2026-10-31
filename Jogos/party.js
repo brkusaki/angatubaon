@@ -147,7 +147,8 @@
   // Ícones gravados dos minigames (Jogos/assets/maquina/ico-*.webp). Sem
   // mapeamento (ou se a imagem falhar) cai no emoji da POOL.
   var ICO_ARQ = { laminas: 'laminas', escada: 'escada', piso: 'piso', esteira: 'esteira', puff: 'puff',
-    ervilhas: 'ervilhas', speedtap: 'sirene', sequencia: 'misterio', piano: 'prensa' };
+    ervilhas: 'ervilhas', speedtap: 'sirene', sequencia: 'misterio', piano: 'prensa',
+    empurra: 'empurra', minado: 'minado', tunel: 'tunel' };
   function _icoHTML(j, cls) {
     var n = j && ICO_ARQ[j.chave];
     if (!n) return _escHTML((j && (j.icone || j.emoji)) || '⚙️');

@@ -254,7 +254,7 @@
     c = document.createElement('canvas'); c.width = px; c.height = ph;
     var g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
     g.drawImage(img, (q % cols) * fw, Math.floor(q / cols) * fh, fw, fh, 0, 0, px, ph);
-    if (vis) _recolorir(g, px, ph, vis.cor);
+    if (vis) _recolorir(g, px, ph, vis.cor, chave.indexOf('skin:') === 0);
     else if (cor) { // coruja de rival: tingida com a cor do jogador (só onde há pena)
       g.globalCompositeOperation = 'source-atop'; g.globalAlpha = 0.42;
       g.fillStyle = cor; g.fillRect(0, 0, px, ph);
@@ -283,8 +283,9 @@
      - COR: troca só o tom das penas cinza-azuladas, em cima da arte. */
   var SKINS = {
     // id: [bases que já têm folha]   (bases: 'coruja', 'puff', 'mesaCoruja')
-    operaria: [], cauboi: [], pirata: [], realeza: [], bruxa: [], chef: [],
-    caipira: [], astronauta: [], heroina: [], nerd: [], detetive: [], roqueira: []
+    operaria: ['coruja', 'puff', 'mesaCoruja'], cauboi: ['coruja', 'puff', 'mesaCoruja'], pirata: ['coruja', 'puff', 'mesaCoruja'], chef: ['coruja', 'puff', 'mesaCoruja'],
+    caipira: ['coruja', 'puff', 'mesaCoruja'], nerd: ['coruja', 'puff', 'mesaCoruja'],
+    realeza: [], bruxa: [], astronauta: [], heroina: [], detetive: [], roqueira: []
   };
   var SKIN_ARQ = { coruja: 'coruja', puff: 'puff', mesaCoruja: 'mesa' };
   // Chave da folha a usar pra esta base com este visual (registra na tabela
@@ -333,7 +334,8 @@
   }
   // Pena = cinza-azulado (ou cinza neutro escuro/médio). Creme, âmbar,
   // amarelo e vermelho ficam de fora.
-  function _recolorir(g, w, h, cor) {
+  // escuro=true (folha de skin): não pinta preto/cinza-escuro (chapéu, óculos).
+  function _recolorir(g, w, h, cor, escuro) {
     var T = CORES_PENA[cor];
     if (!T) return;
     try {
@@ -341,7 +343,7 @@
       for (var i = 0; i < a.length; i += 4) {
         if (a[i + 3] < 10) continue;
         var hsl = _rgb2hsl(a[i], a[i + 1], a[i + 2]), hh = hsl[0], s = hsl[1], l = hsl[2];
-        var pena = (hh >= 180 && hh <= 265 && s < 0.65 && l < 0.85) || (s < 0.1 && l > 0.08 && l < 0.62);
+        var pena = (hh >= 180 && hh <= 265 && s < 0.65 && l < 0.85) || (s < 0.1 && l > (escuro ? 0.2 : 0.08) && l < 0.62);
         if (!pena) continue;
         var nh = T.h == null ? hh : T.h, ns = Math.min(1, s * T.sm + T.sa), nl = Math.max(0, Math.min(1, l * T.lm + T.la));
         var c = _hsl2rgb(nh, ns, nl);

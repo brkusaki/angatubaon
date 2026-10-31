@@ -1028,6 +1028,7 @@
 
     _dcAnimando = true;
     _dcTrocaAnim = { i1: i1, i2: i2, t0: performance.now(), duracao: _DC_DUR_TROCA };
+    var sT = _som(); if (sT && sT.tocar) sT.tocar('doces-trocar', null, 0.6);
     setTimeout(function () {
       _dcTrocaAnim = null;
       _dcTrocarCelulas(i1, i2);
@@ -1050,6 +1051,8 @@
       }
 
       if (especial) {
+        // bomba de cor ou embrulhado na troca: estouro gravado
+        var sB = _som(); if (sB && sB.tocar) sB.tocar('doces-bomba', null, 0.7);
         var ativados = _dcAtivarEspeciaisSwap(i1, i2, tipo1, tipo2);
         ativados.forEach(function (idx) { resultado.marcado[idx] = true; });
       }
@@ -1115,7 +1118,13 @@
       // 1) "Explode" as células combinadas antes de sumirem — sem isso a
       // troca parecia teletransporte (uma cor some, outra já aparece no
       // lugar sem nenhuma ligação visual entre as duas).
-      var s = _som(); if (s) s.combo();
+      // 1º passo: crocante do match; cascata (2º passo em diante): sequência
+      // de sininhos, subindo de tom a cada passo. Sem arquivo: combo sintetizado.
+      var s = _som();
+      if (s) {
+        if (passosNestaTroca <= 1) s.tocar('doces-combina', 'combo', 0.7);
+        else s.tocar('doces-cascata', 'combo', 0.6, Math.min(1.5, 1 + (passosNestaTroca - 2) * 0.08));
+      }
       var fx = window.AngatubaGames && window.AngatubaGames.efeitos;
       var opcoesFx = _dcSpritesMatch ? { sprites: _dcSpritesMatch } : undefined;
       var agora = performance.now();
@@ -1281,6 +1290,7 @@
 
   // ── Preparação da tela (chamada pelo _jogoLoader ao abrir) ──
   function _dcPrepararTela() {
+    var sP = _som(); if (sP && sP.precarregar) sP.precarregar(['doces-trocar', 'doces-combina', 'doces-cascata', 'doces-bomba']);
     _dcRegistrarMenu();
     _dcCanvas = document.getElementById('dc-grid');
     if (_dcCanvas && !_dcCanvas._dcPronto) {

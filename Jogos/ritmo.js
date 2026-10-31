@@ -486,6 +486,7 @@
     // iOS 17+: toca mesmo com a chave de silencioso ligada (é uma música).
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
     if (_rtCtx.state !== 'running' && _rtCtx.resume) { try { _rtCtx.resume(); } catch (e) {} }
+    _rtPlatCarregarGravados();   // plateia gravada já vai baixando enquanto a música carrega
     return _rtCtx;
   }
   function _rtAudioSuspender() {
@@ -506,7 +507,30 @@
      Cada som é um buffer montado uma vez por partida (ruído filtrado +
      palmas + vozes "uuu"/"ahh"), tocado por um ganho próprio ligado
      direto na saída — o da música faz fade no fim e a plateia continua. */
-  var _rtPlat = { sr: 0, buf: {}, fontes: [], ahhEm: 0 };
+  var _rtPlat = { sr: 0, buf: {}, fontes: [], ahhEm: 0, grav: {}, gravSr: 0, baixando: {} };
+  // Sons GRAVADOS (ElevenLabs, out/2026): quando o arquivo já chegou, toca
+  // no lugar do sintetizado; senão o sintetizado (ou o "reserva") cobre.
+  //   energia  → soltar a Energia (reserva: grito)
+  //   vaia     → falhou (amplificador desligando + plateia)
+  //   aplauso  → fim da música
+  //   errou    → toque fora do tempo (sem reserva: silêncio, como antes)
+  //   plateia  → loop de estádio por baixo da música no Show da Cidade
+  var RT_GRAVADOS = { energia: 'energia', vaia: 'falhou', aplauso: 'aplausos', errou: 'errou-nota', plateia: 'plateia-show' };
+  var RT_GRAV_RESERVA = { energia: 'grito' };
+  function _rtPlatCarregarGravados() {
+    var ctx = _rtCtx;
+    if (!ctx || !window.fetch) return;
+    if (_rtPlat.gravSr !== ctx.sampleRate) { _rtPlat.gravSr = ctx.sampleRate; _rtPlat.grav = {}; _rtPlat.baixando = {}; }
+    Object.keys(RT_GRAVADOS).forEach(function (tipo) {
+      if (_rtPlat.grav[tipo] || _rtPlat.baixando[tipo]) return;
+      _rtPlat.baixando[tipo] = true;
+      fetch('/Jogos/assets/ritmo/sfx/' + RT_GRAVADOS[tipo] + '.mp3')
+        .then(function (r) { if (!r.ok) throw new Error('http'); return r.arrayBuffer(); })
+        .then(function (ab) { return new Promise(function (ok, falha) { ctx.decodeAudioData(ab, ok, falha); }); })
+        .then(function (b) { if (_rtCtx === ctx) _rtPlat.grav[tipo] = b; })
+        .catch(function () { delete _rtPlat.baixando[tipo]; });
+    });
+  }
   function _rtPlatRuido(n) {
     var x = new Float32Array(n);
     for (var i = 0; i < n; i++) x[i] = Math.random() * 2 - 1;
@@ -611,6 +635,7 @@
   function _rtPlatPreparar() {
     var ctx = _rtCtx;
     if (!ctx) return;
+    _rtPlatCarregarGravados();
     if (_rtPlat.sr === ctx.sampleRate && _rtPlat.buf.aplauso) return;
     _rtPlat.sr = ctx.sampleRate; _rtPlat.buf = {};
     ['grito', 'aplauso', 'vaia', 'ahh'].forEach(function (tipo) {
@@ -621,12 +646,13 @@
       } catch (e) {}
     });
   }
-  function _rtPlatTocar(tipo, vol) {
-    var ctx = _rtCtx, b = _rtPlat.buf[tipo];
+  function _rtPlatTocar(tipo, vol, emLoop) {
+    var ctx = _rtCtx, b = _rtPlat.grav[tipo] || _rtPlat.buf[tipo] || _rtPlat.buf[RT_GRAV_RESERVA[tipo]];
     if (!ctx || !b || !_rtSomAtivo()) return;
     try {
       var f = ctx.createBufferSource(), g = ctx.createGain();
       f.buffer = b; g.gain.value = vol;
+      if (emLoop) { f.loop = true; if (b.duration > 0.2) { f.loopStart = 0.03; f.loopEnd = b.duration - 0.03; } }
       f.connect(g); g.connect(ctx.destination);
       f.onended = function () {
         try { f.disconnect(); g.disconnect(); } catch (e) {}
@@ -1708,6 +1734,9 @@
     _rtInicioReal = Date.now();
     _rtPadSnapshot();
     _rtPlatParar(); _rtPlatPreparar(); _rtPlat.ahhEm = 0;
+    // Show da Cidade (último palco da Turnê): estádio lotado por baixo da música.
+    var infShow = _rtMusica ? _rtCarInfo(_rtMusica.id) : null;
+    if (infShow && RT_PALCOS[infShow.i] && RT_PALCOS[infShow.i].id === 'show-cidade') _rtPlatTocar('plateia', 0.12, true);
     _rtTocarDe(-RT_LEAD_S * 1000, 0);
     _rtEstado = 'jogando';
     _rtAviso('');
@@ -1834,6 +1863,7 @@
     else if (a <= RT_JANELAS.bom) tipo = 'bom';
     else tipo = 'erro';
     _rtJulgar(n, tipo, dt);
+    if (tipo === 'erro') _rtPlatTocar('errou', 0.3);   // corda raspada (só no toque fora do tempo)
     _rtPonteiro[c]++;
     if (tipo !== 'erro') {
       _rtEfeitoAcerto(c, tipo); _rtDesvioSoma += dt; _rtDesvioN++;
@@ -1975,7 +2005,7 @@
     if (_rtCfg.dicaE < 3) { _rtCfg.dicaE++; _rtCfgSalvar(); }
     _rtEls.jogo.classList.add('rt-energia-on');
     _rtFaixaMostrar('ENERGIA DA CORUJA!', RT_LUAR, 1100);
-    _rtPlatTocar('grito', 0.4);
+    _rtPlatTocar('energia', 0.4);
     _rtEfeitoLuar();
     _rtMultRender();
     _rtHudEnergia(true);

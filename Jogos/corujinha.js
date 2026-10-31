@@ -210,6 +210,11 @@
     var g = G(), S = g && g.som;
     if (S && typeof S[nome] === 'function') { try { S[nome](arg); } catch (e) {} }
   }
+  // Som gravado (ElevenLabs) com reserva sintetizada — ver _ARQ em Jogos/assets/som.js.
+  function somArq(nome, reserva, vol) {
+    var g = G(), S = g && g.som;
+    if (S && typeof S.tocar === 'function') { try { S.tocar(nome, reserva, vol); } catch (e) {} }
+  }
   function vibrar(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
   function saldoReal() { var g = G(); return g && g.moedasSaldo ? g.moedasSaldo() : 0; }
   function $(id) { return document.getElementById(id); }
@@ -585,6 +590,7 @@
     chuvaMoedas();
     corujaModo('festa');
     som('nivelUp'); vibrar([30, 40, 60]);
+    later(function () { somArq('risada', null, 0.8); }, 350);   // a Corujinha ri de alegria no prêmio grande
     return new Promise(function (ok) {
       big.resolver = ok; big.final = opts.valor || 0;
       if (opts.valor) {
@@ -686,7 +692,7 @@
     ganhoBar('<img src="' + ASSETS + 'sim-' + r.voo + '-v2.webp" alt=""> VOO DA SORTE!', 'cjx-ganhobar-voo');
     balao('Voo da Sorte!', 1800);
     corujaModo('voo', 1600);
-    som('mola'); vibrar(40);
+    somArq('decolar', 'mola', 0.8); vibrar(40);   // Voo da Sorte: a coruja levanta voo
     var i = 0;
     function travas(t) {
       for (var a = 0; a < 3; a++) for (var b = 0; b < 3; b++) {

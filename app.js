@@ -3002,8 +3002,10 @@
   // suporte, sem arquivo ou com o som desligado: silêncio, nada quebra.
   var SONS_APP_KEY = 'angatuba_sons_app';
   var _UI_SONS = ['toque','abrir','fechar','aba','favoritar','desfavoritar','sucesso','erro','aviso',
-    'notificacao','mensagem','enviar','copiar','compartilhar','whatsapp','atualizar','loja-abriu','loja-fechou','interruptor'];
-  var _UI_SOM_VOL = { toque: 0.35, aba: 0.4, mensagem: 0.4, copiar: 0.45, interruptor: 0.45 };
+    'notificacao','mensagem','enviar','copiar','compartilhar','whatsapp','atualizar','loja-abriu','loja-fechou','interruptor',
+    'noticia','pagina','abrir-livro'];   // noticia: feed "Hoje em Angatuba"; pagina/abrir-livro: Biblioteca (Biblioteca/hub.js)
+  var _UI_SOM_VOL = { toque: 0.35, aba: 0.4, mensagem: 0.4, copiar: 0.45, interruptor: 0.45, pagina: 0.35, noticia: 0.4 };
+  var _uiSomNoticiaTocou = false;
   var _uiSomCtx = null, _uiSomBuf = {}, _uiSomUlt = {};
   function _uiSonsLigados() { try { return localStorage.getItem(SONS_APP_KEY) !== '0'; } catch (e) { return true; } }
   function _uiSomCarregar(nome) {
@@ -10564,6 +10566,8 @@
     var carousel = document.getElementById('home-carousel');
     if (!carousel) return;
     idx = Math.max(0, Math.min(idx, 1));
+    // Vinheta de notícia ao deslizar pro "Hoje em Angatuba" (1x por sessão).
+    if (animado && idx === 1 && _homePaginaAtual !== 1 && !_uiSomNoticiaTocou) { _uiSomNoticiaTocou = true; _uiSom('noticia'); }
     _homePaginaAtual = idx;
     carousel.style.transition = animado ? 'transform 0.32s cubic-bezier(0.32,0.72,0,1)' : 'none';
     carousel.style.transform  = 'translateX(-' + (idx * 100) + '%)';

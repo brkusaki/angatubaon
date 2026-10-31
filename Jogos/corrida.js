@@ -544,7 +544,8 @@
     tiro: 2, escopeta: 1, metralhadora: 1, recarga: 1, vazio: 1, caixa: 1,
     acerto: 1, morre: 1, gemido: 2, corredora: 1, terra: 1, agarrao: 1,
     rosnado: 1, coracao: 1, trovao: 1, guardia: 1, esbarrao: 1, batida: 1, uivo: 1,
-    'passos-loop': 1, 'respiracao-loop': 1, 'chuva-loop': 1
+    'passos-loop': 1, 'respiracao-loop': 1, 'chuva-loop': 1,
+    moeda: 1   // out/2026: moeda com eco sombrio (sobe de tom na sequência)
   };
   var _corSfxBuf = {}, _corSfxUlt = {}, _corSfxPedido = false, _corLoops = {};
   function _corSfxUrl(nome, i) { return _COR_SFX_BASE + nome + '-' + i + '.mp3'; }
@@ -2912,7 +2913,9 @@
         if (Math.abs(mo.faixa - _corCamX) < _corMoedaPega()) {
           _corMoedasRun++;
           _corMoedaStreak++; _corMoedaStreakT = 1.0;
-          if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.combo(Math.min(8, _corMoedaStreak));
+          // Moeda gravada, subindo ~1 semitom por moeda seguida; sem o arquivo, o ding sintetizado.
+          if (!_corSfx('moeda', 0.7, 0, 0.02, Math.pow(1.0595, Math.min(7, _corMoedaStreak - 1))) &&
+              window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.combo(Math.min(8, _corMoedaStreak));
           if (_corMoedaFx.length >= 8) _corMoedaFx.shift();
           _corMoedaFx.push({ x: _corProj(mo.z, mo.faixa).x, t: 0 });
         }

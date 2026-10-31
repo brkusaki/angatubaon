@@ -355,6 +355,18 @@
   var _vooSquash = 0;           // 0 = neutro; >0 estica (pulo), <0 achata (impacto)
   var _vooTempo = 0;            // relógio do jogo (s) p/ cintilar estrelas/asas
   var _vooAlt = 0;              // altitude normalizada 0→1 (0 = solo, 1 = espaço)
+  // Sons gravados (ElevenLabs — ver _ARQ em Jogos/assets/som.js). pulo e
+  // mola já saem gravados pelo próprio som.pulo()/som.mola().
+  var _VOO_SONS = ['voo-pulo', 'voo-mola', 'pega-combo', 'voo-quebra', 'voo-foguete', 'voo-queda', 'decolar', 'voo-tema'];
+  var _vooMusica = null;        // loop da música tema ({parar, volume}) durante o voo
+  var _vooSomEspaco = false;    // já tocou o "foguete" ao entrar no espaço nesta partida
+  function _vooSom() { var G = window.AngatubaGames; return (G && G.som) || null; }
+  function _vooMusicaParar() { if (_vooMusica) { _vooMusica.parar(); _vooMusica = null; } }
+  function _vooMusicaTocar() {
+    _vooMusicaParar();
+    var S = _vooSom();
+    if (S && S.loop) _vooMusica = S.loop('voo-tema', 0.32);
+  }
   var _vooDecor = [];          // objetos decorativos ativos cruzando o fundo
   var _vooDecorTimer = 0;      // tempo até tentar spawnar o próximo decor (s)
   var _vooBuracoCd = 0;        // cooldown (s) até um buraco negro poder surgir
@@ -844,6 +856,7 @@
     _vooSquash = 0;
     _vooTempo = 0;
     _vooAlt = 0;
+    _vooSomEspaco = false;
     _vooDecor = [];
     _vooDecorTimer = 1.2;      // primeiro decor aparece logo no começo
     _vooBuracoCd = _VOO_BURACO_CD_INI;
@@ -1061,7 +1074,10 @@
               _vooOpcoesFx()
             );
           }
-          if (pl.tipo === 'break') pl.usada = true;  // quebra após impulsionar
+          if (pl.tipo === 'break') {
+            pl.usada = true;  // quebra após impulsionar
+            var Sq = _vooSom(); if (Sq && Sq.tocar) Sq.tocar('voo-quebra', null, 0.6);
+          }
           break;
         }
       }
@@ -1105,6 +1121,11 @@
     var frac = Math.max(0, Math.min(1, _vooMaxClimb / _vooAltMax()));
     var altAlvo = _vooCurvaAlt(frac);
     _vooAlt += (altAlvo - _vooAlt) * Math.min(1, dt * 3);
+    // Chegou no espaço (faixa >= 0.82): foguete subindo, 1x por partida.
+    if (!_vooSomEspaco && _vooAlt >= 0.82) {
+      _vooSomEspaco = true;
+      var Se = _vooSom(); if (Se && Se.tocar) Se.tocar('voo-foguete', null, 0.7);
+    }
 
     // Decoração de fundo (spawn + movimento), depende da altitude atual.
     _vooAtualizarDecor(dt);
@@ -1772,6 +1793,7 @@
     }
     _vooEstado = 'inicio';
     _vooRegistrarMenu();
+    var Sp = _vooSom(); if (Sp && Sp.precarregar) Sp.precarregar(_VOO_SONS);
     _vooMenuPartida(false);
     var rec = document.getElementById('vo-recorde'); if (rec) rec.textContent = _vooRec();
     var pts = document.getElementById('vo-pontos');  if (pts) pts.textContent = 0;
@@ -1819,6 +1841,8 @@
     _vooLast = 0;
     _vooTempoJogado = 0;
     _vooMenuPartida(true);
+    var Sd = _vooSom(); if (Sd && Sd.tocar) Sd.tocar('decolar', null, 0.7);
+    _vooMusicaTocar();
     if (_vooRAF) cancelAnimationFrame(_vooRAF);
     _vooRAF = requestAnimationFrame(_vooLoop);
   }
@@ -1827,6 +1851,7 @@
     if (_vooRAF) { cancelAnimationFrame(_vooRAF); _vooRAF = 0; }
     // Saiu no meio do voo: as moedas já pegas não se perdem.
     if (_vooEstado === 'jogando') { _vooCreditarMoedas(); _vooEstado = 'inicio'; }
+    _vooMusicaParar();
     _vooDragging = false; _vooKeyDir = 0;
     _vooMenuPartida(false);
   }
@@ -1851,10 +1876,12 @@
         _vooPausado = true;
         if (_vooRAF) { cancelAnimationFrame(_vooRAF); _vooRAF = 0; }
         _vooDragging = false; _vooKeyDir = 0;
+        if (_vooMusica) _vooMusica.volume(0.08); // música baixinha no menu de pausa
       },
       continuar: function () {
         if (!_vooPausado) return;
         _vooPausado = false;
+        if (_vooMusica) _vooMusica.volume(0.32);
         if (_vooEstado === 'jogando' && !_vooRAF) {
           _vooLast = 0;
           _vooRAF = requestAnimationFrame(_vooLoop);
@@ -1872,8 +1899,17 @@
     var recorde = score > rec;
     if (recorde) { _vooRecSet(score); var r = document.getElementById('vo-recorde'); if (r) r.textContent = score; }
 
-    // Som de fim (vitória se bateu recorde, senão neutro).
-    if (window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.fim(recorde);
+    // Som de fim: assobio da queda, depois vitória/recorde (com a voz
+    // "Novo recorde!") ou o "wah-wah" de fim de jogo.
+    _vooMusicaParar();
+    var Sf = _vooSom();
+    if (Sf) {
+      if (Sf.tocar) Sf.tocar('voo-queda', null, 0.6);
+      setTimeout(function () {
+        if (recorde && Sf.tocar && Sf.tocar('recorde', null, 0.8)) setTimeout(function () { Sf.voz('recorde'); }, 900);
+        else Sf.fim(recorde);
+      }, 650);
+    }
 
     // Rank (silencioso se deslogado; o Firestore aplica recorde/teto)
     if (window.AngatubaGames) window.AngatubaGames.rankSubmeter('voo', score);

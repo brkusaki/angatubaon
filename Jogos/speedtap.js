@@ -28,6 +28,10 @@
   var _stPausaInicioMs = 0; // Date.now() de quando a pausa atual começou
 
   // Recordes separados por modo.
+  // Sons gravados (ElevenLabs — ver _ARQ em Jogos/assets/som.js).
+  var _ST_SONS = ['pega-aparece', 'pega-pegou', 'pega-combo', 'recorde', 'voz-recorde'];
+  function _stSom() { var G = window.AngatubaGames; return (G && G.som) || null; }
+
   function _stRecChave() {
     return _stModo === 'sobrevivencia' ? 'angatuba_speedtap_surv_rec' : 'angatuba_speedtap_rec';
   }
@@ -149,6 +153,7 @@
 
   // Prepara a tela (estado inicial, mostra recorde). Não inicia o jogo ainda.
   function _stPreparar() {
+    var Sp = _stSom(); if (Sp && Sp.precarregar) Sp.precarregar(_ST_SONS);
     _stParar();
     _stAplicarSkin();
     _stRegistrarMenu();
@@ -217,6 +222,7 @@
     alvo.appendChild(img);
     arena.appendChild(alvo);
     _stPosicionar(alvo, arena, cfg.tamanho);
+    var Sa = _stSom(); if (Sa) Sa.tocar('pega-aparece', null, 0.3, 0.95 + Math.random() * 0.1);
 
     alvo.addEventListener('click', function(){
       if (!_stRodando || _stPausado) return;
@@ -239,6 +245,7 @@
     if (tipo === 'fake') {
       if (_stModo === 'sobrevivencia') {
         // Perde 1 vida. Combo zera. Se acabaram as vidas, fim de jogo.
+        var Sv = _stSom(); if (Sv) Sv.dano();
         _stVidas = Math.max(0, _stVidas - 1);
         _stCombo = 0;
         _stComboMostrar();
@@ -253,6 +260,7 @@
         return;
       }
       // Modo clássico: tocou na errada, perde 2 pontos, zera combo, treme.
+      var Sx = _stSom(); if (Sx) Sx.erro();
       _stPontos = Math.max(0, _stPontos - 2);
       _stCombo = 0;
       if (pEl) pEl.textContent = _stPontos;
@@ -277,6 +285,13 @@
     if (pEl) pEl.textContent = _stPontos;
 
     _stComboMostrar();
+    var Sg = _stSom();
+    if (Sg) {
+      Sg.tocar('pega-pegou', 'acerto', 0.7, tipo === 'bonus' ? 1.25 : 1);
+      if (tipo === 'bonus') Sg.bonus();
+      // subiu o multiplicador (x2 no 3º acerto seguido, x3 no 6º): ding de combo
+      if (_stCombo === 3 || _stCombo === 6) Sg.combo(_stCombo);
+    }
     _stFlutuante('+' + ganho, alvo, arena, tipo === 'bonus' ? 'st-bonus-txt' : (mult > 1 ? 'st-mult-txt' : ''));
     if (navigator.vibrate) { try { navigator.vibrate(tipo === 'bonus' ? [15,30,15] : 15); } catch(e) {} }
     alvo.classList.remove('st-pop'); void alvo.offsetWidth; alvo.classList.add('st-pop');
@@ -453,6 +468,12 @@
           score: _stPontos
         });
       }
+    }
+
+    var Sf = _stSom();
+    if (Sf) {
+      if (bateuRecorde && Sf.tocar('recorde', null, 0.8)) setTimeout(function () { Sf.voz('recorde'); }, 900);
+      else Sf.fim(bateuRecorde);
     }
 
     var fim = document.getElementById('st-fim');

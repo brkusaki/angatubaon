@@ -143,6 +143,7 @@
       _animHold();
       if (elInstrucao) elInstrucao.style.display = 'none';
       _som('toque');
+      _som('precarregar', [['puff-estoura']]);
       // Se o jogador continuar segurando além do limite, a tosse dispara sozinha.
       timerHold = setTimeout(function () { if (segurando) _tosse(); }, limiteAtual);
     }
@@ -203,7 +204,7 @@
         _quadro(tq);
       }, TOSSE_TROCA_MS);
       if (elAvisoTosse) { elAvisoTosse.style.display = 'block'; elAvisoTosse.classList.remove('pf-aviso-anim'); void elAvisoTosse.offsetWidth; elAvisoTosse.classList.add('pf-aviso-anim'); }
-      _som('dano');
+      _som('tocar', ['puff-estoura', 'dano', 0.7]);   // encheu demais: estouro gravado (reserva: dano)
       _vibrar([40, 60, 40]);
       timerAtordoada = setTimeout(function () {
         atordoada = false;

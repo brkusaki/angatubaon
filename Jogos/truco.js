@@ -325,6 +325,38 @@
   var _solo = false;        // maxJogadores da sala == 1 -> assento 1 é o bot "Coruja" (ver seção 3.5)
   var _off = [];            // { ref, evento, cb } — listeners próprios (acoes)
   var _g = null;             // cópia local do "game" (autoritativa só se _souAnfitriao)
+  /* ---------- sons gravados (ElevenLabs — ver _ARQ em Jogos/assets/som.js) ----------
+     Todo celular toca os mesmos sons porque eles saem da COMPARAÇÃO entre o
+     estado anterior e o novo (feita no _render), não de quem fez a ação.
+     A 1ª leitura da mesa só memoriza (entrar no meio não dispara nada). */
+  var _SONS_BARALHO = ['baralho-embaralhar', 'baralho-distribuir', 'baralho-jogar', 'baralho-uno', 'voz-truco', 'voz-uno'];
+  var _somMem = null;
+  function _somB(nome, vol, rate) {
+    var G = window.AngatubaGames, S = G && G.som;
+    if (S && S.tocar) { try { S.tocar(nome, null, vol, rate); } catch (e) {} }
+  }
+  function _vozB(nome) {
+    var G = window.AngatubaGames, S = G && G.som;
+    if (S && S.voz) { try { S.voz(nome); } catch (e) {} }
+  }
+  function _somDistribuir(n) {
+    for (var i = 0; i < n; i++) (function (k) { setTimeout(function () { _somB('baralho-distribuir', 0.55, 0.95 + Math.random() * 0.1); }, 900 + k * 140); })(i);
+  }
+  function _somEstado() {
+    var m = {
+      mao: _g.maoAtual, mesa: (_g.cartasNaMesa || []).length,
+      pedido: _g.pedidoTruco ? (_g.pedidoTruco.de + ':' + _g.pedidoTruco.valor) : '',
+      valor: _g.pedidoTruco ? _g.pedidoTruco.valor : 0
+    };
+    var a = _somMem; _somMem = m;
+    if (!a) { var G = window.AngatubaGames; if (G && G.som && G.som.precarregar) G.som.precarregar(_SONS_BARALHO); return; }
+    if (m.mao !== a.mao) { _somB('baralho-embaralhar', 0.7); _somDistribuir(3); return; }   // mão nova
+    if (m.mesa > a.mesa) _somB('baralho-jogar', 0.7, 0.95 + Math.random() * 0.1);           // carta na mesa
+    if (m.pedido && m.pedido !== a.pedido) {                                                  // pediu truco / aumentou
+      if (m.valor === 3) _vozB('truco'); else _somB('baralho-uno', 0.7);
+    }
+  }
+
   var _sala = null;          // último snapshot completo da sala
   var _timerProximaMao = null;
   var _timerBot = null;
@@ -916,7 +948,7 @@
     _cancelarAgendamentos();
     if (_timerBalao) { clearTimeout(_timerBalao); _timerBalao = null; }
     if (_root) { while (_root.firstChild) _root.removeChild(_root.firstChild); }
-    _ctx = null; _uid = null; _souAnfitriao = false; _g = null; _sala = null;
+    _ctx = null; _uid = null; _souAnfitriao = false; _g = null; _sala = null; _somMem = null;
     _modoEscondida = false; _root = null; _solo = false; _assentos = 2;
     _painelReacoes = false; _baloes = {}; _reacoesVistas = {}; _cooldownReacao = {}; _ultimoBalaoBot = 0;
     _fraseVez = { chave: '', texto: '' };
@@ -1113,6 +1145,7 @@
     if (!_root || !_sala) return;
     while (_root.firstChild) _root.removeChild(_root.firstChild);
     if (!_g) { _root.appendChild(_elx('div', 'carregando', { texto: 'Preparando a mesa…' })); return; }
+    _somEstado();
 
     var jogadores = _jogadoresEfetivos();
     var meuSeat = (jogadores[_uid] && jogadores[_uid].seat) || 0;

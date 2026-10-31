@@ -994,10 +994,14 @@
     if (meta && _bibTela === 'leitor') meta.setAttribute('content', { claro: '#fbfaf7', escuro: '#121212', sepia: '#f3e9d2' }[_bibPrefs.tema]);
   }
 
+  // Sons do app (app.js → _uiSom, respeita "Sons do app" em Minha conta).
+  function _bibSom(nome) { if (typeof window._uiSom === 'function') { try { window._uiSom(nome); } catch (e) {} } }
+
   function _bibAbrirLeitor(id, opts) {
     opts = opts || {};
     var l = _bibLivro(id);
     if (!l) return;
+    _bibSom('abrir-livro');
     _bibCarregarEstado();
     var el = _bibLeitorEl();
     var anterior = _bibTela;
@@ -1164,7 +1168,9 @@
   function _bibIrPagina(n, semAnimar) {
     var L = _bibL, conteudo = document.getElementById('bib-l-conteudo');
     if (!L || _bibPrefs.modo !== 'h') return;
+    var antes = L.pagina;
     L.pagina = Math.max(0, Math.min(n, L.paginas - 1));
+    if (!semAnimar && L.pagina !== antes) _bibSom('pagina');
     conteudo.style.transition = semAnimar ? 'none' : '';
     conteudo.style.transform = 'translate3d(' + (-L.pagina * L.W) + 'px,0,0)';
     if (semAnimar) { void conteudo.offsetWidth; conteudo.style.transition = ''; }

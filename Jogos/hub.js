@@ -821,6 +821,7 @@
     // iOS). Nas primeiras aberturas AngatubaSom ainda não existe (script
     // carregando); o listener de _ligarDestravarAudio cobre esse caso.
     if (window.AngatubaSom && typeof window.AngatubaSom._destravar === 'function') window.AngatubaSom._destravar();
+    _somHubEntrar();
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0,0); }
     // Fix: entrada no histórico pro botão "voltar" (Android) fechar o hub e
     // cair na tela inicial — sem isso, abrir o hub não empilhava nada e o
@@ -838,6 +839,27 @@
      iOS: o AudioContext só acorda dentro de um gesto; por isso
      destravamos o áudio no 1º toque em qualquer lugar do hub. */
   var _assetsJogosCarregados = false;
+  // Sons gravados do hub (ElevenLabs): baixados assim que o som.js chega,
+  // pra já saírem gravados no 1º uso. Ver _ARQ em Jogos/assets/som.js.
+  var _SONS_HUB = ['hub-entrar', 'card-abrir', 'moeda', 'comprar', 'equipar', 'bau-abrir', 'insignia',
+    'recorde', 'vitoria', 'fim-de-jogo', 'voz-oi', 'voz-recorde', 'contagem-tick', 'contagem-ja',
+    'voz-tres', 'voz-dois', 'voz-um', 'voz-ja', 'risada', 'decolar'];
+  function _somHub(nome, vol) {
+    var S = window.AngatubaSom;
+    if (S && typeof S.tocar === 'function') { try { return S.tocar(nome, null, vol); } catch (e) {} }
+    return false;
+  }
+  // Entrar no hub: whoosh + "Oi! Que bom te ver por aqui!" da Corujinha
+  // (a voz só 1x por dia, pra não cansar).
+  function _somHubEntrar() {
+    _somHub('hub-entrar', 0.8);
+    var hoje = new Date().toDateString(), ja = '';
+    try { ja = localStorage.getItem('angatuba_voz_oi') || ''; } catch (e) {}
+    if (ja === hoje || !window.AngatubaSom || !window.AngatubaSom.voz) return;
+    setTimeout(function () {
+      if (window.AngatubaSom.voz('oi')) { try { localStorage.setItem('angatuba_voz_oi', hoje); } catch (e) {} }
+    }, 700);
+  }
   function _carregarAssetsJogos() {
     if (_assetsJogosCarregados) { _sincronizarBotaoSom(); return; }
     Promise.all([
@@ -846,6 +868,7 @@
     ]).then(function () {
       _assetsJogosCarregados = true;
       _sincronizarBotaoSom();
+      if (window.AngatubaSom && window.AngatubaSom.precarregar) window.AngatubaSom.precarregar(_SONS_HUB);
     }).catch(function () { _assetsJogosCarregados = false; /* permite nova tentativa na próxima abertura */ });
     _ligarDestravarAudio();
   }
@@ -1303,6 +1326,7 @@
       '/Jogos/assets/corrida/sfx/recarga-1.mp3', '/Jogos/assets/corrida/sfx/respiracao-loop-1.mp3', '/Jogos/assets/corrida/sfx/rosnado-1.mp3',
       '/Jogos/assets/corrida/sfx/terra-1.mp3', '/Jogos/assets/corrida/sfx/tiro-1.mp3', '/Jogos/assets/corrida/sfx/tiro-2.mp3',
       '/Jogos/assets/corrida/sfx/trovao-1.mp3', '/Jogos/assets/corrida/sfx/uivo-1.mp3', '/Jogos/assets/corrida/sfx/vazio-1.mp3',
+      '/Jogos/assets/corrida/sfx/moeda-1.mp3',
       '/Jogos/assets/corrida/zumbi-coruja-normal.webp',
       '/Jogos/assets/corrida/zumbi-coruja-normal-b.webp',
       '/Jogos/assets/corrida/zumbi-coruja-rapido.webp',
@@ -1369,6 +1393,9 @@
     ],
     voo: [
       '/Jogos/voo.min.js', '/Jogos/voo.css',
+      // out/2026: sons gravados + música tema (ElevenLabs)
+      '/Jogos/assets/voo/sfx/pulo.mp3', '/Jogos/assets/voo/sfx/mola.mp3', '/Jogos/assets/voo/sfx/quebra.mp3',
+      '/Jogos/assets/voo/sfx/foguete.mp3', '/Jogos/assets/voo/sfx/queda.mp3', '/Jogos/assets/voo/musica/tema.mp3',
       '/Jogos/assets/voo/aviao.webp',
       '/Jogos/assets/voo/balao.webp',
       '/Jogos/assets/voo/buraconegro-v2.webp',
@@ -1399,6 +1426,8 @@
     ],
     doces: [
       '/Jogos/doces.min.js', '/Jogos/doces.css',
+      '/Jogos/assets/doces/sfx/trocar.mp3', '/Jogos/assets/doces/sfx/combina-3.mp3',
+      '/Jogos/assets/doces/sfx/cascata.mp3', '/Jogos/assets/doces/sfx/bomba.mp3',
       '/Jogos/assets/doces/doce-amarelo-v2.webp',
       '/Jogos/assets/doces/doce-azul-v2.webp',
       '/Jogos/assets/doces/doce-roxo-v2.webp',
@@ -1436,10 +1465,11 @@
     ],
     puff: [
       '/Jogos/puff.min.js', '/Jogos/puff.css',
-      '/Jogos/assets/puff/puff-sheet-v2.webp'
+      '/Jogos/assets/puff/puff-sheet-v2.webp', '/Jogos/assets/puff/sfx/estoura.mp3'
     ],
     maquina: [
       '/Jogos/maquina.min.js', '/Jogos/maquina.css',
+      '/Jogos/assets/maquina/sfx/eliminado-1.mp3', '/Jogos/assets/maquina/sfx/ultimo-vivo-1.mp3',
       '/Jogos/assets/maquina/coruja-party-sheet.webp', '/Jogos/assets/maquina/serra.webp', '/Jogos/assets/maquina/itens.webp',
       '/Jogos/assets/maquina/coruja-mesa-sheet.webp',
       '/Jogos/assets/maquina/prensa.webp', '/Jogos/assets/maquina/chao-laminas.webp', '/Jogos/assets/maquina/piso-tile.webp',
@@ -1463,6 +1493,9 @@
     ],
     baralho: [
       '/Jogos/baralho.min.js', '/Jogos/baralho.css',
+      '/Jogos/assets/baralho/sfx/embaralhar.mp3', '/Jogos/assets/baralho/sfx/distribuir.mp3',
+      '/Jogos/assets/baralho/sfx/jogar-carta.mp3', '/Jogos/assets/baralho/sfx/uno.mp3',
+      '/Jogos/assets/hub/voz/truco.mp3', '/Jogos/assets/hub/voz/uno.mp3',
       '/Jogos/assets/baralho/owl-comemorando-v2.webp',
       '/Jogos/assets/baralho/owl-neutra-v2.webp',
       '/Jogos/assets/baralho/owl-provocando-v2.webp',
@@ -1694,6 +1727,7 @@
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
     // Presença rica: amigos passam a ver "Jogando <nome>".
     _presencaJogo(nome);
+    _somHub('card-abrir', 0.7);
     // Fix A1.15: empilha uma entrada própria pro jogo — sem isto, o botão
     // "voltar" do Android saía do hub inteiro em vez de só fechar o jogo
     // (ver ramo "jogo-ativo" no handler de popstate, mais abaixo).
@@ -3744,6 +3778,9 @@
     if (qtd !== 0) {
       _moedasSalvar(novo);
       _lojaAtualizarSaldoUI();
+      // Ganhou moedas: "ding" logo depois do jingle de fim (o baú do
+      // resgate diário e o prêmio da Corujinha têm som próprio).
+      if (qtd > 0 && motivo !== 'diario' && motivo !== 'corujinha-premio') setTimeout(function () { _somHub('moeda', 0.7); }, 450);
       if (typeof DEBUG !== 'undefined' && DEBUG) console.log('[loja] moedas +' + qtd + ' (' + (motivo || '?') + ') → ' + novo);
     }
     // A tela de fim de cada jogo mostra o ganho BASE (calculado lá); o
@@ -3792,7 +3829,7 @@
   function _moedasDiarioUI() {
     var r = _moedasResgatarDiario();
     var S = window.AngatubaGames && window.AngatubaGames.som;
-    if (S) { if (r.ok) S.bonus(); else S.erro(); }
+    if (S) { if (r.ok) { if (!_somHub('bau-abrir', 0.8)) S.bonus(); } else S.erro(); }
     // Re-renderiza o que mostra saldo/CTAs (o saldo dos heróis já foi
     // atualizado por _moedasAdd → _lojaAtualizarSaldoUI).
     _lojaRenderCorpo();
@@ -3871,6 +3908,7 @@
     _invSalvar(inv);
     _lojaAtualizarSaldoUI();
     _lojaRenderCorpo();
+    _somHub(item.tipo === 'badge' ? 'insignia' : 'comprar', 0.8);
     return { ok: true };
   }
 
@@ -4209,7 +4247,8 @@
     if (!r.ok && window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.erro();
   }
   function _lojaEquiparUI(slot, id) {
-    _equiparItem(slot, id);
+    var r = _equiparItem(slot, id);
+    if (r && r.ok) _somHub('equipar', 0.8);
   }
   window._lojaComprarUI = _lojaComprarUI;
   window._lojaEquiparUI = _lojaEquiparUI;
@@ -4520,7 +4559,7 @@
     var r = _comprarItem(id);
     var S = window.AngatubaGames && window.AngatubaGames.som;
     if (!r.ok) { if (S) S.erro(); _lojaJogoRender(); return; }
-    if (S) S.bonus();
+    // (o som da compra sai do próprio _comprarItem)
     // Comprou → já veste (é pra isso que a pessoa comprou).
     var item = _lojaItemPorId(id);
     if (item) _equiparItem(item.slot, id);
@@ -4529,6 +4568,7 @@
   function _lojaJogoEquiparUI(slot, id) {
     var r = _equiparItem(slot, id);
     if (!r.ok && window.AngatubaGames && window.AngatubaGames.som) window.AngatubaGames.som.erro();
+    if (r.ok) _somHub('equipar', 0.8);
     _lojaJogoRender();
   }
   window._lojaJogoComprarUI = _lojaJogoComprarUI;
@@ -4838,7 +4878,7 @@
       return;
     }
     if (!it) return;
-    if (a === 'equipar') _equiparItem(it.slot, it.id);
+    if (a === 'equipar') { if (_equiparItem(it.slot, it.id).ok) _somHub('equipar', 0.8); }
     else if (a === 'remover') _equiparItem('badge', null);
     else if (a === 'comprar') {
       var res = _comprarItem(it.id);
@@ -6473,6 +6513,13 @@
         pulo:    function ()   { return chamar('pulo', []); },
         mola:    function ()   { return chamar('mola', []); },
         fim:     function (v)  { return chamar('fim', [v]); },
+        // sons gravados (ver som.js): tocar(nome, reserva, vol, rate),
+        // voz(nome), loop(nome, vol) → {parar, volume}, precarregar([...])
+        tocar:   function (n, r, v, t) { return chamar('tocar', [n, r, v, t]); },
+        voz:     function (n, v)   { return chamar('voz', [n, v]); },
+        loop:    function (n, v)   { return chamar('loop', [n, v]) || { parar: function () {}, volume: function () {} }; },
+        precarregar: function (l)  { return chamar('precarregar', [l]); },
+        moeda:   function ()   { return chamar('moeda', []); },
         ativo:   function ()   { var S = window.AngatubaSom; return S ? S.ativo() : false; }
       };
     })(),

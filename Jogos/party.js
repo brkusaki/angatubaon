@@ -1845,9 +1845,14 @@
       numEl.classList.toggle('pty-countdown-vai', n <= 0);
       numEl.classList.remove('pty-countdown-pulse'); void numEl.offsetWidth; numEl.classList.add('pty-countdown-pulse');
     }
-    // Som do tique-taque (3-2-1) e um som mais triunfante no "Vai!".
-    if (window.AngatubaGames && window.AngatubaGames.som) {
-      if (n > 0) window.AngatubaGames.som.toque(); else window.AngatubaGames.som.nivelUp();
+    // Bip gravado + locutor contando ("Três… dois… um… JÁ!"), cada palavra
+    // no seu tique. Sem os arquivos: o tique-taque sintetizado de antes.
+    var Sc = window.AngatubaGames && window.AngatubaGames.som;
+    if (Sc) {
+      if (n === 3 && Sc.precarregar) Sc.precarregar(['contagem-tick', 'contagem-ja', 'voz-tres', 'voz-dois', 'voz-um', 'voz-ja']);
+      if (n > 0) Sc.tocar('contagem-tick', 'toque', 0.45); else Sc.tocar('contagem-ja', 'nivelUp', 0.55);
+      var palavra = { 3: 'tres', 2: 'dois', 1: 'um', 0: 'ja' }[n];
+      if (palavra) Sc.voz(palavra);
     }
   });
   window.AngatubaParty.on('mostrarArena', function () { _mostrarSub('arena'); /* o render() do minigame injeta o jogo em #pty-arena-container */ });

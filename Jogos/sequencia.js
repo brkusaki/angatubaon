@@ -240,6 +240,8 @@
     _sqLimparTimers();
     _sqApagarTodos();
     if (navigator.vibrate) { try { navigator.vibrate(200); } catch(e) {} }
+    // buzina gravada do erro (vale também dentro do Coruja Party)
+    if (_som()) _som().tocar('seq-erro', 'erro', 0.8);
     var grade = document.getElementById('sq-grade');
     if (grade) { grade.classList.remove('sq-erro'); void grade.offsetWidth; grade.classList.add('sq-erro'); }
 
@@ -272,7 +274,14 @@
       }
     }
 
-    if (_som()) { if (bateu) _som().fim(true); else _som().erro(); }
+    // Bateu o recorde: fanfarra + "Novo recorde!" depois da buzina do erro.
+    if (bateu && _som()) {
+      var Sr = _som();
+      setTimeout(function () {
+        if (Sr.tocar('recorde', null, 0.8)) setTimeout(function () { Sr.voz('recorde'); }, 900);
+        else Sr.fim(true);
+      }, 700);
+    }
     if (bateu && window.AngatubaGames && window.AngatubaGames.efeitos) {
       window.AngatubaGames.efeitos.confete('sq-card');
     }
@@ -387,6 +396,7 @@
 
   // Preparação da tela: liga os botões (idempotente) e reseta o estado.
   function _sqPrepararTela() {
+    if (_som() && _som().precarregar) _som().precarregar(['tom-1', 'tom-2', 'tom-3', 'tom-4', 'seq-erro', 'recorde', 'voz-recorde']);
     _sqLigarBotoes();
     _sqAplicarSkin();
     _sqRegistrarMenu();

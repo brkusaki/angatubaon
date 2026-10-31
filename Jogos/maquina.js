@@ -92,7 +92,9 @@
     serra: 1, clank: 1, raspao: 1, alerta: 1, morte: 1, prensa: 1, passo: 1,
     erro: 1, sirene: 1, queda: 1, fogo: 1, acerto: 1, moeda: 1, vitoria: 1,
     // fase 2/3: Empurra-Empurra, Campo Minado, Puff e Ervilhas
-    investida: 1, explosao: 1, tosse: 1, mastigar: 1
+    investida: 1, explosao: 1, tosse: 1, mastigar: 1,
+    // out/2026 (claude/sons-catalogo-elevenlabs.md): alçapão ao cair, tensão no duelo final
+    eliminado: 1, 'ultimo-vivo': 1
   };
 
   var _pararAtual = null;
@@ -650,6 +652,8 @@
           g.morteT = 0;
           M.som('morte', 0.3);
           if (typeof jogo.rivalCaiu === 'function') { try { jogo.rivalCaiu(g); } catch (er) {} }
+          // Sobraram só 2 (eu e mais um): coração + alarme do duelo final, 1x por rodada.
+          if (!M._duelo && M.estado === 'jogando' && totalJog > 2 && _vivosAgora() === 2) { M._duelo = true; M.som('ultimo-vivo', 0.6); }
         }
         g.e = e; vistos[r.uid] = 1;
       });
@@ -787,6 +791,7 @@
       _redeEnviar(true);
       M.tremer(3); M.flash('rgba(255,40,60,.55)'); M.vibrar([60, 40, 120]);
       _som('morte');
+      setTimeout(function () { _som('eliminado', 0.7); }, 250);   // alçapão + grito engraçado
       _mostrarFim(titulo || 'VOCÊ CAIU!', sub, 'morte');
     };
     function _terminouTempo() {

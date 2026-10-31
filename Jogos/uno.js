@@ -274,6 +274,41 @@
   var _solo = false;
   var _off = [];             // listeners próprios (acoes)
   var _g = null;             // cópia local do "game" (autoritativa só se _souAnfitriao)
+  /* ---------- sons gravados (ElevenLabs — ver _ARQ em Jogos/assets/som.js) ----------
+     Todo celular toca os mesmos sons porque eles saem da COMPARAÇÃO entre o
+     estado anterior e o novo (feita no _render), não de quem fez a ação.
+     A 1ª leitura da mesa só memoriza (entrar no meio não dispara nada). */
+  var _SONS_BARALHO = ['baralho-embaralhar', 'baralho-distribuir', 'baralho-jogar', 'baralho-uno', 'voz-truco', 'voz-uno'];
+  var _somMem = null;
+  function _somB(nome, vol, rate) {
+    var G = window.AngatubaGames, S = G && G.som;
+    if (S && S.tocar) { try { S.tocar(nome, null, vol, rate); } catch (e) {} }
+  }
+  function _vozB(nome) {
+    var G = window.AngatubaGames, S = G && G.som;
+    if (S && S.voz) { try { S.voz(nome); } catch (e) {} }
+  }
+  function _somDistribuir(n) {
+    for (var i = 0; i < n; i++) (function (k) { setTimeout(function () { _somB('baralho-distribuir', 0.55, 0.95 + Math.random() * 0.1); }, 900 + k * 140); })(i);
+  }
+  function _somEstado() {
+    var ev = _g.ultimoEvento;
+    var m = { fase: _g.fase || 'jogando', seq: ev ? ev.seq : 0, tipo: ev ? ev.tipo : '',
+              unos: Object.keys(_g.unoDeclarado || {}).length };
+    var a = _somMem; _somMem = m;
+    if (!a) { var G = window.AngatubaGames; if (G && G.som && G.som.precarregar) G.som.precarregar(_SONS_BARALHO); return; }
+    if (m.fase !== a.fase) {
+      if (m.fase === 'embaralhando') _somB('baralho-embaralhar', 0.7);
+      else if (m.fase === 'distribuindo') _somDistribuir(5);
+    }
+    if (m.seq && m.seq !== a.seq) {
+      if (m.tipo === 'jogou') _somB('baralho-jogar', 0.7, 0.95 + Math.random() * 0.1);
+      else if (m.tipo === 'comprou' || m.tipo === 'comprouStack') _somB('baralho-distribuir', 0.6);
+      else if (m.tipo === 'pegou') _somB('baralho-uno', 0.7);            // pegou alguém sem gritar UNO
+    }
+    if (m.unos > a.unos) { _somB('baralho-uno', 0.6); setTimeout(function () { _vozB('uno'); }, 250); }
+  }
+
   var _monte = [];           // monte de compra — SÓ no anfitrião, nunca vai pro RTDB
   var _sala = null;
   var _root = null;
@@ -987,7 +1022,7 @@
     if (_timerBalao) { clearTimeout(_timerBalao); _timerBalao = null; }
     if (_timerEvento) { clearTimeout(_timerEvento); _timerEvento = null; }
     if (_root) { while (_root.firstChild) _root.removeChild(_root.firstChild); }
-    _ctx = null; _uid = null; _souAnfitriao = false; _g = null; _sala = null;
+    _ctx = null; _uid = null; _souAnfitriao = false; _g = null; _sala = null; _somMem = null;
     _monte = []; _root = null; _solo = false; _assentos = 2;
     _painelReacoes = false; _baloes = {}; _reacoesVistas = {}; _cooldownReacao = {};
     _fraseVez = { chave: '', texto: '' };
@@ -1209,6 +1244,7 @@
     while (_root.firstChild) _root.removeChild(_root.firstChild);
     if (!_g) { _root.appendChild(_elx('div', 'carregando', { texto: 'Embaralhando…' })); return; }
 
+    _somEstado();
     _verEvento();
     var jogadores = _jogadoresEfetivos();
     var ordem = _ordemAssentos(jogadores);

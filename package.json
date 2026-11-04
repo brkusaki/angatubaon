@@ -1,0 +1,26 @@
+{
+  "name": "angatubaon",
+  "private": true,
+  "description": "PWA do AngatubaON — scripts de build, verificação, testes e deploy (o app em si não usa nada daqui).",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node ferramentas/build.mjs",
+    "build:checar": "node ferramentas/build.mjs --checar",
+    "lint": "eslint .",
+    "testar": "playwright test",
+    "servir": "http-server -p 4173 -c-1 .",
+    "regras:firestore": "firebase deploy --only firestore:rules",
+    "regras:realtime": "firebase deploy --only database",
+    "gas:publicar": "powershell -ExecutionPolicy Bypass -File ferramentas/gas-publicar.ps1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "eslint": "^9.39.5",
+    "globals": "^17.14.0",
+    "http-server": "^14.1.1",
+    "terser": "5.51.2"
+  }
+}

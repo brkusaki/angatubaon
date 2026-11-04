@@ -1,0 +1,5 @@
+node_modules/
+test-results/
+playwright-report/
+ferramentas/gas/
+ferramentas/blender-mcp-addon.py

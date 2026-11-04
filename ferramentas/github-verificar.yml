@@ -1,0 +1,23 @@
+# Roda a cada push: confere se os .min.js estão em dia com as fontes, se
+# nenhum global window.* sumiu, se a versão do service worker subiu
+# quando JS/CSS/HTML mudou, e passa o ESLint. Não publica nada: se algo
+# falhar, o GitHub manda e-mail e mostra um X vermelho no commit.
+# Grátis: os runners padrão do GitHub não cobram em repositório público.
+name: Verificar
+on:
+  push:
+  pull_request:
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Minificados e versão do SW
+        run: npm run build:checar
+      - name: ESLint
+        run: npm run lint

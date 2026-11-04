@@ -1,5 +1,5 @@
 {
- "versaoSW": 496,
+ "versaoSW": 497,
  "hashes": {
   "Aprender/conteudo.js": "c2776ebcaf3844f9",
   "Aprender/hub.js": "0025f4b073788e9b",
@@ -34,12 +34,6 @@
   "Jogos/multiplayer.js": "8bc2153091e334dc",
   "Jogos/negocios.css": "df08e9c57365d603",
   "Jogos/negocios.js": "288e33c3a4e80de6",
-  "Jogos/negocios/css/style.css": "62eeb118817c02bb",
-  "Jogos/negocios/index.html": "21a5141092027e7a",
-  "Jogos/negocios/js/app.js": "cd727291b49d455e",
-  "Jogos/negocios/js/dados.js": "2f37e9f30a00c978",
-  "Jogos/negocios/js/jogo.js": "15e3366831cfc2b2",
-  "Jogos/negocios/js/ui.js": "4c66efc57e194a02",
   "Jogos/party.css": "e0a63480691e7c3f",
   "Jogos/party.js": "045c0be6351cb503",
   "Jogos/piano.css": "53935a8aadc2f829",
@@ -63,7 +57,7 @@
   "Jogos/voo.css": "d1b6a6436ee7b367",
   "Jogos/voo.js": "95c4d76666520ced",
   "admin.html": "48a45452afb0db89",
-  "app.js": "fcf8e67c22dc73fd",
+  "app.js": "5f6a65b42e7ee817",
   "index.html": "159834f36648f2a0",
   "offline.html": "b710016856bc3225",
   "privacidade.html": "be26a48acd997c2c",

@@ -2922,6 +2922,11 @@
     if (cat !== 'todos') btn.closest('.cat-item')?.classList.add('has-clear');
 
     activePillFilter = 'all';
+    // O loop abaixo apaga o destaque do chip de bairro: sem zerar o
+    // activeBairro junto, o filtro seguia valendo escondido.
+    activeBairro     = '';
+    const _lblBairro = document.getElementById('pill-bairro-label');
+    if (_lblBairro) _lblBairro.textContent = 'Bairro';
     document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
 
     renderLojas();
@@ -4711,6 +4716,9 @@
     searchQuery      = '';
     activeCat        = 'todos';
     activePillFilter = 'all';
+    activeBairro     = '';  // Início zera tudo, inclusive o bairro
+    const _lblBairroIni = document.getElementById('pill-bairro-label');
+    if (_lblBairroIni) _lblBairroIni.textContent = 'Bairro';
     document.querySelectorAll('.cat-icon').forEach(i => i.classList.remove('active'));
     document.querySelector('[data-cat="todos"] .cat-icon')?.classList.add('active');
     document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
@@ -13517,7 +13525,7 @@ ${urlCard}`)}`;
         avalId: avalId,
         textoEsperado: textoEsperado || '',
       }));
-      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
+      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(20000) });
       const json = await resp.json();
       if (json.status === 'ok') {
         mlToast('Avaliação sinalizada! Será revisada em breve.', 'ok');
@@ -13752,7 +13760,7 @@ ${urlCard}`)}`;
     try {
       const params = new URLSearchParams();
       params.append('payload', JSON.stringify({ action:'lojaResponderAvaliacao', token:_lojaToken, avalId:avalId, resposta:resposta }));
-      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(10000) });
+      const resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(20000) });
       const json = await resp.json();
       if (json.status !== 'ok') { if (msg) { msg.textContent = '❌ ' + (json.msg || 'Erro.'); msg.style.color = 'var(--red)'; } return; }
       const arr = LOJAS[lojaIdx] && LOJAS[lojaIdx].avaliacoes;

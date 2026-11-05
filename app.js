@@ -1017,6 +1017,22 @@
       .replace(/^-+|-+$/g,'');
   }
 
+  // Link da loja que sobrevive a renomeação: #nome-da-loja--k3f9a.
+  // O código final vem do WhatsApp (hash FNV-1a em base36), que não muda
+  // quando a loja troca de nome. toSlug() nunca gera "--", então o separador
+  // é inequívoco. Loja sem WhatsApp fica só com o slug do nome.
+  function lojaLinkId(wpp) {
+    const w = String(wpp || '').replace(/\D/g, '');
+    if (!w) return '';
+    let h = 0x811c9dc5;
+    for (let i = 0; i < w.length; i++) { h ^= w.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h.toString(36);
+  }
+  function lojaHash(nome, wpp) {
+    const id = lojaLinkId(wpp);
+    return toSlug(nome) + (id ? '--' + id : '');
+  }
+
   let activeCat        = 'todos';
   let searchQuery      = '';
   let activePillFilter = 'all';
@@ -5494,7 +5510,7 @@
     const shareSection = document.getElementById('ml-share-section');
     if (shareSection) {
       shareSection.style.display = '';
-      mlMontarCompartilhamento(d.nome);
+      mlMontarCompartilhamento(d.nome, d.wpp);
     }
 
     // ── Upload de imagens (capa: todos · logo: Plus e Pro) ─
@@ -8307,9 +8323,9 @@
     // Evita empilhar entrada duplicada se já estamos num estado 'detalhes'
     // (ex.: abrir outra loja a partir de dentro do próprio modal).
     if (history.state?.modal === 'detalhes') {
-      history.replaceState({ modal: 'detalhes', idx }, '', '#' + toSlug(loja.nome));
+      history.replaceState({ modal: 'detalhes', idx }, '', '#' + lojaHash(loja.nome, loja.wpp));
     } else {
-      history.pushState({ modal: 'detalhes', idx }, '', '#' + toSlug(loja.nome));
+      history.pushState({ modal: 'detalhes', idx }, '', '#' + lojaHash(loja.nome, loja.wpp));
     }
 
     // Métrica de visualização (antes nunca era enviada: Visualizações e
@@ -8645,7 +8661,7 @@
   function detalhesCompartilhar(idx) {
     const loja = LOJAS[idx];
     if (!loja) return;
-    const url = `${location.origin}/#${toSlug(loja.nome)}`;
+    const url = `${location.origin}/#${lojaHash(loja.nome, loja.wpp)}`;
 
     // Monta texto rico com status e horário
     const { status, fechaStr } = calcStatusInfo(loja);
@@ -12164,7 +12180,15 @@
 
     const { slug, cardapio } = _parseHash();
     if (!slug) return;
-    const loja = LOJAS.find(l => toSlug(l.nome) === slug);
+    // #nome--id: acha pelo id (estável a renomeação); empate de id desempata
+    // pelo nome. Sem id (ou id que não bate, ex.: WhatsApp trocado) e links
+    // antigos #nome: acha pelo nome.
+    const sep = slug.lastIndexOf('--');
+    const nomeSlug = sep === -1 ? slug : slug.slice(0, sep);
+    const id       = sep === -1 ? '' : slug.slice(sep + 2);
+    const porId = id ? LOJAS.filter(l => lojaLinkId(l.wpp) === id) : [];
+    const loja = porId.find(l => toSlug(l.nome) === nomeSlug) || porId[0]
+      || LOJAS.find(l => toSlug(l.nome) === nomeSlug);
     if (!loja) return;
     const idx = _lojaIdxMap.get(loja);
     if (idx == null) return;
@@ -12520,8 +12544,10 @@
     }
   };
 
-  function mlMontarCompartilhamento(nome) {
-    const slug    = toSlug(nome);
+  function mlMontarCompartilhamento(nome, wpp) {
+    // Link estável a renomeação (#nome--id) — vale também pro QR do balcão,
+    // que lê o texto de #ml-share-url.
+    const slug    = lojaHash(nome, wpp);
     const url     = `${location.origin}/#${slug}`;
     const urlEl   = document.getElementById('ml-share-url');
     const wppEl   = document.getElementById('ml-share-wpp');

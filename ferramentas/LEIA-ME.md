@@ -23,6 +23,7 @@ powershell -ExecutionPolicy Bypass -File ferramentas\gas-configurar.ps1
 | Comando | O que faz |
 | --- | --- |
 | `npm run build` | Minifica todos os pares `X.js` → `X.min.js` (e `app.js` → `app_min.js`), confere se algum `window.*` sumiu e sobe a versão do CACHE no `service-worker.js` quando JS/CSS/HTML mudou. Se algo der errado, não grava nada. |
+| (dentro do `npm run build`) | Gera `fonts/icones/` (CSS + fontes do Font Awesome e do Tabler só com os ícones que o código usa). Ícone novo escrito por inteiro (`fa-xxx`, `ti-xxx`) entra sozinho; nome montado por pedaços (`'fa-' + nome`) precisa ir no `EXTRAS` de `ferramentas/icones.mjs`, e o build avisa quando aparece um lugar novo assim. |
 | `npm run build:checar` | Só confere, sem gravar (o GitHub Actions roda isso a cada push). |
 | `npm run lint` | ESLint: pega chave duplicada, código inalcançável, atribuição a const etc. Variável não declarada aparece só como aviso. |
 | `npm run testar` | Sobe o site local e testa num celular simulado: carga sem erro de JS, service worker ativo, arquivos essenciais respondendo. |

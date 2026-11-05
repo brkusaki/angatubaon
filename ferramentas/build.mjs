@@ -18,8 +18,9 @@
    ferramentas/build-estado.json, que vai pro repositório junto. */
 
 import { minify } from "terser";
+import { gerarIcones } from "./icones.mjs";
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from "node:fs";
 import { join, relative, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -106,12 +107,37 @@ for (const [fonte, destino] of pares) {
   }
 }
 
+// 2b. Ícones: CSS e fontes só com os ícones que o app usa (ver icones.mjs)
+const pendentes = {}; // rel -> conteúdo novo (texto) para entrar no hash do SW
+try {
+  const ic = await gerarIcones(RAIZ);
+  if (ic.aviso) console.warn(`  ⚠ ${ic.aviso}`);
+  let mudou = false;
+  for (const [r, buf] of ic.arquivos) {
+    const abs = join(RAIZ, r);
+    if (existsSync(abs) && readFileSync(abs).equals(buf)) continue;
+    mudou = true;
+    if (CHECAR) {
+      console.error(`✖ ${r} está desatualizado (mudou o uso de ícones) — rode "npm run build".`);
+      erros++;
+    } else {
+      atualizados.push([abs, buf]);
+      if (r.endsWith(".css")) pendentes[r] = buf.toString("utf8");
+    }
+  }
+  if (mudou && !CHECAR) console.log(`  Ícones: ${ic.resumo}`);
+} catch (e) {
+  console.error(`✖ Ícones: ${e.message}`);
+  erros++;
+}
+
 // 3. Versão do SW
 const fontes = arquivos
   .filter(p => /\.(js|css|html)$/.test(p) && !p.endsWith(".min.js") && p !== appMin && p !== ARQ_SW)
   .sort();
 const hashes = {};
 for (const p of fontes) hashes[rel(p)] = hash(ler(p));
+for (const [r, txt] of Object.entries(pendentes)) hashes[r] = hash(lf(txt));
 
 const sw = ler(ARQ_SW);
 const mCache = sw.match(RE_CACHE);
@@ -157,6 +183,7 @@ if (erros) {
 // Só grava depois que tudo passou: ou entra tudo, ou nada.
 if (!CHECAR) {
   for (const [destino, novo] of atualizados) {
+    mkdirSync(dirname(destino), { recursive: true });
     writeFileSync(destino, novo);
     console.log(`✔ ${rel(destino)} regenerado`);
   }

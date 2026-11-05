@@ -1804,10 +1804,15 @@
       background: rgba(0,0,0,0.9);
       display: flex; align-items: flex-end; justify-content: center;
       opacity: 0; pointer-events: none;
-      transition: opacity 0.25s ease;
+      transition: opacity 0.25s ease, content-visibility 0.25s allow-discrete;
       backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
     }
     .plan-overlay.open { opacity: 1; pointer-events: auto; }
+    /* Fechado, o conteúdo não é desenhado: sem isto as 3 corujas dos
+       planos (~375 KB) baixavam junto com a abertura do app, disputando
+       a rede com o resto. O allow-discrete da transição mantém o
+       conteúdo visível até o fim do fade-out. */
+    .plan-overlay:not(.open) { content-visibility: hidden; }
 
     .plan-sheet {
       width: 100%; max-width: 520px;

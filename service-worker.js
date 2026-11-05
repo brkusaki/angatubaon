@@ -66,7 +66,7 @@ self.addEventListener('notificationclick', function (event) {
   );
 });
 
-const CACHE = 'angatubaon-v497';
+const CACHE = 'angatubaon-v499';
 // Cache separado dos assets dos jogos (sprites, sons, músicas, vídeos
 // dos minigames). Fica de fora do CACHE principal de propósito: o
 // activate() abaixo NUNCA apaga o CACHE_JOGOS quando o app atualiza
@@ -100,6 +100,7 @@ const STATIC = [
   '/index.html',
   '/offline.html',
   '/styles.css',
+  '/fonts/icones/icones.css',
   '/app_min.js',
   // Hub de jogos + som/efeitos compartilhados: sem eles no precache, o
   // hub não abria offline depois de um update até ser aberto online uma vez.
@@ -317,6 +318,19 @@ self.addEventListener('fetch', e => {
           }).catch(() => r || Response.error());
         })
       )
+    );
+  } else if (pathBib.startsWith('/fonts/icones/')) {
+    // Fontes de ícones (geradas pelo build, com ?v=hash no icones.css):
+    // cache-first, guardando na 1ª carga — assim os ícones aparecem
+    // offline. Cada versão nova tem URL nova; as velhas saem quando o
+    // CACHE sobe de versão (activate).
+    e.respondWith(
+      caches.open(CACHE).then(c =>
+        c.match(e.request).then(r => r || fetch(e.request).then(resp => {
+          if (resp && resp.ok) c.put(e.request, resp.clone());
+          return resp;
+        }))
+      ).catch(() => Response.error())
     );
   } else {
     // Cache-first para imagens e outros assets estáticos DO PRÓPRIO DOMÍNIO

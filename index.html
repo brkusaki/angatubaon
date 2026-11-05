@@ -60,11 +60,10 @@
   <!-- Resource hints: abre conexao com os CDNs cedo, reduz latencia do primeiro paint -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <!-- Tabler pinado em 3.44.0 (era @latest: resolvia versao a cada carga, sem cache estavel) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.44.0/dist/tabler-icons.min.css" />
+  <!-- Ícones (Font Awesome 6.5.0 + Tabler 3.44.0) servidos daqui, só com
+       os que o app usa: gerados pelo "npm run build" (ferramentas/icones.mjs).
+       Antes vinham inteiros de dois CDNs (~1,1 MB) e seguravam a 1ª pintura. -->
+  <link rel="stylesheet" href="/fonts/icones/icones.css" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -273,7 +272,7 @@
 
   <!-- ══ TOAST ══ -->
   <div id="toast" role="alert" aria-live="assertive">
-    <img src="/webp/owl-sleeping.webp" alt="" class="toast-owl" id="toast-owl"
+    <img loading="lazy" src="/webp/owl-sleeping.webp" alt="" class="toast-owl" id="toast-owl"
          onerror="this.style.display='none';var s=this.nextElementSibling;if(s)s.style.display='inline-block';" />
     <i class="fa fa-clock-rotate-left toast-icon" style="display:none;"></i>
     <div class="toast-body">
@@ -295,7 +294,7 @@
   <div id="ml-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="ml-confirm-titulo" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:24px;">
     <div style="position:relative;width:100%;max-width:340px;margin-top:44px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:52px 20px 18px;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
       <div style="text-align:center;margin-bottom:8px;">
-        <img id="ml-confirm-owl" src="/webp/owl-sign.webp" alt="" style="position:absolute;top:-46px;left:50%;transform:translateX(-50%);width:92px;height:92px;object-fit:contain;filter:drop-shadow(0 6px 12px rgba(0,0,0,0.55));" onerror="this.style.display='none'" />
+        <img loading="lazy" id="ml-confirm-owl" src="/webp/owl-sign.webp" alt="" style="position:absolute;top:-46px;left:50%;transform:translateX(-50%);width:92px;height:92px;object-fit:contain;filter:drop-shadow(0 6px 12px rgba(0,0,0,0.55));" onerror="this.style.display='none'" />
         <strong id="ml-confirm-titulo" style="font-family:var(--font-h);font-size:1.15rem;font-weight:800;color:var(--text);line-height:1.15;">Confirmar</strong>
       </div>
       <p id="ml-confirm-msg" style="font-size:13.5px;color:var(--muted);line-height:1.45;margin:0 0 18px;text-align:center;"></p>
@@ -311,7 +310,7 @@
   <div id="ml-prompt-overlay" role="dialog" aria-modal="true" aria-labelledby="ml-prompt-titulo" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:24px;">
     <div style="position:relative;width:100%;max-width:340px;margin-top:44px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:52px 20px 18px;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
       <div style="text-align:center;margin-bottom:8px;">
-        <img id="ml-prompt-owl" src="/webp/owl-tip.webp" alt="" style="position:absolute;top:-46px;left:50%;transform:translateX(-50%);width:92px;height:92px;object-fit:contain;filter:drop-shadow(0 6px 12px rgba(0,0,0,0.55));" onerror="this.style.display='none'" />
+        <img loading="lazy" id="ml-prompt-owl" src="/webp/owl-tip.webp" alt="" style="position:absolute;top:-46px;left:50%;transform:translateX(-50%);width:92px;height:92px;object-fit:contain;filter:drop-shadow(0 6px 12px rgba(0,0,0,0.55));" onerror="this.style.display='none'" />
         <strong id="ml-prompt-titulo" style="font-family:var(--font-h);font-size:1.15rem;font-weight:800;color:var(--text);line-height:1.15;">Editar</strong>
       </div>
       <p id="ml-prompt-msg" style="font-size:13.5px;color:var(--muted);line-height:1.45;margin:0 0 12px;text-align:center;"></p>
@@ -417,7 +416,7 @@
             </div>
             <div class="store-list" id="store-list"></div>
             <div class="empty-state" id="empty-state">
-              <img id="empty-owl" class="empty-owl" src="/webp/owl-search.webp" alt=""
+              <img loading="lazy" id="empty-owl" class="empty-owl" src="/webp/owl-search.webp" alt=""
                    onerror="this.dataset.failed='1';this.style.display='none';var e=document.getElementById('empty-icon');if(e)e.style.display='block';" />
               <span class="empty-icon" id="empty-icon" style="display:none;">🔍</span>
               <div class="empty-title" id="empty-title">Nenhuma loja encontrada</div>
@@ -889,7 +888,7 @@
 
       <!-- Estado vazio: nenhum jogo bate com a busca/filtro -->
       <div class="games-empty" id="games-empty">
-        <div class="games-empty-owl"><img src="/webp/owl-search.webp" alt="" style="width:72px;height:72px;object-fit:contain;" onerror="this.parentNode.textContent='🦉'"></div>
+        <div class="games-empty-owl"><img loading="lazy" src="/webp/owl-search.webp" alt="" style="width:72px;height:72px;object-fit:contain;" onerror="this.parentNode.textContent='🦉'"></div>
         <div class="games-empty-tit">Nenhum jogo encontrado</div>
         <div class="games-empty-sub">Tenta outra busca ou categoria.</div>
       </div>
@@ -900,7 +899,7 @@
         <div id="quiz-coruja" class="quiz-coruja" style="display:none;">
           <div class="quiz-inner">
             <div id="quiz-fase-perguntas">
-              <img id="quiz-owl-live" class="quiz-owl-live" src="/webp/owl-idea.webp" alt="" onerror="this.style.display='none'">
+              <img loading="lazy" id="quiz-owl-live" class="quiz-owl-live" src="/webp/owl-idea.webp" alt="" onerror="this.style.display='none'">
               <div class="quiz-head">
                 <span class="quiz-head-txt">Quiz da Coruja 🦉</span>
                 <span class="quiz-progresso" id="quiz-progresso">1/5</span>
@@ -923,7 +922,7 @@
           </div>
         </div>
         <div id="games-loading" style="text-align:center;padding:30px 20px;color:var(--muted);">
-          <img src="/webp/owl-search.webp" alt="" style="width:56px;height:56px;object-fit:contain;opacity:.7;" onerror="this.style.display='none'">
+          <img loading="lazy" src="/webp/owl-search.webp" alt="" style="width:56px;height:56px;object-fit:contain;opacity:.7;" onerror="this.style.display='none'">
           <div style="margin-top:8px;font-size:13px;">Carregando o quiz…</div>
         </div>
       </div>
@@ -960,7 +959,7 @@
         <div id="qt-card" class="quiz-coruja qz-neutro" style="display:none;">
           <div class="quiz-inner">
             <div id="qt-fase-perguntas">
-              <img id="qt-owl-live" class="quiz-owl-live" src="/webp/owl-idea.webp" alt="" onerror="this.style.display='none'">
+              <img loading="lazy" id="qt-owl-live" class="quiz-owl-live" src="/webp/owl-idea.webp" alt="" onerror="this.style.display='none'">
               <div class="quiz-head">
                 <span class="quiz-head-txt" id="qt-head-txt">🎯 Quanto você conhece</span>
                 <span class="quiz-progresso" id="qt-progresso">1/15</span>
@@ -984,7 +983,7 @@
           </div>
         </div>
         <div id="qt-loading" style="text-align:center;padding:30px 20px;color:var(--muted);display:none;">
-          <img src="/webp/owl-search.webp" alt="" style="width:56px;height:56px;object-fit:contain;opacity:.7;" onerror="this.style.display='none'">
+          <img loading="lazy" src="/webp/owl-search.webp" alt="" style="width:56px;height:56px;object-fit:contain;opacity:.7;" onerror="this.style.display='none'">
           <div style="margin-top:8px;font-size:13px;">Carregando perguntas…</div>
         </div>
       </div>
@@ -1007,7 +1006,7 @@
           <!-- Tela inicial -->
           <div class="rl-overlay" id="rl-inicio">
             <div class="rl-overlay-corpo">
-              <img src="/webp/owl-idea.webp" alt="" class="rl-overlay-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/webp/owl-idea.webp" alt="" class="rl-overlay-owl" onerror="this.style.display='none'">
               <div class="rl-overlay-titulo">⚡ Modo Relâmpago</div>
               <div class="rl-overlay-desc">Responda o mais rápido que conseguir! Quanto mais rápido acertar, mais pontos. Erro ou tempo esgotado encerra o jogo.</div>
               <button type="button" class="rl-play" onclick="_rlComecar()">Começar</button>
@@ -1040,7 +1039,7 @@
             <div class="st-combo-badge" id="st-combo" style="display:none;"></div>
             <!-- Estado inicial: escolha de modo -->
             <div class="st-inicio" id="st-inicio">
-              <img src="/webp/owl-wave.webp" alt="" class="st-inicio-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/webp/owl-wave.webp" alt="" class="st-inicio-owl" onerror="this.style.display='none'">
               <div class="st-inicio-titulo">Pega a Coruja!</div>
               <div class="st-inicio-desc">Toque nas corujas boas 🦉 e fuja das impostoras de óculos e bigode 🥸. Acertos seguidos fazem combo!</div>
               <div class="st-modos">
@@ -1089,7 +1088,7 @@
           </div>
           <!-- Tela inicial -->
           <div class="sq-overlay" id="sq-inicio">
-            <img src="/webp/owl-idea.webp" alt="" class="sq-overlay-owl" onerror="this.style.display='none'">
+            <img loading="lazy" src="/webp/owl-idea.webp" alt="" class="sq-overlay-owl" onerror="this.style.display='none'">
             <div class="sq-overlay-titulo">Sequência da Coruja</div>
             <div class="sq-overlay-desc">As corujas piscam numa ordem. Repita tocando na mesma sequência. A cada rodada entra mais um passo — e na rodada 6 as duas corujas trancadas destravam.</div>
             <button type="button" class="sq-play" onclick="_sqComecar()">Começar</button>
@@ -1121,7 +1120,7 @@
             <canvas id="vo-canvas"></canvas>
             <!-- Tela inicial -->
             <div class="vo-overlay" id="vo-inicio">
-              <img src="/webp/owl-flying.webp" alt="" class="vo-overlay-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/webp/owl-flying.webp" alt="" class="vo-overlay-owl" onerror="this.style.display='none'">
               <div class="vo-overlay-titulo">🦉 Voo da Coruja</div>
               <div class="vo-overlay-desc">A coruja pula sozinha nas plataformas. <b>Arraste o dedo</b> pra mover pros lados e suba o máximo que puder. Pegue as moedas pelo caminho: não tem limite! Cuidado pra não cair!</div>
               <button type="button" class="vo-play" onclick="_vooComecar()">Começar</button>
@@ -1163,7 +1162,7 @@
             </div>
             <!-- Tela inicial -->
             <div class="cor-overlay" id="cor-inicio">
-              <img src="/webp/owl-flying.webp" alt="" class="cor-overlay-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/webp/owl-flying.webp" alt="" class="cor-overlay-owl" onerror="this.style.display='none'">
               <div class="cor-overlay-titulo">🧟 Corrida da Coruja</div>
               <div class="cor-overlay-desc">Em <b>primeira pessoa</b>, corra por uma Angatuba tomada por zumbis. <b>Arraste</b> pra desviar e <b>toque</b> pra atirar no que estiver na mira. Munição limitada — pegue as caixas, as armas especiais e a coruja guardiã. E passe pelas moedas: não tem limite! Melhor jogado com o <b>celular deitado</b>.</div>
               <div class="cor-dica">
@@ -1209,7 +1208,7 @@
             <canvas id="pn-canvas"></canvas>
             <!-- Tela inicial -->
             <div class="pn-overlay" id="pn-inicio">
-              <img src="/webp/owl-highlight.webp" alt="" class="pn-overlay-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/webp/owl-highlight.webp" alt="" class="pn-overlay-owl" onerror="this.style.display='none'">
               <div class="pn-overlay-titulo">&#127929; Piano da Coruja</div>
               <div class="pn-overlay-desc">Toque sempre no <b>azulejo mais baixo</b> &mdash; o que está marcado.</div>
               <label class="pn-sel-wrap" for="pn-musica-sel">Música
@@ -1271,7 +1270,7 @@
 
             <!-- Tela inicial -->
             <div class="bb-overlay" id="bb-inicio">
-              <img src="/webp/owl-idea.webp" alt="" class="bb-overlay-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/webp/owl-idea.webp" alt="" class="bb-overlay-owl" onerror="this.style.display='none'">
               <div class="bb-overlay-titulo">🧱 Blocos da Coruja</div>
               <div class="bb-overlay-desc">Encaixe as peças na grade e complete linhas ou colunas pra pontuar. Cumpra o objetivo antes que o espaço acabe!</div>
               <div class="bb-overlay-fase">Fase <b id="bb-fase-inicio">1</b></div>
@@ -1314,7 +1313,7 @@
 
             <!-- Tela inicial -->
             <div class="dc-overlay" id="dc-inicio">
-              <img src="/webp/owl-idea.webp" alt="" class="dc-overlay-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/webp/owl-idea.webp" alt="" class="dc-overlay-owl" onerror="this.style.display='none'">
               <div class="dc-overlay-titulo">🍬 Doces da Coruja</div>
               <div class="dc-overlay-desc">Troque dois doces adjacentes (toque nos dois, ou arraste) pra formar combinações de 3 ou mais. Cumpra o objetivo antes que os movimentos acabem!</div>
               <div class="dc-overlay-fase">Fase <b id="dc-fase-inicio">1</b></div>
@@ -1354,11 +1353,11 @@
           <div class="t48-arena" id="t48-arena">
             <div class="t48-grid" id="t48-grid"></div>
             <div class="t48-toast" id="t48-toast"></div>
-            <img src="/webp/owl-portrait.webp" alt="" class="t48-mascote" onerror="this.style.display='none'">
+            <img loading="lazy" src="/webp/owl-portrait.webp" alt="" class="t48-mascote" onerror="this.style.display='none'">
 
             <!-- Tela inicial -->
             <div class="t48-overlay" id="t48-inicio">
-              <img src="/webp/owl-idea.webp" alt="" class="t48-overlay-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/webp/owl-idea.webp" alt="" class="t48-overlay-owl" onerror="this.style.display='none'">
               <div class="t48-overlay-titulo">🔢 2048 da Coruja</div>
               <div class="t48-overlay-desc">Deslize (arraste) as peças pra juntar dois números iguais e formar peças cada vez maiores. Chegue ao 2048 antes que o tabuleiro lote!</div>
               <div class="t48-overlay-rec">Recorde: <span id="t48-recorde-inicio">0</span> pontos</div>
@@ -1410,7 +1409,7 @@
 
             <!-- Tela inicial: criar sala ou entrar com código -->
             <div class="pp-overlay" id="pp-menu">
-              <img src="/webp/owl-point.webp" alt="" class="pp-overlay-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/webp/owl-point.webp" alt="" class="pp-overlay-owl" onerror="this.style.display='none'">
               <div class="pp-overlay-titulo">🏓 Ping Pong da Coruja</div>
               <div class="pp-overlay-desc">Jogue sozinho contra a CPU, ou desafie um amigo em tempo real criando uma sala.</div>
               <div class="pp-opcoes">
@@ -1436,7 +1435,7 @@
 
             <!-- Tela de sala: aguardando adversário OU conectando -->
             <div class="pp-overlay" id="pp-sala" style="display:none;">
-              <img src="/webp/owl-wave.webp" alt="" class="pp-overlay-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/webp/owl-wave.webp" alt="" class="pp-overlay-owl" onerror="this.style.display='none'">
               <div class="pp-overlay-titulo" id="pp-sala-titulo">Aguardando o amigo…</div>
               <div class="pp-overlay-desc" id="pp-sala-desc"></div>
               <div class="pp-sala-codigo" id="pp-sala-codigo" style="display:none;"></div>
@@ -1525,7 +1524,7 @@
 
             <!-- Tela inicial: criar sala ou entrar com código -->
             <div class="tq-overlay" id="tq-menu">
-              <img src="/webp/owl-angry.webp" alt="" class="tq-overlay-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/webp/owl-angry.webp" alt="" class="tq-overlay-owl" onerror="this.style.display='none'">
               <div class="tq-overlay-titulo">🎯 Batalha de Tanques</div>
               <div class="tq-overlay-desc">Esconda-se atrás dos tijolos e acerte o adversário. Melhor de 3 rodadas. Jogue sozinho contra a CPU, ou desafie um amigo em tempo real.</div>
               <div class="tq-classes" id="tq-classes">
@@ -1574,7 +1573,7 @@
 
             <!-- Tela de sala: aguardando adversário OU conectando -->
             <div class="tq-overlay" id="tq-sala" style="display:none;">
-              <img src="/webp/owl-wave.webp" alt="" class="tq-overlay-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/webp/owl-wave.webp" alt="" class="tq-overlay-owl" onerror="this.style.display='none'">
               <div class="tq-overlay-titulo" id="tq-sala-titulo">Aguardando o amigo…</div>
               <div class="tq-overlay-desc" id="tq-sala-desc"></div>
               <div class="tq-sala-codigo" id="tq-sala-codigo" style="display:none;"></div>
@@ -1633,7 +1632,7 @@
             <!-- Menu: jogar sozinho, criar sala, entrar com código, salas abertas -->
             <div class="hq-overlay" id="hq-menu">
               <div class="hq-aviso" id="hq-menu-aviso" style="display:none;"></div>
-              <img src="/img/pixel/coruja-pixel-idle.png" alt="" class="hq-overlay-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/img/pixel/coruja-pixel-idle.png" alt="" class="hq-overlay-owl" onerror="this.style.display='none'">
               <div class="hq-overlay-titulo">🏒 Hóquei da Coruja</div>
               <div class="hq-overlay-desc">Arraste a sua coruja pra rebater o disco. Primeiro a 7 gols vence (com 2 de vantagem).<span class="hq-dica">Fica melhor com o celular deitado.</span></div>
               <div class="hq-opcoes">
@@ -1658,7 +1657,7 @@
 
             <!-- Sala: aguardando o amigo OU conectando -->
             <div class="hq-overlay" id="hq-sala" style="display:none;">
-              <img src="/webp/owl-wave.webp" alt="" class="hq-overlay-owl" onerror="this.style.display='none'">
+              <img loading="lazy" src="/webp/owl-wave.webp" alt="" class="hq-overlay-owl" onerror="this.style.display='none'">
               <div class="hq-overlay-titulo" id="hq-sala-titulo">Aguardando o amigo…</div>
               <div class="hq-overlay-desc" id="hq-sala-desc"></div>
               <div class="hq-sala-codigo" id="hq-sala-codigo" style="display:none;"></div>
@@ -1763,7 +1762,7 @@
           <div class="pty-sub" id="pty-countdown">
             <div class="pty-maq-rodada" id="pty-countdown-rodada">Rodada 1</div>
             <div class="pty-maq-cartao" id="pty-countdown-cartao">
-              <img class="pty-maq-arte" id="pty-countdown-arte" src="/Jogos/assets/maquina/cartao-maquina.webp" alt="" width="480" height="268" draggable="false">
+              <img loading="lazy" class="pty-maq-arte" id="pty-countdown-arte" src="/Jogos/assets/maquina/cartao-maquina.webp" alt="" width="480" height="268" draggable="false">
               <div class="pty-maq-icone" id="pty-countdown-icone">⚙️</div>
               <div class="pty-countdown-jogo" id="pty-countdown-jogo">Minigame surpresa</div>
               <div class="pty-maq-regra" id="pty-countdown-regra"></div>
@@ -1813,7 +1812,7 @@
 
           <!-- Sub-tela: sala encerrada / erro -->
           <div class="pty-sub" id="pty-erro">
-            <img src="/webp/owl-surprised.webp" alt="" class="pty-owl" onerror="this.style.display='none'">
+            <img loading="lazy" src="/webp/owl-surprised.webp" alt="" class="pty-owl" onerror="this.style.display='none'">
             <!-- Título e descrição são ajustados pelo handler de
                  'salaFechada' (party.js): a mensagem muda se a sala caiu
                  no meio de uma rodada ou ainda estava no lobby. -->
@@ -1855,7 +1854,7 @@
       <div id="jogo-ranking" class="jogo-tela rank-tela" style="display:none;">
         <button type="button" class="jogo-voltar" onclick="rankFecharPainel()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
         <div class="rank-hero">
-          <img src="/webp/owl-trophy.webp" alt="" class="rank-hero-owl" onerror="this.style.display='none'">
+          <img loading="lazy" src="/webp/owl-trophy.webp" alt="" class="rank-hero-owl" onerror="this.style.display='none'">
           <div class="rank-hero-txt">
             <div class="rank-hero-eyebrow">🏆 Ranking da cidade</div>
             <h2 class="rank-hero-titulo">Quem manda em <span>Angatuba</span></h2>
@@ -1873,7 +1872,7 @@
       <div id="jogo-loja" class="jogo-tela rank-tela" style="display:none;">
         <button type="button" class="jogo-voltar" onclick="lojaFechar()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
         <div class="rank-hero">
-          <img src="/webp/owl-tada.webp" alt="" class="rank-hero-owl" onerror="this.style.display='none'">
+          <img loading="lazy" src="/webp/owl-tada.webp" alt="" class="rank-hero-owl" onerror="this.style.display='none'">
           <div class="rank-hero-txt">
             <div class="rank-hero-eyebrow">🪙 Loja da Coruja</div>
             <h2 class="rank-hero-titulo">Troque moedas por <span>cosméticos</span></h2>
@@ -2516,7 +2515,7 @@
 
       <!-- Tela de sucesso -->
       <div class="modal-success" id="cadastro-success">
-        <img id="success-owl" src="/webp/owl-celebrate-gratis.webp" alt="" class="success-owl" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
+        <img loading="lazy" id="success-owl" src="/webp/owl-celebrate-gratis.webp" alt="" class="success-owl" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
         <div class="success-title">Cadastro enviado! 🎉</div>
         <p class="success-sub" id="success-sub-text">
           Recebemos os dados da sua loja.<br>
@@ -2565,7 +2564,7 @@
           <!-- GRÁTIS -->
           <div class="plan-slide" data-plan="GRATIS">
             <div class="plan-card card-gratis selected">
-              <img src="/icons/owl-gratis.png" alt="" class="plan-card-owl owl-gratis" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
+              <img loading="lazy" src="/icons/owl-gratis.png" alt="" class="plan-card-owl owl-gratis" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
               <div class="plan-card-content">
                 <div class="plan-card-top">
                   <div class="plan-card-name">🏪 Grátis</div>
@@ -2593,7 +2592,7 @@
           <!-- PLUS -->
           <div class="plan-slide" data-plan="PLUS">
             <div class="plan-card card-plus" style="position:relative;">
-              <img src="/icons/owl-plus.png" alt="" class="plan-card-owl owl-plus" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
+              <img loading="lazy" src="/icons/owl-plus.png" alt="" class="plan-card-owl owl-plus" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
               <div class="plan-card-content">
                 <span class="plan-popular">⭐ MAIS POPULAR</span>
                 <div class="plan-card-top">
@@ -2635,7 +2634,7 @@
           <!-- PRO -->
           <div class="plan-slide" data-plan="PRO">
             <div class="plan-card card-pro">
-              <img src="/icons/owl-pro.png" alt="" class="plan-card-owl owl-pro" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
+              <img loading="lazy" src="/icons/owl-pro.png" alt="" class="plan-card-owl owl-pro" onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
               <div class="plan-card-content">
                 <div class="plan-card-top">
                   <div class="plan-card-name">⭐ Pro</div>
@@ -2816,7 +2815,7 @@
       </div>
       <div class="modal-body aguardando-body">
         <div class="aguardando-owl-wrap">
-          <img id="aguardando-owl" src="/webp/owl-search.webp" alt="" class="aguardando-owl"
+          <img loading="lazy" id="aguardando-owl" src="/webp/owl-search.webp" alt="" class="aguardando-owl"
             onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
           <div class="aguardando-ring"></div>
         </div>
@@ -2920,7 +2919,7 @@
 
             <!-- Dica da Coruja -->
             <div id="ml-dica-coruja" style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(245,158,11,0.10),rgba(255,68,68,0.06));border:1px solid rgba(245,158,11,0.22);border-radius:16px;padding:12px 14px;margin-bottom:12px;cursor:pointer;" onclick="mlProximaDica()">
-              <img id="ml-dica-owl" src="/webp/owl-tip.webp" alt="" style="width:46px;height:46px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.45));"
+              <img loading="lazy" id="ml-dica-owl" src="/webp/owl-tip.webp" alt="" style="width:46px;height:46px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.45));"
                    onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
               <div style="flex:1;min-width:0;">
                 <div style="font-family:var(--font-h);font-size:11px;font-weight:800;color:var(--zap);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Dica da Coruja</div>
@@ -2931,7 +2930,7 @@
 
             <!-- Banner: nova(s) avaliação(ões) desde a última visita (#5, só pagas) -->
             <div id="ml-aval-nova-banner" style="display:none;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(245,158,11,0.14),rgba(245,158,11,0.05));border:1px solid rgba(245,158,11,0.3);border-radius:16px;padding:12px 14px;margin-bottom:12px;cursor:pointer;" onclick="mlIrParaAvaliacoes()">
-              <img id="ml-aval-nova-owl" src="/webp/owl-love.webp" alt="" style="width:46px;height:46px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.45));"
+              <img loading="lazy" id="ml-aval-nova-owl" src="/webp/owl-love.webp" alt="" style="width:46px;height:46px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.45));"
                    onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
               <div style="flex:1;min-width:0;">
                 <div style="font-family:var(--font-h);font-size:11px;font-weight:800;color:var(--zap);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Novidade boa!</div>
@@ -2942,7 +2941,7 @@
 
             <!-- Banner: plano prestes a vencer (#3) -->
             <div id="ml-vencimento-banner" style="display:none;align-items:center;gap:12px;border-radius:16px;padding:12px 14px;margin-bottom:12px;">
-              <img id="ml-vencimento-owl" src="/webp/owl-sign.webp" alt="" style="width:46px;height:46px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.45));"
+              <img loading="lazy" id="ml-vencimento-owl" src="/webp/owl-sign.webp" alt="" style="width:46px;height:46px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.45));"
                    onerror="if(!this.dataset.failed){this.dataset.failed='1';this.style.display='none';}" />
               <div style="flex:1;min-width:0;">
                 <div id="ml-vencimento-titulo" style="font-family:var(--font-h);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Seu plano vence em breve</div>
@@ -3501,7 +3500,7 @@
           <!-- ░░ ABA MÉTRICAS ░░ -->
           <div id="ml-tab-metricas" class="ml-tab-content" style="display:none;">
             <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;">
-              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;"><span style="display:flex;align-items:center;gap:6px;"><img src="/webp/owl-tip.webp" alt="" style="width:22px;height:22px;object-fit:contain;" onerror="this.style.display='none'" />📊 Cliques na sua loja</span></div>
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;"><span style="display:flex;align-items:center;gap:6px;"><img loading="lazy" src="/webp/owl-tip.webp" alt="" style="width:22px;height:22px;object-fit:contain;" onerror="this.style.display='none'" />📊 Cliques na sua loja</span></div>
               <div id="ml-metricas-wrap" style="position:relative;">
                 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">
                   <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;">
@@ -3797,7 +3796,7 @@
     padding:10px 14px 10px 10px;box-shadow:0 8px 32px rgba(0,0,0,0.5);
     display:none;align-items:center;gap:10px;
     animation: slideUpBanner 0.35s cubic-bezier(0.32,0.72,0,1) forwards;">
-    <img src="/webp/owl-celebrate-flying.webp" alt="" style="width:52px;height:44px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.5));" onerror="this.style.display='none'" />
+    <img loading="lazy" src="/webp/owl-celebrate-flying.webp" alt="" style="width:52px;height:44px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.5));" onerror="this.style.display='none'" />
     <div style="flex:1;min-width:0;">
       <div style="font-family:var(--font-h);font-size:13px;font-weight:800;color:#fff;">Novidade no Angatuba<span style="color:var(--red);">ON</span>!</div>
       <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:1px;">A coruja trouxe uma versão nova. Toque pra atualizar.</div>
@@ -3822,7 +3821,7 @@
     padding:12px 14px;box-shadow:0 8px 32px rgba(0,0,0,0.5);
     align-items:center;gap:10px;
     animation: slideUpBanner 0.35s cubic-bezier(0.32,0.72,0,1) forwards;">
-    <img src="/icons/icon-192.png" alt="" style="width:38px;height:38px;border-radius:10px;flex-shrink:0;object-fit:cover;" />
+    <img loading="lazy" src="/icons/icon-192.png" alt="" style="width:38px;height:38px;border-radius:10px;flex-shrink:0;object-fit:cover;" />
     <div style="flex:1;min-width:0;">
       <div style="font-family:var(--font-h);font-size:13px;font-weight:800;color:#fff;">Instalar AngatubaON</div>
       <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:1px;">Acesso rápido direto da tela inicial</div>
@@ -3861,7 +3860,7 @@
 
       <!-- Passo: escolha do método -->
       <div class="modal-body" id="cli-step-escolha" style="display:flex;flex-direction:column;gap:12px;">
-        <img class="cli-login-owl" src="/webp/owl-wave.webp" alt=""
+        <img loading="lazy" class="cli-login-owl" src="/webp/owl-wave.webp" alt=""
           onerror="if(!this.dataset.f){this.dataset.f=1;this.style.display='none';}"/>
         <button class="cli-method-btn cli-method-google" id="cli-btn-google" onclick="cliEntrarGoogle()">
           <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

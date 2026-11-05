@@ -1716,6 +1716,13 @@
   }
 
   /* ── Escapa aspas em strings usadas em atributos HTML ───────── */
+  // Posição da capa salva pelo lojista ("X% Y%", col AG). Só aceita o formato
+  // exato que o GAS grava — vai direto pra object-/background-position.
+  function fotoPosCss(loja) {
+    const v = String((loja && loja.fotoPos) || '').trim();
+    return /^\d{1,3}% \d{1,3}%$/.test(v) ? v : '';
+  }
+
   function escAttr(s) {
     // Barra invertida primeiro para nao re-escapar as entidades inseridas depois.
     // Protege onclick inline (registrarClique) contra nomes com \\ ' " e quebra de linha.
@@ -2519,7 +2526,7 @@
 
     if (!loja.recomendado && loja.foto && loja.foto.trim()) {
       return `${ringOpen}<div class="store-thumb" style="background:${bg};">
-        <img src="${escAttr(loja.foto)}" alt="${escHTML(loja.nome)}" loading="lazy" />
+        <img src="${escAttr(loja.foto)}" alt="${escHTML(loja.nome)}" loading="lazy"${fotoPosCss(loja) ? ` style="object-position:${fotoPosCss(loja)}"` : ''} />
       </div>${ringOpen ? '</div>' : ''}`;
     }
 
@@ -2580,7 +2587,7 @@
     // #3: remove caracteres que poderiam encerrar o url()/atributo antes da hora.
     // URLs de imagem válidas (Cloudinary/ImgBB) não contêm aspas/parênteses/barra invertida.
     const _fotoCss = hasCover ? String(loja.foto).replace(/['"()\\]/g, '') : '';
-    const bgStyle = hasCover ? `background-image:url('${_fotoCss}');` : '';
+    const bgStyle = hasCover ? `background-image:url('${_fotoCss}');${fotoPosCss(loja) ? `background-position:${fotoPosCss(loja)};` : ''}` : '';
 
     // Todos os cards abrem o modal — pagos com visual completo, grátis simplificado.
     // #8: role=button + tabindex exigem ativação por teclado (Enter/Espaço).
@@ -5297,9 +5304,10 @@
     const lojaLocal = _mlAcharLojaLocal(d);
     const fotoUrl   = d.foto  || lojaLocal?.foto  || '';
     const logoUrl   = d.logo  || lojaLocal?.logo  || '';
+    _mlFotoPosSalva = fotoPosCss(d.foto ? d : lojaLocal) || '50% 50%';
 
     if (isPago && fotoUrl) {
-      if (heroImgEl) { heroImgEl.src = fotoUrl; heroImgEl.style.display = ''; }
+      if (heroImgEl) { heroImgEl.src = fotoUrl; heroImgEl.style.display = ''; heroImgEl.style.objectPosition = _mlFotoPosSalva; }
       if (heroEl) heroEl.style.background = '#0d0d0d';
     } else {
       if (heroImgEl) heroImgEl.style.display = 'none';
@@ -8367,7 +8375,7 @@
 
     const coverHTML = hasFoto
       ? `<div class="detail-cover-wrap">
-           <img class="detail-cover" loading="lazy" decoding="async" src="${escAttr(loja.foto)}" alt="Foto ${escAttr(loja.nome)}"
+           <img class="detail-cover" loading="lazy" decoding="async" src="${escAttr(loja.foto)}" alt="Foto ${escAttr(loja.nome)}"${fotoPosCss(loja) ? ` style="object-position:${fotoPosCss(loja)}"` : ''}
              onerror="this.parentElement.innerHTML = placeholderCover('${escAttr(emojiLoja(loja))}', '${escAttr(loja.categoria || '')}');" />
            <div class="detail-top-bar">
              <div class="detail-handle"></div>
@@ -12626,7 +12634,10 @@ ${urlCard}`)}`;
       if (ph)  ph.style.display = 'none';
       // Foto JÁ SALVA, só visualização: NÃO ativa edição/drag.
       // Reposicionar só vale quando a pessoa upa/troca a foto (mlUploadImagem).
-      // Mantém a posição salva (50% padrão) e deixa o scroll da página livre.
+      // Mantém a posição salva (col AG; 50% padrão) e deixa o scroll da página livre.
+      const _pos = String(_mlFotoPosSalva || '50% 50%').split(' ');
+      _mlPosX = parseFloat(_pos[0]) || 0; _mlPosY = parseFloat(_pos[1]) || 0;
+      if (img) img.style.objectPosition = _mlFotoPosSalva;
       _mlEditandoCapa = false;
       mlInitCapaDrag(false);
     }
@@ -12639,6 +12650,31 @@ ${urlCard}`)}`;
   let _mlCapaDragInited = false;
   let _mlEditandoCapa = false; // só true após upload/troca — libera arraste e bloqueia scroll
   let _mlPosX = 50, _mlPosY = 50;
+  let _mlFotoPosSalva = '50% 50%'; // posição gravada na planilha (col AG)
+  let _mlCapaSalvando = false;     // upload da capa em andamento: a posição vai junto
+  let _mlPosTimer = null;
+  function _mlPosStr() { return `${Math.round(_mlPosX)}% ${Math.round(_mlPosY)}%`; }
+
+  // Grava a posição da capa (arraste do painel). Debounce: só depois que a
+  // pessoa solta o dedo e para de mexer.
+  async function _mlSalvarCapaPos() {
+    const pos = _mlPosStr();
+    if (pos === _mlFotoPosSalva || _mlCapaSalvando) return;
+    const statusEl = document.getElementById('ml-up-foto-status');
+    if (statusEl) { statusEl.textContent = '⏳ Salvando posição...'; statusEl.style.color = 'var(--muted)'; }
+    try {
+      const params = new URLSearchParams();
+      params.append('payload', JSON.stringify({ action: 'lojaAtualizarFotoPos', token: _lojaToken, posicao: pos }));
+      const r = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(20000) });
+      const j = await r.json();
+      if (j.status !== 'ok') throw new Error(j.msg || 'Erro ao salvar');
+      _mlFotoPosSalva = pos;
+      if (statusEl) { statusEl.textContent = '✅ Posição salva!'; statusEl.style.color = 'var(--green)'; setTimeout(() => { statusEl.textContent = ''; }, 3000); }
+    } catch (e) {
+      if (statusEl) { statusEl.textContent = '❌ Posição não salva: ' + e.message; statusEl.style.color = 'var(--red)'; }
+    }
+  }
+
   function mlInitCapaDrag(mostrarHint) {
     const capaWrap = document.getElementById('ml-up-capa-wrap');
     const capaImg  = document.getElementById('ml-up-foto-preview');
@@ -12686,7 +12722,10 @@ ${urlCard}`)}`;
       startX = cx; startY = cy;
       applyPos();
     }
-    function onEnd() { dragging = false; capaWrap.style.cursor = capaImg.style.display !== 'none' ? 'grab' : 'default'; }
+    function onEnd() {
+      if (dragging) { clearTimeout(_mlPosTimer); _mlPosTimer = setTimeout(_mlSalvarCapaPos, 700); }
+      dragging = false; capaWrap.style.cursor = capaImg.style.display !== 'none' ? 'grab' : 'default';
+    }
 
     capaWrap.addEventListener('mousedown', e => { if (!e.target.closest('label')) { e.preventDefault(); onStart(e.clientX, e.clientY); } });
     window.addEventListener('mousemove',  e => onMove(e.clientX, e.clientY));
@@ -12723,7 +12762,7 @@ ${urlCard}`)}`;
         if (img) { img.src = e.target.result; img.style.display = ''; }
         if (ph)  ph.style.display = 'none';
         _mlEditandoCapa = true;   // foto nova: libera arraste de reposicionamento
-        mlInitCapaDrag(true);     // foto nova — mostrar hint
+        _mlResetCapaPos(true);    // foto nova — centro + hint
       }
     };
     reader.readAsDataURL(file);
@@ -12734,9 +12773,10 @@ ${urlCard}`)}`;
     statusEl.textContent = '⏳ Enviando...';
     statusEl.style.color = 'var(--muted)';
 
+    if (tipo === 'foto') _mlCapaSalvando = true;
     try {
       const url = await uploadImagem(file, statusEl);
-      if (!url) return; // uploadImagem já exibiu erro no statusEl
+      if (!url) { _mlCapaSalvando = false; return; } // uploadImagem já exibiu erro no statusEl
 
       // Salva URL na planilha
       const campo = tipo === 'logo' ? 'logoUrl' : 'fotoUrl';
@@ -12746,7 +12786,10 @@ ${urlCard}`)}`;
         token:  _lojaToken,
         campo,
         url,
+        // Capa: a posição do arraste (até aqui) vai junto e substitui a da foto antiga.
+        posicao: tipo === 'foto' ? _mlPosStr() : undefined,
       }));
+      const posEnviada = _mlPosStr();
       const saveResp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(20000) });
       const saveJson = await saveResp.json();
       if (saveJson.status !== 'ok') throw new Error(saveJson.msg || 'Erro ao salvar');
@@ -12754,9 +12797,13 @@ ${urlCard}`)}`;
       // Atualiza hero/logo no painel imediatamente
       if (tipo === 'foto') {
         const heroImg = document.getElementById('ml-hero-img');
-        if (heroImg) { heroImg.src = url; heroImg.style.display = ''; }
-        // Fix #8: reseta posição sem re-anexar listeners globais (evita vazamento)
-        _mlResetCapaPos(true);
+        if (heroImg) { heroImg.src = url; heroImg.style.display = ''; heroImg.style.objectPosition = _mlPosStr(); }
+        // A posição já foi zerada quando a foto nova apareceu; não zera de novo
+        // aqui (apagaria o arraste feito durante o envio).
+        _mlFotoPosSalva = posEnviada;
+        _mlCapaSalvando = false;
+        // Arrastou enquanto enviava? Grava a posição final.
+        if (_mlPosStr() !== posEnviada) _mlSalvarCapaPos();
       } else {
         const logoImg = document.getElementById('ml-logo-img');
         const emojiEl = document.getElementById('ml-emoji');
@@ -12768,6 +12815,7 @@ ${urlCard}`)}`;
       statusEl.style.color = 'var(--green)';
       setTimeout(() => { statusEl.textContent = ''; }, 3000);
     } catch(e) {
+      if (tipo === 'foto') _mlCapaSalvando = false;
       statusEl.textContent = '❌ ' + e.message;
       statusEl.style.color = 'var(--red)';
     }

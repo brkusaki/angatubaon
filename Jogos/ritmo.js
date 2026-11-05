@@ -92,7 +92,7 @@
   var RT_MAPAS_PASTA = '/Jogos/ritmo/beatmaps/';
   // Mesmo nome do CACHE_JOGOS do service-worker.js (o MP3 já cai lá
   // sozinho pelo SW; aqui guardamos também o JSON do beatmap).
-  var RT_CACHE_JOGOS = 'angatubaon-jogos-v4';
+  var RT_CACHE_JOGOS = 'angatubaon-jogos-v5';
 
   /* ── Julgamento (ms de distância da nota) ──────────────────────
      Um pouco mais folgado que o osu!mania de PC: toque de tela tem

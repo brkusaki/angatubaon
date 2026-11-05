@@ -66,7 +66,7 @@ self.addEventListener('notificationclick', function (event) {
   );
 });
 
-const CACHE = 'angatubaon-v499';
+const CACHE = 'angatubaon-v500';
 // Cache separado dos assets dos jogos (sprites, sons, músicas, vídeos
 // dos minigames). Fica de fora do CACHE principal de propósito: o
 // activate() abaixo NUNCA apaga o CACHE_JOGOS quando o app atualiza
@@ -85,7 +85,9 @@ const CACHE = 'angatubaon-v499';
 // de conteúdo mantendo o nome).
 // v4: chao-floresta / arvore-1 / arvore-2 do Tanques trocados pelas
 // versões geradas na ElevenLabs (mesmo nome de arquivo).
-const CACHE_JOGOS = 'angatubaon-jogos-v4';
+// v5: músicas do Ritmo (/musicas/*.mp3) reencodadas de 256 para 128 kbps,
+// sem capa embutida (mesmo nome de arquivo, mesma sincronia).
+const CACHE_JOGOS = 'angatubaon-jogos-v5';
 // Cache dos TEXTOS e das CAPAS da Biblioteca da Coruja
 // (Biblioteca/livros/*.json e Biblioteca/capas/*.jpg).
 // Mesma lógica do CACHE_JOGOS: o activate() nunca apaga, então quem abriu

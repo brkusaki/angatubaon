@@ -1570,7 +1570,7 @@
 
   // Depois que um jogo termina de carregar (js/css injetados com
   // sucesso), baixa em paralelo os assets pesados dele pro cache
-  // separado do Service Worker (CACHE_JOGOS = 'angatubaon-jogos-v4') —
+  // separado do Service Worker (CACHE_JOGOS = 'angatubaon-jogos-v5') —
   // assim a próxima abertura funciona offline, mesmo depois de um
   // update do app (o SW nunca apaga esse cache, ver service-worker.js).
   // Fire-and-forget: não atrasa o "Jogar" nem trava se algum asset
@@ -1585,7 +1585,7 @@
     // mudaram de conteúdo com o MESMO nome; sem subir, o cache-first
     // serviria a imagem velha pra sempre.)
     // (v4: chão e árvores do Tanques trocados pela arte da ElevenLabs.)
-    caches.open('angatubaon-jogos-v4').then(function (c) {
+    caches.open('angatubaon-jogos-v5').then(function (c) {
       return Promise.allSettled(urls.map(function (url) {
         return c.match(url).then(function (jaTem) {
           if (jaTem) return;

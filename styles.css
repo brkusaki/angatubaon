@@ -9781,7 +9781,7 @@ body.light-mode .perfil-jogo-barra { background: rgba(0,0,0,.08); }
       max-width: 520px; height: 100%; height: 100dvh; max-height: none;
       border-radius: 0; border: none;
     }
-    #modal-minha-loja #ml-hero { height: calc(118px + env(safe-area-inset-top)) !important; }
+    #modal-minha-loja #ml-hero { height: calc(132px + env(safe-area-inset-top)) !important; }
     #modal-minha-loja #ml-hero > div:nth-child(3) { padding-top: calc(10px + env(safe-area-inset-top)) !important; }
     #modal-minha-loja.ml-compacto #ml-hero { height: calc(60px + env(safe-area-inset-top)) !important; }
     #modal-minha-loja.ml-compacto .ml-ver-cliente { display: none !important; }

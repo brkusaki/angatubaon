@@ -14720,7 +14720,8 @@ ${urlCard}`)}`;
         <div style="flex:1;min-width:0;">
           <div style="font-family:var(--font-h);font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHTML(item.nome)}</div>
           ${item.categoria ? `<div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:1px;">${escHTML(item.categoria)}</div>` : ''}
-          <div style="font-size:12px;font-weight:700;color:var(--green);margin-top:3px;">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}${esg ? ' <span style="font-size:9px;font-weight:800;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);padding:1px 6px;border-radius:5px;margin-left:4px;">ESGOTADO HOJE</span>' : ''}</div>
+          <div style="font-size:12px;font-weight:700;color:var(--green);margin-top:3px;">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}</div>
+          ${esg ? '<div style="margin-top:3px;"><span style="display:inline-block;white-space:nowrap;font-size:9px;font-weight:800;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);padding:1px 6px;border-radius:5px;">ESGOTADO HOJE</span></div>' : ''}
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
           <button onclick="mlCardapioPausar('${escAttr(item.id)}', ${esg ? 'false' : 'true'})"

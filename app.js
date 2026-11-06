@@ -2644,7 +2644,7 @@
       starsHTML = `<div class="store-stars">
         <span style="color:#f59e0b;letter-spacing:1px;font-size:10px;">${estrelasHTML}</span>
         <span style="font-weight:700;font-size:11px;color:#f59e0b;">${mediaFmt}</span>
-        <span style="font-size:10px;color:var(--muted);">· ${avals.length} avaliação${avals.length > 1 ? 'ões' : ''}</span>
+        <span style="font-size:10px;color:var(--muted);">· ${avals.length} ${avals.length > 1 ? 'avaliações' : 'avaliação'}</span>
       </div>`;
     }
 
@@ -4900,7 +4900,20 @@
     boxes.forEach((box, i) => {
       box.dataset.bound = '1';
       box.addEventListener('input', () => {
-        box.value = box.value.replace(/\D/g,'').slice(0,1);
+        // Sugestão do teclado (Gboard) ou autofill do SMS coloca o código
+        // inteiro numa caixinha só: espalha os dígitos pelas seguintes.
+        const _dig = box.value.replace(/\D/g,'');
+        if (_dig.length > 1) {
+          for (let k = 0; k < _dig.length && i + k < boxes.length; k++) {
+            boxes[i + k].value = _dig[k];
+            boxes[i + k].classList.add('filled');
+          }
+          llOtpSync();
+          llOtpFocus(Math.min(i + _dig.length, boxes.length - 1));
+          if (llOtpValor().length === 6) setTimeout(() => lojaVerificarCodigo(), 120);
+          return;
+        }
+        box.value = _dig.slice(0,1);
         box.classList.toggle('filled', !!box.value);
         const otp = document.getElementById('ll-otp');
         if (otp) otp.classList.remove('error');
@@ -6197,7 +6210,7 @@
           elBadge.textContent = '↑ novo';
           elBadge.style.background = 'rgba(37,211,102,0.15)';
           elBadge.style.color = '#25d366';
-          elMsg.textContent = `Você teve ${d7} clique(s) esta semana. Semana passada não houve nenhum.`;
+          elMsg.textContent = `Você teve ${d7} ${d7 === 1 ? 'clique' : 'cliques'} esta semana. Semana passada não houve nenhum.`;
         } else if (pct >= 0) {
           elBadge.textContent = `↑ ${pct}%`;
           elBadge.style.background = 'rgba(37,211,102,0.15)';
@@ -7153,7 +7166,29 @@
     console.log('[nudge] tentativa forçada para:', alvo);
   };
 
+  // Topo do painel encolhe ao rolar (CSS: #modal-minha-loja.ml-compacto).
+  // Histerese (liga >48px, desliga <8px) para não piscar quando a altura muda.
+  function _mlBindTopoCompacto() {
+    const sc = document.getElementById('ml-scroll');
+    const md = document.getElementById('modal-minha-loja');
+    if (!sc || !md) return;
+    md.classList.remove('ml-compacto');
+    if (sc.dataset.compactoBound) return;
+    sc.dataset.compactoBound = '1';
+    let _raf = 0;
+    sc.addEventListener('scroll', () => {
+      if (_raf) return;
+      _raf = requestAnimationFrame(() => {
+        _raf = 0;
+        const y = sc.scrollTop;
+        if (y > 48) md.classList.add('ml-compacto');
+        else if (y < 8) md.classList.remove('ml-compacto');
+      });
+    }, { passive: true });
+  }
+
   async function abrirMinhaLoja() {
+    _mlBindTopoCompacto();
     if (!_lojaToken) { openLoginLoja(); return; }
 
     // ── Limpa cache de anúncio se for uma loja diferente da anterior ──
@@ -7585,6 +7620,16 @@
   }
 
   /* ── Logout de loja ──────────────────────────────────────── */
+  // Botão "Sair da conta" (fim da aba Loja). Pede confirmação porque, sem a
+  // sessão, entrar de novo depende do código pelo WhatsApp.
+  async function mlSairDaConta() {
+    const ok = await mlConfirmar('Sair da sua loja?',
+      'Para entrar de novo neste celular você vai precisar de um novo código pelo WhatsApp. Para só fechar o painel, use o ✕ lá em cima.',
+      { okLabel: 'Sair', owlSrc: '/webp/owl-sign.webp' });
+    if (ok) lojaLogout();
+  }
+  window.mlSairDaConta = mlSairDaConta;
+
   function lojaLogout(silencioso) {
     if (_lojaToken) {
       // Token via POST — nunca em query string
@@ -8581,19 +8626,19 @@
                       const cor = s <= Math.round(mediaAval) ? '#f59e0b' : 'rgba(255,255,255,0.15)';
                       return `<span style="color:${cor};font-size:14px;">★</span>`;
                     }).join('')}</div>
-                    <div style="font-size:10px;color:var(--muted);">${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''}</div>
+                    <div style="font-size:10px;color:var(--muted);">${avaliacoes.length} ${avaliacoes.length>1?'avaliações':'avaliação'}</div>
                   </div>
                   ${trofeuHTML}
                 </div>`
              : `<div style="font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px;">
-                  <span style="color:#f59e0b;">★</span> ${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''} · a média aparece a partir de ${AVAL_MIN_MEDIA}
+                  <span style="color:#f59e0b;">★</span> ${avaliacoes.length} ${avaliacoes.length>1?'avaliações':'avaliação'} · a média aparece a partir de ${AVAL_MIN_MEDIA}
                 </div>`}
            <button type="button" id="aval-toggle-${idx}" onclick="avalToggleLista(${idx})"
              style="width:100%;margin-top:10px;padding:9px;border-radius:9px;cursor:pointer;
                     background:var(--surface2);border:1px solid var(--border);color:var(--text);
                     font-family:var(--font-b);font-size:12.5px;font-weight:600;
                     display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent;">
-             <span class="aval-toggle-txt">Ver ${avaliacoes.length} avaliação${avaliacoes.length>1?'ões':''}</span>
+             <span class="aval-toggle-txt">Ver ${avaliacoes.length} ${avaliacoes.length>1?'avaliações':'avaliação'}</span>
              <span class="aval-toggle-chev" style="transition:transform 0.25s;">⌄</span>
            </button>
          </div>`
@@ -12640,7 +12685,11 @@ ${urlCard}`)}`;
         const fmt = h => `${String(h).padStart(2,'0')}h`;
         destaqueEl.innerHTML =
           `🔥 Pico às <strong style="color:#f59e0b;">${fmt(idxPico)}–${fmt(idxPico+1)}</strong> · ${pico[idxPico]} clique${pico[idxPico]>1?'s':''}` +
-          `<div style="margin-top:5px;color:var(--muted);font-size:10px;line-height:1.4;">💡 Publique seu anúncio do dia perto das ${fmt(idxPico)} — é quando mais gente vê sua loja.</div>`;
+          // Só sugere horário com um mínimo de movimento e fora da madrugada:
+          // com poucos dados o "pico" costuma ser o próprio dono testando.
+          ((pico[idxPico] >= 5 && idxPico >= 6)
+            ? `<div style="margin-top:5px;color:var(--muted);font-size:10px;line-height:1.4;">💡 Publique seu anúncio do dia perto das ${fmt(idxPico)} — é quando mais gente vê sua loja.</div>`
+            : `<div style="margin-top:5px;color:var(--muted);font-size:10px;line-height:1.4;">Ainda há pouco movimento para indicar o melhor horário. Com mais visitas, a dica aparece aqui.</div>`);
       }
     }
   }
@@ -13631,7 +13680,7 @@ ${urlCard}`)}`;
       lista.style.maxHeight = '0px';
       const loja = LOJAS[idx];
       const n = loja && loja.avaliacoes ? loja.avaliacoes.length : 0;
-      if (txt) txt.textContent = 'Ver ' + n + ' avaliação' + (n > 1 ? 'ões' : '');
+      if (txt) txt.textContent = 'Ver ' + n + (n > 1 ? ' avaliações' : ' avaliação');
     }
   };
 
@@ -13950,7 +13999,7 @@ ${urlCard}`)}`;
       return `<div class="ml-grupo-card">
         <div style="flex:1;min-width:0;">
           <div style="font-family:var(--font-h);font-size:12px;font-weight:800;">${escHTML(g.nome)}</div>
-          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px;">${tipoTxt} · ${modoTxt} · ${nOps} opção${nOps!==1?'ões':''}</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px;">${tipoTxt} · ${modoTxt} · ${nOps} ${nOps!==1?'opções':'opção'}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
           <button onclick="mlGrupoAbrirAplicar('${g.id}')" style="padding:6px 10px;border-radius:7px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10b981;font-size:10px;font-weight:700;cursor:pointer;"><i class="fa fa-layer-group"></i> Aplicar</button>
@@ -14511,7 +14560,7 @@ ${urlCard}`)}`;
       limite.style.color = 'var(--muted)';
       const restam = PLUS_LIMITE_ITENS - ativos.length;
       if (isPro) {
-        limite.textContent = `${ativos.length} item${ativos.length !== 1 ? 's' : ''} no cardápio`;
+        limite.textContent = `${ativos.length} ${ativos.length !== 1 ? 'itens' : 'item'} no cardápio`;
         limite.style.color = 'var(--muted)';
       } else if (restam < 0) {
         // Acima do limite: avisa que itens extras ficam ocultos no app
@@ -14955,7 +15004,12 @@ ${urlCard}`)}`;
       btn.style.borderBottomColor = 'transparent';
     });
     var content = document.getElementById('ml-tab-' + tab);
-    if (content) content.style.display = '';
+    if (content) {
+      content.style.display = '';
+      // Cada aba começa do topo (antes herdava a rolagem da aba anterior)
+      var sc = document.getElementById('ml-scroll');
+      if (sc) sc.scrollTop = 0;
+    }
     var btn = document.querySelector('.ml-tab-btn[data-tab="' + tab + '"]');
     if (btn) {
       btn.classList.add('ml-tab-active');
@@ -14994,8 +15048,26 @@ ${urlCard}`)}`;
       dot.style.background = '#ff4444'; dot.style.animation = '';
       txt.textContent = 'Fechada agora';
     } else {
-      dot.style.background = '#555';
-      txt.textContent = 'Status automático';
+      // Automático: diz o que o cliente está vendo agora (antes só "Status automático")
+      var _si = null;
+      try {
+        var _lj = (typeof _mlAcharLojaLocal === 'function') ? _mlAcharLojaLocal(null, _lojaNome) : null;
+        if (_lj) _si = calcStatusInfo(Object.assign({}, _lj, { statusLoja: '' }));
+      } catch (e) {}
+      dot.style.animation = '';
+      if (_si && _si.status === 'open') {
+        dot.style.background = '#00d084'; dot.style.animation = 'blink 1.5s infinite';
+        txt.textContent = 'Automático · ' + (/^\d{2}:\d{2}$/.test(_si.fechaStr || '') ? 'aberta até ' + _si.fechaStr : 'aberta agora');
+      } else if (_si && _si.agendado) {
+        dot.style.background = '#f59e0b';
+        txt.textContent = 'Sob agendamento';
+      } else if (_si) {
+        dot.style.background = '#ff4444';
+        txt.textContent = 'Automático · ' + (/^\d{2}:\d{2}$/.test(_si.fechaStr || '') ? 'fechada, abre às ' + _si.fechaStr : 'fechada agora');
+      } else {
+        dot.style.background = '#555';
+        txt.textContent = 'Status automático';
+      }
     }
     if (hDiv && hNum && typeof cliquesHoje === 'number' && cliquesHoje > 0) {
       hNum.textContent = cliquesHoje;

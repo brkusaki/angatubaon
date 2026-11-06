@@ -9765,3 +9765,17 @@ body.light-mode .perfil-jogo-barra { background: rgba(0,0,0,.08); }
 .perfil-sync-btn { margin-left: auto; padding: 4px 10px; border-radius: 99px; cursor: pointer; font-size: 11px; font-weight: 800; color: #fff; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); }
 .perfil-sync-btn:disabled { opacity: .6; cursor: default; }
 .perfil-sync-nota { flex-basis: 100%; font-size: 10.5px; color: #fcd34d; word-break: break-all; font-family: monospace; }
+
+    /* ── Painel Minha Loja: topo compacto ao rolar ────────────────
+       O hero (118px) ocupava ~1/4 da tela o tempo todo. Ao rolar o
+       conteúdo, encolhe para uma faixa com logo + nome (app.js liga a
+       classe .ml-compacto em #modal-minha-loja). */
+    #modal-minha-loja.ml-compacto #ml-hero { height: 60px !important; }
+    #modal-minha-loja.ml-compacto .ml-hero-pills,
+    #modal-minha-loja.ml-compacto #ml-ramo { display: none !important; }
+    #modal-minha-loja.ml-compacto .ml-hero-info { bottom: 10px !important; right: 54px !important; }
+    #modal-minha-loja.ml-compacto .ml-hero-info > div:first-child { margin-bottom: 0 !important; align-items: center !important; }
+    #modal-minha-loja.ml-compacto #ml-logo-wrap { width: 38px !important; height: 38px !important; border-radius: 10px !important; }
+    #modal-minha-loja #ml-logo-wrap { transition: width .22s ease, height .22s ease; }
+    /* Painel como janela: o app aparece esmaecido por trás (antes 88% preto) */
+    #modal-minha-loja.detail-overlay { background: rgba(0,0,0,0.6); }

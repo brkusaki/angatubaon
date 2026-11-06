@@ -4206,74 +4206,9 @@
       if (searchEl) searchEl.dispatchEvent(new Event('input', { bubbles: true }));
     };
 
-    /* ── Painel Minha Loja — Navegação por abas ── */
-    window.mlSwitchTab = function(tab) {
-      document.querySelectorAll('.ml-tab-content').forEach(el => el.style.display = 'none');
-      document.querySelectorAll('.ml-tab-btn').forEach(btn => {
-        btn.classList.remove('ml-tab-active');
-        btn.style.color = 'var(--muted)';
-        btn.style.borderBottomColor = 'transparent';
-      });
-      var content = document.getElementById('ml-tab-' + tab);
-      if (content) content.style.display = '';
-      var btn = document.querySelector('.ml-tab-btn[data-tab="' + tab + '"]');
-      if (btn) {
-        btn.classList.add('ml-tab-active');
-        btn.style.color = 'var(--red)';
-        btn.style.borderBottomColor = 'var(--red)';
-      }
-    };
-
-    /* ── Templates de 1 toque no anúncio ── */
-    window.mlAplicarTemplate = function(btn) {
-      var tpl = btn.dataset.tpl;
-      if (!tpl) return;
-      var textarea = document.getElementById('ml-anuncio-texto');
-      if (!textarea) return;
-      textarea.value = tpl;
-      var chars = document.getElementById('ml-anuncio-chars');
-      if (chars) chars.textContent = tpl.length + '/80';
-      textarea.focus();
-    };
-
-    /* ── Hero: status + cliques ── */
-    window.mlAtualizarHeroStatus = function(statusLoja, cliquesHoje) {
-      var dot  = document.getElementById('ml-hero-status-dot');
-      var txt  = document.getElementById('ml-hero-status-txt');
-      var hDiv = document.getElementById('ml-hero-cliques');
-      var hNum = document.getElementById('ml-hero-cliques-num');
-      if (!dot || !txt) return;
-      var s = (statusLoja || '').toUpperCase();
-      if (s.indexOf('ABERTO') === 0) {
-        dot.style.background = '#00d084'; dot.style.animation = 'blink 1.5s infinite';
-        txt.textContent = 'Aberta agora';
-      } else if (s.indexOf('VOLTAMOS') === 0) {
-        dot.style.background = '#f59e0b'; dot.style.animation = '';
-        txt.textContent = 'Já voltamos';
-      } else if (s === 'FECHADO') {
-        dot.style.background = '#ff4444'; dot.style.animation = '';
-        txt.textContent = 'Fechada agora';
-      } else {
-        dot.style.background = '#555';
-        txt.textContent = 'Status automático';
-      }
-      if (hDiv && hNum && typeof cliquesHoje === 'number' && cliquesHoje > 0) {
-        hNum.textContent = cliquesHoje;
-        hDiv.style.display = 'flex';
-      }
-    };
-
-    /* ── Badge de novos cliques na aba Métricas ── */
-    window.mlAtualizarBadgeMetricas = function(novos) {
-      var badge = document.getElementById('ml-tab-badge-metricas');
-      if (!badge) return;
-      if (novos > 0) {
-        badge.textContent = '+' + novos;
-        badge.style.display = 'inline-block';
-      } else {
-        badge.style.display = 'none';
-      }
-    };
+    /* mlSwitchTab, mlAplicarTemplate, mlAtualizarHeroStatus e
+       mlAtualizarBadgeMetricas ficam só no app.js (as cópias daqui
+       rodavam depois e escondiam as mudanças feitas lá). */
   </script>
 </body>
 </html>

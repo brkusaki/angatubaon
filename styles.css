@@ -9785,3 +9785,9 @@ body.light-mode .perfil-jogo-barra { background: rgba(0,0,0,.08); }
     #modal-minha-loja #ml-hero > div:nth-child(3) { padding-top: calc(10px + env(safe-area-inset-top)) !important; }
     #modal-minha-loja.ml-compacto #ml-hero { height: calc(60px + env(safe-area-inset-top)) !important; }
     #modal-minha-loja.ml-compacto .ml-ver-cliente { display: none !important; }
+    /* Emojis do anúncio: 8 por linha que encolhem juntos (antes o último
+       caía sozinho numa segunda linha nos celulares de 360–375px) */
+    #ml-anuncio-emojis, #ml-agenda-emojis {
+      display: grid !important; grid-template-columns: repeat(8, minmax(0, 36px)); gap: 6px !important;
+    }
+    #ml-anuncio-emojis .anuncio-emoji-btn, #ml-agenda-emojis .anuncio-emoji-btn { width: 100%; height: auto; aspect-ratio: 1; }

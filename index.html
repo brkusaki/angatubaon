@@ -3089,7 +3089,7 @@
               <div id="ml-agenda-section" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
                   <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">
-                    ⏰ Postagem automática
+                    ⏰ Anúncio automático
                     <span style="font-size:9px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;padding:2px 6px;border-radius:4px;font-weight:800;margin-left:4px;">PRO</span>
                   </div>
                   <button onclick="mlAgendaToggleForm()" id="ml-agenda-abrir" style="font-size:10px;color:var(--zap);background:none;border:1px solid rgba(245,158,11,0.3);border-radius:6px;cursor:pointer;padding:3px 9px;">+ Agendar</button>
@@ -3198,6 +3198,9 @@
                 </div>
                 <button type="button" id="ml-share-qr-btn" onclick="mlBaixarQR()" style="width:100%;margin-top:8px;padding:9px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
                   <i class="fa fa-qrcode"></i> Baixar QR code para o balcão
+                </button>
+                <button type="button" id="ml-share-status-btn" onclick="mlBaixarStatus()" style="width:100%;margin-top:8px;padding:9px;border-radius:8px;background:rgba(225,29,72,0.1);border:1px solid rgba(225,29,72,0.3);color:#fb7185;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                  <i class="fa fa-image"></i> Imagem pronta para o Status
                 </button>
                 <div id="ml-share-cardapio-wrap" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
                   <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">Link direto do seu cardápio (abre já no menu):</div>

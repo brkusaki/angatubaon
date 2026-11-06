@@ -9875,7 +9875,7 @@
         { key:'telefone',  icon:'fa-phone',        label:'Telefone fixo', val: fmtTel(cur.tel),               empty:'Não informado' },
         { key:'endereco',  icon:'fa-location-dot', label:'Endereço',      val: cur.endereco || '',            empty:'Não informado' },
         { key:'horario',   icon:'fa-clock',        label:'Horário',       val: cur.horario || '',             empty:'Não informado' },
-        { key:'tags',      icon:'fa-magnifying-glass', label:'Tags de busca', val: cur.tags || '',            empty:'Nenhuma palavra-chave' },
+        { key:'tags',      icon:'fa-magnifying-glass', label:'Tags de busca', val: String(cur.tags || '').split(',').map(function (t) { return t.trim(); }).filter(Boolean).join(', '),            empty:'Nenhuma palavra-chave' },
         { key:'descricao', icon:'fa-align-left',   label:'Descrição',     val: cur.obs || '',                 empty:'Sem descrição' },
       ];
 
@@ -10130,7 +10130,7 @@
     window.mlSaveTags = async function () {
       const btn = el('mle-tags-save');
       const msg = el('mle-tags-msg');
-      const valor = tagState.map(function (t) { return t.texto; }).join(', ');
+      const valor = tagState.map(function (t) { return String(t.texto || '').trim(); }).filter(Boolean).join(', ');
       if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
       try {
         const json = await apiPost('lojaAtualizarTags', { token: _lojaToken, tags: valor }, { timeout: 20000, ignoreUnauthorized: true });
@@ -12621,6 +12621,115 @@
     }
   };
 
+  // Imagem pronta para o Status do WhatsApp / Stories (1080×1920): capa da
+  // loja ao fundo, logo, nome, horário e o link. No celular abre o
+  // compartilhar do sistema (dá para mandar direto pro Status); senão baixa.
+  window.mlBaixarStatus = async function () {
+    const btn = document.getElementById('ml-share-status-btn');
+    const lj = _mlAcharLojaLocal(null, _lojaNome);
+    const nome = ((lj && lj.nome) || document.getElementById('ml-nome')?.textContent || _lojaNome || '').trim();
+    if (!nome) return;
+    const rotulo = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Montando…'; }
+    // Imagem com CORS (Cloudinary libera). Se o host não liberar, cai no fundo
+    // padrão em vez de "sujar" o canvas e travar o toBlob.
+    const carregar = (src) => new Promise(ok => {
+      if (!src) return ok(null);
+      const im = new Image(); im.crossOrigin = 'anonymous';
+      const t = setTimeout(() => ok(null), 8000);
+      im.onload = () => { clearTimeout(t); ok(im.naturalWidth > 200 ? im : null); };
+      im.onerror = () => { clearTimeout(t); ok(null); };
+      im.src = src;
+    });
+    const cobrir = (g, im, x, y, w, h) => {
+      const r = Math.max(w / im.naturalWidth, h / im.naturalHeight);
+      const iw = im.naturalWidth * r, ih = im.naturalHeight * r;
+      g.drawImage(im, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
+    };
+    const quebrar = (g, txt, max) => {
+      const pal = String(txt || '').split(/\s+/); const linhas = []; let l = '';
+      pal.forEach(p => { const t = l ? l + ' ' + p : p; if (g.measureText(t).width > max && l) { linhas.push(l); l = p; } else l = t; });
+      if (l) linhas.push(l); return linhas;
+    };
+    try {
+      try { await Promise.all([document.fonts.load("800 80px 'Syne'"), document.fonts.load("700 40px 'DM Sans'")]); } catch (e) {}
+      const [capa, logo] = await Promise.all([carregar(lj && lj.foto), carregar(lj && lj.logo)]);
+      const W = 1080, H = 1920;
+      const c = document.createElement('canvas'); c.width = W; c.height = H;
+      const g = c.getContext('2d');
+      // Fundo: capa escurecida, ou o degradê do app
+      const bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, '#1a1a2e'); bg.addColorStop(1, '#0b0b12');
+      g.fillStyle = bg; g.fillRect(0, 0, W, H);
+      if (capa) { cobrir(g, capa, 0, 0, W, H); }
+      const vela = g.createLinearGradient(0, 0, 0, H);
+      vela.addColorStop(0, 'rgba(0,0,0,0.15)'); vela.addColorStop(0.45, 'rgba(0,0,0,0.55)'); vela.addColorStop(1, 'rgba(0,0,0,0.92)');
+      g.fillStyle = vela; g.fillRect(0, 0, W, H);
+      g.textAlign = 'center';
+      // Logo
+      let y = 900;
+      if (logo) {
+        const L = 260, lx = (W - L) / 2, ly = y - L;
+        g.save(); g.beginPath(); g.roundRect(lx, ly, L, L, 56); g.clip();
+        g.fillStyle = '#fff'; g.fillRect(lx, ly, L, L); cobrir(g, logo, lx, ly, L, L); g.restore();
+        g.lineWidth = 6; g.strokeStyle = 'rgba(255,255,255,0.85)'; g.beginPath(); g.roundRect(lx, ly, L, L, 56); g.stroke();
+        y += 120;
+      } else { y += 40; }
+      // Nome (até 2 linhas)
+      g.fillStyle = '#ffffff'; g.font = "800 96px 'Syne', sans-serif";
+      quebrar(g, nome, W - 140).slice(0, 2).forEach(l => { g.fillText(l, W / 2, y); y += 110; });
+      // Ramo
+      const ramo = (document.getElementById('ml-ramo')?.textContent || (lj && lj.ramo) || '').trim();
+      if (ramo && ramo !== '—') { g.font = "600 46px 'DM Sans', sans-serif"; g.fillStyle = 'rgba(255,255,255,0.75)'; g.fillText(ramo, W / 2, y); y += 90; }
+      // Horário (texto que o lojista cadastrou)
+      const hor = String((lj && (lj.horarioTexto || lj.horario_texto || (typeof lj.horario === 'string' ? lj.horario : ''))) || '').replace(/\s*\|\s*/g, ' · ').trim();
+      // "Seg, Ter, Qua, Qui, Sex, Sáb" → "Seg a Sáb" (3+ dias seguidos)
+      const DIAS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+      const horCurto = hor.replace(/((?:Dom|Seg|Ter|Qua|Qui|Sex|Sáb)(?:\s*,\s*(?:Dom|Seg|Ter|Qua|Qui|Sex|Sáb))+)/g, (m) => {
+        const ds = m.split(/\s*,\s*/); const ix = ds.map(d => DIAS.indexOf(d));
+        const seguido = ix.every((v, k) => k === 0 || v === ix[k - 1] + 1);
+        return (seguido && ds.length >= 3) ? ds[0] + ' a ' + ds[ds.length - 1] : m;
+      });
+      if (hor) {
+        g.font = "700 40px 'DM Sans', sans-serif"; g.fillStyle = '#fbbf24';
+        quebrar(g, '🕒 ' + horCurto, W - 160).slice(0, 2).forEach(l => { g.fillText(l, W / 2, y); y += 56; });
+      }
+      // Chamada + link
+      const by = H - 430;
+      g.fillStyle = '#e11d48'; g.beginPath(); g.roundRect(110, by, W - 220, 150, 75); g.fill();
+      g.fillStyle = '#fff'; g.font = "800 52px 'Syne', sans-serif";
+      g.fillText((lj && Array.isArray(lj.cardapio) && lj.cardapio.length) ? 'Veja o cardápio e peça' : 'Chame a gente no WhatsApp', W / 2, by + 92);
+      g.font = "700 46px 'DM Sans', sans-serif"; g.fillStyle = '#ffffff';
+      g.fillText('angatubaon.com.br', W / 2, by + 250);
+      g.font = "600 34px 'DM Sans', sans-serif"; g.fillStyle = 'rgba(255,255,255,0.7)';
+      g.fillText('Procure por “' + (nome.length > 28 ? nome.slice(0, 27) + '…' : nome) + '” no AngatubaON', W / 2, by + 310);
+
+      const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+      if (!blob) throw new Error('canvas');
+      const arq = 'status-' + (toSlug(nome) || 'loja') + '.jpg';
+      let compartilhou = false;
+      try {
+        const file = new File([blob], arq, { type: 'image/jpeg' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          const urlEl = document.getElementById('ml-share-url');
+          await navigator.share({ files: [file], text: urlEl ? urlEl.textContent.trim() : '' });
+          compartilhou = true;
+        }
+      } catch (e) { if (e && e.name === 'AbortError') compartilhou = true; }
+      if (!compartilhou) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = arq;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        mlToast('Imagem baixada! Poste no Status do WhatsApp ou nos Stories.', 'ok');
+      }
+      if (window.mlChecklistMarcar) window.mlChecklistMarcar('compartilhou');
+    } catch (e) {
+      mlToast('Não foi possível montar a imagem agora. Tente de novo.', 'erro');
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = rotulo; }
+    }
+  };
+
   function mlMontarCompartilhamento(nome, wpp) {
     // Link estável a renomeação (#nome--id) — vale também pro QR do balcão,
     // que lê o texto de #ml-share-url.
@@ -13237,10 +13346,10 @@ ${urlCard}`)}`;
       var stories = json.data.stories || [];
       var limite = json.data.limite || 5;
       _mlStoriesCache = stories;
-      if (cnt) cnt.textContent = stories.length + ' de ' + limite + ' stories publicados';
+      if (cnt) cnt.textContent = stories.length + ' de ' + limite + ' anúncios no ar';
       if (!stories.length) {
         // A1: copy de neg\u00f3cio \u2014 refor\u00e7a o benef\u00edcio (destaque na cidade) em vez de s\u00f3 instruir.
-        lst.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 2px;">Publique o primeiro story e apare\u00e7a em destaque na cidade \u2014 pode ter at\u00e9 ' + limite + '.</div>';
+        lst.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 2px;">Publique o primeiro an\u00fancio e apare\u00e7a em destaque na cidade \u2014 pode ter at\u00e9 ' + limite + ' no ar.</div>';
       } else {
         lst.innerHTML = stories.map(function(st){
           var ehVideo = String(st.midiaTipo||'foto') === 'video';
@@ -13268,7 +13377,7 @@ ${urlCard}`)}`;
         if (form) form.style.opacity = '';
         if (btn) { btn.disabled = false; btn.title = ''; }
       }
-    } catch(e) { lst.innerHTML = '<div style="font-size:11px;color:var(--red);">Erro ao carregar stories.</div>'; }
+    } catch(e) { lst.innerHTML = '<div style="font-size:11px;color:var(--red);">Erro ao carregar os anúncios.</div>'; }
   }
   window.mlStoriesCarregar = mlStoriesCarregar;
 
@@ -13303,7 +13412,7 @@ ${urlCard}`)}`;
       var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(15000) });
       var json = await resp.json();
       if (json.status === 'ok') {
-        mlToast('Story publicado!', 'ok');
+        mlToast('Anúncio publicado!', 'ok');
         _mlLimparFormAnuncio();
         await mlStoriesCarregar();
       } else { throw new Error(json.msg || 'Erro'); }
@@ -13548,7 +13657,7 @@ ${urlCard}`)}`;
       params.append('payload', JSON.stringify({ action:'lojaStoryRemover', token:_lojaToken, id:id }));
       var resp = await fetch(APPS_SCRIPT_URL, { method:'POST', body:params, signal:AbortSignal.timeout(12000) });
       var json = await resp.json();
-      if (json.status === 'ok') { mlToast('Story removido.', 'ok'); await mlStoriesCarregar(); }
+      if (json.status === 'ok') { mlToast('Anúncio removido.', 'ok'); await mlStoriesCarregar(); }
       else { mlToast('Erro ao remover: ' + (json.msg||''), 'erro'); }
     } catch(e) { mlToast('Erro ao remover.', 'erro'); }
   }

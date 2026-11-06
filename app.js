@@ -1487,6 +1487,17 @@
   // mostra Aberto/Fechado incorreto — a planilha/back-end já fixam SP,
   // o front precisa fazer o mesmo para o cálculo bater.
   const _DOW_MAP_SP = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+  // "Esgotado hoje": o item guarda a data (PAUSADO_YYYY-MM-DD na planilha;
+  // no cardápio público vem como item.esgotado). Só vale no dia marcado.
+  function _cardEsgotadoHoje(item) {
+    if (!item) return false;
+    let v = item.esgotado || '';
+    if (!v && /^PAUSADO_\d{4}-\d{2}-\d{2}$/.test(String(item.ativo || ''))) v = String(item.ativo).slice(8);
+    if (!v) return false;
+    const a = _agoraSP();
+    return v === `${a.y}-${String(a.mo).padStart(2,'0')}-${String(a.d).padStart(2,'0')}`;
+  }
+
   function _agoraSP() {
     let partes = {};
     try {
@@ -3281,6 +3292,12 @@
     }
     let wppLoja = '';
     try { const lj = LOJAS.find(l => l.nome === nome); wppLoja = (lj && lj.wpp) || ''; } catch (e) {}
+    // O dono logado testando a própria loja não entra nas métricas dela
+    // (as visitas já eram filtradas; cliques e pedidos de teste não eram).
+    try {
+      const meuWpp = _lojaToken ? (_lojaWpp || localStorage.getItem('angatuba_loja_wpp') || '') : '';
+      if (meuWpp && wppLoja && _mlMesmoWpp(wppLoja, meuWpp)) return;
+    } catch (e) {}
     const params = new URLSearchParams();
     params.append('payload', JSON.stringify({
       action:    'registrarClique',
@@ -7343,6 +7360,21 @@
   document.getElementById('modal-minha-loja').addEventListener('click', function(e) {
     if (e.target === this) fecharMinhaLoja();
   });
+
+  // "Ver como cliente": fecha o painel e abre a página pública da loja,
+  // do jeito que o morador vê. Espera o history.back do fechamento terminar
+  // para o popstate não fechar o detalhe recém-aberto.
+  window.mlVerComoCliente = function () {
+    const idx = _mlAcharIdxLojaLocal(null, _lojaNome);
+    if (idx < 0) { mlToast('Sua loja ainda não apareceu na lista. Tente de novo em instantes.', 'erro'); return; }
+    let abriu = false;
+    const abrir = () => { if (abriu) return; abriu = true; window.removeEventListener('popstate', onPop); abrirDetalhes(idx); };
+    const onPop = () => setTimeout(abrir, 60);
+    const vaiVoltar = history.state?.modal === 'minha-loja';
+    if (vaiVoltar) window.addEventListener('popstate', onPop);
+    fecharMinhaLoja();
+    setTimeout(abrir, vaiVoltar ? 700 : 250);
+  };
 
   /* ── Toggle de status manual ─────────────────────────────── */
   function marcarToggle(status) {
@@ -14186,7 +14218,7 @@ ${urlCard}`)}`;
         <input type="checkbox" value="${escAttr(cat)}" data-total="${total}" onchange="this.closest('.ml-aplicar-cat').classList.toggle('on', this.checked);mlAplicarAtualizarResumo()">
         <span style="flex:1;min-width:0;">
           <span style="font-family:var(--font-h);font-size:12px;font-weight:800;display:block;">${escHTML(cat)}</span>
-          <span style="font-size:9px;color:var(--muted);">${total} item${total!==1?'s':''} ${status ? '· ' + status : ''}</span>
+          <span style="font-size:9px;color:var(--muted);">${total} ${total!==1?'itens':'item'} ${status ? '· ' + status : ''}</span>
         </span>
       </label>`;
     }).join('');
@@ -14204,7 +14236,7 @@ ${urlCard}`)}`;
     btn.disabled = marcadas.length === 0;
     if (btnR) btnR.disabled = marcadas.length === 0;
     btn.innerHTML = marcadas.length
-      ? `<i class="fa fa-check"></i> Aplicar a ${totalItens} item${totalItens!==1?'s':''}`
+      ? `<i class="fa fa-check"></i> Aplicar a ${totalItens} ${totalItens!==1?'itens':'item'}`
       : '<i class="fa fa-check"></i> Selecione as categorias';
   };
 
@@ -14242,7 +14274,7 @@ ${urlCard}`)}`;
       const n = (json.data && json.data.afetados) || 0;
       if (msg) {
         msg.textContent = n > 0
-          ? `✅ ${n} item${n!==1?'s':''} atualizado${n!==1?'s':''}!`
+          ? `✅ ${n} ${n!==1?'itens atualizados':'item atualizado'}!`
           : 'ℹ️ Nada mudou (os itens já estavam assim).';
         msg.style.color = n > 0 ? 'var(--green)' : 'var(--muted)';
       }
@@ -14679,17 +14711,23 @@ ${urlCard}`)}`;
 
   // HTML de um único item do cardápio (reutilizado em lista plana e agrupada)
   function mlCardapioItemHTML(item) {
+    const esg = _cardEsgotadoHoje(item);
     return `
-      <div class="ml-cardapio-item">
+      <div class="ml-cardapio-item"${esg ? ' style="opacity:.6;"' : ''}>
         ${item.foto
           ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="ml-cardapio-item-foto" onerror="this.style.display='none'">`
           : `<div class="ml-cardapio-item-foto" style="display:flex;align-items:center;justify-content:center;font-size:1.2rem;">${_ccEmojiItem(item, '🍽️')}</div>`}
         <div style="flex:1;min-width:0;">
           <div style="font-family:var(--font-h);font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHTML(item.nome)}</div>
           ${item.categoria ? `<div style="font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:1px;">${escHTML(item.categoria)}</div>` : ''}
-          <div style="font-size:12px;font-weight:700;color:var(--green);margin-top:3px;">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}</div>
+          <div style="font-size:12px;font-weight:700;color:var(--green);margin-top:3px;">R$ ${(parseFloat(item.preco) || 0).toFixed(2).replace('.',',')}${esg ? ' <span style="font-size:9px;font-weight:800;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);padding:1px 6px;border-radius:5px;margin-left:4px;">ESGOTADO HOJE</span>' : ''}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button onclick="mlCardapioPausar('${escAttr(item.id)}', ${esg ? 'false' : 'true'})"
+            title="${esg ? 'Voltar a vender' : 'Acabou hoje'}" aria-label="${esg ? 'Voltar a vender ' : 'Marcar como esgotado hoje: '}${escAttr(item.nome)}"
+            style="padding:6px 8px;border-radius:7px;background:${esg ? 'rgba(16,185,129,0.12)' : 'var(--surface)'};border:1px solid ${esg ? 'rgba(16,185,129,0.35)' : 'var(--border)'};color:${esg ? '#10b981' : 'var(--muted)'};font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">
+            ${esg ? '<i class="fa fa-rotate-left"></i> Voltou' : '<i class="fa fa-ban"></i> Acabou'}
+          </button>
           <button onclick="mlCardapioAbrirForm('${escAttr(item.id)}')"
             style="padding:6px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:10px;font-weight:700;cursor:pointer;">
             <i class="fa fa-pencil"></i>
@@ -14701,6 +14739,33 @@ ${urlCard}`)}`;
         </div>
       </div>`;
   }
+
+  // "Acabou hoje" / "Voltou": pausa o item só no dia de hoje (amanhã volta sozinho).
+  window.mlCardapioPausar = async function (id, pausar) {
+    const item = _cardapioItens.find(i => i.id === id);
+    if (!item || !_lojaToken) return;
+    const antes = item.ativo;
+    const a = _agoraSP();
+    item.ativo = pausar ? `PAUSADO_${a.y}-${String(a.mo).padStart(2,'0')}-${String(a.d).padStart(2,'0')}` : 'SIM';
+    mlCardapioRenderLista(); // otimista
+    try {
+      const json = await apiPost('lojaCardapioPausar', { token: _lojaToken, id, pausar: !!pausar }, { timeout: 25000 });
+      if (json.status !== 'ok') throw new Error(json.msg || 'Falha');
+      if (json.data && json.data.ativo) item.ativo = json.data.ativo;
+      // Reflete no cardápio público em memória (mesmo aparelho)
+      try {
+        const lj = _mlAcharLojaLocal(null, _lojaNome);
+        const pub = lj && Array.isArray(lj.cardapio) ? lj.cardapio.find(i => i.id === id) : null;
+        if (pub) pub.esgotado = pausar ? item.ativo.slice(8) : '';
+      } catch (e) {}
+      mlToast(pausar ? `“${item.nome}” aparece como esgotado até o fim do dia.` : `“${item.nome}” voltou ao cardápio.`, 'ok');
+    } catch (e) {
+      item.ativo = antes;
+      if (e && e.message === 'UNAUTHORIZED') return;
+      mlToast('Não deu para salvar agora. Tente de novo.', 'erro');
+    }
+    mlCardapioRenderLista();
+  };
 
   // Busca: filtra em memória e re-renderiza
   function mlCardapioFiltrar(termo) {
@@ -16151,6 +16216,7 @@ ${urlCard}`)}`;
 
   // ── MODO PRODUTO: card em lista, tap adiciona ao carrinho ─────────────────
   function _ccItemProdutoHTML(item, placeholderEmoji) {
+    if (_cardEsgotadoHoje(item)) return _ccItemEsgotadoHTML(item, placeholderEmoji);
     const temFoto = !!item.foto;
     const temGrupos = _ccItemTemGrupos(item);
     const exigePers = _ccItemExigePersonalizar(item);
@@ -16199,6 +16265,21 @@ ${urlCard}`)}`;
         </div>
         <div class="cc-qty-ctrl" id="cc-qty-${item.id}"${exigePers ? '' : ' onclick="event.stopPropagation()"'}>
           ${btnHTML}
+        </div>
+      </div>`;
+  }
+
+  // Item marcado pelo lojista como "Acabou hoje": aparece apagado, sem botão.
+  function _ccItemEsgotadoHTML(item, placeholderEmoji) {
+    return `
+      <div class="cc-item-card" id="cc-card-${item.id}" aria-disabled="true" style="margin-bottom:8px;opacity:.5;">
+        ${item.foto
+          ? `<div class="cc-foto-wrap"><img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" style="filter:grayscale(1);" onerror="this.parentNode.style.display='none'"></div>`
+          : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
+        <div class="cc-item-info">
+          <div class="cc-item-nome">${escHTML(item.nome)}</div>
+          ${item.descricao ? `<div class="cc-item-desc">${escHTML(item.descricao)}</div>` : ''}
+          <div class="cc-item-preco" style="color:var(--muted);">Esgotado hoje</div>
         </div>
       </div>`;
   }
@@ -16286,6 +16367,7 @@ ${urlCard}`)}`;
     const loja = LOJAS[_ccLojaIdx];
     const item = loja.cardapio.find(i => i.id === itemId);
     if (!item) return;
+    if (_cardEsgotadoHoje(item)) { mlToast('Esse item acabou hoje.', 'erro'); return; }
 
     // So obriga a personalizar quando ha escolha obrigatoria (ex.: tamanho).
     // Com acrescimos opcionais, o '+' adiciona direto no padrao.

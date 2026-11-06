@@ -2844,18 +2844,17 @@
 
   <!-- ══════════════════════════════════════ PAINEL MINHA LOJA ══ -->
   <div class="detail-overlay" id="modal-minha-loja" role="dialog" aria-modal="true">
-    <div class="detail-sheet" style="max-height:92vh;display:flex;flex-direction:column;">
+    <div class="detail-sheet" style="display:flex;flex-direction:column;">
 
       <!-- ── Hero ── -->
-      <div id="ml-hero" style="position:relative;height:118px;transition:height .22s ease;border-radius:20px 20px 0 0;overflow:hidden;background:linear-gradient(135deg,#1a1a2e,#16213e);flex-shrink:0;">
+      <div id="ml-hero" style="position:relative;height:118px;transition:height .22s ease;border-radius:0;overflow:hidden;background:linear-gradient(135deg,#1a1a2e,#16213e);flex-shrink:0;">
         <img id="ml-hero-img" src="" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;" onerror="this.style.display='none'" />
         <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.05) 0%,rgba(0,0,0,0.75) 100%);z-index:1;"></div>
 
         <!-- Handle + Sair -->
         <div style="position:absolute;top:0;left:0;right:0;display:flex;align-items:flex-start;justify-content:space-between;padding:10px 14px;z-index:2;">
-          <div style="flex:1;"></div>
-          <div style="flex:1;display:flex;justify-content:center;padding-top:4px;">
-            <div style="width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,0.25);"></div>
+          <div style="flex:1;">
+            <button type="button" class="ml-ver-cliente" onclick="mlVerComoCliente()" aria-label="Ver minha loja como o cliente vê" style="display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 11px;font-size:11px;font-weight:700;color:#fff;border-radius:16px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);backdrop-filter:blur(6px);cursor:pointer;"><i class="fa fa-eye"></i> Ver como cliente</button>
           </div>
           <div style="flex:1;display:flex;justify-content:flex-end;">
             <button onclick="fecharMinhaLoja()" aria-label="Fechar painel" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;border-radius:50%;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.4);backdrop-filter:blur(6px);cursor:pointer;"><i class="fa fa-times"></i></button>

@@ -2924,7 +2924,8 @@
         return `
           <button class="cat-item${isActive && cat.id !== 'todos' ? ' has-clear' : ''}" data-cat="${cat.id}" onclick="setCat('${cat.id}',this)">
             <div class="cat-icon ${isActive?'active':''}" style="background:${cat.bg};">
-              <i class="ti ${cat.icon}" style="color:${cat.cor};"></i>
+              <img class="cat-img" src="webp/cat/${cat.id}.webp" alt="" decoding="async" onerror="this.nextElementSibling.style.display='';this.remove()">
+              <i class="ti ${cat.icon}" style="color:${cat.cor};display:none;"></i>
               ${badge}
             </div>
             <span class="cat-label">${cat.label}</span>

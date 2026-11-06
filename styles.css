@@ -208,6 +208,13 @@
       transition: color 0.2s, font-weight 0.2s;
     }
     .cat-icon.active + .cat-label { color: var(--text); font-weight: 700; }
+    /* Ícone 3D da categoria (webp/cat/<id>.webp). Sem a imagem, o onerror
+       mostra o ícone de linha (Tabler) que fica escondido logo depois. */
+    .cat-img {
+      width: 40px; height: 40px; object-fit: contain;
+      pointer-events: none; -webkit-user-drag: none;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35));
+    }
 
     .cat-badge {
       position: absolute; top: -4px; right: -4px;

@@ -5577,6 +5577,9 @@ body.light-mode .rc-evento-chip { color: #b45309; }
 /* Corujinha: card com arte (card-corujinha.webp), cores roxo/ouro de "sorte". */
 .gc-corujinha { --gc:#f5c542; --gc-2:#7c3aed; --gc-a:rgba(245,197,66,.16); --gc-b:rgba(245,197,66,.34); }
 .gc-armadilha .gc-media { background: #f2a541; }
+/* Sinal Branco: aventura de mistério na Antártica — azul-gelo/ciano. */
+.gc-sinalbranco { --gc:#38bdf8; --gc-2:#0e7490; --gc-a:rgba(56,189,248,.16); --gc-b:rgba(56,189,248,.34); }
+.gc-sinalbranco .gc-media { background: #0b1626; }
 
 .game-card:active { transform: scale(.97); border-color: var(--gc-b); }
 .game-card:focus-visible { outline: 2px solid var(--gc); outline-offset: 2px; }

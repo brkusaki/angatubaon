@@ -983,7 +983,7 @@
     armadilha: 'Armadilha da Coruja', pingpong: 'Ping Pong da Coruja',
     tanques: 'Batalha de Tanques', hoquei: 'Hóquei da Coruja', party: 'Coruja Party',
     negocios: 'Negócios da Cidade', baralho: 'Baralho', corujinha: 'Corujinha',
-    ritmo: 'Ritmo da Coruja', hexarena: 'Hex Arena'
+    ritmo: 'Ritmo da Coruja', hexarena: 'Hex Arena', sinalbranco: 'Sinal Branco'
   };
   var JOGO_ICOS = { pingpong: '🏓', tanques: '💥', hoquei: '🏒', ritmo: '🎵', hexarena: '⬡' };
 
@@ -1020,6 +1020,7 @@
     if (window.DocesGame     && typeof window.DocesGame.parar     === 'function') window.DocesGame.parar();
     if (window.Game2048      && typeof window.Game2048.parar      === 'function') window.Game2048.parar();
     if (window.ArmadilhaGame && typeof window.ArmadilhaGame.parar === 'function') window.ArmadilhaGame.parar();
+    if (window.SinalBrancoGame && typeof window.SinalBrancoGame.parar === 'function') window.SinalBrancoGame.parar();
     if (window.CorujinhaGame && typeof window.CorujinhaGame.parar === 'function') window.CorujinhaGame.parar();
     // Negócios da Cidade: parar() só mata timers e fecha modal — a partida
     // em andamento sobrevive de propósito, pra quem sai pro menu por engano
@@ -1275,6 +1276,11 @@
     // Armadilha da Coruja: platformer de armadilhas (estilo Level Devil),
     // solo com 3 fases, sem ranking. Desenha tudo em #armadilha-root.
     armadilha: { js: '/Jogos/armadilha.min.js', css: '/Jogos/armadilha.css', global: 'ArmadilhaGame' },
+    // Sinal Branco: aventura de mistério em 1ª pessoa (cenas ilustradas,
+    // celular deitado). Solo, sem ranking por enquanto. Monta tudo em
+    // #sinalbranco-root — ver Jogos/sinalbranco.js e o doc do projeto
+    // claude/sinal-branco-biblia.md.
+    sinalbranco: { js: '/Jogos/sinalbranco.min.js', css: '/Jogos/sinalbranco.css', global: 'SinalBrancoGame' },
     // Negócios da Cidade: banco imobiliário de Angatuba, 2 a 8 pessoas no
     // MESMO aparelho (passa-o-celular). Não usa AngatubaMP (não é 1x1 em
     // rede) nem ranking: não existe pontuação individual, o placar é a
@@ -1302,6 +1308,24 @@
      cacheia js/css deles no cache principal via stale-while-revalidate.
      Quem consome esta lista é o _jogosCacheAssets logo abaixo. */
   var JOGOS_ASSETS = {
+    sinalbranco: [
+      '/Jogos/sinalbranco.min.js', '/Jogos/sinalbranco.css',
+      '/Jogos/assets/sinalbranco/heliponto-v1.webp',
+      '/Jogos/assets/sinalbranco/entrada-v1.webp',
+      '/Jogos/assets/sinalbranco/refeitorio-v1.webp',
+      '/Jogos/assets/sinalbranco/corredor-v1.webp',
+      '/Jogos/assets/sinalbranco/quarto-v1.webp',
+      '/Jogos/assets/sinalbranco/lab-v1.webp',
+      '/Jogos/assets/sinalbranco/radio-v1.webp',
+      '/Jogos/assets/sinalbranco/gerador-escuro-v1.webp',
+      '/Jogos/assets/sinalbranco/gerador-ligado-v1.webp',
+      '/Jogos/assets/sinalbranco/item-multimetro-v1.webp',
+      '/Jogos/assets/sinalbranco/item-lanterna-v1.webp',
+      '/Jogos/assets/sinalbranco/item-bilhete-v1.webp',
+      '/Jogos/assets/sinalbranco/item-chaves-v1.webp',
+      '/Jogos/assets/sinalbranco/item-gravador-v1.webp',
+      '/Jogos/assets/sinalbranco/item-fusivel-v1.webp'
+    ],
     corujinha: [
       '/Jogos/corujinha.min.js', '/Jogos/corujinha.css',
       '/Jogos/assets/corujinha/coruja-sheet-v2.webp', '/Jogos/assets/corujinha/moldura.png',

@@ -580,37 +580,63 @@
     [3, 1, 4, 2], [4, 1, 8, 4], [4, 2, 1, 2], [5, 2, 8, 2]
   ];
   function girarBits(m, r) { for (var i = 0; i < r; i++) m = ((m << 1) | (m >> 3)) & 15; return m; }
-  function abrirCircuito() {
-    var grade = [], i, c, l;
-    for (l = 0; l < LINS; l++) for (c = 0; c < COLS; c++) grade.push({ base: Math.random() < 0.5 ? 5 : 3, rot: 0 });
+  // Tabuleiro FIXO (sempre o mesmo, sorteio com semente) e o progresso
+  // fica salvo em S.circ: sair do painel não embaralha de novo.
+  function semente(n) { return function () { n = (n * 1103515245 + 12345) & 0x7fffffff; return n / 0x7fffffff; }; }
+  function montarGrade() {
+    var rnd = semente(1407), grade = [], i;
+    for (i = 0; i < COLS * LINS; i++) grade.push({ base: rnd() < 0.5 ? 5 : 3, rot: Math.floor(rnd() * 4) });
     ROTA.forEach(function (p) {
       var m = p[2] | p[3];
       grade[p[1] * COLS + p[0]].base = (m === 5 || m === 10) ? 5 : 3;
     });
-    // embaralha garantindo que não comece resolvido
-    do { for (i = 0; i < grade.length; i++) grade[i].rot = Math.floor(Math.random() * 4); } while (energizar(grade).ok);
-
+    while (energizar(grade).ok) grade[ROTA[4][1] * COLS + ROTA[4][0]].rot++;
+    return grade;
+  }
+  function rotCerta(base, m) { var r = 0; while (girarBits(base, r) !== m && r < 4) r++; return r; }
+  function abrirCircuito() {
+    var grade = montarGrade();
+    if (S.circ && S.circ.length === grade.length) grade.forEach(function (t, i) { t.rot = S.circ[i]; });
     var html = '<div class="sb-doc-tit">Painel de fusíveis — circuito principal</div>' +
-      '<div class="sb-puz-dica">Toque nas peças para girar. Leve a energia da bateria (esquerda) até o gerador (direita).</div>' +
+      '<div class="sb-puz-dica">Toque nas peças para girar. Leve a energia da bateria (BAT) até o gerador (GER). Nem toda peça faz parte do caminho.</div>' +
       '<div class="sb-circ"><div class="sb-circ-fonte">BAT</div><div class="sb-circ-grade"></div><div class="sb-circ-alvo">GER</div></div>' +
-      '<button type="button" class="sb-btn-sec sb-x2">Sair do painel</button>';
+      '<div class="sb-puz-botoes"><button type="button" class="sb-btn-sec sb-medir"><i class="fa fa-bolt"></i> Medir com o multímetro</button>' +
+      '<button type="button" class="sb-btn-sec sb-x2">Sair do painel</button></div>';
     abrirModal(html, 'sb-puz', false);
     var gEl = el.caixa.querySelector('.sb-circ-grade');
     el.caixa.querySelector('.sb-x2').addEventListener('click', function () { som.clique(); fecharModal(); });
-    var tiles = grade.map(function (t, idx) {
+    var tiles = grade.map(function (t) {
       var b = h('button', 'sb-peca', svgPeca(t.base));
       b.type = 'button';
-      b.style.transform = 'rotate(' + (t.rot * 90) + 'deg)';
       t.ang = t.rot * 90;
+      b.style.transform = 'rotate(' + t.ang + 'deg)';
       b.addEventListener('click', function () {
         if (gEl.classList.contains('sb-ok')) return;
         t.rot = (t.rot + 1) % 4; t.ang += 90;
         b.style.transform = 'rotate(' + t.ang + 'deg)';
+        b.classList.remove('sb-medida');
         som.giro();
+        S.circ = grade.map(function (x) { return x.rot; });
+        salvar();
         atualizar();
       });
       gEl.appendChild(b);
       return b;
+    });
+    // Dica: o multímetro aponta a primeira peça do caminho que está virada errado.
+    el.caixa.querySelector('.sb-medir').addEventListener('click', function () {
+      som.clique();
+      tiles.forEach(function (b) { b.classList.remove('sb-medida'); });
+      for (var i = 0; i < ROTA.length; i++) {
+        var p = ROTA[i], idx = p[1] * COLS + p[0], t = grade[idx];
+        if (girarBits(t.base, t.rot) !== (p[2] | p[3])) {
+          tiles[idx].classList.add('sb-medida');
+          var falta = (rotCerta(t.base, p[2] | p[3]) - t.rot + 4) % 4;
+          var msg = el.caixa.querySelector('.sb-puz-dica');
+          msg.textContent = 'O multímetro apita nesta peça: gire ' + (falta === 1 ? '1 vez' : falta + ' vezes') + '.';
+          return;
+        }
+      }
     });
     var fonteEl = el.caixa.querySelector('.sb-circ-fonte'), alvoEl = el.caixa.querySelector('.sb-circ-alvo');
     function atualizar() {

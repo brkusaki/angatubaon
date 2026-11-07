@@ -1,5 +1,5 @@
 {
- "versaoSW": 510,
+ "versaoSW": 511,
  "hashes": {
   "Aprender/conteudo.js": "c2776ebcaf3844f9",
   "Aprender/hub.js": "0025f4b073788e9b",
@@ -46,8 +46,8 @@
   "Jogos/ritmo.js": "fcd8d756f98f3b0b",
   "Jogos/sequencia.css": "fc7743429df94134",
   "Jogos/sequencia.js": "ac20a999e4bb4662",
-  "Jogos/sinalbranco.css": "211a2294d3b079d1",
-  "Jogos/sinalbranco.js": "dfbcff65c52cded6",
+  "Jogos/sinalbranco.css": "4fd4af25f669de5a",
+  "Jogos/sinalbranco.js": "e96b5737f560ebb5",
   "Jogos/speedtap.css": "5ae579f0992794c7",
   "Jogos/speedtap.js": "f3d11bedd49ce3d7",
   "Jogos/tanques.css": "97cbfaf969f984e9",

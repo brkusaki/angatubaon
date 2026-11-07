@@ -119,6 +119,9 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position
 .sb-no{fill:#334155;}
 .sb-peca.sb-luz .sb-fio{stroke:#22d3ee;filter:drop-shadow(0 0 4px #22d3ee);}
 .sb-peca.sb-luz .sb-no{fill:#a5f3fc;}
+.sb-peca.sb-medida{border-color:#facc15;box-shadow:0 0 1.2em rgba(250,204,21,.7);animation:sb-medida .8s ease-in-out infinite;}
+@keyframes sb-medida{50%{box-shadow:0 0 .3em rgba(250,204,21,.3);}}
+.sb-puz-botoes{display:flex;justify-content:center;gap:1em;}
 .sb-circ-grade.sb-ok{box-shadow:0 0 2.4em rgba(34,211,238,.55);}
 
 .sb-freq-cv{width:100%;height:auto;aspect-ratio:3/1;border-radius:.6em;border:1px solid rgba(34,211,238,.3);display:block;}

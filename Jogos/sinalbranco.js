@@ -166,7 +166,7 @@
         { id: 'quarto', x: 61, y: 28, w: 12, h: 44, porta: true, acao: function () { ir('quarto'); } },
         { id: 'fundo', x: 42, y: 26, w: 15, h: 38, porta: true, acao: function () {
           if (!tem('lanterna')) fala(['O fim do corredor está completamente escuro.', 'Pela planta, a sala do gerador fica pra lá. Sem luz, não dá.']);
-          else { fala(['Liguei a lanterna.'], function () { ir('gerador'); }); } } }
+          else { som.tocar('lanterna', 0.8); fala(['Liguei a lanterna.'], function () { ir('gerador'); }); } } }
       ]
     },
     quarto: {
@@ -388,7 +388,7 @@
       el.palco.classList.toggle('sb-pisca', !!c.pisca);
       el.local.textContent = c.nome;
       ligarNeve(!!c.neve);
-      som.ambiente(c.fora ? 'fora' : 'dentro');
+      som.ambiente(c.fora ? 'fora' : 'dentro', S.cena);
     }
     el.pontos.innerHTML = '';
     c.pontos.forEach(function (pt) {
@@ -402,7 +402,7 @@
         if (ocupado()) return;
         S.vistos[S.cena + '.' + pt.id] = true;
         b.classList.add('sb-visto');
-        som.clique();
+        if (pt.porta) som.porta(); else som.clique();
         pt.acao();
         salvar();
       });
@@ -414,7 +414,7 @@
         var ic = { esq: 'fa-chevron-left', dir: 'fa-chevron-right', baixo: 'fa-chevron-down', cima: 'fa-chevron-up' }[s.lado];
         var b = h('button', 'sb-saida sb-saida-' + s.lado, '<i class="fa ' + ic + '"></i><span>' + esc(s.rotulo) + '</span>');
         b.type = 'button';
-        b.addEventListener('click', function () { if (ocupado()) return; som.passo(); ir(s.para); });
+        b.addEventListener('click', function () { if (ocupado()) return; som.passo(!!cenaAtual().fora); ir(s.para); });
         el.saidas.appendChild(b);
       });
     }
@@ -519,6 +519,7 @@
     el.caixa.innerHTML = '';
     puz.parar();
     som.estatica(0);
+    som.pararVoz();
     var f = modalAoFechar; modalAoFechar = null;
     if (f) f();
   }
@@ -537,7 +538,7 @@
       '<div class="sb-doc-txt">' + corpo + '</div>' +
       (novo ? '<div class="sb-doc-novo">Guardado no Arquivo</div>' : ''),
       'sb-doc sb-doc-' + d.tipo, true, aoFechar);
-    if (d.tipo === 'audio') som.fita();
+    if (d.tipo === 'audio') { som.fita(); som.voz(id); }
     else som.papel();
   }
 
@@ -654,7 +655,8 @@
           el.fade.classList.add('sb-flash');
           setTimeout(function () { el.fade.classList.remove('sb-flash'); }, 700);
           desenharCena();
-          som.ambiente('dentro');
+          som.ambiente('dentro', S.cena);
+          setTimeout(function () { som.tocar('luzes', 0.7); }, 1300);
           fala(['O motor tossiu, engasgou... e pegou.', 'As luzes acenderam. Lá longe, a estação inteira voltou a zumbir.', 'Agora o rádio.']);
         }, 900);
       }
@@ -766,7 +768,7 @@
         if (segurar > 0.8) {
           feito = true;
           som.estatica(0);
-          som.energia();
+          som.tocar('sinal-ok', 0.8, som.energia);
           pct.textContent = 'Sinal 100% — decodificando...';
           setTimeout(function () {
             fecharModal();
@@ -828,6 +830,7 @@
     ir(id);
   }
   function fimDoAto() {
+    som.tocar('revelacao', 0.9);
     fala(['Treze. Doze da equipe... e eu.', 'E aquela voz era da Ingrid. Igual à da gravação.', 'Debaixo do piso, alguma coisa começou a vibrar.'], function () {
       flag('atoFim');
       _tickTempo(); salvar();
@@ -889,6 +892,12 @@
   ══════════════════════════════════════════════════════════════ */
   var som = (function () {
     var ac = null, master = null, vento = null, ventoG = null, zumbido = null, zumbG = null, estG = null, mudoT = 0;
+    // Arquivos gravados (ElevenLabs) em /Jogos/assets/sinalbranco/sfx/<nome>.mp3.
+    // Enquanto um arquivo não existe ou não carregou, toca a síntese de reserva.
+    var ARQ = ['passos-neve', 'passos-metal', 'porta', 'gerador-liga', 'sinal-ok', 'pegar', 'papel', 'gravador',
+      'peca', 'lanterna', 'luzes', 'revelacao', 'voz-audio_ingrid', 'voz-sinal'];
+    var LOOPS = ['vento-loop', 'interior-loop', 'gerador-loop', 'estatica-loop', 'coro-loop'];
+    var buf = {}, loopG = {}, loopOn = {}, vozSrc = null, ambAtual = { onde: '', cena: '' };
     function ligado() { var s = window.AngatubaSom; return !(s && typeof s.ativo === 'function' && !s.ativo()); }
     function ruidoBuf() {
       var b = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), d = b.getChannelData(0), u = 0;
@@ -900,33 +909,51 @@
       for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       return b;
     }
+    function carregar(nome) {
+      try {
+        fetch(A + 'sfx/' + nome + '.mp3').then(function (r) { if (!r.ok) throw new Error('404'); return r.arrayBuffer(); })
+          .then(function (ab) { return new Promise(function (ok, erro) { ac.decodeAudioData(ab, ok, erro); }); })
+          .then(function (b) { buf[nome] = b; if (loopG[nome]) iniciarLoop(nome); aplicarAmbiente(); })
+          .catch(function () {});
+      } catch (e) {}
+    }
+    function iniciarLoop(nome) {
+      if (loopOn[nome] || !buf[nome]) return;
+      var s = ac.createBufferSource(); s.buffer = buf[nome]; s.loop = true;
+      // pula o respiro do mp3 nas pontas
+      s.loopStart = 0.03; s.loopEnd = Math.max(0.1, buf[nome].duration - 0.03);
+      s.connect(loopG[nome]); s.start(0, 0.03);
+      loopOn[nome] = true;
+    }
     function destravar() {
       if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
       var C = window.AudioContext || window.webkitAudioContext;
       if (!C) return;
       ac = new C();
       master = ac.createGain(); master.gain.value = ligado() ? 0.8 : 0; master.connect(ac.destination);
-      // vento: ruído marrom + passa-faixa com LFO
+      // vento sintetizado (reserva): ruído marrom + passa-faixa com LFO
       vento = ac.createBufferSource(); vento.buffer = ruidoBuf(); vento.loop = true;
       var bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 420; bp.Q.value = 0.6;
       var lfo = ac.createOscillator(); lfo.frequency.value = 0.13;
       var lfoG = ac.createGain(); lfoG.gain.value = 220; lfo.connect(lfoG); lfoG.connect(bp.frequency); lfo.start();
       ventoG = ac.createGain(); ventoG.gain.value = 0;
       vento.connect(bp); bp.connect(ventoG); ventoG.connect(master); vento.start();
-      // zumbido da estação (só com o gerador ligado)
+      // zumbido sintetizado (reserva)
       zumbido = ac.createOscillator(); zumbido.type = 'sawtooth'; zumbido.frequency.value = 55;
       var lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 160;
       zumbG = ac.createGain(); zumbG.gain.value = 0;
       zumbido.connect(lp); lp.connect(zumbG); zumbG.connect(master); zumbido.start();
-      // estática do rádio
+      // estática sintetizada (reserva)
       var est = ac.createBufferSource(); est.buffer = brancoBuf(); est.loop = true;
       var hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800;
       estG = ac.createGain(); estG.gain.value = 0;
       est.connect(hp); hp.connect(estG); estG.connect(master); est.start();
+      LOOPS.forEach(function (n) { loopG[n] = ac.createGain(); loopG[n].gain.value = 0; loopG[n].connect(master); });
+      ARQ.concat(LOOPS).forEach(carregar);
       clearInterval(mudoT);
       mudoT = setInterval(function () { if (master) master.gain.value = ligado() ? 0.8 : 0; }, 500);
     }
-    function alvo(g, v, t) { if (g) { g.gain.cancelScheduledValues(ac.currentTime); g.gain.setTargetAtTime(v, ac.currentTime, t || 0.6); } }
+    function alvo(g, v, t) { if (g && ac) { g.gain.cancelScheduledValues(ac.currentTime); g.gain.setTargetAtTime(v, ac.currentTime, t || 0.6); } }
     function bip(f, dur, tipo, vol, f2) {
       if (!ac) return;
       var o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
@@ -943,22 +970,59 @@
       g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       s.connect(bp); bp.connect(g); g.connect(master); s.start(t); s.stop(t + dur + 0.02);
     }
+    // Toca o arquivo; sem ele, chama a reserva sintetizada.
+    function tocar(nome, vol, reserva) {
+      if (ac && buf[nome]) {
+        var s = ac.createBufferSource(), g = ac.createGain();
+        s.buffer = buf[nome]; g.gain.value = vol == null ? 0.8 : vol;
+        s.connect(g); g.connect(master); s.start();
+        return s;
+      }
+      if (typeof reserva === 'function') reserva();
+      return null;
+    }
+    function aplicarAmbiente() {
+      if (!ac) return;
+      var fora = ambAtual.onde === 'fora', cena = ambAtual.cena;
+      var energia = !!(S && S.flags.energia), radio = !!(S && S.flags.radioOk);
+      // gravados
+      alvo(loopG['vento-loop'], fora ? 0.75 : 0, 0.8);
+      alvo(loopG['interior-loop'], fora ? 0 : 0.55, 0.8);
+      alvo(loopG['gerador-loop'], cena === 'gerador' && energia ? 0.6 : (energia && !fora ? 0.08 : 0), 1);
+      alvo(loopG['coro-loop'], radio && !fora ? 0.35 : 0, 2);
+      // reservas sintetizadas só tocam se o arquivo correspondente não existir
+      alvo(ventoG, buf['vento-loop'] ? 0 : (fora ? 0.55 : (buf['interior-loop'] ? 0 : 0.1)), 0.8);
+      alvo(zumbG, buf['gerador-loop'] ? 0 : (energia && !fora ? 0.05 : 0), 1.2);
+    }
     return {
       destravar: destravar,
-      ambiente: function (onde) {
+      tocar: tocar,
+      ambiente: function (onde, cena) { ambAtual = { onde: onde, cena: cena || '' }; aplicarAmbiente(); },
+      estatica: function (v) {
         if (!ac) return;
-        alvo(ventoG, onde === 'fora' ? 0.55 : 0.1, 0.8);
-        alvo(zumbG, S && S.flags.energia && onde !== 'fora' ? 0.05 : 0, 1.2);
+        var x = Math.max(0, v);
+        if (buf['estatica-loop']) { estG.gain.setTargetAtTime(0, ac.currentTime, 0.08); loopG['estatica-loop'].gain.setTargetAtTime(x * 0.7, ac.currentTime, 0.08); }
+        else estG.gain.setTargetAtTime(x * 0.16, ac.currentTime, 0.08);
       },
-      estatica: function (v) { if (ac) estG.gain.setTargetAtTime(Math.max(0, v) * 0.16, ac.currentTime, 0.08); },
+      voz: function (id) {
+        if (!ac || !buf['voz-' + id]) return;
+        setTimeout(function () {
+          if (vozSrc) try { vozSrc.stop(); } catch (e) {}
+          vozSrc = tocar('voz-' + id, 1);
+        }, 700);
+      },
+      pararVoz: function () { if (vozSrc) { try { vozSrc.stop(); } catch (e) {} vozSrc = null; } },
       clique: function () { bip(1800, 0.03, 'square', 0.025); },
       tique: function () { bip(2400, 0.02, 'square', 0.02); },
-      giro: function () { bip(300, 0.06, 'triangle', 0.08, 180); sopro(0.05, 3000, 0.04); },
-      passo: function () { sopro(0.12, 700, 0.12); setTimeout(function () { sopro(0.12, 600, 0.1); }, 170); },
-      papel: function () { sopro(0.18, 4200, 0.07); },
-      fita: function () { bip(140, 0.08, 'square', 0.05); sopro(0.5, 2500, 0.05); },
-      pegar: function () { bip(660, 0.18, 'sine', 0.09); setTimeout(function () { bip(990, 0.25, 'sine', 0.08); }, 110); },
-      energia: function () { bip(60, 1.4, 'sawtooth', 0.14, 110); setTimeout(function () { bip(880, 0.4, 'sine', 0.06); }, 500); },
+      porta: function () { tocar('porta', 0.7, function () { sopro(0.3, 500, 0.08); }); },
+      giro: function () { tocar('peca', 0.7, function () { bip(300, 0.06, 'triangle', 0.08, 180); sopro(0.05, 3000, 0.04); }); },
+      passo: function (fora) {
+        tocar(fora ? 'passos-neve' : 'passos-metal', 0.8, function () { sopro(0.12, 700, 0.12); setTimeout(function () { sopro(0.12, 600, 0.1); }, 170); });
+      },
+      papel: function () { tocar('papel', 0.8, function () { sopro(0.18, 4200, 0.07); }); },
+      fita: function () { tocar('gravador', 0.8, function () { bip(140, 0.08, 'square', 0.05); sopro(0.5, 2500, 0.05); }); },
+      pegar: function () { tocar('pegar', 0.8); bip(660, 0.18, 'sine', 0.06); setTimeout(function () { bip(990, 0.25, 'sine', 0.05); }, 110); },
+      energia: function () { tocar('gerador-liga', 0.9, function () { bip(60, 1.4, 'sawtooth', 0.14, 110); setTimeout(function () { bip(880, 0.4, 'sine', 0.06); }, 500); }); },
       parar: function () { if (ac && ac.state === 'running') ac.suspend(); clearInterval(mudoT); mudoT = 0; },
       voltar: function () {
         if (ac && ac.state === 'suspended') ac.resume();

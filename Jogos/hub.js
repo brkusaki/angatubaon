@@ -1324,7 +1324,27 @@
       '/Jogos/assets/sinalbranco/item-bilhete-v1.webp',
       '/Jogos/assets/sinalbranco/item-chaves-v1.webp',
       '/Jogos/assets/sinalbranco/item-gravador-v1.webp',
-      '/Jogos/assets/sinalbranco/item-fusivel-v1.webp'
+      '/Jogos/assets/sinalbranco/item-fusivel-v1.webp',
+      // sons e vozes (ElevenLabs)
+      '/Jogos/assets/sinalbranco/sfx/coro-loop.mp3',
+      '/Jogos/assets/sinalbranco/sfx/estatica-loop.mp3',
+      '/Jogos/assets/sinalbranco/sfx/gerador-liga.mp3',
+      '/Jogos/assets/sinalbranco/sfx/gerador-loop.mp3',
+      '/Jogos/assets/sinalbranco/sfx/gravador.mp3',
+      '/Jogos/assets/sinalbranco/sfx/interior-loop.mp3',
+      '/Jogos/assets/sinalbranco/sfx/lanterna.mp3',
+      '/Jogos/assets/sinalbranco/sfx/luzes.mp3',
+      '/Jogos/assets/sinalbranco/sfx/papel.mp3',
+      '/Jogos/assets/sinalbranco/sfx/passos-metal.mp3',
+      '/Jogos/assets/sinalbranco/sfx/passos-neve.mp3',
+      '/Jogos/assets/sinalbranco/sfx/peca.mp3',
+      '/Jogos/assets/sinalbranco/sfx/pegar.mp3',
+      '/Jogos/assets/sinalbranco/sfx/porta.mp3',
+      '/Jogos/assets/sinalbranco/sfx/revelacao.mp3',
+      '/Jogos/assets/sinalbranco/sfx/sinal-ok.mp3',
+      '/Jogos/assets/sinalbranco/sfx/vento-loop.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-audio_ingrid.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-sinal.mp3'
     ],
     corujinha: [
       '/Jogos/corujinha.min.js', '/Jogos/corujinha.css',

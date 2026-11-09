@@ -57,8 +57,9 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position
 @keyframes sb-pulsa{50%{transform:scale(1.5);background:#22d3ee;}}
 
 /* ── Inventário (faixa no canto de baixo, à esquerda) ── */
-.sb-inv{position:absolute;left:1.4%;bottom:2.4%;display:flex;gap:.7em;}
-.sb-item{width:5em;height:5em;padding:.4em;border-radius:1em;border:1px solid rgba(125,211,252,.28);background:rgba(4,10,18,.62);box-shadow:inset 0 0 1em rgba(56,189,248,.12);}
+.sb-inv{position:absolute;left:1.4%;bottom:2.4%;display:flex;gap:.6em;max-width:38%;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding:.3em;}
+.sb-inv::-webkit-scrollbar{display:none;}
+.sb-item{flex:0 0 auto;width:4.6em;height:4.6em;padding:.4em;border-radius:1em;border:1px solid rgba(125,211,252,.28);background:rgba(4,10,18,.62);box-shadow:inset 0 0 1em rgba(56,189,248,.12);}
 .sb-item img{width:100%;height:100%;object-fit:contain;pointer-events:none;}
 .sb-item:active{transform:scale(.93);}
 .sb-item.sb-novo{animation:sb-novo 1.2s ease 2;}
@@ -177,3 +178,46 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position
 .sb-fade{position:absolute;inset:0;z-index:9;background:#000;opacity:0;pointer-events:none;transition:opacity .26s ease;}
 .sb-fade.sb-on{opacity:1;}
 .sb-fade.sb-flash{background:#e0f2fe;opacity:.85;transition:opacity .6s ease;}
+
+/* ── Ato 2: elevador ── */
+.sb-puz-elev,.sb-puz-fios,.sb-puz-senha,.sb-puz-estrela{padding:1.8em 2.4em;}
+.sb-puz-elev{width:84%;}
+.sb-elev{display:flex;gap:1.4em;align-items:stretch;}
+.sb-elev-cv{flex:1;min-width:0;aspect-ratio:3/1;border-radius:.6em;border:1px solid rgba(148,163,184,.3);display:block;}
+.sb-elev-alav{width:11em;border-radius:1em;border:2px solid rgba(250,204,21,.6);background:linear-gradient(180deg,#3f3a1a,#1c1a0c);color:#fde68a;font-weight:800;font-size:1.3em;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3em;touch-action:none;}
+.sb-elev-alav small{font-size:.75em;opacity:.7;font-weight:600;}
+.sb-elev-alav.sb-on{background:linear-gradient(180deg,#facc15,#ca8a04);color:#1c1a0c;box-shadow:0 0 1.6em rgba(250,204,21,.6);transform:translateY(.25em);}
+.sb-freq-barra.sb-calor{background:linear-gradient(90deg,#f59e0b,#ef4444);}
+
+/* ── Ato 2: caixa de junção ── */
+.sb-puz-fios{width:62%;}
+.sb-fios{display:flex;align-items:stretch;gap:0;margin:.4em auto 1em;width:80%;height:22em;}
+.sb-fios-col{display:flex;flex-direction:column;justify-content:space-around;width:11em;}
+.sb-fios-svg{flex:1;height:100%;}
+.sb-fio-b,.sb-borne{height:4.2em;border-radius:.6em;border:1px solid rgba(255,255,255,.15);background:#0b1220;color:#e0f2fe;font-weight:800;font-size:1.25em;text-transform:capitalize;display:flex;align-items:center;justify-content:center;gap:.5em;}
+.sb-fio-b i{width:1.4em;height:.5em;border-radius:99em;display:inline-block;}
+.sb-borne{font-size:1.9em;width:2.6em;margin-left:auto;}
+.sb-fio-b.sb-sel{border-color:#7dd3fc;box-shadow:0 0 1em rgba(125,211,252,.6);}
+.sb-fio-b.sb-ok,.sb-borne.sb-ok{background:#13233a;}
+.sb-tremer{animation:sb-tremer .4s ease;}
+@keyframes sb-tremer{20%{transform:translateX(-1.2em)}40%{transform:translateX(1em)}60%{transform:translateX(-.6em)}80%{transform:translateX(.4em)}}
+
+/* ── Ato 2: senha ── */
+.sb-puz-senha{width:40%;}
+.sb-senha-vis{font-family:ui-monospace,'Courier New',monospace;font-size:3em;letter-spacing:.2em;color:#4ade80;text-shadow:0 0 .4em rgba(74,222,128,.7);background:#020a07;border:1px solid rgba(74,222,128,.35);border-radius:.3em;padding:.2em 0;margin:.2em auto .4em;}
+.sb-teclado{display:grid;grid-template-columns:repeat(3,1fr);gap:.6em;width:80%;margin:0 auto;}
+.sb-tecla{height:3.6em;border-radius:.6em;border:1px solid rgba(74,222,128,.3);background:#06140e;color:#bbf7d0;font-family:ui-monospace,monospace;font-size:1.5em;font-weight:800;}
+.sb-tecla:active{background:#14532d;}
+
+/* ── Ato 2: a estrela ── */
+.sb-puz-estrela{width:46%;}
+.sb-estrela{width:30em;height:30em;margin:.2em auto 0;}
+.sb-estrela svg{width:100%;height:100%;overflow:visible;}
+.sb-est-aro{fill:#0a1222;stroke:rgba(34,211,238,.35);stroke-width:.6;}
+.sb-est-pt{fill:#0f2a35;stroke:#22d3ee;stroke-width:.6;cursor:pointer;}
+.sb-est-pt[data-p="0"]{stroke-width:1.2;}
+.sb-est-pt.sb-on{fill:#22d3ee;filter:drop-shadow(0 0 2px #22d3ee);}
+.sb-est-l{stroke:#a5f3fc;stroke-width:1.1;stroke-linecap:round;filter:drop-shadow(0 0 1.5px #22d3ee);}
+.sb-est-l.sb-erro{stroke:#f87171;filter:drop-shadow(0 0 1.5px #ef4444);}
+.sb-est-l.sb-ok{stroke:#ecfeff;stroke-width:1.6;filter:drop-shadow(0 0 3px #22d3ee);}
+.sb-puz-dica.sb-aviso{color:#fca5a5;font-weight:700;}

@@ -18,7 +18,7 @@
    - Progresso no localStorage (angatuba_sinalbranco_save). Sem backend.
    - Som: síntese própria (vento, zumbido, estática), respeitando o mudo
      do hub (AngatubaSom.ativo()).
-   - Ato 1 (O Muro Branco) jogável; Atos 2–4 vêm depois.
+   - Atos 1 (O Muro Branco) e 2 (Subsolo Zero) jogáveis; 3 e 4 vêm depois.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -36,7 +36,16 @@
     bilhete:    { nome: 'Bilhete',    img: 'item-bilhete-v1.webp',    desc: 'O bilhete do Pavel.', doc: 'bilhete_pavel' },
     chaves:     { nome: 'Chaves',     img: 'item-chaves-v1.webp',     desc: 'Chaves com etiqueta vermelha: GERADOR.' },
     gravador:   { nome: 'Gravador',   img: 'item-gravador-v1.webp',   desc: 'O gravador da Dra. Ingrid. Tem uma gravação.', doc: 'audio_ingrid' },
-    fusivel:    { nome: 'Fusível',    img: 'item-fusivel-v1.webp',    desc: 'Fusível cerâmico de reserva, 30 A.' }
+    fusivel:    { nome: 'Fusível',    img: 'item-fusivel-v1.webp',    desc: 'Fusível cerâmico de reserva, 30 A.' },
+    // Ato 2
+    pecabra:    { nome: 'Pé de cabra', img: 'item-pecabra-v1.webp',   desc: 'Pé de cabra de aço. Pesado e frio.' },
+    valvula:    { nome: 'Válvula',    img: 'item-valvula-v1.webp',    desc: 'Válvula termiônica antiga. Ainda acende um pouco quando aquece na mão.' },
+    cracha:     { nome: 'Crachá vermelho', img: 'item-cracha-vermelho-v1.webp', desc: 'Crachá de segurança de Kazuo Ren. Faixa vermelha: acesso total ao nível -1.' },
+    fita:       { nome: 'Fita',       img: 'item-fita-v1.webp',       desc: 'Fita de dados com a etiqueta "K. — não apagar".', doc: 'fita_kazuo' },
+    polaroid:   { nome: 'Foto',       img: 'item-polaroid-v1.webp',   desc: 'Uma foto instantânea com algo escrito no verso.', doc: 'polaroid' },
+    mapa:       { nome: 'Mapa',       img: 'item-mapa-v1.webp',       desc: 'Mapa do nível -1 desenhado à mão.', doc: 'mapa_mao' },
+    frasco:     { nome: 'Amostra 7',  img: 'item-frasco-v1.webp',     desc: 'Frasco com um líquido que brilha sozinho. Está morno.', doc: 'amostra' },
+    cartao:     { nome: 'Cartão perfurado', img: 'item-cartao-v1.webp', desc: 'Cartão perfurado amarelado. Os furos não seguem nenhum padrão que eu conheça.' }
   };
 
   /* ══════════════════════════════════════════════════════════════
@@ -96,7 +105,64 @@
       '...nós ouvimos você descer do céu...\n\n...desça mais...\n\n' +
       '[o sinal se repete, agora com a voz de uma mulher]' }
   };
-  var DOCS_ATO1 = ['avisos', 'bilhete_pavel', 'diario_ingrid', 'audio_ingrid', 'graf', 'relatorio_mira', 'log_radio', 'sinal'];
+  // Ato 2
+  DOCS.planta = { titulo: 'Planta oficial — nível -1', tipo: 'papel', texto:
+    'ESTAÇÃO HALVORSEN — NÍVEL -1 (SUBSOLO TÉCNICO)\n\n' +
+    'Almoxarifado A ........ peças e combustível\n' +
+    'Almoxarifado B ........ suprimentos de frio\n\n' +
+    'Parede norte do Almoxarifado B: rocha. Sem acesso.\n' +
+    'Elevadores registrados: NENHUM.\n\n' +
+    '— alguém riscou "SEM ACESSO" e escreveu por cima, a lápis: —\n' +
+    'desce 640 metros' };
+  DOCS.emails = { titulo: 'Terminal de Kazuo Ren — e-mails', tipo: 'terminal', texto:
+    'DE: k.ren  PARA: p.drozd\nASSUNTO: caixa do corredor de serviço\n' +
+    '----------------------------------------\n' +
+    'Pavel, refiz a caixa de junção depois do curto. Se cair de novo, a ordem dos fios é:\n\n' +
+    '   VERMELHO -> ○      AZUL   -> ✕\n   AMARELO  -> □      BRANCO -> △\n\n' +
+    'E deixa a porta de segurança FECHADA. Larguei meu crachá vermelho na gaveta da mesa do arquivo. Não quero ele comigo.\n\n' +
+    '========================================\n' +
+    'DE: i.solberg  PARA: equipe\nASSUNTO: descida\n' +
+    '----------------------------------------\n' +
+    'Amanhã, 03h11, todos no nível -1.\nNão tragam nada.\nEla já sabe quem somos.' };
+  DOCS.fita_kazuo = { titulo: 'Fita — Kazuo Ren', tipo: 'audio', texto:
+    'Registro, Kazuo Ren. O cabo preto não é nosso. A gente achou ele já plugado no rack 9, descendo pelo chão.\n\n' +
+    'Puxei a ponta pra ver. Estava morna. Morna, debaixo de 600 metros de gelo.\n\n' +
+    'Os servidores não guardam nada. Eles traduzem. A Ingrid chama de "o Coro".\n\n' +
+    'Se alguém achar isto: não abram a porta de pedra sem a Mira. Ela é a única que entende a estrela.\n\n[fim da fita]' };
+  DOCS.polaroid = { titulo: 'Foto — verso', tipo: 'mao', texto:
+    'Na frente: a equipe toda no refeitório, sorrindo, dia 1.\n\n' +
+    'No verso, à mão:\n"Halvorsen — 12 pessoas."\n\n' +
+    'Embaixo, com outra letra, mais tremida:\n"13. Contei de novo. São 13."' };
+  DOCS.mapa_mao = { titulo: 'Mapa do nível -1 (à mão)', tipo: 'mao', texto:
+    'ELEVADOR → corredor de serviço\n' +
+    '   ← servidores        arquivo →\n' +
+    '   no fundo: porta de segurança (crachá VERMELHO)\n' +
+    '   → laboratório da Mira → TÚNEL → "a porta"\n\n' +
+    'Nota no canto: "a energia do túnel vem de uma caixa velha. Ela come válvulas."' };
+  DOCS.amostra = { titulo: 'Etiqueta — Amostra 7', tipo: 'papel', texto:
+    'AMOSTRA 7 — coletada no tanque principal\n\n' +
+    'Luminescência sem fonte de energia.\n' +
+    'Temperatura estável: 37,0 °C.\n' +
+    'Igual à temperatura do corpo humano.\n\n' +
+    '— M. Okafor' };
+  DOCS.quadro_mira = { titulo: 'Quadro do laboratório', tipo: 'mao', texto:
+    'ORDEM DE ATIVAÇÃO (não apagar!)\n\n' +
+    'A estrela não se desenha em volta.\nEla PULA.\n\n' +
+    'Comece na ponta de CIMA.\nVá de TRÊS em TRÊS.\nSete traços e você volta ao começo.\n\n' +
+    'Se errar, ela apaga tudo. — M.' };
+  DOCS.terminal_antigo = { titulo: 'Console de pedra', tipo: 'terminal', texto:
+    '> CARTÃO LIDO\n> IDIOMA: ???  (tradução parcial de K. Ren)\n\n' +
+    'CONTAGEM ............ 8.112.406.218\n' +
+    'CONTAGEM ............ 8.112.406.219\n' +
+    'CONTAGEM ............ 8.112.406.221\n\n' +
+    'ESCUTA .............. CONTÍNUA\n' +
+    'NOVOS OUVINTES ...... 13\n\n' +
+    '> ESTAÇÃO DE RESPOSTA: ABERTA\n> AGUARDANDO O DÉCIMO QUARTO' };
+  var DOCS_ATO = {
+    1: ['avisos', 'bilhete_pavel', 'diario_ingrid', 'audio_ingrid', 'graf', 'relatorio_mira', 'log_radio', 'sinal'],
+    2: ['planta', 'emails', 'fita_kazuo', 'polaroid', 'mapa_mao', 'amostra', 'quadro_mira', 'terminal_antigo']
+  };
+  function docsAte(n) { var l = []; for (var i = 1; i <= n; i++) l = l.concat(DOCS_ATO[i] || []); return l; }
 
   /* ══════════════════════════════════════════════════════════════
      CENAS — pontos em % da imagem { x, y, w, h }.
@@ -245,6 +311,159 @@
     }
   };
 
+  /* ── ATO 2 — Subsolo Zero ───────────────────────────────────── */
+  CENAS.almoxarifado = {
+    nome: 'Almoxarifado B', img: 'almoxarifado-v1.webp',
+    imgCom: function () { return S.flags.painelAberto ? 'almoxarifado-aberto-v1.webp' : null; },
+    chegada: ['Almoxarifado B. "Suprimentos de frio", dizia a planta.', 'Mas tem marcas de arrasto no chão. Vindo daquela parede.'],
+    saidas: [{ lado: 'baixo', para: 'entrada', rotulo: 'Entrada' }],
+    pontos: [
+      { id: 'planta', x: 5, y: 19, w: 16, h: 35, acao: function () { doc('planta'); } },
+      { id: 'arranhoes', x: 37, y: 72, w: 26, h: 15, acao: function () {
+        fala(['Marcas fundas no concreto, em arco.', 'Aquela placa de metal foi aberta e fechada dezenas de vezes.']); } },
+      { id: 'pecabra', x: 70, y: 50, w: 11, h: 40, se: function () { return !S.flags.pecabraPego; }, acao: function () {
+        flag('pecabraPego'); pegar('pecabra', ['Um pé de cabra encostado na prateleira.', 'Como se alguém tivesse deixado ali pra próxima pessoa.']); } },
+      { id: 'painel', x: 43, y: 27, w: 19, h: 45, porta: true, acao: function () {
+        if (S.flags.painelAberto) { ir('elevador'); return; }
+        if (!tem('pecabra')) { fala(['Uma placa de metal aparafusada na rocha. Está solta de um lado.', 'Com alguma coisa pra fazer alavanca, dá pra abrir.']); return; }
+        som.tocar('porta', 0.9);
+        flag('painelAberto'); tirar('pecabra');
+        desenharCena();
+        fala(['Enfiei o pé de cabra na fresta e puxei com o corpo todo.', 'A placa abriu como uma porta. Atrás dela...', 'Um elevador. Que não existe em planta nenhuma.']); } },
+      { id: 'prateleiras', x: 23, y: 28, w: 16, h: 42, acao: function () {
+        fala(['Peças de reposição, caixas de ração, cobertores.', 'Tudo etiquetado, tudo em ordem. Menos aquela parede.']); } }
+    ]
+  };
+  CENAS.elevador = {
+    nome: 'Elevador de carga', img: 'elevador-v1.webp',
+    chegada: ['Uma gaiola de aço velha. A chave ainda está no painel.', 'Quem desceu por último não pensou em voltar.'],
+    pontos: [
+      { id: 'painel', x: 76, y: 26, w: 19, h: 50, acao: function () {
+        if (S.flags.desceu) { fala(['O painel marca SUBSOLO ZERO.', 'Para subir é só puxar a alavanca ao contrário... mas eu ainda não terminei aqui.']); return; }
+        fala(['Chave na posição LIGA. Uma alavanca de descida e um medidor de profundidade.', 'Nenhum botão de andar. Só uma marca riscada no vidro do medidor: 640.'], abrirElevador); } },
+      { id: 'poco', x: 40, y: 20, w: 20, h: 56, acao: function () {
+        fala(['O poço desce até onde a luz não alcança.', 'Lá embaixo, bem fraco, o mesmo zumbido do rádio.']); } },
+      { id: 'sair', x: 21, y: 14, w: 15, h: 66, porta: true, acao: function () {
+        ir(S.flags.desceu ? 'servico' : 'almoxarifado'); } }
+    ]
+  };
+  CENAS.servico = {
+    nome: 'Corredor de serviço', img: 'servico-v1.webp',
+    chegada: ['Subsolo Zero. O gelo invadiu o concreto por todo lado.', 'E o ar é mais quente do que devia.'],
+    aoChegar: function () {
+      radio(['Téo? Aqui é a central do consórcio. O sinal está fraco, mas estamos te ouvindo.',
+        '— Central? Ninguém me falou de um nível abaixo da base.',
+        'A gente te guia daqui. Siga em frente.']);
+    },
+    saidas: [
+      { lado: 'esq', para: 'servidores', rotulo: 'Servidores' },
+      { lado: 'dir', para: 'arquivo', rotulo: 'Arquivo' },
+      { lado: 'baixo', para: 'elevador', rotulo: 'Elevador' }
+    ],
+    pontos: [
+      { id: 'juncao', x: 19, y: 25, w: 17, h: 31, acao: function () {
+        if (S.flags.energia2) { fala(['A caixa de junção está ligada. Os fios no lugar certo.']); return; }
+        fala(['A caixa de junção do corredor. Quatro fios soltos e quatro bornes marcados com símbolos.',
+          S.docs.indexOf('emails') >= 0 ? 'O e-mail do Kazuo tinha a ordem dos fios.' : 'Sem saber a ordem, posso fritar tudo. Alguém deve ter anotado isso.'], abrirFios); } },
+      { id: 'porta', x: 47, y: 42, w: 14, h: 30, porta: true, acao: function () {
+        if (S.flags.portaSeg) { ir('biolab'); return; }
+        if (!S.flags.energia2) { fala(['Porta de segurança. A luz do leitor está vermelha e apagada por dentro.', 'Sem energia no corredor, nem com crachá isso abre.']); return; }
+        if (!tem('cracha')) { fala(['O leitor acendeu. Pede um crachá com acesso ao nível -1.']); return; }
+        flag('portaSeg'); som.tocar('sinal-ok', 0.6); som.tocar('porta', 0.9);
+        fala(['Passei o crachá vermelho do Kazuo. Bip. A trava abriu.'], function () {
+          radio(['Ótimo trabalho, Téo. O laboratório da Dra. Okafor fica logo à frente.', '— Como vocês sabem onde eu estou?', '[só estática]'], function () { ir('biolab'); });
+        }); } }
+    ]
+  };
+  CENAS.servidores = {
+    nome: 'Sala de servidores', img: 'servidores-v1.webp',
+    chegada: ['Servidores. Centenas de luzes piscando no mesmo ritmo.', 'Como uma respiração.'],
+    saidas: [{ lado: 'baixo', para: 'servico', rotulo: 'Corredor' }],
+    pontos: [
+      { id: 'terminal', x: 44, y: 42, w: 14, h: 16, acao: function () {
+        if (S.flags.logado) { doc('emails'); return; }
+        fala(['O terminal do Kazuo pede uma senha de 4 dígitos.'], abrirSenha); } },
+      { id: 'caneca', x: 55, y: 50, w: 7, h: 11, acao: function () {
+        fala(['Café pela metade. Ainda está... morno.', 'Isso não faz sentido nenhum.']); } },
+      { id: 'rack', x: 72, y: 38, w: 12, h: 30, acao: function () {
+        if (!S.flags.valvulaPega) { flag('valvulaPega'); pegar('valvula', ['O rack 9 está aberto. No meio dos servidores modernos, um soquete antigo com uma válvula termiônica.', 'Isto aqui é dos anos 50. Peguei.']); }
+        else fala(['O cabo preto entra no rack e desce pelo buraco do chão.', 'Encostei a mão. Está morno. E pulsa.']); } },
+      { id: 'buraco', x: 61, y: 80, w: 21, h: 13, acao: function () {
+        fala(['O cabo some num buraco aberto no piso.', 'Não dá pra ver o fundo. Dá pra ouvir o zumbido.']); } }
+    ]
+  };
+  CENAS.arquivo = {
+    nome: 'Arquivo', img: 'arquivo-v1.webp',
+    chegada: ['Um escritório virado do avesso.', 'Alguém estava procurando alguma coisa. Ou tentando entender.'],
+    saidas: [{ lado: 'baixo', para: 'servico', rotulo: 'Corredor' }],
+    pontos: [
+      { id: 'mural', x: 36, y: 14, w: 30, h: 34, acao: function () {
+        fala(['Um mapa-múndi com fotos de estações: Svalbard, Atacama, Sibéria, Groenlândia.', 'Barbantes de todas elas. Todos terminam no mesmo ponto.', 'Aqui.']); } },
+      { id: 'fotos', x: 49, y: 51, w: 12, h: 10, se: function () { return !tem('polaroid'); }, acao: function () {
+        pegar('polaroid', ['Fotos espalhadas pela mesa. Uma delas tem algo escrito no verso.'], 'polaroid'); } },
+      { id: 'gaveta', x: 59, y: 61, w: 9, h: 17, acao: function () {
+        if (!S.flags.crachaPego) { flag('crachaPego'); pegar('cracha', ['Na gaveta da mesa, um crachá com faixa vermelha.', 'KAZUO REN — ACESSO TOTAL.']); }
+        else fala(['Só clipes e uma caneta sem tinta.']); } },
+      { id: 'arquivos', x: 9, y: 31, w: 19, h: 45, acao: function () {
+        if (!S.flags.fitaPega) { flag('fitaPega'); pegar('fita', ['Gavetas arrombadas. No fundo de uma delas, uma fita com a etiqueta "K. — não apagar".'], 'fita_kazuo'); }
+        else fala(['Relatórios de temperatura, pedidos de suprimento...', 'E dezenas de folhas com a mesma estrela de sete pontas.']); } },
+      { id: 'mapa', x: 36, y: 46, w: 10, h: 13, se: function () { return !tem('mapa'); }, acao: function () {
+        pegar('mapa', ['Na pilha de pastas, um mapa do nível -1 desenhado à mão.'], 'mapa_mao'); } },
+      { id: 'cartao', x: 58, y: 80, w: 10, h: 11, se: function () { return !S.flags.cartaoPego; }, acao: function () {
+        flag('cartaoPego'); pegar('cartao', ['No chão, entre os papéis, um cartão perfurado.', 'Ninguém usa isso desde antes de eu nascer.']); } }
+    ]
+  };
+  CENAS.biolab = {
+    nome: 'Laboratório da Mira', img: 'biolab-v1.webp', pisca: true,
+    chegada: ['O laboratório da Dra. Okafor.', 'O tanque do meio está rachado. O que estava dentro não está mais.'],
+    saidas: [
+      { lado: 'dir', para: 'portaAntiga', rotulo: 'Túnel' },
+      { lado: 'baixo', para: 'servico', rotulo: 'Corredor' }
+    ],
+    pontos: [
+      { id: 'frascos', x: 1, y: 55, w: 12, h: 16, se: function () { return !tem('frasco'); }, acao: function () {
+        pegar('frasco', ['Frascos que brilham sozinhos. Peguei um.', 'Está morno. Na palma da mão, parece um pulso.'], 'amostra'); } },
+      { id: 'microscopio', x: 12, y: 39, w: 9, h: 26, acao: function () {
+        fala(['No microscópio, uma lâmina com o líquido do tanque.', 'Não são células. São padrões. Estrelas de sete pontas, minúsculas, se repetindo.']); } },
+      { id: 'tanque', x: 44, y: 22, w: 12, h: 55, acao: function () {
+        fala(['O vidro rachou de dentro pra fora.', 'No fundo, um resto escuro congelado. E marcas de mão. Do lado de dentro.']); } },
+      { id: 'quadro', x: 77, y: 10, w: 23, h: 43, acao: function () { doc('quadro_mira'); } }
+    ]
+  };
+  CENAS.portaAntiga = {
+    nome: 'O túnel', img: 'porta-antiga-v1.webp',
+    imgCom: function () { return S.flags.portaAberta ? 'porta-aberta-v1.webp' : null; },
+    chegada: ['O concreto acaba aqui. Daqui pra frente é pedra.', 'Uma porta redonda, entalhada, muito mais velha que qualquer coisa que eu conheça.'],
+    aoChegar: function () { radio(['A Mira deixou a ordem no quadro. Ela sempre deixava.', '— Eu não te contei do quadro.']); },
+    saidas: [{ lado: 'baixo', para: 'biolab', rotulo: 'Laboratório' }],
+    pontos: [
+      { id: 'caixa', x: 77, y: 37, w: 10, h: 19, acao: function () {
+        if (S.flags.caixaLigada) { fala(['A caixa zumbe. A válvula brilha laranja lá dentro.']); return; }
+        if (!tem('valvula')) { fala(['Uma caixa de energia improvisada, aparafusada na pedra.', 'Tem um soquete vazio. De válvula.']); return; }
+        flag('caixaLigada'); tirar('valvula'); som.tocar('luzes', 0.7);
+        fala(['Encaixei a válvula dos servidores no soquete.', 'Ela acendeu. Os entalhes da porta acenderam junto.']); } },
+      { id: 'estrela', x: 37, y: 24, w: 26, h: 48, porta: true, acao: function () {
+        if (S.flags.portaAberta) { ir('terminalAntigo'); return; }
+        if (!S.flags.caixaLigada) { fala(['A estrela no centro tem sete pontas. Cada uma com uma marca gasta pelo toque.', 'Está tudo apagado. Os cabos vêm daquela caixa à direita.']); return; }
+        fala(['As sete pontas brilham fraco, esperando.'], abrirEstrela); } }
+    ]
+  };
+  CENAS.terminalAntigo = {
+    nome: 'A câmara', img: 'terminal-antigo-v1.webp',
+    chegada: ['Um console de pedra preta. Os símbolos flutuam no ar, sem tela nenhuma.', 'Os notebooks da equipe estão no chão, ligados nele.'],
+    saidas: [{ lado: 'baixo', para: 'portaAntiga', rotulo: 'Túnel' }],
+    pontos: [
+      { id: 'simbolos', x: 41, y: 28, w: 18, h: 18, acao: function () {
+        fala(['Os símbolos giram devagar. Quando eu chego perto, eles param.', 'Como se estivessem olhando de volta.']); } },
+      { id: 'notebook', x: 22, y: 66, w: 10, h: 14, acao: function () {
+        fala(['O notebook do Kazuo. Última anotação na tela:', '"A fenda do console aceita os cartões perfurados do arquivo. Foi assim que a gente começou a traduzir."']); } },
+      { id: 'console', x: 34, y: 46, w: 33, h: 27, acao: function () {
+        if (!tem('cartao')) { fala(['Uma fenda fina no meio do console.', 'Do tamanho exato de um cartão.']); return; }
+        tirar('cartao'); som.tocar('sinal-ok', 0.8);
+        fala(['Encaixei o cartão perfurado na fenda.', 'O console inteiro acendeu.'], function () { doc('terminal_antigo', fimDoAto2); }); } }
+    ]
+  };
+
   /* ══════════════════════════════════════════════════════════════
      ESTADO
   ══════════════════════════════════════════════════════════════ */
@@ -257,7 +476,7 @@
   var emPartida = false;
 
   function novoEstado() {
-    return { cena: 'heliponto', itens: [], flags: {}, docs: [], vistos: {}, chegou: {}, tempo: 0 };
+    return { ato: 1, cena: 'heliponto', itens: [], flags: {}, docs: [], vistos: {}, chegou: {}, tempo: 0 };
   }
   function salvar() {
     if (!S) return;
@@ -277,6 +496,12 @@
   /* ── Auxiliares usados pelas cenas ───────────────────────────── */
   function tem(id) { return S.itens.indexOf(id) >= 0; }
   function flag(f) { S.flags[f] = true; salvar(); }
+  // Fala da "voz da central" no rádio do cinto: estática curta antes.
+  function radio(linhas, aoFim) {
+    som.estatica(0.7);
+    setTimeout(function () { som.estatica(0); }, 700);
+    fala(linhas.map(function (l) { return l.charAt(0) === '—' || l.charAt(0) === '[' ? l : 'Voz no rádio: "' + l + '"'; }), aoFim);
+  }
   function tirar(id) { var i = S.itens.indexOf(id); if (i >= 0) S.itens.splice(i, 1); desenharInv(); }
   function pegar(id, linhas, docId) {
     if (!tem(id)) S.itens.push(id);
@@ -453,7 +678,10 @@
       var pronto = function () {
         el.fade.classList.remove('sb-on');
         var c = cenaAtual();
-        if (!S.chegou[id] && c.chegada) { S.chegou[id] = true; salvar(); setTimeout(function () { fala(c.chegada); }, 280); }
+        if (!S.chegou[id] && c.chegada) {
+          S.chegou[id] = true; salvar();
+          setTimeout(function () { fala(c.chegada, c.aoChegar || null); }, 280);
+        }
       };
       if (el.bg.complete) pronto(); else { el.bg.onload = function () { el.bg.onload = null; pronto(); }; setTimeout(pronto, 900); }
     }, 260);
@@ -581,7 +809,7 @@
     abrirModal(
       '<button type="button" class="sb-x" aria-label="Fechar">✕</button>' +
       '<div class="sb-doc-tit">Arquivo</div>' +
-      '<div class="sb-arq-cont">' + S.docs.length + ' de ' + DOCS_ATO1.length + ' arquivos encontrados</div>' +
+      '<div class="sb-arq-cont">' + S.docs.length + ' de ' + docsAte(S.ato || 1).length + ' arquivos encontrados</div>' +
       '<div class="sb-arq-lista">' + lista + '</div>', 'sb-arq', true);
     Array.prototype.forEach.call(el.caixa.querySelectorAll('[data-doc]'), function (b) {
       b.addEventListener('click', function () { som.clique(); var id = b.getAttribute('data-doc'); fecharModal(); doc(id, abrirArquivo); });
@@ -834,18 +1062,289 @@
     puz.raf = requestAnimationFrame(quadro);
   }
 
+  /* ── Elevador (Ato 2): descer e parar no Subsolo Zero ──────────
+     Segurar a alavanca acelera; soltar freia (o freio é mais fraco
+     que o motor, então é preciso soltar ANTES). Passar de 110 m/s
+     aquece o cabo e trava o freio de emergência. Parou dentro da
+     faixa de 640 m ± 12: chegou. Passou muito: o elevador sobe de
+     volta um trecho. */
+  var puzInfo = null;   // leitura para testes (_puz)
+  function abrirElevador() {
+    var ALVO = 640, FAIXA = 12, VMAX = 150, LIMITE = 110;
+    var prof = 0, v = 0, calor = 0, segurando = false, travado = 0, parado = 0, feito = false;
+    var html = '<button type="button" class="sb-x sb-x2" aria-label="Sair">✕</button>' +
+      '<div class="sb-doc-tit">Elevador de carga</div>' +
+      '<div class="sb-puz-dica">Segure a alavanca para descer, solte para frear. Pare na faixa verde dos 640 m. Acima de 110 m/s o cabo esquenta.</div>' +
+      '<div class="sb-elev">' +
+        '<canvas class="sb-elev-cv" width="900" height="300"></canvas>' +
+        '<button type="button" class="sb-elev-alav"><span>ALAVANCA</span><small>segure</small></button>' +
+      '</div>' +
+      '<div class="sb-freq-medidor"><div class="sb-freq-barra"></div><span class="sb-freq-pct"></span></div>';
+    abrirModal(html, 'sb-puz sb-puz-elev', false);
+    var cv = el.caixa.querySelector('.sb-elev-cv'), ctx = cv.getContext('2d');
+    var alav = el.caixa.querySelector('.sb-elev-alav');
+    var barra = el.caixa.querySelector('.sb-freq-barra'), pct = el.caixa.querySelector('.sb-freq-pct');
+    var dica = el.caixa.querySelector('.sb-puz-dica'), dicaBase = dica.textContent, dicaT = 0;
+    function avisar(t) { dica.textContent = t; dica.classList.add('sb-aviso'); clearTimeout(dicaT); dicaT = setTimeout(function () { dica.textContent = dicaBase; dica.classList.remove('sb-aviso'); }, 3200); }
+    el.caixa.querySelector('.sb-x2').addEventListener('click', function () { som.clique(); fecharModal(); });
+    var on = function (e) { e.preventDefault(); if (!travado && !feito) { segurando = true; alav.classList.add('sb-on'); som.tique(); } };
+    var off = function () { segurando = false; alav.classList.remove('sb-on'); };
+    alav.addEventListener('pointerdown', on); alav.addEventListener('pointerup', off);
+    alav.addEventListener('pointerleave', off); alav.addEventListener('pointercancel', off);
+    var ult = 0;
+    function quadro(ts) {
+      var dt = ult ? Math.min(0.05, (ts - ult) / 1000) : 0.016; ult = ts;
+      if (!feito) {
+        if (travado > 0) { travado -= dt; v = Math.max(0, v - 160 * dt); if (travado <= 0) calor = 0; }
+        else if (segurando) v = Math.min(VMAX, v + 34 * dt);
+        else v = Math.max(0, v - 42 * dt);
+        prof += v * dt;
+        calor = v > LIMITE ? Math.min(1, calor + dt * 0.9) : Math.max(0, calor - dt * 0.4);
+        if (calor >= 1 && travado <= 0) {
+          travado = 2.2; segurando = false; alav.classList.remove('sb-on');
+          som.tocar('porta', 0.8);
+          avisar('O freio de emergência travou com um tranco. O cabo esquentou demais.');
+        }
+        if (prof > ALVO + 60 && v < 30) {
+          som.tocar('gerador-liga', 0.5);
+          avisar('Passei do andar. O elevador subiu de volta um trecho, rangendo.');
+          prof = ALVO - 260; v = 0;
+        }
+        var dentro = Math.abs(prof - ALVO) <= FAIXA && v < 3;
+        parado = dentro ? parado + dt : 0;
+        if (parado > 0.6) {
+          feito = true; flag('desceu');
+          som.tocar('sinal-ok', 0.5);
+          setTimeout(function () {
+            fecharModal();
+            fala(['O elevador parou com um baque. Na parede do poço, pintado à mão: SUBSOLO ZERO.'], function () { ir('servico'); });
+          }, 900);
+        }
+      }
+      puzInfo = { prof: prof, v: v, calor: calor };
+      // desenho: poço com marcas de profundidade passando
+      var W = cv.width, H = cv.height;
+      ctx.fillStyle = '#060b12'; ctx.fillRect(0, 0, W, H);
+      var esc = 1.2, cy = H / 2;
+      for (var m = Math.floor((prof - 140) / 20) * 20; m < prof + 140; m += 20) {
+        if (m < 0) continue;
+        var y = cy + (m - prof) * esc;
+        ctx.strokeStyle = m % 100 === 0 ? 'rgba(148,163,184,.55)' : 'rgba(148,163,184,.18)';
+        ctx.lineWidth = m % 100 === 0 ? 2 : 1;
+        ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(m % 100 === 0 ? 150 : 110, y); ctx.stroke();
+        if (m % 100 === 0) { ctx.fillStyle = 'rgba(148,163,184,.7)'; ctx.font = '600 18px ui-monospace,monospace'; ctx.fillText(m + ' m', 160, y + 6); }
+      }
+      var ya = cy + (ALVO - FAIXA - prof) * esc, yb = cy + (ALVO + FAIXA - prof) * esc;
+      ctx.fillStyle = 'rgba(34,197,94,.22)'; ctx.fillRect(40, ya, W - 80, yb - ya);
+      ctx.strokeStyle = 'rgba(74,222,128,.8)'; ctx.strokeRect(40, ya, W - 80, yb - ya);
+      ctx.fillStyle = '#86efac'; ctx.font = '800 20px ui-monospace,monospace'; ctx.fillText('SUBSOLO ZERO — 640 m', W - 330, ya - 8);
+      // régua da descida inteira (0–800 m) à esquerda
+      var rx = 16, rt = 16, rb = H - 16, k = (rb - rt) / 800;
+      ctx.fillStyle = 'rgba(148,163,184,.12)'; ctx.fillRect(rx, rt, 10, rb - rt);
+      ctx.fillStyle = 'rgba(74,222,128,.85)'; ctx.fillRect(rx - 3, rt + (ALVO - FAIXA) * k, 16, 2 * FAIXA * k);
+      ctx.fillStyle = '#f8fafc'; ctx.fillRect(rx - 5, rt + Math.min(800, prof) * k - 2, 20, 4);
+      // a cabine (linha do meio)
+      ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(44, cy); ctx.lineTo(W - 30, cy); ctx.stroke();
+      ctx.fillStyle = '#f8fafc'; ctx.font = '800 34px ui-monospace,monospace';
+      ctx.fillText(Math.round(prof) + ' m', W - 230, cy - 18);
+      ctx.font = '600 20px ui-monospace,monospace';
+      ctx.fillStyle = v > LIMITE ? '#f87171' : '#a5f3fc';
+      ctx.fillText(Math.round(v) + ' m/s', W - 230, cy + 34);
+      barra.style.width = Math.round(calor * 100) + '%';
+      barra.classList.toggle('sb-calor', calor > 0.01);
+      pct.textContent = travado > 0 ? 'FREIO DE EMERGÊNCIA' : (calor > 0.01 ? 'Cabo esquentando ' + Math.round(calor * 100) + '%' : 'Temperatura do cabo: normal');
+      puz.raf = requestAnimationFrame(quadro);
+    }
+    puz.raf = requestAnimationFrame(quadro);
+  }
+
+  /* ── Caixa de junção (Ato 2): ligar 4 fios aos bornes certos ────
+     Toca no fio e depois no borne. "Testar" diz quantos estão certos
+     (a ordem está no e-mail do Kazuo, mas dá pra deduzir testando). */
+  var FIOS = [
+    { id: 'vermelho', cor: '#ef4444', certo: 'O' },
+    { id: 'azul', cor: '#3b82f6', certo: 'X' },
+    { id: 'amarelo', cor: '#facc15', certo: 'Q' },
+    { id: 'branco', cor: '#f1f5f9', certo: 'T' }
+  ];
+  var BORNES = [{ id: 'T', s: '△' }, { id: 'X', s: '✕' }, { id: 'O', s: '○' }, { id: 'Q', s: '□' }];
+  function abrirFios() {
+    var lig = {}, sel = null, tentativas = 0;
+    var html = '<button type="button" class="sb-x sb-x2" aria-label="Sair">✕</button>' +
+      '<div class="sb-doc-tit">Caixa de junção — corredor de serviço</div>' +
+      '<div class="sb-puz-dica">Toque num fio e depois num borne. Ligue os quatro e teste.</div>' +
+      '<div class="sb-fios">' +
+        '<div class="sb-fios-col">' + FIOS.map(function (f) { return '<button type="button" class="sb-fio-b" data-f="' + f.id + '"><i style="background:' + f.cor + '"></i>' + f.id + '</button>'; }).join('') + '</div>' +
+        '<svg class="sb-fios-svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>' +
+        '<div class="sb-fios-col">' + BORNES.map(function (b) { return '<button type="button" class="sb-borne" data-b="' + b.id + '">' + b.s + '</button>'; }).join('') + '</div>' +
+      '</div>' +
+      '<div class="sb-puz-botoes"><button type="button" class="sb-btn" data-a="testar">Testar</button><button type="button" class="sb-btn-sec" data-a="limpar">Soltar tudo</button></div>';
+    abrirModal(html, 'sb-puz sb-puz-fios', false);
+    var svg = el.caixa.querySelector('.sb-fios-svg'), msg = el.caixa.querySelector('.sb-puz-dica');
+    el.caixa.querySelector('.sb-x2').addEventListener('click', function () { som.clique(); fecharModal(); });
+    function desenhar() {
+      var linhas = '';
+      FIOS.forEach(function (f, i) {
+        if (!lig[f.id]) return;
+        var j = BORNES.map(function (b) { return b.id; }).indexOf(lig[f.id]);
+        var y1 = 12.5 + i * 25, y2 = 12.5 + j * 25;
+        linhas += '<path d="M0 ' + y1 + ' C50 ' + y1 + ' 50 ' + y2 + ' 100 ' + y2 + '" stroke="' + f.cor + '" stroke-width="3" fill="none" vector-effect="non-scaling-stroke"/>';
+      });
+      svg.innerHTML = linhas;
+      Array.prototype.forEach.call(el.caixa.querySelectorAll('.sb-fio-b'), function (b) {
+        b.classList.toggle('sb-sel', b.getAttribute('data-f') === sel);
+        b.classList.toggle('sb-ok', !!lig[b.getAttribute('data-f')]);
+      });
+      Array.prototype.forEach.call(el.caixa.querySelectorAll('.sb-borne'), function (b) {
+        var usado = false; for (var k in lig) if (lig[k] === b.getAttribute('data-b')) usado = true;
+        b.classList.toggle('sb-ok', usado);
+      });
+    }
+    Array.prototype.forEach.call(el.caixa.querySelectorAll('.sb-fio-b'), function (b) {
+      b.addEventListener('click', function () { som.tique(); sel = b.getAttribute('data-f'); desenhar(); });
+    });
+    Array.prototype.forEach.call(el.caixa.querySelectorAll('.sb-borne'), function (b) {
+      b.addEventListener('click', function () {
+        if (!sel) { msg.textContent = 'Escolha um fio primeiro.'; return; }
+        var alvo = b.getAttribute('data-b');
+        for (var k in lig) if (lig[k] === alvo) delete lig[k];
+        lig[sel] = alvo; sel = null; som.giro(); desenhar();
+      });
+    });
+    el.caixa.querySelector('[data-a="limpar"]').addEventListener('click', function () { som.clique(); lig = {}; sel = null; desenhar(); });
+    el.caixa.querySelector('[data-a="testar"]').addEventListener('click', function () {
+      if (Object.keys(lig).length < 4) { msg.textContent = 'Faltam fios. Ligue os quatro antes de testar.'; som.clique(); return; }
+      tentativas++;
+      var certos = FIOS.filter(function (f) { return lig[f.id] === f.certo; }).length;
+      if (certos === 4) {
+        som.energia();
+        msg.textContent = 'Energia restabelecida no corredor.';
+        setTimeout(function () {
+          fecharModal(); flag('energia2'); som.tocar('luzes', 0.7);
+          fala(['As luzes do corredor firmaram. Lá no fundo, o leitor da porta de segurança acendeu.']);
+        }, 900);
+      } else {
+        som.tocar('porta', 0.4);
+        el.caixa.classList.remove('sb-tremer'); void el.caixa.offsetWidth; el.caixa.classList.add('sb-tremer');
+        msg.textContent = 'Faísca! ' + certos + ' de 4 no lugar certo. Desliguei tudo de novo.' +
+          (tentativas >= 3 && S.docs.indexOf('emails') < 0 ? ' Alguém deve ter anotado essa ordem.' : '');
+        lig = {}; desenhar();
+      }
+    });
+    desenhar();
+  }
+
+  /* ── Senha de 4 dígitos (terminal do Kazuo) ───────────────────── */
+  function abrirSenha() {
+    var dig = '';
+    var html = '<button type="button" class="sb-x sb-x2" aria-label="Sair">✕</button>' +
+      '<div class="sb-doc-tit">Terminal — k.ren</div>' +
+      '<div class="sb-puz-dica">Dica de senha: "a hora em que ela acorda"</div>' +
+      '<div class="sb-senha-vis">____</div>' +
+      '<div class="sb-teclado">' + [1, 2, 3, 4, 5, 6, 7, 8, 9, 'C', 0, 'OK'].map(function (t) {
+        return '<button type="button" class="sb-tecla" data-t="' + t + '">' + (t === 'C' ? '⌫' : t) + '</button>';
+      }).join('') + '</div>';
+    abrirModal(html, 'sb-puz sb-puz-senha', false);
+    var vis = el.caixa.querySelector('.sb-senha-vis'), msg = el.caixa.querySelector('.sb-puz-dica');
+    el.caixa.querySelector('.sb-x2').addEventListener('click', function () { som.clique(); fecharModal(); });
+    function mostrar() { vis.textContent = (dig + '____').slice(0, 4).split('').join(' '); }
+    Array.prototype.forEach.call(el.caixa.querySelectorAll('.sb-tecla'), function (b) {
+      b.addEventListener('click', function () {
+        var t = b.getAttribute('data-t');
+        som.tique();
+        if (t === 'C') dig = dig.slice(0, -1);
+        else if (t === 'OK') {
+          if (dig === '0312') {
+            som.tocar('sinal-ok', 0.6); vis.textContent = 'ACESSO LIBERADO';
+            setTimeout(function () { fecharModal(); flag('logado'); doc('emails'); }, 700);
+            return;
+          }
+          vis.textContent = 'SENHA INCORRETA'; dig = '';
+          el.caixa.classList.remove('sb-tremer'); void el.caixa.offsetWidth; el.caixa.classList.add('sb-tremer');
+          msg.textContent = 'Dica de senha: "a hora em que ela acorda" (formato HHMM)';
+          setTimeout(mostrar, 900); return;
+        } else if (dig.length < 4) dig += t;
+        mostrar();
+      });
+    });
+    mostrar();
+  }
+
+  /* ── A estrela (porta de pedra): desenhar a heptagrama {7/3} ─────
+     Sete pontas num círculo; começa na de cima e pula de 3 em 3 (para
+     qualquer lado, mas sempre o mesmo). Erro: apaga tudo. */
+  function abrirEstrela() {
+    var seq = [], passo = 0;
+    var pts = [];
+    for (var i = 0; i < 7; i++) {
+      var a = -Math.PI / 2 + i * Math.PI * 2 / 7;
+      pts.push({ x: 50 + 40 * Math.cos(a), y: 50 + 40 * Math.sin(a) });
+    }
+    var html = '<button type="button" class="sb-x sb-x2" aria-label="Sair">✕</button>' +
+      '<div class="sb-doc-tit">A estrela</div>' +
+      '<div class="sb-puz-dica">Toque nas pontas, na ordem certa, para desenhar a estrela.</div>' +
+      '<div class="sb-estrela"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" class="sb-est-aro"/><g class="sb-est-linhas"></g>' +
+      pts.map(function (p, k) { return '<circle cx="' + p.x.toFixed(2) + '" cy="' + p.y.toFixed(2) + '" r="5.2" class="sb-est-pt" data-p="' + k + '"/>'; }).join('') +
+      '</svg></div>';
+    abrirModal(html, 'sb-puz sb-puz-estrela', false);
+    var linhasG = el.caixa.querySelector('.sb-est-linhas'), msg = el.caixa.querySelector('.sb-puz-dica');
+    el.caixa.querySelector('.sb-x2').addEventListener('click', function () { som.clique(); fecharModal(); });
+    function desenhar(cls) {
+      var l = '';
+      for (var k = 1; k < seq.length; k++) {
+        var a = pts[seq[k - 1]], b = pts[seq[k]];
+        l += '<line x1="' + a.x.toFixed(2) + '" y1="' + a.y.toFixed(2) + '" x2="' + b.x.toFixed(2) + '" y2="' + b.y.toFixed(2) + '" class="sb-est-l ' + (cls || '') + '"/>';
+      }
+      linhasG.innerHTML = l;
+      Array.prototype.forEach.call(el.caixa.querySelectorAll('.sb-est-pt'), function (c) {
+        c.classList.toggle('sb-on', seq.indexOf(+c.getAttribute('data-p')) >= 0);
+      });
+    }
+    function errou() {
+      desenhar('sb-erro'); som.tocar('porta', 0.4);
+      msg.textContent = 'As linhas piscaram em vermelho e apagaram.';
+      setTimeout(function () { seq = []; passo = 0; desenhar(); }, 700);
+    }
+    Array.prototype.forEach.call(el.caixa.querySelectorAll('.sb-est-pt'), function (c) {
+      c.addEventListener('click', function () {
+        var p = +c.getAttribute('data-p');
+        if (!seq.length) {
+          if (p !== 0) { msg.textContent = 'Nada acontece. Talvez precise começar por outra ponta.'; som.clique(); return; }
+          seq.push(p); som.tique(); desenhar(); return;
+        }
+        var ant = seq[seq.length - 1], dif = (p - ant + 7) % 7;
+        if (!passo) { if (dif === 3 || dif === 4) passo = dif; else { seq.push(p); return errou(); } }
+        if (dif !== passo) { seq.push(p); return errou(); }
+        seq.push(p); som.giro(); desenhar();
+        if (seq.length === 8) {
+          desenhar('sb-ok'); som.tocar('revelacao', 0.8);
+          msg.textContent = 'A estrela inteira acendeu.';
+          setTimeout(function () {
+            fecharModal(); flag('portaAberta'); desenharCena();
+            el.fade.classList.add('sb-flash'); setTimeout(function () { el.fade.classList.remove('sb-flash'); }, 700);
+            fala(['A pedra rolou pro lado sem fazer barulho nenhum.', 'Lá dentro, uma luz azul. E calor.']);
+          }, 1300);
+        }
+      });
+    });
+    desenhar();
+  }
+
   /* ══════════════════════════════════════════════════════════════
      TELAS: título e fim do ato
   ══════════════════════════════════════════════════════════════ */
+  var NOMES_ATO = { 1: 'Ato 1 — O Muro Branco', 2: 'Ato 2 — Subsolo Zero' };
+  var ULTIMO_ATO = 2;   // atos prontos
   function telaTitulo() {
-    var temSave = !!carregar();
+    var save = carregar(), temSave = !!save;
     el.bg.src = A + 'heliponto-v1.webp';
     el.pontos.innerHTML = ''; el.saidas.innerHTML = ''; el.inv.innerHTML = '';
     el.local.textContent = '';
     ligarNeve(true);
     el.titulo.innerHTML =
       '<div class="sb-tit-nome">SINAL BRANCO</div>' +
-      '<div class="sb-tit-sub">Ato 1 — O Muro Branco</div>' +
+      '<div class="sb-tit-sub">' + NOMES_ATO[(save && save.ato) || 1] + '</div>' +
       '<div class="sb-tit-botoes">' +
         (temSave ? '<button type="button" class="sb-btn" data-t="continuar">Continuar</button>' : '') +
         '<button type="button" class="sb-btn' + (temSave ? ' sb-btn-sec' : '') + '" data-t="novo">Novo jogo</button>' +
@@ -860,6 +1359,7 @@
           if (temSave && !confirmarNovo(b)) return;
           S = novoEstado();
         } else S = carregar() || novoEstado();
+        if (!S.ato) S.ato = 1;
         comecar();
       });
     });
@@ -876,35 +1376,55 @@
     partida(true);
     desenharInv();
     atualizarBadge(false);
-    var id = S.cena;
-    if (S.flags.atoFim) { fimDoAto(); return; }
-    S.cena = id;
-    ir(id);
+    if (S.ato === 1 && S.flags.atoFim) { telaFimAto(1); return; }
+    if (S.ato === 2 && S.flags.ato2Fim) { telaFimAto(2); return; }
+    ir(S.cena);
   }
   function fimDoAto() {
     som.tocar('revelacao', 0.9);
     fala(['Treze. Doze da equipe... e eu.', 'E aquela voz era da Ingrid. Igual à da gravação.', 'Debaixo do piso, alguma coisa começou a vibrar.'], function () {
-      flag('atoFim');
-      _tickTempo(); salvar();
-      var min = Math.floor(S.tempo / 60000), seg = Math.floor(S.tempo / 1000) % 60;
-      var achados = DOCS_ATO1.filter(function (d) { return S.docs.indexOf(d) >= 0; }).length;
-      partida(false);
-      el.titulo.innerHTML =
-        '<div class="sb-tit-sub">Fim do</div>' +
-        '<div class="sb-tit-nome sb-tit-menor">ATO 1</div>' +
-        '<div class="sb-tit-stats">Tempo: ' + min + 'min ' + (seg < 10 ? '0' : '') + seg + 's · Arquivos: ' + achados + '/' + DOCS_ATO1.length + '</div>' +
-        '<div class="sb-tit-sub2">Ato 2 — Subsolo Zero · em breve</div>' +
-        '<div class="sb-tit-botoes"><button type="button" class="sb-btn" data-t="arquivo">Ver arquivos</button>' +
-        '<button type="button" class="sb-btn sb-btn-sec" data-t="novo">Jogar de novo</button></div>';
-      el.titulo.style.display = '';
-      el.titulo.querySelector('[data-t="arquivo"]').addEventListener('click', function () {
-        som.clique(); el.titulo.style.display = 'none'; abrirArquivo();
-        modalAoFechar = function () { el.titulo.style.display = ''; };
-      });
-      el.titulo.querySelector('[data-t="novo"]').addEventListener('click', function () {
-        som.clique(); S = novoEstado(); salvar(); comecar();
-      });
+      flag('atoFim'); telaFimAto(1);
     });
+  }
+  function fimDoAto2() {
+    som.tocar('revelacao', 0.9);
+    fala(['Treze novos ouvintes.', 'Ninguém morreu aqui embaixo, eu entendi. Eles só... começaram a escutar também.', 'E ela está esperando o décimo quarto.'], function () {
+      radio(['Bem-vindo, Téo. Agora desça.'], function () { flag('ato2Fim'); telaFimAto(2); });
+    });
+  }
+  function iniciarAto2() {
+    // Itens do Ato 1 já cumpriram o papel (os documentos ficam no Arquivo); a lanterna segue.
+    S.ato = 2; S.cena = 'almoxarifado'; S.itens = tem('lanterna') ? ['lanterna'] : []; salvar();
+    el.titulo.style.display = 'none';
+    partida(true); desenharInv(); atualizarBadge(false);
+    fala(['O zumbido não vinha do gerador. Vinha de baixo.', 'O quadro de avisos falava de um Almoxarifado B. Restrito.'], function () { ir('almoxarifado'); });
+  }
+  function telaFimAto(n) {
+    _tickTempo(); salvar();
+    var min = Math.floor(S.tempo / 60000), seg = Math.floor(S.tempo / 1000) % 60;
+    var lista = DOCS_ATO[n] || [];
+    var achados = lista.filter(function (d) { return S.docs.indexOf(d) >= 0; }).length;
+    var temProximo = n < ULTIMO_ATO;
+    partida(false);
+    el.titulo.innerHTML =
+      '<div class="sb-tit-sub">Fim do</div>' +
+      '<div class="sb-tit-nome sb-tit-menor">ATO ' + n + '</div>' +
+      '<div class="sb-tit-stats">Tempo total: ' + min + 'min ' + (seg < 10 ? '0' : '') + seg + 's · Arquivos deste ato: ' + achados + '/' + lista.length + '</div>' +
+      (temProximo ? '' : '<div class="sb-tit-sub2">Ato ' + (n + 1) + ' · em breve</div>') +
+      '<div class="sb-tit-botoes">' +
+        (temProximo ? '<button type="button" class="sb-btn" data-t="proximo">Ir para o ' + NOMES_ATO[n + 1] + '</button>' : '') +
+        '<button type="button" class="sb-btn' + (temProximo ? ' sb-btn-sec' : '') + '" data-t="arquivo">Ver arquivos</button>' +
+        (temProximo ? '' : '<button type="button" class="sb-btn sb-btn-sec" data-t="novo">Jogar de novo</button>') +
+      '</div>';
+    el.titulo.style.display = '';
+    var b = el.titulo.querySelector('[data-t="proximo"]');
+    if (b) b.addEventListener('click', function () { som.clique(); iniciarAto2(); });
+    el.titulo.querySelector('[data-t="arquivo"]').addEventListener('click', function () {
+      som.clique(); el.titulo.style.display = 'none'; abrirArquivo();
+      modalAoFechar = function () { el.titulo.style.display = ''; };
+    });
+    var bn = el.titulo.querySelector('[data-t="novo"]');
+    if (bn) bn.addEventListener('click', function () { som.clique(); S = novoEstado(); salvar(); comecar(); });
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -1107,7 +1627,7 @@
     M.registrar(TELA, {
       pausar: function () { _tickTempo(); som.parar(); },
       continuar: function () { tUltimo = Date.now(); som.voltar(); },
-      descricao: function () { return S ? 'Ato 1 · ' + cenaAtual().nome + ' · progresso salvo' : 'Ato 1'; }
+      descricao: function () { return S ? 'Ato ' + (S.ato || 1) + ' · ' + cenaAtual().nome + ' · progresso salvo' : 'Sinal Branco'; }
     });
   }
   function aoTecla(e) {
@@ -1151,6 +1671,7 @@
   window.SinalBrancoGame = {
     preparar: preparar, parar: parar,
     // Leitura de estado para testes (não altera nada)
-    _estado: function () { return S ? JSON.parse(JSON.stringify(S)) : null; }
+    _estado: function () { return S ? JSON.parse(JSON.stringify(S)) : null; },
+    _puz: function () { return puzInfo; }
   };
 })();

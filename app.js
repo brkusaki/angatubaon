@@ -761,6 +761,26 @@
   // stub pela versão real assim que carrega.
   window._abrirGamesHub = _abrirGamesHub;
 
+  /* Volta pro jogo que estava aberto quando a página recarrega sozinha
+     (o Android descarta a aba em segundo plano pra liberar memória e,
+     ao voltar, recarrega do zero). Jogos/hub.js grava o jogo aberto no
+     sessionStorage (só desta aba) e apaga ao sair do jogo; aqui só
+     reabrimos se a marca for recente (até 30 min). */
+  (function _restaurarJogoAberto() {
+    var m = null;
+    try { m = JSON.parse(sessionStorage.getItem('angatuba_jogo_aberto') || 'null'); } catch (e) {}
+    if (!m || !m.n || Date.now() - (m.t || 0) > 30 * 60 * 1000) return;
+    var reabrir = function () {
+      setTimeout(function () {
+        _carregarHubJogos().then(function () {
+          if (typeof window._abrirGamesHub === 'function') window._abrirGamesHub();
+          setTimeout(function () { if (typeof window._abrirJogo === 'function') window._abrirJogo(m.n); }, 350);
+        }).catch(function () {});
+      }, 700);
+    };
+    if (document.readyState === 'complete') reabrir(); else window.addEventListener('load', reabrir, { once: true });
+  })();
+
   /* ── Módulo Aprender: Aprender/hub.js + Aprender/conteudo.js carregados
      sob demanda ──────────────────────────────────────────────────
      Mesmo padrão do hub de jogos acima: só baixa quem toca no botão

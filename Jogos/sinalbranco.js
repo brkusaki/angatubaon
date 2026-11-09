@@ -281,10 +281,32 @@
   function pegar(id, linhas, docId) {
     if (!tem(id)) S.itens.push(id);
     som.pegar();
-    desenharInv(id);
     salvar();
-    fala(linhas.concat(['[ ' + ITENS[id].nome + ' adicionado ao inventário ]']), docId ? function () { doc(docId); } : null);
     desenharCena(true);
+    fala(linhas, function () {
+      desenharInv(id);
+      mostrarItem(id, true, docId ? function () { doc(docId); } : null);
+    });
+  }
+
+  // Janela do item: imagem grande, nome e descrição. Ao pegar ("Novo item")
+  // ou ao tocar no item do inventário. Itens com documento (bilhete,
+  // gravador) ganham o botão de ler/ouvir.
+  function mostrarItem(id, novo, aoFechar) {
+    var it = ITENS[id], d = it.doc ? DOCS[it.doc] : null;
+    abrirModal(
+      '<div class="sb-it-novo">' + (novo ? 'Novo item' : 'Inventário') + '</div>' +
+      '<div class="sb-it-img"><img src="' + A + it.img + '" alt=""></div>' +
+      '<div class="sb-it-nome">' + esc(it.nome) + '</div>' +
+      '<div class="sb-it-desc">' + esc(it.desc) + '</div>' +
+      '<div class="sb-puz-botoes">' +
+        (d ? '<button type="button" class="sb-btn" data-i="doc"><i class="fa ' + (d.tipo === 'audio' ? 'fa-play' : 'fa-book-open') + '"></i> ' + (d.tipo === 'audio' ? 'Ouvir gravação' : 'Ler') + '</button>' : '') +
+        '<button type="button" class="' + (d ? 'sb-btn-sec' : 'sb-btn') + '" data-i="ok">' + (novo ? 'Guardar' : 'Fechar') + '</button>' +
+      '</div>', 'sb-it', true, aoFechar);
+    if (novo) som.tocar('pegar', 0.5);
+    var bDoc = el.caixa.querySelector('[data-i="doc"]');
+    if (bDoc) bDoc.addEventListener('click', function () { som.clique(); modalAoFechar = null; fecharModal(); doc(it.doc); });
+    el.caixa.querySelector('[data-i="ok"]').addEventListener('click', function () { som.clique(); fecharModal(); });
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -304,9 +326,8 @@
     root.innerHTML = '';
     var palco = h('div', 'sb-palco');
     palco.innerHTML =
-      '<img class="sb-bg" alt="" draggable="false">' +
+      '<div class="sb-mundo"><img class="sb-bg" alt="" draggable="false"><div class="sb-pontos"></div></div>' +
       '<canvas class="sb-fx" width="800" height="450"></canvas>' +
-      '<div class="sb-pontos"></div>' +
       '<div class="sb-saidas"></div>' +
       '<div class="sb-hud">' +
         '<div class="sb-local"></div>' +
@@ -402,6 +423,8 @@
         if (ocupado()) return;
         S.vistos[S.cena + '.' + pt.id] = true;
         b.classList.add('sb-visto');
+        var onda = h('span', 'sb-onda-toque'); b.appendChild(onda);
+        setTimeout(function () { if (onda.parentNode) onda.parentNode.removeChild(onda); }, 600);
         if (pt.porta) som.porta(); else som.clique();
         pt.acao();
         salvar();
@@ -458,7 +481,7 @@
       b.addEventListener('click', function () {
         if (ocupado()) return;
         som.clique();
-        fala([it.nome + ': ' + it.desc], it.doc ? function () { doc(it.doc); } : null);
+        mostrarItem(id, false);
       });
       el.inv.appendChild(b);
     });
@@ -688,93 +711,122 @@
     return '<svg viewBox="0 0 100 100"><path class="sb-fio-f" d="' + d + '"/><path class="sb-fio" d="' + d + '"/><circle cx="50" cy="50" r="9" class="sb-no"/></svg>';
   }
 
-  /* ── Frequência do rádio (encaixar a onda na onda-alvo) ──────── */
+  /* ── Frequência do rádio ──────────────────────────────────────
+     O sinal escondido NÃO fica parado: a fase e a força dele oscilam o
+     tempo todo. São três controles (frequência, fase e ganho) e o
+     jogador precisa ACOMPANHAR o sinal até a barra de trava encher —
+     ela enche com o sinal casado e esvazia quando escapa. O mostrador
+     não mostra o número enquanto está longe (a pista do 6,3 está no
+     diário de rádio do Kazuo). Conforme a trava enche, a mensagem
+     aparece, cada vez menos embaralhada. */
+  var MSG_RADIO = '...doze... doze... treze... você chegou...';
+  function embaralhar(txt, q) {
+    var lixo = '#%&*@$?!/\\|~^';
+    return txt.split('').map(function (ch) {
+      if (ch === ' ' || ch === '.') return ch;
+      return Math.random() < q ? ch : lixo[Math.floor(Math.random() * lixo.length)];
+    }).join('');
+  }
   function abrirFrequencia() {
-    var alvo = { f: 6.3, p: 2.2 };
-    var cur = { f: 3.0 + Math.random() * 1.2, p: 0.3 + Math.random() };
-    var segurar = 0;
-    var html = '<div class="sb-doc-tit">Rádio principal — sintonia</div>' +
-      '<div class="sb-puz-dica">Encaixe a sua onda (branca) na onda escondida no ruído (ciano).</div>' +
+    var F0 = 6.3, P0 = 2.2, G0 = 0.6;
+    var cur = { f: 2.4 + Math.random() * 1.2, p: 0.3 + Math.random(), g: 0.25 };
+    var trava = 0, t = 0, feito = false, msgT = 0;
+    var html = '<button type="button" class="sb-x sb-x2" aria-label="Desligar o rádio">✕</button>' +
+      '<div class="sb-doc-tit">Rádio principal — sintonia</div>' +
+      '<div class="sb-puz-dica">O sinal (ciano) se mexe. Ajuste a sua onda (branca) e acompanhe até a trava encher.</div>' +
       '<canvas class="sb-freq-cv" width="900" height="300"></canvas>' +
+      '<div class="sb-freq-msg">&nbsp;</div>' +
       '<div class="sb-freq-ctrl">' +
         '<div class="sb-freq-grupo"><span>Frequência</span><button type="button" data-k="f" data-d="-1">◀</button><b class="sb-freq-fv"></b><button type="button" data-k="f" data-d="1">▶</button></div>' +
         '<div class="sb-freq-grupo"><span>Fase</span><button type="button" data-k="p" data-d="-1">◀</button><b class="sb-freq-pv"></b><button type="button" data-k="p" data-d="1">▶</button></div>' +
+        '<div class="sb-freq-grupo"><span>Ganho</span><button type="button" data-k="g" data-d="-1">◀</button><b class="sb-freq-gv"></b><button type="button" data-k="g" data-d="1">▶</button></div>' +
       '</div>' +
-      '<div class="sb-freq-medidor"><div class="sb-freq-barra"></div><span class="sb-freq-pct"></span></div>' +
-      '<button type="button" class="sb-btn-sec sb-x2">Desligar o rádio</button>';
+      '<div class="sb-freq-medidor"><div class="sb-freq-barra"></div><span class="sb-freq-pct"></span></div>';
     abrirModal(html, 'sb-puz sb-puz-freq', false);
     var cv = el.caixa.querySelector('.sb-freq-cv'), ctx = cv.getContext('2d');
-    var fv = el.caixa.querySelector('.sb-freq-fv'), pv = el.caixa.querySelector('.sb-freq-pv');
+    var fv = el.caixa.querySelector('.sb-freq-fv'), pv = el.caixa.querySelector('.sb-freq-pv'), gv = el.caixa.querySelector('.sb-freq-gv');
     var barra = el.caixa.querySelector('.sb-freq-barra'), pct = el.caixa.querySelector('.sb-freq-pct');
-    var feito = false;
+    var msgEl = el.caixa.querySelector('.sb-freq-msg');
     el.caixa.querySelector('.sb-x2').addEventListener('click', function () { som.clique(); fecharModal(); });
     Array.prototype.forEach.call(el.caixa.querySelectorAll('[data-k]'), function (b) {
       var k = b.getAttribute('data-k'), dd = +b.getAttribute('data-d');
       var passo = function () {
         if (feito) return;
         if (k === 'f') cur.f = Math.max(1, Math.min(9.9, Math.round((cur.f + dd * 0.1) * 10) / 10));
-        else cur.p = (cur.p + dd * 0.1 + Math.PI * 2) % (Math.PI * 2);
+        else if (k === 'p') cur.p = (cur.p + dd * 0.07 + Math.PI * 2) % (Math.PI * 2);
+        else cur.g = Math.max(0.1, Math.min(1, Math.round((cur.g + dd * 0.04) * 100) / 100));
         som.tique();
       };
-      var t = 0, r = 0;
-      var parar = function () { clearTimeout(t); clearInterval(r); };
+      var tm = 0, r = 0;
+      var parar = function () { clearTimeout(tm); clearInterval(r); };
       b.addEventListener('pointerdown', function (e) {
         e.preventDefault(); passo(); parar();
-        t = setTimeout(function () { r = setInterval(passo, 70); puz.timers.push(r); }, 320);
+        tm = setTimeout(function () { r = setInterval(passo, 60); puz.timers.push(r); }, 280);
       });
       b.addEventListener('pointerup', parar); b.addEventListener('pointerleave', parar); b.addEventListener('pointercancel', parar);
     });
-    function casamento() {
-      var df = Math.abs(cur.f - alvo.f);
-      var dp = Math.abs(((cur.p - alvo.p) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
-      var mf = Math.max(0, 1 - df / 2.5), mp = Math.max(0, 1 - dp / Math.PI);
-      return df < 0.05 ? (0.55 + 0.45 * mp) : mf * 0.55 * (0.6 + 0.4 * mp);
+    // alvo que se move: fase e força oscilam em ritmos diferentes
+    function alvo() {
+      return { f: F0, p: (P0 + 0.75 * Math.sin(t * 0.55) + 0.35 * Math.sin(t * 1.3) + Math.PI * 4) % (Math.PI * 2),
+               g: G0 + 0.28 * Math.sin(t * 0.41 + 1) };
+    }
+    function casamento(a) {
+      var df = Math.abs(cur.f - a.f);
+      var dp = Math.abs(((cur.p - a.p) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
+      var mp = Math.max(0, 1 - dp / Math.PI), mg = Math.max(0, 1 - Math.abs(cur.g - a.g) / 0.6);
+      if (df < 0.05) return 0.4 + 0.35 * mp + 0.25 * mg;
+      return Math.max(0, 1 - df / 2.5) * 0.5 * (0.5 + 0.5 * mp);
     }
     var ult = 0;
     function quadro(ts) {
       var dt = ult ? Math.min(0.05, (ts - ult) / 1000) : 0.016; ult = ts;
-      var W = cv.width, H = cv.height, c = casamento();
+      if (!feito) t += dt;
+      var a = alvo(), c = casamento(a);
+      var W = cv.width, H = cv.height;
       ctx.fillStyle = '#04110f'; ctx.fillRect(0, 0, W, H);
       ctx.strokeStyle = 'rgba(80,255,220,.07)'; ctx.lineWidth = 1;
       for (var gx = 0; gx <= W; gx += 75) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
       for (var gy = 0; gy <= H; gy += 50) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
       var ruido = 1 - c;
-      function onda(f, p, cor, lw, sujo) {
+      function onda(f, p, g, cor, lw, sujo) {
         ctx.beginPath();
         for (var x = 0; x <= W; x += 4) {
-          var y = H / 2 + Math.sin(x / W * Math.PI * 2 * f / 2 + p) * H * 0.3;
+          var y = H / 2 + Math.sin(x / W * Math.PI * 2 * f / 2 + p) * H * 0.4 * g;
           if (sujo) y += (Math.random() - 0.5) * H * 0.22 * sujo;
           if (x) ctx.lineTo(x, y); else ctx.moveTo(x, y);
         }
         ctx.strokeStyle = cor; ctx.lineWidth = lw; ctx.stroke();
       }
       ctx.shadowBlur = 14; ctx.shadowColor = '#22d3ee';
-      onda(alvo.f, alvo.p, 'rgba(34,211,238,' + (0.35 + 0.4 * c) + ')', 5, ruido * 0.9);
+      onda(a.f, a.p, a.g, 'rgba(34,211,238,' + (0.3 + 0.45 * c) + ')', 5, ruido * 0.9);
       ctx.shadowColor = '#fff';
-      onda(cur.f, cur.p, 'rgba(255,255,255,.92)', 3, 0);
+      onda(cur.f, cur.p, cur.g, 'rgba(255,255,255,.92)', 3, 0);
       ctx.shadowBlur = 0;
-      // chiado visual
       ctx.fillStyle = 'rgba(200,255,240,' + (0.08 * ruido) + ')';
       for (var n = 0; n < 160 * ruido; n++) ctx.fillRect(Math.random() * W, Math.random() * H, 2, 2);
-      fv.textContent = cur.f.toFixed(1).replace('.', ',') + ' MHz';
+      // mostrador: o número só aparece quando a agulha chega perto
+      fv.textContent = Math.abs(cur.f - F0) <= 0.6 ? cur.f.toFixed(1).replace('.', ',') + ' MHz' : '–,– MHz';
       pv.textContent = Math.round(cur.p / (Math.PI * 2) * 360) + '°';
-      var pc = Math.round(c * 100);
-      barra.style.width = pc + '%';
-      barra.classList.toggle('sb-quase', pc >= 80);
-      pct.textContent = 'Sinal ' + pc + '%';
-      som.estatica(ruido);
+      gv.textContent = Math.round(cur.g * 100) + '%';
+      som.estatica(feito ? 0 : ruido);
       if (!feito) {
-        segurar = c >= 0.96 ? segurar + dt : 0;
-        if (segurar > 0.8) {
+        trava = c >= 0.88 ? Math.min(1, trava + dt / 4) : Math.max(0, trava - dt / 5);
+        barra.style.width = Math.round(trava * 100) + '%';
+        barra.classList.toggle('sb-quase', c >= 0.88);
+        pct.textContent = c >= 0.88 ? 'Travando o sinal... ' + Math.round(trava * 100) + '%' : 'Sinal ' + Math.round(c * 100) + '%';
+        msgT -= dt;
+        if (msgT <= 0) { msgT = 0.12; msgEl.textContent = trava > 0.02 ? embaralhar(MSG_RADIO, 0.15 + trava * 0.85) : ' '; }
+        if (trava >= 1) {
           feito = true;
           som.estatica(0);
           som.tocar('sinal-ok', 0.8, som.energia);
-          pct.textContent = 'Sinal 100% — decodificando...';
+          msgEl.textContent = MSG_RADIO;
+          pct.textContent = 'Sinal travado — decodificando...';
           setTimeout(function () {
             fecharModal();
             flag('radioOk');
             doc('sinal', fimDoAto);
-          }, 1200);
+          }, 1600);
         }
       }
       puz.raf = requestAnimationFrame(quadro);
@@ -894,10 +946,11 @@
     var ac = null, master = null, vento = null, ventoG = null, zumbido = null, zumbG = null, estG = null, mudoT = 0;
     // Arquivos gravados (ElevenLabs) em /Jogos/assets/sinalbranco/sfx/<nome>.mp3.
     // Enquanto um arquivo não existe ou não carregou, toca a síntese de reserva.
+    var VOZES = { audio_ingrid: 'voz-audio_ingrid-v2', sinal: 'voz-sinal-v2' };
     var ARQ = ['passos-neve', 'passos-metal', 'porta', 'gerador-liga', 'sinal-ok', 'pegar', 'papel', 'gravador',
-      'peca', 'lanterna', 'luzes', 'revelacao', 'voz-audio_ingrid', 'voz-sinal'];
+      'peca', 'lanterna', 'luzes', 'revelacao', VOZES.audio_ingrid, VOZES.sinal];
     var LOOPS = ['vento-loop', 'interior-loop', 'gerador-loop', 'estatica-loop', 'coro-loop'];
-    var buf = {}, loopG = {}, loopOn = {}, vozSrc = null, ambAtual = { onde: '', cena: '' };
+    var buf = {}, loopG = {}, loopOn = {}, vozSrc = null, vozVez = 0, ambAtual = { onde: '', cena: '' };
     function ligado() { var s = window.AngatubaSom; return !(s && typeof s.ativo === 'function' && !s.ativo()); }
     function ruidoBuf() {
       var b = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), d = b.getChannelData(0), u = 0;
@@ -1004,14 +1057,20 @@
         if (buf['estatica-loop']) { estG.gain.setTargetAtTime(0, ac.currentTime, 0.08); loopG['estatica-loop'].gain.setTargetAtTime(x * 0.7, ac.currentTime, 0.08); }
         else estG.gain.setTargetAtTime(x * 0.16, ac.currentTime, 0.08);
       },
+      // Cada pedido ganha uma "vez"; se outro pedido ou o fechamento do
+      // documento vier antes do atraso, o anterior não toca mais.
       voz: function (id) {
-        if (!ac || !buf['voz-' + id]) return;
+        var nome = VOZES[id];
+        if (!ac || !nome || !buf[nome]) return;
+        var vez = ++vozVez;
+        if (vozSrc) { try { vozSrc.stop(); } catch (e) {} vozSrc = null; }
         setTimeout(function () {
-          if (vozSrc) try { vozSrc.stop(); } catch (e) {}
-          vozSrc = tocar('voz-' + id, 1);
+          if (vez !== vozVez) return;
+          vozSrc = tocar(nome, 1);
+          if (vozSrc) vozSrc.onended = function () { if (vez === vozVez) vozSrc = null; };
         }, 700);
       },
-      pararVoz: function () { if (vozSrc) { try { vozSrc.stop(); } catch (e) {} vozSrc = null; } },
+      pararVoz: function () { vozVez++; if (vozSrc) { try { vozSrc.stop(); } catch (e) {} vozSrc = null; } },
       clique: function () { bip(1800, 0.03, 'square', 0.025); },
       tique: function () { bip(2400, 0.02, 'square', 0.02); },
       porta: function () { tocar('porta', 0.7, function () { sopro(0.3, 500, 0.08); }); },

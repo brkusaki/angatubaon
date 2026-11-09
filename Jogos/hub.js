@@ -742,6 +742,18 @@
   // reavisamos os jogos ativos pra redimensionar o canvas na hora (senão a
   // arena fica com o tamanho antigo até um resize manual).
   var _fsListenerOn = false;
+  /* Jogo aberto guardado na sessão da aba: se o Android descartar a página
+     em segundo plano e ela recarregar, app.js reabre o hub direto neste
+     jogo (ver _restaurarJogoAberto em app.js). Some ao sair do jogo. */
+  var _fsUltimaTrocaApp = 0, _jogoAbertoNome = null;
+  function _jogoAbertoMarcar(nome) {
+    _jogoAbertoNome = nome || null;
+    try {
+      if (nome) sessionStorage.setItem('angatuba_jogo_aberto', JSON.stringify({ n: nome, t: Date.now() }));
+      else sessionStorage.removeItem('angatuba_jogo_aberto');
+    } catch (e) {}
+  }
+
   function _ligarFsListener() {
     if (_fsListenerOn) return;
     _fsListenerOn = true;
@@ -755,11 +767,20 @@
       // jogo. Só tratamos como saída de verdade com a aba visível; senão
       // isso derrubava o jogo (e a sala multiplayer) toda vez que alguém
       // só trocava de app um instante.
-      var hubEl = document.getElementById('games-hub');
-      var jogoAberto = hubEl && hubEl.classList.contains('jogo-ativo');
-      if (!_fsAtivo() && jogoAberto && !document.hidden) {
-        // Evita loop: _voltarAoMenu chama _sairTelaCheia, que é no-op aqui.
-        _voltarAoMenu();
+      // No Android, ao apertar Home/trocar de app, a tela cheia sai ANTES
+      // do visibilitychange avisar que a aba ficou oculta — e ao voltar o
+      // evento pode chegar com a aba já visível. Em ambos os casos o jogo
+      // era fechado sem a pessoa pedir. Agora a decisão espera um pouco e
+      // ignora qualquer saída de tela cheia perto de uma troca de app (o
+      // botão voltar do Android continua saindo do jogo pelo popstate).
+      if (!_fsAtivo()) {
+        setTimeout(function () {
+          var hubEl = document.getElementById('games-hub');
+          var jogoAberto = hubEl && hubEl.classList.contains('jogo-ativo');
+          var trocouDeApp = document.hidden || !document.hasFocus() || (Date.now() - _fsUltimaTrocaApp < 2500);
+          // Evita loop: _voltarAoMenu chama _sairTelaCheia, que é no-op aqui.
+          if (!_fsAtivo() && jogoAberto && !trocouDeApp) _voltarAoMenu();
+        }, 600);
       }
       // Deixa o layout assentar antes de medir (dois frames).
       if (typeof requestAnimationFrame === 'function') {
@@ -777,11 +798,13 @@
     // o navegador soltou sozinho ao ir pro segundo plano), tenta reentrar —
     // silencioso se o navegador recusar, o fallback CSS já cobre a viewport.
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden) return;
+      _fsUltimaTrocaApp = Date.now();
       var hubEl = document.getElementById('games-hub');
       var jogoAberto = hubEl && hubEl.classList.contains('jogo-ativo');
+      if (document.hidden) { if (jogoAberto) _jogoAbertoMarcar(_jogoAbertoNome); return; }
       if (jogoAberto && !_fsAtivo()) _entrarTelaCheia();
     });
+    window.addEventListener('blur', function () { _fsUltimaTrocaApp = Date.now(); });
   }
 
 
@@ -922,6 +945,7 @@
   window._alternarSomJogos = _alternarSomJogos;
 
   function _fecharGamesHub(viaPopstate) {
+    _jogoAbertoMarcar(null);
     _pararJogosExternos(); // para Speed Tap / Sequência / Voo se estavam rodando
     // Fix A1.18: suspende os dois AudioContext (som compartilhado + piano,
     // que tem o seu próprio) — sem isso o indicador de mídia do navegador
@@ -1050,6 +1074,7 @@
   }
 
   function _voltarAoMenu() {
+    _jogoAbertoMarcar(null);
     // Loja de skins aberta dentro do jogo: o "voltar" do Android (entrada
     // 'lojajogo' já consumida) fecha só a loja e fica no jogo. Saída por
     // outro caminho fecha a loja e desfaz as 2 entradas (lojajogo + jogo).
@@ -1343,8 +1368,8 @@
       '/Jogos/assets/sinalbranco/sfx/revelacao.mp3',
       '/Jogos/assets/sinalbranco/sfx/sinal-ok.mp3',
       '/Jogos/assets/sinalbranco/sfx/vento-loop.mp3',
-      '/Jogos/assets/sinalbranco/sfx/voz-audio_ingrid.mp3',
-      '/Jogos/assets/sinalbranco/sfx/voz-sinal.mp3'
+      '/Jogos/assets/sinalbranco/sfx/voz-audio_ingrid-v2.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-sinal-v2.mp3'
     ],
     corujinha: [
       '/Jogos/corujinha.min.js', '/Jogos/corujinha.css',
@@ -1771,6 +1796,7 @@
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
     // Presença rica: amigos passam a ver "Jogando <nome>".
     _presencaJogo(nome);
+    _jogoAbertoMarcar(nome);
     _somHub('card-abrir', 0.7);
     // Fix A1.15: empilha uma entrada própria pro jogo — sem isto, o botão
     // "voltar" do Android saía do hub inteiro em vez de só fechar o jogo

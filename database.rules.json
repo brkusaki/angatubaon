@@ -4,6 +4,8 @@
     ".write": false,
     "salas": {
       "$codigo": {
+        // Código da sala: 4–6 letras/números maiúsculos (o app gera 4).
+        ".validate": "$codigo.matches(/^[A-Z0-9]{4,6}$/)",
         ".read": "auth != null",
         // ".validate" nunca roda quando o novo valor é nulo (apagar), então
         // sem a segunda parte aqui qualquer autenticado podia apagar a
@@ -11,7 +13,10 @@
         // NÃO é apagar a sala inteira (inclui remover só um filho, como o
         // convidado saindo) — só a exclusão da sala em si exige ser o
         // anfitrião (ver A1.6).
-        ".write": "auth != null && (newData.exists() || data.child('anfitriao/uid').val() == auth.uid)",
+        // Quem não é o anfitrião só escreve se o anfitrião continuar o
+        // mesmo: ".validate" não roda ao apagar, então antes dava pra
+        // apagar "anfitriao" e gravar o próprio uid (auditoria 10/11, P1-3).
+        ".write": "auth != null && (data.child('anfitriao/uid').val() == auth.uid || (newData.exists() && (!data.child('anfitriao').exists() || newData.child('anfitriao/uid').val() == data.child('anfitriao/uid').val())))",
         "anfitriao": {
           ".validate": "!data.exists() && newData.hasChildren(['uid','nome']) && newData.child('uid').val() == auth.uid && newData.child('nome').isString() && newData.child('nome').val().length <= 20"
         },
@@ -22,19 +27,19 @@
           ".validate": "!data.exists() && newData.parent().child('anfitriao/uid').val() == auth.uid && newData.isBoolean()"
         },
         "oferta": {
-          ".validate": "!data.exists() && data.parent().child('anfitriao/uid').val() == auth.uid && newData.hasChildren(['type','sdp'])"
+          ".validate": "!data.exists() && data.parent().child('anfitriao/uid').val() == auth.uid && newData.hasChildren(['type','sdp']) && newData.child('sdp').isString() && newData.child('sdp').val().length < 20000"
         },
         "resposta": {
-          ".validate": "!data.exists() && data.parent().child('convidado/uid').val() == auth.uid && newData.hasChildren(['type','sdp'])"
+          ".validate": "!data.exists() && data.parent().child('convidado/uid').val() == auth.uid && newData.hasChildren(['type','sdp']) && newData.child('sdp').isString() && newData.child('sdp').val().length < 20000"
         },
         "iceAnfitriao": {
           "$id": {
-            ".validate": "data.parent().parent().child('anfitriao/uid').val() == auth.uid && newData.hasChild('candidate')"
+            ".validate": "data.parent().parent().child('anfitriao/uid').val() == auth.uid && newData.hasChild('candidate') && newData.child('candidate').isString() && newData.child('candidate').val().length < 2000"
           }
         },
         "iceConvidado": {
           "$id": {
-            ".validate": "data.parent().parent().child('convidado/uid').val() == auth.uid && newData.hasChild('candidate')"
+            ".validate": "data.parent().parent().child('convidado/uid').val() == auth.uid && newData.hasChild('candidate') && newData.child('candidate').isString() && newData.child('candidate').val().length < 2000"
           }
         },
         "criadoEm": {
@@ -49,7 +54,11 @@
       ".read": "auth != null",
       "$codigo": {
         ".write": "auth != null && root.child('salas').child($codigo).child('anfitriao').child('uid').val() == auth.uid",
-        ".validate": "!newData.exists() || (newData.hasChildren(['nome','criadoEm']) && newData.child('nome').isString() && newData.child('nome').val().length <= 20)"
+        ".validate": "!newData.exists() || (newData.hasChildren(['nome','criadoEm']) && newData.child('nome').isString() && newData.child('nome').val().length <= 20)",
+        // Só estes campos: todo celular que abre a lista baixa o espelho (P2-8).
+        "nome": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "criadoEm": { ".validate": "newData.isNumber()" },
+        "$outro": { ".validate": false }
       }
     },
 
@@ -70,11 +79,16 @@
        assim nenhuma regra precisa lidar com delete de subárvore. */
     "salasParty": {
       "$codigo": {
+        // Código da sala: 4–6 letras/números maiúsculos (o app gera 4).
+        ".validate": "$codigo.matches(/^[A-Z0-9]{4,6}$/)",
         ".read": "auth != null",
         // Mesma correção de "salas" acima: sem isto, apagar não passa por
         // .validate e qualquer autenticado podia matar a Party de outro
         // grupo (ver A1.6).
-        ".write": "auth != null && (newData.exists() || data.child('anfitriao/uid').val() == auth.uid)",
+        // Quem não é o anfitrião só escreve se o anfitrião continuar o
+        // mesmo: ".validate" não roda ao apagar, então antes dava pra
+        // apagar "anfitriao" e gravar o próprio uid (auditoria 10/11, P1-3).
+        ".write": "auth != null && (data.child('anfitriao/uid').val() == auth.uid || (newData.exists() && (!data.child('anfitriao').exists() || newData.child('anfitriao/uid').val() == data.child('anfitriao/uid').val())))",
         "anfitriao": {
           ".validate": "!data.exists() && newData.hasChildren(['uid','nome']) && newData.child('uid').val() == auth.uid && newData.child('nome').isString() && newData.child('nome').val().length <= 20"
         },
@@ -222,7 +236,11 @@
       ".read": "auth != null",
       "$codigo": {
         ".write": "auth != null && root.child('salasParty').child($codigo).child('anfitriao').child('uid').val() == auth.uid",
-        ".validate": "!newData.exists() || (newData.hasChildren(['nome','criadoEm']) && newData.child('nome').isString() && newData.child('nome').val().length <= 20)"
+        ".validate": "!newData.exists() || (newData.hasChildren(['nome','criadoEm']) && newData.child('nome').isString() && newData.child('nome').val().length <= 20)",
+        // Só estes campos: todo celular que abre a lista baixa o espelho (P2-8).
+        "nome": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "criadoEm": { ".validate": "newData.isNumber()" },
+        "$outro": { ".validate": false }
       }
     },
 
@@ -238,10 +256,15 @@
        claude/Jogos/baralho.js e claude/Jogos/truco.js. */
     "salasBaralho": {
       "$codigo": {
+        // Código da sala: 4–6 letras/números maiúsculos (o app gera 4).
+        ".validate": "$codigo.matches(/^[A-Z0-9]{4,6}$/)",
         ".read": "auth != null",
         // Mesma correção de "salas"/"salasParty": sem o "newData.exists()"
         // qualquer autenticado podia apagar a sala de outro grupo.
-        ".write": "auth != null && (newData.exists() || data.child('anfitriao/uid').val() == auth.uid)",
+        // Quem não é o anfitrião só escreve se o anfitrião continuar o
+        // mesmo: ".validate" não roda ao apagar, então antes dava pra
+        // apagar "anfitriao" e gravar o próprio uid (auditoria 10/11, P1-3).
+        ".write": "auth != null && (data.child('anfitriao/uid').val() == auth.uid || (newData.exists() && (!data.child('anfitriao').exists() || newData.child('anfitriao/uid').val() == data.child('anfitriao/uid').val()) && (!data.child('game').exists() || newData.child('game').exists())))",
         "anfitriao": {
           ".validate": "!data.exists() && newData.hasChildren(['uid','nome']) && newData.child('uid').val() == auth.uid && newData.child('nome').isString() && newData.child('nome').val().length <= 20"
         },
@@ -272,6 +295,8 @@
             // reescrevem nome/seat/entrouEm/pronto de uma vez — por isso,
             // diferente de salasParty, não trava com "!data.exists()").
             ".write": "auth != null && auth.uid == $uid",
+            // Idem: sem este ".validate", qualquer um renomeava outro jogador.
+            ".validate": "auth.uid == $uid || newData.parent().parent().child('anfitriao/uid').val() == auth.uid",
             "nome": { ".validate": "newData.isString() && newData.val().length <= 20" },
             "entrouEm": { ".validate": "newData.val() == now" },
             // Até 8 assentos (0-7) por causa do Uno; Truco usa só 0-3.
@@ -285,7 +310,10 @@
         // Confiança na mesma medida de rodadaAtual/jogoAtual/seed em
         // salasParty: quem hospeda é quem valida as regras do jogo.
         "game": {
-          ".write": "auth != null && data.parent().child('anfitriao/uid').val() == auth.uid"
+          ".write": "auth != null && data.parent().child('anfitriao/uid').val() == auth.uid",
+          // O ".write" acima não restringe: o nó da sala já liberou a
+          // escrita para todo autenticado. Quem barra é este ".validate".
+          ".validate": "newData.parent().child('anfitriao/uid').val() == auth.uid"
         },
         // Fila de intenções de jogada. Qualquer jogador cria a própria
         // (uid tem que bater com quem está autenticado); só o autor ou o
@@ -307,7 +335,14 @@
       ".read": "auth != null",
       "$codigo": {
         ".write": "auth != null && root.child('salasBaralho').child($codigo).child('anfitriao/uid').val() == auth.uid",
-        ".validate": "!newData.exists() || (newData.hasChildren(['anfitriao','criadoEm','modo','maxJogadores']) && newData.child('anfitriao').isString() && newData.child('anfitriao').val().length <= 20)"
+        ".validate": "!newData.exists() || (newData.hasChildren(['anfitriao','criadoEm','modo','maxJogadores']) && newData.child('anfitriao').isString() && newData.child('anfitriao').val().length <= 20)",
+        // Só estes campos: todo celular que abre a lista baixa o espelho (P2-8).
+        "anfitriao": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "criadoEm": { ".validate": "newData.isNumber()" },
+        "modo": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "maxJogadores": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 8" },
+        "qtdJogadores": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 8" },
+        "$outro": { ".validate": false }
       }
     },
 
@@ -467,7 +502,7 @@
           // campo, e a UI cai na inicial. https obrigatório (é sempre
           // a URL do Cloudinary que o avatar já usa) e teto de 300
           // caracteres, pra este nó não virar carona pra texto.
-          "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().beginsWith('https://')" },
+          "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && (newData.val().beginsWith('https://res.cloudinary.com/') || newData.val().beginsWith('https://lh3.googleusercontent.com/'))" },
           "$outro": { ".validate": false }
         }
       }
@@ -483,7 +518,7 @@
           "nome": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
           "desde": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
           // Foto (P3): OPCIONAL, mesmas travas do friendRequests.
-          "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().beginsWith('https://')" },
+          "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && (newData.val().beginsWith('https://res.cloudinary.com/') || newData.val().beginsWith('https://lh3.googleusercontent.com/'))" },
           "$outro": { ".validate": false }
         }
       }
@@ -588,7 +623,7 @@
         // Só o dono da caixa lê a caixa inteira.
         ".read": "auth != null && auth.uid == $para && auth.token.firebase.sign_in_provider != 'anonymous'",
         "$convite": {
-          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((auth.uid == $para && !newData.exists()) || (auth.uid != $para && newData.exists() && $convite == auth.uid + '_' + newData.child('jogo').val() && root.child('friends').child(auth.uid).child($para).exists()) || (auth.uid != $para && !newData.exists() && data.child('de').val() == auth.uid))",
+          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((auth.uid == $para && !newData.exists()) || (auth.uid != $para && newData.exists() && $convite == auth.uid + '_' + newData.child('jogo').val() && root.child('friends').child($para).child(auth.uid).exists()) || (auth.uid != $para && !newData.exists() && data.child('de').val() == auth.uid))",
           ".validate": "newData.hasChildren(['de','nome','jogo','codigo','em','expiraEm'])",
           "de": { ".validate": "newData.isString() && newData.val() == auth.uid" },
           "nome": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
@@ -652,14 +687,14 @@
         // Só o dono da caixa lê a caixa inteira.
         ".read": "auth != null && auth.uid == $para && auth.token.firebase.sign_in_provider != 'anonymous'",
         "$de": {
-          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((auth.uid == $para && !newData.exists()) || (auth.uid == $de && auth.uid != $para && newData.exists() && root.child('friends').child(auth.uid).child($para).exists()) || (auth.uid == $de && !newData.exists()))",
+          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((auth.uid == $para && !newData.exists()) || (auth.uid == $de && auth.uid != $para && newData.exists() && root.child('friends').child($para).child(auth.uid).exists()) || (auth.uid == $de && !newData.exists()))",
           ".validate": "newData.hasChildren(['nome','codigoLobby','em','expiraEm'])",
           "nome": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
           // Foto (L2): OPCIONAL de propósito — fica fora do
           // hasChildren, então quem não tem avatar grava o convite sem
           // o campo, e convite antigo (gravado na L1) continua válido.
           // Mesmas duas travas dos nós de amizade: https e teto de 300.
-          "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().beginsWith('https://')" },
+          "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && (newData.val().beginsWith('https://res.cloudinary.com/') || newData.val().beginsWith('https://lh3.googleusercontent.com/'))" },
           "codigoLobby": { ".validate": "newData.isString() && newData.val().length == 6 && newData.val().matches(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]+$/)" },
           "em": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
           "expiraEm": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 3600000" },
@@ -706,7 +741,7 @@
         // Só o dono do ramo lê o ramo inteiro.
         ".read": "auth != null && auth.uid == $de && auth.token.firebase.sign_in_provider != 'anonymous'",
         "$para": {
-          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((auth.uid == $de && auth.uid != $para && newData.exists() && root.child('friends').child(auth.uid).child($para).exists()) || (auth.uid == $de && !newData.exists()) || (auth.uid == $para && auth.uid != $de && !newData.exists()))",
+          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((auth.uid == $de && auth.uid != $para && newData.exists() && root.child('friends').child($para).child(auth.uid).exists()) || (auth.uid == $de && !newData.exists()) || (auth.uid == $para && auth.uid != $de && !newData.exists()))",
           ".validate": "newData.hasChildren(['codigoLobby','em','expiraEm'])",
           "codigoLobby": { ".validate": "newData.isString() && newData.val().length == 6 && newData.val().matches(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]+$/)" },
           "em": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
@@ -846,7 +881,7 @@
             // conseguir voltar pro lobby.
             "entrouEm": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
             // Foto: OPCIONAL, mesmas travas de friends/ e friendRequests/.
-            "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().beginsWith('https://')" },
+            "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && (newData.val().beginsWith('https://res.cloudinary.com/') || newData.val().beginsWith('https://lh3.googleusercontent.com/'))" },
             "pronto": { ".validate": "newData.isBoolean()" },
             "$outro": { ".validate": false }
           }
@@ -911,7 +946,7 @@
         ".read": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))",
         "msgs": {
           "$msgId": {
-            ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && newData.exists() && !data.exists() && newData.child('de').val() == auth.uid && (($chatId.beginsWith(auth.uid + '_') && root.child('friends').child(auth.uid).child($chatId.replace(auth.uid + '_', '')).exists()) || ($chatId.endsWith('_' + auth.uid) && root.child('friends').child(auth.uid).child($chatId.replace('_' + auth.uid, '')).exists()))",
+            ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && newData.exists() && !data.exists() && newData.child('de').val() == auth.uid && (($chatId.beginsWith(auth.uid + '_') && root.child('friends').child($chatId.replace(auth.uid + '_', '')).child(auth.uid).exists()) || ($chatId.endsWith('_' + auth.uid) && root.child('friends').child($chatId.replace('_' + auth.uid, '')).child(auth.uid).exists()))",
             ".validate": "newData.hasChildren(['de','txt','em'])",
             "de": { ".validate": "newData.isString() && newData.val() == auth.uid" },
             "txt": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 500" },
@@ -933,7 +968,7 @@
         // O freio de custo (1 gravação a cada 2s no máximo) é do cliente.
         "typing": {
           "$uid": {
-            ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && auth.uid == $uid && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid)) && (!newData.exists() || ($chatId.beginsWith(auth.uid + '_') && root.child('friends').child(auth.uid).child($chatId.replace(auth.uid + '_', '')).exists()) || ($chatId.endsWith('_' + auth.uid) && root.child('friends').child(auth.uid).child($chatId.replace('_' + auth.uid, '')).exists()))",
+            ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && auth.uid == $uid && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid)) && (!newData.exists() || ($chatId.beginsWith(auth.uid + '_') && root.child('friends').child($chatId.replace(auth.uid + '_', '')).child(auth.uid).exists()) || ($chatId.endsWith('_' + auth.uid) && root.child('friends').child($chatId.replace('_' + auth.uid, '')).child(auth.uid).exists()))",
             ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000"
           }
         },
@@ -944,14 +979,14 @@
       "$dono": {
         ".read": "auth != null && auth.uid == $dono && auth.token.firebase.sign_in_provider != 'anonymous'",
         "$outro": {
-          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && $outro != $dono && (auth.uid == $dono || (auth.uid == $outro && newData.exists() && root.child('friends').child(auth.uid).child($dono).exists()))",
+          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && $outro != $dono && (auth.uid == $dono || (auth.uid == $outro && newData.exists() && root.child('friends').child($dono).child(auth.uid).exists()))",
           ".validate": "newData.hasChildren(['ultima','de','em','naoLidas','nome'])",
           "ultima": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 80" },
           "de": { ".validate": "newData.isString() && (newData.val() == $dono || newData.val() == $outro)" },
           "em": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000" },
           "naoLidas": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9999" },
           "nome": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
-          "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && newData.val().beginsWith('https://')" },
+          "foto": { ".validate": "newData.isString() && newData.val().length <= 300 && (newData.val().beginsWith('https://res.cloudinary.com/') || newData.val().beginsWith('https://lh3.googleusercontent.com/'))" },
           "$campo": { ".validate": false }
         }
       }

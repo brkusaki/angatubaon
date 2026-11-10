@@ -1901,8 +1901,9 @@
         return '<div class="pty-resultado-item' + (i === 0 ? ' pty-resultado-1' : '') + (eu ? ' pty-resultado-eu' : '') + '" style="animation-delay:' + ((n - 1 - i) * 0.32 + 0.1).toFixed(2) + 's">' +
           '<span class="pty-resultado-pos">' + (medalhas[i] || (i + 1) + 'º') + '</span>' +
           '<span class="pty-resultado-nome">' + _ptyAvatar(sala, uid) + _escHTML(it.nome) + '</span>' +
-          '<span class="pty-resultado-score">' + it.score + '</span>' +
-          '<span class="pty-resultado-pts">+' + it.pontosGanhos + '</span></div>';
+          // Number(): placarRodadas vem do banco e pode trazer texto.
+          '<span class="pty-resultado-score">' + (Number(it.score) || 0) + '</span>' +
+          '<span class="pty-resultado-pts">+' + (Number(it.pontosGanhos) || 0) + '</span></div>';
       }).join('');
     }
 

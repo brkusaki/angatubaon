@@ -1740,7 +1740,7 @@
   // fechaStr opcional: se fornecido, exibe "Aberto até HH:MM" ou "Abre às HH:MM"
   function badgeHTML(status, fechaStr, agendado) {
     if (status === 'open') {
-      const label = fechaStr ? `Aberto até ${fechaStr}` : 'Aberto Agora';
+      const label = fechaStr ? `Aberto até ${escHTML(fechaStr)}` : 'Aberto Agora';
       return `<span class="badge badge-open"><span class="badge-dot"></span>${label}</span>`;
     }
     if (status === 'zap') {
@@ -1748,7 +1748,7 @@
       return `<span class="badge badge-zap"><span class="badge-dot"></span>${zLabel}</span>`;
     }
     // closed
-    const label = fechaStr ? `Abre às ${fechaStr}` : 'Fechado';
+    const label = fechaStr ? `Abre às ${escHTML(fechaStr)}` : 'Fechado';
     return `<span class="badge badge-closed"><span class="badge-dot"></span>${label}</span>`;
   }
 
@@ -1784,6 +1784,25 @@
       .replace(/[\r\n]/g, ' ');
   }
 
+  // Texto dentro de onclick="fn('…')": escAttr não basta, porque o navegador
+  // desfaz &#39; antes de rodar o JS e o apóstrofo fecha a string (nome
+  // "Sant'Ana" quebrava o botão; texto montado rodava código). Aqui o texto
+  // vira escape de string JS (\x27…), que o HTML não mexe.
+  function escJsArg(s) {
+    return String(s == null ? '' : s)
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, '\\x27').replace(/"/g, '\\x22')
+      .replace(/&/g, '\\x26').replace(/</g, '\\x3c').replace(/>/g, '\\x3e')
+      .replace(/[\r\n\u2028\u2029]/g, ' ');
+  }
+
+  // @ do Instagram já normalizado e no formato válido; senão ''. Vai cru
+  // para href e texto do link, então nada fora do formato passa.
+  function _igHandleSeguro(input) {
+    const h = normalizarInstagramHandle(input);
+    return _igHandleValido(h) ? h : '';
+  }
+
   /* ── Botão de contato ────────────────────────────────────── */
   function contatoHTML(loja, status) {
     const abre     = loja.horario ? loja.horario.abre : '';
@@ -1800,11 +1819,11 @@
     if (loja.tel && !loja.wpp) {
       if (status === 'closed') {
         return `<button class="btn-tel closed"
-          data-nome="${nomeAttr}" data-abre="${abre}" data-tel="${loja.tel}"
+          data-nome="${nomeAttr}" data-abre="${escAttr(abre)}" data-tel="${escAttr(loja.tel)}"
           onclick="showToast(this.dataset.nome,this.dataset.abre,this.dataset.tel)"
           aria-label="Loja fechada"><i class="fa fa-phone"></i></button>`;
       }
-      return `<a href="tel:${loja.tel}" class="btn-tel open" aria-label="Ligar"
+      return `<a href="tel:${escAttr(loja.tel)}" class="btn-tel open" aria-label="Ligar"
         data-nome="${mNome}" data-tipo="tel" data-plano="${mPlan}" data-cat="${mCat}"
         onclick="registrarClique(this.dataset.nome,this.dataset.tipo,this.dataset.plano,this.dataset.cat)">
         <i class="fa fa-phone"></i></a>`;
@@ -1822,7 +1841,7 @@
     }
 
     return `<button class="btn-wpp closed"
-      data-nome="${nomeAttr}" data-abre="${abre}"
+      data-nome="${nomeAttr}" data-abre="${escAttr(abre)}"
       onclick="showToast(this.dataset.nome,this.dataset.abre)"
       aria-label="Loja fechada"><i class="fab fa-whatsapp"></i></button>`;
   }
@@ -3002,9 +3021,13 @@
     title.textContent = `${nomeLoja} — fechado agora`;
 
     if (tel) {
-      msg.innerHTML = horarioAbre
-        ? `Abre às ${horarioAbre} · <a href="tel:${tel}" style="color:var(--zap);font-weight:600;">${formatTel(tel)}</a>`
-        : `<a href="tel:${tel}" style="color:var(--zap);font-weight:600;">${formatTel(tel)}</a>`;
+      // Montado por DOM: hora e telefone vêm do cadastro e não passam por innerHTML.
+      msg.textContent = horarioAbre ? `Abre às ${horarioAbre} · ` : '';
+      const aTel = document.createElement('a');
+      aTel.href = 'tel:' + String(tel).replace(/[^\d+]/g, '');
+      aTel.style.cssText = 'color:var(--zap);font-weight:600;';
+      aTel.textContent = formatTel(tel);
+      msg.appendChild(aTel);
     } else {
       msg.textContent = horarioAbre
         ? `Atendimento começa às ${horarioAbre}`
@@ -5405,7 +5428,7 @@
     const mlIgWrap = document.getElementById('ml-instagram-wrap');
     if (mlIgWrap) {
       mlIgWrap.style.display = '';
-      const igHandleAtual = normalizarInstagramHandle(d.instagram);
+      const igHandleAtual = _igHandleSeguro(d.instagram);
       mlIgWrap.innerHTML = `
         <div style="display:flex;gap:8px;align-items:center;">
           <div style="position:relative;flex:1;display:flex;align-items:center;">
@@ -8287,8 +8310,8 @@
           data-rua="${escAttr(ruaPart)}">
           <i class="fa fa-map-marker-alt"></i>
           <div>
-            <div class="addr-item-main">${ruaPart}</div>
-            ${subPart ? `<div class="addr-item-sub">${subPart}</div>` : ''}
+            <div class="addr-item-main">${escHTML(ruaPart)}</div>
+            ${subPart ? `<div class="addr-item-sub">${escHTML(subPart)}</div>` : ''}
           </div>
         </div>`;
     }
@@ -8490,7 +8513,7 @@
     const coverHTML = hasFoto
       ? `<div class="detail-cover-wrap">
            <img class="detail-cover" loading="lazy" decoding="async" src="${escAttr(loja.foto)}" alt="Foto ${escAttr(loja.nome)}"${fotoPosCss(loja) ? ` style="object-position:${fotoPosCss(loja)}"` : ''}
-             onerror="this.parentElement.innerHTML = placeholderCover('${escAttr(emojiLoja(loja))}', '${escAttr(loja.categoria || '')}');" />
+             onerror="this.parentElement.innerHTML = placeholderCover('${escJsArg(emojiLoja(loja))}', '${escJsArg(loja.categoria || '')}');" />
            <div class="detail-top-bar">
              <div class="detail-handle"></div>
              <button class="detail-close" onclick="fecharDetalhes()" aria-label="Fechar">✕</button>
@@ -8941,7 +8964,7 @@
     const { dias, abre, fecha } = loja.horario;
     const hoje   = new Date().getDay();
     const is24h  = abre === '00:00' && fecha === '23:59';
-    const horaStr = is24h ? '24 horas' : `${abre} – ${fecha}`;
+    const horaStr = is24h ? '24 horas' : `${escHTML(abre)} – ${escHTML(fecha)}`;
     const DIAS_ABREV = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
     // ── Agrupa dias consecutivos com mesmo status ──────────────
@@ -9102,7 +9125,7 @@
 
     // Botão Instagram — linha separada
     if (loja.instagram) {
-      const igHandle = normalizarInstagramHandle(loja.instagram);
+      const igHandle = _igHandleSeguro(loja.instagram);
       if (igHandle) {
         const igUrl = `https://instagram.com/${igHandle}`;
         ig = `<a href="${igUrl}" target="_blank" rel="noopener"
@@ -9221,7 +9244,7 @@
       const sigJson = await sigResp.json();
       if (sigJson.status !== 'ok') throw new Error(sigJson.msg || 'Erro ao assinar upload');
 
-      const { cloud, apiKey, timestamp, folder, signature } = sigJson.data;
+      const { cloud, apiKey, timestamp, folder, signature, allowed_formats } = sigJson.data;
 
       // Etapa 2: upload direto do browser para Cloudinary (sem passar pelo GAS)
       statusEl.textContent = '⏳ Enviando imagem...';
@@ -9230,6 +9253,8 @@
       formData.append('api_key',   apiKey);
       formData.append('timestamp', timestamp);
       formData.append('folder',    folder);
+      // Entra na assinatura do GAS: tem que ir exatamente como veio.
+      if (allowed_formats) formData.append('allowed_formats', allowed_formats);
       formData.append('signature', signature);
 
       const uploadResp = await fetch(
@@ -9305,6 +9330,7 @@
       fd.append('api_key', d.apiKey);
       fd.append('timestamp', d.timestamp);
       fd.append('folder', d.folder);
+      if (d.allowed_formats) fd.append('allowed_formats', d.allowed_formats);
       fd.append('signature', d.signature);
       // Vídeo pode demorar no 4G: timeout generoso.
       var upResp = await fetch('https://api.cloudinary.com/v1_1/' + d.cloud + '/video/upload',
@@ -9542,7 +9568,7 @@
         visible = [{ emoji:'➕', label:`"${qRaw}"`, slug: qRaw, grupo:'', busca:[], _custom: true }];
         html = `<div class="ramo-opt is-outro" role="option" data-idx="0">
           <span class="ramo-opt-emoji">➕</span>
-          <span class="ramo-opt-label">Usar <mark>${qRaw}</mark> como ramo</span>
+          <span class="ramo-opt-label">Usar <mark>${escHTML(qRaw)}</mark> como ramo</span>
         </div>`;
       } else {
         map.forEach((items, grupo) => {
@@ -12030,6 +12056,7 @@
       fd.append('api_key', d.apiKey);
       fd.append('timestamp', d.timestamp);
       fd.append('folder', d.folder);
+      if (d.allowed_formats) fd.append('allowed_formats', d.allowed_formats);
       fd.append('signature', d.signature);
       // Endpoint do Cloudinary usa o tipo de recurso em inglês (image/video),
       // não o 'foto'/'video' interno do app — por isso o map aqui.
@@ -12768,7 +12795,7 @@
     const lojaLocal = _mlAcharLojaLocal(null, nome);
     if (igEl) {
       // Item 2: junção por WhatsApp (estável a renomeações); nome é fallback.
-      const igHandle  = lojaLocal ? normalizarInstagramHandle(lojaLocal.instagram || '') : '';
+      const igHandle  = lojaLocal ? _igHandleSeguro(lojaLocal.instagram || '') : '';
       igEl.href = igHandle ? `https://www.instagram.com/${igHandle}` : `https://www.instagram.com/`;
     }
     // Link direto do cardápio: só aparece se a loja tem itens no menu.
@@ -13722,10 +13749,10 @@ ${urlCard}`)}`;
     const dataHTML = quando ? `<span style="font-size:10px;color:var(--muted);">· ${quando}</span>` : '';
     const idSafe = String(a.id || '');
     const sinalizarBtn = isDono
-      ? `<button onclick="avalSinalizar(${idx},'${escAttr(idSafe)}','${escAttr(a.texto||'')}')" title="Sinalizar para revisão" style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:5px;border:1px solid var(--border);flex-shrink:0;">🚩</button>`
+      ? `<button onclick="avalSinalizar(${idx},'${escJsArg(idSafe)}','${escJsArg(a.texto||'')}')" title="Sinalizar para revisão" style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:5px;border:1px solid var(--border);flex-shrink:0;">🚩</button>`
       : '';
     const responderBtn = (isDono && !a.resposta)
-      ? `<button onclick="avalResponder(${idx},'${escAttr(idSafe)}')" style="font-size:10.5px;color:#f59e0b;background:none;border:none;cursor:pointer;padding:2px 4px;font-weight:700;">Responder</button>`
+      ? `<button onclick="avalResponder(${idx},'${escJsArg(idSafe)}')" style="font-size:10.5px;color:#f59e0b;background:none;border:none;cursor:pointer;padding:2px 4px;font-weight:700;">Responder</button>`
       : '';
     const textoHTML = a.texto ? `<p style="font-size:11.5px;color:var(--text);margin:0;line-height:1.5;">${escHTML(a.texto)}</p>` : '';
     const respHTML = a.resposta
@@ -13766,7 +13793,7 @@ ${urlCard}`)}`;
             oninput="var c=document.getElementById('aval-contador-${idx}');if(c)c.textContent=this.value.length+'/120';"
             style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;font-family:var(--font-b);line-height:1.5;margin-bottom:2px;"></textarea>
           <div id="aval-contador-${idx}" style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:6px;">0/120</div>
-          <button onclick="avalEnviar(${idx},'${escAttr(nome)}')"
+          <button onclick="avalEnviar(${idx},'${escJsArg(nome)}')"
             style="width:100%;padding:10px;border-radius:8px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:13px;font-weight:800;border:none;cursor:pointer;">
             ⭐ Enviar avaliação
           </button>
@@ -13788,8 +13815,8 @@ ${urlCard}`)}`;
             <div style="font-size:12px;font-weight:700;color:var(--text);">Você já avaliou esta loja ${notaTxt}</div>
           </div>
           <div id="aval-min-area-${idx}" style="display:flex;gap:8px;">
-            <button onclick="avalEditarAbrir(${idx},'${escAttr(nome)}')" style="flex:1;padding:9px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--font-b);font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">✏️ Editar</button>
-            <button onclick="avalRemover(${idx},'${escAttr(nome)}')" style="flex:1;padding:9px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--red);font-family:var(--font-b);font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">🗑️ Remover</button>
+            <button onclick="avalEditarAbrir(${idx},'${escJsArg(nome)}')" style="flex:1;padding:9px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--font-b);font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">✏️ Editar</button>
+            <button onclick="avalRemover(${idx},'${escJsArg(nome)}')" style="flex:1;padding:9px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--red);font-family:var(--font-b);font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">🗑️ Remover</button>
           </div>
           <div id="aval-msg-${idx}" style="font-size:11px;text-align:center;margin-top:8px;min-height:16px;"></div>
         </div>
@@ -13954,7 +13981,7 @@ ${urlCard}`)}`;
         <textarea id="avaledit-texto-${idx}" maxlength="120" rows="2" placeholder="Conte sua experiência... (opcional)"
           style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--text);resize:none;box-sizing:border-box;font-family:var(--font-b);line-height:1.5;margin-bottom:6px;">${escHTML(minha.texto || '')}</textarea>
         <div style="display:flex;gap:8px;">
-          <button onclick="avalEditarEnviar(${idx},'${escAttr(nome)}')" style="flex:1;padding:9px;border-radius:8px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;">Salvar</button>
+          <button onclick="avalEditarEnviar(${idx},'${escJsArg(nome)}')" style="flex:1;padding:9px;border-radius:8px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:12px;font-weight:800;border:none;cursor:pointer;">Salvar</button>
           <button onclick="abrirDetalhes(${idx})" style="padding:9px 14px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-family:var(--font-b);font-size:12px;font-weight:700;cursor:pointer;">Cancelar</button>
         </div>
       </div>`;
@@ -14028,7 +14055,7 @@ ${urlCard}`)}`;
     div.innerHTML =
       `<textarea id="aval-resp-txt-${lojaIdx}-${avalId}" maxlength="150" rows="2" placeholder="Responder publicamente..." style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:7px 9px;font-size:11px;color:var(--text);resize:none;box-sizing:border-box;font-family:var(--font-b);margin-bottom:6px;"></textarea>
        <div style="display:flex;gap:6px;">
-         <button onclick="avalResponderEnviar(${lojaIdx},'${escAttr(avalId)}')" style="flex:1;padding:7px;border-radius:6px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:11px;font-weight:800;border:none;cursor:pointer;">Publicar</button>
+         <button onclick="avalResponderEnviar(${lojaIdx},'${escJsArg(avalId)}')" style="flex:1;padding:7px;border-radius:6px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-family:var(--font-h);font-size:11px;font-weight:800;border:none;cursor:pointer;">Publicar</button>
          <button onclick="this.closest('.aval-resp-form').remove()" style="padding:7px 12px;border-radius:6px;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;">Cancelar</button>
        </div>
        <div class="aval-resp-msg" style="font-size:10px;text-align:center;margin-top:4px;min-height:12px;"></div>`;
@@ -14167,7 +14194,7 @@ ${urlCard}`)}`;
           <button onclick="mlGrupoAbrirAplicar('${g.id}')" style="padding:6px 10px;border-radius:7px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10b981;font-size:10px;font-weight:700;cursor:pointer;"><i class="fa fa-layer-group"></i> Aplicar</button>
           <button onclick="mlGrupoAbrirOpcoes('${g.id}')" style="padding:6px 10px;border-radius:7px;background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);color:#7c3aed;font-size:10px;font-weight:700;cursor:pointer;"><i class="fa fa-list"></i> Opções</button>
           <button onclick="mlGrupoAbrirForm('${g.id}')" style="padding:6px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:10px;font-weight:700;cursor:pointer;"><i class="fa fa-pencil"></i></button>
-          <button onclick="mlGrupoRemover('${g.id}','${escAttr(g.nome)}')" style="padding:6px 10px;border-radius:7px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.2);color:var(--red);font-size:10px;font-weight:700;cursor:pointer;"><i class="fa fa-trash"></i></button>
+          <button onclick="mlGrupoRemover('${g.id}','${escJsArg(g.nome)}')" style="padding:6px 10px;border-radius:7px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.2);color:var(--red);font-size:10px;font-weight:700;cursor:pointer;"><i class="fa fa-trash"></i></button>
         </div>
       </div>`;
     }).join('');
@@ -14477,7 +14504,7 @@ ${urlCard}`)}`;
         ${qBadge}
         <span style="font-size:11px;color:var(--green);font-weight:700;margin-right:6px;">${precoTxt}</span>
         <button onclick="mlOpcaoEditar('${op.id}')" aria-label="Editar ${escAttr(op.nome)}" style="padding:4px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:10px;cursor:pointer;"><i class="fa fa-pencil"></i></button>
-        <button onclick="mlOpcaoRemover('${op.id}','${escAttr(op.nome)}')" style="padding:4px 8px;border-radius:6px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.2);color:var(--red);font-size:10px;cursor:pointer;"><i class="fa fa-trash"></i></button>
+        <button onclick="mlOpcaoRemover('${op.id}','${escJsArg(op.nome)}')" style="padding:4px 8px;border-radius:6px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.2);color:var(--red);font-size:10px;cursor:pointer;"><i class="fa fa-trash"></i></button>
       </div>`;
     }).join('');
   }
@@ -14805,14 +14832,14 @@ ${urlCard}`)}`;
       return `
         <div class="ml-cardapio-grupo">
           <div class="ml-cardapio-grupo-row">
-            <button type="button" class="ml-cardapio-grupo-head" onclick="mlCardapioToggleGrupo('${escAttr(cat)}')">
+            <button type="button" class="ml-cardapio-grupo-head" onclick="mlCardapioToggleGrupo('${escJsArg(cat)}')">
               <span><i class="fa fa-chevron-${aberto ? 'down' : 'right'}" style="font-size:9px;margin-right:6px;opacity:.7;"></i>${escHTML(cat)}</span>
               <span class="ml-cardapio-grupo-count">${grupos[cat].length}</span>
             </button>
             <button type="button" class="ml-cardapio-grupo-foto"
               title="Aplicar uma foto a todos os itens de ${escAttr(cat)}"
               aria-label="Aplicar foto a todos os itens de ${escAttr(cat)}"
-              onclick="mlCardapioFotoLoteAbrir('${escAttr(cat)}')">
+              onclick="mlCardapioFotoLoteAbrir('${escJsArg(cat)}')">
               <i class="fa fa-camera"></i>
               ${semFoto ? `<span class="ml-cardapio-grupo-foto-badge">${semFoto}</span>` : ''}
             </button>
@@ -14820,17 +14847,17 @@ ${urlCard}`)}`;
           <div class="ml-cardapio-grupo-acoes">
             <button type="button" class="ml-cat-acao" ${idx === 0 ? 'disabled' : ''}
               title="Mover para cima" aria-label="Mover ${escAttr(cat)} para cima"
-              onclick="mlCategoriaMover('${escAttr(cat)}',-1)">
+              onclick="mlCategoriaMover('${escJsArg(cat)}',-1)">
               <i class="fa fa-arrow-up"></i>
             </button>
             <button type="button" class="ml-cat-acao" ${idx === totalCats - 1 ? 'disabled' : ''}
               title="Mover para baixo" aria-label="Mover ${escAttr(cat)} para baixo"
-              onclick="mlCategoriaMover('${escAttr(cat)}',1)">
+              onclick="mlCategoriaMover('${escJsArg(cat)}',1)">
               <i class="fa fa-arrow-down"></i>
             </button>
             <button type="button" class="ml-cat-acao ml-cat-acao-txt"
               title="Renomear categoria" aria-label="Renomear ${escAttr(cat)}"
-              onclick="mlCategoriaRenomear('${escAttr(cat)}')">
+              onclick="mlCategoriaRenomear('${escJsArg(cat)}')">
               <i class="fa fa-pencil"></i> Renomear
             </button>
           </div>
@@ -14854,16 +14881,16 @@ ${urlCard}`)}`;
           ${esg ? '<div style="margin-top:3px;"><span style="display:inline-block;white-space:nowrap;font-size:9px;font-weight:800;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);padding:1px 6px;border-radius:5px;">ESGOTADO HOJE</span></div>' : ''}
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
-          <button onclick="mlCardapioPausar('${escAttr(item.id)}', ${esg ? 'false' : 'true'})"
+          <button onclick="mlCardapioPausar('${escJsArg(item.id)}', ${esg ? 'false' : 'true'})"
             title="${esg ? 'Voltar a vender' : 'Acabou hoje'}" aria-label="${esg ? 'Voltar a vender ' : 'Marcar como esgotado hoje: '}${escAttr(item.nome)}"
             style="padding:6px 8px;border-radius:7px;background:${esg ? 'rgba(16,185,129,0.12)' : 'var(--surface)'};border:1px solid ${esg ? 'rgba(16,185,129,0.35)' : 'var(--border)'};color:${esg ? '#10b981' : 'var(--muted)'};font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;">
             ${esg ? '<i class="fa fa-rotate-left"></i> Voltou' : '<i class="fa fa-ban"></i> Acabou'}
           </button>
-          <button onclick="mlCardapioAbrirForm('${escAttr(item.id)}')"
+          <button onclick="mlCardapioAbrirForm('${escJsArg(item.id)}')"
             style="padding:6px 10px;border-radius:7px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:10px;font-weight:700;cursor:pointer;">
             <i class="fa fa-pencil"></i>
           </button>
-          <button onclick="mlCardapioRemover('${escAttr(item.id)}','${escAttr(item.nome)}')"
+          <button onclick="mlCardapioRemover('${escJsArg(item.id)}','${escJsArg(item.nome)}')"
             style="padding:6px 10px;border-radius:7px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.2);color:var(--red);font-size:10px;font-weight:700;cursor:pointer;">
             <i class="fa fa-trash"></i>
           </button>
@@ -16318,7 +16345,7 @@ ${urlCard}`)}`;
         tabsEl.style.display = '';
         tabsEl.innerHTML = cats.map((cat, i) => {
           const cid = _ccCatId(cat, i);
-          return `<button class="cc-tab-pill${i===0?' active':''}" data-cat-id="${escAttr(cid)}" onclick="ccScrollTocat('${escAttr(cid)}')">${escHTML(cat)}</button>`;
+          return `<button class="cc-tab-pill${i===0?' active':''}" data-cat-id="${escAttr(cid)}" onclick="ccScrollTocat('${escJsArg(cid)}')">${escHTML(cat)}</button>`;
         }).join('');
       } else {
         tabsEl.style.display = 'none';
@@ -16365,24 +16392,24 @@ ${urlCard}`)}`;
     // deixa o clique subir para o card em vez de chamar a funcao de novo —
     // chamar duas vezes era o que fazia o sheet 'levantar dois'.
     const btnHTML = exigePers
-      ? `<button class="cc-item-add cc-item-personalizar" aria-label="Escolher opções de ${escAttr(item.nome)}" onclick="ccAbrirPersonalizacao('${escAttr(item.id)}')">+</button>`
-      : `<button class="cc-item-add" aria-label="Adicionar ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAdicionarItem('${escAttr(item.id)}')">+</button>`;
+      ? `<button class="cc-item-add cc-item-personalizar" aria-label="Escolher opções de ${escAttr(item.nome)}" onclick="ccAbrirPersonalizacao('${escJsArg(item.id)}')">+</button>`
+      : `<button class="cc-item-add" aria-label="Adicionar ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAdicionarItem('${escJsArg(item.id)}')">+</button>`;
     // Toque no card = adicionar +1 (comportamento de sempre). Item que exige
     // escolha (tamanho) abre a personalizacao, porque nao da pra adicionar sem.
     const clickAttr = exigePers
-      ? `onclick="ccAbrirPersonalizacao('${escAttr(item.id)}')"`
-      : `onclick="ccCardClick(event,'${escAttr(item.id)}')"`;
+      ? `onclick="ccAbrirPersonalizacao('${escJsArg(item.id)}')"`
+      : `onclick="ccCardClick(event,'${escJsArg(item.id)}')"`;
     // Acrescimos opcionais: um botao proprio, so ele abre a personalizacao.
     // Assim o resto do card continua adicionando +1 com um toque.
     const dicaHTML = (temGrupos && !exigePers)
-      ? `<button type="button" class="cc-item-dica" onclick="event.stopPropagation();ccDicaClick(event,'${escAttr(item.id)}')"><i class="fa fa-sliders"></i> Adicionar acréscimos</button>`
+      ? `<button type="button" class="cc-item-dica" onclick="event.stopPropagation();ccDicaClick(event,'${escJsArg(item.id)}')"><i class="fa fa-sliders"></i> Adicionar acréscimos</button>`
       : '';
     return `
       <div class="cc-item-card cc-item-clickable" id="cc-card-${item.id}" role="button" tabindex="0" ${clickAttr} style="margin-bottom:8px;cursor:pointer;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
         ${temFoto
           ? `<div class="cc-foto-wrap">
                <img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" onerror="this.parentNode.style.display='none'">
-               <button class="cc-foto-zoom" aria-label="Ver foto de ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAbrirFoto('${escAttr(item.id)}')">🔍</button>
+               <button class="cc-foto-zoom" aria-label="Ver foto de ${escAttr(item.nome)}" onclick="event.stopPropagation();ccAbrirFoto('${escJsArg(item.id)}')">🔍</button>
              </div>`
           : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
         <div class="cc-item-info">
@@ -16422,7 +16449,7 @@ ${urlCard}`)}`;
     return `
       <div class="cc-item-card cc-servico-card" id="cc-card-${item.id}" style="margin-bottom:8px;${item.destaque==='SIM'?'border-color:rgba(245,158,11,0.5);background:rgba(245,158,11,0.05);':''}">
         ${temFoto
-          ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" onclick="ccAbrirFoto('${escAttr(item.id)}')" style="cursor:zoom-in;" onerror="this.style.display='none'">`
+          ? `<img loading="lazy" decoding="async" src="${escAttr(item.foto)}" class="cc-item-foto" onclick="ccAbrirFoto('${escJsArg(item.id)}')" style="cursor:zoom-in;" onerror="this.style.display='none'">`
           : `<div class="cc-item-foto-placeholder">${placeholderEmoji}</div>`}
         <div class="cc-item-info">
           <div class="cc-item-nome">
@@ -16445,7 +16472,7 @@ ${urlCard}`)}`;
     // Placeholder fica sempre no fundo do wrap; a foto (se houver) cobre por cima.
     // Se a foto falhar, onerror apenas esconde a <img> e o placeholder reaparece,
     // sem destruir o badge de destaque (bug antigo: innerHTML apagava a estrela).
-    const zoomAttr = temFoto ? ` onclick="ccAbrirFoto('${escAttr(item.id)}')" style="cursor:zoom-in;"` : '';
+    const zoomAttr = temFoto ? ` onclick="ccAbrirFoto('${escJsArg(item.id)}')" style="cursor:zoom-in;"` : '';
     return `
       <div class="cc-vitrine-card" id="cc-card-${item.id}">
         <div class="cc-vitrine-foto-wrap"${zoomAttr}>
@@ -16747,8 +16774,8 @@ ${urlCard}`)}`;
       // Ja esta em modo botao '+'? Nao mexe no DOM.
       if (qtyEl.querySelector('.cc-item-add')) return;
       qtyEl.innerHTML = _ccItemExigePersonalizar(item)
-        ? `<button class="cc-item-add cc-item-personalizar" onclick="event.stopPropagation();ccAbrirPersonalizacao('${escAttr(item.id)}')">+</button>`
-        : `<button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${escAttr(item.id)}')">+</button>`;
+        ? `<button class="cc-item-add cc-item-personalizar" onclick="event.stopPropagation();ccAbrirPersonalizacao('${escJsArg(item.id)}')">+</button>`
+        : `<button class="cc-item-add" onclick="event.stopPropagation();ccAdicionarItem('${escJsArg(item.id)}')">+</button>`;
     }
   }
 
@@ -17536,10 +17563,10 @@ ${urlCard}`)}`;
         '<button class="cli-avatar-btn" id="cli-avatar-btn" ' +
         'onclick="cliAbrirPainelConta()" aria-label="Minha conta" title="Minha conta">' +
         (foto
-          ? '<img src="' + foto + '" alt="" class="cli-avatar-img" ' +
+          ? '<img src="' + escAttr(foto) + '" alt="" class="cli-avatar-img" ' +
             'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"/>' +
-            '<span class="cli-avatar-ini" style="display:none">' + inicial + '</span>'
-          : '<span class="cli-avatar-ini">' + inicial + '</span>') +
+            '<span class="cli-avatar-ini" style="display:none">' + escHTML(inicial) + '</span>'
+          : '<span class="cli-avatar-ini">' + escHTML(inicial) + '</span>') +
         '</button>';
       slot.style.display = 'flex';
       if (themeBtn) themeBtn.style.display = 'none';
@@ -18034,16 +18061,16 @@ ${urlCard}`)}`;
       var logo = (l.logo && String(l.logo).trim()) ? String(l.logo).trim() : '';
       var ini = (nome.trim()[0] || '?').toUpperCase();
       var thumb = logo
-        ? '<img src="' + logo + '" alt="" class="cli-fav-logo" loading="lazy" ' +
+        ? '<img src="' + escAttr(logo) + '" alt="" class="cli-fav-logo" loading="lazy" ' +
           'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'"/>' +
-          '<span class="cli-fav-ini" style="display:none">' + ini + '</span>'
-        : '<span class="cli-fav-ini">' + ini + '</span>';
+          '<span class="cli-fav-ini" style="display:none">' + escHTML(ini) + '</span>'
+        : '<span class="cli-fav-ini">' + escHTML(ini) + '</span>';
       var onclick = (it.idx >= 0)
         ? ' onclick="cliAbrirLojaFav(' + it.idx + ')" role="button" tabindex="0"'
         : '';
       return '<div class="cli-fav-item"' + onclick + '>' +
         '<span class="cli-fav-thumb">' + thumb + '</span>' +
-        '<span class="cli-fav-nome">' + nome + '</span>' +
+        '<span class="cli-fav-nome">' + escHTML(nome) + '</span>' +
         '<i class="fa fa-chevron-right cli-fav-seta"></i></div>';
     }).join('');
   }
@@ -18778,7 +18805,11 @@ ${urlCard}`)}`;
      usa, e a regra do RTDB repete os dois limites. */
   function _amigosFotoValida(url) {
     var f = String(url || '').trim();
-    return (f.indexOf('https://') === 0 && f.length <= AMIGO_FOTO_MAX) ? f : '';
+    // Só Cloudinary e foto do Google (mesma lista das regras do RTDB e do
+    // Firestore): foto de outro site mostrava ao dono do site o IP de quem
+    // abria o aviso de amizade (auditoria 10/11, P2-7).
+    var hostOk = f.indexOf('https://res.cloudinary.com/') === 0 || f.indexOf('https://lh3.googleusercontent.com/') === 0;
+    return (hostOk && f.length <= AMIGO_FOTO_MAX) ? f : '';
   }
 
   function _amigosMinhaFoto() {

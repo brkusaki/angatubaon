@@ -811,7 +811,7 @@
       }
       elFim.innerHTML = '<div class="hx-fim-tit">' + _esc(titulo) + '</div>' +
         '<ol class="hx-fim-lista">' + uids.map(function (u) {
-          return '<li><i style="background:' + _cor(u) + '"></i><span>' + coloc[u] + 'º</span> ' + _esc(_nome(u)) + '</li>';
+          return '<li><i style="background:' + _cor(u) + '"></i><span>' + (parseInt(coloc[u], 10) || 0) + 'º</span> ' + _esc(_nome(u)) + '</li>';
         }).join('') + '</ol>' +
         (minha ? '<div class="hx-fim-moedas">' + (moedas ? '+' + moedas + ' 🪙' : '') + '</div>' : '') +
         '<div class="hx-fim-sub">Placar da Party em instantes…</div>';

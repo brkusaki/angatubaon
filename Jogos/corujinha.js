@@ -229,6 +229,13 @@
     grade: null,             // o que a tela mostra agora
     timers: [], raf: 0, montado: false, ultimoGanho: 0, bigAberto: false
   };
+  // Aposta e turbo ficam lembrados entre uma visita e outra.
+  var PREFS = 'angatuba_corujinha_prefs';
+  try {
+    var p0 = JSON.parse(localStorage.getItem(PREFS) || 'null');
+    if (p0) { if (APOSTAS.indexOf(p0.a) !== -1) st.aposta = p0.a; st.turbo = !!p0.t; }
+  } catch (e) {}
+  function prefsSalvar() { try { localStorage.setItem(PREFS, JSON.stringify({ a: st.aposta, t: st.turbo })); } catch (e) {} }
   function later(fn, ms) { var t = setTimeout(fn, ms); st.timers.push(t); return t; }
   function limparTimers() {
     st.timers.forEach(clearTimeout); st.timers = [];
@@ -276,10 +283,11 @@
   }
   function balao(txt, ms) {
     var b = $('cjx-balao'); if (!b) return;
+    clearTimeout(balao.t);
     if (!txt) { b.classList.remove('cjx-balao-on'); return; }
     b.textContent = txt;
     b.classList.remove('cjx-balao-on'); void b.offsetWidth; b.classList.add('cjx-balao-on');
-    if (ms) later(function () { b.classList.remove('cjx-balao-on'); }, ms);
+    if (ms) balao.t = later(function () { b.classList.remove('cjx-balao-on'); }, ms);
   }
 
   /* ── DOM ─────────────────────────────────────────────────────── */
@@ -336,9 +344,9 @@
             '<button type="button" class="cjx-girar" id="cjx-girar" aria-label="Girar" onclick="CorujinhaGame._girar()"><i class="fa fa-rotate-right"></i><span id="cjx-autoconta"></span></button>' +
             '<button type="button" class="cjx-redondo" id="cjx-mais" aria-label="Aumentar aposta" onclick="CorujinhaGame._aposta(1)"><i class="fa fa-plus"></i></button>' +
             '<button type="button" class="cjx-redondo cjx-auto" id="cjx-auto" aria-label="Giro automático" onclick="CorujinhaGame._autoMenu()"><i class="fa fa-repeat"></i><small>Auto</small></button>' +
-          '</div>' +
-          '<div class="cjx-autopop" id="cjx-autopop">' +
-            [10, 25, 50, 100].map(function (n) { return '<button type="button" onclick="CorujinhaGame._autoIniciar(' + n + ')">' + n + '</button>'; }).join('') +
+            '<div class="cjx-autopop" id="cjx-autopop"><small>Giros automáticos</small>' +
+              [10, 25, 50, 100].map(function (n) { return '<button type="button" onclick="CorujinhaGame._autoIniciar(' + n + ')">' + n + '</button>'; }).join('') +
+            '</div>' +
           '</div>' +
         '</div>' +
         // Abertura
@@ -376,6 +384,8 @@
         '</div>' +
       '</div>';
     montarTabela();
+    // Toque fora do menu do automático fecha o menu.
+    $('cjx').addEventListener('click', function (e) { if (!e.target.closest('#cjx-autopop, #cjx-auto')) fecharAutoMenu(); });
     st.montado = true;
     return true;
   }
@@ -562,12 +572,11 @@
         else { st.raf = 0; ok(); }
       }
       st.raf = requestAnimationFrame(passo);
-      st.contarFim = function () { el.textContent = (prefixo || '') + fmt(valor); };
     });
   }
 
   /* ── Grande ganho / ovo ─────────────────────────────────────── */
-  var big = { resolver: null, contando: false, final: 0 };
+  var big = { resolver: null, contando: false, final: 0, autoT: 0 };
   function faixaDe(mult) { for (var i = 0; i < FAIXAS.length; i++) if (mult >= FAIXAS[i].min) return FAIXAS[i]; return null; }
   function chuvaMoedas() {
     var w = $('cjx-big-moedas'); if (!w) return;
@@ -615,8 +624,9 @@
       }
     });
   }
-  function bigAutoFechar() { if (st.auto > 0) later(bigFechar, tempo(1800)); }
+  function bigAutoFechar() { if (st.auto > 0) big.autoT = later(bigFechar, tempo(1800)); }
   function bigFechar() {
+    clearTimeout(big.autoT);
     var ov = $('cjx-big'); if (ov) ov.classList.remove('on');
     var w = $('cjx-big-moedas'); if (w) w.innerHTML = '';
     st.bigAberto = false;
@@ -645,12 +655,16 @@
     if (r.ganho > 0) g.moedasAdd(r.ganho, 'corujinha-premio');
   }
 
-  function girar() {
+  // doAuto === true: chamado pelo próprio automático. Toque no botão com o
+  // automático ligado para o automático (mesmo no intervalo entre dois giros —
+  // antes esse toque disparava um giro extra).
+  function girar(doAuto) {
     if (!st.montado) return;
     if (st.bigAberto) { bigToque(); return; }
-    if (st.auto > 0 && st.girando) { st.auto = 0; painel(); return; }   // toque no meio do auto = parar
+    if (st.auto > 0 && (st.girando || doAuto !== true)) { st.auto = 0; painel(); return; }
     if (st.girando) return;
     fecharAutoMenu();
+    var pedida = st.aposta;
     var aposta = apostaValida();
     if (!aposta || saldoReal() < aposta) {
       st.auto = 0;
@@ -669,6 +683,7 @@
     limparDestaques();
     ganhoBar('Boa sorte!', '');
     painel();
+    if (aposta < pedida) balao('Aposta baixou pra ' + aposta, 1600);
     som('pulo');
     corujaModo('gira');
     var gir = $('cjx-girar'); if (gir) { gir.classList.remove('cjx-girar-roda'); void gir.offsetWidth; gir.classList.add('cjx-girar-roda'); }
@@ -679,11 +694,11 @@
       return vooAnimar(r);
     }).then(function () {
       return revelar(r);
-    }).then(function () {
+    }).catch(function () {}).then(function () {   // erro na animação não trava o botão
       st.girando = false;
       st.pend = 0;
       painel();
-      if (st.auto > 0) later(girar, tempo(500));
+      if (st.auto > 0) later(function () { if (st.auto > 0) girar(true); }, tempo(500));
     });
   }
 
@@ -727,12 +742,16 @@
       // "quase": par numa linha
       var quase = CJM.LINHAS.some(function (L) {
         var a = gFinal[L[0][0]][L[0][1]], b = gFinal[L[1][0]][L[1][1]], c = gFinal[L[2][0]][L[2][1]];
-        return a !== 'ovo' && (a === b || b === c) && a !== 'moeda';
+        var par = a === b ? a : (b === c ? b : null);
+        return !!par && par !== 'ovo' && par !== 'moeda';
       });
       if (quase) corujaModo('quase', 1600); else corujaModo('parada');
       ganhoBar(quase ? 'Quase! Mais um giro?' : 'Boa sorte!', '');
     }
-    if (r.ovo) mostrarOvos(gFinal);
+    if (r.ovo) {
+      mostrarOvos(gFinal);
+      if (!r.linhas.length) ganhoBar('<img src="' + ASSETS + 'sim-ovo-v2.webp" alt=""> OVO DOURADO!', 'cjx-ganhobar-ganho cjx-ganhobar-forte');
+    }
 
     var faixa = faixaDe(r.mult);
     if (valorLinhas > 0 && !faixa) {
@@ -787,10 +806,11 @@
     if (i < 0 || i >= APOSTAS.length) return;
     if (APOSTAS[i] > saldoVisivel() && d > 0) { som('erro'); return; }
     st.aposta = APOSTAS[i];
+    prefsSalvar();
     som('toque');
     painel();
   }
-  function turbo() { st.turbo = !st.turbo; som('toque'); painel(); balao(st.turbo ? 'Turbo ligado!' : 'Turbo desligado', 1100); }
+  function turbo() { st.turbo = !st.turbo; prefsSalvar(); som('toque'); painel(); balao(st.turbo ? 'Turbo ligado!' : 'Turbo desligado', 1100); }
   function autoMenu() {
     if (st.auto > 0) { st.auto = 0; painel(); return; }
     var p = $('cjx-autopop'); if (p) p.classList.toggle('on');
@@ -801,7 +821,7 @@
     fecharAutoMenu();
     st.auto = n;
     painel();
-    if (!st.girando) girar();
+    if (!st.girando) girar(true);
   }
   function tabela(abrir) { var t = $('cjx-tabela'); if (t) t.classList.toggle('on', !!abrir); som('toque'); }
   function comecar() {
@@ -836,6 +856,12 @@
     big.resolver = null; big.contando = false;
   }
 
+  // App em segundo plano (tela bloqueada, troca de app): para o automático —
+  // os timers seguem rodando com a aba oculta e gastariam moedas sem ninguém ver.
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden && st.auto > 0) { st.auto = 0; painel(); }
+  });
+
   window.CorujinhaGame = {
     preparar: preparar,
     parar: parar,
@@ -849,7 +875,7 @@
       var b = $('cjx-premio-equipar');
       if (b && ok && ok.ok) { b.textContent = '✓ Equipado'; b.disabled = true; som('toque'); }
     },
-    _verColecao: function (id) { bigFechar(); var g = G(); if (g && g.colecaoAbrir) g.colecaoAbrir(id); },
+    _verColecao: function (id) { st.auto = 0; bigFechar(); var g = G(); if (g && g.colecaoAbrir) g.colecaoAbrir(id); },
     _mat: CJM
   };
 })();

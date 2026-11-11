@@ -9,10 +9,15 @@
 #corujinha-root { flex: 1 1 auto; min-height: 0; display: flex; }
 
 .cjx {
-  --g: min(80vw, 44vh, 380px);
-  --g: min(80vw, 44dvh, 380px);
+  /* Tamanho da grade: cabe na LARGURA (grade + moldura 36 + números das
+     linhas 2×22 + folga = 84px) e na ALTURA (--fixo = topo 50 + moldura 36 +
+     barra de ganho 52 + rodapé 172 + folga 8; a mascote entra com 80% porque
+     20% dela fica por cima da moldura). Antes era 80vw/44vh fixo: os números
+     das linhas saíam da tela e a mascote era esmagada em celular baixo. */
+  --alt: 100vh; --fixo: 318px;
+  --masc: clamp(60px, var(--alt) * 0.22 - 60px, 150px);
+  --g: max(120px, min(100vw - 84px, var(--alt) - var(--fixo) - var(--masc) * 0.8 - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px), 380px));
   --cel: calc((var(--g) - 16px) / 3);
-  --masc: clamp(78px, 16vh, 150px);
   --ouro: #ffd23f; --ouro2: #f4a300; --roxo: #5a189a; --tinta: #1a0b2e;
   position: relative; flex: 1 1 auto; min-height: 0;
   display: flex; flex-direction: column; overflow: hidden;
@@ -22,6 +27,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 .cjx button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+@supports (height: 1dvh) { .cjx { --alt: 100dvh; } }
 
 /* Céu: estrelas piscando + horizonte com a Matriz */
 .cjx-ceu { position: absolute; inset: 0; pointer-events: none; }
@@ -61,9 +67,9 @@
 .cjx-palco {
   position: relative; z-index: 2; flex: 1 1 auto; min-height: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 0 8px;
+  padding: 0 2px;
 }
-.cjx-mascote { position: relative; z-index: 3; width: var(--masc); height: var(--masc); margin-bottom: calc(var(--masc) * -0.2); }
+.cjx-mascote { position: relative; z-index: 3; flex-shrink: 0; width: var(--masc); height: var(--masc); margin-bottom: calc(var(--masc) * -0.2); }
 .cjx-coruja {
   width: 100%; height: 100%;
   background: url('/Jogos/assets/corujinha/coruja-sheet-v2.webp') 0 0 / 300% 300% no-repeat;
@@ -182,7 +188,7 @@
 .cjx-painel small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.55); }
 .cjx-painel b { display: block; font-family: var(--font-h, system-ui); font-size: 17px; font-weight: 800; line-height: 1.25; }
 .cjx-painel > div:first-child b { color: var(--ouro); }
-.cjx-controles { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; }
+.cjx-controles { position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; }
 .cjx-redondo {
   width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
@@ -216,14 +222,18 @@
   content: ''; position: absolute; inset: -8px; border-radius: 50%;
   border: 3px dashed rgba(255,210,63,.75); animation: cjxRoda 3s linear infinite;
 }
+/* Menu do automático: faixa logo acima dos botões (antes abria em coluna
+   por cima da grade). */
 .cjx-autopop {
-  position: absolute; right: 12px; bottom: calc(100% - 8px); z-index: 5;
-  display: none; flex-direction: column; gap: 6px; padding: 8px; border-radius: 14px;
+  position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); z-index: 5;
+  display: none; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 8px 10px 10px; border-radius: 14px;
+  width: max-content; max-width: 94vw;
   background: #1a0b33; border: 2px solid rgba(255,210,63,.45); box-shadow: 0 8px 24px rgba(0,0,0,.5);
 }
 .cjx-autopop.on { display: flex; }
+.cjx-autopop small { flex: 0 0 100%; text-align: center; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.6); }
 .cjx-autopop button {
-  min-width: 64px; padding: 9px 10px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 15px;
+  min-width: 56px; padding: 9px 10px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 15px;
   color: var(--tinta); background: linear-gradient(var(--ouro), var(--ouro2)); border: none;
 }
 
@@ -305,7 +315,7 @@
 .cjx-premio {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
   width: min(300px, 82vw); margin: 10px auto 0; padding: 16px 16px 14px; border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255,210,63,.16), rgba(255,255,255,.05));
+  background: linear-gradient(180deg, rgba(255,210,63,.16), rgba(255,255,255,.05)), #1d0b3d;
   border: 2px solid rgba(255,210,63,.65); box-shadow: 0 0 34px rgba(255,210,63,.35);
   animation: cjxPremio .5s cubic-bezier(.3,1.5,.5,1) both;
 }
@@ -359,6 +369,39 @@
 .cjx-tabela-ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: rgba(255,255,255,.82); }
 .cjx-tabela-ul li { margin-bottom: 5px; }
 .cjx-tabela-ul b { color: #fff; }
+
+/* Celular baixo em pé: rodapé e barra mais enxutos pra sobrar grade. */
+@media (orientation: portrait) and (max-height: 660px) {
+  .cjx { --fixo: 290px; }
+  .cjx-girar { width: 74px; height: 74px; font-size: 30px; }
+  .cjx-controles { margin-top: 8px; }
+  .cjx-ganhobar { height: 36px; margin-top: 6px; }
+}
+/* Celular deitado: grade à esquerda, painel e botões à direita (antes a
+   grade passava por cima do título e a barra de ganho sumia). A mascote sai. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .cjx {
+    display: grid; grid-template-columns: minmax(0, 1fr) 312px; grid-template-rows: auto minmax(0, 1fr);
+    --g: max(120px, min(var(--alt) - 148px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px), 100vw - 412px, 380px));
+  }
+  .cjx-topo { grid-column: 1 / -1; }
+  .cjx-palco { padding-left: env(safe-area-inset-left, 0px); }
+  .cjx-mascote { display: none; }
+  .cjx-rodape { align-self: center; background: none; padding: 0 calc(12px + env(safe-area-inset-right, 0px)) 0 0; }
+  .cjx-controles { gap: 8px; }
+  .cjx-redondo { width: 46px; height: 46px; }
+  .cjx-girar { width: 72px; height: 72px; font-size: 30px; }
+  .cjx-ganhobar { height: 36px; margin-top: 6px; }
+  /* Abertura e avisos de prêmio também precisam caber na altura. */
+  .cjx-splash-coruja, .cjx-big-coruja { display: none; }
+  .cjx-splash { padding: 10px 20px; gap: 8px; }
+  .cjx-logo-grande { font-size: 40px; margin-top: 0; }
+  .cjx-splash-lista { display: grid; grid-template-columns: auto auto; column-gap: 18px; margin: 2px 0; }
+  .cjx-big-tit { font-size: 30px; }
+  .cjx-big-num { font-size: 40px; }
+  .cjx-premio { margin-top: 6px; padding: 14px 16px 10px; }
+  .cjx-premio-prev { width: 84px; height: 84px; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .cjx-coruja, .cjx-ceu i, .cjx-splash-raios, .cjx-big-raios, .cjx-comecar, .cjx-ganha .cjx-s i, .cjx-trava::after { animation: none !important; }

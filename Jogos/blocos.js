@@ -356,8 +356,11 @@
     for (var i = 0; i < 3; i++) {
       var slot = _bbTrayEls[i], peca = _bbTray[i];
       slot.innerHTML = '';
+      slot.classList.remove('bb-peca-sem-lugar');
       if (!peca) { slot.classList.add('bb-peca-vazia'); continue; }
       slot.classList.remove('bb-peca-vazia');
+      // Peça que não cabe em lugar nenhum agora fica apagada (dica visual).
+      if (_bbRodando && !_bbPecaCabeEmAlgumLugar(peca)) slot.classList.add('bb-peca-sem-lugar');
       var maxR = 0, maxC = 0;
       peca.cel.forEach(function (o) { if (o[0] > maxR) maxR = o[0]; if (o[1] > maxC) maxC = o[1]; });
       var cols = maxC + 1, rows = maxR + 1;
@@ -394,6 +397,9 @@
 
   function _bbIniciarArraste(e, slotIdx) {
     if (!_bbRodando) return;
+    // Um arraste por vez: um 2º dedo em outra peça sobrescrevia o estado do
+    // 1º arraste e o "fantasma" dele ficava preso na tela pra sempre.
+    if (_bbArrastando) return;
     var peca = _bbTray[slotIdx];
     if (!peca) return;
     e.preventDefault();
@@ -425,19 +431,25 @@
     (document.fullscreenElement || document.body).appendChild(ghost);
     pecaEl.classList.add('bb-peca-arrastando');
 
+    // Bandeja ao lado da grade (celular deitado): a peça vai pra ESQUERDA do
+    // dedo em vez de pra cima — senão as linhas de baixo ficavam fora de alcance.
+    var trayEl = document.getElementById('bb-tray');
+    var lateral = !!trayEl && trayEl.getBoundingClientRect().left >= gridRect.right - 4;
     _bbArrastando = {
       slotIdx: slotIdx, peca: peca, ghost: ghost, cell: cell,
-      cols: cols, rows: rows, gridRect: gridRect, pecaEl: pecaEl,
+      cols: cols, rows: rows, gridRect: gridRect, pecaEl: pecaEl, lateral: lateral,
       anchorRow: 0, anchorCol: 0, valido: false
     };
     _bbMoverGhost(e.clientX, e.clientY);
 
     function mover(ev) { ev.preventDefault(); _bbMoverGhost(ev.clientX, ev.clientY); }
-    function soltar() {
+    function soltar(ev) {
       pecaEl.removeEventListener('pointermove', mover);
       pecaEl.removeEventListener('pointerup', soltar);
       pecaEl.removeEventListener('pointercancel', soltar);
-      _bbFinalizarArraste();
+      // Toque cancelado pelo sistema (gesto, ligação, notificação) NÃO coloca
+      // a peça onde ela estava passando — só solta.
+      if (ev && ev.type === 'pointercancel') _bbCancelarArraste(); else _bbFinalizarArraste();
     }
     pecaEl.addEventListener('pointermove', mover);
     pecaEl.addEventListener('pointerup', soltar);
@@ -447,8 +459,8 @@
   function _bbMoverGhost(clientX, clientY) {
     var st = _bbArrastando;
     if (!st) return;
-    var left = clientX - (st.cols * st.cell) / 2;
-    var top = clientY - (st.rows * st.cell) - _BB_GHOST_OFFSET_Y;
+    var left = st.lateral ? clientX - (st.cols * st.cell) - 40 : clientX - (st.cols * st.cell) / 2;
+    var top = st.lateral ? clientY - (st.rows * st.cell) / 2 : clientY - (st.rows * st.cell) - _BB_GHOST_OFFSET_Y;
     st.ghost.style.left = left + 'px';
     st.ghost.style.top = top + 'px';
 

@@ -4,6 +4,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 .dc-card {
+  position: relative;   /* as telas de início/fim (.dc-overlay) cobrem o card inteiro, HUD incluso */
   border-radius: 16px; overflow: hidden;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -21,13 +22,13 @@
   color: var(--muted); font-weight: 700;
 }
 .dc-hud-valor {
-  font-family: var(--font-h); font-weight: 800; font-size: 18px;
+  /* A Syne é larga: em tela estreita o valor encolhe pra o HUD não quebrar em mais linhas. */
+  font-family: var(--font-h); font-weight: 800; font-size: clamp(14px, 4.6vw, 18px);
   color: var(--text);
 }
 .dc-hud-obj-txt { font-size: 13px; text-align: center; }
 
 .dc-arena {
-  position: relative;
   padding: 16px 12px 18px;
   display: flex; flex-direction: column; align-items: center;
   background:
@@ -58,15 +59,23 @@
 }
 
 /* Telas de início e fim (mesmo padrão dos outros jogos) */
+/* Cobrem o card inteiro (antes só a arena: com o ranking, o fim não cabia e
+   vazava por cima do HUD e pra fora da tela). O conteúdo fica centralizado
+   pelos espaçadores ::before/::after, não encolhe e, se ainda assim não
+   couber (celular baixo ou deitado), a tela rola. */
 .dc-overlay {
-  position: absolute; inset: 0;
+  position: absolute; inset: 0; z-index: 3;
   display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
+  align-items: center; justify-content: flex-start;
   text-align: center; padding: 20px; gap: 6px;
   background: var(--surface2);
+  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
 }
+.dc-overlay::before, .dc-overlay::after { content: ''; flex: 1 1 0; min-height: 0; }
+.dc-overlay > * { flex-shrink: 0; }
+.dc-overlay .rank-slot { max-width: 340px; }
 .dc-overlay-owl { width: 72px; height: 72px; object-fit: contain; margin-bottom: 4px; }
-.dc-overlay-titulo { font-family: var(--font-h); font-weight: 800; font-size: 20px; color: var(--text); }
+.dc-overlay-titulo { font-family: var(--font-h); font-weight: 800; font-size: clamp(15px, 4.8vw, 20px); color: var(--text); }
 .dc-overlay-desc { font-size: 13px; color: var(--muted); line-height: 1.4; max-width: 260px; }
 .dc-overlay-fase { font-family: var(--font-h); font-weight: 800; font-size: 16px; color: var(--text); margin-top: 4px; }
 .dc-overlay-rec { font-size: 12.5px; color: var(--muted); }
@@ -88,3 +97,23 @@
   font-size: 13px; font-weight: 700; color: var(--muted);
   text-decoration: underline; -webkit-tap-highlight-color: transparent;
 }
+
+/* ── Tela cheia (celular): o tabuleiro se ajusta ao espaço que SOBRA ─────
+   A arena vira "container" e o tabuleiro usa 100cqh/100cqw: cabe sempre,
+   com o HUD de 2, 3 ou 4 linhas e com o celular deitado (o tabuleiro
+   passava por cima do HUD e saía da tela). Sem suporte a container query,
+   fica o tamanho fixo de antes. */
+@supports (width: 1cqh) {
+  @media (max-width: 599px), (max-height: 599px) {
+    body.games-fs-open #dc-arena { container-type: size; min-height: 0; padding: 10px 12px 12px; }
+    body.games-fs-open #dc-arena .dc-grid { max-width: min(340px, 100cqh, 100cqw); }
+  }
+  /* Celular deitado: HUD à esquerda, tabuleiro à direita. */
+  @media (orientation: landscape) and (max-height: 520px) {
+    body.games-fs-open .jogo-tela#jogo-doces .jogo-voltar { padding: 6px 16px; }
+    body.games-fs-open .dc-card { flex-direction: row; padding: 4px 12px 8px; gap: 10px; }
+    .dc-hud { flex: 0 0 168px; align-content: center; border-bottom: none; border-radius: 12px; }
+    body.games-fs-open #dc-arena { padding: 0; border-radius: 12px; }
+  }
+}
+@media (max-height: 620px) { .dc-overlay-owl { display: none; } }

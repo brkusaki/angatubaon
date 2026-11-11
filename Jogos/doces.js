@@ -206,6 +206,10 @@
   var _dcSelecionado = null;      // { r, c } escolhida por toque
   var _dcArraste = null;
   var _dcInicioFaseMs = 0;        // Date.now() no início da fase (segundos reais — P1-2)
+  // Sobe a cada fase iniciada. Os setTimeout da troca/cascata guardam o valor
+  // e desistem se ele mudou: sem isso, sair no meio de uma cascata e começar
+  // de novo deixava os timers antigos apagando doces do tabuleiro NOVO.
+  var _dcGeracao = 0;
 
   // ── Estado só do RENDER em canvas ──────────────────────────
   var _dcCanvas = null, _dcCtx = null;
@@ -1029,7 +1033,9 @@
     _dcAnimando = true;
     _dcTrocaAnim = { i1: i1, i2: i2, t0: performance.now(), duracao: _DC_DUR_TROCA };
     var sT = _som(); if (sT && sT.tocar) sT.tocar('doces-trocar', null, 0.6);
+    var ger = _dcGeracao;
     setTimeout(function () {
+      if (ger !== _dcGeracao) return;
       _dcTrocaAnim = null;
       _dcTrocarCelulas(i1, i2);
       var tipo1 = _dcTipo[i1], tipo2 = _dcTipo[i2];
@@ -1043,6 +1049,7 @@
         _dcTrocarCelulas(i1, i2);
         _dcTrocaAnim = { i1: i1, i2: i2, t0: performance.now(), duracao: _DC_DUR_TROCA, reversa: true };
         setTimeout(function () {
+          if (ger !== _dcGeracao) return;
           _dcTrocaAnim = null;
           _dcAnimando = false;
           _dcFeedbackInvalido(i1, i2);
@@ -1089,7 +1096,9 @@
     var passosNestaTroca = 0, maiorRunNestaTroca = 0;
     var prefCel = (opts && opts.prefCel != null) ? opts.prefCel : null;
     var resultadoForcado = (opts && opts.resultadoInicial) ? opts.resultadoInicial : null;
+    var ger = _dcGeracao;
     function passo() {
+      if (ger !== _dcGeracao) return;
       var resultado = resultadoForcado || _dcEncontrarMatches();
       resultadoForcado = null;
       if (resultado.marcado.indexOf(true) === -1) {
@@ -1140,6 +1149,7 @@
         if (m) _dcPopAnim[idx] = { t0: agora };
       });
       setTimeout(function () {
+        if (ger !== _dcGeracao) return;
         resultado.marcado.forEach(function (m, idx) { if (m) delete _dcPopAnim[idx]; });
         // 2) só depois da explosão os doces de cima caem no lugar —
         // com animação de queda em vez de troca instantânea de cor.
@@ -1157,7 +1167,10 @@
   function _dcAposCascata() {
     if (_dcObjetivoAtingido()) { _dcFimFase(true); return; }
     if (_dcMovimentosRestantes <= 0) { _dcFimFase(false); return; }
-    if (!_dcExisteMovimentoValido()) _dcEmbaralhar();
+    if (!_dcExisteMovimentoValido()) {
+      _dcEmbaralhar();
+      _dcMostrarComboMsg('Embaralhando!', '#ffffff');   // antes o tabuleiro trocava do nada
+    }
   }
 
   function _dcAtualizarHud() {
@@ -1180,6 +1193,7 @@
 
   // ── Início / fim de fase ────────────────────────────────────
   function _dcIniciarFase(fase) {
+    _dcGeracao++;
     _dcFaseAtual = Math.max(1, fase);
     var cfg = _dcConfigFase(_dcFaseAtual);
     _dcObjetivo = { tipo: cfg.tipo, meta: cfg.meta, corAlvo: cfg.corAlvo };

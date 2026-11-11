@@ -1,6 +1,14 @@
 /* ═══════════════════════════════════════════════════════════════
    BLOCOS DA CORUJA — estilos do jogo (lazy-loaded)
    Injetado sob demanda pelo _jogoLoader ao abrir o jogo.
+
+   Visual v3 (nov/2026): placar (fase · objetivo + barra · pontos),
+   cenário da fase com blocos flutuando, coruja com balão, grade em
+   moldura com casas fundas, peças que estalam ao encaixar, prévia das
+   linhas que vão fechar, estouro das linhas limpas e telas de
+   início/fim no mesmo cenário. Os elementos extras (.bb-barra,
+   .bb-decos, .bb-mascote, .bb-fx, .bb-overlay-obj, .bb-fim-stats) são
+   criados pelo JS (_bbMontarVisual), não estão no index.html.
    ═══════════════════════════════════════════════════════════════ */
 
 .bb-card {
@@ -8,60 +16,219 @@
   border-radius: 16px; overflow: hidden;
   border: 1px solid var(--border);
   background: var(--surface);
+  /* cenário da fase (o JS troca por fase em _bbAplicarTema) */
+  --bb-a: #1e1b4b; --bb-b: #0b1030; --bb-luz: rgba(99,102,241,.45);
+  --bb-cenario:
+    radial-gradient(120% 55% at 50% -8%, var(--bb-luz), transparent 62%),
+    radial-gradient(90% 40% at 50% 108%, var(--bb-luz), transparent 70%),
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px) 0 0 / 28px 28px,
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px) 0 0 / 28px 28px,
+    linear-gradient(170deg, var(--bb-a), var(--bb-b));
 }
-.bb-hud {
-  display: flex; flex-wrap: wrap; justify-content: space-around; gap: 6px;
-  padding: 12px 10px;
-  background: linear-gradient(135deg, rgba(34,211,238,0.12), rgba(37,99,235,0.08));
-  border-bottom: 1px solid var(--border);
-}
-.bb-hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 58px; }
-.bb-hud-objetivo { flex: 1 1 100%; order: -1; }
-.bb-hud-label {
-  font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
-  color: var(--muted); font-weight: 700;
-}
-.bb-hud-valor {
-  /* A Syne é larga: em tela estreita o valor encolhe pra o HUD não quebrar em mais linhas. */
-  font-family: var(--font-h); font-weight: 800; font-size: clamp(14px, 4.6vw, 18px);
-  color: var(--text);
-}
-.bb-hud-obj-txt { font-size: 13px; text-align: center; }
 
+/* ── Placar ────────────────────────────────────────────────────
+   Ordem no HTML: 1 objetivo · 2 fase · 3 progresso · 4 pontos ·
+   5 recorde. Aqui vira [fase] [objetivo + barra] [pontos], em duas
+   linhas fixas. O recorde sai daqui (aparece na tela inicial). */
+.bb-hud {
+  position: relative; z-index: 2;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "fase obj pts" "fase prog pts";
+  align-items: center; column-gap: 12px; row-gap: 6px;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(34,211,238,.28), rgba(99,102,241,.26) 55%, rgba(168,85,247,.22));
+  border-bottom: 1px solid rgba(255,255,255,.12);
+}
+.bb-hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.bb-hud-label {
+  font-size: 9px; text-transform: uppercase; letter-spacing: .08em;
+  color: rgba(255,255,255,.72); font-weight: 800;
+}
+.bb-hud-valor { font-family: var(--font-h); font-weight: 800; font-size: 18px; color: #fff; }
+
+.bb-hud > .bb-hud-item:nth-child(1) { grid-area: obj; align-items: flex-start; align-self: end; }
+.bb-hud-obj-txt { font-size: clamp(12px, 3.7vw, 14.5px); text-align: left; line-height: 1.2; }
+
+.bb-hud > .bb-hud-item:nth-child(2) {
+  grid-area: fase; justify-content: center;
+  width: 50px; height: 50px; border-radius: 15px;
+  background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+}
+.bb-hud > .bb-hud-item:nth-child(2) .bb-hud-valor { font-size: 20px; line-height: 1; }
+
+.bb-hud > .bb-hud-item:nth-child(3) { grid-area: prog; flex-direction: row; align-items: center; gap: 8px; align-self: start; }
+.bb-hud > .bb-hud-item:nth-child(3) .bb-hud-label { display: none; }
+.bb-hud > .bb-hud-item:nth-child(3) .bb-hud-valor { font-size: 11px; color: rgba(255,255,255,.9); white-space: nowrap; }
+.bb-barra {
+  flex: 1 1 auto; min-width: 0; height: 10px; border-radius: 99px; overflow: hidden;
+  background: rgba(0,0,0,.4); box-shadow: inset 0 1px 2px rgba(0,0,0,.6);
+}
+.bb-barra i {
+  display: block; height: 100%; width: 0; border-radius: 99px;
+  background: linear-gradient(90deg, #22d3ee, #a78bfa);
+  box-shadow: 0 0 8px rgba(34,211,238,.7);
+  transition: width .4s cubic-bezier(.3,1.2,.5,1);
+}
+
+.bb-hud > .bb-hud-item:nth-child(4) { grid-area: pts; flex-direction: column-reverse; gap: 3px; }
+.bb-hud > .bb-hud-item:nth-child(4) .bb-hud-label { font-size: 7.5px; letter-spacing: .06em; }
+.bb-hud > .bb-hud-item:nth-child(4) .bb-hud-valor {
+  min-width: 52px; height: 44px; padding: 0 8px; box-sizing: border-box; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; line-height: 1; letter-spacing: -.02em; text-shadow: 0 1px 0 rgba(0,0,0,.35);
+  background: linear-gradient(180deg, #67e8f9, #22d3ee 45%, #0891b2);
+  border: 2px solid rgba(255,255,255,.75);
+  box-shadow: 0 3px 0 #155e75, 0 0 14px rgba(34,211,238,.5);
+}
+.bb-hud > .bb-hud-item:nth-child(5) { display: none; }
+
+/* ── Arena: cenário + blocos flutuando + mascote + grade + bandeja ── */
 .bb-arena {
+  position: relative; overflow: hidden;
   padding: 16px 12px 18px;
   display: flex; flex-direction: column; align-items: center; gap: 14px;
-  background:
-    radial-gradient(circle at 30% 10%, rgba(34,211,238,0.08), transparent 55%),
-    var(--surface2);
+  background: var(--bb-cenario);
   min-height: 420px;
 }
+.bb-decos { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.bb-decos i {
+  position: absolute; width: 46px; height: 46px; border-radius: 10px;
+  background: center / cover no-repeat;
+  opacity: .16; box-shadow: 0 6px 14px rgba(0,0,0,.4);
+  animation: bbFlutua 9s ease-in-out infinite alternate;
+}
+.bb-decos i:nth-child(1) { left: 5%; top: 4%; transform: rotate(-12deg); }
+.bb-decos i:nth-child(2) { right: 6%; top: 10%; width: 34px; height: 34px; animation-delay: -2s; }
+.bb-decos i:nth-child(3) { left: 7%; bottom: 7%; width: 38px; height: 38px; animation-delay: -4s; }
+.bb-decos i:nth-child(4) { right: 4%; bottom: 10%; width: 56px; height: 56px; animation-delay: -1s; }
+.bb-decos i:nth-child(5) { left: 47%; top: 1%; width: 26px; height: 26px; animation-delay: -5s; }
+.bb-decos i:nth-child(6) { left: -14px; top: 48%; width: 44px; height: 44px; animation-delay: -3s; }
+.bb-decos i:nth-child(7) { right: -12px; top: 56%; width: 40px; height: 40px; animation-delay: -6s; }
+@keyframes bbFlutua { from { transform: translateY(6px) rotate(-10deg); } to { transform: translateY(-10px) rotate(12deg); } }
 
-/* Grade 8×8 */
+/* Mascote + balão: só onde sobra altura (ver @container / tela grande). */
+.bb-mascote {
+  display: none; position: relative; z-index: 1;
+  align-items: flex-end; justify-content: flex-start; gap: 8px;
+  width: 100%; max-width: 340px; height: 76px; margin-bottom: -6px; padding-left: 6%;
+  box-sizing: border-box;
+}
+.bb-mascote img {
+  height: 76px; width: auto; flex-shrink: 0;
+  filter: drop-shadow(0 5px 6px rgba(0,0,0,.45));
+  transform-origin: 50% 100%;
+  animation: bbBob 2.4s ease-in-out infinite;
+}
+.bb-mascote img.bb-mascote-pulo { animation: bbPulo .5s cubic-bezier(.3,1.6,.5,1), bbBob 2.4s ease-in-out .5s infinite; }
+@keyframes bbBob { 50% { transform: translateY(-4px); } }
+@keyframes bbPulo { 0% { transform: scale(.8) translateY(6px); } 55% { transform: scale(1.1) translateY(-10px); } 100% { transform: scale(1) translateY(0); } }
+.bb-balao {
+  position: relative; align-self: center; max-width: 210px;
+  padding: 7px 11px; border-radius: 14px;
+  background: #fff; color: #1e1b4b; font-weight: 800; font-size: 12.5px; line-height: 1.25; text-align: left;
+  box-shadow: 0 4px 0 rgba(0,0,0,.25);
+  transform: scale(0); transform-origin: 0 70%;
+  transition: transform .18s cubic-bezier(.3,1.6,.5,1);
+}
+.bb-balao::before {
+  content: ''; position: absolute; left: -5px; top: 52%; width: 12px; height: 12px;
+  background: #fff; border-radius: 2px; transform: rotate(45deg);
+}
+.bb-balao.on { transform: scale(1); }
+
+/* Grade 8×8 numa moldura */
 .bb-grid {
+  position: relative; z-index: 1;
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   grid-template-rows: repeat(8, 1fr);
   width: 100%; max-width: 340px; aspect-ratio: 1 / 1;
   gap: 3px;
-  padding: 6px; border-radius: 12px;
-  background: rgba(0,0,0,0.18);
-  border: 1px solid var(--border);
+  padding: 6px; border-radius: 14px;
+  background: linear-gradient(180deg, rgba(6,8,24,.78), rgba(10,12,34,.86));
+  border: 2px solid rgba(255,255,255,.16);
+  box-shadow: 0 0 0 4px rgba(0,0,0,.25), 0 14px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.1);
   touch-action: none;
 }
 .bb-cel {
-  border-radius: 5px;
-  background: rgba(255,255,255,0.05);
+  position: relative;
+  border-radius: 6px;
+  background: rgba(255,255,255,.06);
+  box-shadow: inset 0 2px 3px rgba(0,0,0,.45), inset 0 -1px 0 rgba(255,255,255,.05);
   transition: background .08s;
 }
 .bb-cel.bb-cheia {
-  box-shadow: inset 0 -3px 0 rgba(0,0,0,0.22), inset 0 2px 0 rgba(255,255,255,0.28);
+  background-size: cover; background-position: center;
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.28), inset 0 2px 0 rgba(255,255,255,.35), 0 2px 3px rgba(0,0,0,.35);
 }
-.bb-cel.bb-preview-ok { background: rgba(74,222,128,0.55) !important; }
-.bb-cel.bb-preview-bad { background: rgba(239,68,68,0.45) !important; }
+/* Sombra da peça arrastada: na cor dela, translúcida */
+.bb-cel.bb-preview-ok { opacity: .55; box-shadow: inset 0 0 0 2px rgba(255,255,255,.65); }
+.bb-cel.bb-preview-bad { background: rgba(239,68,68,.45) !important; }
+/* Linhas/colunas que fecham se soltar aqui */
+.bb-cel.bb-preview-linha { z-index: 1; opacity: 1; box-shadow: 0 0 0 2px #fff, 0 0 14px 2px rgba(255,255,255,.8); }
+.bb-cel.bb-preview-linha::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: rgba(255,255,255,.5); animation: bbLinhaPisca .45s ease-in-out infinite alternate;
+}
+@keyframes bbLinhaPisca { from { opacity: .15; } to { opacity: .6; } }
+
+/* Peça encaixada: estala */
+.bb-cel.bb-estalo { animation: bbEstalo .3s cubic-bezier(.3,1.7,.5,1); z-index: 1; }
+@keyframes bbEstalo { 0% { transform: scale(.55); } 60% { transform: scale(1.14); } 100% { transform: scale(1); } }
+/* Entrada da fase: as casas surgem em onda diagonal */
+.bb-grid.bb-entra .bb-cel { animation: bbEntra .42s cubic-bezier(.3,1.5,.5,1) both; animation-delay: var(--d, 0ms); }
+@keyframes bbEntra { from { transform: scale(.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+/* Vitória: os blocos pulam em onda, coluna por coluna */
+.bb-grid.bb-vitoria .bb-cel { animation: bbOnda .5s ease-in-out 2 both; animation-delay: var(--dc, 0ms); }
+@keyframes bbOnda { 50% { transform: translateY(-28%) scale(1.08); filter: brightness(1.4); } }
+/* Derrota: a grade apaga e treme */
+.bb-grid.bb-derrota { animation: bbTreme .4s ease-in-out; }
+.bb-grid.bb-derrota .bb-cel.bb-cheia { filter: grayscale(.85) brightness(.7); transition: filter .6s; }
+.bb-grid.bb-treme { animation: bbTreme .3s ease-in-out; }
+@keyframes bbTreme { 20% { transform: translate(-4px, 2px); } 40% { transform: translate(4px, -2px); } 60% { transform: translate(-3px, -1px); } 80% { transform: translate(2px, 1px); } }
+
+/* ── Efeitos da limpeza (camada por cima da arena) ── */
+.bb-fx { position: absolute; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
+.bb-fx-feixe {
+  position: absolute; border-radius: 6px;
+  background: linear-gradient(90deg, transparent, #fff 18%, #fff 82%, transparent);
+  box-shadow: 0 0 18px 6px rgba(255,255,255,.75), 0 0 40px 12px var(--bb-luz);
+  animation: bbFeixe .5s ease-out forwards;
+}
+.bb-fx-v { background: linear-gradient(180deg, transparent, #fff 18%, #fff 82%, transparent); }
+@keyframes bbFeixe { 0% { opacity: 0; transform: scale(1, .3); } 20% { opacity: 1; transform: scale(1, 1.1); } 100% { opacity: 0; transform: scale(1, .2); } }
+.bb-fx-v { animation-name: bbFeixeV; }
+@keyframes bbFeixeV { 0% { opacity: 0; transform: scale(.3, 1); } 20% { opacity: 1; transform: scale(1.1, 1); } 100% { opacity: 0; transform: scale(.2, 1); } }
+.bb-fx-bloco {
+  position: absolute; border-radius: 6px; background-size: cover; background-position: center;
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.28), inset 0 2px 0 rgba(255,255,255,.35);
+  animation: bbVoa .75s cubic-bezier(.4,0,.8,.6) both;
+}
+@keyframes bbVoa {
+  0% { transform: none; filter: brightness(2.2); }
+  22% { transform: translate(calc(var(--dx) * .25), -40%) scale(1.12); filter: brightness(1.4); opacity: 1; }
+  100% { transform: translate(var(--dx), 260%) rotate(var(--rot)) scale(.5); opacity: 0; }
+}
+.bb-fx-pontos {
+  position: absolute; width: 0; overflow: visible; white-space: nowrap;
+  font-family: var(--font-h); font-weight: 800; font-size: 22px; color: #fff;
+  text-shadow: 0 2px 0 rgba(0,0,0,.5), 0 0 12px var(--bb-luz);
+  animation: bbSobe .9s ease-out forwards;
+}
+@keyframes bbSobe { 0% { transform: translate(-50%, 0) scale(.6); opacity: 0; } 20% { transform: translate(-50%, -14px) scale(1.15); opacity: 1; } 100% { transform: translate(-50%, -60px) scale(1); opacity: 0; } }
+.bb-fx-aviso {
+  position: absolute; left: 0; right: 0; text-align: center;
+  font-family: var(--font-h); font-weight: 800; font-size: clamp(26px, 9vw, 40px); color: #fde68a;
+  -webkit-text-stroke: 1.5px #fff;
+  text-shadow: 0 3px 0 #78350f, 0 0 24px rgba(253,230,138,.9);
+  animation: bbAviso .9s cubic-bezier(.3,1.4,.5,1) forwards;
+}
+@keyframes bbAviso { 0% { transform: scale(.3) rotate(-6deg); opacity: 0; } 22% { transform: scale(1.1) rotate(-4deg); opacity: 1; } 75% { transform: scale(1) rotate(-4deg); opacity: 1; } 100% { transform: scale(1.1) rotate(-4deg); opacity: 0; } }
 
 /* Bandeja de peças */
 .bb-tray {
+  position: relative; z-index: 1;
   display: flex; justify-content: center; gap: 14px;
   width: 100%; max-width: 340px;
   min-height: 76px;
@@ -70,21 +237,32 @@
   flex: 1 1 0; max-width: 100px;
   display: flex; align-items: center; justify-content: center;
   min-height: 76px;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.04);
+  border-radius: 14px;
+  background: rgba(0,0,0,.28);
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
   touch-action: none;
   cursor: grab;
+  transition: opacity .2s, filter .2s, transform .12s;
 }
-.bb-peca.bb-peca-vazia { background: transparent; }
+.bb-peca:active { transform: scale(.95); }
+.bb-peca.bb-peca-vazia { background: rgba(0,0,0,.12); border-style: dashed; box-shadow: none; }
+.bb-peca-mini { filter: drop-shadow(0 3px 3px rgba(0,0,0,.45)); }
+.bb-peca:not(.bb-peca-vazia):not(.bb-peca-sem-lugar) .bb-peca-mini { animation: bbBob 2.6s ease-in-out infinite; }
+.bb-peca:nth-child(2) .bb-peca-mini { animation-delay: -.8s !important; }
+.bb-peca:nth-child(3) .bb-peca-mini { animation-delay: -1.6s !important; }
+/* Peças novas entram deslizando de baixo, uma depois da outra */
+.bb-peca.bb-peca-nova { animation: bbPecaNova .42s cubic-bezier(.3,1.5,.5,1) both; animation-delay: var(--d, 0ms); }
+@keyframes bbPecaNova { from { transform: translateY(60px) scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
 /* Tela grande (PC/tablet): grade e bandeja crescem com a altura
    disponível em vez de ficarem presas em 340px. Nunca menores que 340px
-   (celular não muda); desconta HUD + botão voltar + bandeja de peças. */
+   (celular não muda); desconta HUD + botão voltar + bandeja + mascote. */
 @media (min-width: 600px) and (min-height: 600px) {
-  .bb-grid,
-  .bb-tray {
-    max-width: max(340px, min(600px, calc(100vh - 320px)));
-    max-width: max(340px, min(600px, calc(100dvh - 320px)));
+  .bb-grid, .bb-tray, .bb-mascote {
+    max-width: max(340px, min(600px, calc(100vh - 400px)));
+    max-width: max(340px, min(600px, calc(100dvh - 400px)));
   }
+  .bb-mascote { display: flex; }
 }
 .bb-peca.bb-peca-arrastando { opacity: .35; }
 .bb-peca-mini {
@@ -94,9 +272,11 @@
   display: grid; gap: 3px;
 }
 .bb-peca-bloco {
-  border-radius: 4px;
-  box-shadow: inset 0 -2px 0 rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.28);
+  border-radius: 4px; background-size: cover; background-position: center;
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.3);
 }
+/* Peça que não cabe em lugar nenhum agora: apagada e sem cor. */
+.bb-peca.bb-peca-sem-lugar { opacity: .38; filter: grayscale(.8); }
 
 /* "Fantasma" da peça sendo arrastada (position:fixed, segue o dedo) */
 .bb-ghost {
@@ -104,76 +284,146 @@
   display: grid; gap: 3px;
   pointer-events: none;
   z-index: 9999;
-  opacity: .92;
-  filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5));
+  opacity: .95;
+  filter: drop-shadow(0 10px 14px rgba(0,0,0,.55));
 }
-.bb-ghost-bloco { border-radius: 4px; }
+.bb-ghost-bloco {
+  border-radius: 5px; background-size: cover; background-position: center;
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.28), inset 0 2px 0 rgba(255,255,255,.35);
+}
 .bb-ghost.bb-ghost-invalido { opacity: .55; }
 
-/* Telas de início e fim (mesmo padrão dos outros jogos: overlay
-   absoluto sobre a arena) */
-/* Cobrem o card inteiro (antes só a arena: com o ranking, o fim não cabia e
-   vazava por cima do HUD e pra fora da tela). O conteúdo fica centralizado
-   pelos espaçadores ::before/::after, não encolhe e, se ainda assim não
+/* ── Telas de início e fim ─────────────────────────────────────
+   Cobrem o card inteiro, no cenário da fase. O conteúdo fica
+   centralizado pelos espaçadores ::before/::after, não encolhe e, se não
    couber (celular baixo ou deitado), a tela rola. */
 .bb-overlay {
-  position: absolute; inset: 0; z-index: 3;
+  position: absolute; inset: 0; z-index: 5;
   display: flex; flex-direction: column;
   align-items: center; justify-content: flex-start;
   text-align: center; padding: 20px; gap: 6px;
-  background: var(--surface2);
+  background:
+    url('/Jogos/assets/blocos/bloco-roxo.webp') 7% 8% / 44px no-repeat,
+    url('/Jogos/assets/blocos/bloco-azul.webp') 92% 14% / 34px no-repeat,
+    url('/Jogos/assets/blocos/bloco-amarelo.webp') 8% 92% / 38px no-repeat,
+    url('/Jogos/assets/blocos/bloco-verde.webp') 92% 88% / 50px no-repeat,
+    var(--bb-cenario);
   overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  animation: bbSurge .3s ease-out;
 }
+@keyframes bbSurge { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }
 .bb-overlay::before, .bb-overlay::after { content: ''; flex: 1 1 0; min-height: 0; }
 .bb-overlay > * { flex-shrink: 0; }
 .bb-overlay .rank-slot { max-width: 340px; }
-.bb-overlay-owl { width: 72px; height: 72px; object-fit: contain; margin-bottom: 4px; }
-.bb-overlay-titulo { font-family: var(--font-h); font-weight: 800; font-size: clamp(15px, 4.8vw, 20px); color: var(--text); }
-.bb-overlay-desc { font-size: 13px; color: var(--muted); line-height: 1.4; max-width: 260px; }
-.bb-overlay-fase { font-family: var(--font-h); font-weight: 800; font-size: 16px; color: var(--text); margin-top: 4px; }
-.bb-overlay-rec { font-size: 12.5px; color: var(--muted); }
+.bb-overlay-owl {
+  width: 104px; height: 104px; object-fit: contain; margin-bottom: 2px;
+  filter: drop-shadow(0 8px 10px rgba(0,0,0,.45));
+  animation: bbBob 2.4s ease-in-out infinite;
+}
+.bb-overlay-titulo {
+  font-family: var(--font-h); font-weight: 800; font-size: clamp(19px, 6vw, 27px); color: #fff;
+  text-shadow: 0 2px 0 #1e3a8a, 0 0 18px rgba(34,211,238,.75);
+}
+.bb-overlay-desc { font-size: 13px; color: rgba(255,255,255,.84); line-height: 1.4; max-width: 270px; }
+.bb-overlay-fase {
+  margin-top: 8px; padding: 7px 22px; border-radius: 999px;
+  font-family: var(--font-h); font-weight: 800; font-size: 18px; color: #fff;
+  background: linear-gradient(135deg, #22d3ee, #6366f1);
+  box-shadow: 0 4px 0 rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.bb-overlay-obj {
+  padding: 7px 12px; border-radius: 12px; max-width: 290px;
+  font-size: 13px; font-weight: 700; color: #fff;
+  background: rgba(0,0,0,.32); border: 1px solid rgba(255,255,255,.15);
+}
+.bb-overlay-rec { font-size: 12px; color: rgba(255,255,255,.66); }
+.bb-fim-venceu .bb-overlay-titulo {
+  text-shadow: 0 2px 0 #b45309, 0 0 20px rgba(251,191,36,.85);
+  animation: bbPulaTit .6s cubic-bezier(.3,1.6,.5,1);
+}
+@keyframes bbPulaTit { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.bb-fim-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 4px 0 2px; }
+.bb-fim-stats:empty { display: none; }
+.bb-chip {
+  padding: 6px 12px; border-radius: 999px; font-size: 12.5px; color: rgba(255,255,255,.86);
+  background: rgba(0,0,0,.34); border: 1px solid rgba(255,255,255,.16);
+}
+.bb-chip b { font-family: var(--font-h); font-size: 14px; color: #fff; }
+.bb-overlay-moedas {
+  margin: 4px 0 8px !important; padding: 5px 16px; border-radius: 999px;
+  background: rgba(255,215,64,.15); border: 1px solid rgba(255,215,64,.5);
+  box-shadow: 0 0 14px rgba(255,215,64,.25);
+}
 
 .bb-btn {
-  margin-top: 10px;
-  font-family: var(--font-h); font-weight: 800; font-size: 15px;
-  color: #fff; cursor: pointer;
-  padding: 12px 32px; border-radius: 999px; border: none;
-  background: linear-gradient(135deg, #22d3ee, #2563eb);
+  position: relative; overflow: hidden;
+  margin-top: 12px;
+  font-family: var(--font-h); font-weight: 800; font-size: 18px;
+  color: #fff; cursor: pointer; text-shadow: 0 1px 0 rgba(0,0,0,.28);
+  padding: 14px 46px; border-radius: 999px;
+  border: 2px solid rgba(255,255,255,.78);
+  background: linear-gradient(180deg, #67e8f9, #22d3ee 40%, #2563eb);
   -webkit-tap-highlight-color: transparent;
-  transition: transform .1s, filter .15s;
-  box-shadow: 0 4px 14px rgba(37,99,235,0.35);
+  transition: transform .1s, filter .15s, box-shadow .1s;
+  box-shadow: 0 6px 0 #1e3a8a, 0 0 26px rgba(34,211,238,.5);
+  animation: bbChama 1.5s ease-in-out infinite;
 }
-.bb-btn:active { transform: scale(0.96); }
-.bb-btn:hover { filter: brightness(1.08); }
+.bb-btn::after {
+  content: ''; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+  animation: bbBrilhoBtn 2.6s ease-in-out infinite;
+}
+@keyframes bbChama { 50% { transform: scale(1.045); } }
+@keyframes bbBrilhoBtn { 0%, 55% { left: -60%; } 100% { left: 130%; } }
+.bb-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #1e3a8a; animation: none; }
+.bb-btn:hover { filter: brightness(1.06); }
 .bb-link {
-  margin-top: 2px; background: none; border: none; cursor: pointer;
-  font-size: 13px; font-weight: 700; color: var(--muted);
+  margin-top: 4px; background: none; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 700; color: rgba(255,255,255,.72);
   text-decoration: underline; -webkit-tap-highlight-color: transparent;
 }
 
-/* Peça da bandeja que não cabe em lugar nenhum da grade agora. */
-.bb-peca.bb-peca-sem-lugar { opacity: .38; }
-
 /* ── Tela cheia (celular): a grade se ajusta ao espaço que SOBRA ─────────
-   A arena vira "container" e a grade usa 100cqh/100cqw: cabe sempre, com o
-   HUD de 2, 3 ou 4 linhas (fases altas têm números grandes e o HUD cresce —
-   a grade passava por cima dele e a bandeja saía da tela). Sem suporte a
-   container query, fica o tamanho fixo de antes. */
+   A arena vira "container" e a grade usa 100cqh/100cqw: cabe sempre, em pé
+   ou deitado. Com altura sobrando, entra a mascote. Sem suporte a
+   container query, fica o tamanho fixo (e sem mascote). */
 @supports (width: 1cqh) {
   @media (max-width: 599px), (max-height: 599px) {
     body.games-fs-open #bb-arena { container-type: size; min-height: 0; padding: 10px 12px 12px; }
     body.games-fs-open #bb-arena .bb-grid,
-    body.games-fs-open #bb-arena .bb-tray { max-width: min(340px, 100cqh - 90px); }   /* 90 = bandeja 76 + vão 14 */
+    body.games-fs-open #bb-arena .bb-tray,
+    body.games-fs-open #bb-arena .bb-mascote { max-width: min(400px, 100cqw, 100cqh - 90px); }   /* 90 = bandeja 76 + vão 14 */
+    @container (min-height: 520px) {
+      .bb-mascote { display: flex; }
+      body.games-fs-open #bb-arena .bb-grid,
+      body.games-fs-open #bb-arena .bb-tray,
+      body.games-fs-open #bb-arena .bb-mascote { max-width: min(400px, 100cqw, 100cqh - 174px); }   /* + mascote 70 + vão */
+    }
   }
-  /* Celular deitado: HUD à esquerda, grade no meio, bandeja em coluna à direita. */
+  /* Celular deitado: placar à esquerda, grade no meio, bandeja em coluna à direita. */
   @media (orientation: landscape) and (max-height: 520px) {
     body.games-fs-open .jogo-tela#jogo-blocos .jogo-voltar { padding: 6px 16px; }
     body.games-fs-open .bb-card { flex-direction: row; padding: 4px 12px 8px; gap: 10px; }
-    .bb-hud { flex: 0 0 168px; align-content: center; border-bottom: none; border-radius: 12px; }
-    body.games-fs-open #bb-arena { flex-direction: row; justify-content: center; align-items: center; padding: 0; gap: 12px; background: none; }
-    body.games-fs-open #bb-arena .bb-grid { max-width: min(340px, 100cqh, 100cqw - 108px); }
+    .bb-hud {
+      flex: 0 0 168px; box-sizing: border-box;
+      grid-template-columns: 1fr 1fr; grid-template-areas: "obj obj" "prog prog" "fase pts";
+      align-content: center; justify-items: center; row-gap: 14px;
+      border-bottom: none; border-radius: 12px;
+    }
+    .bb-hud > .bb-hud-item:nth-child(1) { align-items: center; justify-self: stretch; }
+    .bb-hud-obj-txt { text-align: center; font-size: 13.5px; }
+    .bb-hud > .bb-hud-item:nth-child(3) { justify-self: stretch; }
+    body.games-fs-open #bb-arena { flex-direction: row; justify-content: center; align-items: center; padding: 0; gap: 12px; border-radius: 12px; }
+    body.games-fs-open #bb-arena .bb-mascote { display: none !important; }
+    body.games-fs-open #bb-arena .bb-grid { max-width: min(340px, 100cqh - 8px, 100cqw - 116px); }
     body.games-fs-open #bb-arena .bb-tray { flex-direction: column; flex: 0 0 96px; width: 96px; max-width: 96px; gap: 8px; min-height: 0; }
     .bb-peca { flex: 0 0 auto; width: 96px; min-height: 64px; }
   }
 }
-@media (max-height: 620px) { .bb-overlay-owl { display: none; } }
+@media (max-height: 620px) { .bb-overlay-owl { width: 64px; height: 64px; } }
+@media (max-height: 580px) { .bb-overlay-owl { display: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .bb-decos i, .bb-mascote img, .bb-overlay, .bb-overlay-owl, .bb-btn, .bb-btn::after, .bb-peca-mini,
+  .bb-cel, .bb-grid, .bb-peca, .bb-fim-venceu .bb-overlay-titulo { animation: none !important; }
+}

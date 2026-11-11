@@ -1,5 +1,5 @@
 {
- "versaoSW": 520,
+ "versaoSW": 522,
  "hashes": {
   "Aprender/conteudo.js": "c2776ebcaf3844f9",
   "Aprender/hub.js": "0025f4b073788e9b",
@@ -14,8 +14,8 @@
   "Jogos/assets/som.js": "71f290b8a884cbde",
   "Jogos/baralho.css": "87b5ee390e494018",
   "Jogos/baralho.js": "3a537456e8b62c9e",
-  "Jogos/blocos.css": "91c09f7b095d893c",
-  "Jogos/blocos.js": "8a815e5323dbb4c7",
+  "Jogos/blocos.css": "c079ac5e01739866",
+  "Jogos/blocos.js": "971528d3748c4bdc",
   "Jogos/corrida.css": "2ca54eacf6e853e7",
   "Jogos/corrida.js": "144471077b6da745",
   "Jogos/corujinha.css": "910a442c95e78e6a",

@@ -151,6 +151,31 @@
   var _bbTrayEls = null;
   var _bbArrastando = null;
   var _bbInicioFaseMs = 0;        // Date.now() no início da fase (segundos reais — P1-2)
+  // Sobe a cada fase iniciada; os setTimeout de efeito/fim guardam o valor e
+  // desistem se ele mudou (saiu ou recomeçou no meio).
+  var _bbGeracao = 0;
+
+  /* ── Visual v3 (nov/2026) ─────────────────────────────────────
+     Cenário por fase, coruja com balão, peças estalando ao encaixar,
+     prévia das linhas que vão fechar, estouro das linhas limpas (feixe +
+     blocos voando + "+pontos"), peças novas deslizando, onda de vitória.
+     Os elementos extras são criados em _bbMontarVisual (não estão no
+     index.html). */
+  function _bbMovReduzido() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  var _BB_TEMAS = [
+    { a: '#1e1b4b', b: '#0b1030', luz: 'rgba(99,102,241,0.45)' },   // anil
+    { a: '#083344', b: '#04161d', luz: 'rgba(34,211,238,0.40)' },   // ciano
+    { a: '#3b0764', b: '#180327', luz: 'rgba(192,132,252,0.42)' },  // roxo
+    { a: '#052e16', b: '#03160b', luz: 'rgba(52,211,153,0.38)' },   // verde
+    { a: '#431407', b: '#1c0903', luz: 'rgba(251,146,60,0.40)' },   // laranja
+    { a: '#4c0519', b: '#1f0209', luz: 'rgba(251,113,133,0.40)' }   // rosa
+  ];
+  var _BB_OWL = {
+    normal: '/webp/owl-curious.webp', ola: '/webp/owl-wave.webp', feliz: '/webp/owl-thumbsup.webp',
+    festa: '/webp/owl-tada.webp', uau: '/webp/owl-love.webp', aperto: '/webp/owl-surprised.webp',
+    pensa: '/webp/owl-thinking.webp', triste: '/webp/owl-sad.webp'
+  };
+  var _bbMascoteT = 0, _bbMascoteEstado = 'normal';
 
   // ── localStorage: maior fase JÁ CONCLUÍDA ──────────────────
   function _bbRecordeGet() {
@@ -319,6 +344,9 @@
     for (var i = 0; i < _BB_TAM * _BB_TAM; i++) {
       var el = document.createElement('div');
       el.className = 'bb-cel';
+      // atraso da "onda" (entrada da fase / vitória): diagonal de cima-esquerda
+      el.style.setProperty('--d', (((i / _BB_TAM) | 0) + (i % _BB_TAM)) * 28 + 'ms');
+      el.style.setProperty('--dc', (i % _BB_TAM) * 55 + 'ms');
       grid.appendChild(el);
       _bbCelEls.push(el);
     }
@@ -351,11 +379,17 @@
       _bbTrayEls.push(slot);
     }
   }
-  function _bbRenderTray() {
+  function _bbRenderTray(novas) {
     if (!_bbTrayEls) return;
     for (var i = 0; i < 3; i++) {
       var slot = _bbTrayEls[i], peca = _bbTray[i];
       slot.innerHTML = '';
+      slot.classList.remove('bb-peca-nova');
+      if (novas && peca && !_bbMovReduzido()) {
+        void slot.offsetWidth;
+        slot.style.setProperty('--d', (i * 90) + 'ms');
+        slot.classList.add('bb-peca-nova');
+      }
       slot.classList.remove('bb-peca-sem-lugar');
       if (!peca) { slot.classList.add('bb-peca-vazia'); continue; }
       slot.classList.remove('bb-peca-vazia');
@@ -476,12 +510,32 @@
       var rr = anchorRow + o[0], cc = anchorCol + o[1];
       if (rr < 0 || rr >= _BB_TAM || cc < 0 || cc >= _BB_TAM) return;
       var el = _bbCelEls[rr * _BB_TAM + cc];
-      if (el) el.classList.add(st.valido ? 'bb-preview-ok' : 'bb-preview-bad');
+      if (el) {
+        el.classList.add(st.valido ? 'bb-preview-ok' : 'bb-preview-bad');
+        if (st.valido) _bbAplicarCor(el, st.peca.cor - 1);   // a sombra já mostra a cor da peça
+      }
     });
+    // Linhas/colunas que FECHAM se soltar aqui acendem (igual ao Block Blast).
+    if (st.valido) {
+      var sim = _bbGrid.slice(), r, c, k, cheia;
+      st.peca.cel.forEach(function (o) { sim[(anchorRow + o[0]) * _BB_TAM + anchorCol + o[1]] = st.peca.cor; });
+      for (r = 0; r < _BB_TAM; r++) {
+        for (cheia = true, c = 0; c < _BB_TAM; c++) if (!sim[r * _BB_TAM + c]) { cheia = false; break; }
+        if (cheia) for (k = 0; k < _BB_TAM; k++) _bbCelEls[r * _BB_TAM + k].classList.add('bb-preview-linha');
+      }
+      for (c = 0; c < _BB_TAM; c++) {
+        for (cheia = true, r = 0; r < _BB_TAM; r++) if (!sim[r * _BB_TAM + c]) { cheia = false; break; }
+        if (cheia) for (k = 0; k < _BB_TAM; k++) _bbCelEls[k * _BB_TAM + c].classList.add('bb-preview-linha');
+      }
+    }
   }
   function _bbLimparPreview() {
     if (!_bbCelEls) return;
-    for (var i = 0; i < _bbCelEls.length; i++) _bbCelEls[i].classList.remove('bb-preview-ok', 'bb-preview-bad');
+    for (var i = 0; i < _bbCelEls.length; i++) {
+      var el = _bbCelEls[i];
+      if (el.classList.contains('bb-preview-ok') && !_bbGrid[i]) { el.style.background = ''; el.style.backgroundImage = ''; }
+      el.classList.remove('bb-preview-ok', 'bb-preview-bad', 'bb-preview-linha');
+    }
   }
 
   function _bbFinalizarArraste() {
@@ -517,6 +571,7 @@
     _bbTray[slotIdx] = null;
     _bbPontosFase += peca.cel.length;
 
+    var antesLimpar = _bbGrid.slice();   // cores das linhas que vão sumir (pro efeito)
     var limpeza = _bbLimparLinhasCompletas();
     var qtdLimpas = limpeza.qtd;
     var s = _som();
@@ -528,14 +583,19 @@
       _bbBurstLimpeza(limpeza.linhas, limpeza.colunas);
     } else if (s) { s.acerto(); }
 
+    var novas = false;
     if (_bbTray.every(function (p) { return !p; })) {
       _bbRodadasFase++;
       _bbTray = [_bbNovaPeca(), _bbNovaPeca(), _bbNovaPeca()];
+      novas = true;
     }
 
     _bbRenderGrid();
-    _bbRenderTray();
+    _bbRenderTray(novas);
     _bbAtualizarHud();
+    _bbEstalo(peca, anchorRow, anchorCol, limpeza);
+    if (qtdLimpas > 0) _bbEfeitoLimpeza(limpeza, antesLimpar, qtdLimpas * qtdLimpas * 10);
+    _bbReagir(qtdLimpas);
 
     if (_bbObjetivoAtingido()) { _bbFimFase(true); return; }
     if (_bbSemEspaco()) { _bbFimFase(false); }
@@ -547,6 +607,21 @@
     var pontosEl = document.getElementById('bb-pontos'); if (pontosEl) pontosEl.textContent = _bbPontosFase;
     var objEl = document.getElementById('bb-objetivo-texto'); if (objEl) objEl.textContent = _bbObjetivoTexto();
     var progEl = document.getElementById('bb-objetivo-progresso'); if (progEl) progEl.textContent = _bbObjetivoProgresso();
+    var barra = document.getElementById('bb-barra-fill');
+    if (barra) barra.style.width = (_bbObjetivoFracao() * 100).toFixed(1) + '%';
+    if (objEl && _bbObjetivo) objEl.textContent = _bbObjetivoCurto();
+  }
+  function _bbObjetivoFracao() {
+    if (!_bbObjetivo || !_bbObjetivo.meta) return 0;
+    var v = _bbObjetivo.tipo === 'pontos' ? _bbPontosFase : (_bbObjetivo.tipo === 'linhas' ? _bbLinhasFase : _bbRodadasFase);
+    return Math.max(0, Math.min(1, v / _bbObjetivo.meta));
+  }
+  // Versão curta pro placar (o rótulo "Objetivo" já está em cima).
+  function _bbObjetivoCurto() {
+    var m = _bbObjetivo.meta;
+    if (_bbObjetivo.tipo === 'pontos') return m + ' pontos';
+    if (_bbObjetivo.tipo === 'linhas') return 'Limpe ' + m + (m === 1 ? ' linha' : ' linhas');
+    return 'Sobreviva ' + m + (m === 1 ? ' rodada' : ' rodadas');
   }
 
   function _bbMostrarOverlay(nome) {
@@ -561,8 +636,10 @@
 
   // ── Início / fim de fase ────────────────────────────────────
   function _bbIniciarFase(fase) {
+    _bbGeracao++;
     _bbFaseAtual = Math.max(1, fase);
     var cfg = _bbConfigFase(_bbFaseAtual);
+    _bbAplicarTema(_bbFaseAtual);
     _bbObjetivo = { tipo: cfg.tipo, meta: cfg.meta };
     _bbPontosFase = 0; _bbLinhasFase = 0; _bbRodadasFase = 0;
     _bbRng = _bbMulberry32(1000 + _bbFaseAtual * 97);
@@ -583,8 +660,15 @@
 
     _bbRodando = true;
     _bbRenderGrid();
-    _bbRenderTray();
+    _bbRenderTray(true);
     _bbAtualizarHud();
+    var grid = document.getElementById('bb-grid');
+    if (grid) {
+      grid.classList.remove('bb-vitoria', 'bb-derrota', 'bb-entra');
+      if (!_bbMovReduzido()) { void grid.offsetWidth; grid.classList.add('bb-entra'); }
+    }
+    var fx = document.getElementById('bb-fx'); if (fx) fx.innerHTML = '';
+    _bbMascote('ola', _bbObjetivoTexto() + '!', 3200);
   }
 
   function _bbFimFase(venceu) {
@@ -603,17 +687,33 @@
     var tit = document.getElementById('bb-fim-titulo');
     var msg = document.getElementById('bb-fim-msg');
     var btn = document.getElementById('bb-fim-btn');
-    if (owl) { owl.src = venceu ? '/webp/owl-celebrate-pro.webp' : '/webp/owl-angry.webp'; owl.style.display = ''; }
+    if (owl) { owl.src = venceu ? '/webp/owl-trophy.webp' : '/webp/owl-sad.webp'; owl.style.display = ''; }
     if (tit) tit.textContent = venceu ? ('Fase ' + _bbFaseAtual + ' concluída! 🎉') : 'Não coube mais!';
     if (msg) {
       msg.textContent = venceu
-        ? ('Você fez ' + _bbPontosFase + ' pontos nesta fase. Bora pra próxima?')
-        : ('Você chegou até a fase ' + _bbFaseAtual + ' com ' + _bbPontosFase + ' pontos nesta tentativa. Tenta de novo!');
+        ? 'Mandou bem! Bora pra próxima?'
+        : ('Faltou pouco: ' + _bbObjetivoProgresso() + ' do objetivo. Tenta de novo!');
     }
+    var stats = document.getElementById('bb-fim-stats');
+    if (stats) {
+      stats.innerHTML = '<span class="bb-chip"><b>' + _bbPontosFase + '</b> pontos</span>' +
+        '<span class="bb-chip"><b>' + _bbLinhasFase + '</b> ' + (_bbLinhasFase === 1 ? 'linha limpa' : 'linhas limpas') + '</span>';
+    }
+    var fimEl = document.getElementById('bb-fim');
+    if (fimEl) fimEl.classList.toggle('bb-fim-venceu', !!venceu);
     if (btn) btn.textContent = venceu ? 'Próxima fase' : 'Tentar de novo';
     var recEl = document.getElementById('bb-recorde'); if (recEl) recEl.textContent = recorde;
 
-    _bbMostrarOverlay('fim');
+    // A grade comemora (ou apaga) e a tela de fim entra logo depois.
+    var grid = document.getElementById('bb-grid');
+    if (grid && !_bbMovReduzido()) { grid.classList.remove('bb-entra'); void grid.offsetWidth; grid.classList.add(venceu ? 'bb-vitoria' : 'bb-derrota'); }
+    _bbMascote(venceu ? 'festa' : 'triste', venceu ? 'Fase concluída!' : 'Não coube mais!');
+    var gerFim = _bbGeracao;
+    setTimeout(function () {
+      if (gerFim !== _bbGeracao || _bbRodando) return;
+      _bbMostrarOverlay('fim');
+      if (window.AngatubaGames) window.AngatubaGames.rankFimDeJogo('blocos', 'bb-rank-slot', recorde);
+    }, venceu ? 1200 : 900);
 
     var segundos = Math.max(0, Math.round((Date.now() - _bbInicioFaseMs) / 1000));
 
@@ -636,8 +736,6 @@
         if (moedasGanhas > 0) { moedasEl.textContent = '+' + moedasGanhas + ' 🪙'; moedasEl.style.display = ''; }
         else moedasEl.style.display = 'none';
       }
-
-      window.AngatubaGames.rankFimDeJogo('blocos', 'bb-rank-slot', recorde);
     }
   }
 
@@ -658,6 +756,146 @@
     _bbIniciarFase(_bbFaseAtual);
   }
 
+  // ── Visual v3: helpers ───────────────────────────────────────
+  function _bbMontarVisual() {
+    var card = document.getElementById('bb-card'), arena = document.getElementById('bb-arena'), grid = document.getElementById('bb-grid');
+    if (!card || !arena || card._bbVisual) return;
+    card._bbVisual = true;
+    function novo(tag, cls, id) { var e = document.createElement(tag); if (cls) e.className = cls; if (id) e.id = id; return e; }
+    // Telas de início/fim cobrem o card inteiro (HUD incluso).
+    ['bb-inicio', 'bb-fim'].forEach(function (id) { var ov = document.getElementById(id); if (ov) card.appendChild(ov); });
+    var prog = document.getElementById('bb-objetivo-progresso');
+    if (prog && prog.parentNode) {
+      var barra = novo('div', 'bb-barra'); barra.appendChild(novo('i', '', 'bb-barra-fill'));
+      prog.parentNode.insertBefore(barra, prog);
+    }
+    var decos = novo('div', 'bb-decos'); decos.setAttribute('aria-hidden', 'true');
+    for (var i = 0; i < 7; i++) {
+      var d = novo('i');
+      d.style.backgroundImage = 'url(' + _BB_TEX_CLASSICAS[i % _BB_TEX_CLASSICAS.length] + ')';
+      decos.appendChild(d);
+    }
+    arena.insertBefore(decos, arena.firstChild);
+    var masc = novo('div', 'bb-mascote', 'bb-mascote'), img = novo('img', '', 'bb-mascote-img'), bal = novo('div', 'bb-balao', 'bb-balao');
+    img.alt = ''; img.src = _BB_OWL.normal; bal.setAttribute('aria-live', 'polite');
+    masc.appendChild(img); masc.appendChild(bal);
+    arena.insertBefore(masc, grid || null);
+    for (var k in _BB_OWL) { var pre = new Image(); pre.src = _BB_OWL[k]; }
+    // Camada dos efeitos (feixes, blocos voando, "+pontos"), por cima de tudo na arena.
+    var fx = novo('div', 'bb-fx', 'bb-fx'); fx.setAttribute('aria-hidden', 'true');
+    arena.appendChild(fx);
+    var faseIni = document.querySelector('#bb-inicio .bb-overlay-fase');
+    if (faseIni && faseIni.parentNode) faseIni.parentNode.insertBefore(novo('div', 'bb-overlay-obj', 'bb-inicio-obj'), faseIni.nextSibling);
+    var moedas = document.getElementById('bb-fim-moedas');
+    if (moedas && moedas.parentNode) moedas.parentNode.insertBefore(novo('div', 'bb-fim-stats', 'bb-fim-stats'), moedas);
+    var owlIni = document.querySelector('#bb-inicio .bb-overlay-owl');
+    if (owlIni) { owlIni.removeAttribute('loading'); owlIni.src = _BB_OWL.ola; }
+  }
+  function _bbResumoFase(fase) {
+    var cfg = _bbConfigFase(fase), m = cfg.meta, alvo;
+    if (cfg.tipo === 'pontos') alvo = m + ' pontos';
+    else if (cfg.tipo === 'linhas') alvo = 'limpar ' + m + (m === 1 ? ' linha' : ' linhas');
+    else alvo = 'sobreviver ' + m + (m === 1 ? ' rodada' : ' rodadas');
+    return '🎯 ' + alvo + (cfg.prefill ? ' · grade com ' + cfg.prefill + ' blocos' : '');
+  }
+  function _bbAplicarTema(fase) {
+    var t = _BB_TEMAS[(fase - 1) % _BB_TEMAS.length], card = document.getElementById('bb-card');
+    if (!card) return;
+    card.style.setProperty('--bb-a', t.a);
+    card.style.setProperty('--bb-b', t.b);
+    card.style.setProperty('--bb-luz', t.luz);
+  }
+  function _bbMascote(estado, fala, ms) {
+    var img = document.getElementById('bb-mascote-img'), bal = document.getElementById('bb-balao');
+    if (!img) return;
+    clearTimeout(_bbMascoteT);
+    _bbMascoteEstado = estado;
+    var src = _BB_OWL[estado] || _BB_OWL.normal;
+    if (img.getAttribute('src') !== src) img.setAttribute('src', src);
+    img.classList.remove('bb-mascote-pulo');
+    if (estado !== 'normal') { void img.offsetWidth; img.classList.add('bb-mascote-pulo'); }
+    if (bal) { if (fala) bal.textContent = fala; bal.classList.toggle('on', !!fala); }
+    if (ms) _bbMascoteT = setTimeout(function () { _bbMascote(_bbApertado() ? 'aperto' : 'normal', _bbApertado() ? 'Tá apertado aqui!' : ''); }, ms);
+  }
+  // Grade quase cheia (ou só uma peça cabendo): a coruja fica aflita.
+  function _bbApertado() {
+    if (!_bbRodando) return false;
+    var cheias = 0, cabem = 0;
+    for (var i = 0; i < _bbGrid.length; i++) if (_bbGrid[i]) cheias++;
+    _bbTray.forEach(function (p) { if (p && _bbPecaCabeEmAlgumLugar(p)) cabem++; });
+    var pend = _bbTray.filter(function (p) { return p; }).length;
+    return cheias >= 40 || (pend >= 2 && cabem <= 1);
+  }
+  function _bbReagir(qtd) {
+    if (!_bbRodando) return;
+    if (qtd >= 3) _bbMascote('uau', 'Incrível! ' + qtd + ' de uma vez!', 1800);
+    else if (qtd === 2) _bbMascote('festa', 'Linha dupla!', 1600);
+    else if (qtd === 1) _bbMascote('feliz', ['Boa!', 'Isso!', 'Limpou!'][(Math.random() * 3) | 0], 1300);
+    else if (_bbApertado()) _bbMascote('aperto', 'Tá apertado aqui!');
+    else if (_bbMascoteEstado === 'aperto') _bbMascote('normal', '');   // abriu espaço de novo
+  }
+  // Retângulo de uma célula relativo à arena (pros efeitos da camada .bb-fx).
+  function _bbCelRect(idx, base) {
+    var el = _bbCelEls && _bbCelEls[idx];
+    if (!el) return null;
+    var r = el.getBoundingClientRect();
+    return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
+  }
+  // Peça encaixada: as células estalam (crescem e assentam).
+  function _bbEstalo(peca, ar, ac, limpeza) {
+    if (_bbMovReduzido() || !_bbCelEls) return;
+    peca.cel.forEach(function (o) {
+      var rr = ar + o[0], cc = ac + o[1];
+      if (limpeza.linhas.indexOf(rr) !== -1 || limpeza.colunas.indexOf(cc) !== -1) return;
+      var el = _bbCelEls[rr * _BB_TAM + cc];
+      if (!el) return;
+      el.classList.remove('bb-estalo'); void el.offsetWidth; el.classList.add('bb-estalo');
+      setTimeout(function () { el.classList.remove('bb-estalo'); }, 320);
+    });
+  }
+  // Linhas limpas: feixe de luz na linha/coluna, cada bloco salta e cai
+  // girando, "+pontos" sobe do meio e, em limpeza múltipla, a grade treme
+  // e aparece um aviso grande.
+  function _bbEfeitoLimpeza(limpeza, cores, pontos) {
+    var fx = document.getElementById('bb-fx'), arena = document.getElementById('bb-arena'), grid = document.getElementById('bb-grid');
+    if (!fx || !arena || !grid) return;
+    var base = arena.getBoundingClientRect(), g = grid.getBoundingClientRect();
+    var reduzido = _bbMovReduzido(), feitos = {}, html = '', meio = Math.floor(_BB_TAM / 2);
+    var gx = g.left - base.left, gy = g.top - base.top;
+    function bloco(idx, atraso) {
+      if (feitos[idx] || !cores[idx]) return;
+      feitos[idx] = true;
+      var r = _bbCelRect(idx, base); if (!r) return;
+      var cor = _bbCores[cores[idx] - 1] || '#fff', tex = _bbTemaPaleta ? '' : _bbTexturas[cores[idx] - 1];
+      var dx = (Math.random() * 2 - 1) * r.w * 1.6, rot = (Math.random() * 2 - 1) * 200;
+      html += '<i class="bb-fx-bloco" style="left:' + r.x + 'px;top:' + r.y + 'px;width:' + r.w + 'px;height:' + r.h + 'px;' +
+        'background-color:' + cor + ';' + (tex ? 'background-image:url(' + tex + ');' : '') +
+        '--dx:' + dx.toFixed(0) + 'px;--rot:' + rot.toFixed(0) + 'deg;animation-delay:' + atraso + 'ms"></i>';
+    }
+    limpeza.linhas.forEach(function (r) {
+      var c0 = _bbCelRect(r * _BB_TAM, base);
+      if (c0) html += '<i class="bb-fx-feixe bb-fx-h" style="left:' + gx + 'px;top:' + c0.y + 'px;width:' + g.width + 'px;height:' + c0.h + 'px"></i>';
+      if (!reduzido) for (var c = 0; c < _BB_TAM; c++) bloco(r * _BB_TAM + c, Math.abs(c - 3.5) * 22);
+    });
+    limpeza.colunas.forEach(function (c) {
+      var c0 = _bbCelRect(c, base);
+      if (c0) html += '<i class="bb-fx-feixe bb-fx-v" style="left:' + c0.x + 'px;top:' + gy + 'px;width:' + c0.w + 'px;height:' + g.height + 'px"></i>';
+      if (!reduzido) for (var r = 0; r < _BB_TAM; r++) bloco(r * _BB_TAM + c, Math.abs(r - 3.5) * 22);
+    });
+    // "+pontos" no meio da primeira linha/coluna limpa
+    var ref = limpeza.linhas.length ? _bbCelRect(limpeza.linhas[0] * _BB_TAM + meio, base) : _bbCelRect(meio * _BB_TAM + limpeza.colunas[0], base);
+    if (ref) html += '<b class="bb-fx-pontos" style="left:' + ref.x + 'px;top:' + ref.y + 'px">+' + pontos + '</b>';
+    var qtd = limpeza.qtd;
+    if (qtd >= 2) html += '<b class="bb-fx-aviso" style="top:' + (gy + g.height * 0.38) + 'px">' + (qtd >= 3 ? 'INCRÍVEL!' : 'LINHA DUPLA!') + '</b>';
+    var wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    var criados = Array.prototype.slice.call(wrap.children);
+    criados.forEach(function (el) { fx.appendChild(el); });
+    // cada estouro tira só os próprios elementos (outro pode já ter começado)
+    setTimeout(function () { criados.forEach(function (el) { if (el.parentNode) el.parentNode.removeChild(el); }); }, 1300);
+    if (qtd >= 2 && !reduzido) { grid.classList.remove('bb-treme'); void grid.offsetWidth; grid.classList.add('bb-treme'); }
+  }
+
   // ── Menu unificado (hub.js → AngatubaGames.menu) ────────────
   // Jogo por turnos, sem relógio: "pausar" só solta a peça que estiver
   // sendo arrastada — o overlay do menu cobre o tabuleiro e a bandeja.
@@ -673,6 +911,7 @@
   // ── Preparação da tela (chamada pelo _jogoLoader ao abrir) ──
   function _bbPrepararTela() {
     _bbCriarGridDOM();
+    _bbMontarVisual();
     _bbRegistrarMenu();
     _bbCriarTrayDOM();
     _bbAplicarSkin();
@@ -682,11 +921,16 @@
     var recorde = _bbRecordeGet();
     var faseIni = document.getElementById('bb-fase-inicio'); if (faseIni) faseIni.textContent = (recorde + 1);
     var recIni = document.getElementById('bb-recorde-inicio'); if (recIni) recIni.textContent = recorde;
+    var objIni = document.getElementById('bb-inicio-obj'); if (objIni) objIni.textContent = _bbResumoFase(recorde + 1);
+    _bbAplicarTema(recorde + 1);
+    _bbMascote('normal', '');
     _bbAtualizarHud();
     _bbMostrarOverlay('inicio');
   }
   function _bbParar() {
     _bbRodando = false;
+    _bbGeracao++;
+    clearTimeout(_bbMascoteT);
     _bbCancelarArraste();
   }
 

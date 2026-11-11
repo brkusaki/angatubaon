@@ -57,7 +57,9 @@
 }
 .cjx-ico:active { transform: scale(.92); }
 .cjx-logo {
-  font-family: var(--font-h, system-ui); font-weight: 900; font-size: 24px; letter-spacing: .06em;
+  /* A Syne é bem larga (≈ 10,9× o tamanho da fonte pra "CORUJINHA"): o
+     tamanho acompanha a largura da tela pra não bater nos botões do topo. */
+  font-family: var(--font-h, system-ui); font-weight: 900; font-size: clamp(16px, 5.5vw, 24px); letter-spacing: .06em; white-space: nowrap;
   background: linear-gradient(180deg, #fffbe0 0%, #ffd23f 45%, #f08c00 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 2px 0 #5a189a) drop-shadow(0 3px 0 #2a0f57) drop-shadow(0 0 10px rgba(255,210,63,.35));
@@ -227,7 +229,7 @@
 .cjx-autopop {
   position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); z-index: 5;
   display: none; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 8px 10px 10px; border-radius: 14px;
-  width: max-content; max-width: 94vw;
+  width: min(290px, 94vw);
   background: #1a0b33; border: 2px solid rgba(255,210,63,.45); box-shadow: 0 8px 24px rgba(0,0,0,.5);
 }
 .cjx-autopop.on { display: flex; }
@@ -262,7 +264,7 @@
 }
 .cjx-big-coruja { width: clamp(90px, 17vh, 140px); height: clamp(90px, 17vh, 140px); background-position: 0 100%; animation: cjxBob 1.2s ease-in-out infinite; }
 @keyframes cjxAsas { 0% { background-position: 100% 0; } 50% { background-position: 0 50%; } }
-.cjx-logo-grande { position: relative; font-size: clamp(34px, 11vw, 52px); margin-top: -6px; }
+.cjx-logo-grande { position: relative; font-size: clamp(22px, 8vw, 52px); margin-top: -6px; }
 .cjx-splash-sub { position: relative; font-weight: 800; font-size: 15px; color: #fff6c4; }
 .cjx-splash-lista {
   position: relative; list-style: none; margin: 6px 0 4px; padding: 10px 14px; border-radius: 14px;
@@ -292,7 +294,7 @@
 @keyframes cjxCai { to { transform: translateY(115vh) rotate(var(--g, 360deg)); } }
 .cjx-big-tit {
   position: relative; padding: 0 10px;
-  font-family: var(--font-h, system-ui); font-weight: 900; font-size: clamp(30px, 10vw, 50px); letter-spacing: .03em; line-height: 1.05;
+  font-family: var(--font-h, system-ui); font-weight: 900; font-size: clamp(26px, 8.6vw, 50px); letter-spacing: .03em; line-height: 1.05;
   background: linear-gradient(180deg, #fffbe0 0%, #ffd23f 45%, #f08c00 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 3px 0 #5a189a) drop-shadow(0 5px 0 #2a0f57) drop-shadow(0 0 18px rgba(255,210,63,.6));

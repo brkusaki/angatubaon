@@ -646,6 +646,7 @@
         _pnAtualizarHUD();
         return;
       }
+      _pnFlashErro = 2; _pnColErro = col;   // a coluna errada fica vermelha na tela de fim
       _pnGameOver('errou');
       return;
     }
@@ -699,8 +700,9 @@
     // conta como nota perdida e a música segue.
     while (_pnAzulejos.length && _pnAzulejos[0].y >= _PN_LINHAS_TELA) {
       if (!_pnAzulejos[0].tocada) {
-        if (_pnModo !== 'normal') { _pnGameOver('passou'); return; }
+        if (_pnModo !== 'normal') { _pnFlashErro = 2; _pnColErro = _pnAzulejos[0].col; _pnGameOver('passou'); return; }
         _pnPerdidas++;
+        _pnCombo = 0;   // nota perdida quebra o combo (antes só o toque errado quebrava)
       }
       _pnAzulejos.shift();
     }
@@ -879,6 +881,7 @@
   }
 
   /* ── Fim de jogo ──────────────────────────────────────────────── */
+  var _pnFimT = 0;   // atraso da tela de fim da Sobrevivência (ver _pnGameOver)
   function _pnGameOver(motivo) {
     if (_pnRAF) { cancelAnimationFrame(_pnRAF); _pnRAF = 0; }
     _pnEstado = 'fim';
@@ -958,10 +961,19 @@
     var comboTxt = _pnComboMax >= 10 ? ' Melhor combo: ' + _pnComboMax + '!' : '';
     if (msgEl) msgEl.textContent = recorde ? ('Você nunca tocou tão longe! 🦉' + comboTxt)
       : (rec > 0 ? 'Seu recorde: ' + rec + '.' + comboTxt + ' Bora de novo?' : 'Toque sempre no azulejo mais baixo!' + comboTxt);
-    _pnMostrarOverlay('fim');
     _pnAtualizarHUD(true);
-    if (recorde && window.AngatubaGames && window.AngatubaGames.efeitos) window.AngatubaGames.efeitos.confete('pn-fim', 90);
-    if (window.AngatubaGames) window.AngatubaGames.rankFimDeJogo('piano', 'pn-rank-slot', score);
+    // A tela de fim entra meio segundo depois: dá pra ver a coluna do erro
+    // (vermelha) e o toque seguinte de quem vinha tocando rápido não cai
+    // sem querer em "Tocar de novo" / "Skins", que ficam bem onde estavam
+    // os polegares.
+    clearTimeout(_pnFimT);
+    _pnFimT = setTimeout(function () {
+      _pnFimT = 0;
+      if (_pnEstado !== 'fim') return;   // saiu ou recomeçou nesse meio-tempo
+      _pnMostrarOverlay('fim');
+      if (recorde && window.AngatubaGames && window.AngatubaGames.efeitos) window.AngatubaGames.efeitos.confete('pn-fim', 90);
+      if (window.AngatubaGames) window.AngatubaGames.rankFimDeJogo('piano', 'pn-rank-slot', score);
+    }, 550);
   }
 
   /* ── Controles ────────────────────────────────────────────────
@@ -987,6 +999,9 @@
   }
   function _pnKey(e) {
     if (_pnEstado !== 'jogando' || _pnPausado || !_pnCanvas) return;
+    // Tecla segurada repete o keydown: virava toque atrás de toque na mesma
+    // coluna (fim de jogo na Sobrevivência). Atalhos (Ctrl+S…) não são do jogo.
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     var mapa = { '1': 0, '2': 1, '3': 2, '4': 3,
                  'a': 0, 's': 1, 'd': 2, 'f': 3,
                  'ArrowLeft': 0, 'ArrowDown': 1, 'ArrowUp': 2, 'ArrowRight': 3 };
@@ -1493,6 +1508,7 @@
     _pnCanvas = document.getElementById('pn-canvas');
     if (!_pnCanvas) return;
     if (!_pnCtx) _pnCtx = _pnCanvas.getContext('2d');
+    clearTimeout(_pnFimT); _pnFimT = 0;
     _pnAudioDestravar();            // veio de um clique: acorda o áudio
     _pnAplicarSkin();
     _pnLigarControles();
@@ -1520,6 +1536,7 @@
   }
 
   function _pnParar() {
+    clearTimeout(_pnFimT); _pnFimT = 0;
     if (_pnRAF) { cancelAnimationFrame(_pnRAF); _pnRAF = 0; }
     if (_pnEstado === 'jogando') _pnEstado = 'inicio';
     _pnMovendo = false;

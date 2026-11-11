@@ -18,10 +18,19 @@
 .pn-batida-btn:active{background:rgba(255,255,255,.14);}
 .pn-arena{position:relative;width:100%;aspect-ratio:9/16;max-height:72vh;margin:0 auto;border-radius:14px;overflow:hidden;background:#0d1420;touch-action:none;}
 .pn-arena #pn-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
-.pn-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;background:rgba(9,14,22,.82);backdrop-filter:blur(3px);z-index:2;}
+/* Telas de início e fim. O conteúdo fica centralizado pelos dois
+   espaçadores (::before/::after) e NÃO encolhe: quando não cabe (celular
+   baixo ou deitado, fim com ranking) a tela rola em vez de cortar a coruja
+   em cima e os botões embaixo. touch-action: pan-y porque a arena é
+   touch-action: none (senão o dedo não rolaria aqui dentro). */
+.pn-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;text-align:center;padding:24px;background:rgba(9,14,22,.82);backdrop-filter:blur(3px);z-index:2;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;}
+.pn-overlay::before,.pn-overlay::after{content:'';flex:1 1 0;min-height:0;}
+.pn-overlay > *{flex-shrink:0;}
+.pn-overlay .rank-slot{max-width:340px;}
 .pn-overlay-owl{width:96px;height:96px;object-fit:contain;margin-bottom:12px;filter:drop-shadow(0 6px 18px rgba(0,0,0,.5));}
-.pn-overlay-titulo{font-size:22px;font-weight:800;color:#fff;font-family:'Syne',sans-serif;margin-bottom:8px;}
-.pn-overlay-pontos{font-size:30px;font-weight:900;color:var(--red,#ff3355);font-family:'Syne',sans-serif;margin-bottom:6px;}
+/* A Syne é larga: o tamanho acompanha a tela pra o título ficar numa linha. */
+.pn-overlay-titulo{font-size:clamp(16px,5.2vw,22px);font-weight:800;color:#fff;font-family:'Syne',sans-serif;margin-bottom:8px;}
+.pn-overlay-pontos{font-size:clamp(22px,7vw,30px);font-weight:900;color:var(--red,#ff3355);font-family:'Syne',sans-serif;margin-bottom:6px;}
 .pn-overlay-desc{font-size:14px;line-height:1.5;color:#c7d1e0;max-width:300px;margin-bottom:14px;}
 .pn-overlay-desc b{color:#fff;}
 /* Créditos das melodias: some pequeno no rodapé da tela inicial.
@@ -48,6 +57,26 @@
 .pn-btn-modo-surv{border-color:rgba(255,77,99,.40);background:rgba(255,77,99,.12);}
 .pn-btn-modo-tit{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;}
 .pn-btn-modo-sub{font-size:11.5px;color:rgba(199,209,224,.75);font-weight:500;}
+
+/* Tela cheia em pé: o conteúdo começa abaixo do "Voltar", do placar e da
+   faixa da música, que flutuam no topo (antes a coruja ficava por baixo). */
+@media (orientation: portrait) {
+  body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-overlay { padding-top: calc(env(safe-area-inset-top, 0px) + 84px); }
+}
+/* Pouca altura: enxuga a abertura. */
+@media (max-height: 620px) {
+  .pn-overlay-owl { width: 64px; height: 64px; margin-bottom: 6px; }
+  .pn-creditos { display: none; }
+}
+/* Celular deitado: sem coruja e com os dois modos lado a lado. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .pn-overlay { padding: 12px 24px; }
+  .pn-overlay-owl { display: none; }
+  .pn-overlay-desc { max-width: 420px; margin-bottom: 10px; }
+  .pn-sel-wrap { margin-bottom: 10px; }
+  .pn-modos { flex-direction: row; max-width: 520px; margin-bottom: 10px; }
+  .pn-btn-modo { flex: 1 1 0; }
+}
 
 /* ── Foco do controle nos menus (início, fim, pausa) — mesmo visual do .rt-foco do Ritmo ── */
 #jogo-piano .pn-foco {

@@ -1,5 +1,5 @@
 {
- "versaoSW": 516,
+ "versaoSW": 517,
  "hashes": {
   "Aprender/conteudo.js": "c2776ebcaf3844f9",
   "Aprender/hub.js": "0025f4b073788e9b",
@@ -18,7 +18,7 @@
   "Jogos/blocos.js": "7401bf4a7e46f0aa",
   "Jogos/corrida.css": "2ca54eacf6e853e7",
   "Jogos/corrida.js": "144471077b6da745",
-  "Jogos/corujinha.css": "cf17215d064d9b1b",
+  "Jogos/corujinha.css": "910a442c95e78e6a",
   "Jogos/corujinha.js": "07500b1fc3c39728",
   "Jogos/doces.css": "8152679edfedf21d",
   "Jogos/doces.js": "eb9cd3755f03fdf4",
@@ -36,8 +36,8 @@
   "Jogos/negocios.js": "288e33c3a4e80de6",
   "Jogos/party.css": "e0a63480691e7c3f",
   "Jogos/party.js": "e0e1b366a33be295",
-  "Jogos/piano.css": "53935a8aadc2f829",
-  "Jogos/piano.js": "cb7e1baab536c0d2",
+  "Jogos/piano.css": "25690c3cea8e0fa7",
+  "Jogos/piano.js": "3d7b6fe5b18a3c84",
   "Jogos/pingpong.css": "89e286fd8ed01d57",
   "Jogos/pingpong.js": "2fa0aced200fd630",
   "Jogos/puff.css": "6f9b1a780d8f1eb3",

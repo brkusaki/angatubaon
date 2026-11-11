@@ -122,3 +122,96 @@
 .jpad-link { background: none; border: none; color: rgba(199,209,224,.75); font-size: 13px; font-weight: 600; text-decoration: underline; cursor: pointer; }
 @keyframes jpadPisca { from { box-shadow: 0 0 0 rgba(167,139,250,0); } to { box-shadow: 0 0 10px rgba(167,139,250,.8); } }
 @media (prefers-reduced-motion: reduce) { .jpad-slot-agora { animation: none; } }
+
+/* ═══ Visual v3 (nov/2026) — telas de início/fim e placar ══════════
+   O tabuleiro (azulejos com relevo, holofotes, placar grande, efeitos)
+   é desenhado no canvas — ver piano.js. Aqui ficam as telas por cima. */
+
+/* Em tela cheia o número grande de notas está no canvas; o quadrinho
+   "Notas" do HUD sai (o de Recorde/Erros fica). */
+body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-hud > .pn-hud-item:first-child { display: none; }
+
+.pn-overlay {
+  /* teclas de piano no rodapé (2 camadas: pretas por cima das brancas) + palco */
+  background:
+    linear-gradient(90deg, transparent 0 5%, #0d0f16 5% 9.3%, transparent 9.3% 19.3%, #0d0f16 19.3% 23.6%, transparent 23.6% 40.4%, #0d0f16 40.4% 44.7%, transparent 44.7% 54.7%, #0d0f16 54.7% 59%, transparent 59% 69%, #0d0f16 69% 73.3%, transparent 73.3% 90%, #0d0f16 90% 94.3%, transparent 94.3%) 0 calc(100% - 16px) / 100% 22px no-repeat,
+    repeating-linear-gradient(90deg, #f4f1ea 0 calc(100% / 14 - 2px), #a8a196 calc(100% / 14 - 2px) calc(100% / 14)) 0 100% / 100% 38px no-repeat,
+    radial-gradient(120% 60% at 50% -10%, rgba(255,77,99,.32), transparent 60%),
+    radial-gradient(90% 45% at 50% 110%, rgba(167,139,250,.28), transparent 65%),
+    linear-gradient(180deg, rgba(14,8,26,.86), rgba(6,9,18,.92));
+  /* as teclas acompanham a rolagem (ficam no fim do conteúdo, nunca por cima) */
+  background-attachment: local, local, scroll, scroll, scroll;
+  padding-bottom: 60px;
+  backdrop-filter: blur(4px);
+  animation: pnSurge .3s ease-out;
+}
+@keyframes pnSurge { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }
+.pn-overlay-owl { width: 108px; height: 108px; animation: pnBob 2.4s ease-in-out infinite; }
+@keyframes pnBob { 50% { transform: translateY(-5px); } }
+.pn-overlay-titulo {
+  font-size: clamp(19px, 6vw, 27px);
+  text-shadow: 0 2px 0 #9f1239, 0 0 18px rgba(255,77,99,.7);
+}
+.pn-overlay-pontos {
+  font-size: clamp(30px, 10vw, 46px); color: #fff;
+  text-shadow: 0 3px 0 #9f1239, 0 0 24px rgba(255,77,99,.8);
+  animation: pnPula .55s cubic-bezier(.3,1.6,.5,1);
+}
+@keyframes pnPula { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.pn-fim-recorde .pn-overlay-titulo { text-shadow: 0 2px 0 #b45309, 0 0 20px rgba(251,191,36,.9); }
+.pn-fim-recorde .pn-overlay-pontos { text-shadow: 0 3px 0 #b45309, 0 0 26px rgba(251,191,36,.9); }
+.pn-fim-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: -4px 0 12px; }
+.pn-fim-stats:empty { display: none; }
+.pn-chip {
+  padding: 6px 12px; border-radius: 999px; font-size: 12.5px; color: rgba(255,255,255,.86);
+  background: rgba(0,0,0,.36); border: 1px solid rgba(255,255,255,.16);
+}
+.pn-chip b { font-family: 'Syne', sans-serif; font-size: 14px; color: #fff; }
+.pn-overlay-moedas {
+  padding: 5px 16px; border-radius: 999px;
+  background: rgba(255,215,64,.15); border: 1px solid rgba(255,215,64,.5);
+  box-shadow: 0 0 14px rgba(255,215,64,.25);
+}
+/* Modos: cartões com relevo */
+.pn-btn-modo {
+  position: relative; padding: 13px 16px 13px 16px; border-radius: 16px;
+  border: 2px solid rgba(45,212,150,.55);
+  background: linear-gradient(180deg, rgba(45,212,150,.26), rgba(16,120,90,.22));
+  box-shadow: 0 5px 0 rgba(6,60,45,.9), 0 0 18px rgba(45,212,150,.2);
+  transition: transform .1s, box-shadow .1s;
+}
+.pn-btn-modo:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(6,60,45,.9); }
+.pn-btn-modo-surv {
+  border-color: rgba(255,77,99,.65);
+  background: linear-gradient(180deg, rgba(255,77,99,.32), rgba(160,20,50,.26));
+  box-shadow: 0 5px 0 rgba(90,8,28,.95), 0 0 20px rgba(255,77,99,.28);
+  animation: pnChama 1.6s ease-in-out infinite;
+}
+.pn-btn-modo-surv:active { box-shadow: 0 1px 0 rgba(90,8,28,.95); animation: none; }
+@keyframes pnChama { 50% { box-shadow: 0 5px 0 rgba(90,8,28,.95), 0 0 30px rgba(255,77,99,.55); } }
+.pn-btn-modo-tit { font-size: 16px; }
+.pn-sel { border-radius: 12px; padding: 8px 10px; background: rgba(0,0,0,.35); border-color: rgba(255,255,255,.2); }
+/* Botão principal do fim */
+.pn-play {
+  position: relative; overflow: hidden;
+  font-family: 'Syne', sans-serif; font-size: 18px; padding: 14px 44px;
+  border: 2px solid rgba(255,255,255,.78);
+  background: linear-gradient(180deg, #ff8fa0, #ff3355 45%, #c81e3c);
+  box-shadow: 0 6px 0 #7f1028, 0 0 26px rgba(255,51,85,.5);
+  animation: pnPulsa 1.5s ease-in-out infinite;
+}
+.pn-play::after {
+  content: ''; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+  animation: pnBrilho 2.6s ease-in-out infinite;
+}
+@keyframes pnPulsa { 50% { transform: scale(1.045); } }
+@keyframes pnBrilho { 0%, 55% { left: -60%; } 100% { left: 130%; } }
+.pn-play:active { transform: translateY(4px); box-shadow: 0 2px 0 #7f1028; animation: none; }
+/* Tela cheia deitado: o conteúdo começa abaixo do placar e da faixa da música. */
+@media (orientation: landscape) and (max-height: 520px) {
+  body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-overlay { padding-top: calc(env(safe-area-inset-top, 0px) + 60px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pn-overlay, .pn-overlay-owl, .pn-overlay-pontos, .pn-btn-modo-surv, .pn-play, .pn-play::after { animation: none !important; }
+}

@@ -482,6 +482,25 @@
   var _pnErros = 0, _pnPerdidas = 0;
   var _pnFlashErro = 0, _pnColErro = -1;   // brilho vermelho ao errar
 
+  /* ── Visual v3 (nov/2026) ─────────────────────────────────────
+     Azulejos com relevo (sprite pré-desenhado por tamanho/cor — por quadro
+     é só drawImage), placar grande no topo, luzes de palco que crescem com
+     o combo, coluna acesa + estouro + nota ♪ subindo no acerto, aviso
+     "Acelerou!", e o fim no estilo Piano Tiles: o azulejo errado (ou o que
+     passou, com a pista voltando um pouco) pisca em vermelho antes da tela. */
+  var _pnSpr = null;          // { k, tecla, alvo, tocada }  sprites dos azulejos
+  var _pnLuz = null;          // sprite do cone de luz
+  var _pnLane = null;         // sprite da coluna acesa (gradiente vertical)
+  var _pnParts = [];          // estilhaços { x, y, vx, vy, r, t0, dur }
+  var _pnNotas = [];          // ♪ subindo { x, y, t0, g }
+  var _pnLanes = [0, 0, 0, 0];// brilho de cada coluna (0..1)
+  var _pnPulso = 0;           // "pulo" do placar a cada acerto (0..1)
+  var _pnAviso = null;        // { txt, t0 } "Acelerou!"
+  var _pnErroVis = null;      // { col, y, t0, recuo } azulejo vermelho do fim
+  var _pnFimRAF = 0;
+  var _PN_GLIFOS = ['♪', '♫', '♩', '♬'];
+  function _pnMovReduzido() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+
   /* ── Persistência ─────────────────────────────────────────────
      Cacheado em memória: o HUD lia localStorage a cada frame nos
      jogos antigos e isso sozinho engasgava Android fraco. */
@@ -580,6 +599,7 @@
     _pnCriados = 0;
     _pnFlashErro = 0; _pnColErro = -1;
     _pnCombo = 0; _pnComboMax = 0; _pnComboFlash = 0;
+    _pnParts.length = 0; _pnNotas.length = 0; _pnLanes = [0, 0, 0, 0]; _pnPulso = 0; _pnAviso = null; _pnErroVis = null;
     _pnMovendo = false;
     _pnBatFase = 0; _pnBatStep = -1;   // próximo passo será o 0 (bumbo)
     _pnMelodia = _pnEscolherMelodia();
@@ -647,6 +667,8 @@
         return;
       }
       _pnFlashErro = 2; _pnColErro = col;   // a coluna errada fica vermelha na tela de fim
+      // azulejo ainda entrando pelo topo: a pista desce um pouco pra ele aparecer
+      _pnErroVis = { col: col, y: alvo.y, t0: performance.now(), recuo: Math.min(0, alvo.y - 0.06) };
       _pnGameOver('errou');
       return;
     }
@@ -674,7 +696,25 @@
       y: (alvo.y + 0.5) * lh,
       t: 0
     });
+    _pnEfeitoAcerto(alvo, cw, lh);
     _pnAtualizarHUD();
+  }
+  function _pnEfeitoAcerto(alvo, cw, lh) {
+    var agora = performance.now(), cx = _pnX0() + (alvo.col + 0.5) * cw, cy = (alvo.y + 0.5) * lh;
+    _pnLanes[alvo.col] = 1;
+    _pnPulso = 1;
+    if (_pnMovReduzido()) return;
+    _pnNotas.push({ x: cx + (Math.random() * 2 - 1) * cw * 0.15, y: cy, t0: agora, g: _PN_GLIFOS[_pnPontos % _PN_GLIFOS.length] });
+    if (_pnNotas.length > 12) _pnNotas.shift();
+    var n = _pnCombo >= 20 ? 10 : 6;
+    for (var k = 0; k < n && _pnParts.length < 120; k++) {
+      var ang = Math.random() * Math.PI * 2, vel = cw * (0.9 + Math.random() * 1.6);
+      _pnParts.push({ x: cx, y: cy, vx: Math.cos(ang) * vel, vy: Math.sin(ang) * vel - cw * 0.6, r: cw * (0.03 + Math.random() * 0.04), t0: agora, dur: 380 + Math.random() * 220 });
+    }
+    // marcos de velocidade (só Sobrevivência)
+    if (_pnModo !== 'normal' && (_pnPontos === 50 || _pnPontos === 100 || _pnPontos === 200 || _pnPontos === 350)) {
+      _pnAviso = { txt: _pnPontos >= 200 ? 'VELOCIDADE MÁXIMA!' : 'ACELEROU!', t0: agora };
+    }
   }
 
   /* ── Update ───────────────────────────────────────────────────── */
@@ -685,6 +725,8 @@
     }
     if (_pnFlashErro > 0) _pnFlashErro = Math.max(0, _pnFlashErro - dt * 3);
     if (_pnComboFlash > 0) _pnComboFlash = Math.max(0, _pnComboFlash - dt);
+    for (i = 0; i < 4; i++) if (_pnLanes[i] > 0) _pnLanes[i] = Math.max(0, _pnLanes[i] - dt * 3.2);
+    if (_pnPulso > 0) _pnPulso = Math.max(0, _pnPulso - dt * 5);
     for (i = _pnOndas.length - 1; i >= 0; i--) {
       _pnOndas[i].t += dt;
       if (_pnOndas[i].t > 0.4) _pnOndas.splice(i, 1);
@@ -700,7 +742,13 @@
     // conta como nota perdida e a música segue.
     while (_pnAzulejos.length && _pnAzulejos[0].y >= _PN_LINHAS_TELA) {
       if (!_pnAzulejos[0].tocada) {
-        if (_pnModo !== 'normal') { _pnFlashErro = 2; _pnColErro = _pnAzulejos[0].col; _pnGameOver('passou'); return; }
+        if (_pnModo !== 'normal') {
+          _pnFlashErro = 2; _pnColErro = _pnAzulejos[0].col;
+          // a pista volta um pouco, pra o azulejo que passou aparecer inteiro
+          _pnErroVis = { col: _pnAzulejos[0].col, y: _pnAzulejos[0].y, t0: performance.now(), recuo: _pnAzulejos[0].y - (_PN_LINHAS_TELA - 1) + 0.12 };
+          _pnGameOver('passou');
+          return;
+        }
         _pnPerdidas++;
         _pnCombo = 0;   // nota perdida quebra o combo (antes só o toque errado quebrava)
       }
@@ -736,10 +784,77 @@
     ctx.closePath();
   }
 
+  // ── Sprites (feitos 1x por tamanho/tema) ──────────────────────
+  function _pnHex(c) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(String(c).trim());
+    if (!m) return null;
+    var n = parseInt(m[1], 16);
+    return [n >> 16 & 255, n >> 8 & 255, n & 255];
+  }
+  function _pnMix(rgb, alvo, f) {
+    return 'rgb(' + Math.round(rgb[0] + (alvo - rgb[0]) * f) + ',' + Math.round(rgb[1] + (alvo - rgb[1]) * f) + ',' + Math.round(rgb[2] + (alvo - rgb[2]) * f) + ')';
+  }
+  // Azulejo com relevo: degradê vertical, faixa de verniz em cima, borda
+  // escura embaixo (espessura) e fio de luz na borda. 'alvo' ganha contorno.
+  function _pnSpriteTecla(bw, bh, raio, cor, alvo) {
+    var dpr = _pnDpr, cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(bw * dpr)); cv.height = Math.max(1, Math.round(bh * dpr));
+    var c = cv.getContext('2d'); c.scale(dpr, dpr);
+    var rgb = _pnHex(cor) || [227, 53, 79], esp = Math.max(3, bh * 0.07);
+    // espessura (lado de baixo)
+    c.fillStyle = _pnMix(rgb, 0, 0.55);
+    _pnRoundRect(c, 0, esp, bw, bh - esp, raio); c.fill();
+    // face
+    var g = c.createLinearGradient(0, 0, 0, bh - esp);
+    g.addColorStop(0, _pnMix(rgb, 255, 0.28)); g.addColorStop(0.5, cor); g.addColorStop(1, _pnMix(rgb, 0, 0.22));
+    c.fillStyle = g;
+    _pnRoundRect(c, 0, 0, bw, bh - esp, raio); c.fill();
+    // verniz
+    var gv = c.createLinearGradient(0, 0, 0, (bh - esp) * 0.45);
+    gv.addColorStop(0, 'rgba(255,255,255,0.42)'); gv.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = gv;
+    _pnRoundRect(c, bw * 0.06, bh * 0.04, bw * 0.88, (bh - esp) * 0.42, raio * 0.8); c.fill();
+    // fio de luz
+    c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = 1;
+    _pnRoundRect(c, 0.5, 0.5, bw - 1, bh - esp - 1, raio); c.stroke();
+    if (alvo) {
+      c.strokeStyle = '#fff'; c.lineWidth = Math.max(2.5, bw * 0.03);
+      _pnRoundRect(c, c.lineWidth / 2, c.lineWidth / 2, bw - c.lineWidth, bh - esp - c.lineWidth, raio); c.stroke();
+    }
+    return cv;
+  }
+  function _pnSprites(bw, bh, raio) {
+    var k = Math.round(bw) + 'x' + Math.round(bh) + '|' + _pnDpr + '|' + _pnSkin.tecla;
+    if (_pnSpr && _pnSpr.k === k) return _pnSpr;
+    try {
+      _pnSpr = { k: k, tecla: _pnSpriteTecla(bw, bh, raio, _pnSkin.tecla, false), alvo: _pnSpriteTecla(bw, bh, raio, _pnSkin.tecla, true) };
+    } catch (e) { _pnSpr = null; }
+    return _pnSpr;
+  }
+  // Cone de luz (holofote) e coluna acesa — gradientes desenhados 1x.
+  function _pnSpritesPalco() {
+    if (_pnLuz && _pnLane) return;
+    try {
+      var l = document.createElement('canvas'); l.width = 128; l.height = 256;
+      var c = l.getContext('2d'), g = c.createLinearGradient(0, 0, 0, 256);
+      g.addColorStop(0, 'rgba(255,240,200,0.55)'); g.addColorStop(1, 'rgba(255,240,200,0)');
+      c.fillStyle = g;
+      c.beginPath(); c.moveTo(56, 0); c.lineTo(72, 0); c.lineTo(128, 256); c.lineTo(0, 256); c.closePath(); c.fill();
+      _pnLuz = l;
+      var ln = document.createElement('canvas'); ln.width = 4; ln.height = 256;
+      var c2 = ln.getContext('2d'), g2 = c2.createLinearGradient(0, 0, 0, 256);
+      g2.addColorStop(0, 'rgba(255,255,255,0)'); g2.addColorStop(0.65, 'rgba(255,255,255,0.10)'); g2.addColorStop(1, 'rgba(255,255,255,0.42)');
+      c2.fillStyle = g2; c2.fillRect(0, 0, 4, 256);
+      _pnLane = ln;
+    } catch (e) { _pnLuz = null; _pnLane = null; }
+  }
+
   function _pnDraw() {
     if (!_pnCtx) return;
     var ctx = _pnCtx, W = _pnW, H = _pnH;
     var lh = _pnLinhaH(), cw = _pnColW(), x0 = _pnX0();
+    var agora = performance.now(), i;
+    _pnSpritesPalco();
 
     // Fundo + trilhos das colunas
     ctx.fillStyle = _pnSkin.fundo;
@@ -749,51 +864,78 @@
       var fi = _pnFundoImg, fs = Math.max(W / fi.naturalWidth, H / fi.naturalHeight);
       var fw = fi.naturalWidth * fs, fh = fi.naturalHeight * fs;
       ctx.drawImage(fi, (W - fw) / 2, (H - fh) / 2, fw, fh);
-      ctx.fillStyle = 'rgba(6,9,18,0.55)';
+      ctx.fillStyle = 'rgba(6,9,18,0.58)';
       ctx.fillRect(0, 0, W, H);
+    }
+    // Holofotes balançando — mais fortes com o combo
+    if (_pnLuz && !_pnMovReduzido()) {
+      var forca = 0.35 + Math.min(0.65, _pnCombo / 40);
+      for (i = 0; i < 2; i++) {
+        var ang = Math.sin(agora / (2300 + i * 700) + i * 2) * 0.32 + (i ? -0.22 : 0.22);
+        ctx.save();
+        ctx.globalAlpha = forca * 0.55;
+        ctx.translate(W * (i ? 0.82 : 0.18), -10);
+        ctx.rotate(ang);
+        ctx.drawImage(_pnLuz, -W * 0.32, 0, W * 0.64, H * 1.1);
+        ctx.restore();
+      }
     }
     // Tela larga: escurece as laterais fora do campo pra marcar a pista
     if (x0 > 1) {
-      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.fillStyle = 'rgba(0,0,0,0.32)';
       ctx.fillRect(0, 0, x0, H);
       ctx.fillRect(W - x0, 0, x0, H);
     }
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
     ctx.lineWidth = 1;
     for (var c = (x0 > 1 ? 0 : 1); c <= (x0 > 1 ? _PN_COLS : _PN_COLS - 1); c++) {
       ctx.beginPath();
       ctx.moveTo(x0 + c * cw, 0); ctx.lineTo(x0 + c * cw, H);
       ctx.stroke();
     }
+    // Coluna acesa (acerto)
+    if (_pnLane) for (i = 0; i < _PN_COLS; i++) {
+      if (_pnLanes[i] <= 0) continue;
+      ctx.globalAlpha = _pnLanes[i];
+      ctx.drawImage(_pnLane, x0 + i * cw, 0, cw, H);
+    }
+    ctx.globalAlpha = 1;
 
     // Qual é o próximo a tocar (ganha contorno de dica)
-    var alvo = _pnAlvo(), i;
+    var alvo = _pnAlvo();
 
-    var pad = Math.max(2, cw * 0.03);
-    var raio = Math.min(cw, lh) * 0.14;
+    var pad = Math.max(2, cw * 0.035);
+    var raio = Math.min(cw, lh) * 0.12;
+    var bwT = cw - pad * 2, bhT = lh - pad * 2;
+    var spr = (!_pnAzImg) ? _pnSprites(bwT, bhT, raio) : null;
+    // fim de partida: a pista volta um pouco (azulejo que passou)
+    var recuo = 0, ev = _pnErroVis;
+    if (ev && ev.recuo) recuo = ev.recuo * _pnEaseOut(Math.min(1, (agora - ev.t0) / 260));
 
     for (i = 0; i < _pnAzulejos.length; i++) {
       var az = _pnAzulejos[i];
-      var y = az.y * lh;
+      var y = (az.y - recuo) * lh;
       if (y > H || y + lh < 0) continue;          // fora da tela
       var x = x0 + az.col * cw;
-      var bx = x + pad, by = y + pad, bw = cw - pad * 2, bh = lh - pad * 2;
+      var bx = x + pad, by = y + pad, bw = bwT, bh = bhT;
 
       if (az.tocada) {
-        // Tocado: esverdeado, esmaecendo conforme desce. Cor sólida
-        // (sem gradiente) — com ~8 azulejos visíveis, criar um
-        // CanvasGradient por azulejo A CADA FRAME (60x/s) gera muito
-        // lixo de memória e engasga o jogo periodicamente (GC) em
-        // Android mais fraco. Uma cor só, recalculada por número, é
-        // igual de viva no efeito de flash e não aloca nada extra.
+        // Tocado: some encolhendo e clareando, deixa um rastro leve na cor
+        // do tema (cor sólida — sem alocar nada por quadro).
         var f = az.flash;
         if (_pnAzImg && _pnImgOk(_pnAzImg.tocada)) {
-          ctx.globalAlpha = 0.28 + f * 0.72;
+          ctx.globalAlpha = 0.22 + f * 0.78;
           ctx.drawImage(_pnAzImg.tocada, bx, by, bw, bh);
           ctx.globalAlpha = 1;
         } else {
-          ctx.fillStyle = 'rgba(' + _pnSkin.tocada + ',' + (0.13 + f * 0.475) + ')';
-          _pnRoundRect(ctx, bx, by, bw, bh, raio); ctx.fill();
+          if (f > 0 && spr) {
+            var esc = 1 + (1 - f) * 0.12;
+            ctx.globalAlpha = f * 0.9;
+            ctx.drawImage(spr.tecla, bx - bw * (esc - 1) / 2, by - bh * (esc - 1) / 2, bw * esc, bh * esc);
+            ctx.globalAlpha = 1;
+          }
+          ctx.fillStyle = 'rgba(' + _pnSkin.tocada + ',' + (0.16 + f * 0.5).toFixed(3) + ')';
+          _pnRoundRect(ctx, bx + bw * 0.04, by + bh * 0.04, bw * 0.92, bh * 0.92, raio); ctx.fill();
         }
       } else if (_pnAzImg && _pnImgOk(_pnAzImg.tecla)) {
         ctx.drawImage(_pnAzImg.tecla, bx, by, bw, bh);
@@ -802,26 +944,50 @@
           ctx.lineWidth = Math.max(2, cw * 0.022);
           _pnRoundRect(ctx, bx, by, bw, bh, raio); ctx.stroke();
         }
+      } else if (spr) {
+        ctx.drawImage(az === alvo ? spr.alvo : spr.tecla, bx, by, bw, bh);
       } else {
-        // Idem: era gradiente #ff4d63→#c81e3c recriado por azulejo
-        // por frame; agora é o tom médio fixo, sem alocação.
         ctx.fillStyle = _pnSkin.tecla;
         _pnRoundRect(ctx, bx, by, bw, bh, raio); ctx.fill();
-        // Brilho de tecla envernizada (faixa clara no topo, cor sólida —
-        // sem gradiente por frame, pelo mesmo motivo de cima).
-        ctx.fillStyle = 'rgba(255,255,255,0.16)';
-        _pnRoundRect(ctx, bx + bw * 0.06, by + bh * 0.06, bw * 0.88, bh * 0.30, raio * 0.8); ctx.fill();
-        if (az === alvo) {
-          ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-          ctx.lineWidth = Math.max(2, cw * 0.022);
-          _pnRoundRect(ctx, bx, by, bw, bh, raio); ctx.stroke();
-        }
+      }
+      // Antes do 1º toque: o azulejo de largada diz "COMEÇAR" e pulsa
+      if (az === alvo && _pnEstado === 'jogando' && !_pnMovendo) {
+        var pz = 0.5 + 0.5 * Math.sin(agora / 220);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,255,255,' + (0.35 + pz * 0.5).toFixed(3) + ')';
+        ctx.lineWidth = 3;
+        _pnRoundRect(ctx, bx - 3 - pz * 3, by - 3 - pz * 3, bw + 6 + pz * 6, bh + 6 + pz * 6, raio + 3); ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        var fsC = Math.round(Math.min(bw * 0.2, 22));
+        ctx.font = '800 ' + fsC + "px 'Syne','DM Sans',sans-serif";
+        var lgC = ctx.measureText('COMEÇAR').width;
+        if (lgC > bw * 0.84) { fsC = Math.floor(fsC * bw * 0.84 / lgC); ctx.font = '800 ' + fsC + "px 'Syne','DM Sans',sans-serif"; }
+        ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 6;
+        ctx.fillText('COMEÇAR', bx + bw / 2, by + bh * 0.47);
+        ctx.restore();
       }
     }
 
-    // Coluna que o jogador errou (só acontece no Normal, onde errar
-    // não encerra — precisa de um retorno visual no lugar do fim).
-    if (_pnFlashErro > 0 && _pnColErro >= 0) {
+    // Fim: a pista escurece e o azulejo do erro (onde errou / o que passou)
+    // pisca em vermelho e branco com um X — se destaca em qualquer tema.
+    if (ev) {
+      var tev = agora - ev.t0, ey = (ev.y - recuo) * lh, ex = x0 + ev.col * cw + pad;
+      ctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.55, tev / 400).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+      var branco = Math.floor(tev / 150) % 2 === 1 && tev < 900;
+      ctx.save();
+      ctx.fillStyle = branco ? '#ffffff' : '#ff2d4b';
+      ctx.shadowColor = 'rgba(255,45,75,0.95)'; ctx.shadowBlur = 24;
+      _pnRoundRect(ctx, ex, ey + pad, bwT, bhT, raio); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = branco ? '#ff2d4b' : '#ffffff';
+      ctx.lineWidth = Math.max(4, bwT * 0.08); ctx.lineCap = 'round';
+      var xm = ex + bwT / 2, ym = ey + pad + bhT / 2, t = Math.min(bwT, bhT) * 0.2;
+      ctx.beginPath(); ctx.moveTo(xm - t, ym - t); ctx.lineTo(xm + t, ym + t); ctx.moveTo(xm + t, ym - t); ctx.lineTo(xm - t, ym + t); ctx.stroke();
+      ctx.restore();
+    } else if (_pnFlashErro > 0 && _pnColErro >= 0) {
+      // Coluna que o jogador errou (no Normal, onde errar não encerra).
       ctx.fillStyle = 'rgba(255,60,80,' + (_pnFlashErro * 0.20) + ')';
       ctx.fillRect(x0 + _pnColErro * cw, 0, cw, H);
     }
@@ -830,43 +996,107 @@
     for (i = 0; i < _pnOndas.length; i++) {
       var on = _pnOndas[i];
       var p = on.t / 0.4;
-      ctx.globalAlpha = (1 - p) * 0.55;
+      ctx.globalAlpha = (1 - p) * 0.6;
       ctx.strokeStyle = _pnSkin.onda;
-      ctx.lineWidth = Math.max(1.5, cw * 0.03) * (1 - p);
+      ctx.lineWidth = Math.max(1.5, cw * 0.035) * (1 - p);
       ctx.beginPath();
-      ctx.arc(on.x, on.y, cw * (0.15 + p * 0.55), 0, Math.PI * 2);
+      ctx.arc(on.x, on.y, cw * (0.15 + p * 0.6), 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
+    // Estilhaços
+    ctx.fillStyle = _pnSkin.onda;
+    for (i = _pnParts.length - 1; i >= 0; i--) {
+      var pa = _pnParts[i], tp = (agora - pa.t0) / pa.dur;
+      if (tp >= 1) { _pnParts.splice(i, 1); continue; }
+      var sg = (agora - pa.t0) / 1000;
+      ctx.globalAlpha = 1 - tp;
+      ctx.beginPath();
+      ctx.arc(pa.x + pa.vx * sg, pa.y + pa.vy * sg + 300 * sg * sg + _pnVel * lh * sg * (_pnMovendo ? 1 : 0), pa.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // ♪ subindo
+    if (_pnNotas.length) {
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '700 ' + Math.round(cw * 0.42) + 'px serif';
+      ctx.fillStyle = '#fff';
+      ctx.shadowColor = _pnSkin.onda; ctx.shadowBlur = 10;
+      for (i = _pnNotas.length - 1; i >= 0; i--) {
+        var nt = _pnNotas[i], tn = (agora - nt.t0) / 900;
+        if (tn >= 1) { _pnNotas.splice(i, 1); continue; }
+        ctx.globalAlpha = tn < 0.7 ? 1 : 1 - (tn - 0.7) / 0.3;
+        ctx.fillText(nt.g, nt.x + Math.sin(tn * 6) * cw * 0.12, nt.y - tn * lh * 0.9);
+      }
+      ctx.restore();
+    }
 
-    // Combo na tela (retenção): pulso curto só nos marcos, menor e mais
-    // pro topo — não pode cobrir os azulejos caindo no meio da tela.
+    // Placar grande no topo (estilo Piano Tiles), pula a cada acerto
+    if (_pnEstado !== 'inicio') {
+      var fsP = Math.round(Math.min(W, H) * 0.15 * (1 + _pnPulso * 0.12));
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '800 ' + fsP + "px 'Syne','DM Sans',sans-serif";
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = Math.max(4, fsP * 0.1);
+      ctx.strokeStyle = 'rgba(10,6,20,0.75)';
+      var yP = H * 0.13;
+      ctx.strokeText(String(_pnPontos), W / 2, yP);
+      ctx.fillStyle = _pnCombo >= 20 ? '#ffd54a' : '#ffffff';
+      ctx.fillText(String(_pnPontos), W / 2, yP);
+      ctx.restore();
+    }
+
+    // Combo na tela (retenção): pulso curto só nos marcos, logo abaixo do placar.
     if (_pnEstado === 'jogando' && _pnComboFlash > 0 && _pnCombo >= 5) {
       var alpha = Math.min(1, _pnComboFlash * 1.6);
-      var escala = 1 + Math.min(0.2, (_pnCombo - 5) * 0.008);
+      var tc = 1 - _pnComboFlash / 0.9;
+      var escala = (tc < 0.2 ? 0.6 + tc * 2.6 : 1.12 - Math.min(0.12, (tc - 0.2) * 0.4)) * (1 + Math.min(0.25, (_pnCombo - 5) * 0.01));
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      var fs = Math.round(Math.min(W, H) * 0.055 * escala);
+      ctx.translate(W / 2, H * 0.235);
+      var fs = Math.round(Math.min(W, H) * 0.062);
       ctx.font = '800 ' + fs + "px 'Syne','DM Sans',sans-serif";
-      ctx.fillStyle = _pnCombo >= 20 ? '#ffd54a' : (_pnCombo >= 10 ? '#8ffdd6' : '#ffffff');
-      ctx.shadowColor = 'rgba(0,0,0,0.55)';
-      ctx.shadowBlur = 8;
+      var corC = _pnCombo >= 30 ? '#ff7a45' : (_pnCombo >= 20 ? '#ffd54a' : (_pnCombo >= 10 ? '#8ffdd6' : '#ffffff'));
       var sufixo = _pnCombo >= 30 ? ' INSANO 🔥' : (_pnCombo >= 20 ? ' FOGO 🔥' : (_pnCombo >= 15 ? ' BOA!' : ''));
-      ctx.fillText(_pnCombo + ' COMBO' + sufixo, W / 2, H * 0.10);
+      var txtC = _pnCombo + ' COMBO' + sufixo;
+      // a Syne é larga: encolhe pra caber com folga na largura da tela
+      var lgT = ctx.measureText(txtC).width * escala;
+      if (lgT > W * 0.88) escala *= W * 0.88 / lgT;
+      ctx.scale(escala, escala);
+      ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(4, fs * 0.22); ctx.strokeStyle = 'rgba(10,6,20,0.8)';
+      ctx.strokeText(txtC, 0, 0);
+      ctx.shadowColor = corC; ctx.shadowBlur = 16;
+      ctx.fillStyle = corC;
+      ctx.fillText(txtC, 0, 0);
       ctx.restore();
     }
-
-    // Antes do primeiro toque: dica de onde começar.
-    if (_pnEstado === 'jogando' && !_pnMovendo && alvo) {
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.font = '700 ' + Math.round(Math.min(W, H) * 0.045) + "px 'DM Sans',sans-serif";
-      ctx.textAlign = 'center';
-      ctx.fillText('Toque no azulejo marcado pra começar', W / 2, H - lh * 0.28);
-      ctx.textAlign = 'left';
+    // Aviso de velocidade
+    if (_pnAviso) {
+      var ta = (agora - _pnAviso.t0) / 1300;
+      if (ta >= 1) _pnAviso = null;
+      else {
+        ctx.save();
+        ctx.globalAlpha = ta < 0.15 ? ta / 0.15 : (ta > 0.75 ? 1 - (ta - 0.75) / 0.25 : 1);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.translate(W / 2, H * 0.42);
+        ctx.rotate(-0.06);
+        var fa = Math.round(Math.min(W * 0.085, H * 0.06));
+        ctx.font = '800 ' + fa + "px 'Syne','DM Sans',sans-serif";
+        var lgA = ctx.measureText(_pnAviso.txt).width;
+        if (lgA > W * 0.86) { fa = Math.floor(fa * W * 0.86 / lgA); ctx.font = '800 ' + fa + "px 'Syne','DM Sans',sans-serif"; }
+        ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(5, fa * 0.24); ctx.strokeStyle = 'rgba(10,6,20,0.85)';
+        ctx.strokeText(_pnAviso.txt, 0, 0);
+        ctx.fillStyle = '#ff5470';
+        ctx.fillText(_pnAviso.txt, 0, 0);
+        ctx.restore();
+      }
     }
   }
+  function _pnEaseOut(t) { return 1 - (1 - t) * (1 - t); }
 
   /* ── Loop ─────────────────────────────────────────────────────── */
   function _pnLoop(ts) {
@@ -888,6 +1118,15 @@
     _pnMenuPartida(false);
     _pnMovendo = false;
     _pnDraw();
+    // Laço curto só pra animação do fim (azulejo vermelho, estilhaços terminando).
+    if (_pnFimRAF) cancelAnimationFrame(_pnFimRAF);
+    var fimIni = performance.now();
+    (function fimQuadro(t) {
+      _pnFimRAF = 0;
+      if (_pnEstado !== 'fim' || t - fimIni > 1400) return;
+      _pnDraw();
+      _pnFimRAF = requestAnimationFrame(fimQuadro);
+    })(fimIni);
 
     var owlEl = document.getElementById('pn-fim-owl');
     var titEl = document.getElementById('pn-fim-titulo');
@@ -911,6 +1150,7 @@
         : (_pnErros > 0 ? 'Você tocou ' + _pnMelodia.nome + ' com ' + _pnErros + (_pnErros === 1 ? ' erro' : ' erros') + '.' + comboExtra + ' Sem pressa, tenta de novo!'
                         : 'Você tocou ' + _pnMelodia.nome + '.' + comboExtra + ' Sem pressa, tenta de novo!');
       if (slot) { slot.style.display = 'none'; slot.innerHTML = ''; }
+      _pnFimStats([[_pnErros, _pnErros === 1 ? 'erro' : 'erros'], [_pnComboMax, 'melhor combo']]);
       // P2-2: modo normal não paga moeda — some com o "+N 🪙" que podia
       // ter ficado visível de uma partida anterior de sobrevivência.
       var moedasElNormal = document.getElementById('pn-fim-moedas');
@@ -955,8 +1195,10 @@
       else moedasEl.style.display = 'none';
     }
 
-    if (owlEl) { owlEl.src = recorde ? '/webp/owl-celebrate-flying.webp' : '/webp/owl-surprised.webp'; owlEl.style.display = ''; }
+    _pnFimStats([[_pnComboMax, 'melhor combo'], [Math.max(score, rec), 'recorde']]);
+    if (owlEl) { owlEl.src = recorde ? '/webp/owl-trophy.webp' : '/webp/owl-surprised.webp'; owlEl.style.display = ''; }
     if (titEl) titEl.textContent = recorde ? '🎉 Novo recorde!' : (motivo === 'passou' ? 'Deixou passar!' : 'Nota errada!');
+    var fimBox = document.getElementById('pn-fim'); if (fimBox) fimBox.classList.toggle('pn-fim-recorde', !!recorde);
     if (ptsEl) ptsEl.textContent = score + (score === 1 ? ' nota' : ' notas');
     var comboTxt = _pnComboMax >= 10 ? ' Melhor combo: ' + _pnComboMax + '!' : '';
     if (msgEl) msgEl.textContent = recorde ? ('Você nunca tocou tão longe! 🦉' + comboTxt)
@@ -973,7 +1215,21 @@
       _pnMostrarOverlay('fim');
       if (recorde && window.AngatubaGames && window.AngatubaGames.efeitos) window.AngatubaGames.efeitos.confete('pn-fim', 90);
       if (window.AngatubaGames) window.AngatubaGames.rankFimDeJogo('piano', 'pn-rank-slot', score);
-    }, 550);
+    }, 950);
+  }
+
+  // Números da partida na tela de fim (criados 1x, sem mexer no index.html).
+  function _pnFimStats(itens) {
+    var fim = document.getElementById('pn-fim');
+    if (!fim) return;
+    var el = document.getElementById('pn-fim-stats');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'pn-fim-stats'; el.className = 'pn-fim-stats';
+      var ref = document.getElementById('pn-fim-moedas');
+      fim.insertBefore(el, ref || null);
+    }
+    el.innerHTML = itens.map(function (it) { return '<span class="pn-chip"><b>' + it[0] + '</b> ' + it[1] + '</span>'; }).join('');
   }
 
   /* ── Controles ────────────────────────────────────────────────
@@ -1509,6 +1765,7 @@
     if (!_pnCanvas) return;
     if (!_pnCtx) _pnCtx = _pnCanvas.getContext('2d');
     clearTimeout(_pnFimT); _pnFimT = 0;
+    if (_pnFimRAF) { cancelAnimationFrame(_pnFimRAF); _pnFimRAF = 0; }
     _pnAudioDestravar();            // veio de um clique: acorda o áudio
     _pnAplicarSkin();
     _pnLigarControles();
@@ -1537,6 +1794,7 @@
 
   function _pnParar() {
     clearTimeout(_pnFimT); _pnFimT = 0;
+    if (_pnFimRAF) { cancelAnimationFrame(_pnFimRAF); _pnFimRAF = 0; }
     if (_pnRAF) { cancelAnimationFrame(_pnRAF); _pnRAF = 0; }
     if (_pnEstado === 'jogando') _pnEstado = 'inicio';
     _pnMovendo = false;

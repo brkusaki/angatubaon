@@ -1,5 +1,5 @@
 {
- "versaoSW": 522,
+ "versaoSW": 525,
  "hashes": {
   "Aprender/conteudo.js": "c2776ebcaf3844f9",
   "Aprender/hub.js": "0025f4b073788e9b",
@@ -36,8 +36,8 @@
   "Jogos/negocios.js": "288e33c3a4e80de6",
   "Jogos/party.css": "e0a63480691e7c3f",
   "Jogos/party.js": "e0e1b366a33be295",
-  "Jogos/piano.css": "25690c3cea8e0fa7",
-  "Jogos/piano.js": "3d7b6fe5b18a3c84",
+  "Jogos/piano.css": "33a8da36620080db",
+  "Jogos/piano.js": "f68d8d5eb19c30e7",
   "Jogos/pingpong.css": "89e286fd8ed01d57",
   "Jogos/pingpong.js": "2fa0aced200fd630",
   "Jogos/puff.css": "6f9b1a780d8f1eb3",

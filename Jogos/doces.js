@@ -113,8 +113,7 @@
       _dcCoresNome = (it.nomes && it.nomes.length >= n) ? it.nomes.slice(0, n) : _DC_NOMES_CLASSICOS.slice();
       _dcSkinSprites = pal.map(function (cor, i) { return _dcSpriteDoce(cor, i); });
     }
-    var objEl = document.getElementById('dc-objetivo-texto');
-    if (objEl && _dcObjetivo) objEl.textContent = _dcObjetivoTexto();
+    if (_dcObjetivo) _dcObjetivoNoHud();
   }
   function _dcSpriteDoce(cor, forma) {
     var T = 128, cv, c;
@@ -227,6 +226,24 @@
   var _dcCorBorda = 'rgba(255,255,255,0.08)'; // fallback; lido de --border ao preparar a tela
   var _dcComboMsg = null;         // { texto, cor, t0, duracao } — aviso tipo "Delicioso!"
 
+  // ── Visual v3 (nov/2026): tudo desenhado no mesmo canvas ────
+  var _dcDpr = 1;                 // DPR em uso (teto 2 — acima disso custa caro e não se vê)
+  var _dcAgora = 0;               // performance.now() do quadro atual (pros doces especiais animarem)
+  var _dcFundoCache = null;       // { cv, w, h, dpr, v } painel + casas pré-desenhados
+  var _dcFundoVersao = 0;         // sobe quando o formato do tabuleiro muda
+  var _dcGlow = null;             // sprite de brilho (gradiente radial) reaproveitado
+  var _dcParticulas = [];         // estilhaços do doce estourado { x, y, vx, vy, r, cor, t0, dur }
+  var _dcPopups = [];             // "+30" subindo { x, y, texto, cor, t0 }
+  var _dcFx = [];                 // efeitos dos especiais { tipo:'h'|'v'|'onda'|'raios'|'flash', ... }
+  var _dcTremor = null;           // { t0, forca } tabuleiro treme em estouro grande
+  var _dcBrilho = null, _dcProxBrilho = 0;   // reflexo que passeia pelos doces parados
+  var _dcDica = null;             // { i1, i2, t0 } jogada sugerida depois de um tempo parado
+  var _dcUltimaAcaoMs = 0;
+  var _dcVitoriaT0 = 0;           // onda de comemoração antes da tela de fim
+  var _DC_DUR_PART = 520, _DC_DUR_POPUP = 850, _DC_MS_DICA = 5000;
+  function _dcMovReduzido() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  function _dcAcao() { _dcUltimaAcaoMs = performance.now(); _dcDica = null; }
+
   // ── localStorage: maior fase JÁ CONCLUÍDA ──────────────────
   function _dcRecordeGet() {
     try { return Math.max(0, Math.round(Number(localStorage.getItem('angatuba_doces_fase')) || 0)); }
@@ -301,9 +318,16 @@
     var arena = document.getElementById('dc-arena');
     if (!arena) return;
     var t = _dcTemasFundo[(fase - 1) % _dcTemasFundo.length];
-    arena.style.background =
-      'radial-gradient(circle at 70% 8%, ' + t.destaque + ', transparent 55%), ' +
-      'linear-gradient(160deg, ' + t.base1 + ', ' + t.base2 + ')';
+    var forte = t.destaque.replace(/[\d.]+\)$/, '0.42)'), medio = t.destaque.replace(/[\d.]+\)$/, '0.26)');
+    var fundo =
+      'radial-gradient(120% 55% at 50% -8%, ' + forte + ', transparent 62%), ' +
+      'radial-gradient(90% 45% at 50% 108%, ' + medio + ', transparent 65%), ' +
+      'repeating-linear-gradient(135deg, rgba(255,255,255,0.035) 0 16px, transparent 16px 32px), ' +
+      'linear-gradient(165deg, ' + t.base1 + ', ' + t.base2 + ')';
+    arena.style.background = fundo;
+    // As telas de início/fim usam o mesmo cenário da fase.
+    var card = document.getElementById('dc-card');
+    if (card) card.style.setProperty('--dc-cenario', fundo);
   }
 
   // ── Tabuleiro ───────────────────────────────────────────────
@@ -427,6 +451,26 @@
       }
     }
     return false;
+  }
+  // Primeira jogada válida do tabuleiro ([i1, i2]) — usada pela dica.
+  // Prefere combinação de cor; doce especial (sempre trocável) fica de reserva.
+  function _dcAcharJogada() {
+    var reserva = null;
+    for (var r = 0; r < _DC_TAM; r++) {
+      for (var c = 0; c < _DC_TAM; c++) {
+        var idx = r * _DC_TAM + c;
+        if (!_dcCelulaAtiva(idx)) continue;
+        if (c + 1 < _DC_TAM && _dcTrocaFormaMatch(idx, idx + 1)) return [idx, idx + 1];
+        if (r + 1 < _DC_TAM && _dcTrocaFormaMatch(idx, idx + _DC_TAM)) return [idx, idx + _DC_TAM];
+        if (!reserva && _dcTipo[idx] > 0) {
+          if (c + 1 < _DC_TAM && _dcCelulaAtiva(idx + 1)) reserva = [idx, idx + 1];
+          else if (r + 1 < _DC_TAM && _dcCelulaAtiva(idx + _DC_TAM)) reserva = [idx, idx + _DC_TAM];
+          else if (c - 1 >= 0 && _dcCelulaAtiva(idx - 1)) reserva = [idx, idx - 1];
+          else if (r - 1 >= 0 && _dcCelulaAtiva(idx - _DC_TAM)) reserva = [idx, idx - _DC_TAM];
+        }
+      }
+    }
+    return reserva;
   }
   function _dcEmbaralhar() {
     var tentativas = 0;
@@ -683,7 +727,8 @@
     if (!_dcCanvas || !_dcCtx) return;
     var rect = _dcCanvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return; // tela ainda escondida (display:none)
-    var dpr = window.devicePixelRatio || 1;
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    _dcDpr = dpr;
     var wPx = Math.round(rect.width * dpr), hPx = Math.round(rect.height * dpr);
     if (_dcCanvas.width === wPx && _dcCanvas.height === hPx) return;
     _dcCanvas.width = wPx;
@@ -715,10 +760,20 @@
 
     // Bomba de cor: orbe arco-íris no lugar da imagem normal — não fica
     // "dentro" de gelo nem herda a textura da cor guardada (ela é curinga).
+    // Doce especial: halo pulsando por trás (sprite pronto, só muda o alfa).
+    if (tipo > 0 && _dcGlow) {
+      var pulso = 0.55 + 0.3 * Math.sin(_dcAgora / 260 + cx * 0.05);
+      var ladoG = r * (tipo === _DC_TIPO_BOMBA ? 3.4 : 3);
+      ctx.globalAlpha = a * pulso;
+      try { ctx.drawImage(_dcGlow, x - ladoG / 2, cy - ladoG / 2, ladoG, ladoG); } catch (e) {}
+      ctx.globalAlpha = a;
+    }
     if (tipo === _DC_TIPO_BOMBA) {
       if (_dcImgs.bomba) {
         var ladoB = r * 1.9;
-        try { ctx.drawImage(_dcImgs.bomba, x - ladoB / 2, cy - ladoB / 2, ladoB, ladoB); } catch (e) {}
+        ctx.translate(x, cy);
+        ctx.rotate((_dcAgora / 2600) % (Math.PI * 2));   // gira devagar
+        try { ctx.drawImage(_dcImgs.bomba, -ladoB / 2, -ladoB / 2, ladoB, ladoB); } catch (e) {}
         ctx.restore();
         return;
       }
@@ -760,12 +815,15 @@
     // Overlay do doce especial (listrado/embrulhado) por cima da imagem
     // normal — sem precisar de nenhum asset novo.
     if (tipo === _DC_TIPO_LISTRA_H || tipo === _DC_TIPO_LISTRA_V) {
+      // Listras brancas que ANDAM no sentido do efeito (recortadas no doce).
       ctx.save();
-      ctx.globalAlpha = a * 0.85;
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      var nb = 3, lado2 = r * 1.7, faixa = (lado2 / nb) * 0.42;
-      for (var bi = 0; bi < nb; bi++) {
-        var offB = -lado2 / 2 + bi * (lado2 / nb) + (lado2 / nb - faixa) / 2;
+      ctx.beginPath(); ctx.arc(x, cy, r * 0.84, 0, Math.PI * 2); ctx.clip();
+      ctx.globalAlpha = a * 0.8;
+      ctx.fillStyle = 'rgba(255,255,255,0.72)';
+      var nb = 3, lado2 = r * 1.7, vao = lado2 / nb, faixa = vao * 0.42;
+      var anda = ((_dcAgora / 700) % 1) * vao;
+      for (var bi = -1; bi < nb; bi++) {
+        var offB = -lado2 / 2 + bi * vao + (vao - faixa) / 2 + anda;
         if (tipo === _DC_TIPO_LISTRA_H) ctx.fillRect(x - lado2 / 2, cy + offB, lado2, faixa);
         else ctx.fillRect(x + offB, cy - lado2 / 2, faixa, lado2);
       }
@@ -800,35 +858,110 @@
     requestAnimationFrame(_dcDesenharFrame);
   }
 
+  // Sprite de brilho: gradiente radial branco-dourado, criado 1x.
+  function _dcCriarGlow() {
+    if (_dcGlow) return;
+    try {
+      var cv = document.createElement('canvas'); cv.width = 96; cv.height = 96;
+      var c = cv.getContext('2d'), g = c.createRadialGradient(48, 48, 2, 48, 48, 48);
+      g.addColorStop(0, 'rgba(255,250,210,0.95)'); g.addColorStop(0.35, 'rgba(255,225,140,0.45)'); g.addColorStop(1, 'rgba(255,220,120,0)');
+      c.fillStyle = g; c.fillRect(0, 0, 96, 96);
+      _dcGlow = cv;
+    } catch (e) { _dcGlow = null; }
+  }
+
+  // Painel do tabuleiro pré-desenhado: uma "bandeja" escura com o FORMATO da
+  // fase (as casas-buraco ficam de fora) e uma casa clara/escura por célula,
+  // em xadrez. Refeito só quando muda o tamanho ou o formato — no quadro a
+  // quadro é um drawImage só.
+  function _dcFundoTabuleiro(layout, w, h) {
+    var dpr = _dcDpr, fc = _dcFundoCache;
+    if (fc && fc.w === w && fc.h === h && fc.dpr === dpr && fc.v === _dcFundoVersao) return fc.cv;
+    var cv, c, forma, f;
+    try {
+      cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(w * dpr)); cv.height = Math.max(1, Math.round(h * dpr));
+      c = cv.getContext('2d'); c.scale(dpr, dpr);
+      forma = document.createElement('canvas'); forma.width = cv.width; forma.height = cv.height;
+      f = forma.getContext('2d'); f.scale(dpr, dpr);
+    } catch (e) { return null; }
+    var cel = layout.cellPx, passo = layout.passo, pad = layout.pad, r, col, x, y;
+    var folga = Math.min(pad, 5);
+    // 1) silhueta opaca da bandeja (união das casas, um pouco maiores)
+    f.fillStyle = '#1a0d2b';
+    for (r = 0; r < _DC_TAM; r++) for (col = 0; col < _DC_TAM; col++) {
+      if (!_dcCelulaAtiva(r * _DC_TAM + col)) continue;
+      x = pad + col * passo; y = pad + r * passo;
+      _dcCaminhoArredondado(f, x - folga, y - folga, cel + folga * 2, cel + folga * 2, 10); f.fill();
+    }
+    // 2) cola a silhueta com sombra + transparência (vidro escuro)
+    c.save();
+    c.shadowColor = 'rgba(0,0,0,0.45)'; c.shadowBlur = 10 * dpr; c.shadowOffsetY = 3 * dpr;
+    c.globalAlpha = 0.72;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.drawImage(forma, 0, 0);
+    c.restore();
+    // 3) casas em xadrez, com um fio de luz em cima
+    for (r = 0; r < _DC_TAM; r++) for (col = 0; col < _DC_TAM; col++) {
+      if (!_dcCelulaAtiva(r * _DC_TAM + col)) continue;
+      x = pad + col * passo; y = pad + r * passo;
+      _dcCaminhoArredondado(c, x, y, cel, cel, Math.min(9, cel * 0.24));
+      c.fillStyle = ((r + col) % 2) ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.045)';
+      c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.07)';
+      c.fillRect(x + cel * 0.16, y + 1.5, cel * 0.68, 1.5);
+    }
+    _dcFundoCache = { cv: cv, w: w, h: h, dpr: dpr, v: _dcFundoVersao };
+    return cv;
+  }
+
+  // Estrelinha de 4 pontas (reflexo).
+  function _dcEstrela(ctx, x, y, t) {
+    if (t <= 0) return;
+    ctx.beginPath();
+    ctx.moveTo(x, y - t); ctx.quadraticCurveTo(x, y, x + t, y);
+    ctx.quadraticCurveTo(x, y, x, y + t); ctx.quadraticCurveTo(x, y, x - t, y);
+    ctx.quadraticCurveTo(x, y, x, y - t);
+    ctx.fill();
+  }
+
   function _dcDesenharTabuleiro(agora) {
     if (!_dcCtx || !_dcCanvas) return;
     var layout = _dcObterLayout();
     var w = layout.rect.width, h = layout.rect.height;
-    var ctx = _dcCtx;
+    var ctx = _dcCtx, i;
+    _dcAgora = agora;
     ctx.clearRect(0, 0, w, h);
-    // fundo do tabuleiro (igual ao antigo .dc-grid)
-    _dcCaminhoArredondado(ctx, 0, 0, w, h, 12);
-    ctx.fillStyle = 'rgba(0,0,0,0.18)';
-    ctx.fill();
-    ctx.strokeStyle = _dcCorBorda;
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    ctx.save();
+
+    // tremor do tabuleiro (estouro grande)
+    if (_dcTremor) {
+      var tt0 = (agora - _dcTremor.t0) / 280;
+      if (tt0 >= 1) _dcTremor = null;
+      else ctx.translate(Math.sin(agora * 0.09) * _dcTremor.forca * (1 - tt0), Math.cos(agora * 0.11) * _dcTremor.forca * (1 - tt0));
+    }
+
+    var fundo = _dcFundoTabuleiro(layout, w, h);
+    if (fundo) ctx.drawImage(fundo, 0, 0, w, h);
+
+    var parado = _dcRodando && !_dcAnimando && !_dcTrocaAnim;
+    // reflexo que passeia pelos doces parados
+    if (parado && !_dcBrilho && agora > _dcProxBrilho && !_dcMovReduzido()) {
+      var sorteio = (Math.random() * _DC_TAM * _DC_TAM) | 0;
+      if (_dcCelulaAtiva(sorteio) && _dcCor[sorteio]) _dcBrilho = { idx: sorteio, t0: agora };
+      _dcProxBrilho = agora + 700 + Math.random() * 1300;
+    }
+    // dica: depois de um tempo sem jogar, dois doces "se chamam"
+    if (parado && !_dcSelecionado && !_dcDica && agora - _dcUltimaAcaoMs > _DC_MS_DICA) {
+      var jog = _dcAcharJogada();
+      if (jog) { _dcDica = { i1: jog[0], i2: jog[1], t0: agora }; _dcMascote('dica', 'Que tal aqui?', 2600); }
+      else _dcUltimaAcaoMs = agora;
+    }
+    if (!parado) _dcDica = null;
 
     for (var r = 0; r < _DC_TAM; r++) {
       for (var c = 0; c < _DC_TAM; c++) {
         var idx = r * _DC_TAM + c;
-        if (!_dcCelulaAtiva(idx)) {
-          // buraco do formato da fase: marca como um vão, sem doce nem interação
-          var pBuraco = _dcCentroCelula(layout, r, c);
-          ctx.save();
-          ctx.globalAlpha = 0.4;
-          ctx.beginPath();
-          ctx.arc(pBuraco.x, pBuraco.y, layout.cellPx * 0.3, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(0,0,0,0.4)';
-          ctx.fill();
-          ctx.restore();
-          continue;
-        }
+        if (!_dcCelulaAtiva(idx)) continue;   // buraco: a bandeja já não tem casa ali
         var p = _dcCentroCelula(layout, r, c);
         var cx = p.x, cy = p.y;
         var raio = layout.cellPx / 2;
@@ -847,10 +980,12 @@
           cy = de.y + (para.y - de.y) * te;
         }
 
-        // queda (entra de cima, com um leve "estica" ao final)
+        // queda (entra de cima, com um leve "estica" ao final). t0 no futuro =
+        // doce ainda não entrou (chuva de doces no começo da fase).
         var quedaInfo = _dcQuedaAnim[idx];
         if (quedaInfo) {
-          var tq = Math.min(1, (agora - quedaInfo.t0) / _DC_DUR_QUEDA);
+          if (agora < quedaInfo.t0) continue;
+          var tq = Math.min(1, (agora - quedaInfo.t0) / (quedaInfo.dur || _DC_DUR_QUEDA));
           var teq = _dcEaseOutBack(tq);
           offY += -(1 - teq) * quedaInfo.filas * layout.passo;
           if (tq >= 1) {
@@ -860,14 +995,11 @@
         }
         // squash ao pousar
         var pousoInfo = _dcPousoAnim[idx];
-        var escalaX = 1, escalaY = 1;
+        var escalaY = 1;
         if (pousoInfo) {
           var tp = Math.min(1, (agora - pousoInfo.t0) / _DC_DUR_POUSO);
           if (tp >= 1) delete _dcPousoAnim[idx];
-          else {
-            var achata = Math.sin(tp * Math.PI) * 0.22;
-            escalaY = 1 - achata; escalaX = 1 + achata * 0.7;
-          }
+          else escalaY = 1 - Math.sin(tp * Math.PI) * 0.22;
         }
         // pop/explosão
         var popInfo = _dcPopAnim[idx];
@@ -876,9 +1008,30 @@
           if (tpop < 0.45) escala = 1 + (tpop / 0.45) * 0.3;
           else { var tt = (tpop - 0.45) / 0.55; escala = 1.3 - tt * 1.15; alpha = 1 - tt; }
         }
-        // seleção (encolhe um pouco + anel branco)
+        // onda de comemoração (fase concluída): cada coluna pula na sua vez
+        if (_dcVitoriaT0) {
+          var tv = (agora - _dcVitoriaT0 - c * 55) / 420;
+          if (tv > 0 && tv < 1) offY -= Math.sin(tv * Math.PI) * layout.cellPx * 0.42;
+        }
+        // seleção: cresce, pulsa e ganha anel
         var selecionada = !!(_dcSelecionado && (_dcSelecionado.r * _DC_TAM + _dcSelecionado.c) === idx);
-        if (selecionada) escala *= 0.86;
+        if (selecionada) escala *= 1.1 + Math.sin(agora / 150) * 0.04;
+        // dica: os dois doces se inclinam um pro outro
+        if (_dcDica && (idx === _dcDica.i1 || idx === _dcDica.i2)) {
+          var td = ((agora - _dcDica.t0) % 1300) / 1300;
+          var nud = td < 0.5 ? Math.sin(td / 0.5 * Math.PI) : 0;
+          var outro = idx === _dcDica.i1 ? _dcDica.i2 : _dcDica.i1;
+          offX += ((outro % _DC_TAM) - c) * nud * layout.passo * 0.16;
+          offY += (Math.floor(outro / _DC_TAM) - r) * nud * layout.passo * 0.16;
+          escala *= 1 + nud * 0.08;
+        }
+        // reflexo
+        var brilhando = 0;
+        if (_dcBrilho && _dcBrilho.idx === idx) {
+          var tb = (agora - _dcBrilho.t0) / 520;
+          if (tb >= 1) _dcBrilho = null;
+          else { brilhando = Math.sin(tb * Math.PI); escala *= 1 + brilhando * 0.07; }
+        }
         // troca inválida (tremida horizontal)
         var shakeInfo = _dcShakeAnim[idx];
         if (shakeInfo) {
@@ -887,19 +1040,109 @@
           else offX += Math.sin(ts * Math.PI * 4) * 5 * (1 - ts);
         }
 
-        var raioFinal = raio * escalaX;
-        _dcDesenharDoce(ctx, cx, cy + offY, raio, _dcCor[idx], _dcTipo[idx], _dcGelo[idx], escala * (escalaY), alpha, offX);
+        if (!_dcCor[idx]) continue;
+        // sombra de contato no pé da casa (fica no lugar quando o doce pula)
+        if (alpha > 0.5) {
+          ctx.beginPath();
+          ctx.ellipse(cx + offX, p.y + raio * 0.8, raio * 0.56, raio * 0.15, 0, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(0,0,0,0.26)';
+          ctx.fill();
+        }
+        if (selecionada && _dcGlow) {
+          var ladoS = raio * 3.3;
+          ctx.drawImage(_dcGlow, cx + offX - ladoS / 2, cy + offY - ladoS / 2, ladoS, ladoS);
+        }
+        _dcDesenharDoce(ctx, cx, cy + offY, raio, _dcCor[idx], _dcTipo[idx], _dcGelo[idx], escala * escalaY, alpha, offX);
         if (selecionada) {
           ctx.save();
           ctx.beginPath();
-          ctx.arc(cx + offX, cy + offY, raio * escala + 2, 0, Math.PI * 2);
+          ctx.arc(cx + offX, cy + offY, raio * 1.02, 0, Math.PI * 2);
           ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 3;
+          ctx.lineWidth = 2.5;
+          ctx.setLineDash([7, 5]);
+          ctx.lineDashOffset = -agora / 45;   // anel "andando"
           ctx.stroke();
           ctx.restore();
         }
+        if (brilhando > 0) {
+          ctx.fillStyle = 'rgba(255,255,255,' + (0.9 * brilhando).toFixed(3) + ')';
+          _dcEstrela(ctx, cx + offX - raio * 0.34, cy + offY - raio * 0.38, raio * 0.42 * brilhando);
+        }
       }
     }
+
+    // ── efeitos dos doces especiais (feixe, onda, raios, clarão) ──
+    for (i = _dcFx.length - 1; i >= 0; i--) {
+      var fx = _dcFx[i], tf = (agora - fx.t0) / fx.dur;
+      if (tf >= 1) { _dcFx.splice(i, 1); continue; }
+      if (tf < 0) continue;
+      ctx.save();
+      if (fx.tipo === 'h' || fx.tipo === 'v') {
+        var esp = layout.cellPx * (0.95 - tf * 0.75);
+        ctx.globalAlpha = (1 - tf) * 0.9;
+        ctx.fillStyle = fx.cor;
+        if (fx.tipo === 'h') ctx.fillRect(0, fx.y - esp / 2, w, esp); else ctx.fillRect(fx.x - esp / 2, 0, esp, h);
+        ctx.fillStyle = '#fff';
+        if (fx.tipo === 'h') ctx.fillRect(0, fx.y - esp * 0.22, w, esp * 0.44); else ctx.fillRect(fx.x - esp * 0.22, 0, esp * 0.44, h);
+      } else if (fx.tipo === 'onda') {
+        ctx.globalAlpha = (1 - tf) * 0.95;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = Math.max(1, layout.cellPx * 0.3 * (1 - tf));
+        ctx.beginPath(); ctx.arc(fx.x, fx.y, layout.passo * (0.4 + tf * 1.5), 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = fx.cor; ctx.lineWidth *= 0.45;
+        ctx.beginPath(); ctx.arc(fx.x, fx.y, layout.passo * (0.25 + tf * 1.15), 0, Math.PI * 2); ctx.stroke();
+      } else if (fx.tipo === 'raios') {
+        ctx.globalAlpha = (1 - tf);
+        ctx.lineCap = 'round';
+        for (var ri = 0; ri < fx.alvos.length; ri++) {
+          var al = _dcCentroCelula(layout, Math.floor(fx.alvos[ri] / _DC_TAM), fx.alvos[ri] % _DC_TAM);
+          var org = _dcCentroCelula(layout, Math.floor(fx.de / _DC_TAM), fx.de % _DC_TAM);
+          var prog = Math.min(1, tf * 2.4);   // o raio "chega" no alvo
+          ctx.strokeStyle = fx.cor; ctx.lineWidth = Math.max(1.5, layout.cellPx * 0.16 * (1 - tf));
+          ctx.beginPath(); ctx.moveTo(org.x, org.y); ctx.lineTo(org.x + (al.x - org.x) * prog, org.y + (al.y - org.y) * prog); ctx.stroke();
+          ctx.strokeStyle = '#fff'; ctx.lineWidth *= 0.4;
+          ctx.beginPath(); ctx.moveTo(org.x, org.y); ctx.lineTo(org.x + (al.x - org.x) * prog, org.y + (al.y - org.y) * prog); ctx.stroke();
+        }
+      } else if (fx.tipo === 'flash') {
+        ctx.globalAlpha = (1 - tf) * 0.3;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, w, h);
+      }
+      ctx.restore();
+    }
+
+    // ── estilhaços dos doces estourados ──
+    for (i = _dcParticulas.length - 1; i >= 0; i--) {
+      var pa = _dcParticulas[i], tpa = (agora - pa.t0) / pa.dur;
+      if (tpa >= 1) { _dcParticulas.splice(i, 1); continue; }
+      var seg = (agora - pa.t0) / 1000;
+      ctx.globalAlpha = 1 - tpa * tpa;
+      ctx.fillStyle = pa.cor;
+      ctx.beginPath();
+      ctx.arc(pa.x + pa.vx * seg, pa.y + pa.vy * seg + 260 * seg * seg, pa.r * (1 - tpa * 0.5), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // ── pontos subindo ("+30") ──
+    if (_dcPopups.length) {
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '800 ' + Math.round(layout.cellPx * 0.52) + "px 'Syne', system-ui, sans-serif";
+      ctx.lineJoin = 'round';
+      for (i = _dcPopups.length - 1; i >= 0; i--) {
+        var po = _dcPopups[i], tpo = (agora - po.t0) / _DC_DUR_POPUP;
+        if (tpo >= 1) { _dcPopups.splice(i, 1); continue; }
+        if (tpo < 0) continue;
+        var ypo = po.y - _dcEaseOutQuad(tpo) * layout.passo * 0.95;
+        ctx.globalAlpha = tpo < 0.6 ? 1 : 1 - (tpo - 0.6) / 0.4;
+        ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(24,8,40,0.85)';
+        ctx.strokeText(po.texto, po.x, ypo);
+        ctx.fillStyle = po.cor; ctx.fillText(po.texto, po.x, ypo);
+      }
+      ctx.restore();
+    }
+    ctx.restore();   // fim do tremor
 
     // Mensagem de combo ("Delicioso!", "Combo x2!"...) — aparece só em
     // jogadas grandes, centrada sobre o tabuleiro, com pop-in e fade-out.
@@ -914,12 +1157,21 @@
         ctx.save();
         ctx.globalAlpha = Math.max(0, alphaMsg);
         ctx.translate(w / 2, h * 0.4);
+        ctx.rotate(-0.05);
         ctx.scale(escalaMsg, escalaMsg);
-        ctx.font = '800 ' + Math.round(w * 0.095) + 'px system-ui, -apple-system, sans-serif';
+        // cabe sempre na largura: a Syne é larga
+        var tamMsg = Math.round(w * 0.105);
+        ctx.font = '800 ' + tamMsg + "px 'Syne', system-ui, sans-serif";
+        var largMsg = ctx.measureText(_dcComboMsg.texto).width;
+        if (largMsg > w * 0.9) { tamMsg = Math.floor(tamMsg * w * 0.9 / largMsg); ctx.font = '800 ' + tamMsg + "px 'Syne', system-ui, sans-serif"; }
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = Math.max(5, tamMsg * 0.2);
+        ctx.strokeStyle = 'rgba(24,8,40,0.9)';
+        ctx.strokeText(_dcComboMsg.texto, 0, 0);
+        ctx.lineWidth = Math.max(2, tamMsg * 0.07);
+        ctx.strokeStyle = '#fff';
         ctx.strokeText(_dcComboMsg.texto, 0, 0);
         ctx.fillStyle = _dcComboMsg.cor || '#fff';
         ctx.fillText(_dcComboMsg.texto, 0, 0);
@@ -935,6 +1187,81 @@
     ctx.arcTo(x, y + h, x, y, raio);
     ctx.arcTo(x, y, x + w, y, raio);
     ctx.closePath();
+  }
+
+  // ── Mascote (coruja acima do tabuleiro) e balão de fala ─────
+  // Só troca a imagem e o texto de elementos criados em _dcMontarVisual;
+  // se eles não existirem (tela sem espaço), não faz nada.
+  var _DC_OWL = {
+    normal: '/webp/owl-curious.webp', ola: '/webp/owl-wave.webp', feliz: '/webp/owl-thumbsup.webp',
+    festa: '/webp/owl-tada.webp', amor: '/webp/owl-love.webp', susto: '/webp/owl-surprised.webp', dica: '/webp/owl-point.webp'
+  };
+  var _dcMascoteT = 0;
+  function _dcMascote(estado, fala, ms) {
+    var img = document.getElementById('dc-mascote-img'), bal = document.getElementById('dc-balao');
+    if (!img) return;
+    clearTimeout(_dcMascoteT);
+    var src = _DC_OWL[estado] || _DC_OWL.normal;
+    if (img.getAttribute('src') !== src) img.setAttribute('src', src);
+    img.classList.remove('dc-mascote-pulo');
+    if (estado !== 'normal') { void img.offsetWidth; img.classList.add('dc-mascote-pulo'); }
+    if (bal) { if (fala) bal.textContent = fala; bal.classList.toggle('on', !!fala); }
+    if (ms) _dcMascoteT = setTimeout(_dcMascoteDescansar, ms);
+  }
+  // Volta pro estado "de fundo": aflita nos últimos movimentos, curiosa no resto.
+  function _dcMascoteDescansar() {
+    if (_dcRodando && _dcMovimentosRestantes <= 3) _dcMascote('susto', _dcMovimentosRestantes === 1 ? 'Último movimento!' : 'Últimos movimentos!');
+    else _dcMascote('normal', '');
+  }
+
+  // Estouro de um passo da cascata: estilhaços na cor de cada doce, "+pontos"
+  // por combinação e o efeito de cada doce especial que disparou.
+  function _dcEfeitosEstouro(resultado) {
+    var layout = _dcObterLayout(), agora = performance.now(), n = 0, extras = 0, primeiroEsp = -1, forte = false;
+    var emRun = {}, reduzido = _dcMovReduzido();
+    resultado.runs.forEach(function (run) {
+      run.cells.forEach(function (i) { emRun[i] = true; });
+      var meio = run.cells[Math.floor(run.cells.length / 2)];
+      var pm = _dcCentroCelula(layout, Math.floor(meio / _DC_TAM), meio % _DC_TAM);
+      _dcPopups.push({ x: pm.x, y: pm.y, texto: '+' + (run.cells.length * 10), cor: '#ffffff', t0: agora + 60 });
+    });
+    resultado.marcado.forEach(function (m, idx) {
+      if (!m) return;
+      n++;
+      var r = Math.floor(idx / _DC_TAM), c = idx % _DC_TAM, pc = _dcCentroCelula(layout, r, c);
+      var cor = _dcCores[_dcCor[idx] - 1] || '#ffffff', tipo = _dcTipo[idx];
+      if (!emRun[idx]) extras++;
+      if (tipo === _DC_TIPO_LISTRA_H) { _dcFx.push({ tipo: 'h', y: pc.y, cor: cor, t0: agora, dur: 520 }); forte = true; }
+      else if (tipo === _DC_TIPO_LISTRA_V) { _dcFx.push({ tipo: 'v', x: pc.x, cor: cor, t0: agora, dur: 520 }); forte = true; }
+      else if (tipo === _DC_TIPO_EMBRULHADO) { _dcFx.push({ tipo: 'onda', x: pc.x, y: pc.y, cor: cor, t0: agora, dur: 560 }); forte = true; }
+      else if (tipo === _DC_TIPO_BOMBA) { primeiroEsp = idx; forte = true; }
+      if (tipo > 0 && primeiroEsp < 0) primeiroEsp = idx;
+      if (reduzido || _dcParticulas.length > 240) return;
+      for (var k = 0; k < 6; k++) {
+        var ang = Math.random() * Math.PI * 2, vel = layout.cellPx * (1.6 + Math.random() * 2.6);
+        _dcParticulas.push({
+          x: pc.x, y: pc.y, vx: Math.cos(ang) * vel, vy: Math.sin(ang) * vel - layout.cellPx * 1.4,
+          r: layout.cellPx * (0.08 + Math.random() * 0.09), cor: k === 0 ? '#ffffff' : cor,
+          t0: agora + 90, dur: _DC_DUR_PART * (0.7 + Math.random() * 0.5)
+        });
+      }
+    });
+    // bomba de cor: um raio da bomba até cada doce atingido + clarão
+    resultado.marcado.forEach(function (m, idx) {
+      if (!m || _dcTipo[idx] !== _DC_TIPO_BOMBA) return;
+      var alvos = [];
+      resultado.marcado.forEach(function (m2, j) { if (m2 && j !== idx && alvos.length < 40) alvos.push(j); });
+      _dcFx.push({ tipo: 'raios', de: idx, alvos: alvos, cor: '#fde68a', t0: agora, dur: 560 });
+      _dcFx.push({ tipo: 'flash', t0: agora, dur: 320 });
+    });
+    if (extras > 0 && primeiroEsp >= 0) {
+      var pe = _dcCentroCelula(layout, Math.floor(primeiroEsp / _DC_TAM), primeiroEsp % _DC_TAM);
+      _dcPopups.push({ x: pe.x, y: pe.y - layout.cellPx * 0.5, texto: '+' + (extras * 15), cor: '#fde68a', t0: agora + 140 });
+    }
+    if (!reduzido && (forte || n >= 9)) {
+      _dcTremor = { t0: agora, forca: forte ? Math.min(7, 3 + n * 0.18) : 3 };
+      if (navigator.vibrate) { try { navigator.vibrate(forte ? 28 : 14); } catch (e) {} }
+    }
   }
 
   function _dcFeedbackInvalido(i1, i2) {
@@ -987,6 +1314,7 @@
 
   function _dcCanvasPointerDown(e) {
     if (!_dcRodando || _dcAnimando) return;
+    _dcAcao();
     var cel = _dcCanvasParaCelula(e.clientX, e.clientY);
     if (!cel) return;
     e.preventDefault();
@@ -1083,8 +1411,9 @@
     3: ['Embrulhado!', '#a855f7'],
     4: ['Bomba de cor!', '#fb7185']
   };
-  function _dcMostrarComboMsg(texto, cor) {
+  function _dcMostrarComboMsg(texto, cor, humor) {
     _dcComboMsg = { texto: texto, cor: cor, t0: performance.now(), duracao: _DC_DUR_COMBO };
+    _dcMascote(humor || 'feliz', texto, 1700);
   }
   // `opts.prefCel` (opcional): célula de destino da troca do jogador, só
   // usada no 1º passo, pra um doce especial recém-criado nascer onde o
@@ -1104,7 +1433,7 @@
       if (resultado.marcado.indexOf(true) === -1) {
         _dcAnimando = false;
         if (passosNestaTroca >= 2) {
-          _dcMostrarComboMsg('Combo x' + passosNestaTroca + '!', '#fbbf24');
+          _dcMostrarComboMsg('Combo x' + passosNestaTroca + '!', '#fbbf24', passosNestaTroca >= 3 ? 'festa' : 'feliz');
         } else if (maiorRunNestaTroca >= 4) {
           var msg = _DC_MENSAGENS_RUN[Math.min(6, maiorRunNestaTroca)];
           _dcMostrarComboMsg(msg[0], msg[1]);
@@ -1122,7 +1451,7 @@
       prefCel = null;
       if (criar.length) {
         var msgEsp = _DC_MENSAGENS_ESPECIAL[criar[criar.length - 1].tipo];
-        if (msgEsp) _dcMostrarComboMsg(msgEsp[0], msgEsp[1]);
+        if (msgEsp) _dcMostrarComboMsg(msgEsp[0], msgEsp[1], 'amor');
       }
       // 1) "Explode" as células combinadas antes de sumirem — sem isso a
       // troca parecia teletransporte (uma cor some, outra já aparece no
@@ -1148,6 +1477,7 @@
       resultado.marcado.forEach(function (m, idx) {
         if (m) _dcPopAnim[idx] = { t0: agora };
       });
+      _dcEfeitosEstouro(resultado);
       setTimeout(function () {
         if (ger !== _dcGeracao) return;
         resultado.marcado.forEach(function (m, idx) { if (m) delete _dcPopAnim[idx]; });
@@ -1169,7 +1499,22 @@
     if (_dcMovimentosRestantes <= 0) { _dcFimFase(false); return; }
     if (!_dcExisteMovimentoValido()) {
       _dcEmbaralhar();
-      _dcMostrarComboMsg('Embaralhando!', '#ffffff');   // antes o tabuleiro trocava do nada
+      _dcMostrarComboMsg('Embaralhando!', '#ffffff', 'susto');   // antes o tabuleiro trocava do nada
+      _dcChuvaDeDoces();
+    }
+    _dcAcao();
+    if (_dcMovimentosRestantes <= 3 && !_dcComboMsg) _dcMascoteDescansar();
+  }
+
+  // Todos os doces entram caindo, coluna por coluna (começo de fase e embaralhada).
+  function _dcChuvaDeDoces() {
+    var agora = performance.now();
+    _dcQuedaAnim = {};
+    if (_dcMovReduzido()) return;
+    for (var i = 0; i < _DC_TAM * _DC_TAM; i++) {
+      if (!_dcCelulaAtiva(i)) continue;
+      var r = Math.floor(i / _DC_TAM), c = i % _DC_TAM;
+      _dcQuedaAnim[i] = { t0: agora + c * 38 + (_DC_TAM - 1 - r) * 26, filas: r + 2, dur: 360 };
     }
   }
 
@@ -1178,8 +1523,48 @@
     var recEl = document.getElementById('dc-recorde'); if (recEl) recEl.textContent = _dcRecordeGet();
     var movEl = document.getElementById('dc-movimentos'); if (movEl) movEl.textContent = _dcMovimentosRestantes;
     var pontosEl = document.getElementById('dc-pontos'); if (pontosEl) pontosEl.textContent = _dcPontosFase;
-    var objEl = document.getElementById('dc-objetivo-texto'); if (objEl) objEl.textContent = _dcObjetivoTexto();
+    _dcObjetivoNoHud();
     var progEl = document.getElementById('dc-objetivo-progresso'); if (progEl) progEl.textContent = _dcObjetivoProgresso();
+    var barra = document.getElementById('dc-barra-fill');
+    if (barra) barra.style.width = (_dcObjetivoFracao() * 100).toFixed(1) + '%';
+    if (movEl && movEl.parentNode) movEl.parentNode.classList.toggle('dc-mov-baixo', _dcRodando && _dcMovimentosRestantes <= 5);
+  }
+  // 0..1 do objetivo da fase (barra do HUD).
+  function _dcObjetivoFracao() {
+    if (!_dcObjetivo || !_dcObjetivo.meta) return 0;
+    var v = _dcObjetivo.tipo === 'pontos' ? _dcPontosFase : (_dcObjetivo.tipo === 'cor' ? _dcMatchesCorFase : _dcObstaculosQuebrados);
+    return Math.max(0, Math.min(1, v / _dcObjetivo.meta));
+  }
+  // Imagem do doce de uma cor (pro objetivo "combinações de …"): arte do
+  // clássico, do tema com arte, ou o sprite gerado do tema de paleta.
+  function _dcIconeCor(corIdx) {
+    try {
+      var sp = _dcSkinSprites ? _dcSkinSprites[corIdx - 1] : null;
+      if (sp && sp.tagName === 'IMG') return sp.src;
+      if (sp && sp.toDataURL) return sp.toDataURL();
+    } catch (e) {}
+    return _dcTexturas[corIdx - 1] || '';
+  }
+  function _dcObjetivoNoHud() {
+    var objEl = document.getElementById('dc-objetivo-texto');
+    if (!objEl) return;
+    var chave = _dcObjetivo ? (_dcObjetivo.tipo + _dcObjetivo.meta + '|' + _dcObjetivo.corAlvo + '|' + (_dcSkinSprites ? 's' : 'c') + _dcCores[0]) : '';
+    if (objEl._dcChave === chave) return;   // só mexe no DOM quando o objetivo muda
+    objEl._dcChave = chave;
+    // Texto curto (o rótulo "Objetivo" já está em cima): cabe em 1 linha.
+    var ico = (_dcObjetivo && _dcObjetivo.tipo === 'cor') ? _dcIconeCor(_dcObjetivo.corAlvo) : '';
+    if (ico) {
+      objEl.textContent = 'Combine ' + _dcObjetivo.meta + '× ';
+      var im = document.createElement('img');
+      im.className = 'dc-obj-ico'; im.alt = _dcCoresNome[_dcObjetivo.corAlvo - 1] || ''; im.src = ico;
+      objEl.appendChild(im);
+    } else if (_dcObjetivo && _dcObjetivo.tipo === 'pontos') {
+      objEl.textContent = _dcObjetivo.meta + ' pontos';
+    } else if (_dcObjetivo && _dcObjetivo.tipo === 'obstaculo') {
+      objEl.textContent = 'Derreta ' + _dcObjetivo.meta + (_dcObjetivo.meta === 1 ? ' gelo' : ' gelos');
+    } else {
+      objEl.textContent = _dcObjetivoTexto();
+    }
   }
   function _dcMostrarOverlay(nome) {
     // Sem overlay do jogo = fase rolando → menu unificado do hub no canto.
@@ -1202,8 +1587,11 @@
     _dcRng = _dcMulberry32(2000 + _dcFaseAtual * 131);
     _dcInicioFaseMs = Date.now();
     _dcFormato = _dcGerarFormato(_dcFaseAtual);
+    _dcFundoVersao++;
     _dcAplicarTemaFase(_dcFaseAtual);
     _dcComboMsg = null;
+    _dcParticulas.length = 0; _dcPopups.length = 0; _dcFx.length = 0;
+    _dcTremor = null; _dcBrilho = null; _dcVitoriaT0 = 0;
 
     var tentativas = 0;
     do {
@@ -1216,35 +1604,62 @@
     _dcAnimando = false;
     _dcSelecionado = null;
     _dcQuedaAnim = {}; _dcPopAnim = {}; _dcPousoAnim = {}; _dcShakeAnim = {}; _dcTrocaAnim = null;
+    _dcChuvaDeDoces();
+    _dcAcao();
     _dcAtualizarHud();
+    _dcMascote('ola', _dcObjetivoTexto() + '!', 3200);
   }
 
   function _dcFimFase(venceu) {
     _dcRodando = false;
+    _dcDica = null; _dcSelecionado = null;
     _dcUltimoResultado = venceu ? 'venceu' : 'perdeu';
     var s = _som();
     if (venceu) {
       if (_dcFaseAtual > _dcRecordeGet()) _dcRecordeSet(_dcFaseAtual);
       if (s) s.fim(true);
       if (window.AngatubaGames && window.AngatubaGames.efeitos) window.AngatubaGames.efeitos.confete('dc-card');
-    } else if (s) { s.fim(false); }
+      if (!_dcMovReduzido()) _dcVitoriaT0 = performance.now();   // os doces pulam em onda
+      _dcMascote('festa', 'Fase concluída!');
+    } else {
+      if (s) s.fim(false);
+      _dcMascote('susto', 'Acabaram os movimentos!');
+    }
+    _dcAtualizarHud();
     var recorde = _dcRecordeGet();
 
     var owl = document.getElementById('dc-fim-owl');
     var tit = document.getElementById('dc-fim-titulo');
     var msg = document.getElementById('dc-fim-msg');
     var btn = document.getElementById('dc-fim-btn');
-    if (owl) { owl.src = venceu ? '/webp/owl-celebrate-pro.webp' : '/webp/owl-angry.webp'; owl.style.display = ''; }
+    if (owl) { owl.src = venceu ? '/webp/owl-trophy.webp' : '/webp/owl-sad.webp'; owl.style.display = ''; }
     if (tit) tit.textContent = venceu ? ('Fase ' + _dcFaseAtual + ' concluída! 🎉') : 'Movimentos esgotados!';
     if (msg) {
       msg.textContent = venceu
-        ? ('Você fez ' + _dcPontosFase + ' pontos nesta fase. Bora pra próxima?')
-        : ('Você chegou até a fase ' + _dcFaseAtual + ' com ' + _dcPontosFase + ' pontos nesta tentativa. Tenta de novo!');
+        ? 'Mandou bem! Bora pra próxima?'
+        : ('Faltou pouco: ' + _dcObjetivoProgresso() + ' do objetivo. Tenta de novo!');
     }
+    var stats = document.getElementById('dc-fim-stats');
+    if (stats) {
+      stats.innerHTML =
+        '<span class="dc-chip"><b>' + _dcPontosFase + '</b> pontos</span>' +
+        (venceu ? '<span class="dc-chip"><b>' + _dcMovimentosRestantes + '</b> ' + (_dcMovimentosRestantes === 1 ? 'movimento sobrando' : 'movimentos sobrando') + '</span>'
+                : '<span class="dc-chip">Fase <b>' + _dcFaseAtual + '</b></span>');
+    }
+    var fimEl = document.getElementById('dc-fim');
+    if (fimEl) fimEl.classList.toggle('dc-fim-venceu', !!venceu);
     if (btn) btn.textContent = venceu ? 'Próxima fase' : 'Tentar de novo';
     var recEl = document.getElementById('dc-recorde'); if (recEl) recEl.textContent = recorde;
 
-    _dcMostrarOverlay('fim');
+    // A tela de fim entra um instante depois: dá pra ver a última jogada e a
+    // comemoração dos doces. Pontos/moedas/ranking já foram gravados abaixo.
+    var gerFim = _dcGeracao;
+    setTimeout(function () {
+      if (gerFim !== _dcGeracao || !_dcTelaAberta) return;   // saiu ou já começou outra fase
+      _dcVitoriaT0 = 0;
+      _dcMostrarOverlay('fim');
+      if (window.AngatubaGames) window.AngatubaGames.rankFimDeJogo('doces', 'dc-rank-slot', recorde);
+    }, venceu ? 1100 : 750);
 
     var segundos = Math.max(0, Math.round((Date.now() - _dcInicioFaseMs) / 1000));
 
@@ -1267,8 +1682,6 @@
         if (moedasGanhas > 0) { moedasEl.textContent = '+' + moedasGanhas + ' 🪙'; moedasEl.style.display = ''; }
         else moedasEl.style.display = 'none';
       }
-
-      window.AngatubaGames.rankFimDeJogo('doces', 'dc-rank-slot', recorde);
     }
   }
 
@@ -1302,6 +1715,52 @@
     });
   }
 
+  // ── Visual v3: elementos extras criados aqui (1x), sem mexer no index.html ──
+  function _dcMontarVisual() {
+    var card = document.getElementById('dc-card'), arena = document.getElementById('dc-arena');
+    if (!card || !arena || card._dcVisual) return;
+    card._dcVisual = true;
+    function novo(tag, cls, id) { var e = document.createElement(tag); if (cls) e.className = cls; if (id) e.id = id; return e; }
+    // Telas de início/fim passam a ser filhas do CARD (cobrem o HUD), e a
+    // arena volta a ser a referência dos enfeites de fundo.
+    ['dc-inicio', 'dc-fim'].forEach(function (id) { var ov = document.getElementById(id); if (ov) card.appendChild(ov); });
+    // Barra de progresso do objetivo (dentro do quadro "Progresso").
+    var prog = document.getElementById('dc-objetivo-progresso');
+    if (prog && prog.parentNode) {
+      var barra = novo('div', 'dc-barra'); barra.appendChild(novo('i', '', 'dc-barra-fill'));
+      prog.parentNode.insertBefore(barra, prog);
+    }
+    // Doces flutuando no fundo da arena (enfeite, não interagem).
+    var decos = novo('div', 'dc-decos'); decos.setAttribute('aria-hidden', 'true');
+    for (var i = 0; i < 7; i++) {
+      var d = novo('i');
+      d.style.backgroundImage = 'url(' + _dcTexturas[i % _dcTexturas.length] + ')';
+      decos.appendChild(d);
+    }
+    arena.insertBefore(decos, arena.firstChild);
+    // Mascote + balão acima do tabuleiro (o CSS só mostra quando tem altura).
+    var masc = novo('div', 'dc-mascote', 'dc-mascote'), img = novo('img', '', 'dc-mascote-img'), bal = novo('div', 'dc-balao', 'dc-balao');
+    img.alt = ''; img.src = _DC_OWL.normal; bal.setAttribute('aria-live', 'polite');
+    masc.appendChild(img); masc.appendChild(bal);
+    arena.insertBefore(masc, _dcCanvas || arena.firstChild);
+    for (var k in _DC_OWL) { var pre = new Image(); pre.src = _DC_OWL[k]; }   // pré-carrega as poses
+    // Início: objetivo da próxima fase. Fim: números da fase.
+    var faseIni = document.querySelector('#dc-inicio .dc-overlay-fase');
+    if (faseIni && faseIni.parentNode) faseIni.parentNode.insertBefore(novo('div', 'dc-overlay-obj', 'dc-inicio-obj'), faseIni.nextSibling);
+    var moedas = document.getElementById('dc-fim-moedas');
+    if (moedas && moedas.parentNode) moedas.parentNode.insertBefore(novo('div', 'dc-fim-stats', 'dc-fim-stats'), moedas);
+    var owlIni = document.querySelector('#dc-inicio .dc-overlay-owl');
+    if (owlIni) { owlIni.removeAttribute('loading'); owlIni.src = _DC_OWL.ola; }
+  }
+  // Texto curto do que a fase pede (tela inicial).
+  function _dcResumoFase(fase) {
+    var cfg = _dcConfigFase(fase), alvo;
+    if (cfg.tipo === 'pontos') alvo = cfg.meta + ' pontos';
+    else if (cfg.tipo === 'cor') alvo = cfg.meta + ' combinações ' + (_dcCoresNome[cfg.corAlvo - 1] || '');
+    else alvo = 'derreter ' + cfg.meta + (cfg.meta === 1 ? ' gelo' : ' gelos');
+    return '🎯 ' + alvo + ' · ' + cfg.movimentos + ' movimentos';
+  }
+
   // ── Preparação da tela (chamada pelo _jogoLoader ao abrir) ──
   function _dcPrepararTela() {
     var sP = _som(); if (sP && sP.precarregar) sP.precarregar(['doces-trocar', 'doces-combina', 'doces-cascata', 'doces-bomba']);
@@ -1316,6 +1775,8 @@
     _dcCarregarImagens();
     _dcCarregarSpritesMatch();
     _dcAplicarSkin();
+    _dcCriarGlow();
+    _dcMontarVisual();
     try {
       var corBorda = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
       if (corBorda) _dcCorBorda = corBorda;
@@ -1332,6 +1793,8 @@
     var recorde = _dcRecordeGet();
     var faseIni = document.getElementById('dc-fase-inicio'); if (faseIni) faseIni.textContent = (recorde + 1);
     var recIni = document.getElementById('dc-recorde-inicio'); if (recIni) recIni.textContent = recorde;
+    var objIni = document.getElementById('dc-inicio-obj'); if (objIni) objIni.textContent = _dcResumoFase(recorde + 1);
+    _dcMascote('normal', '');
     _dcAplicarTemaFase(recorde + 1);
     _dcAtualizarHud();
     _dcMostrarOverlay('inicio');
@@ -1343,6 +1806,8 @@
     _dcRodando = false;
     _dcAnimando = false;
     _dcArraste = null;
+    _dcDica = null; _dcVitoriaT0 = 0;
+    clearTimeout(_dcMascoteT);
     _dcTelaAberta = false; // para o loop de desenho (economiza bateria fora da tela)
   }
 

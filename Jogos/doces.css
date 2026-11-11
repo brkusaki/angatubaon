@@ -1,6 +1,14 @@
 /* ═══════════════════════════════════════════════════════════════
    DOCES DA CORUJA — estilos do jogo (lazy-loaded)
    Injetado sob demanda pelo _jogoLoader ao abrir o jogo.
+
+   Visual v3 (nov/2026): HUD em placar (fase · objetivo + barra ·
+   movimentos), cenário de fase com doces flutuando, mascote com balão
+   acima do tabuleiro e telas de início/fim no mesmo cenário. O
+   tabuleiro em si (bandeja, casas, brilhos, estouros) é desenhado no
+   canvas — ver doces.js. Os elementos extras (.dc-barra, .dc-decos,
+   .dc-mascote, .dc-overlay-obj, .dc-fim-stats) são criados pelo JS
+   (_dcMontarVisual), não estão no index.html.
    ═══════════════════════════════════════════════════════════════ */
 
 .dc-card {
@@ -8,40 +16,135 @@
   border-radius: 16px; overflow: hidden;
   border: 1px solid var(--border);
   background: var(--surface);
+  /* cenário da fase: o JS troca conforme o tema (_dcAplicarTemaFase) */
+  --dc-cenario: radial-gradient(120% 55% at 50% -8%, rgba(251,113,133,.42), transparent 62%), linear-gradient(165deg, #3a1a2e, #1c0f1c);
 }
-.dc-hud {
-  display: flex; flex-wrap: wrap; justify-content: space-around; gap: 6px;
-  padding: 12px 10px;
-  background: linear-gradient(135deg, rgba(251,113,133,0.12), rgba(249,115,22,0.08));
-  border-bottom: 1px solid var(--border);
-}
-.dc-hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 58px; }
-.dc-hud-objetivo { flex: 1 1 100%; order: -1; }
-.dc-hud-label {
-  font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
-  color: var(--muted); font-weight: 700;
-}
-.dc-hud-valor {
-  /* A Syne é larga: em tela estreita o valor encolhe pra o HUD não quebrar em mais linhas. */
-  font-family: var(--font-h); font-weight: 800; font-size: clamp(14px, 4.6vw, 18px);
-  color: var(--text);
-}
-.dc-hud-obj-txt { font-size: 13px; text-align: center; }
 
+/* ── HUD em placar ─────────────────────────────────────────────
+   Ordem no HTML: 1 objetivo · 2 fase · 3 progresso · 4 movimentos ·
+   5 recorde. Aqui vira: [fase] [objetivo + barra] [movimentos]. Duas
+   linhas fixas — não cresce mais com números grandes. O "recorde" some
+   daqui (é sempre a fase atual − 1 e já aparece na tela inicial). */
+.dc-hud {
+  position: relative; z-index: 2;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "fase obj mov" "fase prog mov";
+  align-items: center; column-gap: 12px; row-gap: 6px;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(251,113,133,.30), rgba(168,85,247,.24) 55%, rgba(56,189,248,.18));
+  border-bottom: 1px solid rgba(255,255,255,.12);
+}
+.dc-hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.dc-hud-label {
+  font-size: 9px; text-transform: uppercase; letter-spacing: .08em;
+  color: rgba(255,255,255,.72); font-weight: 800;
+}
+.dc-hud-valor { font-family: var(--font-h); font-weight: 800; font-size: 18px; color: #fff; }
+
+.dc-hud > .dc-hud-item:nth-child(1) { grid-area: obj; align-items: flex-start; align-self: end; }
+.dc-hud-obj-txt { font-size: clamp(12px, 3.7vw, 14.5px); text-align: left; line-height: 1.2; }
+.dc-obj-ico { width: 22px; height: 22px; vertical-align: -6px; margin-left: 2px; }
+
+.dc-hud > .dc-hud-item:nth-child(2) {
+  grid-area: fase; justify-content: center;
+  width: 50px; height: 50px; border-radius: 15px;
+  background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+}
+.dc-hud > .dc-hud-item:nth-child(2) .dc-hud-valor { font-size: 20px; line-height: 1; }
+
+.dc-hud > .dc-hud-item:nth-child(3) { grid-area: prog; flex-direction: row; align-items: center; gap: 8px; align-self: start; }
+.dc-hud > .dc-hud-item:nth-child(3) .dc-hud-label { display: none; }
+.dc-hud > .dc-hud-item:nth-child(3) .dc-hud-valor { font-size: 11px; color: rgba(255,255,255,.9); white-space: nowrap; }
+.dc-barra {
+  flex: 1 1 auto; min-width: 0; height: 10px; border-radius: 99px; overflow: hidden;
+  background: rgba(0,0,0,.4); box-shadow: inset 0 1px 2px rgba(0,0,0,.6);
+}
+.dc-barra i {
+  display: block; height: 100%; width: 0; border-radius: 99px;
+  background: linear-gradient(90deg, #fbbf24, #fb7185);
+  box-shadow: 0 0 8px rgba(251,191,36,.7);
+  transition: width .4s cubic-bezier(.3,1.2,.5,1);
+}
+
+.dc-hud > .dc-hud-item:nth-child(4) { grid-area: mov; flex-direction: column-reverse; gap: 3px; }
+.dc-hud > .dc-hud-item:nth-child(4) .dc-hud-label { font-size: 7.5px; letter-spacing: .06em; }
+.dc-hud > .dc-hud-item:nth-child(4) .dc-hud-valor {
+  width: 46px; height: 46px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; line-height: 1; letter-spacing: -.03em; text-shadow: 0 1px 0 rgba(0,0,0,.35);
+  background: radial-gradient(circle at 35% 28%, #ffe4e6 0%, #fb7185 42%, #e11d48 100%);
+  border: 2px solid rgba(255,255,255,.75);
+  box-shadow: 0 3px 0 #9f1239, 0 0 14px rgba(251,113,133,.55);
+}
+/* Últimos movimentos: o contador fica vermelho e pulsa. */
+.dc-mov-baixo .dc-hud-valor {
+  background: radial-gradient(circle at 35% 28%, #fecaca 0%, #ef4444 42%, #b91c1c 100%) !important;
+  animation: dcAlerta .7s ease-in-out infinite;
+}
+@keyframes dcAlerta { 50% { transform: scale(1.14); box-shadow: 0 3px 0 #7f1d1d, 0 0 22px rgba(239,68,68,.9); } }
+.dc-hud > .dc-hud-item:nth-child(5) { display: none; }
+
+/* ── Arena: cenário + doces flutuando + mascote + tabuleiro ───── */
 .dc-arena {
+  position: relative; overflow: hidden;
   padding: 16px 12px 18px;
   display: flex; flex-direction: column; align-items: center;
-  background:
-    radial-gradient(circle at 70% 8%, rgba(251,113,133,0.08), transparent 55%),
-    var(--surface2);
+  background: var(--dc-cenario);
   min-height: 420px;
 }
+.dc-decos { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.dc-decos i {
+  position: absolute; width: 54px; height: 54px;
+  background: center / contain no-repeat;
+  opacity: .22; filter: blur(.5px);
+  animation: dcFlutua 8s ease-in-out infinite alternate;
+}
+.dc-decos i:nth-child(1) { left: 4%; top: 5%; }
+.dc-decos i:nth-child(2) { right: 5%; top: 12%; width: 40px; height: 40px; animation-delay: -2s; }
+.dc-decos i:nth-child(3) { left: 8%; bottom: 6%; width: 46px; height: 46px; animation-delay: -4s; }
+.dc-decos i:nth-child(4) { right: 3%; bottom: 9%; width: 64px; height: 64px; animation-delay: -1s; }
+.dc-decos i:nth-child(5) { left: 46%; top: 1%; width: 32px; height: 32px; animation-delay: -5s; }
+.dc-decos i:nth-child(6) { left: -12px; top: 46%; width: 48px; height: 48px; animation-delay: -3s; }
+.dc-decos i:nth-child(7) { right: -10px; top: 54%; width: 44px; height: 44px; animation-delay: -6s; }
+@keyframes dcFlutua { from { transform: translateY(6px) rotate(-7deg); } to { transform: translateY(-10px) rotate(9deg); } }
 
-/* Grade 8×8 de doces — agora um <canvas> desenhado via JS (doces.js).
-   O box-model (tamanho, padding visual, cantos) continua definido aqui
-   porque o JS lê o tamanho real do elemento via getBoundingClientRect()
-   tanto pra desenhar quanto pra converter toque em linha/coluna. */
+/* Mascote + balão: só aparece onde sobra altura (ver @container / tela grande abaixo). */
+.dc-mascote {
+  display: none; position: relative; z-index: 1;
+  align-items: flex-end; justify-content: flex-start; gap: 8px;
+  width: 100%; max-width: 340px; height: 84px; margin-bottom: 4px; padding-left: 8%;
+  box-sizing: border-box;
+}
+.dc-mascote img {
+  height: 84px; width: auto; flex-shrink: 0;
+  filter: drop-shadow(0 5px 6px rgba(0,0,0,.45));
+  transform-origin: 50% 100%;
+  animation: dcBob 2.4s ease-in-out infinite;
+}
+.dc-mascote img.dc-mascote-pulo { animation: dcPulo .5s cubic-bezier(.3,1.6,.5,1), dcBob 2.4s ease-in-out .5s infinite; }
+@keyframes dcBob { 50% { transform: translateY(-4px); } }
+@keyframes dcPulo { 0% { transform: scale(.8) translateY(6px); } 55% { transform: scale(1.1) translateY(-10px); } 100% { transform: scale(1) translateY(0); } }
+.dc-balao {
+  position: relative; align-self: center; max-width: 200px;
+  padding: 7px 11px; border-radius: 14px;
+  background: #fff; color: #2a1240; font-weight: 800; font-size: 12.5px; line-height: 1.25; text-align: left;
+  box-shadow: 0 4px 0 rgba(0,0,0,.25);
+  transform: scale(0); transform-origin: 0 70%;
+  transition: transform .18s cubic-bezier(.3,1.6,.5,1);
+}
+.dc-balao::before {
+  content: ''; position: absolute; left: -5px; top: 52%; width: 12px; height: 12px;
+  background: #fff; border-radius: 2px; transform: rotate(45deg);
+}
+.dc-balao.on { transform: scale(1); }
+
+/* Tabuleiro 8×8 — um <canvas> desenhado via JS (doces.js). O tamanho
+   continua definido aqui porque o JS lê o tamanho real do elemento via
+   getBoundingClientRect() tanto pra desenhar quanto pra converter toque
+   em linha/coluna. */
 .dc-grid {
+  position: relative; z-index: 1;
   display: block;
   width: 100%; max-width: 340px; aspect-ratio: 1 / 1;
   border-radius: 12px;
@@ -49,71 +152,144 @@
 }
 /* Tela grande (PC/tablet): o tabuleiro cresce com a altura disponível
    em vez de ficar preso em 340px. Nunca menor que 340px (celular não
-   muda); desconta HUD + botão voltar. O JS lê o tamanho real pelo
-   getBoundingClientRect e reajusta a resolução no resize. */
+   muda); desconta HUD + botão voltar + mascote. O JS lê o tamanho real
+   pelo getBoundingClientRect e reajusta a resolução no resize. */
 @media (min-width: 600px) and (min-height: 600px) {
-  .dc-grid {
-    max-width: max(340px, min(640px, calc(100vh - 240px)));
-    max-width: max(340px, min(640px, calc(100dvh - 240px)));
+  .dc-grid, .dc-mascote {
+    max-width: max(340px, min(640px, calc(100vh - 330px)));
+    max-width: max(340px, min(640px, calc(100dvh - 330px)));
   }
+  .dc-mascote { display: flex; }
 }
 
-/* Telas de início e fim (mesmo padrão dos outros jogos) */
-/* Cobrem o card inteiro (antes só a arena: com o ranking, o fim não cabia e
-   vazava por cima do HUD e pra fora da tela). O conteúdo fica centralizado
-   pelos espaçadores ::before/::after, não encolhe e, se ainda assim não
-   couber (celular baixo ou deitado), a tela rola. */
+/* ── Telas de início e fim ─────────────────────────────────────
+   Cobrem o card inteiro, no cenário da fase, com doces nos cantos. O
+   conteúdo fica centralizado pelos espaçadores ::before/::after, não
+   encolhe e, se não couber (celular baixo ou deitado), a tela rola. */
 .dc-overlay {
-  position: absolute; inset: 0; z-index: 3;
+  position: absolute; inset: 0; z-index: 5;
   display: flex; flex-direction: column;
   align-items: center; justify-content: flex-start;
   text-align: center; padding: 20px; gap: 6px;
-  background: var(--surface2);
+  background-color: #1c0f1c;
+  background-image:
+    url('/Jogos/assets/doces/doce-vermelho-v2.webp'), url('/Jogos/assets/doces/doce-azul-v2.webp'),
+    url('/Jogos/assets/doces/doce-amarelo-v2.webp'), url('/Jogos/assets/doces/doce-verde-v2.webp'),
+    var(--dc-cenario);
+  background-size: 58px, 44px, 50px, 62px, auto, auto, auto, auto;
+  background-position: 5% 7%, 94% 13%, 7% 93%, 93% 89%, 0 0, 0 0, 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat, repeat, repeat;
   overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  animation: dcSurge .3s ease-out;
 }
+@keyframes dcSurge { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }
 .dc-overlay::before, .dc-overlay::after { content: ''; flex: 1 1 0; min-height: 0; }
 .dc-overlay > * { flex-shrink: 0; }
 .dc-overlay .rank-slot { max-width: 340px; }
-.dc-overlay-owl { width: 72px; height: 72px; object-fit: contain; margin-bottom: 4px; }
-.dc-overlay-titulo { font-family: var(--font-h); font-weight: 800; font-size: clamp(15px, 4.8vw, 20px); color: var(--text); }
-.dc-overlay-desc { font-size: 13px; color: var(--muted); line-height: 1.4; max-width: 260px; }
-.dc-overlay-fase { font-family: var(--font-h); font-weight: 800; font-size: 16px; color: var(--text); margin-top: 4px; }
-.dc-overlay-rec { font-size: 12.5px; color: var(--muted); }
+.dc-overlay-owl {
+  width: 104px; height: 104px; object-fit: contain; margin-bottom: 2px;
+  filter: drop-shadow(0 8px 10px rgba(0,0,0,.45));
+  animation: dcBob 2.4s ease-in-out infinite;
+}
+.dc-overlay-titulo {
+  font-family: var(--font-h); font-weight: 800; font-size: clamp(19px, 6vw, 27px); color: #fff;
+  text-shadow: 0 2px 0 #9f1239, 0 0 18px rgba(251,113,133,.75);
+}
+.dc-overlay-desc { font-size: 13px; color: rgba(255,255,255,.84); line-height: 1.4; max-width: 270px; }
+.dc-overlay-fase {
+  margin-top: 8px; padding: 7px 22px; border-radius: 999px;
+  font-family: var(--font-h); font-weight: 800; font-size: 18px; color: #fff;
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  box-shadow: 0 4px 0 rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.dc-overlay-obj {
+  padding: 7px 12px; border-radius: 12px; max-width: 290px;
+  font-size: 13px; font-weight: 700; color: #fff;
+  background: rgba(0,0,0,.32); border: 1px solid rgba(255,255,255,.15);
+}
+.dc-overlay-rec { font-size: 12px; color: rgba(255,255,255,.66); }
+
+.dc-fim-venceu .dc-overlay-titulo {
+  text-shadow: 0 2px 0 #b45309, 0 0 20px rgba(251,191,36,.85);
+  animation: dcPulaTit .6s cubic-bezier(.3,1.6,.5,1);
+}
+@keyframes dcPulaTit { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.dc-fim-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 4px 0 2px; }
+.dc-fim-stats:empty { display: none; }
+.dc-chip {
+  padding: 6px 12px; border-radius: 999px; font-size: 12.5px; color: rgba(255,255,255,.86);
+  background: rgba(0,0,0,.34); border: 1px solid rgba(255,255,255,.16);
+}
+.dc-chip b { font-family: var(--font-h); font-size: 14px; color: #fff; }
+/* "+N 🪙" (tem margem/cor inline no index.html) vira uma pílula dourada */
+.dc-overlay-moedas {
+  margin: 4px 0 8px !important; padding: 5px 16px; border-radius: 999px;
+  background: rgba(255,215,64,.15); border: 1px solid rgba(255,215,64,.5);
+  box-shadow: 0 0 14px rgba(255,215,64,.25);
+}
 
 .dc-btn {
-  margin-top: 10px;
-  font-family: var(--font-h); font-weight: 800; font-size: 15px;
-  color: #fff; cursor: pointer;
-  padding: 12px 32px; border-radius: 999px; border: none;
-  background: linear-gradient(135deg, #fb7185, #f97316);
+  position: relative; overflow: hidden;
+  margin-top: 12px;
+  font-family: var(--font-h); font-weight: 800; font-size: 18px;
+  color: #fff; cursor: pointer; text-shadow: 0 1px 0 rgba(0,0,0,.28);
+  padding: 14px 46px; border-radius: 999px;
+  border: 2px solid rgba(255,255,255,.78);
+  background: linear-gradient(180deg, #fda4af, #fb7185 45%, #f97316);
   -webkit-tap-highlight-color: transparent;
-  transition: transform .1s, filter .15s;
-  box-shadow: 0 4px 14px rgba(251,113,133,0.35);
+  transition: transform .1s, filter .15s, box-shadow .1s;
+  box-shadow: 0 6px 0 #9f1239, 0 0 26px rgba(251,113,133,.55);
+  animation: dcChama 1.5s ease-in-out infinite;
 }
-.dc-btn:active { transform: scale(0.96); }
-.dc-btn:hover { filter: brightness(1.08); }
+.dc-btn::after {
+  content: ''; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+  animation: dcBrilhoBtn 2.6s ease-in-out infinite;
+}
+@keyframes dcChama { 50% { transform: scale(1.045); } }
+@keyframes dcBrilhoBtn { 0%, 55% { left: -60%; } 100% { left: 130%; } }
+.dc-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #9f1239; animation: none; }
+.dc-btn:hover { filter: brightness(1.06); }
 .dc-link {
-  margin-top: 2px; background: none; border: none; cursor: pointer;
-  font-size: 13px; font-weight: 700; color: var(--muted);
+  margin-top: 4px; background: none; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 700; color: rgba(255,255,255,.72);
   text-decoration: underline; -webkit-tap-highlight-color: transparent;
 }
 
 /* ── Tela cheia (celular): o tabuleiro se ajusta ao espaço que SOBRA ─────
    A arena vira "container" e o tabuleiro usa 100cqh/100cqw: cabe sempre,
-   com o HUD de 2, 3 ou 4 linhas e com o celular deitado (o tabuleiro
-   passava por cima do HUD e saía da tela). Sem suporte a container query,
-   fica o tamanho fixo de antes. */
+   em pé ou deitado. Com altura sobrando, entra a mascote por cima. Sem
+   suporte a container query, fica o tamanho fixo (e sem mascote). */
 @supports (width: 1cqh) {
   @media (max-width: 599px), (max-height: 599px) {
     body.games-fs-open #dc-arena { container-type: size; min-height: 0; padding: 10px 12px 12px; }
-    body.games-fs-open #dc-arena .dc-grid { max-width: min(340px, 100cqh, 100cqw); }
+    body.games-fs-open #dc-arena .dc-grid { max-width: min(420px, 100cqh, 100cqw); }
+    body.games-fs-open #dc-arena .dc-mascote { max-width: min(420px, 100cqw); }
+    @container (min-height: 420px) {
+      .dc-mascote { display: flex; }
+      body.games-fs-open #dc-arena .dc-grid { max-width: min(420px, 100cqw, 100cqh - 88px); }
+    }
   }
-  /* Celular deitado: HUD à esquerda, tabuleiro à direita. */
+  /* Celular deitado: placar à esquerda, tabuleiro à direita. */
   @media (orientation: landscape) and (max-height: 520px) {
     body.games-fs-open .jogo-tela#jogo-doces .jogo-voltar { padding: 6px 16px; }
     body.games-fs-open .dc-card { flex-direction: row; padding: 4px 12px 8px; gap: 10px; }
-    .dc-hud { flex: 0 0 168px; align-content: center; border-bottom: none; border-radius: 12px; }
+    .dc-hud {
+      flex: 0 0 168px; box-sizing: border-box;
+      grid-template-columns: 1fr 1fr; grid-template-areas: "obj obj" "prog prog" "fase mov";
+      align-content: center; justify-items: center; row-gap: 14px;
+      border-bottom: none; border-radius: 12px;
+    }
+    .dc-hud > .dc-hud-item:nth-child(1) { align-items: center; justify-self: stretch; }
+    .dc-hud-obj-txt { text-align: center; font-size: 13.5px; }
+    .dc-hud > .dc-hud-item:nth-child(3) { justify-self: stretch; }
     body.games-fs-open #dc-arena { padding: 0; border-radius: 12px; }
   }
 }
-@media (max-height: 620px) { .dc-overlay-owl { display: none; } }
+@media (max-height: 620px) { .dc-overlay-owl { width: 64px; height: 64px; } }
+@media (max-height: 580px) { .dc-overlay-owl { display: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-decos i, .dc-mascote img, .dc-overlay, .dc-overlay-owl, .dc-btn, .dc-btn::after,
+  .dc-mov-baixo .dc-hud-valor, .dc-fim-venceu .dc-overlay-titulo { animation: none !important; }
+}

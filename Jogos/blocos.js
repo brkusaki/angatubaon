@@ -161,7 +161,12 @@
      blocos voando + "+pontos"), peças novas deslizando, onda de vitória.
      Os elementos extras são criados em _bbMontarVisual (não estão no
      index.html). */
-  function _bbMovReduzido() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  function _bbMovReduzido() {
+    var E = window.AngatubaGames && window.AngatubaGames.efeitos;
+    if (E && E.leves) return E.leves();
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+  function _bbAplicarLeve() { var t = document.getElementById('jogo-blocos'); if (t) t.classList.toggle('fx-leve', _bbMovReduzido()); }
   var _BB_TEMAS = [
     { a: '#1e1b4b', b: '#0b1030', luz: 'rgba(99,102,241,0.45)' },   // anil
     { a: '#083344', b: '#04161d', luz: 'rgba(34,211,238,0.40)' },   // ciano
@@ -911,7 +916,17 @@
     if (!G || !G.menu) return;
     G.menu.registrar('jogo-blocos', {
       pausar: function () { _bbCancelarArraste(); },
-      continuar: function () {}
+      continuar: function () {},
+      opcoes: function () {
+        var E = G.efeitos, leve = _bbMovReduzido();
+        return [
+          { icone: 'fa-wand-magic-sparkles', ativo: !leve,
+            rotulo: leve ? ('Efeitos: leves' + (E && E.levesAutomatico && E.levesAutomatico() ? ' (automático)' : '')) : 'Efeitos: completos',
+            acao: function () { if (E && E.definirLeves) E.definirLeves(!leve); _bbAplicarLeve(); } },
+          { icone: 'fa-rotate-right', rotulo: 'Recomeçar',
+            acao: function () { G.menu.fechar('jogo-blocos', false); _bbRetry(); } }
+        ];
+      }
     });
   }
 
@@ -920,6 +935,8 @@
     var sP = _som(); if (sP && sP.precarregar) sP.precarregar(['blocos-encaixar-1', 'blocos-encaixar-2', 'blocos-linha', 'blocos-linha-dupla', 'blocos-pecas', 'blocos-sem-espaco']);
     _bbCriarGridDOM();
     _bbMontarVisual();
+    _bbAplicarLeve();
+    var Ef = window.AngatubaGames && window.AngatubaGames.efeitos; if (Ef && Ef.medir) Ef.medir(_bbAplicarLeve);
     _bbRegistrarMenu();
     _bbCriarTrayDOM();
     _bbAplicarSkin();

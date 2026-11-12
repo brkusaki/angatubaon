@@ -241,7 +241,12 @@
   var _dcUltimaAcaoMs = 0;
   var _dcVitoriaT0 = 0;           // onda de comemoração antes da tela de fim
   var _DC_DUR_PART = 520, _DC_DUR_POPUP = 850, _DC_MS_DICA = 5000;
-  function _dcMovReduzido() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  function _dcMovReduzido() {
+    var E = window.AngatubaGames && window.AngatubaGames.efeitos;
+    if (E && E.leves) return E.leves();
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+  function _dcAplicarLeve() { var t = document.getElementById('jogo-doces'); if (t) t.classList.toggle('fx-leve', _dcMovReduzido()); }
   function _dcAcao() { _dcUltimaAcaoMs = performance.now(); _dcDica = null; }
 
   // ── localStorage: maior fase JÁ CONCLUÍDA ──────────────────
@@ -1715,7 +1720,17 @@
     if (!G || !G.menu) return;
     G.menu.registrar('jogo-doces', {
       pausar: function () { _dcArraste = null; },
-      continuar: function () {}
+      continuar: function () {},
+      opcoes: function () {
+        var E = G.efeitos, leve = _dcMovReduzido();
+        return [
+          { icone: 'fa-wand-magic-sparkles', ativo: !leve,
+            rotulo: leve ? ('Efeitos: leves' + (E && E.levesAutomatico && E.levesAutomatico() ? ' (automático)' : '')) : 'Efeitos: completos',
+            acao: function () { if (E && E.definirLeves) E.definirLeves(!leve); _dcAplicarLeve(); } },
+          { icone: 'fa-rotate-right', rotulo: 'Recomeçar',
+            acao: function () { G.menu.fechar('jogo-doces', false); _dcRetry(); } }
+        ];
+      }
     });
   }
 
@@ -1781,6 +1796,8 @@
     _dcAplicarSkin();
     _dcCriarGlow();
     _dcMontarVisual();
+    _dcAplicarLeve();
+    var Ef = window.AngatubaGames && window.AngatubaGames.efeitos; if (Ef && Ef.medir) Ef.medir(_dcAplicarLeve);
     try {
       var corBorda = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
       if (corBorda) _dcCorBorda = corBorda;

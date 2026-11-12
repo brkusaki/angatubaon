@@ -427,3 +427,12 @@
   .bb-decos i, .bb-mascote img, .bb-overlay, .bb-overlay-owl, .bb-btn, .bb-btn::after, .bb-peca-mini,
   .bb-cel, .bb-grid, .bb-peca, .bb-fim-venceu .bb-overlay-titulo { animation: none !important; }
 }
+
+/* Efeitos leves (menu de pausa ou automático em aparelho lento): some o
+   enfeite do fundo e param as animações decorativas; os blocos voando da
+   linha limpa já não são criados (_bbMovReduzido). */
+#jogo-blocos.fx-leve .bb-decos { display: none; }
+#jogo-blocos.fx-leve .bb-mascote img, #jogo-blocos.fx-leve .bb-overlay, #jogo-blocos.fx-leve .bb-overlay-owl,
+#jogo-blocos.fx-leve .bb-btn, #jogo-blocos.fx-leve .bb-btn::after, #jogo-blocos.fx-leve .bb-peca-mini,
+#jogo-blocos.fx-leve .bb-cel, #jogo-blocos.fx-leve .bb-grid, #jogo-blocos.fx-leve .bb-peca { animation: none !important; }
+#jogo-blocos.fx-leve .bb-cel.bb-preview-linha::after { animation: none; opacity: .45; }

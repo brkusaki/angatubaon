@@ -7695,9 +7695,10 @@ body.games-fs-open #games-hub.jogo-ativo .rl-hud {
 .jm-play:active, .jm-opcao:active { transform: scale(.97); }
 .jm-play:hover { filter: brightness(1.06); }
 .jm-caixa { max-height: 100%; overflow-y: auto; }
-.jm-opcoes { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.jm-opcoes .jm-op { font-size: 12.5px; padding: 10px 8px; gap: 6px; }
-.jm-opcoes .jm-op span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* minmax(0, 1fr): sem isso a coluna crescia com o texto e o 2º botão saía cortado. */
+.jm-opcoes { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.jm-opcoes .jm-op { font-size: 11.5px; padding: 10px 6px; gap: 6px; min-height: 44px; }
+.jm-opcoes .jm-op span { line-height: 1.2; text-align: left; min-width: 0; }
 @media (min-width: 560px) { .jm-caixa:has(.jm-opcoes:not([style*="none"])) { max-width: 420px; } }
 .jm-link {
   margin-top: 2px; background: none; border: none;

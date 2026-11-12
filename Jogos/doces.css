@@ -293,3 +293,10 @@
   .dc-decos i, .dc-mascote img, .dc-overlay, .dc-overlay-owl, .dc-btn, .dc-btn::after,
   .dc-mov-baixo .dc-hud-valor, .dc-fim-venceu .dc-overlay-titulo { animation: none !important; }
 }
+
+/* Efeitos leves (menu de pausa ou automático em aparelho lento): some o
+   enfeite do fundo e param as animações decorativas. O canvas já corta
+   partículas, chuva de doces, reflexos e tremor (_dcMovReduzido). */
+#jogo-doces.fx-leve .dc-decos { display: none; }
+#jogo-doces.fx-leve .dc-mascote img, #jogo-doces.fx-leve .dc-overlay, #jogo-doces.fx-leve .dc-overlay-owl,
+#jogo-doces.fx-leve .dc-btn, #jogo-doces.fx-leve .dc-btn::after, #jogo-doces.fx-leve .dc-mov-baixo .dc-hud-valor { animation: none !important; }

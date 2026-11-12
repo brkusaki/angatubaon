@@ -215,3 +215,10 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-piano .pn-hud > .pn-hud-item:firs
 @media (prefers-reduced-motion: reduce) {
   .pn-overlay, .pn-overlay-owl, .pn-overlay-pontos, .pn-btn-modo-surv, .pn-play, .pn-play::after { animation: none !important; }
 }
+
+/* Efeitos leves (menu de pausa ou automático em aparelho lento): o canvas
+   já corta holofotes, estilhaços e notas (_pnMovReduzido); aqui param as
+   animações das telas e sai o desfoque, que pesa em celular fraco. */
+#jogo-piano.fx-leve .pn-overlay { animation: none !important; backdrop-filter: none; }
+#jogo-piano.fx-leve .pn-overlay-owl, #jogo-piano.fx-leve .pn-overlay-pontos, #jogo-piano.fx-leve .pn-btn-modo-surv,
+#jogo-piano.fx-leve .pn-play, #jogo-piano.fx-leve .pn-play::after { animation: none !important; }

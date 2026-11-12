@@ -502,7 +502,12 @@
   var _pnErroVis = null;      // { col, y, t0, recuo } azulejo vermelho do fim
   var _pnFimRAF = 0;
   var _PN_GLIFOS = ['♪', '♫', '♩', '♬'];
-  function _pnMovReduzido() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  function _pnMovReduzido() {
+    var E = window.AngatubaGames && window.AngatubaGames.efeitos;
+    if (E && E.leves) return E.leves();
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+  function _pnAplicarLeve() { var t = document.getElementById('jogo-piano'); if (t) t.classList.toggle('fx-leve', _pnMovReduzido()); }
 
   /* ── Persistência ─────────────────────────────────────────────
      Cacheado em memória: o HUD lia localStorage a cada frame nos
@@ -1722,6 +1727,8 @@
   function _pnPreparar() {
     _pnCarregarFundo();
     var SP = window.AngatubaGames && window.AngatubaGames.som; if (SP && SP.precarregar) SP.precarregar(['piano-erro', 'piano-acelerou']);
+    _pnAplicarLeve();
+    var Ef = window.AngatubaGames && window.AngatubaGames.efeitos; if (Ef && Ef.medir) Ef.medir(_pnAplicarLeve);
     _pnCanvas = document.getElementById('pn-canvas');
     if (!_pnCanvas) return;
     _pnCtx = _pnCanvas.getContext('2d');
@@ -1833,6 +1840,16 @@
     if (!M) return;
     M.registrar('jogo-piano', {
       podePausar: function () { return !_pnNaParty(); },
+      opcoes: function () {
+        var G = window.AngatubaGames, E = G && G.efeitos, leve = _pnMovReduzido(), l = [
+          { icone: 'fa-wand-magic-sparkles', ativo: !leve,
+            rotulo: leve ? ('Efeitos: leves' + (E && E.levesAutomatico && E.levesAutomatico() ? ' (automático)' : '')) : 'Efeitos: completos',
+            acao: function () { if (E && E.definirLeves) E.definirLeves(!leve); _pnAplicarLeve(); } }
+        ];
+        if (!_pnNaParty()) l.push({ icone: 'fa-rotate-right', rotulo: 'Recomeçar',
+          acao: function () { M.fechar('jogo-piano', false); _pnComecar(); } });
+        return l;
+      },
       pausar: function () {
         _pnPausado = true;
         _pnPausaInicioMs = Date.now();

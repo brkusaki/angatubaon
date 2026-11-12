@@ -6632,6 +6632,36 @@
         var E = window.AngatubaEfeitos;
         if (E && E.carregarSprites) return E.carregarSprites(urls);
         return Promise.resolve([]);
+      },
+      // Efeitos leves (Doces, Blocos, Piano): menos animação e partícula.
+      // 'angatuba_fx_leve' = '1' (a pessoa ligou), '0' (desligou) ou '2'
+      // (ligado sozinho porque o aparelho engasgou — ver medir). Sem valor
+      // = completos. "Reduzir movimento" do sistema também conta como leve.
+      leves: function () {
+        try {
+          if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
+          var v = localStorage.getItem('angatuba_fx_leve');
+          return v === '1' || v === '2';
+        } catch (e) { return false; }
+      },
+      levesAutomatico: function () { try { return localStorage.getItem('angatuba_fx_leve') === '2'; } catch (e) { return false; } },
+      definirLeves: function (on) { try { localStorage.setItem('angatuba_fx_leve', on ? '1' : '0'); } catch (e) {} },
+      // Mede ~3 s de quadros; abaixo de ~40 fps liga o modo leve sozinho
+      // (só se a pessoa nunca escolheu). aoLigar() é chamado se ligou.
+      medir: function (aoLigar) {
+        var v; try { v = localStorage.getItem('angatuba_fx_leve'); } catch (e) { return; }
+        if (v !== null || !window.requestAnimationFrame) return;
+        var n = 0, t0 = 0, ult = 0, soma = 0;
+        (function q(t) {
+          if (document.hidden) { t0 = 0; ult = 0; requestAnimationFrame(q); return; }   // aba oculta não conta
+          if (!t0) { t0 = t; ult = t; requestAnimationFrame(q); return; }
+          soma += Math.min(100, t - ult); ult = t; n++;
+          if (t - t0 < 3000) { requestAnimationFrame(q); return; }
+          if (n >= 6 && soma / n > 25) {   // aparelho bem lento dá poucos quadros em 3 s
+            try { localStorage.setItem('angatuba_fx_leve', '2'); } catch (e) {}
+            if (typeof aoLigar === 'function') { try { aoLigar(); } catch (e) {} }
+          }
+        })(0);
       }
     },
 

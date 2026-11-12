@@ -1388,7 +1388,13 @@
       '/Jogos/assets/sinalbranco/sfx/sinal-ok.mp3',
       '/Jogos/assets/sinalbranco/sfx/vento-loop.mp3',
       '/Jogos/assets/sinalbranco/sfx/voz-audio_ingrid-v2.mp3',
-      '/Jogos/assets/sinalbranco/sfx/voz-sinal-v2.mp3'
+      '/Jogos/assets/sinalbranco/sfx/voz-sinal-v2.mp3',
+      '/Jogos/assets/sinalbranco/sfx/elevador-loop.mp3',
+      '/Jogos/assets/sinalbranco/sfx/elevador-freio.mp3',
+      '/Jogos/assets/sinalbranco/sfx/faisca.mp3',
+      '/Jogos/assets/sinalbranco/sfx/porta-pedra.mp3',
+      '/Jogos/assets/sinalbranco/sfx/cabra.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-fita_kazuo-v1.mp3'
     ],
     corujinha: [
       '/Jogos/corujinha.min.js', '/Jogos/corujinha.css',

@@ -326,7 +326,7 @@
       { id: 'painel', x: 43, y: 27, w: 19, h: 45, porta: true, acao: function () {
         if (S.flags.painelAberto) { ir('elevador'); return; }
         if (!tem('pecabra')) { fala(['Uma placa de metal aparafusada na rocha. Está solta de um lado.', 'Com alguma coisa pra fazer alavanca, dá pra abrir.']); return; }
-        som.tocar('porta', 0.9);
+        som.tocar('cabra', 0.9, function () { som.porta(); });
         flag('painelAberto'); tirar('pecabra');
         desenharCena();
         fala(['Enfiei o pé de cabra na fresta e puxei com o corpo todo.', 'A placa abriu como uma porta. Atrás dela...', 'Um elevador. Que não existe em planta nenhuma.']); } },
@@ -821,6 +821,7 @@
   ══════════════════════════════════════════════════════════════ */
   var puz = { raf: 0, timers: [], parar: function () {
     if (puz.raf) cancelAnimationFrame(puz.raf); puz.raf = 0;
+    som.elevador(0);
     puz.timers.forEach(clearInterval); puz.timers = [];
   } };
 
@@ -1102,18 +1103,19 @@
         calor = v > LIMITE ? Math.min(1, calor + dt * 0.9) : Math.max(0, calor - dt * 0.4);
         if (calor >= 1 && travado <= 0) {
           travado = 2.2; segurando = false; alav.classList.remove('sb-on');
-          som.tocar('porta', 0.8);
+          som.tocar('elevador-freio', 0.9, function () { som.tocar('porta', 0.8); });
           avisar('O freio de emergência travou com um tranco. O cabo esquentou demais.');
         }
         if (prof > ALVO + 60 && v < 30) {
-          som.tocar('gerador-liga', 0.5);
+          som.tocar('elevador-freio', 0.6, function () { som.tocar('gerador-liga', 0.5); });
           avisar('Passei do andar. O elevador subiu de volta um trecho, rangendo.');
           prof = ALVO - 260; v = 0;
         }
+        som.elevador(travado > 0 ? 0 : Math.min(1, v / VMAX));
         var dentro = Math.abs(prof - ALVO) <= FAIXA && v < 3;
         parado = dentro ? parado + dt : 0;
         if (parado > 0.6) {
-          feito = true; flag('desceu');
+          feito = true; flag('desceu'); som.elevador(0);
           som.tocar('sinal-ok', 0.5);
           setTimeout(function () {
             fecharModal();
@@ -1218,14 +1220,14 @@
       tentativas++;
       var certos = FIOS.filter(function (f) { return lig[f.id] === f.certo; }).length;
       if (certos === 4) {
-        som.energia();
+        som.tocar('faisca', 0.6); som.energia();
         msg.textContent = 'Energia restabelecida no corredor.';
         setTimeout(function () {
           fecharModal(); flag('energia2'); som.tocar('luzes', 0.7);
           fala(['As luzes do corredor firmaram. Lá no fundo, o leitor da porta de segurança acendeu.']);
         }, 900);
       } else {
-        som.tocar('porta', 0.4);
+        som.tocar('faisca', 0.9, function () { som.tocar('porta', 0.4); });
         el.caixa.classList.remove('sb-tremer'); void el.caixa.offsetWidth; el.caixa.classList.add('sb-tremer');
         msg.textContent = 'Faísca! ' + certos + ' de 4 no lugar certo. Desliguei tudo de novo.' +
           (tentativas >= 3 && S.docs.indexOf('emails') < 0 ? ' Alguém deve ter anotado essa ordem.' : '');
@@ -1318,12 +1320,12 @@
         if (dif !== passo) { seq.push(p); return errou(); }
         seq.push(p); som.giro(); desenhar();
         if (seq.length === 8) {
-          desenhar('sb-ok'); som.tocar('revelacao', 0.8);
+          desenhar('sb-ok'); som.tocar('revelacao', 0.6);
           msg.textContent = 'A estrela inteira acendeu.';
           setTimeout(function () {
-            fecharModal(); flag('portaAberta'); desenharCena();
+            fecharModal(); flag('portaAberta'); desenharCena(); som.tocar('porta-pedra', 0.95, function () { som.tocar('porta', 0.9); });
             el.fade.classList.add('sb-flash'); setTimeout(function () { el.fade.classList.remove('sb-flash'); }, 700);
-            fala(['A pedra rolou pro lado sem fazer barulho nenhum.', 'Lá dentro, uma luz azul. E calor.']);
+            fala(['A pedra rolou pro lado, pesada, e o chão tremeu sob os meus pés.', 'Lá dentro, uma luz azul. E calor.']);
           }, 1300);
         }
       });
@@ -1466,10 +1468,11 @@
     var ac = null, master = null, vento = null, ventoG = null, zumbido = null, zumbG = null, estG = null, mudoT = 0;
     // Arquivos gravados (ElevenLabs) em /Jogos/assets/sinalbranco/sfx/<nome>.mp3.
     // Enquanto um arquivo não existe ou não carregou, toca a síntese de reserva.
-    var VOZES = { audio_ingrid: 'voz-audio_ingrid-v2', sinal: 'voz-sinal-v2' };
+    var VOZES = { audio_ingrid: 'voz-audio_ingrid-v2', sinal: 'voz-sinal-v2', fita_kazuo: 'voz-fita_kazuo-v1' };
     var ARQ = ['passos-neve', 'passos-metal', 'porta', 'gerador-liga', 'sinal-ok', 'pegar', 'papel', 'gravador',
-      'peca', 'lanterna', 'luzes', 'revelacao', VOZES.audio_ingrid, VOZES.sinal];
-    var LOOPS = ['vento-loop', 'interior-loop', 'gerador-loop', 'estatica-loop', 'coro-loop'];
+      'peca', 'lanterna', 'luzes', 'revelacao', 'elevador-freio', 'faisca', 'porta-pedra', 'cabra',
+      VOZES.audio_ingrid, VOZES.sinal, VOZES.fita_kazuo];
+    var LOOPS = ['vento-loop', 'interior-loop', 'gerador-loop', 'estatica-loop', 'coro-loop', 'elevador-loop'];
     var buf = {}, loopG = {}, loopOn = {}, vozSrc = null, vozVez = 0, ambAtual = { onde: '', cena: '' };
     function ligado() { var s = window.AngatubaSom; return !(s && typeof s.ativo === 'function' && !s.ativo()); }
     function ruidoBuf() {
@@ -1589,6 +1592,13 @@
           vozSrc = tocar(nome, 1);
           if (vozSrc) vozSrc.onended = function () { if (vez === vozVez) vozSrc = null; };
         }, 700);
+      },
+      // motor do elevador: x = 0..1 (velocidade); arquivo em loop, sem reserva sintetizada
+      elevador: function (x) {
+        if (!ac || !loopG['elevador-loop']) return;
+        var g = loopG['elevador-loop'].gain;
+        g.cancelScheduledValues(ac.currentTime);
+        g.setTargetAtTime(x > 0.02 ? 0.25 + 0.6 * x : 0, ac.currentTime, 0.15);
       },
       pararVoz: function () { vozVez++; if (vozSrc) { try { vozSrc.stop(); } catch (e) {} vozSrc = null; } },
       clique: function () { bip(1800, 0.03, 'square', 0.025); },

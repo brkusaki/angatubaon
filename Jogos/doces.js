@@ -324,10 +324,14 @@
     if (!arena) return;
     var t = _dcTemasFundo[(fase - 1) % _dcTemasFundo.length];
     var forte = t.destaque.replace(/[\d.]+\)$/, '0.42)'), medio = t.destaque.replace(/[\d.]+\)$/, '0.26)');
+    // Cenário pintado (nov/2026) por cima do gradiente, que fica de reserva
+    // enquanto a imagem baixa; véu escuro no meio pros doces saltarem.
+    var n = ((fase - 1) % _dcTemasFundo.length) + 1;
     var fundo =
+      'radial-gradient(75% 50% at 50% 52%, rgba(8,4,12,0.5), rgba(8,4,12,0.12) 70%, transparent), ' +
+      'url(/Jogos/assets/doces/cenario-' + n + '.webp) center / cover no-repeat, ' +
       'radial-gradient(120% 55% at 50% -8%, ' + forte + ', transparent 62%), ' +
       'radial-gradient(90% 45% at 50% 108%, ' + medio + ', transparent 65%), ' +
-      'repeating-linear-gradient(135deg, rgba(255,255,255,0.035) 0 16px, transparent 16px 32px), ' +
       'linear-gradient(165deg, ' + t.base1 + ', ' + t.base2 + ')';
     arena.style.background = fundo;
     // As telas de início/fim usam o mesmo cenário da fase.
@@ -700,6 +704,14 @@
     var imgBomba = new Image();
     imgBomba.onload = function () { _dcImgs.bomba = imgBomba; };
     imgBomba.src = _DC_TEX_BOMBA;
+    // Listrados e embrulhados com arte própria (só no tema clássico).
+    ['listrado', 'embrulhado'].forEach(function (tp) {
+      _dcTexturas.forEach(function (src, i) {
+        var img = new Image();
+        img.onload = function () { _dcImgs[tp + i] = img; };
+        img.src = src.replace('/doce-', '/' + tp + '-').replace('-v2.webp', '.webp');
+      });
+    });
   }
 
   // Layout atual do tabuleiro em pixels CSS (depende só da largura
@@ -804,7 +816,17 @@
     if (gelo) { try { ctx.filter = gelo === 2 ? 'saturate(0.5) brightness(1.05)' : 'saturate(0.3) brightness(1.12)'; } catch (e) {} }
     var img = _dcSkinSprites ? _dcSkinSprites[corIdx - 1] : _dcImgs[corIdx - 1];
     if (img && img.tagName === 'IMG' && !(img.complete && img.naturalWidth)) img = null;   // arte do tema ainda baixando
-    if (img) {
+    var listra = tipo === _DC_TIPO_LISTRA_H || tipo === _DC_TIPO_LISTRA_V;
+    var arteEsp = (_dcSkinSprites || !(listra || tipo === _DC_TIPO_EMBRULHADO)) ? null
+      : _dcImgs[(listra ? 'listrado' : 'embrulhado') + (corIdx - 1)];
+    if (arteEsp) {
+      var ladoE = r * 1.9;
+      ctx.save();
+      ctx.translate(x, cy);
+      if (tipo === _DC_TIPO_LISTRA_H) ctx.rotate(Math.PI / 2);   // a arte é vertical
+      try { ctx.drawImage(arteEsp, -ladoE / 2, -ladoE / 2, ladoE, ladoE); } catch (e) {}
+      ctx.restore();
+    } else if (img) {
       var lado = r * 1.9; // quase o diâmetro (2r) inteiro da célula
       try { ctx.drawImage(img, x - lado / 2, cy - lado / 2, lado, lado); } catch (e) {}
     } else {
@@ -818,8 +840,8 @@
     try { ctx.filter = 'none'; } catch (e) {}
 
     // Overlay do doce especial (listrado/embrulhado) por cima da imagem
-    // normal — sem precisar de nenhum asset novo.
-    if (tipo === _DC_TIPO_LISTRA_H || tipo === _DC_TIPO_LISTRA_V) {
+    // normal — só quando não tem arte própria (temas frutas/joias).
+    if (!arteEsp && listra) {
       // Listras brancas que ANDAM no sentido do efeito (recortadas no doce).
       ctx.save();
       ctx.beginPath(); ctx.arc(x, cy, r * 0.84, 0, Math.PI * 2); ctx.clip();
@@ -833,7 +855,7 @@
         else ctx.fillRect(x + offB, cy - lado2 / 2, faixa, lado2);
       }
       ctx.restore();
-    } else if (tipo === _DC_TIPO_EMBRULHADO) {
+    } else if (!arteEsp && tipo === _DC_TIPO_EMBRULHADO) {
       ctx.save();
       ctx.globalAlpha = a;
       ctx.strokeStyle = 'rgba(255,255,255,0.85)';
@@ -1197,10 +1219,11 @@
   // ── Mascote (coruja acima do tabuleiro) e balão de fala ─────
   // Só troca a imagem e o texto de elementos criados em _dcMontarVisual;
   // se eles não existirem (tela sem espaço), não faz nada.
-  var _DC_OWL = {
-    normal: '/webp/owl-curious.webp', ola: '/webp/owl-wave.webp', feliz: '/webp/owl-thumbsup.webp',
-    festa: '/webp/owl-tada.webp', amor: '/webp/owl-love.webp', susto: '/webp/owl-surprised.webp', dica: '/webp/owl-point.webp'
-  };
+  // Coruja confeiteira (nov/2026): um quadro por estado.
+  var _DC_OWL = {};
+  ['normal', 'ola', 'feliz', 'festa', 'amor', 'susto', 'dica', 'pensa', 'triste'].forEach(function (k) {
+    _DC_OWL[k] = '/Jogos/assets/doces/coruja-' + k + '.webp';
+  });
   var _dcMascoteT = 0;
   function _dcMascote(estado, fala, ms) {
     var img = document.getElementById('dc-mascote-img'), bal = document.getElementById('dc-balao');
@@ -1641,7 +1664,7 @@
     var tit = document.getElementById('dc-fim-titulo');
     var msg = document.getElementById('dc-fim-msg');
     var btn = document.getElementById('dc-fim-btn');
-    if (owl) { owl.src = venceu ? '/webp/owl-trophy.webp' : '/webp/owl-sad.webp'; owl.style.display = ''; }
+    if (owl) { owl.src = venceu ? _DC_OWL.festa : _DC_OWL.triste; owl.style.display = ''; }
     if (tit) tit.textContent = venceu ? ('Fase ' + _dcFaseAtual + ' concluída! 🎉') : 'Movimentos esgotados!';
     if (msg) {
       msg.textContent = venceu

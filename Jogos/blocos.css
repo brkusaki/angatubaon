@@ -18,7 +18,10 @@
   background: var(--surface);
   /* cenário da fase (o JS troca por fase em _bbAplicarTema) */
   --bb-a: #1e1b4b; --bb-b: #0b1030; --bb-luz: rgba(99,102,241,.45);
+  --bb-img: none;   /* cenário pintado da fase (o JS troca); véu escuro no meio pros blocos saltarem */
   --bb-cenario:
+    radial-gradient(75% 50% at 50% 55%, rgba(4,6,16,.5), rgba(4,6,16,.12) 70%, transparent),
+    var(--bb-img) center / cover no-repeat,
     radial-gradient(120% 55% at 50% -8%, var(--bb-luz), transparent 62%),
     radial-gradient(90% 40% at 50% 108%, var(--bb-luz), transparent 70%),
     linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px) 0 0 / 28px 28px,

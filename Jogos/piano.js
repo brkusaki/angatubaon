@@ -423,13 +423,16 @@
   // Fundo: sala de concerto (opcional — sem a imagem, fica a cor do tema).
   // Escurecida por cima pra os azulejos continuarem saltando à vista.
   var _PN_FUNDO_SRC = '/Jogos/assets/piano/sala-concerto.webp';
-  var _pnFundoImg = null, _pnFundoOk = false;
+  // Skin com 'palco' troca o fundo (ver _pnAplicarSkin).
+  var _pnFundoImg = null, _pnFundoOk = false, _pnFundoSrc = _PN_FUNDO_SRC;
   function _pnCarregarFundo() {
-    if (_pnFundoImg) return;
+    if (_pnFundoImg && _pnFundoImg.getAttribute('src') === _pnFundoSrc) return;
     try {
-      _pnFundoImg = new Image();
-      _pnFundoImg.onload = function () { _pnFundoOk = true; };
-      _pnFundoImg.src = _PN_FUNDO_SRC;
+      var im = new Image();
+      im.onload = function () { if (im === _pnFundoImg) { _pnFundoOk = true; if (_pnCtx && _pnEstado !== 'jogando') _pnDraw(); } };
+      _pnFundoOk = false;
+      _pnFundoImg = im;
+      im.src = _pnFundoSrc;
     } catch (e) { _pnFundoImg = null; }
   }
   function _pnAplicarSkin() {
@@ -445,6 +448,8 @@
       _pnAzImg.tecla.src = az.tecla;
       _pnAzImg.tocada.src = az.tocada;
     }
+    var palco = (it && it.palco) || _PN_FUNDO_SRC;
+    if (palco !== _pnFundoSrc) { _pnFundoSrc = palco; if (_pnFundoImg) _pnCarregarFundo(); }
     if (_pnCtx && _pnEstado !== 'jogando') _pnDraw();
   }
   window.addEventListener('angatuba:equipado', function (e) {

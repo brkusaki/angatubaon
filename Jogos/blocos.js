@@ -175,11 +175,11 @@
     { a: '#431407', b: '#1c0903', luz: 'rgba(251,146,60,0.40)' },   // laranja
     { a: '#4c0519', b: '#1f0209', luz: 'rgba(251,113,133,0.40)' }   // rosa
   ];
-  var _BB_OWL = {
-    normal: '/webp/owl-curious.webp', ola: '/webp/owl-wave.webp', feliz: '/webp/owl-thumbsup.webp',
-    festa: '/webp/owl-tada.webp', uau: '/webp/owl-love.webp', aperto: '/webp/owl-surprised.webp',
-    pensa: '/webp/owl-thinking.webp', triste: '/webp/owl-sad.webp'
-  };
+  // Coruja construtora (nov/2026): um quadro por estado.
+  var _BB_OWL = {};
+  ['normal', 'ola', 'feliz', 'festa', 'uau', 'aperto', 'pensa', 'triste', 'vitoria'].forEach(function (k) {
+    _BB_OWL[k] = '/Jogos/assets/blocos/coruja-' + k + '.webp';
+  });
   var _bbMascoteT = 0, _bbMascoteEstado = 'normal';
 
   // ── localStorage: maior fase JÁ CONCLUÍDA ──────────────────
@@ -699,7 +699,7 @@
     var tit = document.getElementById('bb-fim-titulo');
     var msg = document.getElementById('bb-fim-msg');
     var btn = document.getElementById('bb-fim-btn');
-    if (owl) { owl.src = venceu ? '/webp/owl-trophy.webp' : '/webp/owl-sad.webp'; owl.style.display = ''; }
+    if (owl) { owl.src = venceu ? _BB_OWL.vitoria : _BB_OWL.triste; owl.style.display = ''; }
     if (tit) tit.textContent = venceu ? ('Fase ' + _bbFaseAtual + ' concluída! 🎉') : 'Não coube mais!';
     if (msg) {
       msg.textContent = venceu
@@ -816,6 +816,9 @@
     card.style.setProperty('--bb-a', t.a);
     card.style.setProperty('--bb-b', t.b);
     card.style.setProperty('--bb-luz', t.luz);
+    // Cenário pintado (nov/2026); o tema 3 ainda não tem arte e fica no gradiente.
+    var n = ((fase - 1) % _BB_TEMAS.length) + 1;
+    card.style.setProperty('--bb-img', n === 3 ? 'none' : 'url(/Jogos/assets/blocos/cenario-' + n + '.webp)');
   }
   function _bbMascote(estado, fala, ms) {
     var img = document.getElementById('bb-mascote-img'), bal = document.getElementById('bb-balao');

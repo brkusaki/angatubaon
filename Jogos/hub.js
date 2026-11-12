@@ -1516,7 +1516,13 @@
       '/Jogos/assets/blocos/bloco-ciano.webp',
       '/Jogos/assets/blocos/bloco-rosa.webp',
       '/Jogos/assets/blocos/bloco-roxo.webp',
-      '/Jogos/assets/blocos/bloco-verde.webp'
+      '/Jogos/assets/blocos/bloco-verde.webp',
+      '/Jogos/assets/blocos/coruja-normal.webp', '/Jogos/assets/blocos/coruja-ola.webp',
+      '/Jogos/assets/blocos/coruja-feliz.webp', '/Jogos/assets/blocos/coruja-festa.webp',
+      '/Jogos/assets/blocos/coruja-uau.webp', '/Jogos/assets/blocos/coruja-aperto.webp',
+      '/Jogos/assets/blocos/coruja-pensa.webp', '/Jogos/assets/blocos/coruja-triste.webp',
+      '/Jogos/assets/blocos/coruja-vitoria.webp',
+      '/Jogos/assets/blocos/cenario-1.webp', '/Jogos/assets/blocos/cenario-2.webp'
     ],
     doces: [
       '/Jogos/doces.min.js', '/Jogos/doces.css',
@@ -1528,7 +1534,19 @@
       '/Jogos/assets/doces/doce-verde-v2.webp',
       '/Jogos/assets/doces/doce-vermelho-v2.webp',
       '/Jogos/assets/doces/gelo-v2.webp',
-      '/Jogos/assets/doces/bomba-v2.webp'
+      '/Jogos/assets/doces/bomba-v2.webp',
+      '/Jogos/assets/doces/coruja-normal.webp', '/Jogos/assets/doces/coruja-ola.webp',
+      '/Jogos/assets/doces/coruja-feliz.webp', '/Jogos/assets/doces/coruja-festa.webp',
+      '/Jogos/assets/doces/coruja-amor.webp', '/Jogos/assets/doces/coruja-susto.webp',
+      '/Jogos/assets/doces/coruja-dica.webp', '/Jogos/assets/doces/coruja-pensa.webp',
+      '/Jogos/assets/doces/coruja-triste.webp',
+      '/Jogos/assets/doces/listrado-vermelho.webp', '/Jogos/assets/doces/listrado-roxo.webp',
+      '/Jogos/assets/doces/listrado-verde.webp', '/Jogos/assets/doces/listrado-amarelo.webp',
+      '/Jogos/assets/doces/listrado-azul.webp',
+      '/Jogos/assets/doces/embrulhado-vermelho.webp', '/Jogos/assets/doces/embrulhado-roxo.webp',
+      '/Jogos/assets/doces/embrulhado-verde.webp', '/Jogos/assets/doces/embrulhado-amarelo.webp',
+      '/Jogos/assets/doces/embrulhado-azul.webp',
+      '/Jogos/assets/doces/cenario-1.webp', '/Jogos/assets/doces/cenario-2.webp'
     ],
     tanques: [
       '/Jogos/tanques.min.js', '/Jogos/tanques.css', '/Jogos/multiplayer.min.js',
@@ -3614,6 +3632,10 @@
     // fundo e fallback enquanto a imagem carrega).
     { id: 'piano_vidro',     nome: 'Vidro Negro',   desc: 'Teclas de vidro preto.',  preco: 180, slot: 'piano_tema', tipo: 'skin', preview: '/Jogos/assets/piano/azulejo-preto.webp', jogo: 'piano', cores: { tecla: '#111318', tocada: '255,255,255', onda: '#ffffff', fundo: '#07080c' }, azulejos: { tecla: '/Jogos/assets/piano/azulejo-preto.webp', tocada: '/Jogos/assets/piano/azulejo-preto-tocado.webp' } },
     { id: 'piano_neonvidro', nome: 'Neon de Vidro', desc: 'Roxo que acende ciano.',  preco: 220, slot: 'piano_tema', tipo: 'skin', preview: '/Jogos/assets/piano/azulejo-neon-roxo.webp', jogo: 'piano', cores: { tecla: '#9333ea', tocada: '34,211,238', onda: '#67e8f9', fundo: '#05010d' }, azulejos: { tecla: '/Jogos/assets/piano/azulejo-neon-roxo.webp', tocada: '/Jogos/assets/piano/azulejo-neon-ciano.webp' } },
+    // nov/2026: 'palco' troca também o fundo da sala.
+    { id: 'piano_jazz',      nome: 'Clube de Jazz', desc: 'Laca vinho e ouro, no palco do jazz.', preco: 200, slot: 'piano_tema', tipo: 'skin', preview: '/Jogos/assets/piano/azulejo-jazz.webp', jogo: 'piano', cores: { tecla: '#4a0d18', tocada: '251,191,36', onda: '#fde68a', fundo: '#0c0507' }, azulejos: { tecla: '/Jogos/assets/piano/azulejo-jazz.webp', tocada: '/Jogos/assets/piano/azulejo-jazz-tocado.webp' }, palco: '/Jogos/assets/piano/palco-jazz.webp' },
+    { id: 'piano_coreto',    nome: 'Coreto',        desc: 'Bala de coco na praça à noite.',      preco: 160, slot: 'piano_tema', tipo: 'skin', preview: '/Jogos/assets/piano/azulejo-doce.webp', jogo: 'piano', cores: { tecla: '#f472b6', tocada: '251,207,232', onda: '#fbcfe8', fundo: '#120a10' }, azulejos: { tecla: '/Jogos/assets/piano/azulejo-doce.webp', tocada: '/Jogos/assets/piano/azulejo-doce-tocado.webp' }, palco: '/Jogos/assets/piano/palco-praca.webp' },
+    { id: 'piano_galaxia',   nome: 'Galáxia',       desc: 'Teclas de céu estrelado.',            preco: 250, slot: 'piano_tema', tipo: 'skin', preview: '/Jogos/assets/piano/azulejo-galaxia.webp', jogo: 'piano', cores: { tecla: '#1e1b4b', tocada: '34,211,238', onda: '#a5f3fc', fundo: '#03030c' }, azulejos: { tecla: '/Jogos/assets/piano/azulejo-galaxia.webp', tocada: '/Jogos/assets/piano/azulejo-galaxia-tocado.webp' } },
     // Ping Pong — só a SUA raquete e a bola (local; o adversário não vê).
     { id: 'pp_classico', nome: 'Clássico',     desc: 'Raquete azul, bola branca.', preco: 0,   slot: 'pp_skin', tipo: 'skin', preview: null, jogo: 'pingpong', amostra: ['#38bdf8', '#ffffff'] },
     { id: 'pp_limao',    nome: 'Verde Limão',  desc: 'Raquete limão.',             preco: 85,  slot: 'pp_skin', tipo: 'skin', preview: null, jogo: 'pingpong', corRaquete: '#84cc16', corBola: '#fef08a', amostra: ['#84cc16', '#fef08a'] },

@@ -1,5 +1,5 @@
 {
- "versaoSW": 533,
+ "versaoSW": 534,
  "hashes": {
   "Aprender/conteudo.js": "c2776ebcaf3844f9",
   "Aprender/hub.js": "0025f4b073788e9b",
@@ -14,13 +14,13 @@
   "Jogos/assets/som.js": "4c6ad9ec76357088",
   "Jogos/baralho.css": "87b5ee390e494018",
   "Jogos/baralho.js": "3a537456e8b62c9e",
-  "Jogos/blocos.css": "2af7dfd97321cecb",
+  "Jogos/blocos.css": "3b25f3f0a16e5362",
   "Jogos/blocos.js": "e3599d1975e98395",
   "Jogos/corrida.css": "2ca54eacf6e853e7",
   "Jogos/corrida.js": "144471077b6da745",
   "Jogos/corujinha.css": "910a442c95e78e6a",
   "Jogos/corujinha.js": "07500b1fc3c39728",
-  "Jogos/doces.css": "47367e19f5a5f71b",
+  "Jogos/doces.css": "e97b66c05f13d093",
   "Jogos/doces.js": "5468944ce46061bc",
   "Jogos/ervilhas.css": "346a96133d614597",
   "Jogos/ervilhas.js": "c3ad76d01993f980",

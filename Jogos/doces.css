@@ -300,3 +300,16 @@
 #jogo-doces.fx-leve .dc-decos { display: none; }
 #jogo-doces.fx-leve .dc-mascote img, #jogo-doces.fx-leve .dc-overlay, #jogo-doces.fx-leve .dc-overlay-owl,
 #jogo-doces.fx-leve .dc-btn, #jogo-doces.fx-leve .dc-btn::after, #jogo-doces.fx-leve .dc-mov-baixo .dc-hud-valor { animation: none !important; }
+
+/* Celular em pé com altura sobrando (nov/2026): a coruja cresce no espaço
+   que o tabuleiro não usa e o conjunto fica centralizado — sem faixa vazia. */
+@supports (width: 1cqh) {
+  @media (max-width: 599px) and (orientation: portrait) {
+    @container (min-height: 520px) {
+      body.games-fs-open #dc-arena { justify-content: center; }
+      body.games-fs-open #dc-arena .dc-mascote { height: clamp(84px, 100cqh - 100cqw - 24px, 210px); margin-bottom: 8px; }
+      body.games-fs-open #dc-arena .dc-mascote img { height: 100%; }
+      body.games-fs-open #dc-arena .dc-balao { font-size: 14px; max-width: 220px; }
+    }
+  }
+}

@@ -439,3 +439,16 @@
 #jogo-blocos.fx-leve .bb-btn, #jogo-blocos.fx-leve .bb-btn::after, #jogo-blocos.fx-leve .bb-peca-mini,
 #jogo-blocos.fx-leve .bb-cel, #jogo-blocos.fx-leve .bb-grid, #jogo-blocos.fx-leve .bb-peca { animation: none !important; }
 #jogo-blocos.fx-leve .bb-cel.bb-preview-linha::after { animation: none; opacity: .45; }
+
+/* Celular em pé com altura sobrando (nov/2026): a coruja cresce no espaço
+   que a grade e a bandeja não usam e o conjunto fica centralizado. */
+@supports (width: 1cqh) {
+  @media (max-width: 599px) and (orientation: portrait) {
+    @container (min-height: 600px) {
+      body.games-fs-open #bb-arena { justify-content: center; }
+      body.games-fs-open #bb-arena .bb-mascote { height: clamp(76px, 100cqh - 100cqw - 120px, 200px); margin-bottom: 0; }
+      body.games-fs-open #bb-arena .bb-mascote img { height: 100%; }
+      body.games-fs-open #bb-arena .bb-balao { font-size: 14px; max-width: 220px; }
+    }
+  }
+}

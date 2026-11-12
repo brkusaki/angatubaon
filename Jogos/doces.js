@@ -1218,7 +1218,7 @@
   // por combinação e o efeito de cada doce especial que disparou.
   function _dcEfeitosEstouro(resultado) {
     var layout = _dcObterLayout(), agora = performance.now(), n = 0, extras = 0, primeiroEsp = -1, forte = false;
-    var emRun = {}, reduzido = _dcMovReduzido();
+    var emRun = {}, reduzido = _dcMovReduzido(), somEsp = null;
     resultado.runs.forEach(function (run) {
       run.cells.forEach(function (i) { emRun[i] = true; });
       var meio = run.cells[Math.floor(run.cells.length / 2)];
@@ -1231,6 +1231,7 @@
       var r = Math.floor(idx / _DC_TAM), c = idx % _DC_TAM, pc = _dcCentroCelula(layout, r, c);
       var cor = _dcCores[_dcCor[idx] - 1] || '#ffffff', tipo = _dcTipo[idx];
       if (!emRun[idx]) extras++;
+      if (tipo > 0 && tipo !== _DC_TIPO_BOMBA) somEsp = tipo === _DC_TIPO_EMBRULHADO ? 'doces-embrulhado' : (somEsp || 'doces-listra');
       if (tipo === _DC_TIPO_LISTRA_H) { _dcFx.push({ tipo: 'h', y: pc.y, cor: cor, t0: agora, dur: 520 }); forte = true; }
       else if (tipo === _DC_TIPO_LISTRA_V) { _dcFx.push({ tipo: 'v', x: pc.x, cor: cor, t0: agora, dur: 520 }); forte = true; }
       else if (tipo === _DC_TIPO_EMBRULHADO) { _dcFx.push({ tipo: 'onda', x: pc.x, y: pc.y, cor: cor, t0: agora, dur: 560 }); forte = true; }
@@ -1258,6 +1259,7 @@
       var pe = _dcCentroCelula(layout, Math.floor(primeiroEsp / _DC_TAM), primeiroEsp % _DC_TAM);
       _dcPopups.push({ x: pe.x, y: pe.y - layout.cellPx * 0.5, texto: '+' + (extras * 15), cor: '#fde68a', t0: agora + 140 });
     }
+    if (somEsp) { var sE = _som(); if (sE && sE.tocar) sE.tocar(somEsp, null, 0.75); }
     if (!reduzido && (forte || n >= 9)) {
       _dcTremor = { t0: agora, forca: forte ? Math.min(7, 3 + n * 0.18) : 3 };
       if (navigator.vibrate) { try { navigator.vibrate(forte ? 28 : 14); } catch (e) {} }
@@ -1265,7 +1267,7 @@
   }
 
   function _dcFeedbackInvalido(i1, i2) {
-    var s = _som(); if (s) s.erro();
+    var s = _som(); if (s) { if (s.tocar) s.tocar('doces-invalida', function () { s.erro(); }, 0.7); else s.erro(); }
     var agora = performance.now();
     _dcShakeAnim[i1] = { t0: agora };
     _dcShakeAnim[i2] = { t0: agora };
@@ -1452,6 +1454,7 @@
       if (criar.length) {
         var msgEsp = _DC_MENSAGENS_ESPECIAL[criar[criar.length - 1].tipo];
         if (msgEsp) _dcMostrarComboMsg(msgEsp[0], msgEsp[1], 'amor');
+        var sN = _som(); if (sN && sN.tocar) setTimeout(function () { sN.tocar('doces-especial', null, 0.7); }, 220);
       }
       // 1) "Explode" as células combinadas antes de sumirem — sem isso a
       // troca parecia teletransporte (uma cor some, outra já aparece no
@@ -1510,6 +1513,7 @@
   function _dcChuvaDeDoces() {
     var agora = performance.now();
     _dcQuedaAnim = {};
+    var sC = _som(); if (sC && sC.tocar) sC.tocar('doces-chuva', null, 0.5);
     if (_dcMovReduzido()) return;
     for (var i = 0; i < _DC_TAM * _DC_TAM; i++) {
       if (!_dcCelulaAtiva(i)) continue;
@@ -1763,7 +1767,7 @@
 
   // ── Preparação da tela (chamada pelo _jogoLoader ao abrir) ──
   function _dcPrepararTela() {
-    var sP = _som(); if (sP && sP.precarregar) sP.precarregar(['doces-trocar', 'doces-combina', 'doces-cascata', 'doces-bomba']);
+    var sP = _som(); if (sP && sP.precarregar) sP.precarregar(['doces-trocar', 'doces-combina', 'doces-cascata', 'doces-bomba', 'doces-listra', 'doces-embrulhado', 'doces-especial', 'doces-invalida', 'doces-chuva']);
     _dcRegistrarMenu();
     _dcCanvas = document.getElementById('dc-grid');
     if (_dcCanvas && !_dcCanvas._dcPronto) {

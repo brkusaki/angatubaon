@@ -578,16 +578,20 @@
     if (qtdLimpas > 0) {
       _bbLinhasFase += qtdLimpas;
       _bbPontosFase += qtdLimpas * qtdLimpas * 10;
-      if (s) s.combo(qtdLimpas);
+      if (s) { if (s.tocar) s.tocar(qtdLimpas >= 2 ? 'blocos-linha-dupla' : 'blocos-linha', function () { s.combo(qtdLimpas); }, 0.8); else s.combo(qtdLimpas); }
       if (navigator.vibrate) { try { navigator.vibrate(qtdLimpas >= 2 ? [20, 30, 20] : 15); } catch (e) {} }
       _bbBurstLimpeza(limpeza.linhas, limpeza.colunas);
-    } else if (s) { s.acerto(); }
+    } else if (s) {
+      if (s.tocar) s.tocar(Math.random() < 0.5 ? 'blocos-encaixar-1' : 'blocos-encaixar-2', function () { s.acerto(); }, 0.7, 0.94 + Math.random() * 0.12);
+      else s.acerto();
+    }
 
     var novas = false;
     if (_bbTray.every(function (p) { return !p; })) {
       _bbRodadasFase++;
       _bbTray = [_bbNovaPeca(), _bbNovaPeca(), _bbNovaPeca()];
       novas = true;
+      if (s && s.tocar) setTimeout(function () { s.tocar('blocos-pecas', null, 0.55); }, 120);
     }
 
     _bbRenderGrid();
@@ -680,7 +684,10 @@
       if (_bbFaseAtual > _bbRecordeGet()) _bbRecordeSet(_bbFaseAtual);
       if (s) s.fim(true);
       if (window.AngatubaGames && window.AngatubaGames.efeitos) window.AngatubaGames.efeitos.confete('bb-card');
-    } else if (s) { s.fim(false); }
+    } else if (s) {
+      if (s.tocar) s.tocar('blocos-sem-espaco', null, 0.8);
+      setTimeout(function () { s.fim(false); }, 450);
+    }
     var recorde = _bbRecordeGet();
 
     var owl = document.getElementById('bb-fim-owl');
@@ -910,6 +917,7 @@
 
   // ── Preparação da tela (chamada pelo _jogoLoader ao abrir) ──
   function _bbPrepararTela() {
+    var sP = _som(); if (sP && sP.precarregar) sP.precarregar(['blocos-encaixar-1', 'blocos-encaixar-2', 'blocos-linha', 'blocos-linha-dupla', 'blocos-pecas', 'blocos-sem-espaco']);
     _bbCriarGridDOM();
     _bbMontarVisual();
     _bbRegistrarMenu();

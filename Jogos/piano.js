@@ -372,8 +372,11 @@
     if (_pnBatFase >= 1) _pnBatFase = 0;
   }
 
+  // Erro: o acorde gravado (ElevenLabs) com o "bzzz" sintetizado de reserva.
   function _pnSomErro() {
     if (!_pnSomLigado()) return;
+    var SG = window.AngatubaGames && window.AngatubaGames.som;
+    if (SG && SG.tocar && SG.tocar('piano-erro', null, 0.8)) return;
     var ac = _pnAudio(); if (!ac) return;
     var t = ac.currentTime;
     var o = ac.createOscillator();
@@ -714,6 +717,7 @@
     // marcos de velocidade (só Sobrevivência)
     if (_pnModo !== 'normal' && (_pnPontos === 50 || _pnPontos === 100 || _pnPontos === 200 || _pnPontos === 350)) {
       _pnAviso = { txt: _pnPontos >= 200 ? 'VELOCIDADE MÁXIMA!' : 'ACELEROU!', t0: agora };
+      var SA = window.AngatubaGames && window.AngatubaGames.som; if (SA && SA.tocar) SA.tocar('piano-acelerou', null, 0.6);
     }
   }
 
@@ -1717,6 +1721,7 @@
   /* ── Ciclo de vida ────────────────────────────────────────────── */
   function _pnPreparar() {
     _pnCarregarFundo();
+    var SP = window.AngatubaGames && window.AngatubaGames.som; if (SP && SP.precarregar) SP.precarregar(['piano-erro', 'piano-acelerou']);
     _pnCanvas = document.getElementById('pn-canvas');
     if (!_pnCanvas) return;
     _pnCtx = _pnCanvas.getContext('2d');

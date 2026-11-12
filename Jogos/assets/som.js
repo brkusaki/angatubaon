@@ -165,7 +165,13 @@
     'baralho-embaralhar': 'baralho/sfx/embaralhar', 'baralho-distribuir': 'baralho/sfx/distribuir',
     'baralho-jogar': 'baralho/sfx/jogar-carta', 'baralho-uno': 'baralho/sfx/uno',
     'doces-trocar': 'doces/sfx/trocar', 'doces-combina': 'doces/sfx/combina-3',
-    'doces-cascata': 'doces/sfx/cascata', 'doces-bomba': 'doces/sfx/bomba'
+    'doces-cascata': 'doces/sfx/cascata', 'doces-bomba': 'doces/sfx/bomba',
+    'doces-listra': 'doces/sfx/listra', 'doces-embrulhado': 'doces/sfx/embrulhado',
+    'doces-especial': 'doces/sfx/especial', 'doces-invalida': 'doces/sfx/invalida', 'doces-chuva': 'doces/sfx/chuva',
+    'blocos-encaixar-1': 'blocos/sfx/encaixar-1', 'blocos-encaixar-2': 'blocos/sfx/encaixar-2',
+    'blocos-linha': 'blocos/sfx/linha', 'blocos-linha-dupla': 'blocos/sfx/linha-dupla',
+    'blocos-pecas': 'blocos/sfx/pecas', 'blocos-sem-espaco': 'blocos/sfx/sem-espaco',
+    'piano-erro': 'piano/sfx/erro', 'piano-acelerou': 'piano/sfx/acelerou'
   };
   var _GANHO_ARQ = 2.0;     // arquivos já vêm nivelados; compensa o master conservador da síntese
   var _bufs = {};           // nome → AudioBuffer decodificado

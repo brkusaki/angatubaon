@@ -8,6 +8,9 @@ body.games-fs-open #sinalbranco-root{min-height:0;}
 /* Voltar flutuante (igual à Corrida): o palco usa a tela inteira. */
 body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco{position:relative;}
 body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position:absolute;top:calc(env(safe-area-inset-top,0px) + 8px);left:8px;z-index:6;margin:0;padding:8px 12px;background:rgba(9,14,22,.55);border-radius:999px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-size:13px;}
+/* Preenchimento ambiente: a mesma cena, borrada e escurecida, ocupa as laterais (sem faixa preta). */
+.sb-amb{position:absolute;inset:-6%;width:112%;height:112%;object-fit:cover;filter:blur(2.2em) brightness(.62) saturate(1.15);transform:translateZ(0);pointer-events:none;}
+#sinalbranco-root .sb-amb{filter:blur(28px) brightness(.62) saturate(1.15);}
 .sb-palco{position:absolute;left:50%;top:50%;overflow:hidden;background:#05080d;color:#e6eef8;font-family:'DM Sans',system-ui,sans-serif;transform-origin:center center;}
 /* :where() deixa a especificidade baixa: as classes de cada botão continuam valendo. */
 :where(.sb-palco) button{font-family:inherit;font-size:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer;}

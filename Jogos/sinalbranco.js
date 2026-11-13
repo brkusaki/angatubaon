@@ -608,8 +608,9 @@
       '<div class="sb-modal" style="display:none"><div class="sb-modal-caixa"></div></div>' +
       '<div class="sb-titulo" style="display:none"></div>' +
       '<div class="sb-fade"></div>';
-    root.appendChild(palco);
-    el.root = root; el.palco = palco;
+    var amb = h('img', 'sb-amb'); amb.alt = ''; amb.setAttribute('aria-hidden', 'true'); amb.draggable = false;
+    root.appendChild(amb); root.appendChild(palco);
+    el.root = root; el.palco = palco; el.amb = amb;
     el.bg = palco.querySelector('.sb-bg');
     el.fx = palco.querySelector('.sb-fx');
     el.pontos = palco.querySelector('.sb-pontos');
@@ -673,7 +674,7 @@
     var c = cenaAtual();
     if (!soPontos) {
       var src = A + ((c.imgCom && c.imgCom()) || c.img);
-      if (el.bg.getAttribute('src') !== src) el.bg.src = src;
+      if (el.bg.getAttribute('src') !== src) { el.bg.src = src; el.amb.src = src; }
       el.palco.classList.toggle('sb-pisca', !!c.pisca);
       el.local.textContent = c.nome;
       ligarNeve(!!c.neve);
@@ -1431,7 +1432,7 @@
   function telaTitulo() {
     var save = carregar(), temSave = !!save;
     progRegistrar();   // guarda o ato já alcançado antes de qualquer "refazer ato"
-    el.bg.src = A + 'heliponto-v1.webp';
+    el.bg.src = el.amb.src = A + 'heliponto-v1.webp';
     el.pontos.innerHTML = ''; el.saidas.innerHTML = ''; el.inv.innerHTML = '';
     el.local.textContent = '';
     ligarNeve(true);

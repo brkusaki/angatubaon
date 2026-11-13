@@ -1387,7 +1387,7 @@
       '/Jogos/assets/sinalbranco/sfx/revelacao.mp3',
       '/Jogos/assets/sinalbranco/sfx/sinal-ok.mp3',
       '/Jogos/assets/sinalbranco/sfx/vento-loop.mp3',
-      '/Jogos/assets/sinalbranco/sfx/voz-audio_ingrid-v2.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-audio_ingrid-v3.mp3',
       '/Jogos/assets/sinalbranco/sfx/voz-sinal-v2.mp3',
       '/Jogos/assets/sinalbranco/sfx/elevador-loop.mp3',
       '/Jogos/assets/sinalbranco/sfx/elevador-freio.mp3',

@@ -1395,7 +1395,7 @@
       '/Jogos/assets/sinalbranco/sfx/faisca.mp3',
       '/Jogos/assets/sinalbranco/sfx/porta-pedra.mp3',
       '/Jogos/assets/sinalbranco/sfx/cabra.mp3',
-      '/Jogos/assets/sinalbranco/sfx/voz-fita_kazuo-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-fita_kazuo-v2.mp3',
       // retratos dos personagens
       '/Jogos/assets/sinalbranco/ret-teo-neutro-v2.webp',
       '/Jogos/assets/sinalbranco/ret-teo-tenso-v2.webp',

@@ -1539,7 +1539,7 @@
     var ac = null, master = null, vento = null, ventoG = null, zumbido = null, zumbG = null, estG = null, mudoT = 0;
     // Arquivos gravados (ElevenLabs) em /Jogos/assets/sinalbranco/sfx/<nome>.mp3.
     // Enquanto um arquivo não existe ou não carregou, toca a síntese de reserva.
-    var VOZES = { audio_ingrid: 'voz-audio_ingrid-v3', sinal: 'voz-sinal-v2', fita_kazuo: 'voz-fita_kazuo-v1' };
+    var VOZES = { audio_ingrid: 'voz-audio_ingrid-v3', sinal: 'voz-sinal-v2', fita_kazuo: 'voz-fita_kazuo-v2' };
     var ARQ = ['passos-neve', 'passos-metal', 'porta', 'gerador-liga', 'sinal-ok', 'pegar', 'papel', 'gravador',
       'peca', 'lanterna', 'luzes', 'revelacao', 'elevador-freio', 'faisca', 'porta-pedra', 'cabra',
       VOZES.audio_ingrid, VOZES.sinal, VOZES.fita_kazuo];

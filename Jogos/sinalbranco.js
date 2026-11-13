@@ -172,9 +172,13 @@
   var CENAS = {
     heliponto: {
       nome: 'Heliponto', img: 'heliponto-v1.webp', neve: true, fora: true,
-      chegada: ['O helicóptero já estava subindo antes de eu fechar a porta.',
+      chegada: ['Meu nome é Téo Marin. Eu conserto sinais.',
+        'Um serviço simples, segundo o Consórcio Polar: a Estação Halvorsen parou de transmitir. Valor fechado e uma cláusula de sigilo que li duas vezes.',
+        'O helicóptero já estava subindo antes de eu fechar a porta.',
         '"Volto em três dias, se o tempo deixar", o piloto gritou. Não parecia ter muita certeza.',
-        'Estação Halvorsen. Doze pesquisadores, segundo o contrato. Nenhum veio me receber.'],
+        'Estação Halvorsen. Doze pesquisadores, segundo o contrato. Nenhum veio me receber.',
+        '"Eu fui levada", minha mãe repetia à mesa, todo domingo. Ninguém dava bola. Eu também não.',
+        '{confuso}Faz anos que eu não pensava nisso. Deve ser o frio.'],
       pontos: [
         { id: 'placa', x: 4, y: 17, w: 21, h: 26, acao: function () {
           fala(['ESTAÇÃO HALVORSEN — Consórcio Polar Internacional.', 'O gelo cobriu metade das letras. Ninguém limpa essa placa há semanas.']); } },
@@ -1411,6 +1415,23 @@
     b.textContent = 'Apagar o progresso? Toque de novo';
     return false;
   }
+  // Ordem de serviço que abre o jogo: o jogador fica sabendo quem é e por que está ali.
+  var CONTRATO = 'CONSÓRCIO POLAR INTERNACIONAL\n\n' +
+    'Contratado: Téo Marin\nFunção: técnico de telecomunicações\n' +
+    'Destino: Estação Halvorsen, Antártica interior\nPessoal na base: 12 pesquisadores\n\n' +
+    'Missão: restabelecer a transmissão de dados da estação.\n' +
+    'Prazo: 3 dias. Retirada de helicóptero, se o tempo deixar.\n\n' +
+    'Cláusula 7 — Sigilo. Tudo o que o técnico vir ou ouvir na estação pertence ao Consórcio e não será comentado com terceiros.';
+  function abrirContrato(aoFechar) {
+    som.papel();
+    abrirModal(
+      '<div class="sb-doc-duas"><div class="sb-ret sb-doc-ret">' + retInterno('teo', 'neutro') + '</div><div class="sb-doc-corpo">' +
+      '<div class="sb-doc-tit">Ordem de serviço nº 1014</div>' +
+      '<div class="sb-doc-txt">' + esc(CONTRATO).replace(/\n/g, '<br>') + '</div>' +
+      '<button type="button" class="sb-btn sb-contrato-ok" data-i="embarcar">Aceitar e embarcar</button></div></div>',
+      'sb-doc sb-doc-papel sb-contrato', false, aoFechar);
+    el.caixa.querySelector('[data-i="embarcar"]').addEventListener('click', function () { som.clique(); fecharModal(); });
+  }
   function comecar() {
     el.titulo.style.display = 'none';
     tUltimo = Date.now();
@@ -1419,6 +1440,10 @@
     atualizarBadge(false);
     if (S.ato === 1 && S.flags.atoFim) { telaFimAto(1); return; }
     if (S.ato === 2 && S.flags.ato2Fim) { telaFimAto(2); return; }
+    if (S.ato === 1 && S.cena === 'heliponto' && !S.chegou.heliponto && !S.flags.intro) {
+      abrirContrato(function () { flag('intro'); ir(S.cena); });
+      return;
+    }
     ir(S.cena);
   }
   function fimDoAto() {

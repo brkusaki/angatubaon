@@ -7656,6 +7656,23 @@ body.games-fs-open #games-hub.jogo-ativo .rl-hud {
 .jogo-tela.jm-fluxo > .jm-btn { top: env(safe-area-inset-top, 0px); }
 .jogo-tela.jm-partida:not(.jm-fluxo) > .jogo-voltar { display: none !important; }
 .jogo-tela.jm-partida.jm-fluxo > .jogo-voltar { visibility: hidden; pointer-events: none; }
+/* Tela cheia (nov/2026): a faixa invisível do voltar deixava um vão vazio
+   em cima. Na partida ela sai de vez, o botão de pausa senta no canto do
+   card e o placar abre espaço pra ele na mesma linha. */
+@media (orientation: portrait) {
+body.games-fs-open .jogo-tela.jm-partida.jm-fluxo > .jogo-voltar { display: none; }
+body.games-fs-open .jogo-tela.jm-partida.jm-fluxo > .jm-btn { top: calc(env(safe-area-inset-top, 0px) + 12px); }
+body.games-fs-open #jogo-doces.jm-partida.jm-fluxo > .jm-btn,
+body.games-fs-open #jogo-blocos.jm-partida.jm-fluxo > .jm-btn { top: calc(env(safe-area-inset-top, 0px) + 32px); left: calc(env(safe-area-inset-left, 0px) + 24px); }   /* meio da faixa (~80 px) */
+body.games-fs-open #jogo-2048.jm-partida.jm-fluxo > .jm-btn { top: calc(env(safe-area-inset-top, 0px) + 48px); left: calc(env(safe-area-inset-left, 0px) + 24px); }    /* faixa ~112 px */
+body.games-fs-open .jm-partida.jm-fluxo .dc-hud,
+body.games-fs-open .jm-partida.jm-fluxo .bb-hud,
+body.games-fs-open .jm-partida.jm-fluxo .t48-hud { padding-left: 72px; }   /* placar em faixa: o botão senta dentro dela */
+body.games-fs-open .jm-partida.jm-fluxo .sq-hud,
+body.games-fs-open .jm-partida.jm-fluxo .st-hud { margin-left: 46px; }
+body.games-fs-open #games-hub.jogo-ativo .jm-partida.jm-fluxo .st-hud,
+body.games-fs-open #games-hub.jogo-ativo .jm-partida.jm-fluxo .sq-hud { top: 0; }
+}
 
 .jm-overlay {
   display: none;

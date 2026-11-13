@@ -1,5 +1,5 @@
 {
- "versaoSW": 534,
+ "versaoSW": 539,
  "hashes": {
   "Aprender/conteudo.js": "c2776ebcaf3844f9",
   "Aprender/hub.js": "0025f4b073788e9b",
@@ -64,7 +64,7 @@
   "index.html": "bf00aba29ed7a9d9",
   "offline.html": "b710016856bc3225",
   "privacidade.html": "be26a48acd997c2c",
-  "styles.css": "8bc7b8e14d9f1286",
+  "styles.css": "56e397e0d3af6319",
   "termos.html": "d89a3d33d6264e38"
  }
 }

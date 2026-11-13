@@ -170,12 +170,22 @@
      Uma porta que dá pra outra cena é um ponto com acao: ir(...).
   ══════════════════════════════════════════════════════════════ */
   var CENAS = {
-    heliponto: {
-      nome: 'Heliponto', img: 'heliponto-v1.webp', neve: true, fora: true,
+    // Abertura: dentro do helicóptero, a caminho da estação. Termina na ordem de serviço.
+    voo: {
+      nome: 'Helicóptero', img: 'helicoptero-v1.webp', fora: true,
       chegada: ['Meu nome é Téo Marin. Eu conserto sinais.',
         'Um serviço simples, segundo o Consórcio Polar: a Estação Halvorsen parou de transmitir. Valor fechado e uma cláusula de sigilo que li duas vezes.',
-        'O helicóptero já estava subindo antes de eu fechar a porta.',
-        '"Volto em três dias, se o tempo deixar", o piloto gritou. Não parecia ter muita certeza.',
+        '"Halvorsen à vista", o piloto avisou pelo intercomunicador, sem tirar os olhos do branco. "Aquela luz vermelha na antena é a base."',
+        'Uma luz vermelha piscando no meio de um deserto de gelo. Não é o tipo de sinal que eu gosto de ver.',
+        '"Não posso esperar, o tempo fecha rápido aqui. Volto em três dias, se deixar."',
+        'Peguei a pasta com a ordem de serviço no banco ao lado. Li de novo, só pra ter o que fazer com as mãos.'],
+      aoChegar: function () { abrirContrato(function () { flag('intro'); ir('heliponto'); }); },
+      pontos: []
+    },
+    heliponto: {
+      nome: 'Heliponto', img: 'heliponto-v1.webp', neve: true, fora: true,
+      chegada: ['O helicóptero já estava subindo antes de eu fechar a porta.',
+        'Ficou só o vento, e o barulho dele sumindo no branco.',
         'Estação Halvorsen. Doze pesquisadores, segundo o contrato. Nenhum veio me receber.',
         '"Eu fui levada", minha mãe repetia à mesa, todo domingo. Ninguém dava bola. Eu também não.',
         '{confuso}Faz anos que eu não pensava nisso. Deve ser o frio.'],
@@ -480,7 +490,7 @@
   var emPartida = false;
 
   function novoEstado() {
-    return { ato: 1, cena: 'heliponto', itens: [], flags: {}, docs: [], vistos: {}, chegou: {}, tempo: 0 };
+    return { ato: 1, cena: 'voo', itens: [], flags: {}, docs: [], vistos: {}, chegou: {}, tempo: 0 };
   }
   function salvar() {
     if (!S) return;
@@ -1428,7 +1438,7 @@
       '<div class="sb-doc-duas"><div class="sb-ret sb-doc-ret">' + retInterno('teo', 'neutro') + '</div><div class="sb-doc-corpo">' +
       '<div class="sb-doc-tit">Ordem de serviço nº 1014</div>' +
       '<div class="sb-doc-txt">' + esc(CONTRATO).replace(/\n/g, '<br>') + '</div>' +
-      '<button type="button" class="sb-btn sb-contrato-ok" data-i="embarcar">Aceitar e embarcar</button></div></div>',
+      '<button type="button" class="sb-btn sb-contrato-ok" data-i="embarcar">Aceitar o serviço</button></div></div>',
       'sb-doc sb-doc-papel sb-contrato', false, aoFechar);
     el.caixa.querySelector('[data-i="embarcar"]').addEventListener('click', function () { som.clique(); fecharModal(); });
   }
@@ -1440,10 +1450,7 @@
     atualizarBadge(false);
     if (S.ato === 1 && S.flags.atoFim) { telaFimAto(1); return; }
     if (S.ato === 2 && S.flags.ato2Fim) { telaFimAto(2); return; }
-    if (S.ato === 1 && S.cena === 'heliponto' && !S.chegou.heliponto && !S.flags.intro) {
-      abrirContrato(function () { flag('intro'); ir(S.cena); });
-      return;
-    }
+    if (S.ato === 1 && !S.chegou.heliponto && !S.flags.intro) { S.cena = 'voo'; S.chegou.voo = false; }
     ir(S.cena);
   }
   function fimDoAto() {

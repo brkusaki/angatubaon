@@ -1336,6 +1336,7 @@
     sinalbranco: [
       '/Jogos/sinalbranco.min.js', '/Jogos/sinalbranco.css',
       '/Jogos/assets/sinalbranco/heliponto-v1.webp',
+      '/Jogos/assets/sinalbranco/helicoptero-v1.webp',
       '/Jogos/assets/sinalbranco/entrada-v1.webp',
       '/Jogos/assets/sinalbranco/refeitorio-v1.webp',
       '/Jogos/assets/sinalbranco/corredor-v1.webp',

@@ -745,6 +745,14 @@
     relatorio_mira: ['mira', 'perturbada'], log_radio: ['kazuo', 'tecnico'], sinal: ['coro', ''], emails: ['kazuo', 'desconfiado'],
     fita_kazuo: ['kazuo', 'cansado'], amostra: ['mira', 'curiosa'], quadro_mira: ['mira', 'firme']
   };
+  // Falas da "central" que têm áudio (a voz do Coro disfarçado). Chave = texto exato da linha.
+  var VOZ_CENTRAL = {
+    'Téo? Aqui é a central do consórcio. O sinal está fraco, mas estamos te ouvindo.': 'central_abertura',
+    'A gente te guia daqui. Siga em frente.': 'central_guia',
+    'Ótimo trabalho, Téo. O laboratório da Dra. Okafor fica logo à frente.': 'central_otimo',
+    'A Mira deixou a ordem no quadro. Ela sempre deixava.': 'central_quadro',
+    'Bem-vindo, Téo. Agora desça.': 'central_desca'
+  };
   function estrela7() {
     var p = [], i, a;
     for (i = 0; i < 7; i++) { a = ((i * 3) % 7) / 7 * 2 * Math.PI - Math.PI / 2; p.push((42 * Math.cos(a)).toFixed(1) + ',' + (42 * Math.sin(a)).toFixed(1)); }
@@ -783,6 +791,7 @@
     var l = falaFila.shift(), m = /^\{(\w+)\}/.exec(l);
     falaTexto = m ? l.slice(m[0].length) : l;
     retFala(m ? m[1] : '');
+    if (m && m[1] === 'coro' && VOZ_CENTRAL[falaTexto]) som.voz(VOZ_CENTRAL[falaTexto]);
     falaPos = 0;
     el.falaTxt.textContent = '';
     el.fala.classList.remove('sb-pronta');
@@ -1539,10 +1548,13 @@
     var ac = null, master = null, vento = null, ventoG = null, zumbido = null, zumbG = null, estG = null, mudoT = 0;
     // Arquivos gravados (ElevenLabs) em /Jogos/assets/sinalbranco/sfx/<nome>.mp3.
     // Enquanto um arquivo não existe ou não carregou, toca a síntese de reserva.
-    var VOZES = { audio_ingrid: 'voz-audio_ingrid-v3', sinal: 'voz-sinal-v2', fita_kazuo: 'voz-fita_kazuo-v2' };
+    var VOZES = { audio_ingrid: 'voz-audio_ingrid-v3', sinal: 'voz-sinal-v2', fita_kazuo: 'voz-fita_kazuo-v2',
+      central_abertura: 'voz-central-abertura-v1', central_guia: 'voz-central-guia-v1', central_otimo: 'voz-central-otimo-v1',
+      central_quadro: 'voz-central-quadro-v1', central_desca: 'voz-central-desca-v1' };
     var ARQ = ['passos-neve', 'passos-metal', 'porta', 'gerador-liga', 'sinal-ok', 'pegar', 'papel', 'gravador',
       'peca', 'lanterna', 'luzes', 'revelacao', 'elevador-freio', 'faisca', 'porta-pedra', 'cabra',
-      VOZES.audio_ingrid, VOZES.sinal, VOZES.fita_kazuo];
+      VOZES.audio_ingrid, VOZES.sinal, VOZES.fita_kazuo,
+      VOZES.central_abertura, VOZES.central_guia, VOZES.central_otimo, VOZES.central_quadro, VOZES.central_desca];
     var LOOPS = ['vento-loop', 'interior-loop', 'gerador-loop', 'estatica-loop', 'coro-loop', 'elevador-loop'];
     var buf = {}, loopG = {}, loopOn = {}, vozSrc = null, vozVez = 0, ambAtual = { onde: '', cena: '' };
     function ligado() { var s = window.AngatubaSom; return !(s && typeof s.ativo === 'function' && !s.ativo()); }

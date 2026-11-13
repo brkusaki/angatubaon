@@ -1396,6 +1396,11 @@
       '/Jogos/assets/sinalbranco/sfx/porta-pedra.mp3',
       '/Jogos/assets/sinalbranco/sfx/cabra.mp3',
       '/Jogos/assets/sinalbranco/sfx/voz-fita_kazuo-v2.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-central-abertura-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-central-guia-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-central-otimo-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-central-quadro-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-central-desca-v1.mp3',
       // retratos dos personagens
       '/Jogos/assets/sinalbranco/ret-teo-neutro-v2.webp',
       '/Jogos/assets/sinalbranco/ret-teo-tenso-v2.webp',

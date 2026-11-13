@@ -1064,7 +1064,7 @@
     root.innerHTML = '';
     var palco = h('div', 'sb-palco');
     palco.innerHTML =
-      '<div class="sb-mundo"><img class="sb-bg" alt="" draggable="false"><div class="sb-pontos"></div></div>' +
+      '<div class="sb-mundo"><img class="sb-bg" alt="" draggable="false"><video class="sb-vid" muted loop playsinline preload="auto" aria-hidden="true" style="display:none"></video><div class="sb-pontos"></div></div>' +
       '<canvas class="sb-fx" width="800" height="450"></canvas>' +
       '<div class="sb-saidas"></div>' +
       '<div class="sb-hud">' +
@@ -1083,6 +1083,7 @@
     root.appendChild(amb); root.appendChild(palco);
     el.root = root; el.palco = palco; el.amb = amb;
     el.bg = palco.querySelector('.sb-bg');
+    el.vid = palco.querySelector('.sb-vid');
     el.fx = palco.querySelector('.sb-fx');
     el.pontos = palco.querySelector('.sb-pontos');
     el.saidas = palco.querySelector('.sb-saidas');
@@ -1147,6 +1148,12 @@
       var src = A + ((c.imgCom && c.imgCom()) || c.img);
       if (el.bg.getAttribute('src') !== src) { el.bg.src = src; el.amb.src = src; }
       el.palco.classList.toggle('sb-pisca', !!c.pisca);
+      // Vídeo opcional da cena (loop mudo por cima da imagem, só com a imagem base; a imagem fica de fundo/reserva)
+      var vsrc = c.video && !(c.imgCom && c.imgCom()) ? A + c.video : '';
+      if (vsrc) {
+        if (el.vid.getAttribute('src') !== vsrc) { el.vid.style.display = 'none'; el.vid.onplaying = function () { el.vid.style.display = ''; }; el.vid.onerror = function () { el.vid.style.display = 'none'; }; el.vid.src = vsrc; }
+        var pv = el.vid.play(); if (pv && pv.catch) pv.catch(function () {});
+      } else { el.vid.style.display = 'none'; if (el.vid.getAttribute('src')) { el.vid.pause(); el.vid.removeAttribute('src'); el.vid.load(); } }
       el.palco.classList.toggle('sb-nucleo-ok', S.cena === 'nucleo' && !!S.flags.nucleoOk);
       el.local.textContent = c.nome;
       ligarNeve(!!c.neve);

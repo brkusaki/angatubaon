@@ -489,6 +489,33 @@
   var neveRaf = 0, neve = [];
   var emPartida = false;
 
+  // Progresso desbloqueado (maior ato alcançado). Separado do save para sobreviver a "refazer ato".
+  var PROG = 'angatuba_sinalbranco_prog', progCache = 0;
+  var ATO_CENAS = {
+    1: ['voo', 'heliponto', 'entrada', 'refeitorio', 'corredor', 'quarto', 'lab', 'radio', 'gerador'],
+    2: ['almoxarifado', 'elevador', 'servico', 'servidores', 'arquivo', 'biolab', 'portaAntiga', 'terminalAntigo']
+  };
+  var ATO_FLAGS = {
+    1: ['energia', 'radioOk', 'atoFim', 'chavesPegas', 'fusivelPego', 'dia14', 'f3', 'simbolo'],
+    2: ['caixaLigada', 'cartaoPego', 'crachaPego', 'desceu', 'energia2', 'fitaPega', 'logado', 'painelAberto', 'pecabraPego', 'portaAberta', 'portaSeg', 'valvulaPega', 'ato2Fim']
+  };
+  function progLer() {
+    var p = 1;
+    try { p = (JSON.parse(localStorage.getItem(PROG) || '{}').max | 0) || 1; } catch (e) {}
+    return p;
+  }
+  function progMax() {
+    var p = Math.max(progLer(), progCache || 1);
+    try {
+      var sv = JSON.parse(localStorage.getItem(SAVE) || 'null');
+      if (sv) p = Math.max(p, sv.ato || 1, sv.flags && sv.flags.atoFim ? 2 : 1, sv.flags && sv.flags.ato2Fim ? 3 : 1);
+    } catch (e) {}
+    return Math.min(p, ULTIMO_ATO);
+  }
+  function progRegistrar() {
+    var p = progMax();
+    if (p > progCache) { progCache = p; try { localStorage.setItem(PROG, JSON.stringify({ max: p })); } catch (e) {} }
+  }
   function novoEstado() {
     return { ato: 1, cena: 'voo', itens: [], flags: {}, docs: [], vistos: {}, chegou: {}, tempo: 0 };
   }
@@ -496,6 +523,7 @@
     if (!S) return;
     _tickTempo();
     try { localStorage.setItem(SAVE, JSON.stringify(S)); } catch (e) {}
+    progRegistrar();
   }
   function carregar() {
     try { var s = JSON.parse(localStorage.getItem(SAVE) || 'null'); if (s && CENAS[s.cena]) return s; } catch (e) {}
@@ -1402,6 +1430,7 @@
   var ULTIMO_ATO = 2;   // atos prontos
   function telaTitulo() {
     var save = carregar(), temSave = !!save;
+    progRegistrar();   // guarda o ato já alcançado antes de qualquer "refazer ato"
     el.bg.src = A + 'heliponto-v1.webp';
     el.pontos.innerHTML = ''; el.saidas.innerHTML = ''; el.inv.innerHTML = '';
     el.local.textContent = '';
@@ -1411,6 +1440,7 @@
       '<div class="sb-tit-sub">' + NOMES_ATO[(save && save.ato) || 1] + '</div>' +
       '<div class="sb-tit-botoes">' +
         (temSave ? '<button type="button" class="sb-btn" data-t="continuar">Continuar</button>' : '') +
+        (temSave && progMax() >= 2 ? '<button type="button" class="sb-btn sb-btn-sec" data-t="atos">Escolher ato</button>' : '') +
         '<button type="button" class="sb-btn' + (temSave ? ' sb-btn-sec' : '') + '" data-t="novo">Novo jogo</button>' +
       '</div>' +
       '<div class="sb-tit-nota">Use fones de ouvido. Toque nas coisas da cena para examinar.</div>';
@@ -1419,12 +1449,56 @@
     Array.prototype.forEach.call(el.titulo.querySelectorAll('[data-t]'), function (b) {
       b.addEventListener('click', function () {
         som.destravar(); som.clique();
+        if (b.getAttribute('data-t') === 'atos') { telaAtos(); return; }
         if (b.getAttribute('data-t') === 'novo') {
           if (temSave && !confirmarNovo(b)) return;
           S = novoEstado();
+          progCache = 0; try { localStorage.removeItem(PROG); } catch (e) {}
         } else S = carregar() || novoEstado();
         if (!S.ato) S.ato = 1;
         comecar();
+      });
+    });
+  }
+  // Refazer um ato: apaga o progresso dele e dos seguintes; os arquivos achados continuam no Arquivo.
+  function prepararAto(n) {
+    S = carregar() || novoEstado();
+    for (var k = n; k <= ULTIMO_ATO; k++) {
+      (ATO_FLAGS[k] || []).forEach(function (f) { delete S.flags[f]; });
+      (ATO_CENAS[k] || []).forEach(function (c) {
+        delete S.chegou[c];
+        Object.keys(S.vistos).forEach(function (v) { if (v.indexOf(c + '.') === 0) delete S.vistos[v]; });
+      });
+    }
+    if (n >= 2) { S.flags.energia = S.flags.radioOk = S.flags.atoFim = true; }   // o Ato 1 conta como cumprido
+    S.ato = n;
+    S.itens = n >= 2 ? ['lanterna'] : [];
+    if (n === 1) { S.cena = 'heliponto'; S.flags.intro = true; }
+    salvar();
+  }
+  function telaAtos() {
+    var max = progMax(), sv = carregar(), atual = (sv && sv.ato) || 1, l = '';
+    for (var n = 1; n <= max; n++) {
+      l += '<button type="button" class="sb-btn sb-btn-sec sb-ato-b" data-ato="' + n + '">' + NOMES_ATO[n] +
+        '<small>' + (n < max ? 'concluído' : n === atual ? 'em andamento' : 'novo') + '</small></button>';
+    }
+    el.titulo.innerHTML =
+      '<div class="sb-tit-sub">Escolher ato</div>' +
+      '<div class="sb-atos">' + l + '</div>' +
+      '<div class="sb-tit-botoes"><button type="button" class="sb-btn sb-btn-sec" data-t="voltar">Voltar</button></div>' +
+      '<div class="sb-tit-nota">Os arquivos que você já achou continuam no Arquivo. Refazer um ato apaga só o progresso dele e dos seguintes.</div>';
+    el.titulo.querySelector('[data-t="voltar"]').addEventListener('click', function () { som.clique(); telaTitulo(); });
+    Array.prototype.forEach.call(el.titulo.querySelectorAll('[data-ato]'), function (b) {
+      b.addEventListener('click', function () {
+        som.destravar(); som.clique();
+        var n = +b.getAttribute('data-ato');
+        if (b.getAttribute('data-ok') !== '1') {
+          Array.prototype.forEach.call(el.titulo.querySelectorAll('[data-ato]'), function (o) { o.removeAttribute('data-ok'); o.firstChild.nodeValue = NOMES_ATO[+o.getAttribute('data-ato')]; });
+          b.setAttribute('data-ok', '1'); b.firstChild.nodeValue = 'Refazer o Ato ' + n + '? Toque de novo';
+          return;
+        }
+        prepararAto(n);
+        if (n === 1) comecar(); else iniciarAto(n);
       });
     });
   }
@@ -1474,6 +1548,7 @@
       radio(['Bem-vindo, Téo. Agora desça.'], function () { flag('ato2Fim'); telaFimAto(2); });
     });
   }
+  function iniciarAto(n) { if (n === 2) iniciarAto2(); }
   function iniciarAto2() {
     // Itens do Ato 1 já cumpriram o papel (os documentos ficam no Arquivo); a lanterna segue.
     S.ato = 2; S.cena = 'almoxarifado'; S.itens = tem('lanterna') ? ['lanterna'] : []; salvar();

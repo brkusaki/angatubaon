@@ -161,7 +161,8 @@
   var DOCS_ATO = {
     1: ['avisos', 'bilhete_pavel', 'diario_ingrid', 'audio_ingrid', 'graf', 'relatorio_mira', 'log_radio', 'sinal'],
     2: ['planta', 'emails', 'fita_kazuo', 'polaroid', 'mapa_mao', 'amostra', 'quadro_mira', 'terminal_antigo'],
-    3: ['caderneta_radio', 'notas_traducao', 'nota_ondas', 'inscricao', 'relatorio_selo', 'ficha_teo', 'audio_ingrid_final']
+    3: ['caderneta_radio', 'notas_traducao', 'nota_ondas', 'inscricao', 'relatorio_selo', 'ficha_teo', 'audio_ingrid_final'],
+    4: ['ata_conselho', 'ordem_envelope', 'manual_reator', 'desenho_mira']
   };
   function docsAte(n) { var l = []; for (var i = 1; i <= n; i++) l = l.concat(DOCS_ATO[i] || []); return l; }
 
@@ -945,6 +946,227 @@
   };
 
   /* ══════════════════════════════════════════════════════════════
+     ATO 4 — A TRANSMISSÃO FINAL
+     4.1 sala de transmissão (cofre do conselho, crachá, envelope, disco, chave)
+     4.2 sala dos reatores (painel final) → 4.3 um dos quatro finais.
+     O final sai das flags dos três pedidos do Ato 3 (ver qualFinal()).
+     Projeto: claude/sinal-branco-ato4.md
+  ══════════════════════════════════════════════════════════════ */
+  ITENS.cracha_conselho = { nome: 'Crachá do Conselho', img: 'item-crachaconselho-v1.webp', desc: 'Crachá preto com faixa dourada: CONSELHO. Abre as portas de serviço do Consórcio.', doc: 'ata_conselho' };
+  ITENS.envelope        = { nome: 'Envelope lacrado', img: 'item-envelope-v1.webp', desc: 'Envelope do Consórcio, com a ordem de campo. O lacre já está rompido.', doc: 'ordem_envelope' };
+  ITENS.disco           = { nome: 'Disco de transmissão', img: 'item-disco-v1.webp', desc: 'Disco com o conteúdo que o Consórcio mandou transmitir: registros do Coro, gravações da equipe e a ficha 13.' };
+  ITENS.chave_reator    = { nome: 'Chave do reator', img: 'item-chavereator-v1.webp', desc: 'Chave pesada de aço, com uma etiqueta: REATORES A/B.' };
+
+  DOCS.ata_conselho = { titulo: 'Ata do Conselho', tipo: 'papel', texto:
+    'CONSELHO — ATA DA 9ª SESSÃO\nCLASSIFICAÇÃO: RESERVADO\n\n' +
+    'Presentes, por codinome: O CARTÓGRAFO, A BIBLIOTECÁRIA, O TESOUREIRO, O VIGIA.\n\n' +
+    '1. A Estação Halvorsen segue sob fachada científica. A presença se justifica pelo Tratado da Antártica (1959), que proíbe atividade militar: ciência é a melhor cobertura.\n' +
+    '2. O Coro responde a frequências humanas. Meta da Fase 3: operar essas frequências sobre pessoas de decisão.\n' +
+    '3. Compatibilidade do técnico MARIN confirmada (ficha 13). Suscetibilidade: a avaliar em campo.\n' +
+    '4. Se a estação parar de transmitir, enviar o técnico. Se ele chegar à sala de transmissão, o envelope lacrado já traz a ordem.\n' +
+    '5. A equipe de campo é descartável. O Tesoureiro discorda e pede registro em ata.\n\n' +
+    'Cofre da sala: a data em que o Consórcio autorizou a descida. Dia e mês, quatro dígitos.' };
+  DOCS.ordem_envelope = { titulo: 'Ordem de campo', tipo: 'papel', texto:
+    'ORDEM DE CAMPO — LACRADA\n\n' +
+    'Restabelecido o sinal: transmitir o conteúdo do disco pela antena principal, na janela das 03h00 às 03h20.\n\n' +
+    'Conteúdo do disco: registros do Coro, gravações da equipe e a ficha 13.\n' +
+    'O técnico não deve ser informado do destino. Quem receber responde por conta própria.\n\n' +
+    'Obs.: a chave dos reatores fica no cofre. É o último recurso do Consórcio.' };
+  DOCS.manual_reator = { titulo: 'Manual dos reatores', tipo: 'papel', texto:
+    'MANUAL — REATORES A E B\n\n' +
+    'A sobrecarga simultânea rompe a contenção da câmara central. O cofre desaba e a estrutura inteira afunda no gelo.\n\n' +
+    'O painel só aceita a chave de reator. Não há como desfazer. Na sobrecarga, a estrela do painel apaga.\n\n' +
+    'Nota à mão: "Se algum dia precisar, é aqui. A voz não vai gostar." — K. R.' };
+  DOCS.desenho_mira = { titulo: 'Desenho da Mira', tipo: 'mao', texto:
+    'DESENHO A LÁPIS, FOLHA QUADRICULADA\n\n' +
+    'Legenda: "Leitura do sensor do mirante. Isto é o que o instrumento viu, sem a figura de luz que a gente vê."\n\n' +
+    'Uma forma alta e estreita, de proporções que não fecham. Sem rosto. Em volta, a sombra de asas dobradas.\n\n' +
+    '"Não é monstro. É bonito demais, e é isso que a gente não suporta olhar. Acho que ele sabe."' };
+
+  /* ── Cofre do conselho (4 dígitos: dia e mês da autorização da descida) ── */
+  function abrirCofre() {
+    var dig = '';
+    abrirModal(
+      '<button type="button" class="sb-x sb-x2" aria-label="Sair">✕</button>' +
+      '<div class="sb-doc-tit">Cofre do Conselho</div>' +
+      '<div class="sb-puz-dica">Quatro dígitos.</div>' +
+      '<div class="sb-senha-vis">____</div>' +
+      '<div class="sb-teclado">' + [1, 2, 3, 4, 5, 6, 7, 8, 9, 'C', 0, 'OK'].map(function (t) {
+        return '<button type="button" class="sb-tecla" data-t="' + t + '">' + (t === 'C' ? '⌫' : t) + '</button>';
+      }).join('') + '</div><div class="sb-puz-botoes">' + htmlDica() + '</div>', 'sb-puz sb-puz-senha', false);
+    el.caixa.querySelector('.sb-x2').addEventListener('click', function () { som.clique(); fecharModal(); });
+    ligarDica(function () { return obedeceuSemChecar() ? '1013, Téo. O dia em que a Mira achou a escada.' : 'O dia e o mês em que o Consórcio confirmou a descida, Téo. Está na caderneta do Kazuo.'; });
+    var vis = el.caixa.querySelector('.sb-senha-vis'), msg = el.caixa.querySelector('.sb-puz-dica');
+    function mostrar() { vis.textContent = (dig + '____').slice(0, 4).split('').join(' '); }
+    Array.prototype.forEach.call(el.caixa.querySelectorAll('.sb-tecla'), function (b) {
+      b.addEventListener('click', function () {
+        var t = b.getAttribute('data-t'); som.tique();
+        if (t === 'C') dig = dig.slice(0, -1);
+        else if (t === 'OK') {
+          if (dig === '1410') {
+            som.tocar('sinal-ok', 0.6); vis.textContent = 'ABERTO';
+            setTimeout(function () {
+              fecharModal(); flag('cofreAberto');
+              if (!tem('disco')) S.itens.push('disco');
+              if (!tem('chave_reator')) S.itens.push('chave_reator');
+              desenharInv(); desenharCena(true);
+              fala(['O cofre abriu com um clique seco.', 'Dentro: um envelope lacrado, um disco de transmissão e uma chave pesada com etiqueta REATORES A/B.'], function () {
+                pegar('envelope', ['Peguei os três. O envelope tem o lacre do Consórcio, já rompido.'], 'ordem_envelope');
+              });
+            }, 700);
+            return;
+          }
+          vis.textContent = 'CÓDIGO ERRADO'; dig = ''; tremer(); som.tocar('porta', 0.3);
+          msg.textContent = 'O cofre não cede. Quatro dígitos: pense numa data.';
+          setTimeout(mostrar, 900); return;
+        } else if (dig.length < 4) dig += t;
+        mostrar();
+      });
+    });
+    mostrar();
+  }
+
+  /* ── Os quatro finais ───────────────────────────────────────── */
+  var FINAIS = {
+    revelacao: { nome: 'REVELAÇÃO', img: 'ato4-fim-revelacao-v1.webp', fb: 'ato3-nucleo-v1.webp', doc: 'desenho_mira',
+      resumo: 'Você conferiu o que a voz dizia. Parte das provas era forjada, e você saiu sabendo disso.',
+      parte1: ['A voz me pediu três coisas. Numa delas eu conferi, e não batia.',
+        '{tenso}Se ela mentiu numa coisa que eu consegui checar, o que mais ela me contou sem eu poder checar?',
+        'Preso na moldura do painel, um papel dobrado. Um desenho a lápis, com a letra da Mira.'],
+      parte2: ['{tenso}Leitura de sensor. Sem a figura bonita que a voz me mostrou. Só uma forma alta demais, bonita demais, com a sombra de asas dobradas.',
+        'Entendi por que ele pedia tão bem. Não era mentira o tempo todo. Era o tempo todo bem-feito.',
+        'Desliguei o rádio. A porta da sala final abriu sozinha, sem a ajuda da voz, como se a tranca estivesse do lado de dentro e eu tivesse finalmente entendido de quem.',
+        'Levei o disco comigo. O helicóptero volta em três dias. Eu tenho três dias pra decidir quem vai ler isso primeiro.',
+        '{confuso}Só não sei se o desenho da Mira também não foi plantado.'] },
+    abrir: { nome: 'ABRIR', img: 'ato4-fim-abrir-v1.webp', fb: 'ato3-mirante-luz-v1.webp',
+      resumo: 'Você obedeceu sem conferir e soltou o primeiro dos que desceram. Téo agora é a porta.',
+      parte1: ['{obediente}Não conferi nada que importava. Obedeci a voz quando ela pediu, e soltei o primeiro dos que desceram.',
+        '{obediente}No painel, o último pedido: abrir a porta de baixo. Já estava aberta.',
+        '{fundido}Uma luz subiu atrás do meu rosto. Vi no reflexo do vidro: eu continuava eu, só que com o resto da luz dentro.',
+        '{fundido}O celular vibrou no bolso, sem sinal nenhum aqui embaixo. Uma palavra, sem remetente: "Recebido."',
+        '{fundido}Lá embaixo, no abismo, as luzes começaram a subir.'], parte2: [] },
+    transmitir: { nome: 'TRANSMITIR', img: 'ato4-fim-transmitir-v1.webp', fb: 'heliponto-v1.webp',
+      resumo: 'Você enviou os arquivos pela antena principal. Alguém respondeu, e você nunca vai saber quem.',
+      parte1: ['Obedeci duas vezes sem conferir. Na terceira, não soltei o que a voz queria solto. Já bastava.',
+        'Subi pra antena principal e coloquei o disco na bandeja. Os arquivos saíram na janela das 03h00.',
+        'Lá fora o céu acendeu: uma aurora verde e violeta e, dentro dela, linhas retas formando uma estrela de sete pontas.',
+        '{tenso}O celular vibrou: "Recebido." Não dizia de quem.',
+        'Fiz o que o envelope mandava. Não sei se quem respondeu foi o Consórcio ou ele.'], parte2: [] },
+    soterrar: { nome: 'SOTERRAR', img: 'ato4-fim-soterrar-v1.webp', fb: 'helicoptero-v1.webp',
+      resumo: 'Você recusou o Coro e enterrou a estação. A base afundou, mas o sinal continua no ar.',
+      parte1: ['Recusei a voz quando ela pediu, e recusei de novo quando ela insistiu.',
+        'Girei a chave dos dois reatores ao mesmo tempo. O painel rangeu, e a estrela de sete pontas no meio dele apagou, ponta por ponta.',
+        'O chão tremeu. A sala de transmissão veio abaixo, depois o cofre, depois a escada que eu tinha descido.',
+        'Subi pelo túnel de manutenção com o gelo caindo atrás de mim. O helicóptero chegou com o tempo fechando.',
+        'A base afundou devagar, como alguém que cansou.',
+        '{tenso}No fone, no meio da estática, uma frequência que eu reconheci. 6,3. Continuava chamando.'], parte2: [] }
+  };
+  // Prioridade do roteiro: Revelação > Abrir > Transmitir > Soterrar.
+  // (obedeceu o P3 e mais um sem conferir = Abrir; só P1 e P2 = Transmitir; recusou 2 ou mais = Soterrar)
+  function qualFinal() {
+    var f = S.flags, ch = 0, ob = 0;
+    for (var i = 1; i <= 3; i++) { if (f['checou' + i]) ch++; if (f['obedeceu' + i]) ob++; }
+    if (ch) return 'revelacao';
+    if (ob >= 2 && f.obedeceu3) return 'abrir';
+    if (ob >= 2) return 'transmitir';
+    return 'soterrar';
+  }
+  var FINAIS_KEY = 'angatuba_sinalbranco_finais';
+  function finaisVistos() { try { return JSON.parse(localStorage.getItem(FINAIS_KEY) || '[]'); } catch (e) { return []; } }
+  function registrarFinal(t) {
+    var l = finaisVistos();
+    if (l.indexOf(t) < 0) { l.push(t); try { localStorage.setItem(FINAIS_KEY, JSON.stringify(l)); } catch (e) {} }
+    return l.length;
+  }
+  function comecarFinal() { S.fim = qualFinal(); salvar(); ir('final'); }
+  function rodarFinal() {
+    var F = FINAIS[S.fim], ok = function () { flag('ato4Fim'); telaFinal(S.fim); };
+    som.tocar('revelacao', 0.8);
+    fala(F.parte1, function () {
+      if (F.doc) doc(F.doc, function () { fala(F.parte2, ok); });
+      else fala(F.parte2, ok);
+    });
+  }
+  function telaFinal(t) {
+    _tickTempo(); salvar();
+    var F = FINAIS[t], n = registrarFinal(t), min = Math.floor(S.tempo / 60000), seg = Math.floor(S.tempo / 1000) % 60;
+    partida(false);
+    el.titulo.innerHTML =
+      '<div class="sb-tit-sub">Final</div>' +
+      '<div class="sb-tit-nome sb-tit-menor">' + F.nome + '</div>' +
+      '<div class="sb-tit-sub2" style="max-width:46em;margin:.4em auto 0">' + esc(F.resumo) + '</div>' +
+      '<div class="sb-tit-stats">Tempo total: ' + min + 'min ' + (seg < 10 ? '0' : '') + seg + 's · Finais encontrados: ' + n + '/4</div>' +
+      '<div class="sb-tit-botoes">' +
+        '<button type="button" class="sb-btn" data-t="arquivo">Ver arquivos</button>' +
+        '<button type="button" class="sb-btn sb-btn-sec" data-t="atos">Escolher ato</button>' +
+        '<button type="button" class="sb-btn sb-btn-sec" data-t="novo">Jogar de novo</button>' +
+      '</div>';
+    el.titulo.style.display = '';
+    el.titulo.querySelector('[data-t="arquivo"]').addEventListener('click', function () {
+      som.clique(); el.titulo.style.display = 'none'; abrirArquivo();
+      modalAoFechar = function () { el.titulo.style.display = ''; };
+    });
+    el.titulo.querySelector('[data-t="atos"]').addEventListener('click', function () { som.clique(); telaAtos(); });
+    el.titulo.querySelector('[data-t="novo"]').addEventListener('click', function () { som.clique(); S = novoEstado(); salvar(); comecar(); });
+  }
+
+  CENAS.transmissao = {
+    nome: 'Sala de transmissão', img: 'ato4-transmissao-v1.webp', fb: 'radio-v1.webp',
+    chegada: ['A coluna de luz me deixou no alto de uma escada de serviço. Aqui o ar é outro: carpete, ar-condicionado, luz de escritório.',
+      'Uma sala de transmissão do Consórcio, escondida dentro da pedra. Mesa de reunião, um cofre na parede e um console enorme ligado a uma antena que eu nem vi do lado de fora.',
+      '{tenso}Eu vim consertar uma transmissão. Pelo jeito, é esta.'],
+    aoChegar: function () { radio(['Você chegou longe, Téo. Falta pouco.']); },
+    pontos: [
+      { id: 'mesa', x: 3, y: 48, w: 28, h: 40, acao: function () {
+        if (!S.flags.crachaCPego) { flag('crachaCPego'); pegar('cracha_conselho', ['Pastas fechadas na mesa de reunião, cadeiras de couro empurradas pra trás. Alguém saiu com pressa.', 'Entre as pastas, um crachá preto com faixa dourada e uma ata aberta.'], 'ata_conselho'); }
+        else fala(['A mesa do Conselho. Quem sentou aqui decidiu o destino de doze pessoas por ata.']); } },
+      { id: 'console', x: 36, y: 30, w: 28, h: 40, acao: function () {
+        fala(['O console de transmissão: telas, chaves, uma bandeja pra um disco.', 'Está pronto pra enviar. Falta só quem mande.']); } },
+      { id: 'cabo', x: 44, y: 0, w: 12, h: 28, acao: function () {
+        fala(['Um feixe grosso de cabos sobe pelo teto até a antena principal. A pedra em volta vibra.']); } },
+      { id: 'cofre', x: 69, y: 28, w: 15, h: 38, acao: function () {
+        if (S.flags.cofreAberto) { fala(['O cofre vazio. A ata dizia que o código era uma data.']); return; }
+        fala(tem('cracha_conselho') ? ['Um cofre embutido na parede, com teclado numérico.', 'A ata do Conselho falava dele: uma data, dia e mês.'] : ['Um cofre embutido na parede, com teclado numérico de quatro dígitos.'], abrirCofre); } },
+      { id: 'porta', x: 88, y: 25, w: 10, h: 55, porta: true, acao: function () {
+        if (!tem('cracha_conselho')) { fala(['Uma porta blindada com luz vermelha e leitor de crachá. Reatores, diz a placa.', 'Preciso de um crachá do Conselho.']); return; }
+        ir('reatores'); } }
+    ]
+  };
+  CENAS.reatores = {
+    nome: 'Sala dos reatores', img: 'ato4-reatores-v1.webp', fb: 'gerador-escuro-v1.webp',
+    chegada: ['Dois reatores compactos, um de cada lado, zumbindo em um tom grave que eu sinto no peito.', 'No meio, um painel de controle com uma estrela de sete pontas acesa no alto. A mesma estrela de sempre, só que aqui ela é um indicador.'],
+    saidas: [{ lado: 'baixo', para: 'transmissao', rotulo: 'Transmissão' }],
+    pontos: [
+      { id: 'reator-e', x: 5, y: 15, w: 25, h: 70, acao: function () { fala(['Reator A. O casco está morno e o ar em volta cheira a ozônio.']); } },
+      { id: 'reator-d', x: 70, y: 15, w: 25, h: 70, acao: function () { fala(['Reator B. Gêmeo do outro, ligado ao mesmo painel.']); } },
+      { id: 'manual', x: 29, y: 56, w: 8, h: 11, acao: function () {
+        if (!S.flags.manualLido) flag('manualLido');
+        doc('manual_reator'); } },
+      { id: 'estrela', x: 47, y: 18, w: 6, h: 14, acao: function () {
+        fala(['A estrela de sete pontas, acesa. Se o painel for desligado, imagino que ela apague.']); } },
+      { id: 'painel', x: 38, y: 42, w: 24, h: 34, porta: true, acao: function () {
+        if (!tem('chave_reator')) { fala(['O painel tem uma fenda pra chave de reator.', 'Eu não tenho nenhuma. Talvez o cofre da sala de cima.']); return; }
+        abrirModal(
+          '<div class="sb-doc-tit">O painel central</div>' +
+          '<div class="sb-puz-dica">Tudo o que você fez até aqui decide o que acontece quando a chave girar.</div>' +
+          '<div class="sb-ped-botoes">' +
+            '<button type="button" class="sb-btn" data-p="ir">Usar a chave</button>' +
+            '<button type="button" class="sb-btn sb-btn-sec" data-p="nao">Ainda não</button></div>', 'sb-puz sb-puz-pedido', false);
+        el.caixa.querySelector('[data-p="nao"]').addEventListener('click', function () { som.clique(); fecharModal(); });
+        el.caixa.querySelector('[data-p="ir"]').addEventListener('click', function () {
+          som.clique(); fecharModal();
+          fala(['Encaixei a chave no painel. Ela entrou como se já conhecesse o lugar.'], comecarFinal);
+        }); } }
+    ]
+  };
+  CENAS.final = {
+    nome: '', img: 'ato3-nucleo-v1.webp',
+    imgCom: function () { return S.fim && FINAIS[S.fim] ? FINAIS[S.fim].img : null; },
+    fb: function () { return S.fim && FINAIS[S.fim] ? FINAIS[S.fim].fb : null; },
+    chegada: [], aoChegar: rodarFinal, pontos: []
+  };
+
+  /* ══════════════════════════════════════════════════════════════
      ESTADO
   ══════════════════════════════════════════════════════════════ */
   var S = null;           // { cena, itens[], flags{}, docs[], vistos{}, chegou{}, tempo }
@@ -960,14 +1182,16 @@
   var ATO_CENAS = {
     1: ['voo', 'heliponto', 'entrada', 'refeitorio', 'corredor', 'quarto', 'lab', 'radio', 'gerador'],
     2: ['almoxarifado', 'elevador', 'servico', 'servidores', 'arquivo', 'biolab', 'portaAntiga', 'terminalAntigo'],
-    3: ['escadaria', 'salao', 'monolitos', 'ressonancia', 'mirante', 'nucleo']
+    3: ['escadaria', 'salao', 'monolitos', 'ressonancia', 'mirante', 'nucleo'],
+    4: ['transmissao', 'reatores', 'final']
   };
   var ATO_FLAGS = {
     1: ['energia', 'radioOk', 'atoFim', 'chavesPegas', 'fusivelPego', 'dia14', 'f3', 'simbolo'],
     2: ['caixaLigada', 'cartaoPego', 'crachaPego', 'desceu', 'energia2', 'fitaPega', 'logado', 'painelAberto', 'pecabraPego', 'portaAberta', 'portaSeg', 'valvulaPega', 'ato2Fim'],
     3: ['obedeceu1', 'obedeceu2', 'obedeceu3', 'checou1', 'checou2', 'checou3', 'recusou1', 'recusou2', 'recusou3', 'semRadio',
       'p1ok', 'p2ok', 'p3ok', 'inscricaoOk', 'decoderLigado', 'decodificado', 'seloSolto', 'erros3', 'rodada3', 'ondasOk', 'figura', 'nucleoOk', 'ato3Fim',
-      'cadernetaPega', 'notasPegas', 'cartaoMemPego', 'pastaPega', 'gravadorPego', 'oculosPego']
+      'cadernetaPega', 'notasPegas', 'cartaoMemPego', 'pastaPega', 'gravadorPego', 'oculosPego'],
+    4: ['crachaCPego', 'cofreAberto', 'manualLido', 'ato4Fim']
   };
   function progLer() {
     var p = 1;
@@ -1146,6 +1370,8 @@
     var c = cenaAtual();
     if (!soPontos) {
       var src = A + ((c.imgCom && c.imgCom()) || c.img);
+      var fb = typeof c.fb === 'function' ? c.fb() : c.fb;
+      el.bg.onerror = fb ? function () { var u = A + fb; if (el.bg.getAttribute('src') !== u) { el.bg.src = u; el.amb.src = u; } } : null;
       if (el.bg.getAttribute('src') !== src) { el.bg.src = src; el.amb.src = src; }
       el.palco.classList.toggle('sb-pisca', !!c.pisca);
       // Vídeo opcional da cena (loop mudo por cima da imagem, só com a imagem base; a imagem fica de fundo/reserva)
@@ -1254,7 +1480,7 @@
     relatorio_mira: ['mira', 'perturbada'], log_radio: ['kazuo', 'tecnico'], sinal: ['coro', ''], emails: ['kazuo', 'desconfiado'],
     fita_kazuo: ['kazuo', 'cansado'], amostra: ['mira', 'curiosa'], quadro_mira: ['mira', 'firme'],
     caderneta_radio: ['kazuo', 'tecnico'], notas_traducao: ['mira', 'firme'], nota_ondas: ['kazuo', 'cansado'],
-    relatorio_selo: ['mira', 'perturbada'], audio_ingrid_final: ['ingrid', 'assustada']
+    relatorio_selo: ['mira', 'perturbada'], audio_ingrid_final: ['ingrid', 'assustada'], desenho_mira: ['mira', 'curiosa']
   };
   // Falas da "central" que têm áudio (a voz do Coro disfarçado). Chave = texto exato da linha.
   var VOZ_CENTRAL = {
@@ -1910,8 +2136,8 @@
   /* ══════════════════════════════════════════════════════════════
      TELAS: título e fim do ato
   ══════════════════════════════════════════════════════════════ */
-  var NOMES_ATO = { 1: 'Ato 1 — O Muro Branco', 2: 'Ato 2 — Subsolo Zero', 3: 'Ato 3 — O Cofre Pré-Diluviano' };
-  var ULTIMO_ATO = 3;   // atos prontos
+  var NOMES_ATO = { 1: 'Ato 1 — O Muro Branco', 2: 'Ato 2 — Subsolo Zero', 3: 'Ato 3 — O Cofre Pré-Diluviano', 4: 'Ato 4 — A Transmissão Final' };
+  var ULTIMO_ATO = 4;   // atos prontos
   function telaTitulo() {
     var save = carregar(), temSave = !!save;
     progRegistrar();   // guarda o ato já alcançado antes de qualquer "refazer ato"
@@ -1955,7 +2181,9 @@
       });
     }
     if (n >= 2) { S.flags.energia = S.flags.radioOk = S.flags.atoFim = true; }
-    if (n >= 3) S.flags.ato2Fim = true;   // o Ato 1 conta como cumprido
+    if (n >= 3) S.flags.ato2Fim = true;
+    if (n >= 4) S.flags.ato3Fim = true;
+    delete S.fim;   // o Ato 1 conta como cumprido
     S.ato = n;
     S.itens = n >= 2 ? ['lanterna'] : [];
     if (n === 1) { S.cena = 'heliponto'; S.flags.intro = true; }
@@ -2019,6 +2247,7 @@
     if (S.ato === 1 && S.flags.atoFim) { telaFimAto(1); return; }
     if (S.ato === 2 && S.flags.ato2Fim) { telaFimAto(2); return; }
     if (S.ato === 3 && S.flags.ato3Fim) { telaFimAto(3); return; }
+    if (S.ato === 4 && S.fim && FINAIS[S.fim]) { telaFinal(S.fim); return; }
     if (S.ato === 1 && !S.chegou.heliponto && !S.flags.intro) { S.cena = 'voo'; S.chegou.voo = false; }
     ir(S.cena);
   }
@@ -2034,7 +2263,13 @@
       radio(['Bem-vindo, Téo. Agora desça.'], function () { flag('ato2Fim'); telaFimAto(2); });
     });
   }
-  function iniciarAto(n) { if (n === 2) iniciarAto2(); else if (n === 3) iniciarAto3(); }
+  function iniciarAto(n) { if (n === 2) iniciarAto2(); else if (n === 3) iniciarAto3(); else if (n === 4) iniciarAto4(); }
+  function iniciarAto4() {
+    S.ato = 4; S.cena = 'transmissao'; S.itens = tem('lanterna') ? ['lanterna'] : []; S.flags.ato3Fim = true; delete S.fim; salvar();
+    el.titulo.style.display = 'none';
+    partida(true); desenharInv(); atualizarBadge(false);
+    ir('transmissao');
+  }
   function iniciarAto3() {
     S.ato = 3; S.cena = 'escadaria'; S.itens = tem('lanterna') ? ['lanterna'] : []; S.flags.ato2Fim = true; salvar();
     el.titulo.style.display = 'none';

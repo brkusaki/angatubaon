@@ -160,7 +160,8 @@
     '> ESTAÇÃO DE RESPOSTA: ABERTA\n> AGUARDANDO O DÉCIMO QUARTO' };
   var DOCS_ATO = {
     1: ['avisos', 'bilhete_pavel', 'diario_ingrid', 'audio_ingrid', 'graf', 'relatorio_mira', 'log_radio', 'sinal'],
-    2: ['planta', 'emails', 'fita_kazuo', 'polaroid', 'mapa_mao', 'amostra', 'quadro_mira', 'terminal_antigo']
+    2: ['planta', 'emails', 'fita_kazuo', 'polaroid', 'mapa_mao', 'amostra', 'quadro_mira', 'terminal_antigo'],
+    3: ['caderneta_radio', 'notas_traducao', 'nota_ondas', 'inscricao', 'relatorio_selo', 'ficha_teo', 'audio_ingrid_final']
   };
   function docsAte(n) { var l = []; for (var i = 1; i <= n; i++) l = l.concat(DOCS_ATO[i] || []); return l; }
 
@@ -479,6 +480,470 @@
   };
 
   /* ══════════════════════════════════════════════════════════════
+     ATO 3 — O COFRE PRÉ-DILUVIANO
+     Cenas: escadaria → salão → monólitos → ressonância → mirante → núcleo.
+     Puzzles: inscrição, decodificador, três ondas, 13ª frequência.
+     Três pedidos do Coro (P1, P2, P3): obedecer / conferir / recusar.
+     Projeto: claude/sinal-branco-ato3-puzzles.md
+  ══════════════════════════════════════════════════════════════ */
+  ITENS.caderneta = { nome: 'Caderneta de rádio', img: 'item-caderneta-v1.webp', desc: 'A caderneta do Kazuo, com horários e frases de rádio anotados à mão.', doc: 'caderneta_radio' };
+  ITENS.notas     = { nome: 'Anotações da Mira', img: 'item-notas-v1.webp', desc: 'Folhas coladas numa coluna, com marcas desenhadas e as traduções ao lado.', doc: 'notas_traducao' };
+  ITENS.cartaomem = { nome: 'Cartão de memória', img: 'item-cartaomem-v1.webp', desc: 'Cartão de memória com uma etiqueta: "K. — decodificador".' };
+  ITENS.pasta     = { nome: 'Pasta do selo', img: 'item-pasta-v1.webp', desc: 'Pasta plástica com o relatório da Mira sobre a faixa dourada.', doc: 'relatorio_selo' };
+  ITENS.gravador2 = { nome: 'Gravador da Ingrid', img: 'item-gravador-v1.webp', desc: 'O último gravador da Dra. Ingrid. A fita ainda gira.', doc: 'audio_ingrid_final' };
+  ITENS.oculos    = { nome: 'Óculos da Ingrid', img: 'item-oculos-v1.webp', desc: 'Óculos finos de armação prateada. Uma das hastes está torta.' };
+
+  DOCS.caderneta_radio = { titulo: 'Caderneta de rádio', tipo: 'mao', texto:
+    'CADERNETA DE RÁDIO — K. REN\n\n' +
+    '11/10  21h40 — Sem resposta do continente há dois dias.\n' +
+    '13/10  18h10 — Mira achou a escada no fundo do arquivo.\n' +
+    '14/10  03h05 — Consórcio confirmou ciência da descida: "cientes, prossigam".\n' +
+    '14/10  03h12 — Pedi pra repetir. Repetiram igual. Mesma voz, mesma pausa.\n\n' +
+    'Se alguém perguntar: eles sabiam.' };
+  DOCS.notas_traducao = { titulo: 'Anotações da Mira', tipo: 'mao', texto:
+    'NOTAS DA PAREDE — M. OKAFOR\n\n' +
+    'Três marcas eu tenho certeza:\n\n' +
+    '[[g:ELE]]  = ELE\n[[g:ESCUTA]]  = ESCUTA\n[[g:RESPONDA]]  = RESPONDA\n\n' +
+    'A quarta é a que abre a frase. O Kazuo disse que sabe qual é. Não deu tempo de perguntar.' };
+  DOCS.nota_ondas = { titulo: 'Notebook do Kazuo', tipo: 'terminal', texto:
+    'ANOTAÇÕES — K. REN\n\n' +
+    '[[g:NAO]]  = NÃO. Abre toda frase de aviso. Aparece sempre primeiro.\n\n' +
+    'Sobre as três ondas da sala de baixo: elas entram da mais lenta para a mais rápida, nessa ordem, da esquerda pra direita.\n\n' +
+    'Se errar, a sala não reclama. Ela muda.' };
+  DOCS.inscricao = { titulo: 'A parede, traduzida', tipo: 'papel', texto:
+    ''+
+    '[[g:NAO]]  [[g:RESPONDA]]  [[g:ELE]]  [[g:ESCUTA]]\n\n' +
+    'NÃO RESPONDA. ELE ESCUTA.\n\n' +
+    'Na borda de baixo, duas marcas menores:\n[[g:GELO]]  [[g:DESCE]]\n\n' +
+    'É um aviso. Escrito por quem desceu primeiro, muito antes de nós.' };
+  DOCS.relatorio_selo = { titulo: 'Relatório do selo', tipo: 'papel', texto:
+    'RELATÓRIO — SELO DOS MONÓLITOS\nM. OKAFOR\n\n' +
+    'A faixa dourada não segura a porta. Ela segura o Coro.\n' +
+    'O que está preso passa pela estrutura inteira e é contido no ponto do selo. Se o selo for solto, ele sai.\n\n' +
+    'Não sei dizer pra onde. Não encosta nele.' };
+  DOCS.ficha_teo = { titulo: 'Ficha 13', tipo: 'terminal', texto:
+    'CONSÓRCIO POLAR — PROGRAMA DE COMPATIBILIDADE\nFICHA 13\n\n' +
+    'Nome: MARIN, TÉO\nFunção: técnico de telecomunicações\nOrigem do contato: linhagem materna\n\n' +
+    'MARCADORES\n  equipe (12 amostras) ...... compatíveis\n  amostra 13 (anterior ao Programa) ... compatível\n\n' +
+    'SUSCETIBILIDADE: a avaliar em campo.\n' +
+    'Obs.: contratado por indicação do Programa. Sem ciência do candidato.' };
+  DOCS.audio_ingrid_final = { titulo: 'Gravador da Ingrid — última', tipo: 'audio', texto:
+    'É a última que eu gravo. Contei de novo. Ainda são treze.\n\n' +
+    'Eu sei quem é o treze. Ele me disse o nome, e não era um nome. Era uma luz.\n\n' +
+    'Ele é gentil. É isso que me assusta mais. Ele nunca pediu nada que eu não quisesse dar.\n\n' +
+    'Se alguém ouvir isso: não responda. Mesmo se ele pedir com a minha voz. Principalmente se pedir com a minha voz.' };
+
+  // Glifos (traço em SVG 24×24): os documentos escrevem [[g:NOME]]
+  var GLIFOS = {
+    NAO: 'M12 2V22M5 7L19 17M19 7L5 17',
+    RESPONDA: 'M4 5V19M4 12H19M14 7L19 12L14 17',
+    ELE: 'M12 3L21 20H3ZM12 11V15',
+    ESCUTA: 'M8 20C3 11 7 3 13 4C19 5 18 12 14 13C11 14 12 18 9 17',
+    GELO: 'M12 2V22M3 7L21 17M21 7L3 17M9 3L12 6L15 3M9 21L12 18L15 21',
+    DESCE: 'M5 5L12 12L19 5M5 12L12 19L19 12',
+    SETE: 'M12 2L20 20L3 8H21L4 20Z'
+  };
+  var PAL_GLIFO = { NAO: 'NÃO', RESPONDA: 'RESPONDA', ELE: 'ELE', ESCUTA: 'ESCUTA', GELO: 'GELO', DESCE: 'DESCE' };
+  function glifoSvg(k, cls) { return '<svg class="sb-gl ' + (cls || '') + '" viewBox="0 0 24 24"><path d="' + GLIFOS[k] + '"/></svg>'; }
+
+  /* ── Pedidos do Coro ───────────────────────────────────────── */
+  var PEDIDOS = {
+    1: { resumo: '"Não avise a central."', docs: ['caderneta_radio'],
+      voz: ['Téo. Antes de descer: não avise a central.', 'Eles não sabem que esta escada existe. Se souberem, cortam a energia da estação e eu perco você.'],
+      contra: ['A caderneta do Kazuo: "14/10, 03h05 — Consórcio confirmou ciência da descida."', '{tenso}Eles sabiam. Eles autorizaram. A voz mentiu pra mim.'],
+      obedece: ['Deixei o rádio calado. Se ele tem razão, é melhor assim.'],
+      recusa: ['{tenso}Não. Quem manda aqui não é uma voz sem rosto.', 'Liguei o rádio pra avisar a central. Só estática. Alguma coisa cortou o sinal.'] },
+    2: { resumo: '"Solte o selo do monólito."', docs: ['relatorio_selo'],
+      voz: ['Téo. Aquela faixa dourada é uma trava velha. Solte o selo.', 'Sem ela, a estrutura inteira responde. Você termina o trabalho em minutos.'],
+      contra: ['O relatório da Mira: "A faixa não segura a porta. Segura o Coro. Se soltar, ele sai."', '{tenso}Não é uma trava velha. É a tranca.'],
+      obedece: ['A faixa se soltou como se estivesse esperando.', 'A luz que saiu dela encheu a câmara toda.'],
+      recusa: ['{tenso}Não vou encostar nisso.'] },
+    3: { resumo: '"Solte o primeiro dos que desceram."', docs: ['polaroid', 'ficha_teo'],
+      voz: ['Téo. Ali, no parapeito. É o primeiro dos que desceram.', 'A equipe o prendeu lá embaixo e esqueceu. Solte-o. Ele só quer subir.'],
+      contra: ['A foto da Ingrid: "13. Contei de novo." Desde o primeiro dia, quando eram doze.', 'A ficha: a amostra 13 é anterior ao Programa. Nunca foi da equipe.', '{tenso}Ninguém prendeu um pesquisador aqui embaixo. Isso nunca foi um deles.'],
+      obedece: ['Encostei na pedra do parapeito. Estava quente.', 'A luz desceu pelo vão, devagar, como quem volta pra casa.'],
+      recusa: ['{tenso}Não.', 'A figura me olhou um pouco mais. Depois apagou.'] }
+  };
+  function nObedecidos() { var n = 0; if (S) for (var i = 1; i <= 3; i++) if (S.flags['obedeceu' + i]) n++; return n; }
+  function emoBase() { return S && nObedecidos() >= 2 ? 'obediente' : 'neutro'; }
+  // Obedeceu algum pedido sem conferir → o Coro passa a mentir nas dicas
+  function obedeceuSemChecar() {
+    for (var i = 1; i <= 3; i++) if (S.flags['obedeceu' + i] && !S.flags['checou' + i]) return true;
+    return false;
+  }
+  function pedido(n, depois) {
+    fala(PEDIDOS[n].voz.map(function (l) { return '{coro}' + l; }), function () { pedidoQuadro(n, depois, false); });
+  }
+  function pedidoQuadro(n, depois, conferido) {
+    var P = PEDIDOS[n];
+    abrirModal(
+      '<div class="sb-doc-tit">A voz pede</div>' +
+      '<div class="sb-ped-txt">' + esc(P.resumo) + '</div>' +
+      '<div class="sb-ped-botoes">' +
+        '<button type="button" class="sb-btn" data-p="obedecer">Obedecer</button>' +
+        (conferido ? '' : '<button type="button" class="sb-btn sb-btn-sec" data-p="conferir"><i class="fa fa-folder-open"></i> Conferir o Arquivo</button>') +
+        '<button type="button" class="sb-btn sb-btn-sec" data-p="recusar">Recusar</button>' +
+      '</div>', 'sb-puz sb-puz-pedido', false);
+    el.caixa.querySelector('[data-p="obedecer"]').addEventListener('click', function () {
+      som.clique(); flag('obedeceu' + n); fecharModal(); fala(P.obedece, depois);
+    });
+    var bc = el.caixa.querySelector('[data-p="conferir"]');
+    if (bc) bc.addEventListener('click', function () {
+      som.clique(); fecharModal();
+      var ok = P.docs.every(function (d) { return S.docs.indexOf(d) >= 0; });
+      if (ok) { flag('checou' + n); fala(P.contra, function () { pedidoQuadro(n, depois, true); }); }
+      else fala(['{tenso}Não tenho nada pra conferir isso. Ainda.'], function () { pedidoQuadro(n, depois, false); });
+    });
+    el.caixa.querySelector('[data-p="recusar"]').addEventListener('click', function () {
+      som.clique(); flag('recusou' + n); flag('semRadio'); fecharModal();
+      som.estatica(0.7); setTimeout(function () { som.estatica(0); }, 600);
+      fala(P.recusa, depois);
+    });
+  }
+
+  /* ── Auxiliares dos puzzles ─────────────────────────────────── */
+  function tremer() { el.caixa.classList.remove('sb-tremer'); void el.caixa.offsetWidth; el.caixa.classList.add('sb-tremer'); }
+  function htmlDica() { return S.flags.semRadio ? '' : '<button type="button" class="sb-btn sb-btn-sec" data-d="dica"><i class="fa fa-headphones"></i> Ouvir a central</button>'; }
+  function ligarDica(texto) {
+    var b = el.caixa.querySelector('[data-d="dica"]');
+    if (!b) return;
+    b.addEventListener('click', function () {
+      som.clique(); som.estatica(0.5); setTimeout(function () { som.estatica(0); }, 450);
+      var m = el.caixa.querySelector('.sb-puz-dica');
+      m.classList.remove('sb-aviso'); m.textContent = 'VOZ: «' + texto() + '»';
+    });
+  }
+  function clarao() { el.fade.classList.add('sb-flash'); setTimeout(function () { el.fade.classList.remove('sb-flash'); }, 700); }
+
+  /* ── Puzzle 1: a inscrição (4 glifos → 4 palavras) ───────────── */
+  function abrirInscricao() {
+    var PAL = ['NAO', 'RESPONDA', 'ELE', 'ESCUTA', 'GELO', 'DESCE'], CERTO = ['NAO', 'RESPONDA', 'ELE', 'ESCUTA'], idx = [-1, -1, -1, -1];
+    abrirModal(
+      '<button type="button" class="sb-x sb-x2" aria-label="Sair">✕</button>' +
+      '<div class="sb-doc-tit">A inscrição</div>' +
+      '<div class="sb-puz-dica">Quatro marcas na parede. Toque embaixo de cada uma para trocar a palavra.</div>' +
+      '<div class="sb-ins">' + CERTO.map(function (k, i) {
+        return '<div class="sb-ins-c">' + glifoSvg(k, 'sb-gl-g') + '<button type="button" class="sb-ins-p" data-i="' + i + '">· · ·</button></div>';
+      }).join('') + '</div>' +
+      '<div class="sb-puz-botoes">' + htmlDica() + '<button type="button" class="sb-btn" data-p="ok">Traduzir</button></div>', 'sb-puz sb-puz-ins', false);
+    el.caixa.querySelector('.sb-x2').addEventListener('click', function () { som.clique(); fecharModal(); });
+    ligarDica(function () { return 'Não. Responda. Ele. Escuta. Nessa ordem, Téo.'; });
+    var msg = el.caixa.querySelector('.sb-puz-dica');
+    Array.prototype.forEach.call(el.caixa.querySelectorAll('.sb-ins-p'), function (b) {
+      b.addEventListener('click', function () {
+        var i = +b.getAttribute('data-i');
+        idx[i] = (idx[i] + 1) % PAL.length; som.tique();
+        b.textContent = PAL_GLIFO[PAL[idx[i]]];
+      });
+    });
+    el.caixa.querySelector('[data-p="ok"]').addEventListener('click', function () {
+      som.clique();
+      var certo = CERTO.every(function (k, i) { return PAL[idx[i]] === k; });
+      if (!certo) { tremer(); som.tocar('porta', 0.35); msg.textContent = 'A estrela do chão não reage. Alguma marca está errada.'; msg.classList.add('sb-aviso'); return; }
+      som.tocar('sinal-ok', 0.7); msg.textContent = 'A estrela do chão acendeu.'; msg.classList.remove('sb-aviso');
+      setTimeout(function () {
+        fecharModal(); flag('inscricaoOk'); desenharCena(); clarao();
+        doc('inscricao', function () {
+          fala(['A estrela no chão acendeu, ponta por ponta. No fundo do salão, uma passagem se abriu.',
+            '{tenso}"Não responda. Ele escuta." Quem escuta? E por que alguém gravaria um aviso na pedra?']);
+        });
+      }, 900);
+    });
+  }
+
+  /* ── Puzzle 2: o decodificador (tocar os monólitos na ordem da inscrição) ── */
+  function abrirDecoder() {
+    var seq = S.flags.semRadio ? ['NAO', 'RESPONDA', 'ELE', 'ESCUTA', 'GELO', 'DESCE'] : ['NAO', 'RESPONDA', 'ELE', 'ESCUTA'];
+    var lay = ['ELE', 'GELO', 'NAO', 'DESCE', 'ESCUTA', 'SETE', 'RESPONDA'], pos = 0;
+    abrirModal(
+      '<button type="button" class="sb-x sb-x2" aria-label="Sair">✕</button>' +
+      '<div class="sb-doc-tit">Decodificador</div>' +
+      '<div class="sb-puz-dica">Toque os monólitos na ordem da inscrição do salão.</div>' +
+      '<div class="sb-dec-prog">' + seq.map(function () { return '<i></i>'; }).join('') + '</div>' +
+      '<div class="sb-dec">' + lay.map(function (k) { return '<button type="button" class="sb-dec-m" data-k="' + k + '">' + glifoSvg(k) + '</button>'; }).join('') + '</div>' +
+      '<div class="sb-puz-botoes">' + htmlDica() + '</div>', 'sb-puz sb-puz-dec', false);
+    el.caixa.querySelector('.sb-x2').addEventListener('click', function () { som.clique(); fecharModal(); });
+    ligarDica(function () { return 'Na ordem em que estão na parede, Téo. O primeiro é o NÃO.'; });
+    var msg = el.caixa.querySelector('.sb-puz-dica'), pts = el.caixa.querySelectorAll('.sb-dec-prog i'), ms = el.caixa.querySelectorAll('.sb-dec-m');
+    function limpar() { pos = 0; Array.prototype.forEach.call(pts, function (p) { p.classList.remove('sb-on'); }); Array.prototype.forEach.call(ms, function (m) { m.classList.remove('sb-on'); }); }
+    Array.prototype.forEach.call(ms, function (m) {
+      m.addEventListener('click', function () {
+        var k = m.getAttribute('data-k');
+        if (k !== seq[pos]) { tremer(); som.tocar('porta', 0.35); msg.textContent = 'Os monólitos apagaram. A sequência recomeça.'; msg.classList.add('sb-aviso'); limpar(); return; }
+        msg.classList.remove('sb-aviso'); som.giro(); m.classList.add('sb-on'); pts[pos].classList.add('sb-on'); pos++;
+        if (pos === seq.length) {
+          som.tocar('revelacao', 0.6);
+          setTimeout(function () {
+            fecharModal(); flag('decodificado'); clarao();
+            doc('ficha_teo', function () {
+              fala(['{tenso}Marin, Téo. Ficha 13. Eles tinham o meu nome antes de me contratarem.',
+                '"Sem ciência do candidato." Eu não fui chamado pra consertar nada.',
+                'A amostra 13 também é compatível comigo. Uma amostra de antes do Programa, que nenhuma equipe coletou.']);
+            });
+          }, 900);
+        }
+      });
+    });
+  }
+
+  /* ── Puzzle 3: as três ondas ────────────────────────────────── */
+  function ondaPath(t) {
+    var ciclos = { lenta: 1.5, media: 3, rapida: 6 }, d = '', x, y;
+    if (t === 'plana') return 'M0 20H100';
+    if (t === 'irregular') return 'M0 20L7 6L13 31L22 12L26 28L37 9L41 33L53 14L58 26L66 8L74 32L80 15L91 27L100 18';
+    for (x = 0; x <= 100; x += 2) { y = 20 + 14 * Math.sin(2 * Math.PI * ciclos[t] * x / 100); d += (x ? 'L' : 'M') + x + ' ' + y.toFixed(1); }
+    return d;
+  }
+  function abrirOndas() {
+    var TIPOS = ['plana', 'lenta', 'media', 'rapida', 'irregular'], CERTO = ['lenta', 'media', 'rapida'], sel = [0, 0, 0];
+    abrirModal(
+      '<button type="button" class="sb-x sb-x2" aria-label="Sair">✕</button>' +
+      '<div class="sb-doc-tit">O pedestal</div>' +
+      '<div class="sb-puz-dica">Três anéis. Toque em cada um para trocar a onda.</div>' +
+      '<div class="sb-ondas">' + [0, 1, 2].map(function (i) {
+        return '<button type="button" class="sb-onda-a" data-i="' + i + '"><svg viewBox="0 0 100 40"><path d="' + ondaPath('plana') + '"/></svg></button>';
+      }).join('') + '</div>' +
+      '<div class="sb-puz-botoes">' + htmlDica() + '<button type="button" class="sb-btn" data-p="ok">Alinhar</button></div>', 'sb-puz sb-puz-ond', false);
+    el.caixa.querySelector('.sb-x2').addEventListener('click', function () { som.clique(); fecharModal(); });
+    ligarDica(function () { return obedeceuSemChecar() ? 'Rápida, média, lenta. Começa pela mais rápida, Téo.' : 'Lenta, média, rápida. Da esquerda pra direita.'; });
+    var msg = el.caixa.querySelector('.sb-puz-dica');
+    Array.prototype.forEach.call(el.caixa.querySelectorAll('.sb-onda-a'), function (b) {
+      b.addEventListener('click', function () {
+        var i = +b.getAttribute('data-i'); sel[i] = (sel[i] + 1) % TIPOS.length; som.giro();
+        b.querySelector('path').setAttribute('d', ondaPath(TIPOS[sel[i]]));
+      });
+    });
+    el.caixa.querySelector('[data-p="ok"]').addEventListener('click', function () {
+      som.clique();
+      var certo = CERTO.every(function (t, i) { return TIPOS[sel[i]] === t; });
+      if (!certo) {
+        tremer(); som.tocar('porta', 0.5); msg.textContent = 'A sala estremeceu. Alguma coisa nos discos mudou de lugar.'; msg.classList.add('sb-aviso');
+        var primeira = !S.flags.erros3;
+        S.flags.erros3 = (S.flags.erros3 | 0) + 1; salvar();
+        setTimeout(function () {
+          fecharModal(); desenharCena(); clarao();
+          if (primeira) fala(['{tenso}A sala trocou. Os discos estão em outros lugares, a luz virou outra e a porta agora está do outro lado.', 'Eu não saí do lugar. Eu tenho certeza que não saí do lugar.']);
+        }, 900);
+        return;
+      }
+      som.tocar('sinal-ok', 0.7); msg.classList.remove('sb-aviso');
+      if (S.flags.semRadio && !S.flags.rodada3) {
+        flag('rodada3'); S.flags.erros3 = Math.max(1, S.flags.erros3 | 0); salvar();
+        msg.textContent = 'Os discos giraram sozinhos. A sala trocou de novo.';
+        setTimeout(function () {
+          fecharModal(); desenharCena(); clarao();
+          fala(['Os discos bateram no mesmo compasso... e a sala trocou outra vez.', '{tenso}Sem a voz, não tenho como saber se acertei. Preciso alinhar uma segunda vez, já na sala trocada.']);
+        }, 1000);
+        return;
+      }
+      msg.textContent = 'Os três discos bateram no mesmo compasso.';
+      setTimeout(function () {
+        fecharModal(); flag('ondasOk'); clarao();
+        fala(['Os três discos pararam no mesmo compasso. O ar ficou mais leve.', 'No canto da sala, uma porta que não estava aqui destravou.']);
+      }, 900);
+    });
+  }
+
+  /* ── Puzzle 4: a 13ª frequência ─────────────────────────────── */
+  function abrirNucleo() {
+    var dig = '', pts = [], i;
+    for (i = 0; i < 13; i++) {
+      var a = -Math.PI / 2 + i * Math.PI * 2 / 13;
+      pts.push({ x: 50 + 37 * Math.cos(a), y: 50 + 37 * Math.sin(a) });
+    }
+    var soq = pts.map(function (p, k) {
+      var v = (6.3 * (k + 1)).toFixed(1).replace('.', ',');
+      return k < 12
+        ? '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="7.2" class="sb-soq sb-soq-on"/><text x="' + p.x.toFixed(1) + '" y="' + (p.y + 1.6).toFixed(1) + '" class="sb-soq-t">' + v + '</text>'
+        : '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="7.2" class="sb-soq sb-soq-13"/><text x="' + p.x.toFixed(1) + '" y="' + (p.y + 1.6).toFixed(1) + '" class="sb-soq-t sb-soq-t13">?</text>';
+    }).join('');
+    abrirModal(
+      '<button type="button" class="sb-x sb-x2" aria-label="Sair">✕</button>' +
+      '<div class="sb-doc-tit">Núcleo — anel de soquetes (MHz)</div>' +
+      '<div class="sb-puz-dica">Doze soquetes acesos, um por pessoa da equipe. O décimo terceiro está apagado.</div>' +
+      '<div class="sb-nuc">' +
+        '<svg class="sb-nuc-anel" viewBox="0 0 100 100">' + soq + '<text x="50" y="50" class="sb-nuc-v">____</text></svg>' +
+        '<div class="sb-nuc-pad"><div class="sb-teclado">' + [1, 2, 3, 4, 5, 6, 7, 8, 9, ',', 0, 'C'].map(function (t) {
+          return '<button type="button" class="sb-tecla" data-t="' + t + '">' + (t === 'C' ? '⌫' : t) + '</button>';
+        }).join('') + '</div><div class="sb-puz-botoes">' + htmlDica() + '<button type="button" class="sb-btn" data-p="ok">Encaixar</button></div></div>' +
+      '</div>', 'sb-puz sb-puz-nuc', false);
+    el.caixa.querySelector('.sb-x2').addEventListener('click', function () { som.clique(); fecharModal(); });
+    ligarDica(function () { return obedeceuSemChecar() ? '6,3, Téo. A base de tudo. Encaixe a base.' : 'A cada soquete soma 6,3 ao anterior. É só continuar a série.'; });
+    var msg = el.caixa.querySelector('.sb-puz-dica'), vis = el.caixa.querySelector('.sb-nuc-v');
+    function mostrar() { vis.textContent = dig || '____'; }
+    Array.prototype.forEach.call(el.caixa.querySelectorAll('.sb-tecla'), function (b) {
+      b.addEventListener('click', function () {
+        var t = b.getAttribute('data-t'); som.tique();
+        if (t === 'C') dig = dig.slice(0, -1);
+        else if (dig.length < 5 && !(t === ',' && (dig.indexOf(',') >= 0 || !dig))) dig += t;
+        mostrar();
+      });
+    });
+    el.caixa.querySelector('[data-p="ok"]').addEventListener('click', function () {
+      som.clique();
+      var v = dig.replace('.', ',');
+      if (v === '81,9') {
+        som.tocar('revelacao', 0.8); msg.classList.remove('sb-aviso'); msg.textContent = 'O décimo terceiro soquete acendeu.';
+        el.caixa.querySelector('.sb-soq-13').classList.add('sb-soq-on'); el.caixa.querySelector('.sb-soq-t13').textContent = '81,9';
+        setTimeout(function () { fecharModal(); flag('nucleoOk'); desenharCena(); clarao(); fimDoAto3(); }, 1500);
+        return;
+      }
+      tremer(); som.tocar('porta', 0.4); msg.classList.add('sb-aviso');
+      msg.textContent = v === '6,3' ? 'O soquete devolve o mesmo número: 6,3 já está aceso no primeiro anel.' : 'O soquete recusa. A coluna de luz estremeceu.';
+      dig = ''; mostrar();
+    });
+  }
+  function fimDoAto3() {
+    fala(['O décimo terceiro soquete acendeu. A coluna de luz no meio da sala mudou de cor, de branco para um violeta que eu não sei nomear.',
+      '{tenso}Treze acesos. A equipe, e mais um. Eu completei o círculo.'], function () {
+      if (S.flags.semRadio) fala(['{tenso}Sem a voz no rádio, o silêncio ficou pesado. Alguma coisa lá em cima abriu um caminho mesmo assim.'], function () { flag('ato3Fim'); telaFimAto(3); });
+      else radio(['Treze acesos, Téo. Faltava só a última frequência.', 'Suba agora. A sala de transmissão está aberta.'], function () { flag('ato3Fim'); telaFimAto(3); });
+    });
+  }
+  function apareceFigura() {
+    if (S.flags.figura) return;
+    flag('figura');
+    if (S.cena !== 'mirante') return;
+    desenharCena(); clarao(); som.tocar('revelacao', 0.7);
+    fala(['{tenso}Na ponta do mirante, uma luz com forma de gente. Linda. Sem rosto fixo, como se mudasse conforme eu olho.'], function () {
+      radio(['Aquele é o primeiro dos que desceram, Téo. Venha até o parapeito.']);
+    });
+  }
+
+  CENAS.escadaria = {
+    nome: 'Escadaria de gelo', img: 'ato3-escadaria-v1.webp',
+    chegada: ['O elevador parou de responder. A única descida que sobrou é esta escada.',
+      'Degraus de pedra com gelo por cima, e uma fila de lâmpadas penduradas por alguém que passou antes de mim.',
+      'Ferramentas largadas, uma bolsa, pegadas de bota. Aqui o frio é outro, mais antigo.'],
+    pontos: [
+      { id: 'lampadas', x: 15, y: 5, w: 20, h: 45, acao: function () {
+        fala(['Lâmpadas de obra penduradas em fio. Alguém trouxe energia até aqui embaixo.', 'O cabo está morno. Vem do mesmo lugar do zumbido.']); } },
+      { id: 'picaretas', x: 24, y: 72, w: 13, h: 24, acao: function () {
+        fala(['Duas picaretas largadas uma por cima da outra.', 'Usaram pra quebrar o gelo dos degraus. Quem desceu primeiro teve trabalho.']); } },
+      { id: 'pegadas', x: 45, y: 71, w: 14, h: 25, acao: function () {
+        fala(['{tenso}Pegadas de bota indo só pra baixo.', 'Contei duas vezes. Treze pares. De novo o treze.']); } },
+      { id: 'bolsa', x: 61, y: 68, w: 17, h: 21, acao: function () {
+        if (!S.flags.cadernetaPega) { flag('cadernetaPega'); pegar('caderneta', ['Uma bolsa laranja de campo, aberta, com ferramentas e uma corda.', 'No fundo, uma caderneta de rádio com a letra do Kazuo.'], 'caderneta_radio'); }
+        else fala(['A bolsa do Kazuo. Só ferramentas e corda.']); } },
+      { id: 'lanterna', x: 77, y: 84, w: 12, h: 12, acao: function () {
+        fala(['Uma lanterna de campo caída no degrau, sem bateria.', 'Quem largou isso aqui não voltou pra buscar.']); } },
+      { id: 'escada', x: 36, y: 50, w: 28, h: 20, porta: true, acao: function () {
+        if (S.flags.p1ok) { ir('salao'); return; }
+        fala(['A escada desce até onde a luz das lâmpadas acaba.', 'Daqui pra baixo, o rádio do cinto vai começar a falhar.'], function () {
+          pedido(1, function () { flag('p1ok'); ir('salao'); });
+        }); } }
+    ]
+  };
+  CENAS.salao = {
+    nome: 'Salão de colunas', img: 'ato3-salao-v1.webp',
+    chegada: ['Um salão de colunas altas, de uma pedra que não é da Antártica. As paredes têm inscrições, as mesmas marcas do túnel.',
+      'No chão, a estrela de sete pontas de novo, apagada. E encostada numa coluna, uma mesa de campo com o notebook do Kazuo, ainda ligado.'],
+    saidas: [
+      { lado: 'baixo', para: 'escadaria', rotulo: 'Escadaria' },
+      { lado: 'cima', para: 'monolitos', rotulo: 'Câmara dos monólitos', se: function () { return !!S.flags.inscricaoOk; } }
+    ],
+    pontos: [
+      { id: 'parede', x: 53, y: 14, w: 20, h: 42, acao: function () {
+        if (S.flags.inscricaoOk) { doc('inscricao'); return; }
+        fala(['Uma parede inteira de marcas, em fileiras. Quatro delas brilham mais que as outras.'], abrirInscricao); } },
+      { id: 'estrela', x: 40, y: 64, w: 40, h: 17, acao: function () {
+        fala(S.flags.inscricaoOk ? ['A estrela acesa mostra o caminho pro fundo do salão.'] : ['A estrela de sete pontas, gravada no piso. Apagada.', 'Quando a parede for lida, imagino que ela acenda.']); } },
+      { id: 'notas', x: 13, y: 50, w: 8, h: 21, acao: function () {
+        if (!S.flags.notasPegas) { flag('notasPegas'); pegar('notas', ['Folhas coladas na coluna, com a letra da Mira. Marcas desenhadas, e ao lado, a tradução.'], 'notas_traducao'); }
+        else fala(['As folhas da Mira, que já guardei.']); } },
+      { id: 'notebook', x: 18, y: 67, w: 8, h: 9, acao: function () { doc('nota_ondas'); } },
+      { id: 'cartao', x: 27, y: 70, w: 6, h: 8, acao: function () {
+        if (!S.flags.cartaoMemPego) { flag('cartaoMemPego'); pegar('cartaomem', ['Ao lado do notebook, um cartão de memória preso com fita.', 'A etiqueta, na letra do Kazuo: "decodificador".']); }
+        else fala(['A mesa de campo. O resto é cabo e ferramenta.']); } }
+    ]
+  };
+  CENAS.monolitos = {
+    nome: 'Câmara dos monólitos', img: 'ato3-monolitos-v1.webp',
+    imgCom: function () { return S.flags.seloSolto ? 'ato3-monolitos-solto-v1.webp' : null; },
+    chegada: ['Sete monólitos num círculo, cobertos de marcas que brilham sozinhas. No meio, uma pedra baixa com três notebooks ligados em cabos que somem pelo chão.',
+      'Em volta do monólito mais alto, uma faixa dourada. Parece que está apertando.'],
+    saidas: [
+      { lado: 'baixo', para: 'salao', rotulo: 'Salão' },
+      { lado: 'cima', para: 'ressonancia', rotulo: 'Sala da ressonância', se: function () { return !!S.flags.p2ok; } }
+    ],
+    pontos: [
+      { id: 'runas', x: 73, y: 7, w: 13, h: 78, acao: function () {
+        fala(['As marcas do monólito têm o mesmo traço das do salão.', '{tenso}Pulsam. Devagar. Como quem respira.']); } },
+      { id: 'equipamento', x: 41, y: 53, w: 18, h: 21, acao: function () {
+        if (S.flags.decodificado) { doc('ficha_teo'); return; }
+        if (!tem('cartaomem')) { fala(['Três notebooks ligados a um leitor de cartão. A fenda está vazia.', 'Preciso do cartão de memória do Kazuo.']); return; }
+        if (!S.flags.decoderLigado) { flag('decoderLigado'); tirar('cartaomem'); som.tocar('sinal-ok', 0.6); fala(['Encaixei o cartão. Os três notebooks acordaram juntos.', 'Cada monólito agora tem um sinal ao lado, esperando uma ordem.'], abrirDecoder); return; }
+        abrirDecoder(); } },
+      { id: 'pasta', x: 28, y: 80, w: 6, h: 7, acao: function () {
+        if (!S.flags.pastaPega) { flag('pastaPega'); pegar('pasta', ['Uma caixa de energia no chão, com uma pasta plástica presa embaixo.', 'Na capa, a letra da Mira: "SELO".'], 'relatorio_selo'); }
+        else fala(['A caixa de energia. Ainda quente.']); } },
+      { id: 'selo', x: 14, y: 7, w: 14, h: 78, acao: function () {
+        if (S.flags.p2ok) { fala(S.flags.seloSolto ? ['O monólito está inteiro, mas sem a faixa. A luz de dentro ficou mais forte.'] : ['A faixa dourada continua no lugar. Eu deixei.']); return; }
+        if (!S.flags.decodificado) { fala(['Uma faixa dourada em volta do monólito mais alto, apertada como uma cinta.', 'Não há controle nenhum aqui. Primeiro preciso ligar o equipamento do meio.']); return; }
+        pedido(2, function () { flag('p2ok'); if (S.flags.obedeceu2) flag('seloSolto'); desenharCena(); }); } }
+    ]
+  };
+  CENAS.ressonancia = {
+    nome: 'Sala da ressonância', img: 'ato3-ressonancia-v1.webp',
+    imgCom: function () { return (S.flags.erros3 | 0) > 0 ? 'ato3-ressonancia-errada-v1.webp' : null; },
+    chegada: ['Uma sala redonda, de pedra lisa, com três discos de luz na parede. Cada um mostra uma onda diferente.', 'No meio, um pedestal com três anéis giratórios.'],
+    saidas: [{ lado: 'baixo', para: 'monolitos', rotulo: 'Monólitos' }],
+    pontos: [
+      { id: 'pedestal', x: 43, y: 52, w: 15, h: 24, acao: function () {
+        if (S.flags.ondasOk) { fala(['Os três anéis bateram no mesmo compasso e ficaram quietos.']); return; }
+        abrirOndas(); } },
+      { id: 'discos', x: 20, y: 20, w: 62, h: 35, acao: function () {
+        fala(['Três discos de luz com três ondas: uma lenta, uma média e uma rápida.', 'Pelo que o Kazuo anotou, o pedestal quer que eu copie a ordem deles.']); } },
+      { id: 'porta-esq', x: 3, y: 18, w: 11, h: 45, se: function () { return !((S.flags.erros3 | 0) > 0); }, porta: true, acao: function () { portaOndas(); } },
+      { id: 'porta-dir', x: 86, y: 20, w: 11, h: 46, se: function () { return (S.flags.erros3 | 0) > 0; }, porta: true, acao: function () { portaOndas(); } }
+    ]
+  };
+  function portaOndas() {
+    if (S.flags.ondasOk) ir('mirante');
+    else fala(['A porta não cede. Os anéis do pedestal ainda estão fora do compasso.']);
+  }
+  CENAS.mirante = {
+    nome: 'Mirante', img: 'ato3-mirante-v1.webp',
+    imgCom: function () { return S.flags.figura && !S.flags.p3ok ? 'ato3-mirante-luz-v1.webp' : null; },
+    chegada: ['A sala acaba num mirante sobre um vazio enorme. Lá embaixo, em linhas e círculos, milhares de luzes pequenas desenham uma coisa que eu levo um tempo pra entender.',
+      '{tenso}Não é uma cidade. É uma planta. E cada luz, uma coisa presa.'],
+    saidas: [
+      { lado: 'baixo', para: 'ressonancia', rotulo: 'Ressonância' },
+      { lado: 'dir', para: 'nucleo', rotulo: 'Núcleo do Coro', se: function () { return !!S.flags.p3ok; } }
+    ],
+    pontos: [
+      { id: 'gravador', x: 35, y: 83, w: 8, h: 10, se: function () { return !S.flags.gravadorPego; }, acao: function () {
+        flag('gravadorPego'); pegar('gravador2', ['No chão do mirante, um gravador de bolso. O da Ingrid.', 'A fita ainda está girando, devagar.'], 'audio_ingrid_final'); } },
+      { id: 'oculos', x: 42, y: 85, w: 8, h: 8, se: function () { return !S.flags.oculosPego; }, acao: function () {
+        flag('oculosPego'); pegar('oculos', ['Óculos finos de armação prateada, ao lado do gravador.', 'Uma das hastes está torta. Ela nunca andava sem eles.']); } },
+      { id: 'abismo', x: 60, y: 44, w: 30, h: 17, acao: function () {
+        fala(['As luzes lá embaixo não se mexem, mas parecem olhar pra cima.', '{tenso}Dá pra sentir de longe: é de lá que vem o zumbido.']); } },
+      { id: 'figura', x: 45, y: 19, w: 13, h: 22, se: function () { return !!S.flags.figura && !S.flags.p3ok; }, acao: function () {
+        fala(['{tenso}A luz tem a forma de uma pessoa alta, de ombros relaxados. Não tem rosto, mas eu tenho a sensação de que sorri.']); } },
+      { id: 'parapeito', x: 26, y: 62, w: 68, h: 19, acao: function () {
+        if (S.flags.p3ok) { fala(['O parapeito de pedra. O vão embaixo está quieto.']); return; }
+        if (!S.flags.figura) { fala(['Um parapeito de pedra, cheio de gelo, com o vazio logo atrás.', 'O gravador no chão parece mais interessante que a vista.']); return; }
+        pedido(3, function () { flag('p3ok'); desenharCena(); }); } }
+    ]
+  };
+  CENAS.nucleo = {
+    nome: 'Núcleo do Coro', img: 'ato3-nucleo-v1.webp',
+    chegada: ['Um salão circular, com colunas ao redor e servidores modernos plugados nelas por feixes de cabos grossos como braços.',
+      'No centro, uma coluna de luz branca vai do chão ao teto. E num disco no piso, um anel de soquetes acesos. Falta um.'],
+    pontos: [
+      { id: 'coluna', x: 47, y: 0, w: 6, h: 68, acao: function () {
+        fala(['A coluna de luz não faz calor, nem som. Faz só pressão, como a de um ouvido tapado.']); } },
+      { id: 'servidor-e', x: 20, y: 44, w: 10, h: 22, acao: function () {
+        fala(['Servidores comuns, de rack, ligados direto na pedra.', 'Alguém pagou caro pra enfiar um data center dentro de uma coisa mais velha que a escrita.']); } },
+      { id: 'servidor-d', x: 72, y: 44, w: 10, h: 22, acao: function () {
+        fala(['A etiqueta do rack diz CONSÓRCIO POLAR. O resto é cabo.']); } },
+      { id: 'anel', x: 54, y: 79, w: 33, h: 16, acao: function () {
+        if (S.flags.nucleoOk) { fala(['Os treze soquetes acesos. Não sobrou nada pra fazer aqui.']); return; }
+        abrirNucleo(); } }
+    ]
+  };
+
+  /* ══════════════════════════════════════════════════════════════
      ESTADO
   ══════════════════════════════════════════════════════════════ */
   var S = null;           // { cena, itens[], flags{}, docs[], vistos{}, chegou{}, tempo }
@@ -493,11 +958,15 @@
   var PROG = 'angatuba_sinalbranco_prog', progCache = 0;
   var ATO_CENAS = {
     1: ['voo', 'heliponto', 'entrada', 'refeitorio', 'corredor', 'quarto', 'lab', 'radio', 'gerador'],
-    2: ['almoxarifado', 'elevador', 'servico', 'servidores', 'arquivo', 'biolab', 'portaAntiga', 'terminalAntigo']
+    2: ['almoxarifado', 'elevador', 'servico', 'servidores', 'arquivo', 'biolab', 'portaAntiga', 'terminalAntigo'],
+    3: ['escadaria', 'salao', 'monolitos', 'ressonancia', 'mirante', 'nucleo']
   };
   var ATO_FLAGS = {
     1: ['energia', 'radioOk', 'atoFim', 'chavesPegas', 'fusivelPego', 'dia14', 'f3', 'simbolo'],
-    2: ['caixaLigada', 'cartaoPego', 'crachaPego', 'desceu', 'energia2', 'fitaPega', 'logado', 'painelAberto', 'pecabraPego', 'portaAberta', 'portaSeg', 'valvulaPega', 'ato2Fim']
+    2: ['caixaLigada', 'cartaoPego', 'crachaPego', 'desceu', 'energia2', 'fitaPega', 'logado', 'painelAberto', 'pecabraPego', 'portaAberta', 'portaSeg', 'valvulaPega', 'ato2Fim'],
+    3: ['obedeceu1', 'obedeceu2', 'obedeceu3', 'checou1', 'checou2', 'checou3', 'recusou1', 'recusou2', 'recusou3', 'semRadio',
+      'p1ok', 'p2ok', 'p3ok', 'inscricaoOk', 'decoderLigado', 'decodificado', 'seloSolto', 'erros3', 'rodada3', 'ondasOk', 'figura', 'nucleoOk', 'ato3Fim',
+      'cadernetaPega', 'notasPegas', 'cartaoMemPego', 'pastaPega', 'gravadorPego', 'oculosPego']
   };
   function progLer() {
     var p = 1;
@@ -508,7 +977,7 @@
     var p = Math.max(progLer(), progCache || 1);
     try {
       var sv = JSON.parse(localStorage.getItem(SAVE) || 'null');
-      if (sv) p = Math.max(p, sv.ato || 1, sv.flags && sv.flags.atoFim ? 2 : 1, sv.flags && sv.flags.ato2Fim ? 3 : 1);
+      if (sv) p = Math.max(p, sv.ato || 1, sv.flags && sv.flags.atoFim ? 2 : 1, sv.flags && sv.flags.ato2Fim ? 3 : 1, sv.flags && sv.flags.ato3Fim ? 4 : 1);
     } catch (e) {}
     return Math.min(p, ULTIMO_ATO);
   }
@@ -540,19 +1009,20 @@
   function flag(f) { S.flags[f] = true; salvar(); }
   // Fala da "voz da central" no rádio do cinto: estática curta antes.
   function radio(linhas, aoFim) {
+    if (S && S.flags.semRadio) { som.estatica(0.7); setTimeout(function () { som.estatica(0); }, 600); fala(['{tenso}Só estática no rádio. A central não responde mais.'], aoFim); return; }
     som.estatica(0.7);
     setTimeout(function () { som.estatica(0); }, 700);
     fala(linhas.map(function (l) { return l.charAt(0) === '—' || l.charAt(0) === '[' ? l : '{coro}' + l; }), aoFim);
   }
   function tirar(id) { var i = S.itens.indexOf(id); if (i >= 0) S.itens.splice(i, 1); desenharInv(); }
-  function pegar(id, linhas, docId) {
+  function pegar(id, linhas, docId, aoDoc) {
     if (!tem(id)) S.itens.push(id);
     som.pegar();
     salvar();
     desenharCena(true);
     fala(linhas, function () {
       desenharInv(id);
-      mostrarItem(id, true, docId ? function () { doc(docId); } : null);
+      mostrarItem(id, true, docId ? function () { doc(docId, aoDoc); } : null);
     });
   }
 
@@ -676,6 +1146,7 @@
       var src = A + ((c.imgCom && c.imgCom()) || c.img);
       if (el.bg.getAttribute('src') !== src) { el.bg.src = src; el.amb.src = src; }
       el.palco.classList.toggle('sb-pisca', !!c.pisca);
+      el.palco.classList.toggle('sb-nucleo-ok', S.cena === 'nucleo' && !!S.flags.nucleoOk);
       el.local.textContent = c.nome;
       ligarNeve(!!c.neve);
       som.ambiente(c.fora ? 'fora' : 'dentro', S.cena);
@@ -703,6 +1174,7 @@
     if (!soPontos) {
       el.saidas.innerHTML = '';
       (c.saidas || []).forEach(function (s) {
+        if (s.se && !s.se()) return;
         var ic = { esq: 'fa-chevron-left', dir: 'fa-chevron-right', baixo: 'fa-chevron-down', cima: 'fa-chevron-up' }[s.lado];
         var b = h('button', 'sb-saida sb-saida-' + s.lado, '<i class="fa ' + ic + '"></i><span>' + esc(s.rotulo) + '</span>');
         b.type = 'button';
@@ -772,7 +1244,9 @@
   var DOC_RET = {
     bilhete_pavel: ['pavel', 'paranoico'], diario_ingrid: ['ingrid', 'obsessiva'], audio_ingrid: ['ingrid', 'serena'],
     relatorio_mira: ['mira', 'perturbada'], log_radio: ['kazuo', 'tecnico'], sinal: ['coro', ''], emails: ['kazuo', 'desconfiado'],
-    fita_kazuo: ['kazuo', 'cansado'], amostra: ['mira', 'curiosa'], quadro_mira: ['mira', 'firme']
+    fita_kazuo: ['kazuo', 'cansado'], amostra: ['mira', 'curiosa'], quadro_mira: ['mira', 'firme'],
+    caderneta_radio: ['kazuo', 'tecnico'], notas_traducao: ['mira', 'firme'], nota_ondas: ['kazuo', 'cansado'],
+    relatorio_selo: ['mira', 'perturbada'], audio_ingrid_final: ['ingrid', 'assustada']
   };
   // Falas da "central" que têm áudio (a voz do Coro disfarçado). Chave = texto exato da linha.
   var VOZ_CENTRAL = {
@@ -794,7 +1268,7 @@
     return cara + (EMO_ICONE[emo] ? '<span class="sb-ret-emo">' + EMO_ICONE[emo] + '</span>' : '') + '<span class="sb-ret-nome">' + NOMES[quem] + '</span>';
   }
   function retFala(tag) {
-    var coro = tag === 'coro', emo = coro ? '' : (tag || 'neutro'), k = (coro ? 'coro' : 'teo') + emo;
+    var coro = tag === 'coro', emo = coro ? '' : (tag || emoBase()), k = (coro ? 'coro' : 'teo') + emo;
     el.fala.classList.toggle('sb-fala-coro', coro);
     if (k !== falaRet) { falaRet = k; el.ret.innerHTML = retInterno(coro ? 'coro' : 'teo', emo); }
   }
@@ -868,7 +1342,8 @@
     var d = DOCS[id];
     var novo = S.docs.indexOf(id) < 0;
     if (novo) { S.docs.push(id); salvar(); atualizarBadge(true); }
-    var corpo = esc(d.texto).replace(/\n/g, '<br>');
+    var corpo = esc(d.texto).replace(/\n/g, '<br>').replace(/\[\[g:(\w+)\]\]/g, function (_, k) { return glifoSvg(k); });
+    if (id === 'audio_ingrid_final' && !S.flags.figura) { var fim0 = aoFechar; aoFechar = function () { if (fim0) fim0(); apareceFigura(); }; }
     var topo = d.tipo === 'audio'
       ? '<div class="sb-onda"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>'
       : '';
@@ -1427,8 +1902,8 @@
   /* ══════════════════════════════════════════════════════════════
      TELAS: título e fim do ato
   ══════════════════════════════════════════════════════════════ */
-  var NOMES_ATO = { 1: 'Ato 1 — O Muro Branco', 2: 'Ato 2 — Subsolo Zero' };
-  var ULTIMO_ATO = 2;   // atos prontos
+  var NOMES_ATO = { 1: 'Ato 1 — O Muro Branco', 2: 'Ato 2 — Subsolo Zero', 3: 'Ato 3 — O Cofre Pré-Diluviano' };
+  var ULTIMO_ATO = 3;   // atos prontos
   function telaTitulo() {
     var save = carregar(), temSave = !!save;
     progRegistrar();   // guarda o ato já alcançado antes de qualquer "refazer ato"
@@ -1471,7 +1946,8 @@
         Object.keys(S.vistos).forEach(function (v) { if (v.indexOf(c + '.') === 0) delete S.vistos[v]; });
       });
     }
-    if (n >= 2) { S.flags.energia = S.flags.radioOk = S.flags.atoFim = true; }   // o Ato 1 conta como cumprido
+    if (n >= 2) { S.flags.energia = S.flags.radioOk = S.flags.atoFim = true; }
+    if (n >= 3) S.flags.ato2Fim = true;   // o Ato 1 conta como cumprido
     S.ato = n;
     S.itens = n >= 2 ? ['lanterna'] : [];
     if (n === 1) { S.cena = 'heliponto'; S.flags.intro = true; }
@@ -1534,6 +2010,7 @@
     atualizarBadge(false);
     if (S.ato === 1 && S.flags.atoFim) { telaFimAto(1); return; }
     if (S.ato === 2 && S.flags.ato2Fim) { telaFimAto(2); return; }
+    if (S.ato === 3 && S.flags.ato3Fim) { telaFimAto(3); return; }
     if (S.ato === 1 && !S.chegou.heliponto && !S.flags.intro) { S.cena = 'voo'; S.chegou.voo = false; }
     ir(S.cena);
   }
@@ -1549,7 +2026,13 @@
       radio(['Bem-vindo, Téo. Agora desça.'], function () { flag('ato2Fim'); telaFimAto(2); });
     });
   }
-  function iniciarAto(n) { if (n === 2) iniciarAto2(); }
+  function iniciarAto(n) { if (n === 2) iniciarAto2(); else if (n === 3) iniciarAto3(); }
+  function iniciarAto3() {
+    S.ato = 3; S.cena = 'escadaria'; S.itens = tem('lanterna') ? ['lanterna'] : []; S.flags.ato2Fim = true; salvar();
+    el.titulo.style.display = 'none';
+    partida(true); desenharInv(); atualizarBadge(false);
+    ir('escadaria');
+  }
   function iniciarAto2() {
     // Itens do Ato 1 já cumpriram o papel (os documentos ficam no Arquivo); a lanterna segue.
     S.ato = 2; S.cena = 'almoxarifado'; S.itens = tem('lanterna') ? ['lanterna'] : []; salvar();
@@ -1576,7 +2059,7 @@
       '</div>';
     el.titulo.style.display = '';
     var b = el.titulo.querySelector('[data-t="proximo"]');
-    if (b) b.addEventListener('click', function () { som.clique(); iniciarAto2(); });
+    if (b) b.addEventListener('click', function () { som.clique(); iniciarAto(n + 1); });
     el.titulo.querySelector('[data-t="arquivo"]').addEventListener('click', function () {
       som.clique(); el.titulo.style.display = 'none'; abrirArquivo();
       modalAoFechar = function () { el.titulo.style.display = ''; };

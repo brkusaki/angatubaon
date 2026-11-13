@@ -46,6 +46,7 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position
 .sb-saida-baixo{left:50%;bottom:2.4%;transform:translateX(-50%);}
 .sb-saida-baixo:active{transform:translateX(-50%) scale(.95);}
 .sb-saida-cima{left:50%;top:9%;transform:translateX(-50%);}
+.sb-saida-cima:active{transform:translateX(-50%) scale(.95);}
 
 /* ── HUD ── */
 .sb-hud{position:absolute;left:0;right:0;top:0;display:flex;align-items:flex-start;justify-content:center;padding:1.4% 1.4% 0;pointer-events:none;}
@@ -251,3 +252,51 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position
 .sb-est-l.sb-erro{stroke:#f87171;filter:drop-shadow(0 0 1.5px #ef4444);}
 .sb-est-l.sb-ok{stroke:#ecfeff;stroke-width:1.6;filter:drop-shadow(0 0 3px #22d3ee);}
 .sb-puz-dica.sb-aviso{color:#fca5a5;font-weight:700;}
+
+/* ═══ Ato 3 — O Cofre Pré-Diluviano ═══ */
+.sb-gl{display:inline-block;width:1.5em;height:1.5em;vertical-align:-.3em;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.sb-gl-g{width:6em;height:6em;color:#67e8f9;filter:drop-shadow(0 0 .35em rgba(34,211,238,.7));}
+/* pedido do Coro */
+.sb-puz-pedido{width:46%;padding:1.8em 2.4em;border-color:rgba(167,139,250,.45);box-shadow:0 0 3em rgba(139,92,246,.22);}
+.sb-ped-txt{font-size:2em;font-style:italic;color:#ddd6fe;margin:.3em 0 .4em;}
+.sb-ped-botoes{display:flex;flex-direction:column;align-items:center;gap:.2em;}
+.sb-ped-botoes .sb-btn,.sb-ped-botoes .sb-btn-sec{width:74%;margin-top:.5em;font-size:1.45em;}
+/* inscrição */
+.sb-puz-ins{width:62%;padding:1.8em 2.4em;}
+.sb-ins{display:flex;justify-content:center;gap:2em;margin:.4em 0 .6em;}
+.sb-ins-c{display:flex;flex-direction:column;align-items:center;gap:.6em;}
+.sb-ins-p{min-width:9em;padding:.7em .4em;border-radius:.6em;border:1px solid rgba(103,232,249,.4);background:#07131f;color:#cffafe;font-size:1.3em;font-weight:800;letter-spacing:.06em;}
+.sb-ins-p:active{background:#0e3a4f;}
+.sb-puz-botoes .sb-btn,.sb-puz-botoes .sb-btn-sec{margin-top:.6em;}
+/* decodificador */
+.sb-puz-dec{width:70%;padding:1.8em 2.4em;}
+.sb-dec-prog{display:flex;justify-content:center;gap:.7em;margin:-.2em 0 .8em;}
+.sb-dec-prog i{width:1.1em;height:1.1em;border-radius:50%;border:1px solid rgba(103,232,249,.5);background:#07131f;}
+.sb-dec-prog i.sb-on{background:#67e8f9;box-shadow:0 0 .8em #22d3ee;}
+.sb-dec{display:flex;justify-content:center;align-items:flex-end;gap:1.1em;}
+.sb-dec-m{width:5.6em;height:13em;border-radius:.5em .5em .2em .2em;border:1px solid rgba(148,163,184,.35);background:linear-gradient(180deg,#101c2c,#060b14);color:#67e8f9;display:flex;align-items:flex-start;justify-content:center;padding-top:1.2em;}
+.sb-dec-m:nth-child(even){height:11em;}
+.sb-dec-m .sb-gl{width:3.6em;height:3.6em;}
+.sb-dec-m.sb-on{background:linear-gradient(180deg,#0e4a5f,#07202c);border-color:#67e8f9;box-shadow:0 0 1.2em rgba(34,211,238,.6);color:#ecfeff;}
+/* ondas */
+.sb-puz-ond{width:70%;padding:1.8em 2.4em;}
+.sb-ondas{display:flex;justify-content:center;gap:2.4em;margin:.3em 0 .4em;}
+.sb-onda-a{width:12em;height:12em;border-radius:50%;border:2px solid rgba(103,232,249,.55);background:radial-gradient(circle,#0b2535,#050c14);box-shadow:0 0 1.4em rgba(34,211,238,.35);padding:1.4em .8em;}
+.sb-onda-a svg{width:100%;height:100%;overflow:visible;}
+.sb-onda-a path{fill:none;stroke:#67e8f9;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px #22d3ee);}
+/* núcleo */
+.sb-puz-nuc{width:84%;padding:1.4em 2.4em;}
+.sb-nuc{display:flex;align-items:center;justify-content:center;gap:3em;}
+.sb-nuc-anel{width:27em;height:27em;flex:none;}
+.sb-soq{fill:#06121b;stroke:rgba(103,232,249,.3);stroke-width:.5;}
+.sb-soq.sb-soq-on{fill:#0e5a73;stroke:#67e8f9;filter:drop-shadow(0 0 1.6px #22d3ee);}
+.sb-soq-13{stroke:#c4b5fd;stroke-dasharray:1.6 1.2;animation:sb-pulsa-soq 1.4s ease-in-out infinite;}
+@keyframes sb-pulsa-soq{50%{stroke:#fff;fill:#1b1040}}
+.sb-soq-t{fill:#ecfeff;font-size:3.6px;font-weight:700;text-anchor:middle;font-family:ui-monospace,monospace;}
+.sb-soq-t13{fill:#ddd6fe;font-size:5px;}
+.sb-nuc-v{fill:#4ade80;font-size:9px;font-weight:800;text-anchor:middle;font-family:ui-monospace,monospace;}
+.sb-nuc-pad{flex:1;max-width:24em;}
+.sb-nuc-pad .sb-teclado{width:100%;}
+.sb-nuc-pad .sb-puz-botoes{flex-wrap:wrap;}
+/* fim do ato 3: coluna muda de cor */
+.sb-nucleo-ok .sb-bg{filter:hue-rotate(70deg) saturate(1.2);}

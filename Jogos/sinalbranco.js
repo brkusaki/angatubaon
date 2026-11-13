@@ -509,6 +509,7 @@
     'ANOTAÇÕES — K. REN\n\n' +
     '[[g:NAO]]  = NÃO. Abre toda frase de aviso. Aparece sempre primeiro.\n\n' +
     'Sobre as três ondas da sala de baixo: elas entram da mais lenta para a mais rápida, nessa ordem, da esquerda pra direita.\n\n' +
+    'O anel do núcleo, mais abaixo: um soquete por pessoa, na ordem em que chegaram. Cada um é um múltiplo do sinal de 6,3 MHz que captamos no primeiro dia (a n-ésima harmônica). Eu sou o terceiro: 18,9.\n\n' +
     'Se errar, a sala não reclama. Ela muda.' };
   DOCS.inscricao = { titulo: 'A parede, traduzida', tipo: 'papel', texto:
     ''+
@@ -760,7 +761,7 @@
     abrirModal(
       '<button type="button" class="sb-x sb-x2" aria-label="Sair">✕</button>' +
       '<div class="sb-doc-tit">Núcleo — anel de soquetes (MHz)</div>' +
-      '<div class="sb-puz-dica">Doze soquetes acesos, um por pessoa da equipe. O décimo terceiro está apagado.</div>' +
+      '<div class="sb-puz-dica">Doze soquetes acesos, um por pessoa, na ordem de chegada. O décimo terceiro está apagado.</div>' +
       '<div class="sb-nuc">' +
         '<svg class="sb-nuc-anel" viewBox="0 0 100 100">' + soq + '<text x="50" y="50" class="sb-nuc-v">____</text></svg>' +
         '<div class="sb-nuc-pad"><div class="sb-teclado">' + [1, 2, 3, 4, 5, 6, 7, 8, 9, ',', 0, 'C'].map(function (t) {

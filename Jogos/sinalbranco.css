@@ -300,4 +300,4 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position
 .sb-nuc-pad .sb-teclado{width:100%;}
 .sb-nuc-pad .sb-puz-botoes{flex-wrap:wrap;}
 /* fim do ato 3: coluna muda de cor */
-.sb-nucleo-ok .sb-bg{filter:hue-rotate(70deg) saturate(1.2);}
+.sb-nucleo-ok .sb-bg,.sb-nucleo-ok .sb-vid{filter:hue-rotate(70deg) saturate(1.2);}

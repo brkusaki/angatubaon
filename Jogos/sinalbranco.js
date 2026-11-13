@@ -836,7 +836,7 @@
     ]
   };
   CENAS.salao = {
-    nome: 'Salão de colunas', img: 'ato3-salao-v1.webp',
+    nome: 'Salão de colunas', img: 'ato3-salao-v1.webp', video: 'ato3-salao-anim-v1.mp4',
     chegada: ['Um salão de colunas altas, de uma pedra que não é da Antártica. As paredes têm inscrições, as mesmas marcas do túnel.',
       'No chão, a estrela de sete pontas de novo, apagada. E encostada numa coluna, uma mesa de campo com o notebook do Kazuo, ainda ligado.'],
     saidas: [
@@ -904,7 +904,7 @@
     else fala(['A porta não cede. Os anéis do pedestal ainda estão fora do compasso.']);
   }
   CENAS.mirante = {
-    nome: 'Mirante', img: 'ato3-mirante-v1.webp',
+    nome: 'Mirante', img: 'ato3-mirante-v1.webp', video: 'ato3-mirante-anim-v1.mp4',
     imgCom: function () { return S.flags.figura && !S.flags.p3ok ? 'ato3-mirante-luz-v1.webp' : null; },
     chegada: ['A sala acaba num mirante sobre um vazio enorme. Lá embaixo, em linhas e círculos, milhares de luzes pequenas desenham uma coisa que eu levo um tempo pra entender.',
       '{tenso}Não é uma cidade. É uma planta. E cada luz, uma coisa presa.'],
@@ -928,7 +928,7 @@
     ]
   };
   CENAS.nucleo = {
-    nome: 'Núcleo do Coro', img: 'ato3-nucleo-v1.webp',
+    nome: 'Núcleo do Coro', img: 'ato3-nucleo-v1.webp', video: 'ato3-nucleo-anim-v1.mp4',
     chegada: ['Um salão circular, com colunas ao redor e servidores modernos plugados nelas por feixes de cabos grossos como braços.',
       'No centro, uma coluna de luz branca vai do chão ao teto. E num disco no piso, um anel de soquetes acesos. Falta um.'],
     pontos: [

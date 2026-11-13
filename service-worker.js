@@ -66,7 +66,7 @@ self.addEventListener('notificationclick', function (event) {
   );
 });
 
-const CACHE = 'angatubaon-v557';
+const CACHE = 'angatubaon-v558';
 // Cache separado dos assets dos jogos (sprites, sons, músicas, vídeos
 // dos minigames). Fica de fora do CACHE principal de propósito: o
 // activate() abaixo NUNCA apaga o CACHE_JOGOS quando o app atualiza
@@ -215,7 +215,9 @@ self.addEventListener('fetch', e => {
   // Assets dos jogos (sprites, sons, músicas, vídeos): /Jogos/assets/**
   // ou áudio do próprio domínio. Cacheados à parte no CACHE_JOGOS (ver
   // fetch abaixo) pra sobreviver a updates do CACHE principal.
-  const isJogoAsset = !isJsCss && (
+  // .mp4 fica de fora: o Safari não toca vídeo vindo do cache do SW (pede Range e recebe 200).
+  // Sem rede o jogo usa a imagem parada da cena.
+  const isJogoAsset = !isJsCss && !/\.mp4$/i.test(url) && (
     new URL(url).pathname.startsWith('/Jogos/assets/') ||
     /\.(mp3|wav|ogg)$/i.test(url)
   );

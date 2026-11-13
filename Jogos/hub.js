@@ -1394,7 +1394,25 @@
       '/Jogos/assets/sinalbranco/sfx/faisca.mp3',
       '/Jogos/assets/sinalbranco/sfx/porta-pedra.mp3',
       '/Jogos/assets/sinalbranco/sfx/cabra.mp3',
-      '/Jogos/assets/sinalbranco/sfx/voz-fita_kazuo-v1.mp3'
+      '/Jogos/assets/sinalbranco/sfx/voz-fita_kazuo-v1.mp3',
+      // retratos dos personagens
+      '/Jogos/assets/sinalbranco/ret-teo-neutro-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-teo-tenso-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-teo-confuso-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-teo-obediente-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-teo-fundido-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-ingrid-serena-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-ingrid-obsessiva-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-ingrid-assustada-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-ingrid-transe-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-kazuo-tecnico-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-kazuo-desconfiado-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-kazuo-cansado-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-mira-curiosa-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-mira-perturbada-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-mira-firme-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-pavel-paranoico-v2.webp',
+      '/Jogos/assets/sinalbranco/ret-pavel-arrependido-v2.webp'
     ],
     corujinha: [
       '/Jogos/corujinha.min.js', '/Jogos/corujinha.css',

@@ -196,7 +196,7 @@
           else fala(['Os casacos de frio estão todos aqui.', 'Se a equipe saiu da base... saiu sem casaco.']); } },
         { id: 'quadro', x: 74, y: 13, w: 20, h: 47, acao: function () { doc('avisos'); } },
         { id: 'pegadas', x: 42, y: 76, w: 20, h: 22, acao: function () {
-          fala(['Pegadas molhadas. Indo pra dentro.', 'Não são minhas. Eu ainda nem tinha entrado.']); } },
+          fala(['Pegadas molhadas. Indo pra dentro.', '{tenso}Não são minhas. Eu ainda nem tinha entrado.']); } },
         { id: 'porta', x: 41, y: 24, w: 18, h: 50, porta: true, acao: function () { ir('refeitorio'); } }
       ]
     },
@@ -226,7 +226,7 @@
       pontos: [
         { id: 'simbolo', x: 8, y: 24, w: 17, h: 40, acao: function () {
           flag('simbolo');
-          fala(['Alguém riscou isso na parede. Com força, até arrancar a tinta.', 'Uma estrela de sete pontas.']); } },
+          fala(['Alguém riscou isso na parede. Com força, até arrancar a tinta.', '{tenso}Uma estrela de sete pontas.']); } },
         { id: 'quadro', x: 54, y: 74, w: 18, h: 16, acao: function () {
           fala(['Um quadro caído. O vidro quebrou bem no meio.', 'Alguém passou correndo por aqui e nem parou pra juntar.']); } },
         { id: 'quarto', x: 61, y: 28, w: 12, h: 44, porta: true, acao: function () { ir('quarto'); } },
@@ -247,7 +247,7 @@
         { id: 'gravador', x: 47, y: 63, w: 11, h: 11, se: function () { return !tem('gravador'); }, acao: function () {
           pegar('gravador', ['Um gravador. A luzinha vermelha ainda acende.'], 'audio_ingrid'); } },
         { id: 'foto', x: 4, y: 21, w: 14, h: 18, acao: function () {
-          fala(['A equipe toda, na frente da estação. O reflexo no vidro não deixa ver os rostos.', 'Contei. Doze pessoas... e uma sombra a mais, no canto.', 'Deve ser o vidro.']); } },
+          fala(['A equipe toda, na frente da estação. O reflexo no vidro não deixa ver os rostos.', '{tenso}Contei. Doze pessoas... e uma sombra a mais, no canto.', '{confuso}Deve ser o vidro.']); } },
         { id: 'gaveta', x: 82, y: 76, w: 17, h: 22, acao: function () {
           if (!S.flags.chavesPegas) { flag('chavesPegas'); pegar('chaves', ['Na gaveta, um molho de chaves com etiqueta vermelha: GERADOR.', 'A Ingrid não queria mesmo que ninguém mexesse no gerador.']); }
           else fala(['A gaveta está vazia agora.']); } }
@@ -282,9 +282,9 @@
         { id: 'transceptor', x: 41, y: 42, w: 22, h: 21, acao: function () {
           if (!S.flags.energia) fala(['O rádio principal está morto. Só os aparelhos pequenos funcionam na bateria.', 'Preciso religar o gerador primeiro.']);
           else if (!S.flags.radioOk) fala(['Agora sim, o rádio liga.', 'Muita estática. Tem alguma coisa escondida no meio do ruído.'], abrirFrequencia);
-          else fala(['O rádio só chia agora.', 'Mas eu sei que ela ainda está ouvindo.']); } },
+          else fala(['O rádio só chia agora.', '{tenso}Mas eu sei que ela ainda está ouvindo.']); } },
         { id: 'fones', x: 1, y: 20, w: 13, h: 44, acao: function () {
-          fala(['Os fones do Kazuo.', 'Ainda estão... mornos?', 'Não pode ser.']); } },
+          fala(['Os fones do Kazuo.', '{confuso}Ainda estão... mornos?', '{tenso}Não pode ser.']); } },
         { id: 'livro', x: 68, y: 56, w: 23, h: 24, acao: function () { doc('log_radio'); } },
         { id: 'mapa', x: 89, y: 8, w: 11, h: 30, acao: function () {
           fala(['Um mapa da região. Alguém circulou a lápis um ponto bem abaixo da estação.', 'Embaixo. Não ao lado.']); } }
@@ -329,7 +329,7 @@
         som.tocar('cabra', 0.9, function () { som.porta(); });
         flag('painelAberto'); tirar('pecabra');
         desenharCena();
-        fala(['Enfiei o pé de cabra na fresta e puxei com o corpo todo.', 'A placa abriu como uma porta. Atrás dela...', 'Um elevador. Que não existe em planta nenhuma.']); } },
+        fala(['Enfiei o pé de cabra na fresta e puxei com o corpo todo.', 'A placa abriu como uma porta. Atrás dela...', '{confuso}Um elevador. Que não existe em planta nenhuma.']); } },
       { id: 'prateleiras', x: 23, y: 28, w: 16, h: 42, acao: function () {
         fala(['Peças de reposição, caixas de ração, cobertores.', 'Tudo etiquetado, tudo em ordem. Menos aquela parede.']); } }
     ]
@@ -342,7 +342,7 @@
         if (S.flags.desceu) { fala(['O painel marca SUBSOLO ZERO.', 'Para subir é só puxar a alavanca ao contrário... mas eu ainda não terminei aqui.']); return; }
         fala(['Chave na posição LIGA. Uma alavanca de descida e um medidor de profundidade.', 'Nenhum botão de andar. Só uma marca riscada no vidro do medidor: 640.'], abrirElevador); } },
       { id: 'poco', x: 40, y: 20, w: 20, h: 56, acao: function () {
-        fala(['O poço desce até onde a luz não alcança.', 'Lá embaixo, bem fraco, o mesmo zumbido do rádio.']); } },
+        fala(['O poço desce até onde a luz não alcança.', '{tenso}Lá embaixo, bem fraco, o mesmo zumbido do rádio.']); } },
       { id: 'sair', x: 21, y: 14, w: 15, h: 66, porta: true, acao: function () {
         ir(S.flags.desceu ? 'servico' : 'almoxarifado'); } }
     ]
@@ -384,12 +384,12 @@
         if (S.flags.logado) { doc('emails'); return; }
         fala(['O terminal do Kazuo pede uma senha de 4 dígitos.'], abrirSenha); } },
       { id: 'caneca', x: 55, y: 50, w: 7, h: 11, acao: function () {
-        fala(['Café pela metade. Ainda está... morno.', 'Isso não faz sentido nenhum.']); } },
+        fala(['Café pela metade. Ainda está... morno.', '{confuso}Isso não faz sentido nenhum.']); } },
       { id: 'rack', x: 72, y: 38, w: 12, h: 30, acao: function () {
         if (!S.flags.valvulaPega) { flag('valvulaPega'); pegar('valvula', ['O rack 9 está aberto. No meio dos servidores modernos, um soquete antigo com uma válvula termiônica.', 'Isto aqui é dos anos 50. Peguei.']); }
-        else fala(['O cabo preto entra no rack e desce pelo buraco do chão.', 'Encostei a mão. Está morno. E pulsa.']); } },
+        else fala(['O cabo preto entra no rack e desce pelo buraco do chão.', '{tenso}Encostei a mão. Está morno. E pulsa.']); } },
       { id: 'buraco', x: 61, y: 80, w: 21, h: 13, acao: function () {
-        fala(['O cabo some num buraco aberto no piso.', 'Não dá pra ver o fundo. Dá pra ouvir o zumbido.']); } }
+        fala(['O cabo some num buraco aberto no piso.', '{tenso}Não dá pra ver o fundo. Dá pra ouvir o zumbido.']); } }
     ]
   };
   CENAS.arquivo = {
@@ -398,7 +398,7 @@
     saidas: [{ lado: 'baixo', para: 'servico', rotulo: 'Corredor' }],
     pontos: [
       { id: 'mural', x: 36, y: 14, w: 30, h: 34, acao: function () {
-        fala(['Um mapa-múndi com fotos de estações: Svalbard, Atacama, Sibéria, Groenlândia.', 'Barbantes de todas elas. Todos terminam no mesmo ponto.', 'Aqui.']); } },
+        fala(['Um mapa-múndi com fotos de estações: Svalbard, Atacama, Sibéria, Groenlândia.', 'Barbantes de todas elas. Todos terminam no mesmo ponto.', '{tenso}Aqui.']); } },
       { id: 'fotos', x: 49, y: 51, w: 12, h: 10, se: function () { return !tem('polaroid'); }, acao: function () {
         pegar('polaroid', ['Fotos espalhadas pela mesa. Uma delas tem algo escrito no verso.'], 'polaroid'); } },
       { id: 'gaveta', x: 59, y: 61, w: 9, h: 17, acao: function () {
@@ -454,7 +454,7 @@
     saidas: [{ lado: 'baixo', para: 'portaAntiga', rotulo: 'Túnel' }],
     pontos: [
       { id: 'simbolos', x: 41, y: 28, w: 18, h: 18, acao: function () {
-        fala(['Os símbolos giram devagar. Quando eu chego perto, eles param.', 'Como se estivessem olhando de volta.']); } },
+        fala(['Os símbolos giram devagar. Quando eu chego perto, eles param.', '{tenso}Como se estivessem olhando de volta.']); } },
       { id: 'notebook', x: 22, y: 66, w: 10, h: 14, acao: function () {
         fala(['O notebook do Kazuo. Última anotação na tela:', '"A fenda do console aceita os cartões perfurados do arquivo. Foi assim que a gente começou a traduzir."']); } },
       { id: 'console', x: 34, y: 46, w: 33, h: 27, acao: function () {
@@ -470,7 +470,7 @@
   var S = null;           // { cena, itens[], flags{}, docs[], vistos{}, chegou{}, tempo }
   var montado = false, ativo = false, lockNativo = false;
   var el = {};            // referências do DOM
-  var falaFila = [], falaFim = null, falaTimer = 0, falaTexto = '', falaPos = 0;
+  var falaFila = [], falaFim = null, falaTimer = 0, falaTexto = '', falaPos = 0, falaRet = '';
   var tUltimo = 0, relogio = 0;
   var neveRaf = 0, neve = [];
   var emPartida = false;
@@ -500,7 +500,7 @@
   function radio(linhas, aoFim) {
     som.estatica(0.7);
     setTimeout(function () { som.estatica(0); }, 700);
-    fala(linhas.map(function (l) { return l.charAt(0) === '—' || l.charAt(0) === '[' ? l : 'Voz no rádio: "' + l + '"'; }), aoFim);
+    fala(linhas.map(function (l) { return l.charAt(0) === '—' || l.charAt(0) === '[' ? l : '{coro}' + l; }), aoFim);
   }
   function tirar(id) { var i = S.itens.indexOf(id); if (i >= 0) S.itens.splice(i, 1); desenharInv(); }
   function pegar(id, linhas, docId) {
@@ -562,7 +562,7 @@
         '</div>' +
       '</div>' +
       '<div class="sb-inv"></div>' +
-      '<div class="sb-fala" style="display:none"><div class="sb-fala-txt"></div><div class="sb-fala-seta">▼</div></div>' +
+      '<div class="sb-fala" style="display:none"><div class="sb-ret"></div><div class="sb-fala-txt"></div><div class="sb-fala-seta">▼</div></div>' +
       '<div class="sb-modal" style="display:none"><div class="sb-modal-caixa"></div></div>' +
       '<div class="sb-titulo" style="display:none"></div>' +
       '<div class="sb-fade"></div>';
@@ -577,6 +577,7 @@
     el.inv = palco.querySelector('.sb-inv');
     el.fala = palco.querySelector('.sb-fala');
     el.falaTxt = palco.querySelector('.sb-fala-txt');
+    el.ret = palco.querySelector('.sb-ret');
     el.modal = palco.querySelector('.sb-modal');
     el.caixa = palco.querySelector('.sb-modal-caixa');
     el.titulo = palco.querySelector('.sb-titulo');
@@ -716,7 +717,39 @@
   }
 
   /* ══════════════════════════════════════════════════════════════
-     FALA (caixa de texto com máquina de escrever)
+     RETRATOS: busto de quem fala + ícone da emoção
+     Arquivos ret-<quem>-<emoção>-v1.webp. Nas falas, '{tenso}texto' troca
+     a emoção do Téo (sem tag = neutro) e '{coro}texto' é a voz do rádio
+     (sem retrato: símbolo da estrela de sete pontas).
+  ══════════════════════════════════════════════════════════════ */
+  var NOMES = { teo: 'TÉO', ingrid: 'INGRID', kazuo: 'KAZUO', mira: 'MIRA', pavel: 'PAVEL', coro: 'VOZ' };
+  var EMO_ICONE = { tenso: '!', confuso: '?', obediente: '…', fundido: '✦', obsessiva: '!', assustada: '!!', transe: '✦',
+    desconfiado: '?', cansado: '…', perturbada: '!', paranoico: '!!', arrependido: '…', curiosa: '?' };
+  // Quem "escreveu" cada documento e com que cara (sem entrada = sem retrato)
+  var DOC_RET = {
+    bilhete_pavel: ['pavel', 'paranoico'], diario_ingrid: ['ingrid', 'obsessiva'], audio_ingrid: ['ingrid', 'serena'],
+    relatorio_mira: ['mira', 'perturbada'], log_radio: ['kazuo', 'tecnico'], sinal: ['coro', ''], emails: ['kazuo', 'desconfiado'],
+    fita_kazuo: ['kazuo', 'cansado'], amostra: ['mira', 'curiosa'], quadro_mira: ['mira', 'firme']
+  };
+  function estrela7() {
+    var p = [], i, a;
+    for (i = 0; i < 7; i++) { a = ((i * 3) % 7) / 7 * 2 * Math.PI - Math.PI / 2; p.push((42 * Math.cos(a)).toFixed(1) + ',' + (42 * Math.sin(a)).toFixed(1)); }
+    return p.join(' ');
+  }
+  function retInterno(quem, emo) {
+    var cara = quem === 'coro'
+      ? '<svg class="sb-ret-coro" viewBox="-50 -50 100 100"><polygon points="' + estrela7() + '"/></svg>'
+      : '<img class="sb-ret-img" src="' + A + 'ret-' + quem + '-' + emo + '-v2.webp" alt="" draggable="false">';
+    return cara + (EMO_ICONE[emo] ? '<span class="sb-ret-emo">' + EMO_ICONE[emo] + '</span>' : '') + '<span class="sb-ret-nome">' + NOMES[quem] + '</span>';
+  }
+  function retFala(tag) {
+    var coro = tag === 'coro', emo = coro ? '' : (tag || 'neutro'), k = (coro ? 'coro' : 'teo') + emo;
+    el.fala.classList.toggle('sb-fala-coro', coro);
+    if (k !== falaRet) { falaRet = k; el.ret.innerHTML = retInterno(coro ? 'coro' : 'teo', emo); }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     FALA (balão com retrato e máquina de escrever)
   ══════════════════════════════════════════════════════════════ */
   function fala(linhas, aoFim) {
     falaFila = linhas.slice();
@@ -728,24 +761,28 @@
     clearInterval(falaTimer);
     if (!falaFila.length) {
       el.fala.style.display = 'none';
+      falaRet = '';
       var f = falaFim; falaFim = null;
       if (f) f();
       return;
     }
-    falaTexto = falaFila.shift();
+    var l = falaFila.shift(), m = /^\{(\w+)\}/.exec(l);
+    falaTexto = m ? l.slice(m[0].length) : l;
+    retFala(m ? m[1] : '');
     falaPos = 0;
     el.falaTxt.textContent = '';
     el.fala.classList.remove('sb-pronta');
+    el.fala.classList.add('sb-digita');
     falaTimer = setInterval(function () {
       falaPos += 2;
       el.falaTxt.textContent = falaTexto.slice(0, falaPos);
-      if (falaPos >= falaTexto.length) { clearInterval(falaTimer); el.fala.classList.add('sb-pronta'); }
+      if (falaPos >= falaTexto.length) { clearInterval(falaTimer); el.fala.classList.remove('sb-digita'); el.fala.classList.add('sb-pronta'); }
     }, 28);
   }
   function avancarFala() {
     if (falaPos < falaTexto.length) {
       clearInterval(falaTimer); falaPos = falaTexto.length;
-      el.falaTxt.textContent = falaTexto; el.fala.classList.add('sb-pronta');
+      el.falaTxt.textContent = falaTexto; el.fala.classList.remove('sb-digita'); el.fala.classList.add('sb-pronta');
       return;
     }
     som.clique();
@@ -783,11 +820,13 @@
     var topo = d.tipo === 'audio'
       ? '<div class="sb-onda"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>'
       : '';
+    var dr = DOC_RET[id];
+    var miolo = '<div class="sb-doc-tit">' + esc(d.titulo) + '</div>' + topo +
+      '<div class="sb-doc-txt">' + corpo + '</div>' +
+      (novo ? '<div class="sb-doc-novo">Guardado no Arquivo</div>' : '');
     abrirModal(
       '<button type="button" class="sb-x" aria-label="Fechar">✕</button>' +
-      '<div class="sb-doc-tit">' + esc(d.titulo) + '</div>' + topo +
-      '<div class="sb-doc-txt">' + corpo + '</div>' +
-      (novo ? '<div class="sb-doc-novo">Guardado no Arquivo</div>' : ''),
+      (dr ? '<div class="sb-doc-duas"><div class="sb-ret sb-doc-ret">' + retInterno(dr[0], dr[1]) + '</div><div class="sb-doc-corpo">' + miolo + '</div></div>' : miolo),
       'sb-doc sb-doc-' + d.tipo, true, aoFechar);
     if (d.tipo === 'audio') { som.fita(); som.voz(id); }
     else som.papel();
@@ -1384,13 +1423,13 @@
   }
   function fimDoAto() {
     som.tocar('revelacao', 0.9);
-    fala(['Treze. Doze da equipe... e eu.', 'E aquela voz era da Ingrid. Igual à da gravação.', 'Debaixo do piso, alguma coisa começou a vibrar.'], function () {
+    fala(['{tenso}Treze. Doze da equipe... e eu.', '{confuso}E aquela voz era da Ingrid. Igual à da gravação.', '{tenso}Debaixo do piso, alguma coisa começou a vibrar.'], function () {
       flag('atoFim'); telaFimAto(1);
     });
   }
   function fimDoAto2() {
     som.tocar('revelacao', 0.9);
-    fala(['Treze novos ouvintes.', 'Ninguém morreu aqui embaixo, eu entendi. Eles só... começaram a escutar também.', 'E ela está esperando o décimo quarto.'], function () {
+    fala(['Treze novos ouvintes.', '{tenso}Ninguém morreu aqui embaixo, eu entendi. Eles só... começaram a escutar também.', '{tenso}E ela está esperando o décimo quarto.'], function () {
       radio(['Bem-vindo, Téo. Agora desça.'], function () { flag('ato2Fim'); telaFimAto(2); });
     });
   }

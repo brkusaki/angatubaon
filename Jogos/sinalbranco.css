@@ -66,12 +66,34 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position
 @keyframes sb-novo{50%{box-shadow:0 0 1.6em .3em rgba(56,189,248,.8);border-color:#7dd3fc;}}
 
 /* ── Fala ── */
-.sb-fala{position:absolute;left:10%;right:10%;bottom:3%;min-height:12%;padding:1.6em 2.4em 1.8em;border-radius:1.2em;border:1px solid rgba(125,211,252,.3);background:linear-gradient(180deg,rgba(6,14,26,.92),rgba(3,7,14,.95));box-shadow:0 0 2em rgba(0,0,0,.6),inset 0 0 2em rgba(56,189,248,.08);z-index:5;}
+.sb-fala{position:absolute;left:25%;right:5%;bottom:3%;min-height:12%;padding:1.6em 2.4em 1.8em;border-radius:1.2em;border:1px solid rgba(125,211,252,.3);background:linear-gradient(180deg,rgba(6,14,26,.92),rgba(3,7,14,.95));box-shadow:0 0 2em rgba(0,0,0,.6),inset 0 0 2em rgba(56,189,248,.08);z-index:5;}
 .sb-fala-txt{font-size:1.75em;line-height:1.45;color:#eef6ff;}
 .sb-fala-seta{position:absolute;right:1.4em;bottom:.6em;font-size:1.2em;color:#7dd3fc;opacity:0;}
 .sb-fala.sb-pronta .sb-fala-seta{opacity:1;animation:sb-seta 1s ease-in-out infinite;}
 @keyframes sb-seta{50%{transform:translateY(.3em);}}
 .sb-fala::before{content:'';position:fixed;inset:-100vmax;z-index:-1;}
+
+/* ── Retrato, emoção e balão ── */
+.sb-fala::after{content:'';position:absolute;left:-.8em;bottom:3em;border:.7em solid transparent;border-left:0;border-right:.9em solid rgba(125,211,252,.4);}
+.sb-ret{position:relative;width:11em;height:11em;border-radius:1.1em;border:.2em solid rgba(125,211,252,.5);background:#05080d;box-shadow:0 0 2em rgba(0,0,0,.65),0 0 1.8em rgba(56,189,248,.2);}
+.sb-fala .sb-ret{position:absolute;right:100%;bottom:0;margin-right:1.6em;width:15em;height:15em;}
+.sb-ret-img{display:block;width:100%;height:100%;object-fit:cover;border-radius:.9em;pointer-events:none;animation:sb-ret-in .22s ease-out;}
+.sb-ret-coro{display:block;width:100%;height:100%;box-sizing:border-box;padding:2em;animation:sb-ret-in .22s ease-out;}
+.sb-ret-coro polygon{fill:none;stroke:#bae6fd;stroke-width:2.2;stroke-linejoin:round;filter:drop-shadow(0 0 3px #38bdf8);}
+.sb-ret-nome{position:absolute;left:0;right:0;bottom:0;padding:.7em 0 .55em;text-align:center;font-family:'Syne','DM Sans',sans-serif;font-weight:800;font-size:1.3em;letter-spacing:.16em;color:#eaf6ff;background:linear-gradient(transparent,rgba(2,6,12,.92));border-radius:0 0 .75em .75em;pointer-events:none;}
+.sb-ret-emo{position:absolute;top:-.6em;right:-.6em;min-width:1.7em;height:1.7em;padding:0 .3em;box-sizing:border-box;border-radius:1em;background:#0b1626;border:.12em solid #7dd3fc;color:#eaf6ff;font-weight:800;font-size:2.2em;line-height:1.5em;text-align:center;animation:sb-emo-pop .35s cubic-bezier(.3,1.6,.5,1);}
+@keyframes sb-ret-in{from{opacity:0;transform:translateY(.8em);}to{opacity:1;transform:none;}}
+@keyframes sb-emo-pop{from{transform:scale(0);}to{transform:scale(1);}}
+@keyframes sb-ret-glow{to{box-shadow:0 0 2em rgba(0,0,0,.65),0 0 3em rgba(125,211,252,.5);}}
+.sb-fala.sb-digita .sb-ret{animation:sb-ret-glow .45s ease-in-out infinite alternate;}
+.sb-fala-coro{border-color:rgba(186,230,253,.55);background:linear-gradient(180deg,rgba(10,22,40,.94),rgba(4,10,20,.96));box-shadow:0 0 2.4em rgba(56,189,248,.28),inset 0 0 2em rgba(56,189,248,.14);}
+.sb-fala-coro::after{border-right-color:rgba(186,230,253,.6);}
+.sb-fala-coro .sb-fala-txt{font-style:italic;color:#d6eeff;letter-spacing:.02em;}
+.sb-fala-coro .sb-ret{border-color:rgba(186,230,253,.7);background:radial-gradient(circle at 50% 45%,#0e2a4a,#04101f 70%);}
+.sb-doc-duas{display:flex;align-items:flex-start;gap:2.4em;}
+.sb-doc-ret{flex:0 0 13em;width:13em;height:13em;position:sticky;top:0;}
+.sb-doc-corpo{flex:1;min-width:0;}
+.sb-doc-duas .sb-doc-tit{margin-right:3em;}
 
 /* ── Modal (documentos, arquivo, puzzles) ── */
 .sb-modal{position:absolute;inset:0;z-index:7;display:flex;align-items:center;justify-content:center;background:rgba(0,3,8,.72);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}

@@ -7,7 +7,7 @@
 body.games-fs-open #sinalbranco-root{min-height:0;}
 /* Voltar flutuante (igual à Corrida): o palco usa a tela inteira. */
 body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco{position:relative;}
-body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position:absolute;top:calc(env(safe-area-inset-top,0px) + 8px);left:8px;z-index:6;margin:0;padding:8px 12px;background:rgba(9,14,22,.55);border-radius:999px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-size:13px;}
+body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position:absolute;top:calc(env(safe-area-inset-top,0px) + 8px);left:8px;z-index:6;margin:0;padding:8px 12px;background:rgba(9,14,22,.78);border-radius:999px;font-size:13px;}
 /* Preenchimento ambiente: a mesma cena, borrada e escurecida, ocupa as laterais (sem faixa preta). */
 .sb-amb{position:absolute;inset:-6%;width:112%;height:112%;object-fit:cover;filter:blur(2.2em) brightness(.62) saturate(1.15);transform:translateZ(0);pointer-events:none;}
 #sinalbranco-root .sb-amb{filter:blur(28px) brightness(.62) saturate(1.15);}
@@ -25,6 +25,8 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position
 
 /* ── Pontos de toque ── */
 .sb-mundo{position:absolute;inset:0;transform-origin:50% 55%;animation:sb-respira 18s ease-in-out infinite alternate;}
+/* Cena com vídeo: o vídeo já se mexe; sem o "respirar" o vídeo não é reescalado a cada quadro */
+.sb-com-vid .sb-mundo{animation:none;}
 @keyframes sb-respira{from{transform:scale(1) translate(0,0)}to{transform:scale(1.035) translate(-.6%,-.4%)}}
 .sb-pontos{position:absolute;inset:0;}
 .sb-onda-toque{position:absolute;left:50%;top:50%;width:3em;height:3em;margin:-1.5em 0 0 -1.5em;border-radius:50%;border:.2em solid rgba(165,243,252,.9);pointer-events:none;animation:sb-onda-toque .55s ease-out forwards;}
@@ -39,7 +41,7 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position
 .sb-lupa .sb-ponto::after{opacity:.9;animation:sb-brilho 1.2s ease-in-out infinite;}
 
 /* ── Saídas (setas nas bordas) ── */
-.sb-saida{position:absolute;display:flex;align-items:center;gap:.6em;padding:.7em 1.2em;border:1px solid rgba(255,255,255,.18);background:rgba(4,10,18,.55);color:#dbeafe;border-radius:99em;font-size:1.25em;font-weight:700;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);}
+.sb-saida{position:absolute;display:flex;align-items:center;gap:.6em;padding:.7em 1.2em;border:1px solid rgba(255,255,255,.18);background:rgba(4,10,18,.72);color:#dbeafe;border-radius:99em;font-size:1.25em;font-weight:700;}
 .sb-saida i{font-size:1.1em;color:#7dd3fc;}
 .sb-saida:active{transform:scale(.95);}
 .sb-saida-esq{left:1.2%;top:50%;margin-top:-1.6em;}
@@ -53,7 +55,7 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position
 .sb-hud{position:absolute;left:0;right:0;top:0;display:flex;align-items:flex-start;justify-content:center;padding:1.4% 1.4% 0;pointer-events:none;}
 .sb-local{font-family:'Syne','DM Sans',sans-serif;font-weight:800;font-size:1.5em;letter-spacing:.18em;text-transform:uppercase;color:rgba(220,236,255,.85);text-shadow:0 0 1em rgba(56,189,248,.6),0 .1em .3em #000;padding-top:.5em;}
 .sb-botoes{position:absolute;right:1.4%;top:2.2%;display:flex;gap:.8em;pointer-events:auto;}
-.sb-hbtn{position:relative;width:4.4em;height:4.4em;border-radius:50%;border:1px solid rgba(255,255,255,.2);background:rgba(4,10,18,.6);color:#e0f2fe;font-size:1em;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
+.sb-hbtn{position:relative;width:4.4em;height:4.4em;border-radius:50%;border:1px solid rgba(255,255,255,.2);background:rgba(4,10,18,.75);color:#e0f2fe;font-size:1em;display:flex;align-items:center;justify-content:center;}
 .sb-hbtn i{font-size:1.7em;}
 .sb-hbtn:active{transform:scale(.92);}
 .sb-badge{position:absolute;right:-.3em;top:-.3em;min-width:1.7em;height:1.7em;padding:0 .4em;border-radius:99em;background:#0ea5e9;color:#fff;font-size:1em;font-weight:800;line-height:1.7em;text-align:center;}
@@ -103,7 +105,7 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position
 .sb-contrato-ok{margin-top:1.4em;font-size:1.3em;}
 
 /* ── Modal (documentos, arquivo, puzzles) ── */
-.sb-modal{position:absolute;inset:0;z-index:7;display:flex;align-items:center;justify-content:center;background:rgba(0,3,8,.72);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}
+.sb-modal{position:absolute;inset:0;z-index:7;display:flex;align-items:center;justify-content:center;background:rgba(0,3,8,.78);}
 .sb-modal-caixa{position:relative;width:62%;max-height:90%;overflow:auto;padding:2.6em 3em;border-radius:1em;-webkit-overflow-scrolling:touch;}
 .sb-x{position:absolute;right:1em;top:1em;width:3.6em;height:3.6em;border-radius:50%;border:1px solid rgba(0,0,0,.2);background:rgba(0,0,0,.12);color:inherit;font-size:1.3em;}
 .sb-doc-tit{font-family:'Syne','DM Sans',sans-serif;font-weight:800;font-size:1.9em;margin:0 3em 1em 0;}

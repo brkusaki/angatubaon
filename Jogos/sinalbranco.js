@@ -1120,9 +1120,10 @@
         '<button type="button" class="sb-btn sb-btn-sec" data-t="novo">Jogar de novo</button>' +
       '</div>';
     el.titulo.style.display = '';
+    vidTocar(false);
     el.titulo.querySelector('[data-t="arquivo"]').addEventListener('click', function () {
-      som.clique(); el.titulo.style.display = 'none'; abrirArquivo();
-      modalAoFechar = function () { el.titulo.style.display = ''; };
+      som.clique(); el.titulo.style.display = 'none';
+      abrirArquivo(function () { el.titulo.style.display = ''; });
     });
     el.titulo.querySelector('[data-t="atos"]').addEventListener('click', function () { som.clique(); telaAtos(); });
     el.titulo.querySelector('[data-t="novo"]').addEventListener('click', function () { som.clique(); S = novoEstado(); salvar(); comecar(); });
@@ -1188,7 +1189,7 @@
      ESTADO
   ══════════════════════════════════════════════════════════════ */
   var S = null;           // { cena, itens[], flags{}, docs[], vistos{}, chegou{}, tempo }
-  var montado = false, ativo = false, lockNativo = false;
+  var montado = false, ativo = false, lockNativo = false, trocando = false;
   var el = {};            // referências do DOM
   var falaFila = [], falaFim = null, falaTimer = 0, falaTexto = '', falaPos = 0, falaRet = '';
   var tUltimo = 0, relogio = 0;
@@ -1396,8 +1397,9 @@
       var vsrc = c.video && !(c.imgCom && c.imgCom()) ? A + c.video : '';
       if (vsrc) {
         if (el.vid.getAttribute('src') !== vsrc) { el.vid.style.display = 'none'; el.vid.onplaying = function () { el.vid.style.display = ''; }; el.vid.onerror = function () { el.vid.style.display = 'none'; }; el.vid.src = vsrc; }
-        var pv = el.vid.play(); if (pv && pv.catch) pv.catch(function () {});
+        vidTocar(true);
       } else { el.vid.style.display = 'none'; if (el.vid.getAttribute('src')) { el.vid.pause(); el.vid.removeAttribute('src'); el.vid.load(); } }
+      el.palco.classList.toggle('sb-com-vid', !!vsrc);
       el.palco.classList.toggle('sb-nucleo-ok', S.cena === 'nucleo' && !!S.flags.nucleoOk);
       el.local.textContent = c.nome;
       ligarNeve(!!c.neve);
@@ -1438,18 +1440,21 @@
 
   function ir(id) {
     if (!CENAS[id]) return;
+    trocando = true;   // bloqueia toques até a cena (e a fala de chegada) começar
     el.fade.classList.add('sb-on');
     setTimeout(function () {
       S.cena = id;
       desenharCena();
       salvar();
+      var feito = false;
       var pronto = function () {
+        if (feito) return; feito = true;
         el.fade.classList.remove('sb-on');
         var c = cenaAtual();
         if (!S.chegou[id] && c.chegada) {
           S.chegou[id] = true; salvar();
-          setTimeout(function () { fala(c.chegada, c.aoChegar || null); }, 280);
-        }
+          setTimeout(function () { trocando = false; fala(c.chegada, c.aoChegar || null); }, 280);
+        } else trocando = false;
       };
       if (el.bg.complete) pronto(); else { el.bg.onload = function () { el.bg.onload = null; pronto(); }; setTimeout(pronto, 900); }
     }, 260);
@@ -1461,8 +1466,20 @@
     lupa._t = setTimeout(function () { el.palco.classList.remove('sb-lupa'); }, 2200);
   }
 
+  // O vídeo da cena só decodifica quando a cena está à vista (fora de modal, título, pausa e app em segundo plano)
+  var pausadoMenu = false;
+  function vidTocar(on) {
+    var v = el.vid;
+    if (!v || !v.getAttribute('src')) return;
+    var pode = on && ativo && !pausadoMenu && !document.hidden &&
+      el.modal.style.display === 'none' && el.titulo.style.display === 'none';
+    if (pode) { if (v.paused) { var pv = v.play(); if (pv && pv.catch) pv.catch(function () {}); } }
+    else if (!v.paused) v.pause();
+  }
+  function aoVisibilidade() { vidTocar(!document.hidden); }
+
   function ocupado() {
-    return el.fala.style.display !== 'none' || el.modal.style.display !== 'none' || el.titulo.style.display !== 'none';
+    return trocando || el.fala.style.display !== 'none' || el.modal.style.display !== 'none' || el.titulo.style.display !== 'none';
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -1585,6 +1602,7 @@
     el.caixa.className = 'sb-modal-caixa ' + (cls || '');
     el.caixa.innerHTML = html;
     el.modal.style.display = '';
+    vidTocar(false);
     el.modal.setAttribute('data-fecha', podeFechar ? '1' : '0');
     modalAoFechar = aoFechar || null;
     var x = el.caixa.querySelector('.sb-x');
@@ -1598,6 +1616,7 @@
     som.pararVoz();
     var f = modalAoFechar; modalAoFechar = null;
     if (f) f();
+    vidTocar(true);
   }
 
   function doc(id, aoFechar) {
@@ -1634,7 +1653,8 @@
     if (novo) { el.badge.classList.remove('sb-pulsa'); void el.badge.offsetWidth; el.badge.classList.add('sb-pulsa'); }
   }
 
-  function abrirArquivo() {
+  // aoSair: chamado só quando o Arquivo é fechado no X (ex.: voltar para a tela final)
+  function abrirArquivo(aoSair) {
     if (ocupado()) return;
     var lista = S.docs.length
       ? S.docs.map(function (id) {
@@ -1646,9 +1666,13 @@
       '<button type="button" class="sb-x" aria-label="Fechar">✕</button>' +
       '<div class="sb-doc-tit">Arquivo</div>' +
       '<div class="sb-arq-cont">' + S.docs.length + ' de ' + docsAte(S.ato || 1).length + ' arquivos encontrados</div>' +
-      '<div class="sb-arq-lista">' + lista + '</div>', 'sb-arq', true);
+      '<div class="sb-arq-lista">' + lista + '</div>', 'sb-arq', true, typeof aoSair === 'function' ? aoSair : null);
     Array.prototype.forEach.call(el.caixa.querySelectorAll('[data-doc]'), function (b) {
-      b.addEventListener('click', function () { som.clique(); var id = b.getAttribute('data-doc'); fecharModal(); doc(id, abrirArquivo); });
+      b.addEventListener('click', function () {
+        som.clique(); var id = b.getAttribute('data-doc');
+        modalAoFechar = null; fecharModal();
+        doc(id, function () { abrirArquivo(aoSair); });
+      });
     });
   }
 
@@ -2191,6 +2215,7 @@
       '</div>' +
       '<div class="sb-tit-nota">Use fones de ouvido. Toque nas coisas da cena para examinar.</div>';
     el.titulo.style.display = '';
+    vidTocar(false);
     partida(false);
     Array.prototype.forEach.call(el.titulo.querySelectorAll('[data-t]'), function (b) {
       b.addEventListener('click', function () {
@@ -2337,11 +2362,12 @@
         (temProximo ? '' : '<button type="button" class="sb-btn sb-btn-sec" data-t="novo">Jogar de novo</button>') +
       '</div>';
     el.titulo.style.display = '';
+    vidTocar(false);
     var b = el.titulo.querySelector('[data-t="proximo"]');
     if (b) b.addEventListener('click', function () { som.clique(); iniciarAto(n + 1); });
     el.titulo.querySelector('[data-t="arquivo"]').addEventListener('click', function () {
-      som.clique(); el.titulo.style.display = 'none'; abrirArquivo();
-      modalAoFechar = function () { el.titulo.style.display = ''; };
+      som.clique(); el.titulo.style.display = 'none';
+      abrirArquivo(function () { el.titulo.style.display = ''; });
     });
     var bn = el.titulo.querySelector('[data-t="novo"]');
     if (bn) bn.addEventListener('click', function () { som.clique(); S = novoEstado(); salvar(); comecar(); });
@@ -2564,8 +2590,8 @@
     var M = _menu();
     if (!M) return;
     M.registrar(TELA, {
-      pausar: function () { _tickTempo(); som.parar(); },
-      continuar: function () { tUltimo = Date.now(); som.voltar(); },
+      pausar: function () { _tickTempo(); som.parar(); pausadoMenu = true; vidTocar(false); },
+      continuar: function () { tUltimo = Date.now(); som.voltar(); pausadoMenu = false; vidTocar(true); },
       descricao: function () { return S ? 'Ato ' + (S.ato || 1) + ' · ' + cenaAtual().nome + ' · progresso salvo' : 'Sinal Branco'; }
     });
   }
@@ -2582,7 +2608,9 @@
       window.addEventListener('resize', aoRedimensionar);
       window.addEventListener('orientationchange', aoRedimensionar);
       window.addEventListener('keydown', aoTecla, true);
+      document.addEventListener('visibilitychange', aoVisibilidade);
     }
+    trocando = false; pausadoMenu = false;
     registrarMenu();
     travarPaisagem();
     layout(); setTimeout(layout, 120); setTimeout(layout, 400);
@@ -2599,12 +2627,14 @@
     partida(false);
     puz.parar();
     clearInterval(falaTimer);
+    if (el.vid && !el.vid.paused) el.vid.pause();
     ligarNeve(false);
     som.parar();
     destravar();
     window.removeEventListener('resize', aoRedimensionar);
     window.removeEventListener('orientationchange', aoRedimensionar);
     window.removeEventListener('keydown', aoTecla, true);
+    document.removeEventListener('visibilitychange', aoVisibilidade);
   }
 
   window.SinalBrancoGame = {

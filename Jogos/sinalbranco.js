@@ -813,7 +813,7 @@
   }
 
   CENAS.escadaria = {
-    nome: 'Escadaria de gelo', img: 'ato3-escadaria-v1.webp',
+    nome: 'Escadaria de gelo', img: 'ato3-escadaria-v1.webp', video: 'ato3-escadaria-anim-v1.mp4',
     chegada: ['O elevador parou de responder. A única descida que sobrou é esta escada.',
       'Degraus de pedra com gelo por cima, e uma fila de lâmpadas penduradas por alguém que passou antes de mim.',
       'Ferramentas largadas, uma bolsa, pegadas de bota. Aqui o frio é outro, mais antigo.'],
@@ -860,7 +860,7 @@
     ]
   };
   CENAS.monolitos = {
-    nome: 'Câmara dos monólitos', img: 'ato3-monolitos-v1.webp',
+    nome: 'Câmara dos monólitos', img: 'ato3-monolitos-v1.webp', video: 'ato3-monolitos-anim-v1.mp4',
     imgCom: function () { return S.flags.seloSolto ? 'ato3-monolitos-solto-v1.webp' : null; },
     chegada: ['Sete monólitos num círculo, cobertos de marcas que brilham sozinhas. No meio, uma pedra baixa com três notebooks ligados em cabos que somem pelo chão.',
       'Em volta do monólito mais alto, uma faixa dourada. Parece que está apertando.'],
@@ -886,7 +886,7 @@
     ]
   };
   CENAS.ressonancia = {
-    nome: 'Sala da ressonância', img: 'ato3-ressonancia-v1.webp',
+    nome: 'Sala da ressonância', img: 'ato3-ressonancia-v1.webp', video: 'ato3-ressonancia-anim-v1.mp4',
     imgCom: function () { return (S.flags.erros3 | 0) > 0 ? 'ato3-ressonancia-errada-v1.webp' : null; },
     chegada: ['Uma sala redonda, de pedra lisa, com três discos de luz na parede. Cada um mostra uma onda diferente.', 'No meio, um pedestal com três anéis giratórios.'],
     saidas: [{ lado: 'baixo', para: 'monolitos', rotulo: 'Monólitos' }],
@@ -1117,17 +1117,17 @@
       '{tenso}Eu vim consertar uma transmissão. Pelo jeito, é esta.'],
     aoChegar: function () { radio(['Você chegou longe, Téo. Falta pouco.']); },
     pontos: [
-      { id: 'mesa', x: 3, y: 48, w: 28, h: 40, acao: function () {
+      { id: 'mesa', x: 0, y: 62, w: 40, h: 36, acao: function () {
         if (!S.flags.crachaCPego) { flag('crachaCPego'); pegar('cracha_conselho', ['Pastas fechadas na mesa de reunião, cadeiras de couro empurradas pra trás. Alguém saiu com pressa.', 'Entre as pastas, um crachá preto com faixa dourada e uma ata aberta.'], 'ata_conselho'); }
         else fala(['A mesa do Conselho. Quem sentou aqui decidiu o destino de doze pessoas por ata.']); } },
-      { id: 'console', x: 36, y: 30, w: 28, h: 40, acao: function () {
+      { id: 'console', x: 34, y: 44, w: 38, h: 36, acao: function () {
         fala(['O console de transmissão: telas, chaves, uma bandeja pra um disco.', 'Está pronto pra enviar. Falta só quem mande.']); } },
-      { id: 'cabo', x: 44, y: 0, w: 12, h: 28, acao: function () {
+      { id: 'cabo', x: 45, y: 0, w: 14, h: 30, acao: function () {
         fala(['Um feixe grosso de cabos sobe pelo teto até a antena principal. A pedra em volta vibra.']); } },
-      { id: 'cofre', x: 69, y: 28, w: 15, h: 38, acao: function () {
+      { id: 'cofre', x: 73, y: 38, w: 11, h: 30, acao: function () {
         if (S.flags.cofreAberto) { fala(['O cofre vazio. A ata dizia que o código era uma data.']); return; }
         fala(tem('cracha_conselho') ? ['Um cofre embutido na parede, com teclado numérico.', 'A ata do Conselho falava dele: uma data, dia e mês.'] : ['Um cofre embutido na parede, com teclado numérico de quatro dígitos.'], abrirCofre); } },
-      { id: 'porta', x: 88, y: 25, w: 10, h: 55, porta: true, acao: function () {
+      { id: 'porta', x: 91, y: 20, w: 9, h: 70, porta: true, acao: function () {
         if (!tem('cracha_conselho')) { fala(['Uma porta blindada com luz vermelha e leitor de crachá. Reatores, diz a placa.', 'Preciso de um crachá do Conselho.']); return; }
         ir('reatores'); } }
     ]
@@ -1137,14 +1137,14 @@
     chegada: ['Dois reatores compactos, um de cada lado, zumbindo em um tom grave que eu sinto no peito.', 'No meio, um painel de controle com uma estrela de sete pontas acesa no alto. A mesma estrela de sempre, só que aqui ela é um indicador.'],
     saidas: [{ lado: 'baixo', para: 'transmissao', rotulo: 'Transmissão' }],
     pontos: [
-      { id: 'reator-e', x: 5, y: 15, w: 25, h: 70, acao: function () { fala(['Reator A. O casco está morno e o ar em volta cheira a ozônio.']); } },
-      { id: 'reator-d', x: 70, y: 15, w: 25, h: 70, acao: function () { fala(['Reator B. Gêmeo do outro, ligado ao mesmo painel.']); } },
-      { id: 'manual', x: 29, y: 56, w: 8, h: 11, acao: function () {
+      { id: 'reator-e', x: 7, y: 5, w: 22, h: 70, acao: function () { fala(['Reator A. O casco está morno e o ar em volta cheira a ozônio.']); } },
+      { id: 'reator-d', x: 73, y: 5, w: 20, h: 70, acao: function () { fala(['Reator B. Gêmeo do outro, ligado ao mesmo painel.']); } },
+      { id: 'manual', x: 35, y: 48, w: 11, h: 16, acao: function () {
         if (!S.flags.manualLido) flag('manualLido');
         doc('manual_reator'); } },
-      { id: 'estrela', x: 47, y: 18, w: 6, h: 14, acao: function () {
+      { id: 'estrela', x: 45, y: 28, w: 9, h: 18, acao: function () {
         fala(['A estrela de sete pontas, acesa. Se o painel for desligado, imagino que ela apague.']); } },
-      { id: 'painel', x: 38, y: 42, w: 24, h: 34, porta: true, acao: function () {
+      { id: 'painel', x: 44, y: 45, w: 13, h: 38, porta: true, acao: function () {
         if (!tem('chave_reator')) { fala(['O painel tem uma fenda pra chave de reator.', 'Eu não tenho nenhuma. Talvez o cofre da sala de cima.']); return; }
         abrirModal(
           '<div class="sb-doc-tit">O painel central</div>' +

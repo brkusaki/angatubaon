@@ -1,5 +1,5 @@
 {
- "versaoSW": 559,
+ "versaoSW": 560,
  "hashes": {
   "Aprender/conteudo.js": "c2776ebcaf3844f9",
   "Aprender/hub.js": "0025f4b073788e9b",
@@ -28,7 +28,7 @@
   "Jogos/hexarena.js": "3182054cce4aba52",
   "Jogos/hoquei.css": "efae916a46cd5dcd",
   "Jogos/hoquei.js": "f1677652333fc81b",
-  "Jogos/hub.js": "bd7a7213ea62a7c5",
+  "Jogos/hub.js": "e93c0845f8c0698e",
   "Jogos/maquina.css": "9c2ae17719231e15",
   "Jogos/maquina.js": "201a9781dddaeca8",
   "Jogos/multiplayer.js": "8bc2153091e334dc",
@@ -47,7 +47,7 @@
   "Jogos/sequencia.css": "fc7743429df94134",
   "Jogos/sequencia.js": "ac20a999e4bb4662",
   "Jogos/sinalbranco.css": "fc05d56924babf90",
-  "Jogos/sinalbranco.js": "95eee3de84c557aa",
+  "Jogos/sinalbranco.js": "ce87bb8e2b100756",
   "Jogos/speedtap.css": "5ae579f0992794c7",
   "Jogos/speedtap.js": "f3d11bedd49ce3d7",
   "Jogos/tanques.css": "97cbfaf969f984e9",

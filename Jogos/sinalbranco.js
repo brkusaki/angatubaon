@@ -1488,7 +1488,13 @@
     'A gente te guia daqui. Siga em frente.': 'central_guia',
     'Ótimo trabalho, Téo. O laboratório da Dra. Okafor fica logo à frente.': 'central_otimo',
     'A Mira deixou a ordem no quadro. Ela sempre deixava.': 'central_quadro',
-    'Bem-vindo, Téo. Agora desça.': 'central_desca'
+    'Bem-vindo, Téo. Agora desça.': 'central_desca',
+    'Treze acesos, Téo. Faltava só a última frequência.': 'central_treze',
+    'Suba agora. A sala de transmissão está aberta.': 'central_suba',
+    'Aquele é o primeiro dos que desceram, Téo. Venha até o parapeito.': 'central_primeiro',
+    'Você chegou longe, Téo. Falta pouco.': 'central_chegou',
+    'Eles não sabem que esta escada existe. Se souberem, cortam a energia da estação e eu perco você.': 'coro_pedido1b',
+    'A equipe o prendeu lá embaixo e esqueceu. Solte-o. Ele só quer subir.': 'coro_pedido3b'
   };
   function estrela7() {
     var p = [], i, a;
@@ -2352,11 +2358,16 @@
     // Enquanto um arquivo não existe ou não carregou, toca a síntese de reserva.
     var VOZES = { audio_ingrid: 'voz-audio_ingrid-v3', sinal: 'voz-sinal-v2', fita_kazuo: 'voz-fita_kazuo-v2',
       central_abertura: 'voz-central-abertura-v1', central_guia: 'voz-central-guia-v1', central_otimo: 'voz-central-otimo-v1',
-      central_quadro: 'voz-central-quadro-v1', central_desca: 'voz-central-desca-v1' };
+      central_quadro: 'voz-central-quadro-v1', central_desca: 'voz-central-desca-v1',
+      audio_ingrid_final: 'voz-audio_ingrid_final-v1', central_suba: 'voz-central-suba-v1', central_treze: 'voz-central-treze-v1',
+      central_primeiro: 'voz-central-primeiro-v1', central_chegou: 'voz-central-chegou-v1',
+      coro_pedido1b: 'voz-coro-pedido1b-v1', coro_pedido3b: 'voz-coro-pedido3b-v1' };
     var ARQ = ['passos-neve', 'passos-metal', 'porta', 'gerador-liga', 'sinal-ok', 'pegar', 'papel', 'gravador',
       'peca', 'lanterna', 'luzes', 'revelacao', 'elevador-freio', 'faisca', 'porta-pedra', 'cabra',
       VOZES.audio_ingrid, VOZES.sinal, VOZES.fita_kazuo,
-      VOZES.central_abertura, VOZES.central_guia, VOZES.central_otimo, VOZES.central_quadro, VOZES.central_desca];
+      VOZES.central_abertura, VOZES.central_guia, VOZES.central_otimo, VOZES.central_quadro, VOZES.central_desca,
+      VOZES.audio_ingrid_final, VOZES.central_suba, VOZES.central_treze, VOZES.central_primeiro, VOZES.central_chegou,
+      VOZES.coro_pedido1b, VOZES.coro_pedido3b];
     var LOOPS = ['vento-loop', 'interior-loop', 'gerador-loop', 'estatica-loop', 'coro-loop', 'elevador-loop'];
     var buf = {}, loopG = {}, loopOn = {}, vozSrc = null, vozVez = 0, ambAtual = { onde: '', cena: '' };
     function ligado() { var s = window.AngatubaSom; return !(s && typeof s.ativo === 'function' && !s.ativo()); }

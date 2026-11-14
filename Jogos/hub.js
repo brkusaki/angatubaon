@@ -1425,6 +1425,13 @@
       '/Jogos/assets/sinalbranco/sfx/voz-central-otimo-v1.mp3',
       '/Jogos/assets/sinalbranco/sfx/voz-central-quadro-v1.mp3',
       '/Jogos/assets/sinalbranco/sfx/voz-central-desca-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-audio_ingrid_final-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-central-suba-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-central-treze-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-central-primeiro-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-central-chegou-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-coro-pedido1b-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-coro-pedido3b-v1.mp3',
       // retratos dos personagens
       '/Jogos/assets/sinalbranco/ret-teo-neutro-v2.webp',
       '/Jogos/assets/sinalbranco/ret-teo-tenso-v2.webp',

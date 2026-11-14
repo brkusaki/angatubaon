@@ -1494,7 +1494,10 @@
     'Aquele é o primeiro dos que desceram, Téo. Venha até o parapeito.': 'central_primeiro',
     'Você chegou longe, Téo. Falta pouco.': 'central_chegou',
     'Eles não sabem que esta escada existe. Se souberem, cortam a energia da estação e eu perco você.': 'coro_pedido1b',
-    'A equipe o prendeu lá embaixo e esqueceu. Solte-o. Ele só quer subir.': 'coro_pedido3b'
+    'A equipe o prendeu lá embaixo e esqueceu. Solte-o. Ele só quer subir.': 'coro_pedido3b',
+    'Téo. Aquela faixa dourada é uma trava velha. Solte o selo.': 'coro_pedido2a',
+    'Sem ela, a estrutura inteira responde. Você termina o trabalho em minutos.': 'coro_pedido2b',
+    'Téo. Ali, no parapeito. É o primeiro dos que desceram.': 'coro_pedido3a'
   };
   function estrela7() {
     var p = [], i, a;
@@ -2359,6 +2362,7 @@
     var VOZES = { audio_ingrid: 'voz-audio_ingrid-v3', sinal: 'voz-sinal-v2', fita_kazuo: 'voz-fita_kazuo-v2',
       central_abertura: 'voz-central-abertura-v1', central_guia: 'voz-central-guia-v1', central_otimo: 'voz-central-otimo-v1',
       central_quadro: 'voz-central-quadro-v1', central_desca: 'voz-central-desca-v1',
+      coro_pedido2a: 'voz-coro-pedido2a-v1', coro_pedido2b: 'voz-coro-pedido2b-v1', coro_pedido3a: 'voz-coro-pedido3a-v1',
       audio_ingrid_final: 'voz-audio_ingrid_final-v1', central_suba: 'voz-central-suba-v1', central_treze: 'voz-central-treze-v1',
       central_primeiro: 'voz-central-primeiro-v1', central_chegou: 'voz-central-chegou-v1',
       coro_pedido1b: 'voz-coro-pedido1b-v1', coro_pedido3b: 'voz-coro-pedido3b-v1' };
@@ -2367,8 +2371,8 @@
       VOZES.audio_ingrid, VOZES.sinal, VOZES.fita_kazuo,
       VOZES.central_abertura, VOZES.central_guia, VOZES.central_otimo, VOZES.central_quadro, VOZES.central_desca,
       VOZES.audio_ingrid_final, VOZES.central_suba, VOZES.central_treze, VOZES.central_primeiro, VOZES.central_chegou,
-      VOZES.coro_pedido1b, VOZES.coro_pedido3b];
-    var LOOPS = ['vento-loop', 'interior-loop', 'gerador-loop', 'estatica-loop', 'coro-loop', 'elevador-loop'];
+      VOZES.coro_pedido1b, VOZES.coro_pedido3b, VOZES.coro_pedido2a, VOZES.coro_pedido2b, VOZES.coro_pedido3a];
+    var LOOPS = ['vento-loop', 'interior-loop', 'gerador-loop', 'estatica-loop', 'coro-loop', 'elevador-loop', 'rotor-loop'];
     var buf = {}, loopG = {}, loopOn = {}, vozSrc = null, vozVez = 0, ambAtual = { onde: '', cena: '' };
     function ligado() { var s = window.AngatubaSom; return !(s && typeof s.ativo === 'function' && !s.ativo()); }
     function ruidoBuf() {
@@ -2458,7 +2462,9 @@
       var fora = ambAtual.onde === 'fora', cena = ambAtual.cena;
       var energia = !!(S && S.flags.energia), radio = !!(S && S.flags.radioOk);
       // gravados
-      alvo(loopG['vento-loop'], fora ? 0.75 : 0, 0.8);
+      var voo = cena === 'voo';
+      alvo(loopG['rotor-loop'], voo ? 0.9 : 0, voo ? 0.8 : 2.5);  // cabine do helicóptero; some devagar quando ele vai embora
+      alvo(loopG['vento-loop'], fora ? (voo ? 0.2 : 0.75) : 0, 0.8);
       alvo(loopG['interior-loop'], fora ? 0 : 0.55, 0.8);
       alvo(loopG['gerador-loop'], cena === 'gerador' && energia ? 0.6 : (energia && !fora ? 0.08 : 0), 1);
       alvo(loopG['coro-loop'], radio && !fora ? 0.35 : 0, 2);

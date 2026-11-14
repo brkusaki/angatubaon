@@ -1396,6 +1396,10 @@
       '/Jogos/assets/sinalbranco/item-cartao-v1.webp',
       // sons e vozes (ElevenLabs)
       '/Jogos/assets/sinalbranco/sfx/coro-loop.mp3',
+      '/Jogos/assets/sinalbranco/sfx/rotor-loop.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-coro-pedido2a-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-coro-pedido2b-v1.mp3',
+      '/Jogos/assets/sinalbranco/sfx/voz-coro-pedido3a-v1.mp3',
       '/Jogos/assets/sinalbranco/sfx/estatica-loop.mp3',
       '/Jogos/assets/sinalbranco/sfx/gerador-liga.mp3',
       '/Jogos/assets/sinalbranco/sfx/gerador-loop.mp3',

@@ -174,7 +174,7 @@
   var CENAS = {
     // Abertura: dentro do helicóptero, a caminho da estação. Termina na ordem de serviço.
     voo: {
-      nome: 'Helicóptero', img: 'helicoptero-v1.webp', fora: true,
+      nome: 'Helicóptero', img: 'helicoptero-v2.webp', fora: true,
       chegada: ['Meu nome é Téo Marin. Eu conserto sinais.',
         'Um serviço simples, segundo o Consórcio Polar: a Estação Halvorsen parou de transmitir. Valor fechado e uma cláusula de sigilo que li duas vezes.',
         '"Halvorsen à vista", o piloto avisou pelo intercomunicador, sem tirar os olhos do branco. "Aquela luz vermelha na antena é a base."',
@@ -1052,7 +1052,7 @@
         'Lá fora o céu acendeu: uma aurora verde e violeta e, dentro dela, linhas retas formando uma estrela de sete pontas.',
         '{tenso}O celular vibrou: "Recebido." Não dizia de quem.',
         'Fiz o que o envelope mandava. Não sei se quem respondeu foi o Consórcio ou ele.'], parte2: [] },
-    soterrar: { nome: 'SOTERRAR', img: 'ato4-fim-soterrar-v1.webp', fb: 'helicoptero-v1.webp',
+    soterrar: { nome: 'SOTERRAR', img: 'ato4-fim-soterrar-v2.webp', fb: 'helicoptero-v2.webp',
       resumo: 'Você recusou o Coro e enterrou a estação. A base afundou, mas o sinal continua no ar.',
       parte1: ['Recusei a voz quando ela pediu, e recusei de novo quando ela insistiu.',
         'Girei a chave dos dois reatores ao mesmo tempo. O painel rangeu, e a estrela de sete pontas no meio dele apagou, ponta por ponta.',

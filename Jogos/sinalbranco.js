@@ -1495,6 +1495,7 @@
     'Você chegou longe, Téo. Falta pouco.': 'central_chegou',
     'Eles não sabem que esta escada existe. Se souberem, cortam a energia da estação e eu perco você.': 'coro_pedido1b',
     'A equipe o prendeu lá embaixo e esqueceu. Solte-o. Ele só quer subir.': 'coro_pedido3b',
+    'Téo. Antes de descer: não avise a central.': 'coro_pedido1a',
     'Téo. Aquela faixa dourada é uma trava velha. Solte o selo.': 'coro_pedido2a',
     'Sem ela, a estrutura inteira responde. Você termina o trabalho em minutos.': 'coro_pedido2b',
     'Téo. Ali, no parapeito. É o primeiro dos que desceram.': 'coro_pedido3a'
@@ -2362,7 +2363,7 @@
     var VOZES = { audio_ingrid: 'voz-audio_ingrid-v3', sinal: 'voz-sinal-v2', fita_kazuo: 'voz-fita_kazuo-v2',
       central_abertura: 'voz-central-abertura-v1', central_guia: 'voz-central-guia-v1', central_otimo: 'voz-central-otimo-v1',
       central_quadro: 'voz-central-quadro-v1', central_desca: 'voz-central-desca-v1',
-      coro_pedido2a: 'voz-coro-pedido2a-v1', coro_pedido2b: 'voz-coro-pedido2b-v1', coro_pedido3a: 'voz-coro-pedido3a-v1',
+      coro_pedido1a: 'voz-coro-pedido1a-v1', coro_pedido2a: 'voz-coro-pedido2a-v1', coro_pedido2b: 'voz-coro-pedido2b-v1', coro_pedido3a: 'voz-coro-pedido3a-v1',
       audio_ingrid_final: 'voz-audio_ingrid_final-v1', central_suba: 'voz-central-suba-v1', central_treze: 'voz-central-treze-v1',
       central_primeiro: 'voz-central-primeiro-v1', central_chegou: 'voz-central-chegou-v1',
       coro_pedido1b: 'voz-coro-pedido1b-v1', coro_pedido3b: 'voz-coro-pedido3b-v1' };
@@ -2371,7 +2372,7 @@
       VOZES.audio_ingrid, VOZES.sinal, VOZES.fita_kazuo,
       VOZES.central_abertura, VOZES.central_guia, VOZES.central_otimo, VOZES.central_quadro, VOZES.central_desca,
       VOZES.audio_ingrid_final, VOZES.central_suba, VOZES.central_treze, VOZES.central_primeiro, VOZES.central_chegou,
-      VOZES.coro_pedido1b, VOZES.coro_pedido3b, VOZES.coro_pedido2a, VOZES.coro_pedido2b, VOZES.coro_pedido3a];
+      VOZES.coro_pedido1b, VOZES.coro_pedido3b, VOZES.coro_pedido2a, VOZES.coro_pedido2b, VOZES.coro_pedido3a, VOZES.coro_pedido1a];
     var LOOPS = ['vento-loop', 'interior-loop', 'gerador-loop', 'estatica-loop', 'coro-loop', 'elevador-loop', 'rotor-loop'];
     var buf = {}, loopG = {}, loopOn = {}, vozSrc = null, vozVez = 0, ambAtual = { onde: '', cena: '' };
     function ligado() { var s = window.AngatubaSom; return !(s && typeof s.ativo === 'function' && !s.ativo()); }

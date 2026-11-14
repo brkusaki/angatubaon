@@ -161,7 +161,7 @@
   var DOCS_ATO = {
     1: ['avisos', 'bilhete_pavel', 'diario_ingrid', 'audio_ingrid', 'graf', 'relatorio_mira', 'log_radio', 'sinal'],
     2: ['planta', 'emails', 'fita_kazuo', 'polaroid', 'mapa_mao', 'amostra', 'quadro_mira', 'terminal_antigo'],
-    3: ['caderneta_radio', 'notas_traducao', 'nota_ondas', 'inscricao', 'relatorio_selo', 'ficha_teo', 'audio_ingrid_final'],
+    3: ['caderneta_radio', 'notas_traducao', 'nota_ondas', 'inscricao', 'relatorio_selo', 'ficha_teo', 'audio_ingrid_final', 'bilhete_pavel2'],
     4: ['ata_conselho', 'ordem_envelope', 'manual_reator', 'desenho_mira']
   };
   function docsAte(n) { var l = []; for (var i = 1; i <= n; i++) l = l.concat(DOCS_ATO[i] || []); return l; }
@@ -492,8 +492,16 @@
   ITENS.cartaomem = { nome: 'Cartão de memória', img: 'item-cartaomem-v1.webp', desc: 'Cartão de memória com uma etiqueta: "K. — decodificador".' };
   ITENS.pasta     = { nome: 'Pasta do selo', img: 'item-pasta-v1.webp', desc: 'Pasta plástica com o relatório da Mira sobre a faixa dourada.', doc: 'relatorio_selo' };
   ITENS.gravador2 = { nome: 'Gravador da Ingrid', img: 'item-gravador-v1.webp', desc: 'O último gravador da Dra. Ingrid. A fita ainda gira.', doc: 'audio_ingrid_final' };
+  ITENS.bilhete2  = { nome: 'Outro bilhete do Pavel', img: 'item-bilhete-v1.webp', desc: 'Preso na alça da lanterna. A letra do Pavel, mais calma.', doc: 'bilhete_pavel2' };
   ITENS.oculos    = { nome: 'Óculos da Ingrid', img: 'item-oculos-v1.webp', desc: 'Óculos finos de armação prateada. Uma das hastes está torta.' };
 
+  DOCS.bilhete_pavel2 = { titulo: 'Bilhete do Pavel', tipo: 'mao', texto:
+    'Deixei isto preso na lanterna. Quem descer atrás da gente, leia antes de pisar no degrau.\n\n' +
+    'Fui eu que mandei os relatórios pro continente. Todo dia, às 22h, sem a Ingrid saber. Achei que era meu trabalho.\n\n' +
+    'Na noite do dia 14 mandei o último: "a equipe vai descer". A resposta veio em minutos, na mesma voz de sempre: "cientes, prossigam".\n\n' +
+    'Ninguém quis nos parar. Eu devia ter derrubado esta escada.\n\n' +
+    'Uma coisa pra quem receber ordem pelo rádio: a segurança daqui sou eu. Tenho a lista de todo mundo que entrou. Ninguém foi preso lá embaixo. Ninguém ficou pra trás.\n\n' +
+    'Desculpa, Ingrid.\n\n— P.' };
   DOCS.caderneta_radio = { titulo: 'Caderneta de rádio', tipo: 'mao', texto:
     'CADERNETA DE RÁDIO — K. REN\n\n' +
     '11/10  21h40 — Sem resposta do continente há dois dias.\n' +
@@ -593,7 +601,12 @@
     if (bc) bc.addEventListener('click', function () {
       som.clique(); fecharModal();
       var ok = P.docs.every(function (d) { return S.docs.indexOf(d) >= 0; });
-      if (ok) { flag('checou' + n); fala(P.contra, function () { pedidoQuadro(n, depois, true); }); }
+      if (ok) {
+        flag('checou' + n);
+        var contra = P.contra.slice();
+        if (n === 3 && S.docs.indexOf('bilhete_pavel2') >= 0) contra.splice(contra.length - 1, 0, 'O bilhete do Pavel: ele era a segurança, tinha a lista de todos. "Ninguém foi preso lá embaixo."');
+        fala(contra, function () { pedidoQuadro(n, depois, true); });
+      }
       else fala(['{tenso}Não tenho nada pra conferir isso. Ainda.'], function () { pedidoQuadro(n, depois, false); });
     });
     el.caixa.querySelector('[data-p="recusar"]').addEventListener('click', function () {
@@ -828,7 +841,12 @@
         if (!S.flags.cadernetaPega) { flag('cadernetaPega'); pegar('caderneta', ['Uma bolsa laranja de campo, aberta, com ferramentas e uma corda.', 'No fundo, uma caderneta de rádio com a letra do Kazuo.'], 'caderneta_radio'); }
         else fala(['A bolsa do Kazuo. Só ferramentas e corda.']); } },
       { id: 'lanterna', x: 77, y: 84, w: 12, h: 12, acao: function () {
-        fala(['Uma lanterna de campo caída no degrau, sem bateria.', 'Quem largou isso aqui não voltou pra buscar.']); } },
+        if (!S.flags.bilhete2Pego) {
+          flag('bilhete2Pego');
+          pegar('bilhete2', ['Uma lanterna de campo caída no degrau, sem bateria.', 'Na alça, um bilhete dobrado e preso com fita. Reconheço a letra: é do Pavel.'], 'bilhete_pavel2');
+          return;
+        }
+        fala(['A lanterna do Pavel, sem bateria.', 'Quem largou isso aqui não voltou pra buscar.']); } },
       { id: 'escada', x: 36, y: 50, w: 28, h: 20, porta: true, acao: function () {
         if (S.flags.p1ok) { ir('salao'); return; }
         fala(['A escada desce até onde a luz das lâmpadas acaba.', 'Daqui pra baixo, o rádio do cinto vai começar a falhar.'], function () {
@@ -1190,7 +1208,7 @@
     2: ['caixaLigada', 'cartaoPego', 'crachaPego', 'desceu', 'energia2', 'fitaPega', 'logado', 'painelAberto', 'pecabraPego', 'portaAberta', 'portaSeg', 'valvulaPega', 'ato2Fim'],
     3: ['obedeceu1', 'obedeceu2', 'obedeceu3', 'checou1', 'checou2', 'checou3', 'recusou1', 'recusou2', 'recusou3', 'semRadio',
       'p1ok', 'p2ok', 'p3ok', 'inscricaoOk', 'decoderLigado', 'decodificado', 'seloSolto', 'erros3', 'rodada3', 'ondasOk', 'figura', 'nucleoOk', 'ato3Fim',
-      'cadernetaPega', 'notasPegas', 'cartaoMemPego', 'pastaPega', 'gravadorPego', 'oculosPego'],
+      'cadernetaPega', 'notasPegas', 'cartaoMemPego', 'pastaPega', 'gravadorPego', 'oculosPego', 'bilhete2Pego'],
     4: ['crachaCPego', 'cofreAberto', 'manualLido', 'ato4Fim']
   };
   function progLer() {
@@ -1476,7 +1494,7 @@
     desconfiado: '?', cansado: '…', perturbada: '!', paranoico: '!!', arrependido: '…', curiosa: '?' };
   // Quem "escreveu" cada documento e com que cara (sem entrada = sem retrato)
   var DOC_RET = {
-    bilhete_pavel: ['pavel', 'paranoico'], diario_ingrid: ['ingrid', 'obsessiva'], audio_ingrid: ['ingrid', 'serena'],
+    bilhete_pavel: ['pavel', 'paranoico'], bilhete_pavel2: ['pavel', 'arrependido'], diario_ingrid: ['ingrid', 'obsessiva'], audio_ingrid: ['ingrid', 'serena'],
     relatorio_mira: ['mira', 'perturbada'], log_radio: ['kazuo', 'tecnico'], sinal: ['coro', ''], emails: ['kazuo', 'desconfiado'],
     fita_kazuo: ['kazuo', 'cansado'], amostra: ['mira', 'curiosa'], quadro_mira: ['mira', 'firme'],
     caderneta_radio: ['kazuo', 'tecnico'], notas_traducao: ['mira', 'firme'], nota_ondas: ['kazuo', 'cansado'],
@@ -1601,6 +1619,14 @@
       'sb-doc sb-doc-' + d.tipo, true, aoFechar);
     if (d.tipo === 'audio') { som.fita(); som.voz(id); }
     else som.papel();
+    // Ingrid cai em transe quando fala do 13º (a voz começa 0,7 s depois; os cortes seguem as pausas da gravação)
+    if (id === 'audio_ingrid_final') {
+      [[6150, 'transe'], [18250, 'assustada']].forEach(function (t) {
+        puz.timers.push(setTimeout(function () {
+          var r = el.caixa.querySelector('.sb-doc-ret'); if (r) r.innerHTML = retInterno('ingrid', t[1]);
+        }, t[0]));
+      });
+    }
   }
 
   function atualizarBadge(novo) {

@@ -1,5 +1,5 @@
 {
- "versaoSW": 566,
+ "versaoSW": 579,
  "hashes": {
   "Aprender/conteudo.js": "c2776ebcaf3844f9",
   "Aprender/hub.js": "0025f4b073788e9b",
@@ -28,10 +28,12 @@
   "Jogos/hexarena.js": "3182054cce4aba52",
   "Jogos/hoquei.css": "efae916a46cd5dcd",
   "Jogos/hoquei.js": "f1677652333fc81b",
-  "Jogos/hub.js": "c5f042e8e5197c73",
+  "Jogos/hub.js": "8a6b9ed0d069b17b",
   "Jogos/maquina.css": "9c2ae17719231e15",
   "Jogos/maquina.js": "201a9781dddaeca8",
   "Jogos/multiplayer.js": "8bc2153091e334dc",
+  "Jogos/naopare.css": "0e1a63607da8840f",
+  "Jogos/naopare.js": "8842ef4f6ea5c6e8",
   "Jogos/negocios.css": "df08e9c57365d603",
   "Jogos/negocios.js": "288e33c3a4e80de6",
   "Jogos/party.css": "e0a63480691e7c3f",
@@ -60,11 +62,11 @@
   "Jogos/voo.js": "95c4d76666520ced",
   "admin.html": "6773cc5bbc4011ac",
   "app.js": "35984336669e5d0b",
-  "fonts/icones/icones.css": "1e0733328d1ae516",
-  "index.html": "bf00aba29ed7a9d9",
+  "fonts/icones/icones.css": "d68e398a624f97f9",
+  "index.html": "d8506e9b60d34e34",
   "offline.html": "b710016856bc3225",
   "privacidade.html": "be26a48acd997c2c",
-  "styles.css": "56e397e0d3af6319",
+  "styles.css": "7590504573bc45a7",
   "termos.html": "d89a3d33d6264e38"
  }
 }

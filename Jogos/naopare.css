@@ -1,0 +1,99 @@
+/* ═══════════════════════════════════════════════════════════════
+   NÃO PARE — estilos (prefixo .np-*)
+   O palco ocupa a tela (em pé, o JS gira 90°). font-size do palco =
+   1% da largura útil 16:9 (setado no JS): 1em aqui = esse 1%.
+   ═══════════════════════════════════════════════════════════════ */
+#naopare-root{position:relative;flex:1 1 auto;min-height:60vh;width:100%;overflow:hidden;background:#000;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;}
+body.games-fs-open #naopare-root{min-height:0;}
+body.games-fs-open #games-hub.jogo-ativo #jogo-naopare{position:relative;}
+body.games-fs-open #games-hub.jogo-ativo #jogo-naopare .jogo-voltar{position:absolute;top:calc(env(safe-area-inset-top,0px) + 8px);left:8px;z-index:6;margin:0;padding:8px 12px;background:rgba(10,8,14,.78);border-radius:999px;font-size:13px;}
+.np-palco{position:absolute;left:50%;top:50%;overflow:hidden;background:#05040a;color:#f1ece6;font-family:'DM Sans',system-ui,sans-serif;transform-origin:center center;}
+:where(.np-palco) button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer;}
+.np-canvas{position:absolute;left:0;top:0;display:block;}
+.np-carregando{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2em;letter-spacing:.08em;color:#c9b9a8;background:#05040a;text-align:center;padding:0 10%;}
+
+/* ── HUD ── */
+.np-hud{position:absolute;inset:0;pointer-events:none;text-shadow:0 .1em .3em rgba(0,0,0,.8);}
+.np-topo{position:absolute;top:1.4em;right:3em;display:flex;flex-direction:column;align-items:flex-end;gap:.15em;font-weight:700;font-size:2em;letter-spacing:.04em;font-variant-numeric:tabular-nums;color:#efe6da;}
+.np-topo .np-tempo{font-size:1.25em;}
+.np-topo .np-km{color:#c7b8a6;}
+.np-curva{position:absolute;top:1.2em;left:3em;min-width:9em;padding:.5em 1em .55em;border-radius:.6em;background:rgba(12,10,16,.72);border:.18em solid rgba(240,230,215,.55);display:flex;flex-direction:column;align-items:center;gap:.1em;transition:opacity .2s;}
+.np-curva.np-oculto{opacity:0;}
+.np-curva-seta{font-family:'Syne','DM Sans',sans-serif;font-weight:800;font-size:3.6em;line-height:1;letter-spacing:-.08em;}
+.np-curva-dist{font-size:1.5em;font-weight:700;opacity:.85;font-variant-numeric:tabular-nums;}
+.np-sev1 .np-curva-seta{color:#f4efe6;}
+.np-sev2 .np-curva-seta{color:#ffcf4a;}
+.np-sev2{border-color:rgba(255,207,74,.7);}
+.np-sev3 .np-curva-seta{color:#ff5a3c;}
+.np-sev3{border-color:rgba(255,90,60,.85);}
+.np-curva.np-perto{animation:np-pisca .45s steps(2) infinite;}
+.np-curva.np-dentro{animation:none;background:rgba(40,12,10,.75);}
+@keyframes np-pisca{50%{background:rgba(70,20,14,.85);}}
+.np-vel{position:absolute;right:3em;bottom:2.2em;display:flex;align-items:baseline;gap:.4em;}
+.np-vel b{font-family:'Syne','DM Sans',sans-serif;font-weight:800;font-size:5.4em;line-height:1;font-variant-numeric:tabular-nums;}
+.np-vel span{font-size:1.6em;font-weight:700;opacity:.75;}
+.np-perigo{position:absolute;left:50%;bottom:2.4em;transform:translateX(-50%);display:flex;align-items:center;gap:.8em;opacity:.9;}
+.np-ferr{width:2.6em;height:2.6em;fill:#c8b49c;}
+.np-perigo-trilho{width:16em;height:.8em;border-radius:1em;background:rgba(255,255,255,.14);overflow:hidden;}
+.np-perigo-barra{height:100%;width:0;background:linear-gradient(90deg,#f0b35a,#ff4a1c);border-radius:1em;transition:width .15s linear;}
+.np-perigo.np-alerta .np-ferr{fill:#ff5a2a;animation:np-treme .25s infinite;}
+@keyframes np-treme{25%{transform:translateX(-.1em)}75%{transform:translateX(.1em)}}
+
+.np-aviso{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.8);font-family:'Syne','DM Sans',sans-serif;font-weight:800;font-size:4.2em;letter-spacing:.06em;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;white-space:nowrap;text-shadow:0 .08em .4em rgba(0,0,0,.9);}
+.np-aviso.np-mostra{opacity:1;transform:translate(-50%,-50%) scale(1);}
+.np-aviso.np-perigo{color:#ff4b2b;}
+.np-aviso.np-placa{color:#bfe8c8;font-size:3em;}
+.np-cont{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);font-family:'Syne','DM Sans',sans-serif;font-weight:800;font-size:11em;color:#f6efe4;opacity:0;pointer-events:none;text-shadow:0 .05em .3em rgba(0,0,0,.9);white-space:nowrap;}
+.np-cont.np-mostra{opacity:1;}
+.np-cont.np-pulsa{animation:np-pulsa .9s ease-out;}
+@keyframes np-pulsa{from{transform:translate(-50%,-50%) scale(1.5);opacity:0}25%{opacity:1}to{transform:translate(-50%,-50%) scale(1);}}
+
+/* ── Toque ── */
+.np-toque{position:absolute;inset:0;pointer-events:none;}
+.np-tq{pointer-events:auto;touch-action:none;border:.2em solid rgba(255,255,255,.28);background:rgba(15,12,20,.38);color:rgba(255,255,255,.85);border-radius:1.4em;font-weight:800;letter-spacing:.06em;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}
+.np-tq.np-on{background:rgba(255,140,60,.38);border-color:rgba(255,170,90,.8);}
+.np-tq-esq{position:absolute;left:2.4em;bottom:2.4em;display:flex;gap:1.6em;}
+.np-tq-esq .np-tq{width:3em;height:3em;font-size:4em;border-radius:.35em;border-width:.05em;line-height:1;}
+.np-tq-dir{position:absolute;right:2.4em;bottom:2.4em;display:flex;flex-direction:column;align-items:flex-end;gap:1.2em;}
+.np-tq-dir .np-tq{font-size:1.9em;}
+.np-tq-drift{width:7.4em;height:5em;border-color:rgba(255,190,80,.55);}
+.np-tq-freio{width:5.4em;height:3.2em;}
+.np-tq-acel{width:7.4em;height:3.6em;}
+.np-tq-cima{position:absolute;right:2.4em;top:10em;display:flex;gap:1em;}
+.np-tq-mini{width:2.6em;height:2.6em;border-radius:50%;font-size:1.7em;padding:0;}
+/* No toque, a velocidade vai para o meio, em cima da ferradura */
+.np-palco.np-com-toque .np-vel{right:50%;transform:translateX(50%);bottom:6.8em;}
+.np-palco.np-com-toque .np-vel b{font-size:4.2em;}
+
+/* ── Telas ── */
+.np-tela{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.4em;padding:4em 8em;text-align:center;background:radial-gradient(ellipse at 50% 60%,rgba(8,4,10,.35),rgba(5,3,8,.86) 80%);animation:np-entra .35s ease-out;}
+@keyframes np-entra{from{opacity:0}to{opacity:1}}
+.np-titulo{justify-content:flex-end;padding-bottom:6em;background:linear-gradient(180deg,rgba(5,3,8,.05) 30%,rgba(5,3,8,.82) 85%);}
+.np-logo{font-family:'Syne','DM Sans',sans-serif;font-weight:800;font-size:10em;line-height:.86;letter-spacing:.02em;color:#f3e9dc;text-shadow:0 0 .3em rgba(255,90,30,.45),0 .04em 0 #5a1208;}
+.np-sub{font-size:2em;color:#d8cbbd;max-width:36em;line-height:1.35;}
+.np-h{font-family:'Syne','DM Sans',sans-serif;font-weight:800;font-size:5em;letter-spacing:.04em;}
+.np-h-perigo{color:#ff4b2b;text-shadow:0 0 .4em rgba(255,60,20,.5);}
+.np-h-ok{color:#ffd27a;}
+.np-rota{background:rgba(20,14,18,.72);border:.15em solid rgba(240,220,200,.25);border-radius:1em;padding:1em 2em;}
+.np-rota-nome{font-size:2.2em;font-weight:800;}
+.np-rota-nome i{opacity:.7;margin-right:.3em;}
+.np-dif{font-size:.75em;font-weight:700;color:#c7b8a6;margin-left:.6em;}
+.np-rota-rec{font-size:1.6em;color:#c7b8a6;margin-top:.3em;}
+.np-botoes{display:flex;gap:1.4em;flex-wrap:wrap;justify-content:center;}
+.np-botoes.np-col{flex-direction:column;align-items:stretch;min-width:34em;}
+.np-btn{font-size:2.1em;font-weight:800;padding:.7em 1.6em;border-radius:.8em;border:.1em solid rgba(240,225,210,.35);background:rgba(30,22,28,.85);color:#f3e9dc;}
+.np-btn i{margin-right:.4em;}
+.np-btn small{font-weight:600;opacity:.75;font-size:.7em;}
+.np-btn-pri{background:linear-gradient(180deg,#e0581f,#a8320f);border-color:#ff9a5c;color:#fff;box-shadow:0 .3em 1.2em rgba(220,80,20,.35);}
+.np-btn:active{transform:translateY(.1em);}
+.np-lista{list-style:none;margin:0;padding:0;text-align:left;max-width:62em;display:flex;flex-direction:column;gap:.7em;}
+.np-lista li{font-size:1.75em;line-height:1.35;color:#e7dccf;padding-left:1.2em;position:relative;}
+.np-lista li::before{content:'';position:absolute;left:0;top:.5em;width:.45em;height:.45em;border-radius:50%;background:#e0581f;}
+.np-teclas{display:flex;flex-wrap:wrap;gap:.6em 1.6em;justify-content:center;font-size:1.5em;color:#c7b8a6;}
+.np-teclas b{color:#f3e9dc;}
+.np-tempo-fim{font-family:'Syne','DM Sans',sans-serif;font-weight:800;font-size:7em;font-variant-numeric:tabular-nums;}
+.np-metas{font-size:1.5em;color:#a99a8a;}
+.np-med{display:inline-block;padding:.1em .7em;border-radius:1em;font-weight:800;font-size:.9em;}
+.np-med-ouro{background:#e7b93c;color:#2a1d00;}
+.np-med-prata{background:#c8ccd2;color:#1e2226;}
+.np-med-bronze{background:#c07a45;color:#2a1306;}

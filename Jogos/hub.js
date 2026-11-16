@@ -1469,7 +1469,8 @@
       '/Jogos/assets/naopare/tex/estrada-cor.webp', '/Jogos/assets/naopare/tex/estrada-normal.webp', '/Jogos/assets/naopare/tex/estrada-aspereza.webp',
       '/Jogos/assets/naopare/tex/chao-cor.webp', '/Jogos/assets/naopare/tex/chao-normal.webp',
       '/Jogos/assets/naopare/tex/casca-cor.webp', '/Jogos/assets/naopare/tex/casca-normal.webp',
-      '/Jogos/assets/naopare/tex/ceu.webp'
+      '/Jogos/assets/naopare/tex/ceu.webp',
+      '/Jogos/assets/naopare/sfx/grito.mp3', '/Jogos/assets/naopare/sfx/impacto.mp3', '/Jogos/assets/naopare/sfx/trinca.mp3', '/Jogos/assets/naopare/sfx/casco.mp3'
     ],
     corujinha: [
       '/Jogos/corujinha.min.js', '/Jogos/corujinha.css',

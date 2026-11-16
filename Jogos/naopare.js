@@ -285,8 +285,29 @@
       derrapa = cadeiaRuido('bandpass', 1700, 1.4);
       fogo = cadeiaRuido('lowpass', 260, 0.9);
       ok = true;
+      ARQ.forEach(carregarArq);
     }
     function retomar() { if (ac && ac.state === 'suspended') ac.resume().catch(function () {}); }
+    // Sons gravados (ElevenLabs). Se o arquivo ainda não chegou, toca o sintetizado.
+    var ARQ = ['grito', 'impacto', 'trinca', 'casco'], bufs = {}, baixando = {};
+    function carregarArq(nome) {
+      if (!ac || bufs[nome] || baixando[nome] || !window.fetch) return;
+      baixando[nome] = true;
+      fetch(PASTA + 'sfx/' + nome + '.mp3').then(function (r) { if (!r.ok) throw 0; return r.arrayBuffer(); })
+        .then(function (ab) { ac.decodeAudioData(ab, function (b) { bufs[nome] = b; }, function () {}); })
+        .catch(function () { baixando[nome] = false; });
+    }
+    function arq(nome, vol, rate) {
+      var b = bufs[nome];
+      if (!b || !ac) return false;
+      var s = ac.createBufferSource(), g = ac.createGain();
+      s.buffer = b; if (rate) s.playbackRate.value = rate;
+      g.gain.value = vol;
+      s.connect(g); g.connect(mestre);
+      s.start(ac.currentTime);
+      s.onended = function () { try { s.disconnect(); g.disconnect(); } catch (e) {} };
+      return true;
+    }
     function env(g, t, a, d, v) {
       g.gain.setValueAtTime(0.0001, t);
       g.gain.exponentialRampToValueAtTime(Math.max(0.0002, v), t + a);
@@ -308,6 +329,7 @@
     }
     // Uma batida de casco: baque de terra + o "tlim" da ferradura
     function casco(v) {
+      if (arq('casco', Math.min(1, v * 1.1), 0.92 + Math.random() * 0.2)) return;
       var t = ac.currentTime + 0.005;
       estalo(t, 700, 1.2, 0.004, 0.07, v * 0.9);
       tom(t, 'sine', 95, 45, 0.004, 0.09, v * 0.8);
@@ -381,6 +403,7 @@
       grito: function (forte) {
         if (!ok || !ligado()) return;
         var t = ac.currentTime, vg0 = forte ? 0.95 : 0.5;
+        if (arq('grito', forte ? 1 : 0.55, forte ? 1 : 1.12)) return;
         [0, 7].forEach(function (det) {
           var o = ac.createOscillator(), vib = ac.createOscillator(), vg = ac.createGain(), f = ac.createBiquadFilter(), g = ac.createGain();
           o.type = 'sawtooth'; o.frequency.setValueAtTime(950 + det * 9, t);
@@ -409,6 +432,7 @@
         if (!ok || !ligado()) return;
         var t = ac.currentTime;
         mestre.gain.cancelScheduledValues(t); mestre.gain.setValueAtTime(1.2, t); silencioAte = 0;
+        if (arq('impacto', 1 * forca)) { tom(t, 'sine', 70, 28, 0.003, 0.5, 0.7 * forca); return; }
         tom(t, 'sine', 90, 30, 0.003, 0.4, 1.0 * forca);
         tom(t + 0.07, 'sine', 80, 28, 0.003, 0.35, 0.9 * forca);
         estalo(t, 250, 0.5, 0.003, 0.45, 1.0 * forca);
@@ -417,6 +441,7 @@
       trinca: function () {
         if (!ok || !ligado()) return;
         var t = ac.currentTime;
+        if (arq('trinca', 0.9)) return;
         for (var i = 0; i < 7; i++) estalo(t + i * 0.018 + Math.random() * 0.015, 4500 + Math.random() * 3500, 5, 0.001, 0.06, 0.3);
       },
       // Chiado de estática (o sinal caindo)

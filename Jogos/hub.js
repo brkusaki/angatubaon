@@ -1463,7 +1463,13 @@
       '/Jogos/assets/sinalbranco/ret-pavel-arrependido-v2.webp'
     ],
     naopare: [
-      '/Jogos/naopare.min.js', '/Jogos/naopare.css', '/Jogos/vendor/three-naopare.min.js?v=187'
+      '/Jogos/naopare.min.js', '/Jogos/naopare.css', '/Jogos/vendor/three-naopare.min.js?v=187b',
+      '/Jogos/assets/naopare/carro-v1.glb', '/Jogos/assets/naopare/mula-v1.glb',
+      '/Jogos/assets/naopare/tronco-v1.glb', '/Jogos/assets/naopare/pedra-v1.glb',
+      '/Jogos/assets/naopare/tex/estrada-cor.webp', '/Jogos/assets/naopare/tex/estrada-normal.webp', '/Jogos/assets/naopare/tex/estrada-aspereza.webp',
+      '/Jogos/assets/naopare/tex/chao-cor.webp', '/Jogos/assets/naopare/tex/chao-normal.webp',
+      '/Jogos/assets/naopare/tex/casca-cor.webp', '/Jogos/assets/naopare/tex/casca-normal.webp',
+      '/Jogos/assets/naopare/tex/ceu.webp'
     ],
     corujinha: [
       '/Jogos/corujinha.min.js', '/Jogos/corujinha.css',

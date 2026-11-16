@@ -26,7 +26,7 @@
   'use strict';
 
   var TELA = 'jogo-naopare';
-  var THREE_URL = '/Jogos/vendor/three-naopare.min.js?v=187';
+  var THREE_URL = '/Jogos/vendor/three-naopare.min.js?v=187b';
   var SAVE = 'angatuba_naopare';
   var T = null;            // namespace do Three (window.NPTHREE)
 
@@ -236,10 +236,11 @@
       camera: s.camera || 'atras',              // 'atras' | 'cabine'
       autoAcel: s.autoAcel != null ? !!s.autoAcel : toque,
       grafico: s.grafico || (toque ? 'medio' : 'alto'),
+      susto: s.susto || 'forte',                // 'forte' | 'suave'
       toque: toque
     };
   })();
-  function salvarCfg() { var s = lerSave(); s.camera = cfg.camera; s.autoAcel = cfg.autoAcel; s.grafico = cfg.grafico; gravarSave(s); }
+  function salvarCfg() { var s = lerSave(); s.camera = cfg.camera; s.autoAcel = cfg.autoAcel; s.grafico = cfg.grafico; s.susto = cfg.susto; gravarSave(s); }
 
   /* ══════════════════════════════════════════════════════════════
      SOM (sintetizado)
@@ -247,7 +248,7 @@
   var som = (function () {
     var ac = null, mestre = null, ruido = null, ok = false;
     var motor = {}, estrada = {}, vento = {}, derrapa = {}, fogo = {};
-    var proxCasco = 0, proxCoracao = 0, proxGrilo = 0, proxFagulha = 0, faseGalope = 0;
+    var proxCasco = 0, proxCoracao = 0, proxGrilo = 0, proxFagulha = 0, faseGalope = 0, silencioAte = 0;
     function ligado() { var s = window.AngatubaSom; return !(s && typeof s.ativo === 'function' && !s.ativo()); }
     function criarRuido() {
       var b = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), d = b.getChannelData(0);
@@ -320,7 +321,7 @@
       quadro: function (dt, e) {
         if (!ok) return;
         var t = ac.currentTime, on = ligado() && e.ativo;
-        mestre.gain.setTargetAtTime(on ? 0.9 : 0, t, 0.05);
+        if (t > silencioAte) mestre.gain.setTargetAtTime(on ? 0.9 : 0, t, 0.05);
         if (!on) return;
         // Motor: marchas simuladas pela velocidade
         var v = Math.abs(e.vel), marchas = [0, 11, 19, 27, 34, 41, 60];
@@ -377,9 +378,9 @@
         for (var i = 0; i < 14; i++) estalo(t + i * 0.045 + Math.random() * 0.02, 1500 + Math.random() * 1500, 6, 0.004, 0.06, 0.16);
       },
       // Relincho/grito da Mula quando alcança
-      grito: function () {
+      grito: function (forte) {
         if (!ok || !ligado()) return;
-        var t = ac.currentTime;
+        var t = ac.currentTime, vg0 = forte ? 0.95 : 0.5;
         [0, 7].forEach(function (det) {
           var o = ac.createOscillator(), vib = ac.createOscillator(), vg = ac.createGain(), f = ac.createBiquadFilter(), g = ac.createGain();
           o.type = 'sawtooth'; o.frequency.setValueAtTime(950 + det * 9, t);
@@ -389,10 +390,52 @@
           vib.connect(vg); vg.connect(o.frequency);
           f.type = 'bandpass'; f.frequency.value = 1300; f.Q.value = 1.2;
           o.connect(f); f.connect(g); g.connect(mestre);
-          env(g, t, 0.03, 1.3, 0.5);
+          env(g, t, 0.03, 1.3, vg0);
           o.start(t); vib.start(t); o.stop(t + 1.45); vib.stop(t + 1.45);
         });
         estalo(t, 400, 0.5, 0.02, 1.4, 0.9);
+      },
+      // Um instante de silêncio antes do susto (o mestre quase zera)
+      silencio: function (dur) {
+        if (!ok) return;
+        var t = ac.currentTime;
+        mestre.gain.cancelScheduledValues(t);
+        mestre.gain.setValueAtTime(mestre.gain.value, t);
+        mestre.gain.linearRampToValueAtTime(0.05, t + 0.04);
+        silencioAte = t + dur;
+      },
+      // Cascos no capô + vidro trincando
+      impacto: function (forca) {
+        if (!ok || !ligado()) return;
+        var t = ac.currentTime;
+        mestre.gain.cancelScheduledValues(t); mestre.gain.setValueAtTime(1.2, t); silencioAte = 0;
+        tom(t, 'sine', 90, 30, 0.003, 0.4, 1.0 * forca);
+        tom(t + 0.07, 'sine', 80, 28, 0.003, 0.35, 0.9 * forca);
+        estalo(t, 250, 0.5, 0.003, 0.45, 1.0 * forca);
+        for (var i = 0; i < 10; i++) estalo(t + 0.01 + i * 0.012 + Math.random() * 0.02, 3500 + Math.random() * 4000, 4, 0.001, 0.05 + Math.random() * 0.08, 0.35 * forca);
+      },
+      trinca: function () {
+        if (!ok || !ligado()) return;
+        var t = ac.currentTime;
+        for (var i = 0; i < 7; i++) estalo(t + i * 0.018 + Math.random() * 0.015, 4500 + Math.random() * 3500, 5, 0.001, 0.06, 0.3);
+      },
+      // Chiado de estática (o sinal caindo)
+      estatica: function (dur) {
+        if (!ok || !ligado()) return;
+        var t = ac.currentTime, s = fonteRuido(), f = ac.createBiquadFilter(), g = ac.createGain();
+        f.type = 'bandpass'; f.frequency.value = 2200; f.Q.value = 0.4;
+        s.connect(f); f.connect(g); g.connect(mestre);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.7, t + 0.02);
+        g.gain.setValueAtTime(0.7, t + dur - 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        s.start(t); s.stop(t + dur + 0.05);
+      },
+      // Sobressalto curto (ela encostou do lado)
+      ferroada: function () {
+        if (!ok || !ligado()) return;
+        var t = ac.currentTime;
+        tom(t, 'sawtooth', 1400, 600, 0.005, 0.4, 0.12);
+        tom(t, 'sawtooth', 1480, 640, 0.005, 0.4, 0.1);
+        estalo(t, 900, 0.8, 0.003, 0.3, 0.4);
       },
       bip: function (alto) {
         if (!ok || !ligado()) return;
@@ -480,6 +523,81 @@
       gr.addColorStop(0, cor0); gr.addColorStop(0.35, cor1); gr.addColorStop(1, 'rgba(0,0,0,0)');
       g.fillStyle = gr; g.fillRect(0, 0, w, w);
     });
+  }
+  // N planos verticais cruzados (base em y=0, 1x1), com um plano de topo opcional
+  function cartoes(nPlanos, topo) {
+    var pos = [], uv = [], nor = [], idx = [], v = 0;
+    function quad(p, n) {
+      for (var k = 0; k < 4; k++) { pos.push(p[k][0], p[k][1], p[k][2]); nor.push(n[0], n[1], n[2]); }
+      uv.push(0, 0, 1, 0, 1, 1, 0, 1);
+      idx.push(v, v + 1, v + 2, v, v + 2, v + 3); v += 4;
+    }
+    for (var i = 0; i < nPlanos; i++) {
+      var a = i / nPlanos * Math.PI, cx = Math.cos(a) * 0.5, cz = Math.sin(a) * 0.5;
+      quad([[-cx, 0, -cz], [cx, 0, cz], [cx, 1, cz], [-cx, 1, -cz]], [-Math.sin(a), 0, Math.cos(a)]);
+    }
+    if (topo) quad([[-0.45, 0.62, -0.45], [0.45, 0.62, -0.45], [0.45, 0.62, 0.45], [-0.45, 0.62, 0.45]], [0, 1, 0]);
+    var g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new T.Float32BufferAttribute(nor, 3));
+    g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    return g;
+  }
+  // Folhas de eucalipto: compridas, finas e caídas, em cachos
+  function texFolhas(c1, c2, c3) {
+    var t = texCanvas(256, 256, function (g, w, h) {
+      var r = rng(c1.length * 97 + c2.charCodeAt(2));
+      for (var i = 0; i < 260; i++) {
+        var x = 20 + r() * (w - 40), y = 10 + r() * (h - 30);
+        // mais denso no meio, ralo nas bordas
+        var dx = (x - w / 2) / (w / 2), dy = (y - h * 0.45) / (h / 2);
+        if (dx * dx + dy * dy > 1 + r() * 0.25) continue;
+        var ang = Math.PI / 2 + (r() - 0.5) * 1.2, len = 10 + r() * 16, larg = 1.6 + r() * 1.6;
+        g.save(); g.translate(x, y); g.rotate(ang);
+        g.fillStyle = [c1, c2, c3][Math.floor(r() * 3)];
+        g.beginPath(); g.ellipse(len / 2, 0, len / 2, larg, 0.08, 0, 6.3); g.fill();
+        g.restore();
+      }
+      // galhinhos
+      g.strokeStyle = 'rgba(70,60,50,.7)'; g.lineWidth = 1;
+      for (var k = 0; k < 14; k++) { g.beginPath(); var sx = w * (0.3 + r() * 0.4); g.moveTo(sx, h); g.quadraticCurveTo(sx + (r() - 0.5) * 60, h * 0.6, w * (0.15 + r() * 0.7), h * (0.15 + r() * 0.5)); g.stroke(); }
+    });
+    t.wrapS = t.wrapT = T.ClampToEdgeWrapping;
+    return t;
+  }
+  // Capim seco de pasto
+  function texCapim() {
+    var t = texCanvas(128, 128, function (g, w, h) {
+      var r = rng(4242);
+      for (var i = 0; i < 70; i++) {
+        var x = 8 + r() * (w - 16), alt = h * (0.35 + r() * 0.6), curva = (r() - 0.5) * 40;
+        g.strokeStyle = ['#7a7640', '#5d6a2f', '#8f8550', '#6b6b35', '#a39a62'][Math.floor(r() * 5)];
+        g.lineWidth = 1 + r() * 1.6;
+        g.beginPath(); g.moveTo(x, h); g.quadraticCurveTo(x + curva * 0.3, h - alt * 0.6, x + curva, h - alt); g.stroke();
+      }
+    });
+    t.wrapS = t.wrapT = T.ClampToEdgeWrapping;
+    return t;
+  }
+  // Cana: colmos e folhas longas arqueadas
+  function texCana() {
+    var t = texCanvas(128, 256, function (g, w, h) {
+      var r = rng(777);
+      for (var i = 0; i < 9; i++) {
+        var x = 10 + r() * (w - 20);
+        g.strokeStyle = '#5a5a2a'; g.lineWidth = 3;
+        g.beginPath(); g.moveTo(x, h); g.lineTo(x + (r() - 0.5) * 8, h * 0.25); g.stroke();
+      }
+      for (var k = 0; k < 60; k++) {
+        var x0 = 10 + r() * (w - 20), y0 = h * (0.15 + r() * 0.7), dir = r() < 0.5 ? -1 : 1, len = 30 + r() * 50;
+        g.strokeStyle = ['#4d5b26', '#627033', '#3e4a1e', '#7b7a3e'][Math.floor(r() * 4)];
+        g.lineWidth = 2 + r() * 2;
+        g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(x0 + dir * len * 0.6, y0 - len * 0.5, x0 + dir * len, y0 + len * 0.15); g.stroke();
+      }
+    });
+    t.wrapS = t.wrapT = T.ClampToEdgeWrapping;
+    return t;
   }
   function texPlaca(txt, sub) {
     return texCanvas(256, 160, function (g, w, h) {
@@ -628,6 +746,7 @@
     renderer.toneMappingExposure = 1.3;
     renderer.outputColorSpace = T.SRGBColorSpace;
     renderer.setPixelRatio(1);
+    renderer.shadowMap.enabled = true;
     G.renderer = renderer;
 
     var cena = new T.Scene();
@@ -644,7 +763,19 @@
     var lua = new T.Sprite(new T.SpriteMaterial({ map: texBrilho('rgba(255,236,214,1)', 'rgba(220,180,170,.35)'), fog: false, depthWrite: false, transparent: true }));
     lua.scale.set(70, 70, 1); G.lua = lua; cena.add(lua);
 
-    cena.add(new T.HemisphereLight(0x6c6cb0, 0x24160e, 1.1));
+    if (AST && AST.tx.ceu) {
+      var tc = AST.tx.ceu;
+      tc.mapping = T.EquirectangularReflectionMapping; tc.wrapS = T.RepeatWrapping; tc.wrapT = T.ClampToEdgeWrapping;
+      cena.background = tc;
+      cena.backgroundIntensity = 0.42;
+      var pm = new T.PMREMGenerator(renderer);
+      cena.environment = pm.fromEquirectangular(tc).texture;
+      cena.environmentIntensity = 0.45;
+      pm.dispose();
+      ceu.visible = false; lua.visible = false;
+      cena.fog.color.setRGB(0.035, 0.04, 0.07);
+    }
+    cena.add(new T.HemisphereLight(0x6c6cb0, 0x24160e, AST && AST.tx.ceu ? 0.75 : 1.1));
     var luar = new T.DirectionalLight(0x9aa0d8, 0.9);
     luar.position.set(-200, 300, -150);
     cena.add(luar); G.luar = luar; cena.add(luar.target);
@@ -660,7 +791,55 @@
     G.poeira = new Particulas(160, G.tex.fumaca, false, corPoeira);
     cena.add(G.poeira.obj);
     montarPos();
+    montarNevoa();
     G.estradaObj = null;
+  }
+
+  // Névoa rasteira: tufos grandes e suaves na beira do chão, clareados quando caem no facho do farol
+  var NEV_N = 70;
+  function montarNevoa() {
+    var geo = new T.BufferGeometry();
+    var pos = new Float32Array(NEV_N * 3), tam = new Float32Array(NEV_N), alfa = new Float32Array(NEV_N), cor = new Float32Array(NEV_N * 3);
+    geo.setAttribute('position', new T.BufferAttribute(pos, 3));
+    geo.setAttribute('tam', new T.BufferAttribute(tam, 1));
+    geo.setAttribute('alfa', new T.BufferAttribute(alfa, 1));
+    geo.setAttribute('cor', new T.BufferAttribute(cor, 3));
+    var mat = new T.ShaderMaterial({
+      uniforms: { tMapa: { value: G.tex.fumaca }, uEscala: { value: 400 } },
+      vertexShader: 'attribute vec3 cor; attribute float tam; attribute float alfa; varying vec3 vCor; varying float vAlfa; uniform float uEscala;' +
+        'void main(){ vCor=cor; vec4 mv=modelViewMatrix*vec4(position,1.0); vAlfa=alfa*smoothstep(1.5, 8.0, -mv.z); gl_PointSize=tam*uEscala/max(0.5,-mv.z); gl_Position=projectionMatrix*mv; }',
+      fragmentShader: 'uniform sampler2D tMapa; varying vec3 vCor; varying float vAlfa; void main(){ float a = texture2D(tMapa, gl_PointCoord).a; gl_FragColor = vec4(vCor, a*vAlfa); }',
+      transparent: true, depthWrite: false, blending: T.NormalBlending
+    });
+    var pts = new T.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 4;
+    G.cena.add(pts);
+    G.nev = { geo: geo, pos: pos, tam: tam, alfa: alfa, cor: cor, mat: mat, s: new Float32Array(NEV_N), lat: new Float32Array(NEV_N), alt: new Float32Array(NEV_N), ok: false };
+  }
+  var _pn = { x: 0, z: 0, y: 0, th: 0 };
+  function atualizarNevoa(dt) {
+    var N = G.nev, c = carro;
+    var fx = Math.sin(c.psi), fz = Math.cos(c.psi);
+    for (var i = 0; i < NEV_N; i++) {
+      // recicla o que ficou para trás ou longe demais
+      if (!N.ok || N.s[i] < c.s - 25 || N.s[i] > c.s + 150) {
+        N.s[i] = c.s + (N.ok ? 120 + Math.random() * 30 : -20 + Math.random() * 170);
+        N.lat[i] = (Math.random() - 0.5) * 34; N.alt[i] = 0.4 + Math.random() * 1.6;
+        N.tam[i] = 7 + Math.random() * 9;
+      }
+      N.s[i] -= dt * 0.6;
+      pontoEm(R, clamp(N.s[i], 0, R.L - 1), _pn);
+      var x = _pn.x - Math.cos(_pn.th) * N.lat[i], z = _pn.z + Math.sin(_pn.th) * N.lat[i], y = _pn.y + N.alt[i];
+      N.pos[i * 3] = x; N.pos[i * 3 + 1] = y; N.pos[i * 3 + 2] = z;
+      // dentro do facho do farol: clareia
+      var dx = x - c.x, dz = z - c.z, d = Math.sqrt(dx * dx + dz * dz) || 1;
+      var noFacho = clamp(((dx * fx + dz * fz) / d - 0.86) / 0.12, 0, 1) * clamp(1 - d / 70, 0, 1);
+      var luzM = mula && G.mulaObj.visible ? clamp(1 - Math.hypot(x - G.mulaObj.position.x, z - G.mulaObj.position.z) / 18, 0, 1) : 0;
+      N.cor[i * 3] = 0.16 + noFacho * 0.75 + luzM * 0.8; N.cor[i * 3 + 1] = 0.16 + noFacho * 0.66 + luzM * 0.35; N.cor[i * 3 + 2] = 0.22 + noFacho * 0.5 + luzM * 0.1;
+      N.alfa[i] = 0.06 + noFacho * 0.12;
+    }
+    N.ok = true;
+    N.geo.attributes.position.needsUpdate = true; N.geo.attributes.tam.needsUpdate = true;
+    N.geo.attributes.alfa.needsUpdate = true; N.geo.attributes.cor.needsUpdate = true;
   }
 
   // Chão: grade que acompanha o carro (alturas pelo relevo, rebaixada junto da estrada)
@@ -669,8 +848,13 @@
     var geo = new T.PlaneGeometry(CHAO_N * CHAO_C, CHAO_N * CHAO_C, CHAO_N, CHAO_N);
     geo.rotateX(-Math.PI / 2);
     var mat = new T.MeshLambertMaterial({ map: G.tex.mato });
+    if (AST && AST.tx.chaoCor) {
+      mat = new T.MeshStandardMaterial({ map: AST.tx.chaoCor, normalMap: AST.tx.chaoNor || null, roughness: 0.95, metalness: 0, color: new T.Color(0.62, 0.72, 0.48) });
+      G.uvChao = 2.4;
+    }
     var m = new T.Mesh(geo, mat);
     m.frustumCulled = false;
+    m.receiveShadow = true;
     G.chao = m; G.chaoCx = 1e9; G.chaoCz = 1e9;
     G.cena.add(m);
   }
@@ -690,7 +874,7 @@
           if (_de.d < 30) h = lerp(_de.y - 0.35, h, suave(6.5, 24, _de.d));
         }
         p.setXYZ(k, x, h, z);
-        uv.setXY(k, x / 7, z / 7);
+        uv.setXY(k, x / (G.uvChao || 7), z / (G.uvChao || 7));
       }
     }
     p.needsUpdate = true; uv.needsUpdate = true;
@@ -704,31 +888,47 @@
     G.estradaObj = grp;
     var n = R.n;
     // Faixa da estrada: 4 vértices por amostra (-5.4, -4.5, 4.5, 5.4)
-    var LAT = [-5.5, -MEIA, MEIA, 5.5], UU = [0, 0.1, 0.9, 1], ALT = [-0.28, 0.06, 0.06, -0.28];
-    var pos = new Float32Array(n * 4 * 3), uvs = new Float32Array(n * 4 * 2), idx = [];
+    var real = !!(AST && AST.tx.estradaCor);
+    var LAT = real ? [-5.6, -4.9, -4.3, -3.0, -2.2, -1.4, 0, 1.4, 2.2, 3.0, 4.3, 4.9, 5.6] : [-5.5, -MEIA, MEIA, 5.5];
+    var ALT = real ? [-0.3, -0.06, 0.04, 0.06, 0.04, 0.07, 0.09, 0.07, 0.04, 0.06, 0.04, -0.06, -0.3] : [-0.28, 0.06, 0.06, -0.28];
+    // cor por vértice: borda com capim, trilhos de pneu mais escuros e lisos, meio mais claro
+    var COR = [[0.42, 0.5, 0.3], [0.62, 0.62, 0.48], [0.95, 0.9, 0.85], [0.9, 0.86, 0.82], [0.7, 0.66, 0.62], [0.92, 0.88, 0.84], [1.05, 1.0, 0.95],
+      [0.92, 0.88, 0.84], [0.7, 0.66, 0.62], [0.9, 0.86, 0.82], [0.95, 0.9, 0.85], [0.62, 0.62, 0.48], [0.42, 0.5, 0.3]];
+    var NL = LAT.length;
+    var pos = new Float32Array(n * NL * 3), uvs = new Float32Array(n * NL * 2), cores = new Float32Array(n * NL * 3), idx = [];
     for (var i = 0; i < n; i++) {
       var th = R.th[i], rx = -Math.cos(th), rz = Math.sin(th);
-      for (var a = 0; a < 4; a++) {
-        var o = (i * 4 + a);
+      for (var a = 0; a < NL; a++) {
+        var o = (i * NL + a);
         pos[o * 3] = R.x[i] + rx * LAT[a];
         pos[o * 3 + 1] = R.y[i] + ALT[a];
         pos[o * 3 + 2] = R.z[i] + rz * LAT[a];
-        uvs[o * 2] = UU[a]; uvs[o * 2 + 1] = i * DS / 9;
+        if (real) { uvs[o * 2] = (LAT[a] + 5.6) / 1.5; uvs[o * 2 + 1] = i * DS / 1.5; }
+        else { uvs[o * 2] = [0, 0.1, 0.9, 1][a]; uvs[o * 2 + 1] = i * DS / 9; }
+        var cc = real ? COR[a] : [1, 1, 1];
+        cores[o * 3] = cc[0]; cores[o * 3 + 1] = cc[1]; cores[o * 3 + 2] = cc[2];
       }
-      if (i < n - 1) for (a = 0; a < 3; a++) {
-        var p0 = i * 4 + a, p1 = p0 + 1, p2 = p0 + 4, p3 = p0 + 5;
+      if (i < n - 1) for (a = 0; a < NL - 1; a++) {
+        var p0 = i * NL + a, p1 = p0 + 1, p2 = p0 + NL, p3 = p0 + NL + 1;
         idx.push(p0, p1, p2, p1, p3, p2);
       }
     }
     var geo = new T.BufferGeometry();
     geo.setAttribute('position', new T.BufferAttribute(pos, 3));
     geo.setAttribute('uv', new T.BufferAttribute(uvs, 2));
+    geo.setAttribute('color', new T.BufferAttribute(cores, 3));
+    if (real && !G.matEstrada) {
+      G.matEstrada = new T.MeshStandardMaterial({ map: AST.tx.estradaCor, normalMap: AST.tx.estradaNor || null,
+        roughness: 0.93, metalness: 0, vertexColors: true, normalScale: new T.Vector2(1.3, 1.3), envMapIntensity: 0.4 });
+    }
     geo.setIndex(idx);
     geo.computeVertexNormals();
-    var estrada = new T.Mesh(geo, new T.MeshLambertMaterial({ map: G.tex.terra }));
+    var estrada = new T.Mesh(geo, G.matEstrada || new T.MeshLambertMaterial({ map: G.tex.terra }));
+    estrada.receiveShadow = true;
     grp.add(estrada);
 
     montarBeira(grp);
+    grp.traverse(function (o) { if (o.isMesh && !o.isInstancedMesh) { o.castShadow = true; o.receiveShadow = true; } });
     G.cena.add(grp);
     atualizarChao(R.x[0], R.z[0], true);
   }
@@ -752,6 +952,17 @@
     var geoPoste = new T.BoxGeometry(0.14, 1.3, 0.14); geoPoste.translate(0, 0.65, 0);
     var geoRefl = new T.BoxGeometry(0.1, 0.16, 0.16);
     var matTronco = new T.MeshLambertMaterial({ color: 0xb9b2a6 });
+    if (AST && AST.tx.cascaCor) {
+      var tcas = AST.tx.cascaCor.clone(); tcas.repeat.set(1, 7); tcas.needsUpdate = true;
+      var tcasN = AST.tx.cascaNor ? AST.tx.cascaNor.clone() : null; if (tcasN) { tcasN.repeat.set(1, 7); tcasN.needsUpdate = true; }
+      matTronco = new T.MeshStandardMaterial({ map: tcas, normalMap: tcasN, roughness: 0.85, metalness: 0, color: 0xd8d2c8 });
+    }
+    // Copas e capim em cartões com transparência (folhas desenhadas em canvas)
+    var geoCopaC = cartoes(3, true), geoCapim = cartoes(2, false), geoCanaC = cartoes(3, false);
+    var matFolha = new T.MeshStandardMaterial({ map: texFolhas('#2c3b2a', '#4a5a3c', '#6b7354'), alphaTest: 0.45, side: T.DoubleSide, roughness: 0.9, metalness: 0 });
+    var matFolha2 = new T.MeshStandardMaterial({ map: texFolhas('#24331f', '#3f5230', '#5d6b3a'), alphaTest: 0.45, side: T.DoubleSide, roughness: 0.9, metalness: 0 });
+    var matCapim = new T.MeshStandardMaterial({ map: texCapim(), alphaTest: 0.4, side: T.DoubleSide, roughness: 1, metalness: 0 });
+    var matCanaC = new T.MeshStandardMaterial({ map: texCana(), alphaTest: 0.4, side: T.DoubleSide, roughness: 0.95, metalness: 0 });
     var matTronco2 = new T.MeshLambertMaterial({ color: 0x3b2c22 });
     var matCopa = new T.MeshLambertMaterial({ color: 0x1d2d1c, flatShading: true });
     var matCopa2 = new T.MeshLambertMaterial({ color: 0x2a3118, flatShading: true });
@@ -765,7 +976,7 @@
     trechos[0].tipo = 'pasto';
     function trechoEm(s) { var t = trechos[0]; for (var i = 0; i < trechos.length; i++) if (trechos[i].s0 <= s) t = trechos[i]; return t.tipo; }
     var blocos = [];
-    for (var b = 0; b < nb; b++) blocos.push({ tronco: [], tronco2: [], copa: [], copa2: [], cana: [], poste: [], refl: [], balz: [] });
+    for (var b = 0; b < nb; b++) blocos.push({ tronco: [], tronco2: [], copa: [], copa2: [], cana: [], poste: [], refl: [], balz: [], capim: [] });
     function livre(x, z, folga) { distEstrada(R, x, z, tmp); return tmp.d > folga; }
     function ponto(i, lat) { var th = R.th[i]; return { x: R.x[i] - Math.cos(th) * lat, z: R.z[i] + Math.sin(th) * lat, th: th }; }
     for (var i = 2; i < R.n - 2; i++) {
@@ -780,21 +991,27 @@
             if (!livre(pt.x, pt.z, 9.5)) continue;
             var y = relevo(pt.x, pt.z) - 0.2, alt = 15 + rnd() * 9;
             bl.tronco.push([pt.x, y, pt.z, 0.9 + rnd() * 0.3, alt, rnd() * 6]);
-            bl.copa.push([pt.x, y + alt - 2.2, pt.z, 1.7 + rnd() * 0.8, 3.6 + rnd() * 1.5, rnd() * 6]);
+            bl.copa.push([pt.x, y + alt - 5.5, pt.z, 3.6 + rnd() * 1.6, 7 + rnd() * 2.5, rnd() * 6]);
           }
         } else if (tipo === 'cana' && i % 1 === 0) {
           for (var c = 0; c < 5; c++) {
             var lat2 = lado * (8.6 + rnd() * 28), pc = ponto(i, lat2);
             if (!livre(pc.x, pc.z, 8.2)) continue;
-            bl.cana.push([pc.x, relevo(pc.x, pc.z) - 0.3, pc.z, 0.9 + rnd() * 0.7, 2.2 + rnd() * 1.4, rnd() * 6]);
+            bl.cana.push([pc.x, relevo(pc.x, pc.z) - 0.3, pc.z, 1.3 + rnd() * 0.7, 2.6 + rnd() * 1.2, rnd() * 6]);
           }
         } else if (rnd() < (tipo === 'mata' ? 0.55 : 0.08)) {
           var lat3 = lado * (10 + rnd() * (tipo === 'mata' ? 30 : 50)), pm = ponto(i, lat3);
           if (livre(pm.x, pm.z, 9.5)) {
             var y3 = relevo(pm.x, pm.z) - 0.2, alt3 = 4 + rnd() * 5;
             bl.tronco2.push([pm.x, y3, pm.z, 1.3 + rnd() * 0.6, alt3, rnd() * 6]);
-            bl.copa2.push([pm.x, y3 + alt3, pm.z, 2.6 + rnd() * 2.2, 2 + rnd() * 1.2, rnd() * 6]);
+            bl.copa2.push([pm.x, y3 + alt3 - 2.2, pm.z, 5 + rnd() * 3.5, 4.2 + rnd() * 2, rnd() * 6]);
           }
+        }
+        // Tufos de capim na beira da estrada
+        if (tipo !== 'cana') for (var tc2 = 0; tc2 < 2; tc2++) {
+          var latc = lado * (5.4 + rnd() * (tc2 ? 9 : 2.5)), pcp = ponto(i, latc);
+          if (!livre(pcp.x, pcp.z, 5.2)) continue;
+          bl.capim.push([pcp.x, relevo(pcp.x, pcp.z) - 0.25, pcp.z, 0.9 + rnd() * 0.9, 0.55 + rnd() * 0.6, rnd() * 6]);
         }
         // Cerca do pasto
         if (tipo === 'pasto' && i % 2 === 0) {
@@ -849,19 +1066,22 @@
         if (tipoEsc === 'tronco') sc.set(it[3], it[4], it[3]);
         else if (tipoEsc === 'copa') sc.set(it[3], it[4], it[3] * (0.8 + (k % 5) * 0.08));
         else if (tipoEsc === 'poste') sc.set(1, it[3], 1);
+        else if (tipoEsc === 'card') sc.set(it[3], it[4], it[3]);
         else sc.set(it[3], it[4], it[3]);
         mtx.compose(ps, q, sc);
         im.setMatrixAt(k, mtx);
       }
       im.computeBoundingSphere();
+      im.castShadow = tipoEsc !== 'refl' && tipoEsc !== 'capim'; im.receiveShadow = true;
       grp.add(im);
     }
     blocos.forEach(function (bl) {
       inst(geoTronco, matTronco, bl.tronco, 'tronco');
-      inst(geoCopa, matCopa, bl.copa, 'copa');
+      inst(geoCopaC, matFolha, bl.copa, 'card');
       inst(geoTronco, matTronco2, bl.tronco2, 'tronco');
-      inst(geoCopa, matCopa2, bl.copa2, 'copa');
-      inst(geoCana, matCana, bl.cana, 'cana');
+      inst(geoCopaC, matFolha2, bl.copa2, 'card');
+      inst(geoCanaC, matCanaC, bl.cana, 'cana');
+      inst(geoCapim, matCapim, bl.capim, 'capim');
       inst(geoPoste, matPoste, bl.poste, 'poste');
       inst(geoRefl, matRefl, bl.refl, 'refl');
       inst(geoRefl, matBalz, bl.balz, 'refl');
@@ -925,6 +1145,20 @@
           g2.add(pd);
         }
       }
+      if (AST && AST.tronco && ob.tipo === 'tronco') {
+        g2.clear();
+        var tr = AST.tronco.scene.clone(true);
+        tr.scale.set(1.75, 2.1, 2.1); tr.position.y = 0.05;
+        g2.add(tr);
+      } else if (AST && AST.pedra && ob.tipo === 'pedras') {
+        g2.clear();
+        for (var pr = 0; pr < 3; pr++) {
+          var pe = AST.pedra.scene.clone(true), e = 0.45 + rnd() * 0.3;
+          pe.scale.set(e, e * (0.7 + rnd() * 0.4), e); pe.rotation.y = rnd() * 6;
+          pe.position.set(-1.5 + pr * 1.5 + (rnd() - 0.5) * 0.4, -0.1, (rnd() - 0.5) * 0.8);
+          g2.add(pe);
+        }
+      }
       g2.position.set(po.x, R.y[io], po.z);
       g2.rotation.y = R.th[io];
       grp.add(g2);
@@ -932,13 +1166,13 @@
     // A capela no fim (o abrigo)
     var ifim = Math.round((R.fim + 40) / DS), pf = ponto(Math.min(ifim, R.n - 1), 0);
     var capela = new T.Group();
-    var matCal = new T.MeshLambertMaterial({ color: 0x9c958a });
+    var matCal = new T.MeshStandardMaterial({ color: 0x5f5a53, roughness: 0.95, metalness: 0 });
     var corpo = new T.Mesh(new T.BoxGeometry(9, 6, 12), matCal); corpo.position.y = 3; capela.add(corpo);
     var tel = new T.Mesh(new T.ConeGeometry(8.7, 3.4, 4), new T.MeshLambertMaterial({ color: 0x6a2a1c })); tel.position.y = 7.7; tel.rotation.y = Math.PI / 4; capela.add(tel);
     var torre = new T.Mesh(new T.BoxGeometry(3, 11, 3), matCal); torre.position.set(0, 5.5, 5.5); capela.add(torre);
     var cruzT = new T.Mesh(new T.BoxGeometry(0.25, 1.6, 0.25), matCruz); cruzT.position.set(0, 12, 5.5); capela.add(cruzT);
-    var porta = new T.Mesh(new T.PlaneGeometry(2.4, 3.6), new T.MeshBasicMaterial({ color: 0xffc26a })); porta.position.set(0, 1.8, -6.02); porta.rotation.y = Math.PI; capela.add(porta);
-    var luzCap = new T.PointLight(0xffb060, 60, 40, 1.4); luzCap.position.set(0, 2.5, -8); capela.add(luzCap);
+    var porta = new T.Mesh(new T.PlaneGeometry(2.4, 3.6), new T.MeshBasicMaterial({ color: 0xc8882e })); porta.position.set(0, 1.8, -6.02); porta.rotation.y = Math.PI; capela.add(porta);
+    var luzCap = new T.PointLight(0xffb060, 25, 30, 1.6); luzCap.position.set(0, 2.5, -8); capela.add(luzCap);
     capela.position.set(pf.x, R.y[Math.min(ifim, R.n - 1)] - 0.2, pf.z);
     capela.rotation.y = pf.th;
     grp.add(capela);
@@ -950,7 +1184,7 @@
     var ext = new T.Group(); c.add(ext);
     var matLat = new T.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.55, metalness: 0.3 });
     var matPreto = new T.MeshStandardMaterial({ color: 0x15161a, roughness: 0.8 });
-    var matVidro = new T.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.15, metalness: 0.8 });
+    var matVidro = new T.MeshStandardMaterial({ color: 0x1a222c, roughness: 0.25, metalness: 0.2 });
     var matSujo = new T.MeshLambertMaterial({ color: 0x5a3a26 });
     var base = new T.Mesh(new T.BoxGeometry(1.76, 0.62, 3.9), matLat); base.position.y = 0.62; ext.add(base);
     var saia = new T.Mesh(new T.BoxGeometry(1.8, 0.22, 3.95), matSujo); saia.position.y = 0.36; ext.add(saia);
@@ -958,12 +1192,12 @@
     var teto = new T.Mesh(new T.BoxGeometry(1.5, 0.08, 1.8), matLat); teto.position.set(0, 1.55, -0.4); ext.add(teto);
     var faixa = new T.Mesh(new T.BoxGeometry(0.35, 0.02, 3.92), new T.MeshStandardMaterial({ color: 0x1b3d6e, roughness: 0.6 })); faixa.position.set(0, 0.94, 0); ext.add(faixa);
     var barra = new T.Mesh(new T.BoxGeometry(1.3, 0.12, 0.12), matPreto); barra.position.set(0, 1.64, 0.35); ext.add(barra);
-    var matFarol = new T.MeshBasicMaterial({ color: 0xfff2d0 });
+    var matFarol = new T.MeshBasicMaterial({ color: 0xfff2d0 }); matFarol.color.setRGB(6, 5.4, 4.2);
     var farois = [];
-    [-0.55, 0.55].forEach(function (x) { var f = new T.Mesh(new T.BoxGeometry(0.34, 0.14, 0.05), matFarol); f.position.set(x, 0.72, 1.96); ext.add(f); farois.push(f); });
+    [-0.55, 0.55].forEach(function (x) { var f = new T.Mesh(new T.BoxGeometry(0.34, 0.14, 0.05), matFarol); f.position.set(x, 0.72, 1.96); f.userData.luz = true; ext.add(f); farois.push(f); });
     [-0.45, -0.15, 0.15, 0.45].forEach(function (x) { var f = new T.Mesh(new T.CylinderGeometry(0.09, 0.09, 0.06, 10), matFarol); f.rotation.x = Math.PI / 2; f.position.set(x, 1.64, 0.43); ext.add(f); });
     G.matLanterna = new T.MeshBasicMaterial({ color: 0x8a0a06 });
-    [-0.62, 0.62].forEach(function (x) { var f = new T.Mesh(new T.BoxGeometry(0.32, 0.14, 0.05), G.matLanterna); f.position.set(x, 0.78, -1.96); ext.add(f); });
+    [-0.62, 0.62].forEach(function (x) { var f = new T.Mesh(new T.BoxGeometry(0.32, 0.14, 0.05), G.matLanterna); f.position.set(x, 0.78, -1.96); f.userData.luz = true; f.userData.lanterna = true; ext.add(f); });
     var rodas = [];
     var geoRoda = new T.CylinderGeometry(0.34, 0.34, 0.26, 14); geoRoda.rotateZ(Math.PI / 2);
     [[-0.84, 1.25], [0.84, 1.25], [-0.84, -1.2], [0.84, -1.2]].forEach(function (p) {
@@ -976,22 +1210,68 @@
     var inter = new T.Group(); c.add(inter);
     var painel = new T.Mesh(new T.BoxGeometry(1.6, 0.22, 0.45), matPreto); painel.position.set(0, 0.92, 0.7); inter.add(painel);
     var capo = new T.Mesh(new T.BoxGeometry(1.7, 0.06, 1.3), new T.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.55, metalness: 0.3, emissive: 0x2a1e06 })); capo.position.set(0, 0.86, 1.35); capo.rotation.x = 0.08; inter.add(capo);
-    var volante = new T.Mesh(new T.TorusGeometry(0.19, 0.03, 6, 18), matPreto); volante.position.set(-0.36, 1.0, 0.42); volante.rotation.x = -0.35; inter.add(volante);
+    var volante = new T.Mesh(new T.TorusGeometry(0.17, 0.025, 6, 18), matPreto); volante.position.set(0.36, 0.9, 0.5); volante.rotation.x = -0.35; inter.add(volante);
     var raio = new T.Mesh(new T.BoxGeometry(0.36, 0.04, 0.03), matPreto); volante.add(raio);
     [-0.8, 0.8].forEach(function (x) { var col = new T.Mesh(new T.BoxGeometry(0.05, 0.75, 0.05), matPreto); col.position.set(x, 1.3, 0.62); col.rotation.x = -0.55; col.rotation.z = x > 0 ? 0.18 : -0.18; inter.add(col); });
     var tetoI = new T.Mesh(new T.BoxGeometry(1.6, 0.05, 1.6), matPreto); tetoI.position.set(0, 1.62, -0.2); inter.add(tetoI);
-    var conta = new T.Mesh(new T.PlaneGeometry(0.3, 0.1), new T.MeshBasicMaterial({ color: 0xff9a3a })); conta.position.set(-0.36, 1.04, 0.62); conta.rotation.x = -0.6; conta.rotation.y = Math.PI; inter.add(conta);
+    var conta = new T.Mesh(new T.PlaneGeometry(0.3, 0.1), new T.MeshBasicMaterial({ color: 0xff9a3a })); conta.position.set(0.36, 1.04, 0.62); conta.rotation.x = -0.6; conta.rotation.y = Math.PI; inter.add(conta);
     inter.visible = false;
     // Luzes: faróis (spot) e lanterna (vermelha, ilumina a Mula atrás)
     var spot = new T.SpotLight(0xffe7c0, 2600, 150, 0.5, 0.5, 1.2);
+    spot.castShadow = true; spot.shadow.camera.near = 0.5; spot.shadow.camera.far = 90; spot.shadow.bias = -0.0004; spot.shadow.normalBias = 0.05;
     spot.position.set(0, 0.78, 2.1); c.add(spot);
     var alvo = new T.Object3D(); alvo.position.set(0, -0.2, 26); c.add(alvo); spot.target = alvo;
     var spot2 = new T.SpotLight(0xfff6e0, 700, 60, 0.95, 0.8, 1.4);
     spot2.position.set(0, 0.95, 2.05); c.add(spot2);
     var alvo2 = new T.Object3D(); alvo2.position.set(0, -1, 9); c.add(alvo2); spot2.target = alvo2;
+    // Facho visível dos faróis na neblina
+    var matFacho = new T.ShaderMaterial({
+      uniforms: { uCor: { value: new T.Color(1.0, 0.86, 0.66) }, uForca: { value: 0.11 } },
+      vertexShader: 'varying float vL; varying vec3 vN; varying vec3 vV; void main(){ vL = clamp(position.z, 0.0, 1.0); vec4 mv = modelViewMatrix*vec4(position,1.0); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix*mv; }',
+      fragmentShader: 'uniform vec3 uCor; uniform float uForca; varying float vL; varying vec3 vN; varying vec3 vV; void main(){ float borda = pow(abs(dot(vN, vV)), 1.6); float a = pow(max(1.0 - vL, 0.0), 1.4) * borda * uForca; gl_FragColor = vec4(uCor * a, 1.0); }',
+      transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide
+    });
+    var geoFacho = new T.CylinderGeometry(0.08, 4.2, 1, 20, 1, true);
+    geoFacho.translate(0, -0.5, 0); geoFacho.rotateX(-Math.PI / 2 - 0.03);
+    [-0.55, 0.55].forEach(function (x) {
+      var f = new T.Mesh(geoFacho, matFacho);
+      f.position.set(x, 0.72, 2.0); f.scale.set(1, 1, 30);
+      f.renderOrder = 5; f.frustumCulled = false; f.castShadow = false; f.userData.semSombra = true;
+      ext.add(f);
+    });
+    G.matFacho = matFacho;
     var lant = new T.PointLight(0xff1a10, 5, 9, 1.6); lant.position.set(0, 0.55, -2.7); c.add(lant);
     G.cena.add(c);
+    G.carroReal = usarCarroReal(ext, capo, rodas);
+    c.traverse(function (o) { if (o.isMesh && !o.userData.semSombra) { o.castShadow = true; o.receiveShadow = true; } });
     G.carroObj = c; G.carroExt = ext; G.carroInt = inter; G.rodas = rodas; G.volante = volante; G.lantLuz = lant; G.farol = spot;
+  }
+
+  // Lataria do modelo real: esconde as primitivas (fica só o que é luz e o facho)
+  function usarCarroReal(ext, capo, rodas) {
+    if (!(AST && AST.carro)) return false;
+    ext.children.forEach(function (o) {
+      if (o.isMesh && !o.userData.semSombra && !o.userData.luz) o.visible = false;
+      if (o.userData.luz && !o.userData.lanterna) { o.position.y = 0.6; o.position.z = 2.0; o.scale.set(0.7, 0.8, 1); }
+      if (o.userData.lanterna) { o.position.y = 0.74; o.position.z = -1.96; o.scale.set(0.6, 0.7, 1); }
+    });
+    // a barra de faróis do teto não existe no carro real
+    ext.children.forEach(function (o) { if (o.userData.luz && o.position.y > 1.2) o.visible = false; });
+    rodas.forEach(function (r) { r.pivo.visible = false; });
+    var cena = AST.carro.scene.clone(true), nos = {}, novas = [];
+    cena.traverse(function (o) { if (o.name) nos[o.name] = o; });
+    ['roda_fe', 'roda_fd', 'roda_te', 'roda_td'].forEach(function (n) {
+      var w = nos[n]; if (!w) return;
+      var piv = new T.Group(); piv.position.copy(w.position);
+      w.parent.remove(w); w.position.set(0, 0, 0); piv.add(w); cena.add(piv);
+      novas.push({ pivo: piv, roda: w, frente: n.charAt(5) === 'f' });
+    });
+    cena.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; if (o.material) o.material.envMapIntensity = 0.7; } });
+    ext.add(cena);
+    // cabine: o capô de primitiva assume a cor do carro real (os vidros do modelo são opacos por dentro)
+    capo.material.color.setHex(0x6e2620); capo.material.emissive.setHex(0x1a0605); capo.material.metalness = 0.15;
+    if (novas.length === 4) { rodas.length = 0; novas.forEach(function (x) { rodas.push(x); }); }
+    return true;
   }
 
   /* ── Mula sem cabeça (primitivas) ─────────────────────────────
@@ -1028,8 +1308,109 @@
     var brilho = new T.Sprite(new T.SpriteMaterial({ map: G.tex.brilhoFogo, color: 0xff9a40, blending: T.AdditiveBlending, depthWrite: false, transparent: true }));
     brilho.scale.set(3.2, 3.2, 1); G.cena.add(brilho);
     var luz = new T.PointLight(0xff7a28, 220, 60, 1.5); G.cena.add(luz);
+    // Luz do fogo apontada para o carro: joga a sombra do carro para a frente na estrada
+    var luzSombra = new T.SpotLight(0xff8a30, 0, 70, 0.75, 0.6, 1.4);
+    luzSombra.castShadow = true; luzSombra.shadow.camera.near = 0.5; luzSombra.shadow.camera.far = 70; luzSombra.shadow.bias = -0.0005; luzSombra.shadow.normalBias = 0.05;
+    G.cena.add(luzSombra); G.cena.add(luzSombra.target);
+    G.mulaSombra = luzSombra;
+    m.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
     G.cena.add(m);
     G.mulaObj = m; G.mulaCorpo = corpoG; G.mulaPernas = pernas; G.mulaPonta = ponta; G.mulaBrilho = brilho; G.mulaLuz = luz; G.mulaPescoco = pescoco;
+    usarMulaReal(m, corpoG);
+  }
+
+  /* ── Mula do modelo real: malha com esqueleto; o galope é feito aqui ── */
+  var OSSOS = {
+    // [nome no glTF, papel]
+    upper_armL_38: 'ombroE', forearmL_37: 'anteE', handL_36: 'canelaDE', f_toeL_35: 'cascoDE',
+    upper_armR_44: 'ombroD', forearmR_43: 'anteD', handR_42: 'canelaDD', f_toeR_41: 'cascoDD',
+    thighL_56: 'coxaE', shinL_55: 'pernaE', footL_54: 'canelaTE', r_toeL_53: 'cascoTE',
+    thighR_61: 'coxaD', shinR_60: 'pernaD', footR_59: 'canelaTD', r_toeR_58: 'cascoTD',
+    spine010_34: 'pesc1', spine011_31: 'pesc2', spine012_28: 'pesc3', spine014_25: 'pesc4', spine015_22: 'toco',
+    spine004_5: 'rabo1', spine003_4: 'rabo2', spine002_3: 'rabo3', spine001_2: 'rabo4', spine_1: 'rabo5',
+    spine005_64: 'quadril', spine009_48: 'peito', spine007_51: 'lombo'
+  };
+  function usarMulaReal(m, corpoG) {
+    if (!(AST && AST.mula)) return false;
+    var g = AST.mula.scene;
+    var ossos = {}, malhas = [];
+    g.traverse(function (o) {
+      if (o.isBone && OSSOS[o.name]) { ossos[OSSOS[o.name]] = o; o.userData.q0 = o.quaternion.clone(); }
+      if (o.isMesh) {
+        malhas.push(o);
+        o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
+        var nome = (o.material && o.material.name) || '';
+        if (nome === 'toco') { var mb = new T.MeshBasicMaterial({ color: 0xffffff, side: T.DoubleSide }); mb.color.setRGB(5, 1.5, 0.25); o.material = mb; }
+        else o.material = new T.MeshStandardMaterial({ color: 0x241811, roughness: 0.45, metalness: 0, emissive: 0x0c0302, envMapIntensity: 0.8, side: T.DoubleSide });
+      }
+    });
+    if (!ossos.toco || !ossos.ombroE || !ossos.coxaE) return false;
+    // esconde as primitivas
+    corpoG.children.forEach(function (o) { o.visible = false; });
+    // orienta: do quadril para o pescoço = +Z; escala para 2,4 m de comprimento; cascos no chão
+    var ajuste = new T.Group(); ajuste.add(g);
+    var piv = new T.Group(); piv.add(ajuste); m.add(piv);
+    g.updateMatrixWorld(true);
+    var a = new T.Vector3(), b = new T.Vector3();
+    ossos.coxaE.getWorldPosition(a); ossos.toco.getWorldPosition(b);
+    ajuste.rotation.y = -Math.atan2(b.x - a.x, b.z - a.z);
+    ajuste.updateMatrixWorld(true);
+    var caixa = new T.Box3().setFromObject(g, true), tam = new T.Vector3(); caixa.getSize(tam);
+    var esc = 2.45 / Math.max(tam.z, 0.01);
+    ajuste.scale.setScalar(esc);
+    ajuste.updateMatrixWorld(true);
+    caixa.setFromObject(g, true);
+    var cz = (caixa.min.z + caixa.max.z) / 2;
+    // pivô do corpo nos cascos de trás (para empinar), 0,8 m atrás do centro
+    piv.position.set(0, 0, -0.8);
+    ajuste.position.set(-(caixa.min.x + caixa.max.x) / 2, -caixa.min.y, 0.8 - cz);
+    G.mulaCorpo = piv; G.mulaBaseZ = piv.position.z;
+    G.mulaOssos = ossos;
+    var ponta = new T.Object3D();
+    ossos.toco.add(ponta);
+    // o eixo Y do osso aponta ao longo do pescoço: sai uns 25 cm do corte
+    ponta.position.set(0, 0.25 / Math.max(0.0001, ossos.toco.getWorldScale(new T.Vector3()).y), 0);
+    G.mulaPonta = ponta;
+    return true;
+  }
+  // Galope transverso (4 tempos), osso por osso. Ângulos em radianos, girando no eixo X local
+  // de cada osso (o eixo de dobra das pernas nesse esqueleto).
+  var GAL = { ombro: 0.6, ante: -1.5, canelaD: 0.9, cascoD: 0.6, coxa: 0.5, perna: 0.9, canelaT: -0.9, cascoT: 0.3,
+    fases: { E_t: 0.0, D_t: 0.12, E_d: 0.5, D_d: 0.62 }, apoio: 0.42 };
+  var _qx = null;
+  function girarX(o, ang) {
+    if (!o) return;
+    if (!_qx) _qx = new T.Quaternion();
+    _qx.setFromAxisAngle(_eixoX, ang);
+    o.quaternion.copy(o.userData.q0).multiply(_qx);
+  }
+  var _eixoX = null;
+  function animarOssos(f, emp) {
+    var O = G.mulaOssos;
+    if (!_eixoX) _eixoX = new T.Vector3(1, 0, 0);
+    var ciclo = f / (Math.PI * 2);
+    function perna(fase, A, osso1, osso2, osso3, osso4, k2, k3, k4) {
+      var u = ciclo + fase; u -= Math.floor(u);
+      var ap = GAL.apoio, giro, dobra;
+      if (u < ap) { giro = lerp(A, -A, u / ap); dobra = 0.08; }
+      else { var sw = (u - ap) / (1 - ap); giro = -A + 2 * A * (0.5 - 0.5 * Math.cos(Math.PI * sw)); dobra = Math.sin(Math.PI * Math.min(1, sw * 1.15)); }
+      girarX(osso1, giro * emp);
+      girarX(osso2, k2 * dobra * emp);
+      girarX(osso3, k3 * dobra * emp);
+      girarX(osso4, k4 * (dobra - 0.15) * emp);
+    }
+    var F = GAL.fases;
+    perna(F.E_t, GAL.coxa, O.coxaE, O.pernaE, O.canelaTE, O.cascoTE, GAL.perna, GAL.canelaT, GAL.cascoT);
+    perna(F.D_t, GAL.coxa, O.coxaD, O.pernaD, O.canelaTD, O.cascoTD, GAL.perna, GAL.canelaT, GAL.cascoT);
+    perna(F.E_d, GAL.ombro, O.ombroE, O.anteE, O.canelaDE, O.cascoDE, GAL.ante, GAL.canelaD, GAL.cascoD);
+    perna(F.D_d, GAL.ombro, O.ombroD, O.anteD, O.canelaDD, O.cascoDD, GAL.ante, GAL.canelaD, GAL.cascoD);
+    // pescoço balança contra o corpo; rabo levantado e solto
+    var balanco = Math.sin(f + 0.6);
+    girarX(O.pesc1, balanco * 0.1 * emp + (mula.pescoco || 0));
+    girarX(O.pesc2, balanco * 0.08 * emp);
+    girarX(O.lombo, Math.sin(f * 2) * 0.03 * emp);
+    var rab = ['rabo1', 'rabo2', 'rabo3', 'rabo4', 'rabo5'];
+    for (var i = 0; i < rab.length; i++) girarX(O[rab[i]], (GAL.rabo != null ? GAL.rabo : -0.32) * emp + Math.sin(f * 2 - i * 0.7) * 0.09 * emp);
   }
 
   /* ── Passe final: grão, vinheta, aberração, perigo, retrovisor ─── */
@@ -1038,12 +1419,12 @@
     G.camPos = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     G.matPos = new T.ShaderMaterial({
       uniforms: {
-        tCena: { value: null }, tEsp: { value: null }, uT: { value: 0 }, uPerigo: { value: 0 }, uFlash: { value: 0 },
-        uEsp: { value: 1 }, uRet: { value: new T.Vector4(0.37, 0.80, 0.63, 0.94) }, uRes: { value: new T.Vector2(1280, 720) }, uPreto: { value: 0 }
+        tCena: { value: null }, tEsp: { value: null }, tBloom: { value: null }, uT: { value: 0 }, uPerigo: { value: 0 }, uFlash: { value: 0 },
+        uEsp: { value: 1 }, uEstatica: { value: 0 }, uRet: { value: new T.Vector4(0.37, 0.80, 0.63, 0.94) }, uRes: { value: new T.Vector2(1280, 720) }, uPreto: { value: 0 }
       },
       vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.0,1.0); }',
       fragmentShader: [
-        'uniform sampler2D tCena; uniform sampler2D tEsp; uniform float uT, uPerigo, uFlash, uEsp, uPreto; uniform vec4 uRet; uniform vec2 uRes;',
+        'uniform sampler2D tCena; uniform sampler2D tEsp; uniform sampler2D tBloom; uniform float uT, uPerigo, uFlash, uEsp, uPreto, uEstatica; uniform vec4 uRet; uniform vec2 uRes;',
         'varying vec2 vUv;',
         'float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }',
         'void main(){',
@@ -1058,6 +1439,7 @@
         '    vec3 ce = texture2D(tEsp, vec2(1.0 - m.x, m.y)).rgb * 1.05;',
         '    c = borda > 0.93 ? vec3(0.02) : mix(ce, ce*0.6, smoothstep(0.6, 0.93, borda));',
         '  }',
+        '  c += texture2D(tBloom, uv).rgb * 0.9;',
         '  c = c * vec3(1.03, 0.96, 1.07);',
         '  #ifdef TONE_MAPPING',
         '  c = toneMapping(c);',
@@ -1070,6 +1452,11 @@
         '  c *= mix(0.32, 1.0, vig);',
         '  c = mix(c, vec3(0.5,0.0,0.02), (1.0 - vig) * uPerigo * 0.62);',
         '  c = mix(c, vec3(1.0,0.55,0.18), uFlash);',
+        '  if (uEstatica > 0.5) {',
+        '    float n = h(floor(uv*uRes/2.0) + fract(uT*61.0)*317.0);',
+        '    float faixa = step(0.92, fract(uv.y*7.0 - uT*9.0));',
+        '    c = vec3(n*0.85 + faixa*0.25);',
+        '  }',
         '  c *= 1.0 - uPreto;',
         '  gl_FragColor = vec4(c, 1.0);',
         '  #include <colorspace_fragment>',
@@ -1081,6 +1468,19 @@
     quad.frustumCulled = false;
     G.cenaPos.add(quad);
     G.rtCena = null; G.rtEsp = null;
+    // Bloom: separa o que passa do branco, borra em 1/4 da resolução e soma no passe final
+    var vs = 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.0,1.0); }';
+    G.matLimiar = new T.ShaderMaterial({ uniforms: { tMapa: { value: null } }, vertexShader: vs, depthTest: false, depthWrite: false,
+      fragmentShader: 'uniform sampler2D tMapa; varying vec2 vUv; void main(){ vec3 c = texture2D(tMapa, vUv).rgb; if (!(c.r == c.r && c.g == c.g && c.b == c.b)) c = vec3(0.0); c = clamp(c, 0.0, 60.0); float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c * smoothstep(0.9, 2.2, l), 1.0); }' });
+    G.matBorrao = new T.ShaderMaterial({ uniforms: { tMapa: { value: null }, uDir: { value: new T.Vector2() } }, vertexShader: vs, depthTest: false, depthWrite: false,
+      fragmentShader: 'uniform sampler2D tMapa; uniform vec2 uDir; varying vec2 vUv; void main(){ vec3 c = texture2D(tMapa, vUv).rgb * 0.227;' +
+        ' c += (texture2D(tMapa, vUv + uDir*1.385).rgb + texture2D(tMapa, vUv - uDir*1.385).rgb) * 0.316;' +
+        ' c += (texture2D(tMapa, vUv + uDir*3.231).rgb + texture2D(tMapa, vUv - uDir*3.231).rgb) * 0.070; gl_FragColor = vec4(c, 1.0); }' });
+    G.cenaPasse = new T.Scene();
+    G.quadPasse = new T.Mesh(new T.PlaneGeometry(2, 2), G.matLimiar);
+    G.quadPasse.frustumCulled = false;
+    G.cenaPasse.add(G.quadPasse);
+    G.rtB1 = null; G.rtB2 = null;
   }
   function tamanhoRT(w, h) {
     var esc = cfg.grafico === 'alto' ? 1 : cfg.grafico === 'medio' ? 0.72 : 0.5;
@@ -1090,8 +1490,20 @@
     if (!G.rtCena) { G.rtCena = new T.WebGLRenderTarget(rw, rh, opts); G.rtEsp = new T.WebGLRenderTarget(Math.round(rw * 0.3), Math.round(rw * 0.3 / 3), opts); }
     else { G.rtCena.setSize(rw, rh); G.rtEsp.setSize(Math.round(rw * 0.3), Math.round(rw * 0.3 / 3)); }
     G.matPos.uniforms.uRes.value.set(rw, rh);
+    var bw = Math.max(80, Math.round(rw / 4)), bh = Math.max(45, Math.round(rh / 4));
+    if (!G.rtB1) { G.rtB1 = new T.WebGLRenderTarget(bw, bh, { type: T.HalfFloatType, depthBuffer: false }); G.rtB2 = G.rtB1.clone(); }
+    else { G.rtB1.setSize(bw, bh); G.rtB2.setSize(bw, bh); }
+    G.bloomTam = [bw, bh];
+    // sombras por nível de gráfico
+    var somb = cfg.grafico !== 'leve';
+    G.renderer.shadowMap.enabled = somb;
+    G.farol.castShadow = somb;
+    var tam = cfg.grafico === 'alto' ? 2048 : 1024;
+    if (G.farol.shadow.mapSize.x !== tam) { G.farol.shadow.mapSize.set(tam, tam); if (G.farol.shadow.map) { G.farol.shadow.map.dispose(); G.farol.shadow.map = null; } }
+    G.sombraMula = cfg.grafico === 'alto';
     G.fogo.mat.uniforms.uEscala.value = rh * 0.9;
     G.poeira.mat.uniforms.uEscala.value = rh * 0.9;
+    G.nev.mat.uniforms.uEscala.value = rh * 0.9;
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -1263,25 +1675,56 @@
     pontoEm(R, Math.max(0, sM), _pm);
     if (sM < 0) { _pm.x += Math.sin(_pm.th) * sM; _pm.z += Math.cos(_pm.th) * sM; }
     // vem pelo meio, puxando para o lado do carro quando chega perto
-    mula.lat = lerp(mula.lat, mula.gap < 14 ? carro.lat * 0.8 : Math.sin(tempoGlobal * 0.6) * 1.3, dt * 1.5);
+    if (mula.gap < 12) { if (!mula.lado) mula.lado = carro.lat > 0 ? -1 : 1; }
+    else if (mula.gap > 18) mula.lado = 0;
+    var latAlvo = mula.lado ? clamp(carro.lat + mula.lado * 2.3, -MEIA - 0.5, MEIA + 0.5) : Math.sin(tempoGlobal * 0.6) * 1.3;
+    mula.lat = lerp(mula.lat, latAlvo, dt * 1.8);
+    if (mula.gap < 7 && !mula.ferroou && estado === 'correndo') { mula.ferroou = true; som.ferroada(); vibrar(80); }
+    if (mula.gap > 16) mula.ferroou = false;
     var rx = -Math.cos(_pm.th), rz = Math.sin(_pm.th);
     o.position.set(_pm.x + rx * mula.lat, _pm.y, _pm.z + rz * mula.lat);
     o.rotation.y = _pm.th;
+    if (mula.capo) {
+      // em cima do capô, de frente para o para-brisa
+      var cfx = Math.sin(carro.psi), cfz = Math.cos(carro.psi);
+      o.position.set(carro.x + cfx * mula.capoD, carro.y + mula.capoY, carro.z + cfz * mula.capoD);
+      o.rotation.y = carro.psi + Math.PI;
+      _pm.th = carro.psi + Math.PI;
+    }
     // Galope
     mula.fase += dt * (1.4 + mula.vel * 0.05) * Math.PI * 2;
+    if (GAL.fixo != null) mula.fase = GAL.fixo * Math.PI * 2;
     var f = mula.fase, emp = mula.vel > 0.5 ? 1 : 0.15;
     G.mulaCorpo.position.y = Math.abs(Math.sin(f)) * 0.16 * emp;
     G.mulaCorpo.rotation.x = Math.sin(f) * 0.07 * emp + (mula.empina || 0);
-    G.mulaPernas.forEach(function (pn) {
+    if (G.mulaOssos) { G.mulaCorpo.position.z = G.mulaBaseZ; animarOssos(f, emp); }
+    else G.mulaPernas.forEach(function (pn) {
       var ph = f + pn.fase * Math.PI * 2;
       pn.quad.rotation.x = Math.sin(ph) * 0.75 * emp;
       pn.joelho.rotation.x = (pn.tras ? -1 : 1) * Math.max(0, Math.sin(ph + 0.9)) * 1.1 * emp;
     });
-    G.mulaPescoco.rotation.x = 0.75 + Math.sin(f * 0.5) * 0.06;
+    if (!G.mulaOssos) G.mulaPescoco.rotation.x = 0.75 + Math.sin(f * 0.5) * 0.06;
     // Fogo
     G.mulaObj.updateMatrixWorld(true);
     var pw = _pw; G.mulaPonta.getWorldPosition(pw);
+    if (mula.capo) {
+      // encaixa o toco do pescoço no ponto pedido, à frente dos olhos do motorista
+      var ofx = Math.sin(carro.psi), ofz = Math.cos(carro.psi);
+      var ex = carro.x + Math.cos(carro.psi) * 0.36 + ofx * 0.05, ez = carro.z - Math.sin(carro.psi) * 0.36 + ofz * 0.05, ey = carro.y + (G.carroReal ? 1.22 : 1.32);
+      var alvoX = ex + ofx * mula.capoD, alvoY = ey + mula.capoY, alvoZ = ez + ofz * mula.capoD;
+      o.position.x += alvoX - pw.x; o.position.y += alvoY - pw.y; o.position.z += alvoZ - pw.z;
+      o.updateMatrixWorld(true);
+      G.mulaPonta.getWorldPosition(pw);
+    }
     var fdx = Math.sin(_pm.th), fdz = Math.cos(_pm.th);
+    if (mula.capo && mula.jorro > 0) {
+      var cp = G.cam.position;
+      for (var j = 0; j < 10; j++) {
+        var ddx = cp.x - pw.x, ddy = cp.y - pw.y, ddz = cp.z - pw.z, dl = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz) || 1;
+        var vj = 4 + Math.random() * 5 * mula.jorro;
+        G.fogo.emitir(pw.x, pw.y, pw.z, ddx / dl * vj + (Math.random() - 0.5) * 3, ddy / dl * vj + (Math.random() - 0.5) * 3, ddz / dl * vj + (Math.random() - 0.5) * 3, 0.5 + Math.random() * 0.4, 0.5 + Math.random() * 0.9);
+      }
+    }
     var nEmit = Math.min(8, Math.round(dt * (mula.surto > 0 ? 900 : 260)));
     for (var i = 0; i < nEmit; i++) {
       var sp = mula.surto > 0 ? 4 : 1;
@@ -1296,6 +1739,11 @@
     G.mulaBrilho.scale.set(esc, esc * 1.3, 1);
     G.mulaLuz.position.set(pw.x, pw.y + 0.8, pw.z);
     G.mulaLuz.intensity = 240 * tremula * (mula.surto > 0 ? 3 : 1);
+    var proxM = clamp(1 - (mula.gap - 3) / 45, 0, 1);
+    G.mulaSombra.position.set(pw.x, pw.y + 0.6, pw.z);
+    G.mulaSombra.target.position.set(carro.x, carro.y + 0.5, carro.z);
+    G.mulaSombra.intensity = (estado === 'titulo' ? 0.35 : proxM) * 420 * tremula;
+    G.mulaSombra.castShadow = G.sombraMula && proxM > 0.05;
     if (mula.surto > 0) mula.surto -= dt;
   }
 
@@ -1319,7 +1767,7 @@
       corrida = novaCorrida();
       carro = novoCarro();
       posicionarCarroEm(30);
-      mula = { gap: GAP_INI, vel: 0, lat: 0, fase: 0, tCorrida: 0, empina: 0, surto: 0, invT: 0, proxInv: 28 };
+      mula = { gap: GAP_INI, vel: 0, lat: 0, fase: 0, tCorrida: 0, empina: 0, surto: 0, invT: 0, proxInv: 28, capo: false, jorro: 0, lado: 0 };
       R.obst.forEach(function (o) { o.batido = 0; });
     } else {
       corrida.retries--; corrida.usouRetry = true;
@@ -1328,10 +1776,11 @@
       corrida.kmTempos.length = retryKm + 1;
       carro = novoCarro();
       posicionarCarroEm(retryKm * 1000 + 6);
-      mula = { gap: GAP_RETRY, vel: 0, lat: 0, fase: 0, tCorrida: 0, empina: 0, surto: 0, invT: 0, proxInv: 22 };
+      mula = { gap: GAP_RETRY, vel: 0, lat: 0, fase: 0, tCorrida: 0, empina: 0, surto: 0, invT: 0, proxInv: 22, capo: false, jorro: 0, lado: 0 };
     }
-    G.fogo.limpar(); G.poeira.limpar();
-    corrida.flash = 0; corrida.preto = 0;
+    G.fogo.limpar(); G.poeira.limpar(); G.nev.ok = false;
+    corrida.flash = 0; corrida.preto = 0; corrida.estatica = 0;
+    limparRachas();
     atualizarChao(carro.x, carro.z, true);
     camInstantanea = true;
     mudarEstado('contagem');
@@ -1372,14 +1821,17 @@
       if (carro.s >= R.fim) { vencer(); }
       else if (mula.gap <= GAP_PEGA) { pegar(); }
     } else if (estado === 'pego') {
-      // carro morre, a Mula passa por cima
       carro.vx *= Math.pow(0.2, dt); carro.vz *= Math.pow(0.2, dt); carro.vel *= Math.pow(0.2, dt);
       carro.x += carro.vx * dt; carro.z += carro.vz * dt; projetar(carro);
-      mula.gap = Math.max(-1.5, mula.gap - dt * 6);
-      mula.empina = -Math.min(0.55, tEstado * 1.2);
-      corrida.flash = tEstado < 0.25 ? tEstado * 4 : Math.max(0, 1 - (tEstado - 0.25) * 1.4);
-      corrida.preto = clamp((tEstado - 0.9) * 1.6, 0, 1);
-      if (tEstado > 1.7 && !corrida.mostrouFim) { corrida.mostrouFim = true; telaDerrota(); }
+      if (cfg.susto === 'forte') sustoForte(dt);
+      else {
+        // suave: câmera de lado, a Mula empina por cima do carro
+        mula.gap = Math.max(-1.5, mula.gap - dt * 6);
+        mula.empina = -Math.min(0.55, tEstado * 1.2);
+        corrida.flash = (tEstado < 0.25 ? tEstado * 4 : Math.max(0, 1 - (tEstado - 0.25) * 1.4)) * 0.6;
+        corrida.preto = clamp((tEstado - 0.9) * 1.6, 0, 1);
+        if (tEstado > 1.7 && !corrida.mostrouFim) { corrida.mostrouFim = true; telaDerrota(); }
+      }
     } else if (estado === 'fim') {
       // entra devagar no adro da capela
       carro.vx *= Math.pow(0.3, dt); carro.vz *= Math.pow(0.3, dt); carro.vel *= Math.pow(0.3, dt);
@@ -1393,11 +1845,113 @@
   function pegar() {
     mudarEstado('pego');
     corrida.mostrouFim = false;
-    mula.surto = 1.2;
-    som.grito();
-    vibrar(400);
+    corrida.fase = 0;
     partida(false);
     el.toque.style.display = 'none';
+    if (cfg.susto === 'forte') {
+      // 1) um instante de silêncio, já dentro do carro
+      som.silencio(0.4);
+      mula.capo = false; mula.jorro = 0;
+      el.hud.style.display = 'none';
+    } else {
+      mula.surto = 1.2;
+      som.grito(false);
+      vibrar(250);
+    }
+  }
+
+  /* JUMP SCARE (forte)
+     0,00 s  corte para a cabine, silêncio; ela some (está pulando o carro)
+     0,32 s  PAM: cai no capô de frente para você, o vidro trinca, grito
+     0,32–1,0 s  o pescoço em chamas avança contra o para-brisa, fogo na cara
+     1,0 s   segunda trinca; o fogo toma a tela
+     1,25 s  estática (o sinal cai) → preto → tela de derrota */
+  function sustoForte(dt) {
+    var t = tEstado;
+    if (corrida.fase === 0) {
+      mula.capo = false;
+      G.mulaObj.visible = false;
+      if (t > 0.32) {
+        corrida.fase = 1;
+        mula.capo = true; mula.capoD = 3.8; mula.capoY = 1.6; mula.empina = -0.75; mula.surto = 2; mula.jorro = 0;
+        mula.vel = 0;
+        som.impacto(1); som.grito(true);
+        racha(0.5 + (Math.random() - 0.5) * 0.25, 0.35 + Math.random() * 0.15, 0.55);
+        corrida.tremor = 2.2; corrida.flash = 0.35;
+        vibrar([300, 60, 500]);
+      }
+    } else if (corrida.fase === 1) {
+      var k = clamp((t - 0.32) / 0.68, 0, 1);
+      // avança: chega mais perto e abaixa o pescoço para o vidro
+      mula.capoD = lerp(3.8, 1.75, suave(0.1, 1, k));
+      mula.capoY = lerp(1.6, 0.1, suave(0, 0.9, k)) + Math.sin(t * 40) * 0.03;
+      mula.empina = lerp(-0.75, 0.22, suave(0, 0.8, k)) + Math.sin(t * 38) * 0.04;
+      mula.jorro = k;
+      corrida.flash = Math.max(corrida.flash - dt * 2, k > 0.75 ? (k - 0.75) * 2.4 : 0);
+      corrida.tremor = Math.max(corrida.tremor, 1.2);
+      if (k >= 1) { corrida.fase = 2; racha(0.42 + Math.random() * 0.16, 0.5, 1); som.trinca(); }
+    } else if (corrida.fase === 2) {
+      corrida.flash = Math.min(1, corrida.flash + dt * 5);
+      mula.jorro = 1;
+      if (t > 1.25) { corrida.fase = 3; corrida.estatica = 1; som.estatica(0.45); mula.jorro = 0; }
+    } else if (corrida.fase === 3) {
+      corrida.flash = 0;
+      corrida.estatica = t < 1.7 ? 1 : 0;
+      corrida.preto = t < 1.7 ? 0 : 1;
+      if (t > 1.85 && !corrida.mostrouFim) {
+        corrida.mostrouFim = true;
+        mula.capo = false; mula.jorro = 0; corrida.estatica = 0;
+        limparRachas();
+        telaDerrota();
+      }
+    }
+  }
+
+  // Trinca no para-brisa (desenhada num canvas por cima do jogo)
+  function racha(u, v, tam) {
+    var c = el.trinca; if (!c) return;
+    var w = c.clientWidth, h = c.clientHeight;
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    var g = c.getContext('2d');
+    var cx = u * w, cy = v * h, R0 = Math.min(w, h) * 0.6 * tam;
+    c.style.opacity = '1';
+    g.lineCap = 'round';
+    var raios = 14 + Math.floor(Math.random() * 8), pontas = [];
+    for (var i = 0; i < raios; i++) {
+      var a = i / raios * Math.PI * 2 + (Math.random() - 0.5) * 0.35, len = R0 * (0.45 + Math.random() * 0.75);
+      var x = cx, y = cy, seg = 7 + Math.floor(Math.random() * 5), pts = [[x, y]];
+      for (var k = 0; k < seg; k++) {
+        a += (Math.random() - 0.5) * 0.45;
+        x += Math.cos(a) * len / seg; y += Math.sin(a) * len / seg; pts.push([x, y]);
+      }
+      pontas.push(pts);
+      // sombra escura + fio claro = trinca visível em qualquer fundo
+      [['rgba(0,0,0,.55)', 3.2], ['rgba(235,245,255,.9)', 1.3]].forEach(function (est) {
+        g.strokeStyle = est[0]; g.lineWidth = est[1];
+        g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+        for (var m = 1; m < pts.length; m++) g.lineTo(pts[m][0], pts[m][1]);
+        g.stroke();
+      });
+    }
+    // anéis entre os raios
+    for (var anel = 1; anel <= 3; anel++) {
+      g.strokeStyle = 'rgba(230,240,255,' + (0.75 - anel * 0.15) + ')'; g.lineWidth = 1.1;
+      g.beginPath();
+      for (var j = 0; j < pontas.length; j++) {
+        var pa = pontas[j], q = pa[Math.min(pa.length - 1, anel * 2)];
+        if (j === 0) g.moveTo(q[0], q[1]); else g.lineTo(q[0] + (Math.random() - 0.5) * 6, q[1] + (Math.random() - 0.5) * 6);
+      }
+      g.closePath(); g.stroke();
+    }
+    // miolo estilhaçado
+    var gr = g.createRadialGradient(cx, cy, 0, cx, cy, R0 * 0.12);
+    gr.addColorStop(0, 'rgba(255,255,255,.7)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, R0 * 0.12, 0, 6.3); g.fill();
+  }
+  function limparRachas() {
+    var c = el.trinca; if (!c) return;
+    c.getContext('2d').clearRect(0, 0, c.width, c.height);
+    c.style.opacity = '0';
   }
 
   function vencer() {
@@ -1441,7 +1995,7 @@
       if (r.frente) r.pivo.rotation.y = -c.volante * 0.5;
     });
     G.volante.rotation.z = c.volante * 1.6;
-    G.matLanterna.color.setHex(c.freando ? 0xff2015 : 0x8a0a06);
+    G.matLanterna.color.setRGB(c.freando ? 5 : 1.2, c.freando ? 0.15 : 0.03, c.freando ? 0.08 : 0.02);
     G.lantLuz.intensity = c.freando ? 14 : 5;
     // Poeira vermelha das rodas
     if (vAbs > 5 && estado !== 'titulo') {
@@ -1455,18 +2009,25 @@
     G.poeira.atualizar(dt, 0.1, 0.9);
     G.fogo.atualizar(dt, 2.2, 1.4);
     posicionarMula(dt);
+    atualizarNevoa(dt);
     atualizarChao(c.x, c.z, false);
 
     // Câmera principal
-    var cab = cfg.camera === 'cabine' && estado !== 'pego' && estado !== 'fim';
+    var susto = estado === 'pego' && cfg.susto === 'forte';
+    var cab = (cfg.camera === 'cabine' && estado !== 'pego' && estado !== 'fim') || susto;
     var olharTras = ent.olharTras && (estado === 'correndo' || estado === 'contagem');
     G.carroExt.visible = !cab;
     G.carroInt.visible = cab;
     var fx = Math.sin(c.psi), fz = Math.cos(c.psi);
     var fov = 64 + clamp(vAbs, 0, 45) * 0.32 + (c.driftT > 0 ? 3 : 0);
     if (cab) {
-      _v1.set(-0.36, 1.32, 0.05).applyEuler(o.rotation).add(o.position);
-      _v2.set(-0.36 + c.volante * -0.5, 1.12, olharTras ? -10 : 10).applyEuler(o.rotation).add(o.position);
+      _v1.set(0.36, G.carroReal ? 1.22 : 1.32, 0.05).applyEuler(o.rotation).add(o.position);
+      _v2.set(0.36 + c.volante * -0.5, G.carroReal ? 1.0 : 1.12, olharTras ? -10 : 10).applyEuler(o.rotation).add(o.position);
+      if (susto && mula.capo) {
+        // olha para o pescoço em chamas
+        G.mulaPonta.getWorldPosition(_pw);
+        _v2.lerp(_pw, 0.8);
+      }
       camPos.copy(_v1); camAlvo.copy(_v2);
       G.cam.position.copy(camPos);
       fov -= 4;
@@ -1495,7 +2056,7 @@
     camInstantanea = false;
     // Tremor: batida e perigo
     var perigo = estado === 'correndo' || estado === 'pego' ? clamp(1 - (mula.gap - 4) / 28, 0, 1) : 0;
-    var tr = corrida ? corrida.tremor * 0.25 + perigo * perigo * 0.05 : 0;
+    var tr = corrida ? corrida.tremor * (susto ? 0.06 : 0.25) + perigo * perigo * 0.05 : 0;
     if (tr > 0) G.cam.position.add(_v1.set((Math.random() - 0.5) * tr, (Math.random() - 0.5) * tr, (Math.random() - 0.5) * tr));
     G.cam.lookAt(camAlvo);
     G.cam.fov = lerp(G.cam.fov, fov, Math.min(1, dt * 3));
@@ -1514,6 +2075,8 @@
     u.uPerigo.value = lerp(u.uPerigo.value, perigo, Math.min(1, dt * 3));
     u.uFlash.value = corrida ? corrida.flash : 0;
     u.uPreto.value = corrida ? corrida.preto : 0;
+    u.uEstatica.value = corrida && corrida.estatica ? 1 : 0;
+    if (susto && corrida.fase >= 1 && corrida.fase < 3) u.uPerigo.value = 1;
     u.uEsp.value = (estado === 'correndo' || estado === 'contagem') && !olharTras ? 1 : 0;
   }
 
@@ -1525,6 +2088,18 @@
     }
     r.setRenderTarget(G.rtCena);
     r.render(G.cena, G.cam);
+    // bloom
+    var q = G.quadPasse, bw = G.bloomTam[0], bh = G.bloomTam[1];
+    q.material = G.matLimiar; G.matLimiar.uniforms.tMapa.value = G.rtCena.texture;
+    r.setRenderTarget(G.rtB1); r.render(G.cenaPasse, G.camPos);
+    q.material = G.matBorrao;
+    for (var i = 0; i < 2; i++) {
+      G.matBorrao.uniforms.tMapa.value = G.rtB1.texture; G.matBorrao.uniforms.uDir.value.set((1 + i) / bw, 0);
+      r.setRenderTarget(G.rtB2); r.render(G.cenaPasse, G.camPos);
+      G.matBorrao.uniforms.tMapa.value = G.rtB2.texture; G.matBorrao.uniforms.uDir.value.set(0, (1 + i) / bh);
+      r.setRenderTarget(G.rtB1); r.render(G.cenaPasse, G.camPos);
+    }
+    G.matPos.uniforms.tBloom.value = G.rtB1.texture;
     r.setRenderTarget(null);
     G.matPos.uniforms.tCena.value = G.rtCena.texture;
     G.matPos.uniforms.tEsp.value = G.rtEsp.texture;
@@ -1626,7 +2201,9 @@
       '</ul>' +
       (tq ? '' : '<div class="np-teclas"><span><b>W/↑</b> acelera</span><span><b>S/↓</b> freia</span><span><b>A D / ← →</b> volante</span><span><b>Espaço</b> drift</span><span><b>C</b> olhar para trás</span><span><b>V</b> câmera</span></div>') +
       '<div class="np-botoes"><button type="button" class="np-btn np-btn-pri" data-a="dirigir"><i class="fa fa-car"></i> Dirigir</button>' +
-      '<button type="button" class="np-btn" data-a="titulo">Voltar</button></div>', 'np-ajuda');
+      '<button type="button" class="np-btn" data-a="titulo">Voltar</button></div>' +
+      '<div class="np-creditos">Modelos 3D: Mula a partir de "Animated Rigged Horse With Saddle", de ayanahmadbutt (CC BY 4.0, modificado: sem cabeça e sem sela) · ' +
+      'carro "Lowpoly Abandoned Simple Car Prop", de rashad-brahimli (CC BY 4.0) · tronco, pedra, texturas e céu: Poly Haven (CC0).</div>', 'np-ajuda');
   }
 
   function telaDerrota() {
@@ -1671,7 +2248,7 @@
   function preview() {
     carro = novoCarro();
     posicionarCarroEm(30);
-    mula = { gap: 34, vel: 0, lat: 0, fase: 0, tCorrida: 0, empina: 0, surto: 0, invT: 0, proxInv: 99 };
+    mula = { gap: 34, vel: 0, lat: 0, fase: 0, tCorrida: 0, empina: 0, surto: 0, invT: 0, proxInv: 99, capo: false, jorro: 0, lado: 0 };
     corrida = novaCorrida();
     G.fogo.limpar(); G.poeira.limpar();
     atualizarChao(carro.x, carro.z, true);
@@ -1694,6 +2271,7 @@
           '<div class="np-vel"><b>0</b><span>km/h</span></div>' +
           '<div class="np-perigo" title="Distância da Mula"><svg viewBox="0 0 24 24" class="np-ferr"><path d="M6 3c-1.8 2.4-2.8 5.3-2.8 8.3 0 5.4 3.8 9.7 8.8 9.7s8.8-4.3 8.8-9.7c0-3-1-5.9-2.8-8.3h-3.3c1.9 2.1 3 4.9 3 7.9 0 3.6-2.5 6.5-5.7 6.5s-5.7-2.9-5.7-6.5c0-3 1.1-5.8 3-7.9z"/></svg><div class="np-perigo-trilho"><div class="np-perigo-barra"></div></div></div>' +
         '</div>' +
+        '<canvas class="np-trinca"></canvas>' +
         '<div class="np-aviso"></div>' +
         '<div class="np-cont"></div>' +
         '<div class="np-toque" style="display:none">' +
@@ -1721,6 +2299,7 @@
     el.hPerigo = p.querySelector('.np-perigo');
     el.hPerigoBarra = p.querySelector('.np-perigo-barra');
     el.aviso = p.querySelector('.np-aviso');
+    el.trinca = p.querySelector('.np-trinca');
     el.cont = p.querySelector('.np-cont');
     el.toque = p.querySelector('.np-toque');
     el.tela = p.querySelector('.np-tela');
@@ -1884,6 +2463,9 @@
             cfg.autoAcel = !cfg.autoAcel; salvarCfg();
             el.toque.querySelector('.np-tq-acel').style.display = cfg.autoAcel ? 'none' : '';
           } },
+          { icone: 'fa-ghost', rotulo: 'Susto: ' + (cfg.susto === 'forte' ? 'Forte' : 'Suave'), ativo: cfg.susto === 'forte', acao: function () {
+            cfg.susto = cfg.susto === 'forte' ? 'suave' : 'forte'; salvarCfg();
+          } },
           { icone: 'fa-display', rotulo: 'Gráficos: ' + (cfg.grafico === 'alto' ? 'Alto' : cfg.grafico === 'medio' ? 'Médio' : 'Leve'), ativo: true, acao: function () {
             cfg.grafico = cfg.grafico === 'alto' ? 'medio' : cfg.grafico === 'medio' ? 'leve' : 'alto'; salvarCfg(); layout();
           } }
@@ -1901,6 +2483,47 @@
 
   var fotoAng = null;
   var carregandoThree = null;
+
+  /* ══════════════════════════════════════════════════════════════
+     ASSETS REAIS (modelos e texturas) — Jogos/assets/naopare/
+     Mula: "Animated Rigged Horse With Saddle" (ayanahmadbutt, Sketchfab,
+     CC BY), sem cabeça, sem sela e sem a animação original (o galope é
+     feito aqui, osso por osso). Carro: "Lowpoly Abandoned Simple Car
+     Prop" (rashad-brahimli, Sketchfab, CC BY). Tronco, pedra, texturas
+     de terra/chão/casca e o céu (Moonlit Golf): Poly Haven, CC0.
+     Os .blend de origem ficam em "Claude outputs/naopare" (fora do site).
+     Se algum arquivo falhar, o jogo usa as primitivas de antes.
+  ══════════════════════════════════════════════════════════════ */
+  var PASTA = '/Jogos/assets/naopare/';
+  var AST = null, carregandoAst = null;
+  function carregarAssets(prog) {
+    if (carregandoAst) return carregandoAst;
+    var tl = new T.TextureLoader(), gl = new T.GLTFLoader();
+    var out = { tx: {} }, tarefas = [], feitos = 0;
+    function um() { feitos++; if (prog) prog(feitos / tarefas.length); }
+    function tex(nome, arq, cor) {
+      tarefas.push(new Promise(function (ok) {
+        tl.load(PASTA + arq, function (t) {
+          if (cor) t.colorSpace = T.SRGBColorSpace;
+          t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = 8;
+          out.tx[nome] = t; um(); ok();
+        }, undefined, function () { um(); ok(); });
+      }));
+    }
+    function glb(nome, arq) {
+      tarefas.push(new Promise(function (ok) {
+        gl.load(PASTA + arq, function (g) { out[nome] = g; um(); ok(); }, undefined, function () { um(); ok(); });
+      }));
+    }
+    tex('estradaCor', 'tex/estrada-cor.webp', true); tex('estradaNor', 'tex/estrada-normal.webp'); tex('estradaRug', 'tex/estrada-aspereza.webp');
+    tex('chaoCor', 'tex/chao-cor.webp', true); tex('chaoNor', 'tex/chao-normal.webp');
+    tex('cascaCor', 'tex/casca-cor.webp', true); tex('cascaNor', 'tex/casca-normal.webp');
+    tex('ceu', 'tex/ceu.webp', true);
+    glb('carro', 'carro-v1.glb'); glb('mula', 'mula-v1.glb'); glb('tronco', 'tronco-v1.glb'); glb('pedra', 'pedra-v1.glb');
+    carregandoAst = Promise.all(tarefas).then(function () { AST = out; return out; });
+    return carregandoAst;
+  }
+  function nomeOsso(n) { return String(n).toLowerCase().replace(/[^a-z0-9]/g, ''); }
   function carregarThree() {
     if (window.NPTHREE) return Promise.resolve(window.NPTHREE);
     if (carregandoThree) return carregandoThree;
@@ -1946,6 +2569,9 @@
     el.carregando.style.display = '';
     el.carregando.textContent = 'Ligando o motor…';
     carregarThree().then(function () {
+      T = window.NPTHREE;
+      return carregarAssets(function (f) { el.carregando.textContent = 'Ligando o motor… ' + Math.round(f * 100) + '%'; });
+    }).then(function () {
       if (!ativo) return;
       try { iniciarMundo(); }
       catch (e) { el.carregando.textContent = 'Seu aparelho não conseguiu abrir o 3D deste jogo.'; if (window.console) console.error(e); }
@@ -1982,6 +2608,8 @@
     // Só para testes automáticos: entradas virtuais e simulação sem desenhar
     _ent: ent,
     _foto: function (ang, gap) { fotoAng = ang; if (mula) mula.gap = gap; },
+    _gal: GAL,
+    _dbg: function () { var v = new T.Vector3(); G.mulaPonta.getWorldPosition(v); return { cam: G.cam.position.toArray().map(function (x) { return +x.toFixed(2); }), toco: v.toArray().map(function (x) { return +x.toFixed(2); }), mula: G.mulaObj.position.toArray().map(function (x) { return +x.toFixed(2); }), carro: [+carro.x.toFixed(2), +carro.y.toFixed(2), +carro.z.toFixed(2)], psi: +carro.psi.toFixed(2), fase: corrida && corrida.fase, capo: mula.capo, D: mula.capoD, Y: mula.capoY, visivel: G.mulaObj.visible }; },
     _simular: function (n, dt, fn) {
       for (var i = 0; i < n; i++) {
         if (estado !== 'correndo' && estado !== 'contagem') break;

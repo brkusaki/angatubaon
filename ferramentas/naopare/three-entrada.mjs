@@ -16,7 +16,10 @@ import {
   CanvasTexture, RepeatWrapping, ClampToEdgeWrapping, LinearFilter, LinearMipmapLinearFilter,
   SRGBColorSpace, ACESFilmicToneMapping, AdditiveBlending, NormalBlending, DoubleSide, BackSide,
   Vector2, Vector3, Vector4, Matrix4, Quaternion, Euler, MathUtils, Sphere
+  , PMREMGenerator, TextureLoader, EquirectangularReflectionMapping, AnimationMixer, LoopRepeat, LoopOnce,
+  MeshPhysicalMaterial, PCFSoftShadowMap, SkinnedMesh, Box3
 } from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 window.NPTHREE = {
   Scene, PerspectiveCamera, OrthographicCamera, WebGLRenderer, WebGLRenderTarget,
   Color, FogExp2, HemisphereLight, DirectionalLight, SpotLight, PointLight,
@@ -28,5 +31,7 @@ window.NPTHREE = {
   ShaderMaterial, SpriteMaterial, LineBasicMaterial,
   CanvasTexture, RepeatWrapping, ClampToEdgeWrapping, LinearFilter, LinearMipmapLinearFilter,
   SRGBColorSpace, ACESFilmicToneMapping, AdditiveBlending, NormalBlending, DoubleSide, BackSide,
-  Vector2, Vector3, Vector4, Matrix4, Quaternion, Euler, MathUtils, Sphere
+  Vector2, Vector3, Vector4, Matrix4, Quaternion, Euler, MathUtils, Sphere,
+  PMREMGenerator, TextureLoader, EquirectangularReflectionMapping, AnimationMixer, LoopRepeat, LoopOnce,
+  MeshPhysicalMaterial, PCFSoftShadowMap, SkinnedMesh, Box3, GLTFLoader
 };

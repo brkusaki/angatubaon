@@ -289,7 +289,7 @@
     }
     function retomar() { if (ac && ac.state === 'suspended') ac.resume().catch(function () {}); }
     // Sons gravados (ElevenLabs). Se o arquivo ainda não chegou, toca o sintetizado.
-    var ARQ = ['grito', 'impacto', 'trinca', 'casco'], bufs = {}, baixando = {};
+    var ARQ = ['grito', 'impacto', 'trinca', 'casco', 'susto', 'estatica', 'ferroada', 'rasga', 'grilos', 'fogo'], bufs = {}, baixando = {}, lacos = {};
     function carregarArq(nome) {
       if (!ac || bufs[nome] || baixando[nome] || !window.fetch) return;
       baixando[nome] = true;
@@ -307,6 +307,16 @@
       s.start(ac.currentTime);
       s.onended = function () { try { s.disconnect(); g.disconnect(); } catch (e) {} };
       return true;
+    }
+    // Som gravado em loop (fogo da Mula, grilos). Só começa quando o arquivo já chegou.
+    function laco(nome) {
+      if (lacos[nome]) return lacos[nome];
+      var b = bufs[nome];
+      if (!b || !ac) return null;
+      var s = ac.createBufferSource(), g = ac.createGain();
+      s.buffer = b; s.loop = true; g.gain.value = 0;
+      s.connect(g); g.connect(mestre); s.start();
+      return (lacos[nome] = { s: s, g: g });
     }
     function env(g, t, a, d, v) {
       g.gain.setValueAtTime(0.0001, t);
@@ -361,7 +371,9 @@
         derrapa.g.gain.setTargetAtTime(clamp(e.deslize * 0.05, 0, 0.32), t, 0.04);
         // Mula: fogo e galope pela distância
         var prox = e.mulaVisivel ? clamp(1 - (e.gap - 3) / 70, 0, 1) : 0;
-        fogo.g.gain.setTargetAtTime(prox * prox * 0.55, t, 0.1);
+        var lf = laco('fogo');
+        fogo.g.gain.setTargetAtTime(prox * prox * (lf ? 0.12 : 0.55), t, 0.1);
+        if (lf) lf.g.gain.setTargetAtTime(prox * prox * 0.75, t, 0.1);
         if (e.mulaVisivel && e.mulaVel > 1) {
           faseGalope += dt * (1.6 + e.mulaVel * 0.045);
           if (faseGalope >= proxCasco) {
@@ -380,7 +392,9 @@
           proxCoracao = t + iv;
         }
         // Grilos no mato
-        if (t > proxGrilo) {
+        var lg = laco('grilos');
+        if (lg) lg.g.gain.setTargetAtTime(0.2, t, 0.4);
+        else if (t > proxGrilo) {
           var gt = t + 0.02, gf = 4200 + Math.random() * 900;
           for (var c = 0; c < 3; c++) tom(gt + c * 0.045, 'sine', gf, 0, 0.004, 0.025, 0.012);
           proxGrilo = t + 0.4 + Math.random() * 1.6;
@@ -397,6 +411,7 @@
       rasga: function () {
         if (!ok || !ligado()) return;
         var t = ac.currentTime;
+        if (arq('rasga', 0.85)) return;
         for (var i = 0; i < 14; i++) estalo(t + i * 0.045 + Math.random() * 0.02, 1500 + Math.random() * 1500, 6, 0.004, 0.06, 0.16);
       },
       // Relincho/grito da Mula quando alcança
@@ -444,9 +459,16 @@
         if (arq('trinca', 0.9)) return;
         for (var i = 0; i < 7; i++) estalo(t + i * 0.018 + Math.random() * 0.015, 4500 + Math.random() * 3500, 5, 0.001, 0.06, 0.3);
       },
+      // Trilha do vídeo do susto (o vídeo toca mudo; o som vem por aqui, que já está liberado pelo toque)
+      susto: function () {
+        if (!ok || !ligado()) return false;
+        retomar();
+        return arq('susto', 1);
+      },
       // Chiado de estática (o sinal caindo)
       estatica: function (dur) {
         if (!ok || !ligado()) return;
+        if (arq('estatica', 0.75)) return;
         var t = ac.currentTime, s = fonteRuido(), f = ac.createBiquadFilter(), g = ac.createGain();
         f.type = 'bandpass'; f.frequency.value = 2200; f.Q.value = 0.4;
         s.connect(f); f.connect(g); g.connect(mestre);
@@ -458,6 +480,7 @@
       ferroada: function () {
         if (!ok || !ligado()) return;
         var t = ac.currentTime;
+        if (arq('ferroada', 1.25)) return;
         tom(t, 'sawtooth', 1400, 600, 0.005, 0.4, 0.12);
         tom(t, 'sawtooth', 1480, 640, 0.005, 0.4, 0.1);
         estalo(t, 900, 0.8, 0.003, 0.3, 0.4);
@@ -2005,7 +2028,7 @@
     }
     G.fogo.limpar(); G.chama.limpar(); G.poeira.limpar(); G.nev.ok = false;
     corrida.flash = 0; corrida.preto = 0; corrida.estatica = 0;
-    limparRachas();
+    limparRachas(); pararVideoSusto();
     atualizarChao(carro.x, carro.z, true);
     camInstantanea = true;
     mudarEstado('contagem');
@@ -2048,7 +2071,7 @@
     } else if (estado === 'pego') {
       carro.vx *= Math.pow(0.2, dt); carro.vz *= Math.pow(0.2, dt); carro.vel *= Math.pow(0.2, dt);
       carro.x += carro.vx * dt; carro.z += carro.vz * dt; projetar(carro);
-      if (cfg.susto === 'forte') sustoForte(dt);
+      if (cfg.susto === 'forte') { if (corrida.video) sustoVideo(); else sustoForte(dt); }
       else {
         // suave: câmera de lado, a Mula empina por cima do carro
         mula.gap = Math.max(-1.5, mula.gap - dt * 6);
@@ -2073,11 +2096,13 @@
     corrida.fase = 0;
     partida(false);
     el.toque.style.display = 'none';
+    corrida.video = false; corrida.videoTocando = false;
     if (cfg.susto === 'forte') {
-      // 1) um instante de silêncio, já dentro do carro
-      som.silencio(0.4);
       mula.capo = false; mula.jorro = 0;
       el.hud.style.display = 'none';
+      corrida.video = iniciarVideoSusto();
+      // 1) sem vídeo: um instante de silêncio, já dentro do carro
+      if (!corrida.video) som.silencio(0.4);
     } else {
       mula.surto = 1.2;
       som.grito(false);
@@ -2129,6 +2154,41 @@
         limparRachas();
         telaDerrota();
       }
+    }
+  }
+
+  /* Susto em vídeo (gerado com IA a partir do quadro da cabine). Carrega como blob: funciona offline
+     e o Safari não precisa de Range. Se algo falhar, o susto 3D acima entra no lugar. */
+  function prepararVideoSusto() {
+    var v = el.video; if (!v || el.videoOk || !window.fetch) return;
+    el.videoOk = 'carregando';
+    fetch(PASTA + 'susto.mp4').then(function (r) { if (!r.ok) throw 0; return r.blob(); })
+      .then(function (b) { v.src = URL.createObjectURL(b); v.load(); el.videoOk = true; })
+      .catch(function () { el.videoOk = false; });
+  }
+  function iniciarVideoSusto() {
+    var v = el.video;
+    if (!v || el.videoOk !== true) return false;
+    try {
+      v.muted = true; v.currentTime = 0;
+      v.onplaying = function () { v.onplaying = null; v.style.display = 'block'; corrida.videoTocando = true; som.susto(); };
+      var pr = v.play();
+      if (pr && pr.catch) pr.catch(function () { pararVideoSusto(); });
+      return true;
+    } catch (e) { return false; }
+  }
+  function pararVideoSusto() {
+    var v = el.video;
+    if (v) { v.onplaying = null; try { v.pause(); } catch (e) {} v.style.display = 'none'; }
+    if (corrida) { corrida.video = false; corrida.videoTocando = false; }
+  }
+  function sustoVideo() {
+    mula.capo = false; G.mulaObj.visible = false;
+    var v = el.video;
+    if (!corrida.mostrouFim && ((corrida.videoTocando && v.ended) || tEstado > 8)) {
+      corrida.mostrouFim = true;
+      pararVideoSusto();
+      telaDerrota();
     }
   }
 
@@ -2499,6 +2559,7 @@
           '<div class="np-vel"><b>0</b><span>km/h</span></div>' +
           '<div class="np-perigo" title="Distância da Mula"><svg viewBox="0 0 24 24" class="np-ferr"><path d="M6 3c-1.8 2.4-2.8 5.3-2.8 8.3 0 5.4 3.8 9.7 8.8 9.7s8.8-4.3 8.8-9.7c0-3-1-5.9-2.8-8.3h-3.3c1.9 2.1 3 4.9 3 7.9 0 3.6-2.5 6.5-5.7 6.5s-5.7-2.9-5.7-6.5c0-3 1.1-5.8 3-7.9z"/></svg><div class="np-perigo-trilho"><div class="np-perigo-barra"></div></div></div>' +
         '</div>' +
+        '<video class="np-video" muted playsinline preload="auto" style="display:none"></video>' +
         '<canvas class="np-trinca"></canvas>' +
         '<div class="np-aviso"></div>' +
         '<div class="np-cont"></div>' +
@@ -2528,6 +2589,8 @@
     el.hPerigoBarra = p.querySelector('.np-perigo-barra');
     el.aviso = p.querySelector('.np-aviso');
     el.trinca = p.querySelector('.np-trinca');
+    el.video = p.querySelector('.np-video');
+    prepararVideoSusto();
     el.cont = p.querySelector('.np-cont');
     el.toque = p.querySelector('.np-toque');
     el.tela = p.querySelector('.np-tela');
@@ -2655,7 +2718,7 @@
       if (fotoAng != null) { var mp = G.mulaObj.position; camAlvo.set((c.x + mp.x) / 2, c.y + 1.3, (c.z + mp.z) / 2); }
       G.cam.lookAt(camAlvo);
     }
-    renderizar();
+    if (!(estado === 'pego' && corrida && corrida.videoTocando)) renderizar();
     if (estado !== 'titulo') atualizarHud();
     var perigo = estado === 'correndo' ? clamp(1 - (mula.gap - 4) / 28, 0, 1) : 0;
     som.quadro(dt, {
@@ -2811,7 +2874,7 @@
   function parar() {
     if (!ativo) return;
     ativo = false;
-    partida(false);
+    partida(false); pararVideoSusto();
     cancelAnimationFrame(raf); raf = 0;
     som.suspender();
     soltarTudo();

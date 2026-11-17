@@ -10,6 +10,7 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-naopare .jogo-voltar{position:abs
 .np-palco{position:absolute;left:50%;top:50%;overflow:hidden;background:#05040a;color:#f1ece6;font-family:'DM Sans',system-ui,sans-serif;transform-origin:center center;}
 :where(.np-palco) button{font-family:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer;}
 .np-canvas{position:absolute;left:0;top:0;display:block;}
+.np-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;pointer-events:none;}
 .np-trinca{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0;transition:opacity .2s;mix-blend-mode:screen;}
 .np-carregando{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2em;letter-spacing:.08em;color:#c9b9a8;background:#05040a;text-align:center;padding:0 10%;}
 

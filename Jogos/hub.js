@@ -1470,7 +1470,9 @@
       '/Jogos/assets/naopare/tex/chao-cor.webp', '/Jogos/assets/naopare/tex/chao-normal.webp',
       '/Jogos/assets/naopare/tex/casca-cor.webp', '/Jogos/assets/naopare/tex/casca-normal.webp',
       '/Jogos/assets/naopare/tex/ceu.webp',
-      '/Jogos/assets/naopare/sfx/grito.mp3', '/Jogos/assets/naopare/sfx/impacto.mp3', '/Jogos/assets/naopare/sfx/trinca.mp3', '/Jogos/assets/naopare/sfx/casco.mp3'
+      '/Jogos/assets/naopare/sfx/grito.mp3', '/Jogos/assets/naopare/sfx/impacto.mp3', '/Jogos/assets/naopare/sfx/trinca.mp3', '/Jogos/assets/naopare/sfx/casco.mp3', '/Jogos/assets/naopare/sfx/susto.mp3',
+      '/Jogos/assets/naopare/sfx/estatica.mp3', '/Jogos/assets/naopare/sfx/ferroada.mp3', '/Jogos/assets/naopare/sfx/rasga.mp3', '/Jogos/assets/naopare/sfx/grilos.mp3', '/Jogos/assets/naopare/sfx/fogo.mp3',
+      '/Jogos/assets/naopare/susto.mp4'
     ],
     corujinha: [
       '/Jogos/corujinha.min.js', '/Jogos/corujinha.css',

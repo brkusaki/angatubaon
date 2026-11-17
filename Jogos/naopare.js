@@ -309,7 +309,7 @@
     }
     function retomar() { if (ac && ac.state === 'suspended') ac.resume().catch(function () {}); }
     // Sons gravados (ElevenLabs). Se o arquivo ainda não chegou, toca o sintetizado.
-    var ARQ = ['grito', 'impacto', 'trinca', 'casco', 'susto', 'estatica', 'ferroada', 'rasga', 'grilos', 'fogo'], bufs = {}, baixando = {}, lacos = {};
+    var ARQ = ['grito', 'impacto', 'trinca', 'casco', 'susto-v2', 'estatica', 'ferroada', 'rasga', 'grilos', 'fogo'], bufs = {}, baixando = {}, lacos = {};
     function carregarArq(nome) {
       if (!ac || bufs[nome] || baixando[nome] || !window.fetch) return;
       baixando[nome] = true;
@@ -494,7 +494,7 @@
       susto: function () {
         if (!ok || !ligado()) return false;
         retomar();
-        return arq('susto', 1);
+        return arq('susto-v2', 1);
       },
       // Chiado de estática (o sinal caindo)
       estatica: function (dur) {
@@ -2277,7 +2277,7 @@
   function prepararVideoSusto() {
     var v = el.video; if (!v || el.videoOk || !window.fetch) return;
     el.videoOk = 'carregando';
-    fetch(PASTA + 'susto.mp4').then(function (r) { if (!r.ok) throw 0; return r.blob(); })
+    fetch(PASTA + 'susto-v2.mp4').then(function (r) { if (!r.ok) throw 0; return r.blob(); })
       .then(function (b) { v.src = URL.createObjectURL(b); v.load(); el.videoOk = true; })
       .catch(function () { el.videoOk = false; });
   }

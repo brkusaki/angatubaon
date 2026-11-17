@@ -135,3 +135,6 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-naopare .jogo-voltar{position:abs
 .np-radio{font:800 2.4em 'DM Sans',monospace;color:#ff5a3a;background:#120806;border:.08em solid #3a1a12;border-radius:.3em;padding:.15em .6em;letter-spacing:.1em;animation:np-radio .18s steps(2) infinite;text-shadow:0 0 .4em rgba(255,60,30,.8);}
 @keyframes np-radio{50%{opacity:.55;}}
 .np-tq-evt{position:absolute;left:50%;bottom:9em;transform:translateX(-50%);font-size:2em;padding:.7em 1.4em;border-color:rgba(255,140,80,.7);background:rgba(120,30,10,.55);}
+/* Clarão que esconde a troca do 3D para o vídeo do susto */
+.np-clarao{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at 50% 58%,#fff4d6 0%,#ffb052 38%,#c4470f 72%,#3a0f04 100%);transition:opacity .85s ease-out;}
+.np-clarao.np-on{opacity:1;transition:opacity .07s ease-in;}

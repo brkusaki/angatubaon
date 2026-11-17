@@ -2286,7 +2286,13 @@
     if (!v || el.videoOk !== true) return false;
     try {
       v.muted = true; v.currentTime = 0;
-      v.onplaying = function () { v.onplaying = null; v.style.display = 'block'; corrida.videoTocando = true; som.susto(); };
+      // Clarão de fogo cobre a troca da cena 3D (clara pelo fogo) para o vídeo (mais escuro):
+      // acende na hora e só apaga, devagar, depois que o vídeo já está na tela
+      el.clarao.classList.add('np-on');
+      v.onplaying = function () {
+        v.onplaying = null; v.style.display = 'block'; corrida.videoTocando = true; som.susto();
+        setTimeout(function () { el.clarao.classList.remove('np-on'); }, 140);
+      };
       var pr = v.play();
       if (pr && pr.catch) pr.catch(function () { pararVideoSusto(); });
       return true;
@@ -2295,6 +2301,7 @@
   function pararVideoSusto() {
     var v = el.video;
     if (v) { v.onplaying = null; try { v.pause(); } catch (e) {} v.style.display = 'none'; }
+    if (el.clarao) el.clarao.classList.remove('np-on');
     if (corrida) { corrida.video = false; corrida.videoTocando = false; }
   }
   function sustoVideo() {
@@ -2975,6 +2982,7 @@
           '<div class="np-perigo" title="Distância da Mula"><svg viewBox="0 0 24 24" class="np-ferr"><path d="M6 3c-1.8 2.4-2.8 5.3-2.8 8.3 0 5.4 3.8 9.7 8.8 9.7s8.8-4.3 8.8-9.7c0-3-1-5.9-2.8-8.3h-3.3c1.9 2.1 3 4.9 3 7.9 0 3.6-2.5 6.5-5.7 6.5s-5.7-2.9-5.7-6.5c0-3 1.1-5.8 3-7.9z"/></svg><div class="np-perigo-trilho"><div class="np-perigo-barra"></div></div></div>' +
         '</div>' +
         '<video class="np-video" muted playsinline preload="auto" style="display:none"></video>' +
+        '<div class="np-clarao"></div>' +
         '<canvas class="np-trinca"></canvas>' +
         '<div class="np-aviso"></div>' +
         '<div class="np-cont"></div>' +
@@ -3012,6 +3020,7 @@
     el.tqEvt = p.querySelector('.np-tq-evt');
     el.trinca = p.querySelector('.np-trinca');
     el.video = p.querySelector('.np-video');
+    el.clarao = p.querySelector('.np-clarao');
     prepararVideoSusto();
     el.cont = p.querySelector('.np-cont');
     el.toque = p.querySelector('.np-toque');

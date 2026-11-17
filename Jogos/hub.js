@@ -1464,7 +1464,7 @@
     ],
     naopare: [
       '/Jogos/naopare.min.js', '/Jogos/naopare.css', '/Jogos/vendor/three-naopare.min.js?v=187b',
-      '/Jogos/assets/naopare/carro-v1.glb', '/Jogos/assets/naopare/mula-v1.glb',
+      '/Jogos/assets/naopare/carro-v1.glb', '/Jogos/assets/naopare/cabine-v2.glb', '/Jogos/assets/naopare/mula-v1.glb',
       '/Jogos/assets/naopare/tronco-v1.glb', '/Jogos/assets/naopare/pedra-v1.glb',
       '/Jogos/assets/naopare/tex/estrada-cor.webp', '/Jogos/assets/naopare/tex/estrada-normal.webp', '/Jogos/assets/naopare/tex/estrada-aspereza.webp',
       '/Jogos/assets/naopare/tex/chao-cor.webp', '/Jogos/assets/naopare/tex/chao-normal.webp',

@@ -592,6 +592,18 @@
     return t;
   }
   // Capim seco de pasto
+  // Poça: mancha irregular de borda suave (vai como alphaMap)
+  function texPoca() {
+    var cv = document.createElement('canvas'); cv.width = cv.height = 128;
+    var g = cv.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 128, 128);
+    for (var i = 0; i < 7; i++) {
+      var x = 64 + (Math.random() - 0.5) * 50, y = 64 + (Math.random() - 0.5) * 30, r = 18 + Math.random() * 22;
+      var gr = g.createRadialGradient(x, y, r * 0.3, x, y, r);
+      gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.beginPath(); g.ellipse(x, y, r * 1.3, r, 0, 0, 6.3); g.fill();
+    }
+    return new T.CanvasTexture(cv);
+  }
   function texCapim() {
     var t = texCanvas(128, 128, function (g, w, h) {
       var r = rng(4242);
@@ -984,7 +996,9 @@
   }
 
   // Árvores, cercas, refletores, placas, cruzes, obstáculos e a capela
+  var _corInst = null;
   function montarBeira(grp) {
+    if (!_corInst) _corInst = new T.Color();
     var rnd = rng(R.def.semente * 3 + 11);
     var BLOCO = 500, nb = Math.ceil(R.L / BLOCO);
     var mtx = new T.Matrix4(), q = new T.Quaternion(), sc = new T.Vector3(), ps = new T.Vector3(), eixoY = new T.Vector3(0, 1, 0);
@@ -1007,6 +1021,14 @@
     var matCapim = new T.MeshStandardMaterial({ map: texCapim(), alphaTest: 0.4, side: T.DoubleSide, roughness: 1, metalness: 0 });
     var matCanaC = new T.MeshStandardMaterial({ map: texCana(), alphaTest: 0.4, side: T.DoubleSide, roughness: 0.95, metalness: 0 });
     var matTronco2 = new T.MeshLambertMaterial({ color: 0x3b2c22 });
+    var geoCupim = new T.IcosahedronGeometry(1, 1); geoCupim.translate(0, 0.6, 0);
+    geoCupim.attributes.position.array.forEach(function (v, k, a) { if (k % 3 === 1 && v > 0.6) a[k] = 0.6 + (v - 0.6) * 1.6; });
+    geoCupim.computeVertexNormals();
+    var matCupim = AST && AST.tx.estradaCor ? new T.MeshStandardMaterial({ map: AST.tx.estradaCor, normalMap: AST.tx.estradaNor || null, roughness: 0.95, metalness: 0, color: 0xb08070 })
+      : new T.MeshLambertMaterial({ color: 0x7a3a22, flatShading: true });
+    var geoPoca = new T.PlaneGeometry(1, 1); geoPoca.rotateX(-Math.PI / 2);
+    var matPoca = new T.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.05, metalness: 0.3, envMapIntensity: 1.6,
+      alphaMap: texPoca(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     var matCopa = new T.MeshLambertMaterial({ color: 0x1d2d1c, flatShading: true });
     var matCopa2 = new T.MeshLambertMaterial({ color: 0x2a3118, flatShading: true });
     var matCana = new T.MeshLambertMaterial({ color: 0x3e4a21, flatShading: true });
@@ -1019,7 +1041,7 @@
     trechos[0].tipo = 'pasto';
     function trechoEm(s) { var t = trechos[0]; for (var i = 0; i < trechos.length; i++) if (trechos[i].s0 <= s) t = trechos[i]; return t.tipo; }
     var blocos = [];
-    for (var b = 0; b < nb; b++) blocos.push({ tronco: [], tronco2: [], copa: [], copa2: [], cana: [], poste: [], refl: [], balz: [], capim: [] });
+    for (var b = 0; b < nb; b++) blocos.push({ tronco: [], tronco2: [], copa: [], copa2: [], cana: [], poste: [], refl: [], balz: [], capim: [], cupim: [], arbusto: [], poca: [] });
     function livre(x, z, folga) { distEstrada(R, x, z, tmp); return tmp.d > folga; }
     function ponto(i, lat) { var th = R.th[i]; return { x: R.x[i] - Math.cos(th) * lat, z: R.z[i] + Math.sin(th) * lat, th: th }; }
     for (var i = 2; i < R.n - 2; i++) {
@@ -1050,6 +1072,15 @@
             bl.copa2.push([pm.x, y3 + alt3 - 2.2, pm.z, 5 + rnd() * 3.5, 4.2 + rnd() * 2, rnd() * 6]);
           }
         }
+        // Cupinzeiros no pasto e arbustos na beira (variedade)
+        if (tipo === 'pasto' && rnd() < 0.09) {
+          var pq = ponto(i, lado * (10 + rnd() * 35));
+          if (livre(pq.x, pq.z, 9)) bl.cupim.push([pq.x, relevo(pq.x, pq.z) - 0.15, pq.z, 0.45 + rnd() * 0.4, 0.5 + rnd() * 0.7, rnd() * 6]);
+        }
+        if (tipo !== 'cana' && rnd() < (tipo === 'mata' ? 0.3 : 0.12)) {
+          var pa = ponto(i, lado * (8.2 + rnd() * 7));
+          if (livre(pa.x, pa.z, 8)) bl.arbusto.push([pa.x, relevo(pa.x, pa.z) + 0.3, pa.z, 1.1 + rnd() * 1.2, 0.9 + rnd() * 0.8, rnd() * 6]);
+        }
         // Tufos de capim na beira da estrada
         if (tipo !== 'cana') for (var tc2 = 0; tc2 < 2; tc2++) {
           var latc = lado * (5.4 + rnd() * (tc2 ? 9 : 2.5)), pcp = ponto(i, latc);
@@ -1062,6 +1093,12 @@
           if (livre(pp.x, pp.z, BARREIRA - 0.5)) bl.poste.push([pp.x, R.y[i] - 0.3, pp.z, 1, 1, pp.th]);
         }
       }
+    }
+    // Poças na estrada (refletem o céu e brilham no farol)
+    for (i = 8; i < R.n - 4 && i * DS < R.fim - 20; i++) {
+      if (rnd() > DS / 45) continue;
+      var latP = [-1.8, 0, 1.8][Math.floor(rnd() * 3)] + (rnd() - 0.5) * 0.6, pp2 = ponto(i, latP);
+      blocos[Math.floor(i * DS / BLOCO)].poca.push([pp2.x, R.y[i] + 0.095, pp2.z, 1.2 + rnd() * 1.6, 1, pp2.th + (rnd() - 0.5) * 0.4, 0.7 + rnd() * 0.6]);
     }
     // Balizadores brancos nos dois lados, a cada 20 m (leitura da estrada à noite)
     for (i = 5; i < R.n - 2 && i * DS < R.fim; i += 10) {
@@ -1110,12 +1147,20 @@
         else if (tipoEsc === 'copa') sc.set(it[3], it[4], it[3] * (0.8 + (k % 5) * 0.08));
         else if (tipoEsc === 'poste') sc.set(1, it[3], 1);
         else if (tipoEsc === 'card') sc.set(it[3], it[4], it[3]);
+        else if (tipoEsc === 'poca') sc.set(it[3], 1, it[3] * it[6]);
         else sc.set(it[3], it[4], it[3]);
         mtx.compose(ps, q, sc);
         im.setMatrixAt(k, mtx);
+        if (tipoEsc === 'card') {
+          // cada copa num tom: mais verde, mais seca, mais escura
+          var h = (Math.sin(k * 12.9898 + it[0] * 0.37) * 43758.5453) % 1; h = h < 0 ? h + 1 : h;
+          _corInst.setRGB(0.82 + h * 0.3, 0.85 + (1 - h) * 0.25, 0.75 + h * 0.15);
+          im.setColorAt(k, _corInst);
+        }
       }
       im.computeBoundingSphere();
-      im.castShadow = tipoEsc !== 'refl' && tipoEsc !== 'capim'; im.receiveShadow = true;
+      im.castShadow = tipoEsc !== 'refl' && tipoEsc !== 'capim' && tipoEsc !== 'poca'; im.receiveShadow = tipoEsc !== 'poca';
+      if (tipoEsc === 'poca') im.renderOrder = 1;
       grp.add(im);
     }
     blocos.forEach(function (bl) {
@@ -1125,6 +1170,9 @@
       inst(geoCopaC, matFolha2, bl.copa2, 'card');
       inst(geoCanaC, matCanaC, bl.cana, 'cana');
       inst(geoCapim, matCapim, bl.capim, 'capim');
+      inst(geoCupim, matCupim, bl.cupim, 'tronco');
+      inst(geoCopaC, matFolha2, bl.arbusto, 'card');
+      inst(geoPoca, matPoca, bl.poca, 'poca');
       inst(geoPoste, matPoste, bl.poste, 'poste');
       inst(geoRefl, matRefl, bl.refl, 'refl');
       inst(geoRefl, matBalz, bl.balz, 'refl');
@@ -1252,30 +1300,68 @@
     // Interior (câmera de cabine): painel, volante, colunas
     var inter = new T.Group(); c.add(inter);
     var matPainel = new T.MeshStandardMaterial({ color: 0x1c1a18, roughness: 0.82, metalness: 0.05 });
-    var painel = new T.Mesh(new T.BoxGeometry(1.6, 0.22, 0.45), matPainel); painel.position.set(0, 0.92, 0.7); inter.add(painel);
+    var painel = new T.Mesh(new T.BoxGeometry(1.6, 0.22, 0.45), matPainel); painel.position.set(0, 0.92, 0.7); inter.add(painel); G.painelCab = painel;
     var capo = new T.Mesh(new T.BoxGeometry(1.7, 0.06, 1.3), new T.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.55, metalness: 0.3, emissive: 0x2a1e06 })); capo.position.set(0, 0.86, 1.35); capo.rotation.x = 0.08; inter.add(capo);
-    var volante = new T.Mesh(new T.TorusGeometry(0.17, 0.028, 10, 28), matPainel); volante.position.set(0.36, 0.9, 0.5); volante.rotation.x = -0.35; inter.add(volante);
+    var volante = new T.Mesh(new T.TorusGeometry(0.17, 0.028, 10, 28), matPainel); volante.position.set(0.36, 0.9, 0.5); volante.rotation.x = -0.35; inter.add(volante); G.volante = volante;
     var raio = new T.Mesh(new T.BoxGeometry(0.34, 0.035, 0.03), matPainel); volante.add(raio);
     var raio2 = new T.Mesh(new T.BoxGeometry(0.035, 0.17, 0.03), matPainel); raio2.position.y = -0.085; volante.add(raio2);
     var miolo = new T.Mesh(new T.CylinderGeometry(0.06, 0.07, 0.04, 14), matPainel); miolo.rotation.x = Math.PI / 2; volante.add(miolo);
-    [-0.8, 0.8].forEach(function (x) { var col = new T.Mesh(new T.BoxGeometry(0.05, 0.75, 0.05), matPreto); col.position.set(x, 1.3, 0.62); col.rotation.x = -0.55; col.rotation.z = x > 0 ? 0.18 : -0.18; inter.add(col); });
-    var tetoI = new T.Mesh(new T.BoxGeometry(1.6, 0.05, 1.6), matPreto); tetoI.position.set(0, 1.62, -0.2); inter.add(tetoI);
+    var primCab = [painel];
+    [-0.8, 0.8].forEach(function (x) { var col = new T.Mesh(new T.BoxGeometry(0.05, 0.75, 0.05), matPreto); col.position.set(x, 1.3, 0.62); col.rotation.x = -0.55; col.rotation.z = x > 0 ? 0.18 : -0.18; inter.add(col); primCab.push(col); });
+    var tetoI = new T.Mesh(new T.BoxGeometry(1.6, 0.05, 1.6), matPreto); tetoI.position.set(0, 1.62, -0.2); inter.add(tetoI); primCab.push(tetoI);
     // Quadro de instrumentos: velocímetro desenhado em canvas, o ponteiro acompanha a velocidade
-    var cvQ = document.createElement('canvas'); cvQ.width = 256; cvQ.height = 128;
+    var cvQ = document.createElement('canvas'); cvQ.width = 512; cvQ.height = 160;
     var texQ = new T.CanvasTexture(cvQ); texQ.colorSpace = T.SRGBColorSpace;
-    var conta = new T.Mesh(new T.PlaneGeometry(0.34, 0.17), new T.MeshBasicMaterial({ map: texQ, color: 0xd8c8b8 }));
+    var conta = new T.Mesh(new T.PlaneGeometry(0.34, 0.106), new T.MeshBasicMaterial({ map: texQ, color: 0xd8dce4 }));
     conta.position.set(0.36, 1.1, 0.6);
     var casulo = new T.Mesh(new T.BoxGeometry(0.4, 0.12, 0.22), matPainel); casulo.position.set(0.36, 1.04, 0.7); casulo.rotation.x = 0.3; inter.add(casulo); conta.rotation.x = 0.3; conta.rotation.y = Math.PI; inter.add(conta);
     G.quadro = { cv: cvQ, tex: texQ, kmh: -99 };
     var luzPainel = new T.PointLight(0xff9a50, 0.5, 2.4, 2); luzPainel.position.set(0.36, 1.08, 0.5); inter.add(luzPainel);
+    primCab.push(casulo);
+    // Interior modelado no Blender (painel, console, portas, colunas, forro, volante); a sombra de contato vem nas cores dos vértices
+    if (AST && AST.cabine) {
+      var cabM = AST.cabine.scene.clone(true), volM = null;
+      var MATC = {
+        plastico: { color: 0x1d1d20, roughness: 0.72 }, plastico2: { color: 0x34353a, roughness: 0.8 },
+        grade: { color: 0x0a0a0b, roughness: 0.9 }, cromo: { color: 0xb8bcc4, roughness: 0.25, metalness: 0.9, envMapIntensity: 1.0 },
+        led: { color: 0x401010, emissive: 0xff2a10, emissiveIntensity: 1.5 }, tela: { color: 0x05101c, emissive: 0x1e6ac8, emissiveIntensity: 0.9, roughness: 0.3 },
+        couro: { color: 0x141414, roughness: 0.55 }, forro: { color: 0x4d4943, roughness: 0.95 }, borracha: { color: 0x0b0b0b, roughness: 0.6 }
+      };
+      var matsCab = {};
+      cabM.traverse(function (o) {
+        if (o.name === 'volante') volM = o;
+        if (!o.isMesh) return;
+        var n = o.material.name, cor = !!o.geometry.attributes.color;
+        var k = n + (cor ? '+c' : '');
+        if (!matsCab[k]) {
+          var d = MATC[n] || MATC.plastico, op = { roughness: 0.7, metalness: 0, envMapIntensity: 0.3, vertexColors: cor };
+          for (var c in d) op[c] = d[c];
+          matsCab[k] = new T.MeshStandardMaterial(op);
+        }
+        o.material = matsCab[k]; o.castShadow = false; o.receiveShadow = true;
+      });
+      inter.add(cabM);
+      primCab.forEach(function (o) { o.visible = false; });
+      // volante de verdade: gira no próprio eixo (inclinado 0,4 rad, como a coluna)
+      if (volM) {
+        volM.parent.remove(volM);
+        var piv = new T.Group(); piv.position.set(0.36, 0.84, 0.22); piv.rotation.x = 0.4; inter.add(piv);
+        volM.position.set(0, 0, 0); volM.rotation.set(0, 0, 0); piv.add(volM);
+        G.volante.visible = false; G.volante = volM;
+      }
+      // o quadro fica dentro do capuz, sobre o painel
+      conta.position.set(0.36, 1.0, 0.585); conta.rotation.set(0.12, Math.PI, 0); conta.scale.setScalar(1.1);
+      luzPainel.position.set(0.15, 1.02, 0.12); luzPainel.intensity = 0.75; luzPainel.distance = 1.7; luzPainel.decay = 1.6; luzPainel.color.setHex(0x9fb8e0); // brilho do painel enchendo a cabine
+      G.cabineReal = true;
+    }
     inter.visible = false;
     // Luzes: faróis (spot) e lanterna (vermelha, ilumina a Mula atrás)
     var spot = new T.SpotLight(0xffe7c0, 1600, 150, 0.5, 0.5, 1.2);
     spot.castShadow = true; spot.shadow.camera.near = 0.5; spot.shadow.camera.far = 90; spot.shadow.bias = -0.0004; spot.shadow.normalBias = 0.05;
     spot.position.set(0, 0.78, 2.1); c.add(spot);
     var alvo = new T.Object3D(); alvo.position.set(0, -0.2, 26); c.add(alvo); spot.target = alvo;
-    var spot2 = new T.SpotLight(0xfff6e0, 300, 60, 0.95, 0.8, 1.4);
-    spot2.position.set(0, 0.95, 2.05); c.add(spot2);
+    var spot2 = new T.SpotLight(0xfff6e0, 190, 60, 0.95, 0.85, 1.4);
+    spot2.position.set(0, 0.72, 2.14); // fora da ponta do capô (senão ilumina o capô e estoura) c.add(spot2);
     var alvo2 = new T.Object3D(); alvo2.position.set(0, -1, 9); c.add(alvo2); spot2.target = alvo2;
     // Facho visível dos faróis na neblina
     var matFacho = new T.ShaderMaterial({
@@ -1297,37 +1383,51 @@
     G.cena.add(c);
     G.carroReal = usarCarroReal(ext, capo, rodas);
     c.traverse(function (o) { if (o.isMesh && !o.userData.semSombra) { o.castShadow = true; o.receiveShadow = true; } });
-    G.carroObj = c; G.carroExt = ext; G.carroInt = inter; G.rodas = rodas; G.volante = volante; G.lantLuz = lant; G.farol = spot;
+    G.carroObj = c; G.carroExt = ext; G.carroInt = inter; G.rodas = rodas; if (!G.cabineReal) G.volante = volante; G.lantLuz = lant; G.farol = spot;
   }
 
   function desenharQuadro(kmh) {
     var q = G.quadro; if (!q) return;
     kmh = Math.round(clamp(kmh, 0, 180));
     if (q.kmh === kmh) return; q.kmh = kmh;
-    var g = q.cv.getContext('2d'), W = 256, H = 128;
-    g.fillStyle = '#0a0806'; g.fillRect(0, 0, W, H);
-    // mostrador
-    var cx = 128, cy = 70, R0 = 50, a0 = Math.PI * 0.8, a1 = Math.PI * 2.2;
-    g.strokeStyle = 'rgba(255,150,70,.55)'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R0, a0, a1); g.stroke();
-    g.font = '10px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    for (var v = 0; v <= 160; v += 10) {
-      var a = lerp(a0, a1, v / 160), maior = v % 20 === 0;
-      g.strokeStyle = maior ? '#ffb070' : 'rgba(255,150,70,.5)'; g.lineWidth = maior ? 2 : 1;
-      g.beginPath(); g.moveTo(cx + Math.cos(a) * (R0 - (maior ? 9 : 5)), cy + Math.sin(a) * (R0 - (maior ? 9 : 5))); g.lineTo(cx + Math.cos(a) * R0, cy + Math.sin(a) * R0); g.stroke();
-      if (v % 40 === 0) { g.fillStyle = '#ffc890'; g.fillText(String(v), cx + Math.cos(a) * (R0 - 19), cy + Math.sin(a) * (R0 - 19)); }
+    var g = q.cv.getContext('2d'), W = 512, H = 160;
+    g.fillStyle = '#05070a'; g.fillRect(0, 0, W, H);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    // marcha e giro de mentira, só para o ponteiro do conta-giros ter vida
+    var marcha = Math.min(5, Math.floor(kmh / 34) + 1), rpm = kmh < 2 ? 0.9 : 1 + (kmh - (marcha - 1) * 34) / 34 * 4.6;
+    function mostrador(cx, max, passo, rotulo, val, txt) {
+      var cy = 86, R0 = 64, a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
+      var gr = g.createRadialGradient(cx, cy, R0 * 0.5, cx, cy, R0 + 6);
+      gr.addColorStop(0, 'rgba(20,60,110,0)'); gr.addColorStop(0.85, 'rgba(40,120,220,.18)'); gr.addColorStop(1, 'rgba(40,120,220,0)');
+      g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, R0 + 6, 0, 6.3); g.fill();
+      g.strokeStyle = 'rgba(90,170,255,.75)'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R0, a0, a1); g.stroke();
+      g.font = '13px sans-serif';
+      for (var v = 0; v <= max + 1e-6; v += passo / 2) {
+        var a = lerp(a0, a1, v / max), maior = Math.abs(v / passo - Math.round(v / passo)) < 1e-6;
+        var vermelho = rotulo === 'rpm' && v >= 6;
+        g.strokeStyle = vermelho ? '#ff4030' : maior ? '#e8f2ff' : 'rgba(200,225,255,.5)'; g.lineWidth = maior ? 2.5 : 1.2;
+        var r1 = R0 - (maior ? 11 : 6);
+        g.beginPath(); g.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); g.lineTo(cx + Math.cos(a) * (R0 - 2), cy + Math.sin(a) * (R0 - 2)); g.stroke();
+        if (maior) { g.fillStyle = vermelho ? '#ff6a50' : '#dfeaff'; g.fillText(String(Math.round(v)), cx + Math.cos(a) * (R0 - 23), cy + Math.sin(a) * (R0 - 23)); }
+      }
+      var ap = lerp(a0, a1, clamp(val / max, 0, 1));
+      g.strokeStyle = '#ff5a28'; g.lineWidth = 3.5; g.shadowColor = '#ff5a28'; g.shadowBlur = 6;
+      g.beginPath(); g.moveTo(cx - Math.cos(ap) * 10, cy - Math.sin(ap) * 10); g.lineTo(cx + Math.cos(ap) * (R0 - 5), cy + Math.sin(ap) * (R0 - 5)); g.stroke();
+      g.shadowBlur = 0; g.fillStyle = '#1a1e24'; g.beginPath(); g.arc(cx, cy, 8, 0, 6.3); g.fill();
+      g.fillStyle = 'rgba(200,225,255,.7)'; g.font = '10px sans-serif'; g.fillText(txt, cx, cy + 30);
     }
-    // ponteiro
-    var ap = lerp(a0, a1, clamp(kmh / 160, 0, 1));
-    g.strokeStyle = '#ff4a2a'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - Math.cos(ap) * 8, cy - Math.sin(ap) * 8); g.lineTo(cx + Math.cos(ap) * (R0 - 6), cy + Math.sin(ap) * (R0 - 6)); g.stroke();
-    g.fillStyle = '#2a2420'; g.beginPath(); g.arc(cx, cy, 6, 0, 6.3); g.fill();
-    g.fillStyle = '#ffc890'; g.font = 'bold 15px sans-serif'; g.fillText(String(kmh), cx, cy + 24);
-    g.font = '8px sans-serif'; g.fillText('km/h', cx, cy + 36);
-    // marcador de combustível e luzes do painel
-    g.strokeStyle = 'rgba(255,150,70,.5)'; g.lineWidth = 1.5; g.beginPath(); g.arc(34, 70, 24, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
-    g.strokeStyle = '#ff6a3a'; g.lineWidth = 2; g.beginPath(); g.moveTo(34, 70); g.lineTo(34 + Math.cos(Math.PI * 1.35) * 22, 70 + Math.sin(Math.PI * 1.35) * 22); g.stroke();
-    g.fillStyle = '#ffc890'; g.font = '8px sans-serif'; g.fillText('E   F', 34, 92);
-    g.fillStyle = '#c4281a'; g.beginPath(); g.arc(222, 40, 4, 0, 6.3); g.fill();
-    g.fillStyle = '#4ac05a'; g.beginPath(); g.arc(222, 58, 3, 0, 6.3); g.fill();
+    mostrador(112, 7, 1, 'rpm', rpm, 'x1000 rpm');
+    mostrador(400, 180, 20, 'kmh', kmh, 'km/h');
+    // miolo: velocidade digital, marcha, combustível e luzes
+    g.fillStyle = '#0b1622'; g.fillRect(205, 30, 102, 100);
+    g.strokeStyle = 'rgba(90,170,255,.35)'; g.lineWidth = 1; g.strokeRect(205.5, 30.5, 101, 99);
+    g.fillStyle = '#eaf4ff'; g.font = 'bold 30px sans-serif'; g.fillText(String(kmh), 256, 66);
+    g.fillStyle = 'rgba(200,225,255,.6)'; g.font = '10px sans-serif'; g.fillText('km/h', 256, 86);
+    g.fillStyle = '#8fd0ff'; g.font = 'bold 13px sans-serif'; g.fillText(marcha + 'ª', 230, 110);
+    g.fillStyle = 'rgba(200,225,255,.25)'; g.fillRect(250, 105, 48, 8);
+    g.fillStyle = '#ffb030'; g.fillRect(250, 105, 9, 8); // combustível quase no fim
+    g.fillStyle = '#c4281a'; g.beginPath(); g.arc(215, 18, 4, 0, 6.3); g.fill();
+    g.fillStyle = '#3ac05a'; g.beginPath(); g.arc(297, 18, 4, 0, 6.3); g.fill();
     q.tex.needsUpdate = true;
   }
 
@@ -1352,8 +1452,17 @@
     });
     cena.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; if (o.material) o.material.envMapIntensity = 0.7; } });
     ext.add(cena);
-    // cabine: o capô de primitiva assume a cor do carro real (os vidros do modelo são opacos por dentro)
-    capo.material.color.setHex(0x6e2620); capo.material.emissive.setHex(0x1a0605); capo.material.metalness = 0.15;
+    // cabine: a própria lataria do modelo, só com a face de fora (os vidros e o teto somem por dentro)
+    var cabC = cena.clone(true), matsC = {};
+    cabC.traverse(function (o) {
+      if (!o.isMesh) return;
+      if (/^roda_/.test(o.name) || (o.parent && /^roda_/.test(o.parent.name))) { o.visible = false; return; }
+      var m0 = o.material, k = m0.uuid;
+      if (!matsC[k]) { matsC[k] = m0.clone(); matsC[k].side = T.FrontSide; matsC[k].envMapIntensity = 0.55; }
+      o.material = matsC[k]; o.castShadow = false; o.receiveShadow = true;
+    });
+    capo.parent.add(cabC); capo.visible = false;
+    if (!G.cabineReal) G.painelCab.position.y = 0.85; // painel mais baixo deixa ver o capô de verdade
     if (novas.length === 4) { rodas.length = 0; novas.forEach(function (x) { rodas.push(x); }); }
     return true;
   }
@@ -1414,6 +1523,28 @@
     spine004_5: 'rabo1', spine003_4: 'rabo2', spine002_3: 'rabo3', spine001_2: 'rabo4', spine_1: 'rabo5',
     spine005_64: 'quadril', spine009_48: 'peito', spine007_51: 'lombo'
   };
+  // Pelo no shader: fios finos ao longo do corpo (posição do modelo, não depende das UVs),
+  // cor e aspereza variando, e um contorno quente onde a luz pega de raspão
+  function matPelo(geo) {
+    if (!geo.boundingBox) geo.computeBoundingBox();
+    var tam = new T.Vector3(); geo.boundingBox.getSize(tam);
+    var esc = 1 / Math.max(0.001, tam.x, tam.y, tam.z);
+    var mat = new T.MeshStandardMaterial({ color: 0x2a1c14, roughness: 0.6, metalness: 0, emissive: 0x0c0302, envMapIntensity: 0.8, side: T.DoubleSide });
+    mat.onBeforeCompile = function (sh) {
+      sh.uniforms.uEscP = { value: esc };
+      sh.vertexShader = 'uniform float uEscP; varying vec3 vPelo;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vPelo = position * uEscP;');
+      sh.fragmentShader = 'varying vec3 vPelo;\n' +
+        'float hP(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }\n' +
+        'float nP(vec3 p){ vec3 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);' +
+        ' return mix(mix(mix(hP(i), hP(i+vec3(1,0,0)), f.x), mix(hP(i+vec3(0,1,0)), hP(i+vec3(1,1,0)), f.x), f.y),' +
+        ' mix(mix(hP(i+vec3(0,0,1)), hP(i+vec3(1,0,1)), f.x), mix(hP(i+vec3(0,1,1)), hP(i+vec3(1,1,1)), f.x), f.y), f.z); }\n' +
+        sh.fragmentShader
+          .replace('#include <color_fragment>', '#include <color_fragment>\n float fio = nP(vPelo * vec3(260.0, 260.0, 34.0)) * 0.6 + nP(vPelo * vec3(70.0, 70.0, 9.0)) * 0.4;\n float manc = nP(vPelo * 9.0);\n diffuseColor.rgb *= (0.5 + fio * 0.55) * (0.85 + manc * 0.3);')
+          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(0.58 + (1.0 - fio) * 0.32, 0.0, 1.0);')
+          .replace('#include <opaque_fragment>', ' float raspa = pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 3.0);\n outgoingLight += vec3(1.0, 0.42, 0.14) * raspa * (0.015 + fio * 0.035);\n#include <opaque_fragment>');
+    };
+    return mat;
+  }
   function usarMulaReal(m, corpoG) {
     if (!(AST && AST.mula)) return false;
     var g = AST.mula.scene;
@@ -1425,7 +1556,7 @@
         o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
         var nome = (o.material && o.material.name) || '';
         if (nome === 'toco') { var mb = new T.MeshBasicMaterial({ color: 0xffffff, side: T.DoubleSide }); mb.color.setRGB(5, 1.5, 0.25); o.material = mb; }
-        else o.material = new T.MeshStandardMaterial({ color: 0x241811, roughness: 0.45, metalness: 0, emissive: 0x0c0302, envMapIntensity: 0.8, side: T.DoubleSide });
+        else o.material = matPelo(o.geometry);
       }
     });
     if (!ossos.toco || !ossos.ombroE || !ossos.coxaE) return false;
@@ -1568,7 +1699,8 @@
   }
   function tamanhoRT(w, h) {
     var esc = cfg.grafico === 'alto' ? 1 : cfg.grafico === 'medio' ? 0.72 : 0.5;
-    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    // no celular o Alto fica em 1,5x: a tela cheia em 2x derruba o FPS até em aparelho bom
+    var dpr = Math.min(cfg.toque ? 1.5 : 2, window.devicePixelRatio || 1);
     var rw = Math.max(320, Math.round(w * dpr * esc)), rh = Math.max(180, Math.round(h * dpr * esc));
     var opts = { type: T.HalfFloatType, depthBuffer: true };
     if (!G.rtCena) { G.rtCena = new T.WebGLRenderTarget(rw, rh, opts); G.rtEsp = new T.WebGLRenderTarget(Math.round(rw * 0.3), Math.round(rw * 0.3 / 3), opts); }
@@ -2116,8 +2248,8 @@
     var fx = Math.sin(c.psi), fz = Math.cos(c.psi);
     var fov = 64 + clamp(vAbs, 0, 45) * 0.32 + (c.driftT > 0 ? 3 : 0);
     if (cab) {
-      _v1.set(0.36, G.carroReal ? 1.22 : 1.32, 0.05).applyEuler(o.rotation).add(o.position);
-      _v2.set(0.36 + c.volante * -0.5, G.carroReal ? 1.0 : 1.12, olharTras ? -10 : 10).applyEuler(o.rotation).add(o.position);
+      _v1.set(0.36, G.cabineReal ? 1.17 : G.carroReal ? 1.22 : 1.32, G.cabineReal ? -0.25 : 0.05).applyEuler(o.rotation).add(o.position);
+      _v2.set(0.36 + c.volante * -0.5, G.cabineReal ? 0.55 : G.carroReal ? 1.0 : 1.12, olharTras ? -10 : 10).applyEuler(o.rotation).add(o.position);
       if (susto && mula.capo) {
         // olha para o pescoço em chamas
         G.mulaPonta.getWorldPosition(_pw);
@@ -2615,7 +2747,7 @@
     tex('chaoCor', 'tex/chao-cor.webp', true); tex('chaoNor', 'tex/chao-normal.webp');
     tex('cascaCor', 'tex/casca-cor.webp', true); tex('cascaNor', 'tex/casca-normal.webp');
     tex('ceu', 'tex/ceu.webp', true);
-    glb('carro', 'carro-v1.glb'); glb('mula', 'mula-v1.glb'); glb('tronco', 'tronco-v1.glb'); glb('pedra', 'pedra-v1.glb');
+    glb('carro', 'carro-v1.glb'); glb('cabine', 'cabine-v2.glb'); glb('mula', 'mula-v1.glb'); glb('tronco', 'tronco-v1.glb'); glb('pedra', 'pedra-v1.glb');
     carregandoAst = Promise.all(tarefas).then(function () { AST = out; return out; });
     return carregandoAst;
   }

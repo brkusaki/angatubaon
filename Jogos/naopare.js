@@ -730,10 +730,26 @@
   Particulas.prototype.limpar = function () { this.n = 0; this.geo.setDrawRange(0, 0); };
 
   function corFogo(f, c, o) {
-    // branco-amarelo → laranja → vermelho → brasa escura
-    if (f < 0.15) { c[o] = 1.6; c[o + 1] = 1.35; c[o + 2] = 0.7; }
-    else if (f < 0.45) { var t = (f - 0.15) / 0.3; c[o] = 1.5; c[o + 1] = lerp(1.2, 0.45, t); c[o + 2] = lerp(0.5, 0.08, t); }
-    else { var u = (f - 0.45) / 0.55; c[o] = lerp(1.3, 0.25, u); c[o + 1] = lerp(0.4, 0.04, u); c[o + 2] = 0.03; }
+    // fagulha: amarelo → laranja → brasa escura
+    if (f < 0.15) { c[o] = 1.2; c[o + 1] = 0.95; c[o + 2] = 0.4; }
+    else if (f < 0.45) { var t = (f - 0.15) / 0.3; c[o] = 1.15; c[o + 1] = lerp(0.9, 0.38, t); c[o + 2] = lerp(0.35, 0.06, t); }
+    else { var u = (f - 0.45) / 0.55; c[o] = lerp(1.0, 0.2, u); c[o + 1] = lerp(0.34, 0.04, u); c[o + 2] = 0.03; }
+  }
+  // língua de fogo: amarelo no miolo, laranja, vermelho, some escuro
+  function corChama(f, c, o) {
+    if (f < 0.3) { var a = f / 0.3; c[o] = 1.15; c[o + 1] = lerp(0.8, 0.55, a); c[o + 2] = lerp(0.28, 0.1, a); }
+    else { var b = (f - 0.3) / 0.7; c[o] = lerp(1.1, 0.3, b); c[o + 1] = lerp(0.5, 0.05, b); c[o + 2] = lerp(0.1, 0.02, b); }
+  }
+  corChama.tam = function (f) { return f < 0.25 ? 0.7 + f * 1.6 : 1.1 - (f - 0.25) * 1.15; };
+  corChama.alfa = function (f) { return f < 0.12 ? f / 0.12 * 0.85 : (1 - f) * 0.85; };
+  function texChama() {
+    return texCanvas(64, 64, function (g, w) {
+      g.translate(w / 2, w * 0.58); g.scale(0.5, 1);
+      var gr = g.createRadialGradient(0, 0, 0, 0, 0, w * 0.46);
+      gr.addColorStop(0, 'rgba(255,240,190,1)'); gr.addColorStop(0.3, 'rgba(255,170,60,.8)');
+      gr.addColorStop(0.7, 'rgba(255,80,10,.28)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.beginPath(); g.arc(0, 0, w * 0.46, 0, 6.3); g.fill();
+    });
   }
   corFogo.tam = function (f) { return f < 0.2 ? 0.6 + f * 2.5 : 1.1 - (f - 0.2) * 0.9; };
   corFogo.alfa = function (f) { return f < 0.1 ? f * 10 : 1 - f; };
@@ -768,7 +784,7 @@
     G = {};
     var renderer = new T.WebGLRenderer({ canvas: el.canvas, antialias: false, powerPreference: 'high-performance' });
     renderer.toneMapping = T.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.3;
+    renderer.toneMappingExposure = 1.2;
     renderer.outputColorSpace = T.SRGBColorSpace;
     renderer.setPixelRatio(1);
     renderer.shadowMap.enabled = true;
@@ -813,6 +829,8 @@
     montarMula();
     G.fogo = new Particulas(420, G.tex.brilhoFogo, true, corFogo);
     cena.add(G.fogo.obj);
+    G.chama = new Particulas(160, texChama(), true, corChama);
+    cena.add(G.chama.obj);
     G.poeira = new Particulas(160, G.tex.fumaca, false, corPoeira);
     cena.add(G.poeira.obj);
     montarPos();
@@ -1233,20 +1251,30 @@
     });
     // Interior (câmera de cabine): painel, volante, colunas
     var inter = new T.Group(); c.add(inter);
-    var painel = new T.Mesh(new T.BoxGeometry(1.6, 0.22, 0.45), matPreto); painel.position.set(0, 0.92, 0.7); inter.add(painel);
+    var matPainel = new T.MeshStandardMaterial({ color: 0x1c1a18, roughness: 0.82, metalness: 0.05 });
+    var painel = new T.Mesh(new T.BoxGeometry(1.6, 0.22, 0.45), matPainel); painel.position.set(0, 0.92, 0.7); inter.add(painel);
     var capo = new T.Mesh(new T.BoxGeometry(1.7, 0.06, 1.3), new T.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.55, metalness: 0.3, emissive: 0x2a1e06 })); capo.position.set(0, 0.86, 1.35); capo.rotation.x = 0.08; inter.add(capo);
-    var volante = new T.Mesh(new T.TorusGeometry(0.17, 0.025, 6, 18), matPreto); volante.position.set(0.36, 0.9, 0.5); volante.rotation.x = -0.35; inter.add(volante);
-    var raio = new T.Mesh(new T.BoxGeometry(0.36, 0.04, 0.03), matPreto); volante.add(raio);
+    var volante = new T.Mesh(new T.TorusGeometry(0.17, 0.028, 10, 28), matPainel); volante.position.set(0.36, 0.9, 0.5); volante.rotation.x = -0.35; inter.add(volante);
+    var raio = new T.Mesh(new T.BoxGeometry(0.34, 0.035, 0.03), matPainel); volante.add(raio);
+    var raio2 = new T.Mesh(new T.BoxGeometry(0.035, 0.17, 0.03), matPainel); raio2.position.y = -0.085; volante.add(raio2);
+    var miolo = new T.Mesh(new T.CylinderGeometry(0.06, 0.07, 0.04, 14), matPainel); miolo.rotation.x = Math.PI / 2; volante.add(miolo);
     [-0.8, 0.8].forEach(function (x) { var col = new T.Mesh(new T.BoxGeometry(0.05, 0.75, 0.05), matPreto); col.position.set(x, 1.3, 0.62); col.rotation.x = -0.55; col.rotation.z = x > 0 ? 0.18 : -0.18; inter.add(col); });
     var tetoI = new T.Mesh(new T.BoxGeometry(1.6, 0.05, 1.6), matPreto); tetoI.position.set(0, 1.62, -0.2); inter.add(tetoI);
-    var conta = new T.Mesh(new T.PlaneGeometry(0.3, 0.1), new T.MeshBasicMaterial({ color: 0xff9a3a })); conta.position.set(0.36, 1.04, 0.62); conta.rotation.x = -0.6; conta.rotation.y = Math.PI; inter.add(conta);
+    // Quadro de instrumentos: velocímetro desenhado em canvas, o ponteiro acompanha a velocidade
+    var cvQ = document.createElement('canvas'); cvQ.width = 256; cvQ.height = 128;
+    var texQ = new T.CanvasTexture(cvQ); texQ.colorSpace = T.SRGBColorSpace;
+    var conta = new T.Mesh(new T.PlaneGeometry(0.34, 0.17), new T.MeshBasicMaterial({ map: texQ, color: 0xd8c8b8 }));
+    conta.position.set(0.36, 1.1, 0.6);
+    var casulo = new T.Mesh(new T.BoxGeometry(0.4, 0.12, 0.22), matPainel); casulo.position.set(0.36, 1.04, 0.7); casulo.rotation.x = 0.3; inter.add(casulo); conta.rotation.x = 0.3; conta.rotation.y = Math.PI; inter.add(conta);
+    G.quadro = { cv: cvQ, tex: texQ, kmh: -99 };
+    var luzPainel = new T.PointLight(0xff9a50, 0.5, 2.4, 2); luzPainel.position.set(0.36, 1.08, 0.5); inter.add(luzPainel);
     inter.visible = false;
     // Luzes: faróis (spot) e lanterna (vermelha, ilumina a Mula atrás)
-    var spot = new T.SpotLight(0xffe7c0, 2600, 150, 0.5, 0.5, 1.2);
+    var spot = new T.SpotLight(0xffe7c0, 1600, 150, 0.5, 0.5, 1.2);
     spot.castShadow = true; spot.shadow.camera.near = 0.5; spot.shadow.camera.far = 90; spot.shadow.bias = -0.0004; spot.shadow.normalBias = 0.05;
     spot.position.set(0, 0.78, 2.1); c.add(spot);
     var alvo = new T.Object3D(); alvo.position.set(0, -0.2, 26); c.add(alvo); spot.target = alvo;
-    var spot2 = new T.SpotLight(0xfff6e0, 700, 60, 0.95, 0.8, 1.4);
+    var spot2 = new T.SpotLight(0xfff6e0, 300, 60, 0.95, 0.8, 1.4);
     spot2.position.set(0, 0.95, 2.05); c.add(spot2);
     var alvo2 = new T.Object3D(); alvo2.position.set(0, -1, 9); c.add(alvo2); spot2.target = alvo2;
     // Facho visível dos faróis na neblina
@@ -1270,6 +1298,37 @@
     G.carroReal = usarCarroReal(ext, capo, rodas);
     c.traverse(function (o) { if (o.isMesh && !o.userData.semSombra) { o.castShadow = true; o.receiveShadow = true; } });
     G.carroObj = c; G.carroExt = ext; G.carroInt = inter; G.rodas = rodas; G.volante = volante; G.lantLuz = lant; G.farol = spot;
+  }
+
+  function desenharQuadro(kmh) {
+    var q = G.quadro; if (!q) return;
+    kmh = Math.round(clamp(kmh, 0, 180));
+    if (q.kmh === kmh) return; q.kmh = kmh;
+    var g = q.cv.getContext('2d'), W = 256, H = 128;
+    g.fillStyle = '#0a0806'; g.fillRect(0, 0, W, H);
+    // mostrador
+    var cx = 128, cy = 70, R0 = 50, a0 = Math.PI * 0.8, a1 = Math.PI * 2.2;
+    g.strokeStyle = 'rgba(255,150,70,.55)'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R0, a0, a1); g.stroke();
+    g.font = '10px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (var v = 0; v <= 160; v += 10) {
+      var a = lerp(a0, a1, v / 160), maior = v % 20 === 0;
+      g.strokeStyle = maior ? '#ffb070' : 'rgba(255,150,70,.5)'; g.lineWidth = maior ? 2 : 1;
+      g.beginPath(); g.moveTo(cx + Math.cos(a) * (R0 - (maior ? 9 : 5)), cy + Math.sin(a) * (R0 - (maior ? 9 : 5))); g.lineTo(cx + Math.cos(a) * R0, cy + Math.sin(a) * R0); g.stroke();
+      if (v % 40 === 0) { g.fillStyle = '#ffc890'; g.fillText(String(v), cx + Math.cos(a) * (R0 - 19), cy + Math.sin(a) * (R0 - 19)); }
+    }
+    // ponteiro
+    var ap = lerp(a0, a1, clamp(kmh / 160, 0, 1));
+    g.strokeStyle = '#ff4a2a'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - Math.cos(ap) * 8, cy - Math.sin(ap) * 8); g.lineTo(cx + Math.cos(ap) * (R0 - 6), cy + Math.sin(ap) * (R0 - 6)); g.stroke();
+    g.fillStyle = '#2a2420'; g.beginPath(); g.arc(cx, cy, 6, 0, 6.3); g.fill();
+    g.fillStyle = '#ffc890'; g.font = 'bold 15px sans-serif'; g.fillText(String(kmh), cx, cy + 24);
+    g.font = '8px sans-serif'; g.fillText('km/h', cx, cy + 36);
+    // marcador de combustível e luzes do painel
+    g.strokeStyle = 'rgba(255,150,70,.5)'; g.lineWidth = 1.5; g.beginPath(); g.arc(34, 70, 24, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
+    g.strokeStyle = '#ff6a3a'; g.lineWidth = 2; g.beginPath(); g.moveTo(34, 70); g.lineTo(34 + Math.cos(Math.PI * 1.35) * 22, 70 + Math.sin(Math.PI * 1.35) * 22); g.stroke();
+    g.fillStyle = '#ffc890'; g.font = '8px sans-serif'; g.fillText('E   F', 34, 92);
+    g.fillStyle = '#c4281a'; g.beginPath(); g.arc(222, 40, 4, 0, 6.3); g.fill();
+    g.fillStyle = '#4ac05a'; g.beginPath(); g.arc(222, 58, 3, 0, 6.3); g.fill();
+    q.tex.needsUpdate = true;
   }
 
   // Lataria do modelo real: esconde as primitivas (fica só o que é luz e o facho)
@@ -1445,19 +1504,20 @@
     G.matPos = new T.ShaderMaterial({
       uniforms: {
         tCena: { value: null }, tEsp: { value: null }, tBloom: { value: null }, uT: { value: 0 }, uPerigo: { value: 0 }, uFlash: { value: 0 },
-        uEsp: { value: 1 }, uEstatica: { value: 0 }, uRet: { value: new T.Vector4(0.37, 0.80, 0.63, 0.94) }, uRes: { value: new T.Vector2(1280, 720) }, uPreto: { value: 0 }
+        uEsp: { value: 1 }, uEstatica: { value: 0 }, uVel: { value: 0 }, uRet: { value: new T.Vector4(0.37, 0.80, 0.63, 0.94) }, uRes: { value: new T.Vector2(1280, 720) }, uPreto: { value: 0 }
       },
       vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.0,1.0); }',
       fragmentShader: [
-        'uniform sampler2D tCena; uniform sampler2D tEsp; uniform sampler2D tBloom; uniform float uT, uPerigo, uFlash, uEsp, uPreto, uEstatica; uniform vec4 uRet; uniform vec2 uRes;',
+        'uniform sampler2D tCena; uniform sampler2D tEsp; uniform sampler2D tBloom; uniform float uT, uPerigo, uFlash, uEsp, uPreto, uEstatica, uVel; uniform vec4 uRet; uniform vec2 uRes;',
         'varying vec2 vUv;',
         'float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }',
         'void main(){',
         '  vec2 uv = vUv;',
         '  uv.x += sin(uv.y*170.0 + uT*7.0) * 0.0012 * uPerigo * uPerigo;',
         '  vec2 d = uv - 0.5; float r2 = dot(d,d);',
-        '  float ab = 0.002 + uPerigo*0.009;',
+        '  float ab = 0.0004 + uPerigo*0.006;',
         '  vec3 c = vec3(texture2D(tCena, uv + d*ab).r, texture2D(tCena, uv).g, texture2D(tCena, uv - d*ab).b);',
+        '  if (uVel > 0.02) { vec3 sm = c; for (int i = 1; i < 5; i++) sm += texture2D(tCena, uv - d*uVel*0.007*float(i)).rgb; c = mix(c, sm/5.0, smoothstep(0.03, 0.22, r2)); }',
         '  if (uEsp > 0.5 && uv.x > uRet.x && uv.x < uRet.z && uv.y > uRet.y && uv.y < uRet.w) {',
         '    vec2 m = (uv - uRet.xy) / (uRet.zw - uRet.xy);',
         '    vec2 e = abs(m - 0.5) * 2.0; float borda = max(e.x, e.y);',
@@ -1471,10 +1531,9 @@
         '  #endif',
         '  float l = dot(c, vec3(0.299,0.587,0.114)); c = mix(vec3(l), c, 0.82);',
         '  float g = h(uv*uRes + fract(uT*13.7)*91.0) - 0.5;',
-        '  c += g * (0.04 + uPerigo*0.06);',
-        '  c *= 0.965 + 0.035*sin(uv.y*uRes.y*1.3 + uT*30.0);',
-        '  float vig = smoothstep(0.75, 0.12, r2*2.1);',
-        '  c *= mix(0.32, 1.0, vig);',
+        '  c += g * (0.012 + uPerigo*0.03);',
+                '  float vig = smoothstep(0.75, 0.12, r2*2.1);',
+        '  c *= mix(0.5, 1.0, vig);',
         '  c = mix(c, vec3(0.5,0.0,0.02), (1.0 - vig) * uPerigo * 0.62);',
         '  c = mix(c, vec3(1.0,0.55,0.18), uFlash);',
         '  if (uEstatica > 0.5) {',
@@ -1527,6 +1586,7 @@
     if (G.farol.shadow.mapSize.x !== tam) { G.farol.shadow.mapSize.set(tam, tam); if (G.farol.shadow.map) { G.farol.shadow.map.dispose(); G.farol.shadow.map = null; } }
     G.sombraMula = cfg.grafico === 'alto';
     G.fogo.mat.uniforms.uEscala.value = rh * 0.9;
+    G.chama.mat.uniforms.uEscala.value = rh * 0.9;
     G.poeira.mat.uniforms.uEscala.value = rh * 0.9;
     G.nev.mat.uniforms.uEscala.value = rh * 0.9;
   }
@@ -1747,7 +1807,8 @@
       for (var j = 0; j < 10; j++) {
         var ddx = cp.x - pw.x, ddy = cp.y - pw.y, ddz = cp.z - pw.z, dl = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz) || 1;
         var vj = 4 + Math.random() * 5 * mula.jorro;
-        G.fogo.emitir(pw.x, pw.y, pw.z, ddx / dl * vj + (Math.random() - 0.5) * 3, ddy / dl * vj + (Math.random() - 0.5) * 3, ddz / dl * vj + (Math.random() - 0.5) * 3, 0.5 + Math.random() * 0.4, 0.5 + Math.random() * 0.9);
+        G.fogo.emitir(pw.x, pw.y, pw.z, ddx / dl * vj + (Math.random() - 0.5) * 3, ddy / dl * vj + (Math.random() - 0.5) * 3, ddz / dl * vj + (Math.random() - 0.5) * 3, 0.5 + Math.random() * 0.4, 0.25 + Math.random() * 0.4);
+        if (j < 5) G.chama.emitir(pw.x, pw.y, pw.z, ddx / dl * vj * 0.7 + (Math.random() - 0.5) * 2, ddy / dl * vj * 0.7 + (Math.random() - 0.5) * 2, ddz / dl * vj * 0.7 + (Math.random() - 0.5) * 2, 0.4 + Math.random() * 0.3, 0.55 + Math.random() * 0.5);
       }
     }
     var nEmit = Math.min(8, Math.round(dt * (mula.surto > 0 ? 900 : 260)));
@@ -1755,12 +1816,19 @@
       var sp = mula.surto > 0 ? 4 : 1;
       G.fogo.emitir(pw.x + (Math.random() - 0.5) * 0.3, pw.y + Math.random() * 0.2, pw.z + (Math.random() - 0.5) * 0.3,
         fdx * mula.vel * 0.55 + (Math.random() - 0.5) * 1.6 * sp, 2.2 + Math.random() * 2.5 * sp, fdz * mula.vel * 0.55 + (Math.random() - 0.5) * 1.6 * sp,
-        0.45 + Math.random() * 0.5, 0.55 + Math.random() * 0.6 * sp);
+        0.45 + Math.random() * 0.5, 0.2 + Math.random() * 0.3 * sp);
+    }
+    // língua de fogo: sobe do corte do pescoço e é puxada para trás pelo galope
+    var nCh = Math.min(5, Math.round(dt * (mula.surto > 0 ? 320 : 150))), tc = mula.capo ? 0.5 : 1;
+    for (var k2 = 0; k2 < nCh; k2++) {
+      G.chama.emitir(pw.x + (Math.random() - 0.5) * 0.28, pw.y + Math.random() * 0.1, pw.z + (Math.random() - 0.5) * 0.28,
+        fdx * mula.vel * 0.5 + (Math.random() - 0.5) * 0.9, 2.2 + Math.random() * 2.2, fdz * mula.vel * 0.5 + (Math.random() - 0.5) * 0.9,
+        0.32 + Math.random() * 0.36, (0.65 + Math.random() * 0.55) * tc);
     }
     var tremula = 0.75 + Math.sin(tempoGlobal * 31) * 0.12 + Math.sin(tempoGlobal * 17.3) * 0.13 + Math.random() * 0.1;
     G.mulaBrilho.visible = true;
     G.mulaBrilho.position.set(pw.x, pw.y + 0.5, pw.z);
-    var esc = 3 * tremula * (mula.surto > 0 ? 2.2 : 1);
+    var esc = 1.5 * tremula * (mula.surto > 0 ? 2.2 : 1);
     G.mulaBrilho.scale.set(esc, esc * 1.3, 1);
     G.mulaLuz.position.set(pw.x, pw.y + 0.8, pw.z);
     G.mulaLuz.intensity = 240 * tremula * (mula.surto > 0 ? 3 : 1);
@@ -1803,7 +1871,7 @@
       posicionarCarroEm(retryKm * 1000 + 6);
       mula = { gap: GAP_RETRY, vel: 0, lat: 0, fase: 0, tCorrida: 0, empina: 0, surto: 0, invT: 0, proxInv: 22, capo: false, jorro: 0, lado: 0 };
     }
-    G.fogo.limpar(); G.poeira.limpar(); G.nev.ok = false;
+    G.fogo.limpar(); G.chama.limpar(); G.poeira.limpar(); G.nev.ok = false;
     corrida.flash = 0; corrida.preto = 0; corrida.estatica = 0;
     limparRachas();
     atualizarChao(carro.x, carro.z, true);
@@ -2033,6 +2101,7 @@
     }
     G.poeira.atualizar(dt, 0.1, 0.9);
     G.fogo.atualizar(dt, 2.2, 1.4);
+    G.chama.atualizar(dt, 2.6, 1.1);
     posicionarMula(dt);
     atualizarNevoa(dt);
     atualizarChao(c.x, c.z, false);
@@ -2043,6 +2112,7 @@
     var olharTras = ent.olharTras && (estado === 'correndo' || estado === 'contagem');
     G.carroExt.visible = !cab;
     G.carroInt.visible = cab;
+    if (cab) desenharQuadro(Math.abs(c.vel) * 3.6);
     var fx = Math.sin(c.psi), fz = Math.cos(c.psi);
     var fov = 64 + clamp(vAbs, 0, 45) * 0.32 + (c.driftT > 0 ? 3 : 0);
     if (cab) {
@@ -2101,6 +2171,7 @@
     u.uFlash.value = corrida ? corrida.flash : 0;
     u.uPreto.value = corrida ? corrida.preto : 0;
     u.uEstatica.value = corrida && corrida.estatica ? 1 : 0;
+    u.uVel.value = lerp(u.uVel.value, cfg.grafico !== 'leve' && estado === 'correndo' ? clamp((c.vel - 22) / 24, 0, 1) * 0.7 : 0, Math.min(1, dt * 4));
     if (susto && corrida.fase >= 1 && corrida.fase < 3) u.uPerigo.value = 1;
     u.uEsp.value = (estado === 'correndo' || estado === 'contagem') && !olharTras ? 1 : 0;
   }
@@ -2275,7 +2346,7 @@
     posicionarCarroEm(30);
     mula = { gap: 34, vel: 0, lat: 0, fase: 0, tCorrida: 0, empina: 0, surto: 0, invT: 0, proxInv: 99, capo: false, jorro: 0, lado: 0 };
     corrida = novaCorrida();
-    G.fogo.limpar(); G.poeira.limpar();
+    G.fogo.limpar(); G.chama.limpar(); G.poeira.limpar();
     atualizarChao(carro.x, carro.z, true);
     camInstantanea = true;
   }

@@ -18,9 +18,12 @@
    - A imagem sai por um passe final próprio (grão, vinheta, aberração,
      tom vermelho do perigo) e o retrovisor é desenhado nesse passe.
    - Som 100% sintetizado (Web Audio), respeitando o mudo do hub.
-   - Recorde por rota no localStorage (angatuba_naopare). Sem backend.
-   - Fase 1 (protótipo): 1 rota, direção com drift, Mula, placas de km
-     com retry, derrota/vitória. Eventos de cabine vêm na fase 2.
+   - Recorde e medalha por rota no localStorage (angatuba_naopare).
+   - 4 rotas (Estrada Velha, Beira da Represa, Serra do Cemitério, Sem
+     Fim). Chegar à capela libera a próxima. O Sem Fim vale distância e
+     sobe para o ranking da cidade (ranking_naopare, via hub).
+   - Assombrações (eventos de cabine): Pisadeira, Saci e Cuca.
+   - Controle (Gamepad API): ver padPoll.
    ═══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -38,7 +41,18 @@
       // Medalhas pelo tempo total (segundos)
       ouro: 198, prata: 212, bronze: 235,
       // Mula: velocidade base (m/s) do começo e do fim da rota
-      mulaIni: 19.5, mulaFim: 23.2 }
+      mulaIni: 19.5, mulaFim: 23.2 },
+    // Represa: a estrada passa num aterro entre os braços d'água (agua = nível da água)
+    { id: 'represa', nome: 'Beira da Represa', dif: 'Média', km: 8, semente: 2207,
+      ouro: 258, prata: 277, bronze: 306, mulaIni: 20.2, mulaFim: 24.0,
+      agua: -1.1, biomas: ['pasto', 'mata', 'eucalipto', 'pasto', 'mata'], nevoa: 1.25 },
+    // Serra: mais curva forte, mais neblina e o cemitério à beira da estrada
+    { id: 'serra', nome: 'Serra do Cemitério', dif: 'Difícil', km: 10, semente: 3511,
+      ouro: 327, prata: 351, bronze: 388, mulaIni: 20.6, mulaFim: 24.6,
+      forte: true, biomas: ['mata', 'eucalipto', 'cemiterio', 'mata', 'cemiterio', 'cana'], nevoa: 1.55 },
+    // Sem Fim: sem capela; a Mula acelera sem parar. Vale a distância (ranking da cidade)
+    { id: 'sem-fim', nome: 'Sem Fim', dif: 'Até onde der', km: 20, semente: 4409, semFim: true,
+      mulaIni: 20.4, mulaFim: 27.5, biomas: ['pasto', 'mata', 'eucalipto', 'cana', 'cemiterio'], nevoa: 1.2 }
   ];
 
   var DS = 2;              // metros entre amostras da estrada
@@ -107,6 +121,7 @@
       var p = s / L;
       if (rnd() < 0.34) { s += lerp(70, 210, rnd()) * (1 - p * 0.35); continue; }
       var w = p < 0.18 ? [0.7, 0.28, 0.02] : p < 0.5 ? [0.38, 0.4, 0.22] : [0.22, 0.4, 0.38];
+      if (def.forte) w = p < 0.1 ? [0.5, 0.4, 0.1] : [0.14, 0.4, 0.46];
       var q = rnd(), sev = q < w[0] ? 1 : q < w[0] + w[1] ? 2 : 3;
       var dir = rnd() < 0.5 ? 1 : -1;
       if (Math.abs(theta) > 1.1) dir = theta > 0 ? 1 : -1;   // volta para o rumo
@@ -153,6 +168,8 @@
     var y0 = new Float32Array(n);
     for (i = 0; i < n; i++) y0[i] = relevo(x[i], z[i]);
     var y = suavizar(suavizar(y0, 10), 10);
+    // Represa: a estrada fica num aterro acima da água
+    if (def.agua != null) { for (i = 0; i < n; i++) y[i] = Math.max(y[i], def.agua + 0.9); y = suavizar(y, 8); }
     // Obstáculos (troncos/pedras) em retas depois do km 1
     var obst = [];
     var so = 1000 + rnd() * 300;
@@ -237,10 +254,11 @@
       autoAcel: s.autoAcel != null ? !!s.autoAcel : toque,
       grafico: s.grafico || (toque ? 'medio' : 'alto'),
       susto: s.susto || 'forte',                // 'forte' | 'suave'
+      assombra: s.assombra != null ? !!s.assombra : true,   // eventos de cabine (folclore)
       toque: toque
     };
   })();
-  function salvarCfg() { var s = lerSave(); s.camera = cfg.camera; s.autoAcel = cfg.autoAcel; s.grafico = cfg.grafico; s.susto = cfg.susto; gravarSave(s); }
+  function salvarCfg() { var s = lerSave(); s.camera = cfg.camera; s.autoAcel = cfg.autoAcel; s.grafico = cfg.grafico; s.susto = cfg.susto; s.assombra = cfg.assombra; gravarSave(s); }
 
   /* ══════════════════════════════════════════════════════════════
      SOM (sintetizado)
@@ -249,6 +267,7 @@
     var ac = null, mestre = null, ruido = null, ok = false;
     var motor = {}, estrada = {}, vento = {}, derrapa = {}, fogo = {};
     var proxCasco = 0, proxCoracao = 0, proxGrilo = 0, proxFagulha = 0, faseGalope = 0, silencioAte = 0;
+    var cantando = false, proxRodada = 4, radioLig = false, proxNota = 0, notaI = 0, radioCh = null;
     function ligado() { var s = window.AngatubaSom; return !(s && typeof s.ativo === 'function' && !s.ativo()); }
     function criarRuido() {
       var b = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), d = b.getChannelData(0);
@@ -284,6 +303,7 @@
       vento = cadeiaRuido('lowpass', 500, 0.5);
       derrapa = cadeiaRuido('bandpass', 1700, 1.4);
       fogo = cadeiaRuido('lowpass', 260, 0.9);
+      radioCh = cadeiaRuido('bandpass', 2600, 0.6);
       ok = true;
       ARQ.forEach(carregarArq);
     }
@@ -384,6 +404,14 @@
           }
           if (prox > 0.25 && t > proxFagulha) { estalo(t, 3000 + Math.random() * 2000, 3, 0.002, 0.03, prox * 0.25); proxFagulha = t + 0.04 + Math.random() * 0.15; }
         }
+        // Rádio da Cuca: caixinha de música desafinada com chiado
+        radioCh.g.gain.setTargetAtTime(radioLig ? 0.05 : 0, t, 0.05);
+        if (radioLig && t > proxNota) {
+          var MEL = [0, 3, 7, 10, 7, 3, 0, -2, -5, -2, 0, 3];
+          var fn = 620 * Math.pow(2, MEL[notaI % MEL.length] / 12) * (1 + Math.sin(t * 2.3) * 0.025);
+          tom(t, 'triangle', fn, 0, 0.004, 0.42, 0.07); tom(t, 'sine', fn * 2.01, 0, 0.004, 0.25, 0.03);
+          notaI++; proxNota = t + 0.3 + (notaI % 4 === 0 ? 0.18 : 0);
+        }
         // Coração quando ela está perto
         if (e.perigo > 0.45 && t > proxCoracao) {
           var bpm = 70 + e.perigo * 90, iv = 60 / bpm;
@@ -392,9 +420,12 @@
           proxCoracao = t + iv;
         }
         // Grilos no mato
+        // Grilos: cantam em rodadas curtas com silêncio entre elas, só na estrada (somem na capela)
+        var amb = e.amb == null ? 1 : e.amb;
+        if (t > proxRodada) { cantando = !cantando; proxRodada = t + (cantando ? 3 + Math.random() * 4 : 8 + Math.random() * 10); }
         var lg = laco('grilos');
-        if (lg) lg.g.gain.setTargetAtTime(0.2, t, 0.4);
-        else if (t > proxGrilo) {
+        if (lg) lg.g.gain.setTargetAtTime(cantando ? 0.07 * amb : 0, t, cantando ? 0.9 : 0.6);
+        else if (cantando && amb > 0.5 && t > proxGrilo) {
           var gt = t + 0.02, gf = 4200 + Math.random() * 900;
           for (var c = 0; c < 3; c++) tom(gt + c * 0.045, 'sine', gf, 0, 0.004, 0.025, 0.012);
           proxGrilo = t + 0.4 + Math.random() * 1.6;
@@ -485,6 +516,32 @@
         tom(t, 'sawtooth', 1480, 640, 0.005, 0.4, 0.1);
         estalo(t, 900, 0.8, 0.003, 0.3, 0.4);
       },
+      // Assombrações da cabine
+      batidaVidro: function (v) {
+        if (!ok || !ligado()) return;
+        var t = ac.currentTime;
+        estalo(t, 1100, 1.6, 0.002, 0.07, 0.45 * v); tom(t, 'sine', 210, 120, 0.002, 0.09, 0.3 * v);
+        estalo(t + 0.16, 1000, 1.6, 0.002, 0.07, 0.35 * v); tom(t + 0.16, 'sine', 200, 115, 0.002, 0.09, 0.25 * v);
+      },
+      respiro: function (v) {
+        if (!ok || !ligado()) return;
+        var t = ac.currentTime, s = fonteRuido(), f = ac.createBiquadFilter(), g = ac.createGain();
+        f.type = 'bandpass'; f.frequency.value = 520; f.Q.value = 0.7;
+        s.connect(f); f.connect(g); g.connect(mestre);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22 * v, t + 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+        s.start(t); s.stop(t + 1.9);
+      },
+      // Assobio do Saci: sobe, treme e desce
+      assobio: function () {
+        if (!ok || !ligado()) return;
+        var t = ac.currentTime, o = ac.createOscillator(), vib = ac.createOscillator(), vg = ac.createGain(), g = ac.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(1500, t); o.frequency.exponentialRampToValueAtTime(2700, t + 0.35); o.frequency.exponentialRampToValueAtTime(1900, t + 0.9);
+        vib.frequency.value = 9; vg.gain.value = 55; vib.connect(vg); vg.connect(o.frequency);
+        o.connect(g); g.connect(mestre); env(g, t, 0.06, 0.9, 0.09);
+        o.start(t); vib.start(t); o.stop(t + 1.05); vib.stop(t + 1.05);
+      },
+      radio: function (on) { radioLig = !!on; proxNota = 0; notaI = 0; },
+      clique: function () { if (!ok || !ligado()) return; estalo(ac.currentTime, 2400, 3, 0.001, 0.03, 0.35); },
       bip: function (alto) {
         if (!ok || !ligado()) return;
         tom(ac.currentTime, 'square', alto ? 880 : 440, 0, 0.005, alto ? 0.35 : 0.15, 0.12);
@@ -798,12 +855,33 @@
   var el = {};               // elementos DOM
   var G = null;              // tudo do Three (cena, câmeras, objetos)
   var R = null;              // rota atual
-  var rotaIdx = 0;
+  var rotaIdx = (function () { var i = ROTAS.map(function (d) { return d.id; }).indexOf(lerSave().rota); return i < 0 ? 0 : i; })();
+  // Rota liberada: a 1ª e o Sem Fim sempre; as outras depois de chegar à capela da anterior
+  var liberarTudo = false;   // só testes
+  function liberada(i) {
+    var d = ROTAS[i];
+    if (i === 0 || d.semFim || liberarTudo) return true;
+    var reg = (lerSave().rotas || {})[ROTAS[i - 1].id] || {};
+    return (reg.chegadas || 0) > 0;
+  }
+  function trocarRota(passo) {
+    rotaIdx = (rotaIdx + passo + ROTAS.length) % ROTAS.length;
+    var sv = lerSave(); sv.rota = ROTAS[rotaIdx].id; gravarSave(sv);
+    el.carregando.style.display = ''; el.carregando.textContent = 'Abrindo a estrada…';
+    setTimeout(function () {
+      R = gerarRota(ROTAS[rotaIdx]); montarEstrada();
+      preview(); telaTitulo();
+      el.carregando.style.display = 'none';
+    }, 30);
+  }
   var ativo = false, montado = false, pausado = false, emPartida = false, lockNativo = false;
   var raf = 0, tAnt = 0, tempoGlobal = 0;
   var estado = 'titulo';     // titulo | contagem | correndo | pego | fim
   var tEstado = 0;
-  var ent = { acel: 0, freio: 0, esq: 0, dir: 0, drift: 0, olharTras: 0 };
+  var ent = { acel: 0, freio: 0, esq: 0, dir: 0, drift: 0, olharTras: 0, vidro: 0 };
+  var entK = { acel: 0, freio: 0, esq: 0, dir: 0, drift: 0, olharTras: 0, vidro: 0 };   // teclado e toque
+  var entP = { acel: 0, freio: 0, esq: 0, dir: 0, drift: 0, olharTras: 0, vidro: 0 };   // controle
+  function juntarEntradas() { for (var k in ent) ent[k] = Math.max(entK[k], entP[k]); }
   var teclas = {};
   var carro = null, mula = null, corrida = null;
 
@@ -935,12 +1013,18 @@
     m.receiveShadow = true;
     G.chao = m; G.chaoCx = 1e9; G.chaoCz = 1e9;
     G.cena.add(m);
+    // Água da represa: um plano escuro e liso que reflete o céu (só nas rotas com 'agua')
+    var ga = new T.PlaneGeometry(CHAO_N * CHAO_C, CHAO_N * CHAO_C); ga.rotateX(-Math.PI / 2);
+    G.agua = new T.Mesh(ga, new T.MeshStandardMaterial({ color: 0x04070b, roughness: 0.07, metalness: 0.55, envMapIntensity: 1.5 }));
+    G.agua.frustumCulled = false; G.agua.receiveShadow = true; G.agua.visible = false;
+    G.cena.add(G.agua);
   }
   var _de = { d: 0, y: 0, i: 0 };
   function atualizarChao(px, pz, forcar) {
     var cx = Math.round(px / CHAO_C) * CHAO_C, cz = Math.round(pz / CHAO_C) * CHAO_C;
     if (!forcar && Math.abs(cx - G.chaoCx) < 24 && Math.abs(cz - G.chaoCz) < 24) return;
     G.chaoCx = cx; G.chaoCz = cz;
+    if (G.agua.visible) G.agua.position.set(cx, R.def.agua, cz);
     var geo = G.chao.geometry, p = geo.attributes.position, uv = geo.attributes.uv;
     var meio = CHAO_N * CHAO_C / 2, k = 0;
     for (var j = 0; j <= CHAO_N; j++) {
@@ -1005,6 +1089,8 @@
     estrada.receiveShadow = true;
     grp.add(estrada);
 
+    G.agua.visible = R.def.agua != null;
+    G.cena.fog.density = 0.0105 * (R.def.nevoa || 1);
     montarBeira(grp);
     grp.traverse(function (o) { if (o.isMesh && !o.isInstancedMesh) { o.castShadow = true; o.receiveShadow = true; } });
     G.cena.add(grp);
@@ -1058,14 +1144,20 @@
     var matPoste = new T.MeshLambertMaterial({ color: 0x4a3828 });
     var matRefl = new T.MeshBasicMaterial({ color: 0xff2a1a });
     var matBalz = new T.MeshBasicMaterial({ color: 0xd8dccf });
+    var geoLapide = new T.BoxGeometry(0.62, 0.95, 0.14); geoLapide.translate(0, 0.42, 0);
+    var geoCruzV = new T.BoxGeometry(0.11, 1.15, 0.09); geoCruzV.translate(0, 0.52, 0);
+    var geoCruzH = new T.BoxGeometry(0.55, 0.1, 0.09);
+    var matLapide = new T.MeshStandardMaterial({ color: 0x7d7a72, roughness: 0.95, metalness: 0 });
     // Trechos: eucaliptal, pasto, canavial (mudam a cada 300-600 m)
     var trechos = [], st = 0;
-    while (st < R.L) { var tipos = ['eucalipto', 'pasto', 'cana', 'mata']; trechos.push({ s0: st, tipo: tipos[Math.floor(rnd() * tipos.length)] }); st += 300 + rnd() * 300; }
+    var tipos = R.def.biomas || ['eucalipto', 'pasto', 'cana', 'mata'];
+    while (st < R.L) { trechos.push({ s0: st, tipo: tipos[Math.floor(rnd() * tipos.length)] }); st += 300 + rnd() * 300; }
     trechos[0].tipo = 'pasto';
     function trechoEm(s) { var t = trechos[0]; for (var i = 0; i < trechos.length; i++) if (trechos[i].s0 <= s) t = trechos[i]; return t.tipo; }
     var blocos = [];
-    for (var b = 0; b < nb; b++) blocos.push({ tronco: [], tronco2: [], copa: [], copa2: [], cana: [], poste: [], refl: [], balz: [], capim: [], cupim: [], arbusto: [], poca: [] });
-    function livre(x, z, folga) { distEstrada(R, x, z, tmp); return tmp.d > folga; }
+    for (var b = 0; b < nb; b++) blocos.push({ tronco: [], tronco2: [], copa: [], copa2: [], cana: [], poste: [], refl: [], balz: [], capim: [], cupim: [], arbusto: [], poca: [], lapide: [], cruzV: [], cruzH: [] });
+    var agua = R.def.agua;
+    function livre(x, z, folga) { if (agua != null && relevo(x, z) < agua + 0.35) return false; distEstrada(R, x, z, tmp); return tmp.d > folga; }
     function ponto(i, lat) { var th = R.th[i]; return { x: R.x[i] - Math.cos(th) * lat, z: R.z[i] + Math.sin(th) * lat, th: th }; }
     for (var i = 2; i < R.n - 2; i++) {
       var s = i * DS, bl = blocos[Math.floor(s / BLOCO)], tipo = trechoEm(s);
@@ -1086,6 +1178,19 @@
             var lat2 = lado * (8.6 + rnd() * 28), pc = ponto(i, lat2);
             if (!livre(pc.x, pc.z, 8.2)) continue;
             bl.cana.push([pc.x, relevo(pc.x, pc.z) - 0.3, pc.z, 1.3 + rnd() * 0.7, 2.6 + rnd() * 1.2, rnd() * 6]);
+          }
+        } else if (tipo === 'cemiterio') {
+          // lápides e cruzes de pedra, tortas, e uma ou outra árvore seca
+          if (i % 2 === 0) for (var lp = 0; lp < 3; lp++) {
+            var pl = ponto(i, lado * (9 + rnd() * 24));
+            if (!livre(pl.x, pl.z, 8.6)) continue;
+            var yl = relevo(pl.x, pl.z) - 0.08, gl = pl.th + (rnd() - 0.5) * 0.5;
+            if (rnd() < 0.6) bl.lapide.push([pl.x, yl, pl.z, 0.9 + rnd() * 0.5, 0.8 + rnd() * 0.6, gl]);
+            else { var ec = 0.9 + rnd() * 0.5; bl.cruzV.push([pl.x, yl, pl.z, ec, ec, gl]); bl.cruzH.push([pl.x, yl + 0.86 * ec, pl.z, ec, ec, gl]); }
+          }
+          if (rnd() < 0.06) {
+            var ps2 = ponto(i, lado * (12 + rnd() * 25));
+            if (livre(ps2.x, ps2.z, 9.5)) bl.tronco2.push([ps2.x, relevo(ps2.x, ps2.z) - 0.2, ps2.z, 1 + rnd() * 0.5, 5 + rnd() * 4, rnd() * 6]);
           }
         } else if (rnd() < (tipo === 'mata' ? 0.55 : 0.08)) {
           var lat3 = lado * (10 + rnd() * (tipo === 'mata' ? 30 : 50)), pm = ponto(i, lat3);
@@ -1199,6 +1304,9 @@
       inst(geoPoste, matPoste, bl.poste, 'poste');
       inst(geoRefl, matRefl, bl.refl, 'refl');
       inst(geoRefl, matBalz, bl.balz, 'refl');
+      inst(geoLapide, matLapide, bl.lapide, 'tronco');
+      inst(geoCruzV, matLapide, bl.cruzV, 'tronco');
+      inst(geoCruzH, matLapide, bl.cruzH, 'tronco');
     });
     // Arame da cerca (duas linhas) nos trechos de pasto
     var arame = [];
@@ -1233,7 +1341,7 @@
     var geoPlaca = new T.PlaneGeometry(1.6, 1);
     for (var km = 1; km <= R.def.km; km++) {
       var ik = Math.round(km * 1000 / DS), pk = ponto(ik, 6.4);
-      var placa = new T.Mesh(geoPlaca, new T.MeshLambertMaterial({ map: texPlaca('KM ' + km, km === R.def.km ? 'CAPELA' : R.def.nome.toUpperCase()), emissive: 0x0a1a10 }));
+      var placa = new T.Mesh(geoPlaca, new T.MeshLambertMaterial({ map: texPlaca('KM ' + km, km === R.def.km ? (R.def.semFim ? 'FIM' : 'CAPELA') : R.def.nome.toUpperCase()), emissive: 0x0a1a10 }));
       placa.position.set(pk.x, R.y[ik] + 2.0, pk.z);
       placa.rotation.y = R.th[ik] + Math.PI;
       var pst = new T.Mesh(new T.BoxGeometry(0.1, 2.0, 0.1), matPoste); pst.position.set(pk.x, R.y[ik] + 0.6, pk.z);
@@ -1289,7 +1397,7 @@
     var luzCap = new T.PointLight(0xffb060, 25, 30, 1.6); luzCap.position.set(0, 2.5, -8); capela.add(luzCap);
     capela.position.set(pf.x, R.y[Math.min(ifim, R.n - 1)] - 0.2, pf.z);
     capela.rotation.y = pf.th;
-    grp.add(capela);
+    if (!R.def.semFim) grp.add(capela);
   }
 
   /* ── Carro (hatch de rali, primitivas) ───────────────────────── */
@@ -1795,7 +1903,7 @@
     c.psi -= giro * dt;
     // Motor e freio
     var a = 0;
-    var acel = cfg.autoAcel && !ent.freio ? 1 : ent.acel;
+    var acel = corrida && corrida.hipnose > 0 ? 0 : cfg.autoAcel && !ent.freio ? 1 : ent.acel;
     c.acel = acel;
     c.freando = ent.freio > 0;
     if (ent.freio) {
@@ -1803,7 +1911,7 @@
       else a -= CARRO.re;
     } else if (acel) {
       var fr = clamp(vf / CARRO.vmax, 0, 1);
-      a += CARRO.acel * (1 - fr * fr * 0.92) * (vf < 0 ? 2 : 1);
+      a += CARRO.acel * Math.min(1, acel) * (1 - fr * fr * 0.92) * (vf < 0 ? 2 : 1);
     }
     a -= vf * 0.035 + (vf > 0 ? 0.25 : -0.25);          // arrasto e rolagem
     if (fora) a -= vf * 0.55;                            // mato segura
@@ -2028,6 +2136,7 @@
     }
     G.fogo.limpar(); G.chama.limpar(); G.poeira.limpar(); G.nev.ok = false;
     corrida.flash = 0; corrida.preto = 0; corrida.estatica = 0;
+    evtLimpar(); evtAgendar(true); corrida.hipnose = 0; PAD.usado = false;
     limparRachas(); pararVideoSusto();
     atualizarChao(carro.x, carro.z, true);
     camInstantanea = true;
@@ -2042,6 +2151,7 @@
   function mudarEstado(e) { estado = e; tEstado = 0; }
 
   function atualizar(dt) {
+    juntarEntradas();
     tEstado += dt;
     if (estado === 'contagem') {
       var n = 3 - Math.floor(tEstado);
@@ -2060,13 +2170,16 @@
       var sub = 4, h = dt / sub;
       for (var i = 0; i < sub; i++) { passoFisica(carro, h); projetar(carro); colisoes(carro); }
       passoMula(dt);
+      evtPasso(dt);
+      if (corrida.hipnose > 0) { corrida.hipnose -= dt; corrida.preto = clamp(corrida.hipnose, 0, 1) * 0.55; }
+      else if (corrida.preto) corrida.preto = 0;
       // Placas de km
       var kmAgora = Math.floor(carro.s / 1000);
       if (kmAgora > corrida.km && kmAgora <= R.def.km) {
         corrida.km = kmAgora; corrida.kmTempos[kmAgora] = corrida.tempo;
         if (kmAgora < R.def.km) { som.placa(); aviso('KM ' + kmAgora, 'placa'); }
       }
-      if (carro.s >= R.fim) { vencer(); }
+      if (carro.s >= R.fim) { if (R.def.semFim) chegarFimSemFim(); else vencer(); }
       else if (mula.gap <= GAP_PEGA) { pegar(); }
     } else if (estado === 'pego') {
       carro.vx *= Math.pow(0.2, dt); carro.vz *= Math.pow(0.2, dt); carro.vel *= Math.pow(0.2, dt);
@@ -2091,6 +2204,8 @@
   }
 
   function pegar() {
+    evtLimpar();
+    if (R.def.semFim) semFimFim();
     mudarEstado('pego');
     corrida.mostrouFim = false;
     corrida.fase = 0;
@@ -2240,6 +2355,7 @@
   }
 
   function vencer() {
+    evtLimpar();
     mudarEstado('fim');
     corrida.kmTempos[R.def.km] = corrida.tempo;
     som.vitoria();
@@ -2257,6 +2373,274 @@
   }
   function medalha(d, t) { return t <= d.ouro ? 'ouro' : t <= d.prata ? 'prata' : t <= d.bronze ? 'bronze' : ''; }
   function rankMed(m) { return m === 'ouro' ? 3 : m === 'prata' ? 2 : m === 'bronze' ? 1 : 0; }
+
+  /* ── Sem Fim: vale a distância; recorde local + ranking da cidade ── */
+  var REC_SEMFIM = 'angatuba_naopare_rec';   // metros (o hub sobe isso pro ranking_naopare)
+  function semFimFim() {
+    var m = Math.floor(clamp(carro.s, 0, R.fim)), rec = 0;
+    try { rec = Number(localStorage.getItem(REC_SEMFIM)) || 0; } catch (e) {}
+    corrida.metros = m; corrida.novoRec = m > rec;
+    if (m > rec) { try { localStorage.setItem(REC_SEMFIM, String(m)); } catch (e) {} }
+    corrida.recSemFim = Math.max(m, rec);
+  }
+  function chegarFimSemFim() {
+    evtLimpar(); semFimFim();
+    mudarEstado('fim'); som.vitoria(); partida(false);
+    el.toque.style.display = 'none';
+    setTimeout(function () { esconderHud(); telaSemFim(); }, 1400);
+  }
+  function recSemFim() { try { return Number(localStorage.getItem(REC_SEMFIM)) || 0; } catch (e) { return 0; } }
+
+  /* ══════════════════════════════════════════════════════════════
+     ASSOMBRAÇÕES — eventos de cabine com o folclore
+     De tempos em tempos (a partir do km 0,8) uma assombração aparece e
+     você tem alguns segundos para reagir SEM soltar o acelerador:
+       janela  Pisadeira na janela ...... segure F (Y / botão) para subir o vidro
+       tras    Saci no banco de trás .... segure C (LB / botão) para olhar
+       radio   Cuca no rádio ............ aperte R 3 vezes (X / botão)
+     Errou: a Pisadeira trava o carro, o Saci puxa o volante, a Cuca
+     hipnotiza (o acelerador some por 2,4 s). A Mula ganha terreno.
+     Liga/desliga em "Assombrações" no menu de pausa.
+  ══════════════════════════════════════════════════════════════ */
+  var EVT = {
+    janela: { aviso: 'TEM ALGO NA JANELA', dica: 'Segure', acao: 'SUBIR O VIDRO', tecla: 'F', pad: 'Y', meta: 1.3, dur: 6.5,
+      fig: '<svg viewBox="0 0 100 200"><g fill="#cfc6b4"><path d="M28 200C31 165 27 140 33 120L35 64C35 57 42 57 42 64L44 112L47 46C47 39 55 39 55 46L55 108L61 52C61 45 69 45 68 52L64 112L73 76C75 69 83 71 81 78L70 128C67 150 65 172 69 200Z"/></g>' +
+        '<g fill="#fff3d6"><ellipse cx="38" cy="20" rx="6" ry="2.6"/><ellipse cx="64" cy="20" rx="6" ry="2.6"/></g></svg>' },
+    tras: { aviso: 'TEM ALGUÉM NO BANCO DE TRÁS', dica: 'Segure', acao: 'OLHAR PARA TRÁS', tecla: 'C', pad: 'LB', meta: 1.1, dur: 6.5,
+      fig: '<svg viewBox="0 0 120 80"><path d="M36 32Q58-6 94 12Q78 18 80 32Z" fill="#c0141d"/><ellipse cx="60" cy="44" rx="26" ry="20" fill="#0d0907"/>' +
+        '<circle cx="50" cy="42" r="3.6" fill="#ffd27a"/><circle cx="69" cy="42" r="3.6" fill="#ffd27a"/><path d="M70 56L96 62" stroke="#6b4a2a" stroke-width="4"/><circle cx="98" cy="62" r="4.5" fill="#ff7a1a"/></svg>' },
+    radio: { aviso: 'O RÁDIO LIGOU SOZINHO', dica: 'Aperte 3 vezes', acao: 'DESLIGAR O RÁDIO', tecla: 'R', pad: 'X', meta: 3, dur: 6,
+      fig: '<div class="np-radio"><i class="fa fa-music"></i> 66,6 AM</div>' }
+  };
+  function evtAgendar(primeiro) { if (corrida) corrida.proxEvt = (primeiro ? 30 : 24) + Math.random() * 22; }
+  function evtPasso(dt) {
+    var ev = corrida.evt;
+    if (!ev) {
+      if (!cfg.assombra) return;
+      corrida.proxEvt -= dt;
+      if (corrida.proxEvt > 0 || carro.s < 800 || carro.s > R.fim - 350 || mula.invT > 0 || mula.gap < 16) return;
+      var tipos = ['janela', 'tras', 'radio'].filter(function (k) { return k !== corrida.ultEvt; });
+      evtIniciar(tipos[Math.floor(Math.random() * tipos.length)]);
+      return;
+    }
+    var d = EVT[ev.tipo];
+    ev.t += dt;
+    if (ev.tipo === 'janela') {
+      if (ent.vidro) ev.prog += dt;
+      if (ev.t > ev.proxSom) { som.batidaVidro(0.4 + Math.min(1, ev.t / d.dur) * 0.6); ev.proxSom = ev.t + 0.5 + Math.random() * 0.5; }
+    } else if (ev.tipo === 'tras') {
+      if (ent.olharTras) ev.prog += dt;
+      if (ev.t > ev.proxSom) { som.assobio(); ev.proxSom = ev.t + 1.7 + Math.random(); }
+    }
+    if (ev.prog >= d.meta) evtFim(true);
+    else if (ev.t >= d.dur) evtFim(false);
+    else evtHud();
+  }
+  function evtIniciar(tipo) {
+    var d = EVT[tipo];
+    corrida.evt = { tipo: tipo, t: 0, prog: 0, proxSom: 0.25 }; corrida.ultEvt = tipo;
+    aviso(d.aviso, 'perigo');
+    if (tipo === 'radio') som.radio(true);
+    if (tipo === 'janela') som.respiro(0.9);
+    vibrar(60);
+    el.evtFig.innerHTML = d.fig;
+    el.evtTxt.innerHTML = d.dica + ' <b>' + d.acao + '</b>' + (cfg.toque && !PAD.on ? '' : ' <kbd>' + (PAD.on ? d.pad : d.tecla) + '</kbd>');
+    el.evt.className = 'np-evt np-evt-' + tipo + ' np-mostra';
+    el.tqEvt.textContent = d.acao;
+    el.tqEvt.style.display = '';
+    hudCache.ep = hudCache.er = -1;
+    evtHud();
+  }
+  // Rádio: cada aperto conta 1 (teclado R, controle X, botão na tela)
+  function evtToque() {
+    var ev = corrida && corrida.evt;
+    if (!ev || ev.tipo !== 'radio' || estado !== 'correndo') return;
+    ev.prog += 1; som.clique();
+    if (ev.prog >= EVT.radio.meta) evtFim(true); else evtHud();
+  }
+  // Botão da assombração na tela de toque: faz o que o evento pede
+  function evtBotao(on) {
+    var ev = corrida && corrida.evt;
+    if (!on) { entK.vidro = 0; entK.olharTras = 0; return; }
+    if (!ev) return;
+    if (ev.tipo === 'janela') entK.vidro = 1;
+    else if (ev.tipo === 'tras') entK.olharTras = 1;
+    else evtToque();
+  }
+  function evtFim(ok) {
+    var ev = corrida.evt;
+    if (!ev) return;
+    corrida.evt = null; evtAgendar(false);
+    el.evt.className = 'np-evt'; el.tqEvt.style.display = 'none';
+    if (ev.tipo === 'radio') som.radio(false);
+    if (ok) {
+      aviso(ev.tipo === 'janela' ? 'VIDRO FECHADO' : ev.tipo === 'tras' ? 'O SACI SUMIU' : 'RÁDIO DESLIGADO', 'placa');
+      corrida.assombracoes = (corrida.assombracoes || 0) + 1;
+      return;
+    }
+    corrida.tremor = Math.max(corrida.tremor, 0.9); vibrar(220);
+    if (ev.tipo === 'janela') {
+      aviso('A PISADEIRA SEGUROU O CARRO', 'perigo'); som.trinca(); som.respiro(1.2);
+      carro.vx *= 0.45; carro.vz *= 0.45; mula.gap -= 12;
+    } else if (ev.tipo === 'tras') {
+      aviso('O SACI PUXOU O VOLANTE', 'perigo'); som.assobio();
+      var l = Math.random() < 0.5 ? -1 : 1;
+      carro.vx += -Math.cos(carro.psi) * l * 6; carro.vz += Math.sin(carro.psi) * l * 6; carro.psi += l * 0.45; mula.gap -= 6;
+    } else {
+      aviso('A CUCA TE HIPNOTIZOU', 'perigo'); som.estatica(0.7);
+      corrida.hipnose = 2.4; mula.gap -= 4;
+    }
+  }
+  function evtLimpar() {
+    if (corrida && corrida.evt) { if (corrida.evt.tipo === 'radio') som.radio(false); corrida.evt = null; }
+    som.radio(false);
+    if (el.evt) el.evt.className = 'np-evt';
+    if (el.tqEvt) el.tqEvt.style.display = 'none';
+    entK.vidro = 0;
+  }
+  function evtHud() {
+    var ev = corrida.evt, d = EVT[ev.tipo];
+    var pr = clamp(ev.prog / d.meta, 0, 1), p = Math.round(pr * 100), rr = Math.round(clamp(1 - ev.t / d.dur, 0, 1) * 100);
+    if (hudCache.ep !== p) { hudCache.ep = p; el.evtProg.style.width = p + '%'; }
+    if (hudCache.er !== rr) { hudCache.er = rr; el.evtTempo.style.width = rr + '%'; }
+    // aparece aos poucos e some conforme você reage
+    el.evtFig.style.opacity = (clamp(ev.t / 1.2, 0, 1) * (1 - pr * 0.85)).toFixed(2);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     CONTROLE (Gamepad API) — mesmo esquema da Corrida e do Ritmo
+     Lido a cada quadro no laço (a Gamepad API não tem eventos de botão).
+     Mapa (layout "standard", Xbox/Ipega no modo X-input):
+       analógico esq. / D-pad ← → .... volante (proporcional)
+       RT (7) ......................... acelera (gatilho proporcional)
+       LT (6) ......................... freio / ré
+       A (0) ou RB (5) ................ drift
+       LB (4) ......................... olhar para trás (Saci)
+       Y (3) .......................... subir o vidro (Pisadeira)
+       X (2) .......................... desligar o rádio (Cuca)
+       B (1) .......................... câmera
+       Start (9) ...................... pausa
+     Fora da corrida (título, telas de fim, pausa): ↑↓←→ movem o foco,
+     A confirma, B volta, Start confirma (ou fecha a pausa).
+  ══════════════════════════════════════════════════════════════ */
+  var PAD = { on: false, usado: false, antes: {}, ctx: '', foco: null, desde: {}, rep: {} };
+  function padLista() {
+    var out = [];
+    try {
+      var l = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (var i = 0; i < l.length; i++) if (l[i] && l[i].connected !== false) out.push(l[i]);
+    } catch (e) {}
+    return out;
+  }
+  function padBt(gp, b) { var x = gp.buttons && gp.buttons[b]; return !!x && (x.pressed || x.value > 0.5); }
+  function padVal(gp, b) { var x = gp.buttons && gp.buttons[b]; return x ? Math.max(x.value || 0, x.pressed ? 1 : 0) : 0; }
+  function padCtx() {
+    if (!ativo || !G) return 'nada';
+    var M = _menu();
+    if (M && M.aberto && M.aberto(TELA)) return 'pausa';
+    if (el.tela && el.tela.style.display !== 'none' && el.tela.innerHTML) return 'tela';
+    if ((estado === 'correndo' || estado === 'contagem') && !pausado) return 'jogo';
+    return 'nada';
+  }
+  function padZerar() { for (var k in entP) entP[k] = 0; }
+  function padFocoLimpar() {
+    var l = document.querySelectorAll('#' + TELA + ' .np-foco');
+    for (var i = 0; i < l.length; i++) l[i].classList.remove('np-foco');
+  }
+  function padFocar(b) { padFocoLimpar(); PAD.foco = b; if (b) b.classList.add('np-foco'); }
+  function padItens(ctx) {
+    var cx = ctx === 'pausa' ? document.querySelector('#' + TELA + ' .jm-overlay .jm-caixa') : el.tela;
+    if (!cx) return [];
+    return Array.prototype.slice.call(cx.querySelectorAll('button')).filter(function (b) { return b.offsetParent !== null && !b.disabled; });
+  }
+  function padMover(l, atual, n) {
+    var r0 = atual.getBoundingClientRect(), cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2;
+    // primeiro os alinhados (mesma linha para ←→, mesma coluna para ↑↓), o mais perto ganha
+    var horiz = n === 'dir' || n === 'esq', melhor = null, nota = Infinity, alinhado = false;
+    for (var i = 0; i < l.length; i++) {
+      if (l[i] === atual) continue;
+      var q = l[i].getBoundingClientRect(), dx = q.left + q.width / 2 - cx, dy = q.top + q.height / 2 - cy;
+      var frente = n === 'dir' ? dx : n === 'esq' ? -dx : n === 'baixo' ? dy : -dy;
+      if (frente <= 4) continue;
+      var al = horiz ? (q.top < r0.bottom && q.bottom > r0.top) : (q.left < r0.right && q.right > r0.left);
+      if (horiz && !al) continue;
+      var v = al ? frente : frente + (horiz ? Math.abs(dy) : Math.abs(dx)) * 2;
+      if ((al && !alinhado) || (al === alinhado && v < nota)) { nota = v; melhor = l[i]; alinhado = al; }
+    }
+    return melhor || atual;
+  }
+  function padIndicador() {
+    var e = el.tela && el.tela.querySelector('.np-pad');
+    if (e) e.style.display = PAD.on ? '' : 'none';
+  }
+  function padPoll() {
+    var pads = padLista();
+    if (!pads.length) {
+      if (PAD.on) { PAD.on = false; padZerar(); padFocoLimpar(); PAD.foco = null; padIndicador(); }
+      return;
+    }
+    if (!PAD.on) { PAD.on = true; padIndicador(); }
+    var st = { x: 0, acel: 0, freio: 0 };
+    for (var i = 0; i < pads.length; i++) {
+      var gp = pads[i], ax = gp.axes || [], x = ax[0] || 0, y = ax[1] || 0;
+      var d = (padBt(gp, 15) ? 1 : 0) - (padBt(gp, 14) ? 1 : 0);
+      if (d) st.x = d;
+      else if (!st.x && Math.abs(x) > 0.18) st.x = (x < 0 ? -1 : 1) * Math.min(1, (Math.abs(x) - 0.18) / 0.82);
+      st.acel = Math.max(st.acel, padVal(gp, 7)); st.freio = Math.max(st.freio, padVal(gp, 6));
+      if (padBt(gp, 0) || padBt(gp, 5)) st.drift = true;
+      if (padBt(gp, 0)) st.a = true;
+      if (padBt(gp, 1)) st.b = true;
+      if (padBt(gp, 2)) st.radio = true;
+      if (padBt(gp, 3)) st.vidro = true;
+      if (padBt(gp, 4)) st.tras = true;
+      if (padBt(gp, 9)) st.start = true;
+      if (padBt(gp, 12) || y < -0.6) st.cima = true;
+      if (padBt(gp, 13) || y > 0.6) st.baixo = true;
+      if (padBt(gp, 14) || x < -0.6) st.esq = true;
+      if (padBt(gp, 15) || x > 0.6) st.dir = true;
+    }
+    var an = PAD.antes, ctx = padCtx();
+    PAD.antes = st;
+    if (ctx !== PAD.ctx) { PAD.ctx = ctx; PAD.foco = null; padFocoLimpar(); an = st; }   // o que já estava apertado não conta
+    if (ctx === 'jogo') {
+      entP.esq = st.x < 0 ? -st.x : 0; entP.dir = st.x > 0 ? st.x : 0;
+      entP.acel = st.acel > 0.08 ? st.acel : 0; entP.freio = st.freio > 0.3 ? 1 : 0;
+      entP.drift = st.drift ? 1 : 0; entP.olharTras = st.tras ? 1 : 0; entP.vidro = st.vidro ? 1 : 0;
+      if (st.x || entP.acel || st.drift) {
+        if (!PAD.usado && cfg.toque) el.toque.style.display = 'none';   // jogando no controle: some com os botões de toque
+        PAD.usado = true;
+      }
+      if (st.radio && !an.radio) evtToque();
+      if (st.b && !an.b) trocarCamera();
+      if (st.start && !an.start) { var M = _menu(); if (M && M.abrir) M.abrir(TELA); else { pausado = true; soltarTudo(); } }
+      return;
+    }
+    padZerar();
+    if (ctx === 'nada') return;
+    var l = padItens(ctx);
+    if (!l.length) return;
+    if (!PAD.foco || l.indexOf(PAD.foco) === -1) {
+      var pri = null;
+      for (var j = 0; j < l.length; j++) if (l[j].matches(ctx === 'pausa' ? '[data-jm="continuar"]' : '.np-btn-pri')) { pri = l[j]; break; }
+      padFocar(pri || l[0]);
+    }
+    var agora = performance.now();
+    ['cima', 'baixo', 'esq', 'dir'].forEach(function (n) {
+      if (st[n] && !an[n]) { PAD.desde[n] = PAD.rep[n] = agora; padFocar(padMover(l, PAD.foco, n)); }
+      else if (st[n] && agora - PAD.desde[n] > 420 && agora - PAD.rep[n] > 130) { PAD.rep[n] = agora; padFocar(padMover(l, PAD.foco, n)); }
+    });
+    if (ctx === 'pausa' && ((st.b && !an.b) || (st.start && !an.start))) { var M2 = _menu(); if (M2 && M2.fechar) M2.fechar(TELA, true); return; }
+    if ((st.a && !an.a) || (st.start && !an.start)) { if (PAD.foco) PAD.foco.click(); return; }
+    if (st.b && !an.b) {
+      var volta = el.tela.querySelector('[data-a="titulo"]');
+      if (volta) volta.click();
+      else if (typeof window._voltarAoMenu === 'function') window._voltarAoMenu();
+    }
+  }
+  function aoDesconectarPad() {
+    if (estado === 'correndo' && !pausado && PAD.usado) { var M = _menu(); if (M && M.abrir) M.abrir(TELA); }
+    padZerar();
+  }
 
   /* ══════════════════════════════════════════════════════════════
      CÂMERA E QUADRO
@@ -2412,7 +2796,7 @@
   function atualizarHud() {
     if (!corrida || !carro) return;
     setTxt(el.hTempo, 't', fmtTempo(corrida.tempo));
-    setTxt(el.hKm, 'km', fmtKm(clamp(carro.s, 0, R.fim)) + ' / ' + R.def.km + ' km');
+    setTxt(el.hKm, 'km', fmtKm(clamp(carro.s, 0, R.fim)) + (R.def.semFim ? ' km' : ' / ' + R.def.km + ' km'));
     setTxt(el.hVel, 'v', String(Math.round(Math.max(0, carro.vel) * 3.6)));
     // Próxima curva: setas como o teclado do copiloto (<<< forte ... > leve)
     var cv = proximaCurva();
@@ -2461,16 +2845,25 @@
     el.hud.style.display = 'none';
     el.toque.style.display = 'none';
     mostrarContagem('');
-    var d = R.def, reg = (lerSave().rotas || {})[d.id] || {};
+    var d = R.def, reg = (lerSave().rotas || {})[d.id] || {}, livre = liberada(rotaIdx);
+    var rec = d.semFim ? (recSemFim() ? 'Recorde ' + fmtKm(recSemFim()) + ' km · vale no ranking da cidade' : 'Fuja o mais longe que puder · vale no ranking da cidade')
+      : !livre ? '<i class="fa fa-lock"></i> Chegue à capela da ' + ROTAS[rotaIdx - 1].nome + ' para liberar'
+      : reg.melhor ? 'Recorde ' + fmtTempo(reg.melhor) + ' ' + medIcone(reg.medalha) : 'Chegue à capela no fim da estrada';
     mostrarTela(
       '<div class="np-logo">NÃO<br>PARE</div>' +
       '<div class="np-sub">A Mula sem cabeça corre atrás de você. Se parar, ela te alcança.</div>' +
-      '<div class="np-rota">' +
-        '<div class="np-rota-nome"><i class="fa fa-road"></i> ' + d.nome + ' <span class="np-dif">' + d.dif + ' · ' + d.km + ' km</span></div>' +
-        '<div class="np-rota-rec">' + (reg.melhor ? 'Recorde ' + fmtTempo(reg.melhor) + ' ' + medIcone(reg.medalha) : 'Chegue à capela no fim da estrada') + '</div>' +
+      '<div class="np-rota' + (livre ? '' : ' np-trancada') + '">' +
+        '<button type="button" class="np-rota-seta" data-a="rotaAnt" aria-label="Rota anterior"><i class="fa fa-chevron-left"></i></button>' +
+        '<div class="np-rota-info">' +
+          '<div class="np-rota-nome"><i class="fa ' + (d.semFim ? 'fa-infinity' : 'fa-road') + '"></i> ' + d.nome + ' <span class="np-dif">' + d.dif + (d.semFim ? '' : ' · ' + d.km + ' km') + '</span></div>' +
+          '<div class="np-rota-rec">' + rec + '</div>' +
+          '<div class="np-rota-pontos">' + ROTAS.map(function (x, i) { return '<i class="' + (i === rotaIdx ? 'np-on' : '') + '"></i>'; }).join('') + '</div>' +
+        '</div>' +
+        '<button type="button" class="np-rota-seta" data-a="rotaProx" aria-label="Próxima rota"><i class="fa fa-chevron-right"></i></button>' +
       '</div>' +
+      '<div class="np-pad"' + (PAD.on ? '' : ' style="display:none"') + '>🎮 Controle: <b>RT</b> acelera · <b>LT</b> freia · <b>A</b> drift · <b>LB</b> olha para trás · <b>Y</b> vidro · <b>X</b> rádio · <b>B</b> câmera</div>' +
       '<div class="np-botoes">' +
-        '<button type="button" class="np-btn np-btn-pri" data-a="dirigir"><i class="fa fa-car"></i> Dirigir</button>' +
+        '<button type="button" class="np-btn np-btn-pri" data-a="dirigir"' + (livre ? '' : ' disabled') + '><i class="fa fa-car"></i> Dirigir</button>' +
         '<button type="button" class="np-btn" data-a="ajuda"><i class="fa fa-circle-question"></i> Como jogar</button>' +
       '</div>', 'np-titulo');
   }
@@ -2486,8 +2879,11 @@
         '<li>A <b>ferradura</b> enche quando ela chega perto. Olhe o retrovisor e escute o galope.</li>' +
         '<li>O mato segura o carro. Troncos e pedras na pista: desvie.</li>' +
         '<li>Cada <b>placa de km</b> é um ponto de volta: se ela te pegar, dá para tentar de novo dali (2 vezes por corrida).</li>' +
+        '<li><b>Assombrações:</b> a <b>Pisadeira</b> na janela (segure ' + (tq ? 'o botão' : '<b>F</b>') + ' para subir o vidro), o <b>Saci</b> no banco de trás (segure para olhar para trás' + (tq ? '' : ', <b>C</b>') + ') e a <b>Cuca</b> no rádio (aperte 3 vezes' + (tq ? '' : ', <b>R</b>') + '). Não solte o acelerador.</li>' +
+        '<li><b>Rotas:</b> chegue à capela para liberar a próxima. No <b>Sem Fim</b> não tem capela: vale até onde você chega, no ranking da cidade.</li>' +
       '</ul>' +
-      (tq ? '' : '<div class="np-teclas"><span><b>W/↑</b> acelera</span><span><b>S/↓</b> freia</span><span><b>A D / ← →</b> volante</span><span><b>Espaço</b> drift</span><span><b>C</b> olhar para trás</span><span><b>V</b> câmera</span></div>') +
+      (tq ? '' : '<div class="np-teclas"><span><b>W/↑</b> acelera</span><span><b>S/↓</b> freia</span><span><b>A D / ← →</b> volante</span><span><b>Espaço</b> drift</span><span><b>C</b> olhar para trás</span><span><b>F</b> vidro</span><span><b>R</b> rádio</span><span><b>V</b> câmera</span></div>' +
+        '<div class="np-teclas"><span>🎮 <b>RT</b> acelera</span><span><b>LT</b> freia</span><span><b>analógico</b> volante</span><span><b>A</b> drift</span><span><b>LB</b> trás</span><span><b>Y</b> vidro</span><span><b>X</b> rádio</span><span><b>B</b> câmera</span><span><b>Start</b> pausa</span></div>') +
       '<div class="np-botoes"><button type="button" class="np-btn np-btn-pri" data-a="dirigir"><i class="fa fa-car"></i> Dirigir</button>' +
       '<button type="button" class="np-btn" data-a="titulo">Voltar</button></div>' +
       '<div class="np-creditos">Modelos 3D: Mula a partir de "Animated Rigged Horse With Saddle", de ayanahmadbutt (CC BY 4.0, modificado: sem cabeça e sem sela) · ' +
@@ -2496,6 +2892,7 @@
 
   function telaDerrota() {
     esconderHud();
+    if (R.def.semFim) { telaSemFim(); return; }
     var km = corrida.km, podeRetry = km >= 1 && corrida.retries > 0;
     var onde = fmtKm(clamp(carro.s, 0, R.fim));
     mostrarTela(
@@ -2506,6 +2903,19 @@
         '<button type="button" class="np-btn' + (podeRetry ? '' : ' np-btn-pri') + '" data-a="dirigir"><i class="fa fa-car"></i> Recomeçar do início</button>' +
         '<button type="button" class="np-btn" data-a="titulo">Menu do jogo</button>' +
       '</div>', 'np-derrota');
+  }
+
+  function telaSemFim() {
+    var m = corrida.metros || 0, fim = m >= R.fim;
+    mostrarTela(
+      '<div class="np-h ' + (fim ? 'np-h-ok">VOCÊ CHEGOU AO FIM DA ESTRADA' : 'np-h-perigo">ELA TE ALCANÇOU') + '</div>' +
+      '<div class="np-tempo-fim">' + fmtKm(m) + ' km</div>' +
+      '<div class="np-sub">' + fmtTempo(corrida.tempo) + (corrida.novoRec ? ' · <b>novo recorde!</b>' : ' · recorde ' + fmtKm(corrida.recSemFim || m) + ' km') + '</div>' +
+      '<div id="np-rank-slot" class="np-rank-slot" style="display:none"></div>' +
+      '<div class="np-botoes"><button type="button" class="np-btn np-btn-pri" data-a="dirigir"><i class="fa fa-car"></i> Correr de novo</button>' +
+      '<button type="button" class="np-btn" data-a="titulo">Menu do jogo</button></div>', 'np-derrota');
+    var Gm = window.AngatubaGames;
+    if (Gm) { try { Gm.rankSubmeter('naopare', m); Gm.rankFimDeJogo('naopare', 'np-rank-slot', m); } catch (e) {} }
   }
 
   function telaVitoria(t, med, novo) {
@@ -2526,7 +2936,9 @@
     if (!b) return;
     var a = b.getAttribute('data-a');
     som.init(); som.retomar();
-    if (a === 'dirigir') comecar(null);
+    if (a === 'dirigir') { if (liberada(rotaIdx)) comecar(null); }
+    else if (a === 'rotaAnt') trocarRota(-1);
+    else if (a === 'rotaProx') trocarRota(1);
     else if (a === 'retry') comecar(corrida.km);
     else if (a === 'ajuda') telaAjuda();
     else if (a === 'titulo') { preview(); telaTitulo(); }
@@ -2537,6 +2949,7 @@
     carro = novoCarro();
     posicionarCarroEm(30);
     mula = { gap: 34, vel: 0, lat: 0, fase: 0, tCorrida: 0, empina: 0, surto: 0, invT: 0, proxInv: 99, capo: false, jorro: 0, lado: 0 };
+    evtLimpar();
     corrida = novaCorrida();
     G.fogo.limpar(); G.chama.limpar(); G.poeira.limpar();
     atualizarChao(carro.x, carro.z, true);
@@ -2557,6 +2970,8 @@
           '<div class="np-topo"><span class="np-tempo">0:00.0</span><span class="np-km">0,0 km</span></div>' +
           '<div class="np-curva np-oculto"><span class="np-curva-seta"></span><span class="np-curva-dist"></span></div>' +
           '<div class="np-vel"><b>0</b><span>km/h</span></div>' +
+          '<div class="np-evt"><div class="np-evt-fig"></div><div class="np-evt-caixa"><div class="np-evt-txt"></div>' +
+            '<div class="np-evt-trilho"><i class="np-evt-prog"></i></div><div class="np-evt-tempo"><i></i></div></div></div>' +
           '<div class="np-perigo" title="Distância da Mula"><svg viewBox="0 0 24 24" class="np-ferr"><path d="M6 3c-1.8 2.4-2.8 5.3-2.8 8.3 0 5.4 3.8 9.7 8.8 9.7s8.8-4.3 8.8-9.7c0-3-1-5.9-2.8-8.3h-3.3c1.9 2.1 3 4.9 3 7.9 0 3.6-2.5 6.5-5.7 6.5s-5.7-2.9-5.7-6.5c0-3 1.1-5.8 3-7.9z"/></svg><div class="np-perigo-trilho"><div class="np-perigo-barra"></div></div></div>' +
         '</div>' +
         '<video class="np-video" muted playsinline preload="auto" style="display:none"></video>' +
@@ -2570,6 +2985,7 @@
             '<button type="button" class="np-tq np-tq-drift" data-tq="drift">DRIFT</button>' +
             '<button type="button" class="np-tq np-tq-acel" data-tq="acel">ACEL.</button>' +
           '</div>' +
+          '<button type="button" class="np-tq np-tq-evt" data-tq="evt" style="display:none"></button>' +
           '<div class="np-tq-cima"><button type="button" class="np-tq np-tq-mini" data-tq="tras" aria-label="Olhar para trás"><i class="fa fa-rotate-right"></i></button><button type="button" class="np-tq np-tq-mini" data-tq="cam" aria-label="Câmera"><i class="fa fa-camera"></i></button></div>' +
         '</div>' +
         '<div class="np-tela" style="display:none"></div>' +
@@ -2588,6 +3004,12 @@
     el.hPerigo = p.querySelector('.np-perigo');
     el.hPerigoBarra = p.querySelector('.np-perigo-barra');
     el.aviso = p.querySelector('.np-aviso');
+    el.evt = p.querySelector('.np-evt');
+    el.evtFig = p.querySelector('.np-evt-fig');
+    el.evtTxt = p.querySelector('.np-evt-txt');
+    el.evtProg = p.querySelector('.np-evt-prog');
+    el.evtTempo = p.querySelector('.np-evt-tempo i');
+    el.tqEvt = p.querySelector('.np-tq-evt');
     el.trinca = p.querySelector('.np-trinca');
     el.video = p.querySelector('.np-video');
     prepararVideoSusto();
@@ -2611,14 +3033,16 @@
         b.classList.add('np-on');
         som.retomar();
         if (k === 'cam') { trocarCamera(); return; }
-        if (k === 'tras') { ent.olharTras = 1; return; }
-        ent[k] = 1;
+        if (k === 'tras') { entK.olharTras = 1; return; }
+        if (k === 'evt') { evtBotao(1); return; }
+        entK[k] = 1;
       }
       function off(e) {
         if (e) e.preventDefault();
         b.classList.remove('np-on');
-        if (k === 'tras') { ent.olharTras = 0; return; }
-        if (k !== 'cam') ent[k] = 0;
+        if (k === 'tras') { entK.olharTras = 0; return; }
+        if (k === 'evt') { evtBotao(0); return; }
+        if (k !== 'cam') entK[k] = 0;
       }
       b.addEventListener('pointerdown', on);
       b.addEventListener('pointerup', off);
@@ -2630,16 +3054,17 @@
   }
   function trocarCamera() { cfg.camera = cfg.camera === 'cabine' ? 'atras' : 'cabine'; salvarCfg(); camInstantanea = true; }
 
-  var MAPA = { KeyW: 'acel', ArrowUp: 'acel', KeyS: 'freio', ArrowDown: 'freio', KeyA: 'esq', ArrowLeft: 'esq', KeyD: 'dir', ArrowRight: 'dir', Space: 'drift', KeyC: 'olharTras' };
+  var MAPA = { KeyW: 'acel', ArrowUp: 'acel', KeyS: 'freio', ArrowDown: 'freio', KeyA: 'esq', ArrowLeft: 'esq', KeyD: 'dir', ArrowRight: 'dir', Space: 'drift', KeyC: 'olharTras', KeyF: 'vidro' };
   function aoTecla(e) {
     if (!ativo || pausado) return;
     var k = MAPA[e.code];
     if (k) {
       if (estado === 'correndo' || estado === 'contagem') e.preventDefault();
-      if (!teclas[e.code]) { teclas[e.code] = 1; ent[k] = 1; som.retomar(); }
+      if (!teclas[e.code]) { teclas[e.code] = 1; entK[k] = 1; som.retomar(); }
       return;
     }
     if (e.code === 'KeyV' && !e.repeat) trocarCamera();
+    if (e.code === 'KeyR' && !e.repeat) evtToque();
     if ((e.code === 'Enter') && el.tela.style.display !== 'none') {
       var pri = el.tela.querySelector('.np-btn-pri'); if (pri) { e.preventDefault(); pri.click(); }
     }
@@ -2651,9 +3076,9 @@
     // só solta se nenhuma outra tecla da mesma ação estiver apertada
     var ainda = false;
     for (var c in MAPA) if (MAPA[c] === k && teclas[c]) ainda = true;
-    if (!ainda) ent[k] = 0;
+    if (!ainda) entK[k] = 0;
   }
-  function soltarTudo() { teclas = {}; ent.acel = ent.freio = ent.esq = ent.dir = ent.drift = ent.olharTras = 0; }
+  function soltarTudo() { teclas = {}; for (var k in ent) ent[k] = entK[k] = entP[k] = 0; }
 
   /* ── Layout: palco 16:9; em pé, gira 90° ─────────────────────── */
   function layout() {
@@ -2702,6 +3127,7 @@
     var dt = tAnt ? (t - tAnt) / 1000 : 0.016;
     tAnt = t;
     if (dt > 0.05) dt = 0.05;
+    padPoll();
     if (pausado) { som.quadro(dt, { ativo: false }); return; }
     tempoGlobal += dt;
     if (estado === 'titulo') {
@@ -2725,7 +3151,9 @@
       ativo: true,
       vel: carro.vel, acel: estado === 'pego' || estado === 'fim' ? 0 : carro.acel,
       foraPista: carro.foraPista, deslize: (estado === 'correndo' && carro.driftT > 0) ? carro.deslize + 3 : carro.deslize * 0.5,
-      gap: mula.gap, mulaVel: mula.vel, mulaVisivel: G.mulaObj.visible, perigo: perigo
+      gap: mula.gap, mulaVel: mula.vel, mulaVisivel: G.mulaObj.visible, perigo: perigo,
+      // grilos: só durante a corrida, sumindo perto da capela
+      amb: estado === 'correndo' || estado === 'contagem' ? clamp((R.fim - carro.s) / 200, 0, 1) : 0
     });
   }
 
@@ -2756,6 +3184,9 @@
           } },
           { icone: 'fa-ghost', rotulo: 'Susto: ' + (cfg.susto === 'forte' ? 'Forte' : 'Suave'), ativo: cfg.susto === 'forte', acao: function () {
             cfg.susto = cfg.susto === 'forte' ? 'suave' : 'forte'; salvarCfg();
+          } },
+          { icone: 'fa-hat-wizard', rotulo: 'Assombrações: ' + (cfg.assombra ? 'Sim' : 'Não'), ativo: cfg.assombra, acao: function () {
+            cfg.assombra = !cfg.assombra; salvarCfg(); if (!cfg.assombra) evtLimpar(); else evtAgendar(false);
           } },
           { icone: 'fa-display', rotulo: 'Gráficos: ' + (cfg.grafico === 'alto' ? 'Alto' : cfg.grafico === 'medio' ? 'Médio' : 'Leve'), ativo: true, acao: function () {
             cfg.grafico = cfg.grafico === 'alto' ? 'medio' : cfg.grafico === 'medio' ? 'leve' : 'alto'; salvarCfg(); layout();
@@ -2851,6 +3282,7 @@
       window.addEventListener('keyup', aoSoltar, true);
       window.addEventListener('blur', soltarTudo);
       document.addEventListener('visibilitychange', aoVisibilidade);
+      window.addEventListener('gamepaddisconnected', aoDesconectarPad);
     }
     pausado = false; soltarTudo();
     registrarMenu();
@@ -2885,6 +3317,8 @@
     window.removeEventListener('keyup', aoSoltar, true);
     window.removeEventListener('blur', soltarTudo);
     document.removeEventListener('visibilitychange', aoVisibilidade);
+    window.removeEventListener('gamepaddisconnected', aoDesconectarPad);
+    evtLimpar(); padZerar(); padFocoLimpar();
   }
 
   window.NaoPareGame = {
@@ -2894,10 +3328,16 @@
       var cv = carro && R ? proximaCurva() : null;
       return { estado: estado, s: carro && carro.s, lat: carro && carro.lat, vel: carro && carro.vel, gap: mula && mula.gap, psi: carro && carro.psi, th: carro && carro.thPista,
         curva: cv ? { d: cv.s0 - carro.s, sev: cv.sev, dir: cv.dir, fim: cv.s1 - carro.s } : null,
-        tempo: corrida && corrida.tempo, km: corrida && corrida.km, curvas: R && R.curvas.length, L: R && R.L };
+        tempo: corrida && corrida.tempo, km: corrida && corrida.km, curvas: R && R.curvas.length, L: R && R.L,
+        evt: corrida && corrida.evt ? corrida.evt.tipo : null, rota: R && R.def.id, pausado: pausado, tEstado: tEstado, raf: !!raf };
     },
+    // Só para testes: troca de rota na hora, libera todas e aperta o rádio
+    _rota: function (i) { rotaIdx = i; R = gerarRota(ROTAS[i]); montarEstrada(); preview(); telaTitulo(); },
+    _liberar: function () { liberarTudo = true; },
+    _radio: function () { evtToque(); },
+    _evt: function (t) { evtIniciar(t); },
     // Só para testes automáticos: entradas virtuais e simulação sem desenhar
-    _ent: ent,
+    _ent: entK,
     _foto: function (ang, gap) { fotoAng = ang; if (mula) mula.gap = gap; },
     _gal: GAL,
     _dbg: function () { var v = new T.Vector3(); G.mulaPonta.getWorldPosition(v); return { cam: G.cam.position.toArray().map(function (x) { return +x.toFixed(2); }), toco: v.toArray().map(function (x) { return +x.toFixed(2); }), mula: G.mulaObj.position.toArray().map(function (x) { return +x.toFixed(2); }), carro: [+carro.x.toFixed(2), +carro.y.toFixed(2), +carro.z.toFixed(2)], psi: +carro.psi.toFixed(2), fase: corrida && corrida.fase, capo: mula.capo, D: mula.capoD, Y: mula.capoY, visivel: G.mulaObj.visible }; },

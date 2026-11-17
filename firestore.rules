@@ -167,6 +167,20 @@ service cloud.firestore {
                     && rankUpdateOk(request.resource.data, resource.data, 300000);
       allow delete: if false;
     }
+    // Não Pare — modo Sem Fim, score em METROS percorridos antes da Mula
+    // alcançar. Teto 20000: a estrada do Sem Fim tem 20 km e acaba ali
+    // (Jogos/naopare.js, rota 'sem-fim'); passar disso é valor injetado.
+    match /ranking_naopare/{uid} {
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
+      allow create: if contaReal()
+                    && uid == request.auth.uid
+                    && scoreValido(request.resource.data, 20000);
+      allow update: if contaReal()
+                    && uid == request.auth.uid
+                    && rankUpdateOk(request.resource.data, resource.data, 20000);
+      allow delete: if false;
+    }
     // Ritmo da Coruja — um ranking POR MAPA (música + dificuldade + colunas),
     // em subcoleção: ranking_ritmo/{mapa}/scores/{uid}. O id do mapa é
     // "<musica>_<easy|normal|hard|expert>_<4|5|7>k" (ex.: "mare-alta_hard_4k") — validado

@@ -2191,7 +2191,8 @@
     piano:           '#f472b6',
     blocos:          '#22d3ee',
     doces:           '#fb7185',
-    '2048':          '#fb923c'
+    '2048':          '#fb923c',
+    naopare:         '#f97316'
   };
 
   function cliRenderRecordes() {
@@ -2347,7 +2348,8 @@
     piano:           'ranking_piano',
     blocos:          'ranking_blocos',
     doces:           'ranking_doces',
-    '2048':          'ranking_2048'
+    '2048':          'ranking_2048',
+    naopare:         'ranking_naopare'
   };
 
   // Chave do recorde LOCAL (localStorage) de cada jogo. Usada para, ao
@@ -2364,7 +2366,8 @@
     piano:           'angatuba_piano_rec',
     blocos:          'angatuba_blocos_fase',
     doces:           'angatuba_doces_fase',
-    '2048':          'angatuba_2048_rec'
+    '2048':          'angatuba_2048_rec',
+    naopare:         'angatuba_naopare_rec'
   };
   function _rankRecordeLocal(jogoKey) {
     var chave = RANK_REC_LOCAL[jogoKey];
@@ -2874,7 +2877,8 @@
     piano:           { label: 'Piano da Coruja',   sub: '',          ico: '🎹' },
     blocos:          { label: 'Blocos da Coruja',  sub: '',          ico: '🧱' },
     doces:           { label: 'Doces da Coruja',   sub: '',          ico: '🍬' },
-    '2048':          { label: '2048 da Coruja',    sub: '',          ico: '🔢' }
+    '2048':          { label: '2048 da Coruja',    sub: '',          ico: '🔢' },
+    naopare:         { label: 'Não Pare',          sub: 'Sem Fim (m)', ico: '🔥' }
   };
 
   var _rankAbaAtual = 'geral';
@@ -3197,7 +3201,8 @@
     piano:           'pn-rank-slot',
     blocos:          'bb-rank-slot',
     doces:           'dc-rank-slot',
-    '2048':          't48-rank-slot'
+    '2048':          't48-rank-slot',
+    naopare:         'np-rank-slot'
   };
   // Depois que a pessoa loga a partir da tela de fim, troca o convite de
   // login pelo ranking (top 5), já contabilizando a pontuação re-submetida.

@@ -1405,17 +1405,27 @@
         <button type="button" class="jogo-voltar" onclick="_voltarAoMenu()"><i class="fa fa-chevron-left"></i> Voltar aos jogos</button>
         <div class="pp-card">
           <div class="pp-hud" id="pp-hud" style="display:none;">
-            <div class="pp-hud-lado">
-              <span class="pp-hud-lado-label">Você</span>
-              <span class="pp-hud-lado-valor" id="pp-hud-meu">0</span>
-              <span class="pp-hud-lado-sets" id="pp-hud-meu-sets">0 sets</span>
+            <!-- Placar de torneio: nome · sets (bolinhas, melhor de 5) · pontos.
+                 A bolinha amarela marca quem saca; o selo avisa set/match point. -->
+            <div class="pp-placar">
+              <div class="pp-placar-topo">
+                <span class="pp-placar-copa"><i class="fa fa-trophy"></i> Copa da Coruja</span>
+                <span class="pp-placar-set" id="pp-hud-set">Set 1</span>
+              </div>
+              <div class="pp-placar-linha" id="pp-hud-linha-meu">
+                <span class="pp-placar-saque"></span>
+                <span class="pp-placar-nome">Você</span>
+                <span class="pp-placar-sets" id="pp-hud-meu-sets"></span>
+                <span class="pp-placar-pontos" id="pp-hud-meu">0</span>
+              </div>
+              <div class="pp-placar-linha" id="pp-hud-linha-dele">
+                <span class="pp-placar-saque"></span>
+                <span class="pp-placar-nome" id="pp-hud-nome-adversario">Adversário</span>
+                <span class="pp-placar-sets" id="pp-hud-dele-sets"></span>
+                <span class="pp-placar-pontos" id="pp-hud-dele">0</span>
+              </div>
             </div>
-            <span class="pp-hud-x">×</span>
-            <div class="pp-hud-lado">
-              <span class="pp-hud-lado-label" id="pp-hud-nome-adversario">Adversário</span>
-              <span class="pp-hud-lado-valor" id="pp-hud-dele">0</span>
-              <span class="pp-hud-lado-sets" id="pp-hud-dele-sets">0 sets</span>
-            </div>
+            <span class="pp-placar-selo" id="pp-hud-selo"></span>
             <!-- Voz (3.2): só aparece em multiplayer. Fica no canto do HUD,
                  fora da arena, pra não atrapalhar o arrasto da raquete.
                  Ciclo: desligado -> ligado -> mudo (ver _ppAlternarMic). -->

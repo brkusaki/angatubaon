@@ -888,6 +888,7 @@
   function _ppComecarPartida() {
     _ppAplicarSkin();
     _ppMostrarTela('jogando');
+    _ppNarrar('inicio', 500);
     _ppUltimoTs = 0;
     if (_ppRAF) cancelAnimationFrame(_ppRAF);
     _ppRAF = requestAnimationFrame(_ppLoop);
@@ -1123,6 +1124,7 @@
     if (!jaNoFim && S) {
       try { if (S.fim) S.fim(venceu); if (venceu && S.tocar) S.tocar('ritmo-aplausos', null, 0.45); } catch (e) {}
     }
+    if (!jaNoFim) _ppNarrar(venceu ? 'vitoria' : (_ppModo === 'solo' ? 'derrota-coruja' : 'fim-jogo'), 700);
   }
 
   /* 2.2 — adversário sumiu com a tela de resultado já aberta (ver o
@@ -1139,6 +1141,20 @@
     _ppSairDaRede(true);
   }
 
+  // Situação do set agora: 'match' / 'set' (alguém fecha com o próximo
+  // ponto) ou 'empate' (10x10 em diante, vai pra vantagem). null = normal.
+  function _ppSituacao() {
+    var pA = _ppPlacarAnfitriao, pG = _ppPlacarConvidado, quase = PP_PONTOS_SET - 1;
+    function lado(p, o, sets) {
+      if (p >= quase && p - o >= 1) return sets >= PP_SETS_PARA_VENCER - 1 ? 'match' : 'set';
+      return null;
+    }
+    var r = lado(pA, pG, _ppSetsAnfitriao) || lado(pG, pA, _ppSetsConvidado);
+    if (!r && pA === pG && pA >= quase) r = 'empate';
+    return r;
+  }
+
+  var _ppHudAnt = { meu: -1, dele: -1, saque: null };
   function _ppAtualizarHUD() {
     var meu = _ppSouAnfitriao ? _ppPlacarAnfitriao : _ppPlacarConvidado;
     var dele = _ppSouAnfitriao ? _ppPlacarConvidado : _ppPlacarAnfitriao;
@@ -1149,11 +1165,42 @@
     var elNome = document.getElementById('pp-hud-nome-adversario');
     var elMeuSets = document.getElementById('pp-hud-meu-sets');
     var elDeleSets = document.getElementById('pp-hud-dele-sets');
-    if (elMeu) elMeu.textContent = meu;
-    if (elDele) elDele.textContent = dele;
+    var elSet = document.getElementById('pp-hud-set');
+    var elSelo = document.getElementById('pp-hud-selo');
+    if (elMeu) { elMeu.textContent = meu; if (_ppHudAnt.meu >= 0 && meu > _ppHudAnt.meu) _ppPop(elMeu); }
+    if (elDele) { elDele.textContent = dele; if (_ppHudAnt.dele >= 0 && dele > _ppHudAnt.dele) _ppPop(elDele); }
+    _ppHudAnt.meu = meu; _ppHudAnt.dele = dele;
     if (elNome) elNome.textContent = _ppApelidoAdversario || 'Adversário';
-    if (elMeuSets) elMeuSets.textContent = meusSets + (meusSets === 1 ? ' set' : ' sets');
-    if (elDeleSets) elDeleSets.textContent = delesSets + (delesSets === 1 ? ' set' : ' sets');
+    // Sets em bolinhas (melhor de 5: 3 pra vencer)
+    var bolas = function (n) {
+      var h = '';
+      for (var i = 0; i < PP_SETS_PARA_VENCER; i++) h += '<i' + (i < n ? ' class="on"' : '') + '></i>';
+      return h;
+    };
+    if (elMeuSets) elMeuSets.innerHTML = bolas(meusSets);
+    if (elDeleSets) elDeleSets.innerHTML = bolas(delesSets);
+    if (elSet) elSet.textContent = 'Set ' + Math.min(PP_SETS_PARA_VENCER * 2 - 1, _ppSetsAnfitriao + _ppSetsConvidado + 1);
+    if (elSelo) {
+      var sit = _ppEstado === 'jogando' ? _ppSituacao() : null;
+      elSelo.className = 'pp-placar-selo' + (sit ? ' on ' + sit : '');
+      elSelo.textContent = sit === 'match' ? 'Match point' : (sit === 'set' ? 'Set point' : (sit === 'empate' ? 'Empate · vantagem' : ''));
+    }
+    _ppHudSaque(true);
+  }
+  function _ppPop(el) {
+    el.classList.remove('pop');
+    void el.offsetWidth;   // reinicia a animação
+    el.classList.add('pop');
+  }
+  // Bolinha amarela em quem saca o ponto (chamado a cada quadro; só mexe
+  // no DOM quando muda).
+  function _ppHudSaque(forcar) {
+    var meuSaque = _ppEhMinhaVezDeSacar();
+    if (!forcar && meuSaque === _ppHudAnt.saque) return;
+    _ppHudAnt.saque = meuSaque;
+    var lm = document.getElementById('pp-hud-linha-meu'), ld = document.getElementById('pp-hud-linha-dele');
+    if (lm) lm.classList.toggle('saca', meuSaque);
+    if (ld) ld.classList.toggle('saca', !meuSaque);
   }
 
   /* ── Desenho (perspectiva falsa-3D em canvas 2D) ─────────────────
@@ -1186,6 +1233,7 @@
     var jogando = (_ppEstado === 'jogando');
     var renderDBola = _ppSouAnfitriao ? _ppBola.d : (1 - _ppBola.d);
     _ppDetectarEventos(jogando, renderDBola);
+    if (jogando) _ppHudSaque(false);
 
     // 3D pronto: a cena sai no canvas WebGL de baixo e este canvas 2D fica
     // só com os avisos por cima (e continua recebendo o toque).
@@ -1567,19 +1615,30 @@
        - saque: saiu do "aguardando saque";
        - ponto: o placar (sets*100 + pontos) de um dos lados subiu.
   ══════════════════════════════════════════════════════════════ */
-  var _ppEv = { d: null, h: 0, dirD: 0, dirH: 0, ag: false, eu: -1, ele: -1, x: 0 };
+  var _ppEv = { d: null, h: 0, dirD: 0, dirH: 0, ag: false, eu: -1, ele: -1, x: 0, toques: 0, seq: 0, quem: null, sit: null };
   function _ppDetectarEventos(jogando, renderDBola) {
     var ev = _ppEv, b = _ppBola;
     if (!jogando) { ev.d = null; ev.eu = -1; ev.ele = -1; ev.dirD = 0; ev.dirH = 0; return; }
     var eu = _ppSouAnfitriao ? _ppSetsAnfitriao * 100 + _ppPlacarAnfitriao : _ppSetsConvidado * 100 + _ppPlacarConvidado;
     var ele = _ppSouAnfitriao ? _ppSetsConvidado * 100 + _ppPlacarConvidado : _ppSetsAnfitriao * 100 + _ppPlacarAnfitriao;
     if (ev.eu >= 0 && (eu !== ev.eu || ele !== ev.ele)) {
-      if (eu > ev.eu) _ppEvento('pontoMeu');
-      else if (ele > ev.ele) _ppEvento('pontoDele', ev.x, ev.d);
+      var quem = eu > ev.eu ? 'eu' : (ele > ev.ele ? 'ele' : null);
+      if (quem === 'eu') _ppEvento('pontoMeu');
+      else if (quem === 'ele') _ppEvento('pontoDele', ev.x, ev.d);
+      if (quem) {
+        ev.seq = (ev.quem === quem) ? ev.seq + 1 : 1;
+        ev.quem = quem;
+        var fimSet = Math.floor(eu / 100) + Math.floor(ele / 100) !== Math.floor(ev.eu / 100) + Math.floor(ev.ele / 100);
+        _ppNarrarPonto(quem, fimSet, ev.toques, ev.sacouEu);
+      }
     }
     ev.eu = eu; ev.ele = ele;
 
-    if (ev.ag && !_ppAguardandoSaque) _ppEvento('saque', b.x, renderDBola, 0.6);
+    if (ev.ag && !_ppAguardandoSaque) {
+      ev.toques = 1; ev.sacouEu = !!ev.sacandoEu;
+      _ppEvento('saque', b.x, renderDBola, 0.6);
+    }
+    if (_ppAguardandoSaque) ev.sacandoEu = _ppEhMinhaVezDeSacar();
     ev.ag = _ppAguardandoSaque;
     if (_ppAguardandoSaque || ev.d === null) {
       ev.d = renderDBola; ev.h = b.h; ev.x = b.x; ev.dirD = 0; ev.dirH = 0;
@@ -1590,6 +1649,7 @@
     var rebateu = false;
     if (dirD && ev.dirD && dirD !== ev.dirD) {
       rebateu = true;
+      ev.toques++;
       _ppEvento(ev.d < 0.5 ? 'rebatidaMinha' : 'rebatidaDele', ev.x, ev.d, Math.min(1, _ppVelD / PP_VEL_D_MAX));
     }
     if (!rebateu && dirH > 0 && ev.dirH < 0 && Math.min(b.h, ev.h) < 0.08 && ev.d > 0.03 && ev.d < 0.97) {
@@ -1616,6 +1676,96 @@
         break;
     }
     if (_pp3) _pp3Evento(tipo, x, renderD, forca);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     NARRADOR — falas curtas de transmissão (match point, set point,
+     empate, ace, rali longo, sequência, fim de set, resultado). Toca o
+     mp3 gravado em /Jogos/assets/pingpong/voz/<chave>.mp3 (ElevenLabs,
+     voz Locutor); se o arquivo ainda não existir ou não tiver baixado,
+     usa a voz do próprio aparelho (speechSynthesis, pt-BR). Respeita o
+     mudo do hub. No máximo uma fala por ponto.
+  ══════════════════════════════════════════════════════════════ */
+  var PP_NARRADOR = {
+    'inicio': 'Que comecem os jogos!',
+    'ponto-voce': 'Ponto pra você!',
+    'ponto-coruja': 'Ponto da coruja!',
+    'ponto-adversario': 'Ponto do adversário!',
+    'ace': 'Ace! Nem viu a bola!',
+    'rali': 'Que rali!',
+    'fogo': 'Tá pegando fogo!',
+    'set-point': 'Set point!',
+    'match-point': 'Match point!',
+    'empate': 'Empate! Agora é na vantagem!',
+    'fim-set': 'Fim de set!',
+    'vitoria': 'Vitória! Que partida!',
+    'derrota-coruja': 'A coruja venceu!',
+    'fim-jogo': 'Fim de jogo!'
+  };
+  var _ppVozBuf = {}, _ppVozPedida = false, _ppVozUlt = 0, _ppVozTimer = 0;
+  function _ppVozCarregar() {
+    var ac = _ppAc;
+    if (_ppVozPedida || !ac || !window.fetch) return;
+    _ppVozPedida = true;
+    Object.keys(PP_NARRADOR).forEach(function (k) {
+      fetch(_PP_ASSET_BASE + 'voz/' + k + '.mp3')
+        .then(function (r) { if (!r.ok) throw new Error('http'); return r.arrayBuffer(); })
+        .then(function (ab) { return new Promise(function (ok, falha) { ac.decodeAudioData(ab, ok, falha); }); })
+        .then(function (buf) { _ppVozBuf[k] = buf; })
+        .catch(function () { _ppVozBuf[k] = null; });
+    });
+  }
+  function _ppNarrar(chave, atraso) {
+    if (_ppVozTimer) clearTimeout(_ppVozTimer);
+    _ppVozTimer = setTimeout(function () { _ppVozTimer = 0; _ppNarrarJa(chave); }, atraso || 0);
+  }
+  function _ppNarrarJa(chave) {
+    var S = window.AngatubaSom;
+    if (S && typeof S.ativo === 'function' && !S.ativo()) return;
+    var texto = PP_NARRADOR[chave];
+    if (!texto) return;
+    var agora = performance.now();
+    if (agora - _ppVozUlt < 900) return;
+    _ppVozUlt = agora;
+    var ac = _ppSomPronto(), buf = _ppVozBuf[chave];
+    if (ac && buf) {
+      var src = ac.createBufferSource(), g = ac.createGain();
+      src.buffer = buf; g.gain.value = 1.6;
+      src.connect(g); g.connect(_ppSomSaida); g.connect(_ppSomEco);   // locutor no sistema de som do ginásio
+      src.start();
+      src.onended = function () { try { src.disconnect(); g.disconnect(); } catch (e) {} };
+      return;
+    }
+    // Reserva: voz do aparelho (só se houver uma em português)
+    var sy = window.speechSynthesis;
+    if (!sy || typeof window.SpeechSynthesisUtterance !== 'function') return;
+    try {
+      var vozes = sy.getVoices() || [], voz = null;
+      for (var i = 0; i < vozes.length; i++) {
+        if (/^pt[-_]BR/i.test(vozes[i].lang)) { voz = vozes[i]; break; }
+        if (!voz && /^pt/i.test(vozes[i].lang)) voz = vozes[i];
+      }
+      if (!voz) return;
+      var u = new window.SpeechSynthesisUtterance(texto);
+      u.voice = voz; u.lang = voz.lang; u.rate = 1.08; u.pitch = 1.02; u.volume = 1;
+      sy.cancel();
+      sy.speak(u);
+    } catch (e) {}
+  }
+  // Escolhe UMA fala pro ponto que acabou (a mais importante).
+  function _ppNarrarPonto(quem, fimSet, toques, sacouEu) {
+    var acabou = _ppSetsAnfitriao >= PP_SETS_PARA_VENCER || _ppSetsConvidado >= PP_SETS_PARA_VENCER;
+    if (acabou) return;                      // o resultado é narrado em _ppMostrarFim
+    var sit = _ppSituacao(), ch = null;
+    if (fimSet) ch = 'fim-set';
+    else if (sit === 'match') ch = 'match-point';
+    else if (sit === 'set') ch = 'set-point';
+    else if (sit === 'empate') ch = 'empate';
+    else if (toques <= 1 && (quem === 'eu') === !!sacouEu) ch = 'ace';
+    else if (toques >= 8) ch = 'rali';
+    else if (_ppEv.seq >= 3 && _ppEv.seq % 3 === 0) ch = 'fogo';
+    else if (Math.random() < 0.3) ch = quem === 'eu' ? 'ponto-voce' : (_ppModo === 'solo' ? 'ponto-coruja' : 'ponto-adversario');
+    if (ch) _ppNarrar(ch, 450);
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -1657,6 +1807,7 @@
   function _ppSomDestravar() {
     var ac = _ppSomCtx();
     if (ac && ac.state === 'suspended') { try { ac.resume(); } catch (e) {} }
+    _ppVozCarregar();
   }
   function _ppSomPronto() {
     var S = window.AngatubaSom;
@@ -1983,7 +2134,7 @@
     cena.add(mesa);
 
     // Rede: malha transparente desenhada num canvas + faixa branca em cima
-    var REDE_H = 0.1525, REDE_L = (PP3_ML + 0.1525) * 2;
+    var REDE_H = 0.1525, REDE_L = (PP3_ML + 0.025) * 2;   // presa nas laterais da mesa, sem sobrar pra fora
     var texRede = new T.CanvasTexture(_pp3Canvas(512, 48, function (g, w, h) {
       g.strokeStyle = 'rgba(235,240,248,0.75)'; g.lineWidth = 1.2;
       for (var x = 0; x <= w; x += 6) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }

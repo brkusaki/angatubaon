@@ -8,12 +8,30 @@
 /* HUD durante a partida: meu placar à esquerda, do adversário à direita.
    position:relative só pra ancorar o botão de mic no canto sem tirar o
    placar do centro (ver .pp-mic-btn-hud). */
-.pp-hud{position:relative;display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;}
-.pp-hud-lado{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.04);border-radius:12px;padding:6px 18px;min-width:78px;}
-.pp-hud-lado-label{font-size:10.5px;color:var(--muted,#8794a8);text-transform:uppercase;letter-spacing:.04em;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.pp-hud-lado-valor{font-size:24px;font-weight:800;color:#fff;font-family:'Syne',sans-serif;}
-.pp-hud-lado-sets{font-size:9.5px;color:var(--muted,#8794a8);margin-top:1px;letter-spacing:.02em;}
-.pp-hud-x{font-size:13px;color:rgba(255,255,255,.35);font-weight:700;}
+.pp-hud{position:relative;z-index:3;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;min-height:66px;}
+/* Placar de torneio (estilo transmissão de TV) */
+.pp-placar{width:100%;max-width:min(300px,calc(100% - 96px));border-radius:10px;overflow:hidden;background:linear-gradient(180deg,#121a2b,#0a0f1a);border:1px solid rgba(255,255,255,.08);box-shadow:0 6px 18px rgba(0,0,0,.35);font-family:'Syne',sans-serif;}
+.pp-placar-topo{display:flex;justify-content:space-between;align-items:center;padding:3px 10px;background:linear-gradient(90deg,#1d4ed8,#0ea5e9);font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#fff;}
+.pp-placar-copa i{color:#fde047;margin-right:3px;}
+.pp-placar-set{background:rgba(0,0,0,.25);border-radius:4px;padding:1px 6px;}
+.pp-placar-linha{display:flex;align-items:center;gap:8px;padding:4px 0 4px 8px;border-top:1px solid rgba(255,255,255,.05);}
+.pp-placar-saque{width:8px;height:8px;border-radius:50%;flex:none;background:transparent;}
+.pp-placar-linha.saca .pp-placar-saque{background:#fde047;box-shadow:0 0 6px rgba(253,224,71,.8);}
+.pp-placar-nome{flex:1;min-width:0;font-size:13px;font-weight:700;color:#e5ecf6;text-transform:uppercase;letter-spacing:.03em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pp-placar-sets{display:flex;gap:3px;}
+.pp-placar-sets i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.14);}
+.pp-placar-sets i.on{background:#38bdf8;box-shadow:0 0 5px rgba(56,189,248,.8);}
+.pp-placar-pontos{min-width:42px;text-align:center;align-self:stretch;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#0a0f1a;background:#f8fafc;}
+#pp-hud-linha-dele .pp-placar-pontos{background:#e2e8f0;}
+.pp-placar-pontos.pop{animation:pp-pop .45s ease;}
+@keyframes pp-pop{0%{transform:scale(1);}35%{transform:scale(1.25);background:#fde047;}100%{transform:scale(1);}}
+/* Selo SET POINT / MATCH POINT / EMPATE em cima da arena */
+.pp-placar-selo{position:absolute;left:50%;bottom:-24px;transform:translateX(-50%);z-index:3;padding:3px 12px;border-radius:999px;font-family:'Syne',sans-serif;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s;}
+.pp-placar-selo.on{opacity:1;animation:pp-selo 1s ease-in-out infinite;}
+.pp-placar-selo.set{background:#f59e0b;color:#1a1206;}
+.pp-placar-selo.match{background:#ef4444;color:#fff;box-shadow:0 0 14px rgba(239,68,68,.7);}
+.pp-placar-selo.empate{background:#a855f7;color:#fff;}
+@keyframes pp-selo{0%,100%{transform:translateX(-50%) scale(1);}50%{transform:translateX(-50%) scale(1.07);}}
 
 .pp-arena{position:relative;width:100%;aspect-ratio:9/16;max-height:72vh;margin:0 auto;border-radius:14px;overflow:hidden;background:#0a0f1a;touch-action:none;}
 .pp-arena #pp-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}

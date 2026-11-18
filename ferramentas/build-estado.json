@@ -1,5 +1,5 @@
 {
- "versaoSW": 610,
+ "versaoSW": 611,
  "hashes": {
   "Aprender/conteudo.js": "c2776ebcaf3844f9",
   "Aprender/hub.js": "0025f4b073788e9b",
@@ -28,7 +28,7 @@
   "Jogos/hexarena.js": "3182054cce4aba52",
   "Jogos/hoquei.css": "efae916a46cd5dcd",
   "Jogos/hoquei.js": "f1677652333fc81b",
-  "Jogos/hub.js": "5ba9695d036a0e2d",
+  "Jogos/hub.js": "14d44ded472a4c82",
   "Jogos/maquina.css": "9c2ae17719231e15",
   "Jogos/maquina.js": "201a9781dddaeca8",
   "Jogos/multiplayer.js": "8bc2153091e334dc",
@@ -41,7 +41,7 @@
   "Jogos/piano.css": "9b928245855f2360",
   "Jogos/piano.js": "bc878c0982f38665",
   "Jogos/pingpong.css": "d00ff37d691aeac0",
-  "Jogos/pingpong.js": "0df4a29f7d2e5379",
+  "Jogos/pingpong.js": "a803bf06adc934a9",
   "Jogos/puff.css": "6f9b1a780d8f1eb3",
   "Jogos/puff.js": "620adef30cd9ffa4",
   "Jogos/ritmo.css": "ae541ef99d491dfb",

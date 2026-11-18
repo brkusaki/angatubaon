@@ -1645,7 +1645,22 @@
       '/Jogos/pingpong.min.js', '/Jogos/pingpong.css', '/Jogos/multiplayer.min.js',
       '/Jogos/vendor/three-naopare.min.js?v=187b',   // 3D (mesmo pacote do Não Pare)
       '/Jogos/assets/pingpong/cenario-arena.webp',
-      '/Jogos/assets/pingpong/coruja-pp-sheet.webp'
+      '/Jogos/assets/pingpong/coruja-pp-sheet.webp',
+      // narrador (ver PP_NARRADOR em pingpong.js)
+      '/Jogos/assets/pingpong/voz/inicio.mp3',
+      '/Jogos/assets/pingpong/voz/ponto-voce.mp3',
+      '/Jogos/assets/pingpong/voz/ponto-coruja.mp3',
+      '/Jogos/assets/pingpong/voz/ponto-adversario.mp3',
+      '/Jogos/assets/pingpong/voz/ace.mp3',
+      '/Jogos/assets/pingpong/voz/rali.mp3',
+      '/Jogos/assets/pingpong/voz/fogo.mp3',
+      '/Jogos/assets/pingpong/voz/set-point.mp3',
+      '/Jogos/assets/pingpong/voz/match-point.mp3',
+      '/Jogos/assets/pingpong/voz/empate.mp3',
+      '/Jogos/assets/pingpong/voz/fim-set.mp3',
+      '/Jogos/assets/pingpong/voz/vitoria.mp3',
+      '/Jogos/assets/pingpong/voz/derrota-coruja.mp3',
+      '/Jogos/assets/pingpong/voz/fim-jogo.mp3'
     ],
     hoquei: [
       '/Jogos/hoquei.min.js', '/Jogos/hoquei.css', '/Jogos/multiplayer.min.js',

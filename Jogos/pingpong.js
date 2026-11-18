@@ -1694,7 +1694,7 @@
     'ace': 'Ace! Nem viu a bola!',
     'rali': 'Que rali!',
     'fogo': 'Tá pegando fogo!',
-    'set-point': 'Set point!',
+    'set-point': 'É set point!',
     'match-point': 'Match point!',
     'empate': 'Empate! Agora é na vantagem!',
     'fim-set': 'Fim de set!',

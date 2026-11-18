@@ -1643,6 +1643,7 @@
     ],
     pingpong: [
       '/Jogos/pingpong.min.js', '/Jogos/pingpong.css', '/Jogos/multiplayer.min.js',
+      '/Jogos/vendor/three-naopare.min.js?v=187b',   // 3D (mesmo pacote do Não Pare)
       '/Jogos/assets/pingpong/cenario-arena.webp',
       '/Jogos/assets/pingpong/coruja-pp-sheet.webp'
     ],

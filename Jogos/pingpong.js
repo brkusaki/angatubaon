@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
    PING PONG DA CORUJA — módulo de jogo (lazy-loaded)
-   1x1 em tempo real, em 1ª pessoa: a câmera fica atrás da sua
+   1x1 em tempo real, em 1ª pessoa e em 3D (Three.js, ver a seção 3D
+   no fim do arquivo; sem WebGL cai no desenho 2D): a câmera fica atrás da sua
    raquete olhando pra mesa, só as raquetes aparecem (sem bonecos).
    Dois modos: sozinho contra a CPU, ou multiplayer de verdade via
    Jogos/multiplayer.js (AngatubaMP) — sala por código de 4 letras,
@@ -190,6 +191,7 @@
     try { it = (G && typeof G.skinEquipada === 'function') ? G.skinEquipada('pp_skin') : null; } catch (e) {}
     _ppCorRaquete = (it && it.corRaquete) || '#38bdf8';
     _ppCorBola = (it && it.corBola) || '#fff';
+    _pp3AplicarSkin();
     if (_ppCtx) _ppDesenhar();
   }
   window.addEventListener('angatuba:equipado', function (e) {
@@ -217,12 +219,20 @@
     }
     _ppDimensionar();
     _ppAsset('cenario-arena.webp');   // dispara o carregamento do fundo cedo
+    _pp3Iniciar();                     // baixa o Three.js; até lá fica o 2D
+    if (!_ppSomGestoOn) {
+      // O AudioContext dos sons da bola só acorda dentro de um gesto (iOS)
+      document.addEventListener('pointerdown', _ppSomDestravar, true);
+      document.addEventListener('touchend', _ppSomDestravar, true);
+      _ppSomGestoOn = true;
+    }
+    if (window.AngatubaSom && window.AngatubaSom.precarregar) window.AngatubaSom.precarregar(['ritmo-aplausos']);
     _ppRegistrarMenu();
     _ppMostrarTela('inicio');
     _ppLimparErroMenu();
     _ppDesenhar();
   }
-  var _ppResizeOn = false;
+  var _ppResizeOn = false, _ppSomGestoOn = false;
 
   function _ppComecar() { _ppPreparar(); } // exigido pelo contrato { preparar, comecar, parar }
 
@@ -724,6 +734,8 @@
      jogo está "aguardando saque" e é a vez do jogador local também
      dispara o saque (ver _ppEhMinhaVezDeSacar). */
   function _ppPosicaoDoEvento(clientX, clientY) {
+    var p3 = _pp3PosicaoDoEvento(clientX, clientY);
+    if (p3) return p3;
     var r = _ppCanvas.getBoundingClientRect();
     var fracX = (clientX - r.left) / (r.width || 1);
     var x = _ppClamp(fracX * 2 - 1, -1, 1);
@@ -807,6 +819,7 @@
     _ppCanvas.height = Math.round(cssH * _ppDpr);
     _ppW = cssW; _ppH = cssH;
     if (_ppCtx) _ppCtx.setTransform(_ppDpr, 0, 0, _ppDpr, 0, 0);
+    _pp3Dimensionar();
   }
 
   function _ppClamp(v, min, max) { return v < min ? min : (v > max ? max : v); }
@@ -1106,6 +1119,10 @@
 
     var bridge = _ppBridge();
     if (venceu && bridge && bridge.efeitos) bridge.efeitos.confete('pp-fim', 80);
+    var S = window.AngatubaSom;
+    if (!jaNoFim && S) {
+      try { if (S.fim) S.fim(venceu); if (venceu && S.tocar) S.tocar('ritmo-aplausos', null, 0.45); } catch (e) {}
+    }
   }
 
   /* 2.2 — adversário sumiu com a tela de resultado já aberta (ver o
@@ -1166,10 +1183,29 @@
     var ctx = _ppCtx;
     ctx.clearRect(0, 0, _ppW, _ppH);
 
-    _ppDesenharFundo();
-
     var jogando = (_ppEstado === 'jogando');
     var renderDBola = _ppSouAnfitriao ? _ppBola.d : (1 - _ppBola.d);
+    _ppDetectarEventos(jogando, renderDBola);
+
+    // 3D pronto: a cena sai no canvas WebGL de baixo e este canvas 2D fica
+    // só com os avisos por cima (e continua recebendo o toque).
+    if (_pp3) {
+      _pp3Desenhar(jogando, renderDBola);
+    } else {
+      _ppDesenhar2D(jogando, renderDBola);
+    }
+
+    if (jogando && _ppAguardandoSaque) _ppDesenharPromptSaque();
+    if (jogando && !_ppSouAnfitriao && _ppModo === 'multiplayer' && _ppUltimoEEm
+        && (performance.now() - _ppUltimoEEm) > PP_CONGELADO_AVISO_MS) {
+      _ppDesenharAvisoCongelado();
+    }
+  }
+
+  // Reserva sem WebGL (ou enquanto o Three.js ainda baixa): o desenho
+  // falso-3D em canvas 2D de sempre.
+  function _ppDesenhar2D(jogando, renderDBola) {
+    _ppDesenharFundo();
 
     // Adversário: a coruja em pé atrás da mesa (desenhada ANTES do tampo,
     // que cobre as pernas). Sem o sheet carregado, volta a raquete solta.
@@ -1187,12 +1223,6 @@
     _ppDesenharRede();
     if (jogando && renderDBola >= 0.5 && !bolaNaAsa) _ppDesenharBola(renderDBola);
     _ppDesenharRaquete(_ppMinhaRaqueteX, _ppMinhaRaqueteH, 0, _ppCorRaquete);
-
-    if (jogando && _ppAguardandoSaque) _ppDesenharPromptSaque();
-    if (jogando && !_ppSouAnfitriao && _ppModo === 'multiplayer' && _ppUltimoEEm
-        && (performance.now() - _ppUltimoEEm) > PP_CONGELADO_AVISO_MS) {
-      _ppDesenharAvisoCongelado();
-    }
   }
 
   // Fundo: imagem da arena (arquibancada, holofotes, piso de madeira) em
@@ -1408,9 +1438,11 @@
     _ppCoruja.acao = null;
     return -1;
   }
-  function _ppDesenharCorujaAdv(jogando, renderDBola) {
-    var reg = _ppAsset('coruja-pp-sheet.webp');
-    if (!(reg && reg.ok && reg.img && reg.w)) return false;
+  // Estado e quadro da coruja (vale pro 2D e pro 3D). alvo = onde o corpo
+  // deve ficar, na unidade de quem desenha; pxPorUn converte a velocidade
+  // dessa unidade pra px/s (os limiares de andar/inclinar são em px/s do 2D).
+  // Devolve { q, lift (fração da altura do quadro), sx, sy, rot }.
+  function _ppCorujaAtualizar(jogando, renderDBola, alvo, pxPorUn) {
     var c = _ppCoruja, agora = performance.now();
     var dt = c.ts ? Math.min(0.1, (agora - c.ts) / 1000) : 0;
     c.ts = agora;
@@ -1439,14 +1471,10 @@
     }
 
     // Posição: segue a raquete com um deslize suave
-    var p = _ppProjetar(_ppRaqueteAdversarioX, 1, 0);
-    var esc = p.escala * 1.1;                     // um pouco maior que a raquete do jogo: lê melhor de longe
-    var qw = PP_COR_QW * esc, qh = PP_COR_QH * esc;
-    var alvo = p.x + qw * PP_COR_PADX;
     if (c.x === null) c.x = alvo;
     var antes = c.x;
     c.x += (alvo - c.x) * Math.min(1, dt * 12);
-    var vx = dt > 0 ? (c.x - antes) / dt : 0;
+    var vx = dt > 0 ? (c.x - antes) / dt * pxPorUn : 0;
     c.vx += (vx - c.vx) * Math.min(1, dt * 10);
 
     // Quadro
@@ -1455,33 +1483,43 @@
     if (iAcao >= 0) {
       var def = PP_COR_ACOES[c.acao];
       q = def.q[iAcao];
-      if (def.pulo === iAcao) lift = qh * 0.1 * Math.sin(Math.PI * Math.min(1, (agora - c.acaoT0 - def.ms[0]) / def.ms[1]));
+      if (def.pulo === iAcao) lift = 0.1 * Math.sin(Math.PI * Math.min(1, (agora - c.acaoT0 - def.ms[0]) / def.ms[1]));
     } else if (c.segurandoBola) {
       q = 16;
     } else if (alta) {
       q = 14; c.noAr = agora;
-      lift = Math.min(1, (_ppRaqueteAdversarioH - 0.28) / 0.3) * qh * 0.16;
+      lift = Math.min(1, (_ppRaqueteAdversarioH - 0.28) / 0.3) * 0.16;
     } else if (c.noAr && agora - c.noAr < 160) {
       q = 15; sy = 0.94; sx = 1.04;
     } else if (Math.abs(c.vx) > 35) {
       q = PP_COR_ANDAR[Math.floor(agora / PP_COR_ANDAR_MS) % PP_COR_ANDAR.length];
       rot = Math.max(-0.1, Math.min(0.1, c.vx / 900));
-      lift = Math.abs(Math.sin(agora / PP_COR_ANDAR_MS * Math.PI / 2)) * qh * 0.02;
+      lift = Math.abs(Math.sin(agora / PP_COR_ANDAR_MS * Math.PI / 2)) * 0.02;
     } else {
       if (agora > c.piscaEm + 140) c.piscaEm = agora + 1800 + Math.random() * 2600;
       q = (agora >= c.piscaEm && agora < c.piscaEm + 140) ? 1 : 0;
       var resp = Math.sin(agora / 420);
       sy = 1 + resp * 0.018; sx = 1 - resp * 0.012;
     }
+    return { q: q, lift: lift, sx: sx, sy: sy, rot: rot };
+  }
+
+  function _ppDesenharCorujaAdv(jogando, renderDBola) {
+    var reg = _ppAsset('coruja-pp-sheet.webp');
+    if (!(reg && reg.ok && reg.img && reg.w)) return false;
+    var p = _ppProjetar(_ppRaqueteAdversarioX, 1, 0);
+    var esc = p.escala * 1.1;                     // um pouco maior que a raquete do jogo: lê melhor de longe
+    var qw = PP_COR_QW * esc, qh = PP_COR_QH * esc;
+    var e = _ppCorujaAtualizar(jogando, renderDBola, p.x + qw * PP_COR_PADX, 1);
 
     // Desenho: pés escondidos um pouco abaixo da borda de trás da mesa
-    var ctx = _ppCtx;
+    var ctx = _ppCtx, q = e.q;
     var sxq = (q % PP_COR_COLS) * PP_COR_QW, syq = Math.floor(q / PP_COR_COLS) * PP_COR_QH;
-    var pe = p.chaoY + qh * 0.14 - lift;
+    var pe = p.chaoY + qh * 0.14 - e.lift * qh;
     ctx.save();
-    ctx.translate(c.x, pe);
-    if (rot) ctx.rotate(rot);
-    ctx.scale(sx, sy);
+    ctx.translate(_ppCoruja.x, pe);
+    if (e.rot) ctx.rotate(e.rot);
+    ctx.scale(e.sx, e.sy);
     ctx.drawImage(reg.img, sxq, syq, PP_COR_QW, PP_COR_QH,
       -qw / 2, -PP_COR_BASE * esc, qw, qh);
     ctx.restore();
@@ -1519,5 +1557,682 @@
     ctx.shadowBlur = 6;
     ctx.fillText(texto, _ppW / 2, _ppH * 0.5);
     ctx.restore();
+  }
+  /* ══════════════════════════════════════════════════════════════
+     EVENTOS DA BOLA (som e efeitos) — deduzidos do estado da bola a
+     cada quadro, então valem igual no solo, no anfitrião e no convidado
+     (o convidado só recebe x/d/h pela rede, nunca os eventos):
+       - rebatida: a bola inverte o sentido em d;
+       - quique: a altura parou de cair e voltou a subir no meio da mesa;
+       - saque: saiu do "aguardando saque";
+       - ponto: o placar (sets*100 + pontos) de um dos lados subiu.
+  ══════════════════════════════════════════════════════════════ */
+  var _ppEv = { d: null, h: 0, dirD: 0, dirH: 0, ag: false, eu: -1, ele: -1, x: 0 };
+  function _ppDetectarEventos(jogando, renderDBola) {
+    var ev = _ppEv, b = _ppBola;
+    if (!jogando) { ev.d = null; ev.eu = -1; ev.ele = -1; ev.dirD = 0; ev.dirH = 0; return; }
+    var eu = _ppSouAnfitriao ? _ppSetsAnfitriao * 100 + _ppPlacarAnfitriao : _ppSetsConvidado * 100 + _ppPlacarConvidado;
+    var ele = _ppSouAnfitriao ? _ppSetsConvidado * 100 + _ppPlacarConvidado : _ppSetsAnfitriao * 100 + _ppPlacarAnfitriao;
+    if (ev.eu >= 0 && (eu !== ev.eu || ele !== ev.ele)) {
+      if (eu > ev.eu) _ppEvento('pontoMeu');
+      else if (ele > ev.ele) _ppEvento('pontoDele', ev.x, ev.d);
+    }
+    ev.eu = eu; ev.ele = ele;
+
+    if (ev.ag && !_ppAguardandoSaque) _ppEvento('saque', b.x, renderDBola, 0.6);
+    ev.ag = _ppAguardandoSaque;
+    if (_ppAguardandoSaque || ev.d === null) {
+      ev.d = renderDBola; ev.h = b.h; ev.x = b.x; ev.dirD = 0; ev.dirH = 0;
+      return;
+    }
+    var dirD = renderDBola > ev.d + 1e-4 ? 1 : (renderDBola < ev.d - 1e-4 ? -1 : 0);
+    var dirH = b.h > ev.h + 1e-4 ? 1 : (b.h < ev.h - 1e-4 ? -1 : 0);
+    var rebateu = false;
+    if (dirD && ev.dirD && dirD !== ev.dirD) {
+      rebateu = true;
+      _ppEvento(ev.d < 0.5 ? 'rebatidaMinha' : 'rebatidaDele', ev.x, ev.d, Math.min(1, _ppVelD / PP_VEL_D_MAX));
+    }
+    if (!rebateu && dirH > 0 && ev.dirH < 0 && Math.min(b.h, ev.h) < 0.08 && ev.d > 0.03 && ev.d < 0.97) {
+      _ppEvento('quique', ev.x, ev.d, Math.min(1, _ppVelD / PP_VEL_D_MAX));
+    }
+    if (dirD) ev.dirD = dirD;
+    if (dirH) ev.dirH = dirH;
+    ev.d = renderDBola; ev.h = b.h; ev.x = b.x;
+  }
+
+  function _ppEvento(tipo, x, renderD, forca) {
+    var S = window.AngatubaSom;
+    switch (tipo) {
+      case 'quique': _ppSomBatida('mesa', x, renderD, forca); break;
+      case 'saque':
+      case 'rebatidaMinha':
+      case 'rebatidaDele': _ppSomBatida('raquete', x, renderD, forca); break;
+      case 'pontoMeu':
+        if (S && S.tocar) { try { S.tocar('ritmo-aplausos', 'acerto', 0.32); } catch (e) {} }
+        break;
+      case 'pontoDele':
+        if (renderD !== undefined && renderD < 0.25) _ppSomPassou(x);
+        if (S && S.erro) { try { S.erro(); } catch (e) {} }
+        break;
+    }
+    if (_pp3) _pp3Evento(tipo, x, renderD, forca);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     SONS DA PARTIDA — síntese própria (Web Audio, 0 download): o "toc"
+     da raquete, o "tic" do quique na mesa e o vento da bola que passou.
+     Cada batida tem posição (pan pela lateral, mais baixo e abafado do
+     lado de lá) e um eco curto de ginásio. Respeita o mudo do hub
+     (AngatubaSom.ativo). Aplauso e fim de jogo vêm do AngatubaSom.
+  ══════════════════════════════════════════════════════════════ */
+  var _ppAc = null, _ppSomSaida = null, _ppSomEco = null, _ppRuidoBuf = null;
+  function _ppSomCtx() {
+    if (_ppAc) return _ppAc;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    try {
+      var ac = new AC();
+      _ppSomSaida = ac.createGain();
+      _ppSomSaida.gain.value = 0.5;
+      _ppSomSaida.connect(ac.destination);
+      // Eco de ginásio: resposta ao impulso sintetizada (ruído que decai)
+      var sr = ac.sampleRate, n = Math.floor(sr * 0.9), ir = ac.createBuffer(2, n, sr), pre = Math.floor(sr * 0.012);
+      for (var ch = 0; ch < 2; ch++) {
+        var dd = ir.getChannelData(ch);
+        for (var i = 0; i < n; i++) dd[i] = i < pre ? 0 : (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3.2);
+      }
+      var conv = ac.createConvolver();
+      conv.buffer = ir;
+      _ppSomEco = ac.createGain();
+      _ppSomEco.gain.value = 0.2;
+      _ppSomEco.connect(conv); conv.connect(_ppSomSaida);
+      var nr = Math.floor(sr * 0.3);
+      _ppRuidoBuf = ac.createBuffer(1, nr, sr);
+      var dr = _ppRuidoBuf.getChannelData(0);
+      for (var j = 0; j < nr; j++) dr[j] = Math.random() * 2 - 1;
+      _ppAc = ac;
+    } catch (e) { _ppAc = null; }
+    return _ppAc;
+  }
+  function _ppSomDestravar() {
+    var ac = _ppSomCtx();
+    if (ac && ac.state === 'suspended') { try { ac.resume(); } catch (e) {} }
+  }
+  function _ppSomPronto() {
+    var S = window.AngatubaSom;
+    if (S && typeof S.ativo === 'function' && !S.ativo()) return null;
+    var ac = _ppAc;
+    return (ac && ac.state === 'running') ? ac : null;
+  }
+  // Uma voz curta: oscilador com queda de tom e envelope exponencial.
+  function _ppTom(ac, dest, t, f0, f1, dur, vol, tipo) {
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = tipo || 'sine';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.0015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(dest);
+    o.start(t); o.stop(t + dur + 0.02);
+    o.onended = function () { try { o.disconnect(); g.disconnect(); } catch (e) {} };
+  }
+  // Estalo de ruído filtrado (o "clique" do contato).
+  function _ppEstalo(ac, dest, t, dur, freq, q, vol) {
+    var src = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = _ppRuidoBuf;
+    bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = q;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp); bp.connect(g); g.connect(dest);
+    src.start(t, Math.random() * 0.2); src.stop(t + dur + 0.02);
+    src.onended = function () { try { src.disconnect(); bp.disconnect(); g.disconnect(); } catch (e) {} };
+  }
+  // Ponto de saída posicionado: pan pela lateral, volume e brilho pela distância.
+  function _ppSomSaidaEm(ac, x, renderD, vol) {
+    var dist = _ppClamp(renderD || 0, 0, 1);
+    var g = ac.createGain();
+    g.gain.value = vol * (1 - 0.5 * dist);
+    var lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 11000 - 6500 * dist;
+    lp.connect(g);
+    var fim = g;
+    if (ac.createStereoPanner) {
+      var pan = ac.createStereoPanner();
+      pan.pan.value = _ppClamp((x || 0) * 0.6, -0.8, 0.8);
+      g.connect(pan); fim = pan;
+    }
+    fim.connect(_ppSomSaida);
+    fim.connect(_ppSomEco);
+    setTimeout(function () { try { lp.disconnect(); g.disconnect(); if (fim !== g) fim.disconnect(); } catch (e) {} }, 600);
+    return lp;
+  }
+  var _ppSomUltimo = 0;
+  function _ppSomBatida(tipo, x, renderD, forca) {
+    var ac = _ppSomPronto();
+    if (!ac || !_ppRuidoBuf) return;
+    var agora = performance.now();
+    if (agora - _ppSomUltimo < 45) return;   // dois eventos colados não viram ruído
+    _ppSomUltimo = agora;
+    var f = _ppClamp(forca == null ? 0.5 : forca, 0, 1);
+    var t = ac.currentTime + 0.004;
+    var v = 1 + (Math.random() - 0.5) * 0.08;   // cada batida um tiquinho diferente
+    var d = _ppSomSaidaEm(ac, x, renderD, 0.75 + 0.35 * f);
+    if (tipo === 'mesa') {
+      // "tic": a bola de celuloide é aguda e seca; o tampo dá o corpo grave
+      _ppTom(ac, d, t, 1750 * v, 1450 * v, 0.045, 0.55);
+      _ppTom(ac, d, t, 3400 * v, 2950 * v, 0.022, 0.16);
+      _ppTom(ac, d, t, 240, 190, 0.08, 0.32);
+      _ppEstalo(ac, d, t, 0.012, 4300, 1.1, 0.55);
+    } else {
+      // "toc": madeira + borracha, mais grave e mais cheio que o quique
+      _ppTom(ac, d, t, 1180 * v, 900 * v, 0.055, 0.5, 'triangle');
+      _ppTom(ac, d, t, 2250 * v, 1900 * v, 0.03, 0.16);
+      _ppTom(ac, d, t, 170, 115, 0.06, 0.45);
+      _ppEstalo(ac, d, t, 0.018, 2500, 0.9, 0.6 + 0.3 * f);
+    }
+  }
+  // Vento da bola passando do seu lado (ponto perdido).
+  function _ppSomPassou(x) {
+    var ac = _ppSomPronto();
+    if (!ac || !_ppRuidoBuf) return;
+    var t = ac.currentTime + 0.004;
+    var src = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = _ppRuidoBuf;
+    bp.type = 'bandpass'; bp.Q.value = 1.4;
+    bp.frequency.setValueAtTime(600, t);
+    bp.frequency.exponentialRampToValueAtTime(2600, t + 0.12);
+    bp.frequency.exponentialRampToValueAtTime(900, t + 0.28);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.35, t + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+    var d = _ppSomSaidaEm(ac, x, 0, 1);
+    src.connect(bp); bp.connect(g); g.connect(d);
+    src.start(t); src.stop(t + 0.3);
+    src.onended = function () { try { src.disconnect(); bp.disconnect(); g.disconnect(); } catch (e) {} };
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     3D (Three.js) — mesma base do Não Pare: o pacote enxuto
+     /Jogos/vendor/three-naopare.min.js (window.NPTHREE), baixado sob
+     demanda. Enquanto baixa, ou se o aparelho não tiver WebGL, o jogo
+     segue no desenho 2D de sempre (_ppDesenhar2D).
+     Só o DESENHO mudou: física, IA, rede e placar continuam nas mesmas
+     coordenadas (x -1..1, d 0..1, h ≥ 0), convertidas aqui pra metros
+     numa mesa oficial (2,74 × 1,525 m, tampo a 0,76 m). A altura é
+     esticada (PP3_HK) pra bola passar por cima da rede de verdade.
+     O toque vira posição da raquete por um raio da câmera "parada"
+     (camBase) até o plano da minha raquete, então a raquete fica
+     embaixo do dedo mesmo com a câmera balançando.
+  ══════════════════════════════════════════════════════════════ */
+  var PP3_THREE_URL = '/Jogos/vendor/three-naopare.min.js?v=187b';  // mesmo arquivo (e cache) do Não Pare
+  var PP3_ML = 0.7625;     // meia largura da mesa (m) — x = ±1
+  var PP3_MC = 1.37;       // meio comprimento (m) — d = 0 e d = 1
+  var PP3_TOPO = 0.76;     // altura do tampo
+  var PP3_HK = 2.0;        // metros por unidade de altura (h)
+  var PP3_BOLA_R = 0.03;   // raio da bola (maior que o real, pra ler no celular)
+  var PP3_Z_RAQ = 0.07;    // a raquete fica um pouco atrás da linha de fundo
+  var PP3_COR_H = 1.6;     // altura do quadro da coruja (m) — mascote do tamanho de gente
+  var PP3_COR_RAQ = 0.38;  // altura da raquete do desenho acima dos pés (fração do quadro)
+  var PP3_COR_Z = -(PP3_MC + 0.55);
+  var _pp3 = null, _pp3Carregando = false, _pp3Falhou = false;
+
+  function _pp3CarregarThree() {
+    if (window.NPTHREE) return Promise.resolve(window.NPTHREE);
+    return new Promise(function (ok, erro) {
+      var s = document.createElement('script');
+      s.src = PP3_THREE_URL; s.async = true;
+      s.onload = function () { window.NPTHREE ? ok(window.NPTHREE) : erro(new Error('three')); };
+      s.onerror = function () { erro(new Error('three')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function _pp3Iniciar() {
+    if (_pp3 || _pp3Carregando || _pp3Falhou || !_ppCanvas) return;
+    var arena = document.getElementById('pp-arena');
+    if (!arena) return;
+    _pp3Carregando = true;
+    _pp3CarregarThree().then(function (T) {
+      _pp3Carregando = false;
+      try { _pp3Montar(T, arena); } catch (e) {
+        _pp3Falhou = true; _pp3 = null;
+        var cv = arena.querySelector('.pp-canvas-3d');
+        if (cv && cv.parentNode) cv.parentNode.removeChild(cv);
+        return;
+      }
+      _ppCoruja.x = null;          // a posição da coruja muda de unidade (px → m)
+      _pp3Dimensionar();
+      _ppDesenhar();
+    }, function () { _pp3Carregando = false; _pp3Falhou = true; });
+  }
+
+  // Posição no mundo de um ponto do jogo (renderD: 0 = meu fundo).
+  function _pp3Pos(v, x, renderD, h) {
+    return v.set(x * PP3_ML, PP3_TOPO + PP3_BOLA_R + h * PP3_HK, PP3_MC - renderD * 2 * PP3_MC);
+  }
+
+  function _pp3Canvas(w, h, desenhar) {
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    desenhar(c.getContext('2d'), w, h);
+    return c;
+  }
+  function _pp3TexMadeira(T) {
+    var c = _pp3Canvas(512, 512, function (g, w, h) {
+      var n = 8, lw = w / n;
+      for (var i = 0; i < n; i++) {
+        var tom = 0.82 + Math.random() * 0.2;
+        g.fillStyle = 'rgb(' + Math.round(176 * tom) + ',' + Math.round(118 * tom) + ',' + Math.round(68 * tom) + ')';
+        g.fillRect(i * lw, 0, lw, h);
+        // veios
+        for (var k = 0; k < 18; k++) {
+          var x0 = i * lw + Math.random() * lw, a = 0.04 + Math.random() * 0.08;
+          g.strokeStyle = 'rgba(60,32,12,' + a + ')';
+          g.lineWidth = 0.6 + Math.random() * 1.6;
+          g.beginPath();
+          for (var y = 0; y <= h; y += 16) g.lineTo(x0 + Math.sin(y * 0.02 + k) * 2.2, y);
+          g.stroke();
+        }
+        // emendas das réguas
+        var corte = Math.random() * h;
+        g.fillStyle = 'rgba(30,16,6,0.45)';
+        g.fillRect(i * lw, corte, lw, 1.5);
+        g.fillRect(i * lw, 0, 1.5, h);
+      }
+    });
+    var t = new T.CanvasTexture(c);
+    t.colorSpace = T.SRGBColorSpace;
+    t.wrapS = t.wrapT = T.RepeatWrapping;
+    return t;
+  }
+  function _pp3TexRadial(T, interno, externo, anel) {
+    var c = _pp3Canvas(128, 128, function (g, w) {
+      var r = w / 2, gr = g.createRadialGradient(r, r, 0, r, r, r);
+      if (anel) {
+        gr.addColorStop(0, 'rgba(255,255,255,0)');
+        gr.addColorStop(0.62, 'rgba(255,255,255,0)');
+        gr.addColorStop(0.8, 'rgba(255,255,255,1)');
+        gr.addColorStop(1, 'rgba(255,255,255,0)');
+      } else {
+        gr.addColorStop(0, interno);
+        gr.addColorStop(1, externo);
+      }
+      g.fillStyle = gr; g.fillRect(0, 0, w, w);
+    });
+    return new T.CanvasTexture(c);
+  }
+
+  function _pp3Raquete(T, corCostas) {
+    var g = new T.Group();
+    var madeira = new T.MeshStandardMaterial({ color: 0xc8955a, roughness: 0.7 });
+    var cabeca = new T.Group();
+    var lamina = new T.Mesh(new T.CylinderGeometry(0.15, 0.15, 0.012, 40), madeira);
+    lamina.rotation.x = Math.PI / 2;
+    var frente = new T.Mesh(new T.CylinderGeometry(0.143, 0.143, 0.004, 40),
+      new T.MeshStandardMaterial({ color: 0xc0262d, roughness: 0.85 }));
+    frente.rotation.x = Math.PI / 2; frente.position.z = -0.008;
+    var matCostas = new T.MeshStandardMaterial({ color: corCostas, roughness: 0.55, emissive: corCostas, emissiveIntensity: 0.18 });
+    var costas = new T.Mesh(new T.CylinderGeometry(0.143, 0.143, 0.004, 40), matCostas);
+    costas.rotation.x = Math.PI / 2; costas.position.z = 0.008;
+    cabeca.add(lamina, frente, costas);
+    cabeca.scale.set(1, 1.08, 1);
+    var cabo = new T.Mesh(new T.BoxGeometry(0.034, 0.12, 0.026), madeira);
+    cabo.position.y = -0.15 * 1.08 - 0.05;
+    g.add(cabeca, cabo);
+    g.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
+    g.userData.matCostas = matCostas;
+    return g;
+  }
+
+  function _pp3Montar(T, arena) {
+    var cv = document.createElement('canvas');
+    cv.className = 'pp-canvas-3d';
+    cv.setAttribute('aria-hidden', 'true');
+    arena.insertBefore(cv, _ppCanvas);
+    var renderer = new T.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(1.75, window.devicePixelRatio || 1));
+    renderer.outputColorSpace = T.SRGBColorSpace;
+    renderer.toneMapping = T.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    renderer.shadowMap.enabled = true;
+
+    var cena = new T.Scene();
+    cena.background = new T.Color(0x070b14);
+    cena.fog = new T.FogExp2(0x070b14, 0.04);
+    var cam = new T.PerspectiveCamera(56, 0.5625, 0.05, 60);
+    var camBase = new T.PerspectiveCamera(56, 0.5625, 0.05, 60);
+
+    // Luz: holofote em cima da mesa (com sombra), céu frio do ginásio e um
+    // preenchimento vindo da câmera.
+    cena.add(new T.HemisphereLight(0xaec4ff, 0x2a1d12, 0.8));
+    var spot = new T.SpotLight(0xfff1dc, 75, 16, 0.62, 0.55, 1.6);
+    spot.position.set(0, 4.8, 0.3);
+    spot.target.position.set(0, PP3_TOPO, 0);
+    spot.castShadow = true;
+    spot.shadow.mapSize.set(1024, 1024);
+    spot.shadow.bias = -0.0004;
+    spot.shadow.camera.near = 1.5; spot.shadow.camera.far = 7;
+    cena.add(spot, spot.target);
+    var fill = new T.DirectionalLight(0xa8bcff, 0.5);
+    fill.position.set(-1.5, 3, 6);
+    cena.add(fill);
+
+    // Piso de madeira do ginásio
+    var texChao = _pp3TexMadeira(T);
+    texChao.repeat.set(24, 24);
+    texChao.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 1);
+    var chao = new T.Mesh(new T.PlaneGeometry(24, 24), new T.MeshStandardMaterial({ map: texChao, roughness: 0.38, metalness: 0 }));
+    chao.rotation.x = -Math.PI / 2;
+    chao.receiveShadow = true;
+    cena.add(chao);
+
+    // Arquibancada ao fundo: a parte de cima do cenario-arena.webp (torcida,
+    // holofotes e a faixa azul) num painel grande; o chão dela é o 3D.
+    var FW = 16, FH = FW * (665 / 720);
+    var matFundo = new T.MeshBasicMaterial({ color: 0x0c1220, fog: false, toneMapped: false });
+    var fundo = new T.Mesh(new T.PlaneGeometry(FW, FH), matFundo);
+    fundo.position.set(0, FH / 2 - 0.15, -8.5);
+    cena.add(fundo);
+    // Laterais da arquibancada (telas largas): a mesma imagem, viradas pra dentro
+    for (var lado = -1; lado <= 1; lado += 2) {
+      var aba = new T.Mesh(fundo.geometry, matFundo);
+      aba.position.set(lado * (FW / 2 + FW * 0.42), FH / 2 - 0.15, -8.5 + FW * 0.27);
+      aba.rotation.y = -lado * 0.75;
+      cena.add(aba);
+    }
+    new T.TextureLoader().load(_PP_ASSET_BASE + 'cenario-arena.webp', function (t) {
+      t.colorSpace = T.SRGBColorSpace;
+      t.repeat.set(1, 665 / 1280);
+      t.offset.set(0, 1 - 665 / 1280);
+      matFundo.map = t;
+      matFundo.color.set(0x8f97a6);   // um pouco mais escura: fica atrás, não compete com a mesa
+      matFundo.needsUpdate = true;
+    });
+
+    // Mesa oficial
+    var mesa = new T.Group();
+    var matTampo = new T.MeshStandardMaterial({ color: 0x1b56ad, roughness: 0.48 });
+    var tampo = new T.Mesh(new T.BoxGeometry(PP3_ML * 2, 0.03, PP3_MC * 2), matTampo);
+    tampo.position.y = PP3_TOPO - 0.015;
+    var matLinha = new T.MeshStandardMaterial({ color: 0xf2f5fa, roughness: 0.6 });
+    var linhas = [
+      [0.02, PP3_MC * 2, -(PP3_ML - 0.01), 0], [0.02, PP3_MC * 2, PP3_ML - 0.01, 0],
+      [PP3_ML * 2, 0.02, 0, -(PP3_MC - 0.01)], [PP3_ML * 2, 0.02, 0, PP3_MC - 0.01],
+      [0.006, PP3_MC * 2, 0, 0]
+    ];
+    for (var i = 0; i < linhas.length; i++) {
+      var l = new T.Mesh(new T.BoxGeometry(linhas[i][0], 0.002, linhas[i][1]), matLinha);
+      l.position.set(linhas[i][2], PP3_TOPO + 0.001, linhas[i][3]);
+      l.receiveShadow = true;
+      mesa.add(l);
+    }
+    var matFerro = new T.MeshStandardMaterial({ color: 0x1a1d24, roughness: 0.6, metalness: 0.4 });
+    var saia = new T.Mesh(new T.BoxGeometry(PP3_ML * 2 - 0.08, 0.06, PP3_MC * 2 - 0.08), matFerro);
+    saia.position.y = PP3_TOPO - 0.06;
+    mesa.add(tampo, saia);
+    var pAlt = PP3_TOPO - 0.06;
+    for (var px = -1; px <= 1; px += 2) {
+      for (var pz = -1; pz <= 1; pz += 2) {
+        var perna = new T.Mesh(new T.BoxGeometry(0.05, pAlt, 0.05), matFerro);
+        perna.position.set(px * (PP3_ML - 0.12), pAlt / 2, pz * (PP3_MC - 0.25));
+        mesa.add(perna);
+      }
+    }
+    mesa.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    cena.add(mesa);
+
+    // Rede: malha transparente desenhada num canvas + faixa branca em cima
+    var REDE_H = 0.1525, REDE_L = (PP3_ML + 0.1525) * 2;
+    var texRede = new T.CanvasTexture(_pp3Canvas(512, 48, function (g, w, h) {
+      g.strokeStyle = 'rgba(235,240,248,0.75)'; g.lineWidth = 1.2;
+      for (var x = 0; x <= w; x += 6) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+      for (var y = 0; y <= h; y += 6) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+    }));
+    var rede = new T.Mesh(new T.PlaneGeometry(REDE_L, REDE_H),
+      new T.MeshBasicMaterial({ map: texRede, transparent: true, side: T.DoubleSide, depthWrite: false, color: 0xcfd6e2 }));
+    rede.position.set(0, PP3_TOPO + REDE_H / 2, 0);
+    var faixa = new T.Mesh(new T.BoxGeometry(REDE_L, 0.016, 0.006), new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }));
+    faixa.position.set(0, PP3_TOPO + REDE_H, 0);
+    faixa.castShadow = true;
+    cena.add(rede, faixa);
+    for (var ps = -1; ps <= 1; ps += 2) {
+      var poste = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, REDE_H + 0.03, 10), matFerro);
+      poste.position.set(ps * REDE_L / 2, PP3_TOPO + (REDE_H + 0.03) / 2, 0);
+      poste.castShadow = true;
+      cena.add(poste);
+    }
+
+    // Raquetes
+    var minha = _pp3Raquete(T, _ppCorRaquete);
+    var dele = _pp3Raquete(T, '#ff5470');
+    cena.add(minha, dele);
+
+    // Bola + rastro
+    var matBola = new T.MeshStandardMaterial({ color: _ppCorBola, roughness: 0.32, emissive: _ppCorBola, emissiveIntensity: 0.28 });
+    var bola = new T.Mesh(new T.SphereGeometry(PP3_BOLA_R, 20, 14), matBola);
+    bola.castShadow = true;
+    cena.add(bola);
+    var geoRastro = new T.SphereGeometry(PP3_BOLA_R, 10, 8), rastro = [];
+    for (var r = 0; r < 7; r++) {
+      var mr = new T.Mesh(geoRastro, new T.MeshBasicMaterial({ color: _ppCorBola, transparent: true, opacity: 0, depthWrite: false }));
+      mr.visible = false;
+      cena.add(mr);
+      rastro.push(mr);
+    }
+
+    // Efeitos: anel no quique e clarão na rebatida
+    var texAnel = _pp3TexRadial(T, null, null, true);
+    var texBrilho = _pp3TexRadial(T, 'rgba(255,255,255,1)', 'rgba(255,255,255,0)');
+    var aneis = [], claroes = [];
+    for (var a = 0; a < 4; a++) {
+      var an = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ map: texAnel, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending }));
+      an.rotation.x = -Math.PI / 2; an.visible = false; an.userData.t = 1;
+      cena.add(an); aneis.push(an);
+    }
+    for (var b = 0; b < 2; b++) {
+      var sp = new T.Sprite(new T.SpriteMaterial({ map: texBrilho, color: 0xfff4d6, transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending }));
+      sp.visible = false; sp.userData.t = 1;
+      cena.add(sp); claroes.push(sp);
+    }
+
+    // Coruja adversária: o mesmo sheet do 2D, num painel virado pra câmera.
+    // Origem nos pés (gira/amassa a partir do chão).
+    var corCanvas = document.createElement('canvas');
+    corCanvas.width = PP_COR_QW; corCanvas.height = PP_COR_QH;
+    var texCor = new T.CanvasTexture(corCanvas);
+    texCor.colorSpace = T.SRGBColorSpace;
+    var CW = PP3_COR_H * PP_COR_QW / PP_COR_QH;
+    var geoCor = new T.PlaneGeometry(CW, PP3_COR_H);
+    geoCor.translate(0, PP3_COR_H / 2 - PP3_COR_H * (1 - PP_COR_BASE / PP_COR_QH), 0);
+    var coruja = new T.Mesh(geoCor, new T.MeshBasicMaterial({ map: texCor, transparent: true, alphaTest: 0.04, toneMapped: false, color: 0xe6e6e6 }));
+    coruja.visible = false;
+    var sombraCor = new T.Mesh(new T.PlaneGeometry(1.1, 0.45), new T.MeshBasicMaterial({
+      map: _pp3TexRadial(T, 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0)'), transparent: true, depthWrite: false }));
+    sombraCor.rotation.x = -Math.PI / 2;
+    sombraCor.visible = false;
+    cena.add(coruja, sombraCor);
+
+    _pp3 = {
+      T: T, renderer: renderer, cena: cena, cam: cam, camBase: camBase, cv: cv,
+      minha: minha, dele: dele, bola: bola, matBola: matBola, rastro: rastro, rastroPos: [],
+      aneis: aneis, claroes: claroes, coruja: coruja, corCanvas: corCanvas, texCor: texCor,
+      corCW: CW, corQ: -1, corY: null, sombraCor: sombraCor,
+      v1: new T.Vector3(), v2: new T.Vector3(), alvo: new T.Vector3(),
+      ts: 0, swingMeu: 0, swingDele: 0, tremor: 0, sway: 0, camD: 2.6
+    };
+  }
+
+  function _pp3AplicarSkin() {
+    if (!_pp3) return;
+    var m = _pp3.minha.userData.matCostas;
+    m.color.set(_ppCorRaquete); m.emissive.set(_ppCorRaquete);
+    _pp3.matBola.color.set(_ppCorBola); _pp3.matBola.emissive.set(_ppCorBola);
+    for (var i = 0; i < _pp3.rastro.length; i++) _pp3.rastro[i].material.color.set(_ppCorBola);
+  }
+
+  // Câmera atrás da minha raquete. A distância se ajusta à proporção da
+  // tela pra mesa caber na largura (celular em pé = mais longe).
+  function _pp3Dimensionar() {
+    if (!_pp3) return;
+    var w = _ppW || 320, h = _ppH || 480, a = w / h;
+    _pp3.renderer.setSize(w, h, false);
+    var vfov = 56;
+    var D = _ppClamp(0.74 / (Math.tan(vfov * Math.PI / 360) * a), 1.5, 3.0);
+    _pp3.camD = D;
+    var cams = [_pp3.cam, _pp3.camBase];
+    for (var i = 0; i < 2; i++) { cams[i].fov = vfov; cams[i].aspect = a; cams[i].updateProjectionMatrix(); }
+    _pp3.camBase.position.set(0, PP3_TOPO + 0.82 + 0.32 * D, PP3_MC + PP3_Z_RAQ + D);
+    _pp3.alvo.set(0, PP3_TOPO + 0.12, -1.3);
+    _pp3.camBase.lookAt(_pp3.alvo);
+    _pp3.camBase.updateMatrixWorld();
+  }
+
+  // Dedo na tela → x/h da minha raquete (raio da câmera parada até o plano
+  // da raquete). null se o 3D não estiver ativo.
+  function _pp3PosicaoDoEvento(clientX, clientY) {
+    if (!_pp3) return null;
+    var r = _ppCanvas.getBoundingClientRect();
+    var nx = ((clientX - r.left) / (r.width || 1)) * 2 - 1;
+    var ny = -(((clientY - r.top) / (r.height || 1)) * 2 - 1);
+    var cam = _pp3.camBase, o = cam.position;
+    var p = _pp3.v1.set(nx, ny, 0.5).unproject(cam).sub(o);
+    var zPlano = PP3_MC + PP3_Z_RAQ;
+    var t = (zPlano - o.z) / (Math.abs(p.z) > 1e-6 ? p.z : -1e-6);
+    var X = o.x + p.x * t, Y = o.y + p.y * t;
+    return {
+      x: _ppClamp(X / PP3_ML, -1, 1),
+      h: _ppClamp((Y - PP3_TOPO - PP3_BOLA_R) / PP3_HK, 0, PP_RAQUETE_ALTURA_MAX)
+    };
+  }
+
+  function _pp3Evento(tipo, x, renderD, forca) {
+    var S = _pp3;
+    if (tipo === 'quique') {
+      for (var i = 0; i < S.aneis.length; i++) {
+        var an = S.aneis[i];
+        if (an.userData.t < 1) continue;
+        _pp3Pos(an.position, x, renderD, 0);
+        an.position.y = PP3_TOPO + 0.004;
+        an.userData.t = 0; an.visible = true;
+        break;
+      }
+    } else if (tipo === 'rebatidaMinha' || tipo === 'rebatidaDele' || tipo === 'saque') {
+      var meu = renderD < 0.5;
+      if (meu) { S.swingMeu = 1; S.tremor = Math.max(S.tremor, 0.25 + 0.4 * (forca || 0)); }
+      else S.swingDele = 1;
+      for (var j = 0; j < S.claroes.length; j++) {
+        var sp = S.claroes[j];
+        if (sp.userData.t < 1) continue;
+        _pp3Pos(sp.position, x, renderD, _ppBola.h);
+        sp.userData.t = 0; sp.visible = true;
+        break;
+      }
+    } else if (tipo === 'pontoDele') {
+      S.tremor = Math.max(S.tremor, 0.5);
+    }
+  }
+
+  function _pp3Desenhar(jogando, renderDBola) {
+    var S = _pp3, T = S.T, agora = performance.now();
+    var dt = S.ts ? Math.min(0.05, (agora - S.ts) / 1000) : 0;
+    S.ts = agora;
+
+    // Minha raquete: segue o dedo; inclina com o arrasto e "bate" na rebatida
+    S.swingMeu = Math.max(0, S.swingMeu - dt * 4.5);
+    S.swingDele = Math.max(0, S.swingDele - dt * 4.5);
+    var m = S.minha;
+    _pp3Pos(m.position, _ppMinhaRaqueteX, 0, _ppMinhaRaqueteH);
+    var sw = Math.sin(S.swingMeu * Math.PI);
+    m.position.z += PP3_Z_RAQ - sw * 0.1;
+    m.rotation.set(-0.22 - sw * 0.7, 0, _ppClamp(-_ppMinhaRaqueteVX * 0.05, -0.45, 0.45));
+
+    // Coruja (com o sheet carregado) ou a raquete solta do adversário
+    var reg = _ppAsset('coruja-pp-sheet.webp');
+    var comCoruja = !!(reg && reg.ok && reg.img && reg.w);
+    var d = S.dele;
+    _pp3Pos(d.position, _ppRaqueteAdversarioX, 1, _ppRaqueteAdversarioH);
+    if (comCoruja) {
+      d.visible = false;
+      var e = _ppCorujaAtualizar(jogando, renderDBola, d.position.x + S.corCW * PP_COR_PADX, 130);
+      if (e.q !== S.corQ) {
+        var g = S.corCanvas.getContext('2d');
+        g.clearRect(0, 0, PP_COR_QW, PP_COR_QH);
+        g.drawImage(reg.img, (e.q % PP_COR_COLS) * PP_COR_QW, Math.floor(e.q / PP_COR_COLS) * PP_COR_QH,
+          PP_COR_QW, PP_COR_QH, 0, 0, PP_COR_QW, PP_COR_QH);
+        S.texCor.needsUpdate = true;
+        S.corQ = e.q;
+      }
+      // Pés no chão; a coruja só pula quando a raquete sobe além do alcance do braço
+      var peAlvo = Math.max(0, d.position.y - PP3_COR_RAQ * PP3_COR_H);
+      if (S.corY === null) S.corY = peAlvo;
+      S.corY += (peAlvo - S.corY) * Math.min(1, dt * 10);
+      var c = S.coruja;
+      c.visible = true;
+      c.position.set(_ppCoruja.x, S.corY + e.lift * PP3_COR_H, PP3_COR_Z);
+      c.scale.set(e.sx, e.sy, 1);
+      c.rotation.z = -e.rot;
+      var so = S.sombraCor;
+      so.visible = true;
+      so.position.set(_ppCoruja.x, 0.003, PP3_COR_Z + 0.05);
+      var alto = c.position.y;
+      so.scale.setScalar(1 / (1 + alto * 1.2));
+      so.material.opacity = 1 / (1 + alto * 2);
+    } else {
+      d.visible = true;
+      S.coruja.visible = false; S.sombraCor.visible = false;
+      var swd = Math.sin(S.swingDele * Math.PI);
+      d.position.z -= PP3_Z_RAQ - swd * 0.1;
+      d.rotation.set(0.22 + swd * 0.7, 0, _ppClamp(_ppRaqueteAdversarioVX * 0.05, -0.45, 0.45));
+    }
+
+    // Bola (some enquanto a coruja segura pra sacar) + rastro
+    var bolaNaAsa = comCoruja && _ppCoruja.segurandoBola;
+    var mostrar = jogando && !bolaNaAsa;
+    S.bola.visible = mostrar;
+    if (mostrar) _pp3Pos(S.bola.position, _ppBola.x, renderDBola, _ppBola.h);
+    var hist = S.rastroPos;
+    if (mostrar && !_ppAguardandoSaque) {
+      hist.unshift(S.bola.position.clone());
+      if (hist.length > S.rastro.length + 1) hist.length = S.rastro.length + 1;
+    } else hist.length = 0;
+    for (var i = 0; i < S.rastro.length; i++) {
+      var mr = S.rastro[i], hp = hist[i + 1];
+      mr.visible = !!hp;
+      if (!hp) continue;
+      mr.position.copy(hp);
+      var k = 1 - (i + 1) / (S.rastro.length + 1);
+      mr.scale.setScalar(0.4 + 0.6 * k);
+      mr.material.opacity = 0.3 * k;
+    }
+
+    // Efeitos
+    for (var a = 0; a < S.aneis.length; a++) {
+      var an = S.aneis[a];
+      if (an.userData.t >= 1) { an.visible = false; continue; }
+      an.userData.t = Math.min(1, an.userData.t + dt / 0.35);
+      an.scale.setScalar(0.06 + an.userData.t * 0.22);
+      an.material.opacity = 0.75 * (1 - an.userData.t);
+    }
+    for (var b = 0; b < S.claroes.length; b++) {
+      var sp = S.claroes[b];
+      if (sp.userData.t >= 1) { sp.visible = false; continue; }
+      sp.userData.t = Math.min(1, sp.userData.t + dt / 0.18);
+      sp.scale.setScalar(0.12 + sp.userData.t * 0.3);
+      sp.material.opacity = 0.9 * (1 - sp.userData.t);
+    }
+
+    // Câmera: acompanha um pouco a minha raquete e treme na batida
+    S.sway += (_ppMinhaRaqueteX * 0.14 - S.sway) * Math.min(1, dt * 4);
+    S.tremor = Math.max(0, S.tremor - dt * 2.2);
+    var tr = S.tremor * S.tremor * 0.03;
+    S.cam.position.copy(S.camBase.position);
+    S.cam.position.x += S.sway + (Math.random() - 0.5) * tr;
+    S.cam.position.y += (Math.random() - 0.5) * tr;
+    S.v2.copy(S.alvo);
+    S.v2.x += S.sway * 0.4;
+    S.cam.lookAt(S.v2);
+
+    S.renderer.render(S.cena, S.cam);
   }
 })();

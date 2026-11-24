@@ -1,0 +1,10 @@
+/* Caça Folclore — estilos (prefixo .cf-*). O jogo é deitado; em celular em pé
+   o iframe é girado 90° para ocupar a tela inteira. */
+#cacafolclore-root{position:relative;flex:1 1 auto;min-height:60vh;width:100%;overflow:hidden;background:#0b0f0a;touch-action:none;}
+body.games-fs-open #cacafolclore-root{min-height:0;}
+body.games-fs-open #games-hub.jogo-ativo #jogo-cacafolclore{position:relative;}
+body.games-fs-open #games-hub.jogo-ativo #jogo-cacafolclore .jogo-voltar{position:absolute;top:calc(env(safe-area-inset-top,0px) + 8px);left:8px;z-index:6;margin:0;padding:8px 12px;background:rgba(10,14,10,.78);border-radius:999px;font-size:13px;}
+.cf-quadro{position:absolute;left:0;top:0;width:100%;height:100%;border:0;display:block;background:#0b0f0a;}
+@media (orientation:portrait){
+  .cf-quadro{left:50%;top:50%;width:100vh;height:100vw;width:100dvh;height:100dvw;transform:translate(-50%,-50%) rotate(90deg);transform-origin:center center;}
+}

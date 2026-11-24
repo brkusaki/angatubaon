@@ -1008,7 +1008,7 @@
     tanques: 'Batalha de Tanques', hoquei: 'Hóquei da Coruja', party: 'Coruja Party',
     negocios: 'Negócios da Cidade', baralho: 'Baralho', corujinha: 'Corujinha',
     ritmo: 'Ritmo da Coruja', hexarena: 'Hex Arena', sinalbranco: 'Sinal Branco',
-    naopare: 'Não Pare'
+    naopare: 'Não Pare', cacafolclore: 'Caça Folclore'
   };
   var JOGO_ICOS = { pingpong: '🏓', tanques: '💥', hoquei: '🏒', ritmo: '🎵', hexarena: '⬡' };
 
@@ -1047,6 +1047,7 @@
     if (window.ArmadilhaGame && typeof window.ArmadilhaGame.parar === 'function') window.ArmadilhaGame.parar();
     if (window.SinalBrancoGame && typeof window.SinalBrancoGame.parar === 'function') window.SinalBrancoGame.parar();
     if (window.NaoPareGame   && typeof window.NaoPareGame.parar   === 'function') window.NaoPareGame.parar();
+    if (window.CacaFolcloreGame && typeof window.CacaFolcloreGame.parar === 'function') window.CacaFolcloreGame.parar();
     if (window.CorujinhaGame && typeof window.CorujinhaGame.parar === 'function') window.CorujinhaGame.parar();
     // Negócios da Cidade: parar() só mata timers e fecha modal — a partida
     // em andamento sobrevive de propósito, pra quem sai pro menu por engano
@@ -1312,6 +1313,9 @@
     // O próprio naopare.js carrega /Jogos/vendor/three-naopare.min.js e
     // monta tudo em #naopare-root — ver doc claude/nao-pare-mecanicas.md.
     naopare: { js: '/Jogos/naopare.min.js', css: '/Jogos/naopare.css', global: 'NaoPareGame' },
+    // Caça Folclore: coleta de criaturas do folclore em pixel art (canvas), solo,
+    // celular deitado. Roda num iframe de /Jogos/caca-folclore/index.html.
+    cacafolclore: { js: '/Jogos/cacafolclore.min.js', css: '/Jogos/cacafolclore.css', global: 'CacaFolcloreGame' },
     // Negócios da Cidade: banco imobiliário de Angatuba, 2 a 8 pessoas no
     // MESMO aparelho (passa-o-celular). Não usa AngatubaMP (não é 1x1 em
     // rede) nem ranking: não existe pontuação individual, o placar é a
@@ -1461,6 +1465,9 @@
       '/Jogos/assets/sinalbranco/ret-mira-firme-v2.webp',
       '/Jogos/assets/sinalbranco/ret-pavel-paranoico-v2.webp',
       '/Jogos/assets/sinalbranco/ret-pavel-arrependido-v2.webp'
+    ],
+    cacafolclore: [
+      '/Jogos/cacafolclore.min.js', '/Jogos/cacafolclore.css', '/Jogos/caca-folclore/index.html'
     ],
     naopare: [
       '/Jogos/naopare.min.js', '/Jogos/naopare.css', '/Jogos/vendor/three-naopare.min.js?v=187b',
@@ -2208,7 +2215,8 @@
     blocos:          '#22d3ee',
     doces:           '#fb7185',
     '2048':          '#fb923c',
-    naopare:         '#f97316'
+    naopare:         '#f97316',
+    cacafolclore:    '#22c55e'
   };
 
   function cliRenderRecordes() {

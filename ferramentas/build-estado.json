@@ -1,5 +1,5 @@
 {
- "versaoSW": 611,
+ "versaoSW": 612,
  "hashes": {
   "Aprender/conteudo.js": "c2776ebcaf3844f9",
   "Aprender/hub.js": "0025f4b073788e9b",
@@ -16,6 +16,7 @@
   "Jogos/baralho.js": "3a537456e8b62c9e",
   "Jogos/blocos.css": "3b25f3f0a16e5362",
   "Jogos/blocos.js": "e3599d1975e98395",
+  "Jogos/caca-folclore/index.html": "c12867d982e39139",
   "Jogos/corrida.css": "2ca54eacf6e853e7",
   "Jogos/corrida.js": "144471077b6da745",
   "Jogos/corujinha.css": "910a442c95e78e6a",

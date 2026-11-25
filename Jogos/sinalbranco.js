@@ -162,7 +162,8 @@
     1: ['avisos', 'bilhete_pavel', 'diario_ingrid', 'audio_ingrid', 'graf', 'relatorio_mira', 'log_radio', 'sinal'],
     2: ['planta', 'emails', 'fita_kazuo', 'polaroid', 'mapa_mao', 'amostra', 'quadro_mira', 'terminal_antigo'],
     3: ['caderneta_radio', 'notas_traducao', 'nota_ondas', 'inscricao', 'relatorio_selo', 'ficha_teo', 'audio_ingrid_final', 'bilhete_pavel2'],
-    4: ['ata_conselho', 'ordem_envelope', 'manual_reator', 'desenho_mira']
+    4: ['ata_conselho', 'ordem_envelope', 'manual_reator', 'desenho_mira'],
+    5: ['audio_mae', 'log_operador', 'registro_acesso', 'carta_consorcio', 'foto_operador']
   };
   function docsAte(n) { var l = []; for (var i = 1; i <= n; i++) l = l.concat(DOCS_ATO[i] || []); return l; }
 
@@ -572,7 +573,11 @@
       voz: ['Téo. Ali, no parapeito. É o primeiro dos que desceram.', 'A equipe o prendeu lá embaixo e esqueceu. Solte-o. Ele só quer subir.'],
       contra: ['A foto da Ingrid: "13. Contei de novo." Desde o primeiro dia, quando eram doze.', 'A ficha: a amostra 13 é anterior ao Programa. Nunca foi da equipe.', '{tenso}Ninguém prendeu um pesquisador aqui embaixo. Isso nunca foi um deles.'],
       obedece: ['Encostei na pedra do parapeito. Estava quente.', 'A luz desceu pelo vão, devagar, como quem volta pra casa.'],
-      recusa: ['{tenso}Não.', 'A figura me olhou um pouco mais. Depois apagou.'] }
+      recusa: ['{tenso}Não.', 'A figura me olhou um pouco mais. Depois apagou.'] },
+    // Ato 5: aula de Cotejar (sem obedecer/recusar; só conferir)
+    5: { resumo: '"O posto foi fechado em março."', docs: ['log_operador', 'registro_acesso'], dicaProva: 'o diário do operador e o registro da porta.',
+      contra: ['O diário do Ivo: última anotação, três dias atrás. O registro da porta: uma entrada ontem à noite, sem saída.',
+        '{tenso}Fechado em março, e alguém mora aqui até ontem. A voz errou a data, ou mentiu. Cotejar: ler uma frase contra o que está escrito.'] }
   };
   function nObedecidos() { var n = 0; if (S) for (var i = 1; i <= 3; i++) if (S.flags['obedeceu' + i]) n++; return n; }
   function emoBase() { return S && nObedecidos() >= 2 ? 'obediente' : 'neutro'; }
@@ -642,7 +647,7 @@
         msg.classList.remove('sb-aviso');
       });
     });
-    el.caixa.querySelector('[data-p="voltar"]').addEventListener('click', function () { som.clique(); fecharModal(); pedidoQuadro(n, depois, false); });
+    el.caixa.querySelector('[data-p="voltar"]').addEventListener('click', function () { som.clique(); fecharModal(); if (n !== 5) pedidoQuadro(n, depois, false); });
     bAp.addEventListener('click', function () {
       if (sel.length !== qtd) return;
       var certo = P.docs.every(function (d) { return sel.indexOf(d) >= 0; });
@@ -656,7 +661,7 @@
       vibrar([40, 40, 40]);
       var contra = P.contra.slice();
       if (n === 3 && S.docs.indexOf('bilhete_pavel2') >= 0) contra.splice(contra.length - 1, 0, 'O bilhete do Pavel: ele era a segurança, tinha a lista de todos. "Ninguém foi preso lá embaixo."');
-      fala(contra, function () { pedidoQuadro(n, depois, true); });
+      fala(contra, function () { if (n === 5) { if (depois) depois(); } else pedidoQuadro(n, depois, true); });
     });
   }
 
@@ -1190,7 +1195,8 @@
       '<div class="sb-tit-sub2" style="max-width:46em;margin:.4em auto 0">' + esc(F.resumo) + '</div>' +
       '<div class="sb-tit-stats">Tempo total: ' + min + 'min ' + (seg < 10 ? '0' : '') + seg + 's · Finais encontrados: ' + n + '/4</div>' +
       '<div class="sb-tit-botoes">' +
-        '<button type="button" class="sb-btn" data-t="arquivo">Ver arquivos</button>' +
+        '<button type="button" class="sb-btn" data-t="t2">Temporada 2 · Ato 5</button>' +
+        '<button type="button" class="sb-btn sb-btn-sec" data-t="arquivo">Ver arquivos</button>' +
         '<button type="button" class="sb-btn sb-btn-sec" data-t="atos">Escolher ato</button>' +
         '<button type="button" class="sb-btn sb-btn-sec" data-t="novo">Jogar de novo</button>' +
       '</div>';
@@ -1200,6 +1206,7 @@
       som.clique(); el.titulo.style.display = 'none';
       abrirArquivo(function () { el.titulo.style.display = ''; });
     });
+    el.titulo.querySelector('[data-t="t2"]').addEventListener('click', function () { som.clique(); iniciarAto5(); });
     el.titulo.querySelector('[data-t="atos"]').addEventListener('click', function () { som.clique(); telaAtos(); });
     el.titulo.querySelector('[data-t="novo"]').addEventListener('click', function () { som.clique(); S = novoEstado(); salvar(); comecar(); });
   }
@@ -1261,6 +1268,213 @@
   };
 
   /* ══════════════════════════════════════════════════════════════
+     ATO 5 — O RECEBIDO (Temporada 2)
+     5.1 crista · 5.2 posto · 5.3 equipamentos (sintonia) · 5.4 quarto
+     (aula de Cotejar) · 5.5 galeria (estrela + fragmento) · 5.6 câmara.
+     A abertura muda conforme o final da T1 (qualFinal / S.fim).
+     Roteiro: claude/sinal-branco-ato5-roteiro.md
+  ══════════════════════════════════════════════════════════════ */
+  ITENS.fragmento   = { nome: 'Fragmento de pedra', img: 'item-fragmento-v1.webp', desc: 'Pedra cinza e lisa com metade de uma estrela de sete pontas gravada. As linhas brilham fraco, em ocre.' };
+  ITENS.chave_posto = { nome: 'Chave do posto', img: 'item-chavereator-v1.webp', desc: 'Chave de aço com o selo do consórcio. Estava na caixa de ferramentas, do lado de fora do posto.' };
+
+  DOCS.audio_mae = { titulo: 'Mensagem de voz — Mãe', tipo: 'audio', texto:
+    'Téo, leva o casaco. E presta atenção no que você ouve aí... o que fala bonito nem sempre fala verdade.' };
+  DOCS.log_operador = { titulo: 'Diário do posto — Ivo Salles', tipo: 'mao', texto:
+    '04/03 — Carta do consórcio: posto encerrado, desligar tudo. Não desliguei. Alguém precisa continuar ouvindo.\n\n' +
+    '12/10 — O chiado das 03h12 chegou aqui também. Anotei a frequência: 7,7 MHz.\n\n' +
+    '15/10 — Uma palavra, sete vezes: "recebido". Depois, coordenadas. Estas.\n\n' +
+    '17/10 — Vou olhar a galeria atrás da sala. A parede de serviço abre quando o analisador casa com os 7,7. Se alguém vier: voltei já. — I.' };
+  DOCS.registro_acesso = { titulo: 'Registro de acesso — Posto', tipo: 'terminal', texto:
+    'POSTO CRISTA DO JURAMENTO — REGISTRO DE PORTA\n' +
+    '----------------------------------------\n' +
+    '04/03  09:10  PORTA PRINCIPAL ... FECHADA\n' +
+    '13/10  18:02  SALLES, I. ........ ENTRADA\n' +
+    '17/10  15:44  SALLES, I. ........ ENTRADA (GALERIA)\n' +
+    '19/10  21:40  SALLES, I. ........ ENTRADA\n' +
+    '19/10  21:41  PORTA PRINCIPAL ... ABERTA\n\n' +
+    '(nenhuma saída registrada depois de 19/10)\n\n' +
+    'STATUS DO POSTO: ENCERRADO' };
+  DOCS.carta_consorcio = { titulo: 'Memorando do Consórcio', tipo: 'papel', texto:
+    'CONSÓRCIO POLAR INTERNACIONAL — MEMORANDO 0412\nPara: I. Salles, operador\nAssunto: encerramento do posto\n\n' +
+    'O posto Crista do Juramento será encerrado em março. A partir daí o acesso é proibido e os equipamentos ficam desligados.\n\n' +
+    'Qualquer atividade registrada no local deve ser comunicada à Central.\n\n' +
+    '— na margem, à mão —\n"Eles mandam desligar. Eu não vou. Alguém tem que ouvir isso até o fim."' };
+  DOCS.foto_operador = { titulo: 'Foto — verso', tipo: 'mao', texto:
+    'Na frente: um homem sorrindo ao lado de um lago, o rosto pequeno demais pra ver.\n\n' +
+    'No verso, à mão:\n"Ivo, lago Verde, verão. Volta pra casa antes do inverno."\n\n' +
+    'Embaixo, com outra caneta, mais recente:\n"Já é inverno."' };
+
+  // Abertura da 5.1: uma linha por final da T1
+  function aberturaT1() {
+    var f = S.fim || qualFinal();
+    return {
+      revelacao: ['O desenho da Mira estava dobrado no meu bolso. Ela tinha circulado este ponto antes de tudo.'],
+      abrir: ['{fundido}Eu não olhei o mapa. Meus pés já sabiam o caminho.'],
+      transmitir: ['Mandei tudo pela antena. A resposta veio com este endereço. E, dois dias depois, dois carros do consórcio na minha rua.'],
+      soterrar: ['O rádio da base afundou comigo. Mesmo assim, no carro, o chiado voltou, na mesma frequência.']
+    }[f] || [];
+  }
+
+  CENAS.crista = {
+    nome: 'Crista do Juramento', img: 'ato5-crista-v1.webp', fb: 'heliponto-v1.webp', neve: true, fora: true,
+    chegada: ['O celular vibrou na descida. Uma palavra só: Recebido. Depois, coordenadas.'],
+    aoChegar: function () {
+      fala(aberturaT1().concat(['Uma crista de rocha cinza e neve rala. No alto, um mastro de antena e uma casinha de concreto.', 'Na minha frente, pedras empilhadas em círculo. Alguém mandou eu vir aqui.']));
+    },
+    pontos: [
+      { id: 'celular', x: 3, y: 74, w: 24, h: 22, acao: function () {
+        if (S.docs.indexOf('audio_mae') < 0) fala(['Duas coisas na tela: "Recebido", com as coordenadas, e uma mensagem de voz da minha mãe, de ontem.'], function () { doc('audio_mae'); });
+        else doc('audio_mae'); } },
+      { id: 'cairn', x: 47, y: 60, w: 16, h: 29, acao: function () {
+        if (!tem('fragmento')) pegar('fragmento', ['Entre as pedras empilhadas, uma peça diferente: lisa, cinza, com linhas finas que brilham em ocre.', 'Metade de uma estrela de sete pontas. Parece que foi cortada pra encaixar em alguma coisa.']);
+        else fala(['O cairn de novo. Sem a pedra lisa ele é só um monte de pedras.']); } },
+      { id: 'caminhonete', x: 82, y: 53, w: 18, h: 24, acao: function () {
+        fala(['A caminhonete que eu aluguei na estrada. A mala de ferramentas ficou no banco.', 'Aqui em cima não tem sinal pra consertar. Só pra receber.']); } },
+      { id: 'mastro', x: 63, y: 3, w: 10, h: 31, acao: function () {
+        fala(['Um mastro de antena com uma luz vermelha piscando, igual à da Halvorsen.', 'Vermelho é falha. Ou aviso.']); } },
+      { id: 'trilha', x: 64, y: 29, w: 22, h: 14, porta: true, acao: function () { ir('posto'); } }
+    ]
+  };
+
+  CENAS.posto = {
+    nome: 'Posto de escuta', img: 'ato5-posto-v1.webp', fb: 'ato5-crista-v1.webp', neve: true, fora: true,
+    chegada: ['A porta tem o selo do consórcio. Alguém acendeu uma luz aqui dentro, e não foi há muito tempo.'],
+    saidas: [{ lado: 'baixo', para: 'crista', rotulo: 'Crista' }],
+    pontos: [
+      { id: 'porta', x: 44, y: 45, w: 11, h: 36, porta: true, acao: function () {
+        if (S.flags.postoAberto) { ir('equipamentos'); return; }
+        if (!tem('chave_posto')) { fala(['A porta está só encostada, uma fresta de dois dedos, e a luz amarela escapa por ela.', 'Uma trava de aço segura por dentro e a fechadura pede chave.']); return; }
+        flag('postoAberto');
+        fala(['A chave girou sem esforço. A trava soltou com um estalo.'], function () { ir('equipamentos'); }); } },
+      { id: 'caixa', x: 57, y: 65, w: 14, h: 15, acao: function () {
+        if (!tem('chave_posto')) pegar('chave_posto', ['Uma caixa de ferramentas laranja, sem cadeado. Entre as chaves inglesas e a fita isolante, uma chave de aço com o selo do consórcio.']);
+        else fala(['Só ferramentas de manutenção. A tampa está úmida do gelo.']); } },
+      { id: 'antenas', x: 40, y: 9, w: 40, h: 33, acao: function () {
+        fala(['Um conjunto de antenas e parabólicas no teto. Todas apontadas pro mesmo lugar do céu.', 'Um cabo grosso desce do mastro até a casinha. Está morno.']); } },
+      { id: 'janela', x: 62, y: 48, w: 12, h: 16, acao: function () {
+        fala(['Um painel de vidro sujo de gelo. Esfreguei com a luva.', 'Lá dentro, luz e sombra de racks. Nenhum movimento.']); } }
+    ]
+  };
+
+  CENAS.equipamentos = {
+    nome: 'Sala de equipamentos', img: 'ato5-equipamentos-v1.webp', fb: 'ato5-posto-v1.webp',
+    chegada: ['Lá dentro o ar é quente demais pra um lugar fechado há meses.', 'Racks de receptores, um analisador de espectro com uma onda fraca e uma caneca em cima da mesa. Ainda está morna.'],
+    saidas: [
+      { lado: 'baixo', para: 'posto', rotulo: 'Posto' },
+      { lado: 'esq', para: 'quarto', rotulo: 'Quarto do operador' }
+    ],
+    pontos: [
+      { id: 'analisador', x: 28, y: 38, w: 24, h: 18, acao: function () {
+        if (S.flags.sintoniaOk) { fala(['O analisador mostra a estrela de sete pontas, parada. O sinal já foi travado.']); return; }
+        abrirFrequencia({ f0: 7.7, msg: '...recebido... recebido... entre... você veio...', fim: function () {
+          flag('sintoniaOk'); desenharCena(); clarao(); som.tocar('porta-pedra', 0.9);
+          fala(['No analisador, a onda se dobrou até virar uma estrela de sete pontas.', 'Atrás de mim, a parede de serviço deslizou com um estalo seco.']);
+        } }); } },
+      { id: 'mesa', x: 30, y: 55, w: 25, h: 22, acao: function () {
+        if (S.docs.indexOf('log_operador') < 0) fala(['Um caderno aberto, caneta ainda destampada. Letra pequena e apressada.'], function () { doc('log_operador'); });
+        else doc('log_operador'); } },
+      { id: 'monitor', x: 31, y: 24, w: 11, h: 15, acao: function () {
+        if (S.docs.indexOf('registro_acesso') < 0) fala(['Um monitor pequeno, preso ao receptor, ainda mostra uma tela de registro.'], function () { doc('registro_acesso'); });
+        else doc('registro_acesso'); } },
+      { id: 'racks', x: 10, y: 4, w: 13, h: 76, acao: function () {
+        fala(['Receptores ligados em silêncio, cada um preso numa frequência diferente.', 'Todos têm a mesma etiqueta do consórcio, e nenhum tem poeira.']); } },
+      { id: 'porta-servico', x: 59, y: 26, w: 12, h: 40, porta: true, acao: function () {
+        if (S.flags.sintoniaOk) { ir('galeria'); return; }
+        fala(['Uma porta de serviço sem maçaneta e sem fechadura. Só um painel apagado ao lado.', 'Deve responder ao analisador.']); } }
+    ]
+  };
+
+  CENAS.quarto = {
+    nome: 'Quarto do operador', img: 'ato5-quarto-v1.webp', fb: 'quarto-v1.webp',
+    chegada: ['Um quarto minúsculo, de quem mora no trabalho. Beliche desfeito, mochila aberta, uma lâmpada acesa.', 'Tudo aqui tem a marca de quem saiu há pouco.'],
+    saidas: [{ lado: 'baixo', para: 'equipamentos', rotulo: 'Equipamentos' }],
+    pontos: [
+      { id: 'foto', x: 45, y: 26, w: 11, h: 19, acao: function () {
+        if (S.docs.indexOf('foto_operador') < 0) fala(['Uma fotografia presa na parede: um homem sorrindo ao lado de um lago. Tirei a foto do alfinete. Tem algo escrito atrás.'], function () { doc('foto_operador'); });
+        else doc('foto_operador'); } },
+      { id: 'bilhete', x: 39, y: 61, w: 10, h: 9, acao: function () {
+        if (S.docs.indexOf('carta_consorcio') < 0) fala(['Um papel dobrado embaixo da caneca. Papel timbrado do consórcio.'], function () { doc('carta_consorcio'); });
+        else doc('carta_consorcio'); } },
+      { id: 'mochila', x: 27, y: 68, w: 15, h: 20, acao: function () {
+        fala(['Roupa de frio, um carregador, meias velhas. Nada que explique pra onde ele foi.', 'Um homem que sai de casa assim pensa em voltar.']); } },
+      { id: 'prateleira', x: 74, y: 34, w: 24, h: 40, acao: function () {
+        fala(['Um termo, três livros de bolso e uma lanterna sem pilha.', 'O termo ainda está quente.']); } },
+      { id: 'radio', x: 36, y: 52, w: 8, h: 10, acao: function () {
+        if (S.flags.checou5) { fala(['O rádio só chia agora. Ele não vai repetir a frase, e eu já sei o que contrapor a ela.']); return; }
+        var conferir = function () {
+          if (PEDIDOS[5].docs.every(function (d) { return S.docs.indexOf(d) >= 0; })) {
+            fala(['{tenso}"Ninguém entra aí há meses." Mas a luz estava acesa, a caneca estava morna e o termo está quente.',
+              'Eu devia cotejar essa frase com o que está escrito aqui no posto. No Arquivo deve ter o que ele contradiz.'], function () { apontarProva(5, null); });
+          } else fala(['{tenso}Isso não bate com a luz acesa lá fora. Mas eu ainda não tenho nada no Arquivo pra provar.']);
+        };
+        if (S.flags.semRadio) radio([], function () {
+          fala(['Na lateral do rádio, uma etiqueta do consórcio: "POSTO ENCERRADO EM MARÇO. ACESSO PROIBIDO."'], conferir);
+        });
+        else radio(['O posto foi fechado em março. Ninguém entra aí há meses.'], conferir); } }
+    ]
+  };
+
+  CENAS.galeria = {
+    nome: 'A galeria de pedra', img: 'ato5-galeria-v1.webp', fb: 'ato3-escadaria-v1.webp',
+    chegada: ['{tenso}São as mesmas linhas da Antártica. Só que aqui o desenho é mais velho.', 'Cabos pretos novos correm pelo chão, presos à pedra com braçadeiras de aço. Alguém trouxe energia pra cá.'],
+    saidas: [{ lado: 'baixo', para: 'equipamentos', rotulo: 'Equipamentos' }],
+    pontos: [
+      { id: 'nicho', x: 62, y: 20, w: 18, h: 42, acao: function () {
+        if (S.flags.galeriaAberta) { fala(['A estrela de sete pontas está inteira, acesa em ciano. A pedra do fundo já cedeu.']); return; }
+        if (!S.flags.fragEncaixado) {
+          if (!tem('fragmento')) { fala(['Um nicho em forma de estrela de sete pontas, com um brilho ciano fraco por dentro.', 'Está faltando uma peça.']); return; }
+          fala(['O nicho tem o formato de uma estrela, com um pedaço faltando.', 'O fragmento do cairn encaixa como se tivesse sido cortado daqui.'], function () {
+            tirar('fragmento'); flag('fragEncaixado'); som.tocar('peca', 0.9); vibrar([40, 30, 40]);
+            fala(['As pontas se acenderam uma a uma, mas desordenadas.', 'A estrela quer ser desenhada.'], abrirGaleriaEstrela);
+          });
+          return;
+        }
+        abrirGaleriaEstrela(); } },
+      { id: 'paredes', x: 8, y: 8, w: 14, h: 52, acao: function () {
+        fala(['As linhas gravadas se repetem. Começam em cima e pulam pontas, sempre o mesmo passo.', 'Uma estrela, de três em três.']); } },
+      { id: 'cabos', x: 18, y: 72, w: 40, h: 22, acao: function () {
+        fala(['Cabos de energia modernos, do consórcio. Eles ligaram o posto lá em cima a esta pedra.', 'Alguém escolheu ouvir aqui embaixo.']); } },
+      { id: 'laje', x: 30, y: 30, w: 13, h: 38, porta: true, acao: function () {
+        if (S.flags.galeriaAberta) { ir('camara'); return; }
+        fala(['Uma laje lisa, selada, no fundo da galeria. Sem fresta, sem maçaneta.']); } }
+    ]
+  };
+  function abrirGaleriaEstrela() {
+    abrirEstrela({ fim: function () {
+      flag('galeriaAberta'); desenharCena(); clarao(); som.tocar('porta-pedra', 0.95, function () { som.tocar('porta', 0.9); });
+      fala(['A estrela inteira acendeu em ciano.', 'No fundo da galeria, a laje deslizou devagar, soltando um ar frio e muito antigo.']);
+    } });
+  }
+
+  CENAS.camara = {
+    nome: 'Câmara das Memórias', img: 'ato5-camara-v1.webp', fb: 'ato3-nucleo-v1.webp',
+    chegada: ['A laje fechou atrás de mim sem barulho. O ar aqui é mais frio e mais velho.',
+      'Uma câmara redonda de pedra preta. No centro, uma plataforma baixa com um anel de luz. E três arcos, cada um com uma luz quente diferente contra o azul do chão.',
+      '{tenso}Três portas. Cada uma cheira a outro tempo.'],
+    aoChegar: function () { if ((S.fim || qualFinal()) === 'abrir') fala(['{fundido}Elas me chamam pelo nome.']); },
+    pontos: [
+      { id: 'arco1', x: 14, y: 20, w: 13, h: 42, porta: true, acao: function () { arcoMemoria(1, 'Luz dourada, de montanha ao amanhecer. Do outro lado, alguém escreve enquanto muita gente jura em voz baixa.', 'A Escriba'); } },
+      { id: 'arco2', x: 44, y: 24, w: 12, h: 36, porta: true, acao: function () { arcoMemoria(2, 'Âmbar, quente como uma lâmpada acesa a noite toda. Do outro lado, um zumbido que só uma pessoa consegue escutar.', 'O Ouvinte'); } },
+      { id: 'arco3', x: 72, y: 20, w: 13, h: 42, porta: true, acao: function () { arcoMemoria(3, 'Brasa e vento. Do outro lado, alguém carrega uma coisa pequena e pesada, e ninguém pode saber o que é.', 'A Guardiã'); } },
+      { id: 'plataforma', x: 36, y: 59, w: 28, h: 12, acao: function () {
+        fala(['Uma plataforma baixa com um anel de luz. Não tem nada sobre ela, mas o Arquivo pesa mais no meu bolso aqui.'], function () { abrirArquivo(); }); } },
+      { id: 'estrela', x: 35, y: 75, w: 30, h: 15, acao: function () {
+        fala(['A estrela de sete pontas, em pedra clara, incrustada no chão. Todo caminho daqui sai dela.']); } }
+    ]
+  };
+  // As memórias (Ato 6) ainda não estão no jogo: cada arco só mostra uma amostra.
+  // Quando os três tiverem sido examinados, o Ato 5 termina.
+  function arcoMemoria(n, texto, quem) {
+    flag('arco' + n);
+    fala([texto, 'Memória: ' + quem + '. A porta não abre ainda.'], function () {
+      if (S.flags.arco1 && S.flags.arco2 && S.flags.arco3 && !S.flags.ato5Fim) {
+        som.tocar('revelacao', 0.8);
+        fala(['Examinei as três. Nenhuma cedeu.', 'Mas todas sabem que eu estou aqui.'], function () { flag('ato5Fim'); telaFimAto(5); });
+      }
+    });
+  }
+
+  /* ══════════════════════════════════════════════════════════════
      ESTADO
   ══════════════════════════════════════════════════════════════ */
   var S = null;           // { cena, itens[], flags{}, docs[], vistos{}, chegou{}, tempo }
@@ -1277,7 +1491,8 @@
     1: ['voo', 'heliponto', 'entrada', 'refeitorio', 'corredor', 'quarto', 'lab', 'radio', 'gerador'],
     2: ['almoxarifado', 'elevador', 'servico', 'servidores', 'arquivo', 'biolab', 'portaAntiga', 'terminalAntigo'],
     3: ['escadaria', 'salao', 'monolitos', 'ressonancia', 'mirante', 'nucleo'],
-    4: ['transmissao', 'reatores', 'final']
+    4: ['transmissao', 'reatores', 'final'],
+    5: ['crista', 'posto', 'equipamentos', 'quarto', 'galeria', 'camara']
   };
   var ATO_FLAGS = {
     1: ['energia', 'radioOk', 'atoFim', 'chavesPegas', 'fusivelPego', 'dia14', 'f3', 'simbolo'],
@@ -1285,7 +1500,8 @@
     3: ['obedeceu1', 'obedeceu2', 'obedeceu3', 'checou1', 'checou2', 'checou3', 'recusou1', 'recusou2', 'recusou3', 'semRadio',
       'p1ok', 'p2ok', 'p3ok', 'inscricaoOk', 'decoderLigado', 'decodificado', 'seloSolto', 'erros3', 'rodada3', 'ondasOk', 'figura', 'nucleoOk', 'ato3Fim',
       'cadernetaPega', 'notasPegas', 'cartaoMemPego', 'pastaPega', 'gravadorPego', 'oculosPego', 'bilhete2Pego'],
-    4: ['crachaCPego', 'cofreAberto', 'manualLido', 'ato4Fim']
+    4: ['crachaCPego', 'cofreAberto', 'manualLido', 'ato4Fim'],
+    5: ['postoAberto', 'sintoniaOk', 'checou5', 'fragEncaixado', 'galeriaAberta', 'arco1', 'arco2', 'arco3', 'ato5Fim']
   };
   function progLer() {
     var p = 1;
@@ -1296,7 +1512,7 @@
     var p = Math.max(progLer(), progCache || 1);
     try {
       var sv = JSON.parse(localStorage.getItem(SAVE) || 'null');
-      if (sv) p = Math.max(p, sv.ato || 1, sv.flags && sv.flags.atoFim ? 2 : 1, sv.flags && sv.flags.ato2Fim ? 3 : 1, sv.flags && sv.flags.ato3Fim ? 4 : 1);
+      if (sv) p = Math.max(p, sv.ato || 1, sv.flags && sv.flags.atoFim ? 2 : 1, sv.flags && sv.flags.ato2Fim ? 3 : 1, sv.flags && sv.flags.ato3Fim ? 4 : 1, sv.flags && sv.flags.ato4Fim ? 5 : 1);
     } catch (e) {}
     return Math.min(p, ULTIMO_ATO);
   }
@@ -1609,7 +1825,8 @@
     'Téo. Antes de descer: não avise a central.': 'coro_pedido1a',
     'Téo. Aquela faixa dourada é uma trava velha. Solte o selo.': 'coro_pedido2a',
     'Sem ela, a estrutura inteira responde. Você termina o trabalho em minutos.': 'coro_pedido2b',
-    'Téo. Ali, no parapeito. É o primeiro dos que desceram.': 'coro_pedido3a'
+    'Téo. Ali, no parapeito. É o primeiro dos que desceram.': 'coro_pedido3a',
+    'O posto foi fechado em março. Ninguém entra aí há meses.': 'central_posto'
   };
   function estrela7() {
     var p = [], i, a;
@@ -1895,8 +2112,8 @@
       return Math.random() < q ? ch : lixo[Math.floor(Math.random() * lixo.length)];
     }).join('');
   }
-  function abrirFrequencia() {
-    var F0 = 6.3, P0 = 2.2, G0 = 0.6;
+  function abrirFrequencia(cfg) {   // cfg (Ato 5): { f0, msg, fim }
+    var F0 = (cfg && cfg.f0) || 6.3, P0 = 2.2, G0 = 0.6, MSG = (cfg && cfg.msg) || MSG_RADIO;
     var cur = { f: 2.4 + Math.random() * 1.2, p: 0.3 + Math.random(), g: 0.25 };
     var trava = 0, t = 0, feito = false, msgT = 0;
     var html = '<button type="button" class="sb-x sb-x2" aria-label="Desligar o rádio">✕</button>' +
@@ -1983,15 +2200,16 @@
         barra.classList.toggle('sb-quase', c >= 0.88);
         pct.textContent = c >= 0.88 ? 'Travando o sinal... ' + Math.round(trava * 100) + '%' : 'Sinal ' + Math.round(c * 100) + '%';
         msgT -= dt;
-        if (msgT <= 0) { msgT = 0.12; msgEl.textContent = trava > 0.02 ? embaralhar(MSG_RADIO, 0.15 + trava * 0.85) : ' '; }
+        if (msgT <= 0) { msgT = 0.12; msgEl.textContent = trava > 0.02 ? embaralhar(MSG, 0.15 + trava * 0.85) : ' '; }
         if (trava >= 1) {
           feito = true;
           som.estatica(0);
           som.tocar('sinal-ok', 0.8, som.energia);
-          msgEl.textContent = MSG_RADIO;
+          msgEl.textContent = MSG;
           pct.textContent = 'Sinal travado — decodificando...';
           setTimeout(function () {
             fecharModal();
+            if (cfg && cfg.fim) { cfg.fim(); return; }
             flag('radioOk');
             doc('sinal', fimDoAto);
           }, 1600);
@@ -2215,7 +2433,7 @@
   /* ── A estrela (porta de pedra): desenhar a heptagrama {7/3} ─────
      Sete pontas num círculo; começa na de cima e pula de 3 em 3 (para
      qualquer lado, mas sempre o mesmo). Erro: apaga tudo. */
-  function abrirEstrela() {
+  function abrirEstrela(cfg) {   // cfg (Ato 5): { fim }
     var seq = [], passo = 0;
     var pts = [];
     for (var i = 0; i < 7; i++) {
@@ -2262,7 +2480,9 @@
           desenhar('sb-ok'); som.tocar('revelacao', 0.6);
           msg.textContent = 'A estrela inteira acendeu.';
           setTimeout(function () {
-            fecharModal(); flag('portaAberta'); desenharCena(); som.tocar('porta-pedra', 0.95, function () { som.tocar('porta', 0.9); });
+            fecharModal();
+            if (cfg && cfg.fim) { cfg.fim(); return; }
+            flag('portaAberta'); desenharCena(); som.tocar('porta-pedra', 0.95, function () { som.tocar('porta', 0.9); });
             el.fade.classList.add('sb-flash'); setTimeout(function () { el.fade.classList.remove('sb-flash'); }, 700);
             fala(['A pedra rolou pro lado, pesada, e o chão tremeu sob os meus pés.', 'Lá dentro, uma luz azul. E calor.']);
           }, 1300);
@@ -2275,8 +2495,8 @@
   /* ══════════════════════════════════════════════════════════════
      TELAS: título e fim do ato
   ══════════════════════════════════════════════════════════════ */
-  var NOMES_ATO = { 1: 'Ato 1 — O Muro Branco', 2: 'Ato 2 — Subsolo Zero', 3: 'Ato 3 — O Cofre Pré-Diluviano', 4: 'Ato 4 — A Transmissão Final' };
-  var ULTIMO_ATO = 4;   // atos prontos
+  var NOMES_ATO = { 1: 'Ato 1 — O Muro Branco', 2: 'Ato 2 — Subsolo Zero', 3: 'Ato 3 — O Cofre Pré-Diluviano', 4: 'Ato 4 — A Transmissão Final', 5: 'Ato 5 — O Recebido' };
+  var ULTIMO_ATO = 5;   // atos prontos
   function telaTitulo() {
     var save = carregar(), temSave = !!save;
     progRegistrar();   // guarda o ato já alcançado antes de qualquer "refazer ato"
@@ -2323,6 +2543,7 @@
     if (n >= 2) { S.flags.energia = S.flags.radioOk = S.flags.atoFim = true; }
     if (n >= 3) S.flags.ato2Fim = true;
     if (n >= 4) S.flags.ato3Fim = true;
+    if (n >= 5) S.flags.ato4Fim = true;
     delete S.fim;   // o Ato 1 conta como cumprido
     S.ato = n;
     S.itens = n >= 2 ? ['lanterna'] : [];
@@ -2388,6 +2609,7 @@
     if (S.ato === 2 && S.flags.ato2Fim) { telaFimAto(2); return; }
     if (S.ato === 3 && S.flags.ato3Fim) { telaFimAto(3); return; }
     if (S.ato === 4 && S.fim && FINAIS[S.fim]) { telaFinal(S.fim); return; }
+    if (S.ato === 5 && S.flags.ato5Fim) { telaFimAto(5); return; }
     if (S.ato === 1 && !S.chegou.heliponto && !S.flags.intro) { S.cena = 'voo'; S.chegou.voo = false; }
     ir(S.cena);
   }
@@ -2403,7 +2625,13 @@
       radio(['Bem-vindo, Téo. Agora desça.'], function () { flag('ato2Fim'); telaFimAto(2); });
     });
   }
-  function iniciarAto(n) { if (n === 2) iniciarAto2(); else if (n === 3) iniciarAto3(); else if (n === 4) iniciarAto4(); }
+  function iniciarAto(n) { if (n === 2) iniciarAto2(); else if (n === 3) iniciarAto3(); else if (n === 4) iniciarAto4(); else if (n === 5) iniciarAto5(); }
+  function iniciarAto5() {
+    S.ato = 5; S.cena = 'crista'; S.itens = tem('lanterna') ? ['lanterna'] : []; S.flags.ato4Fim = true; salvar();   // S.fim (final da T1) fica: define a abertura
+    el.titulo.style.display = 'none';
+    partida(true); desenharInv(); atualizarBadge(false);
+    ir('crista');
+  }
   function iniciarAto4() {
     S.ato = 4; S.cena = 'transmissao'; S.itens = tem('lanterna') ? ['lanterna'] : []; S.flags.ato3Fim = true; delete S.fim; salvar();
     el.titulo.style.display = 'none';
@@ -2498,13 +2726,15 @@
       coro_pedido1a: 'voz-coro-pedido1a-v1', coro_pedido2a: 'voz-coro-pedido2a-v1', coro_pedido2b: 'voz-coro-pedido2b-v1', coro_pedido3a: 'voz-coro-pedido3a-v1',
       audio_ingrid_final: 'voz-audio_ingrid_final-v1', central_suba: 'voz-central-suba-v1', central_treze: 'voz-central-treze-v1',
       central_primeiro: 'voz-central-primeiro-v1', central_chegou: 'voz-central-chegou-v1',
-      coro_pedido1b: 'voz-coro-pedido1b-v1', coro_pedido3b: 'voz-coro-pedido3b-v1' };
+      coro_pedido1b: 'voz-coro-pedido1b-v1', coro_pedido3b: 'voz-coro-pedido3b-v1',
+      audio_mae: 'voz-audio_mae-v1', central_posto: 'voz-central-posto-v1' };
     var ARQ = ['passos-neve', 'passos-metal', 'porta', 'gerador-liga', 'sinal-ok', 'pegar', 'papel', 'gravador',
       'peca', 'lanterna', 'luzes', 'revelacao', 'elevador-freio', 'faisca', 'porta-pedra', 'cabra',
       VOZES.audio_ingrid, VOZES.sinal, VOZES.fita_kazuo,
       VOZES.central_abertura, VOZES.central_guia, VOZES.central_otimo, VOZES.central_quadro, VOZES.central_desca,
       VOZES.audio_ingrid_final, VOZES.central_suba, VOZES.central_treze, VOZES.central_primeiro, VOZES.central_chegou,
-      VOZES.coro_pedido1b, VOZES.coro_pedido3b, VOZES.coro_pedido2a, VOZES.coro_pedido2b, VOZES.coro_pedido3a, VOZES.coro_pedido1a];
+      VOZES.coro_pedido1b, VOZES.coro_pedido3b, VOZES.coro_pedido2a, VOZES.coro_pedido2b, VOZES.coro_pedido3a, VOZES.coro_pedido1a,
+      VOZES.audio_mae, VOZES.central_posto];
     var LOOPS = ['vento-loop', 'interior-loop', 'gerador-loop', 'estatica-loop', 'coro-loop', 'elevador-loop', 'rotor-loop'];
     var buf = {}, loopG = {}, loopOn = {}, vozSrc = null, vozVez = 0, ambAtual = { onde: '', cena: '' };
     function ligado() { var s = window.AngatubaSom; return !(s && typeof s.ativo === 'function' && !s.ativo()); }

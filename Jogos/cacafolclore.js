@@ -1,4 +1,4 @@
-/* Caça Folclore — módulo do hub.
+/* Guardiões do Folclore (antigo Caça Folclore) — módulo do hub.
    O jogo é um HTML único em /Jogos/caca-folclore/index.html (canvas, pixel art).
    Aqui só montamos um iframe dentro de #cacafolclore-root e o destruímos ao sair,
    para o loop do jogo parar de verdade. Contrato do hub: { preparar, parar }. */
@@ -17,7 +17,7 @@
       r.innerHTML = '';
       quadro = document.createElement('iframe');
       quadro.className = 'cf-quadro';
-      quadro.title = 'Caça Folclore';
+      quadro.title = 'Guardiões do Folclore';
       quadro.setAttribute('allow', 'fullscreen');
       quadro.src = URL_JOGO;
       r.appendChild(quadro);

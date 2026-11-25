@@ -1008,7 +1008,7 @@
     tanques: 'Batalha de Tanques', hoquei: 'Hóquei da Coruja', party: 'Coruja Party',
     negocios: 'Negócios da Cidade', baralho: 'Baralho', corujinha: 'Corujinha',
     ritmo: 'Ritmo da Coruja', hexarena: 'Hex Arena', sinalbranco: 'Sinal Branco',
-    naopare: 'Não Pare', cacafolclore: 'Caça Folclore'
+    naopare: 'Não Pare', cacafolclore: 'Guardiões do Folclore'
   };
   var JOGO_ICOS = { pingpong: '🏓', tanques: '💥', hoquei: '🏒', ritmo: '🎵', hexarena: '⬡' };
 

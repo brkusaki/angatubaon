@@ -144,11 +144,14 @@ const ZON={
  NW:{n:'Vale da Caipora',lv:[9,13],sp:['caipora','curupira','onca'],cor:'#6aa04a'},
  SE:{n:'Pantanal do Boitatá',lv:[9,13],sp:['boitata','capivara','onca'],cor:'#cf683a'},
  SW:{n:'Grota do Saci',lv:[8,12],sp:['curupira','caipora','lobisomem'],cor:'#7d6cb0'}};
-function zonaEm(tx,ty){const l=tx-OFF,r=OFF+GW-1-tx,t=ty-OFF,b=OFF+GW-1-ty;
- if(l>=0&&r>=0&&t>=0&&b>=0){if(URB[ty*MW+tx])return null;const E=34;if(Math.min(l,r,t,b)>=E)return null;return(t<E?'N':b<E?'S':'')+(r<E?'E':l<E?'W':'')}
- return(ty<OFF?'N':ty>=OFF+GW?'S':'')+(tx>=OFF+GW?'E':tx<OFF?'W':'')}
+const CC={x:112+OFF,y:108+OFF,rx:70,ry:60};
+function naCid(x,y){const u=(x-CC.x)/CC.rx,v=(y-CC.y)/CC.ry,a=Math.atan2(v,u);return Math.hypot(u,v)<1+.06*Math.sin(a*3+1)+.035*Math.sin(a*5+2)}
+const ZK=['E','SE','S','SW','W','NW','N','NE'],ZL={};
+ZK.forEach((k,i)=>{const a=i*Math.PI/4,vx=Math.cos(a)*CC.rx,vy=Math.sin(a)*CC.ry,l=Math.hypot(vx,vy),dx=vx/l,dy=vy/l;let t=1e9;if(dx>1e-6)t=Math.min(t,(MW-26-CC.x)/dx);if(dx<-1e-6)t=Math.min(t,(26-CC.x)/dx);if(dy>1e-6)t=Math.min(t,(MH-26-CC.y)/dy);if(dy<-1e-6)t=Math.min(t,(26-CC.y)/dy);ZL[k]=[CC.x+dx*t*.8,CC.y+dy*t*.8]});
+function zonaEm(tx,ty){if(naCid(tx,ty))return null;const u=(tx-CC.x)/CC.rx,v=(ty-CC.y)/CC.ry;return ZK[((Math.round(Math.atan2(v,u)/(Math.PI/4))%8)+8)%8]}
 (function gerar(){const g=rng(7),cl=new Uint8Array(MW*MH),rd=new Uint8Array(MW*MH);
  GRIDZ.split('|').forEach((r,y)=>{let x=0;const re=/([.rwbgfR])(\d*)/g;let m;while((m=re.exec(r))){const n=m[2]?+m[2]:1,k='.rRwg'.indexOf(m[1]);for(let i=0;i<n;i++)cl[(y+OFF)*MW+OFF+x++]=k<0?0:k}});
+ for(let y=0;y<MH;y++)for(let x=0;x<MW;x++)if(!naCid(x,y))cl[y*MW+x]=0;
  const at=(x,y)=>x<0||y<0||x>=MW||y>=MH?-1:y*MW+x;
  for(let y=0;y<MH;y++)for(let x=0;x<MW;x++)if(cl[y*MW+x]===3)for(const[dx,dy]of[[0,0],[1,0],[0,1]]){const j=at(x+dx,y+dy);if(j>=0)rd[j]=2}
  for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){const c=cl[y*MW+x];if(c===1||c===2)for(const[dx,dy]of c===2?[[0,0],[1,0],[0,1],[1,1],[-1,0],[0,-1],[-1,-1],[1,-1],[-1,1]]:[[0,0],[1,0],[0,1],[1,1]]){const j=at(x+dx,y+dy);if(j>=0)rd[j]=1}}
@@ -156,7 +159,7 @@ function zonaEm(tx,ty){const l=tx-OFF,r=OFF+GW-1-tx,t=ty-OFF,b=OFF+GW-1-ty;
  for(let i=0;i<MW*MH;i++)CLN[i]=(cl[i]===1||cl[i]===2)?1:0;
  // densidade de ruas = área urbana
  const W1=MW+1,S=new Int32Array(W1*(MH+1));for(let y=0;y<MH;y++)for(let x=0;x<MW;x++)S[(y+1)*W1+x+1]=S[y*W1+x+1]+S[(y+1)*W1+x]-S[y*W1+x]+(rd[y*MW+x]===1?1:0);
- for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){const r=7,x0=Math.max(0,x-r),x1=Math.min(MW,x+r+1),y0=Math.max(0,y-r),y1=Math.min(MH,y+r+1);URB[y*MW+x]=(S[y1*W1+x1]-S[y0*W1+x1]-S[y1*W1+x0]+S[y0*W1+x0])*225/((x1-x0)*(y1-y0))>=30?1:0}
+ for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){const r=7,x0=Math.max(0,x-r),x1=Math.min(MW,x+r+1),y0=Math.max(0,y-r),y1=Math.min(MH,y+r+1);URB[y*MW+x]=(S[y1*W1+x1]-S[y0*W1+x1]-S[y1*W1+x0]+S[y0*W1+x0])*225/((x1-x0)*(y1-y0))>=30&&naCid(x,y)?1:0}
  const pr=(x0,y0,x1,y1,t)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)map[y*MW+x]=t};
  // praça da Matriz
  pr(CX-5,CY-4,CX+5,CY+4,7);pr(CX-4,CY-9,CX+4,CY-5,7);
@@ -176,8 +179,8 @@ function zonaEm(tx,ty){const l=tx-OFF,r=OFF+GW-1-tx,t=ty-OFF,b=OFF+GW-1-ty;
   if(map[i]!==0&&map[i]!==5)continue;const h=hs(x,y)%1000/1000;
   if(URB[i]){if(h<.012&&!pertoRua(x,y))map[i]=3}else{const cl2=hs(x>>3,y>>3)%100<32?.22:0;if(h<.04+cl2&&!pertoRua(x,y))map[i]=3}}
  // ---- anel selvagem: zonas de caça fora da cidade ----
- {const IN=(x,y)=>x>=OFF&&y>=OFF&&x<OFF+GW&&y<OFF+GW;
-  const lagos=[];for(const[z,n]of[['W',6],['SE',4],['NW',2]])for(let k=0;k<n;k++)for(let t=0;t<60;t++){const x0=6+g()*(MW-12),y0=6+g()*(MH-12);if(IN(x0|0,y0|0)||zonaEm(x0|0,y0|0)!==z)continue;if(x0>OFF-9&&x0<OFF+GW+9&&y0>OFF-9&&y0<OFF+GW+9)continue;lagos.push({x:x0,y:y0,r:4+g()*5,k:g()*6});break}
+ {const IN=(x,y)=>naCid(x,y);
+  const lagos=[];for(const[z,n]of[['W',6],['SE',4],['NW',2]])for(let k=0;k<n;k++)for(let t=0;t<60;t++){const x0=6+g()*(MW-12),y0=6+g()*(MH-12);if(IN(x0|0,y0|0)||zonaEm(x0|0,y0|0)!==z)continue;if(naCid(CC.x+(x0-CC.x)*.85,CC.y+(y0-CC.y)*.85))continue;lagos.push({x:x0,y:y0,r:4+g()*5,k:g()*6});break}
   const lagoEm=(x,y)=>{for(const L of lagos){const dx=x-L.x,dy=(y-L.y)*1.25,a=Math.atan2(dy,dx),r=L.r*(1+.28*Math.sin(a*3+L.k)+.15*Math.sin(a*5+L.k*2));if(Math.hypot(dx,dy)<r)return true}return false};
   for(let y=4;y<MH-4;y++)for(let x=4;x<MW-4;x++){if(IN(x,y))continue;const i=y*MW+x,z=zonaEm(x,y);
    const u=hs(x*7+3,y*13+1)%1000/1000,c=hs(x>>3,y>>3)%100/100,c2=hs(x>>2,y>>2)%100/100,v=hs(x*11+9,y*5+2)%1000/1000;
@@ -193,13 +196,14 @@ function zonaEm(tx,ty){const l=tx-OFF,r=OFF+GW-1-tx,t=ty-OFF,b=OFF+GW-1-ty;
    if(lagoEm(x,y)){map[i]=4;continue}
    map[i]=te?2:(u<pa?5:0);if(v<tr)map[i]=3}
   // estradas de terra saindo das ruas da cidade até as zonas
-  const G0=OFF,G1=OFF+GW-1;
-  for(const L of['T','B','L','R']){const hz=L==='T'||L==='B',run=[];
-   for(let a=G0+8;a<=G1-8;a++){const x=hz?a:(L==='L'?G0+1:G1-1),y=hz?(L==='T'?G0+1:G1-1):a;run.push(rd[y*MW+x]===1)}
-   const gr=[];let st=-1;for(let k=0;k<=run.length;k++){if(k<run.length&&run[k]){if(st<0)st=k}else if(st>=0){gr.push({c:G0+8+((st+k-1)>>1),n:k-st});st=-1}}
-   gr.sort((a,b)=>b.n-a.n);const esc=[];for(const q of gr){if(esc.length>=3)break;if(esc.every(e=>Math.abs(e.c-q.c)>=24))esc.push(q)}
-   for(const q of esc){let p=q.c;for(let s=1;s<=OFF-5;s++){if(s%6===0)p+=[-1,0,1][g()*3|0];
-    for(let o=-1;o<=2;o++){const x=hz?p+o:(L==='L'?G0-s:G1+s),y=hz?(L==='T'?G0-s:G1+s):p+o;if(x<4||y<4||x>=MW-4||y>=MH-4)continue;const i=y*MW+x;if(o===-1||o===2){if(map[i]===3)map[i]=0}else map[i]=2}}}}
+  for(let k=0;k<8;k++){let hit=null,ddx=0,ddy=0;
+   for(const da of[0,.12,-.12,.24,-.24,.4,-.4]){const a=k*Math.PI/4+da,vx=Math.cos(a)*CC.rx,vy=Math.sin(a)*CC.ry,l=Math.hypot(vx,vy);ddx=vx/l;ddy=vy/l;
+    for(let t=88;t>30&&!hit;t-=.7){const x=Math.round(CC.x+ddx*t),y=Math.round(CC.y+ddy*t);if(x>4&&y>4&&x<MW-4&&y<MH-4&&rd[y*MW+x]===1)hit=[x,y]}
+    if(hit)break}
+   if(!hit)continue;let px=hit[0],py=hit[1],off=0;const nx=-ddy,ny=ddx;
+   for(let st=1;st<=220;st++){px+=ddx;py+=ddy;if(st%6===0)off+=[-1,0,1][g()*3|0]*.9;off=Math.max(-5,Math.min(5,off));
+    const x=Math.round(px+nx*off),y=Math.round(py+ny*off);if(x<5||y<5||x>=MW-6||y>=MH-6)break;
+    for(let oy=-1;oy<=2;oy++)for(let ox=-1;ox<=2;ox++){const i=(y+oy)*MW+x+ox,mid=ox>=0&&ox<=1&&oy>=0&&oy<=1;if(mid)map[i]=2;else if(map[i]===3)map[i]=0}}}
  }
  // ---- cidade: casas coladas, comércios perto da praça, só entra onde tem NPC/utilidade ----
  const PD={prefeitura:[5,196,2,'prefeitura'],posto:[4,150,1,'posto'],mercado:[4,150,2,'mercado'],padaria:[4,206,1,'padaria'],farmacia:[4,206,2,'farmacia'],bar:[4,150,1,'bar'],lanchonete:[4,150,2,'lanchonete'],acougue:[4,150,1,'acougue'],modas:[4,206,2,'modas'],pesqueiro:[4,150,1,'pesqueiro'],
@@ -551,21 +555,26 @@ function pedPerto(){if(M.cena||M.bat)return null;let m=null,md=T*1.9;for(const q
 function fecharPed(){if(pd.style.display==='none')return;clearInterval(pd._iv);pd.style.display='none';const q=pd._q;if(q){q.estado=null;q.pausa=12;q.conv=false;pd._q=null}}
 function bicho(q,so){let m=null,md=1e9;for(const e of M.selv){if(e.corpo||e.boss)continue;if(so&&!HOSTIL.has(e.esp))continue;const d=Math.hypot(e.x-q.x,e.y-q.y);if(d<md){md=d;m=e}}
  if(!m)return null;return ESP[m.esp].n+' (Nv '+m.lvl+') lá pro '+direcao(m.x-M.j.x,m.y-M.j.y)+', uns '+Math.round(md/T*6)+' metros daqui'}
-function dicaZona(){const ks=Object.keys(ZON),k=ks[R()*ks.length|0],Z=ZON[k],cx0=k.includes('W')?OFF/2:k.includes('E')?MW-OFF/2:MW/2,cy0=k.includes('N')?OFF/2:k.includes('S')?MH-OFF/2:MH/2;
+function dicaZona(){const ks=Object.keys(ZON),k=ks[R()*ks.length|0],Z=ZON[k],cx0=ZL[k][0],cy0=ZL[k][1];
  return 'Vá pro '+direcao((cx0-M.j.x/T),(cy0-M.j.y/T))+': '+Z.n+'. Lá vivem '+Z.sp.map(e=>ESP[e].n).join(', ')+' (Nv '+Z.lv[0]+' a '+Z.lv[1]+'). Leve cabaças e poção!'}
+const NPC_DIN=30,NPC_XP=40,NPC_MS=600000;
+function cotaNpc(){const w=M.npcW&&Date.now()-M.npcW.t<NPC_MS?M.npcW:(M.npcW={t:Date.now(),v:0,x:0});return{d:Math.max(0,NPC_DIN-w.v),x:Math.max(0,NPC_XP-w.x)}}
+function ganhoNpc(v){const k=cotaNpc(),ok=Math.min(v,k.d);M.npcW.v+=ok;M.din+=ok;return ok}
+function xpNpc(c,xp){const k=cotaNpc(),ok=Math.min(xp,k.x);if(ok<=0)return null;M.npcW.x+=ok;return{ok,up:ganhaXp(c,ok)}}
+function espera(pm,k,ms){const a=Date.now();if(a<(pm[k]||0))return Math.ceil((pm[k]-a)/60000)||1;pm[k]=a+ms;return 0}
 function opsPed(q){const P=q.pers,pm=M.pm[q.gi]||(M.pm[q.gi]={}),o=[],nm=q.nome;
  o.push(['💬 Conversar',()=>{const B=(P==='rancoroso'&&pm.amigo)?FALAS.rancoroso2:FALAS[P];pm.i=(pm.i==null?R()*9|0:pm.i)+1;return nm+': '+B[pm.i%B.length]}]);
- if(P==='bondoso')o.push(['🙏 Pedir uma ajuda',()=>{if(M.t<(pm.cd||0))return nm+': Já te ajudei, filho. Volta mais tarde que eu vejo o que sobra.';
-  if(q.gi===16){pm.cd=M.t+600;M.time.forEach(c=>c.hp=c.hpM);return nm+': Deixa eu ver esses bichinhos... pronto! Seu time está curado. 💚'}
-  pm.cd=M.t+3000;const r=R();if(r<.4){const v=5+(R()*11|0);M.din+=v;return nm+': Toma esse trocado, filho: R$ '+v+'. Compra uma cabaça!'}
+ if(P==='bondoso')o.push(['🙏 Pedir uma ajuda',()=>{if(Date.now()<(pm.cd||0))return nm+': Já te ajudei, filho. Volta mais tarde que eu vejo o que sobra.';
+  if(q.gi===16){pm.cd=Date.now()+60000;M.time.forEach(c=>c.hp=c.hpM);return nm+': Deixa eu ver esses bichinhos... pronto! Seu time está curado. 💚'}
+  pm.cd=Date.now()+300000;const r=R();if(r<.4&&cotaNpc().d>0){const v=ganhoNpc(Math.min(5+(R()*11|0),cotaNpc().d));return nm+': Toma esse trocado, filho: R$ '+v+'. Compra uma cabaça!'}
   if(r<.7){M.cab++;montaBag();return nm+': Achei essa cabaça velha no armário. Fica com você! 🎃'}M.poc++;montaBag();return nm+': Tenho uma poção de ervas aqui. Leva! 🧪'}]);
- if(P==='rancoroso'){if(!pm.amigo)o.push(['🧪 Dar uma poção de presente',()=>{if(M.poc<=0)return nm+': Presente?! Você nem tem o que dar. Hunf.';M.poc--;montaBag();pm.amigo=true;M.din+=10;return nm+': ...Uma poção? Pra mim?! Faz tempo que ninguém me dá nada. Toma R$ 10 de volta e... obrigado, rapaz. 😊'}]);
+ if(P==='rancoroso'){if(!pm.amigo)o.push(['🧪 Dar uma poção de presente',()=>{if(M.poc<=0)return nm+': Presente?! Você nem tem o que dar. Hunf.';M.poc--;montaBag();pm.amigo=true;const v=ganhoNpc(10);return nm+': ...Uma poção? Pra mim?! Faz tempo que ninguém me dá nada.'+(v?' Toma R$ '+v+' de volta e...':' E...')+' obrigado, rapaz. 😊'}]);
   o.push(['😈 Provocar',()=>{pm.irri=(pm.irri||0)+1;if(pm.irri>2){pm.irri=0;q.alvoP=M.j;q.modoP='seg';q.fimP=M.t+60;setTimeout(()=>{if(pd._q===q)fecharPed()},1500);fala(q,'Volta aqui, peste!',40);return nm+': CHEGA! Sai daqui antes que eu pegue a bengala!'}return nm+': Quer levar uma chinelada, é? Some daqui!'}])}
- if(P==='levada')o.push(['🎲 Brincar de pegadinha',()=>{if(M.din>=3&&R()<.65){M.din-=3;q.rouba=3;q.alvoP=M.j;q.modoP='fug';q.fimP=M.t+90;q.pausa=0;q.estado=null;setTimeout(fecharPed,1600);fala(q,'Hihi! Peguei seu trocado! Me pega!',40);return nm+': Hihi! Peguei seu dinheirinho! Me pega!'}return nm+': Hihi! Era pra eu te dar um susto, mas você nem se mexeu.'}],['😤 Dar bronca',()=>nm+': Aaah, que chato! Vou contar pra minha mãe!']);
- if(P==='brincalhona')o.push(['🧩 Adivinha!',()=>{const a=ADIV[R()*ADIV.length|0],ops=a.o.map((t,i)=>[t,i]).sort(()=>R()-.5);q.adiv={a,ops};return nm+': Adivinha só: '+a.q}]);
+ if(P==='levada')o.push(['🎲 Brincar de pegadinha',()=>{const w=espera(pm,'cdP',120000);if(w)return nm+': Já brincamos agora há pouco! Volta daqui a uns '+w+' min.';if(M.din>=3&&R()<.65){M.din-=3;q.rouba=3;q.alvoP=M.j;q.modoP='fug';q.fimP=M.t+90;q.pausa=0;q.estado=null;setTimeout(fecharPed,1600);fala(q,'Hihi! Peguei seu trocado! Me pega!',40);return nm+': Hihi! Peguei seu dinheirinho! Me pega!'}return nm+': Hihi! Era pra eu te dar um susto, mas você nem se mexeu.'}],['😤 Dar bronca',()=>nm+': Aaah, que chato! Vou contar pra minha mãe!']);
+ if(P==='brincalhona')o.push(['🧩 Adivinha!',()=>{const w=espera(pm,'cdA',180000);if(w)return nm+': Já te fiz uma adivinha faz pouco! Volta daqui a uns '+w+' min.';const a=ADIV[R()*ADIV.length|0],ops=a.o.map((t,i)=>[t,i]).sort(()=>R()-.5);q.adiv={a,ops};return nm+': Adivinha só: '+a.q}]);
  if(P==='fofoqueiro')o.push(['🤫 Ouvir fofoca',()=>{const b=bicho(q);return nm+': '+(b?'Psiu... vi um(a) '+b+'. Mas não fui eu que contei!':'Hoje tá tudo calmo, não vi bicho nenhum por perto... Que sem graça!')}]);
  if(P==='medroso')o.push(['😰 Perguntar o que viu',()=>{const b=bicho(q,1);return nm+': '+(b?'Cuidado! Vi um(a) '+b+'. Perigoso!':'Por sorte, nenhum bicho bravo por perto. Ufa!')}]);
- if(P==='valente')o.push(['🏋️ Treinar junto (R$ 10)',()=>{if(M.din<10)return nm+': Sem dinheiro, sem treino, parceiro!';M.din-=10;const up=ganhaXp(M.parc,12);return nm+': Bora! ...Bom treino! Seu '+ESP[M.parc.esp].n+' ganhou 12 de XP.'+up}],['🦾 Braço de ferro (R$ 5)',()=>{if(M.din<5)return nm+': Aposta é R$ 5, parceiro!';if(R()<.5){M.din+=5;return nm+': AI! Você ganhou! Toma os R$ 5 de volta... e mais R$ 5.'}M.din-=5;return nm+': Hahaha! Fraquinho! Fica com os R$ 5 de lembrança... meu.'}]);
+ if(P==='valente')o.push(['🏋️ Treinar junto (R$ 10)',()=>{if(M.din<10)return nm+': Sem dinheiro, sem treino, parceiro!';if(cotaNpc().x<=0)return nm+': Chega por hoje, parceiro! Seu bicho já treinou demais. Descansa um pouco.';const w=espera(pm,'cdT',90000);if(w)return nm+': Tô exausto! Volta daqui a uns '+w+' min.';M.din-=10;const r=xpNpc(M.parc,12);return nm+': Bora! ...Bom treino! Seu '+ESP[M.parc.esp].n+' ganhou '+r.ok+' de XP.'+r.up}],['🦾 Braço de ferro (R$ 5)',()=>{if(M.din<5)return nm+': Aposta é R$ 5, parceiro!';if(cotaNpc().d<=0)return nm+': Hoje eu já perdi grana demais pra você. Tô duro, parceiro!';const w=espera(pm,'cdB',60000);if(w)return nm+': Meu braço tá doendo! Volta daqui a uns '+w+' min.';if(R()<.5){ganhoNpc(5);return nm+': AI! Você ganhou! Toma os R$ 5 de volta... e mais R$ 5.'}M.din-=5;return nm+': Hahaha! Fraquinho! Fica com os R$ 5 de lembrança... meu.'}]);
  if(P==='sabio')o.push(['🗺️ Pedir dica de caça',()=>nm+': '+dicaZona()]);
  o.push(['👋 Tchau',null]);return o}
 function dlg(nome,sub,key,txt,ops,onRes){clearInterval(pd._iv);pd.style.display='flex';txt=txt.replace(/^[^:]{2,30}: /,'');
@@ -577,10 +586,10 @@ function dlg(nome,sub,key,txt,ops,onRes){clearInterval(pd._iv);pd.style.display=
   if(ops){mn.style.display='flex';ops.forEach(([t,f])=>{const b=document.createElement('button');b.textContent=t;b.onclick=e=>{e.stopPropagation();if(!f){fecharPed();return}const r=f();if(r==null||pd.style.display==='none')return;onRes(r)};mn.appendChild(b)})}else ar.style.display='block'};
  pd.querySelector('.pbox').onclick=()=>{if(!fim)acaba();else if(!ops)fecharPed()};
  pd._iv=setInterval(()=>{i+=2;el.textContent=txt.slice(0,i);if(i>=txt.length)acaba()},24)}
-function renderPed(q,txt){const P=PERS[q.pers],ops=q.adiv?q.adiv.ops.map(([t,i])=>[t,()=>{const a=q.adiv.a,ok=i===a.c;q.adiv=null;if(ok){M.din+=5;const up=ganhaXp(M.parc,8);montaBag();return q.nome+': Acertou! 🎉 Toma R$ 5 e um tiquinho de XP pro seu bicho.'+up}return q.nome+': Errou! Era '+a.o[a.c]+'. Hahaha!'}]):opsPed(q);
+function renderPed(q,txt){const P=PERS[q.pers],ops=q.adiv?q.adiv.ops.map(([t,i])=>[t,()=>{const a=q.adiv.a,ok=i===a.c;q.adiv=null;if(ok){const v=ganhoNpc(5),r=xpNpc(M.parc,8);montaBag();return q.nome+': Acertou! 🎉 '+(v||r?'Toma '+(v?'R$ '+v:'')+(v&&r?' e ':'')+(r?'um tiquinho de XP pro seu bicho.'+r.up:''):'Mas hoje já te dei prêmio demais, fica só com a glória!')}return q.nome+': Errou! Era '+a.o[a.c]+'. Hahaha!'}]):opsPed(q);
  dlg(q.nome,P.ic+' '+P.t+(M.pm[q.gi]&&M.pm[q.gi].amigo?' · amigo':''),'npc_g'+q.gi,txt,ops,r=>renderPed(q,r))}
 function abrirPed(q){if(M.bat||M.cena||!q)return;pd._q=q;q.estado='dialogo';q.conv=true;q.pausa=9999;q.mov=false;q.bolha=null;q.esq=M.j.x<q.x;
- if(q.rouba){M.din+=q.rouba+2;aviso(q.nome+': Ai, me pegou! Toma seu dinheiro de volta e R$ 2 de bônus!');q.rouba=0;q.fimP=0;renderPed(q,q.nome+': Ai, me pegou! Toma seu dinheiro de volta e mais R$ 2 de prêmio. Você é rápido!');return}
+ if(q.rouba){M.din+=q.rouba;const bo=ganhoNpc(2);q.rouba=0;q.fimP=0;renderPed(q,q.nome+': Ai, me pegou! Toma seu dinheiro de volta'+(bo?' e mais R$ '+bo+' de prêmio':'')+'. Você é rápido!');return}
  renderPed(q,q.nome+': '+SAUDA[q.pers][R()*SAUDA[q.pers].length|0]+' '+(R()<.5?'(Toque nas opções abaixo.)':''))}
 function encontro(A,B){const ks=[A.pers,B.pers].sort();let a=A,b=B;if(A.pers!==ks[0]){a=B;b=A}
  const pool=ENC[ks.join('|')]||ENC['*'],sc=pool[R()*pool.length|0],n=sc.l.length;a.conv=b.conv=true;a.esq=b.x<a.x;b.esq=a.x<b.x;
@@ -715,13 +724,13 @@ function setaJog(g,x,y,s){const dir=M.j.dir,a=dir==='cima'?-Math.PI/2:dir==='bai
 function estrela(g,x,y,r){g.beginPath();for(let k=0;k<10;k++){const a=-Math.PI/2+k*Math.PI/5,rr=k%2?r*.45:r;g.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}g.closePath();g.fillStyle='#ffe35a';g.fill();g.lineWidth=1.5;g.strokeStyle='#000';g.stroke()}
 function txtC(g,t,x,y,f,cor){g.font=f;g.textAlign='center';g.lineWidth=3;g.strokeStyle='#000';g.strokeText(t,x,y);g.fillStyle=cor||'#fff';g.fillText(t,x,y)}
 let mzTxt='';
-function desenhaMini(){const W=mini.width,H=mini.height;
+function desenhaMini(ag){const W=mini.width,H=mini.height;
  if(M.cena){mg.fillStyle='#6e4b2d';mg.fillRect(0,0,W,H);mg.fillStyle='#fff';mg.font='bold 11px system-ui';mg.textAlign='center';mg.fillText(M.cena.rot||'Interior',W/2,H/2+4);return}
- const S=3,B=baseMapa(),tx=M.j.x/T,ty=M.j.y/T,x0=tx-W/S/2,y0=ty-H/S/2,P=(X,Y)=>[(X-x0)*S,(Y-y0)*S];
+ const S=3,B=baseMapa(),jx=lerp(M.j.px==null?M.j.x:M.j.px,M.j.x,ag||0),jy=lerp(M.j.py==null?M.j.y:M.j.py,M.j.y,ag||0),tx=jx/T,ty=jy/T,x0=tx-W/S/2,y0=ty-H/S/2,P=(X,Y)=>[(X-x0)*S,(Y-y0)*S];
  mg.imageSmoothingEnabled=false;mg.fillStyle='#0d1610';mg.fillRect(0,0,W,H);mg.drawImage(B,Math.round(-x0*S),Math.round(-y0*S),MW*S,MH*S);
  for(const l of lugares()){const[x,y]=P(l.x,l.y);if(x<-4||y<-4||x>W+4||y>H+4)continue;mg.fillStyle=l.s==='igreja'?'#fff':'#ffd23a';mg.fillRect(x-2.5,y-2.5,5,5);mg.strokeStyle='#000';mg.lineWidth=1;mg.strokeRect(x-2.5,y-2.5,5,5)}
  for(const e of M.selv){if(e.corpo&&false)continue;const[x,y]=P(e.x/T,e.y/T);if(x<0||y<0||x>=W||y>=H)continue;mg.fillStyle=e.corpo?'#9a9a9a':e.boss?'#ff40ff':'#ff3b2a';mg.fillRect(x-1.5,y-1.5,4,4);mg.strokeStyle='#000';mg.lineWidth=.8;mg.strokeRect(x-1.5,y-1.5,4,4)}
- const o=objetivo();if(o.a){let[x,y]=P(o.a.x/T,o.a.y/T);const dist=Math.round(Math.hypot(o.a.x-M.j.x,o.a.y-M.j.y)/T*6),fora=x<8||y<8||x>W-8||y>H-14;
+ const o=objetivo();if(o.a){let[x,y]=P(o.a.x/T,o.a.y/T);const dist=Math.round(Math.hypot(o.a.x-jx,o.a.y-jy)/T*6/10)*10,fora=x<8||y<8||x>W-8||y>H-14;
   if(fora){const cxm=W/2,cym=H/2,dx=x-cxm,dy=y-cym,k=Math.min((W/2-9)/Math.abs(dx||1e-6),(H/2-15)/Math.abs(dy||1e-6));x=cxm+dx*k;y=cym+dy*k}
   estrela(mg,x,y,fora?5:6);if(fora)txtC(mg,dist+' m',x,y+(y<H/2?13:-8),'bold 9px system-ui','#ffe35a')}
  setaJog(mg,W/2,H/2,5.5);mg.fillStyle='#000a';mg.fillRect(0,H-13,W,13);const nm=nomeLocal(tx|0,ty|0);txtC(mg,nm,W/2,H-3,'bold 9px system-ui','#fff');
@@ -729,7 +738,7 @@ function desenhaMini(){const W=mini.width,H=mini.height;
  if(nm!==mzTxt){mzTxt=nm;const e=document.getElementById('mz');if(e)e.textContent=''}}
 function desenhaGrande(){const g=mgc,W=mapac.width,K=W/MW;g.imageSmoothingEnabled=false;g.clearRect(0,0,W,W);g.drawImage(baseMapa(),0,0,W,W);
  const P=(X,Y)=>[X*K,Y*K],F=(n,t)=>(t||'bold ')+n+'px system-ui';
- for(const k in ZON){const Z=ZON[k];const cx0=k.includes('W')?OFF/2:k.includes('E')?MW-OFF/2:MW/2,cy0=k.includes('N')?OFF/2:k.includes('S')?MH-OFF/2:MH/2;
+ for(const k in ZON){const Z=ZON[k];const cx0=ZL[k][0],cy0=ZL[k][1];
   const[x,y]=P(cx0,cy0);const ws=Z.n.split(' '),ln=[];let l='';for(const w of ws){if((l+' '+w).length>11&&l){ln.push(l);l=w}else l=l?l+' '+w:w}ln.push(l);
   ln.forEach((t,i)=>txtC(g,t,x,y-ln.length*8+i*17,F(16),'#fff'));txtC(g,'Nv '+Z.lv[0]+'–'+Z.lv[1],x,y+ln.length*9+8,F(15),'#ffe08a')}
  {const[x,y]=P(BX+.5,BY+.5);txtC(g,'👹',x,y+7,F(22));txtC(g,'Clareira da Mula',x,y-12,F(15),'#ff9ae8')}
@@ -816,10 +825,10 @@ function abrirBau(){if(!bauPerto())return;
  const m=criatura('mula',6,M.j.x+30,M.j.y+10);m.hp=m.hpM;M.time.push(m);M.bauLoot=true;M.time.forEach(c=>c.hp=c.hpM);
  aviso('Do baú saiu uma Mula sem Cabeça filhote! Ela entrou pro seu time e todos se recuperaram.',5200);montaHUD();salvar()}
 // ---------- salvar ----------
-function salvar(){try{localStorage.setItem('cf_proto2',JSON.stringify({time:M.time.map(c=>({esp:c.esp,lvl:c.lvl,hp:c.hp,xp:c.xp})),ativo:M.ativo,bau:M.bauAberto,bl:M.bauLoot,v:M.vitorias,c:M.capturas,q:M.q,q0:M.q0,vr:M.vara,din:M.din,cab:M.cab,poc:M.poc,x:(M.cena?M.fora:M.j).x,y:(M.cena?M.fora:M.j).y,o:1}))}catch(e){}}
+function salvar(){try{localStorage.setItem('cf_proto2',JSON.stringify({time:M.time.map(c=>({esp:c.esp,lvl:c.lvl,hp:c.hp,xp:c.xp})),ativo:M.ativo,bau:M.bauAberto,bl:M.bauLoot,v:M.vitorias,c:M.capturas,q:M.q,q0:M.q0,vr:M.vara,din:M.din,cab:M.cab,poc:M.poc,pm:M.pm,nw:M.npcW,x:(M.cena?M.fora:M.j).x,y:(M.cena?M.fora:M.j).y,o:1}))}catch(e){}}
 function carregarSave(){try{const s=JSON.parse(localStorage.getItem('cf_proto2'));if(!s||!s.time||!s.time.length)return false;
  if(!s.o){s.x+=OFF*T;s.y+=OFF*T}novoJogo(s.time[0].esp);M.time=s.time.map(o=>{const c=criatura(o.esp,o.lvl,s.x,s.y+20);c.hp=Math.min(c.hpM,o.hp);c.xp=o.xp||0;return c});M.ativo=Math.min(s.ativo||0,M.time.length-1);M.parc=M.time[M.ativo];
- M.bauAberto=!!s.bau;M.bauLoot=!!s.bl;M.vitorias=s.v||0;M.capturas=s.c||0;M.q=s.q||0;M.q0=s.q0||0;M.vara=!!s.vr;M.din=s.din==null?60:s.din;M.cab=s.cab==null?8:s.cab;M.poc=s.poc==null?2:s.poc;if(M.bauAberto){remover(M.boss)}if(livre(s.x,s.y)){M.j.x=M.j.px=s.x;M.j.y=M.j.py=s.y}montaHUD();return true}catch(e){return false}}
+ M.bauAberto=!!s.bau;M.bauLoot=!!s.bl;M.vitorias=s.v||0;M.capturas=s.c||0;M.q=s.q||0;M.q0=s.q0||0;M.vara=!!s.vr;M.din=s.din==null?60:s.din;M.cab=s.cab==null?8:s.cab;M.poc=s.poc==null?2:s.poc;if(s.pm)M.pm=s.pm;if(s.nw)M.npcW=s.nw;if(M.bauAberto){remover(M.boss)}if(livre(s.x,s.y)){M.j.x=M.j.px=s.x;M.j.y=M.j.py=s.y}montaHUD();return true}catch(e){return false}}
 // ---------- tela ----------
 const cv=document.getElementById('cv'),cx=cv.getContext('2d');let Z=2,ZB=2,VW=400,VH=600,DPR=1;
 function redim(){DPR=window.devicePixelRatio||1;const SW=Math.max(168,Math.min(230,Math.round(innerWidth*.24)));document.documentElement.style.setProperty('--sw',SW+'px');const w=innerWidth-SW,h=innerHeight;cv.width=Math.max(10,Math.round(w*DPR));cv.height=Math.max(10,Math.round(h*DPR));Z=ZB=Math.max(1,Math.floor(Math.min(cv.width/(13*T),cv.height/(8.5*T))*4)/4);VW=cv.width/Z;VH=cv.height/Z;cx.imageSmoothingEnabled=false}
@@ -872,7 +881,7 @@ function barra(x,y,e){const w=e.boss?60:40;cx.fillStyle='#000a';cx.fillRect(x-w/
  cx.font='bold 10px system-ui';cx.textAlign='center';cx.fillStyle='#fff';cx.fillText((e===M.parc?'':'')+ESP[e.esp].n.split(' ')[0]+' '+e.lvl,x,y-3)}
 function perto(){if(M.cena)return null;let m=null,md=T*3;for(const e of M.selv){if(e.corpo)continue;const d=Math.hypot(e.x-M.j.x,e.y-M.j.y);if(d<md){md=d;m=e}}return m}
 function loop(ag){const now=performance.now();acum+=Math.min(500,now-ultimo);ultimo=now;while(acum>=TICK){tick();acum-=TICK}
- desenhar(acum/TICK);atualizaBotoes();requestAnimationFrame(loop)}
+ desenhar(acum/TICK);if(M.j)desenhaMini(acum/TICK);atualizaBotoes();requestAnimationFrame(loop)}
 // ---------- UI ----------
 const msgEl=document.getElementById('msg');let msgT=0;
 const conEl=document.getElementById('con'),LOG=[];
@@ -888,8 +897,8 @@ function montaAcoes(){const a=document.getElementById('acts'),ex=document.getEle
 function atualizaBotoes(){if(M.bat){const bs=document.querySelectorAll('#acts button');M.parc.golpes.forEach((g,i)=>{const b=bs[i];if(!b)return;const f=M.parc.cds[i]/g.cd;b.lastChild.style.transform='scaleX('+f+')';b.disabled=M.parc.hp<=0})}
  else{const b=document.getElementById('blutar');if(b){const pp=!M.cena&&perto(),cp=!M.cena&&!pp&&corpoPerto(),bp=!M.cena&&!pp&&!cp&&bauPerto(),pe=!M.cena&&!pp&&!cp&&!bp&&pedPerto(),ag=!M.cena&&!pp&&!cp&&!bp&&!pe&&aguaTile();const tx=M.cena?'Falar':pp?'Atacar':cp?'🎃 Cabaça':bp?'Abrir':pe?'💬 Falar':ag?(M.pesca?'Pescando…':'Pescar'):'Atacar';if(b.textContent!==tx)b.textContent=tx;b.disabled=M.cena?!npcPerto():!(pp||cp||bp||pe||(ag&&!M.pesca))}}
  for(const c of M.time)if(c._hp){c._hp.style.width=(c.hp/c.hpM*100)+'%';c._xp.style.width=Math.min(100,c.xp/(c.lvl*20)*100)+'%';const t='Nv '+c.lvl;if(c._lv.textContent!==t)c._lv.textContent=t}
- if(M.t%5===0){atualizaQuest();atualizaBL();montaBag()}
- if(M.t%8===0){desenhaMini();if(mapaOn)desenhaGrande()}const de=document.getElementById('din');if(de&&de.textContent!==String(M.din))de.textContent=M.din;
+ atualizaQuest();if(M.t%5===0){atualizaBL();montaBag()}
+ if(M.t%8===0&&mapaOn)desenhaGrande();const de=document.getElementById('din');if(de&&de.textContent!==String(M.din))de.textContent=M.din;
  const pi=document.getElementById('pinfo');if(pi&&M.parc)pi.textContent=ESP[M.parc.esp].n+' Nv '+M.parc.lvl+' · '+M.parc.hp+'/'+M.parc.hpM+' · XP '+M.parc.xp+'/'+M.parc.lvl*20}
 // entrada: joystick + teclado + toque em criatura
 const joy=document.getElementById('joy'),ji=joy.firstChild;let jid=null,j0=null;

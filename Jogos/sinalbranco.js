@@ -558,17 +558,17 @@
 
   /* ── Pedidos do Coro ───────────────────────────────────────── */
   var PEDIDOS = {
-    1: { resumo: '"Não avise a central."', docs: ['caderneta_radio'],
+    1: { resumo: '"Não avise a central."', docs: ['caderneta_radio'], dicaProva: 'quem cuidava do rádio anotava tudo à mão.',
       voz: ['Téo. Antes de descer: não avise a central.', 'Eles não sabem que esta escada existe. Se souberem, cortam a energia da estação e eu perco você.'],
       contra: ['A caderneta do Kazuo: "14/10, 03h05 — Consórcio confirmou ciência da descida."', '{tenso}Eles sabiam. Eles autorizaram. A voz mentiu pra mim.'],
       obedece: ['Deixei o rádio calado. Se ele tem razão, é melhor assim.'],
       recusa: ['{tenso}Não. Quem manda aqui não é uma voz sem rosto.', 'Liguei o rádio pra avisar a central. Só estática. Alguma coisa cortou o sinal.'] },
-    2: { resumo: '"Solte o selo do monólito."', docs: ['relatorio_selo'],
+    2: { resumo: '"Solte o selo do monólito."', docs: ['relatorio_selo'], dicaProva: 'a Mira escreveu sobre o selo.',
       voz: ['Téo. Aquela faixa dourada é uma trava velha. Solte o selo.', 'Sem ela, a estrutura inteira responde. Você termina o trabalho em minutos.'],
       contra: ['O relatório da Mira: "A faixa não segura a porta. Segura o Coro. Se soltar, ele sai."', '{tenso}Não é uma trava velha. É a tranca.'],
       obedece: ['A faixa se soltou como se estivesse esperando.', 'A luz que saiu dela encheu a câmara toda.'],
       recusa: ['{tenso}Não vou encostar nisso.'] },
-    3: { resumo: '"Solte o primeiro dos que desceram."', docs: ['polaroid', 'ficha_teo'],
+    3: { resumo: '"Solte o primeiro dos que desceram."', docs: ['polaroid', 'ficha_teo'], dicaProva: 'uma foto da Ingrid e uma ficha com número.',
       voz: ['Téo. Ali, no parapeito. É o primeiro dos que desceram.', 'A equipe o prendeu lá embaixo e esqueceu. Solte-o. Ele só quer subir.'],
       contra: ['A foto da Ingrid: "13. Contei de novo." Desde o primeiro dia, quando eram doze.', 'A ficha: a amostra 13 é anterior ao Programa. Nunca foi da equipe.', '{tenso}Ninguém prendeu um pesquisador aqui embaixo. Isso nunca foi um deles.'],
       obedece: ['Encostei na pedra do parapeito. Estava quente.', 'A luz desceu pelo vão, devagar, como quem volta pra casa.'],
@@ -595,29 +595,104 @@
         '<button type="button" class="sb-btn sb-btn-sec" data-p="recusar">Recusar</button>' +
       '</div>', 'sb-puz sb-puz-pedido', false);
     el.caixa.querySelector('[data-p="obedecer"]').addEventListener('click', function () {
-      som.clique(); flag('obedeceu' + n); fecharModal(); fala(P.obedece, depois);
+      som.clique(); flag('obedeceu' + n); fecharModal(); pulsoInterf('doce'); vibrar(70); fala(P.obedece, depois);
     });
     var bc = el.caixa.querySelector('[data-p="conferir"]');
     if (bc) bc.addEventListener('click', function () {
       som.clique(); fecharModal();
       var ok = P.docs.every(function (d) { return S.docs.indexOf(d) >= 0; });
-      if (ok) {
-        flag('checou' + n);
-        var contra = P.contra.slice();
-        if (n === 3 && S.docs.indexOf('bilhete_pavel2') >= 0) contra.splice(contra.length - 1, 0, 'O bilhete do Pavel: ele era a segurança, tinha a lista de todos. "Ninguém foi preso lá embaixo."');
-        fala(contra, function () { pedidoQuadro(n, depois, true); });
-      }
+      if (ok) apontarProva(n, depois);
       else fala(['{tenso}Não tenho nada pra conferir isso. Ainda.'], function () { pedidoQuadro(n, depois, false); });
     });
     el.caixa.querySelector('[data-p="recusar"]').addEventListener('click', function () {
       som.clique(); flag('recusou' + n); flag('semRadio'); fecharModal();
+      pulsoInterf('furia'); vibrar([110, 50, 110, 50, 220]);
       som.estatica(0.7); setTimeout(function () { som.estatica(0); }, 600);
       fala(P.recusa, depois);
     });
   }
 
+  // Conferir = apontar no Arquivo o que prova a mentira (antes era automático)
+  function apontarProva(n, depois) {
+    var P = PEDIDOS[n], sel = [], erros = 0, qtd = P.docs.length;
+    var lista = S.docs.map(function (id) {
+      var ic = { papel: 'fa-file', mao: 'fa-pencil', terminal: 'fa-desktop', audio: 'fa-microphone' }[DOCS[id].tipo] || 'fa-file';
+      return '<button type="button" class="sb-arq-item" data-prova="' + id + '"><i class="fa ' + ic + '"></i> ' + esc(DOCS[id].titulo) + '</button>';
+    }).join('');
+    abrirModal(
+      '<div class="sb-doc-tit">O que contradiz a voz?</div>' +
+      '<div class="sb-arq-cont">' + esc(P.resumo) + '</div>' +
+      '<div class="sb-puz-dica">Escolha no Arquivo ' + (qtd > 1 ? 'os ' + qtd + ' que provam' : 'o que prova') + ' a mentira.</div>' +
+      '<div class="sb-ped-botoes sb-prova-botoes">' +
+        '<button type="button" class="sb-btn" data-p="apontar" disabled>Apontar</button>' +
+        '<button type="button" class="sb-btn sb-btn-sec" data-p="voltar">Voltar</button>' +
+      '</div>' +
+      '<div class="sb-arq-lista">' + lista + '</div>', 'sb-arq sb-puz-prova', false);
+    var msg = el.caixa.querySelector('.sb-puz-dica'), bAp = el.caixa.querySelector('[data-p="apontar"]');
+    Array.prototype.forEach.call(el.caixa.querySelectorAll('[data-prova]'), function (b) {
+      b.addEventListener('click', function () {
+        som.clique();
+        var id = b.getAttribute('data-prova'), i = sel.indexOf(id);
+        if (i >= 0) { sel.splice(i, 1); b.classList.remove('sb-sel'); }
+        else {
+          sel.push(id); b.classList.add('sb-sel');
+          if (sel.length > qtd) { var fora = sel.shift(); el.caixa.querySelector('[data-prova="' + fora + '"]').classList.remove('sb-sel'); }
+        }
+        bAp.disabled = sel.length !== qtd;
+        msg.classList.remove('sb-aviso');
+      });
+    });
+    el.caixa.querySelector('[data-p="voltar"]').addEventListener('click', function () { som.clique(); fecharModal(); pedidoQuadro(n, depois, false); });
+    bAp.addEventListener('click', function () {
+      if (sel.length !== qtd) return;
+      var certo = P.docs.every(function (d) { return sel.indexOf(d) >= 0; });
+      if (!certo) {
+        erros++; tremer(); som.tocar('porta', 0.3);
+        msg.textContent = erros >= 2 ? 'Ainda não. Procure: ' + P.dicaProva : 'Isso não contradiz a voz.';
+        msg.classList.add('sb-aviso');
+        return;
+      }
+      som.clique(); fecharModal(); flag('checou' + n);
+      vibrar([40, 40, 40]);
+      var contra = P.contra.slice();
+      if (n === 3 && S.docs.indexOf('bilhete_pavel2') >= 0) contra.splice(contra.length - 1, 0, 'O bilhete do Pavel: ele era a segurança, tinha a lista de todos. "Ninguém foi preso lá embaixo."');
+      fala(contra, function () { pedidoQuadro(n, depois, true); });
+    });
+  }
+
+  /* ── Vibração e interferência do Coro ──────────────────────────
+     vibrar(): só com som ligado no hub e sem "reduzir movimento".
+     O Coro fica mais instável com a profundidade (ato) e com as
+     escolhas: cada recusa o deixa pior, cada obediência o acalma. */
+  function vibrar(p) {
+    try {
+      if (!ativo || !navigator.vibrate) return;
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var sm = window.AngatubaSom;
+      if (sm && typeof sm.ativo === 'function' && !sm.ativo()) return;
+      navigator.vibrate(p);
+    } catch (e) {}
+  }
+  function coroNivel() {
+    var a = S ? (S.ato || 1) : 1, v = a >= 4 ? 0.8 : a === 3 ? 0.55 : a === 2 ? 0.35 : 0.2;
+    if (S) for (var i = 1; i <= 3; i++) { if (S.flags['recusou' + i]) v += 0.15; if (S.flags['obedeceu' + i]) v -= 0.1; }
+    return Math.max(0.12, Math.min(1, v));
+  }
+  function coroFala(on) {
+    if (!el.palco) return;
+    if (on) el.palco.style.setProperty('--sb-int', coroNivel().toFixed(2));
+    el.palco.classList.toggle('sb-coro-on', !!on);
+  }
+  function pulsoInterf(tipo) {
+    if (!el.palco) return;
+    var c = 'sb-' + tipo;
+    el.palco.classList.remove('sb-furia', 'sb-doce'); void el.palco.offsetWidth; el.palco.classList.add(c);
+    clearTimeout(pulsoInterf._t);
+    pulsoInterf._t = setTimeout(function () { el.palco.classList.remove(c); }, 1100);
+  }
+
   /* ── Auxiliares dos puzzles ─────────────────────────────────── */
-  function tremer() { el.caixa.classList.remove('sb-tremer'); void el.caixa.offsetWidth; el.caixa.classList.add('sb-tremer'); }
+  function tremer() { el.caixa.classList.remove('sb-tremer'); void el.caixa.offsetWidth; el.caixa.classList.add('sb-tremer'); vibrar([60, 40, 60]); }
   function htmlDica() { return S.flags.semRadio ? '' : '<button type="button" class="sb-btn sb-btn-sec" data-d="dica"><i class="fa fa-headphones"></i> Ouvir a central</button>'; }
   function ligarDica(texto) {
     var b = el.caixa.querySelector('[data-d="dica"]');
@@ -628,7 +703,7 @@
       m.classList.remove('sb-aviso'); m.textContent = 'VOZ: «' + texto() + '»';
     });
   }
-  function clarao() { el.fade.classList.add('sb-flash'); setTimeout(function () { el.fade.classList.remove('sb-flash'); }, 700); }
+  function clarao() { vibrar([40, 30, 140]); el.fade.classList.add('sb-flash'); setTimeout(function () { el.fade.classList.remove('sb-flash'); }, 700); }
 
   /* ── Puzzle 1: a inscrição (4 glifos → 4 palavras) ───────────── */
   function abrirInscricao() {
@@ -819,7 +894,7 @@
     if (S.flags.figura) return;
     flag('figura');
     if (S.cena !== 'mirante') return;
-    desenharCena(); clarao(); som.tocar('revelacao', 0.7);
+    desenharCena(); clarao(); som.tocar('revelacao', 0.7); vibrar([200, 80, 200]);
     fala(['{tenso}Na ponta do mirante, uma luz com forma de gente. Linda. Sem rosto fixo, como se mudasse conforme eu olho.'], function () {
       radio(['Aquele é o primeiro dos que desceram, Téo. Venha até o parapeito.']);
     });
@@ -1099,7 +1174,7 @@
   function comecarFinal() { S.fim = qualFinal(); salvar(); ir('final'); }
   function rodarFinal() {
     var F = FINAIS[S.fim], ok = function () { flag('ato4Fim'); telaFinal(S.fim); };
-    som.tocar('revelacao', 0.8);
+    som.tocar('revelacao', 0.8); vibrar([120, 60, 120, 60, 320]);
     fala(F.parte1, function () {
       if (F.doc) doc(F.doc, function () { fala(F.parte2, ok); });
       else fala(F.parte2, ok);
@@ -1261,7 +1336,7 @@
   function tirar(id) { var i = S.itens.indexOf(id); if (i >= 0) S.itens.splice(i, 1); desenharInv(); }
   function pegar(id, linhas, docId, aoDoc) {
     if (!tem(id)) S.itens.push(id);
-    som.pegar();
+    som.pegar(); vibrar(35);
     salvar();
     desenharCena(true);
     fala(linhas, function () {
@@ -1310,6 +1385,7 @@
       '<div class="sb-mundo"><img class="sb-bg" alt="" draggable="false"><video class="sb-vid" muted loop playsinline preload="auto" aria-hidden="true" style="display:none"></video><div class="sb-pontos"></div></div>' +
       '<canvas class="sb-fx" width="800" height="450"></canvas>' +
       '<div class="sb-saidas"></div>' +
+      '<div class="sb-interf"></div>' +
       '<div class="sb-hud">' +
         '<div class="sb-local"></div>' +
         '<div class="sb-botoes">' +
@@ -1565,7 +1641,7 @@
     clearInterval(falaTimer);
     if (!falaFila.length) {
       el.fala.style.display = 'none';
-      falaRet = '';
+      falaRet = ''; coroFala(false);
       var f = falaFim; falaFim = null;
       if (f) f();
       return;
@@ -1573,7 +1649,10 @@
     var l = falaFila.shift(), m = /^\{(\w+)\}/.exec(l);
     falaTexto = m ? l.slice(m[0].length) : l;
     retFala(m ? m[1] : '');
-    if (m && m[1] === 'coro' && VOZ_CENTRAL[falaTexto]) som.voz(VOZ_CENTRAL[falaTexto]);
+    var doCoro = !!m && m[1] === 'coro';
+    coroFala(doCoro);
+    if (doCoro) { var nv = coroNivel(); vibrar(nv < 0.4 ? [25] : nv < 0.7 ? [30, 40, 30] : [40, 30, 40, 30, 90]); }
+    if (doCoro && VOZ_CENTRAL[falaTexto]) som.voz(VOZ_CENTRAL[falaTexto]);
     falaPos = 0;
     el.falaTxt.textContent = '';
     el.fala.classList.remove('sb-pronta');
@@ -2410,6 +2489,7 @@
   ══════════════════════════════════════════════════════════════ */
   var som = (function () {
     var ac = null, master = null, vento = null, ventoG = null, zumbido = null, zumbG = null, estG = null, mudoT = 0;
+    var dronO1 = null, dronO2 = null, dronG = null, dronP = null, dronLfoG = null; // zumbido grave por ato (Atos 3 e 4)
     // Arquivos gravados (ElevenLabs) em /Jogos/assets/sinalbranco/sfx/<nome>.mp3.
     // Enquanto um arquivo não existe ou não carregou, toca a síntese de reserva.
     var VOZES = { audio_ingrid: 'voz-audio_ingrid-v3', sinal: 'voz-sinal-v2', fita_kazuo: 'voz-fita_kazuo-v2',
@@ -2477,6 +2557,17 @@
       var hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800;
       estG = ac.createGain(); estG.gain.value = 0;
       est.connect(hp); hp.connect(estG); estG.connect(master); est.start();
+      // drone por ato (reserva sintetizada, sem arquivo): dois senos próximos que "batem"; no Ato 4 pulsa como reator
+      dronO1 = ac.createOscillator(); dronO1.type = 'sine'; dronO1.frequency.value = 41;
+      dronO2 = ac.createOscillator(); dronO2.type = 'sine'; dronO2.frequency.value = 43;
+      var dlp = ac.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 180;
+      dronP = ac.createGain(); dronP.gain.value = 0.75;
+      dronG = ac.createGain(); dronG.gain.value = 0;
+      var dlfo = ac.createOscillator(); dlfo.frequency.value = 0.7;
+      dronLfoG = ac.createGain(); dronLfoG.gain.value = 0;
+      dlfo.connect(dronLfoG); dronLfoG.connect(dronP.gain);
+      dronO1.connect(dlp); dronO2.connect(dlp); dlp.connect(dronP); dronP.connect(dronG); dronG.connect(master);
+      dronO1.start(); dronO2.start(); dlfo.start();
       LOOPS.forEach(function (n) { loopG[n] = ac.createGain(); loopG[n].gain.value = 0; loopG[n].connect(master); });
       ARQ.concat(LOOPS).forEach(carregar);
       clearInterval(mudoT);
@@ -2518,8 +2609,22 @@
       var voo = cena === 'voo';
       alvo(loopG['rotor-loop'], voo ? 0.9 : 0, voo ? 0.8 : 2.5);  // cabine do helicóptero; some devagar quando ele vai embora
       alvo(loopG['vento-loop'], fora ? (voo ? 0.2 : 0.75) : 0, 0.8);
-      alvo(loopG['interior-loop'], fora ? 0 : 0.55, 0.8);
-      alvo(loopG['gerador-loop'], cena === 'gerador' && energia ? 0.6 : (energia && !fora ? 0.08 : 0), 1);
+      // Som por ato: nos Atos 3 e 4 o ambiente da estação cede lugar a um drone grave
+      var ato = (S && S.ato) || 1, fundo = ato >= 3;
+      alvo(loopG['interior-loop'], fora ? 0 : (fundo ? 0.28 : 0.55), 0.8);
+      alvo(loopG['gerador-loop'], cena === 'gerador' && energia ? 0.6 : (ato === 4 && cena === 'reatores' ? 0.5 : (energia && !fora && ato < 3 ? 0.08 : 0)), 1);
+      if (dronG) {
+        var f1 = 41, vol = 0, pulso = 0;
+        if (ato === 3) {
+          f1 = { escadaria: 36, salao: 41, monolitos: 41, ressonancia: S.flags.ondasOk ? 52 : 46, mirante: 44, nucleo: S.flags.nucleoOk ? 64 : 55 }[cena] || 41;
+          vol = cena === 'nucleo' ? 0.2 : 0.13;
+        } else if (ato === 4) {
+          f1 = cena === 'reatores' ? 50 : 46; vol = cena === 'final' ? 0.05 : (cena === 'reatores' ? 0.2 : 0.12); pulso = cena === 'reatores' ? 0.45 : 0.25;
+        }
+        var t = ac.currentTime;
+        dronO1.frequency.setTargetAtTime(f1, t, 1.2); dronO2.frequency.setTargetAtTime(f1 * (ato === 4 ? 1.03 : 1.055), t, 1.2);
+        alvo(dronG, vol, 1.5); alvo(dronLfoG, pulso, 1.2);
+      }
       alvo(loopG['coro-loop'], radio && !fora ? 0.35 : 0, 2);
       // reservas sintetizadas só tocam se o arquivo correspondente não existir
       alvo(ventoG, buf['vento-loop'] ? 0 : (fora ? 0.55 : (buf['interior-loop'] ? 0 : 0.1)), 0.8);
@@ -2628,6 +2733,7 @@
     puz.parar();
     clearInterval(falaTimer);
     if (el.vid && !el.vid.paused) el.vid.pause();
+    coroFala(false);
     ligarNeve(false);
     som.parar();
     destravar();

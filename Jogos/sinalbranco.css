@@ -303,3 +303,31 @@ body.games-fs-open #games-hub.jogo-ativo #jogo-sinalbranco .jogo-voltar{position
 .sb-nuc-pad .sb-puz-botoes{flex-wrap:wrap;}
 /* fim do ato 3: coluna muda de cor */
 .sb-nucleo-ok .sb-bg,.sb-nucleo-ok .sb-vid{filter:hue-rotate(70deg) saturate(1.2);}
+
+/* ── Interferência do Coro (só opacity/transform: nada de backdrop-filter, que pesa sobre o vídeo) ──
+   --sb-int (0..1) é setado pelo JS conforme o ato e as escolhas do jogador. */
+.sb-interf{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;overflow:hidden;transition:opacity .3s ease;}
+.sb-interf::before{content:'';position:absolute;left:0;right:0;top:-5em;bottom:-5em;background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0 .3em,rgba(125,211,252,.2) .3em .5em);animation:sb-scan 1.2s linear infinite;}
+.sb-interf::after{content:'';position:absolute;left:-10%;right:-10%;top:0;height:7%;background:linear-gradient(90deg,transparent,rgba(186,230,253,.55),transparent);opacity:0;animation:sb-rasga 2.6s steps(1) infinite;}
+@keyframes sb-scan{to{transform:translateY(5em);}}
+@keyframes sb-rasga{0%,100%{opacity:0;transform:translate(0,30em)}8%{opacity:.8;transform:translate(1.4em,12em)}11%{opacity:0}46%{opacity:0;transform:translate(0,40em)}48%{opacity:.7;transform:translate(-2em,22em)}51%{opacity:0}78%{opacity:.6;transform:translate(1em,5em)}80%{opacity:0}}
+.sb-coro-on .sb-interf{opacity:calc(.18 + var(--sb-int,.3) * .62);}
+.sb-coro-on .sb-fala-coro .sb-fala-txt{text-shadow:calc(var(--sb-int,.3) * .1em) 0 rgba(251,113,133,.55),calc(var(--sb-int,.3) * -.1em) 0 rgba(56,189,248,.7);animation:sb-glitch-txt 3.1s steps(1) infinite;}
+@keyframes sb-glitch-txt{0%,100%{transform:none}22%{transform:translateX(.06em) skewX(-2deg)}24%{transform:none}63%{transform:translateX(-.08em)}65%{transform:none}87%{transform:translateX(.05em) skewX(2deg)}89%{transform:none}}
+.sb-coro-on .sb-fala-coro .sb-ret-coro{animation:sb-glitch-ret 2.3s steps(1) infinite;}
+@keyframes sb-glitch-ret{0%,100%{transform:none}40%{transform:translateX(.18em)}42%{transform:translateX(-.2em)}44%{transform:none}}
+/* Reação às escolhas: recusar = o Coro se descontrola; obedecer = onda morna e calma */
+.sb-furia .sb-interf{opacity:1;background:rgba(244,63,94,.14);animation:sb-furia .22s steps(2) 5;}
+@keyframes sb-furia{50%{background:rgba(255,255,255,.22);}}
+.sb-doce .sb-interf{opacity:1;background:radial-gradient(ellipse at 50% 55%,rgba(253,224,71,.28),rgba(253,224,71,0) 70%);transition:opacity .9s ease;}
+.sb-doce .sb-interf::before,.sb-doce .sb-interf::after{display:none;}
+/* Conferir: apontar a prova no Arquivo */
+.sb-puz-prova{width:56%;}
+.sb-puz-prova .sb-doc-tit{font-size:1.7em;}
+.sb-prova-botoes{flex-direction:row;justify-content:flex-start;gap:1em;margin:.2em 0 1.2em;}
+.sb-prova-botoes .sb-btn,.sb-prova-botoes .sb-btn-sec{width:auto;margin-top:0;padding:.7em 1.8em;}
+.sb-prova-botoes .sb-btn[disabled]{opacity:.4;box-shadow:none;}
+.sb-puz-prova .sb-puz-dica{margin:0 0 1em;}
+.sb-arq-item.sb-sel{border-color:#7dd3fc;background:rgba(56,189,248,.18);box-shadow:0 0 1em rgba(56,189,248,.35);}
+.sb-arq-item.sb-sel i{color:#e0f2fe;}
+@media (prefers-reduced-motion:reduce){.sb-interf::before,.sb-interf::after,.sb-coro-on .sb-fala-coro .sb-fala-txt,.sb-coro-on .sb-fala-coro .sb-ret-coro,.sb-furia .sb-interf{animation:none;}}

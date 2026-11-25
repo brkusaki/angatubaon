@@ -524,7 +524,7 @@ function posCarro(c,init){const a=c.a,b=c.b,p=c.p,hx=b.x-a.x,hy=b.y-a.y,o1=faixa
 function novoCarro(){const j=M.j,L=TR.lista;if(!L.length)return;for(let n=0;n<14;n++){const i=L[R()*L.length|0],tx=i%MW,ty=(i/MW)|0,X=(tx+.5)*T,Y=(ty+.5)*T,d=Math.hypot(X-j.x,Y-j.y);if(d<T*9||d>T*17)continue;if(TR.car.some(c=>Math.hypot(c.x-X,c.y-Y)<T*4))continue;
   const nb=viz(tx,ty);if(!nb.length)continue;const b=nb[R()*nb.length|0];const c={a:{x:tx,y:ty},b:{x:b[0],y:b[1]},p:0,v:.1+R()*.05,cor:R()*8|0,x:X,y:Y,px:X,py:Y,hx:0,hy:0,esp:0,o0:null};posCarro(c,true);TR.car.push(c);return}}
 // ---------- moradores com personalidade ----------
-const GENP=[['levada','Pedrinho'],['brincalhona','Aninha'],['levada','Joãozinho'],['brincalhona','Duda'],['rancoroso','Seu Valmir'],['bondoso','Dona Aparecida'],['levada','Zezinho'],['fofoqueiro','Dona Sandra'],['rancoroso','Seu Anastácio'],['bondoso','Vó Nena'],['fofoqueiro','Seu Lauro'],['brincalhona','Seu Tonico'],['medroso','Dona Odete'],['rancoroso','Dr. Ferraz'],['valente','Zeca Pesado'],['brincalhona','Camila'],['bondoso','Enfermeira Rosa'],['sabio','Seu Nhô Zé']];
+const GENP=[['levada','Pedrinho'],['brincalhona','Aninha'],['levada','Joãozinho'],['brincalhona','Duda'],['rancoroso','Seu Valmir'],['bondoso','Dona Aparecida'],['levada','Zezinho'],['fofoqueiro','Dona Sandra'],['rancoroso','Seu Anastácio'],['bondoso','Vó Nena'],['fofoqueiro','Seu Lauro'],['brincalhona','Seu Tonico'],['medroso','Dona Odete'],['rancoroso','Dr. Ferraz'],['valente','Zeca Pesado'],['brincalhona','Camila'],['bondoso','Enfermeira Rosa'],['sabio','Vô Jorge']];
 const PERS={rural:{ic:'🌾',t:'Morador da mata'},rancoroso:{ic:'😠',t:'Rancoroso'},bondoso:{ic:'😊',t:'Bondoso'},levada:{ic:'😜',t:'Criança levada'},brincalhona:{ic:'😄',t:'Brincalhão'},fofoqueiro:{ic:'🤫',t:'Fofoqueiro'},medroso:{ic:'😨',t:'Medroso'},valente:{ic:'💪',t:'Valentão'},sabio:{ic:'🧓',t:'Sabido'}};
 const FALAS={rural:['Moro por aqui faz mais de trinta anos. Já vi coisa que ninguém acredita.','De noite a mata fala. Quem é de dentro já se acostumou.','Os bichos daqui não gostam de gente apressada.','Já vi a Mula passando de madrugada, mas isso é segredo.','Cabaça boa é a de casca grossa. Compra e guarda pra hora certa.','Nunca entra na mata sem poção na mochila, moço.','Quando a vida do bicho tá baixa, aí sim a cabaça pega.','Esse caminho de terra leva até a cidade, é só seguir.'],
  rancoroso:['Hunf. No meu tempo ninguém andava com bicho solto na rua.','Essa calçada é minha! Ninguém respeita mais ninguém.','O prefeito prometeu asfalto novo e até hoje só vejo buraco.','Moleque de hoje só faz bagunça. Credo!','Não gosto de conversa. Mas já que parou, fala logo.','Tá me olhando por quê? Nunca viu um homem trabalhador?'],
@@ -798,21 +798,23 @@ function lancarCabaca(e){if(M.bat||M.cena||!e||!e.corpo||e.pegando)return;if(Mat
   else{aviso('A cabaça quebrou e '+ESP[e.esp].n+' escapou! ('+Math.round(ch*100)+'% de chance)');remover(e)}},520)}
 // ---------- história ----------
 const temEsp=e=>M.time.some(c=>c.esp===e);
+const alvoEnc=()=>{const i=M.ini||(M.time[0]&&M.time[0].esp);return i==='saci'?'curupira':'saci'};
+const NOMEENC={saci:'Saci',curupira:'Curupira'};
 const PAPEL={
  prefeito(){const q=M.q;
-  if(q===0){M.q=1;M.q0=M.capturas;aviso('Dr. Almeida: Bem-vindo, jovem! Desde que a Mula sem Cabeça acordou lá no norte, os bichos do folclore andam soltos pela região. Prove que sabe lidar com eles: capture 2 criaturas com a cabaça e volte aqui.',9000)}
-  else if(q===1){const f=M.capturas-M.q0;if(f>=2){M.q=2;aviso('Dr. Almeida: Muito bem! O Padre Zé ouviu o assobio do Saci vindo da mata. Vá falar com ele na igreja Matriz, aqui na praça.',7000)}else aviso('Dr. Almeida: Ainda faltam '+(2-f)+' criatura(s). Enfraqueça-as e use a cabaça!',4500)}
-  else if(q<5)aviso('Dr. Almeida: Siga o que o Padre Zé pediu. A cidade conta com você!',4500);
-  else if(q===5){if(M.bauLoot){M.q=6;M.time.forEach(c=>c.hp=c.hpM);aviso('Dr. Almeida: Você venceu a Mula e abriu o baú! Angatuba tem um novo Caçador de Folclore. Fim do capítulo 1 — muita coisa ainda vai aparecer por aí!',10000)}else aviso('Dr. Almeida: A Mula está lá no norte, depois do rio. Vença-a e abra o baú da clareira.',6000)}
+  if(q===0){M.q=1;M.q0=M.capturas;aviso('Dr. Almeida: Então o Jorge mandou você. Depois daquele apito os bichos ficaram soltos e seu avô não acorda. Aqui tá sua Licença de Guardião do Folclore. Mostra que dá conta: captura 2 criaturas com a cabaça e volta aqui.',9500)}
+  else if(q===1){const f=M.capturas-M.q0;if(f>=2){M.q=2;aviso('Dr. Almeida: Muito bem! O Padre Zé conhece a história do Pacto. Vai falar com ele na igreja Matriz, aqui na praça.',7000)}else aviso('Dr. Almeida: Ainda faltam '+(2-f)+'. Enfraquece a criatura e joga a cabaça!',4500)}
+  else if(q<5)aviso('Dr. Almeida: Segue o que o Padre Zé pediu. A cidade conta com você!',4500);
+  else if(q===5){if(M.bauLoot){M.q=6;M.time.forEach(c=>c.hp=c.hpM);aviso('Dr. Almeida: Você venceu a Mula e abriu o baú! Angatuba tem um novo Guardião do Folclore. Fim do capítulo 1 — muita coisa ainda vai aparecer por aí!',10000)}else aviso('Dr. Almeida: A Mula tá lá no norte, depois do rio. Vence ela e abre o baú da clareira.',6000)}
   else aviso('Dr. Almeida: Obrigado por proteger Angatuba! Continue explorando e capturando.',4500)},
  padre(){const q=M.q;let t;M.time.forEach(c=>c.hp=c.hpM);
-  if(q<2)t='Padre Zé: A paz do Senhor, filho. Procure primeiro o Dr. Almeida na Prefeitura, ele tem uma tarefa pra você.';
-  else if(q===2){M.q=3;t='Padre Zé: O Saci mora no meio da mata, onde o vento faz redemoinho. Capture um e traga pra mim.'}
-  else if(q===3){if(temEsp('saci')){M.q=4;t='Padre Zé: Incrível, um Saci! Agora o Boto: ele só aparece pra quem pesca no rio ou pra quem arrisca a sorte no bar, perto das moças. O Seu Nelson, do Pesqueiro, tem uma vara pra você.'}else t='Padre Zé: Ainda não vi o Saci. Procure os redemoinhos na mata, longe da cidade.'}
-  else if(q===4){if(temEsp('boto')){M.q=5;t='Padre Zé: Você está pronto. A Mula sem Cabeça ronda a clareira ao norte. Vença-a e abra o baú.'}else t='Padre Zé: O Boto ainda não está contigo. Pesque no rio ou tente a sorte no bar.'}
-  else t='Padre Zé: Que Deus te guie. A Matriz está sempre aberta.';
+  if(q<2)t='Padre Zé: Fala, meu filho! Passa primeiro na Prefeitura, o Dr. Almeida tem uma tarefa pra você.';
+  else if(q===2){M.q=3;const a=alvoEnc();t='Padre Zé: A cidade tem um Pacto com os Encantados desde sempre, e foi o ferro daquele apito que quebrou. Pra refazer, começa reconhecendo um deles. '+(a==='saci'?'O Saci mora no meio da mata, onde o vento faz redemoinho.':'O Curupira anda pela Mata do Pererê, ao sul, de pés virados.')+' Captura um e traz pra mim.'}
+  else if(q===3){const a=alvoEnc();if(temEsp(a)){M.q=4;t='Padre Zé: Incrível, um '+NOMEENC[a]+'! Agora o Boto: ele só aparece pra quem pesca no rio ou tenta a sorte no bar. O Seu Nelson, do Pesqueiro, tem uma vara pra você.'}else t='Padre Zé: Ainda não vi o '+NOMEENC[a]+'. '+(a==='saci'?'Procura os redemoinhos na mata, longe da cidade.':'Procura na Mata do Pererê, ao sul.')}
+  else if(q===4){if(temEsp('boto')){M.q=5;t='Padre Zé: Você tá pronto. A Mula sem Cabeça fica na clareira ao norte e guarda um baú que só Guardião abre. Vence ela e abre o baú.'}else t='Padre Zé: O Boto ainda não tá com você. Pesca no rio ou tenta a sorte no bar.'}
+  else t='Padre Zé: Que Deus te guie. A Matriz tá sempre aberta.';
   aviso(t+' (O time se recuperou.)',9000)},
- vara(){if(!M.vara){M.vara=true;aviso('Seu Nelson: Toma essa vara de presente! Vá até um córrego ou rio e toque em Pescar. Dizem que o Boto adora morder a isca de quem tem paciência.',8000)}else aviso('Seu Nelson: Pesca boa é com paciência. Perto d’água, toque em Pescar.',4500)},
+ vara(){if(!M.vara){M.vara=true;aviso('Seu Nelson: Toma essa vara de presente! Vai num córrego ou rio e toca em Pescar. Dizem que o Boto cai fácil na isca de quem tem paciência.',8000)}else aviso('Seu Nelson: Pesca boa é com paciência. Perto d’água, toca em Pescar.',4500)},
  loja(n){n.i=((n.i||0)+1)%n.falas.length;aviso(n.n+': '+n.falas[n.i]);abrirLoja(n.itens,n.n)},
  paquera(){M.paq=(M.paq||0)+1;const L=['Marlene: Oi, forasteiro... você não é daqui, né? Senta aí.','Marlene: Gosto de quem tem coragem. Me paga um guaraná?'];
   if(M.paq<3){aviso(L[M.paq-1],4500);return}
@@ -823,7 +825,7 @@ function objetivo(){const q=M.q,pref=pt(DOORS.find(d=>d.sala==='prefeitura')),ig
  if(q===0)return{t:'Fale com o Prefeito (Prefeitura, perto da praça)',a:pref};
  if(q===1)return{t:'Capture 2 criaturas ('+Math.min(2,M.capturas-M.q0)+'/2) e volte ao Prefeito',a:pref};
  if(q===2)return{t:'Fale com o Padre Zé na igreja da praça',a:igr};
- if(q===3)return temEsp('saci')?{t:'Volte ao Padre com o Saci',a:igr}:{t:'Capture um Saci nos redemoinhos da mata',a:maisPerto(REDE)};
+ if(q===3){const a=alvoEnc(),N=NOMEENC[a];return temEsp(a)?{t:'Volte ao Padre com o '+N,a:igr}:a==='saci'?{t:'Capture um Saci nos redemoinhos da mata',a:maisPerto(REDE)}:{t:'Capture um Curupira na Mata do Pererê (sul)',a:{x:ZL.S[0]*T,y:ZL.S[1]*T}}}
  if(q===4)return temEsp('boto')?{t:'Volte ao Padre com o Boto',a:igr}:{t:M.vara?'Capture um Boto: pesque num córrego ou tente a sorte no bar':'Pegue a vara com Seu Nelson (Pesqueiro) e capture um Boto',a:M.vara?null:pt(DOORS.find(d=>d.sala==='pesqueiro'))};
  if(q===5)return M.bauLoot?{t:'Volte ao Prefeito',a:pref}:M.bauAberto?{t:'Abra o baú na clareira ao norte',a:{x:BAU.x,y:BAU.y}}:{t:'Derrote a Mula sem Cabeça, ao norte',a:{x:(BX+.5)*T,y:(BY+1)*T}};
  return{t:'Capítulo 1 completo! Explore e capture todas as criaturas',a:null}}
@@ -847,10 +849,10 @@ function abrirBau(){if(!bauPerto())return;
  const m=criatura('mula',6,M.j.x+30,M.j.y+10);m.hp=m.hpM;M.time.push(m);M.bauLoot=true;M.time.forEach(c=>c.hp=c.hpM);
  aviso('Do baú saiu uma Mula sem Cabeça filhote! Ela entrou pro seu time e todos se recuperaram.',5200);montaHUD();salvar()}
 // ---------- salvar ----------
-function salvar(){try{localStorage.setItem('cf_proto2',JSON.stringify({time:M.time.map(c=>({esp:c.esp,lvl:c.lvl,hp:c.hp,xp:c.xp})),ativo:M.ativo,bau:M.bauAberto,bl:M.bauLoot,v:M.vitorias,c:M.capturas,q:M.q,q0:M.q0,vr:M.vara,din:M.din,cab:M.cab,poc:M.poc,pm:M.pm,nw:M.npcW,x:(M.cena?M.fora:M.j).x,y:(M.cena?M.fora:M.j).y,o:1}))}catch(e){}}
+function salvar(){try{localStorage.setItem('cf_proto2',JSON.stringify({time:M.time.map(c=>({esp:c.esp,lvl:c.lvl,hp:c.hp,xp:c.xp})),ativo:M.ativo,bau:M.bauAberto,bl:M.bauLoot,v:M.vitorias,c:M.capturas,q:M.q,q0:M.q0,ini:M.ini,vr:M.vara,din:M.din,cab:M.cab,poc:M.poc,pm:M.pm,nw:M.npcW,x:(M.cena?M.fora:M.j).x,y:(M.cena?M.fora:M.j).y,o:1}))}catch(e){}}
 function carregarSave(){try{const s=JSON.parse(localStorage.getItem('cf_proto2'));if(!s||!s.time||!s.time.length)return false;
  if(!s.o){s.x+=OFF*T;s.y+=OFF*T}novoJogo(s.time[0].esp);M.time=s.time.map(o=>{const c=criatura(o.esp,o.lvl,s.x,s.y+20);c.hp=Math.min(c.hpM,o.hp);c.xp=o.xp||0;return c});M.ativo=Math.min(s.ativo||0,M.time.length-1);M.parc=M.time[M.ativo];
- M.bauAberto=!!s.bau;M.bauLoot=!!s.bl;M.vitorias=s.v||0;M.capturas=s.c||0;M.q=s.q||0;M.q0=s.q0||0;M.vara=!!s.vr;M.din=s.din==null?60:s.din;M.cab=s.cab==null?8:s.cab;M.poc=s.poc==null?2:s.poc;if(s.pm)M.pm=s.pm;if(s.nw)M.npcW=s.nw;if(M.bauAberto){remover(M.boss)}if(livre(s.x,s.y)){M.j.x=M.j.px=s.x;M.j.y=M.j.py=s.y}montaHUD();return true}catch(e){return false}}
+ M.bauAberto=!!s.bau;M.bauLoot=!!s.bl;M.vitorias=s.v||0;M.capturas=s.c||0;M.q=s.q||0;M.q0=s.q0||0;M.ini=s.ini||'';M.vara=!!s.vr;M.din=s.din==null?60:s.din;M.cab=s.cab==null?8:s.cab;M.poc=s.poc==null?2:s.poc;if(s.pm)M.pm=s.pm;if(s.nw)M.npcW=s.nw;if(M.bauAberto){remover(M.boss)}if(livre(s.x,s.y)){M.j.x=M.j.px=s.x;M.j.y=M.j.py=s.y}montaHUD();return true}catch(e){return false}}
 // ---------- tela ----------
 const cv=document.getElementById('cv'),cx=cv.getContext('2d');let Z=2,ZB=2,VW=400,VH=600,DPR=1;
 function redim(){DPR=window.devicePixelRatio||1;const SW=Math.max(168,Math.min(230,Math.round(innerWidth*.24)));document.documentElement.style.setProperty('--sw',SW+'px');const w=innerWidth-SW,h=innerHeight;cv.width=Math.max(10,Math.round(w*DPR));cv.height=Math.max(10,Math.round(h*DPR));Z=ZB=Math.max(1,Math.floor(Math.min(cv.width/(13*T),cv.height/(8.5*T))*4)/4);VW=cv.width/Z;VH=cv.height/Z;cx.imageSmoothingEnabled=false}
@@ -935,10 +937,21 @@ addEventListener('keyup',e=>{teclas[e.key.toLowerCase()]=0;tec()});
 function tec(){if(jid!==null)return;entrada.dx=(teclas.d||teclas.arrowright?1:0)-(teclas.a||teclas.arrowleft?1:0);entrada.dy=(teclas.s||teclas.arrowdown?1:0)-(teclas.w||teclas.arrowup?1:0)}
 // início
 function telaCheia(){try{const e=document.documentElement;(e.requestFullscreen||e.webkitRequestFullscreen||(()=>Promise.resolve())).call(e).then?.(()=>screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{})).catch?.(()=>{})}catch(_){}}
-function telaInicial(){const d=document.createElement('div');d.className='dlg';d.innerHTML='<h1>Caça Folclore</h1><p>Protótipo 1. Escolha sua primeira criatura. Você está na praça da Matriz, no centro de Angatuba (o mapa segue as ruas reais). Entre nas casas e na igreja pela porta, toque numa criatura pra lutar e use a cabaça quando ela estiver fraca. A Mula sem Cabeça guarda um baú no campo, ao norte. A cidade tem poucas criaturas: as áreas de caça ficam nas matas, campos e brejos em volta (toque no minimapa pra abrir o mapa grande).</p>';
- const pk=document.createElement('div');pk.className='pick';
- for(const esp of['curupira','capivara','saci']){const c=document.createElement('div');c.appendChild(retrato(esp,96,96));c.insertAdjacentHTML('beforeend','<b>'+ESP[esp].n+'</b><span>'+(ESP[esp].el==='Agua'?'Água':ESP[esp].el)+'</span>');c.onclick=()=>{d.remove();telaCheia();novoJogo(esp);montaAcoes();aviso('Boa! Explore a praça. Toque nas criaturas ou na lista de Batalha pra atacar.')};pk.appendChild(c)}
- d.appendChild(pk);document.body.appendChild(d)}
+function telaInicial(){
+ const PG=[['🎪','Angatuba. Em tupi, “morada dos espíritos”. Dizem que cada alma ainda mora no mato. Desde sempre existe um Pacto: os Encantados ficam nas matas e os Guardiões do Folclore mantêm tudo em paz.'],
+ ['🎺','Noite da Festa do Divino. Você tá ajudando o Vô Jorge, seu avô e o último Guardião, na barraca de causos. No palanque, o Dr. Ferraz faz discurso: “Cuidar de Angatuba é cuidar do que é nosso!”'],
+ ['⚡','De repente um apito agudo, de ferro, corta a festa. As luzes piscam e os bichos descem das matas. O Vô Jorge cai no chão: “Esse som é ferro... O Pacto quebrou.”'],
+ ['🛏️','Em casa, o Vô Jorge não acorda de jeito nenhum. Na mesa, três cabaças brilhando e um bilhete dele: “Quem escolhe o Guardião é a cabaça. Escolhe a sua.”']];
+ let n=0;const d=document.createElement('div');d.className='dlg';document.body.appendChild(d);
+ const pag=()=>{if(n>=PG.length){escolha();return}const [ic,tx]=PG[n];d.innerHTML='<div style="font-size:54px">'+ic+'</div><p></p><button>'+(n<PG.length-1?'Continuar':'Ver as cabaças')+'</button>';
+  const p=d.querySelector('p'),b=d.querySelector('button');let i=0;const iv=setInterval(()=>{i+=2;p.textContent=tx.slice(0,i);if(i>=tx.length)clearInterval(iv)},22);
+  b.onclick=()=>{clearInterval(iv);n++;pag()}};
+ const escolha=()=>{d.innerHTML='<h1>Caça Folclore</h1><p>Três cabaças brilham na mesa, cada uma com um filhote de Encantado. Toca na que chamou você.</p>';
+  const pk=document.createElement('div');pk.className='pick';
+  for(const esp of['saci','curupira','boitata']){const c=document.createElement('div');c.appendChild(retrato(esp,96,96));c.insertAdjacentHTML('beforeend','<b>'+ESP[esp].n+'</b><span>'+ESP[esp].el+'</span>');
+   c.onclick=()=>{d.remove();telaCheia();novoJogo(esp);M.ini=esp;salvar();montaAcoes();aviso('Vô Jorge: Ela te escolheu. Vai lá na Prefeitura pegar sua Licença de Guardião. O Dr. Almeida explica tudo.',9000)};pk.appendChild(c)}
+  d.appendChild(pk)};
+ pag()}
 Promise.all([carregar(),carregarCenario(),carregarNpcs()]).then(()=>{tramaRuas();if(carregarSave()){montaAcoes();aviso('Jogo carregado')}else telaInicial();
  cam.x=(M.j?M.j.x:CX*T)-VW/2;cam.y=(M.j?M.j.y:CY*T)-VH/2;
  const wait=()=>{if(!M.j){requestAnimationFrame(wait);return}ultimo=performance.now();requestAnimationFrame(loop)};wait()});

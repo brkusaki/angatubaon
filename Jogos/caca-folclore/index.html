@@ -345,7 +345,7 @@ function desenhaSprite(c,esp,anim,f,x,y,esq,alpha){const d=D[esp];if(!d||!IMG[es
  c.drawImage(IMG[esp],(q%d.cols)*128,Math.floor(q/d.cols)*96,128,96,-64,-90,128,96);c.restore()}
 // ---------- mundo (simulação separada do desenho) ----------
 const TICK=100;const HOSTIL=new Set(['lobo','onca','lobisomem','boitata','caipora']);
-const M={t:0,j:null,parc:null,time:[],ativo:0,selv:[],bat:null,cmd:[],fx:[],bauAberto:false,bauLoot:false,vitorias:0,capturas:0,q:0,q0:0,vara:false,paq:0,pend:null,pesca:null,din:60,cab:8,poc:2,alvo:null,seguir:null,pm:{}};
+const M={t:0,j:null,parc:null,time:[],ativo:0,selv:[],bat:null,cmd:[],fx:[],bauAberto:false,bauLoot:false,vitorias:0,capturas:0,q:0,q0:0,vara:false,paq:0,pend:null,pesca:null,din:60,cab:8,poc:2,alvo:null,seguir:null,pm:{},selos:[]};
 let uid=1;
 function criatura(esp,lvl,x,y){const s=ESP[esp];const hpM=Math.round(s.hp*(1+lvl*.12));return{id:uid++,esp,lvl,hp:hpM,hpM,x,y,px:x,py:y,dir:'baixo',esq:false,anim:'parado',a0:0,mov:false,alvo:null,cds:[0,0,0,0],golpes:golpesDe(esp),xp:0,home:{x,y},espera:0}}
 function livre(x,y){return!bloqueia(tileEm(x,y))}
@@ -360,7 +360,7 @@ function spawnSelvagem(md){md=md||24;for(let k=0;k<90;k++){const a=R()*6.283,d=(
  if(h[0]==='u')continue;let esp,lv;
  if(z){const Z=ZON[z],el=Z.sp.filter(e=>M.selv.filter(q=>q.esp===e).length<7);if(!el.length)continue;esp=el[R()*el.length|0];lv=Z.lv[0]+(R()*(Z.lv[1]-Z.lv[0]+1)|0)}
  else{const el=Object.keys(ESPH).filter(e=>ESPH[e].split('').some(c=>h.includes(c))&&dist>=(DG[e]||0)&&M.selv.filter(q=>q.esp===e).length<5);if(!el.length)continue;esp=el[R()*el.length|0];lv=Math.min(10,nivel(dist))}
- M.selv.push(criatura(esp,lv,x,y));return}}
+ const c0=criatura(esp,lv,x,y);if(M.q>=6&&R()<.3)c0.col=1;M.selv.push(c0);return}}
 function zonaAviso(){const k=zonaEm(M.j.x/T|0,M.j.y/T|0)||'';if(k===M.zk)return;const ant=M.zk;M.zk=k;if(ant===undefined)return;
  if(k){for(let i=0;i<7;i++)spawnSelvagem(16);const Z=ZON[k];aviso('📍 '+Z.n+' — criaturas Nv '+Z.lv[0]+' a '+Z.lv[1])}else if(URB[(M.j.y/T|0)*MW+(M.j.x/T|0)])aviso('📍 Angatuba — a cidade tem poucas criaturas. Procure nas matas e campos ao redor (toque no minimapa pra ver o mapa).')}
 function spawnSacis(){for(const r of REDE){if(r.sac&&M.selv.includes(r.sac))continue;r.sac=null;const d=Math.hypot(r.x-M.j.x,r.y-M.j.y)/T;if(d<9||d>40||R()<.5)continue;
@@ -368,7 +368,7 @@ function spawnSacis(){for(const r of REDE){if(r.sac&&M.selv.includes(r.sac))cont
 function novoJogo(inicial){M.j={x:(CX+.5)*T,y:(CY+3.6)*T,px:(CX+.5)*T,py:(CY+3.6)*T,dir:'cima',esq:false,mov:false,anim:'parado',a0:0,esp:'treinador'};
  M.time=[criatura(inicial,5,M.j.x-30,M.j.y+20)];M.ativo=0;M.parc=M.time[0];
  for(let i=0;i<26;i++)spawnSelvagem(40);spawnSacis();
- const b=criatura('mula',10,(BX+.5)*T,(BY+1)*T);b.boss=true;M.selv.push(b);M.boss=b;salvar();montaHUD()}
+ const b=criatura('mula',10,(BX+.5)*T,(BY+1)*T);b.boss=true;M.selv.push(b);M.boss=b;criaCapatazes();salvar();montaHUD()}
 // comandos
 const entrada={dx:0,dy:0};
 function tick(){M.t++;const j=M.j;
@@ -388,7 +388,7 @@ function tick(){M.t++;const j=M.j;
    if(M.t%10===0)for(const c of M.time)if(c.hp>0&&c.hp<c.hpM)c.hp++}}
  // selvagens vagando
  if(!M.cena)for(const e of M.selv.slice()){if(e.corpo){if(!e.pegando&&M.t-e.t0>450)remover(e);continue}if(M.bat&&M.bat.inimigo===e){e.mov=false;e.dir='direita';e.esq=true;continue}
-  if(HOSTIL.has(e.esp)&&!e.boss&&!M.bat&&!M.seguir&&M.t>60&&M.t>(M.graca||0)&&Math.hypot(j.x/T-CX,j.y/T-CY)>13){const dj=Math.hypot(e.x-j.x,e.y-j.y);if(dj<T*5){andarPara(e,j.x,j.y,9);e.mov=true;if(dj<T*1.7){aviso(ESP[e.esp].n+' te atacou!');iniciarBatalha(e)}continue}}
+  if(HOSTIL.has(e.esp)&&!e.boss&&!e.cap&&!M.bat&&!M.seguir&&M.t>60&&M.t>(M.graca||0)&&Math.hypot(j.x/T-CX,j.y/T-CY)>13){const dj=Math.hypot(e.x-j.x,e.y-j.y);if(dj<T*5){andarPara(e,j.x,j.y,9);e.mov=true;if(dj<T*1.7){aviso(ESP[e.esp].n+' te atacou!');iniciarBatalha(e)}continue}}
   if(e.espera>0){e.espera--;e.mov=false;continue}
   if(!e.alvo||Math.hypot(e.alvo.x-e.x,e.alvo.y-e.y)<8){if(R()<.5){e.espera=10+R()*30|0;e.alvo=null;continue}const r=e.boss?T*3:T*4;e.alvo={x:e.home.x+(R()*2-1)*r,y:e.home.y+(R()*2-1)*r}}
   const ox=e.x,oy=e.y,sp=e.boss?10:7;andarPara(e,e.alvo.x,e.alvo.y,sp);if(Math.hypot(e.x-ox,e.y-oy)<sp*.6){e.trava=(e.trava||0)+1;if(e.trava>=3){e.alvo=null;e.mov=false;e.trava=0;e.espera=20+R()*30|0}}else e.trava=0}
@@ -396,7 +396,7 @@ function tick(){M.t++;const j=M.j;
  if(pd.style.display!=='none'&&(pd._q?Math.hypot(pd._q.x-j.x,pd._q.y-j.y)>T*3.4:Math.hypot(entrada.dx,entrada.dy)>.3))fecharPed();
  // batalha
  if(M.bat)tickBatalha();
- if(!M.bat&&!M.cena&&M.t%150===0){for(const e of M.selv.slice())if(!e.boss&&Math.hypot(e.x-j.x,e.y-j.y)>T*55)remover(e);};if(!M.bat&&!M.cena&&M.t%60===0){if(M.selv.length<34){spawnSelvagem();spawnSelvagem()}spawnSacis()}
+ if(!M.bat&&!M.cena&&M.t%150===0){for(const e of M.selv.slice())if(!e.boss&&!e.cap&&Math.hypot(e.x-j.x,e.y-j.y)>T*55)remover(e);};if(!M.bat&&!M.cena&&M.t%60===0){if(M.selv.length<34){spawnSelvagem();spawnSelvagem()}spawnSacis()}
  if(M.t%50===0)salvar()}
 function andarPara(e,tx,ty,sp){const dx=tx-e.x,dy=ty-e.y,d=Math.hypot(dx,dy);if(d<4){e.mov=false;return}const s=Math.min(sp,d);const mx=dx/d*s,my=dy/d*s;mover(e,mx,my);dirDe(e,mx,my);e.mov=true}
 // ---------- batalha ----------
@@ -416,14 +416,14 @@ function tickBatalha(){const b=M.bat,p=M.parc,e=b.inimigo;
   if(r.m>1)aviso('É super efetivo!');}
  if(e.hp<=0){const xp=e.lvl*12;let up=ganhaXp(p,xp);for(const c of M.time)if(c!==p&&c.hp>0)ganhaXp(c,Math.ceil(xp/2));
   const din=e.lvl*6+(R()*8|0);M.din+=din;M.vitorias++;if(e.boss){M.bauAberto=true;aviso('Você venceu a Mula sem Cabeça! Chegue perto do baú da Matriz e toque em Abrir.'+up)}else aviso('Vitória sobre '+ESP[e.esp].n+'! +'+xp+' XP, +R$ '+din+'.'+up);
-  if(e.boss)remover(e);else{e.corpo=true;e.t0=M.t;e.mov=false;e.anim='parado';e.alvo=null;aviso('A criatura caiu! Chegue perto e toque nela (ou em Cabaça) pra jogar a cabaça. Você tem '+M.cab+'.')}
+  if(e.boss)remover(e);else if(e.cap)libertaMarco(e);else{if(e.col){e.col=0;M.coleiras=(M.coleiras||0)+1;aviso('⛓️ A coleira de ferro quebrou!')}e.corpo=true;e.t0=M.t;e.mov=false;e.anim='parado';e.alvo=null;aviso('A criatura caiu! Chegue perto e toque nela (ou em Cabaça) pra jogar a cabaça. Você tem '+M.cab+'.')}
   if(M.alvo===e)M.alvo=null;fimBatalha()}
  else if(p.hp<=0){aviso(ESP[p.esp].n+' desmaiou!');const outro=M.time.findIndex(c=>c.hp>0);if(outro>=0){trocar(outro,true)}else{fimBatalha();derrota()}}}
-function derrota(){if(M.wipe)return;M.wipe=1;if(M.bat)fimBatalha();
+function derrota(story){if(M.wipe)return;M.wipe=1;if(M.bat)fimBatalha();
  const el=document.getElementById('apagao')||(()=>{const d=document.createElement('div');d.id='apagao';d.style.cssText='position:fixed;inset:0;background:#000;opacity:0;transition:opacity .6s;z-index:60;display:flex;align-items:center;justify-content:center;color:#fff;font:700 20px system-ui;pointer-events:none;text-align:center;padding:20px';document.body.appendChild(d);return d})();
- el.textContent='Seus bichos desmaiaram...';el.style.opacity=1;
- setTimeout(()=>{const perda=Math.floor(M.din*.1);M.din-=perda;M.time.forEach(c=>c.hp=c.hpM);M.cena=null;M.fora=null;M.seguir=null;M.alvo=null;M.parc=M.time[0];M.ativo=0;reposiciona((CX-.5)*T,(CY+2.5)*T,'baixo');M.graca=M.t+80;montaHUD();montaAcoes();montaBag();salvar();
-  aviso('Você acordou na Praça da Matriz e o time foi curado.'+(perda?' Perdeu R$ '+perda+' no susto.':''),5500);el.style.opacity=0;M.wipe=0},1500)}
+ el.textContent=story?'O apito de ferro soou...':'Seus bichos desmaiaram...';el.style.opacity=1;
+ setTimeout(()=>{const perda=story?0:Math.floor(M.din*.1);M.din-=perda;M.time.forEach(c=>c.hp=c.hpM);M.cena=null;M.fora=null;M.seguir=null;M.alvo=null;M.parc=M.time[0];M.ativo=0;reposiciona((CX-.5)*T,(CY+2.5)*T,'baixo');M.graca=M.t+80;montaHUD();montaAcoes();montaBag();salvar();
+  aviso(story?'Você acordou na Praça da Matriz. O Ferraz sumiu com a Cabaça-Mãe. Fala com o Padre Zé!':'Você acordou na Praça da Matriz e o time foi curado.'+(perda?' Perdeu R$ '+perda+' no susto.':''),story?7000:5500);el.style.opacity=0;M.wipe=0},1500)}
 function ganhaXp(c,xp){c.xp+=xp;let up='';while(c.xp>=c.lvl*20){c.xp-=c.lvl*20;c.lvl++;const n=Math.round(ESP[c.esp].hp*(1+c.lvl*.12));c.hp+=n-c.hpM;c.hpM=n;up+=' '+ESP[c.esp].n+' subiu pro Nv '+c.lvl+'!'}return up}
 function capturar(){const b=M.bat;if(!b)return;const e=b.inimigo;if(e.boss){aviso('A Mula não pode ser capturada');return}
  if(M.time.length>=6){aviso('Time cheio (6)');return}
@@ -797,6 +797,20 @@ function lancarCabaca(e){if(M.bat||M.cena||!e||!e.corpo||e.pegando)return;if(Mat
  setTimeout(()=>{if(R()<ch){aviso('Pegou! '+ESP[e.esp].n+' entrou pro time.');remover(e);e.corpo=false;e.pegando=false;e.hp=Math.max(1,Math.ceil(e.hpM*.5));e.cds=[0,0,0,0];e.anim='parado';M.time.push(e);M.capturas++;montaHUD();salvar()}
   else{aviso('A cabaça quebrou e '+ESP[e.esp].n+' escapou! ('+Math.round(ch*100)+'% de chance)');remover(e)}},520)}
 // ---------- história ----------
+const MARCOS={W:{n:'Marco do Brejo',esp:'iara',lvl:8},S:{n:'Marco da Mata',esp:'caipora',lvl:10},NE:{n:'Marco da Serra',esp:'lobisomem',lvl:12}};
+function criaMarcos(){for(const k in MARCOS){const r=RDP.find(r=>r.k===k&&r.st===38)||RDP.find(r=>r.k===k);if(!r)continue;let ok=false;
+  for(const o of[4,-4,5,-5,3,-3,6,-6,7,-7]){const X=Math.round(r.x+r.nx*o),Y=Math.round(r.y+r.ny*o);if(X<8||Y<8||X>=MW-8||Y>=MH-8)continue;const t=map[Y*MW+X];if(t!==0&&t!==5&&t!==3)continue;if(RURAL.some(q=>Math.hypot(q.tx-X,q.ty-Y)<3)||OBJ.some(q=>q.sign&&Math.hypot(q.x/T-X,q.y/T-Y)<3))continue;
+   map[Y*MW+X]=0;bloq(X,Y);OBJ.push({marco:k,nome:MARCOS[k].n,x:(X+.5)*T,y:(Y+1)*T-4,tx:X,ty:Y});ok=true;break}
+  if(!ok)console.warn('marco sem lugar',k)}}
+function criaCapatazes(){for(const e of M.selv.slice())if(e.cap)remover(e);if(M.q<7)return;
+ for(const o of OBJ){if(!o.marco||M.selos.includes(o.marco))continue;const Mc=MARCOS[o.marco];let x=o.x+T*1.3,y=o.y-T*.3;if(!livreSel(x,y)){x=o.x-T*1.3;if(!livreSel(x,y)){x=o.x;y=o.y+T*1.3}}
+  const c=criatura(Mc.esp,Mc.lvl,x,y);c.cap=o.marco;M.selv.push(c)}}
+function libertaMarco(e){const k=e.cap,Mc=MARCOS[k];remover(e);if(!M.selos.includes(k))M.selos.push(k);let m='⛓️ A coleira de ferro quebrou! O '+Mc.n+' está livre ('+M.selos.length+'/3). ';
+ if(M.time.length<6){e.hp=Math.max(1,Math.ceil(e.hpM*.5));e.cds=[0,0,0,0];e.anim='parado';e.cap=null;e.col=0;e.home={x:e.x,y:e.y};M.time.push(e);m+=ESP[e.esp].n+' agora é seu aliado.'}else m+=ESP[e.esp].n+' voltou pra mata (time cheio).';
+ if(M.selos.length>=3){M.q=8;m+=' Volte ao Padre Zé com os 3 Selos!'}
+ aviso(m,8000)}
+function cenaFerraz(){if(M.bat||M.wipe)return;const L=['Dr. Ferraz: Parabéns! Eu sabia que só um Guardião conseguiria abrir esse baú. Que talento, hein?','Dr. Ferraz: Agora me dá licença que essa Cabaça-Mãe é minha. Quem tem ela e o Apito comanda todo Encantado. E adivinha quem tem o Apito?','Dr. Ferraz: Dorme um pouco, Guardião. Quando você acordar, Angatuba já vai ter dono.'];let i=0;
+ const mostra=()=>{const fim=i>=L.length-1;dlg('Dr. Ferraz','Vereador','npc_g13',L[i],[[fim?'😨 O apito!':'Continuar',()=>{if(fim){fecharPed();derrota(true);return null}i++;return 1}]],mostra)};mostra()}
 const temEsp=e=>M.time.some(c=>c.esp===e);
 const alvoEnc=()=>{const i=M.ini||(M.time[0]&&M.time[0].esp);return i==='saci'?'curupira':'saci'};
 const NOMEENC={saci:'Saci',curupira:'Curupira'};
@@ -805,13 +819,17 @@ const PAPEL={
   if(q===0){M.q=1;M.q0=M.capturas;aviso('Dr. Almeida: Então o Jorge mandou você. Depois daquele apito os bichos ficaram soltos e seu avô não acorda. Aqui tá sua Licença de Guardião do Folclore. Mostra que dá conta: captura 2 criaturas com a cabaça e volta aqui.',9500)}
   else if(q===1){const f=M.capturas-M.q0;if(f>=2){M.q=2;aviso('Dr. Almeida: Muito bem! O Padre Zé conhece a história do Pacto. Vai falar com ele na igreja Matriz, aqui na praça.',7000)}else aviso('Dr. Almeida: Ainda faltam '+(2-f)+'. Enfraquece a criatura e joga a cabaça!',4500)}
   else if(q<5)aviso('Dr. Almeida: Segue o que o Padre Zé pediu. A cidade conta com você!',4500);
-  else if(q===5){if(M.bauLoot){M.q=6;M.time.forEach(c=>c.hp=c.hpM);aviso('Dr. Almeida: Você venceu a Mula e abriu o baú! Angatuba tem um novo Guardião do Folclore. Fim do capítulo 1 — muita coisa ainda vai aparecer por aí!',10000)}else aviso('Dr. Almeida: A Mula tá lá no norte, depois do rio. Vence ela e abre o baú da clareira.',6000)}
+  else if(q===5){if(M.bauLoot){M.q=6;M.time.forEach(c=>c.hp=c.hpM);aviso('Dr. Almeida: Vi a luz do baú daqui... Esse apito de ferro não foi por acaso. Fala com o Padre Zé, ele sabe do Pacto.',8000)}else aviso('Dr. Almeida: A Mula tá lá no norte, depois do rio. Vence ela e abre o baú da clareira.',6000)}
+  else if(q<9)aviso('Dr. Almeida: O Ferraz enganou a cidade inteira, e a Guarda dele já anda por aí. Segue o que o Padre Zé pediu.',6000);
   else aviso('Dr. Almeida: Obrigado por proteger Angatuba! Continue explorando e capturando.',4500)},
  padre(){const q=M.q;let t;M.time.forEach(c=>c.hp=c.hpM);
   if(q<2)t='Padre Zé: Fala, meu filho! Passa primeiro na Prefeitura, o Dr. Almeida tem uma tarefa pra você.';
   else if(q===2){M.q=3;const a=alvoEnc();t='Padre Zé: A cidade tem um Pacto com os Encantados desde sempre, e foi o ferro daquele apito que quebrou. Pra refazer, começa reconhecendo um deles. '+(a==='saci'?'O Saci mora no meio da mata, onde o vento faz redemoinho.':'O Curupira anda pela Mata do Pererê, ao sul, de pés virados.')+' Captura um e traz pra mim.'}
   else if(q===3){const a=alvoEnc();if(temEsp(a)){M.q=4;t='Padre Zé: Incrível, um '+NOMEENC[a]+'! Agora o Boto: ele só aparece pra quem pesca no rio ou tenta a sorte no bar. O Seu Nelson, do Pesqueiro, tem uma vara pra você.'}else t='Padre Zé: Ainda não vi o '+NOMEENC[a]+'. '+(a==='saci'?'Procura os redemoinhos na mata, longe da cidade.':'Procura na Mata do Pererê, ao sul.')}
   else if(q===4){if(temEsp('boto')){M.q=5;t='Padre Zé: Você tá pronto. A Mula sem Cabeça fica na clareira ao norte e guarda um baú que só Guardião abre. Vence ela e abre o baú.'}else t='Padre Zé: O Boto ainda não tá com você. Pesca no rio ou tenta a sorte no bar.'}
+  else if(q===6){M.q=7;criaCapatazes();t='Padre Zé: Foi o Ferraz, então. Ele quebrou o Pacto com o apito e agora tem a Cabaça-Mãe. Mas o Pacto se sustenta em 3 Marcos de pedra: no Brejo da Iara (oeste), na Mata do Pererê (sul) e na Serra do Lobisomem (nordeste). A Guarda Ferraz prendeu cada Marco com correntes e pôs um bicho de coleira de ferro pra vigiar. Vence o bicho, a coleira quebra e ele vira seu aliado.'}
+  else if(q===7){const f=['W','S','NE'].filter(k=>!M.selos.includes(k)).map(k=>MARCOS[k].n).join(', ');t='Padre Zé: Você já libertou '+M.selos.length+' de 3 Marcos. Faltam: '+f+'.'}
+  else if(q===8){M.q=9;t='Padre Zé: Os 3 Selos! Agora há pouco o Jorge abriu os olhos e sussurrou que o apito só quebra na Estação Velha, onde foi forjado. A Guarda já bloqueou as estradas, então se prepara. A próxima parte da história vem aí!'}
   else t='Padre Zé: Que Deus te guie. A Matriz tá sempre aberta.';
   aviso(t+' (O time se recuperou.)',9000)},
  vara(){if(!M.vara){M.vara=true;aviso('Seu Nelson: Toma essa vara de presente! Vai num córrego ou rio e toca em Pescar. Dizem que o Boto cai fácil na isca de quem tem paciência.',8000)}else aviso('Seu Nelson: Pesca boa é com paciência. Perto d’água, toca em Pescar.',4500)},
@@ -828,7 +846,10 @@ function objetivo(){const q=M.q,pref=pt(DOORS.find(d=>d.sala==='prefeitura')),ig
  if(q===3){const a=alvoEnc(),N=NOMEENC[a];return temEsp(a)?{t:'Volte ao Padre com o '+N,a:igr}:a==='saci'?{t:'Capture um Saci nos redemoinhos da mata',a:maisPerto(REDE)}:{t:'Capture um Curupira na Mata do Pererê (sul)',a:{x:ZL.S[0]*T,y:ZL.S[1]*T}}}
  if(q===4)return temEsp('boto')?{t:'Volte ao Padre com o Boto',a:igr}:{t:M.vara?'Capture um Boto: pesque num córrego ou tente a sorte no bar':'Pegue a vara com Seu Nelson (Pesqueiro) e capture um Boto',a:M.vara?null:pt(DOORS.find(d=>d.sala==='pesqueiro'))};
  if(q===5)return M.bauLoot?{t:'Volte ao Prefeito',a:pref}:M.bauAberto?{t:'Abra o baú na clareira ao norte',a:{x:BAU.x,y:BAU.y}}:{t:'Derrote a Mula sem Cabeça, ao norte',a:{x:(BX+.5)*T,y:(BY+1)*T}};
- return{t:'Capítulo 1 completo! Explore e capture todas as criaturas',a:null}}
+ if(q===6)return{t:'Fale com o Padre Zé: o Ferraz levou a Cabaça-Mãe',a:igr};
+ if(q===7){const l=OBJ.filter(o=>o.marco&&!M.selos.includes(o.marco));return{t:'Liberte os 3 Marcos do Pacto ('+M.selos.length+'/3)'+(l.length?': '+maisPerto(l).nome:''),a:maisPerto(l)}}
+ if(q===8)return{t:'Volte ao Padre com os 3 Selos',a:igr};
+ return{t:'Parte 2 completa! Em breve: a Estação Velha. Enquanto isso, explore e capture',a:null}}
 function seta(a){const dx=a.x-M.j.x,dy=a.y-M.j.y,m=Math.round(Math.hypot(dx,dy)/T*6/10)*10,i=((Math.round(Math.atan2(dy,dx)/(Math.PI/4))%8)+8)%8;return ['→','↘','↓','↙','←','↖','↑','↗'][i]+' '+(m>=1000?(m/1000).toFixed(1)+' km':m+' m')}
 function atualizaQuest(){const el=document.getElementById('quest');if(!el)return;const o=objetivo(),t='📜 '+o.t+(o.a&&!M.cena?' '+seta(o.a):'');if(el.textContent!==t)el.textContent=t}
 // ---------- pesca ----------
@@ -847,12 +868,12 @@ function abrirBau(){if(!bauPerto())return;
  if(M.bauLoot){aviso('O baú está vazio.');return}
  if(M.time.length>=6){aviso('Seu time está cheio (6). Deixe um lugar e volte.',3200);return}
  const m=criatura('mula',6,M.j.x+30,M.j.y+10);m.hp=m.hpM;M.time.push(m);M.bauLoot=true;M.time.forEach(c=>c.hp=c.hpM);
- aviso('Do baú saiu uma Mula sem Cabeça filhote! Ela entrou pro seu time e todos se recuperaram.',5200);montaHUD();salvar()}
+ aviso('Do baú saiu uma Mula sem Cabeça filhote! Ela entrou pro seu time e todos se recuperaram.',5200);montaHUD();M.q=6;setTimeout(cenaFerraz,3600);salvar()}
 // ---------- salvar ----------
-function salvar(){try{localStorage.setItem('cf_proto2',JSON.stringify({time:M.time.map(c=>({esp:c.esp,lvl:c.lvl,hp:c.hp,xp:c.xp})),ativo:M.ativo,bau:M.bauAberto,bl:M.bauLoot,v:M.vitorias,c:M.capturas,q:M.q,q0:M.q0,ini:M.ini,vr:M.vara,din:M.din,cab:M.cab,poc:M.poc,pm:M.pm,nw:M.npcW,x:(M.cena?M.fora:M.j).x,y:(M.cena?M.fora:M.j).y,o:1}))}catch(e){}}
+function salvar(){try{localStorage.setItem('cf_proto2',JSON.stringify({time:M.time.map(c=>({esp:c.esp,lvl:c.lvl,hp:c.hp,xp:c.xp})),ativo:M.ativo,bau:M.bauAberto,bl:M.bauLoot,v:M.vitorias,c:M.capturas,q:M.q,q0:M.q0,ini:M.ini,sl:M.selos,vr:M.vara,din:M.din,cab:M.cab,poc:M.poc,pm:M.pm,nw:M.npcW,x:(M.cena?M.fora:M.j).x,y:(M.cena?M.fora:M.j).y,o:1}))}catch(e){}}
 function carregarSave(){try{const s=JSON.parse(localStorage.getItem('cf_proto2'));if(!s||!s.time||!s.time.length)return false;
  if(!s.o){s.x+=OFF*T;s.y+=OFF*T}novoJogo(s.time[0].esp);M.time=s.time.map(o=>{const c=criatura(o.esp,o.lvl,s.x,s.y+20);c.hp=Math.min(c.hpM,o.hp);c.xp=o.xp||0;return c});M.ativo=Math.min(s.ativo||0,M.time.length-1);M.parc=M.time[M.ativo];
- M.bauAberto=!!s.bau;M.bauLoot=!!s.bl;M.vitorias=s.v||0;M.capturas=s.c||0;M.q=s.q||0;M.q0=s.q0||0;M.ini=s.ini||'';M.vara=!!s.vr;M.din=s.din==null?60:s.din;M.cab=s.cab==null?8:s.cab;M.poc=s.poc==null?2:s.poc;if(s.pm)M.pm=s.pm;if(s.nw)M.npcW=s.nw;if(M.bauAberto){remover(M.boss)}if(livre(s.x,s.y)){M.j.x=M.j.px=s.x;M.j.y=M.j.py=s.y}montaHUD();return true}catch(e){return false}}
+ M.bauAberto=!!s.bau;M.bauLoot=!!s.bl;M.vitorias=s.v||0;M.capturas=s.c||0;M.q=s.q||0;M.q0=s.q0||0;M.ini=s.ini||'';M.selos=Array.isArray(s.sl)?s.sl:[];criaCapatazes();M.vara=!!s.vr;M.din=s.din==null?60:s.din;M.cab=s.cab==null?8:s.cab;M.poc=s.poc==null?2:s.poc;if(s.pm)M.pm=s.pm;if(s.nw)M.npcW=s.nw;if(M.bauAberto){remover(M.boss)}if(livre(s.x,s.y)){M.j.x=M.j.px=s.x;M.j.y=M.j.py=s.y}montaHUD();return true}catch(e){return false}}
 // ---------- tela ----------
 const cv=document.getElementById('cv'),cx=cv.getContext('2d');let Z=2,ZB=2,VW=400,VH=600,DPR=1;
 function redim(){DPR=window.devicePixelRatio||1;const SW=Math.max(168,Math.min(230,Math.round(innerWidth*.24)));document.documentElement.style.setProperty('--sw',SW+'px');const w=innerWidth-SW,h=innerHeight;cv.width=Math.max(10,Math.round(w*DPR));cv.height=Math.max(10,Math.round(h*DPR));Z=ZB=Math.max(1,Math.floor(Math.min(cv.width/(13*T),cv.height/(8.5*T))*4)/4);VW=cv.width/Z;VH=cv.height/Z;cx.imageSmoothingEnabled=false}
@@ -875,7 +896,10 @@ function desenharFora(ag){const j=M.j;const jx=lerp(j.px,j.x,ag),jy=lerp(j.py,j.
  const C0x=Math.floor(x0/8),C0y=Math.floor(y0/8),C1x=Math.floor(x1/8),C1y=Math.floor(y1/8);
  for(let cy2=C0y;cy2<=C1y;cy2++)for(let cx2=C0x;cx2<=C1x;cx2++){const ch=chunk(cx2,cy2);if(ch)cx.drawImage(ch,cx2*8*T-ox,cy2*8*T-oy)}
  if(M.t%40===0)for(const k in CH){const q=k.split(',');if(+q[0]<C0x-2||+q[0]>C1x+2||+q[1]<C0y-2||+q[1]>C1y+2)delete CH[k]}
- for(const o of OBJ){if(o.sign){const x=o.x-ox,y=o.y-oy;if(x<-90||x>VW+90||y<-20||y>VH+90)continue;objs.push({y:o.y,d:()=>{sombra(x,y-2,9);cx.font='bold 9px system-ui';const w=Math.max(cx.measureText(o.sign).width,cx.measureText(o.lv).width)+16,X=Math.round(x-w/2),Y=Math.round(y-70);cx.fillStyle='#4a321e';cx.fillRect(Math.round(x-3),Y+30,6,40);cx.fillStyle='#2a1c12';cx.fillRect(X-2,Y-2,w+4,36);cx.fillStyle='#9a6b40';cx.fillRect(X,Y,w,32);cx.fillStyle='#b78350';cx.fillRect(X,Y,w,3);cx.textAlign='center';cx.fillStyle='#2a1c12';cx.fillText(o.sign,Math.round(x),Y+14);cx.fillStyle='#fff3c8';cx.fillText(o.lv,Math.round(x),Y+26)}});continue}const im=PIMG[o.img];if(!im)continue;const x=o.x-ox,y=o.y-oy;if(x<-im.width||x>VW+im.width||y<-20||y-im.height>VH)continue;
+ for(const o of OBJ){if(o.sign){const x=o.x-ox,y=o.y-oy;if(x<-90||x>VW+90||y<-20||y>VH+90)continue;objs.push({y:o.y,d:()=>{sombra(x,y-2,9);cx.font='bold 9px system-ui';const w=Math.max(cx.measureText(o.sign).width,cx.measureText(o.lv).width)+16,X=Math.round(x-w/2),Y=Math.round(y-70);cx.fillStyle='#4a321e';cx.fillRect(Math.round(x-3),Y+30,6,40);cx.fillStyle='#2a1c12';cx.fillRect(X-2,Y-2,w+4,36);cx.fillStyle='#9a6b40';cx.fillRect(X,Y,w,32);cx.fillStyle='#b78350';cx.fillRect(X,Y,w,3);cx.textAlign='center';cx.fillStyle='#2a1c12';cx.fillText(o.sign,Math.round(x),Y+14);cx.fillStyle='#fff3c8';cx.fillText(o.lv,Math.round(x),Y+26)}});continue}if(o.marco){const x=o.x-ox,y=o.y-oy;if(x<-90||x>VW+90||y<-20||y>VH+90)continue;const lv=M.selos.includes(o.marco);objs.push({y:o.y,d:()=>{sombra(x,y-2,14);cx.fillStyle='#6d7078';cx.fillRect(Math.round(x-7),Math.round(y-58),14,56);cx.fillStyle='#8b8f98';cx.fillRect(Math.round(x-7),Math.round(y-58),5,56);cx.fillStyle='#6d7078';cx.fillRect(Math.round(x-17),Math.round(y-46),34,9);cx.fillStyle='#8b8f98';cx.fillRect(Math.round(x-17),Math.round(y-46),34,3);
+ if(lv){cx.fillStyle='rgba(120,255,150,'+(.35+.2*Math.sin(performance.now()/260))+')';cx.beginPath();cx.arc(x,y-34,26,0,7);cx.fill()}else{cx.strokeStyle='#1d1f24';cx.lineWidth=3;cx.beginPath();cx.moveTo(x-17,y-44);cx.lineTo(x+8,y-12);cx.moveTo(x+17,y-44);cx.lineTo(x-8,y-12);cx.moveTo(x-9,y-52);cx.lineTo(x+9,y-30);cx.stroke();cx.fillStyle='#c9a227';cx.fillRect(Math.round(x-4),Math.round(y-30),8,8)}
+ cx.font='bold 9px system-ui';cx.textAlign='center';const tx=(lv?'✔ ':'⛓ ')+o.nome,w=cx.measureText(tx).width+10;cx.fillStyle='#000a';cx.fillRect(Math.round(x-w/2),Math.round(y-76),w,13);cx.fillStyle=lv?'#9ff0a8':'#ffd98a';cx.fillText(tx,Math.round(x),Math.round(y-66))}});continue}
+ const im=PIMG[o.img];if(!im)continue;const x=o.x-ox,y=o.y-oy;if(x<-im.width||x>VW+im.width||y<-20||y-im.height>VH)continue;
   objs.push({y:o.y,d:()=>{if(!o.grande&&o.img!=='igreja'&&o.img!=='fonte')sombra(x,y-2,im.width*.32);cx.drawImage(im,Math.round(x-im.width/2),Math.round(y-im.height));if(o.bau&&M.bauAberto&&!M.bauLoot){cx.fillStyle='rgba(255,230,120,'+(.35+.25*Math.sin(performance.now()/200))+')';cx.beginPath();cx.arc(x,y-16,22,0,7);cx.fill()}}})}
  for(const r of REDE){const x=r.x-ox,y=r.y-oy;if(x<-60||x>VW+60||y<-40||y>VH+120)continue;objs.push({y:r.y,d:()=>{const t=performance.now()/260;for(let k=0;k<8;k++){const yy=y-k*7,rr=4+k*2.3,ph=t+k*.7;cx.fillStyle='rgba(214,198,150,'+(.8-.08*k)+')';cx.beginPath();cx.ellipse(x+Math.sin(ph)*3,yy,rr,rr*.36,0,0,7);cx.fill();cx.fillStyle='rgba(120,160,70,.9)';cx.fillRect(Math.round(x+Math.cos(ph*1.3+k)*rr),Math.round(yy-2),2,2)}}})}
  const ents=[];
@@ -883,6 +907,7 @@ function desenharFora(ag){const j=M.j;const jx=lerp(j.px,j.x,ag),jy=lerp(j.py,j.
  for(const e of ents){const x=lerp(e.px,e.x,ag)-ox,y=lerp(e.py,e.y,ag)-oy;if(x<-80||y<-100||x>VW+80||y>VH+40)continue;
   objs.push({y:e.y,d:()=>{const an=animDe(e);sombra(x,y,e.boss?26:16);let al=null;if(e.hp<=0&&e===M.parc)al=.45;if(e.corpo){al=.6;cx.save();cx.filter='grayscale(1) brightness(.85)'}
    if(e.boss&&M.bat&&M.bat.fase2){cx.save();cx.filter='hue-rotate(185deg) saturate(1.4)';desenhaSprite(cx,e.esp,an.a,quadro(e,ag),x,y,an.esq,al);cx.restore()}else desenhaSprite(cx,e.esp,an.a,quadro(e,ag),x,y,an.esq,al);
+   if((e.col||e.cap)&&!e.corpo){cx.strokeStyle='#1d1f24';cx.lineWidth=4;cx.beginPath();cx.ellipse(Math.round(x),Math.round(y-3),15,6,0,0,7);cx.stroke();cx.strokeStyle='#a3a9b4';cx.lineWidth=2;cx.beginPath();cx.ellipse(Math.round(x),Math.round(y-3),15,6,0,0,7);cx.stroke();cx.font='12px system-ui';cx.textAlign='center';cx.fillText('⛓️',Math.round(x+20),Math.round(y-(e.boss?100:78)+8))}
    if(e.corpo){cx.restore();if(corpoPerto()===e){cx.font='bold 10px system-ui';cx.textAlign='center';cx.fillStyle='#ffe08a';cx.fillText('🎃 toque pra capturar',x,y-70)}}
    else{if(e!==M.parc||M.bat){barra(x,y-(e.boss?100:78),e)}else if(e.hp<e.hpM)barra(x,y-78,e);
     if(e!==M.parc&&(e===M.alvo||(M.bat&&M.bat.inimigo===e))){cx.strokeStyle='#e03030';cx.lineWidth=2;const hh=e.boss?104:78;cx.strokeRect(Math.round(x-28),Math.round(y-hh+2),56,hh)}}}})}
@@ -952,7 +977,7 @@ function telaInicial(){
    c.onclick=()=>{d.remove();telaCheia();novoJogo(esp);M.ini=esp;salvar();montaAcoes();aviso('Vô Jorge: Ela te escolheu. Vai lá na Prefeitura pegar sua Licença de Guardião. O Dr. Almeida explica tudo.',9000)};pk.appendChild(c)}
   d.appendChild(pk)};
  pag()}
-Promise.all([carregar(),carregarCenario(),carregarNpcs()]).then(()=>{tramaRuas();if(carregarSave()){montaAcoes();aviso('Jogo carregado')}else telaInicial();
+Promise.all([carregar(),carregarCenario(),carregarNpcs()]).then(()=>{tramaRuas();criaMarcos();if(carregarSave()){montaAcoes();aviso('Jogo carregado')}else telaInicial();
  cam.x=(M.j?M.j.x:CX*T)-VW/2;cam.y=(M.j?M.j.y:CY*T)-VH/2;
  const wait=()=>{if(!M.j){requestAnimationFrame(wait);return}ultimo=performance.now();requestAnimationFrame(loop)};wait()});
 </script></body></html>

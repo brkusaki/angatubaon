@@ -72,6 +72,7 @@ canvas{display:block;width:100vw;height:100vh;image-rendering:pixelated}
 #shop h2{margin:0 0 4px;font-size:16px;color:#f0b43c}#shop .m{font-size:12px;color:#f0d36a;margin-bottom:8px}
 #shop .li{display:flex;align-items:center;gap:8px;background:#2d2217;border:2px solid #3a2c1b;border-radius:4px;padding:6px;margin-bottom:6px}
 #shop .li span{flex:1;font-size:13px}#shop .li button{min-height:34px;padding:4px 10px;font:700 12px system-ui}
+#shop .f{margin:0 0 8px;font-size:12px;font-style:italic;opacity:.85;max-width:380px}#shop .st{min-height:16px;margin:2px 0 6px;font-size:12px;color:#ffe08a}
 #pdlg{position:fixed;left:0;right:var(--sw);bottom:0;z-index:21;display:none;flex-direction:column;align-items:center;padding:0 10px 8px;pointer-events:none}
 #pdlg>*{pointer-events:auto}
 #pdlg .pbox{position:relative;width:min(640px,100%);min-height:84px;box-sizing:border-box;background:#f8f8f8;border:4px solid #3c5aa8;border-radius:14px;box-shadow:inset 0 0 0 3px #a9bce8,0 4px 0 #1d2f6a;padding:10px 26px 10px 14px;display:flex;gap:12px;align-items:center;cursor:pointer}
@@ -365,10 +366,10 @@ function zonaAviso(){const k=zonaEm(M.j.x/T|0,M.j.y/T|0)||'';if(k===M.zk)return;
  if(k){for(let i=0;i<7;i++)spawnSelvagem(16);const Z=ZON[k];aviso('📍 '+Z.n+' — criaturas Nv '+Z.lv[0]+' a '+Z.lv[1])}else if(URB[(M.j.y/T|0)*MW+(M.j.x/T|0)])aviso('📍 Angatuba — a cidade tem poucas criaturas. Procure nas matas e campos ao redor (toque no minimapa pra ver o mapa).')}
 function spawnSacis(){for(const r of REDE){if(r.sac&&M.selv.includes(r.sac))continue;r.sac=null;const d=Math.hypot(r.x-M.j.x,r.y-M.j.y)/T;if(d<9||d>40||R()<.5)continue;
  const c=criatura('saci',nivel(Math.hypot(r.x-CX*T,r.y-CY*T)/T),r.x,r.y-4);c.home={x:r.x,y:r.y};r.sac=c;M.selv.push(c)}}
-function novoJogo(inicial){M.j={x:(CX+.5)*T,y:(CY+3.6)*T,px:(CX+.5)*T,py:(CY+3.6)*T,dir:'cima',esq:false,mov:false,anim:'parado',a0:0,esp:'treinador'};
+function novoJogo(inicial,carregando){M.j={x:(CX+.5)*T,y:(CY+3.6)*T,px:(CX+.5)*T,py:(CY+3.6)*T,dir:'cima',esq:false,mov:false,anim:'parado',a0:0,esp:'treinador'};
  M.time=[criatura(inicial,5,M.j.x-30,M.j.y+20)];M.ativo=0;M.parc=M.time[0];
  for(let i=0;i<26;i++)spawnSelvagem(40);spawnSacis();
- const b=criatura('mula',10,(BX+.5)*T,(BY+1)*T);b.boss=true;M.selv.push(b);M.boss=b;criaCapatazes();salvar();montaHUD()}
+ const b=criatura('mula',10,(BX+.5)*T,(BY+1)*T);b.boss=true;M.selv.push(b);M.boss=b;criaCapatazes();if(!carregando)salvar();montaHUD()}
 // comandos
 const entrada={dx:0,dy:0};
 function tick(){M.t++;const j=M.j;
@@ -388,12 +389,12 @@ function tick(){M.t++;const j=M.j;
    if(M.t%10===0)for(const c of M.time)if(c.hp>0&&c.hp<c.hpM)c.hp++}}
  // selvagens vagando
  if(!M.cena)for(const e of M.selv.slice()){if(e.corpo){if(!e.pegando&&M.t-e.t0>450)remover(e);continue}if(M.bat&&M.bat.inimigo===e){e.mov=false;e.dir='direita';e.esq=true;continue}
-  if(HOSTIL.has(e.esp)&&!e.boss&&!e.cap&&!M.bat&&!M.seguir&&M.t>60&&M.t>(M.graca||0)&&Math.hypot(j.x/T-CX,j.y/T-CY)>13){const dj=Math.hypot(e.x-j.x,e.y-j.y);if(dj<T*5){andarPara(e,j.x,j.y,9);e.mov=true;if(dj<T*1.7){aviso(ESP[e.esp].n+' te atacou!');iniciarBatalha(e)}continue}}
+  if(HOSTIL.has(e.esp)&&!e.boss&&!e.cap&&!M.bat&&!M.seguir&&!M.wipe&&!pd._fixo&&M.t>60&&M.t>(M.graca||0)&&Math.hypot(j.x/T-CX,j.y/T-CY)>13){const dj=Math.hypot(e.x-j.x,e.y-j.y);if(dj<T*5){andarPara(e,j.x,j.y,9);e.mov=true;if(dj<T*1.7){aviso(ESP[e.esp].n+' te atacou!');iniciarBatalha(e)}continue}}
   if(e.espera>0){e.espera--;e.mov=false;continue}
-  if(!e.alvo||Math.hypot(e.alvo.x-e.x,e.alvo.y-e.y)<8){if(R()<.5){e.espera=10+R()*30|0;e.alvo=null;continue}const r=e.boss?T*3:T*4;e.alvo={x:e.home.x+(R()*2-1)*r,y:e.home.y+(R()*2-1)*r}}
+  if(!e.alvo||Math.hypot(e.alvo.x-e.x,e.alvo.y-e.y)<8){if(R()<.5){e.espera=10+R()*30|0;e.alvo=null;continue}const r=e.boss?T*3:e.cap?T*.6:T*4;e.alvo={x:e.home.x+(R()*2-1)*r,y:e.home.y+(R()*2-1)*r}}
   const ox=e.x,oy=e.y,sp=e.boss?10:7;andarPara(e,e.alvo.x,e.alvo.y,sp);if(Math.hypot(e.x-ox,e.y-oy)<sp*.6){e.trava=(e.trava||0)+1;if(e.trava>=3){e.alvo=null;e.mov=false;e.trava=0;e.espera=20+R()*30|0}}else e.trava=0}
  trafegoTick();if(M.t%8===0&&!M.cena)zonaAviso();
- if(pd.style.display!=='none'&&(pd._q?Math.hypot(pd._q.x-j.x,pd._q.y-j.y)>T*3.4:Math.hypot(entrada.dx,entrada.dy)>.3))fecharPed();
+ if(pd.style.display!=='none'&&!pd._fixo&&(pd._q?Math.hypot(pd._q.x-j.x,pd._q.y-j.y)>T*3.4:Math.hypot(entrada.dx,entrada.dy)>.3))fecharPed();
  // batalha
  if(M.bat)tickBatalha();
  if(!M.bat&&!M.cena&&M.t%150===0){for(const e of M.selv.slice())if(!e.boss&&!e.cap&&Math.hypot(e.x-j.x,e.y-j.y)>T*55)remover(e);};if(!M.bat&&!M.cena&&M.t%60===0){if(M.selv.length<34){spawnSelvagem();spawnSelvagem()}spawnSacis()}
@@ -402,8 +403,9 @@ function andarPara(e,tx,ty,sp){const dx=tx-e.x,dy=ty-e.y,d=Math.hypot(dx,dy);if(
 // ---------- batalha ----------
 function mult(gel,del){return FORTE[gel].includes(del)?1.6:FORTE[del]&&FORTE[del].includes(gel)&&gel!=='Normal'?.7:1}
 function dano(at,df,g){const m=Math.max(mult(g.el,ESP[df.esp].el),mult(g.el,ESP[df.esp].el2)===1.6?1.3:1);const crit=R()<.06;const v=Math.max(1,Math.round(g.pot*(ESP[at.esp].atk/11)*(1+at.lvl*.1)*m*(.85+R()*.3)*(crit?1.5:1)));return{v,m,crit}}
-function iniciarBatalha(e){if(M.bat||!M.parc)return;if(M.parc.hp<=0){aviso(ESP[M.parc.esp].n+' está desmaiado. Troque ou espere.');return}
+function iniciarBatalha(e){if(M.bat||!M.parc||M.wipe||pd._fixo)return;if(M.parc.hp<=0){aviso(ESP[M.parc.esp].n+' está desmaiado. Troque ou espere.');return}
  if(Math.hypot(e.x-M.j.x,e.y-M.j.y)>T*4){aviso('Chegue mais perto');return}
+ fecharPed();fecharLoja();if(M.wipe)return;
  M.bat={inimigo:e,cdI:22,fila:[]};e.alvo=null;aviso((e.boss?'Chefe! ':'Uma ')+ESP[e.esp].n+' Nv '+e.lvl+' apareceu!');montaAcoes()}
 function usarGolpe(i){const b=M.bat;if(!b)return;const p=M.parc;if(p.hp<=0||p.cds[i]>0)return;const g=p.golpes[i];p.cds[i]=g.cd;p.anim='ataque';p.a0=M.t;b.fila.push({quando:M.t+4,de:p,para:b.inimigo,g})}
 function tickBatalha(){const b=M.bat,p=M.parc,e=b.inimigo;
@@ -415,7 +417,7 @@ function tickBatalha(){const b=M.bat,p=M.parc,e=b.inimigo;
   M.fx.push({t0:performance.now(),x0:a.de.x,y0:a.de.y-30,x1:a.para.x,y1:a.para.y-30,cor:(a.de===e&&b.fase2)?'#6ab8ff':EL[a.g.el],proj:a.g.proj,txt:'-'+r.v+(r.crit?'!':''),m:r.m});
   if(r.m>1)aviso('É super efetivo!');}
  if(e.hp<=0){const xp=e.lvl*12;let up=ganhaXp(p,xp);for(const c of M.time)if(c!==p&&c.hp>0)ganhaXp(c,Math.ceil(xp/2));
-  const din=e.lvl*6+(R()*8|0);M.din+=din;M.vitorias++;if(e.boss){M.bauAberto=true;aviso('Você venceu a Mula sem Cabeça! Chegue perto do baú da Matriz e toque em Abrir.'+up)}else aviso('Vitória sobre '+ESP[e.esp].n+'! +'+xp+' XP, +R$ '+din+'.'+up);
+  const din=e.lvl*6+(R()*8|0);M.din+=din;M.vitorias++;if(e.boss){M.bauAberto=true;aviso('Você venceu a Mula sem Cabeça! '+(M.q<5?'O baú da clareira continua selado: só abre pra um Guardião abençoado pelo Padre Zé.':'Chegue perto do baú da clareira e toque em Abrir.')+up)}else aviso('Vitória sobre '+ESP[e.esp].n+'! +'+xp+' XP, +R$ '+din+'.'+up);
   if(e.boss)remover(e);else if(e.cap)libertaMarco(e);else{if(e.col){e.col=0;M.coleiras=(M.coleiras||0)+1;aviso('⛓️ A coleira de ferro quebrou!')}e.corpo=true;e.t0=M.t;e.mov=false;e.anim='parado';e.alvo=null;aviso('A criatura caiu! Chegue perto e toque nela (ou em Cabaça) pra jogar a cabaça. Você tem '+M.cab+'.')}
   if(M.alvo===e)M.alvo=null;fimBatalha()}
  else if(p.hp<=0){aviso(ESP[p.esp].n+' desmaiou!');const outro=M.time.findIndex(c=>c.hp>0);if(outro>=0){trocar(outro,true)}else{fimBatalha();derrota()}}}
@@ -565,7 +567,7 @@ function direcao(dx,dy){return BUSSOLA[(Math.round(Math.atan2(dy,dx)/(Math.PI/4)
 function fala(q,t,d){q.bolha={t,ate:M.t+(d||30)}}
 const pd=document.getElementById('pdlg');
 function pedPerto(){if(M.cena||M.bat)return null;let m=null,md=T*1.9;for(const q of TR.ped.concat(RURAL)){const d=Math.hypot(q.x-M.j.x,q.y-M.j.y);if(d<md){md=d;m=q}}return m}
-function fecharPed(){if(pd.style.display==='none')return;clearInterval(pd._iv);pd.style.display='none';const q=pd._q;if(q){q.estado=null;q.pausa=12;q.conv=false;pd._q=null}}
+function fecharPed(){if(pd.style.display==='none')return;clearInterval(pd._iv);pd.style.display='none';pd._fixo=false;const q=pd._q;if(q){q.estado=null;q.pausa=12;q.conv=false;pd._q=null}const f=pd._aoFechar;pd._aoFechar=null;if(f)f()}
 function bicho(q,so){let m=null,md=1e9;for(const e of M.selv){if(e.corpo||e.boss)continue;if(so&&!HOSTIL.has(e.esp))continue;const d=Math.hypot(e.x-q.x,e.y-q.y);if(d<md){md=d;m=e}}
  if(!m)return null;return ESP[m.esp].n+' (Nv '+m.lvl+') lá pro '+direcao(m.x-M.j.x,m.y-M.j.y)+', uns '+Math.round(md/T*6)+' metros daqui'}
 function dicaZona(){const ks=Object.keys(ZON),k=ks[R()*ks.length|0],Z=ZON[k],cx0=ZL[k][0],cy0=ZL[k][1];
@@ -608,7 +610,7 @@ function dlg(nome,sub,key,txt,ops,onRes){clearInterval(pd._iv);pd.style.display=
  pd._iv=setInterval(()=>{i+=2;el.textContent=txt.slice(0,i);if(i>=txt.length)acaba()},24)}
 function renderPed(q,txt){const P=PERS[q.pers],ops=q.adiv?q.adiv.ops.map(([t,i])=>[t,()=>{const a=q.adiv.a,ok=i===a.c;q.adiv=null;if(ok){const v=ganhoNpc(5),r=xpNpc(M.parc,8);montaBag();return q.nome+': Acertou! 🎉 '+(v||r?'Toma '+(v?'R$ '+v:'')+(v&&r?' e ':'')+(r?'um tiquinho de XP pro seu bicho.'+r.up:''):'Mas hoje já te dei prêmio demais, fica só com a glória!')}return q.nome+': Errou! Era '+a.o[a.c]+'. Hahaha!'}]):opsPed(q);
  dlg(q.nome,P.ic+' '+P.t+(M.pm[q.gi]&&M.pm[q.gi].amigo?' · amigo':''),'npc_g'+(q.fg==null?q.gi:q.fg),txt,ops,r=>renderPed(q,r))}
-function abrirPed(q){if(M.bat||M.cena||!q)return;pd._q=q;q.estado='dialogo';q.conv=true;q.pausa=9999;q.mov=false;q.bolha=null;q.esq=M.j.x<q.x;
+function abrirPed(q){if(M.bat||M.cena||!q||pd._fixo)return;pd._q=q;q.estado='dialogo';q.conv=true;q.pausa=9999;q.mov=false;q.bolha=null;q.esq=M.j.x<q.x;
  if(q.rouba){M.din+=q.rouba;const bo=ganhoNpc(2);q.rouba=0;q.fimP=0;renderPed(q,q.nome+': Ai, me pegou! Toma seu dinheiro de volta'+(bo?' e mais R$ '+bo+' de prêmio':'')+'. Você é rápido!');return}
  renderPed(q,q.nome+': '+SAUDA[q.pers][R()*SAUDA[q.pers].length|0]+' '+(R()<.5?'(Toque nas opções abaixo.)':''))}
 function encontro(A,B){const ks=[A.pers,B.pers].sort();let a=A,b=B;if(A.pers!==ks[0]){a=B;b=A}
@@ -688,7 +690,7 @@ function reposiciona(x,y,dir){const j=M.j;j.x=j.px=x;j.y=j.py=y;j.dir=dir;j.esq=
 function entrar(d){M.fora={x:(d.tx+.5)*T,y:(d.ty+1)*T+26};M.cena=salaDe(d.sala,d.v);reposiciona((M.cena.sx+.5)*T,(M.cena.h-2)*T+40,'cima');aviso((M.cena.rot?M.cena.rot+' — ':'')+M.cena.npc.n+'. Chegue perto e toque em Falar.')}
 function andar(dir){const c=M.cena,k=dir==='up'?c.up:c.down;if(!k)return;M.cena=salaDe(k,c.v);const e=M.cena.esc;reposiciona((e[0]+.5)*T,(e[1]+1.55)*T,'baixo');aviso(dir==='up'?'Andar de cima':'Térreo',1400)}
 function sair(){const f=M.fora;M.cena=null;M.fora=null;reposiciona(f.x,f.y,'baixo');if(M.pend){const e=M.pend;M.pend=null;setTimeout(()=>surgir(e),800)}}
-function surgir(esp){if(M.cena||M.bat)return;const e=criatura(esp,nivel(Math.hypot(M.j.x-CX*T,M.j.y-CY*T)/T)+1,M.j.x+60,M.j.y+14);e.efem=true;e.home={x:e.x,y:e.y};M.selv.push(e);aviso('O Boto ciumento te esperava na porta do bar!',2500);iniciarBatalha(e);if(!M.bat)remover(e)}
+function surgir(esp){if(M.cena){M.pend=M.pend||esp;return}if(M.bat)return;const e=criatura(esp,nivel(Math.hypot(M.j.x-CX*T,M.j.y-CY*T)/T)+1,M.j.x+60,M.j.y+14);e.efem=true;e.home={x:e.x,y:e.y};M.selv.push(e);aviso('O Boto ciumento te esperava na porta do bar!',2500);iniciarBatalha(e);if(!M.bat)remover(e)}
 function npcPerto(){if(!M.cena)return null;const n=M.cena.npc;return n&&Math.hypot(n.x-M.j.x,n.y-M.j.y)<T*1.8?n:null}
 function falar(){const n=npcPerto();if(!n){aviso('Chegue mais perto');return}M.npcF=n;try{falar2(n)}finally{M.npcF=null}}
 function falar2(n){
@@ -718,11 +720,12 @@ function montaBag(){const b=document.getElementById('bag');if(!b)return;const k=
  const d=document.createElement('div');d.className='din';d.textContent='💰 R$ '+M.din;b.appendChild(d)}
 function usarItem(k){if(k==='poc'){const p=M.parc;if(M.poc<=0){aviso('Você não tem poções.');return}if(!p||p.hp<=0){aviso('Essa criatura desmaiou, troque ou espere.');return}if(p.hp>=p.hpM){aviso(ESP[p.esp].n+' já está com a vida cheia.');return}
   M.poc--;p.hp=Math.min(p.hpM,p.hp+60);aviso('Você deu uma poção pro '+ESP[p.esp].n+'. +60 de vida.');montaBag()}}
-function abrirLoja(itens,nome){const sh=document.getElementById('shop');M.loja=itens;
- const render=()=>{sh.innerHTML='<div class="box"><h2>'+nome+'</h2><div class="m">💰 R$ '+M.din+'</div>'+itens.map(k=>'<div class="li"><span>'+ICO[k]+' '+NOMEI[k]+'</span><b>R$ '+PRECO[k]+'</b><button data-k="'+k+'">Comprar</button></div>').join('')+'<button class="fechar" style="width:100%;margin-top:4px">Fechar</button></div>';
-  sh.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{const k=b.dataset.k;if(M.din<PRECO[k]){aviso(nome+': Falta dinheiro, freguês.');return}M.din-=PRECO[k];M[k]++;aviso('Você comprou '+NOMEI[k].split(' (')[0]+'.');montaBag();render()});
-  sh.querySelector('.fechar').onclick=()=>{sh.style.display='none'}};
+function abrirLoja(itens,nome,fala){const sh=document.getElementById('shop');M.loja=itens;
+ const render=st=>{sh.innerHTML='<div class="box"><h2>'+nome+'</h2>'+(fala?'<p class="f">“'+fala+'”</p>':'')+'<div class="m">💰 R$ '+M.din+'</div>'+itens.map(k=>'<div class="li"><span>'+ICO[k]+' '+NOMEI[k]+'</span><b>R$ '+PRECO[k]+'</b><button data-k="'+k+'">Comprar</button></div>').join('')+'<div class="st">'+(st||'')+'</div><button class="fechar" style="width:100%;margin-top:4px">Fechar</button></div>';
+  sh.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{const k=b.dataset.k;if(M.din<PRECO[k]){render('Falta dinheiro, freguês.');return}M.din-=PRECO[k];M[k]++;const t='Você comprou '+NOMEI[k].split(' (')[0]+'.';aviso(t);montaBag();render(t)});
+  sh.querySelector('.fechar').onclick=fecharLoja};
  render();sh.style.display='flex'}
+function fecharLoja(){document.getElementById('shop').style.display='none'}
 // ---------- minimapa ----------
 const mini=document.getElementById('mini'),mg=mini.getContext('2d'),mapac=document.getElementById('mapac'),mgc=mapac.getContext('2d'),mapaEl=document.getElementById('mapa');
 const LUGARES={prefeitura:'Prefeitura',igreja:'Matriz',bar:'Bar',mercado:'Mercado',padaria:'Padaria',farmacia:'Farmácia',posto:'Posto',pesqueiro:'Pesqueiro',lanchonete:'Lanchonete',modas:'Modas',acougue:'Açougue',sorveteria:'Sorveteria',barbearia:'Barbearia',loterica:'Lotérica',petshop:'Petshop',borracharia:'Borracharia'};
@@ -783,7 +786,7 @@ function atualizaBL(){if(M.cena){if(blKey!=='cena'){blKey='cena';blEl.innerHTML=
  const L=M.selv.filter(e=>!e.corpo&&Math.hypot(e.x-M.j.x,e.y-M.j.y)<T*14).sort((a,b)=>Math.hypot(a.x-M.j.x,a.y-M.j.y)-Math.hypot(b.x-M.j.x,b.y-M.j.y)).slice(0,6);
  const alvo=M.bat?M.bat.inimigo:M.alvo,k=L.map(e=>e.id).join(',')+'|'+(alvo?alvo.id:0);
  if(k!==blKey){blKey=k;blEl.innerHTML='';if(!L.length)blEl.innerHTML='<div class="vazio">Nenhuma criatura por perto.</div>';
-  for(const e of L){const r=document.createElement('div');r.className='row'+(e===alvo?' sel':'');r.appendChild(retC(e.esp).cloneNode?cl2(retC(e.esp)):retC(e.esp));const d=document.createElement('div');d.innerHTML='<b>'+ESP[e.esp].n+' Nv '+e.lvl+'</b><div class="bar"><i></i></div>';r.appendChild(d);e._bl=d.querySelector('i');r.onclick=()=>selecionar(e);blEl.appendChild(r)}}
+  for(const e of L){const r=document.createElement('div');r.className='row'+(e===alvo?' sel':'');r.appendChild(retC(e.esp).cloneNode?cl2(retC(e.esp)):retC(e.esp));const d=document.createElement('div');d.innerHTML='<b>'+(e.cap||e.col?'⛓ ':'')+ESP[e.esp].n+' Nv '+e.lvl+'</b><div class="bar"><i></i></div>';r.appendChild(d);e._bl=d.querySelector('i');r.onclick=()=>selecionar(e);blEl.appendChild(r)}}
  for(const e of L)if(e._bl)e._bl.style.width=Math.max(0,e.hp/e.hpM*100)+'%'}
 function cl2(c){const n=document.createElement('canvas');n.width=c.width;n.height=c.height;n.getContext('2d').drawImage(c,0,0);return n}
 function selecionar(e){if(M.cena||!e||e.corpo)return;if(M.bat){aviso('Termine a batalha atual primeiro.');return}M.alvo=e;M.seguir=e;blKey='';aviso('Alvo: '+ESP[e.esp].n+' Nv '+e.lvl+(Math.hypot(e.x-M.j.x,e.y-M.j.y)>T*3.2?' — indo até lá...':''))}
@@ -809,8 +812,11 @@ function libertaMarco(e){const k=e.cap,Mc=MARCOS[k];remover(e);if(!M.selos.inclu
  if(M.time.length<6){e.hp=Math.max(1,Math.ceil(e.hpM*.5));e.cds=[0,0,0,0];e.anim='parado';e.cap=null;e.col=0;e.home={x:e.x,y:e.y};M.time.push(e);m+=ESP[e.esp].n+' agora é seu aliado.'}else m+=ESP[e.esp].n+' voltou pra mata (time cheio).';
  if(M.selos.length>=3){M.q=8;m+=' Volte ao Padre Zé com os 3 Selos!'}
  aviso(m,8000)}
-function cenaFerraz(){if(M.bat||M.wipe)return;const L=['Dr. Ferraz: Parabéns! Eu sabia que só um Guardião conseguiria abrir esse baú. Que talento, hein?','Dr. Ferraz: Agora me dá licença que essa Cabaça-Mãe é minha. Quem tem ela e o Apito comanda todo Encantado. E adivinha quem tem o Apito?','Dr. Ferraz: Dorme um pouco, Guardião. Quando você acordar, Angatuba já vai ter dono.'];let i=0;
- const mostra=()=>{const fim=i>=L.length-1;dlg('Dr. Ferraz','Vereador','npc_g13',L[i],[[fim?'😨 O apito!':'Continuar',()=>{if(fim){fecharPed();derrota(true);return null}i++;return 1}]],mostra)};mostra()}
+let ferrazOn=false;
+function cenaFerraz(){if(ferrazOn)return;if(M.bat||M.wipe||M.cena){setTimeout(cenaFerraz,1500);return}ferrazOn=true;const L=['Dr. Ferraz: Parabéns! Eu sabia que só um Guardião conseguiria abrir esse baú. Que talento, hein?','Dr. Ferraz: Agora me dá licença que essa Cabaça-Mãe é minha. Quem tem ela e o Apito comanda todo Encantado. E adivinha quem tem o Apito?','Dr. Ferraz: Dorme um pouco, Guardião. Quando você acordar, Angatuba já vai ter dono.'];let i=0;
+ const mostra=()=>{const fim=i>=L.length-1;dlg('Dr. Ferraz','Vereador','npc_g13',L[i],[[fim?'😨 O apito!':'Continuar',()=>{if(fim){fecharPed();return null}i++;return 1}]],mostra);pd._fixo=true};
+ // fechar a cena de qualquer jeito (botão, Esc) sempre termina no apagão da história
+ pd._aoFechar=()=>{ferrazOn=false;derrota(true)};mostra()}
 const temEsp=e=>M.time.some(c=>c.esp===e);
 const alvoEnc=()=>{const i=M.ini||(M.time[0]&&M.time[0].esp);return i==='saci'?'curupira':'saci'};
 const NOMEENC={saci:'Saci',curupira:'Curupira'};
@@ -818,6 +824,7 @@ const PAPEL={
  prefeito(){const q=M.q;
   if(q===0){M.q=1;M.q0=M.capturas;aviso('Dr. Almeida: Então o Jorge mandou você. Depois daquele apito os bichos ficaram soltos e seu avô não acorda. Aqui tá sua Licença de Guardião do Folclore. Mostra que dá conta: captura 2 criaturas com a cabaça e volta aqui.',9500)}
   else if(q===1){const f=M.capturas-M.q0;if(f>=2){M.q=2;aviso('Dr. Almeida: Muito bem! O Padre Zé conhece a história do Pacto. Vai falar com ele na igreja Matriz, aqui na praça.',7000)}else aviso('Dr. Almeida: Ainda faltam '+(2-f)+'. Enfraquece a criatura e joga a cabaça!',4500)}
+  else if(q===2)aviso('Dr. Almeida: O Padre Zé tá te esperando na igreja Matriz, aqui na praça.',4500);
   else if(q<5)aviso('Dr. Almeida: Segue o que o Padre Zé pediu. A cidade conta com você!',4500);
   else if(q===5){if(M.bauLoot){M.q=6;M.time.forEach(c=>c.hp=c.hpM);aviso('Dr. Almeida: Vi a luz do baú daqui... Esse apito de ferro não foi por acaso. Fala com o Padre Zé, ele sabe do Pacto.',8000)}else aviso('Dr. Almeida: A Mula tá lá no norte, depois do rio. Vence ela e abre o baú da clareira.',6000)}
   else if(q<9)aviso('Dr. Almeida: O Ferraz enganou a cidade inteira, e a Guarda dele já anda por aí. Segue o que o Padre Zé pediu.',6000);
@@ -827,13 +834,14 @@ const PAPEL={
   else if(q===2){M.q=3;const a=alvoEnc();t='Padre Zé: A cidade tem um Pacto com os Encantados desde sempre, e foi o ferro daquele apito que quebrou. Pra refazer, começa reconhecendo um deles. '+(a==='saci'?'O Saci mora no meio da mata, onde o vento faz redemoinho.':'O Curupira anda pela Mata do Pererê, ao sul, de pés virados.')+' Captura um e traz pra mim.'}
   else if(q===3){const a=alvoEnc();if(temEsp(a)){M.q=4;t='Padre Zé: Incrível, um '+NOMEENC[a]+'! Agora o Boto: ele só aparece pra quem pesca no rio ou tenta a sorte no bar. O Seu Nelson, do Pesqueiro, tem uma vara pra você.'}else t='Padre Zé: Ainda não vi o '+NOMEENC[a]+'. '+(a==='saci'?'Procura os redemoinhos na mata, longe da cidade.':'Procura na Mata do Pererê, ao sul.')}
   else if(q===4){if(temEsp('boto')){M.q=5;t='Padre Zé: Você tá pronto. A Mula sem Cabeça fica na clareira ao norte e guarda um baú que só Guardião abre. Vence ela e abre o baú.'}else t='Padre Zé: O Boto ainda não tá com você. Pesca no rio ou tenta a sorte no bar.'}
+  else if(q===5)t=M.bauAberto?'Padre Zé: A Mula caiu! Agora vai abrir o baú da clareira, ao norte. Ele reconhece um Guardião abençoado.':'Padre Zé: A Mula sem Cabeça te espera na clareira ao norte. Vence ela e abre o baú.';
   else if(q===6){M.q=7;criaCapatazes();t='Padre Zé: Foi o Ferraz, então. Ele quebrou o Pacto com o apito e agora tem a Cabaça-Mãe. Mas o Pacto se sustenta em 3 Marcos de pedra: no Brejo da Iara (oeste), na Mata do Pererê (sul) e na Serra do Lobisomem (nordeste). A Guarda Ferraz prendeu cada Marco com correntes e pôs um bicho de coleira de ferro pra vigiar. Vence o bicho, a coleira quebra e ele vira seu aliado.'}
   else if(q===7){const f=['W','S','NE'].filter(k=>!M.selos.includes(k)).map(k=>MARCOS[k].n).join(', ');t='Padre Zé: Você já libertou '+M.selos.length+' de 3 Marcos. Faltam: '+f+'.'}
   else if(q===8){M.q=9;t='Padre Zé: Os 3 Selos! Agora há pouco o Jorge abriu os olhos e sussurrou que o apito só quebra na Estação Velha, onde foi forjado. A Guarda já bloqueou as estradas, então se prepara. A próxima parte da história vem aí!'}
   else t='Padre Zé: Que Deus te guie. A Matriz tá sempre aberta.';
   aviso(t+' (O time se recuperou.)',9000)},
  vara(){if(!M.vara){M.vara=true;aviso('Seu Nelson: Toma essa vara de presente! Vai num córrego ou rio e toca em Pescar. Dizem que o Boto cai fácil na isca de quem tem paciência.',8000)}else aviso('Seu Nelson: Pesca boa é com paciência. Perto d’água, toca em Pescar.',4500)},
- loja(n){n.i=((n.i||0)+1)%n.falas.length;aviso(n.n+': '+n.falas[n.i]);abrirLoja(n.itens,n.n)},
+ loja(n){n.i=((n.i||0)+1)%n.falas.length;abrirLoja(n.itens,n.n,n.falas[n.i])},
  paquera(){M.paq=(M.paq||0)+1;const L=['Marlene: Oi, forasteiro... você não é daqui, né? Senta aí.','Marlene: Gosto de quem tem coragem. Me paga um guaraná?'];
   if(M.paq<3){aviso(L[M.paq-1],4500);return}
   M.paq=0;M.pend='boto';aviso('Marlene: Ai, meu Deus... aquele rapaz de chapéu branco entrou. É o Boto, me persegue há semanas! Dá um jeito nele lá fora!',7000)}};
@@ -866,14 +874,15 @@ function bauPerto(){return!M.cena&&!M.bat&&Math.hypot(BAU.x-M.j.x,BAU.y+10-M.j.y
 function abrirBau(){if(!bauPerto())return;
  if(!M.bauAberto){aviso('O baú está trancado. A Mula sem Cabeça guarda a chave.',3000);return}
  if(M.bauLoot){aviso('O baú está vazio.');return}
+ if(M.q<5){aviso('O baú não abre. Tem um selo de cera com a cruz da Matriz: só um Guardião abençoado pelo Padre Zé consegue abrir.',4500);return}
  if(M.time.length>=6){aviso('Seu time está cheio (6). Deixe um lugar e volte.',3200);return}
  const m=criatura('mula',6,M.j.x+30,M.j.y+10);m.hp=m.hpM;M.time.push(m);M.bauLoot=true;M.time.forEach(c=>c.hp=c.hpM);
- aviso('Do baú saiu uma Mula sem Cabeça filhote! Ela entrou pro seu time e todos se recuperaram.',5200);montaHUD();M.q=6;setTimeout(cenaFerraz,3600);salvar()}
+ aviso('Do baú saiu uma Mula sem Cabeça filhote! Ela entrou pro seu time e todos se recuperaram.',5200);montaHUD();M.q=6;M.graca=M.t+400;setTimeout(cenaFerraz,3600);salvar()}
 // ---------- salvar ----------
-function salvar(){try{localStorage.setItem('cf_proto2',JSON.stringify({time:M.time.map(c=>({esp:c.esp,lvl:c.lvl,hp:c.hp,xp:c.xp})),ativo:M.ativo,bau:M.bauAberto,bl:M.bauLoot,v:M.vitorias,c:M.capturas,q:M.q,q0:M.q0,ini:M.ini,sl:M.selos,vr:M.vara,din:M.din,cab:M.cab,poc:M.poc,pm:M.pm,nw:M.npcW,x:(M.cena?M.fora:M.j).x,y:(M.cena?M.fora:M.j).y,o:1}))}catch(e){}}
+function salvar(){try{localStorage.setItem('cf_proto2',JSON.stringify({time:M.time.map(c=>({esp:c.esp,lvl:c.lvl,hp:c.hp,xp:c.xp})),ativo:M.ativo,bau:M.bauAberto,bl:M.bauLoot,v:M.vitorias,c:M.capturas,q:M.q,q0:M.q0,ini:M.ini,sl:M.selos,co:M.coleiras||0,vr:M.vara,din:M.din,cab:M.cab,poc:M.poc,pm:M.pm,nw:M.npcW,x:(M.cena?M.fora:M.j).x,y:(M.cena?M.fora:M.j).y,o:1}))}catch(e){}}
 function carregarSave(){try{const s=JSON.parse(localStorage.getItem('cf_proto2'));if(!s||!s.time||!s.time.length)return false;
- if(!s.o){s.x+=OFF*T;s.y+=OFF*T}novoJogo(s.time[0].esp);M.time=s.time.map(o=>{const c=criatura(o.esp,o.lvl,s.x,s.y+20);c.hp=Math.min(c.hpM,o.hp);c.xp=o.xp||0;return c});M.ativo=Math.min(s.ativo||0,M.time.length-1);M.parc=M.time[M.ativo];
- M.bauAberto=!!s.bau;M.bauLoot=!!s.bl;M.vitorias=s.v||0;M.capturas=s.c||0;M.q=s.q||0;M.q0=s.q0||0;M.ini=s.ini||'';M.selos=Array.isArray(s.sl)?s.sl:[];criaCapatazes();M.vara=!!s.vr;M.din=s.din==null?60:s.din;M.cab=s.cab==null?8:s.cab;M.poc=s.poc==null?2:s.poc;if(s.pm)M.pm=s.pm;if(s.nw)M.npcW=s.nw;if(M.bauAberto){remover(M.boss)}if(livre(s.x,s.y)){M.j.x=M.j.px=s.x;M.j.y=M.j.py=s.y}montaHUD();return true}catch(e){return false}}
+ if(!s.o){s.x+=OFF*T;s.y+=OFF*T}novoJogo(s.time[0].esp,true);M.time=s.time.map(o=>{const c=criatura(o.esp,o.lvl,s.x,s.y+20);c.hp=Math.min(c.hpM,o.hp);c.xp=o.xp||0;return c});M.ativo=Math.min(s.ativo||0,M.time.length-1);M.parc=M.time[M.ativo];
+ M.bauAberto=!!s.bau;M.bauLoot=!!s.bl;M.vitorias=s.v||0;M.capturas=s.c||0;M.q=s.q||0;M.q0=s.q0||0;M.ini=s.ini||'';M.selos=Array.isArray(s.sl)?s.sl:[];M.coleiras=s.co||0;criaCapatazes();M.vara=!!s.vr;M.din=s.din==null?60:s.din;M.cab=s.cab==null?8:s.cab;M.poc=s.poc==null?2:s.poc;if(s.pm)M.pm=s.pm;if(s.nw)M.npcW=s.nw;if(M.bauAberto){remover(M.boss)}if(livre(s.x,s.y)){M.j.x=M.j.px=s.x;M.j.y=M.j.py=s.y}montaHUD();return true}catch(e){return false}}
 // ---------- tela ----------
 const cv=document.getElementById('cv'),cx=cv.getContext('2d');let Z=2,ZB=2,VW=400,VH=600,DPR=1;
 function redim(){DPR=window.devicePixelRatio||1;const SW=Math.max(168,Math.min(230,Math.round(innerWidth*.24)));document.documentElement.style.setProperty('--sw',SW+'px');const w=innerWidth-SW,h=innerHeight;cv.width=Math.max(10,Math.round(w*DPR));cv.height=Math.max(10,Math.round(h*DPR));Z=ZB=Math.max(1,Math.floor(Math.min(cv.width/(13*T),cv.height/(8.5*T))*4)/4);VW=cv.width/Z;VH=cv.height/Z;cx.imageSmoothingEnabled=false}
@@ -900,7 +909,7 @@ function desenharFora(ag){const j=M.j;const jx=lerp(j.px,j.x,ag),jy=lerp(j.py,j.
  if(lv){cx.fillStyle='rgba(120,255,150,'+(.35+.2*Math.sin(performance.now()/260))+')';cx.beginPath();cx.arc(x,y-34,26,0,7);cx.fill()}else{cx.strokeStyle='#1d1f24';cx.lineWidth=3;cx.beginPath();cx.moveTo(x-17,y-44);cx.lineTo(x+8,y-12);cx.moveTo(x+17,y-44);cx.lineTo(x-8,y-12);cx.moveTo(x-9,y-52);cx.lineTo(x+9,y-30);cx.stroke();cx.fillStyle='#c9a227';cx.fillRect(Math.round(x-4),Math.round(y-30),8,8)}
  cx.font='bold 9px system-ui';cx.textAlign='center';const tx=(lv?'✔ ':'⛓ ')+o.nome,w=cx.measureText(tx).width+10;cx.fillStyle='#000a';cx.fillRect(Math.round(x-w/2),Math.round(y-76),w,13);cx.fillStyle=lv?'#9ff0a8':'#ffd98a';cx.fillText(tx,Math.round(x),Math.round(y-66))}});continue}
  const im=PIMG[o.img];if(!im)continue;const x=o.x-ox,y=o.y-oy;if(x<-im.width||x>VW+im.width||y<-20||y-im.height>VH)continue;
-  objs.push({y:o.y,d:()=>{if(!o.grande&&o.img!=='igreja'&&o.img!=='fonte')sombra(x,y-2,im.width*.32);cx.drawImage(im,Math.round(x-im.width/2),Math.round(y-im.height));if(o.bau&&M.bauAberto&&!M.bauLoot){cx.fillStyle='rgba(255,230,120,'+(.35+.25*Math.sin(performance.now()/200))+')';cx.beginPath();cx.arc(x,y-16,22,0,7);cx.fill()}}})}
+  objs.push({y:o.y,d:()=>{if(!o.grande&&o.img!=='igreja'&&o.img!=='fonte')sombra(x,y-2,im.width*.32);cx.drawImage(im,Math.round(x-im.width/2),Math.round(y-im.height));if(o.bau&&M.bauAberto&&!M.bauLoot&&M.q>=5){cx.fillStyle='rgba(255,230,120,'+(.35+.25*Math.sin(performance.now()/200))+')';cx.beginPath();cx.arc(x,y-16,22,0,7);cx.fill()}}})}
  for(const r of REDE){const x=r.x-ox,y=r.y-oy;if(x<-60||x>VW+60||y<-40||y>VH+120)continue;objs.push({y:r.y,d:()=>{const t=performance.now()/260;for(let k=0;k<8;k++){const yy=y-k*7,rr=4+k*2.3,ph=t+k*.7;cx.fillStyle='rgba(214,198,150,'+(.8-.08*k)+')';cx.beginPath();cx.ellipse(x+Math.sin(ph)*3,yy,rr,rr*.36,0,0,7);cx.fill();cx.fillStyle='rgba(120,160,70,.9)';cx.fillRect(Math.round(x+Math.cos(ph*1.3+k)*rr),Math.round(yy-2),2,2)}}})}
  const ents=[];
  for(const e of M.selv)ents.push(e);if(M.parc)ents.push(M.parc);
@@ -921,7 +930,7 @@ function desenharFora(ag){const j=M.j;const jx=lerp(j.px,j.x,ag),jy=lerp(j.py,j.
   if(f.txt&&t>=.9){const tt=t-.9;cx.font='bold 14px system-ui';cx.textAlign='center';cx.fillStyle='#000';cx.globalAlpha=Math.max(0,1-tt/1.3);cx.fillText(f.txt,f.x1-ox+1,f.y1-oy-40-tt*24+1);cx.fillStyle=f.m>1?'#ffd23a':f.m<1?'#bbb':'#fff';cx.fillText(f.txt,f.x1-ox,f.y1-oy-40-tt*24);cx.globalAlpha=1}}
  // marcador de alvo perto
  if(!M.bat){const p=perto();if(p){const x=p.x-ox,y=p.y-oy-(p.boss?104:82);cx.fillStyle='#f0b43c';cx.beginPath();cx.moveTo(x-6,y-8);cx.lineTo(x+6,y-8);cx.lineTo(x,y);cx.fill()}}
- if(!M.bat&&bauPerto()&&!perto()){const x=BAU.x-ox,y=BAU.y-oy-44;cx.fillStyle=M.bauAberto&&!M.bauLoot?'#f0b43c':'#9a9a9a';cx.beginPath();cx.moveTo(x-6,y-8);cx.lineTo(x+6,y-8);cx.lineTo(x,y);cx.fill()}
+ if(!M.bat&&bauPerto()&&!perto()){const x=BAU.x-ox,y=BAU.y-oy-44;cx.fillStyle=M.bauAberto&&!M.bauLoot&&M.q>=5?'#f0b43c':'#9a9a9a';cx.beginPath();cx.moveTo(x-6,y-8);cx.lineTo(x+6,y-8);cx.lineTo(x,y);cx.fill()}
  // noite leve perto da Mula
  const dn=Math.hypot(jx-(BX+.5)*T,jy-(BY+1)*T);if(dn<T*12){cx.fillStyle='rgba(20,10,50,'+(0.35*(1-dn/(T*12)))+')';cx.fillRect(0,0,VW,VH)}}
 function sombra(x,y,r){cx.fillStyle='#00000035';cx.beginPath();cx.ellipse(x,y,r,r*.35,0,0,7);cx.fill()}
@@ -957,7 +966,7 @@ cv.addEventListener('pointerdown',ev=>{const wx=ev.clientX*DPR/Z+cam.x,wy=ev.cli
 cv.addEventListener('pointermove',ev=>{if(ev.pointerId!==jid)return;let dx=ev.clientX-j0.x,dy=ev.clientY-j0.y;const d=Math.hypot(dx,dy),mx=45;if(d>mx){dx*=mx/d;dy*=mx/d}ji.style.transform='translate('+dx+'px,'+dy+'px)';entrada.dx=dx/mx;entrada.dy=dy/mx});
 const solta=ev=>{if(ev.pointerId!==jid)return;jid=null;joy.style.display='none';ji.style.transform='';entrada.dx=entrada.dy=0};
 cv.addEventListener('pointerup',solta);cv.addEventListener('pointercancel',solta);
-const teclas={};addEventListener('keydown',e=>{if(e.key.toLowerCase()==='m'){mapaOn?fecharMapa():abrirMapa()}if(e.key==='Escape'){fecharMapa();fecharPed()}teclas[e.key.toLowerCase()]=1;tec();if(M.bat&&'1234'.includes(e.key))M.cmd.push({t:'golpe',i:+e.key-1});if(e.key===' '&&!M.bat){if(M.cena)falar();else{const p=perto(),cp=corpoPerto();if(p)selecionar(p);else if(cp)lancarCabaca(cp);else if(bauPerto())abrirBau();else if(pedPerto())abrirPed(pedPerto());else if(aguaTile())pescar()}}if(e.key.toLowerCase()==='q'&&!M.bat){const cp=corpoPerto();if(cp)lancarCabaca(cp)}if(e.key.toLowerCase()==='p')usarItem('poc')});
+const teclas={};addEventListener('keydown',e=>{if(e.key.toLowerCase()==='m'){mapaOn?fecharMapa():abrirMapa()}if(e.key==='Escape'){fecharMapa();fecharPed();fecharLoja()}teclas[e.key.toLowerCase()]=1;tec();if(M.bat&&'1234'.includes(e.key))M.cmd.push({t:'golpe',i:+e.key-1});if(e.key===' '&&!M.bat){if(M.cena)falar();else{const p=perto(),cp=corpoPerto();if(p)selecionar(p);else if(cp)lancarCabaca(cp);else if(bauPerto())abrirBau();else if(pedPerto())abrirPed(pedPerto());else if(aguaTile())pescar()}}if(e.key.toLowerCase()==='q'&&!M.bat){const cp=corpoPerto();if(cp)lancarCabaca(cp)}if(e.key.toLowerCase()==='p')usarItem('poc')});
 addEventListener('keyup',e=>{teclas[e.key.toLowerCase()]=0;tec()});
 function tec(){if(jid!==null)return;entrada.dx=(teclas.d||teclas.arrowright?1:0)-(teclas.a||teclas.arrowleft?1:0);entrada.dy=(teclas.s||teclas.arrowdown?1:0)-(teclas.w||teclas.arrowup?1:0)}
 // início

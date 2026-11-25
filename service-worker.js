@@ -66,7 +66,7 @@ self.addEventListener('notificationclick', function (event) {
   );
 });
 
-const CACHE = 'angatubaon-v616';
+const CACHE = 'angatubaon-v617';
 // Cache separado dos assets dos jogos (sprites, sons, músicas, vídeos
 // dos minigames). Fica de fora do CACHE principal de propósito: o
 // activate() abaixo NUNCA apaga o CACHE_JOGOS quando o app atualiza
@@ -210,7 +210,12 @@ self.addEventListener('fetch', e => {
   if (e.request.url.includes('/service-worker.js')) return;
 
   const url = e.request.url;
-  const isDoc = e.request.destination === 'document';
+  // Navegação de iframe (Caça Folclore roda num iframe de
+  // /Jogos/caca-folclore/index.html) chega com destination 'iframe', não
+  // 'document'. Sem isto ela caía no cache-first do else lá embaixo e o
+  // caches.match() achava a cópia congelada no CACHE_JOGOS: quem já tinha
+  // aberto o jogo nunca recebia versão nova.
+  const isDoc = e.request.mode === 'navigate' || e.request.destination === 'document' || e.request.destination === 'iframe';
   const isJsCss = url.endsWith('.js') || url.endsWith('.css');
   // Assets dos jogos (sprites, sons, músicas, vídeos): /Jogos/assets/**
   // ou áudio do próprio domínio. Cacheados à parte no CACHE_JOGOS (ver
@@ -249,6 +254,15 @@ self.addEventListener('fetch', e => {
           if (r && r.ok) {
             const clone = r.clone();
             caches.open(CACHE).then(c => c.put(e.request, clone));
+            // Página de jogo que também mora no CACHE_JOGOS (ex.: o
+            // index.html do Caça Folclore): atualiza lá também, senão o
+            // offline continuaria servindo a versão velha.
+            if (new URL(url).pathname.startsWith('/Jogos/')) {
+              const cloneJogos = r.clone();
+              caches.open(CACHE_JOGOS).then(cj =>
+                cj.match(e.request).then(tem => { if (tem) return cj.put(e.request, cloneJogos); })
+              ).catch(() => {});
+            }
           }
           return r;
         })

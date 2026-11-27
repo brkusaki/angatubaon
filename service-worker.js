@@ -66,7 +66,7 @@ self.addEventListener('notificationclick', function (event) {
   );
 });
 
-const CACHE = 'angatubaon-v619';
+const CACHE = 'angatubaon-v620';
 // Cache separado dos assets dos jogos (sprites, sons, músicas, vídeos
 // dos minigames). Fica de fora do CACHE principal de propósito: o
 // activate() abaixo NUNCA apaga o CACHE_JOGOS quando o app atualiza
@@ -101,7 +101,7 @@ const STATIC = [
   '/',
   '/index.html',
   '/offline.html',
-  '/styles.css',
+  '/styles.min.css',
   '/fonts/icones/icones.css',
   '/app_min.js',
   // Hub de jogos + som/efeitos compartilhados: sem eles no precache, o

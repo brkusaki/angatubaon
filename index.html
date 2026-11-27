@@ -57,15 +57,16 @@
   }
   </script>
   <link rel="manifest" href="/manifest.json" />
-  <!-- Resource hints: abre conexao com os CDNs cedo, reduz latencia do primeiro paint -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <!-- Fontes (Syne + DM Sans) servidas daqui: @font-face no topo do
+       styles.css. A do texto vai em preload pra não esperar o CSS. -->
+  <link rel="preload" href="/fonts/dm-sans-400-latin.woff2" as="font" type="font/woff2" crossorigin />
   <!-- Ícones (Font Awesome 6.5.0 + Tabler 3.44.0) servidos daqui, só com
        os que o app usa: gerados pelo "npm run build" (ferramentas/icones.mjs).
        Antes vinham inteiros de dois CDNs (~1,1 MB) e seguravam a 1ª pintura. -->
   <link rel="stylesheet" href="/fonts/icones/icones.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css" />
+  <!-- styles.min.css é gerado do styles.css pelo "npm run build" (csso,
+       sem reestruturar). Edite sempre o styles.css. -->
+  <link rel="stylesheet" href="/styles.min.css" />
 </head>
 <body>
   <script>

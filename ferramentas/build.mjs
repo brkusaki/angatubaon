@@ -8,6 +8,7 @@
    1. Acha todo par "X.js" + "X.min.js" do repositório (mais o caso
       especial app.js -> app_min.js) e minifica com terser -c -m, as
       mesmas opções usadas até hoje (o resultado sai byte a byte igual).
+      Gera também styles.min.css a partir do styles.css (csso).
    2. Compara os globais window.* do minificado novo com o antigo. Se
       algum SUMIU, para tudo e avisa (use --forcar se a remoção foi de
       propósito).
@@ -18,6 +19,7 @@
    ferramentas/build-estado.json, que vai pro repositório junto. */
 
 import { minify } from "terser";
+import { minify as minificarCss } from "csso";
 import { gerarIcones } from "./icones.mjs";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, mkdirSync } from "node:fs";
@@ -107,6 +109,31 @@ for (const [fonte, destino] of pares) {
   }
 }
 
+// 2a. CSS: styles.css -> styles.min.css (é o que o index.html carrega).
+// csso com restructure:false: só tira comentários, espaços e o último
+// ";" de cada bloco. Não junta nem reordena regras, então fallbacks como
+// "height:100vh; height:100dvh" e os pares -webkit-/sem prefixo ficam
+// intactos (o lightningcss foi testado e apagava esses pares).
+for (const [fonteCss, destinoCss] of [["styles.css", "styles.min.css"]]) {
+  const absF = join(RAIZ, fonteCss), absD = join(RAIZ, destinoCss);
+  if (!existsSync(absF)) continue;
+  let novo;
+  try {
+    novo = minificarCss(ler(absF), { restructure: false, comments: false }).css;
+  } catch (e) {
+    console.error(`✖ ${fonteCss}: erro de CSS — ${e.message}`);
+    erros++;
+    continue;
+  }
+  if (existsSync(absD) && ler(absD) === novo) continue;
+  if (CHECAR) {
+    console.error(`✖ ${destinoCss} está desatualizado em relação a ${fonteCss} — rode "npm run build".`);
+    erros++;
+  } else {
+    atualizados.push([absD, novo]);
+  }
+}
+
 // 2b. Ícones: CSS e fontes só com os ícones que o app usa (ver icones.mjs)
 const pendentes = {}; // rel -> conteúdo novo (texto) para entrar no hash do SW
 try {
@@ -133,7 +160,7 @@ try {
 
 // 3. Versão do SW
 const fontes = arquivos
-  .filter(p => /\.(js|css|html)$/.test(p) && !p.endsWith(".min.js") && p !== appMin && p !== ARQ_SW)
+  .filter(p => /\.(js|css|html)$/.test(p) && !p.endsWith(".min.js") && !p.endsWith(".min.css") && p !== appMin && p !== ARQ_SW)
   .sort();
 const hashes = {};
 for (const p of fontes) hashes[rel(p)] = hash(ler(p));

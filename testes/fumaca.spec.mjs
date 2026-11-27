@@ -25,7 +25,7 @@ test("o service worker registra e ativa", async ({ page }) => {
   expect(ativo).toBe(true);
 });
 
-for (const arquivo of ["/manifest.json", "/offline.html", "/app_min.js", "/social.min.js", "/styles.min.css", "/fonts/dm-sans-400-latin.woff2", "/service-worker.js"]) {
+for (const arquivo of ["/manifest.json", "/offline.html", "/app_min.js", "/social.min.js", "/lojista.min.js", "/styles.min.css", "/fonts/dm-sans-400-latin.woff2", "/service-worker.js"]) {
   test(`${arquivo} responde`, async ({ request }) => {
     const r = await request.get(arquivo);
     expect(r.status()).toBe(200);

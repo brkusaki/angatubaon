@@ -31,9 +31,13 @@ function andar(dir, out = []) {
 const arquivosApp = andar(".");
 const doProjeto = {};
 const reTopo = /^(?:async\s+)?(?:function\*?\s+([\w$]+)|(?:const|let|var|class)\s+([\w$]+))/gm;
+// app.js, social.js e lojista.js têm o topo indentado 2 espaços (e
+// dividem o mesmo escopo global entre si).
+const reTopoIndentado = /^ {2}(?:async\s+)?(?:function\*?\s+([\w$]+)|(?:const|let|var|class)\s+([\w$]+))/gm;
+const INDENTADOS = new Set(["app.js", "social.js", "lojista.js"]);
 for (const f of arquivosApp) {
   const src = readFileSync(f, "utf8");
-  for (const m of src.matchAll(reTopo)) doProjeto[m[1] || m[2]] = "writable";
+  for (const m of src.matchAll(INDENTADOS.has(f) ? reTopoIndentado : reTopo)) doProjeto[m[1] || m[2]] = "writable";
   for (const m of src.matchAll(/window\.([\w$]+)\s*=(?!=)/g)) doProjeto[m[1]] = "writable";
 }
 

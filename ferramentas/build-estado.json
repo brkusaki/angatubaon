@@ -1,5 +1,5 @@
 {
- "versaoSW": 621,
+ "versaoSW": 622,
  "hashes": {
   "Aprender/conteudo.js": "c2776ebcaf3844f9",
   "Aprender/hub.js": "0025f4b073788e9b",
@@ -64,9 +64,10 @@
   "Jogos/voo.css": "d1b6a6436ee7b367",
   "Jogos/voo.js": "95c4d76666520ced",
   "admin.html": "6773cc5bbc4011ac",
-  "app.js": "63916e3f8601d519",
+  "app.js": "3f1cc025ca247054",
   "fonts/icones/icones.css": "3f6acd0d47b276df",
   "index.html": "70eb78230f19ab84",
+  "lojista.js": "42af4985434e866b",
   "offline.html": "b710016856bc3225",
   "privacidade.html": "be26a48acd997c2c",
   "social.js": "13e63d1900b1705f",

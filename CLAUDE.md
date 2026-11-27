@@ -5,7 +5,8 @@ Este arquivo é carregado inteiro em toda conversa: mantenha curto. Os números 
 
 ## Como o app carrega
 - `index.html` → `/styles.min.css` + `/fonts/icones/icones.css` → no fim do body `/app_min.js`.
-- Carregados sob demanda pelo app.js: Firebase (SDK compat), `Jogos/hub.min.js` (+ cada jogo), `Aprender/`, `Biblioteca/hub.min.js`.
+- Carregados sob demanda pelo app.js: Firebase (SDK compat), `social.min.js`, `Jogos/hub.min.js` (+ cada jogo), `Aprender/`, `Biblioteca/hub.min.js`.
+- `social.js` (presença, amigos, convites, chat, avisos, lobby, push) roda no mesmo escopo global do app.js e carrega no login, com o hub de jogos ou no 1º toque social. No app.js, o bloco `SOCIAL SOB DEMANDA` tem um stub com o mesmo nome para cada função dele chamada de fora: função nova do social.js usada fora dele precisa de stub lá.
 - `service-worker.js`: lista `STATIC` (precache), caches `CACHE` (sobe a cada deploy), `CACHE_JOGOS` e `CACHE_BIB` (só sobem quando os assets deles mudam).
 
 ## Regras
@@ -17,7 +18,7 @@ Este arquivo é carregado inteiro em toda conversa: mantenha curto. Os números 
 - Antes de publicar: `npm run build:checar` e `npm run lint` (é o que o GitHub Actions roda). `npm run testar` = testes de fumaça (Playwright).
 - Deploy = push na `main` (GitHub Pages, angatubaon.com.br). `_headers.txt` é legado da Netlify, sem efeito.
 
-## Mapa do app.js (~24 mil linhas, 1,2 MB)
+## Mapa do app.js (~18,6 mil linhas)
 Tudo no escopo global (indentado 2 espaços); handlers inline do `index.html` chamam essas funções direto.
 
 | ~Linha | Seção (título para buscar) |
@@ -42,10 +43,11 @@ Tudo no escopo global (indentado 2 espaços); handlers inline do `index.html` ch
 | 13741–14090 | `AVALIAÇÕES` |
 | 14087–15840 | `CARDÁPIO — PAINEL DO DONO` (grupos de opções, lote, fila de itens PRO) |
 | 15837–17340 | `CARDÁPIO — TELA DO CLIENTE` (modificadores, personalização, swipe) |
-| 17338–18345 | `AUTENTICAÇÃO DE CLIENTE` (Firebase Auth), painel da conta |
-| 18347–21225 | Social: `PRESENÇA`, `AMIGOS`, `CONVITES PRA JOGAR`, `CHAT 1x1`, `AVISOS NO TOPO` |
-| 21225–23760 | `LOBBY SOCIAL` (núcleo, UI, chat do lobby, convites) |
-| 23758–fim | `PUSH NOTIFICATIONS (FCM)` |
+| 17344–18352 | `AUTENTICAÇÃO DE CLIENTE` (Firebase Auth), painel da conta |
+| 18353–18477 | `SOCIAL SOB DEMANDA` (carregador + stubs do social.js) |
+| 18478–fim | Clique em notificação, atalhos do manifest (`?atalho=`) |
+
+`social.js` (~5,6 mil linhas): `PRESENÇA`, `AMIGOS`, `CONVITES PRA JOGAR`, `CHAT 1x1`, `AVISOS NO TOPO`, `LOBBY SOCIAL`, `PUSH NOTIFICATIONS (FCM)`.
 
 ## Outras pastas
 - `Jogos/`: `hub.js` (hub, ranking, perfil) + um `X.js`/`X.css` por jogo; `Jogos/assets/` sprites e sons (cache dos jogos); `Jogos/caca-folclore/` roda em iframe.
